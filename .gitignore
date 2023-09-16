@@ -1,0 +1,10 @@
+0v
+*.o
+*.sw*
+*.gch
+*.dSYM
+a.out
+*.yy.c
+*.tab.[ch]
+*.output
+*-preproc.[c0]

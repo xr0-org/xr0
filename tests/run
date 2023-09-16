@@ -1,0 +1,58 @@
+#!/bin/bash
+printf 'running test suite at %s\n\n' "$(date)"
+start=$(date +"%s")
+
+ntests=0
+npass=0
+
+expected_suffix="EXPECTED"
+fail_prefix="FAIL"
+
+XR0=$(pwd)/bin/0v
+libx=$(pwd)/libx
+cd tests
+length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
+	tail -1 | wc -c)
+
+for f in */*.x
+do
+	ntests=$((ntests+1))
+	printf "%-${length}s ..." "$f"
+	output=$($XR0 -I $libx $f 2>&1 >/dev/null)
+	if [[ "$f" != *"${fail_prefix}"* && $output -eq 0 ]]
+	then
+		npass=$((npass+1))
+		printf 'PASS\n'
+	else
+		# negative tests
+
+		#echo "expected filename: ${expected_file}\n"
+		#echo "output: ${output} expected_output: ${expected_output}\n"
+
+		# check if fail prefix present and output matches expected error
+		if [[ "$f" == *"${fail_prefix}"* ]]
+		then
+			expected_file="${f}.${expected_suffix}"
+			expected_output=$(cat $expected_file)
+			
+			if [[ $output == $expected_output ]]
+			then
+				npass=$((npass+1))
+				printf 'PASS\n'
+			else
+				printf 'FAIL\n'
+			fi
+		else
+			printf 'FAIL\n'
+		fi
+	fi
+done
+
+nfail=$((ntests-npass))
+finish=$(date +"%s")
+printf '\n%d tests:\t%d passed\t%d failed\tin %d seconds\n' \
+	$ntests $npass $nfail $((finish-start))
+if [ $nfail -ne 0 ]
+then
+	exit 1
+fi
