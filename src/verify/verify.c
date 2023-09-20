@@ -1214,6 +1214,9 @@ abstract_audit(struct ast_function *f, struct state *actual_state)
 		return err;
 	}
 
+	printf("actual: %s\n", state_str(actual_state));
+	printf("alleged: %s\n", state_str(alleged_state));
+
 	ast_block_destroy(abs);
 
 	bool equiv = state_abstractly_equivalent(actual_state, alleged_state);

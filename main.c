@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "gram_util.h"
-#include "gram.tab.h"
+#include "build/gram.tab.h"
 #include "ast.h"
 #include "lex.h"
 #include "state.h"
