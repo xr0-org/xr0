@@ -61,7 +61,7 @@ check: $(RUNTEST) $(TESTFILES) $(XR0V)
 	valgrind $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 check-verbose: $(RUNTEST) $(TESTFILES) $(XR0V)
-	valgrind $(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
+	valgrind --num-callers=30 $(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 clean:
 	@rm -rf $(BIN) $(OBJECTS) gram.output gram.tab.c gram.tab.h lex.yy.c *.gch

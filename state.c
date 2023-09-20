@@ -684,7 +684,7 @@ void
 pointer_destroy(struct pointer *ptr);
 
 bool
-pointer_hasheap(struct pointer *ptr);
+pointer_heap_equivalent(struct pointer *, struct pointer *);
 
 bool
 pointer_references(struct pointer *ptr, int address);
@@ -746,28 +746,11 @@ object_ispointer(struct object *obj)
 }
 
 bool
-object_onheap(struct object *obj);
-
-bool
 object_heap_equivalent(struct object *obj1, struct object *obj2)
 {
-	/* order so that obj1 is not NULL */
-	assert(obj1 || obj2);
-	if (!obj1) {
-		return object_heap_equivalent(obj2, obj1);
-	}
-	/* the decision here rests on the ordering enforced above. we know that
-	 * obj1 is not NULL, so we can call object_onheap, to determine if it is
-	 * on the heap. if this is so, then obj2 must be defined and on the heap
-	 * also; if obj1 is not on the heap, then obj2 must either be NULL or
-	 * not on the heap */
-	return object_onheap(obj1) == ((bool) obj2 && object_onheap(obj2));
-}
-
-bool
-object_onheap(struct object *obj)
-{
-	return object_ispointer(obj) && pointer_hasheap(object_pointer(obj));
+	assert(obj1 && obj2);
+	/* TODO: assert(obj1->type == obj2->type) */
+	return pointer_heap_equivalent(obj1->ptr, obj2->ptr);
 }
 
 bool
@@ -827,7 +810,7 @@ bool
 predicate_references(predicate *pred, int address);
 
 bool
-predicate_hasheap(predicate *pred);
+predicate_heap_equivalent(predicate *pred1, predicate *pred2);
 
 char *
 predicate_str(predicate *pred);
@@ -872,10 +855,23 @@ pointer_destroy(struct pointer *ptr)
 }
 
 bool
-pointer_hasheap(struct pointer *ptr)
+pointer_heap_equivalent(struct pointer *ptr1, struct pointer *ptr2)
 {
-	return predicate_hasheap(ptr->pred)
-		|| (bool) ptr->deref && pointer_hasheap(ptr->deref);
+	/* order ptr1, ptr2 so that ptr1 is not NULL, or return true if both are
+	 * NULL */
+	if (!ptr1) {
+		if (!ptr2) {
+			return true;
+		}
+		return pointer_heap_equivalent(ptr2, ptr1);
+	}
+	assert(ptr1);
+
+	if (!ptr2 || !predicate_heap_equivalent(ptr1->pred, ptr2->pred)) {
+		return false;
+	}
+
+	return pointer_heap_equivalent(ptr1->deref, ptr2->deref);
 }
 
 struct pointer *
@@ -1177,18 +1173,27 @@ predicate_references(predicate *pred, int address)
 }
 
 bool
-predicate_hasheap(predicate *pred)
+predicate_heap_subequivalent(predicate *pred, predicate *sub);
+
+bool
+predicate_heap_equivalent(predicate *pred1, predicate *pred2)
 {
-	struct alloc **alloc = alloc_arr_allocs(pred);
-	int nallocs = alloc_arr_nallocs(pred);
+	return predicate_heap_subequivalent(pred1, pred2)
+		&& predicate_heap_subequivalent(pred2, pred1);
+}
+
+bool
+predicate_heap_subequivalent(predicate *pred, predicate *sub)
+{
+	struct alloc **alloc = alloc_arr_allocs(sub);
+	int nallocs = alloc_arr_nallocs(sub);
 	for (int i = 0; i < nallocs; i++) {
-		struct heaploc *loc = alloc_heaploc(alloc[i]);
-		if (loc && heaploc_isfreed(loc)) {
-			continue;
+		struct alloc *b = alloc[i];
+		if (!predicate_range_onheap(pred, alloc_lower(b), alloc_upper(b))) {
+			return heaploc_isfreed(alloc_heaploc(b));
 		}
-		return true;
 	}
-	return false;
+	return true;
 }
 
 
