@@ -15,9 +15,7 @@ unit() [ .alloc result; ]
 
 	free(p[3]);
 
-	for (i = 0; i < 3; i++) [
-		if (@p[i]) { .dealloc p[i]; } else { .undefined; }
-	] {
+	for (i = 0; i < 3; i++) [ .dealloc p[i]; ] {
 		free(p[i]);	
 	}
 

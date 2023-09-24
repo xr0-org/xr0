@@ -1450,7 +1450,6 @@ ast_type_str(struct ast_type *t)
 		[TYPE_SIGNED]	= "signed",
 		[TYPE_UNSIGNED]	= "unsigned",
 	};
-	const int baselen = 9;
 	struct strbuilder *b = strbuilder_create();
 	int nmods = 0;
 	for (int i = 0; i < modlen; i++) {

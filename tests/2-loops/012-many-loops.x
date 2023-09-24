@@ -20,21 +20,15 @@ unit()
 
 	free(p[6]);
 
-	for (i = 0; i < 3; i++) [
-		if (@p[i]) { .dealloc p[i]; } else { .undefined; }
-	]{
+	for (i = 0; i < 3; i++) [ .dealloc p[i]; ] {
 		free(p[i]);
 	}
 
-	for (i = 5; i < 6; i++) [
-		if (@p[i]) { .dealloc p[i]; } else { undefined; }
-	]{
+	for (i = 5; i < 6; i++) [ .dealloc p[i]; ] {
 		free(p[i]);
 	}
 
-	for (i = 7; i < 9; i++) [
-		if (@p[i]) { .dealloc p[i]; } else { undefined; }
-	]{
+	for (i = 7; i < 9; i++) [ .dealloc p[i]; ] {
 		free(p[i]);
 	}
 

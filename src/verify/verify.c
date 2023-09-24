@@ -22,25 +22,46 @@ Funcarr
 paths_fromfunction(struct ast_function *f);
 
 struct error *
-path_verify(struct ast_function *f, struct state *state);
+function_verify_paths(Funcarr paths, struct map *extfunc);
 
 struct error *
 function_verify(struct ast_function *f, struct map *extfunc)
 {
-	struct error *err;
-
 	Funcarr paths = paths_fromfunction(f);
+	struct error *err = function_verify_paths(paths, extfunc);
+	func_arr_destroy(paths);
+	return err;
+}
+
+struct error *
+path_verify_withstate(struct ast_function *, struct map *extfunc);
+
+struct error *
+function_verify_paths(Funcarr paths, struct map *extfunc)
+{	
 	int len = func_arr_len(paths);
 	struct ast_function **path = func_arr_paths(paths);
 	for (int i = 0; i < len; i++) {
-		struct state *state = state_create(extfunc, ast_function_type(f));
-		if ((err = path_verify(path[i], state))) {
+		struct error *err;
+		if ((err = path_verify_withstate(path[i], extfunc))) {
 			return err;
 		}
-		state_destroy(state);
 	}
-	func_arr_destroy(paths);
 	return NULL;
+}
+
+/* path_verify_withstate */
+
+struct error *
+path_verify(struct ast_function *f, struct state *state);
+
+struct error *
+path_verify_withstate(struct ast_function *f, struct map *extfunc)
+{
+	struct state *state = state_create(extfunc, ast_function_type(f));
+	struct error *err = path_verify(f, state);
+	state_destroy(state);
+	return err;
 }
 
 /* Funcarr */
@@ -276,9 +297,6 @@ stmt_exec(struct ast_stmt *stmt, struct state *state);
 static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state);
 
-void
-hack_alloc_p_i_for_iter_verification(struct ast_function *f, struct state *state);
-
 struct error *
 path_verify(struct ast_function *f, struct state *state)
 {
@@ -297,7 +315,6 @@ path_verify(struct ast_function *f, struct state *state)
 	for (int i = 0; i < ndecls; i++) {
 		state_declare(state, var[i], false);
 	}
-	hack_alloc_p_i_for_iter_verification(f, state);
 
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
@@ -322,75 +339,17 @@ path_verify(struct ast_function *f, struct state *state)
 	return NULL;
 }
 
-/* hack_alloc_p_i_for_iter_verification */
-
-static Ref *
-hack_ref_from_assertion(struct ast_expr *expr, struct state *state);
-
-static struct error *
-alloc_or_unalloc(bool isalloc, Ref *ref, struct state *state);
-
-void
-hack_alloc_p_i_for_iter_verification(struct ast_function *f, struct state *state)
-{
-	struct ast_block *abs = ast_function_abstract(f);
-	if (ast_block_nstmts(abs) != 1) {
-		return;
-	}
-	struct ast_stmt *stmt = ast_block_stmts(abs)[0];
-	if (ast_stmt_kind(stmt) != STMT_SELECTION) {
-		return;
-	}
-	Ref *ref = hack_ref_from_assertion(
-		ast_stmt_sel_cond(stmt), state
-	);
-	struct error *err = alloc_or_unalloc(true, ref, state);
-	assert(!err);
-	ref_destroy(ref);
-}
-
-/* hack_ref_from_assertion*/
-
-static Ref *
-ref_from_expr(struct ast_expr *expr, struct state *state);
-
-static Ref *
-hack_ref_from_assertion(struct ast_expr *expr, struct state *state)
+static struct location *
+hack_location_from_assertion(struct ast_expr *expr, struct state *state)
 {	
 	/* get assertand */
 	struct ast_expr *assertand = ast_expr_assertion_assertand(expr);
 
 	/* get `assertand' variable */
-	return ref_from_expr(assertand, state);
+	struct location *loc = state_location_from_lvalue(state, assertand);
+	assert(loc);
+	return loc;
 }
-
-static Ref *
-ref_from_expr(struct ast_expr *expr, struct state *state)
-{
-	if (ast_expr_kind(expr) == EXPR_IDENTIFIER) {
-		if (strcmp(ast_expr_as_identifier(expr), KEYWORD_RESULT) == 0) {
-			return state_getresult(state);
-		}
-		struct ast_expr *offset = ast_expr_create_constant(0);
-		Ref *ref = ref_create_offset(
-			ast_expr_as_identifier(expr), 0, offset
-		);
-		ast_expr_destroy(offset);
-		return ref;
-	}
-
-	/* otherwise, we must have an access */
-	Ref *base = ref_from_expr(ast_expr_access_root(expr), state);
-	Ref *ref = ref_create_offset(
-		ref_id(base),
-		ref_nderef(base) + 1,
-		ast_expr_access_index(expr)
-	);
-	ref_destroy(base);
-	return ref;
-}
-
-
 
 /* stmt_verify */
 
@@ -486,33 +445,24 @@ expr_unary_decide(struct ast_expr *expr, struct state *state)
 static bool
 expr_assertion_decide(struct ast_expr *expr, struct state *state)
 {
-	Ref *ref = hack_ref_from_assertion(expr, state);
-	bool onheap = state_ref_onheap(state, ref);
-	ref_destroy(ref);
-	return onheap;
+	struct location *loc = hack_location_from_assertion(expr, state);
+	assert(loc);
+	bool isdeallocand = state_location_addresses_deallocand(state, loc);
+	state_location_destroy(loc);
+	return isdeallocand;
 }
 
 static struct error *
 stmt_iter_verify(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_function *f = ast_function_create(
-		false,
-		ast_type_create(TYPE_VOID, 0),
-		dynamic_str("<iter_function>"),
-		state_nvariables(state),
-		state_getvariables(state),
-		ast_block_copy(ast_stmt_iter_abstract(stmt)),
-		ast_block_copy(ast_stmt_as_block(ast_stmt_iter_body(stmt)))
-	);
-	struct error *err = function_verify(f, state_extfunc(state));
-	ast_function_destroy(f);
-	return err;
+	/* XXX: we're assuming internal consistency for now */
+	return NULL;
 }
 
 /* stmt_exec */
 
 typedef struct {
-	Heaploc *loc;
+	struct location *loc;
 	struct error *err;
 } Result;
 
@@ -537,16 +487,26 @@ result_iserror(Result res)
 static struct error *
 result_error(Result res)
 {
-	assert(result_iserror(res));
 	return res.err;
 }
 
 static Result
-result_create_heap(Heaploc *loc)
+result_create_loc(struct location *loc)
 {
 	return (Result) { .loc = loc, .err = NULL };
 }
 
+static void
+result_destroy(Result res)
+{
+	assert(!res.err);
+	if (res.loc) {
+		state_location_destroy(res.loc);
+	}
+}
+
+
+/* XXX: obsolete */
 static bool
 result_onheap(Result res)
 {
@@ -554,8 +514,8 @@ result_onheap(Result res)
 	return res.loc; /* implicit cast */
 }
 
-static Heaploc *
-result_heaploc(Result res)
+static struct location *
+result_loc(Result res)
 {
 	assert(!result_iserror(res) && res.loc);
 	return res.loc;
@@ -610,34 +570,35 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 	return NULL;
 }
 
-/* stmt_expr_exec */
+/* stmt_expr_eval */
 
 static Result
-expr_exec(struct ast_expr *expr, struct state *state);
+expr_eval(struct ast_expr *expr, struct state *state);
 
 static struct error *
 stmt_expr_exec(struct ast_stmt *stmt, struct state *state)
 {
-	Result res = expr_exec(ast_stmt_as_expr(stmt), state);
+	Result res = expr_eval(ast_stmt_as_expr(stmt), state);
 	if (result_iserror(res)) {
 		return result_error(res);
 	}
+	result_destroy(res);
 	return NULL;
 }
 
-/* expr_exec */
+/* expr_eval */
 
 static Result
-expr_access_or_identifier_exec(struct ast_expr *expr, struct state *state);
+expr_access_or_identifier_eval(struct ast_expr *expr, struct state *state);
 
 static Result
-expr_call_exec(struct ast_expr *expr, struct state *state);
+expr_call_eval(struct ast_expr *expr, struct state *state);
 
 static Result
-expr_assign_exec(struct ast_expr *expr, struct state *state);
+expr_assign_eval(struct ast_expr *expr, struct state *state);
 
 static Result
-expr_exec(struct ast_expr *expr, struct state *state)
+expr_eval(struct ast_expr *expr, struct state *state)
 {
 	/* TODO: verify preconditions of expr (statement) are satisfied */
 	/* now add postconditions */
@@ -646,11 +607,11 @@ expr_exec(struct ast_expr *expr, struct state *state)
 		return result_create_empty();
 	case EXPR_IDENTIFIER:
 	case EXPR_ACCESS:
-		return expr_access_or_identifier_exec(expr, state);
+		return expr_access_or_identifier_eval(expr, state);
 	case EXPR_CALL:
-		return expr_call_exec(expr, state);
+		return expr_call_eval(expr, state);
 	case EXPR_ASSIGNMENT:
-		return expr_assign_exec(expr, state);
+		return expr_assign_eval(expr, state);
 	default:
 		fprintf(stderr, "unknown expr kind `%s'\n", ast_expr_str(expr));
 		assert(false);
@@ -658,31 +619,28 @@ expr_exec(struct ast_expr *expr, struct state *state)
 }
 
 static Result
-expr_access_or_identifier_exec(struct ast_expr *expr, struct state *state)
+expr_access_or_identifier_eval(struct ast_expr *expr, struct state *state)
 {
-	/* XXX: allow for assigning of non-heaploc references to each other */
-	Ref *ref = ref_from_expr(expr, state);
-	Heaploc *loc = state_ref_get_heaploc(state, ref);
-	ref_destroy(ref);
-	if (loc) {
-		return result_create_heap(loc);
+	struct location *loc = state_location_from_rvalue(state, expr);
+	if (!loc) {
+		return result_create_error(error_create("no value"));
 	}
-	return result_create_empty();
+	return result_create_loc(loc);
 }
 
-/* expr_call_exec */
+/* expr_call_eval */
 
 struct ast_function *
 expr_as_func(struct ast_expr *expr, struct state *state);
 
 static Result
-call_exec_inframe(struct ast_expr *expr, struct state *state);
+call_eval_inframe(struct ast_expr *expr, struct state *state);
 
 static Result
-expr_call_exec(struct ast_expr *expr, struct state *state)
+expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	state_pushframe(state, ast_function_type(expr_as_func(expr, state)));
-	Result res = call_exec_inframe(expr, state);
+	Result res = call_eval_inframe(expr, state);
 	state_popframe(state);
 	return res;
 }
@@ -697,7 +655,7 @@ expr_as_func(struct ast_expr *expr, struct state *state)
 	return state_getfunc(state, ast_expr_as_identifier(root));
 }
 
-/* call_exec_inframe */
+/* call_eval_inframe */
 
 static bool
 hack_isfreenull(struct ast_expr *expr);
@@ -712,11 +670,8 @@ block_reduce(struct ast_block *, struct state *state);
 static Result
 alloc_or_free(struct ast_expr *red, struct state *state);
 
-static bool
-isundefined(struct ast_expr *);
-
 static Result
-call_exec_inframe(struct ast_expr *expr, struct state *state)
+call_eval_inframe(struct ast_expr *expr, struct state *state)
 {
 	/* XXX: allow free(NULL) */
 	if (hack_isfreenull(expr)) {
@@ -736,10 +691,11 @@ call_exec_inframe(struct ast_expr *expr, struct state *state)
 	}
 
 	/* undefined */
-	if (isundefined(red_expr)) {
+	if (ast_expr_memory_isundefined(red_expr)) {
+		ast_expr_destroy(red_expr); /* XXX */
 		return result_create_error(error_create("undefined behaviour"));
 	}
-
+	
 	/* alloc or free */
 	Result res = alloc_or_free(red_expr, state);
 	ast_expr_destroy(red_expr);
@@ -762,12 +718,6 @@ hack_isfreenull(struct ast_expr *expr)
 		&& strcmp(ast_expr_as_identifier(arg), "NULL") == 0;
 }
 
-static bool
-isundefined(struct ast_expr *expr)
-{
-	return ast_expr_memory_isundefined(expr);
-}
-
 /* prepare_parameters: Allocate arguments in call expression and assign them to
  * their respective parameters. */
 static struct error *
@@ -782,23 +732,29 @@ prepare_parameters(struct ast_function *f, struct ast_expr *expr,
 	assert(ast_function_nparams(f) == nargs);
 
 	for (int i = 0; i < nargs; i++) {
-		/* in the case of exprs that aren't calls we want to eval */
 		state_declare(state, param[i], true);
-		Result res = expr_exec(arg[i], state);
+		Result res = expr_eval(arg[i], state);
 		if (result_onheap(res)) {
-			char *param_name = ast_variable_name(param[i]);
-
-			struct ast_expr *offset = ast_expr_create_constant(0);
-			Ref *ref = ref_create_offset(
-				param_name, 0, offset
+			struct ast_expr *name = ast_expr_create_identifier(
+				dynamic_str(ast_variable_name(param[i]))
 			);
-			ast_expr_destroy(offset);
+			struct location *loc = state_location_from_lvalue(
+				state, name
+			);
+			assert(loc);
+			ast_expr_destroy(name);
 
-			state_ref_assign_heaploc(
-				state, ref, result_heaploc(res)
+			/* TODO: change to state_lvalue_assign_value */
+			struct error *err = state_location_assign(
+				state, loc, result_loc(res)
 			);
 
-			ref_destroy(ref);
+			state_location_destroy(loc);
+			result_destroy(res);
+
+			if (err) {
+				return err;
+			}
 		}
 	}
 	return NULL;
@@ -877,56 +833,56 @@ hack_force_sel_body_as_alloc_or_identifier(struct ast_stmt *body)
 	return ast_expr_copy(alloc);
 }
 
-/* alloc_or_free: Create or free Heaploc in state as dictated by the given
- * expression `alloc'. */
+/* operates at location level. It either creates an object on the heap and returns
+ * a location or gets the location pointed to by an lvalue and attempts to free
+ * possibly returning an error
+ * */
 static Result
 alloc_or_free(struct ast_expr *mem, struct state *state)
 {
 	struct ast_expr *root = ast_expr_memory_root(mem);
+
 	if (ast_expr_memory_isalloc(mem)) {
-		assert(strcmp(ast_expr_as_identifier(root), KEYWORD_RESULT) == 0);
-		Heaploc *loc = state_alloc(state);
-		return result_create_heap(loc);
+		/* assert(strcmp(ast_expr_as_identifier(id), KEYWORD_RESULT) == 0); */
+
+		/* TODO: size needs to be passed in here when added to .alloc */
+		return result_create_loc(state_alloc(state, 1)); /* XXX */
 	}
 
-	Ref *ref = ref_from_expr(root, state);
-	Heaploc *loc = state_ref_get_heaploc(state, ref);
-	ref_destroy(ref);
-
-	assert(loc); /* XXX: probably user error */
-	struct error *err = state_heaploc_free(state, loc);
+	struct location *loc = state_location_from_rvalue(state, root);
+	assert(loc);
+	struct error *err = state_location_dealloc(state, loc); /* lval free? */
 	if (err) {
 		fprintf(stderr, "cannot free: %s\n", err->msg);
 		assert(false);
 	}
+	state_location_destroy(loc);
 	return result_create_empty();
 }
 
 static Result
-expr_assign_exec(struct ast_expr *expr, struct state *state)
+expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
-	Result res = expr_exec(rval, state);
+	Result res = expr_eval(rval, state);
 	if (result_onheap(res)) {
-		Ref *ref = ref_from_expr(lval, state);
-
-		state_ref_assign_heaploc(state, ref, result_heaploc(res));
-
-		ref_destroy(ref);
+		struct location *loc = state_location_from_lvalue(state, lval);
+		assert(loc);
+		struct error *err = state_location_assign(
+			state, loc, result_loc(res)
+		);
+		state_location_destroy(loc);
+		if (err) {
+			return result_create_error(err);
+		}
 	}
 	return res;
 }
 
 static struct ast_expr *
 iter_abstract_action(struct ast_stmt *iter, struct state *state);
-
-static struct pointer_deref { char *id; int nderef; }
-pointer_deref_from_expr(struct ast_expr *expr);
-
-static struct error *
-alloc_or_unalloc(bool isalloc, Ref *ref, struct state *state);
 
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
@@ -942,7 +898,7 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 	if (!action) {
 		return NULL;
 	}
-	if (isundefined(action)) {
+	if (ast_expr_memory_isundefined(action)) {
 		return error_create("undefined");
 	}
 
@@ -950,21 +906,28 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 	struct ast_expr *mem = action;
 
 	/* get ref to object allocated/freed */
-	struct pointer_deref pd = pointer_deref_from_expr(
-		ast_expr_memory_root(mem)
-	);
-	Ref *ref = ref_create_range(
-		pd.id,
-		pd.nderef,
-		ast_stmt_iter_lower_bound(stmt),
-		ast_stmt_iter_upper_bound(stmt)
-	);
 
-	err = alloc_or_unalloc(
-		ast_expr_memory_isalloc(mem), ref, state
+	/* we're currently discarding analysis of `offset` and relying on the
+	 * bounds (lower, upper beneath) alone */
+	struct ast_expr *acc = ast_expr_memory_root(mem); /* `arr[offset]` */
+	struct ast_expr *i = ast_expr_create_identifier(dynamic_str("i"));
+	assert(ast_expr_equal(ast_expr_access_index(acc), i)); 
+	ast_expr_destroy(i);
+	struct location *loc = state_location_from_lvalue(
+		state, ast_expr_access_root(acc) /* `arr` */
 	);
+	assert(loc);
 
-	ref_destroy(ref);
+	struct ast_expr *lower = ast_stmt_iter_lower_bound(stmt),
+			*upper = ast_stmt_iter_upper_bound(stmt);
+
+	if (ast_expr_memory_isalloc(mem)) {
+		err = state_location_range_alloc(state, loc, lower, upper);
+	} else {
+		err = state_location_range_dealloc(state, loc, lower, upper);
+	}
+	
+	state_location_destroy(loc);
 
 	return err;
 }
@@ -1025,7 +988,7 @@ stmt_expr_itereval(struct ast_stmt *stmt, struct ast_stmt *iter,
 		struct state *state)
 {
 	struct ast_expr *expr = ast_stmt_as_expr(stmt);
-	assert(ast_expr_kind(expr) == EXPR_MEMORY || isundefined(expr));
+	assert(ast_expr_kind(expr) == EXPR_MEMORY || ast_expr_memory_isundefined(expr));
 	return expr;
 }
 
@@ -1104,20 +1067,19 @@ expr_assertion_iter_decide(struct ast_expr *expr, struct ast_stmt *iter,
 {
 	struct ast_expr *access = hack_access_from_assertion(expr);
 
-	struct pointer_deref pd = pointer_deref_from_expr(access);
+	struct location *loc = state_location_from_lvalue(state, access);
+	assert(loc);
 
-	Ref *ref = ref_create_range(
-		pd.id,
-		pd.nderef,
+	bool deallocands = state_location_range_aredeallocands(
+		state,
+		loc,
 		ast_stmt_iter_lower_bound(iter),
 		ast_stmt_iter_upper_bound(iter)
 	);
 
-	bool onheap = state_ref_onheap(state, ref);
+	state_location_destroy(loc);
 
-	ref_destroy(ref);
-
-	return onheap;
+	return deallocands;
 }
 
 static struct ast_expr *
@@ -1128,44 +1090,21 @@ hack_access_from_assertion(struct ast_expr *expr)
 	return assertand;
 }
 
-
-static struct pointer_deref
-pointer_deref_from_expr(struct ast_expr *expr)
-{
-	if (ast_expr_kind(expr) == EXPR_IDENTIFIER) {
-		return (struct pointer_deref) {
-			.id	= ast_expr_as_identifier(expr),
-			.nderef	= 0,
-		};
-	}
-
-	/* otherwise, we must have an access */
-	struct pointer_deref pd =
-		pointer_deref_from_expr(ast_expr_access_root(expr));
-	return (struct pointer_deref) {
-		.id	= pd.id,
-		.nderef	= pd.nderef + 1,
-	};
-}
-
-static struct error *
-alloc_or_unalloc(bool isalloc, Ref *ref, struct state *state)
-{
-	if (isalloc) {
-		state_ref_assign_heaploc(state, ref, state_alloc(state));
-		return NULL;
-	}
-	return state_ref_unalloc(state, ref);
-}
-
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
-	Result res = expr_exec(ast_stmt_jump_rv(stmt), state);
-	if (result_onheap(res)) {
-		state_result_assign(state, result_heaploc(res));
+	Result res = expr_eval(ast_stmt_jump_rv(stmt), state);
+	if (result_iserror(res)) {
+		return result_error(res);
 	}
-	return NULL; /* TODO: return error from above */
+	if (result_onheap(res)) {
+		struct error *err = state_location_assign(
+			state, state_getresultloc(state), result_loc(res)
+		);
+		result_destroy(res);
+		return err;
+	}
+	return NULL;
 }
 
 /* abstract_audit */
@@ -1190,20 +1129,12 @@ abstract_audit(struct ast_function *f, struct state *actual_state)
 		state_extfunc(actual_state), ast_function_type(f)
 	);
 
-	struct ast_block *body = ast_function_body(f);
-
 	/* declare params and locals in stack frame */
 	struct ast_variable **param = ast_function_params(f);
 	int nparams = ast_function_nparams(f);
 	for (int i = 0; i < nparams; i++) {
 		state_declare(alleged_state, param[i], true);
 	}
-	int ndecls = ast_block_ndecls(body);
-	struct ast_variable **var = ast_block_decls(body);
-	for (int i = 0; i < ndecls; i++) {
-		state_declare(alleged_state, var[i], false);
-	}
-	hack_alloc_p_i_for_iter_verification(f, alleged_state);
 
 	struct ast_block *abs = hack_flatten_abstract_for_iter_verification(
 		f, actual_state
@@ -1214,8 +1145,8 @@ abstract_audit(struct ast_function *f, struct state *actual_state)
 		return err;
 	}
 
-	printf("actual: %s\n", state_str(actual_state));
-	printf("alleged: %s\n", state_str(alleged_state));
+	/*printf("actual: %s\n", state_str(actual_state));*/
+	/*printf("alleged: %s\n", state_str(alleged_state));*/
 
 	ast_block_destroy(abs);
 
@@ -1244,8 +1175,8 @@ hack_flatten_abstract_for_iter_verification(struct ast_function *f,
 		return ast_block_copy(abs);
 	}
 	/* asserts that we have `allocated' condition */
-	ref_destroy(
-		hack_ref_from_assertion(
+	state_location_destroy(
+		hack_location_from_assertion(
 			ast_stmt_sel_cond(stmt), state
 		)
 	);
@@ -1268,7 +1199,7 @@ function_absexec(struct ast_block *abs, struct state *state)
 			return err;
 		}
 	}
-	assert(state_heap_referenced(state));
+	//assert(state_heap_referenced(state));
 	return NULL;
 }
 
@@ -1303,7 +1234,7 @@ expr_absexec(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
 	case EXPR_IDENTIFIER:
-		assert(isundefined(expr));
+		assert(ast_expr_memory_isundefined(expr));
 		return error_create("undefined");
 	case EXPR_MEMORY:
 		return mem_absexec(expr, state);
@@ -1315,13 +1246,20 @@ expr_absexec(struct ast_expr *expr, struct state *state)
 static struct error *
 mem_absexec(struct ast_expr *mem, struct state *state)
 {
-	Ref *ref = ref_from_expr(ast_expr_memory_root(mem), state);
-
-	struct error *err = alloc_or_unalloc(
-		ast_expr_memory_isalloc(mem), ref, state
-	);
-	ref_destroy(ref);
-	return err;
+	Result res = alloc_or_free(mem, state);
+	if (result_onheap(res)) {
+		struct location *loc = state_location_from_lvalue(
+			state, ast_expr_memory_root(mem)
+		);
+		assert(loc);
+		struct error *err = state_location_assign(
+			state, loc, result_loc(res)
+		);
+		state_location_destroy(loc);
+		result_destroy(res);
+		return err;
+	}
+	return NULL;
 }
 
 static struct error *

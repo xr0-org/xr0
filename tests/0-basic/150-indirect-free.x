@@ -6,6 +6,6 @@ unit()
 	void *p; void *q;
 
 	p = malloc(1);
-	q = p;	
+	q = p;
 	free(q);
 }

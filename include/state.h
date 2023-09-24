@@ -1,10 +1,15 @@
 #ifndef XR0_STATE_H
 #define XR0_STATE_H
 
+#include <stdbool.h>
+
+#define KEYWORD_RESULT "result"
+
 /* util.h */
 struct map;
 
 struct state;
+struct ast_type;
 
 struct state *
 state_create(struct map *extfunc, struct ast_type *result_type);
@@ -12,17 +17,22 @@ state_create(struct map *extfunc, struct ast_type *result_type);
 void
 state_destroy(struct state *state);
 
-bool
-state_abstractly_equivalent(struct state *s1, struct state *s2);
+char *
+state_str(struct state *state);
 
-bool
-state_heap_referenced(struct state *state);
+struct map *
+state_extfunc(struct state *state);
+
+struct ast_function *
+state_getfunc(struct state *state, char *f);
 
 void
-state_pushframe(struct state *state, struct ast_type *type);
+state_pushframe(struct state *state, struct ast_type *ret_type);
 
 void
 state_popframe(struct state *state);
+
+struct ast_variable;
 
 void
 state_declare(struct state *state, struct ast_variable *var, bool isparam);
@@ -33,68 +43,55 @@ state_getvariables(struct state *state);
 int
 state_nvariables(struct state *state);
 
-struct map *
-state_extfunc(struct state *state);
+struct variable;
+struct location;
 
-struct ast_function *
-state_getfunc(struct state *state, char *f);
+struct location *
+state_getresultloc(struct state *state);
 
-struct reference *
-state_getresult(struct state *state);
+struct ast_expr;
 
-typedef struct reference Ref;
+struct location *
+state_location_from_lvalue(struct state *state, struct ast_expr *lvalue);
 
-Ref *
-ref_create_offset(char *id, int nderef, struct ast_expr *offset);
+struct location *
+state_location_from_rvalue(struct state *state, struct ast_expr *rvalue);
 
-Ref *
-ref_create_range(char *id, int nderef, struct ast_expr *lower,
-		struct ast_expr *upper);
+/* state_location_assign: Assign the value in the object denoted by r to
+ * the object denoted by l. */
+struct error *
+state_location_assign(struct state *state, struct location *l, struct location *r);
 
-void
-ref_destroy(Ref *ref);
-
-bool
-ref_isresult(Ref *ref);
-
-char *
-ref_id(Ref *ref);
-
-int
-ref_nderef(Ref *ref);
-
-char *
-ref_str(Ref *ref);
-
-bool
-state_ref_onheap(struct state *state, Ref *ref);
+/* state_location_alloc_range: Assign a (virtual) array to the object denoted by
+ * loc on the range [lower, upper). */
+struct error *
+state_location_range_alloc(struct state *state, struct location *loc,
+		struct ast_expr *lw, struct ast_expr *up);
 
 struct error *
-state_ref_unalloc(struct state *state, Ref *ref);
-
-typedef struct heaploc Heaploc;
+state_location_dealloc(struct state *state, struct location *loc);
 
 struct error *
-state_heaploc_free(struct state *state, Heaploc *loc);
-
-Heaploc *
-state_ref_get_heaploc(struct state *state, Ref *ref);
-
-void
-state_ref_assign_heaploc(struct state *state, Ref *ref, Heaploc *loc);
+state_location_range_dealloc(struct state *state, struct location *loc,
+		struct ast_expr *lower, struct ast_expr *upper);
 
 bool
-state_ref_canfree(struct state *state, Ref *ref);
+state_location_addresses_deallocand(struct state *state, struct location *loc);
+
+bool
+state_location_range_aredeallocands(struct state *state, struct location *loc,
+		struct ast_expr *lower, struct ast_expr *upper);
+
+struct location *
+state_alloc(struct state *state, int size);
+
+bool
+state_abstractly_equivalent(struct state *s1, struct state *s2);
+
+bool
+state_heap_referenced(struct state *state);
 
 void
-state_result_assign(struct state *state, Heaploc *loc);
-
-Heaploc *
-state_alloc(struct state *state);
-
-char *
-state_str(struct state *state);
-
-#define KEYWORD_RESULT "result"
+state_location_destroy(struct location *loc);
 
 #endif
