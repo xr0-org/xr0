@@ -788,7 +788,7 @@ for_iteration_statement
 	*/
 	: for_some '(' expression_statement expression_statement expression ')' optional_compound_verification statement
 		{
-		struct ast_stmt *stmt = $8; 
+		/*struct ast_stmt *stmt = $8; */
 		$$ = ast_stmt_create_iter(lexloc(), $3, $4, $5, $7, $8); }
 	;
 

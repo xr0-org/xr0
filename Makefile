@@ -12,8 +12,6 @@ INCLUDE_DIR = include
 SRC_DIR = src
 VERIFY_DIR = $(SRC_DIR)/verify
 STATE_DIR = $(SRC_DIR)/state
-PARSE_DIR = $(SRC_DIR)/parse
-LEX_DIR = $(SRC_DIR)/lex
 AST_DIR = $(SRC_DIR)/ast
 UTIL_DIR = $(SRC_DIR)/util
 
@@ -23,7 +21,15 @@ XR0V = $(BIN_DIR)/0v
 # build artifacts
 MAIN_OBJ = $(BUILD_DIR)/main.o
 VERIFY_OBJ = $(BUILD_DIR)/verify.o
+
 STATE_OBJ = $(BUILD_DIR)/state.o
+STACK_OBJ = $(BUILD_DIR)/stack.o
+HEAP_OBJ = $(BUILD_DIR)/heap.o
+LOCATION_OBJ = $(BUILD_DIR)/location.o
+BLOCK_OBJ = $(BUILD_DIR)/block.o
+OBJECT_OBJ = $(BUILD_DIR)/object.o
+VALUE_OBJ = $(BUILD_DIR)/value.o
+
 AST_OBJ = $(BUILD_DIR)/ast.o
 LEX_OBJ = $(BUILD_DIR)/lex.o
 UTIL_OBJ = $(BUILD_DIR)/util.o
@@ -33,7 +39,21 @@ GRAM_TAB_C = $(BUILD_DIR)/gram.tab.c
 GRAM_TAB_H = $(BUILD_DIR)/gram.tab.h
 LEX_YY_C = $(BUILD_DIR)/lex.yy.c
 
-OBJECTS = $(AST_OBJ) $(LEX_OBJ) $(GRAM_OBJ) $(STATE_OBJ) $(UTIL_OBJ) $(VERIFY_OBJ)
+XR0_OBJECTS = $(AST_OBJ) \
+	      $(LEX_OBJ) \
+	      $(GRAM_OBJ) \
+	      $(STATE_OBJ) \
+	      $(UTIL_OBJ) \
+	      $(VERIFY_OBJ)
+
+STATE_OBJECTS = $(VALUE_OBJ) \
+		$(LOCATION_OBJ) \
+		$(OBJECT_OBJ) \
+		$(BLOCK_OBJ) \
+		$(HEAP_OBJ) \
+		$(STACK_OBJ)
+
+OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
 # tests
 TESTDIR = tests
@@ -55,11 +75,35 @@ $(VERIFY_OBJ): $(VERIFY_DIR)/verify.c $(STATE_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(VERIFY_DIR)/verify.c
 
-$(STATE_OBJ): $(STATE_DIR)/state.c $(AST_OBJ) $(UTIL_OBJ)
+$(STATE_OBJ): $(STATE_DIR)/state.c $(STATE_OBJECTS)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/state.c
 
-$(UTIL_OBJ): $(UTIL_DIR)/util.c $(AST_OBJ)
+$(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/stack.c
+
+$(HEAP_OBJ): $(STATE_DIR)/heap.c $(BLOCK_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/heap.c
+
+$(BLOCK_OBJ): $(STATE_DIR)/block.c $(OBJECT_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/block.c
+
+$(OBJECT_OBJ): $(STATE_DIR)/object.c $(VALUE_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/object.c
+
+$(VALUE_OBJ): $(STATE_DIR)/value.c $(LOCATION_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/value.c
+
+$(LOCATION_OBJ): $(STATE_DIR)/location.c $(UTIL_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/location.c
+
+$(UTIL_OBJ): $(UTIL_DIR)/util.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(UTIL_DIR)/util.c
 
@@ -67,21 +111,21 @@ $(AST_OBJ): $(AST_DIR)/ast.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(AST_DIR)/ast.c
 
-$(LEX_OBJ): $(LEX_YY_C) $(GRAM_OBJ)
+$(LEX_OBJ): $(LEX_YY_C) $(BUILD_DIR)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(LEX_YY_C)
 
-$(LEX_YY_C): $(INCLUDE_DIR)/lex.h $(LEX_DIR)/lex.l
+$(LEX_YY_C): $(INCLUDE_DIR)/lex.h $(AST_DIR)/lex.l $(GRAM_OBJ)
 	@printf 'LEX\t$@\n'
-	@$(LEX) -o $(BUILD_DIR)/lex.yy.c $(LEX_DIR)/lex.l
+	@$(LEX) -o $(BUILD_DIR)/lex.yy.c $(AST_DIR)/lex.l
 
 $(GRAM_OBJ): $(GRAM_TAB_C) $(GRAM_TAB_H)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(GRAM_TAB_C)
 
-$(GRAM_TAB_C) $(GRAM_TAB_H): $(PARSE_DIR)/gram.y $(BUILD_DIR)
+$(GRAM_TAB_C) $(GRAM_TAB_H): $(AST_DIR)/gram.y $(BUILD_DIR)
 	@printf 'YACC\t$@\n'
-	@$(YACC) -o $(BUILD_DIR)/gram.tab.c -d $(PARSE_DIR)/gram.y
+	@$(YACC) -o $(BUILD_DIR)/gram.tab.c -d $(AST_DIR)/gram.y
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
@@ -93,7 +137,8 @@ check: $(RUNTEST) $(TESTFILES) $(XR0V)
 	valgrind $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 check-verbose: $(RUNTEST) $(TESTFILES) $(XR0V)
-	valgrind --num-callers=30 $(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
+	valgrind --leak-check=full --num-callers=30 \
+		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 clean:
-	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(OBJECTS)
+	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(OBJECTS) $(XR0_OBJECTS)

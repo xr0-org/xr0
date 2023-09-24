@@ -12,9 +12,7 @@ unit()
 		p[i] = malloc(1);
 	}
 
-	for (i = 0; i < 9; i++) [
-		if (@p[i]) { .dealloc p[i]; } else { .undefined; }
-	]{
+	for (i = 0; i < 9; i++) [ .dealloc p[i]; ] {
 		free(p[i]);
 	}
 
