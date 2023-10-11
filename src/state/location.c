@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "block.h"
 #include "heap.h"
+#include "state.h"
 #include "location.h"
 #include "object.h"
 #include "stack.h"
@@ -15,8 +16,6 @@ struct location {
 	enum location_type type;
 	int block;
 	struct ast_expr *offset;
-
-	int stack_depth; /* XXX */
 };
 
 struct location *
@@ -26,7 +25,6 @@ location_create(enum location_type type, int block, struct ast_expr *offset)
 	assert(loc);
 	loc->type = type;
 	loc->block = block;
-	loc->stack_depth = 0;
 	assert(offset);
 	loc->offset = offset;
 	return loc;
@@ -68,16 +66,10 @@ location_str(struct location *loc)
 static bool
 offsetzero(struct location *loc)
 {
-	struct ast_expr *zero = ast_expr_create_constant(0);
+	struct ast_expr *zero = ast_expr_constant_create(0);
 	bool eq = ast_expr_equal(loc->offset, zero);
 	ast_expr_destroy(zero);
 	return eq;
-}
-
-void
-location_setdepth(struct location *loc, int depth)
-{
-	loc->stack_depth = depth;
 }
 
 enum location_type
@@ -119,7 +111,7 @@ bool
 location_isdeallocand(struct location *loc, struct heap *h)
 {
 	bool type_equal = loc->type == LOCATION_DYNAMIC;
-	block *b = heap_getblock(h, loc->block);
+	struct block *b = heap_getblock(h, loc->block);
 	return type_equal && b;
 }
 
@@ -132,41 +124,36 @@ location_equal(struct location *l1, struct location *l2)
 }
 
 bool
-location_heap_equivalent(struct location *l1, struct location *l2,
-		struct stack *s1, struct stack *s2, struct heap *h1, struct heap *h2)
+location_references(struct location *l1, struct location *l2, struct state *s)
 {
-	assert(l1 && l2);
-	struct object *obj1 = location_getobject(l1, s1, h1),
-		      *obj2 = location_getobject(l2, s2, h2);
-	assert(obj1 && obj2);
-
-	return value_heap_equivalent(
-		object_value(obj1), object_value(obj2), s1, s2, h1, h2
-	);
-}
-
-struct object *
-location_getobject(struct location *loc, struct stack *stack, struct heap *heap)
-{
-	block *b = location_getblock(loc, stack, heap);
-	if (!b) {
-		assert(loc->type == LOCATION_DYNAMIC);
-		return NULL;
+	if (location_equal(l1, l2)) {
+		return true;
 	}
-	return block_observe(b, loc->offset, heap);
+
+	struct block *b = state_getblock(s, l1);
+	assert(b);
+	return block_references(b, l2, s);
 }
 
-block *
-location_getblock(struct location *loc, struct stack *s, struct heap *h)
+struct block *
+location_getblock(struct location *loc, struct vconst *v, struct stack *s,
+		struct heap *h)
 {
 	switch (loc->type) {
 	case LOCATION_AUTOMATIC:
-		return stack_getblock(stack_prev(s, loc->stack_depth), loc->block);
+		return stack_getblock(s, loc->block);
 	case LOCATION_DYNAMIC:
 		return heap_getblock(h, loc->block);
 	default:
 		assert(false);
 	}
+}
+
+struct block *
+location_getstackblock(struct location *loc, struct stack *s)
+{
+	assert(loc->type == LOCATION_AUTOMATIC);
+	return stack_getblock(s, loc->block);
 }
 
 struct error *
@@ -180,108 +167,22 @@ location_dealloc(struct location *loc, struct heap *heap)
 
 struct error *
 location_range_dealloc(struct location *loc, struct ast_expr *lw,
-		struct ast_expr *up, struct stack *stack, struct heap *heap)
+		struct ast_expr *up, struct state *state)
 {
 	/* TODO: adjust lw, up by loc->offset for nonzero cases */
 	assert(offsetzero(loc));
 
-	block *b = location_getblock(loc, stack, heap);
+	struct block *b = state_getblock(state, loc);
 	if (!b) {
 		return error_create("cannot get block");
 	}
 
-	if (!block_range_aredeallocands(b, lw, up, heap)) {
+	if (!block_range_aredeallocands(b, lw, up, state)) {
+		printf("block: %s\n", block_str(b));
+		printf("lw: %s, up: %s\n", ast_expr_str(lw), ast_expr_str(up));
 		assert(false);
 		return error_create("some values not allocated");
 	}
 
-	return block_range_dealloc(b, lw, up, heap);
-}
-
-
-struct variable {
-	struct ast_type *type;
-	struct location *loc;
-	bool isparam;
-};
-
-struct variable *
-variable_create(struct ast_type *type, struct stack *stack, bool isparam)
-{
-	struct variable *v = malloc(sizeof(struct variable));
-	v->type = ast_type_copy(type);
-	v->loc = stack_newblock(stack, 1); /* XXX: will change to sizeof */
-	v->isparam = isparam;
-	return v;
-}
-
-void
-variable_destroy(struct variable *v)
-{
-	ast_type_destroy(v->type);
-	location_destroy(v->loc);
-	free(v);
-}
-
-char *
-variable_str(struct variable *v, struct stack *s, struct heap *h)
-{
-	struct strbuilder *b = strbuilder_create();
-	char *type = ast_type_str(v->type);
-	char *loc = location_str(v->loc);
-	char *isparam = v->isparam ? "param " : "";
-	struct object *obj = location_getobject(v->loc, s, h);
-	assert(obj);
-	char *obj_str = object_str(obj);
-	strbuilder_printf(b, "{%s%s := %s} @ %s", isparam, type, obj_str, loc);
-	free(obj_str);
-	free(loc);
-	free(type);
-	return strbuilder_build(b);
-}
-
-struct ast_variable *
-variable_to_ast(struct variable *v, char *name)
-{
-	return ast_variable_create(
-		dynamic_str(name),
-		ast_type_copy(v->type)
-	);
-}
-
-struct location *
-variable_location(struct variable *v)
-{
-	return v->loc;
-}
-
-bool
-variable_references(struct variable *v, struct location *loc, struct stack *stack,
-		struct heap *heap)
-{
-	struct object *obj = location_getobject(v->loc, stack, heap);
-	assert(obj);
-	struct value *val = object_value(obj); 
-	if (val && value_type(val) == VALUE_PTR) {
-		struct location *vloc = value_location(val);
-		if (location_equal(loc, vloc)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-bool
-variable_isparam(struct variable *v)
-{
-	return v->isparam;
-}
-
-bool
-variable_heap_equivalent(struct variable *v1, struct variable *v2,
-		struct stack *s1, struct stack *s2, struct heap *h1, struct heap *h2)
-{
-	assert(v1 && v2);
-
-	return location_heap_equivalent(v1->loc, v2->loc, s1, s2, h1, h2);
+	return block_range_dealloc(b, lw, up, state);
 }

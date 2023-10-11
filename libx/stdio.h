@@ -1,20 +1,10 @@
 #ifndef STDIO_H
 #define STDIO_H
 
-typedef struct FILE; 
+axiom int
+putc(int c);
 
-FILE *stdout;
-
-int
-fputc(int c, FILE *stream);
-
-int
-putc(int c, FILE *stream);
-
-int
-fputs(char *s, FILE *stream);
-
-int
+axiom int
 puts(char *s);
 
 #endif

@@ -21,8 +21,11 @@ yyerror();
 int
 int_constant(char *s)
 {
-	assert(strlen(s) == 1);
-	return (int) *s - '0';
+	int n = 0;
+	for (; *s; s++) {
+		n = 10*n + ((int) *s - '0');
+	}
+	return n;
 }
 
 /* XXX */
@@ -76,25 +79,6 @@ stmt_array_append(struct stmt_array *arr, struct ast_stmt *v)
 	return *arr;
 }
 
-struct variable_array
-variable_array_create(struct ast_variable *v)
-{
-	struct variable_array arr = (struct variable_array) {
-		.n 	= 1, 
-		.var	= malloc(sizeof(struct ast_variable *)),
-	};
-	arr.var[0] = v;
-	return arr;
-}
-
-struct variable_array
-variable_array_append(struct variable_array *arr, struct ast_variable *v)
-{
-	arr->var = realloc(arr->var, sizeof(struct ast_variable *) * ++arr->n);
-	arr->var[arr->n-1] = v;
-	return *arr;
-}
-
 struct expr_array
 expr_array_create(struct ast_expr *v)
 {
@@ -114,6 +98,20 @@ expr_array_append(struct expr_array *arr, struct ast_expr *v)
 	return *arr;
 }
 
+struct ast_variable_arr *
+variable_array_append(struct ast_variable_arr *arr, struct ast_variable *v)
+{
+	ast_variable_arr_append(arr, v);
+	return arr;
+}
+
+struct ast_variable_arr *
+variable_array_create(struct ast_variable *v)
+{
+	return variable_array_append(ast_variable_arr_create(), v);
+}
+
+
 %}
 
 %token IDENTIFIER CONSTANT CHAR_LITERAL STRING_LITERAL SIZEOF
@@ -128,6 +126,7 @@ expr_array_append(struct expr_array *arr, struct ast_expr *v)
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
 %token AXIOM LEMMA SFUNC ASSERT
+%token ARB_ARG
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR SOME GOTO CONTINUE BREAK RETURN
 
@@ -151,7 +150,7 @@ expr_array_append(struct expr_array *arr, struct ast_expr *v)
 
 	struct expr_array expr_array;
 	struct stmt_array stmt_array;
-	struct variable_array variable_array;
+	struct ast_variable_arr *variable_array;
 
 	struct direct_function_declarator {
 		char *name;
@@ -169,22 +168,19 @@ expr_array_append(struct expr_array *arr, struct ast_expr *v)
 		char *name;
 	} declarator;
 
-	struct type_specifier {
-		int base;
-		char *typedef_name;
-	} type_specifier;
-
-	int chain_operator;
+	int binary_operator;
 	int integer;
 	int type_modifier;
 	int unary_operator;
+	int boolean;
 }
 
 %type <ast> translation_unit
 %type <block> block compound_statement compound_verification_statement
 %type <block> optional_compound_verification
 %type <block_statement> block_statement
-%type <chain_operator> connective equality_operator relational_operator
+%type <binary_operator> connective equality_operator relational_operator
+%type <boolean> struct_or_union
 %type <declarator> declarator init_declarator init_declarator_list
 %type <direct_function_declarator> direct_function_declarator
 
@@ -203,44 +199,53 @@ expr_array_append(struct expr_array *arr, struct ast_expr *v)
 %type <function_declarator> function_declarator
 %type <integer> pointer
 %type <statement> statement expression_statement selection_statement jump_statement 
-%type <statement> iteration_statement for_iteration_statement iteration_effect_statement
+%type <statement> labelled_statement iteration_statement for_iteration_statement
+%type <statement> iteration_effect_statement
 %type <stmt_array> statement_list
-%type <string> identifier struct_or_union_specifier direct_declarator
-%type <type> declaration_specifiers
-%type <type_specifier> type_specifier
+%type <string> identifier direct_declarator
+%type <type> declaration_specifiers type_specifier struct_or_union_specifier 
 %type <type_modifier> declaration_modifier storage_class_specifier type_qualifier
 %type <unary_operator> unary_operator
-%type <variable> declaration parameter_declaration
+%type <variable> declaration parameter_declaration struct_declaration
 %type <variable_array> declaration_list parameter_list parameter_type_list
+%type <variable_array> struct_declaration_list
 %%
 
 primary_expression
 	: identifier
-		{ $$ = ast_expr_create_identifier($1); }
+		{ $$ = ast_expr_identifier_create($1); }
+	| ARB_ARG
+		{ $$ = ast_expr_arbarg_create(); }
 	| CONSTANT
-		{ $$ = ast_expr_create_constant(int_constant(yytext)); } /* XXX */
+		{ $$ = ast_expr_constant_create(int_constant(yytext)); } /* XXX */
 	| CHAR_LITERAL
-		{ $$ = ast_expr_create_constant(char_constant(yytext)); }
+		{ $$ = ast_expr_constant_create(char_constant(yytext)); }
 	| STRING_LITERAL
-		{ $$ = ast_expr_create_literal(strip_quotes(yytext)); }
+		{ $$ = ast_expr_literal_create(strip_quotes(yytext)); }
 	| '(' expression ')'
-		{ $$ = ast_expr_create_bracketed($2); }
+		{ $$ = ast_expr_bracketed_create($2); }
 	;
 
 postfix_expression
 	: primary_expression
 	| postfix_expression '[' expression ']'
-		{ $$ = ast_expr_create_access($1, $3); }
+		{ $$ = ast_expr_access_create($1, $3); }
 	| postfix_expression '(' ')'
-		{ $$ = ast_expr_create_call($1, 0, NULL); }
+		{ $$ = ast_expr_call_create($1, 0, NULL); }
 	| postfix_expression '(' argument_expression_list ')'
-		{ $$ = ast_expr_create_call($1, $3.n, $3.expr); }
-	/*| postfix_expression '.' IDENTIFIER*/
-	/*| postfix_expression PTR_OP IDENTIFIER*/
+		{ $$ = ast_expr_call_create($1, $3.n, $3.expr); }
+	| postfix_expression '.' identifier
+		{ $$ = ast_expr_member_create($1, $3); }
+	| postfix_expression PTR_OP identifier {
+		$$ = ast_expr_member_create(
+			ast_expr_access_create($1, ast_expr_constant_create(0)),
+			$3
+		);
+	}
 	| postfix_expression INC_OP
-		{ $$ = ast_expr_create_incdec($1, true, false); }
+		{ $$ = ast_expr_incdec_create($1, true, false); }
 	| postfix_expression DEC_OP
-		{ $$ = ast_expr_create_incdec($1, false, false); }
+		{ $$ = ast_expr_incdec_create($1, false, false); }
 	;
 
 argument_expression_list
@@ -253,15 +258,15 @@ argument_expression_list
 memory_expression
 	: postfix_expression 
 	| '.' identifier {
-		$$ = ast_expr_create_memory(effectfromid($2), NULL);
+		$$ = ast_expr_memory_create(effectfromid($2), NULL);
 		free($2);
 	}
 	| '.' identifier memory_expression	{
-		$$ = ast_expr_create_memory(effectfromid($2), $3);
+		$$ = ast_expr_memory_create(effectfromid($2), $3);
 		free($2);
 	}
 	| ASSERT memory_expression {
-		$$ = ast_expr_create_assertion($2);
+		$$ = ast_expr_assertion_create($2);
 	}
 
 	;
@@ -269,13 +274,14 @@ memory_expression
 unary_expression
 	: memory_expression
 	| INC_OP unary_expression
-		{ $$ = ast_expr_create_incdec($2, true, true); }
+		{ $$ = ast_expr_incdec_create($2, true, true); }
 	| DEC_OP unary_expression
-		{ $$ = ast_expr_create_incdec($2, false, true); }
+		{ $$ = ast_expr_incdec_create($2, false, true); }
 	| unary_operator cast_expression
-		{ $$ = ast_expr_create_unary($2, $1); }
+		{ $$ = ast_expr_unary_create($2, $1); }
 	/*| SIZEOF unary_expression*/
-	/*| SIZEOF '(' type_name ')'*/
+	| SIZEOF '(' type_name ')'
+		{ $$ = ast_expr_constant_create(1); /* XXX */ }
 	;
 
 unary_operator
@@ -294,28 +300,28 @@ cast_expression
 
 multiplicative_expression
 	: cast_expression
-	/*| multiplicative_expression '*' cast_expression*/
+	| multiplicative_expression '*' cast_expression
 	/*| multiplicative_expression '/' cast_expression*/
 /*| multiplicative_expression '%' cast_expression*/
 ;
 
 additive_expression
 	: multiplicative_expression
-	/*| additive_expression '+' multiplicative_expression*/
+	| additive_expression '+' multiplicative_expression
 	/*| additive_expression '-' multiplicative_expression*/
 	;
 
 shift_expression
 	: additive_expression
-	/*| shift_expression LEFT_OP additive_expression*/
-	/*| shift_expression RIGHT_OP additive_expression*/
+	| shift_expression LEFT_OP additive_expression
+	| shift_expression RIGHT_OP additive_expression
 	;
 
 relational_operator
-	: '<'	{ $$ = CHAIN_OP_LT; }
-        | '>'	{ $$ = CHAIN_OP_GT; } 
-        | LE_OP	{ $$ = CHAIN_OP_LE; }
-        | GE_OP	{ $$ = CHAIN_OP_GE; }
+	: '<'	{ $$ = BINARY_OP_LT; }
+        | '>'	{ $$ = BINARY_OP_GT; } 
+        | LE_OP	{ $$ = BINARY_OP_LE; }
+        | GE_OP	{ $$ = BINARY_OP_GE; }
 	;
 
 justification
@@ -326,18 +332,18 @@ justification
 relational_expression
 	: shift_expression
 	| relational_expression relational_operator justification shift_expression
-		{ $$ = ast_expr_create_chain($1, $2, NULL, $4); }
+		{ $$ = ast_expr_binary_create($1, $2, $4); }
 	;
 
 equality_operator
-	: EQ_OP	{ $$ = CHAIN_OP_EQ; }
-	| NE_OP	{ $$ = CHAIN_OP_NE; }
+	: EQ_OP	{ $$ = BINARY_OP_EQ; }
+	| NE_OP	{ $$ = BINARY_OP_NE; }
 	;
 
 equality_expression
 	: relational_expression
 	| equality_expression equality_operator justification relational_expression
-		{ $$ = ast_expr_create_chain($1, $2, NULL, $4); }
+		{ $$ = ast_expr_binary_create($1, $2, $4); }
 	;
 
 and_expression
@@ -357,7 +363,7 @@ inclusive_or_expression
 
 logical_and_expression
 	: inclusive_or_expression
-	/*| logical_and_expression AND_OP inclusive_or_expression*/
+	| logical_and_expression AND_OP inclusive_or_expression
 	;
 
 logical_or_expression
@@ -366,15 +372,15 @@ logical_or_expression
 	;
 
 connective
-	: EQV_OP 	{ $$ = CHAIN_OP_EQV; }
-	| IMPL_OP	{ $$ = CHAIN_OP_IMPL; }
-	/*| FLLW_OP	{ $$ = CHAIN_OP_FLLW; }*/
+	: EQV_OP 	{ $$ = BINARY_OP_EQV; }
+	| IMPL_OP	{ $$ = BINARY_OP_IMPL; }
+	/*| FLLW_OP	{ $$ = BINARY_OP_FLLW; }*/
 	;
 
 justified_expression
 	: logical_or_expression
 	| justified_expression connective justification logical_or_expression
-		{ $$ = ast_expr_create_chain($1, $2, NULL, $4); }
+		{ $$ = ast_expr_binary_create($1, $2, $4); }
 	;
 
 conditional_expression
@@ -385,7 +391,7 @@ conditional_expression
 assignment_expression
 	: conditional_expression
 	| unary_expression assignment_operator assignment_expression
-		{ $$ = ast_expr_create_assignment($1, $3); }
+		{ $$ = ast_expr_assignment_create($1, $3); }
 	;
 
 assignment_operator
@@ -407,14 +413,14 @@ expression
 	/*| expression ',' assignment_expression*/
 	;
 
-constant_expression
-	: conditional_expression
-	;
+/*constant_expression*/
+	/*: conditional_expression*/
+	/*;*/
 
 declaration
-	: declaration_specifiers ';'
-		{ $$ = ast_variable_create(dynamic_str(""), $1); }
-	| declaration_specifiers init_declarator_list ';' {
+	/*: declaration_specifiers ';'*/
+		/*{ $$ = ast_variable_create(dynamic_str(""), $1); }*/
+	: declaration_specifiers init_declarator_list ';' {
 		for (int i = 0; i < $2.ptr_valence; i++) {
 			assert($1);
 			$1 = ast_type_create_ptr($1);
@@ -429,33 +435,10 @@ declaration_modifier
 	;
 
 declaration_specifiers
-	: type_specifier {
-		switch ($1.base) {
-		case TYPE_TYPEDEF:
-			/* XXX */
-			assert($1.typedef_name 
-				&& strcmp($1.typedef_name, "FILE") == 0);
-			$$ = ast_type_create_typedef(
-				ast_type_create(TYPE_STRUCT, 0),
-				$1.typedef_name
-			);
-			break;
-		case TYPE_POINTER:
-		case TYPE_ARRAY:
-			assert(false);
-		default:
-			assert(!$1.typedef_name);
-			$$ = ast_type_create($1.base, 0);
-			break;
-		}
+	: type_specifier
+	| type_specifier declaration_specifiers {
+		$$ = $2;
 	}
-	/*| type_specifier declaration_specifiers {*/
-		/*[> allocate for concatenation with intervening space <]*/
-		/*$1 = realloc($1, strlen($1) + 1 + strlen($2->name) + 1);*/
-		/*sprintf($1, "%s %s", $1, $2->name);*/
-		/*free($2->name); $2->name = $1;*/
-		/*$$ = $2;*/
-	/*}*/
 	| declaration_modifier declaration_specifiers {
 		$2->mod |= $1;
 		$$ = $2;
@@ -464,7 +447,7 @@ declaration_specifiers
 
 init_declarator_list
 	: init_declarator
-	/*| init_declarator_list ',' init_declarator*/
+	| init_declarator_list ',' init_declarator
 	;
 
 init_declarator
@@ -487,51 +470,57 @@ storage_class_specifier
 	;
 
 type_specifier
-	: VOID		{ $$ = (struct type_specifier) { TYPE_VOID, NULL }; }
-	| CHAR		{ $$ = (struct type_specifier) { TYPE_CHAR, NULL }; }
+	: VOID		{ $$ = ast_type_create(TYPE_VOID, 0); }
+	| CHAR		{ $$ = ast_type_create(TYPE_CHAR, 0); }
 	/*| SHORT*/
-	| INT		{ $$ = (struct type_specifier) { TYPE_INT, NULL }; }
+	| INT		{ $$ = ast_type_create(TYPE_INT, 0); }
 	/*| LONG*/
 	/*| FLOAT*/
 	/*| DOUBLE*/
-	| SIGNED	{ $$ = (struct type_specifier) { TYPE_SIGNED, NULL }; }
-	| UNSIGNED	{ $$ = (struct type_specifier) { TYPE_UNSIGNED, NULL }; }
+	/*| SIGNED*/
+	/*| UNSIGNED*/
 	| struct_or_union_specifier
-		/* XXX: placeholder */
-		{ free($1); $$ = (struct type_specifier) { TYPE_STRUCT, NULL }; }
-	| enum_specifier
-		{ assert(false); }
+	/*| enum_specifier*/
 	| TYPE_NAME	{ 
-		$$ = (struct type_specifier) { TYPE_TYPEDEF, dynamic_str(yytext) }; 
+		$$ = ast_type_create_typedef(
+			ast_type_create(TYPE_TYPEDEF, 0),
+			dynamic_str(yytext)
+		);
 	}
 	;
 
 struct_or_union_specifier
-	/*: struct_or_union IDENTIFIER '{' struct_declaration_list '}'*/
-	/*| struct_or_union '{' struct_declaration_list '}'*/
-	: struct_or_union identifier { $$ = $2; }
+	: struct_or_union identifier '{' struct_declaration_list '}'
+		{ assert($1); $$ = ast_type_create_struct($2, $4); }
+	| struct_or_union '{' struct_declaration_list '}'
+		{ assert($1); $$ = ast_type_create_struct_anonym($3); }
+	| struct_or_union identifier
+		{ assert($1); $$ = ast_type_create_struct_partial($2); }
 	;
 
 struct_or_union
-	: STRUCT
-	| UNION
+	: STRUCT	{ $$ = true; }
+	| UNION		{ $$ = false; }
 	;
 
-/*struct_declaration_list*/
-	/*: struct_declaration*/
-	/*| struct_declaration_list struct_declaration*/
-	/*;*/
+struct_declaration_list
+	: struct_declaration
+		{ $$ = variable_array_create($1); }
+	| struct_declaration_list struct_declaration
+		{ $$ = variable_array_append($1, $2); }
+	;
 
-/*struct_declaration*/
+struct_declaration
 	/*: specifier_qualifier_list struct_declarator_list ';'*/
-	/*;*/
+	: declaration /* XXX: added temporarily */
+	;
 
-/*specifier_qualifier_list*/
-	/*: type_specifier specifier_qualifier_list*/
-	/*| type_specifier*/
-	/*| type_qualifier specifier_qualifier_list*/
-	/*| type_qualifier*/
-	/*;*/
+specifier_qualifier_list
+	: type_specifier specifier_qualifier_list
+	| type_specifier
+	| type_qualifier specifier_qualifier_list
+	| type_qualifier
+	;
 
 /*struct_declarator_list*/
 	/*: struct_declarator*/
@@ -544,21 +533,21 @@ struct_or_union
 	/*| declarator ':' constant_expression*/
 	/*;*/
 
-enum_specifier
-	: ENUM '{' enumerator_list '}'
-	| ENUM IDENTIFIER '{' enumerator_list '}'
-	| ENUM IDENTIFIER
-	;
+/*enum_specifier*/
+	/*: ENUM '{' enumerator_list '}'*/
+	/*| ENUM IDENTIFIER '{' enumerator_list '}'*/
+	/*| ENUM IDENTIFIER*/
+	/*;*/
 
-enumerator_list
-	: enumerator
-	| enumerator_list ',' enumerator
-	;
+/*enumerator_list*/
+	/*: enumerator*/
+	/*| enumerator_list ',' enumerator*/
+	/*;*/
 
-enumerator
-	: IDENTIFIER
-	| IDENTIFIER '=' constant_expression
-	;
+/*enumerator*/
+	/*: IDENTIFIER*/
+	/*| IDENTIFIER '=' constant_expression*/
+	/*;*/
 
 type_qualifier
 	: CONST		{ $$ = MOD_CONST; }
@@ -586,8 +575,8 @@ direct_function_declarator
 	: identifier '(' parameter_type_list ')' {
 		$$ = (struct direct_function_declarator) {
 			.name		= $1,
-			.n		= $3.n,
-			.param		= $3.var,
+			.n		= ast_variable_arr_n($3),
+			.param		= ast_variable_arr_v($3),
 		};
 	}
 	| identifier '(' ')' {
@@ -602,6 +591,7 @@ direct_function_declarator
 declarator
 	: pointer direct_declarator	{ $$ = (struct declarator) { $1, $2 }; }
 	| direct_declarator		{ $$ = (struct declarator) { 0, $1 }; }
+	| pointer			{ $$ = (struct declarator) { $1, NULL}; }
 	;
 
 direct_declarator
@@ -609,7 +599,7 @@ direct_declarator
 	/*| '(' declarator ')'*/
 	/*| direct_declarator '[' constant_expression ']'*/
 	/*| direct_declarator '[' ']'*/
-	/*| direct_declarator '(' parameter_type_list ')'*/
+	| direct_declarator '(' parameter_type_list ')'
 	/*| direct_declarator '(' identifier_list ')'*/
 	/*| direct_declarator '(' ')'*/
 	;
@@ -636,7 +626,7 @@ parameter_list
 		$$ = variable_array_create($1);
 	}
 	| parameter_list ',' parameter_declaration {
-		$$ = variable_array_append(&$1, $3);
+		$$ = variable_array_append($1, $3);
 	}
 	;
 
@@ -659,13 +649,13 @@ parameter_declaration
 	/*| identifier_list ',' IDENTIFIER*/
 	/*;*/
 
-/*type_name*/
-	/*: specifier_qualifier_list*/
-	/*| specifier_qualifier_list abstract_declarator*/
-	/*;*/
+type_name
+	: specifier_qualifier_list
+	| specifier_qualifier_list abstract_declarator
+	;
 
-/*abstract_declarator*/
-	/*: pointer*/
+abstract_declarator
+	: pointer
 	/*| direct_abstract_declarator*/
 	/*| pointer direct_abstract_declarator*/
 	/*;*/
@@ -694,8 +684,8 @@ parameter_declaration
 	/*;*/
 
 statement
-	/*: labeled_statement*/
-	: compound_statement
+	: labelled_statement
+	| compound_statement
 		{ $$ = ast_stmt_create_compound(lexloc(), $1); }
 	| expression_statement
 	| selection_statement
@@ -707,8 +697,10 @@ statement
 		{ $$ = ast_stmt_create_compound_v(lexloc(), $1); }
 	;
 
-/*labeled_statement*/
-	/*: IDENTIFIER ':' statement*/
+labelled_statement
+	: identifier ':' statement
+		{ $$ = ast_stmt_create_labelled(lexloc(), $1, $3); }
+	;
 	/*| CASE constant_expression ':' statement*/
 	/*| DEFAULT ':' statement*/
 	/*;*/
@@ -722,10 +714,16 @@ block
 		{ $$ = ast_block_create(NULL, 0, NULL, 0); }
 	| statement_list
 		{ $$ = ast_block_create(NULL, 0, $1.stmt, $1.n); }
-	| declaration_list
-		{ $$ = ast_block_create($1.var, $1.n, NULL, 0); }
-	| declaration_list statement_list
-		{ $$ = ast_block_create($1.var, $1.n, $2.stmt, $2.n); }
+	| declaration_list {
+		$$ = ast_block_create(
+			ast_variable_arr_v($1), ast_variable_arr_n($1), NULL, 0
+		);
+	}
+	| declaration_list statement_list {
+		$$ = ast_block_create(
+			ast_variable_arr_v($1), ast_variable_arr_n($1), $2.stmt, $2.n
+		);
+	}
 	;
 
 iteration_effect_statement
@@ -741,7 +739,7 @@ declaration_list
 	: declaration
 		{ $$ = variable_array_create($1); }
 	| declaration_list declaration
-		{ $$ = variable_array_append(&$1, $2); }
+		{ $$ = variable_array_append($1, $2); }
 	;
 
 statement_list
@@ -761,7 +759,7 @@ selection_statement
 		{ $$ = ast_stmt_create_sel(lexloc(), false, $3, $5, NULL); }
 	| IF '(' expression ')' statement ELSE statement
 		{
-			struct ast_expr *neg_cond = ast_expr_create_unary(
+			struct ast_expr *neg_cond = ast_expr_unary_create(
 				ast_expr_copy($3), UNARY_OP_BANG
 			);
 			struct ast_stmt *_else = ast_stmt_create_sel(
@@ -818,6 +816,9 @@ translation_unit
 external_declaration
 	: function_definition	{ $$ = ast_functiondecl_create($1); }
 	| declaration		{ $$ = ast_variabledecl_create($1); }
+
+	/* XXX: until we fix declaration */
+	| declaration_specifiers ';' { $$ = ast_typedecl_create($1); }
 	;
 
 block_statement

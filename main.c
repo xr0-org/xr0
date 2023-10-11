@@ -14,15 +14,32 @@
 
 #define OUTPUT_PATH "0.c"
 
-#define PREPROC_CMD_TEMPLATE "cc -I %s -nostdinc -E -xc %s"
+#define PREPROC_CMD_TEMPLATE "cc %s -nostdinc -E -xc %s"
 #define PREPROC_CMD_BASE_LEN (strlen(PREPROC_CMD_TEMPLATE) - 4)
 
 int yyparse();
 
+struct string_arr;
+
+struct string_arr *
+string_arr_create();
+
+void
+string_arr_destroy(struct string_arr *);
+
+void
+string_arr_append(struct string_arr *, char *);
+
+char **
+string_arr_s(struct string_arr *);
+
+int
+string_arr_n(struct string_arr *);
+
 struct config {
 	char *infile;
 	char *outfile;
-	char *includedir;
+	struct string_arr *includedirs;
 	bool verbose;
 };
 
@@ -30,13 +47,13 @@ struct config
 parse_config(int argc, char *argv[])
 {
 	bool verbose = false;
-	char *includedir = NULL;
+	struct string_arr *includedirs = string_arr_create();
 	char *outfile = OUTPUT_PATH;
 	int opt;
 	while ((opt = getopt(argc, argv, "vo:I:")) != -1) {
 		switch (opt) {
 		case 'I':
-			includedir = optarg;
+			string_arr_append(includedirs, dynamic_str(optarg));
 			break;
 		case 'o':
 			outfile = optarg;
@@ -49,10 +66,6 @@ parse_config(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 	}
-	if (!includedir) {
-		fprintf(stderr, "must provide include directory\n");
-		exit(EXIT_FAILURE);
-	}
 	if (optind >= argc) {
 		fprintf(stderr, "must provide input as string\n");
 		exit(EXIT_FAILURE);
@@ -60,33 +73,86 @@ parse_config(int argc, char *argv[])
 	return (struct config) {
 		.infile		= argv[optind],
 		.outfile	= outfile,
-		.includedir	= includedir,
+		.includedirs	= includedirs,
 		.verbose	= verbose,
 	};
 }
 
-char *
-preprocesscmd_fmt(char *includedir, char *infile)
+struct string_arr {
+	int n;
+	char **s;
+};
+
+struct string_arr *
+string_arr_create()
 {
-	int len = PREPROC_CMD_BASE_LEN + strlen(includedir) + strlen(infile) + 1;
+	return calloc(1, sizeof(struct string_arr));
+}
+
+void
+string_arr_destroy(struct string_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		free(arr->s[i]);
+	}
+	free(arr);
+}
+
+void
+string_arr_append(struct string_arr *arr, char *s)
+{
+	arr->s = realloc(arr->s, sizeof(char *) * ++arr->n);
+	arr->s[arr->n-1] = s;
+}
+
+char **
+string_arr_s(struct string_arr *arr)
+{
+	return arr->s;
+}
+
+int
+string_arr_n(struct string_arr *arr)
+{
+	return arr->n;
+}
+
+
+char *
+genincludes(struct string_arr *includedirs)
+{
+	struct strbuilder *b = strbuilder_create();
+	char **s = string_arr_s(includedirs);
+	int n = string_arr_n(includedirs);
+	for (int i = 0; i < n; i++) {
+		strbuilder_printf(b, " -I %s", s[i]);
+	}
+	return strbuilder_build(b);
+}
+
+char *
+preprocesscmd_fmt(struct string_arr *includedirs, char *infile)
+{
+	char *includes = genincludes(includedirs);
+	int len = PREPROC_CMD_BASE_LEN + strlen(includes) + strlen(infile) + 1;
 	char *s = malloc(sizeof(char) * len);
-	snprintf(s, len, PREPROC_CMD_TEMPLATE, includedir, infile);
+	snprintf(s, len, PREPROC_CMD_TEMPLATE, includes, infile);
 	return s;
 }
 
 FILE *
-open_preprocessor(char *infile, char *includedir)
+open_preprocessor(char *infile, struct string_arr *includedirs)
 {
-	char *cmd = preprocesscmd_fmt(includedir, infile);
+	char *cmd = preprocesscmd_fmt(includedirs, infile);
 	FILE *pipe = popen(cmd, "r");
 	free(cmd);
 	return pipe;
 }
 
 FILE *
-preprocess(char *infile, char *includedir)
+preprocess(char *infile, struct string_arr *includedirs)
 {
-	FILE *pipe = open_preprocessor(infile, includedir);
+	FILE *pipe = open_preprocessor(infile, includedirs);
 	if (!pipe) {
 		fprintf(stderr, "command error\n");
 		exit(EXIT_FAILURE);
@@ -118,19 +184,35 @@ should_verify(struct ast_externdecl *decl)
 }
 
 static void
-install_declaration(struct ast_externdecl *decl, struct map *extfunc)
+install_declaration(struct ast_externdecl *decl, struct externals *ext)
 {
-	/* TODO: install global vars in table */
-	if (decl->kind != EXTERN_FUNCTION) {
-		return; /* XXX */
+	struct ast_function *f;
+	struct ast_variable *v;
+	struct ast_type *t;
+
+	switch (decl->kind) {
+	case EXTERN_FUNCTION:
+		f = decl->u.function;
+		externals_declarefunc(ext, f->name, f);
+		break;
+	case EXTERN_VARIABLE:
+		printf("variable: %s\n", decl->u.variable->name);
+		v = decl->u.variable;
+		externals_declarevar(ext, v->name, v);
+		break;
+	case EXTERN_TYPE:
+		t = decl->u.type;
+		assert(t->base == TYPE_STRUCT && t->u.structunion.tag);
+		externals_declaretype(ext, t->u.structunion.tag, t);
+		break;
+	default:
+		assert(false);
 	}
-	struct ast_function *f = decl->u.function;
-	map_set(extfunc, dynamic_str(f->name), ast_function_copy(f));
 }
 
 
 void
-pass1(struct ast *root, struct map *extfunc)
+pass1(struct ast *root, struct externals *ext)
 {
 	struct error *err;
 	/* TODO:
@@ -142,7 +224,7 @@ pass1(struct ast *root, struct map *extfunc)
 	 */
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
-		install_declaration(decl, extfunc);
+		install_declaration(decl, ext);
 		if (!should_verify(decl)) {
 			continue;
 		}
@@ -151,7 +233,7 @@ pass1(struct ast *root, struct map *extfunc)
 		if (!f->abstract) {
 			f->abstract = ast_block_create(NULL, 0, NULL, 0);
 		}
-		if ((err = function_verify(f, extfunc))) {
+		if ((err = function_verify(f, ext))) {
 			fprintf(stderr, "%s", err->msg);
 			exit(EXIT_FAILURE);
 		}
@@ -164,7 +246,7 @@ main(int argc, char *argv[])
 	/* read file and preprocess */
 	extern FILE *yyin;
 	struct config c = parse_config(argc, argv);
-	yyin = preprocess(c.infile, c.includedir);
+	yyin = preprocess(c.infile, c.includedirs);
 
 	/* lex and parse */
 	lex_begin();
@@ -174,12 +256,9 @@ main(int argc, char *argv[])
 	lex_finish();
 
 	/* TODO: move table from lexer to pass1 */
-	struct map *extfunc = map_create();
-	pass1(root, extfunc);
-	for (int i = 0; i < extfunc->n; i++) {
-		ast_function_destroy((struct ast_function *) extfunc->entry[i].value);
-	}
-	map_destroy(extfunc);
+	struct externals *ext = externals_create();
+	pass1(root, ext);
+	externals_destroy(ext);
 
 	ast_destroy(root);
 }
