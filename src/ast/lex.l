@@ -131,6 +131,7 @@ L?\"(\\.|[^\\"])*\"	{ count(); return(STRING_LITERAL); }
 "|"			{ count(); return('|'); }
 "?"			{ count(); return('?'); }
 "@"			{ count(); return(ASSERT); }
+"$"			{ count(); return(ARB_ARG); }
 
 [ \t\v\n\f]		{ count(); }
 .			{ /* ignore bad characters */ }

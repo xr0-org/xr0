@@ -11,6 +11,9 @@ heap_create();
 void
 heap_destroy();
 
+struct heap *
+heap_copy(struct heap *);
+
 char *
 heap_str(struct heap *, char *indent);
 
@@ -20,15 +23,43 @@ struct block_arr *
 heap_blocks(struct heap *);
 
 struct location *
-heap_newblock(struct heap *h, int size);
+heap_newblock(struct heap *h);
 
-block *
+struct block; 
+
+struct block *
 heap_getblock(struct heap *h, int block);
 
 bool
-heap_referenced(struct heap *h, struct stack *);
+heap_referenced(struct heap *h, struct state *);
 
 struct error *
 heap_deallocblock(struct heap *h, int block);
+
+
+/* TODO: extract to own file */
+
+struct vconst;
+
+struct vconst *
+vconst_create();
+
+struct vconst *
+vconst_copy(struct vconst *);
+
+void
+vconst_destroy(struct vconst *);
+
+char *
+vconst_str(struct vconst *, char *indent);
+
+char *
+vconst_declare(struct vconst *, struct value *);
+
+struct value *
+vconst_get(struct vconst *, char *id);
+
+bool
+vconst_eval(struct vconst *, struct ast_expr *);
 
 #endif

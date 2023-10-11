@@ -22,28 +22,28 @@ Funcarr
 paths_fromfunction(struct ast_function *f);
 
 struct error *
-function_verify_paths(Funcarr paths, struct map *extfunc);
+function_verify_paths(Funcarr paths, struct externals *);
 
 struct error *
-function_verify(struct ast_function *f, struct map *extfunc)
+function_verify(struct ast_function *f, struct externals *ext)
 {
 	Funcarr paths = paths_fromfunction(f);
-	struct error *err = function_verify_paths(paths, extfunc);
+	struct error *err = function_verify_paths(paths, ext);
 	func_arr_destroy(paths);
 	return err;
 }
 
 struct error *
-path_verify_withstate(struct ast_function *, struct map *extfunc);
+path_verify_withstate(struct ast_function *, struct externals *);
 
 struct error *
-function_verify_paths(Funcarr paths, struct map *extfunc)
+function_verify_paths(Funcarr paths, struct externals *ext)
 {	
 	int len = func_arr_len(paths);
 	struct ast_function **path = func_arr_paths(paths);
 	for (int i = 0; i < len; i++) {
-		struct error *err;
-		if ((err = path_verify_withstate(path[i], extfunc))) {
+		struct error *err = NULL;
+		if ((err = path_verify_withstate(path[i], ext))) {
 			return err;
 		}
 	}
@@ -53,13 +53,13 @@ function_verify_paths(Funcarr paths, struct map *extfunc)
 /* path_verify_withstate */
 
 struct error *
-path_verify(struct ast_function *f, struct state *state);
+path_verify(struct ast_function *f, struct state *state, struct externals *);
 
 struct error *
-path_verify_withstate(struct ast_function *f, struct map *extfunc)
+path_verify_withstate(struct ast_function *f, struct externals *ext)
 {
-	struct state *state = state_create(extfunc, ast_function_type(f));
-	struct error *err = path_verify(f, state);
+	struct state *state = state_create(ext, ast_function_type(f));
+	struct error *err = path_verify(f, state, ext);
 	state_destroy(state);
 	return err;
 }
@@ -295,21 +295,23 @@ static struct error *
 stmt_exec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
-abstract_audit(struct ast_function *f, struct state *actual_state);
+abstract_audit(struct ast_function *f, struct state *actual_state,
+		struct externals *);
+
+static struct error *
+parameterise_state(struct state *s, struct ast_function *f);
 
 struct error *
-path_verify(struct ast_function *f, struct state *state)
+path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 {
-	struct error *err;
+	struct error *err = NULL;
 
 	struct ast_block *body = ast_function_body(f);
 
-	/* declare params and locals in stack frame */
-	struct ast_variable **param = ast_function_params(f);
-	int nparams = ast_function_nparams(f);
-	for (int i = 0; i < nparams; i++) {
-		state_declare(state, param[i], true);
+	if ((err = parameterise_state(state, f))) {
+		return err;
 	}
+
 	int ndecls = ast_block_ndecls(body);
 	struct ast_variable **var = ast_block_decls(body);
 	for (int i = 0; i < ndecls; i++) {
@@ -332,23 +334,86 @@ path_verify(struct ast_function *f, struct state *state)
 			return error_prepend(err, "cannot exec statement: ");
 		}
 	}
+	state_stack_undeclare(state);
 	/* TODO: verify that `result' is of same type as f->result */
-	if ((err = abstract_audit(f, state))) {
+	if ((err = abstract_audit(f, state, ext))) {
 		return error_prepend(err, "qed error: ");
 	}
 	return NULL;
 }
 
-static struct location *
-hack_location_from_assertion(struct ast_expr *expr, struct state *state)
+static bool
+isprecondition(struct ast_stmt *);
+
+static struct error *
+parameterise_state(struct state *s, struct ast_function *f)
+{
+	/* declare params and locals in stack frame */
+	struct ast_variable **param = ast_function_params(f);
+	int nparams = ast_function_nparams(f);
+	for (int i = 0; i < nparams; i++) {
+		struct ast_variable *p = param[i];
+		state_declare(s, p, true);
+		if (ast_type_base(ast_variable_type(p)) == TYPE_INT) {
+			struct object *obj = state_getobject(s, ast_variable_name(p));
+			assert(obj);
+			struct error *err = state_assign(s, obj, state_vconst(s));
+			if (err) {
+				return err;
+			}
+		}
+	}
+
+	struct ast_block *abs = ast_function_abstract(f);
+	int nstmts = ast_block_nstmts(abs);
+	struct ast_stmt **stmt = ast_block_stmts(abs);
+	for (int i = 0; i < nstmts; i++) {
+		struct error *err = NULL;
+		if (isprecondition(stmt[i])) {
+			if ((err = stmt_exec(stmt[i], s))) {
+				return err;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+static bool
+isprecondition(struct ast_stmt *stmt)
+{
+	return ast_stmt_kind(stmt) == STMT_LABELLED
+		&& strcmp(ast_stmt_labelled_label(stmt), "pre") == 0;
+}
+
+
+struct lvalue;
+
+struct lvalue *
+lvalue_create(struct ast_type *, struct object *);
+
+void
+lvalue_destroy(struct lvalue *);
+
+struct ast_type *
+lvalue_type(struct lvalue *);
+
+struct object *
+lvalue_object(struct lvalue *);
+
+struct lvalue *
+expr_lvalue(struct ast_expr *, struct state *);
+
+static struct object *
+hack_object_from_assertion(struct ast_expr *expr, struct state *state)
 {	
 	/* get assertand */
 	struct ast_expr *assertand = ast_expr_assertion_assertand(expr);
 
 	/* get `assertand' variable */
-	struct location *loc = state_location_from_lvalue(state, assertand);
-	assert(loc);
-	return loc;
+	struct object *obj = lvalue_object(expr_lvalue(assertand, state));
+	assert(obj);
+	return obj;
 }
 
 /* stmt_verify */
@@ -398,6 +463,60 @@ stmt_v_block_verify(struct ast_stmt *v_block_stmt, struct state *state)
 
 /* stmt_expr_verify */
 
+typedef struct {
+	struct value *val;
+	struct error *err;
+} Result;
+
+static Result
+result_error_create(struct error *err)
+{
+	assert(err);
+	return (Result) { .err = err };
+}
+
+static Result
+result_value_create(struct value *val)
+{
+	return (Result) { .val = val, .err = NULL };
+}
+
+static void
+result_destroy(Result res)
+{
+	assert(!res.err);
+	if (res.val) {
+		state_value_destroy(res.val);
+	}
+}
+
+static bool
+result_iserror(Result res)
+{
+	return res.err;
+}
+
+static struct error *
+result_as_error(Result res)
+{
+	assert(res.err);
+	return res.err;
+}
+
+static struct value *
+result_as_value(Result res)
+{
+	assert(!res.err && res.val);
+	return res.val;
+}
+
+static bool
+result_hasvalue(Result res)
+{
+	assert(!result_iserror(res));
+	return res.val; /* implicit cast */
+}
+
 static bool
 expr_decide(struct ast_expr *expr, struct state *state);
 
@@ -418,6 +537,9 @@ static bool
 expr_assertion_decide(struct ast_expr *expr, struct state *state);
 
 static bool
+expr_binary_decide(struct ast_expr *expr, struct state *state);
+
+static bool
 expr_decide(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
@@ -425,6 +547,8 @@ expr_decide(struct ast_expr *expr, struct state *state)
 		return expr_unary_decide(expr, state);
 	case EXPR_ASSERTION:
 		return expr_assertion_decide(expr, state);
+	case EXPR_BINARY:
+		return expr_binary_decide(expr, state);
 	default:
 		assert(false);
 	}
@@ -445,87 +569,142 @@ expr_unary_decide(struct ast_expr *expr, struct state *state)
 static bool
 expr_assertion_decide(struct ast_expr *expr, struct state *state)
 {
-	struct location *loc = hack_location_from_assertion(expr, state);
-	assert(loc);
-	bool isdeallocand = state_location_addresses_deallocand(state, loc);
-	state_location_destroy(loc);
+	struct object *obj = hack_object_from_assertion(expr, state);
+	bool isdeallocand = state_addresses_deallocand(state, obj);
+	state_object_destroy(obj);
 	return isdeallocand;
 }
+
+static Result
+expr_eval(struct ast_expr *expr, struct state *state);
+
+static bool
+expr_binary_decide(struct ast_expr *expr, struct state *state)
+{
+	Result root = expr_eval(ast_expr_binary_e1(expr), state),
+	       last = expr_eval(ast_expr_binary_e2(expr), state);
+
+	assert(!result_iserror(root) && !result_iserror(last));
+
+	return value_compare(
+		result_as_value(root),
+		ast_expr_binary_op(expr),
+		result_as_value(last)
+	);
+}
+
+static bool
+iter_empty(struct ast_stmt *stmt, struct state *state);
+
+static bool
+expr_iter_verify(struct ast_expr *expr, struct ast_expr *up,
+		struct ast_expr *lw, struct state *state);
 
 static struct error *
 stmt_iter_verify(struct ast_stmt *stmt, struct state *state)
 {
-	/* XXX: we're assuming internal consistency for now */
+	/* check for empty sets */
+	if (iter_empty(stmt, state)) {
+		return NULL;
+	}
+
+	/* neteffect is an iter statement */
+	struct ast_stmt *body = ast_stmt_iter_body(stmt);
+	assert(ast_stmt_kind(body) == STMT_COMPOUND);
+	struct ast_block *block = ast_stmt_as_block(body);
+	assert(ast_block_ndecls(block) == 0 && ast_block_nstmts(block) == 1);
+	struct ast_expr *assertion = ast_stmt_as_expr(ast_block_stmts(block)[0]);
+
+	/* we're currently discarding analysis of `offset` and relying on the
+	 * bounds (lw, up beneath) alone */
+	struct ast_expr *lw = ast_stmt_iter_lower_bound(stmt),
+			*up = ast_stmt_iter_upper_bound(stmt);
+
+	if (!expr_iter_verify(assertion, lw, up, state)) {
+		return error_create("could not verify");	
+	}
 	return NULL;
 }
 
-/* stmt_exec */
-
-typedef struct {
-	struct location *loc;
-	struct error *err;
-} Result;
-
-static Result
-result_create_empty()
+static bool
+iter_empty(struct ast_stmt *stmt, struct state *state)
 {
-	return (Result) { .loc = NULL, .err = NULL };
-}
-
-static Result
-result_create_error(struct error *err)
-{
-	return (Result) { .err = err };
+	struct error *err = stmt_exec(ast_stmt_iter_init(stmt), state);
+	assert(!err);
+	/* iter is empty if its cond is false after init (executed above) */
+	return !expr_decide(ast_stmt_as_expr(ast_stmt_iter_cond(stmt)), state);
 }
 
 static bool
-result_iserror(Result res)
-{
-	return res.err;
-}
+expr_iter_unary_verify(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *);
 
-static struct error *
-result_error(Result res)
-{
-	return res.err;
-}
+static bool
+expr_iter_assertion_verify(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *);
 
-static Result
-result_create_loc(struct location *loc)
+static bool
+expr_iter_verify(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *state)
 {
-	return (Result) { .loc = loc, .err = NULL };
-}
-
-static void
-result_destroy(Result res)
-{
-	assert(!res.err);
-	if (res.loc) {
-		state_location_destroy(res.loc);
+	switch (ast_expr_kind(expr)) {
+	case EXPR_UNARY:
+		return expr_iter_unary_verify(expr, lw, up, state);
+	case EXPR_ASSERTION:
+		return expr_iter_assertion_verify(expr, lw, up, state);
+	default:
+		assert(false);
 	}
 }
 
-
-/* XXX: obsolete */
 static bool
-result_onheap(Result res)
+expr_iter_unary_verify(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *state)
 {
-	assert(!result_iserror(res));
-	return res.loc; /* implicit cast */
+	struct ast_expr *operand = ast_expr_unary_operand(expr);
+	switch (ast_expr_unary_op(expr)) {
+	case UNARY_OP_BANG:
+		return !expr_iter_verify(operand, lw, up, state);
+	default:
+		assert(false);
+	}
 }
 
-static struct location *
-result_loc(Result res)
+static bool
+expr_iter_assertion_verify(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *state)
 {
-	assert(!result_iserror(res) && res.loc);
-	return res.loc;
+	struct ast_expr *acc = ast_expr_assertion_assertand(expr); /* `arr[offset]` */
+	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
+	struct ast_expr *j = ast_expr_identifier_create(dynamic_str("j"));
+	assert(
+		ast_expr_equal(ast_expr_access_index(acc), i) ||
+		ast_expr_equal(ast_expr_access_index(acc), j)
+	);
+	ast_expr_destroy(j);
+	ast_expr_destroy(i);
+	struct object *obj = lvalue_object(
+		expr_lvalue(ast_expr_access_root(acc), state)
+	);
+	assert(obj);
+
+	bool deallocands = state_range_aredeallocands(
+		state, obj, lw, up	
+	);
+
+	state_object_destroy(obj);
+
+	return deallocands;
 }
+
+
+/* stmt_exec */
 
 static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
-stmt_expr_exec(struct ast_stmt *stmt, struct state *state);
+expr_exec(struct ast_expr *exec, struct state *state);
 
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state);
@@ -537,23 +716,25 @@ static struct error *
 stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_LABELLED:
+		return stmt_exec(ast_stmt_labelled_stmt(stmt), state);
 	case STMT_COMPOUND:
 		return stmt_compound_exec(stmt, state);
 	case STMT_COMPOUND_V:
 		return NULL;
 	case STMT_EXPR:
-		return stmt_expr_exec(stmt, state);
+		return expr_exec(ast_stmt_as_expr(stmt), state);
 	case STMT_ITERATION:
 		return stmt_iter_exec(stmt, state);
 	case STMT_JUMP:
 		return stmt_jump_exec(stmt, state);
 	default:
-		fprintf(stderr, "stmt->kind: %d\n", stmt->kind);
 		assert(false);
 	}
 }
 
 /* stmt_compound_exec */
+
 static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 {
@@ -570,17 +751,156 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 	return NULL;
 }
 
+/* expr_lvalue */
+
+struct lvalue *
+expr_identifier_lvalue(struct ast_expr *expr, struct state *state);
+
+struct lvalue *
+expr_access_lvalue(struct ast_expr *expr, struct state *state);
+
+struct lvalue *
+expr_unary_lvalue(struct ast_expr *expr, struct state *state);
+
+struct lvalue *
+expr_structmember_lvalue(struct ast_expr *expr, struct state *state);
+
+struct lvalue *
+expr_lvalue(struct ast_expr *expr, struct state *state)
+{
+	switch (ast_expr_kind(expr)) {
+	case EXPR_IDENTIFIER:
+		return expr_identifier_lvalue(expr, state);
+	case EXPR_ACCESS:
+		return expr_access_lvalue(expr, state);
+	case EXPR_UNARY:
+		return expr_unary_lvalue(expr, state);
+	case EXPR_STRUCTMEMBER:
+		return expr_structmember_lvalue(expr, state);
+	default:
+		assert(false);
+	}
+}
+
+struct lvalue *
+expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
+{
+	char *id = ast_expr_as_identifier(expr);
+	return lvalue_create(
+		state_gettype(state, id),
+		state_getobject(state, id)
+	);
+}
+
+struct lvalue *
+expr_access_lvalue(struct ast_expr *acc, struct state *state)
+{
+	/* from access `arr[offset]` get `arr` */
+	struct lvalue *arr = expr_lvalue(ast_expr_access_root(acc), state);
+	struct object *arr_obj = lvalue_object(arr);
+	if (!arr_obj) { /* `arr` freed */
+		return NULL;
+	}
+	struct ast_type *t = ast_type_ptr_type(lvalue_type(arr));
+	/* *(arr+offset) */
+	struct object *obj = state_deref(
+		state, arr_obj, ast_expr_access_index(acc)
+	);
+	return lvalue_create(t, obj);
+}
+
+struct lvalue *
+expr_unary_lvalue(struct ast_expr *expr, struct state *state)
+{
+	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
+
+	struct lvalue *root = expr_lvalue(ast_expr_unary_operand(expr), state);
+	struct object *root_obj = lvalue_object(root);
+	if (!root_obj) { /* `root` freed */
+		return NULL;
+	}
+	struct ast_type *t = ast_type_ptr_type(lvalue_type(root));
+
+	struct ast_expr *zero = ast_expr_constant_create(0);
+	struct object *obj = state_deref(
+		state,
+		lvalue_object(root),
+		zero
+	);
+	ast_expr_destroy(zero);
+
+	return lvalue_create(t, obj);
+}
+
+
+struct lvalue *
+expr_structmember_lvalue(struct ast_expr *expr, struct state *state)
+{
+	struct lvalue *root = expr_lvalue(ast_expr_member_root(expr), state);
+	struct object *root_obj = lvalue_object(root);
+	assert(root_obj);
+	struct object *obj = state_getobjectmember(
+		state,
+		root_obj,
+		lvalue_type(root),
+		ast_expr_member_field(expr)
+	);
+	struct ast_type *t = state_getobjectmembertype(
+		state,
+		root_obj,
+		lvalue_type(root),
+		ast_expr_member_field(expr)
+	);
+	return lvalue_create(t, obj);
+}
+
+
+struct lvalue {
+	struct ast_type *t;
+	struct object *obj;
+};
+
+struct lvalue *
+lvalue_create(struct ast_type *t, struct object *obj)
+{
+	struct lvalue *l = malloc(sizeof(struct lvalue));
+	l->t = t;
+	l->obj = obj;
+	return l;
+}
+
+void
+lvalue_destroy(struct lvalue *l)
+{
+	ast_type_destroy(l->t);
+	state_object_destroy(l->obj);
+	free(l);
+}
+
+struct ast_type *
+lvalue_type(struct lvalue *l)
+{
+	return l->t;
+}
+
+struct object *
+lvalue_object(struct lvalue *l)
+{
+	return l->obj;
+}
+
+
+
+
+
 /* stmt_expr_eval */
 
-static Result
-expr_eval(struct ast_expr *expr, struct state *state);
-
 static struct error *
-stmt_expr_exec(struct ast_stmt *stmt, struct state *state)
+expr_exec(struct ast_expr *expr, struct state *state)
 {
-	Result res = expr_eval(ast_stmt_as_expr(stmt), state);
+	Result res = expr_eval(expr, state);
 	if (result_iserror(res)) {
-		return result_error(res);
+		return result_as_error(res);
 	}
 	result_destroy(res);
 	return NULL;
@@ -589,7 +909,16 @@ stmt_expr_exec(struct ast_stmt *stmt, struct state *state)
 /* expr_eval */
 
 static Result
+expr_constant_eval(struct ast_expr *expr, struct state *state);
+
+static Result
+expr_literal_eval(struct ast_expr *expr, struct state *state);
+
+static Result
 expr_access_or_identifier_eval(struct ast_expr *expr, struct state *state);
+
+static Result
+expr_structmember_eval(struct ast_expr *expr, struct state *state);
 
 static Result
 expr_call_eval(struct ast_expr *expr, struct state *state);
@@ -598,34 +927,80 @@ static Result
 expr_assign_eval(struct ast_expr *expr, struct state *state);
 
 static Result
+expr_incdec_eval(struct ast_expr *expr, struct state *state);
+
+static Result
+expr_binary_eval(struct ast_expr *expr, struct state *state);
+
+static Result
 expr_eval(struct ast_expr *expr, struct state *state)
 {
 	/* TODO: verify preconditions of expr (statement) are satisfied */
 	/* now add postconditions */
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
-		return result_create_empty();
+		return expr_constant_eval(expr, state);
+	case EXPR_STRING_LITERAL:
+		return expr_literal_eval(expr, state);
 	case EXPR_IDENTIFIER:
 	case EXPR_ACCESS:
 		return expr_access_or_identifier_eval(expr, state);
+	case EXPR_STRUCTMEMBER:
+		return expr_structmember_eval(expr, state);
 	case EXPR_CALL:
 		return expr_call_eval(expr, state);
 	case EXPR_ASSIGNMENT:
 		return expr_assign_eval(expr, state);
+	case EXPR_INCDEC:
+		return expr_incdec_eval(expr, state);
+	case EXPR_BINARY:
+		return expr_binary_eval(expr, state);
 	default:
-		fprintf(stderr, "unknown expr kind `%s'\n", ast_expr_str(expr));
 		assert(false);
 	}
 }
 
 static Result
+expr_literal_eval(struct ast_expr *expr, struct state *state)
+{
+	return result_value_create(
+		value_literal_create(ast_expr_as_literal(expr))
+	);
+}
+
+static Result
+expr_constant_eval(struct ast_expr *expr, struct state *state)
+{
+	return result_value_create(
+		value_int_create(ast_expr_as_constant(expr))
+	);
+}
+
+static Result
 expr_access_or_identifier_eval(struct ast_expr *expr, struct state *state)
 {
-	struct location *loc = state_location_from_rvalue(state, expr);
-	if (!loc) {
-		return result_create_error(error_create("no value"));
+	struct value *val = state_getvalue(state, expr);
+	if (!val) {
+		return result_error_create(error_create("no value"));
 	}
-	return result_create_loc(loc);
+	return result_value_create(val);
+}
+
+static Result
+expr_structmember_eval(struct ast_expr *expr, struct state *s)
+{
+	Result res = expr_eval(ast_expr_member_root(expr), s);
+	if (result_iserror(res)) {
+		return res;
+	}
+	return result_value_create(
+		object_as_value(
+			value_struct_member(
+				result_as_value(res),
+				ast_expr_member_field(expr)
+			)
+		)
+	);
 }
 
 /* expr_call_eval */
@@ -633,14 +1008,86 @@ expr_access_or_identifier_eval(struct ast_expr *expr, struct state *state)
 struct ast_function *
 expr_as_func(struct ast_expr *expr, struct state *state);
 
+struct result_arr {
+	int n;
+	Result *res;
+};
+
+struct result_arr *
+result_arr_create()
+{
+	return calloc(1, sizeof(struct result_arr));
+}
+
+void
+result_arr_destroy(struct result_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		result_destroy(arr->res[i]);
+	}
+	free(arr);
+}
+
+void
+result_arr_append(struct result_arr *arr, Result res)
+{
+	arr->res = realloc(arr->res, sizeof(Result) * ++arr->n);
+	arr->res[arr->n-1] = res;
+}
+
 static Result
-call_eval_inframe(struct ast_expr *expr, struct state *state);
+prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state *);
+
+struct result_arr *
+prepare_arguments(struct ast_expr *call, struct state *state)
+{
+	struct result_arr *args = result_arr_create();
+
+	int nargs = ast_expr_call_nargs(call);
+	struct ast_expr **arg = ast_expr_call_args(call);
+
+	struct ast_function *f = expr_as_func(call, state);
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **param = ast_function_params(f);
+
+	assert(nargs == nparams);
+
+	for (int i = 0; i < nargs; i++) {
+		result_arr_append(
+			args, prepare_argument(arg[i], param[i], state)
+		);
+	}
+
+	return args;
+}
+
+static Result
+prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state *s)
+{
+	if (ast_expr_kind(arg) != EXPR_ARBARG) {
+		return expr_eval(arg, s);
+	}
+	assert(ast_type_base(ast_variable_type(param)) == TYPE_INT);
+	return result_value_create(state_vconst(s));
+}
+
+
+static Result
+call_eval_inframe(struct ast_expr *expr, struct state *state, struct result_arr *args);
 
 static Result
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
+	struct result_arr *args = prepare_arguments(expr, state);
 	state_pushframe(state, ast_function_type(expr_as_func(expr, state)));
-	Result res = call_eval_inframe(expr, state);
+	Result res = call_eval_inframe(expr, state, args);
+	result_arr_destroy(args);
+	if (result_iserror(res)) {
+		return res;
+	}
+	if (result_hasvalue(res)) { /* preserve value through pop */
+		res = result_value_create(state_value_copy(result_as_value(res)));
+	}
 	state_popframe(state);
 	return res;
 }
@@ -657,207 +1104,64 @@ expr_as_func(struct ast_expr *expr, struct state *state)
 
 /* call_eval_inframe */
 
-static bool
-hack_isfreenull(struct ast_expr *expr);
-
 static struct error *
-prepare_parameters(struct ast_function *f, struct ast_expr *expr,
+prepare_parameters(struct ast_function *f, struct result_arr *args,
 		struct state *state);
 
-static struct ast_expr *
-block_reduce(struct ast_block *, struct state *state);
+static Result
+function_absexec(struct ast_block *abs, struct state *state);
 
 static Result
-alloc_or_free(struct ast_expr *red, struct state *state);
-
-static Result
-call_eval_inframe(struct ast_expr *expr, struct state *state)
+call_eval_inframe(struct ast_expr *expr, struct state *state, struct result_arr *args)
 {
-	/* XXX: allow free(NULL) */
-	if (hack_isfreenull(expr)) {
-		return result_create_empty();
-	}
-
 	struct ast_function *f = expr_as_func(expr, state);
 	assert(f);
-	struct error *err = prepare_parameters(f, expr, state);
+
+	struct error *err = prepare_parameters(f, args, state);
 	assert(!err);
 
-	/* reduce abstract to proposition we care about */
-	struct ast_block *abstract = ast_function_abstract(f);
-	struct ast_expr *red_expr = block_reduce(abstract, state);
-	if (!red_expr) {
-		return result_create_empty();
-	}
-
-	/* undefined */
-	if (ast_expr_memory_isundefined(red_expr)) {
-		ast_expr_destroy(red_expr); /* XXX */
-		return result_create_error(error_create("undefined behaviour"));
-	}
-	
-	/* alloc or free */
-	Result res = alloc_or_free(red_expr, state);
-	ast_expr_destroy(red_expr);
-	return res;
-}
-
-static bool
-hack_isfreenull(struct ast_expr *expr)
-{
-	/* check root is "free" */
-	struct ast_expr *root = ast_expr_call_root(expr);
-	char *id = ast_expr_as_identifier(root);
-	if (strcmp(id, "free") != 0) {
-		return false;
-	}
-	assert(ast_expr_call_nargs(expr) == 1);
-
-	struct ast_expr *arg = ast_expr_call_args(expr)[0];
-	return ast_expr_kind(arg) == EXPR_IDENTIFIER
-		&& strcmp(ast_expr_as_identifier(arg), "NULL") == 0;
+	return function_absexec(ast_function_abstract(f), state);
 }
 
 /* prepare_parameters: Allocate arguments in call expression and assign them to
  * their respective parameters. */
 static struct error *
-prepare_parameters(struct ast_function *f, struct ast_expr *expr,
+prepare_parameters(struct ast_function *f, struct result_arr *args,
 		struct state *state)
 {
-	int nargs = ast_expr_call_nargs(expr);
-	struct ast_expr **arg = ast_expr_call_args(expr);
-
 	struct ast_variable **param = ast_function_params(f);
 
-	assert(ast_function_nparams(f) == nargs);
+	assert(ast_function_nparams(f) == args->n);
 
-	for (int i = 0; i < nargs; i++) {
+	for (int i = 0; i < args->n; i++) {
 		state_declare(state, param[i], true);
-		Result res = expr_eval(arg[i], state);
-		if (result_onheap(res)) {
-			struct ast_expr *name = ast_expr_create_identifier(
-				dynamic_str(ast_variable_name(param[i]))
-			);
-			struct location *loc = state_location_from_lvalue(
-				state, name
-			);
-			assert(loc);
-			ast_expr_destroy(name);
 
-			/* TODO: change to state_lvalue_assign_value */
-			struct error *err = state_location_assign(
-				state, loc, result_loc(res)
-			);
+		Result res = args->res[i];
+		if (result_iserror(res)) {
+			return result_as_error(res);
+		}
 
-			state_location_destroy(loc);
-			result_destroy(res);
+		if (!result_hasvalue(res)) {
+			continue;
+		}
 
-			if (err) {
-				return err;
-			}
+		struct ast_expr *name = ast_expr_identifier_create(
+			dynamic_str(ast_variable_name(param[i]))
+		);
+		struct object *obj = lvalue_object(expr_lvalue(name, state));
+		ast_expr_destroy(name);
+
+		struct error *err = state_assign(
+			state, obj, state_value_copy(result_as_value(res))
+		);
+
+		state_object_destroy(obj);
+
+		if (err) {
+			return err;
 		}
 	}
 	return NULL;
-}
-
-/* block_reduce */
-
-static struct ast_expr *
-stmt_reduce(struct ast_stmt *stmt, struct state *state);
-
-static struct ast_expr *
-block_reduce(struct ast_block *b, struct state *state)
-{
-	assert(ast_block_nstmts(b) == 1); /* XXX */
-	struct ast_stmt **stmt = ast_block_stmts(b);
-	return stmt_reduce(stmt[0], state);
-}
-
-/* stmt_reduce */
-
-static struct ast_expr *
-stmt_expr_reduce(struct ast_stmt *stmt, struct state *state);
-
-static struct ast_expr *
-stmt_sel_reduce(struct ast_stmt *stmt, struct state *state);
-
-static struct ast_expr *
-stmt_reduce(struct ast_stmt *stmt, struct state *state)
-{
-	switch (stmt->kind) {
-	case STMT_EXPR:
-		return stmt_expr_reduce(stmt, state);
-	case STMT_SELECTION:
-		return stmt_sel_reduce(stmt, state);
-	default:
-		assert(false);
-	}
-}
-
-static struct ast_expr *
-stmt_expr_reduce(struct ast_stmt *stmt, struct state *state)
-{
-	struct ast_expr *expr = ast_stmt_as_expr(stmt);
-	/* XXX: only dealing with allocs */
-	assert(ast_expr_kind(expr) == EXPR_MEMORY);
-	return ast_expr_copy(expr);
-}
-
-/* stmt_sel_reduce */
-
-static struct ast_expr *
-hack_force_sel_body_as_alloc_or_identifier(struct ast_stmt *body);
-
-static struct ast_expr *
-stmt_sel_reduce(struct ast_stmt *stmt, struct state *state)
-{
-	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
-	if (!expr_decide(cond, state)) {
-		struct ast_stmt *nest = ast_stmt_sel_nest(stmt);
-		if (nest) {
-			return stmt_reduce(nest, state);
-		} 
-		return NULL;
-	}
-	/* XXX: only dealing with allocs or identifiers (for `undefined') */
-	struct ast_stmt *body = ast_stmt_sel_body(stmt);
-	return hack_force_sel_body_as_alloc_or_identifier(body);
-}
-
-static struct ast_expr *
-hack_force_sel_body_as_alloc_or_identifier(struct ast_stmt *body)
-{
-	struct ast_expr *alloc = ast_stmt_as_expr(body);
-	enum ast_expr_kind kind = ast_expr_kind(alloc);
-	assert(kind == EXPR_MEMORY || kind == EXPR_IDENTIFIER);
-	return ast_expr_copy(alloc);
-}
-
-/* operates at location level. It either creates an object on the heap and returns
- * a location or gets the location pointed to by an lvalue and attempts to free
- * possibly returning an error
- * */
-static Result
-alloc_or_free(struct ast_expr *mem, struct state *state)
-{
-	struct ast_expr *root = ast_expr_memory_root(mem);
-
-	if (ast_expr_memory_isalloc(mem)) {
-		/* assert(strcmp(ast_expr_as_identifier(id), KEYWORD_RESULT) == 0); */
-
-		/* TODO: size needs to be passed in here when added to .alloc */
-		return result_create_loc(state_alloc(state, 1)); /* XXX */
-	}
-
-	struct location *loc = state_location_from_rvalue(state, root);
-	assert(loc);
-	struct error *err = state_location_dealloc(state, loc); /* lval free? */
-	if (err) {
-		fprintf(stderr, "cannot free: %s\n", err->msg);
-		assert(false);
-	}
-	state_location_destroy(loc);
-	return result_create_empty();
 }
 
 static Result
@@ -867,91 +1171,151 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 			*rval = ast_expr_assignment_rval(expr);
 
 	Result res = expr_eval(rval, state);
-	if (result_onheap(res)) {
-		struct location *loc = state_location_from_lvalue(state, lval);
-		assert(loc);
-		struct error *err = state_location_assign(
-			state, loc, result_loc(res)
+	if (result_hasvalue(res)) {
+		struct object *obj = lvalue_object(expr_lvalue(lval, state));
+		assert(obj);
+		struct error *err = state_assign(
+			state, obj, state_value_copy(result_as_value(res))
 		);
-		state_location_destroy(loc);
+		state_object_destroy(obj);
 		if (err) {
-			return result_create_error(err);
+			return result_error_create(err);
 		}
 	}
 	return res;
 }
 
+static Result
+expr_incdec_eval(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *assign = ast_expr_incdec_to_assignment(expr);
+
+	Result res;
+
+	if (ast_expr_incdec_pre(expr)) { /* ++i */
+		res = expr_assign_eval(assign, state);
+	} else { /* i++ */
+		res = expr_eval(ast_expr_incdec_root(expr), state);
+		/* assign and ignore result */ 
+		result_destroy(expr_assign_eval(assign, state));
+	}
+
+	ast_expr_destroy(assign);
+
+	return res;
+}
+
+static Result
+expr_binary_eval(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *e1 = ast_expr_binary_e1(expr),
+			*e2 = ast_expr_binary_e2(expr);
+	Result res1 = expr_eval(e1, state),
+	       res2 = expr_eval(e2, state);
+	if (result_iserror(res1)) {
+		return res1;
+	}
+	if (result_iserror(res2)) {
+		return res2;
+	}
+	return result_value_create(
+		value_int_sync_create(
+			ast_expr_binary_create(
+				value_to_expr(result_as_value(res1)),
+				ast_expr_binary_op(expr),
+				value_to_expr(result_as_value(res2))
+			)
+		)
+	);
+}
+
+
+static struct ast_stmt *
+iter_neteffect(struct ast_stmt *);
+
 static struct ast_expr *
-iter_abstract_action(struct ast_stmt *iter, struct state *state);
+hack_mem_from_neteffect(struct ast_stmt *);
+
+static struct object *
+hack_base_object_from_mem(struct ast_expr *, struct state *);
+
+static Result
+stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct error *err;
+	/* TODO: check internal consistency of iteration */
 
-	/* check internal consistency of iteration */
-	if ((err = stmt_verify(stmt, state))) {
-		return err;
-	}
-
-	struct ast_expr *action = iter_abstract_action(stmt, state);
-	if (!action) {
+	struct ast_stmt *neteffect = iter_neteffect(stmt);
+	if (!neteffect) {
 		return NULL;
 	}
-	if (ast_expr_memory_isundefined(action)) {
-		return error_create("undefined");
+
+	Result res = stmt_absexec(neteffect, state);
+	if (result_iserror(res)) {
+		return result_as_error(res);
 	}
 
-	/* our assumption going forward is that action is a memory expression */
-	struct ast_expr *mem = action;
+	ast_stmt_destroy(neteffect);
 
-	/* get ref to object allocated/freed */
-
-	/* we're currently discarding analysis of `offset` and relying on the
-	 * bounds (lower, upper beneath) alone */
-	struct ast_expr *acc = ast_expr_memory_root(mem); /* `arr[offset]` */
-	struct ast_expr *i = ast_expr_create_identifier(dynamic_str("i"));
-	assert(ast_expr_equal(ast_expr_access_index(acc), i)); 
-	ast_expr_destroy(i);
-	struct location *loc = state_location_from_lvalue(
-		state, ast_expr_access_root(acc) /* `arr` */
-	);
-	assert(loc);
-
-	struct ast_expr *lower = ast_stmt_iter_lower_bound(stmt),
-			*upper = ast_stmt_iter_upper_bound(stmt);
-
-	if (ast_expr_memory_isalloc(mem)) {
-		err = state_location_range_alloc(state, loc, lower, upper);
-	} else {
-		err = state_location_range_dealloc(state, loc, lower, upper);
-	}
-	
-	state_location_destroy(loc);
-
-	return err;
+	return NULL;
 }
 
-/* iter_abstract_action */
+static struct ast_expr *
+hack_mem_from_neteffect(struct ast_stmt *stmt)
+{
+	struct ast_stmt *body = ast_stmt_iter_body(stmt);
+	assert(ast_stmt_kind(body) == STMT_COMPOUND);
+	struct ast_block *block = ast_stmt_as_block(body);
+	assert(ast_block_ndecls(block) == 0 && ast_block_nstmts(block) == 1);
+	return ast_stmt_as_expr(ast_block_stmts(block)[0]);
+}
+
+static struct object *
+hack_base_object_from_mem(struct ast_expr *expr, struct state *state)
+{
+	/* we're currently discarding analysis of `offset` and relying on the
+	 * bounds (lower, upper beneath) alone */
+	struct ast_expr *acc = ast_expr_memory_root(expr); /* `arr[offset]` */
+	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
+	assert(ast_expr_equal(ast_expr_access_index(acc), i)); 
+	ast_expr_destroy(i);
+	struct object *obj = lvalue_object(
+		expr_lvalue(ast_expr_access_root(acc), state)
+	);
+	assert(obj);
+	return obj;
+}
+
+/* iter_neteffect */
 
 static struct ast_expr *
 stmt_itereval(struct ast_stmt *stmt, struct ast_stmt *iter, struct state *state);
 
-static struct ast_expr *
-iter_abstract_action(struct ast_stmt *iter, struct state *state)
+static struct ast_stmt *
+iter_neteffect(struct ast_stmt *iter)
 {
 	struct ast_block *abs = ast_stmt_iter_abstract(iter);
 	assert(abs);
 
 	int nstmts = ast_block_nstmts(abs);
-	if (nstmts == 0) {
+	if (!nstmts) {
 		return NULL;
 	}
 
 	assert(ast_block_ndecls(abs) == 0 && nstmts == 1);
-	struct ast_stmt **stmt = ast_block_stmts(abs);
-	assert(!ast_block_decls(abs) && stmt);
-	return stmt_itereval(stmt[0], iter, state);
+
+	return ast_stmt_create_iter(
+		NULL,
+		ast_stmt_copy(ast_stmt_iter_init(iter)),
+		ast_stmt_copy(ast_stmt_iter_cond(iter)),
+		ast_expr_copy(ast_stmt_iter_iter(iter)),
+		ast_block_create(NULL, 0, NULL, 0),
+		ast_stmt_create_compound(
+			NULL, ast_block_copy(ast_stmt_iter_abstract(iter))
+		)
+	);
 }
 
 /* stmt_itereval */
@@ -969,6 +1333,10 @@ stmt_sel_itereval(struct ast_stmt *stmt, struct ast_stmt *iter,
 		struct state *state);
 
 static struct ast_expr *
+stmt_iter_itereval(struct ast_stmt *stmt, struct ast_stmt *iter,
+		struct state *state);
+
+static struct ast_expr *
 stmt_itereval(struct ast_stmt *stmt, struct ast_stmt *iter, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
@@ -978,6 +1346,8 @@ stmt_itereval(struct ast_stmt *stmt, struct ast_stmt *iter, struct state *state)
 		return stmt_compound_itereval(stmt, iter, state);
 	case STMT_SELECTION:
 		return stmt_sel_itereval(stmt, iter, state);
+	case STMT_ITERATION:
+		return stmt_iter_itereval(stmt, iter, state);
 	default:
 		assert(false);
 	}
@@ -1067,17 +1437,15 @@ expr_assertion_iter_decide(struct ast_expr *expr, struct ast_stmt *iter,
 {
 	struct ast_expr *access = hack_access_from_assertion(expr);
 
-	struct location *loc = state_location_from_lvalue(state, access);
-	assert(loc);
+	struct object *obj = lvalue_object(expr_lvalue(access, state));
+	assert(obj);
 
-	bool deallocands = state_location_range_aredeallocands(
-		state,
-		loc,
-		ast_stmt_iter_lower_bound(iter),
-		ast_stmt_iter_upper_bound(iter)
-	);
+	struct ast_expr *lw = ast_stmt_iter_lower_bound(iter),
+			*up = ast_stmt_iter_upper_bound(iter);
 
-	state_location_destroy(loc);
+	bool deallocands = state_range_aredeallocands(state, obj, lw, up);
+
+	state_object_destroy(obj);
 
 	return deallocands;
 }
@@ -1090,19 +1458,34 @@ hack_access_from_assertion(struct ast_expr *expr)
 	return assertand;
 }
 
+
+/* stmt_iter_itereval */
+
+static struct ast_expr *
+stmt_iter_itereval(struct ast_stmt *stmt, struct ast_stmt *iter,
+		struct state *state)
+{
+	assert(false);
+}
+
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
 	Result res = expr_eval(ast_stmt_jump_rv(stmt), state);
 	if (result_iserror(res)) {
-		return result_error(res);
+		return result_as_error(res);
 	}
-	if (result_onheap(res)) {
-		struct error *err = state_location_assign(
-			state, state_getresultloc(state), result_loc(res)
+	if (result_hasvalue(res)) {
+		struct object *obj = state_getresult(state); 
+		assert(obj);
+		struct error *err = state_assign(
+			state, obj, state_value_copy(result_as_value(res))
 		);
 		result_destroy(res);
-		return err;
+		if (err) {
+			return err;
+		}
+		state_stack_undeclare(state);
 	}
 	return NULL;
 }
@@ -1114,26 +1497,19 @@ hack_flatten_abstract_for_iter_verification(struct ast_function *f,
 		struct state* state);
 
 static struct error *
-function_absexec(struct ast_block *abs, struct state *initial_state);
-
-static struct error *
-abstract_audit(struct ast_function *f, struct state *actual_state)
+abstract_audit(struct ast_function *f, struct state *actual_state,
+		struct externals *ext)
 {
-	struct error *err;
+	struct error *err = NULL;
 
 	if (!state_heap_referenced(actual_state)) {
-		return error_create("unaddressed memory on heap");
+		return error_create("garbage on heap");
 	}
+	/*printf("actual: %s\n", state_str(actual_state));*/
 
-	struct state *alleged_state = state_create(
-		state_extfunc(actual_state), ast_function_type(f)
-	);
-
-	/* declare params and locals in stack frame */
-	struct ast_variable **param = ast_function_params(f);
-	int nparams = ast_function_nparams(f);
-	for (int i = 0; i < nparams; i++) {
-		state_declare(alleged_state, param[i], true);
+	struct state *alleged_state = state_create(ext, ast_function_type(f));
+	if ((err = parameterise_state(alleged_state, f))) {
+		return err;
 	}
 
 	struct ast_block *abs = hack_flatten_abstract_for_iter_verification(
@@ -1141,8 +1517,9 @@ abstract_audit(struct ast_function *f, struct state *actual_state)
 	);
 
 	/* mutates alleged_state */
-	if ((err = function_absexec(abs, alleged_state))) {
-		return err;
+	Result res = function_absexec(abs, alleged_state);
+	if (result_iserror(res)) {
+		return result_as_error(res);
 	}
 
 	/*printf("actual: %s\n", state_str(actual_state));*/
@@ -1150,7 +1527,7 @@ abstract_audit(struct ast_function *f, struct state *actual_state)
 
 	ast_block_destroy(abs);
 
-	bool equiv = state_abstractly_equivalent(actual_state, alleged_state);
+	bool equiv = state_equal(actual_state, alleged_state);
 
 	state_destroy(alleged_state); /* actual_state handled by caller */ 
 	
@@ -1175,8 +1552,8 @@ hack_flatten_abstract_for_iter_verification(struct ast_function *f,
 		return ast_block_copy(abs);
 	}
 	/* asserts that we have `allocated' condition */
-	state_location_destroy(
-		hack_location_from_assertion(
+	state_object_destroy(
+		hack_object_from_assertion(
 			ast_stmt_sel_cond(stmt), state
 		)
 	);
@@ -1185,40 +1562,53 @@ hack_flatten_abstract_for_iter_verification(struct ast_function *f,
 
 /* function_absexec */
 
-static struct error *
-stmt_absexec(struct ast_stmt *stmt, struct state *state);
-
-static struct error *
+static Result
 function_absexec(struct ast_block *abs, struct state *state)
 {
 	int nstmts = ast_block_nstmts(abs);
 	struct ast_stmt **stmt = ast_block_stmts(abs);
 	for (int i = 0; i < nstmts; i++) {
-		struct error *err;
-		if ((err = stmt_absexec(stmt[i], state))) {
-			return err;
+		Result res = stmt_absexec(stmt[i], state);
+		if (result_iserror(res)) {
+			return res;
 		}
+		result_destroy(res);
 	}
-	//assert(state_heap_referenced(state));
-	return NULL;
+	/* wrap result and return */ 
+	struct object *obj = state_getresult(state);
+	assert(obj);
+	return result_value_create(object_as_value(obj));
 }
 
 /* stmt_absexec */
 
-static struct error *
+static Result
 expr_absexec(struct ast_expr *expr, struct state *state);
 
-static struct error *
+static Result
 sel_absexec(struct ast_stmt *stmt, struct state *state);
 
-static struct error *
+static Result
+iter_absexec(struct ast_stmt *stmt, struct state *state);
+
+static Result
+comp_absexec(struct ast_stmt *stmt, struct state *state);
+
+static Result
 stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_LABELLED:
+		/* ignore labelled statements for now */
+		return result_value_create(NULL);
 	case STMT_EXPR:
 		return expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
 		return sel_absexec(stmt, state);
+	case STMT_ITERATION:
+		return iter_absexec(stmt, state);
+	case STMT_COMPOUND:
+		return comp_absexec(stmt, state);
 	default:
 		assert(false);
 	}
@@ -1226,44 +1616,168 @@ stmt_absexec(struct ast_stmt *stmt, struct state *state)
 
 /* expr_absexec */
 
-static struct error *
+static Result
 mem_absexec(struct ast_expr *mem, struct state *state);
 
-static struct error *
+static Result
+assign_absexec(struct ast_expr *expr, struct state *state);
+
+static Result
 expr_absexec(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
 	case EXPR_IDENTIFIER:
 		assert(ast_expr_memory_isundefined(expr));
-		return error_create("undefined");
+		return result_error_create(error_create("undefined"));
 	case EXPR_MEMORY:
 		return mem_absexec(expr, state);
+	case EXPR_ASSIGNMENT:
+		return assign_absexec(expr, state);
 	default:
 		assert(false);
 	}
 }
 
-static struct error *
+static Result
+mem_process(struct ast_expr *red, struct state *state);
+
+static Result
 mem_absexec(struct ast_expr *mem, struct state *state)
 {
-	Result res = alloc_or_free(mem, state);
-	if (result_onheap(res)) {
-		struct location *loc = state_location_from_lvalue(
-			state, ast_expr_memory_root(mem)
-		);
-		assert(loc);
-		struct error *err = state_location_assign(
-			state, loc, result_loc(res)
-		);
-		state_location_destroy(loc);
-		result_destroy(res);
-		return err;
+	Result res = mem_process(mem, state);
+	if (result_iserror(res)) {
+		return res;
 	}
-	return NULL;
+	if (result_hasvalue(res)) {
+		struct object *obj = lvalue_object(
+			expr_lvalue(ast_expr_memory_root(mem), state)
+		);
+		assert(obj);
+		struct error *err = state_assign(
+			state, obj, state_value_copy(result_as_value(res))
+		);
+		state_object_destroy(obj);
+		if (err) {
+			return result_error_create(err);
+		}
+	}
+	return res;
 }
 
-static struct error *
+/* operates at location level. It either creates an object on the heap and returns
+ * a location or gets the location pointed to by an lvalue and attempts to free
+ * possibly returning an error
+ * */
+static Result
+mem_process(struct ast_expr *mem, struct state *state)
+{
+	if (ast_expr_memory_isundefined(mem)) {
+		return result_error_create(error_create("undefined behaviour"));
+	}
+
+	struct ast_expr *root = ast_expr_memory_root(mem);
+
+	if (ast_expr_memory_isalloc(mem)) {
+		/* assert(strcmp(ast_expr_as_identifier(id), KEYWORD_RESULT) == 0); */
+
+		/* TODO: size needs to be passed in here when added to .alloc */
+		return result_value_create(state_alloc(state)); /* XXX */
+	}
+
+	assert(ast_expr_memory_isunalloc(mem));
+
+	/* root is pointing at the heap location we want to free, so we want its
+	 * value rather than location */
+	Result res = expr_eval(root, state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	struct value *val = result_as_value(res);
+	assert(val);
+	struct error *err = state_dealloc(state, val);
+	if (err) {
+		fprintf(stderr, "cannot free: %s\n", err->msg);
+		assert(false);
+	}
+	state_value_destroy(val);
+	return result_value_create(NULL);
+}
+
+static Result
+assign_absexec(struct ast_expr *expr, struct state *state)
+{
+	return expr_assign_eval(expr, state);
+}
+
+static Result
 sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	assert(false);
+	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
+	if (!expr_decide(cond, state)) {
+		struct ast_stmt *nest = ast_stmt_sel_nest(stmt);
+		if (nest) {
+			return stmt_absexec(nest, state);
+		} 
+		return result_value_create(NULL);
+	}
+	return stmt_absexec(ast_stmt_sel_body(stmt), state);
+}
+
+static Result
+iter_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	struct error *err;
+
+	struct ast_expr *mem = hack_mem_from_neteffect(stmt);
+
+	struct object *obj = hack_base_object_from_mem(mem, state);
+
+	struct ast_expr *lw = ast_stmt_iter_lower_bound(stmt),
+			*up = ast_stmt_iter_upper_bound(stmt);
+
+	Result result_lw = expr_eval(lw, state),
+	       result_up = expr_eval(up, state);
+
+	if (result_iserror(result_lw)) {
+		/*result_destroy(result_up);*/
+		return result_lw;
+	}
+	if (result_iserror(result_up)) {
+		/*result_destroy(result_lw);*/
+		return result_up;
+	}
+
+	struct ast_expr *res_lw = value_to_expr(result_as_value(result_lw)),
+			*res_up = value_to_expr(result_as_value(result_up));
+
+	result_destroy(result_up);
+	result_destroy(result_lw);
+
+	if (ast_expr_memory_isalloc(mem)) {
+		err = state_range_alloc(state, obj, res_lw, res_up);
+	} else {
+		err = state_range_dealloc(state, obj, res_lw, res_up);
+	}
+	
+	state_object_destroy(obj);
+
+	if (err) {
+		return result_error_create(err);
+	}
+
+	return result_value_create(NULL);
+}
+
+static Result
+comp_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	struct ast_block *b = ast_stmt_as_block(stmt);
+	struct ast_stmt **stmts = ast_block_stmts(b);
+	for (int i = 0; i < ast_block_nstmts(b); i++) {
+		Result res = stmt_absexec(stmts[i], state);
+		if (result_iserror(res)) {
+			return res;
+		}
+	}
+	return result_value_create(NULL);
 }

@@ -4,6 +4,7 @@
 #include <string.h>
 #include "ast.h"
 #include "lex.h"
+#include "math.h"
 #include "util.h"
 
 static struct ast_expr *
@@ -13,7 +14,7 @@ ast_expr_create()
 }
 
 struct ast_expr *
-ast_expr_create_identifier(char *s)
+ast_expr_identifier_create(char *s)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_IDENTIFIER;
@@ -36,7 +37,7 @@ ast_expr_destroy_identifier(struct ast_expr *expr)
 }
 
 struct ast_expr *
-ast_expr_create_constant(int k)
+ast_expr_constant_create(int k)
 {
 	/* TODO: generalise for all constant cases */
 	struct ast_expr *expr = ast_expr_create();
@@ -53,12 +54,19 @@ ast_expr_as_constant(struct ast_expr *expr)
 }
 
 struct ast_expr *
-ast_expr_create_literal(char *s)
+ast_expr_literal_create(char *s)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_STRING_LITERAL;
 	expr->u.string = s;
 	return expr;
+}
+
+char *
+ast_expr_as_literal(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_STRING_LITERAL);
+	return expr->u.string;
 }
 
 static void
@@ -69,7 +77,7 @@ ast_expr_destroy_literal(struct ast_expr *expr)
 }
 
 struct ast_expr *
-ast_expr_create_bracketed(struct ast_expr *root)
+ast_expr_bracketed_create(struct ast_expr *root)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_BRACKETED;
@@ -87,7 +95,7 @@ ast_expr_bracketed_str_build(struct ast_expr *expr, struct strbuilder *b)
 
 
 struct ast_expr *
-ast_expr_create_iteration()
+ast_expr_iteration_create()
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_ITERATION;
@@ -95,7 +103,7 @@ ast_expr_create_iteration()
 }
 
 struct ast_expr *
-ast_expr_create_access(struct ast_expr *root, struct ast_expr *index)
+ast_expr_access_create(struct ast_expr *root, struct ast_expr *index)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_ACCESS;
@@ -122,10 +130,15 @@ static void
 ast_expr_access_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
 	char *root = ast_expr_str(expr->root);
-	char *index = ast_expr_str(expr->u.access.index);
-	strbuilder_printf(b, "%s[%s]", root, index);
+	struct ast_expr *i = expr->u.access.index;
+	if (i->kind == EXPR_CONSTANT && ast_expr_as_constant(i) == 0) {
+		strbuilder_printf(b, "*(%s)", root);
+	} else {
+		char *index = ast_expr_str(i);
+		strbuilder_printf(b, "*(%s+%s)", root, index);
+		free(index);
+	}
 	free(root);
-	free(index);
 }
 
 static void
@@ -137,7 +150,7 @@ ast_expr_destroy_access(struct ast_expr *expr)
 }
 
 struct ast_expr *
-ast_expr_create_call(struct ast_expr *root, int narg, struct ast_expr **arg)
+ast_expr_call_create(struct ast_expr *root, int narg, struct ast_expr **arg)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_CALL;
@@ -198,7 +211,7 @@ ast_expr_copy_call(struct ast_expr *expr)
 	for (int i = 0; i < expr->u.call.n; i++) {
 		arg[i] = ast_expr_copy(expr->u.call.arg[i]);
 	}
-	return ast_expr_create_call(
+	return ast_expr_call_create(
 		ast_expr_copy(expr->root),
 		expr->u.call.n,
 		arg
@@ -206,7 +219,7 @@ ast_expr_copy_call(struct ast_expr *expr)
 }
 
 struct ast_expr *
-ast_expr_create_incdec(struct ast_expr *root, bool inc, bool pre)
+ast_expr_incdec_create(struct ast_expr *root, bool inc, bool pre)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_INCDEC;
@@ -216,6 +229,36 @@ ast_expr_create_incdec(struct ast_expr *root, bool inc, bool pre)
 	return expr;
 }
 
+struct ast_expr *
+ast_expr_incdec_to_assignment(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_INCDEC);
+
+	return ast_expr_assignment_create(
+		ast_expr_copy(expr->root),
+		ast_expr_binary_create(
+			ast_expr_copy(expr->root),
+			expr->u.incdec.inc ? BINARY_OP_ADDITION : BINARY_OP_SUBTRACTION,
+			ast_expr_constant_create(1)
+		)
+	);
+}
+
+bool
+ast_expr_incdec_pre(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_INCDEC);
+
+	return expr->u.incdec.pre;
+}
+
+struct ast_expr *
+ast_expr_incdec_root(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_INCDEC);
+
+	return expr->root;
+}
 
 static void
 ast_expr_destroy_incdec(struct ast_expr *expr)
@@ -238,7 +281,41 @@ ast_expr_incdec_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
-ast_expr_create_unary(struct ast_expr *root, enum ast_unary_operator op)
+ast_expr_member_create(struct ast_expr *_struct, char *field)
+{
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_STRUCTMEMBER;
+	expr->root = _struct;
+	expr->u.string = field;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_member_root(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_STRUCTMEMBER);
+	return expr->root;
+}
+
+char *
+ast_expr_member_field(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_STRUCTMEMBER);
+	return expr->u.string;
+}
+
+
+static void
+ast_expr_member_str_build(struct ast_expr *expr, struct strbuilder *b)
+{
+	/* XXX: until we eliminate the access/indirection ambiguity */
+	char *root = ast_expr_str(expr->root);
+	strbuilder_printf(b, "%s.%s", root, expr->u.string);
+	free(root);
+}
+
+struct ast_expr *
+ast_expr_unary_create(struct ast_expr *root, enum ast_unary_operator op)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_UNARY;
@@ -283,7 +360,7 @@ ast_expr_unary_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
-ast_expr_create_binary(struct ast_expr *e1, enum ast_binary_operator op,
+ast_expr_binary_create(struct ast_expr *e1, enum ast_binary_operator op,
 		struct ast_expr *e2)
 {
 	struct ast_expr *expr = ast_expr_create();
@@ -323,65 +400,37 @@ ast_expr_destroy_binary(struct ast_expr *expr)
 	ast_expr_destroy(expr->u.binary.e2);
 }
 
+static struct math_expr *
+math_expr(struct ast_expr *);
+
 static void
 ast_expr_binary_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
-	const char opchar[] = {
-		[BINARY_OP_ADDITION]		= '+',
-	};
-	char *e1 = ast_expr_str(expr->u.binary.e1);
-	char *e2 = ast_expr_str(expr->u.binary.e2);
-	strbuilder_printf(b, "%s%c%s", e1, opchar[expr->u.binary.op], e2);
-	free(e2);
-	free(e1);
-}
-
-struct ast_expr *
-ast_expr_create_chain(struct ast_expr *root, enum ast_chain_operator op,
-		struct ast_expr *justification, struct ast_expr *last)
-{
-	struct ast_expr *expr = ast_expr_create();
-	expr->kind = EXPR_CHAIN;
-	expr->root = root;
-	expr->u.chain.op = op;
-	expr->u.chain.justification = justification;
-	expr->u.chain.last = last;
-	return expr;
-}
-
-static void
-ast_expr_destroy_chain(struct ast_expr *expr)
-{
-	ast_expr_destroy(expr->root);
-	/* TODO: ast_expr_destroy(expr->u.chain.justification);*/
-	ast_expr_destroy(expr->u.chain.last);
-}
-
-static void
-ast_expr_chain_str_build(struct ast_expr *expr, struct strbuilder *b)
-{
 	const char *opstr[] = {
-		[CHAIN_OP_EQV]		= "===",
-		[CHAIN_OP_IMPL]		= "==>",
-		[CHAIN_OP_FLLW]		= "<==",
+		[BINARY_OP_EQV]		= "===",
+		[BINARY_OP_IMPL]	= "==>",
+		[BINARY_OP_FLLW]	= "<==",
 
-		[CHAIN_OP_EQ]		= "==",
-		[CHAIN_OP_NE]		= "!=",
+		[BINARY_OP_EQ]		= "==",
+		[BINARY_OP_NE]		= "!=",
 
-		[CHAIN_OP_LT]		= "<",
-		[CHAIN_OP_GT]		= ">",
-		[CHAIN_OP_LE]		= "<=",
-		[CHAIN_OP_GE]		= ">=",
+		[BINARY_OP_LT]		= "<",
+		[BINARY_OP_GT]		= ">",
+		[BINARY_OP_LE]		= "<=",
+		[BINARY_OP_GE]		= ">=",
+
+		[BINARY_OP_ADDITION]	= "+",
+		[BINARY_OP_SUBTRACTION]	= "-",
 	};
-	char *root = ast_expr_str(expr->root),
-	     *last = ast_expr_str(expr->u.chain.last);
-	strbuilder_printf(b, "%s %s %s", root, opstr[expr->u.chain.op], last);
-	free(last);
-	free(root);
+	char *e1 = ast_expr_str(expr->u.binary.e1),
+	     *e2 = ast_expr_str(expr->u.binary.e2);
+	strbuilder_printf(b, "%s%s%s", e1, opstr[expr->u.binary.op], e2);
+	free(e1);
+	free(e2);
 }
 
 struct ast_expr *
-ast_expr_create_assignment(struct ast_expr *root, struct ast_expr *value)
+ast_expr_assignment_create(struct ast_expr *root, struct ast_expr *value)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_ASSIGNMENT;
@@ -423,7 +472,7 @@ ast_expr_assignment_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
-ast_expr_create_memory(enum effect_kind kind, struct ast_expr *expr)
+ast_expr_memory_create(enum effect_kind kind, struct ast_expr *expr)
 {
 	struct ast_expr *new = ast_expr_create();
 	new->kind = EXPR_MEMORY;
@@ -511,7 +560,7 @@ ast_expr_memory_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
-ast_expr_create_assertion(struct ast_expr *assertand)
+ast_expr_assertion_create(struct ast_expr *assertand)
 {
 	struct ast_expr *new = ast_expr_create();
 	new->kind = EXPR_ASSERTION;
@@ -532,6 +581,14 @@ ast_expr_assertion_str_build(struct ast_expr *expr, struct strbuilder *b)
 	char *root = ast_expr_str(expr->root);
 	strbuilder_printf(b, "@%s", root);
 	free(root);
+}
+
+struct ast_expr *
+ast_expr_arbarg_create()
+{
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_ARBARG;
+	return expr;
 }
 
 void
@@ -556,14 +613,14 @@ ast_expr_destroy(struct ast_expr *expr)
 	case EXPR_INCDEC:
 		ast_expr_destroy_incdec(expr);
 		break;
+	case EXPR_STRUCTMEMBER:
+		ast_expr_destroy(expr->root); free(expr->u.string);
+		break;
 	case EXPR_UNARY:
 		ast_expr_destroy_unary(expr);
 		break;
 	case EXPR_BINARY:
 		ast_expr_destroy_binary(expr);
-		break;
-	case EXPR_CHAIN:
-		ast_expr_destroy_chain(expr);
 		break;
 	case EXPR_ASSIGNMENT:
 		ast_expr_destroy_assignment(expr);
@@ -576,9 +633,10 @@ ast_expr_destroy(struct ast_expr *expr)
 	case EXPR_ASSERTION:
 		ast_expr_destroy(expr->root);
 		break;
+	case EXPR_ARBARG:
+		break;
 	default:
-		fprintf(stderr, "unknown ast_expr_kind %d\n", expr->kind);
-		exit(EXIT_FAILURE);
+		assert(false);
 	}
 	free(expr);
 }
@@ -609,14 +667,14 @@ ast_expr_str(struct ast_expr *expr)
 	case EXPR_INCDEC:
 		ast_expr_incdec_str_build(expr, b);
 		break;
+	case EXPR_STRUCTMEMBER:
+		ast_expr_member_str_build(expr, b);
+		break;
 	case EXPR_UNARY:
 		ast_expr_unary_str_build(expr, b);
 		break;
 	case EXPR_BINARY:
 		ast_expr_binary_str_build(expr, b);
-		break;
-	case EXPR_CHAIN:
-		ast_expr_chain_str_build(expr, b);
 		break;
 	case EXPR_ASSIGNMENT:
 		ast_expr_assignment_str_build(expr, b);
@@ -626,6 +684,9 @@ ast_expr_str(struct ast_expr *expr)
 		break;
 	case EXPR_ASSERTION:
 		ast_expr_assertion_str_build(expr, b);
+		break;
+	case EXPR_ARBARG:
+		strbuilder_putc(b, '$');
 		break;
 	default:
 		assert(false);
@@ -639,61 +700,58 @@ ast_expr_copy(struct ast_expr *expr)
 	assert(expr);
 	switch (expr->kind) {
 	case EXPR_IDENTIFIER:
-		return ast_expr_create_identifier(dynamic_str(expr->u.string));
+		return ast_expr_identifier_create(dynamic_str(expr->u.string));
 	case EXPR_CONSTANT:
-		return ast_expr_create_constant(expr->u.constant);
+		return ast_expr_constant_create(expr->u.constant);
 	case EXPR_STRING_LITERAL:
-		return ast_expr_create_literal(dynamic_str(expr->u.string));
+		return ast_expr_literal_create(dynamic_str(expr->u.string));
 	case EXPR_BRACKETED:
-		return ast_expr_create_bracketed(ast_expr_copy(expr->root));
+		return ast_expr_bracketed_create(ast_expr_copy(expr->root));
 	case EXPR_ACCESS:
-		return ast_expr_create_access(
+		return ast_expr_access_create(
 			ast_expr_copy(expr->root),
 			ast_expr_copy(expr->u.access.index)
 		);
 	case EXPR_CALL:
 		return ast_expr_copy_call(expr);
 	case EXPR_INCDEC:
-		return ast_expr_create_incdec(
+		return ast_expr_incdec_create(
 			ast_expr_copy(expr->root),
 			expr->u.incdec.inc,
 			expr->u.incdec.pre
 		);
+	case EXPR_STRUCTMEMBER:
+		return ast_expr_member_create(
+			ast_expr_copy(expr->root), dynamic_str(expr->u.string)
+		);
 	case EXPR_UNARY:
-		return ast_expr_create_unary(
+		return ast_expr_unary_create(
 			ast_expr_copy(expr->root),
 			expr->u.unary_op
 		);
 	case EXPR_BINARY:
-		return ast_expr_create_binary(
+		return ast_expr_binary_create(
 			ast_expr_copy(expr->u.binary.e1),
 			expr->u.binary.op,
 			ast_expr_copy(expr->u.binary.e2)
 		);
-	case EXPR_CHAIN:
-		return ast_expr_create_chain(
-			ast_expr_copy(expr->root),
-			expr->u.chain.op,
-			NULL, /* XXX */
-			ast_expr_copy(expr->u.chain.last)
-		);
 	case EXPR_ASSIGNMENT:
-		return ast_expr_create_assignment(
+		return ast_expr_assignment_create(
 			ast_expr_copy(expr->root),
 			ast_expr_copy(expr->u.assignment_value)
 		);
 	case EXPR_MEMORY:
-		return ast_expr_create_memory(
+		return ast_expr_memory_create(
 			expr->u.memory.kind,
 			expr->root ? ast_expr_copy(expr->root) : NULL
 		);
 	case EXPR_ASSERTION:
-		return ast_expr_create_assertion(
+		return ast_expr_assertion_create(
 			ast_expr_copy(expr->root)
 		);
+	case EXPR_ARBARG:
+		return ast_expr_arbarg_create();
 	default:
-
-		fprintf(stderr, "cannot copy `%s'\n", ast_expr_str(expr));
 		assert(false);
 	}
 }
@@ -721,17 +779,96 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 	case EXPR_ASSIGNMENT:
 		return ast_expr_equal(e1->root, e2->root)
 			&& ast_expr_equal(e1->u.assignment_value, e2->u.assignment_value); 
-	case EXPR_CHAIN:
-		return ast_expr_equal(e1->root, e2->root)
-			&& e1->u.chain.op == e2->u.chain.op
-			&& ast_expr_equal(e1->u.chain.last, e2->u.chain.last);
 	case EXPR_BINARY:
 		return ast_expr_binary_op(e1) == ast_expr_binary_op(e2) &&
 			ast_expr_equal(ast_expr_binary_e1(e1), ast_expr_binary_e1(e2)) && 
 			ast_expr_equal(ast_expr_binary_e2(e1), ast_expr_binary_e2(e2));
 	default:
-		fprintf(stderr, "cannot compare e1: `%s' and e2: %s\n",
-			ast_expr_str(e1), ast_expr_str(e2));
+		assert(false);
+	}
+}
+
+static bool
+eval_prop(struct math_expr *e1, enum ast_binary_operator, struct math_expr *e2);
+
+bool
+ast_expr_eval(struct ast_expr *e)
+{
+	assert(e->kind == EXPR_BINARY);
+
+	struct math_expr *e1 = math_expr(e->u.binary.e1),
+			 *e2 = math_expr(e->u.binary.e2);
+
+	bool val = eval_prop(e1, e->u.binary.op, e2);
+
+	math_expr_destroy(e1);
+	math_expr_destroy(e2);
+
+	return val;
+}
+
+static bool
+eval_prop(struct math_expr *e1, enum ast_binary_operator op, struct math_expr *e2)
+{
+	switch (op) {
+	case BINARY_OP_EQ:
+		return math_eq(e1, e2);
+	case BINARY_OP_NE:
+		return !math_eq(e1, e2);
+	case BINARY_OP_LT:
+		return math_lt(e1, e2);
+	case BINARY_OP_GT:
+		return math_gt(e1, e2);
+	case BINARY_OP_LE:
+		return math_le(e1, e2);
+	case BINARY_OP_GE:
+		return math_ge(e1, e2);
+	default:
+		assert(false);
+	}
+}
+
+static struct math_expr *
+binary_e2(struct ast_expr *e2, enum ast_binary_operator op);
+
+static struct math_expr *
+math_expr(struct ast_expr *e)
+{
+	switch (e->kind) {
+	case EXPR_IDENTIFIER:
+		return math_expr_atom_create(
+			math_atom_variable_create(dynamic_str(e->u.string))
+		);
+	case EXPR_CONSTANT:
+		if (e->u.constant < 0) {
+			return math_expr_neg_create(
+				math_expr_atom_create(
+					math_atom_nat_create(-e->u.constant)
+				)
+			);
+		}
+		return math_expr_atom_create(
+			math_atom_nat_create(e->u.constant)
+		);
+	case EXPR_BINARY:
+		return math_expr_sum_create(
+			math_expr(e->u.binary.e1),
+			binary_e2(e->u.binary.e2, e->u.binary.op)
+		);
+	default:
+		assert(false);
+	}
+}
+
+static struct math_expr *
+binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
+{
+	switch (op) {
+	case BINARY_OP_ADDITION:
+		return math_expr(e2);
+	case BINARY_OP_SUBTRACTION:
+		return math_expr_neg_create(math_expr(e2));
+	default:
 		assert(false);
 	}
 }
@@ -857,6 +994,41 @@ ast_stmt_create(struct lexememarker *loc)
 	struct ast_stmt *stmt = calloc(1, sizeof(struct ast_stmt));
 	stmt->loc = loc;
 	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_create_labelled(struct lexememarker *loc, char *label,
+		struct ast_stmt *substmt)
+{
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_LABELLED;
+	stmt->u.labelled.label = label;
+	stmt->u.labelled.stmt = substmt;
+	return stmt;
+}
+
+char *
+ast_stmt_labelled_label(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_LABELLED);
+
+	return stmt->u.labelled.label;
+}
+
+struct ast_stmt *
+ast_stmt_labelled_stmt(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_LABELLED);
+
+	return stmt->u.labelled.stmt;
+}
+
+static void
+ast_stmt_labelled_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+{
+	char *s = ast_stmt_str(stmt->u.labelled.stmt);
+	strbuilder_printf(b, "%s: %s", stmt->u.labelled.label, s);
+	free(s);
 }
 
 struct ast_stmt *
@@ -1088,8 +1260,8 @@ ast_stmt_iter_upper_bound(struct ast_stmt *stmt)
 	struct ast_stmt *cond = stmt->u.iteration.cond;
 	assert(cond->kind == STMT_EXPR);
 	struct ast_expr *expr = cond->u.expr;
-	assert(expr->kind == EXPR_CHAIN);
-	return expr->u.chain.last;
+	assert(expr->kind == EXPR_BINARY);
+	return expr->u.binary.e2;
 }
 
 static struct ast_stmt *
@@ -1167,6 +1339,10 @@ void
 ast_stmt_destroy(struct ast_stmt *stmt)
 {
 	switch (stmt->kind) {
+	case STMT_LABELLED:
+		free(stmt->u.labelled.label);
+		ast_stmt_destroy(stmt->u.labelled.stmt);
+		break;
 	case STMT_NOP:
 		break;
 	case STMT_COMPOUND:
@@ -1211,6 +1387,12 @@ ast_stmt_copy(struct ast_stmt *stmt)
 		? lexememarker_copy(stmt->loc)
 		: NULL;
 	switch (stmt->kind) {
+	case STMT_LABELLED:
+		return ast_stmt_create_labelled(
+			loc,
+			dynamic_str(stmt->u.labelled.label),
+			ast_stmt_copy(stmt->u.labelled.stmt)
+		);
 	case STMT_NOP:
 		return ast_stmt_create_nop(loc);
 	case STMT_EXPR:
@@ -1250,7 +1432,6 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			ast_expr_copy_ifnotnull(stmt->u.jump.rv)
 		);
 	default:
-		fprintf(stderr, "wrong stmt kind: %d\n", stmt->kind);
 		assert(false);
 	}
 }
@@ -1260,6 +1441,9 @@ ast_stmt_str(struct ast_stmt *stmt)
 {
 	struct strbuilder *b = strbuilder_create();
 	switch (stmt->kind) {
+	case STMT_LABELLED:
+		ast_stmt_labelled_sprint(stmt, b);
+		break;
 	case STMT_NOP:
 		ast_stmt_nop_sprint(stmt, b);
 		break;
@@ -1285,7 +1469,6 @@ ast_stmt_str(struct ast_stmt *stmt)
 		ast_stmt_jump_sprint(stmt, b);
 		break;
 	default:
-		fprintf(stderr, "wrong stmt kind: %d\n", stmt->kind);
 		assert(false);
 	}
 	return strbuilder_build(b);
@@ -1304,7 +1487,6 @@ ast_stmt_equal(struct ast_stmt *s1, struct ast_stmt *s2)
 	case STMT_EXPR:
 		return ast_expr_equal(ast_stmt_as_expr(s1), ast_stmt_as_expr(s2));
 	default:
-		fprintf(stderr, "wrong stmt kind: %d\n", ast_stmt_kind(s1));
 		assert(false);
 	}
 }
@@ -1368,11 +1550,115 @@ ast_type_create_typedef(struct ast_type *base, char *name)
 	return t;
 }
 
+struct ast_type *
+ast_type_create_struct(char *tag, struct ast_variable_arr *members)
+{
+	struct ast_type *t = ast_type_create(TYPE_STRUCT, 0);
+	t->u.structunion.tag = tag;
+	t->u.structunion.members = members;
+	return t;
+}
+
+struct ast_variable_arr *
+ast_type_struct_members(struct ast_type *t)
+{
+	assert(t->base == TYPE_STRUCT);
+
+	return t->u.structunion.members;
+}
+
+char *
+ast_type_struct_tag(struct ast_type *t)
+{
+	assert(t->base == TYPE_STRUCT);
+
+	return t->u.structunion.tag;
+}
+
+struct ast_type *
+ast_type_create_struct_anonym(struct ast_variable_arr *members)
+{
+	return ast_type_create_struct(NULL, members);
+}
+
+struct ast_type *
+ast_type_create_struct_partial(char *tag)
+{
+	return ast_type_create_struct(tag, NULL);
+}
+
+struct ast_type *
+ast_type_copy_struct(struct ast_type *old)
+{
+	assert(old->base == TYPE_STRUCT);
+
+	struct ast_type *new = ast_type_create(TYPE_STRUCT, old->mod);
+	new->u.structunion.tag = old->u.structunion.tag
+		? dynamic_str(old->u.structunion.tag)
+		: NULL;
+	new->u.structunion.members = old->u.structunion.members
+		? ast_variable_arr_copy(old->u.structunion.members)
+		: NULL;
+	return new;
+}
+
+
+struct ast_variable_arr {
+	int n;
+	struct ast_variable **v;
+};
+
+struct ast_variable_arr *
+ast_variable_arr_create()
+{
+	return calloc(1, sizeof(struct ast_variable_arr));
+}
+
+void
+ast_variable_arr_append(struct ast_variable_arr *arr, struct ast_variable *v)
+{
+	arr->v = realloc(arr->v, sizeof(struct ast_variable *) * ++arr->n);
+	arr->v[arr->n-1] = v;
+}
+
+void
+ast_variable_arr_destroy(struct ast_variable_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		ast_variable_destroy(arr->v[i]);
+	}
+	free(arr);
+}
+
+int
+ast_variable_arr_n(struct ast_variable_arr *arr)
+{
+	return arr->n;
+}
+
+struct ast_variable **
+ast_variable_arr_v(struct ast_variable_arr *arr)
+{
+	return arr->v;
+}
+
+struct ast_variable_arr *
+ast_variable_arr_copy(struct ast_variable_arr *old)
+{
+	struct ast_variable_arr *new = ast_variable_arr_create();
+	for (int i = 0; i < old->n; i++) {
+		ast_variable_arr_append(new, ast_variable_copy(old->v[i]));
+	}
+	return new;
+}
+
 void
 ast_type_destroy(struct ast_type *t)
 {
 	switch (t->base) {
 	case TYPE_TYPEDEF:
+		/* XXX: typedef broken type not populating */
+		assert(false);
 		assert(t->u._typedef.type);
 		ast_type_destroy(t->u._typedef.type);
 		assert(t->u._typedef.name);
@@ -1399,7 +1685,9 @@ ast_type_copy(struct ast_type *t)
 	case TYPE_TYPEDEF:
 		return ast_type_create_typedef(
 			ast_type_copy(t->u._typedef.type),
-			dynamic_str(t->u._typedef.name)
+			t->u._typedef.name
+				? dynamic_str(t->u._typedef.name)
+				: NULL
 		);
 	case TYPE_POINTER:
 		return ast_type_create_ptr(
@@ -1410,8 +1698,16 @@ ast_type_copy(struct ast_type *t)
 			ast_type_copy(t->u.arr.type),
 			t->u.arr.length
 		);
-	default:
+	case TYPE_STRUCT:
+		return ast_type_copy_struct(t);
+
+	case TYPE_VOID:
+	case TYPE_INT:
+	case TYPE_CHAR:
 		return ast_type_create(t->base, t->mod);
+
+	default:
+		assert(false);
 	}
 }
 
@@ -1424,6 +1720,9 @@ ast_type_str_build_arr(struct strbuilder *b, struct ast_type *t);
 static void
 ast_type_str_build_typedef(struct strbuilder *b, struct ast_type *t);
 
+static void
+ast_type_str_build_struct(struct strbuilder *b, struct ast_type *t);
+
 char *
 ast_type_str(struct ast_type *t)
 {
@@ -1431,8 +1730,8 @@ ast_type_str(struct ast_type *t)
 	/* XXX */
 	const char *modstr[] = {
 		[MOD_EXTERN]	= "extern",
-		[MOD_STATIC]	= "static",
 		[MOD_AUTO]	= "auto",
+		[MOD_STATIC]	= "static",
 		[MOD_REGISTER]	= "register",
 
 		[MOD_CONST]	= "const",
@@ -1474,6 +1773,9 @@ ast_type_str(struct ast_type *t)
 	case TYPE_ARRAY:
 		ast_type_str_build_arr(b, t);
 		break;
+	case TYPE_STRUCT:
+		ast_type_str_build_struct(b, t);
+		break;
 	default:
 		strbuilder_printf(b, basestr[t->base]);
 		break;
@@ -1504,6 +1806,35 @@ ast_type_str_build_typedef(struct strbuilder *b, struct ast_type *t)
 	char *base = ast_type_str(t->u._typedef.type);
 	strbuilder_printf(b, "typedef %s %s", base, t->u._typedef.type);
 	free(base);
+}
+
+static void
+ast_type_str_build_struct(struct strbuilder *b, struct ast_type *t)
+{
+	char *tag = t->u.structunion.tag;
+	struct ast_variable_arr *members = t->u.structunion.members;
+
+	assert(tag || members);
+
+	strbuilder_printf(b, "struct ");
+
+	if (tag) {
+		strbuilder_printf(b, tag);
+	}
+
+	if (!members) {
+		return;
+	}
+
+	strbuilder_printf(b, " { ");
+	int n = ast_variable_arr_n(members);
+	struct ast_variable **v = ast_variable_arr_v(members);
+	for (int i = 0; i < n; i++) {
+		char *s = ast_variable_str(v[i]);
+		strbuilder_printf(b, "%s; ", s);
+		free(s);
+	}
+	strbuilder_printf(b, "}");
 }
 
 enum ast_type_base
@@ -1716,13 +2047,30 @@ ast_variabledecl_create(struct ast_variable *v)
 	return decl;
 }
 
+struct ast_externdecl *
+ast_typedecl_create(struct ast_type *t)
+{
+	struct ast_externdecl *decl = malloc(sizeof(struct ast_externdecl));
+	decl->kind = EXTERN_TYPE;
+	decl->u.type = t;
+	return decl;
+}
+
 void
 ast_externdecl_destroy(struct ast_externdecl *decl)
 {
-	if (decl->kind == EXTERN_FUNCTION) {
+	switch (decl->kind) {
+	case EXTERN_FUNCTION:
 		ast_function_destroy(decl->u.function);
-	} else if (decl->kind == EXTERN_VARIABLE) {
+		break;
+	case EXTERN_VARIABLE:
 		ast_variable_destroy(decl->u.variable);
+		break;
+	case EXTERN_TYPE:
+		ast_type_destroy(decl->u.type);
+		break;
+	default:
+		assert(false);
 	}
 	free(decl);
 }

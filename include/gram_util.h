@@ -8,11 +8,6 @@ struct expr_array {
 	struct ast_expr **expr;
 };
 
-struct variable_array {
-	int n;
-	struct ast_variable **var;
-};
-
 struct stmt_array {
 	int n;
 	struct ast_stmt **stmt;

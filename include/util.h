@@ -52,6 +52,9 @@ strbuilder_puts(struct strbuilder *b, char *s);
 char *
 strbuilder_build(struct strbuilder *b);
 
+char *
+strbuilder_preview(struct strbuilder *b);
+
 
 struct error {
 	char *msg;

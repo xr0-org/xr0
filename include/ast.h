@@ -14,15 +14,16 @@ struct ast_expr {
 		EXPR_CALL		= 1 << 6,
 		EXPR_INCDEC		= 1 << 7,
 
-		EXPR_UNARY		= 1 << 8,
-		EXPR_BINARY		= 1 << 9,
+		EXPR_STRUCTMEMBER	= 1 << 8,
 
-		EXPR_CHAIN		= 1 << 10,
+		EXPR_UNARY		= 1 << 9,
+		EXPR_BINARY		= 1 << 10,
 
 		EXPR_ASSIGNMENT		= 1 << 11,
 
 		EXPR_MEMORY		= 1 << 12,
 		EXPR_ASSERTION		= 1 << 13,
+		EXPR_ARBARG		= 1 << 14,
 	} kind;
 	struct ast_expr *root;
 	union {
@@ -36,7 +37,7 @@ struct ast_expr {
 			struct ast_expr **arg;
 		} call;
 		struct {
-			bool inc, pre;
+			int inc, pre;
 		} incdec;
 		enum ast_unary_operator {
 			UNARY_OP_ADDRESS		= 1 << 0,
@@ -44,64 +45,64 @@ struct ast_expr {
 			UNARY_OP_POSITIVE		= 1 << 2,
 			UNARY_OP_NEGATIVE		= 1 << 3,
 			UNARY_OP_ONES_COMPLEMENT	= 1 << 4,
-			UNARY_OP_BANG			= 1 << 5,
+			UNARY_OP_BANG			= 1 << 5
 		} unary_op;
 		struct {
 			enum ast_binary_operator {
-				BINARY_OP_ADDITION	= 1 << 0,
+				BINARY_OP_EQV	= 1 << 0,
+				BINARY_OP_IMPL	= 1 << 1,
+				BINARY_OP_FLLW	= 1 << 2,
+				
+				BINARY_OP_EQ	= 1 << 3,
+				BINARY_OP_NE	= 1 << 4,
+
+				BINARY_OP_LT	= 1 << 5,
+				BINARY_OP_GT	= 1 << 6,
+				BINARY_OP_LE	= 1 << 7,
+				BINARY_OP_GE	= 1 << 8,				
+
+				BINARY_OP_ADDITION	= 1 << 9,
+				BINARY_OP_SUBTRACTION	= 1 << 10
 			} op;
 			struct ast_expr *e1, *e2;
 		} binary;
-		struct {
-			enum ast_chain_operator {
-				CHAIN_OP_EQV	= 1 << 0,
-				CHAIN_OP_IMPL	= 1 << 1,
-				CHAIN_OP_FLLW	= 1 << 2,
-
-				CHAIN_OP_EQ	= 1 << 3,
-				CHAIN_OP_NE	= 1 << 4,
-				
-				CHAIN_OP_LT	= 1 << 5,
-				CHAIN_OP_GT	= 1 << 6,
-				CHAIN_OP_LE	= 1 << 7,
-				CHAIN_OP_GE	= 1 << 8,
-			} op;
-			struct ast_expr *justification, *last;
-		} chain;
 		struct ast_expr *assignment_value;
 		struct {
 			enum effect_kind {
 				EFFECT_ALLOC		= 1 << 0,
 				EFFECT_DEALLOC		= 1 << 1,
-				EFFECT_UNDEFINED	= 1 << 2,
+				EFFECT_UNDEFINED	= 1 << 2
 			} kind;
 		} memory;
 	} u;
 };
 
 struct ast_expr *
-ast_expr_create_identifier(char *);
+ast_expr_identifier_create(char *);
 
 char *
 ast_expr_as_identifier(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_create_constant(int);
+ast_expr_constant_create(int);
 
 int
 ast_expr_as_constant(struct ast_expr *expr);
 
-struct ast_expr *
-ast_expr_create_literal(char *);
+char *
+ast_expr_as_literal(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_create_bracketed(struct ast_expr *);
+ast_expr_literal_create(char *);
 
 struct ast_expr *
-ast_expr_create_iteration();
+ast_expr_bracketed_create(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_create_access(struct ast_expr *root, struct ast_expr *index);
+ast_expr_iteration_create();
+
+struct ast_expr *
+ast_expr_access_create(struct ast_expr *root, struct ast_expr *index);
 
 struct ast_expr *
 ast_expr_access_root(struct ast_expr *expr);
@@ -110,7 +111,7 @@ struct ast_expr *
 ast_expr_access_index(struct ast_expr *expr);
 
 struct ast_expr *
-ast_expr_create_call(struct ast_expr *, int narg, struct ast_expr **arg);
+ast_expr_call_create(struct ast_expr *, int narg, struct ast_expr **arg);
 
 struct ast_expr *
 ast_expr_call_root(struct ast_expr *);
@@ -122,10 +123,28 @@ struct ast_expr **
 ast_expr_call_args(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_create_incdec(struct ast_expr *, bool inc, bool pre);
+ast_expr_incdec_create(struct ast_expr *, bool inc, bool pre);
 
 struct ast_expr *
-ast_expr_create_unary(struct ast_expr *, enum ast_unary_operator);
+ast_expr_incdec_to_assignment(struct ast_expr *expr);
+
+struct ast_expr *
+ast_expr_incdec_root(struct ast_expr *);
+
+bool
+ast_expr_incdec_pre(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_member_create(struct ast_expr *, char *);
+
+struct ast_expr *
+ast_expr_member_root(struct ast_expr *);
+
+char *
+ast_expr_member_field(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_unary_create(struct ast_expr *, enum ast_unary_operator);
 
 enum ast_unary_operator
 ast_expr_unary_op(struct ast_expr *);
@@ -134,7 +153,7 @@ struct ast_expr *
 ast_expr_unary_operand(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_create_binary(struct ast_expr *e1, enum ast_binary_operator,
+ast_expr_binary_create(struct ast_expr *e1, enum ast_binary_operator,
 		struct ast_expr *e2);
 
 struct ast_expr *
@@ -147,11 +166,7 @@ enum ast_binary_operator
 ast_expr_binary_op(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_create_chain(struct ast_expr *root, enum ast_chain_operator,
-		struct ast_expr *justification, struct ast_expr *last);
-
-struct ast_expr *
-ast_expr_create_assignment(struct ast_expr *root, struct ast_expr *value);
+ast_expr_assignment_create(struct ast_expr *root, struct ast_expr *value);
 
 struct ast_expr *
 ast_expr_assignment_lval(struct ast_expr *expr);
@@ -160,7 +175,7 @@ struct ast_expr *
 ast_expr_assignment_rval(struct ast_expr *expr);
 
 struct ast_expr *
-ast_expr_create_memory(enum effect_kind, struct ast_expr *expr);
+ast_expr_memory_create(enum effect_kind, struct ast_expr *expr);
 
 struct ast_expr *
 ast_expr_memory_root(struct ast_expr *expr);
@@ -178,10 +193,13 @@ enum effect_kind
 ast_expr_memory_kind(struct ast_expr *expr);
 
 struct ast_expr *
-ast_expr_create_assertion(struct ast_expr *assertand);
+ast_expr_assertion_create(struct ast_expr *assertand);
 
 struct ast_expr *
 ast_expr_assertion_assertand(struct ast_expr *expr);
+
+struct ast_expr *
+ast_expr_arbarg_create();
 
 void
 ast_expr_destroy(struct ast_expr *);
@@ -197,6 +215,11 @@ ast_expr_kind(struct ast_expr *);
 
 bool
 ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2);
+
+struct math_state;
+
+bool
+ast_expr_eval(struct ast_expr *e);
 
 struct ast_stmt;
 
@@ -273,6 +296,15 @@ struct ast_stmt {
 
 	struct lexememarker *loc;
 };
+
+struct ast_stmt *
+ast_stmt_create_labelled(struct lexememarker *, char *label, struct ast_stmt *);
+
+char *
+ast_stmt_labelled_label(struct ast_stmt *);
+
+struct ast_stmt *
+ast_stmt_labelled_stmt(struct ast_stmt *);
 
 struct ast_stmt *
 ast_stmt_create_nop(struct lexememarker *);
@@ -393,6 +425,8 @@ struct ast_type {
 		TYPE_TYPEDEF,
 
 		TYPE_STRUCT,
+		TYPE_UNION,
+		TYPE_ENUM,
 	} base;
 	union {
 		struct ast_type *ptr_type;
@@ -404,6 +438,10 @@ struct ast_type {
 			struct ast_type *type;
 			char *name;
 		} _typedef;
+		struct {
+			char *tag;
+			struct ast_variable_arr *members;
+		} structunion;
 	} u;
 };
 
@@ -421,6 +459,21 @@ ast_type_create_arr(struct ast_type *type, int length);
 struct ast_type *
 ast_type_create_typedef(struct ast_type *type, char *name);
 
+struct ast_type *
+ast_type_create_struct(char *tag, struct ast_variable_arr *);
+
+struct ast_variable_arr *
+ast_type_struct_members(struct ast_type *t);
+
+char *
+ast_type_struct_tag(struct ast_type *t);
+
+struct ast_type *
+ast_type_create_struct_anonym(struct ast_variable_arr *);
+
+struct ast_type *
+ast_type_create_struct_partial(char *tag);
+
 void
 ast_type_destroy(struct ast_type *);
 
@@ -435,6 +488,26 @@ ast_type_base(struct ast_type *t);
 
 struct ast_type *
 ast_type_ptr_type(struct ast_type *t);
+
+struct ast_variable_arr;
+
+struct ast_variable_arr *
+ast_variable_arr_create();
+
+void
+ast_variable_arr_append(struct ast_variable_arr *, struct ast_variable *);
+
+void
+ast_variable_arr_destroy(struct ast_variable_arr *);
+
+int
+ast_variable_arr_n(struct ast_variable_arr *);
+
+struct ast_variable **
+ast_variable_arr_v(struct ast_variable_arr *);
+
+struct ast_variable_arr *
+ast_variable_arr_copy(struct ast_variable_arr *arr);
 
 struct ast_variable {
 	char *name;
@@ -519,10 +592,12 @@ struct ast_externdecl {
 	enum ast_externdecl_kind {
 		EXTERN_FUNCTION = 1 << 0,
 		EXTERN_VARIABLE	= 1 << 1,
+		EXTERN_TYPE	= 1 << 2,
 	} kind;
 	union {
 		struct ast_function *function;
 		struct ast_variable *variable;
+		struct ast_type *type;
 	} u;
 };
 
@@ -531,6 +606,9 @@ ast_functiondecl_create(struct ast_function *);
 
 struct ast_externdecl *
 ast_variabledecl_create(struct ast_variable *);
+
+struct ast_externdecl *
+ast_typedecl_create(struct ast_type *);
 
 void
 ast_externdecl_destroy(struct ast_externdecl *);

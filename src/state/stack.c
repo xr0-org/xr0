@@ -23,11 +23,11 @@ struct stack {
 };
 
 struct location *
-stack_newblock(struct stack *stack, int size)
+stack_newblock(struct stack *stack)
 {
-	int address = block_arr_append(stack->frame, block_create(size));
+	int address = block_arr_append(stack->frame, block_create());
 	return location_create(
-		LOCATION_AUTOMATIC, address, ast_expr_create_constant(0)
+		LOCATION_AUTOMATIC, address, ast_expr_constant_create(0)
 	);
 }
 
@@ -64,24 +64,61 @@ stack_destroy(struct stack *stack)
 	free(stack);
 }
 
+struct stack *
+stack_prev(struct stack *s)
+{
+	return s->prev;
+}
+
+static struct map *
+varmap_copy(struct map *);
+
+struct stack *
+stack_copy(struct stack *stack)
+{
+	struct stack *copy = calloc(1, sizeof(struct stack));
+	copy->frame = block_arr_copy(stack->frame);
+	copy->varmap = varmap_copy(stack->varmap);
+	copy->result = variable_copy(stack->result);
+	if (stack->prev) {
+		copy->prev = stack_copy(stack->prev);
+	}
+	return copy;
+}
+
+static struct map *
+varmap_copy(struct map *m)
+{
+	struct map *m_copy = map_create();
+	for (int i = 0; i < m->n; i++) {
+		struct entry e = m->entry[i];
+		map_set(
+			m_copy,
+			dynamic_str(e.key),
+			variable_copy((struct variable *) e.value)
+		);
+	}
+	return m_copy;
+}
+
 char *
-stack_str(struct stack *stack, struct heap *h)
+stack_str(struct stack *stack, struct state *state)
 {
 	struct strbuilder *b = strbuilder_create();
 	struct map *m = stack->varmap;
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
-		char *var = variable_str((struct variable *) e.value, stack, h);
+		char *var = variable_str((struct variable *) e.value, stack, state);
 		strbuilder_printf(b, "\t%s: %s", e.key, var);
 		free(var);
 		strbuilder_putc(b, '\n');
 	}
-	char *result = variable_str(stack->result, stack, h);
+	char *result = variable_str(stack->result, stack, state);
 	strbuilder_printf(b, "\tresult: %s\n", result);
 	free(result);
 	if (stack->prev) {
 		strbuilder_printf(b, "\t");
-		char *prev = stack_str(stack->prev, h);
+		char *prev = stack_str(stack->prev, state);
 		/* TODO: fix length of line */
 		for (int i = 0, len = 30; i < len-2; i++ ) {
 			strbuilder_putc(b, '-');
@@ -91,14 +128,6 @@ stack_str(struct stack *stack, struct heap *h)
 		free(prev);
 	}
 	return strbuilder_build(b);
-}
-
-struct stack *
-stack_prev(struct stack *stack, int depth)
-{
-	assert(!depth || stack->prev);
-
-	return depth > 0 ? stack_prev(stack->prev, depth-1) : stack;
 }
 
 void
@@ -113,30 +142,22 @@ stack_declare(struct stack *stack, struct ast_variable *var, bool isparam)
 	);
 }
 
-struct ast_variable **
-stack_getvariables(struct stack *stack)
+void
+stack_undeclare(struct stack *stack)
 {
 	struct map *m = stack->varmap;
-
-	struct ast_variable **var = malloc(sizeof(struct ast_variable *) * m->n);
-	assert(var);
+	stack->varmap = map_create();
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
-
 		struct variable *v = (struct variable *) e.value;
-		assert(v);
-
-		var[i] = variable_to_ast(v, e.key);
+		if (variable_isparam(v)) {
+			map_set(stack->varmap, dynamic_str(e.key), v);
+		} else {
+			variable_destroy(v);
+		}
 	}
-	return var;
+	map_destroy(m);
 }
-
-int
-stack_nvariables(struct stack *stack)
-{
-	return stack->varmap->n;
-}
-
 
 struct variable *
 stack_getresult(struct stack *s)
@@ -150,44 +171,27 @@ stack_getvarmap(struct stack *s)
 	return s->varmap;
 }
 
-static struct location *
-stack_getlocation_prop(struct stack *s, char *id, int currdepth);
-
-struct location *
-stack_getlocation(struct stack *s, char *id)
+struct variable *
+stack_getvariable(struct stack *s, char *id)
 {
-	if (strcmp(id, KEYWORD_RESULT) == 0) {
-		return location_copy(variable_location(s->result));
-	}
-	return stack_getlocation_prop(s, id, 0);
-}
+	assert(strcmp(id, KEYWORD_RESULT) != 0);
 
-static struct location *
-stack_getlocation_prop(struct stack *s, char *id, int depth)
-{
-	/* XXX */
-	struct variable *v = map_get(s->varmap, id);
-	if (v) {
-		struct location *loc = location_copy(variable_location(v));
-		location_setdepth(loc, depth);
-		return loc;
-	}
-	return s->prev ? stack_getlocation_prop(s->prev, id, depth+1) : NULL;
+	return map_get(s->varmap, id);
 }
 
 bool
-stack_references(struct stack *s, struct heap *h, struct location *loc)
+stack_references(struct stack *s, struct location *loc, struct state *state)
 {
 	/* TODO: check globals */
-
-	if (variable_references(stack_getresult(s), loc, s, h)) {
+	struct variable *result = stack_getresult(s);
+	if (result && variable_references(result, loc, state)) {
 		return true;
 	}
 
 	struct map *m = s->varmap;
 	for (int i = 0; i < m->n; i++) {
-		struct variable *v = (struct variable *) m->entry[i].value;
-		if (variable_isparam(v) && variable_references(v, loc, s, h)) {
+		struct variable *var = (struct variable *) m->entry[i].value;
+		if (variable_isparam(var) && variable_references(var, loc, state)) {
 			return true;
 		}
 	}
@@ -195,10 +199,123 @@ stack_references(struct stack *s, struct heap *h, struct location *loc)
 	return false;
 }
 
-block *
+struct block *
 stack_getblock(struct stack *s, int address)
 {
 	assert(address < block_arr_nblocks(s->frame));
 
 	return block_arr_blocks(s->frame)[address];
+}
+
+
+struct variable {
+	struct ast_type *type;
+	struct location *loc;
+	bool isparam;
+};
+
+struct variable *
+variable_create(struct ast_type *type, struct stack *stack, bool isparam)
+{
+	struct variable *v = malloc(sizeof(struct variable));
+
+	v->type = ast_type_copy(type);
+	v->isparam = isparam;
+
+	/* create block with uninitialised object at offset 0 */
+	v->loc = stack_newblock(stack);
+	struct block *b = location_getblock(v->loc, NULL, stack, NULL);
+	assert(b);
+	block_install(b, object_value_create(ast_expr_constant_create(0), NULL));
+
+	return v;
+}
+
+void
+variable_destroy(struct variable *v)
+{
+	ast_type_destroy(v->type);
+	location_destroy(v->loc);
+	free(v);
+}
+
+struct variable *
+variable_copy(struct variable *v)
+{
+	struct variable *copy = malloc(sizeof(struct variable));
+	copy->type = ast_type_copy(v->type);
+	copy->loc = location_copy(v->loc);
+	copy->isparam = v->isparam;
+	return copy;
+}
+
+static char *
+object_or_nothing_str(struct location *loc, struct stack *stack, struct state *state);
+
+char *
+variable_str(struct variable *var, struct stack *stack, struct state *state)
+{
+	assert(location_type(var->loc) != LOCATION_VCONST);
+
+	struct strbuilder *b = strbuilder_create();
+	char *type = ast_type_str(var->type);
+	char *loc = location_str(var->loc);
+	char *isparam = var->isparam ? "param " : "";
+	char *obj_str = object_or_nothing_str(var->loc, stack, state);
+	strbuilder_printf(b, "{%s%s := %s} @ %s", isparam, type, obj_str, loc);
+	free(obj_str);
+	free(loc);
+	free(type);
+	return strbuilder_build(b);
+}
+
+static char *
+object_or_nothing_str(struct location *loc, struct stack *stack, struct state *state)
+{
+	struct block *b = location_getstackblock(loc, stack);
+	assert(b);
+	struct object *obj = block_observe(b, location_offset(loc), state, false);
+	if (obj) {
+		return object_str(obj);
+	}
+	return dynamic_str("");
+}
+
+struct location *
+variable_location(struct variable *v)
+{
+	return v->loc;
+}
+
+struct ast_type *
+variable_type(struct variable *v)
+{
+	return v->type;
+}
+
+bool
+variable_references(struct variable *v, struct location *loc, struct state *s)
+{
+	assert(location_type(loc) != LOCATION_VCONST);
+
+	return location_references(v->loc, loc, s);
+}
+
+bool
+variable_ispointer(struct variable *v)
+{
+	return ast_type_base(v->type) == TYPE_POINTER;
+}
+
+bool
+variable_isparam(struct variable *v)
+{
+	return v->isparam;
+}
+
+bool
+variable_isobservable(struct variable *v)
+{
+	/* TODO: include check for all observable types */
+	return ast_type_base(v->type) == TYPE_INT;
 }

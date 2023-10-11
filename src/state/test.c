@@ -83,7 +83,7 @@ bool
 test_value_virt()
 {
 	struct location *loc = location_create(
-		LOCATION_AUTOMATIC, 7, ast_expr_create_constant(3)
+		LOCATION_AUTOMATIC, 7, ast_expr_constant_create(3)
 	);
 	struct value *val = value_virt_create(loc);
 
@@ -106,7 +106,7 @@ bool
 test_value_ptr()
 {
 	struct location *loc = location_create(
-		LOCATION_AUTOMATIC, 3, ast_expr_create_constant(4)
+		LOCATION_AUTOMATIC, 3, ast_expr_constant_create(4)
 	);
 	struct value *val = value_ptr_create(loc);
 
@@ -177,22 +177,22 @@ test_object()
 static struct object *
 setup_object_single()
 {
-	return object_create(ast_expr_create_constant(0), ast_expr_create_constant(1));
+	return object_create(ast_expr_constant_create(0), ast_expr_constant_create(1));
 }
 
 static struct object *
 setup_object_empty()
 {
-	return object_create(ast_expr_create_constant(0), ast_expr_create_constant(0));
+	return object_create(ast_expr_constant_create(0), ast_expr_constant_create(0));
 }
 
 static struct object *
 setup_object_with_value()
 {
-	struct object *obj = object_create(ast_expr_create_constant(0), ast_expr_create_constant(1));
+	struct object *obj = object_create(ast_expr_constant_create(0), ast_expr_constant_create(1));
 
 	struct location *loc = location_create(
-		LOCATION_DYNAMIC, 3, ast_expr_create_constant(0)
+		LOCATION_DYNAMIC, 3, ast_expr_constant_create(0)
 	);
 	struct value *val = value_ptr_create(loc);
 	object_assign(obj, val);
@@ -203,13 +203,13 @@ setup_object_with_value()
 static struct object *
 setup_object_range()
 {
-	return object_create(ast_expr_create_constant(0), ast_expr_create_constant(6));
+	return object_create(ast_expr_constant_create(0), ast_expr_constant_create(6));
 }
 
 static struct object *
 setup_object_range_proceding()
 {
-	return object_create(ast_expr_create_constant(6), ast_expr_create_constant(10));
+	return object_create(ast_expr_constant_create(6), ast_expr_constant_create(10));
 }
 
 bool
@@ -229,8 +229,8 @@ bool
 test_object_contains()
 {
 	struct object *obj = setup_object_range();	
-	struct ast_expr *valid_offset = ast_expr_create_constant(0),
-			*invalid_offset = ast_expr_create_constant(7);
+	struct ast_expr *valid_offset = ast_expr_constant_create(0),
+			*invalid_offset = ast_expr_constant_create(7);
 
 	bool pos_test = object_contains(obj, valid_offset),
 	     neg_test = object_contains(obj, invalid_offset);
@@ -292,11 +292,11 @@ test_object_upto()
 	struct object *obj = setup_object_range();
 	struct heap *heap = heap_create();
 	
-	struct ast_expr *excl_upper = ast_expr_create_constant(4);
+	struct ast_expr *excl_upper = ast_expr_constant_create(4);
 	struct object *res = object_upto(obj, excl_upper, heap);
 	
-	struct ast_expr *expected_lower = ast_expr_create_constant(0),
-			*expected_upper = ast_expr_create_constant(4);
+	struct ast_expr *expected_lower = ast_expr_constant_create(0),
+			*expected_upper = ast_expr_constant_create(4);
 
 	printf("lower: %s, upper: %s\n",
 		ast_expr_str(object_lower(res)),
@@ -318,11 +318,11 @@ test_object_from()
 	struct object *obj = setup_object_range();
 	struct heap *heap = heap_create();
 	
-	struct ast_expr *incl_lower = ast_expr_create_constant(4);
+	struct ast_expr *incl_lower = ast_expr_constant_create(4);
 	struct object *res = object_from(obj, incl_lower, heap);
 	
-	struct ast_expr *expected_lower = ast_expr_create_constant(4),
-			*expected_upper = ast_expr_create_constant(6);
+	struct ast_expr *expected_lower = ast_expr_constant_create(4),
+			*expected_upper = ast_expr_constant_create(6);
 
 	bool result = ast_expr_equal(object_lower(res), expected_lower)
 		&& ast_expr_equal(object_upper(res), expected_upper);	
@@ -388,9 +388,9 @@ test_block_observe()
 	struct heap *heap = heap_create();
 
 	block *b = block_create();
-	struct ast_expr *lower = ast_expr_create_constant(0),
-			*upper = ast_expr_create_constant(9),
-			*offset = ast_expr_create_constant(4);
+	struct ast_expr *lower = ast_expr_constant_create(0),
+			*upper = ast_expr_constant_create(9),
+			*offset = ast_expr_constant_create(4);
 
 	struct error *err = block_range_alloc(b, lower, upper, heap);	
 	if (err) {
@@ -416,8 +416,8 @@ test_block_observe()
 	struct object **objects = object_arr_objects(b);
 	struct object *before = objects[0];
 
-	struct ast_expr *expected_before_lower = ast_expr_create_constant(0),
-			*expected_before_upper = ast_expr_create_constant(4);
+	struct ast_expr *expected_before_lower = ast_expr_constant_create(0),
+			*expected_before_upper = ast_expr_constant_create(4);
 	if (!ast_expr_equal(object_lower(before), expected_before_lower)) {
 		return false;
 	}
@@ -425,10 +425,10 @@ test_block_observe()
 		return false;
 	}
 	
-	struct ast_expr *expected_obs_upper = ast_expr_create_binary(
-		ast_expr_create_constant(4),
+	struct ast_expr *expected_obs_upper = ast_expr_binary_create(
+		ast_expr_constant_create(4),
 		BINARY_OP_ADDITION,
-		ast_expr_create_constant(1)
+		ast_expr_constant_create(1)
 	);
 	if (!ast_expr_equal(object_lower(obs), expected_before_upper)) {
 		return false;
@@ -441,7 +441,7 @@ test_block_observe()
 	if (!ast_expr_equal(object_lower(after), expected_obs_upper)) {
 		return false;
 	}
-	if (!ast_expr_equal(object_upper(after), ast_expr_create_constant(9))) {
+	if (!ast_expr_equal(object_upper(after), ast_expr_constant_create(9))) {
 		return false;
 	}
 
@@ -468,8 +468,8 @@ test_block_range_aredeallocands()
 	struct heap *heap = heap_create();
 
 	block *b = block_create();
-	struct ast_expr *lower_alloc = ast_expr_create_constant(0),
-			*upper_alloc = ast_expr_create_constant(9);
+	struct ast_expr *lower_alloc = ast_expr_constant_create(0),
+			*upper_alloc = ast_expr_constant_create(9);
 
 	struct error *err = block_range_alloc(b, lower_alloc, upper_alloc, heap);	
 	if (err) {
@@ -493,10 +493,10 @@ test_block_range_dealloc()
 	struct heap *heap = heap_create();
 
 	block *b = block_create();
-	struct ast_expr *lower_alloc = ast_expr_create_constant(0),
-			*upper_alloc = ast_expr_create_constant(9),
-			*lower_dealloc = ast_expr_create_constant(4),
-			*upper_dealloc = ast_expr_create_constant(7);
+	struct ast_expr *lower_alloc = ast_expr_constant_create(0),
+			*upper_alloc = ast_expr_constant_create(9),
+			*lower_dealloc = ast_expr_constant_create(4),
+			*upper_dealloc = ast_expr_constant_create(7);
 
 	struct error *err = block_range_alloc(b, lower_alloc, upper_alloc, heap);	
 	if (err) {
@@ -539,7 +539,7 @@ test_location()
 bool
 test_location_create()
 {
-	struct ast_expr *offset = ast_expr_create_constant(0);
+	struct ast_expr *offset = ast_expr_constant_create(0);
 	struct location *loc = location_create(LOCATION_DYNAMIC, 0, offset);
 
 	char *s = location_str(loc);

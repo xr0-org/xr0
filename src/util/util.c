@@ -109,6 +109,16 @@ strbuilder_build(struct strbuilder *b)
 	return s;
 }
 
+char *
+strbuilder_preview(struct strbuilder *b)
+{
+	assert(b != NULL);
+	int len = strlen(b->buf) + 1;
+	char *s = malloc(sizeof(char) * len);
+	snprintf(s, len, "%s", b->buf);
+	return s;
+}
+
 static void
 strbuilder_realloc(struct strbuilder *b, size_t len)
 {

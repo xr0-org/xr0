@@ -4,83 +4,181 @@
 #include <string.h>
 #include "ast.h"
 #include "heap.h"
+#include "state.h"
 #include "location.h"
-#include "value.h"
+#include "object.h"
 #include "util.h"
+#include "value.h"
+
+struct range *
+range_copy(struct range *);
+
+void
+range_destroy(struct range *);
+
+char *
+range_str(struct range *);
+
+struct ast_expr *
+range_size(struct range *);
+
+struct error *
+range_dealloc(struct range *r, struct state *s);
+
+bool
+range_isdeallocand(struct range *, struct state *);
+
+bool
+range_references(struct range *, struct location *, struct state *);
+
 
 struct object {
-	struct ast_expr *lower, *upper;
-	struct value *value;
+	enum object_type {
+		OBJECT_VALUE, OBJECT_DEALLOCAND_RANGE,
+	} type;
+	struct ast_expr *offset;
+	union {
+		struct range *range;
+		struct value *value;
+	};
 };
 
 struct object *
-object_create(struct ast_expr *lower, struct ast_expr *upper)
+object_value_create(struct ast_expr *offset, struct value *v)
 {
 	struct object *obj = malloc(sizeof(struct object));
 	assert(obj);
-	obj->lower = lower;
-	obj->upper = upper;
-	obj->value = NULL;
+	obj->offset = offset;
+	obj->value = v;
+	obj->type = OBJECT_VALUE;
+	return obj;
+}
+
+struct object *
+object_range_create(struct ast_expr *offset, struct range *r)
+{
+	assert(r);
+	struct object *obj = malloc(sizeof(struct object));
+	assert(obj);
+	obj->offset = offset;
+	obj->range = r;
+	obj->type = OBJECT_DEALLOCAND_RANGE;
 	return obj;
 }
 
 void
 object_destroy(struct object *obj)
 {
-	ast_expr_destroy(obj->lower);
-	ast_expr_destroy(obj->upper);
-	if (obj->value) {
-		value_destroy(obj->value);
+	switch (obj->type) {
+	case OBJECT_VALUE:
+		if (obj->value) {
+			value_destroy(obj->value);
+		}
+		break;
+	case OBJECT_DEALLOCAND_RANGE:
+		range_destroy(obj->range);
+		break;
+	default:
+		assert(false);
 	}
+	ast_expr_destroy(obj->offset);
 	free(obj);
 }
+
+struct object *
+object_copy(struct object *old)
+{
+	struct object *new = malloc(sizeof(struct object));
+	new->offset = ast_expr_copy(old->offset);
+	new->type = old->type;
+	switch (old->type) {
+	case OBJECT_VALUE:
+		new->value = old->value ?  value_copy(old->value) : NULL;
+		break;
+	case OBJECT_DEALLOCAND_RANGE:
+		new->range = range_copy(old->range);
+		break;
+	default:
+		assert(false);
+	}
+	return new;
+}
+
+static char *
+inner_str(struct object *);
 
 char *
 object_str(struct object *obj)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "[");
-	char *lw = ast_expr_str(obj->lower),
-	     *up = ast_expr_str(obj->upper);
-	strbuilder_printf(b, "%s:%s:", lw, up);
-	free(up);
-	free(lw);
-	if (obj->value) {
-		char *val = value_str(obj->value);
-		strbuilder_printf(b, "<%s>", val);
-		free(val);
-	} else {
-		strbuilder_printf(b, "<>");
-	}
-	strbuilder_printf(b, "]");
+	strbuilder_printf(b, "{");
+	char *offset = ast_expr_str(obj->offset);
+	strbuilder_printf(b, "%s:", offset);
+	free(offset);
+	char *inner = inner_str(obj);
+	strbuilder_printf(b, "<%s>", inner);
+	free(inner);
+	strbuilder_printf(b, "}");
 	return strbuilder_build(b);
 }
 
-struct ast_expr *
-object_lower(struct object *obj)
+static char *
+inner_str(struct object *obj)
 {
-	assert(obj);
-	return obj->lower;
+	switch (obj->type) {
+	case OBJECT_VALUE:
+		return obj->value ? value_str(obj->value) : dynamic_str("");
+	case OBJECT_DEALLOCAND_RANGE:
+		return range_str(obj->range);
+	default:
+		assert(false);
+	}
 }
 
-struct ast_expr *
-object_upper(struct object *obj)
+bool
+object_isvalue(struct object *obj)
 {
-	assert(obj);
-	return obj->upper;
+	return obj->type == OBJECT_VALUE;
 }
 
 struct value *
-object_value(struct object *obj)
+object_as_value(struct object *obj)
 {
-	assert(obj);
+	assert(obj->type == OBJECT_VALUE);
+
 	return obj->value;
+}
+
+bool
+object_isdeallocand(struct object *obj, struct state *s)
+{
+	switch (obj->type) {
+	case OBJECT_VALUE:
+		return obj->value && state_isdeallocand(s, value_as_ptr(obj->value));
+	case OBJECT_DEALLOCAND_RANGE:
+		return range_isdeallocand(obj->range, s);
+	default:
+		assert(false);
+	}
+}
+
+bool
+object_references(struct object *obj, struct location *loc, struct state *s)
+{
+	if (obj->type == OBJECT_DEALLOCAND_RANGE) {
+		return range_references(obj->range, loc, s);
+	}
+
+	assert(obj->type == OBJECT_VALUE);
+
+	struct value *v = object_as_value(obj);
+	return v ? value_references(v, loc, s) : false;
 }
 
 void
 object_assign(struct object *obj, struct value *val)
 {
-	assert(obj);
+	assert(obj->type == OBJECT_VALUE);
 
 	/* XXX: check that if val has offset it's within range and return error
 	 * potentially */
@@ -88,302 +186,251 @@ object_assign(struct object *obj, struct value *val)
 	obj->value = val;
 }
 
-bool
-hack_is_i_in_i_to_i_plus_one(struct object *obj, struct ast_expr *offset);
-
-struct ast_expr *
-calc_simplify(struct ast_expr *expr);
-
-bool
-object_contains(struct object *obj, struct ast_expr *offset)
-{
-	if (hack_is_i_in_i_to_i_plus_one(obj, offset)) {
-		return true;
-	}
-
-	struct ast_expr *simp_lw = calc_simplify(obj->lower),
-			*simp_up = calc_simplify(obj->upper),
-			*simp_of = calc_simplify(offset);
-
-	int lw = ast_expr_as_constant(simp_lw),
-	    up = ast_expr_as_constant(simp_up),
-	    of = ast_expr_as_constant(simp_of);
-
-	ast_expr_destroy(simp_of);
-	ast_expr_destroy(simp_up);
-	ast_expr_destroy(simp_lw);
-
-	return lw <= of && of < up;
-}
-
-bool
-hack_is_i_in_i_to_i_plus_one(struct object *obj, struct ast_expr *offset)
-{
-	if (ast_expr_kind(offset) != EXPR_IDENTIFIER) {
-		return false;
-	}
-	if (strcmp(ast_expr_as_identifier(offset), "i") != 0) {
-		return false;
-	}
-	if (!ast_expr_equal(obj->lower, offset)) {
-		return false;
-	}
-	struct ast_expr *up = obj->upper;
-	if (ast_expr_kind(up) != EXPR_BINARY) {
-		return false;
-	}
-	struct ast_expr *e1 = ast_expr_binary_e1(up),
-			*e2 = ast_expr_binary_e2(up);
-	if (ast_expr_kind(e2) != EXPR_CONSTANT) {
-		return false;
-	}
-	return ast_expr_equal(e1, offset)
-		&& ast_expr_binary_op(up) == BINARY_OP_ADDITION
-		&& ast_expr_as_constant(e2) == 1;
-}
-
 static struct ast_expr *
-binary_simplify(struct ast_expr *expr);
-
-struct ast_expr *
-calc_simplify(struct ast_expr *expr)
+object_size(struct object *obj)
 {
-	switch (ast_expr_kind(expr)) {
-	case EXPR_CONSTANT:
-	case EXPR_IDENTIFIER:
-		return ast_expr_copy(expr);
-	case EXPR_BINARY:
-		return binary_simplify(expr);
+	switch (obj->type) {
+	case OBJECT_VALUE:
+		/* TODO: derive properly from value type */
+		return ast_expr_constant_create(1);
+	case OBJECT_DEALLOCAND_RANGE:
+		return ast_expr_copy(range_size(obj->range));
 	default:
 		assert(false);
 	}
 }
 
-static struct ast_expr *
-binary_simplify_memory_safe_decision(struct ast_expr *expr, struct ast_expr *e1,
-		struct ast_expr *e2);
-
-static struct ast_expr *
-binary_simplify(struct ast_expr *expr)
+struct ast_expr *
+object_lower(struct object *obj)
 {
-	struct ast_expr *e1 = calc_simplify(ast_expr_binary_e1(expr)),
-			*e2 = calc_simplify(ast_expr_binary_e2(expr));
-	assert(ast_expr_binary_op(expr) == BINARY_OP_ADDITION);
-	struct ast_expr *s = binary_simplify_memory_safe_decision(expr, e1, e2);	
-	ast_expr_destroy(e1);
-	ast_expr_destroy(e2);
-	return s;
+	return obj->offset;
 }
 
-static struct ast_expr *
-binary_simplify_memory_safe_decision(struct ast_expr *expr, struct ast_expr *e1,
-		struct ast_expr *e2)
+struct ast_expr *
+object_upper(struct object *obj)
 {
-	if (ast_expr_kind(e1) != ast_expr_kind(e2)) { /* XXX */
-		return ast_expr_copy(expr);
-	}
-	return ast_expr_create_constant(
-		ast_expr_as_constant(e1) + ast_expr_as_constant(e2)
+	return ast_expr_binary_create(
+		ast_expr_copy(obj->offset),
+		BINARY_OP_ADDITION,
+		object_size(obj)
 	);
 }
 
 bool
-hack_is_i_plus_one_in_i_to_i_plus_one(struct object *obj, struct ast_expr *offset);
-
-bool
-object_contains_upperincl(struct object *obj, struct ast_expr *offset)
+object_contains(struct object *obj, struct ast_expr *offset, struct state *s)
 {
-	if (hack_is_i_plus_one_in_i_to_i_plus_one(obj, offset)) {
-		return true;
-	}
+	struct ast_expr *lw = obj->offset,
+			*up = object_upper(obj),
+			*of = offset;
 
-	struct ast_expr *simp_lw = calc_simplify(obj->lower),
-			*simp_up = calc_simplify(obj->upper),
-			*simp_of = calc_simplify(offset);
-
-	int lw = ast_expr_as_constant(simp_lw),
-	    up = ast_expr_as_constant(simp_up),
-	    of = ast_expr_as_constant(simp_of);
-
-	ast_expr_destroy(simp_of);
-	ast_expr_destroy(simp_up);
-	ast_expr_destroy(simp_lw);
-
-	return lw <= of && of <= up;
-}
-
-bool
-hack_is_i_plus_one_in_i_to_i_plus_one(struct object *obj, struct ast_expr *offset)
-{
-	/* lower is `i' */
-	struct ast_expr *lw = obj->lower;
-	if (ast_expr_kind(lw) != EXPR_IDENTIFIER) {
-		return false;
-	}
-	if (strcmp(ast_expr_as_identifier(lw), "i") != 0) {
-		return false;
-	}
-
-	/* offset, upper are both `i+1' */
-	if (!ast_expr_equal(offset, obj->upper)) {
-		return false;
-	}
-	if (ast_expr_kind(offset) != EXPR_BINARY) {
-		return false;
-	}
-	struct ast_expr *e1 = ast_expr_binary_e1(offset),
-			*e2 = ast_expr_binary_e2(offset);
-	if (ast_expr_kind(e2) != EXPR_CONSTANT) {
-		return false;
-	}
-	return ast_expr_equal(e1, lw)
-		&& ast_expr_binary_op(offset) == BINARY_OP_ADDITION
-		&& ast_expr_as_constant(e2) == 1;
-}
-
-bool
-object_isempty(struct object *obj)
-{
-	struct ast_expr *lw = calc_simplify(obj->lower),
-			*up = calc_simplify(obj->upper);
-	bool empty = ast_expr_equal(lw, up);
-	ast_expr_destroy(lw);
+	struct ast_expr *e1 = ast_expr_binary_create(
+		ast_expr_copy(lw), BINARY_OP_LE, ast_expr_copy(of)
+	);
+	struct ast_expr *e2 = ast_expr_binary_create(
+		ast_expr_copy(of), BINARY_OP_LT, ast_expr_copy(up)
+	);
 	ast_expr_destroy(up);
-	return empty;
+	
+	bool contains =
+		/* lw ≤ of */
+		state_eval(s, e1)
+		&&
+		/* of < up */
+		state_eval(s, e2);
+
+	ast_expr_destroy(e2);
+	ast_expr_destroy(e1);
+
+	return contains;
 }
 
 bool
-object_contig_precedes(struct object *before, struct object *after)
+object_contains_upperincl(struct object *obj, struct ast_expr *offset,
+		struct state *s)
 {
-	if (ast_expr_equal(before->upper, after->lower)) {
-		return true;
-	}
-	return false;
+	struct ast_expr *lw = obj->offset,
+			*up = object_upper(obj),
+			*of = offset;
+
+	return
+		/* lw ≤ of */
+		state_eval(s, ast_expr_binary_create(lw, BINARY_OP_LE, of))
+
+		&&
+
+		/* of ≤ up */
+		state_eval(s, ast_expr_binary_create(of, BINARY_OP_LE, up));
 }
 
 bool
-object_isvirtual(struct object *obj)
+object_isempty(struct object *obj, struct state *s)
 {
-	assert(obj);
-	struct value *val = object_value(obj);
-	if (!val) {
-		return false;
-	}
-	return (bool) value_type(val) == VALUE_VIRTUAL;
+	struct ast_expr *lw = obj->offset,
+			*up = object_upper(obj);
+
+	return state_eval(s, ast_expr_binary_create(lw, BINARY_OP_EQ, up));
 }
 
 bool
-hack_is_i_to_i_plus_one(struct object *);
-
-bool
-object_issingular(struct object *obj)
+object_contig_precedes(struct object *before, struct object *after,
+		struct state *s)
 {
-	if (hack_is_i_to_i_plus_one(obj)) {
-		return true;
-	}
-	struct ast_expr *simp_lw = calc_simplify(obj->lower),
-			*simp_up = calc_simplify(obj->upper);
-	int lw = ast_expr_as_constant(simp_lw),
-	    up = ast_expr_as_constant(simp_up);
-	bool singular = up-lw == 1;
-	ast_expr_destroy(simp_lw);
-	ast_expr_destroy(simp_up);
-	return singular;
+	struct ast_expr *lw = object_upper(before),
+			*up = after->offset;
+	return state_eval(s, ast_expr_binary_create(lw, BINARY_OP_EQ, up));
 }
 
 bool
-hack_is_i_to_i_plus_one(struct object *obj)
+object_issingular(struct object *obj, struct state *s)
 {
-	if (ast_expr_kind(obj->lower) != EXPR_IDENTIFIER) {
-		return false;
-	}
-	if (strcmp(ast_expr_as_identifier(obj->lower), "i") != 0) {
-		return false;
-	}
-	struct ast_expr *up = obj->upper;
-	if (ast_expr_kind(up) != EXPR_BINARY) {
-		return false;
-	}
-	struct ast_expr *e1 = ast_expr_binary_e1(up),
-			*e2 = ast_expr_binary_e2(up);
-	if (ast_expr_kind(e2) != EXPR_CONSTANT) {
-		return false;
-	}
-	return ast_expr_equal(obj->lower, e1)
-		&& ast_expr_binary_op(up) == BINARY_OP_ADDITION
-		&& ast_expr_as_constant(e2) == 1;
+	struct ast_expr *lw = obj->offset,
+			*up = object_upper(obj);
+
+	struct ast_expr *lw_succ = ast_expr_binary_create(
+		lw, BINARY_OP_ADDITION, ast_expr_constant_create(1)
+	);
+
+	/* lw + 1 == up */
+	return state_eval(s, ast_expr_binary_create(lw_succ, BINARY_OP_EQ, up));
 }
 
 struct object *
-object_upto(struct object *obj, struct ast_expr *excl_upper, struct heap *h)
+object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 {
-	if (hack_is_i_in_i_to_i_plus_one(obj, excl_upper)) {
+	struct ast_expr *lw = obj->offset,
+			*up = object_upper(obj);
+
+	struct ast_expr *prop0 = ast_expr_binary_create(lw, BINARY_OP_LE, excl_up),
+			*prop1 = ast_expr_binary_create(lw, BINARY_OP_EQ, excl_up),
+			*prop2 = ast_expr_binary_create(up, BINARY_OP_EQ, excl_up);
+
+	assert(state_eval(s, prop0));
+
+	if (state_eval(s, prop1)) {
 		return NULL;
 	}
 
-	struct ast_expr *simp_lw = calc_simplify(obj->lower),
-			*simp_up = calc_simplify(obj->upper),
-			*simp_excl_up = calc_simplify(excl_upper);
-
-	int lw = ast_expr_as_constant(simp_lw),
-	    up = ast_expr_as_constant(simp_up),
-	    excl_up = ast_expr_as_constant(simp_excl_up);
-
-	ast_expr_destroy(simp_lw);
-	ast_expr_destroy(simp_up);
-	ast_expr_destroy(simp_excl_up);
-
-	assert(excl_up <= up);
-
-	if (lw == excl_up) {
-		return NULL;
+	if (state_eval(s, prop2)) {
+		assert(obj->type == OBJECT_VALUE);
+		return object_value_create(
+			ast_expr_copy(obj->offset), value_copy(obj->value)
+		);
 	}
-
-	struct object *result = object_create(
-		ast_expr_copy(obj->lower), ast_expr_copy(excl_upper)
+	return object_range_create(
+		ast_expr_copy(obj->offset),
+		range_create(
+			ast_expr_binary_create(excl_up, BINARY_OP_SUBTRACTION, lw),
+			value_as_ptr(state_alloc(s))
+		)
 	);
-	if (up == excl_up) {
-		object_assign(result, value_copy(obj->value));
-	} else {
-		object_assign(result, value_virt_create(heap_newblock(h, excl_up-lw)));
-	}
-	return result;
 }
 
 struct object *
-object_from(struct object *obj, struct ast_expr *incl_lower, struct heap *h)
+object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 {
-	if (hack_is_i_plus_one_in_i_to_i_plus_one(obj, incl_lower)) {
+	struct ast_expr *lw = obj->offset,
+			*up = object_upper(obj);
+
+	struct ast_expr *prop0 = ast_expr_binary_create(incl_lw, BINARY_OP_GE, up),
+			*prop1 = ast_expr_binary_create(incl_lw, BINARY_OP_EQ, lw);
+
+	if (state_eval(s, prop0)) {
 		return NULL;
 	}
 
-	struct ast_expr *simp_lw = calc_simplify(obj->lower),
-			*simp_up = calc_simplify(obj->upper),
-			*simp_incl_lw = calc_simplify(incl_lower);
-
-	int lw = ast_expr_as_constant(simp_lw),
-	    up = ast_expr_as_constant(simp_up),
-	    incl_lw = ast_expr_as_constant(simp_incl_lw);
-
-	ast_expr_destroy(simp_lw);
-	ast_expr_destroy(simp_up);
-	ast_expr_destroy(simp_incl_lw);
-
-	assert(lw <= incl_lw);
-
-	if (incl_lw == up) {
-		return NULL;
+	if (state_eval(s, prop1)) {
+		assert(obj->type == OBJECT_VALUE);
+		return object_value_create(
+			ast_expr_copy(incl_lw),
+			value_copy(obj->value)
+		);
 	}
-
-	struct object *result = object_create(
-		ast_expr_copy(incl_lower), ast_expr_copy(obj->upper)
+	return object_range_create(
+		ast_expr_copy(incl_lw),
+		range_create(
+			ast_expr_binary_create(ast_expr_copy(up), BINARY_OP_SUBTRACTION, ast_expr_copy(incl_lw)),
+			value_as_ptr(state_alloc(s))
+		)
 	);
-	if (lw == incl_lw) {
-		object_assign(result, value_copy(obj->value));
-	} else {
-		object_assign(result, value_virt_create(heap_newblock(h, up-incl_lw)));
+}
+
+
+struct error *
+object_dealloc(struct object *obj, struct state *s)
+{
+	switch (obj->type) {
+	case OBJECT_VALUE:
+		return state_dealloc(s, obj->value);
+	case OBJECT_DEALLOCAND_RANGE:
+		return range_dealloc(obj->range, s);
+	default:
+		assert(false);
 	}
-	return result;
+}
+
+
+struct range {
+	struct ast_expr *size;
+	struct location *loc;
+};
+
+struct range *
+range_create(struct ast_expr *size, struct location *loc)
+{
+	struct range *r = malloc(sizeof(struct range));
+	r->size = size;
+	r->loc = loc;
+	return r;
+}
+
+struct range *
+range_copy(struct range *r)
+{
+	return range_create(ast_expr_copy(r->size), location_copy(r->loc));
+}
+
+void
+range_destroy(struct range *r)
+{
+	ast_expr_destroy(r->size);
+	location_destroy(r->loc);
+	free(r);
+}
+
+char *
+range_str(struct range *r)
+{
+	struct strbuilder *b = strbuilder_create();
+	char *size = ast_expr_str(r->size);
+	char *loc = location_str(r->loc);
+	strbuilder_printf(b, "virt:%s@%s", size, loc);
+	free(loc);
+	free(size);
+	return strbuilder_build(b);
+}
+
+struct ast_expr *
+range_size(struct range *r)
+{
+	return r->size;
+}
+
+struct error *
+range_dealloc(struct range *r, struct state *s)
+{
+	return state_dealloc(s, value_ptr_create(r->loc));
+}
+
+bool
+range_isdeallocand(struct range *r, struct state *s)
+{
+	return state_isdeallocand(s, r->loc);
+}
+
+bool
+range_references(struct range *r, struct location *loc, struct state *s)
+{
+	return location_references(r->loc, loc, s);
 }
 
 
@@ -410,6 +457,19 @@ object_arr_destroy(struct object_arr *arr)
 	free(arr);
 }
 
+int
+object_arr_append(struct object_arr *arr, struct object *obj);
+
+struct object_arr *
+object_arr_copy(struct object_arr *arr)
+{
+	struct object_arr *copy = object_arr_create();
+	for (int i = 0; i < arr->n; i++) {
+		object_arr_append(copy, object_copy(arr->object[i]));
+	}
+	return copy;
+}
+
 struct object **
 object_arr_allocs(struct object_arr *arr)
 {
@@ -423,10 +483,11 @@ object_arr_nallocs(struct object_arr *arr)
 }
 
 int
-object_arr_index(struct object_arr *arr, struct ast_expr *offset)
+object_arr_index(struct object_arr *arr, struct ast_expr *offset,
+		struct state *state)
 {
 	for (int i = 0; i < arr->n; i++) {
-		if (object_contains(arr->object[i], offset)) {
+		if (object_contains(arr->object[i], offset, state)) {
 			return i;
 		}
 	}
@@ -434,20 +495,21 @@ object_arr_index(struct object_arr *arr, struct ast_expr *offset)
 }
 
 int
-object_arr_index_upperincl(struct object_arr *arr, struct ast_expr *offset)
+object_arr_index_upperincl(struct object_arr *arr, struct ast_expr *offset,
+		struct state *state)
 {
 	for (int i = 0; i < arr->n; i++) {
-		if (object_contains_upperincl(arr->object[i], offset)) {
+		if (object_contains_upperincl(arr->object[i], offset, state)) {
 			return i;
 		}
 	}
 	return -1;
 }
 
-void
+int
 object_arr_insert(struct object_arr *arr, int index, struct object *obj)
 {
-	assert(!object_isempty(obj));
+	/*assert(!object_isempty(obj));*/
 
 	arr->object = realloc(arr->object, sizeof(struct object *) * ++arr->n);
 	assert(arr->object);
@@ -455,18 +517,18 @@ object_arr_insert(struct object_arr *arr, int index, struct object *obj)
 		arr->object[i] = arr->object[i-1];
 	}
 	arr->object[index] = obj;
+	return index;
 }
 
-void
+int
 object_arr_append(struct object_arr *arr, struct object *obj)
 {
 	return object_arr_insert(arr, arr->n, obj);
 }
 
 void
-object_arr_delete(struct object_arr *arr, int index)
+object_arr_remove(struct object_arr *arr, int index)
 {
-	object_destroy(arr->object[index]);
 	for (int i = index; i < arr->n-1; i++) {
 		arr->object[i] = arr->object[i+1];
 	}
