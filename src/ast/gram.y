@@ -228,8 +228,12 @@ primary_expression
 
 postfix_expression
 	: primary_expression
-	| postfix_expression '[' expression ']'
-		{ $$ = ast_expr_access_create($1, $3); }
+	| postfix_expression '[' expression ']' {
+		$$ = ast_expr_unary_create(
+			ast_expr_binary_create($1, BINARY_OP_ADDITION, $3),
+			UNARY_OP_DEREFERENCE
+		);
+	}
 	| postfix_expression '(' ')'
 		{ $$ = ast_expr_call_create($1, 0, NULL); }
 	| postfix_expression '(' argument_expression_list ')'
@@ -238,7 +242,14 @@ postfix_expression
 		{ $$ = ast_expr_member_create($1, $3); }
 	| postfix_expression PTR_OP identifier {
 		$$ = ast_expr_member_create(
-			ast_expr_access_create($1, ast_expr_constant_create(0)),
+			ast_expr_unary_create(
+				ast_expr_binary_create(
+					$1,
+					BINARY_OP_ADDITION,
+					ast_expr_constant_create(0)
+				),
+				UNARY_OP_DEREFERENCE
+			),
 			$3
 		);
 	}

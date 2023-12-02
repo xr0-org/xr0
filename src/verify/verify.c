@@ -674,17 +674,19 @@ static bool
 expr_iter_assertion_verify(struct ast_expr *expr, struct ast_expr *lw,
 		struct ast_expr *up, struct state *state)
 {
-	struct ast_expr *acc = ast_expr_assertion_assertand(expr); /* `arr[offset]` */
+	struct ast_expr *acc = ast_expr_assertion_assertand(expr); /* `*(arr+offset)` */
+	assert(ast_expr_unary_op(acc) == UNARY_OP_DEREFERENCE);
+	struct ast_expr *inner = ast_expr_unary_operand(acc); /* `arr+offset` */
 	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
 	struct ast_expr *j = ast_expr_identifier_create(dynamic_str("j"));
 	assert(
-		ast_expr_equal(ast_expr_access_index(acc), i) ||
-		ast_expr_equal(ast_expr_access_index(acc), j)
+		ast_expr_equal(ast_expr_binary_e2(inner), i) ||
+		ast_expr_equal(ast_expr_binary_e2(inner), j)
 	);
 	ast_expr_destroy(j);
 	ast_expr_destroy(i);
 	struct object *obj = lvalue_object(
-		expr_lvalue(ast_expr_access_root(acc), state)
+		expr_lvalue(ast_expr_binary_e1(acc), state)
 	);
 	assert(obj);
 
@@ -771,8 +773,6 @@ expr_lvalue(struct ast_expr *expr, struct state *state)
 	switch (ast_expr_kind(expr)) {
 	case EXPR_IDENTIFIER:
 		return expr_identifier_lvalue(expr, state);
-	case EXPR_ACCESS:
-		return expr_access_lvalue(expr, state);
 	case EXPR_UNARY:
 		return expr_unary_lvalue(expr, state);
 	case EXPR_STRUCTMEMBER:
@@ -793,41 +793,23 @@ expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
 }
 
 struct lvalue *
-expr_access_lvalue(struct ast_expr *acc, struct state *state)
-{
-	/* from access `arr[offset]` get `arr` */
-	struct lvalue *arr = expr_lvalue(ast_expr_access_root(acc), state);
-	struct object *arr_obj = lvalue_object(arr);
-	if (!arr_obj) { /* `arr` freed */
-		return NULL;
-	}
-	struct ast_type *t = ast_type_ptr_type(lvalue_type(arr));
-	/* *(arr+offset) */
-	struct object *obj = state_deref(
-		state, arr_obj, ast_expr_access_index(acc)
-	);
-	return lvalue_create(t, obj);
-}
-
-struct lvalue *
 expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 {
 	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
+	struct ast_expr *inner = ast_expr_unary_operand(expr);
 
-	struct lvalue *root = expr_lvalue(ast_expr_unary_operand(expr), state);
+	struct lvalue *root = expr_lvalue(ast_expr_binary_e1(inner), state);
 	struct object *root_obj = lvalue_object(root);
 	if (!root_obj) { /* `root` freed */
 		return NULL;
 	}
 	struct ast_type *t = ast_type_ptr_type(lvalue_type(root));
 
-	struct ast_expr *zero = ast_expr_constant_create(0);
+	struct value *root_val = object_as_value(root_obj);
+	assert(root_val);
 	struct object *obj = state_deref(
-		state,
-		lvalue_object(root),
-		zero
+		state, root_val, ast_expr_binary_e2(inner)
 	);
-	ast_expr_destroy(zero);
 
 	return lvalue_create(t, obj);
 }
@@ -915,7 +897,10 @@ static Result
 expr_literal_eval(struct ast_expr *expr, struct state *state);
 
 static Result
-expr_access_or_identifier_eval(struct ast_expr *expr, struct state *state);
+expr_identifier_eval(struct ast_expr *expr, struct state *state);
+
+static Result
+expr_unary_eval(struct ast_expr *expr, struct state *state);
 
 static Result
 expr_structmember_eval(struct ast_expr *expr, struct state *state);
@@ -943,8 +928,9 @@ expr_eval(struct ast_expr *expr, struct state *state)
 	case EXPR_STRING_LITERAL:
 		return expr_literal_eval(expr, state);
 	case EXPR_IDENTIFIER:
-	case EXPR_ACCESS:
-		return expr_access_or_identifier_eval(expr, state);
+		return expr_identifier_eval(expr, state);
+	case EXPR_UNARY:
+		return expr_unary_eval(expr, state);
 	case EXPR_STRUCTMEMBER:
 		return expr_structmember_eval(expr, state);
 	case EXPR_CALL:
@@ -977,13 +963,35 @@ expr_constant_eval(struct ast_expr *expr, struct state *state)
 }
 
 static Result
-expr_access_or_identifier_eval(struct ast_expr *expr, struct state *state)
+expr_identifier_eval(struct ast_expr *expr, struct state *state)
 {
-	struct value *val = state_getvalue(state, expr);
+	struct value *val = state_getvalue(state, ast_expr_as_identifier(expr));
 	if (!val) {
 		return result_error_create(error_create("no value"));
 	}
 	return result_value_create(val);
+}
+
+static Result
+expr_unary_eval(struct ast_expr *expr, struct state *state)
+{
+	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
+
+	struct ast_expr *inner = ast_expr_unary_operand(expr); /* arr+offset */
+
+	Result res = expr_eval(ast_expr_binary_e1(inner), state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	struct value *arr = result_as_value(res);
+	assert(arr);
+	struct object *obj = state_deref(state, arr, ast_expr_binary_e2(inner));
+	assert(obj);
+
+	struct value *v = object_as_value(obj);
+	assert(v);
+
+	return result_value_create(state_value_copy(v));
 }
 
 static Result
@@ -1277,12 +1285,14 @@ hack_base_object_from_mem(struct ast_expr *expr, struct state *state)
 {
 	/* we're currently discarding analysis of `offset` and relying on the
 	 * bounds (lower, upper beneath) alone */
-	struct ast_expr *acc = ast_expr_memory_root(expr); /* `arr[offset]` */
+	struct ast_expr *acc = ast_expr_memory_root(expr); /* `*(arr+offset)` */
+	assert(ast_expr_unary_op(acc) == UNARY_OP_DEREFERENCE);
+	struct ast_expr *inner = ast_expr_unary_operand(acc); /* `arr+offset` */
 	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
-	assert(ast_expr_equal(ast_expr_access_index(acc), i)); 
+	assert(ast_expr_equal(ast_expr_binary_e2(inner), i)); 
 	ast_expr_destroy(i);
 	struct object *obj = lvalue_object(
-		expr_lvalue(ast_expr_access_root(acc), state)
+		expr_lvalue(ast_expr_binary_e1(inner), state)
 	);
 	assert(obj);
 	return obj;
@@ -1454,7 +1464,8 @@ static struct ast_expr *
 hack_access_from_assertion(struct ast_expr *expr)
 {
 	struct ast_expr *assertand = ast_expr_assertion_assertand(expr);
-	assert(ast_expr_kind(assertand) == EXPR_ACCESS);
+	assert(ast_expr_kind(assertand) == EXPR_UNARY
+			&& ast_expr_unary_op(assertand) == UNARY_OP_DEREFERENCE);
 	return assertand;
 }
 
