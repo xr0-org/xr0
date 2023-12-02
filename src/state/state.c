@@ -309,12 +309,8 @@ struct ast_expr *
 resolve_bound(struct ast_expr *, struct state *);
 
 struct object *
-state_deref(struct state *state, struct object *ptr, struct ast_expr *index)
+state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 {
-	struct value *ptr_val = object_as_value(ptr);
-	if (!ptr_val) { /* `ptr` uninitialized */
-		return NULL;
-	}
 	struct location *deref_base = value_as_ptr(ptr_val);
 	assert(deref_base);
 
@@ -327,27 +323,16 @@ state_deref(struct state *state, struct object *ptr, struct ast_expr *index)
 	return res;
 }
 
-struct value *
-value_from_access(struct ast_expr *acc, struct state *state);
+static struct ast_expr *
+resolve_bound_identifier(char *, struct state *);
 
 struct value *
-state_getvalue(struct state *state, struct ast_expr *rvalue)
+state_getvalue(struct state *state, char *id)
 {
-	switch (ast_expr_kind(rvalue)) {
-	case EXPR_ACCESS:
-		return value_from_access(rvalue, state);
-	case EXPR_IDENTIFIER:
-		break;
-	default:
-		assert(false);
-	}
-
 	/* XXX: side effect of observing if necessary */
-	resolve_bound(rvalue, state);
+	resolve_bound_identifier(id, state);
 
-	struct object *obj = state_getobject(
-		state, ast_expr_as_identifier(rvalue)
-	);
+	struct object *obj = state_getobject(state, id);
 	if (!obj) { /* error: unknown identifier */
 		return NULL;
 	}
@@ -355,23 +340,6 @@ state_getvalue(struct state *state, struct ast_expr *rvalue)
 
 	/* XXX: what to do in cases where this is a parameter to a function */
 	assert(v); /* TODO: user error for setting to uninitialised value */
-	return value_copy(v);
-}
-
-struct value *
-value_from_access(struct ast_expr *acc, struct state *state)
-{
-	struct value *arr = state_getvalue(state, ast_expr_access_root(acc));
-	assert(arr);
-	struct location *loc = value_as_ptr(arr);
-	assert(loc);
-	struct location *deref = location_with_offset(
-		loc, resolve_bound(ast_expr_access_index(acc), state)
-	);
-	value_destroy(arr);
-	struct object *obj = state_get(state, deref, true);
-	struct value *v = object_as_value(obj);
-	assert(v);
 	return value_copy(v);
 }
 
@@ -385,7 +353,7 @@ state_assign(struct state *state, struct object *obj, struct value *val)
 struct value *
 state_boundedincrement(struct state *s, char *id)
 {
-	struct value *sync = state_getvalue(s, ast_expr_identifier_create(id));
+	struct value *sync = state_getvalue(s, id);
 	char *oldc = ast_expr_as_identifier(value_as_sync(sync));
 	struct value *old = vconst_get(s->vconst, oldc);
 	assert(old);
@@ -427,9 +395,6 @@ state_range_alloc(struct state *state, struct object *obj,
 	/* virtual block to represents range of values allocated */
 	return block_range_alloc(b, res_lw, res_up, state->heap);
 }
-
-static struct ast_expr *
-resolve_bound_identifier(char *, struct state *);
 
 static struct ast_expr *
 resolve_structmember(struct ast_expr *, struct state *);

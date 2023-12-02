@@ -97,11 +97,13 @@ struct ast_type *
 state_getobjectmembertype(struct state *state, struct object *obj,
 		struct ast_type *t, char *member);
 
+struct value;
+
 struct object *
-state_deref(struct state *, struct object *ptr, struct ast_expr *index);
+state_deref(struct state *, struct value *ptr, struct ast_expr *index);
 
 struct value *
-state_getvalue(struct state *, struct ast_expr *rvalue);
+state_getvalue(struct state *, char *id);
 
 struct error *
 state_assign(struct state *, struct object *, struct value *);

@@ -10,28 +10,24 @@ struct ast_expr {
 		EXPR_BRACKETED		= 1 << 3,
 		EXPR_ITERATION		= 1 << 4,
 
-		EXPR_ACCESS		= 1 << 5,
-		EXPR_CALL		= 1 << 6,
-		EXPR_INCDEC		= 1 << 7,
+		EXPR_CALL		= 1 << 5,
+		EXPR_INCDEC		= 1 << 6,
 
-		EXPR_STRUCTMEMBER	= 1 << 8,
+		EXPR_STRUCTMEMBER	= 1 << 7,
 
-		EXPR_UNARY		= 1 << 9,
-		EXPR_BINARY		= 1 << 10,
+		EXPR_UNARY		= 1 << 8,
+		EXPR_BINARY		= 1 << 9,
 
-		EXPR_ASSIGNMENT		= 1 << 11,
+		EXPR_ASSIGNMENT		= 1 << 10,
 
-		EXPR_MEMORY		= 1 << 12,
-		EXPR_ASSERTION		= 1 << 13,
-		EXPR_ARBARG		= 1 << 14,
+		EXPR_MEMORY		= 1 << 11,
+		EXPR_ASSERTION		= 1 << 12,
+		EXPR_ARBARG		= 1 << 13,
 	} kind;
 	struct ast_expr *root;
 	union {
 		char *string; /* identifier, literal, assertion */
 		int constant;
-		struct {
-			struct ast_expr *index;
-		} access;
 		struct {
 			int n;
 			struct ast_expr **arg;
@@ -100,15 +96,6 @@ ast_expr_bracketed_create(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_iteration_create();
-
-struct ast_expr *
-ast_expr_access_create(struct ast_expr *root, struct ast_expr *index);
-
-struct ast_expr *
-ast_expr_access_root(struct ast_expr *expr);
-
-struct ast_expr *
-ast_expr_access_index(struct ast_expr *expr);
 
 struct ast_expr *
 ast_expr_call_create(struct ast_expr *, int narg, struct ast_expr **arg);

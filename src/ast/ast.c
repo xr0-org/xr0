@@ -103,53 +103,6 @@ ast_expr_iteration_create()
 }
 
 struct ast_expr *
-ast_expr_access_create(struct ast_expr *root, struct ast_expr *index)
-{
-	struct ast_expr *expr = ast_expr_create();
-	expr->kind = EXPR_ACCESS;
-	expr->root = root;
-	expr->u.access.index = index;
-	return expr;
-}
-
-struct ast_expr *
-ast_expr_access_root(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_ACCESS);
-	return expr->root;
-}
-
-struct ast_expr *
-ast_expr_access_index(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_ACCESS);
-	return expr->u.access.index;
-}
-
-static void
-ast_expr_access_str_build(struct ast_expr *expr, struct strbuilder *b)
-{
-	char *root = ast_expr_str(expr->root);
-	struct ast_expr *i = expr->u.access.index;
-	if (i->kind == EXPR_CONSTANT && ast_expr_as_constant(i) == 0) {
-		strbuilder_printf(b, "*(%s)", root);
-	} else {
-		char *index = ast_expr_str(i);
-		strbuilder_printf(b, "*(%s+%s)", root, index);
-		free(index);
-	}
-	free(root);
-}
-
-static void
-ast_expr_destroy_access(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_ACCESS);
-	ast_expr_destroy(expr->root);
-	ast_expr_destroy(expr->u.access.index);
-}
-
-struct ast_expr *
 ast_expr_call_create(struct ast_expr *root, int narg, struct ast_expr **arg)
 {
 	struct ast_expr *expr = ast_expr_create();
@@ -304,14 +257,44 @@ ast_expr_member_field(struct ast_expr *expr)
 	return expr->u.string;
 }
 
+static void
+ast_expr_member_deref_str_build(struct ast_expr *root, char *member,
+		struct strbuilder *b);
 
 static void
 ast_expr_member_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
-	/* XXX: until we eliminate the access/indirection ambiguity */
-	char *root = ast_expr_str(expr->root);
-	strbuilder_printf(b, "%s.%s", root, expr->u.string);
+	struct ast_expr *root = expr->root;
+
+	if (root->kind == EXPR_UNARY) {
+		return ast_expr_member_deref_str_build(root, expr->u.string, b);
+	}
+
+	char *r = ast_expr_str(root);
+	strbuilder_printf(b, "%s.%s", r, expr->u.string);
 	free(root);
+}
+
+static void
+ast_expr_member_deref_str_build(struct ast_expr *root, char *member,
+		struct strbuilder *b)
+{
+	assert(ast_expr_unary_op(root) == UNARY_OP_DEREFERENCE);
+
+	struct ast_expr *inner = ast_expr_unary_operand(root); /* e1+e2 */
+	struct ast_expr *e1 = ast_expr_binary_e1(inner),
+			*e2 = ast_expr_binary_e2(inner);
+
+	char *left = ast_expr_str(e1);
+	if (e2->kind == EXPR_CONSTANT && ast_expr_as_constant(e2) == 0) { 
+		strbuilder_printf(b, "%s->%s", left, member);
+	} else {
+		char *index = ast_expr_str(e2);
+		strbuilder_printf(b, "%s[%s].%s", left, index, member);
+		free(index);
+	}
+	free(left);
+
 }
 
 struct ast_expr *
@@ -346,6 +329,9 @@ ast_expr_unary_operand(struct ast_expr *expr)
 static void
 ast_expr_unary_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
+	enum ast_unary_operator op = expr->u.unary_op;
+	assert(UNARY_OP_ADDRESS <= op && op <= UNARY_OP_BANG);
+
 	const char opchar[] = {
 		[UNARY_OP_ADDRESS]		= '&',
 		[UNARY_OP_DEREFERENCE]		= '*',
@@ -354,8 +340,9 @@ ast_expr_unary_str_build(struct ast_expr *expr, struct strbuilder *b)
 		[UNARY_OP_ONES_COMPLEMENT]	= '~',
 		[UNARY_OP_BANG]			= '!',
 	};
+
 	char *root = ast_expr_str(expr->root);
-	strbuilder_printf(b, "%c%s", opchar[expr->u.unary_op], root);
+	strbuilder_printf(b, "%c(%s)", opchar[op], root);
 	free(root);
 }
 
@@ -604,9 +591,6 @@ ast_expr_destroy(struct ast_expr *expr)
 	case EXPR_BRACKETED:
 		ast_expr_destroy(expr->root);
 		break;
-	case EXPR_ACCESS:
-		ast_expr_destroy_access(expr);
-		break;
 	case EXPR_CALL:
 		ast_expr_destroy_call(expr);
 		break;
@@ -658,9 +642,6 @@ ast_expr_str(struct ast_expr *expr)
 	case EXPR_BRACKETED:
 		ast_expr_bracketed_str_build(expr, b);
 		break;
-	case EXPR_ACCESS:
-		ast_expr_access_str_build(expr, b);
-		break;
 	case EXPR_CALL:
 		ast_expr_call_str_build(expr, b);
 		break;
@@ -707,11 +688,6 @@ ast_expr_copy(struct ast_expr *expr)
 		return ast_expr_literal_create(dynamic_str(expr->u.string));
 	case EXPR_BRACKETED:
 		return ast_expr_bracketed_create(ast_expr_copy(expr->root));
-	case EXPR_ACCESS:
-		return ast_expr_access_create(
-			ast_expr_copy(expr->root),
-			ast_expr_copy(expr->u.access.index)
-		);
 	case EXPR_CALL:
 		return ast_expr_copy_call(expr);
 	case EXPR_INCDEC:
@@ -852,8 +828,8 @@ math_expr(struct ast_expr *e)
 		);
 	case EXPR_BINARY:
 		return math_expr_sum_create(
-			math_expr(e->u.binary.e1),
-			binary_e2(e->u.binary.e2, e->u.binary.op)
+			math_expr(ast_expr_copy(e->u.binary.e1)),
+			binary_e2(ast_expr_copy(e->u.binary.e2), e->u.binary.op)
 		);
 	default:
 		assert(false);
