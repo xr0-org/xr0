@@ -300,17 +300,32 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
 
-	struct ast_expr *prop0 = ast_expr_binary_create(lw, BINARY_OP_LE, excl_up),
-			*prop1 = ast_expr_binary_create(lw, BINARY_OP_EQ, excl_up),
-			*prop2 = ast_expr_binary_create(up, BINARY_OP_EQ, excl_up);
+	struct ast_expr *prop0 = ast_expr_binary_create(
+		ast_expr_copy(lw), BINARY_OP_LE, ast_expr_copy(excl_up)
+	);
+	struct ast_expr *prop1 = ast_expr_binary_create(
+		ast_expr_copy(lw), BINARY_OP_EQ, ast_expr_copy(excl_up)
+	);
+	struct ast_expr *prop2 = ast_expr_binary_create(
+		ast_expr_copy(up), BINARY_OP_EQ, ast_expr_copy(excl_up)
+	);
 
-	assert(state_eval(s, prop0));
+	bool e0 = state_eval(s, prop0),
+	     e1 = state_eval(s, prop1),
+	     e2 = state_eval(s, prop2);
 
-	if (state_eval(s, prop1)) {
+	ast_expr_destroy(prop2);
+	ast_expr_destroy(prop1);
+	ast_expr_destroy(prop0);
+	ast_expr_destroy(up);
+
+	assert(e0);
+
+	if (e1) {
 		return NULL;
 	}
 
-	if (state_eval(s, prop2)) {
+	if (e2) {
 		assert(obj->type == OBJECT_VALUE);
 		return object_value_create(
 			ast_expr_copy(obj->offset), value_copy(obj->value)
@@ -331,15 +346,27 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
 
-	struct ast_expr *prop0 = ast_expr_binary_create(incl_lw, BINARY_OP_GE, up),
-			*prop1 = ast_expr_binary_create(incl_lw, BINARY_OP_EQ, lw);
+	struct ast_expr *prop0 = ast_expr_binary_create(
+		ast_expr_copy(incl_lw), BINARY_OP_GE, ast_expr_copy(up)
+	);
+	struct ast_expr *prop1 = ast_expr_binary_create(
+		ast_expr_copy(incl_lw), BINARY_OP_EQ, ast_expr_copy(lw)
+	);
 
-	if (state_eval(s, prop0)) {
+	bool e0 = state_eval(s, prop0),
+	     e1 = state_eval(s, prop1);
+
+	ast_expr_destroy(prop1);
+	ast_expr_destroy(prop0);
+
+	if (e0) {
+		ast_expr_destroy(up);
 		return NULL;
 	}
 
-	if (state_eval(s, prop1)) {
+	if (e1) {
 		assert(obj->type == OBJECT_VALUE);
+		ast_expr_destroy(up);
 		return object_value_create(
 			ast_expr_copy(incl_lw),
 			value_copy(obj->value)
@@ -348,7 +375,11 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 	return object_range_create(
 		ast_expr_copy(incl_lw),
 		range_create(
-			ast_expr_binary_create(ast_expr_copy(up), BINARY_OP_SUBTRACTION, ast_expr_copy(incl_lw)),
+			ast_expr_binary_create(
+				up,
+				BINARY_OP_SUBTRACTION,
+				ast_expr_copy(incl_lw)
+			),
 			value_as_ptr(state_alloc(s))
 		)
 	);

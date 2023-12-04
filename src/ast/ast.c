@@ -777,8 +777,8 @@ ast_expr_eval(struct ast_expr *e)
 
 	bool val = eval_prop(e1, e->u.binary.op, e2);
 
-	math_expr_destroy(e1);
 	math_expr_destroy(e2);
+	math_expr_destroy(e1);
 
 	return val;
 }
@@ -828,8 +828,8 @@ math_expr(struct ast_expr *e)
 		);
 	case EXPR_BINARY:
 		return math_expr_sum_create(
-			math_expr(ast_expr_copy(e->u.binary.e1)),
-			binary_e2(ast_expr_copy(e->u.binary.e2), e->u.binary.op)
+			math_expr(e->u.binary.e1),
+			binary_e2(e->u.binary.e2, e->u.binary.op)
 		);
 	default:
 		assert(false);
