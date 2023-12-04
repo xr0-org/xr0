@@ -463,26 +463,26 @@ stmt_v_block_verify(struct ast_stmt *v_block_stmt, struct state *state)
 
 /* stmt_expr_verify */
 
-typedef struct {
+struct result {
 	struct value *val;
 	struct error *err;
-} Result;
+};
 
-static Result
+static struct result
 result_error_create(struct error *err)
 {
 	assert(err);
-	return (Result) { .err = err };
+	return (struct result) { .err = err };
 }
 
-static Result
+static struct result
 result_value_create(struct value *val)
 {
-	return (Result) { .val = val, .err = NULL };
+	return (struct result) { .val = val, .err = NULL };
 }
 
 static void
-result_destroy(Result res)
+result_destroy(struct result res)
 {
 	assert(!res.err);
 	if (res.val) {
@@ -491,27 +491,27 @@ result_destroy(Result res)
 }
 
 static bool
-result_iserror(Result res)
+result_iserror(struct result res)
 {
 	return res.err;
 }
 
 static struct error *
-result_as_error(Result res)
+result_as_error(struct result res)
 {
 	assert(res.err);
 	return res.err;
 }
 
 static struct value *
-result_as_value(Result res)
+result_as_value(struct result res)
 {
 	assert(!res.err && res.val);
 	return res.val;
 }
 
 static bool
-result_hasvalue(Result res)
+result_hasvalue(struct result res)
 {
 	assert(!result_iserror(res));
 	return res.val; /* implicit cast */
@@ -575,13 +575,13 @@ expr_assertion_decide(struct ast_expr *expr, struct state *state)
 	return isdeallocand;
 }
 
-static Result
+static struct result
 expr_eval(struct ast_expr *expr, struct state *state);
 
 static bool
 expr_binary_decide(struct ast_expr *expr, struct state *state)
 {
-	Result root = expr_eval(ast_expr_binary_e1(expr), state),
+	struct result root = expr_eval(ast_expr_binary_e1(expr), state),
 	       last = expr_eval(ast_expr_binary_e2(expr), state);
 
 	assert(!result_iserror(root) && !result_iserror(last));
@@ -880,7 +880,7 @@ lvalue_object(struct lvalue *l)
 static struct error *
 expr_exec(struct ast_expr *expr, struct state *state)
 {
-	Result res = expr_eval(expr, state);
+	struct result res = expr_eval(expr, state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
@@ -890,34 +890,34 @@ expr_exec(struct ast_expr *expr, struct state *state)
 
 /* expr_eval */
 
-static Result
+static struct result
 expr_constant_eval(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_literal_eval(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_identifier_eval(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_unary_eval(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_structmember_eval(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_call_eval(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_assign_eval(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_incdec_eval(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_binary_eval(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_eval(struct ast_expr *expr, struct state *state)
 {
 	/* TODO: verify preconditions of expr (statement) are satisfied */
@@ -946,7 +946,7 @@ expr_eval(struct ast_expr *expr, struct state *state)
 	}
 }
 
-static Result
+static struct result
 expr_literal_eval(struct ast_expr *expr, struct state *state)
 {
 	return result_value_create(
@@ -954,7 +954,7 @@ expr_literal_eval(struct ast_expr *expr, struct state *state)
 	);
 }
 
-static Result
+static struct result
 expr_constant_eval(struct ast_expr *expr, struct state *state)
 {
 	return result_value_create(
@@ -962,24 +962,28 @@ expr_constant_eval(struct ast_expr *expr, struct state *state)
 	);
 }
 
-static Result
+static struct result
 expr_identifier_eval(struct ast_expr *expr, struct state *state)
 {
-	struct value *val = state_getvalue(state, ast_expr_as_identifier(expr));
+	struct object *obj = state_getobject(state, ast_expr_as_identifier(expr));
+	if (!obj) {
+		return result_error_create(error_create("no object"));
+	}
+	struct value *val = object_as_value(obj);
 	if (!val) {
 		return result_error_create(error_create("no value"));
 	}
-	return result_value_create(val);
+	return result_value_create(state_value_copy(val));
 }
 
-static Result
+static struct result
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
 	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
 
 	struct ast_expr *inner = ast_expr_unary_operand(expr); /* arr+offset */
 
-	Result res = expr_eval(ast_expr_binary_e1(inner), state);
+	struct result res = expr_eval(ast_expr_binary_e1(inner), state);
 	if (result_iserror(res)) {
 		return res;
 	}
@@ -987,6 +991,7 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 	assert(arr);
 	struct object *obj = state_deref(state, arr, ast_expr_binary_e2(inner));
 	assert(obj);
+	result_destroy(res);
 
 	struct value *v = object_as_value(obj);
 	assert(v);
@@ -994,21 +999,21 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 	return result_value_create(state_value_copy(v));
 }
 
-static Result
+static struct result
 expr_structmember_eval(struct ast_expr *expr, struct state *s)
 {
-	Result res = expr_eval(ast_expr_member_root(expr), s);
+	struct result res = expr_eval(ast_expr_member_root(expr), s);
 	if (result_iserror(res)) {
 		return res;
 	}
-	return result_value_create(
-		object_as_value(
-			value_struct_member(
-				result_as_value(res),
-				ast_expr_member_field(expr)
-			)
+	struct value *v = state_value_copy(object_as_value(
+		value_struct_member(
+			result_as_value(res),
+			ast_expr_member_field(expr)
 		)
-	);
+	));
+	result_destroy(res);
+	return result_value_create(v);
 }
 
 /* expr_call_eval */
@@ -1018,7 +1023,7 @@ expr_as_func(struct ast_expr *expr, struct state *state);
 
 struct result_arr {
 	int n;
-	Result *res;
+	struct result *res;
 };
 
 struct result_arr *
@@ -1037,13 +1042,13 @@ result_arr_destroy(struct result_arr *arr)
 }
 
 void
-result_arr_append(struct result_arr *arr, Result res)
+result_arr_append(struct result_arr *arr, struct result res)
 {
-	arr->res = realloc(arr->res, sizeof(Result) * ++arr->n);
+	arr->res = realloc(arr->res, sizeof(struct result) * ++arr->n);
 	arr->res[arr->n-1] = res;
 }
 
-static Result
+static struct result
 prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state *);
 
 struct result_arr *
@@ -1069,7 +1074,7 @@ prepare_arguments(struct ast_expr *call, struct state *state)
 	return args;
 }
 
-static Result
+static struct result
 prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state *s)
 {
 	if (ast_expr_kind(arg) != EXPR_ARBARG) {
@@ -1080,15 +1085,15 @@ prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state 
 }
 
 
-static Result
+static struct result
 call_eval_inframe(struct ast_expr *expr, struct state *state, struct result_arr *args);
 
-static Result
+static struct result
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	struct result_arr *args = prepare_arguments(expr, state);
 	state_pushframe(state, ast_function_type(expr_as_func(expr, state)));
-	Result res = call_eval_inframe(expr, state, args);
+	struct result res = call_eval_inframe(expr, state, args);
 	result_arr_destroy(args);
 	if (result_iserror(res)) {
 		return res;
@@ -1116,10 +1121,10 @@ static struct error *
 prepare_parameters(struct ast_function *f, struct result_arr *args,
 		struct state *state);
 
-static Result
+static struct result
 function_absexec(struct ast_block *abs, struct state *state);
 
-static Result
+static struct result
 call_eval_inframe(struct ast_expr *expr, struct state *state, struct result_arr *args)
 {
 	struct ast_function *f = expr_as_func(expr, state);
@@ -1144,7 +1149,7 @@ prepare_parameters(struct ast_function *f, struct result_arr *args,
 	for (int i = 0; i < args->n; i++) {
 		state_declare(state, param[i], true);
 
-		Result res = args->res[i];
+		struct result res = args->res[i];
 		if (result_iserror(res)) {
 			return result_as_error(res);
 		}
@@ -1172,13 +1177,13 @@ prepare_parameters(struct ast_function *f, struct result_arr *args,
 	return NULL;
 }
 
-static Result
+static struct result
 expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
-	Result res = expr_eval(rval, state);
+	struct result res = expr_eval(rval, state);
 	if (result_hasvalue(res)) {
 		struct object *obj = lvalue_object(expr_lvalue(lval, state));
 		assert(obj);
@@ -1193,12 +1198,12 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	return res;
 }
 
-static Result
+static struct result
 expr_incdec_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *assign = ast_expr_incdec_to_assignment(expr);
 
-	Result res;
+	struct result res;
 
 	if (ast_expr_incdec_pre(expr)) { /* ++i */
 		res = expr_assign_eval(assign, state);
@@ -1213,12 +1218,12 @@ expr_incdec_eval(struct ast_expr *expr, struct state *state)
 	return res;
 }
 
-static Result
+static struct result
 expr_binary_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *e1 = ast_expr_binary_e1(expr),
 			*e2 = ast_expr_binary_e2(expr);
-	Result res1 = expr_eval(e1, state),
+	struct result res1 = expr_eval(e1, state),
 	       res2 = expr_eval(e2, state);
 	if (result_iserror(res1)) {
 		return res1;
@@ -1247,7 +1252,7 @@ hack_mem_from_neteffect(struct ast_stmt *);
 static struct object *
 hack_base_object_from_mem(struct ast_expr *, struct state *);
 
-static Result
+static struct result
 stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
@@ -1260,7 +1265,7 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 		return NULL;
 	}
 
-	Result res = stmt_absexec(neteffect, state);
+	struct result res = stmt_absexec(neteffect, state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
@@ -1482,7 +1487,7 @@ stmt_iter_itereval(struct ast_stmt *stmt, struct ast_stmt *iter,
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
-	Result res = expr_eval(ast_stmt_jump_rv(stmt), state);
+	struct result res = expr_eval(ast_stmt_jump_rv(stmt), state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
@@ -1528,7 +1533,7 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 	);
 
 	/* mutates alleged_state */
-	Result res = function_absexec(abs, alleged_state);
+	struct result res = function_absexec(abs, alleged_state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
@@ -1573,13 +1578,13 @@ hack_flatten_abstract_for_iter_verification(struct ast_function *f,
 
 /* function_absexec */
 
-static Result
+static struct result
 function_absexec(struct ast_block *abs, struct state *state)
 {
 	int nstmts = ast_block_nstmts(abs);
 	struct ast_stmt **stmt = ast_block_stmts(abs);
 	for (int i = 0; i < nstmts; i++) {
-		Result res = stmt_absexec(stmt[i], state);
+		struct result res = stmt_absexec(stmt[i], state);
 		if (result_iserror(res)) {
 			return res;
 		}
@@ -1593,19 +1598,19 @@ function_absexec(struct ast_block *abs, struct state *state)
 
 /* stmt_absexec */
 
-static Result
+static struct result
 expr_absexec(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 sel_absexec(struct ast_stmt *stmt, struct state *state);
 
-static Result
+static struct result
 iter_absexec(struct ast_stmt *stmt, struct state *state);
 
-static Result
+static struct result
 comp_absexec(struct ast_stmt *stmt, struct state *state);
 
-static Result
+static struct result
 stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
@@ -1627,13 +1632,13 @@ stmt_absexec(struct ast_stmt *stmt, struct state *state)
 
 /* expr_absexec */
 
-static Result
+static struct result
 mem_absexec(struct ast_expr *mem, struct state *state);
 
-static Result
+static struct result
 assign_absexec(struct ast_expr *expr, struct state *state);
 
-static Result
+static struct result
 expr_absexec(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
@@ -1649,13 +1654,13 @@ expr_absexec(struct ast_expr *expr, struct state *state)
 	}
 }
 
-static Result
+static struct result
 mem_process(struct ast_expr *red, struct state *state);
 
-static Result
+static struct result
 mem_absexec(struct ast_expr *mem, struct state *state)
 {
-	Result res = mem_process(mem, state);
+	struct result res = mem_process(mem, state);
 	if (result_iserror(res)) {
 		return res;
 	}
@@ -1679,7 +1684,7 @@ mem_absexec(struct ast_expr *mem, struct state *state)
  * a location or gets the location pointed to by an lvalue and attempts to free
  * possibly returning an error
  * */
-static Result
+static struct result
 mem_process(struct ast_expr *mem, struct state *state)
 {
 	if (ast_expr_memory_isundefined(mem)) {
@@ -1699,7 +1704,7 @@ mem_process(struct ast_expr *mem, struct state *state)
 
 	/* root is pointing at the heap location we want to free, so we want its
 	 * value rather than location */
-	Result res = expr_eval(root, state);
+	struct result res = expr_eval(root, state);
 	if (result_iserror(res)) {
 		return res;
 	}
@@ -1714,13 +1719,13 @@ mem_process(struct ast_expr *mem, struct state *state)
 	return result_value_create(NULL);
 }
 
-static Result
+static struct result
 assign_absexec(struct ast_expr *expr, struct state *state)
 {
 	return expr_assign_eval(expr, state);
 }
 
-static Result
+static struct result
 sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
@@ -1734,7 +1739,7 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 	return stmt_absexec(ast_stmt_sel_body(stmt), state);
 }
 
-static Result
+static struct result
 iter_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	struct error *err;
@@ -1746,15 +1751,13 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 	struct ast_expr *lw = ast_stmt_iter_lower_bound(stmt),
 			*up = ast_stmt_iter_upper_bound(stmt);
 
-	Result result_lw = expr_eval(lw, state),
+	struct result result_lw = expr_eval(lw, state),
 	       result_up = expr_eval(up, state);
 
 	if (result_iserror(result_lw)) {
-		/*result_destroy(result_up);*/
 		return result_lw;
 	}
 	if (result_iserror(result_up)) {
-		/*result_destroy(result_lw);*/
 		return result_up;
 	}
 
@@ -1770,6 +1773,8 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 		err = state_range_dealloc(state, obj, res_lw, res_up);
 	}
 	
+	ast_expr_destroy(res_up);
+	ast_expr_destroy(res_lw);
 	state_object_destroy(obj);
 
 	if (err) {
@@ -1779,13 +1784,13 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 	return result_value_create(NULL);
 }
 
-static Result
+static struct result
 comp_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	struct ast_block *b = ast_stmt_as_block(stmt);
 	struct ast_stmt **stmts = ast_block_stmts(b);
 	for (int i = 0; i < ast_block_nstmts(b); i++) {
-		Result res = stmt_absexec(stmts[i], state);
+		struct result res = stmt_absexec(stmts[i], state);
 		if (result_iserror(res)) {
 			return res;
 		}

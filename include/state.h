@@ -102,14 +102,8 @@ struct value;
 struct object *
 state_deref(struct state *, struct value *ptr, struct ast_expr *index);
 
-struct value *
-state_getvalue(struct state *, char *id);
-
 struct error *
 state_assign(struct state *, struct object *, struct value *);
-
-struct value *
-state_boundedincrement(struct state *, char *id);
 
 struct value *
 state_alloc(struct state *);
