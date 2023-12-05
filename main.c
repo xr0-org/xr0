@@ -8,6 +8,7 @@
 #include "build/gram.tab.h"
 #include "ast.h"
 #include "lex.h"
+#include "ext.h"
 #include "state.h"
 #include "util.h"
 #include "verify.h"

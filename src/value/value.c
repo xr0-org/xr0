@@ -3,10 +3,8 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
-#include "location.h"
 #include "state.h"
 #include "object.h"
-#include "stack.h"
 #include "util.h"
 #include "value.h"
 

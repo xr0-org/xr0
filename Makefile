@@ -10,8 +10,11 @@ BIN_DIR = bin
 BUILD_DIR = build
 INCLUDE_DIR = include
 SRC_DIR = src
+EXT_DIR = $(SRC_DIR)/ext
 VERIFY_DIR = $(SRC_DIR)/verify
 STATE_DIR = $(SRC_DIR)/state
+OBJECT_DIR = $(SRC_DIR)/object
+VALUE_DIR = $(SRC_DIR)/value
 AST_DIR = $(SRC_DIR)/ast
 UTIL_DIR = $(SRC_DIR)/util
 MATH_DIR = $(SRC_DIR)/math
@@ -24,6 +27,7 @@ MAIN_OBJ = $(BUILD_DIR)/main.o
 VERIFY_OBJ = $(BUILD_DIR)/verify.o
 
 STATE_OBJ = $(BUILD_DIR)/state.o
+EXT_OBJ = $(BUILD_DIR)/ext.o
 STACK_OBJ = $(BUILD_DIR)/stack.o
 HEAP_OBJ = $(BUILD_DIR)/heap.o
 LOCATION_OBJ = $(BUILD_DIR)/location.o
@@ -54,7 +58,8 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 		$(OBJECT_OBJ) \
 		$(BLOCK_OBJ) \
 		$(HEAP_OBJ) \
-		$(STACK_OBJ)
+		$(STACK_OBJ) \
+		$(EXT_OBJ)
 
 OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
@@ -85,6 +90,10 @@ $(STATE_OBJ): $(STATE_DIR)/state.c $(STATE_OBJECTS)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/state.c
 
+$(EXT_OBJ): $(EXT_DIR)/ext.c
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(EXT_DIR)/ext.c
+
 $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/stack.c
@@ -97,13 +106,13 @@ $(BLOCK_OBJ): $(STATE_DIR)/block.c $(OBJECT_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/block.c
 
-$(OBJECT_OBJ): $(STATE_DIR)/object.c $(VALUE_OBJ)
+$(OBJECT_OBJ): $(OBJECT_DIR)/object.c $(VALUE_OBJ)
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/object.c
+	@$(CC) $(CFLAGS) -o $@ -c $(OBJECT_DIR)/object.c
 
-$(VALUE_OBJ): $(STATE_DIR)/value.c $(LOCATION_OBJ)
+$(VALUE_OBJ): $(VALUE_DIR)/value.c $(LOCATION_OBJ)
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/value.c
+	@$(CC) $(CFLAGS) -o $@ -c $(VALUE_DIR)/value.c
 
 $(LOCATION_OBJ): $(STATE_DIR)/location.c $(UTIL_OBJ)
 	@printf 'CC\t$@\n'

@@ -151,7 +151,7 @@ block_referenced(struct state *s, int addr)
 	struct location *loc = location_create(
 		LOCATION_DYNAMIC, addr, ast_expr_constant_create(0)
 	);
-	bool referenced = state_stack_references(s, loc); 
+	bool referenced = state_references(s, loc); 
 	location_destroy(loc);
 	return referenced;
 }

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include "ext.h"
 #include "state.h"
 #include "stack.h"
 #include "heap.h"
@@ -12,76 +13,6 @@
 #include "value.h"
 #include "ast.h"
 #include "util.h"
-
-struct externals {
-	struct map *func, *type, *var;
-};
-
-struct externals *
-externals_create()
-{
-	struct externals *ext = malloc(sizeof(struct externals));
-	ext->func = map_create();
-	ext->var = map_create();
-	ext->type = map_create();
-	return ext;
-}
-
-void
-externals_destroy(struct externals *ext)
-{
-	map_destroy(ext->func);
-	map_destroy(ext->var);
-	map_destroy(ext->type);
-	free(ext);
-}
-
-static char *
-externals_types_str(struct externals *ext, char *indent)
-{
-	struct strbuilder *b = strbuilder_create();
-
-	struct map *m = ext->type;
-	for (int i = 0; i < m->n; i++) {
-		char *type = ast_type_str((struct ast_type *) m->entry[i].value);
-		strbuilder_printf(b, "%s%s\n", indent, type);
-		free(type);
-	}
-
-	return strbuilder_build(b);
-}
-
-void
-externals_declarefunc(struct externals *ext, char *id, struct ast_function *f)
-{
-	map_set(ext->func, dynamic_str(id), f);
-}
-
-void
-externals_declarevar(struct externals *ext, char *id, struct ast_variable *v)
-{
-	map_set(ext->var, dynamic_str(id), v);
-}
-
-void
-externals_declaretype(struct externals *ext, char *id, struct ast_type *t)
-{
-	map_set(ext->type, dynamic_str(id), t);
-}
-
-struct ast_function *
-externals_getfunc(struct externals *ext, char *id)
-{
-	return map_get(ext->func, id);
-}
-
-struct ast_type *
-externals_gettype(struct externals *ext, char *id)
-{
-	return map_get(ext->type, id);
-}
-
-
 
 struct state {
 	struct externals *ext;
@@ -150,6 +81,13 @@ state_str(struct state *state)
 	return strbuilder_build(b);
 }
 
+struct externals *
+state_getext(struct state *s)
+{
+	return s->ext;
+}
+
+
 struct ast_function *
 state_getfunc(struct state *state, char *f)
 {
@@ -179,7 +117,7 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 }
 
 void
-state_stack_undeclare(struct state *s)
+state_undeclarevars(struct state *s)
 {
 	stack_undeclare(s->stack);
 }
@@ -231,7 +169,7 @@ state_getresulttype(struct state *state)
 }
 
 struct ast_type *
-state_gettype(struct state *state, char *id)
+state_getobjecttype(struct state *state, char *id)
 {
 	if (strcmp(id, KEYWORD_RESULT) == 0) {
 		return state_getresulttype(state);
@@ -256,54 +194,6 @@ state_getobject(struct state *state, char *id)
 	return state_get(state, variable_location(v), true);
 }
 
-struct value *
-getorcreatestruct(struct object *, struct ast_type *, struct state *);
-
-struct object *
-state_getobjectmember(struct state *state, struct object *obj,
-		struct ast_type *t, char *member)
-{
-	return value_struct_member(
-		getorcreatestruct(obj, t, state), member
-	);
-}
-
-struct ast_type *
-usecomplete(struct ast_type *, struct state *);
-
-struct value *
-getorcreatestruct(struct object *obj, struct ast_type *t, struct state *state)
-{
-	struct value *v = object_as_value(obj);
-	if (v) {
-		return v;
-	}
-	struct ast_type *complete = usecomplete(t, state);
-	assert(complete);
-	v = value_struct_create(complete);
-	object_assign(obj, v);
-	return v;
-}
-
-struct ast_type *
-usecomplete(struct ast_type *t, struct state *state)
-{
-	if (ast_type_struct_members(t)) {
-		return t;
-	}
-	char *tag = ast_type_struct_tag(t);
-	assert(tag);
-	return externals_gettype(state->ext, tag);
-}
-
-struct ast_type *
-state_getobjectmembertype(struct state *state, struct object *obj,
-		struct ast_type *t, char *member)
-{
-	return value_struct_membertype(
-		getorcreatestruct(obj, t, state), member
-	);
-}
 
 struct object *
 state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
@@ -316,13 +206,6 @@ state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 	struct object *res = state_get(state, deref, true);
 	location_destroy(deref);
 	return res;
-}
-
-struct error *
-state_assign(struct state *state, struct object *obj, struct value *val)
-{
-	object_assign(obj, val);
-	return NULL;
 }
 
 struct error *
@@ -423,7 +306,7 @@ state_range_aredeallocands(struct state *state, struct object *obj,
 }
 
 bool
-state_heap_referenced(struct state *state)
+state_hasgarbage(struct state *state)
 {
 	return heap_referenced(state->heap, state);
 }
@@ -434,27 +317,8 @@ state_location_destroy(struct location *loc)
 	location_destroy(loc);
 }
 
-void
-state_value_destroy(struct value *val)
-{
-	assert(val);
-	value_destroy(val);
-}
-
-struct value *
-state_value_copy(struct value *v)
-{
-	return value_copy(v);
-}
-
-void
-state_object_destroy(struct object *obj)
-{
-	/* XXX */
-}
-
 bool
-state_stack_references(struct state *s, struct location *loc)
+state_references(struct state *s, struct location *loc)
 {
 	return stack_references(s->stack, loc, s);
 }
