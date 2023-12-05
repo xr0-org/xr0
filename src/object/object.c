@@ -2,10 +2,9 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include "ext.h"
 #include "ast.h"
-#include "heap.h"
 #include "state.h"
-#include "location.h"
 #include "object.h"
 #include "util.h"
 #include "value.h"
@@ -397,6 +396,53 @@ object_dealloc(struct object *obj, struct state *s)
 	default:
 		assert(false);
 	}
+}
+
+static struct value *
+getorcreatestruct(struct object *, struct ast_type *, struct state *);
+
+struct object *
+object_getmember(struct object *obj, struct ast_type *t, char *member,
+		struct state *s)
+{
+	return value_struct_member(getorcreatestruct(obj, t, s), member);
+}
+
+static struct ast_type *
+usecomplete(struct ast_type *, struct state *);
+
+static struct value *
+getorcreatestruct(struct object *obj, struct ast_type *t, struct state *s)
+{
+	struct value *v = object_as_value(obj);
+	if (v) {
+		return v;
+	}
+	struct ast_type *complete = usecomplete(t, s);
+	assert(complete);
+	v = value_struct_create(complete);
+	object_assign(obj, v);
+	return v;
+}
+
+static struct ast_type *
+usecomplete(struct ast_type *t, struct state *s)
+{
+	if (ast_type_struct_members(t)) {
+		return t;
+	}
+	char *tag = ast_type_struct_tag(t);
+	assert(tag);
+	return externals_gettype(state_getext(s), tag);
+}
+
+struct ast_type *
+object_getmembertype(struct object *obj, struct ast_type *t, char *member,
+		struct state *s)
+{
+	return value_struct_membertype(
+		getorcreatestruct(obj, t, s), member
+	);
 }
 
 

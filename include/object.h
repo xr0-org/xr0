@@ -26,8 +26,12 @@ object_lower(struct object *);
 struct ast_expr *
 object_upper(struct object *);
 
+struct state;
+
 bool
 object_isdeallocand(struct object *, struct state *);
+
+struct location;
 
 bool
 object_references(struct object *, struct location *, struct state *);
@@ -53,6 +57,14 @@ object_upto(struct object *, struct ast_expr *excl_upper, struct state *);
 
 struct object *
 object_from(struct object *, struct ast_expr *incl_lower, struct state *);
+
+struct object *
+object_getmember(struct object *obj, struct ast_type *t, char *member,
+		struct state *s);
+
+struct ast_type *
+object_getmembertype(struct object *obj, struct ast_type *t, char *member,
+		struct state *s);
 
 struct error *
 object_dealloc(struct object *, struct state *);

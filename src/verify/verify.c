@@ -2,9 +2,12 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include "ext.h"
 #include "ast.h"
+#include "object.h"
 #include "state.h"
 #include "util.h"
+#include "value.h"
 #include "verify.h"
 
 typedef struct func_arr *Funcarr;
@@ -334,7 +337,7 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 			return error_prepend(err, "cannot exec statement: ");
 		}
 	}
-	state_stack_undeclare(state);
+	state_undeclarevars(state);
 	/* TODO: verify that `result' is of same type as f->result */
 	if ((err = abstract_audit(f, state, ext))) {
 		return error_prepend(err, "qed error: ");
@@ -357,10 +360,7 @@ parameterise_state(struct state *s, struct ast_function *f)
 		if (ast_type_base(ast_variable_type(p)) == TYPE_INT) {
 			struct object *obj = state_getobject(s, ast_variable_name(p));
 			assert(obj);
-			struct error *err = state_assign(s, obj, state_vconst(s));
-			if (err) {
-				return err;
-			}
+			object_assign(obj, state_vconst(s));
 		}
 	}
 
@@ -486,7 +486,7 @@ result_destroy(struct result res)
 {
 	assert(!res.err);
 	if (res.val) {
-		state_value_destroy(res.val);
+		value_destroy(res.val);
 	}
 }
 
@@ -571,7 +571,6 @@ expr_assertion_decide(struct ast_expr *expr, struct state *state)
 {
 	struct object *obj = hack_object_from_assertion(expr, state);
 	bool isdeallocand = state_addresses_deallocand(state, obj);
-	state_object_destroy(obj);
 	return isdeallocand;
 }
 
@@ -694,8 +693,6 @@ expr_iter_assertion_verify(struct ast_expr *expr, struct ast_expr *lw,
 		state, obj, lw, up	
 	);
 
-	state_object_destroy(obj);
-
 	return deallocands;
 }
 
@@ -787,7 +784,7 @@ expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
 {
 	char *id = ast_expr_as_identifier(expr);
 	return lvalue_create(
-		state_gettype(state, id),
+		state_getobjecttype(state, id),
 		state_getobject(state, id)
 	);
 }
@@ -821,17 +818,17 @@ expr_structmember_lvalue(struct ast_expr *expr, struct state *state)
 	struct lvalue *root = expr_lvalue(ast_expr_member_root(expr), state);
 	struct object *root_obj = lvalue_object(root);
 	assert(root_obj);
-	struct object *obj = state_getobjectmember(
-		state,
+	struct object *obj = object_getmember(
 		root_obj,
 		lvalue_type(root),
-		ast_expr_member_field(expr)
+		ast_expr_member_field(expr),
+		state
 	);
-	struct ast_type *t = state_getobjectmembertype(
-		state,
+	struct ast_type *t = object_getmembertype(
 		root_obj,
 		lvalue_type(root),
-		ast_expr_member_field(expr)
+		ast_expr_member_field(expr),
+		state
 	);
 	return lvalue_create(t, obj);
 }
@@ -855,7 +852,7 @@ void
 lvalue_destroy(struct lvalue *l)
 {
 	ast_type_destroy(l->t);
-	state_object_destroy(l->obj);
+	object_destroy(l->obj);
 	free(l);
 }
 
@@ -973,7 +970,7 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	if (!val) {
 		return result_error_create(error_create("no value"));
 	}
-	return result_value_create(state_value_copy(val));
+	return result_value_create(value_copy(val));
 }
 
 static struct result
@@ -996,7 +993,7 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 	struct value *v = object_as_value(obj);
 	assert(v);
 
-	return result_value_create(state_value_copy(v));
+	return result_value_create(value_copy(v));
 }
 
 static struct result
@@ -1006,7 +1003,7 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 	if (result_iserror(res)) {
 		return res;
 	}
-	struct value *v = state_value_copy(object_as_value(
+	struct value *v = value_copy(object_as_value(
 		value_struct_member(
 			result_as_value(res),
 			ast_expr_member_field(expr)
@@ -1099,7 +1096,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	if (result_hasvalue(res)) { /* preserve value through pop */
-		res = result_value_create(state_value_copy(result_as_value(res)));
+		res = result_value_create(value_copy(result_as_value(res)));
 	}
 	state_popframe(state);
 	return res;
@@ -1112,7 +1109,7 @@ expr_as_func(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: allow function-valued expressions */
-	return state_getfunc(state, ast_expr_as_identifier(root));
+	return externals_getfunc(state_getext(state), ast_expr_as_identifier(root));
 }
 
 /* call_eval_inframe */
@@ -1164,15 +1161,7 @@ prepare_parameters(struct ast_function *f, struct result_arr *args,
 		struct object *obj = lvalue_object(expr_lvalue(name, state));
 		ast_expr_destroy(name);
 
-		struct error *err = state_assign(
-			state, obj, state_value_copy(result_as_value(res))
-		);
-
-		state_object_destroy(obj);
-
-		if (err) {
-			return err;
-		}
+		object_assign(obj, value_copy(result_as_value(res)));
 	}
 	return NULL;
 }
@@ -1187,13 +1176,7 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	if (result_hasvalue(res)) {
 		struct object *obj = lvalue_object(expr_lvalue(lval, state));
 		assert(obj);
-		struct error *err = state_assign(
-			state, obj, state_value_copy(result_as_value(res))
-		);
-		state_object_destroy(obj);
-		if (err) {
-			return result_error_create(err);
-		}
+		object_assign(obj, value_copy(result_as_value(res)));
 	}
 	return res;
 }
@@ -1460,7 +1443,7 @@ expr_assertion_iter_decide(struct ast_expr *expr, struct ast_stmt *iter,
 
 	bool deallocands = state_range_aredeallocands(state, obj, lw, up);
 
-	state_object_destroy(obj);
+	object_destroy(obj);
 
 	return deallocands;
 }
@@ -1494,14 +1477,9 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 	if (result_hasvalue(res)) {
 		struct object *obj = state_getresult(state); 
 		assert(obj);
-		struct error *err = state_assign(
-			state, obj, state_value_copy(result_as_value(res))
-		);
+		object_assign(obj, value_copy(result_as_value(res)));
 		result_destroy(res);
-		if (err) {
-			return err;
-		}
-		state_stack_undeclare(state);
+		state_undeclarevars(state);
 	}
 	return NULL;
 }
@@ -1518,7 +1496,7 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 {
 	struct error *err = NULL;
 
-	if (!state_heap_referenced(actual_state)) {
+	if (!state_hasgarbage(actual_state)) {
 		return error_create("garbage on heap");
 	}
 	/*printf("actual: %s\n", state_str(actual_state));*/
@@ -1568,7 +1546,7 @@ hack_flatten_abstract_for_iter_verification(struct ast_function *f,
 		return ast_block_copy(abs);
 	}
 	/* asserts that we have `allocated' condition */
-	state_object_destroy(
+	object_destroy(
 		hack_object_from_assertion(
 			ast_stmt_sel_cond(stmt), state
 		)
@@ -1669,13 +1647,7 @@ mem_absexec(struct ast_expr *mem, struct state *state)
 			expr_lvalue(ast_expr_memory_root(mem), state)
 		);
 		assert(obj);
-		struct error *err = state_assign(
-			state, obj, state_value_copy(result_as_value(res))
-		);
-		state_object_destroy(obj);
-		if (err) {
-			return result_error_create(err);
-		}
+		object_assign(obj, value_copy(result_as_value(res)));
 	}
 	return res;
 }
@@ -1715,7 +1687,7 @@ mem_process(struct ast_expr *mem, struct state *state)
 		fprintf(stderr, "cannot free: %s\n", err->msg);
 		assert(false);
 	}
-	state_value_destroy(val);
+	value_destroy(val);
 	return result_value_create(NULL);
 }
 
@@ -1775,7 +1747,6 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 	
 	ast_expr_destroy(res_up);
 	ast_expr_destroy(res_lw);
-	state_object_destroy(obj);
 
 	if (err) {
 		return result_error_create(err);
