@@ -7,7 +7,7 @@
 struct stack;
 
 struct stack *
-stack_create(struct stack *prev, struct ast_type *ret_type);
+stack_create(char *name, struct stack *prev, struct ast_type *ret_type);
 
 struct location *
 stack_newblock(struct stack *stack);

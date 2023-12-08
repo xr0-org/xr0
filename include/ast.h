@@ -554,6 +554,9 @@ ast_function_destroy(struct ast_function *);
 char *
 ast_function_str(struct ast_function *f);
 
+char *
+ast_function_name(struct ast_function *f);
+
 struct ast_function *
 ast_function_copy(struct ast_function *);
 

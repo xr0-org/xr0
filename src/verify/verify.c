@@ -61,7 +61,9 @@ path_verify(struct ast_function *f, struct state *state, struct externals *);
 struct error *
 path_verify_withstate(struct ast_function *f, struct externals *ext)
 {
-	struct state *state = state_create(ext, ast_function_type(f));
+	struct state *state = state_create(
+		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
+	);
 	struct error *err = path_verify(f, state, ext);
 	state_destroy(state);
 	return err;
@@ -1089,12 +1091,15 @@ static struct result
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	struct result_arr *args = prepare_arguments(expr, state);
-	state_pushframe(state, ast_function_type(expr_as_func(expr, state)));
+	struct ast_function *f = expr_as_func(expr, state);
+	state_pushframe(
+		state, dynamic_str(ast_function_name(f)), ast_function_type(f)
+	);
 	struct result res = call_eval_inframe(expr, state, args);
-	result_arr_destroy(args);
 	if (result_iserror(res)) {
 		return res;
 	}
+	result_arr_destroy(args);
 	if (result_hasvalue(res)) { /* preserve value through pop */
 		res = result_value_create(value_copy(result_as_value(res)));
 	}
@@ -1128,7 +1133,9 @@ call_eval_inframe(struct ast_expr *expr, struct state *state, struct result_arr 
 	assert(f);
 
 	struct error *err = prepare_parameters(f, args, state);
-	assert(!err);
+	if (err) {
+		return result_error_create(err);
+	}
 
 	return function_absexec(ast_function_abstract(f), state);
 }
@@ -1148,7 +1155,15 @@ prepare_parameters(struct ast_function *f, struct result_arr *args,
 
 		struct result res = args->res[i];
 		if (result_iserror(res)) {
-			return result_as_error(res);
+			printf("state: %s\n", state_str(state));
+			struct strbuilder *b = strbuilder_create();
+			strbuilder_printf(
+				b, "param `%s': ",
+				ast_variable_name(param[i])
+			);
+			return error_prepend(
+				result_as_error(res), strbuilder_build(b)
+			);
 		}
 
 		if (!result_hasvalue(res)) {
@@ -1501,7 +1516,9 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 	}
 	/*printf("actual: %s\n", state_str(actual_state));*/
 
-	struct state *alleged_state = state_create(ext, ast_function_type(f));
+	struct state *alleged_state = state_create(
+		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
+	);
 	if ((err = parameterise_state(alleged_state, f))) {
 		return err;
 	}
@@ -1684,8 +1701,7 @@ mem_process(struct ast_expr *mem, struct state *state)
 	assert(val);
 	struct error *err = state_dealloc(state, val);
 	if (err) {
-		fprintf(stderr, "cannot free: %s\n", err->msg);
-		assert(false);
+		return result_error_create(err);
 	}
 	value_destroy(val);
 	return result_value_create(NULL);

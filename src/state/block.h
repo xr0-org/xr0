@@ -12,6 +12,12 @@ block_destroy(struct block *);
 char *
 block_str(struct block *);
 
+bool
+block_isfreed(struct block *);
+
+void
+block_free(struct block *);
+
 struct error;
 struct value;
 struct ast_expr;

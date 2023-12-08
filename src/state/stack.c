@@ -13,6 +13,7 @@
 #include "util.h"
 
 struct stack {
+	char *name;
 	struct block_arr *frame;
 
 	/* lvalues of blocks in frame */
@@ -32,11 +33,12 @@ stack_newblock(struct stack *stack)
 }
 
 struct stack *
-stack_create(struct stack *prev, struct ast_type *result_type)
+stack_create(char *name, struct stack *prev, struct ast_type *result_type)
 {
 	struct stack *stack = calloc(1, sizeof(struct stack));
 	assert(stack);
 
+	stack->name = name;
 	stack->frame = block_arr_create();
 
 	stack->varmap = map_create();
@@ -77,6 +79,7 @@ struct stack *
 stack_copy(struct stack *stack)
 {
 	struct stack *copy = calloc(1, sizeof(struct stack));
+	copy->name = dynamic_str(stack->name);
 	copy->frame = block_arr_copy(stack->frame);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->result = variable_copy(stack->result);
@@ -116,14 +119,14 @@ stack_str(struct stack *stack, struct state *state)
 	char *result = variable_str(stack->result, stack, state);
 	strbuilder_printf(b, "\tresult: %s\n", result);
 	free(result);
+	strbuilder_printf(b, "\t");
+	/* TODO: fix length of line */
+	for (int i = 0, len = 30; i < len-2; i++ ) {
+		strbuilder_putc(b, '-');
+	}
+	strbuilder_printf(b, " %s\n", stack->name);
 	if (stack->prev) {
-		strbuilder_printf(b, "\t");
 		char *prev = stack_str(stack->prev, state);
-		/* TODO: fix length of line */
-		for (int i = 0, len = 30; i < len-2; i++ ) {
-			strbuilder_putc(b, '-');
-		}
-		strbuilder_printf(b, "\n");
 		strbuilder_printf(b, prev);
 		free(prev);
 	}

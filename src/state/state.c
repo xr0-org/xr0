@@ -22,13 +22,13 @@ struct state {
 };
 
 struct state *
-state_create(struct externals *ext, struct ast_type *result_type)
+state_create(char *func, struct externals *ext, struct ast_type *result_type)
 {
 	struct state *state = malloc(sizeof(struct state));
 	assert(state);
 	state->ext = ext;
 	state->vconst = vconst_create();
-	state->stack = stack_create(NULL, result_type);
+	state->stack = stack_create(func, NULL, result_type);
 	state->heap = heap_create();
 	return state;
 }
@@ -95,9 +95,9 @@ state_getfunc(struct state *state, char *f)
 }
 
 void
-state_pushframe(struct state *state, struct ast_type *ret_type)
+state_pushframe(struct state *state, char *func, struct ast_type *ret_type)
 {
-	state->stack = stack_create(state->stack, ret_type);
+	state->stack = stack_create(func, state->stack, ret_type);
 }
 
 void
