@@ -1948,6 +1948,12 @@ ast_function_str(struct ast_function *f)
 	return strbuilder_build(b);
 }
 
+char *
+ast_function_name(struct ast_function *f)
+{
+	return f->name;
+}
+
 struct ast_function *
 ast_function_copy(struct ast_function *f)
 {

@@ -22,7 +22,7 @@ struct value;
 struct state;
 
 struct state *
-state_create(struct externals *, struct ast_type *result_type);
+state_create(char *func, struct externals *, struct ast_type *result_type);
 
 struct state *
 state_copy(struct state *);
@@ -37,7 +37,7 @@ struct externals *
 state_getext(struct state *);
 
 void
-state_pushframe(struct state *, struct ast_type *ret_type);
+state_pushframe(struct state *, char *func, struct ast_type *ret_type);
 
 void
 state_popframe(struct state *);
