@@ -395,6 +395,12 @@ ast_stmt_as_v_block(struct ast_stmt *);
 struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
 
+struct error *
+ast_stmt_verify(struct ast_stmt *, struct state *);
+
+struct error *
+ast_stmt_exec(struct ast_stmt *, struct state *);
+
 struct result *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
