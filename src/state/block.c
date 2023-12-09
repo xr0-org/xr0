@@ -85,9 +85,8 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 
 	/* range around observand at offset */
 	struct ast_expr *lw = ast_expr_copy(offset);
-	struct ast_expr *up = ast_expr_binary_create(
+	struct ast_expr *up = ast_expr_sum_create(
 		ast_expr_copy(offset),
-		BINARY_OP_ADDITION,
 		ast_expr_constant_create(1)
 	);
  
@@ -141,9 +140,8 @@ block_range_alloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
 		object_range_create(
 			ast_expr_copy(lw),
 			range_create(
-				ast_expr_binary_create(
+				ast_expr_difference_create(
 					ast_expr_copy(up),
-					BINARY_OP_SUBTRACTION,
 					ast_expr_copy(lw)
 				),
 				heap_newblock(heap)
@@ -204,10 +202,8 @@ hack_first_object_is_exactly_bounds(struct block *b, struct ast_expr *lw,
 		return false;
 	}
 
-	struct ast_expr *same_lw =
-		ast_expr_binary_create(lw, BINARY_OP_EQ, object_lower(obj)),
-			*same_up =
-		ast_expr_binary_create(up, BINARY_OP_EQ, object_upper(obj));
+	struct ast_expr *same_lw = ast_expr_eq_create(lw, object_lower(obj)),
+			*same_up = ast_expr_eq_create(up, object_upper(obj));
 
 	return state_eval(s, same_lw) && state_eval(s, same_up);
 }

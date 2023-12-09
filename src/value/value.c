@@ -440,22 +440,6 @@ struct_references(struct value *v, struct location *loc, struct state *s)
 }
 
 bool
-value_equal(struct value *v1, struct value *v2);
-
-bool
-value_compare(struct value *v1, enum ast_binary_operator op, struct value *v2)
-{
-	switch (op) {
-	case BINARY_OP_EQ:
-		return value_equal(v1, v2);
-	case BINARY_OP_NE:
-		return !value_compare(v1, BINARY_OP_EQ, v2);
-	default:
-		assert(false);
-	}
-}
-
-bool
 number_equal(struct number *n1, struct number *n2);
 
 bool

@@ -30,6 +30,8 @@ check_type();
 %%
 "#"			{ preproc(); }
 "/*"			{ comment(); }
+".alloc"		{ count(); return(ALLOC); }
+".dealloc"		{ count(); return(DEALLOC); }
 
 "auto"			{ count(); return(AUTO); }
 "axiom"			{ count(); return(AXIOM); }
@@ -103,9 +105,6 @@ L?\"(\\.|[^\\"])*\"	{ count(); return(STRING_LITERAL); }
 ">="			{ count(); return(GE_OP); }
 "=="			{ count(); return(EQ_OP); }
 "!="			{ count(); return(NE_OP); }
-"==="			{ count(); return(EQV_OP); }
-"==>"			{ count(); return(IMPL_OP); }
-"<=="			{ count(); return(FLLW_OP); }
 ";"			{ count(); return(';'); }
 ("{"|"<%")		{ count(); return('{'); }
 ("}"|"%>")		{ count(); return('}'); }
@@ -130,7 +129,7 @@ L?\"(\\.|[^\\"])*\"	{ count(); return(STRING_LITERAL); }
 "^"			{ count(); return('^'); }
 "|"			{ count(); return('|'); }
 "?"			{ count(); return('?'); }
-"@"			{ count(); return(ASSERT); }
+"@"			{ count(); return(ISDEALLOCAND_OP); }
 "$"			{ count(); return(ARB_ARG); }
 
 [ \t\v\n\f]		{ count(); }

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <assert.h>
 #include "ast.h"
+#include "expr/expr.h"
 #include "gram_util.h"
 #include "lex.h"
 #include "util.h"
@@ -45,19 +46,6 @@ strip_quotes(char *s)
 	char *t = malloc(sizeof(char) * len);
 	snprintf(t, len, "%s", s + 1);
 	return t;
-}
-
-int
-effectfromid(char *id)
-{
-	if (strcmp(id, "alloc") == 0) {
-		return EFFECT_ALLOC;
-	} else if (strcmp(id, "dealloc") == 0) {
-		return EFFECT_DEALLOC;
-	} else if (strcmp(id, "undefined") == 0) {
-		return EFFECT_UNDEFINED;
-	}
-	assert(false);
 }
 
 struct stmt_array
@@ -116,7 +104,7 @@ variable_array_create(struct ast_variable *v)
 
 %token IDENTIFIER CONSTANT CHAR_LITERAL STRING_LITERAL SIZEOF
 %token PTR_OP INC_OP DEC_OP LEFT_OP RIGHT_OP LE_OP GE_OP EQ_OP NE_OP
-%token EQV_OP IMPL_OP FLLW_OP
+%token ISDEALLOCAND_OP
 %token AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
 %token SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN
 %token XOR_ASSIGN OR_ASSIGN TYPE_NAME
@@ -125,10 +113,11 @@ variable_array_create(struct ast_variable *v)
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
-%token AXIOM LEMMA SFUNC ASSERT
+%token AXIOM LEMMA SFUNC
 %token ARB_ARG
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR SOME GOTO CONTINUE BREAK RETURN
+%token ALLOC DEALLOC
 
 %start translation_unit
 
@@ -179,18 +168,18 @@ variable_array_create(struct ast_variable *v)
 %type <block> block compound_statement compound_verification_statement
 %type <block> optional_compound_verification
 %type <block_statement> block_statement
-%type <binary_operator> connective equality_operator relational_operator
+%type <binary_operator> equality_operator relational_operator
 %type <boolean> struct_or_union
 %type <declarator> declarator init_declarator init_declarator_list
 %type <direct_function_declarator> direct_function_declarator
 
 %type <expr> expression assignment_expression conditional_expression unary_expression
-%type <expr> justified_expression postfix_expression primary_expression
+%type <expr> postfix_expression primary_expression
 %type <expr> logical_or_expression logical_and_expression inclusive_or_expression
 %type <expr> exclusive_or_expression and_expression equality_expression
 %type <expr> relational_expression shift_expression additive_expression
 %type <expr> multiplicative_expression cast_expression
-%type <expr> memory_expression
+%type <expr> isdeallocand_expression
 
 %type <expr_array> argument_expression_list
 
@@ -200,7 +189,7 @@ variable_array_create(struct ast_variable *v)
 %type <integer> pointer
 %type <statement> statement expression_statement selection_statement jump_statement 
 %type <statement> labelled_statement iteration_statement for_iteration_statement
-%type <statement> iteration_effect_statement
+%type <statement> iteration_effect_statement allocation_statement
 %type <stmt_array> statement_list
 %type <string> identifier direct_declarator
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
@@ -266,24 +255,15 @@ argument_expression_list
 		{ $$ = expr_array_append(&$1, $3); }
 	;
 
-memory_expression
+isdeallocand_expression
 	: postfix_expression 
-	| '.' identifier {
-		$$ = ast_expr_memory_create(effectfromid($2), NULL);
-		free($2);
+	| ISDEALLOCAND_OP isdeallocand_expression {
+		$$ = ast_expr_isdeallocand_create($2);
 	}
-	| '.' identifier memory_expression	{
-		$$ = ast_expr_memory_create(effectfromid($2), $3);
-		free($2);
-	}
-	| ASSERT memory_expression {
-		$$ = ast_expr_assertion_create($2);
-	}
-
 	;
 
 unary_expression
-	: memory_expression
+	: isdeallocand_expression
 	| INC_OP unary_expression
 		{ $$ = ast_expr_incdec_create($2, true, true); }
 	| DEC_OP unary_expression
@@ -382,21 +362,9 @@ logical_or_expression
 	/*| logical_or_expression OR_OP logical_and_expression*/
 	;
 
-connective
-	: EQV_OP 	{ $$ = BINARY_OP_EQV; }
-	| IMPL_OP	{ $$ = BINARY_OP_IMPL; }
-	/*| FLLW_OP	{ $$ = BINARY_OP_FLLW; }*/
-	;
-
-justified_expression
-	: logical_or_expression
-	| justified_expression connective justification logical_or_expression
-		{ $$ = ast_expr_binary_create($1, $2, $4); }
-	;
-
 conditional_expression
-	: justified_expression
-	/*| justified_expression '?' expression ':' conditional_expression*/
+	: logical_or_expression
+	/*| logical_or_expression '?' expression ':' conditional_expression*/
 	;
 
 assignment_expression
@@ -451,7 +419,7 @@ declaration_specifiers
 		$$ = $2;
 	}
 	| declaration_modifier declaration_specifiers {
-		$2->mod |= $1;
+		ast_type_mod_or($2, $1);
 		$$ = $2;
 	}
 	;
@@ -706,6 +674,7 @@ statement
 		{ $$ = ast_stmt_create_iter_e($1); }
 	| compound_verification_statement
 		{ $$ = ast_stmt_create_compound_v(lexloc(), $1); }
+	| allocation_statement
 	;
 
 labelled_statement
@@ -744,6 +713,13 @@ iteration_effect_statement
 compound_verification_statement
 	: '[' ']'	{ $$ = ast_block_create(NULL, 0, NULL, 0); }
 	| '[' block ']'	{ $$ = $2; }
+	;
+
+allocation_statement
+	: ALLOC postfix_expression ';'
+		{ $$ = ast_stmt_create_alloc(lexloc(), $2); }
+	| DEALLOC postfix_expression ';'
+		{ $$ = ast_stmt_create_dealloc(lexloc(), $2); }
 	;
 
 declaration_list
