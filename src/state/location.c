@@ -131,8 +131,7 @@ location_references(struct location *l1, struct location *l2, struct state *s)
 	}
 
 	struct block *b = state_getblock(s, l1);
-	assert(b);
-	return block_references(b, l2, s);
+	return b && block_references(b, l2, s);
 }
 
 struct block *

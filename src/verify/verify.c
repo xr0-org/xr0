@@ -10,56 +10,11 @@
 #include "value.h"
 #include "verify.h"
 
-typedef struct func_arr *Funcarr;
-
-int
-func_arr_len(Funcarr);
-
-struct ast_function **
-func_arr_paths(Funcarr);
-
-void
-func_arr_destroy(Funcarr);
-
-Funcarr
-paths_fromfunction(struct ast_function *f);
-
-struct error *
-function_verify_paths(Funcarr paths, struct externals *);
-
-struct error *
-function_verify(struct ast_function *f, struct externals *ext)
-{
-	Funcarr paths = paths_fromfunction(f);
-	struct error *err = function_verify_paths(paths, ext);
-	func_arr_destroy(paths);
-	return err;
-}
-
-struct error *
-path_verify_withstate(struct ast_function *, struct externals *);
-
-struct error *
-function_verify_paths(Funcarr paths, struct externals *ext)
-{	
-	int len = func_arr_len(paths);
-	struct ast_function **path = func_arr_paths(paths);
-	for (int i = 0; i < len; i++) {
-		struct error *err = NULL;
-		if ((err = path_verify_withstate(path[i], ext))) {
-			return err;
-		}
-	}
-	return NULL;
-}
-
-/* path_verify_withstate */
-
 struct error *
 path_verify(struct ast_function *f, struct state *state, struct externals *);
 
 struct error *
-path_verify_withstate(struct ast_function *f, struct externals *ext)
+function_verify(struct ast_function *f, struct externals *ext)
 {
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
@@ -67,228 +22,6 @@ path_verify_withstate(struct ast_function *f, struct externals *ext)
 	struct error *err = path_verify(f, state, ext);
 	state_destroy(state);
 	return err;
-}
-
-/* Funcarr */
-
-struct func_arr {
-	int n;
-	struct ast_function **path;
-};
-
-struct func_arr *
-func_arr_create()
-{
-	return calloc(1, sizeof(struct func_arr));
-}
-
-int
-func_arr_len(struct func_arr *set)
-{
-	return set->n;
-}
-
-struct ast_function **
-func_arr_paths(struct func_arr *set)
-{
-	return set->path;
-}
-
-static int
-findsel(struct ast_function *);
-
-static void
-func_arr_immediate_split_append(struct func_arr *set, struct ast_function *f, int i);
-
-static void
-func_arr_append(struct func_arr *set, struct ast_function *f);
-
-struct func_arr *
-paths_fromfunction(struct ast_function *f)
-{
-	assert(!ast_function_isaxiom(f));
-
-	struct func_arr *arr = func_arr_create();
-
-	int sel = findsel(f);
-	if (sel != -1) {
-		func_arr_immediate_split_append(arr, f, sel);
-	} else {
-		func_arr_append(arr, f);
-	}
-	return arr;
-}
-
-static int
-findsel(struct ast_function *f)
-{
-	assert(!ast_function_isaxiom(f));
-
-	struct ast_block *body = ast_function_body(f);
-
-	struct ast_stmt **stmt = ast_block_stmts(body);
-	int nstmts = ast_block_nstmts(body);
-
-	for (int i = 0; i < nstmts; i++) {
-		struct ast_stmt *s = stmt[i];
-		if (ast_stmt_kind(s) != STMT_SELECTION) {
-			continue;
-		}
-		assert(!ast_stmt_sel_nest(s)); /* XXX: simple cases first */
-		return i;
-	}
-	return -1;
-}
-
-/* func_arr_immediate_split_append */
-
-static struct ast_function *
-immediate_split(struct ast_function *f, int i, bool enter);
-
-static void
-func_arr_appendrange(struct func_arr *set, struct func_arr *other);
-
-static void
-func_arr_immediate_split_append(struct func_arr *set, struct ast_function *f, int i)
-{
-	struct ast_function *t_path = immediate_split(f, i, true),
-			    *f_path = immediate_split(f, i, false);
-
-	struct func_arr *paths_t = paths_fromfunction(t_path),
-			*paths_f = paths_fromfunction(f_path);
-
-	func_arr_appendrange(set, paths_t);
-	func_arr_appendrange(set, paths_f);
-
-	func_arr_destroy(paths_f);
-	func_arr_destroy(paths_t);
-
-	ast_function_destroy(f_path);
-	ast_function_destroy(t_path);
-}
-
-struct ast_block *
-split_block_cond(struct ast_block *b, struct ast_expr *cond, bool enter);
-
-struct ast_block *
-split_block_index(struct ast_block *b, int split_index, bool enter);
-
-static struct ast_function *
-immediate_split(struct ast_function *f, int split_index, bool enter)
-{
-	struct ast_block *abs = ast_function_abstract(f),
-			 *body = ast_function_body(f);
-
-	struct ast_expr *cond = ast_stmt_sel_cond(ast_block_stmts(body)[split_index]);
-
-	assert(!abs->decl && abs->ndecl == 0);
-	return ast_function_create(
-		false,
-		ast_type_copy(f->ret),
-		dynamic_str(f->name),
-		f->nparam,
-		ast_variables_copy(f->nparam, f->param),
-		split_block_cond(abs, cond, enter),
-		split_block_index(body, split_index, enter)
-	);
-}
-
-/* split_block_cond */
-
-struct ast_stmt *
-choose_split_path(struct ast_stmt *old_stmt, bool should_split, bool enter);
-
-struct ast_block *
-split_block_cond(struct ast_block *b, struct ast_expr *cond, bool enter)
-{
-	int nstmts = ast_block_nstmts(b);
-	struct ast_stmt **old_stmt = ast_block_stmts(b);
-
-	int n = 0;
-	struct ast_stmt **stmt = NULL;
-	for (int i = 0; i < nstmts; i++) {
-		struct ast_stmt *old_s = old_stmt[i];
-		bool should_split = 
-			ast_stmt_kind(old_s) == STMT_SELECTION &&
-			ast_expr_equal(ast_stmt_sel_cond(old_s), cond);
-		struct ast_stmt *s = choose_split_path(
-			old_s, should_split, enter
-		);
-		if (!s) {
-			continue;
-		}
-		stmt = realloc(stmt, sizeof(struct ast_stmt *) * ++n);
-		stmt[n-1] = ast_stmt_copy(s);
-	}
-	struct ast_variable **decl = b->decl
-		? ast_variables_copy(b->ndecl, b->decl)
-		: NULL;
-	return ast_block_create(
-		decl, b->ndecl,
-		stmt, n
-	);
-}
-
-struct ast_stmt *
-choose_split_path(struct ast_stmt *stmt, bool should_split, bool enter)
-{
-	if (should_split) {
-		return enter ? ast_stmt_sel_body(stmt) : NULL;
-	}
-	return stmt;
-}
-
-struct ast_block *
-split_block_index(struct ast_block *b, int split_index, bool enter)
-{
-	int nstmts = ast_block_nstmts(b);
-	struct ast_stmt **old_stmt = ast_block_stmts(b);
-
-	int n = 0;
-	struct ast_stmt **stmt = NULL;
-	for (int i = 0; i < nstmts; i++) {
-		struct ast_stmt *s = choose_split_path(
-			old_stmt[i], i == split_index, enter
-		);
-		if (!s) {
-			continue;
-		}
-		stmt = realloc(stmt, sizeof(struct ast_stmt *) * ++n);
-		stmt[n-1] = ast_stmt_copy(s);
-	}
-	struct ast_variable **decl = b->decl
-		? ast_variables_copy(b->ndecl, b->decl)
-		: NULL;
-	return ast_block_create(
-		decl, b->ndecl,
-		stmt, n
-	);
-}
-
-static void
-func_arr_appendrange(struct func_arr *arr, struct func_arr *range)
-{
-	for (int i = 0; i < range->n; i++) {
-		func_arr_append(arr, range->path[i]);
-	}
-}
-
-static void
-func_arr_append(struct func_arr *arr, struct ast_function *f)
-{
-	arr->path = realloc(arr->path,
-		sizeof(struct ast_function *) * ++arr->n);
-	arr->path[arr->n-1] = ast_function_copy(f);
-}
-
-void
-func_arr_destroy(struct func_arr *arr)
-{
-	for (int i = 0; i < arr->n; i++) {
-		ast_function_destroy(arr->path[i]);
-	}
-	free(arr->path);
-	free(arr);
 }
 
 /* path_verify */
@@ -1155,7 +888,6 @@ prepare_parameters(struct ast_function *f, struct result_arr *args,
 
 		struct result res = args->res[i];
 		if (result_iserror(res)) {
-			printf("state: %s\n", state_str(state));
 			struct strbuilder *b = strbuilder_create();
 			strbuilder_printf(
 				b, "param `%s': ",
@@ -1511,10 +1243,10 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 {
 	struct error *err = NULL;
 
+	/*printf("actual: %s\n", state_str(actual_state));*/
 	if (!state_hasgarbage(actual_state)) {
 		return error_create("garbage on heap");
 	}
-	/*printf("actual: %s\n", state_str(actual_state));*/
 
 	struct state *alleged_state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
@@ -1597,9 +1329,6 @@ static struct result
 expr_absexec(struct ast_expr *expr, struct state *state);
 
 static struct result
-sel_absexec(struct ast_stmt *stmt, struct state *state);
-
-static struct result
 iter_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct result
@@ -1614,8 +1343,6 @@ stmt_absexec(struct ast_stmt *stmt, struct state *state)
 		return result_value_create(NULL);
 	case STMT_EXPR:
 		return expr_absexec(ast_stmt_as_expr(stmt), state);
-	case STMT_SELECTION:
-		return sel_absexec(stmt, state);
 	case STMT_ITERATION:
 		return iter_absexec(stmt, state);
 	case STMT_COMPOUND:
@@ -1711,20 +1438,6 @@ static struct result
 assign_absexec(struct ast_expr *expr, struct state *state)
 {
 	return expr_assign_eval(expr, state);
-}
-
-static struct result
-sel_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
-	if (!expr_decide(cond, state)) {
-		struct ast_stmt *nest = ast_stmt_sel_nest(stmt);
-		if (nest) {
-			return stmt_absexec(nest, state);
-		} 
-		return result_value_create(NULL);
-	}
-	return stmt_absexec(ast_stmt_sel_body(stmt), state);
 }
 
 static struct result

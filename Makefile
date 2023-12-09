@@ -27,11 +27,11 @@ MAIN_OBJ = $(BUILD_DIR)/main.o
 VERIFY_OBJ = $(BUILD_DIR)/verify.o
 
 STATE_OBJ = $(BUILD_DIR)/state.o
-EXT_OBJ = $(BUILD_DIR)/ext.o
 STACK_OBJ = $(BUILD_DIR)/stack.o
 HEAP_OBJ = $(BUILD_DIR)/heap.o
 LOCATION_OBJ = $(BUILD_DIR)/location.o
 BLOCK_OBJ = $(BUILD_DIR)/block.o
+EXT_OBJ = $(BUILD_DIR)/ext.o
 OBJECT_OBJ = $(BUILD_DIR)/object.o
 VALUE_OBJ = $(BUILD_DIR)/value.o
 MATH_OBJ = $(BUILD_DIR)/math.o
