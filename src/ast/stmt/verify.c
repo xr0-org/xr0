@@ -33,7 +33,6 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	case STMT_ALLOCATION:
 		return alloc_absexec(stmt, state);
 	default:
-		printf("stmt: %s\n", ast_stmt_str(stmt));
 		assert(false);
 	}
 }

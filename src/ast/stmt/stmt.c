@@ -197,6 +197,15 @@ ast_stmt_create_dealloc(struct lexememarker *loc, struct ast_expr *arg)
 	return stmt;
 }
 
+static struct ast_stmt *
+ast_stmt_copy_alloc(struct lexememarker *loc, struct ast_stmt *stmt)
+{
+	struct ast_expr *arg = ast_expr_copy(stmt->u.alloc.arg);
+	return stmt->u.alloc.isalloc
+		? ast_stmt_create_alloc(loc, arg)
+		: ast_stmt_create_dealloc(loc, arg);
+}
+
 static void
 ast_stmt_destroy_alloc(struct ast_stmt *stmt)
 {
@@ -212,7 +221,7 @@ ast_stmt_alloc_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 
 	char *arg = ast_expr_str(stmt->u.alloc.arg);
 	strbuilder_printf(
-		b, ".%s %s",
+		b, ".%s %s;",
 		stmt->u.alloc.isalloc ? "alloc" : "dealloc",
 		arg
 	);
@@ -545,9 +554,7 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			ast_expr_copy_ifnotnull(stmt->u.jump.rv)
 		);
 	case STMT_ALLOCATION:
-		return ast_stmt_create_alloc(
-			loc, ast_expr_copy(stmt->u.alloc.arg)
-		);
+		return ast_stmt_copy_alloc(loc, stmt);
 	default:
 		assert(false);
 	}

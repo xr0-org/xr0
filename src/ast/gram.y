@@ -727,8 +727,10 @@ compound_verification_statement
 	;
 
 allocation_statement
-	: ALLOC postfix_expression	{ $$ = ast_stmt_create_alloc(lexloc(), $2); }
-	| DEALLOC postfix_expression	{ $$ = ast_stmt_create_dealloc(lexloc(), $2); }
+	: ALLOC postfix_expression ';'
+		{ $$ = ast_stmt_create_alloc(lexloc(), $2); }
+	| DEALLOC postfix_expression ';'
+		{ $$ = ast_stmt_create_dealloc(lexloc(), $2); }
 	;
 
 declaration_list
