@@ -14,7 +14,7 @@ static bool
 expr_unary_decide(struct ast_expr *expr, struct state *state);
 
 static bool
-expr_assertion_decide(struct ast_expr *expr, struct state *state);
+expr_isdeallocand_decide(struct ast_expr *expr, struct state *state);
 
 static bool
 expr_binary_decide(struct ast_expr *expr, struct state *state);
@@ -25,8 +25,8 @@ ast_expr_decide(struct ast_expr *expr, struct state *state)
 	switch (ast_expr_kind(expr)) {
 	case EXPR_UNARY:
 		return expr_unary_decide(expr, state);
-	case EXPR_ASSERTION:
-		return expr_assertion_decide(expr, state);
+	case EXPR_ISDEALLOCAND:
+		return expr_isdeallocand_decide(expr, state);
 	case EXPR_BINARY:
 		return expr_binary_decide(expr, state);
 	default:
@@ -142,7 +142,7 @@ static struct object *
 hack_object_from_assertion(struct ast_expr *expr, struct state *state)
 {	
 	/* get assertand */
-	struct ast_expr *assertand = ast_expr_assertion_assertand(expr);
+	struct ast_expr *assertand = ast_expr_isdeallocand_assertand(expr);
 
 	/* get `assertand' variable */
 	struct object *obj = lvalue_object(ast_expr_lvalue(assertand, state));
@@ -151,7 +151,7 @@ hack_object_from_assertion(struct ast_expr *expr, struct state *state)
 }
 
 static bool
-expr_assertion_decide(struct ast_expr *expr, struct state *state)
+expr_isdeallocand_decide(struct ast_expr *expr, struct state *state)
 {
 	struct object *obj = hack_object_from_assertion(expr, state);
 	bool isdeallocand = state_addresses_deallocand(state, obj);

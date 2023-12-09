@@ -61,7 +61,7 @@ enum ast_expr_kind {
 
 	EXPR_ASSIGNMENT		= 1 << 10,
 
-	EXPR_ASSERTION		= 1 << 11,
+	EXPR_ISDEALLOCAND	= 1 << 11,
 	EXPR_ARBARG		= 1 << 12,
 };
 
@@ -182,10 +182,10 @@ struct ast_expr *
 ast_expr_assignment_rval(struct ast_expr *expr);
 
 struct ast_expr *
-ast_expr_assertion_create(struct ast_expr *assertand);
+ast_expr_isdeallocand_create(struct ast_expr *assertand);
 
 struct ast_expr *
-ast_expr_assertion_assertand(struct ast_expr *expr);
+ast_expr_isdeallocand_assertand(struct ast_expr *expr);
 
 struct ast_expr *
 ast_expr_arbarg_create();

@@ -132,7 +132,7 @@ L?\"(\\.|[^\\"])*\"	{ count(); return(STRING_LITERAL); }
 "^"			{ count(); return('^'); }
 "|"			{ count(); return('|'); }
 "?"			{ count(); return('?'); }
-"@"			{ count(); return(ASSERT); }
+"@"			{ count(); return(ISDEALLOCAND_OP); }
 "$"			{ count(); return(ARB_ARG); }
 
 [ \t\v\n\f]		{ count(); }

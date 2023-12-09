@@ -480,23 +480,23 @@ ast_expr_assignment_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
-ast_expr_assertion_create(struct ast_expr *assertand)
+ast_expr_isdeallocand_create(struct ast_expr *assertand)
 {
 	struct ast_expr *new = ast_expr_create();
-	new->kind = EXPR_ASSERTION;
+	new->kind = EXPR_ISDEALLOCAND;
 	new->root = assertand;
 	return new;
 }
 
 struct ast_expr *
-ast_expr_assertion_assertand(struct ast_expr *expr)
+ast_expr_isdeallocand_assertand(struct ast_expr *expr)
 {
-	assert(expr->kind == EXPR_ASSERTION);
+	assert(expr->kind == EXPR_ISDEALLOCAND);
 	return expr->root;
 }
 
 static void
-ast_expr_assertion_str_build(struct ast_expr *expr, struct strbuilder *b)
+ast_expr_isdeallocand_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
 	char *root = ast_expr_str(expr->root);
 	strbuilder_printf(b, "@%s", root);
@@ -544,7 +544,7 @@ ast_expr_destroy(struct ast_expr *expr)
 		break;
 	case EXPR_CONSTANT:
 		break;
-	case EXPR_ASSERTION:
+	case EXPR_ISDEALLOCAND:
 		ast_expr_destroy(expr->root);
 		break;
 	case EXPR_ARBARG:
@@ -590,8 +590,8 @@ ast_expr_str(struct ast_expr *expr)
 	case EXPR_ASSIGNMENT:
 		ast_expr_assignment_str_build(expr, b);
 		break;
-	case EXPR_ASSERTION:
-		ast_expr_assertion_str_build(expr, b);
+	case EXPR_ISDEALLOCAND:
+		ast_expr_isdeallocand_str_build(expr, b);
 		break;
 	case EXPR_ARBARG:
 		strbuilder_putc(b, '$');
@@ -643,8 +643,8 @@ ast_expr_copy(struct ast_expr *expr)
 			ast_expr_copy(expr->root),
 			ast_expr_copy(expr->u.assignment_value)
 		);
-	case EXPR_ASSERTION:
-		return ast_expr_assertion_create(
+	case EXPR_ISDEALLOCAND:
+		return ast_expr_isdeallocand_create(
 			ast_expr_copy(expr->root)
 		);
 	case EXPR_ARBARG:

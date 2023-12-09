@@ -104,6 +104,7 @@ variable_array_create(struct ast_variable *v)
 %token IDENTIFIER CONSTANT CHAR_LITERAL STRING_LITERAL SIZEOF
 %token PTR_OP INC_OP DEC_OP LEFT_OP RIGHT_OP LE_OP GE_OP EQ_OP NE_OP
 %token EQV_OP IMPL_OP FLLW_OP
+%token ISDEALLOCAND_OP
 %token AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
 %token SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN
 %token XOR_ASSIGN OR_ASSIGN TYPE_NAME
@@ -112,7 +113,7 @@ variable_array_create(struct ast_variable *v)
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
-%token AXIOM LEMMA SFUNC ASSERT
+%token AXIOM LEMMA SFUNC
 %token ARB_ARG
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR SOME GOTO CONTINUE BREAK RETURN
@@ -178,7 +179,7 @@ variable_array_create(struct ast_variable *v)
 %type <expr> exclusive_or_expression and_expression equality_expression
 %type <expr> relational_expression shift_expression additive_expression
 %type <expr> multiplicative_expression cast_expression
-%type <expr> memory_expression
+%type <expr> isdeallocand_expression
 
 %type <expr_array> argument_expression_list
 
@@ -254,15 +255,15 @@ argument_expression_list
 		{ $$ = expr_array_append(&$1, $3); }
 	;
 
-memory_expression
+isdeallocand_expression
 	: postfix_expression 
-	| ASSERT memory_expression {
-		$$ = ast_expr_assertion_create($2);
+	| ISDEALLOCAND_OP isdeallocand_expression {
+		$$ = ast_expr_isdeallocand_create($2);
 	}
 	;
 
 unary_expression
-	: memory_expression
+	: isdeallocand_expression
 	| INC_OP unary_expression
 		{ $$ = ast_expr_incdec_create($2, true, true); }
 	| DEC_OP unary_expression
