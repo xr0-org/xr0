@@ -399,5 +399,3 @@ alloc_process(struct ast_stmt *alloc, struct state *state)
 	value_destroy(val);
 	return result_value_create(NULL);
 }
-
-
