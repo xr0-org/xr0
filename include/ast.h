@@ -43,28 +43,6 @@ lvalue_type(struct lvalue *);
 struct object *
 lvalue_object(struct lvalue *);
 
-
-enum ast_expr_kind {
-	EXPR_IDENTIFIER		= 1 << 0,
-	EXPR_CONSTANT		= 1 << 1,
-	EXPR_STRING_LITERAL	= 1 << 2,
-	EXPR_BRACKETED		= 1 << 3,
-	EXPR_ITERATION		= 1 << 4,
-
-	EXPR_CALL		= 1 << 5,
-	EXPR_INCDEC		= 1 << 6,
-
-	EXPR_STRUCTMEMBER	= 1 << 7,
-
-	EXPR_UNARY		= 1 << 8,
-	EXPR_BINARY		= 1 << 9,
-
-	EXPR_ASSIGNMENT		= 1 << 10,
-
-	EXPR_ISDEALLOCAND	= 1 << 11,
-	EXPR_ARBARG		= 1 << 12,
-};
-
 enum ast_unary_operator {
 	UNARY_OP_ADDRESS		= 1 << 0,
 	UNARY_OP_DEREFERENCE		= 1 << 1,
@@ -156,6 +134,9 @@ ast_expr_unary_create(struct ast_expr *, enum ast_unary_operator);
 enum ast_unary_operator
 ast_expr_unary_op(struct ast_expr *);
 
+bool
+ast_expr_unary_isdereference(struct ast_expr *);
+
 struct ast_expr *
 ast_expr_unary_operand(struct ast_expr *);
 
@@ -198,9 +179,6 @@ ast_expr_str(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_copy(struct ast_expr *);
-
-enum ast_expr_kind
-ast_expr_kind(struct ast_expr *);
 
 bool
 ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2);

@@ -320,7 +320,6 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	/* we're currently discarding analysis of `offset` and relying on the
 	 * bounds (lower, upper beneath) alone */
 	struct ast_expr *acc = ast_stmt_alloc_arg(alloc); /* `*(arr+offset)` */
-	assert(ast_expr_unary_op(acc) == UNARY_OP_DEREFERENCE);
 	struct ast_expr *inner = ast_expr_unary_operand(acc); /* `arr+offset` */
 	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
 	assert(ast_expr_equal(ast_expr_binary_e2(inner), i)); 

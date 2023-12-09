@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "expr.h"
 #include "ext.h"
 #include "math.h"
 #include "object.h"

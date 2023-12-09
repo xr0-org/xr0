@@ -367,9 +367,7 @@ ast_stmt_iter_lower_bound(struct ast_stmt *stmt)
 	assert(stmt->kind == STMT_ITERATION);
 	struct ast_stmt *init = stmt->u.iteration.init;
 	assert(init->kind == STMT_EXPR);
-	struct ast_expr *expr = init->u.expr;
-	assert(ast_expr_kind(expr) == EXPR_ASSIGNMENT);
-	return ast_expr_assignment_rval(expr);
+	return ast_expr_assignment_rval(init->u.expr);
 }
 
 struct ast_expr *
@@ -378,9 +376,7 @@ ast_stmt_iter_upper_bound(struct ast_stmt *stmt)
 	assert(stmt->kind == STMT_ITERATION);
 	struct ast_stmt *cond = stmt->u.iteration.cond;
 	assert(cond->kind == STMT_EXPR);
-	struct ast_expr *expr = cond->u.expr;
-	assert(ast_expr_kind(expr) == EXPR_BINARY);
-	return ast_expr_binary_e2(expr);
+	return ast_expr_binary_e2(cond->u.expr);
 }
 
 static struct ast_stmt *

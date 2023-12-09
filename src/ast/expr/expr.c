@@ -5,28 +5,7 @@
 #include "ast.h"
 #include "math.h"
 #include "util.h"
-
-struct ast_expr {
-	enum ast_expr_kind kind;
-	struct ast_expr *root;
-	union {
-		char *string; /* identifier, literal, assertion */
-		int constant;
-		struct {
-			int n;
-			struct ast_expr **arg;
-		} call;
-		struct {
-			int inc, pre;
-		} incdec;
-		enum ast_unary_operator unary_op;
-		struct {
-			enum ast_binary_operator op;
-			struct ast_expr *e1, *e2;
-		} binary;
-		struct ast_expr *assignment_value;
-	} u;
-};
+#include "expr.h"
 
 static struct ast_expr *
 ast_expr_create()
@@ -332,20 +311,32 @@ static void
 ast_expr_destroy_unary(struct ast_expr *expr)
 {
 	assert(expr->kind == EXPR_UNARY);
+
 	ast_expr_destroy(expr->root);
 }
 
 enum ast_unary_operator
 ast_expr_unary_op(struct ast_expr *expr)
 {
+	assert(expr->kind == EXPR_UNARY);
+
 	return expr->u.unary_op;
 }
 
 struct ast_expr *
 ast_expr_unary_operand(struct ast_expr *expr)
 {
+	assert(expr->kind == EXPR_UNARY);
+
 	return expr->root;
 }
+
+bool
+ast_expr_unary_isdereference(struct ast_expr *expr)
+{
+	return ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE;
+}
+
 
 static void
 ast_expr_unary_str_build(struct ast_expr *expr, struct strbuilder *b)
