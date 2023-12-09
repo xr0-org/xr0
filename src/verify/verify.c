@@ -472,7 +472,7 @@ stmt_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_block *b = stmt->u.compound;
+	struct ast_block *b = ast_stmt_as_block(stmt);
 	assert(ast_block_ndecls(b) == 0);
 	int nstmt = ast_block_nstmts(b);
 	struct ast_stmt **stmts = ast_block_stmts(b);

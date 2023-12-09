@@ -451,7 +451,7 @@ declaration_specifiers
 		$$ = $2;
 	}
 	| declaration_modifier declaration_specifiers {
-		$2->mod |= $1;
+		ast_type_mod_or($2, $1);
 		$$ = $2;
 	}
 	;

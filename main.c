@@ -177,40 +177,12 @@ struct ast *root;
 static bool
 should_verify(struct ast_externdecl *decl)
 {
-	if (decl->kind != EXTERN_FUNCTION) {
+	if (ast_externdecl_kind(decl) != EXTERN_FUNCTION) {
 		/* TODO: install global var in table */
 		return false;
 	}
-	return !ast_function_isaxiom(decl->u.function);
+	return !ast_function_isaxiom(ast_externdecl_as_function(decl));
 }
-
-static void
-install_declaration(struct ast_externdecl *decl, struct externals *ext)
-{
-	struct ast_function *f;
-	struct ast_variable *v;
-	struct ast_type *t;
-
-	switch (decl->kind) {
-	case EXTERN_FUNCTION:
-		f = decl->u.function;
-		externals_declarefunc(ext, f->name, f);
-		break;
-	case EXTERN_VARIABLE:
-		printf("variable: %s\n", decl->u.variable->name);
-		v = decl->u.variable;
-		externals_declarevar(ext, v->name, v);
-		break;
-	case EXTERN_TYPE:
-		t = decl->u.type;
-		assert(t->base == TYPE_STRUCT && t->u.structunion.tag);
-		externals_declaretype(ext, t->u.structunion.tag, t);
-		break;
-	default:
-		assert(false);
-	}
-}
-
 
 void
 pass1(struct ast *root, struct externals *ext)
@@ -225,15 +197,13 @@ pass1(struct ast *root, struct externals *ext)
 	 */
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
-		install_declaration(decl, ext);
+		ast_externdecl_install(decl, ext);
 		if (!should_verify(decl)) {
 			continue;
 		}
-		struct ast_function *f = decl->u.function;
+		struct ast_function *f = ast_externdecl_as_function(decl);
 		/* XXX: ensure that verified functions always have an abstract */
-		if (!f->abstract) {
-			f->abstract = ast_block_create(NULL, 0, NULL, 0);
-		}
+		assert(ast_function_abstract(f));
 		if ((err = function_verify(f, ext))) {
 			fprintf(stderr, "%s", err->msg);
 			exit(EXIT_FAILURE);
