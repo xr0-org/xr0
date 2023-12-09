@@ -215,6 +215,10 @@ struct state;
 bool
 ast_expr_decide(struct ast_expr *, struct state *);
 
+bool
+ast_expr_rangedecide(struct ast_expr *, struct ast_expr *lw,
+		struct ast_expr *up, struct state *);
+
 struct error *
 ast_expr_exec(struct ast_expr *, struct state *);
 

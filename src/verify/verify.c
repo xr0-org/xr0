@@ -165,10 +165,6 @@ stmt_expr_verify(struct ast_stmt *stmt, struct state *state)
 static bool
 iter_empty(struct ast_stmt *stmt, struct state *state);
 
-static bool
-expr_range_decide(struct ast_expr *expr, struct ast_expr *up,
-		struct ast_expr *lw, struct state *state);
-
 static struct error *
 stmt_iter_verify(struct ast_stmt *stmt, struct state *state)
 {
@@ -189,7 +185,7 @@ stmt_iter_verify(struct ast_stmt *stmt, struct state *state)
 	struct ast_expr *lw = ast_stmt_iter_lower_bound(stmt),
 			*up = ast_stmt_iter_upper_bound(stmt);
 
-	if (!expr_range_decide(assertion, lw, up, state)) {
+	if (!ast_expr_rangedecide(assertion, lw, up, state)) {
 		return error_create("could not verify");	
 	}
 	return NULL;
@@ -203,71 +199,6 @@ iter_empty(struct ast_stmt *stmt, struct state *state)
 	/* iter is empty if its cond is false after init (executed above) */
 	return !ast_expr_decide(ast_stmt_as_expr(ast_stmt_iter_cond(stmt)), state);
 }
-
-static bool
-unary_range_decide(struct ast_expr *expr, struct ast_expr *lw,
-		struct ast_expr *up, struct state *);
-
-static bool
-expr_iter_assertion_verify(struct ast_expr *expr, struct ast_expr *lw,
-		struct ast_expr *up, struct state *);
-
-static bool
-expr_range_decide(struct ast_expr *expr, struct ast_expr *lw,
-		struct ast_expr *up, struct state *state)
-{
-	switch (ast_expr_kind(expr)) {
-	case EXPR_UNARY:
-		/* recurses for `!@` cases */
-		return unary_range_decide(expr, lw, up, state);
-	case EXPR_ISDEALLOCAND:
-		return expr_iter_assertion_verify(expr, lw, up, state);
-	default:
-		assert(false);
-	}
-}
-
-static bool
-unary_range_decide(struct ast_expr *expr, struct ast_expr *lw,
-		struct ast_expr *up, struct state *state)
-{
-	struct ast_expr *operand = ast_expr_unary_operand(expr);
-	switch (ast_expr_unary_op(expr)) {
-	case UNARY_OP_BANG:
-		return !expr_range_decide(operand, lw, up, state);
-	default:
-		assert(false);
-	}
-}
-
-static bool
-expr_iter_assertion_verify(struct ast_expr *expr, struct ast_expr *lw,
-		struct ast_expr *up, struct state *state)
-{
-	struct ast_expr *acc = ast_expr_isdeallocand_assertand(expr); /* `*(arr+offset)` */
-
-	assert(ast_expr_unary_op(acc) == UNARY_OP_DEREFERENCE);
-
-	struct ast_expr *inner = ast_expr_unary_operand(acc); /* `arr+offset` */
-	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
-	struct ast_expr *j = ast_expr_identifier_create(dynamic_str("j"));
-
-	assert(
-		ast_expr_equal(ast_expr_binary_e2(inner), i) ||
-		ast_expr_equal(ast_expr_binary_e2(inner), j)
-	);
-
-	ast_expr_destroy(j);
-	ast_expr_destroy(i);
-
-	struct object *obj = lvalue_object(
-		ast_expr_lvalue(ast_expr_binary_e1(acc), state)
-	);
-	assert(obj);
-
-	return state_range_aredeallocands(state, obj, lw, up);
-}
-
 
 /* stmt_exec */
 

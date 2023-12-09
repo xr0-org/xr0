@@ -46,6 +46,73 @@ expr_unary_decide(struct ast_expr *expr, struct state *state)
 	}
 }
 
+static bool
+unary_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *);
+
+static bool
+expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *);
+
+bool
+ast_expr_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *state)
+{
+	switch (ast_expr_kind(expr)) {
+	case EXPR_UNARY:
+		/* recurses for `!@` cases */
+		return unary_rangedecide(expr, lw, up, state);
+	case EXPR_ISDEALLOCAND:
+		return expr_isdeallocand_rangedecide(expr, lw, up, state);
+	default:
+		assert(false);
+	}
+}
+
+static bool
+unary_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *state)
+{
+	struct ast_expr *operand = ast_expr_unary_operand(expr);
+	switch (ast_expr_unary_op(expr)) {
+	case UNARY_OP_BANG:
+		return !ast_expr_rangedecide(operand, lw, up, state);
+	default:
+		assert(false);
+	}
+}
+
+static bool
+expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
+		struct ast_expr *up, struct state *state)
+{
+	struct ast_expr *acc = ast_expr_isdeallocand_assertand(expr); /* `*(arr+offset)` */
+
+	assert(ast_expr_unary_op(acc) == UNARY_OP_DEREFERENCE);
+
+	struct ast_expr *inner = ast_expr_unary_operand(acc); /* `arr+offset` */
+	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
+	struct ast_expr *j = ast_expr_identifier_create(dynamic_str("j"));
+
+	assert(
+		ast_expr_equal(ast_expr_binary_e2(inner), i) ||
+		ast_expr_equal(ast_expr_binary_e2(inner), j)
+	);
+
+	ast_expr_destroy(j);
+	ast_expr_destroy(i);
+
+	struct object *obj = lvalue_object(
+		ast_expr_lvalue(ast_expr_binary_e1(acc), state)
+	);
+	assert(obj);
+
+	return state_range_aredeallocands(state, obj, lw, up);
+}
+
+
+
+
 struct error *
 ast_expr_exec(struct ast_expr *expr, struct state *state)
 {
