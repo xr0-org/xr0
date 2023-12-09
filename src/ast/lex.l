@@ -30,6 +30,8 @@ check_type();
 %%
 "#"			{ preproc(); }
 "/*"			{ comment(); }
+".alloc"		{ count(); return(ALLOC); }
+".dealloc"		{ count(); return(DEALLOC); }
 
 "auto"			{ count(); return(AUTO); }
 "axiom"			{ count(); return(AXIOM); }

@@ -1,6 +1,7 @@
 # commands
 CC = gcc -g -Wreturn-type -std=gnu11
 CFLAGS = -I include -Wall
+VALGRIND = valgrind --fullpath-after=`pwd`/src/
 
 LEX = lex
 YACC = bison -yvd
@@ -68,14 +69,14 @@ $(XR0V): $(MAIN_OBJ) $(BIN_DIR)
 	@$(CC) $(CFLAGS) -o $@ $(MAIN_OBJ) $(OBJECTS)
 
 matrix: $(XR0V)
-	valgrind $(XR0V) -I libx tests/3-program/matrix.x
+	$(VALGRIND) $(XR0V) -I libx tests/3-program/matrix.x
 
 matrix-leaks: $(XR0V)
-	valgrind --leak-check=full \
+	$(VALGRIND) --leak-check=full \
 		$(XR0V) -I libx tests/3-program/matrix.x
 
 matrix-verbose: $(XR0V) 
-	valgrind --num-callers=30 \
+	$(VALGRIND) --num-callers=30 \
 		$(XR0V) -I libx tests/3-program/matrix.x
 
 $(MAIN_OBJ): main.c $(OBJECTS)
@@ -161,10 +162,10 @@ test: $(RUNTEST) $(TESTFILES) $(XR0V)
 	@./tests/run
 
 check: $(RUNTEST) $(TESTFILES) $(XR0V)
-	valgrind $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
+	$(VALGRIND) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 check-verbose: $(RUNTEST) $(TESTFILES) $(XR0V)
-	valgrind --num-callers=30 \
+	$(VALGRIND) --num-callers=30 \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 clean:

@@ -46,6 +46,17 @@ expr_unary_decide(struct ast_expr *expr, struct state *state)
 	}
 }
 
+struct error *
+ast_expr_exec(struct ast_expr *expr, struct state *state)
+{
+	struct result *res = ast_expr_eval(expr, state);
+	if (result_iserror(res)) {
+		return result_as_error(res);
+	}
+	result_destroy(res);
+	return NULL;
+}
+
 struct lvalue *
 expr_identifier_lvalue(struct ast_expr *expr, struct state *state);
 
@@ -514,10 +525,6 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 	);
 }
 
-
-static struct result *
-mem_absexec(struct ast_expr *mem, struct state *state);
-
 static struct result *
 assign_absexec(struct ast_expr *expr, struct state *state);
 
@@ -525,74 +532,11 @@ struct result *
 ast_expr_absexec(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
-	case EXPR_IDENTIFIER:
-		assert(ast_expr_memory_isundefined(expr));
-		return result_error_create(error_create("undefined"));
-	case EXPR_MEMORY:
-		return mem_absexec(expr, state);
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
 	default:
 		assert(false);
 	}
-}
-
-static struct result *
-mem_process(struct ast_expr *red, struct state *state);
-
-static struct result *
-mem_absexec(struct ast_expr *mem, struct state *state)
-{
-	struct result *res = mem_process(mem, state);
-	if (result_iserror(res)) {
-		return res;
-	}
-	if (result_hasvalue(res)) {
-		struct object *obj = lvalue_object(
-			ast_expr_lvalue(ast_expr_memory_root(mem), state)
-		);
-		assert(obj);
-		object_assign(obj, value_copy(result_as_value(res)));
-	}
-	return res;
-}
-
-/* operates at location level. It either creates an object on the heap and returns
- * a location or gets the location pointed to by an lvalue and attempts to free
- * possibly returning an error
- * */
-static struct result *
-mem_process(struct ast_expr *mem, struct state *state)
-{
-	if (ast_expr_memory_isundefined(mem)) {
-		return result_error_create(error_create("undefined behaviour"));
-	}
-
-	struct ast_expr *root = ast_expr_memory_root(mem);
-
-	if (ast_expr_memory_isalloc(mem)) {
-		/* assert(strcmp(ast_expr_as_identifier(id), KEYWORD_RESULT) == 0); */
-
-		/* TODO: size needs to be passed in here when added to .alloc */
-		return result_value_create(state_alloc(state)); /* XXX */
-	}
-
-	assert(ast_expr_memory_isunalloc(mem));
-
-	/* root is pointing at the heap location we want to free, so we want its
-	 * value rather than location */
-	struct result *res = ast_expr_eval(root, state);
-	if (result_iserror(res)) {
-		return res;
-	}
-	struct value *val = result_as_value(res);
-	assert(val);
-	struct error *err = state_dealloc(state, val);
-	if (err) {
-		return result_error_create(err);
-	}
-	value_destroy(val);
-	return result_value_create(NULL);
 }
 
 static struct result *

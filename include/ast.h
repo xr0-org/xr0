@@ -61,9 +61,8 @@ enum ast_expr_kind {
 
 	EXPR_ASSIGNMENT		= 1 << 10,
 
-	EXPR_MEMORY		= 1 << 11,
-	EXPR_ASSERTION		= 1 << 12,
-	EXPR_ARBARG		= 1 << 13,
+	EXPR_ASSERTION		= 1 << 11,
+	EXPR_ARBARG		= 1 << 12,
 };
 
 enum ast_unary_operator {
@@ -91,13 +90,6 @@ enum ast_binary_operator {
 	BINARY_OP_ADDITION	= 1 << 9,
 	BINARY_OP_SUBTRACTION	= 1 << 10
 };
-
-enum effect_kind {
-	EFFECT_ALLOC		= 1 << 0,
-	EFFECT_DEALLOC		= 1 << 1,
-	EFFECT_UNDEFINED	= 1 << 2
-};
-
 
 struct ast_expr;
 
@@ -190,24 +182,6 @@ struct ast_expr *
 ast_expr_assignment_rval(struct ast_expr *expr);
 
 struct ast_expr *
-ast_expr_memory_create(enum effect_kind, struct ast_expr *expr);
-
-struct ast_expr *
-ast_expr_memory_root(struct ast_expr *expr);
-
-bool
-ast_expr_memory_isalloc(struct ast_expr *expr);
-
-bool
-ast_expr_memory_isunalloc(struct ast_expr *expr);
-
-bool
-ast_expr_memory_isundefined(struct ast_expr *expr);
-
-enum effect_kind
-ast_expr_memory_kind(struct ast_expr *expr);
-
-struct ast_expr *
 ast_expr_assertion_create(struct ast_expr *assertand);
 
 struct ast_expr *
@@ -240,6 +214,9 @@ struct state;
 
 bool
 ast_expr_decide(struct ast_expr *, struct state *);
+
+struct error *
+ast_expr_exec(struct ast_expr *, struct state *);
 
 struct lvalue *
 ast_expr_lvalue(struct ast_expr *, struct state *);
@@ -292,6 +269,7 @@ enum ast_stmt_kind {
 	STMT_ITERATION		= 1 << 6,
 	STMT_ITERATION_E	= 1 << 7,
 	STMT_JUMP		= 1 << 8,
+	STMT_ALLOCATION		= 1 << 9,
 };
 
 enum ast_jump_kind {
@@ -375,6 +353,18 @@ ast_stmt_create_jump(struct lexememarker *, enum ast_jump_kind, struct ast_expr 
 
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt);
+
+struct ast_stmt *
+ast_stmt_create_alloc(struct lexememarker *, struct ast_expr *arg);
+
+struct ast_stmt *
+ast_stmt_create_dealloc(struct lexememarker *, struct ast_expr *arg);
+
+struct ast_expr *
+ast_stmt_alloc_arg(struct ast_stmt *);
+
+bool
+ast_stmt_alloc_isalloc(struct ast_stmt *);
 
 void
 ast_stmt_destroy(struct ast_stmt *);

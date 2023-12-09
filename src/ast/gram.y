@@ -47,19 +47,6 @@ strip_quotes(char *s)
 	return t;
 }
 
-int
-effectfromid(char *id)
-{
-	if (strcmp(id, "alloc") == 0) {
-		return EFFECT_ALLOC;
-	} else if (strcmp(id, "dealloc") == 0) {
-		return EFFECT_DEALLOC;
-	} else if (strcmp(id, "undefined") == 0) {
-		return EFFECT_UNDEFINED;
-	}
-	assert(false);
-}
-
 struct stmt_array
 stmt_array_create(struct ast_stmt *v)
 {
@@ -129,6 +116,7 @@ variable_array_create(struct ast_variable *v)
 %token ARB_ARG
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR SOME GOTO CONTINUE BREAK RETURN
+%token ALLOC DEALLOC
 
 %start translation_unit
 
@@ -200,7 +188,7 @@ variable_array_create(struct ast_variable *v)
 %type <integer> pointer
 %type <statement> statement expression_statement selection_statement jump_statement 
 %type <statement> labelled_statement iteration_statement for_iteration_statement
-%type <statement> iteration_effect_statement
+%type <statement> iteration_effect_statement allocation_statement
 %type <stmt_array> statement_list
 %type <string> identifier direct_declarator
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
@@ -268,18 +256,9 @@ argument_expression_list
 
 memory_expression
 	: postfix_expression 
-	| '.' identifier {
-		$$ = ast_expr_memory_create(effectfromid($2), NULL);
-		free($2);
-	}
-	| '.' identifier memory_expression	{
-		$$ = ast_expr_memory_create(effectfromid($2), $3);
-		free($2);
-	}
 	| ASSERT memory_expression {
 		$$ = ast_expr_assertion_create($2);
 	}
-
 	;
 
 unary_expression
@@ -706,6 +685,7 @@ statement
 		{ $$ = ast_stmt_create_iter_e($1); }
 	| compound_verification_statement
 		{ $$ = ast_stmt_create_compound_v(lexloc(), $1); }
+	| allocation_statement
 	;
 
 labelled_statement
@@ -744,6 +724,11 @@ iteration_effect_statement
 compound_verification_statement
 	: '[' ']'	{ $$ = ast_block_create(NULL, 0, NULL, 0); }
 	| '[' block ']'	{ $$ = $2; }
+	;
+
+allocation_statement
+	: ALLOC postfix_expression	{ $$ = ast_stmt_create_alloc(lexloc(), $2); }
+	| DEALLOC postfix_expression	{ $$ = ast_stmt_create_dealloc(lexloc(), $2); }
 	;
 
 declaration_list

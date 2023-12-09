@@ -25,9 +25,6 @@ struct ast_expr {
 			struct ast_expr *e1, *e2;
 		} binary;
 		struct ast_expr *assignment_value;
-		struct {
-			enum effect_kind kind;
-		} memory;
 	} u;
 };
 
@@ -483,94 +480,6 @@ ast_expr_assignment_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
-ast_expr_memory_create(enum effect_kind kind, struct ast_expr *expr)
-{
-	struct ast_expr *new = ast_expr_create();
-	new->kind = EXPR_MEMORY;
-	new->root = expr;
-	new->u.memory.kind = kind;
-	return new;
-}
-
-struct ast_expr *
-ast_expr_memory_root(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_MEMORY);
-	return expr->root;
-}
-
-bool
-ast_expr_memory_isalloc(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_MEMORY);
-	return expr->u.memory.kind == EFFECT_ALLOC;
-}
-
-bool
-ast_expr_memory_isunalloc(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_MEMORY);
-	return expr->u.memory.kind == EFFECT_DEALLOC;
-}
-
-bool
-ast_expr_memory_isundefined(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_MEMORY);
-	return expr->u.memory.kind == EFFECT_UNDEFINED;
-}
-
-enum effect_kind
-ast_expr_memory_kind(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_MEMORY);
-	return expr->u.memory.kind;
-}
-
-struct effect_mapping {
-	enum effect_kind kind;
-	const char* string;
-};
-
-struct effect_mapping effect_string_map[] = {
-	{EFFECT_ALLOC, "alloc"},
-	{EFFECT_DEALLOC, "dealloc"},
-	{EFFECT_UNDEFINED, "undefined"}
-};
-
-const char*
-get_effect_string(enum effect_kind kind)
-{
-	int len = sizeof(effect_string_map) / sizeof(effect_string_map[0]);
-	for (int i = 0; i < len; i++) {
-		if (effect_string_map[i].kind == kind) {
-			return effect_string_map[i].string;
-		}
-	} 
-	return "unknown";
-}
-
-static void
-ast_expr_memory_str_build(struct ast_expr *expr, struct strbuilder *b)
-{
-	assert(ast_expr_kind(expr) == EXPR_MEMORY);
-
-	if (ast_expr_memory_kind(expr) == EFFECT_UNDEFINED) {
-		strbuilder_printf(b, "undefined");
-		return;
-	}
-
-	char *root = ast_expr_str(expr->root);
-
-	strbuilder_printf(
-		b, "%s %s",
-		get_effect_string(ast_expr_memory_kind(expr)),
-		root
-	);
-	free(root);
-}
-
-struct ast_expr *
 ast_expr_assertion_create(struct ast_expr *assertand)
 {
 	struct ast_expr *new = ast_expr_create();
@@ -635,9 +544,6 @@ ast_expr_destroy(struct ast_expr *expr)
 		break;
 	case EXPR_CONSTANT:
 		break;
-	case EXPR_MEMORY:
-		expr->root ? ast_expr_destroy(expr->root) : 0;
-		break;
 	case EXPR_ASSERTION:
 		ast_expr_destroy(expr->root);
 		break;
@@ -683,9 +589,6 @@ ast_expr_str(struct ast_expr *expr)
 		break;
 	case EXPR_ASSIGNMENT:
 		ast_expr_assignment_str_build(expr, b);
-		break;
-	case EXPR_MEMORY:
-		ast_expr_memory_str_build(expr, b);
 		break;
 	case EXPR_ASSERTION:
 		ast_expr_assertion_str_build(expr, b);
@@ -739,11 +642,6 @@ ast_expr_copy(struct ast_expr *expr)
 		return ast_expr_assignment_create(
 			ast_expr_copy(expr->root),
 			ast_expr_copy(expr->u.assignment_value)
-		);
-	case EXPR_MEMORY:
-		return ast_expr_memory_create(
-			expr->u.memory.kind,
-			expr->root ? ast_expr_copy(expr->root) : NULL
 		);
 	case EXPR_ASSERTION:
 		return ast_expr_assertion_create(

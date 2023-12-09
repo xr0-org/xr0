@@ -273,9 +273,6 @@ static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
-expr_exec(struct ast_expr *exec, struct state *state);
-
-static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
@@ -292,7 +289,7 @@ stmt_exec(struct ast_stmt *stmt, struct state *state)
 	case STMT_COMPOUND_V:
 		return NULL;
 	case STMT_EXPR:
-		return expr_exec(ast_stmt_as_expr(stmt), state);
+		return ast_expr_exec(ast_stmt_as_expr(stmt), state);
 	case STMT_ITERATION:
 		return stmt_iter_exec(stmt, state);
 	case STMT_JUMP:
@@ -321,17 +318,6 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 }
 
 /* stmt_expr_eval */
-
-static struct error *
-expr_exec(struct ast_expr *expr, struct state *state)
-{
-	struct result *res = ast_expr_eval(expr, state);
-	if (result_iserror(res)) {
-		return result_as_error(res);
-	}
-	result_destroy(res);
-	return NULL;
-}
 
 static struct ast_stmt *
 iter_neteffect(struct ast_stmt *);
@@ -426,7 +412,7 @@ stmt_expr_itereval(struct ast_stmt *stmt, struct ast_stmt *iter,
 		struct state *state)
 {
 	struct ast_expr *expr = ast_stmt_as_expr(stmt);
-	assert(ast_expr_kind(expr) == EXPR_MEMORY || ast_expr_memory_isundefined(expr));
+	assert(ast_stmt_kind(stmt) == STMT_ALLOCATION);
 	return expr;
 }
 

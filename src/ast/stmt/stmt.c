@@ -30,6 +30,10 @@ struct ast_stmt {
 			enum ast_jump_kind kind;
 			struct ast_expr *rv;
 		} jump;
+		struct {
+			bool isalloc;
+			struct ast_expr *arg;
+		} alloc;
 	} u;
 
 	struct lexememarker *loc;
@@ -172,6 +176,65 @@ ast_stmt_destroy_jump(struct ast_stmt *stmt)
 	assert(stmt->u.jump.kind == JUMP_RETURN);
 	ast_expr_destroy(rv);
 }
+
+struct ast_stmt *
+ast_stmt_create_alloc(struct lexememarker *loc, struct ast_expr *arg)
+{
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_ALLOCATION;
+	stmt->u.alloc.isalloc = true;
+	stmt->u.alloc.arg = arg;
+	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_create_dealloc(struct lexememarker *loc, struct ast_expr *arg)
+{
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_ALLOCATION;
+	stmt->u.alloc.isalloc = false;
+	stmt->u.alloc.arg = arg;
+	return stmt;
+}
+
+static void
+ast_stmt_destroy_alloc(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_ALLOCATION);
+
+	ast_expr_destroy(stmt->u.alloc.arg);
+}
+
+static void
+ast_stmt_alloc_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+{
+	assert(stmt->kind == STMT_ALLOCATION);
+
+	char *arg = ast_expr_str(stmt->u.alloc.arg);
+	strbuilder_printf(
+		b, ".%s %s",
+		stmt->u.alloc.isalloc ? "alloc" : "dealloc",
+		arg
+	);
+	free(arg);
+}
+
+struct ast_expr *
+ast_stmt_alloc_arg(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_ALLOCATION);
+
+	return stmt->u.alloc.arg;
+}
+
+bool
+ast_stmt_alloc_isalloc(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_ALLOCATION);
+
+	return stmt->u.alloc.isalloc;
+}
+
 
 struct ast_stmt *
 ast_stmt_create_sel(struct lexememarker *loc, bool isswitch, struct ast_expr *cond,
@@ -417,6 +480,9 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 	case STMT_JUMP:
 		ast_stmt_destroy_jump(stmt);
 		break;
+	case STMT_ALLOCATION:
+		ast_stmt_destroy_alloc(stmt);
+		break;
 	default:
 		assert(false);
 		break;
@@ -478,6 +544,10 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			loc, stmt->u.jump.kind,
 			ast_expr_copy_ifnotnull(stmt->u.jump.rv)
 		);
+	case STMT_ALLOCATION:
+		return ast_stmt_create_alloc(
+			loc, ast_expr_copy(stmt->u.alloc.arg)
+		);
 	default:
 		assert(false);
 	}
@@ -514,6 +584,9 @@ ast_stmt_str(struct ast_stmt *stmt)
 		break;
 	case STMT_JUMP:
 		ast_stmt_jump_sprint(stmt, b);
+		break;
+	case STMT_ALLOCATION:
+		ast_stmt_alloc_sprint(stmt, b);
 		break;
 	default:
 		assert(false);
