@@ -7,9 +7,9 @@
 #include "math.h"
 #include "util.h"
 
-#include "expr.c"
+#include "expr/expr.c"
 #include "block.c"
-#include "stmt.c"
+#include "stmt/stmt.c"
 #include "type.c"
 #include "variable.c"
 #include "function.c"
@@ -40,3 +40,102 @@ ast_append(struct ast *node, struct ast_externdecl *decl)
 	node->decl[node->n-1] = decl;
 	return node;
 }
+
+struct result {
+	struct value *val;
+	struct error *err;
+};
+
+struct result *
+result_error_create(struct error *err)
+{
+	assert(err);
+
+	struct result *r = malloc(sizeof(struct result));
+	r->val = NULL;
+	r->err = err;
+	return r;
+}
+
+struct result *
+result_value_create(struct value *val)
+{
+	struct result *r = malloc(sizeof(struct result));
+	r->val = val;
+	r->err = NULL;
+	return r;
+}
+
+void
+result_destroy(struct result *res)
+{
+	assert(!res->err);
+	if (res->val) {
+		value_destroy(res->val);
+	}
+	free(res);
+}
+
+bool
+result_iserror(struct result *res)
+{
+	return res->err;
+}
+
+struct error *
+result_as_error(struct result *res)
+{
+	assert(res->err);
+	return res->err;
+}
+
+struct value *
+result_as_value(struct result *res)
+{
+	assert(!res->err && res->val);
+	return res->val;
+}
+
+bool
+result_hasvalue(struct result *res)
+{
+	assert(!result_iserror(res));
+	return res->val; /* implicit cast */
+}
+
+
+struct lvalue {
+	struct ast_type *t;
+	struct object *obj;
+};
+
+struct lvalue *
+lvalue_create(struct ast_type *t, struct object *obj)
+{
+	struct lvalue *l = malloc(sizeof(struct lvalue));
+	l->t = t;
+	l->obj = obj;
+	return l;
+}
+
+void
+lvalue_destroy(struct lvalue *l)
+{
+	ast_type_destroy(l->t);
+	object_destroy(l->obj);
+	free(l);
+}
+
+struct ast_type *
+lvalue_type(struct lvalue *l)
+{
+	return l->t;
+}
+
+struct object *
+lvalue_object(struct lvalue *l)
+{
+	return l->obj;
+}
+
+

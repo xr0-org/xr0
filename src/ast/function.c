@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "object.h"
+#include "state.h"
 #include "util.h"
 
 struct ast_function {
@@ -141,5 +143,37 @@ struct ast_variable **
 ast_function_params(struct ast_function *f)
 {
 	return f->param;
+}
+
+struct error *
+path_verify(struct ast_function *f, struct state *state, struct externals *);
+
+struct error *
+ast_function_verify(struct ast_function *f, struct externals *ext)
+{
+	struct state *state = state_create(
+		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
+	);
+	struct error *err = path_verify(f, state, ext);
+	state_destroy(state);
+	return err;
+}
+
+struct result *
+ast_function_absexec(struct ast_function *f, struct state *state)
+{
+	int nstmts = ast_block_nstmts(f->abstract);
+	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
+	for (int i = 0; i < nstmts; i++) {
+		struct result *res = ast_stmt_absexec(stmt[i], state);
+		if (result_iserror(res)) {
+			return res;
+		}
+		result_destroy(res);
+	}
+	/* wrap result and return */ 
+	struct object *obj = state_getresult(state);
+	assert(obj);
+	return result_value_create(object_as_value(obj));
 }
 

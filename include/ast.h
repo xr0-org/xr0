@@ -2,6 +2,48 @@
 #define XR0_AST_H
 #include <stdbool.h>
 
+struct value;
+struct error;
+
+struct result;
+
+struct result *
+result_error_create(struct error *err);
+
+struct result *
+result_value_create(struct value *val);
+
+void
+result_destroy(struct result *);
+
+bool
+result_iserror(struct result *);
+
+struct error *
+result_as_error(struct result *);
+
+struct value *
+result_as_value(struct result *);
+
+bool
+result_hasvalue(struct result *);
+
+struct object;
+struct ast_type;
+
+struct lvalue *
+lvalue_create(struct ast_type *, struct object *);
+
+void
+lvalue_destroy(struct lvalue *);
+
+struct ast_type *
+lvalue_type(struct lvalue *);
+
+struct object *
+lvalue_object(struct lvalue *);
+
+
 enum ast_expr_kind {
 	EXPR_IDENTIFIER		= 1 << 0,
 	EXPR_CONSTANT		= 1 << 1,
@@ -192,7 +234,21 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2);
 struct math_state;
 
 bool
-ast_expr_eval(struct ast_expr *e);
+ast_expr_matheval(struct ast_expr *e);
+
+struct state;
+
+bool
+ast_expr_decide(struct ast_expr *, struct state *);
+
+struct lvalue *
+ast_expr_lvalue(struct ast_expr *, struct state *);
+
+struct result *
+ast_expr_eval(struct ast_expr *, struct state *);
+
+struct result *
+ast_expr_absexec(struct ast_expr *, struct state *);
 
 struct ast_stmt;
 
@@ -344,6 +400,10 @@ ast_stmt_as_v_block(struct ast_stmt *);
 
 struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
+
+struct result *
+ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
+
 
 enum ast_type_modifier {
 	/* storage class */
@@ -516,6 +576,15 @@ ast_function_nparams(struct ast_function *f);
 struct ast_variable **
 ast_function_params(struct ast_function *f);
 
+struct externals;
+struct error;
+
+struct error *
+ast_function_verify(struct ast_function *, struct externals *);
+
+struct result *
+ast_function_absexec(struct ast_function *, struct state *state);
+
 enum ast_externdecl_kind {
 	EXTERN_FUNCTION = 1 << 0,
 	EXTERN_VARIABLE	= 1 << 1,
@@ -538,8 +607,6 @@ ast_typedecl_create(struct ast_type *);
 
 enum ast_externdecl_kind
 ast_externdecl_kind(struct ast_externdecl *);
-
-struct externals;
 
 void
 ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext);

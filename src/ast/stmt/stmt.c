@@ -35,7 +35,6 @@ struct ast_stmt {
 	struct lexememarker *loc;
 };
 
-
 static struct ast_stmt *
 ast_stmt_create(struct lexememarker *loc)
 {
@@ -559,4 +558,4 @@ ast_stmt_as_expr(struct ast_stmt *stmt)
 	return stmt->u.expr;
 }
 
-
+#include "verify.c"

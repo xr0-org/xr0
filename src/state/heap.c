@@ -236,5 +236,5 @@ vconst_str(struct vconst *v, char *indent)
 bool
 vconst_eval(struct vconst *v, struct ast_expr *e)
 {
-	return ast_expr_eval(e);
+	return ast_expr_matheval(e);
 }

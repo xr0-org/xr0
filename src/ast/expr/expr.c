@@ -792,7 +792,7 @@ static bool
 eval_prop(struct math_expr *e1, enum ast_binary_operator, struct math_expr *e2);
 
 bool
-ast_expr_eval(struct ast_expr *e)
+ast_expr_matheval(struct ast_expr *e)
 {
 	assert(e->kind == EXPR_BINARY);
 
@@ -872,3 +872,5 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 		assert(false);
 	}
 }
+
+#include "verify.c"
