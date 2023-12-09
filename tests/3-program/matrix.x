@@ -59,8 +59,10 @@ struct matrix *
 matrix_add(struct matrix *m1, struct matrix *m2) [
 	int i;
 
-	pre: m1 = matrix_create($, $);
-	pre: m2 = matrix_create($, $);
+	pre: {
+		m1 = matrix_create($, $);
+		m2 = matrix_create($, $);
+	}
 
 	.alloc result;
 	.alloc result->data;

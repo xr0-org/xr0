@@ -14,7 +14,6 @@
 
 struct block {
 	struct object_arr *arr;
-	bool freed;
 };
 
 struct block *
@@ -22,7 +21,6 @@ block_create()
 {
 	struct block *b = malloc(sizeof(struct block));
 	b->arr = object_arr_create();
-	b->freed = false;
 	return b;
 }
 
@@ -38,7 +36,6 @@ block_copy(struct block *old)
 {
 	struct block *new = malloc(sizeof(struct block));
 	new->arr = object_arr_copy(old->arr);
-	new->freed = old->freed;
 	return new;
 }
 
@@ -54,18 +51,6 @@ block_str(struct block *block)
 		free(s);
 	}
 	return strbuilder_build(b);
-}
-
-bool
-block_isfreed(struct block *b)
-{
-	return b->freed;
-}
-
-void
-block_free(struct block *b)
-{
-	b->freed = true;
 }
 
 void
