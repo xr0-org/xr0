@@ -5,6 +5,8 @@ struct range;
 struct value;
 struct object;
 
+struct ast_expr;
+
 struct object *
 object_value_create(struct ast_expr *offset, struct value *);
 

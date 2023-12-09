@@ -84,7 +84,7 @@ value_references(struct value *, struct location *, struct state *);
 enum ast_binary_operator;
 
 bool
-value_compare(struct value *v1, enum ast_binary_operator, struct value *v2);
+value_equal(struct value *v1, struct value *v2);
 
 enum number_value_type {
 	NUMBER_VALUE_CONSTANT,

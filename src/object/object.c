@@ -208,9 +208,8 @@ object_lower(struct object *obj)
 struct ast_expr *
 object_upper(struct object *obj)
 {
-	return ast_expr_binary_create(
+	return ast_expr_sum_create(
 		ast_expr_copy(obj->offset),
-		BINARY_OP_ADDITION,
 		object_size(obj)
 	);
 }
@@ -222,11 +221,11 @@ object_contains(struct object *obj, struct ast_expr *offset, struct state *s)
 			*up = object_upper(obj),
 			*of = offset;
 
-	struct ast_expr *e1 = ast_expr_binary_create(
-		ast_expr_copy(lw), BINARY_OP_LE, ast_expr_copy(of)
+	struct ast_expr *e1 = ast_expr_le_create(
+		ast_expr_copy(lw), ast_expr_copy(of)
 	);
-	struct ast_expr *e2 = ast_expr_binary_create(
-		ast_expr_copy(of), BINARY_OP_LT, ast_expr_copy(up)
+	struct ast_expr *e2 = ast_expr_lt_create(
+		ast_expr_copy(of), ast_expr_copy(up)
 	);
 	ast_expr_destroy(up);
 	
@@ -253,12 +252,12 @@ object_contains_upperincl(struct object *obj, struct ast_expr *offset,
 
 	return
 		/* lw ≤ of */
-		state_eval(s, ast_expr_binary_create(lw, BINARY_OP_LE, of))
+		state_eval(s, ast_expr_le_create(lw, of))
 
 		&&
 
 		/* of ≤ up */
-		state_eval(s, ast_expr_binary_create(of, BINARY_OP_LE, up));
+		state_eval(s, ast_expr_le_create(of, up));
 }
 
 bool
@@ -267,7 +266,7 @@ object_isempty(struct object *obj, struct state *s)
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
 
-	return state_eval(s, ast_expr_binary_create(lw, BINARY_OP_EQ, up));
+	return state_eval(s, ast_expr_eq_create(lw, up));
 }
 
 bool
@@ -276,7 +275,7 @@ object_contig_precedes(struct object *before, struct object *after,
 {
 	struct ast_expr *lw = object_upper(before),
 			*up = after->offset;
-	return state_eval(s, ast_expr_binary_create(lw, BINARY_OP_EQ, up));
+	return state_eval(s, ast_expr_eq_create(lw, up));
 }
 
 bool
@@ -285,12 +284,12 @@ object_issingular(struct object *obj, struct state *s)
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
 
-	struct ast_expr *lw_succ = ast_expr_binary_create(
-		lw, BINARY_OP_ADDITION, ast_expr_constant_create(1)
+	struct ast_expr *lw_succ = ast_expr_sum_create(
+		lw, ast_expr_constant_create(1)
 	);
 
 	/* lw + 1 == up */
-	return state_eval(s, ast_expr_binary_create(lw_succ, BINARY_OP_EQ, up));
+	return state_eval(s, ast_expr_eq_create(lw_succ, up));
 }
 
 struct object *
@@ -299,14 +298,14 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
 
-	struct ast_expr *prop0 = ast_expr_binary_create(
-		ast_expr_copy(lw), BINARY_OP_LE, ast_expr_copy(excl_up)
+	struct ast_expr *prop0 = ast_expr_le_create(
+		ast_expr_copy(lw), ast_expr_copy(excl_up)
 	);
-	struct ast_expr *prop1 = ast_expr_binary_create(
-		ast_expr_copy(lw), BINARY_OP_EQ, ast_expr_copy(excl_up)
+	struct ast_expr *prop1 = ast_expr_eq_create(
+		ast_expr_copy(lw), ast_expr_copy(excl_up)
 	);
-	struct ast_expr *prop2 = ast_expr_binary_create(
-		ast_expr_copy(up), BINARY_OP_EQ, ast_expr_copy(excl_up)
+	struct ast_expr *prop2 = ast_expr_eq_create(
+		ast_expr_copy(up), ast_expr_copy(excl_up)
 	);
 
 	bool e0 = state_eval(s, prop0),
@@ -333,7 +332,7 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 	return object_range_create(
 		ast_expr_copy(obj->offset),
 		range_create(
-			ast_expr_binary_create(excl_up, BINARY_OP_SUBTRACTION, lw),
+			ast_expr_difference_create(excl_up, lw),
 			value_as_ptr(state_alloc(s))
 		)
 	);
@@ -345,11 +344,11 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
 
-	struct ast_expr *prop0 = ast_expr_binary_create(
-		ast_expr_copy(incl_lw), BINARY_OP_GE, ast_expr_copy(up)
+	struct ast_expr *prop0 = ast_expr_ge_create(
+		ast_expr_copy(incl_lw), ast_expr_copy(up)
 	);
-	struct ast_expr *prop1 = ast_expr_binary_create(
-		ast_expr_copy(incl_lw), BINARY_OP_EQ, ast_expr_copy(lw)
+	struct ast_expr *prop1 = ast_expr_eq_create(
+		ast_expr_copy(incl_lw), ast_expr_copy(lw)
 	);
 
 	bool e0 = state_eval(s, prop0),
@@ -374,9 +373,8 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 	return object_range_create(
 		ast_expr_copy(incl_lw),
 		range_create(
-			ast_expr_binary_create(
+			ast_expr_difference_create(
 				up,
-				BINARY_OP_SUBTRACTION,
 				ast_expr_copy(incl_lw)
 			),
 			value_as_ptr(state_alloc(s))
