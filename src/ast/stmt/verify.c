@@ -373,17 +373,13 @@ alloc_absexec(struct ast_stmt *alloc, struct state *state)
 static struct result *
 alloc_process(struct ast_stmt *alloc, struct state *state)
 {
-	struct ast_expr *arg = ast_stmt_alloc_arg(alloc);
-
 	if (ast_stmt_alloc_isalloc(alloc)) {
-		/* assert(strcmp(ast_expr_as_identifier(id), KEYWORD_RESULT) == 0); */
-
 		/* TODO: size needs to be passed in here when added to .alloc */
-		return result_value_create(state_alloc(state)); /* XXX */
+		return result_value_create(state_alloc(state));
 	}
 
-	assert(!ast_stmt_alloc_isalloc(alloc));
-
+	/* dealloc */
+	struct ast_expr *arg = ast_stmt_alloc_arg(alloc);
 	/* arg is pointing at the heap location we want to free, so we want its
 	 * value rather than location */
 	struct result *res = ast_expr_eval(arg, state);
