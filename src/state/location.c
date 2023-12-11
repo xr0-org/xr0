@@ -5,10 +5,11 @@
 #include "ast.h"
 #include "block.h"
 #include "heap.h"
-#include "state.h"
+#include "intern.h"
 #include "location.h"
 #include "object.h"
 #include "stack.h"
+#include "state.h"
 #include "util.h"
 #include "value.h"
 

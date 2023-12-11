@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "block.h"
 #include "heap.h"
+#include "intern.h"
 #include "location.h"
 #include "math.h"
 #include "object.h"
