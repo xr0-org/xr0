@@ -91,22 +91,9 @@ bool
 state_equal(struct state *s1, struct state *s2);
 
 
-/* INTERNALLY USED */
+/* USED BY VALUE */
 
 struct location;
-struct object;
-
-struct object *
-state_get(struct state *state, struct location *loc, bool constructive);
-
-struct block *
-state_getblock(struct state *state, struct location *loc);
-
-bool
-state_references(struct state *s, struct location *loc);
-
-
-/* USED BY VALUE */
 
 struct location *
 location_copy(struct location *);
