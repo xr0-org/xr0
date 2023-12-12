@@ -14,6 +14,7 @@
 #include "variable.c"
 #include "function.c"
 #include "externdecl.c"
+#include "literals.c"
 
 struct ast *
 ast_create(struct ast_externdecl *decl)
