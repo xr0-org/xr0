@@ -286,14 +286,6 @@ count()
 	}
 }
 
-static long *
-heaptk_create(long tk)
-{
-	long *heaptk = malloc(sizeof(long));
-	*heaptk = tk;
-	return heaptk;
-}
-
 static void
 heaptk_destroy(long *tk)
 {
@@ -303,7 +295,7 @@ heaptk_destroy(long *tk)
 void
 install_refresh(long tk)
 {
-	map_set(table, dynamic_str(yytext), (void *) heaptk_create(tk));
+	long_map_set(table, dynamic_str(yytext), tk);
 	installclass = IC_NONE;
 }
 
@@ -311,9 +303,9 @@ long
 check_type()
 {
 	/* NB: must check table before installing */
-	long *heaptk = map_get(table, yytext); 
+	long heaptk = long_map_get(table, yytext); 
 	if (heaptk) {
-		return *heaptk;
+		return heaptk;
 	}
 	switch (installclass) {
 	case IC_TYPE:
@@ -325,13 +317,13 @@ check_type()
 	return IDENTIFIER;
 }
 
-struct map *table;
+struct long_map *table;
 enum ictype installclass;
 
 void
 lex_begin()
 {
-	table = map_create();
+	table = long_map_create();
 	installclass = IC_NONE;
 }
 
@@ -341,10 +333,7 @@ lex_finish()
 	if (marker.filename) {
 		free(marker.filename);
 	}
-	for (int i = 0; i < table->n; i++) {
-		heaptk_destroy((long *) table->entry[i].value);
-	}
-	map_destroy(table);
+	long_map_destroy(table);
 }
 
 struct lexememarker *

@@ -7,6 +7,6 @@
 #define TYPE long
 #define TYPED(THING) long_ ## THING
 
-#include "generic-map.h"
+#include "generic_map.h"
 
 #endif

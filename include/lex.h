@@ -1,6 +1,8 @@
 #ifndef XR0_LEX_H
 #define XR0_LEX_H
 
+#include "long_map.h"
+
 struct lexememarker {
 	int linenum, column;
 	char *filename;
@@ -23,7 +25,7 @@ lexememarker_destroy(struct lexememarker *);
 
 extern int verbose;
 extern struct ast *root;
-extern struct map *table;
+extern struct long_map *table;
 
 enum ictype {
 	IC_NONE = 1 << 0,

@@ -2,7 +2,7 @@
 #include "stdlib.h"
 #include "assert.h"
 #include "string.h"
-#include "generic-map.h"
+#include "generic_map.h"
 
 TYPED(map_entry)
 TYPED(entry_create) (char *key, const void *val)

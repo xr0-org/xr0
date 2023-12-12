@@ -4,7 +4,7 @@
 #include <assert.h>
 #include "math.h"
 #include "util.h"
-#include "long-map.h"
+#include "long_map.h"
 
 bool
 math_eq(struct math_expr *e1, struct math_expr *e2)
