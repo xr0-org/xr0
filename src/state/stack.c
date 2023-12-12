@@ -17,7 +17,7 @@ struct stack {
 	struct block_arr *frame;
 
 	/* lvalues of blocks in frame */
-	struct map *varmap;
+	struct variable_map *varmap;
 	struct variable *result;
 
 	struct stack *prev;
@@ -41,7 +41,7 @@ stack_create(char *name, struct stack *prev, struct ast_type *result_type)
 	stack->name = name;
 	stack->frame = block_arr_create();
 
-	stack->varmap = map_create();
+	stack->varmap = variable_map_create();
 
 	stack->result = variable_create(result_type, stack, false);
 
@@ -55,11 +55,11 @@ stack_destroy(struct stack *stack)
 {
 	block_arr_destroy(stack->frame);
 
-	struct map *m = stack->varmap;
+	struct variable_map *m = stack->varmap;
 	for (int i = 0; i < m->n; i++) {
-		variable_destroy((struct variable *) m->entry[i].value);
+		variable_destroy(m->entry[i].value);
 	}
-	map_destroy(m);
+	variable_map_destroy(m);
 
 	variable_destroy(stack->result);
 
@@ -72,8 +72,8 @@ stack_prev(struct stack *s)
 	return s->prev;
 }
 
-static struct map *
-varmap_copy(struct map *);
+static struct variable_map *
+varmap_copy(struct variable_map *);
 
 struct stack *
 stack_copy(struct stack *stack)
@@ -89,16 +89,16 @@ stack_copy(struct stack *stack)
 	return copy;
 }
 
-static struct map *
-varmap_copy(struct map *m)
+static struct variable_map *
+varmap_copy(struct variable_map *m)
 {
-	struct map *m_copy = map_create();
+	struct variable_map *m_copy = variable_map_create();
 	for (int i = 0; i < m->n; i++) {
-		struct entry e = m->entry[i];
-		map_set(
+		struct variable_map_entry e = m->entry[i];
+		variable_map_set(
 			m_copy,
 			dynamic_str(e.key),
-			variable_copy((struct variable *) e.value)
+			variable_copy(e.value)
 		);
 	}
 	return m_copy;
@@ -108,9 +108,9 @@ char *
 stack_str(struct stack *stack, struct state *state)
 {
 	struct strbuilder *b = strbuilder_create();
-	struct map *m = stack->varmap;
+	struct variable_map *m = stack->varmap;
 	for (int i = 0; i < m->n; i++) {
-		struct entry e = m->entry[i];
+		struct variable_map_entry e = m->entry[i];
 		char *var = variable_str((struct variable *) e.value, stack, state);
 		strbuilder_printf(b, "\t%s: %s", e.key, var);
 		free(var);
@@ -137,8 +137,8 @@ void
 stack_declare(struct stack *stack, struct ast_variable *var, bool isparam)
 {
 	char *id = ast_variable_name(var);
-	assert(!map_get(stack->varmap, id));
-	map_set(
+	assert(!variable_map_get(stack->varmap, id));
+	variable_map_set(
 		stack->varmap,
 		dynamic_str(id),
 		variable_create(ast_variable_type(var), stack, isparam)
@@ -148,18 +148,18 @@ stack_declare(struct stack *stack, struct ast_variable *var, bool isparam)
 void
 stack_undeclare(struct stack *stack)
 {
-	struct map *m = stack->varmap;
-	stack->varmap = map_create();
+	struct variable_map *m = stack->varmap;
+	stack->varmap = variable_map_create();
 	for (int i = 0; i < m->n; i++) {
-		struct entry e = m->entry[i];
+		struct variable_map_entry e = m->entry[i];
 		struct variable *v = (struct variable *) e.value;
 		if (variable_isparam(v)) {
-			map_set(stack->varmap, dynamic_str(e.key), v);
+			variable_map_set(stack->varmap, dynamic_str(e.key), v);
 		} else {
 			variable_destroy(v);
 		}
 	}
-	map_destroy(m);
+	variable_map_destroy(m);
 }
 
 struct variable *
@@ -168,7 +168,7 @@ stack_getresult(struct stack *s)
 	return s->result;
 }
 
-struct map *
+struct variable_map *
 stack_getvarmap(struct stack *s)
 {
 	return s->varmap;
@@ -179,7 +179,7 @@ stack_getvariable(struct stack *s, char *id)
 {
 	assert(strcmp(id, KEYWORD_RESULT) != 0);
 
-	return map_get(s->varmap, id);
+	return variable_map_get(s->varmap, id);
 }
 
 bool
@@ -191,7 +191,7 @@ stack_references(struct stack *s, struct location *loc, struct state *state)
 		return true;
 	}
 
-	struct map *m = s->varmap;
+	struct variable_map *m = s->varmap;
 	for (int i = 0; i < m->n; i++) {
 		struct variable *var = (struct variable *) m->entry[i].value;
 		if (variable_isparam(var) && variable_references(var, loc, state)) {

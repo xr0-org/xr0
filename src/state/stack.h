@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "block.h"
+#include "variable_map.h"
 
 struct stack;
 
@@ -33,7 +34,7 @@ stack_undeclare(struct stack *stack);
 struct variable *
 stack_getresult(struct stack *);
 
-struct map *
+struct variable_map *
 stack_getvarmap(struct stack *);
 
 struct variable *

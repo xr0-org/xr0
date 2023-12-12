@@ -10,8 +10,9 @@
 #include "object.h"
 #include "stack.h"
 #include "state.h"
-#include "util.h"
 #include "value.h"
+#include "util.h"
+#include "value_map.h"
 
 struct heap {
 	struct block_arr *blocks;
@@ -160,25 +161,25 @@ block_referenced(struct state *s, int addr)
 /* TODO: extract to own file */
 
 struct vconst {
-	struct map *varmap;
+	struct value_map *varmap;
 };
 
 struct vconst *
 vconst_create()
 {
 	struct vconst *v = malloc(sizeof(struct vconst));
-	v->varmap = map_create();
+	v->varmap = value_map_create();
 	return v;
 }
 
 void
 vconst_destroy(struct vconst *v)
 {
-	struct map *m = v->varmap;
+	struct value_map *m = v->varmap;
 	for (int i = 0; i < m->n; i++) {
-		value_destroy((struct value *) m->entry[i].value);
+		value_destroy(m->entry[i].value);
 	}
-	map_destroy(m);
+	value_map_destroy(m);
 	free(v);
 }
 
@@ -186,14 +187,14 @@ struct vconst *
 vconst_copy(struct vconst *old)
 {
 	struct vconst *new = malloc(sizeof(struct vconst));
-	new->varmap = map_create();
-	struct map *m = old->varmap;
+	new->varmap = value_map_create();
+	struct value_map *m = old->varmap;
 	for (int i = 0; i < m->n; i++) {
-		struct entry e = m->entry[i];
-		map_set(
+		struct value_map_entry e = m->entry[i];
+		value_map_set(
 			new->varmap,
 			dynamic_str(e.key),
-			value_copy((struct value *) e.value)
+			value_copy(e.value)
 		);
 	}
 	return new;
@@ -202,13 +203,13 @@ vconst_copy(struct vconst *old)
 char *
 vconst_declare(struct vconst *v, struct value *val)
 {
-	struct map *m = v->varmap;
+	struct value_map *m = v->varmap;
 
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "$%d", (int) m->n);
 	char *s = strbuilder_build(b);
 
-	map_set(m, dynamic_str(s), val);
+	value_map_set(m, dynamic_str(s), val);
 
 	return s;
 }
@@ -216,16 +217,16 @@ vconst_declare(struct vconst *v, struct value *val)
 struct value *
 vconst_get(struct vconst *v, char *id)
 {
-	return map_get(v->varmap, id);
+	return value_map_get(v->varmap, id);
 }
 
 char *
 vconst_str(struct vconst *v, char *indent)
 {
 	struct strbuilder *b = strbuilder_create();
-	struct map *m = v->varmap;
+	struct value_map *m = v->varmap;
 	for (int i = 0; i < m->n; i++) {
-		struct entry e = m->entry[i];
+		struct value_map_entry e = m->entry[i];
 		char *value = value_str((struct value *) e.value);
 		strbuilder_printf(b, "%s%s: %s\n", indent, e.key, value);
 		free(value);
