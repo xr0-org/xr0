@@ -8,6 +8,7 @@
 #include "expr/expr.h"
 #include "gram_util.h"
 #include "lex.h"
+#include "literals.h"
 #include "util.h"
 
 extern char *yytext;
@@ -17,25 +18,6 @@ yylex();
 
 int
 yyerror();
-
-/* XXX */
-int
-int_constant(char *s)
-{
-	int n = 0;
-	for (; *s; s++) {
-		n = 10*n + ((int) *s - '0');
-	}
-	return n;
-}
-
-/* XXX */
-int
-char_constant(char *s)
-{
-	assert(strlen(s) == 3 && s[0] == '\'' && s[2] == '\'');
-	return s[1];
-}
 
 /* XXX */
 char *
@@ -108,7 +90,6 @@ variable_array_create(struct ast_variable *v)
 %token AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
 %token SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN
 %token XOR_ASSIGN OR_ASSIGN TYPE_NAME
-%token PREDICATE
 
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
@@ -206,9 +187,9 @@ primary_expression
 	| ARB_ARG
 		{ $$ = ast_expr_arbarg_create(); }
 	| CONSTANT
-		{ $$ = ast_expr_constant_create(int_constant(yytext)); } /* XXX */
+		{ $$ = ast_expr_constant_create(parse_int(yytext)); } /* XXX */
 	| CHAR_LITERAL
-		{ $$ = ast_expr_constant_create(char_constant(yytext)); }
+		{ $$ = ast_expr_constant_create(parse_char(yytext)); }
 	| STRING_LITERAL
 		{ $$ = ast_expr_literal_create(strip_quotes(yytext)); }
 	| '(' expression ')'
@@ -299,7 +280,7 @@ multiplicative_expression
 additive_expression
 	: multiplicative_expression
 	| additive_expression '+' multiplicative_expression
-	/*| additive_expression '-' multiplicative_expression*/
+	| additive_expression '-' multiplicative_expression
 	;
 
 shift_expression
@@ -359,7 +340,7 @@ logical_and_expression
 
 logical_or_expression
 	: logical_and_expression
-	/*| logical_or_expression OR_OP logical_and_expression*/
+	| logical_or_expression OR_OP logical_and_expression
 	;
 
 conditional_expression
@@ -392,9 +373,9 @@ expression
 	/*| expression ',' assignment_expression*/
 	;
 
-/*constant_expression*/
-	/*: conditional_expression*/
-	/*;*/
+constant_expression
+	: conditional_expression
+	;
 
 declaration
 	/*: declaration_specifiers ';'*/
@@ -680,10 +661,11 @@ statement
 labelled_statement
 	: identifier ':' statement
 		{ $$ = ast_stmt_create_labelled(lexloc(), $1, $3); }
+	| CASE constant_expression ':' statement
+		{ $$ = ast_stmt_create_nop(lexloc()); }
+	| DEFAULT ':' statement
+		{ $$ = ast_stmt_create_nop(lexloc()); }
 	;
-	/*| CASE constant_expression ':' statement*/
-	/*| DEFAULT ':' statement*/
-	/*;*/
 
 compound_statement
 	: '{' block '}' { $$ = $2; }
@@ -754,7 +736,8 @@ selection_statement
 			); 
 			$$ = ast_stmt_create_sel(lexloc(), false, $3, $5, _else);
 		}
-	// | SWITCH '(' expression ')' statement
+	| SWITCH '(' expression ')' statement
+		{ $$ = ast_stmt_create_nop(lexloc()); }
 	;
 
 for_some

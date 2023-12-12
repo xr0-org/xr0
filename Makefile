@@ -65,16 +65,27 @@ $(XR0V): $(MAIN_OBJ) $(BIN_DIR)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ $(MAIN_OBJ) $(OBJECTS)
 
+lex: $(XR0V)
+	$(VALGRIND) $(XR0V) -I libx tests/3-program/100-lex/parse.x
+
+lex-leaks: $(XR0V)
+	$(VALGRIND) --leak-check=full \
+		$(XR0V) -I libx tests/3-program/100-lex/parse.x
+
+lex-verbose: $(XR0V) 
+	$(VALGRIND) --num-callers=30 \
+		$(XR0V) -I libx tests/3-program/100-lex/parse.x
+
 matrix: $(XR0V)
-	$(VALGRIND) $(XR0V) -I libx tests/3-program/matrix.x
+	$(VALGRIND) $(XR0V) -I libx tests/3-program/000-matrix.x
 
 matrix-leaks: $(XR0V)
 	$(VALGRIND) --leak-check=full \
-		$(XR0V) -I libx tests/3-program/matrix.x
+		$(XR0V) -I libx tests/3-program/000-matrix.x
 
 matrix-verbose: $(XR0V) 
 	$(VALGRIND) --num-callers=30 \
-		$(XR0V) -I libx tests/3-program/matrix.x
+		$(XR0V) -I libx tests/3-program/000-matrix.x
 
 $(MAIN_OBJ): main.c $(OBJECTS)
 	@printf 'CC\t$@\n'
@@ -116,7 +127,7 @@ $(UTIL_OBJ): $(UTIL_DIR)/util.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(UTIL_DIR)/util.c
 
-$(AST_OBJ): $(AST_DIR)/ast.c $(AST_DIR)/expr/expr.h $(MATH_OBJ)
+$(AST_OBJ): $(AST_DIR)/ast.c $(AST_DIR)/expr/expr.h $(AST_DIR)/literals.h $(MATH_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(AST_DIR)/ast.c
 
