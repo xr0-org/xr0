@@ -5,8 +5,9 @@
 #include "ast.h"
 #include "state.h"
 #include "object.h"
-#include "util.h"
 #include "value.h"
+#include "util.h"
+#include "object_map.h"
 
 struct value {
 	enum value_type type;
@@ -19,7 +20,7 @@ struct value {
 
 		struct {
 			struct ast_variable_arr *members;
-			struct map *m;
+			struct object_map *m;
 		} _struct;
 	};
 };
@@ -151,7 +152,7 @@ value_int_copy(struct value *old)
 	return new;
 }
 
-static struct map *
+static struct object_map *
 frommembers(struct ast_variable_arr *);
 
 struct value *
@@ -169,15 +170,15 @@ value_struct_create(struct ast_type *t)
 	return v;
 }
 
-static struct map *
+static struct object_map *
 frommembers(struct ast_variable_arr *members)
 {
-	struct map *m = map_create();
+	struct object_map *m = object_map_create();
 
 	int n = ast_variable_arr_n(members);
 	struct ast_variable **v = ast_variable_arr_v(members);
 	for (int i = 0; i < n; i++) {
-		map_set(
+		object_map_set(
 			m, dynamic_str(ast_variable_name(v[i])),
 			object_value_create(
 				ast_expr_constant_create(0), NULL
@@ -189,15 +190,15 @@ frommembers(struct ast_variable_arr *members)
 }
 
 static void
-destroymembers(struct map *m)
+destroymembers(struct object_map *m)
 {
 	for (int i = 0; i < m->n; i++) {
 		object_destroy((struct object *) m->entry[i].value);
 	}
 }
 
-static struct map *
-copymembers(struct map *);
+static struct object_map *
+copymembers(struct object_map *);
 
 struct value *
 value_struct_copy(struct value *old)
@@ -210,13 +211,13 @@ value_struct_copy(struct value *old)
 	return new;
 }
 
-static struct map *
-copymembers(struct map *old)
+static struct object_map *
+copymembers(struct object_map *old)
 {
-	struct map *new = map_create();
+	struct object_map *new = object_map_create();
 	for (int i = 0; i < old->n; i++) {
-		struct entry e = old->entry[i];
-		map_set(new, dynamic_str(e.key), object_copy((struct object *) e.value));
+		struct object_map_entry e = old->entry[i];
+		object_map_set(new, dynamic_str(e.key), object_copy(e.value));
 	}
 	return new;
 }
@@ -241,7 +242,7 @@ value_struct_membertype(struct value *v, char *member)
 struct object *
 value_struct_member(struct value *v, char *member)
 {
-	return map_get(v->_struct.m, member);
+	return object_map_get(v->_struct.m, member);
 }
 
 
@@ -256,7 +257,7 @@ value_struct_sprint(struct value *v, struct strbuilder *b)
 	struct ast_variable **var = ast_variable_arr_v(members);
 	for (int i = 0; i < n; i++) {
 		char *f = ast_variable_name(var[i]);
-		struct value *val = object_as_value(map_get(v->_struct.m, f));
+		struct value *val = object_as_value(object_map_get(v->_struct.m, f));
 		char *val_str = val ? value_str(val) : dynamic_str("");
 		strbuilder_printf(b, ".%s = <%s>%s", f, val_str,
 			i+1<n ? ", " : "");
@@ -307,7 +308,7 @@ value_destroy(struct value *v)
 	case VALUE_STRUCT:
 		ast_variable_arr_destroy(v->_struct.members);
 		destroymembers(v->_struct.m);
-		map_destroy(v->_struct.m);
+		object_map_destroy(v->_struct.m);
 		break;
 	default:
 		assert(false);
@@ -427,7 +428,7 @@ value_references(struct value *v, struct location *loc, struct state *s)
 static bool
 struct_references(struct value *v, struct location *loc, struct state *s)
 {
-	struct map *m = v->_struct.m;
+	struct object_map *m = v->_struct.m;
 	for (int i = 0; i < m->n; i++) {
 		struct value *val = object_as_value(
 			(struct object *) m->entry[i].value
