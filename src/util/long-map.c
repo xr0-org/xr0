@@ -1,2 +1,2 @@
-#include "int-map.h"
+#include "long-map.h"
 #include "generic-map.c"

@@ -4,6 +4,7 @@
 #include <assert.h>
 #include "math.h"
 #include "util.h"
+#include "long-map.h"
 
 bool
 math_eq(struct math_expr *e1, struct math_expr *e2)
@@ -13,6 +14,7 @@ math_eq(struct math_expr *e1, struct math_expr *e2)
 
 bool
 math_lt(struct math_expr *e1, struct math_expr *e2)
+
 {
 	return math_le(e1, e2) && !math_eq(e1, e2);
 }
@@ -30,7 +32,7 @@ math_ge(struct math_expr *e1, struct math_expr *e2)
 }
 
 struct tally {
-	struct map *map;
+	struct long_map *map;
 	int num;
 };
 
@@ -67,7 +69,7 @@ math_expr_fromvartally(char *id, int num)
 }
 
 static bool
-variable_tally_eq(struct map *, struct map *);
+variable_tally_eq(struct long_map *, struct long_map *);
 
 bool
 math_le(struct math_expr *e1, struct math_expr *e2)
@@ -223,12 +225,12 @@ math_expr_simplify(struct math_expr *raw)
 {
 	struct tally t = tally(raw);
 
-	struct map *m = t.map;
+	struct long_map *m = t.map;
 
 	struct math_expr *expr = NULL;
 
 	for (int i = 0; i < m->n; i++) {
-		struct entry e = m->entry[i];
+		struct long_map_entry e = m->entry[i];
 		if (!e.value) {
 			continue;
 		}
@@ -270,8 +272,8 @@ tally(struct math_expr *e)
 	}
 }
 
-static struct map *
-map_sum(struct map *, struct map *);
+static struct long_map *
+map_sum(struct long_map *, struct long_map *);
 
 static struct tally
 sum_tally(struct math_expr *e)
@@ -286,22 +288,22 @@ sum_tally(struct math_expr *e)
 	};
 }
 
-static struct map *
-map_sum(struct map *m1, struct map *m2)
+static struct long_map *
+map_sum(struct long_map *m1, struct long_map *m2)
 {
-	struct map *m = map_create();
+	struct long_map *m = long_map_create();
 
 	for (int i = 0; i < m1->n; i++) {
-		struct entry e = m1->entry[i];
-		map_set(m, dynamic_str(e.key), e.value);
+		struct long_map_entry e = m1->entry[i];
+		long_map_set(m, dynamic_str(e.key), e.value);
 	}
 	for (int i = 0; i < m2->n; i++) {
-		struct entry e = m2->entry[i];
-		map_set(m, dynamic_str(e.key), (long) map_get(m, e.key) + e.value);
+		struct long_map_entry e = m2->entry[i];
+		long_map_set(m, dynamic_str(e.key), long_map_get(m, e.key) + e.value);
 	}
 
-	map_destroy(m2);
-	map_destroy(m1);
+	long_map_destroy(m2);
+	long_map_destroy(m1);
 
 	return m;
 }
@@ -312,11 +314,11 @@ neg_tally(struct math_expr *e)
 {
 	struct tally r = tally(e->negated);
 
-	struct map *m = r.map;
+	struct long_map *m = r.map;
 	for (int i = 0; i < m->n; i++) {
-		struct entry e = m->entry[i];
-		long val = - (long) map_get(m, e.key);
-		map_set(m, e.key, (void *) val);
+		struct long_map_entry e = m->entry[i];
+		long val = long_map_get(m, e.key);
+		long_map_set(m, e.key, val);
 	}
 	r.num = -r.num;
 
@@ -324,19 +326,19 @@ neg_tally(struct math_expr *e)
 }
 
 static bool
-variable_tally_eq(struct map *m1, struct map *m2)
+variable_tally_eq(struct long_map *m1, struct long_map *m2)
 {
 	bool res = false;
 	for (int i = 0; i < m1->n; i++) {
 		char *key = m1->entry[i].key;
-		if (map_get(m1, key) != map_get(m2, key)) {
+		if (long_map_get(m1, key) != long_map_get(m2, key)) {
 			res = false;
 		}
 	}
 	res = m1->n == m2->n;
 
-	map_destroy(m2);
-	map_destroy(m1);
+	long_map_destroy(m2);
+	long_map_destroy(m1);
 
 	return res;
 }
@@ -411,7 +413,7 @@ math_atom_str(struct math_atom *a)
 	return strbuilder_build(b);
 }
 
-static struct map *
+static struct long_map *
 map_fromvar(char *id);
 
 static struct tally
@@ -419,7 +421,7 @@ atom_tally(struct math_atom *a)
 {
 	switch (a->type) {
 	case ATOM_NAT:
-		return (struct tally) { map_create(), a->i };
+		return (struct tally) { long_map_create(), a->i };
 	case ATOM_VARIABLE:
 		return (struct tally) {
 			map_fromvar(dynamic_str(a->v)), 0
@@ -429,10 +431,10 @@ atom_tally(struct math_atom *a)
 	}
 }
 
-static struct map *
+static struct long_map *
 map_fromvar(char *id)
 {
-	struct map *m = map_create();
-	map_set(m, id, (void *) 1);
+	struct long_map *m = long_map_create();
+	long_map_set(m, id, 1);
 	return m;
 }

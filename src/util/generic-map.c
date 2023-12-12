@@ -39,7 +39,7 @@ TYPED(map_getindex) (struct TYPED(map) *m, const char *key) {
 	return -1;
 }
 
-TYPE *
+TYPE
 TYPED(map_get) (struct TYPED(map) *m, const char *key)
 {
 	int index = map_getindex(m, key);

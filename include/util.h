@@ -10,28 +10,6 @@ char *
 dynamic_str(const char *);
 
 
-/* XXX: We know. */
-struct map {
-	struct entry {
-		char *key;
-		const void *value;
-	} *entry;
-	size_t n;
-};
-
-struct map *
-map_create();
-
-void
-map_destroy(struct map *);
-
-void *
-map_get(struct map *, const char *key);
-
-void
-map_set(struct map *, const char *key, const void *value);
-
-
 struct strbuilder;
 
 struct strbuilder *
