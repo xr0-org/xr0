@@ -58,6 +58,6 @@ TYPED(map_set) (struct TYPED(map) *m, char *key, const void *value)
 		return;
 	}
 	m->entry = realloc(m->entry, sizeof(struct TYPED(map_entry)) * ++m->n);
-	m->entry[m->n-1] = entry_create(key, value);
+	m->entry[m->n-1] = TYPED(entry_create) (key, value);
 	return;
 }
