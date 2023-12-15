@@ -13,6 +13,9 @@ struct ast_expr;
 /* ext */
 struct externals;
 
+/* props */
+struct props;
+
 /* object */
 struct object;
 
@@ -36,6 +39,9 @@ state_str(struct state *);
 struct externals *
 state_getext(struct state *);
 
+struct props *
+state_getprops(struct state *);
+
 void
 state_pushframe(struct state *, char *func, struct ast_type *ret_type);
 
@@ -44,9 +50,6 @@ state_popframe(struct state *);
 
 void
 state_declare(struct state *, struct ast_variable *var, bool isparam);
-
-void
-state_undeclarevars(struct state *s);
 
 struct object *
 state_getresult(struct state *);
@@ -82,7 +85,10 @@ state_range_aredeallocands(struct state *, struct object *,
 		struct ast_expr *lw, struct ast_expr *up);
 
 struct value *
-state_vconst(struct state *);
+state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
+
+struct value *
+state_getvconst(struct state *, char *id);
 
 bool
 state_hasgarbage(struct state *);
@@ -106,6 +112,12 @@ location_str(struct location *);
 
 bool
 location_references(struct location *l1, struct location *l2, struct state *);
+
+bool
+location_referencesheap(struct location *, struct state *);
+
+struct object *
+state_get(struct state *state, struct location *loc, bool constructive);
 
 
 /* USED BY OBJECT */

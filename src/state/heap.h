@@ -36,6 +36,9 @@ heap_referenced(struct heap *h, struct state *);
 struct error *
 heap_deallocblock(struct heap *h, int block);
 
+void
+heap_undeclare(struct heap *, struct state *);
+
 
 /* TODO: extract to own file */
 
@@ -54,10 +57,13 @@ char *
 vconst_str(struct vconst *, char *indent);
 
 char *
-vconst_declare(struct vconst *, struct value *);
+vconst_declare(struct vconst *, struct value *, char *comment, bool persist);
 
 struct value *
 vconst_get(struct vconst *, char *id);
+
+void
+vconst_undeclare(struct vconst *);
 
 bool
 vconst_eval(struct vconst *, struct ast_expr *);

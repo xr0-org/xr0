@@ -2,9 +2,12 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
+#include "function.h"
 #include "intern.h"
 #include "object.h"
+#include "props.h"
 #include "state.h"
 #include "util.h"
 
@@ -123,6 +126,9 @@ ast_function_type(struct ast_function *f)
 struct ast_block *
 ast_function_body(struct ast_function *f)
 {
+	if (!f->body) {
+		fprintf(stderr, "cannot find body for `%s'\n", f->name);
+	}
 	assert(f->body);
 	return f->body;
 }
@@ -147,14 +153,44 @@ ast_function_params(struct ast_function *f)
 }
 
 struct error *
-path_verify(struct ast_function *f, struct state *state, struct externals *);
+paths_verify(struct ast_function_arr *paths, struct externals *);
 
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
+	struct ast_function_arr *paths = paths_fromfunction(f);
+	struct error *err = paths_verify(paths, ext);
+	ast_function_arr_destroy(paths);
+	return err;
+}
+
+struct error *
+path_verify_withstate(struct ast_function *f, struct externals *ext);
+
+struct error *
+paths_verify(struct ast_function_arr *paths, struct externals *ext)
+{	
+	int len = ast_function_arr_len(paths);
+	struct ast_function **path = ast_function_arr_func(paths);
+	for (int i = 0; i < len; i++) {
+		struct error *err = NULL;
+		if ((err = path_verify_withstate(path[i], ext))) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
+struct error *
+path_verify(struct ast_function *f, struct state *state, struct externals *);
+
+struct error *
+path_verify_withstate(struct ast_function *f, struct externals *ext)
+{
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
+	printf("state: %s\n", state_str(state));
 	struct error *err = path_verify(f, state, ext);
 	state_destroy(state);
 	return err;
@@ -164,7 +200,7 @@ static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state,
 		struct externals *);
 
-static struct error *
+static struct preresult *
 parameterise_state(struct state *s, struct ast_function *f);
 
 struct error *
@@ -174,8 +210,12 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 
 	struct ast_block *body = ast_function_body(f);
 
-	if ((err = parameterise_state(state, f))) {
-		return err;
+	struct preresult *r = parameterise_state(state, f);
+	if (preresult_iserror(r)) {
+		return preresult_as_error(r);
+	} else if (preresult_iscontradiction(r)) {
+		/* ex falso quodlibet */
+		return NULL;
 	}
 
 	int ndecls = ast_block_ndecls(body);
@@ -187,11 +227,15 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = 0; i < nstmts; i++) {
+		/*printf("state: %s\n", state_str(state));*/
+		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
 		if ((err = ast_stmt_process(stmt[i], state))) {
 			return err;
 		}
+		if (ast_stmt_isterminal(stmt[i])) {
+			break;
+		}
 	}
-	state_undeclarevars(state);
 	/* TODO: verify that `result' is of same type as f->result */
 	if ((err = abstract_audit(f, state, ext))) {
 		return error_prepend(err, "qed error: ");
@@ -199,7 +243,7 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 	return NULL;
 }
 
-static struct error *
+static struct preresult *
 parameterise_state(struct state *s, struct ast_function *f)
 {
 	/* declare params and locals in stack frame */
@@ -208,26 +252,26 @@ parameterise_state(struct state *s, struct ast_function *f)
 	for (int i = 0; i < nparams; i++) {
 		struct ast_variable *p = param[i];
 		state_declare(s, p, true);
-		if (ast_type_base(ast_variable_type(p)) == TYPE_INT) {
-			struct object *obj = state_getobject(s, ast_variable_name(p));
-			assert(obj);
-			object_assign(obj, state_vconst(s));
-		}
+		char *name = ast_variable_name(p);
+		struct object *obj = state_getobject(s, name);
+		assert(obj);
+		object_assign(
+			obj,
+			state_vconst(s, ast_variable_type(p), dynamic_str(name), true)
+		);
 	}
 
 	struct ast_block *abs = ast_function_abstract(f);
 	int nstmts = ast_block_nstmts(abs);
 	struct ast_stmt **stmt = ast_block_stmts(abs);
 	for (int i = 0; i < nstmts; i++) {
-		if (ast_stmt_issetup(stmt[i])) {
-			struct error *err = NULL;
-			if ((err = ast_stmt_exec(stmt[i], s))) {
-				return err;
-			}
+		struct preresult *r = ast_stmt_preprocess(stmt[i], s);
+		if (!preresult_isempty(r)) {
+			return r;
 		}
 	}
 
-	return NULL;
+	return preresult_empty_create();
 }
 
 
@@ -235,19 +279,16 @@ static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state,
 		struct externals *ext)
 {
-	struct error *err = NULL;
-
-	/*printf("actual: %s\n", state_str(actual_state));*/
 	if (!state_hasgarbage(actual_state)) {
+		printf("actual: %s\n", state_str(actual_state));
 		return error_create("garbage on heap");
 	}
 
 	struct state *alleged_state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
-	if ((err = parameterise_state(alleged_state, f))) {
-		return err;
-	}
+	struct preresult *r = parameterise_state(alleged_state, f);
+	assert(preresult_isempty(r));
 
 	/* mutates alleged_state */
 	struct result *res = ast_function_absexec(f, alleged_state);
@@ -255,17 +296,15 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 		return result_as_error(res);
 	}
 
-	/*printf("actual: %s\n", state_str(actual_state));*/
-	/*printf("alleged: %s\n", state_str(alleged_state));*/
-
 	bool equiv = state_equal(actual_state, alleged_state);
-
-	state_destroy(alleged_state); /* actual_state handled by caller */ 
-	
 	if (!equiv) {
 		/* XXX: print states */
+		printf("actual: %s\n", state_str(actual_state));
+		printf("alleged: %s\n", state_str(alleged_state));
 		return error_create("actual and alleged states differ");
 	}
+
+	state_destroy(alleged_state); /* actual_state handled by caller */ 
 
 	return NULL;
 }
@@ -282,8 +321,12 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 		}
 		result_destroy(res);
 	}
+
 	/* wrap result and return */ 
 	struct object *obj = state_getresult(state);
 	assert(obj);
 	return result_value_create(object_as_value(obj));
 }
+
+#include "arr.c"
+#include "paths.c"

@@ -17,4 +17,10 @@ enum ast_stmt_kind {
 enum ast_stmt_kind
 ast_stmt_kind(struct ast_stmt *);
 
+bool
+ast_stmt_ispre(struct ast_stmt *stmt);
+
+bool
+ast_stmt_isassume(struct ast_stmt *stmt);
+
 #endif

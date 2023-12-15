@@ -3,22 +3,24 @@
 #include <assert.h>
 #include <string.h>
 
-#include "ext.h"
-#include "state.h"
-#include "stack.h"
-#include "heap.h"
+#include "ast.h"
 #include "block.h"
+#include "ext.h"
+#include "heap.h"
 #include "location.h"
 #include "object.h"
-#include "value.h"
-#include "ast.h"
+#include "props.h"
+#include "stack.h"
+#include "state.h"
 #include "util.h"
+#include "value.h"
 
 struct state {
 	struct externals *ext;
 	struct vconst *vconst;
 	struct stack *stack;
 	struct heap *heap;
+	struct props *props;
 };
 
 struct state *
@@ -30,6 +32,7 @@ state_create(char *func, struct externals *ext, struct ast_type *result_type)
 	state->vconst = vconst_create();
 	state->stack = stack_create(func, NULL, result_type);
 	state->heap = heap_create();
+	state->props = props_create();
 	return state;
 }
 
@@ -39,6 +42,7 @@ state_destroy(struct state *state)
 	/* vconst_destroy(state->vconst); */
 	stack_destroy(state->stack);
 	heap_destroy(state->heap);
+	props_destroy(state->props);
 	free(state);
 }
 
@@ -51,6 +55,7 @@ state_copy(struct state *state)
 	copy->vconst = vconst_copy(state->vconst);
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
+	copy->props = props_copy(state->props);
 	return copy;
 }
 
@@ -70,8 +75,13 @@ state_str(struct state *state)
 	}
 	free(vconst);
 	char *stack = stack_str(state->stack, state);
-	strbuilder_printf(b, "%s", stack);
+	strbuilder_printf(b, "%s\n", stack);
 	free(stack);
+	char *props = props_str(state->props, "\t");
+	if (strlen(props) > 0) {
+		strbuilder_printf(b, "%s", props);
+	}
+	free(props);
 	char *heap = heap_str(state->heap, "\t");
 	if (strlen(heap) > 0) {
 		strbuilder_printf(b, "\n%s\n", heap);
@@ -87,11 +97,10 @@ state_getext(struct state *s)
 	return s->ext;
 }
 
-
-struct ast_function *
-state_getfunc(struct state *state, char *f)
+struct props *
+state_getprops(struct state *s)
 {
-	return externals_getfunc(state->ext, f);
+	return s->props;
 }
 
 void
@@ -116,17 +125,20 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 	stack_declare(state->stack, var, isparam);
 }
 
-void
-state_undeclarevars(struct state *s)
+struct value *
+state_vconst(struct state *state, struct ast_type *t, char *comment, bool persist)
 {
-	stack_undeclare(s->stack);
+	char *c = vconst_declare(
+		state->vconst, ast_type_vconst(t, state_getext(state)),
+		comment, persist
+	);
+	return value_sync_create(ast_expr_identifier_create(c));
 }
 
 struct value *
-state_vconst(struct state *state)
+state_getvconst(struct state *state, char *id)
 {
-	char *c = vconst_declare(state->vconst, value_int_any_create());
-	return value_int_sync_create(ast_expr_identifier_create(c));
+	return vconst_get(state->vconst, id);
 }
 
 struct object *
@@ -247,12 +259,6 @@ state_dealloc(struct state *state, struct value *val)
 	return location_dealloc(value_as_ptr(val), state->heap);
 }
 
-struct value *
-state_getvconst(struct state *state, char *id)
-{
-	return vconst_get(state->vconst, id);
-}
-
 
 struct error *
 state_range_dealloc(struct state *state, struct object *obj,
@@ -329,16 +335,33 @@ state_eval(struct state *s, struct ast_expr *e)
 	return vconst_eval(s->vconst, e);
 }
 
+static void
+state_undeclarevars(struct state *s);
+
 bool
 state_equal(struct state *s1, struct state *s2)
 {
-	bool equal;
-	char *str1 = state_str(s1),
-	     *str2 = state_str(s2);
-	equal = strcmp(str1, str2) == 0;
+	struct state *s1_c = state_copy(s1),
+		     *s2_c = state_copy(s2);
+	state_undeclarevars(s1_c);
+	state_undeclarevars(s2_c);
 
+	char *str1 = state_str(s1_c),
+	     *str2 = state_str(s2_c);
+	bool equal = strcmp(str1, str2) == 0;
 	free(str2);
 	free(str1);
 
+	state_destroy(s2_c);
+	state_destroy(s1_c);
+
 	return equal;
+}
+
+static void
+state_undeclarevars(struct state *s)
+{
+	heap_undeclare(s->heap, s);
+	vconst_undeclare(s->vconst);
+	stack_undeclare(s->stack, s);
 }

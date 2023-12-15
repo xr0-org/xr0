@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
 #include "expr.h"
 #include "ext.h"
 #include "intern.h"
 #include "math.h"
 #include "object.h"
+#include "props.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
@@ -112,9 +114,6 @@ expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
 	return state_range_aredeallocands(state, obj, lw, up);
 }
 
-
-
-
 struct error *
 ast_expr_exec(struct ast_expr *expr, struct state *state)
 {
@@ -128,9 +127,6 @@ ast_expr_exec(struct ast_expr *expr, struct state *state)
 
 struct lvalue *
 expr_identifier_lvalue(struct ast_expr *expr, struct state *state);
-
-struct lvalue *
-expr_access_lvalue(struct ast_expr *expr, struct state *state);
 
 struct lvalue *
 expr_unary_lvalue(struct ast_expr *expr, struct state *state);
@@ -379,20 +375,19 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 	if (result_iserror(res)) {
 		return res;
 	}
-	struct value *v = value_copy(object_as_value(
+	/* XXX */
+	struct value *obj_value = object_as_value(
 		value_struct_member(
 			result_as_value(res),
 			ast_expr_member_field(expr)
 		)
-	));
+	);
+	struct value *v = obj_value ? value_copy(obj_value) : NULL;
 	result_destroy(res);
 	return result_value_create(v);
 }
 
 /* expr_call_eval */
-
-struct ast_function *
-expr_as_func(struct ast_expr *expr, struct state *state);
 
 struct result_arr {
 	int n;
@@ -421,105 +416,134 @@ result_arr_append(struct result_arr *arr, struct result *res)
 	arr->res[arr->n-1] = res;
 }
 
+static struct result_arr *
+prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
+		struct ast_variable **param, struct state *state);
+
+static struct error *
+prepare_parameters(int nparams, struct ast_variable **param, 
+		struct result_arr *args, struct state *state);
+
+static struct result *
+call_result(struct ast_expr *expr, struct ast_function *, struct state *);
+
+static struct result *
+expr_call_eval(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(root);
+
+	struct ast_function *f = externals_getfunc(state_getext(state), name);
+	if (!f) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "function `%s' not found", name);
+		return result_error_create(error_create(strbuilder_build(b)));
+	}
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **params = ast_function_params(f);
+
+	struct result_arr *args = prepare_arguments(
+		ast_expr_call_nargs(expr),
+		ast_expr_call_args(expr),
+		nparams, params, state
+	);
+
+	struct ast_type *ret_type = ast_function_type(f);
+	state_pushframe(state, dynamic_str(name), ret_type);
+
+	struct error *err = prepare_parameters(nparams, params, args, state);
+	if (err) {
+		return result_error_create(err);
+	}
+
+	struct result *res = ast_function_absexec(f, state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	if (result_hasvalue(res)) { /* preserve value through pop */
+		res = result_value_create(value_copy(result_as_value(res)));
+	} else {
+		res = call_result(expr, f, state);
+	}
+
+	state_popframe(state);
+
+	result_arr_destroy(args);
+
+	return res;
+}
+
+static bool
+vconst_applyassumptions(struct value *v, struct ast_expr *call, struct state *state);
+
+static struct result *
+call_result(struct ast_expr *expr, struct ast_function *f, struct state *state)
+{
+	/* declare vconst and get underlying value (i.e. the range) */
+	struct value *vconst = state_vconst(
+		state,
+		ast_function_type(f),
+		dynamic_str(ast_function_name(f)),
+		false
+	);
+	struct ast_expr *sync = value_as_sync(vconst);
+	struct value *v = state_getvconst(state, ast_expr_as_identifier(sync));
+
+	bool ok = vconst_applyassumptions(v, expr, state);
+	assert(ok);
+
+	return result_value_create(vconst);
+}
+
+static bool
+vconst_applyassumptions(struct value *v, struct ast_expr *expr, struct state *state)
+{
+	struct props *p = state_getprops(state);
+	if (props_get(p, expr)) {
+		return value_assume(v, true);
+	} else if (props_contradicts(p, expr)) {
+		return value_assume(v, false);
+	}
+	return true;
+}
+
 static struct result *
 prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state *);
 
-struct result_arr *
-prepare_arguments(struct ast_expr *call, struct state *state)
+static struct result_arr *
+prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
+		struct ast_variable **param, struct state *state)
 {
-	struct result_arr *args = result_arr_create();
-
-	int nargs = ast_expr_call_nargs(call);
-	struct ast_expr **arg = ast_expr_call_args(call);
-
-	struct ast_function *f = expr_as_func(call, state);
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **param = ast_function_params(f);
-
 	assert(nargs == nparams);
 
+	struct result_arr *args = result_arr_create();
 	for (int i = 0; i < nargs; i++) {
 		result_arr_append(
 			args, prepare_argument(arg[i], param[i], state)
 		);
 	}
-
 	return args;
 }
 
 static struct result *
-prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state *s)
+prepare_argument(struct ast_expr *arg, struct ast_variable *p, struct state *s)
 {
 	if (ast_expr_kind(arg) != EXPR_ARBARG) {
 		return ast_expr_eval(arg, s);
 	}
-	assert(ast_type_base(ast_variable_type(param)) == TYPE_INT);
-	return result_value_create(state_vconst(s));
-}
-
-
-static struct result *
-call_eval_inframe(struct ast_expr *expr, struct state *state, struct result_arr *args);
-
-static struct result *
-expr_call_eval(struct ast_expr *expr, struct state *state)
-{
-	struct result_arr *args = prepare_arguments(expr, state);
-	struct ast_function *f = expr_as_func(expr, state);
-	state_pushframe(
-		state, dynamic_str(ast_function_name(f)), ast_function_type(f)
-	);
-	struct result *res = call_eval_inframe(expr, state, args);
-	if (result_iserror(res)) {
-		return res;
-	}
-	result_arr_destroy(args);
-	if (result_hasvalue(res)) { /* preserve value through pop */
-		res = result_value_create(value_copy(result_as_value(res)));
-	}
-	state_popframe(state);
-	return res;
-}
-
-/* call_type */
-
-struct ast_function *
-expr_as_func(struct ast_expr *expr, struct state *state)
-{
-	struct ast_expr *root = ast_expr_call_root(expr);
-	/* TODO: allow function-valued expressions */
-	return externals_getfunc(state_getext(state), ast_expr_as_identifier(root));
-}
-
-/* call_eval_inframe */
-
-static struct error *
-prepare_parameters(struct ast_function *f, struct result_arr *args,
-		struct state *state);
-
-static struct result *
-call_eval_inframe(struct ast_expr *expr, struct state *state, struct result_arr *args)
-{
-	struct ast_function *f = expr_as_func(expr, state);
-	assert(f);
-
-	struct error *err = prepare_parameters(f, args, state);
-	if (err) {
-		return result_error_create(err);
-	}
-
-	return ast_function_absexec(f, state);
+	return result_value_create(state_vconst(
+		s, ast_variable_type(p), dynamic_str(ast_variable_name(p)), true
+	));
 }
 
 /* prepare_parameters: Allocate arguments in call expression and assign them to
  * their respective parameters. */
 static struct error *
-prepare_parameters(struct ast_function *f, struct result_arr *args,
-		struct state *state)
+prepare_parameters(int nparams, struct ast_variable **param, 
+		struct result_arr *args, struct state *state)
 {
-	struct ast_variable **param = ast_function_params(f);
-
-	assert(ast_function_nparams(f) == args->n);
+	assert(nparams == args->n);
 
 	for (int i = 0; i < args->n; i++) {
 		state_declare(state, param[i], true);
@@ -558,7 +582,11 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 			*rval = ast_expr_assignment_rval(expr);
 
 	struct result *res = ast_expr_eval(rval, state);
+	if (result_iserror(res)) {
+		return res;
+	}
 	if (result_hasvalue(res)) {
+		/*printf("state: %s\n", state_str(state));*/
 		struct object *obj = lvalue_object(ast_expr_lvalue(lval, state));
 		assert(obj);
 		object_assign(obj, value_copy(result_as_value(res)));
@@ -600,7 +628,7 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 		return res2;
 	}
 	return result_value_create(
-		value_int_sync_create(
+		value_sync_create(
 			ast_expr_binary_create(
 				value_to_expr(result_as_value(res1)),
 				ast_expr_binary_op(expr),
@@ -628,4 +656,75 @@ static struct result *
 assign_absexec(struct ast_expr *expr, struct state *state)
 {
 	return expr_assign_eval(expr, state);
+}
+
+static struct preresult *
+reduce_assume(struct ast_expr *, bool value, struct state *);
+
+struct preresult *
+ast_expr_assume(struct ast_expr *expr, struct state *state)
+{
+	return reduce_assume(expr, true, state);
+}
+
+static struct preresult *
+identifier_assume(char *id, bool value, struct state *state);
+
+static struct preresult *
+irreducible_assume(struct ast_expr *, bool value, struct state *);
+
+static struct preresult *
+reduce_assume(struct ast_expr *expr, bool value, struct state *s)
+{
+	switch (expr->kind) {
+	case EXPR_IDENTIFIER:
+		return identifier_assume(ast_expr_as_identifier(expr), value, s);
+	case EXPR_UNARY:
+		assert(ast_expr_unary_op(expr) == UNARY_OP_BANG);
+		return reduce_assume(ast_expr_unary_operand(expr), !value, s);
+	case EXPR_BRACKETED:
+		return reduce_assume(expr->root, value, s);
+	case EXPR_CALL:
+	case EXPR_BINARY:
+		return irreducible_assume(expr, value, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct preresult *
+identifier_assume(char *id, bool value, struct state *state)
+{
+	/* set value of variable corresponding to identifier != 0 */
+	struct object *obj = state_getobject(state, id);
+	struct ast_expr *sync = value_as_sync(object_as_value(obj));
+	struct value *v = state_getvconst(state, ast_expr_as_identifier(sync));
+	bool iscontradiction = !value_assume(v, value);
+	if (iscontradiction) {
+		return preresult_contradiction_create();
+	}
+	return preresult_empty_create();
+}
+
+static struct preresult *
+irreducible_assume_actual(struct ast_expr *e, struct state *s);
+
+static struct preresult *
+irreducible_assume(struct ast_expr *e, bool value, struct state *s)
+{
+	struct ast_expr *prop = ast_expr_inverted_copy(e, !value);
+	struct preresult *r = irreducible_assume_actual(prop, s);
+	ast_expr_destroy(prop);
+	return r;
+}
+
+static struct preresult *
+irreducible_assume_actual(struct ast_expr *e, struct state *s)
+{
+	struct props *p = state_getprops(s);
+	if (props_contradicts(p, e)) {
+		return preresult_contradiction_create();
+	}
+	props_install(state_getprops(s), ast_expr_copy(e));
+	return preresult_empty_create();
 }

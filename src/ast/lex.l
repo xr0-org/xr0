@@ -287,15 +287,15 @@ count()
 }
 
 static long *
-heaptk_create(long tk)
+userdeftk_create(long tk)
 {
-	long *heaptk = malloc(sizeof(long));
-	*heaptk = tk;
-	return heaptk;
+	long *userdeftk = malloc(sizeof(long));
+	*userdeftk = tk;
+	return userdeftk;
 }
 
 static void
-heaptk_destroy(long *tk)
+userdeftk_destroy(long *tk)
 {
 	free(tk);
 }
@@ -303,7 +303,7 @@ heaptk_destroy(long *tk)
 void
 install_refresh(long tk)
 {
-	map_set(table, dynamic_str(yytext), (void *) heaptk_create(tk));
+	map_set(table, dynamic_str(yytext), (void *) userdeftk_create(tk));
 	installclass = IC_NONE;
 }
 
@@ -311,9 +311,9 @@ long
 check_type()
 {
 	/* NB: must check table before installing */
-	long *heaptk = map_get(table, yytext); 
-	if (heaptk) {
-		return *heaptk;
+	long *userdeftk = map_get(table, yytext); 
+	if (userdeftk) {
+		return *userdeftk;
 	}
 	switch (installclass) {
 	case IC_TYPE:
@@ -342,7 +342,7 @@ lex_finish()
 		free(marker.filename);
 	}
 	for (int i = 0; i < table->n; i++) {
-		heaptk_destroy((long *) table->entry[i].value);
+		userdeftk_destroy((long *) table->entry[i].value);
 	}
 	map_destroy(table);
 }

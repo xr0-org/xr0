@@ -1,37 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 char *
-read_file(char *path);
-
-struct lexer;
-
-struct lexer *
-parse(char *input);
-
-void
-lexer_destroy(struct lexer *);
-
-void
-lexer_print(struct lexer *);
-
-int
-main()
-{
-	char *file;
-	struct lexer *l;
-
-	file = read_file("gen.l");
-
-	l = parse(file);
-	lexer_print(l);
-	lexer_destroy(l);
-
-	free(file);
-}
-
-char *
-read_file(char *path)
+read_file(char *path) [ .alloc result; ]
 {
 	FILE *f;
 	char *str;
@@ -48,20 +20,75 @@ read_file(char *path)
 	return str;
 }
 
+int
+main()
+{
+	char *file;
+	/*struct lexer *l;*/
+
+	file = read_file("gen.l");
+
+	/* XXX: temporarily framing #15
+	l = parse(file);
+	lexer_print(l);
+	lexer_destroy(l);
+	*/
+
+	free(file);
+}
+
 struct pattern {
 	char *name; char *pattern;
 };
-
-void
-pattern_print(struct pattern *);
 
 struct token {
 	int isliteral;
 	char *name; char *action;
 };
 
+struct pattern *
+pattern_create(char *name, char *pattern) [
+	.alloc result;
+	result->name = name;
+	result->pattern = pattern;
+]{
+	struct pattern *p;
+
+	p = malloc(sizeof(struct pattern));
+	p->name = name;
+	p->pattern = pattern;
+
+	return p;
+}
+
 void
-token_print(struct token *);
+pattern_destroy(struct pattern *p) [
+	pre: p = pattern_create($, $);
+	.dealloc p;
+]{
+	free(p);
+}
+
+struct token *
+token_create(int isliteral, char *name, char *action) [ .alloc result; ]
+{
+	struct token *tk;
+
+	tk = malloc(sizeof(struct token));
+	tk->isliteral = isliteral;
+	tk->name = name;
+	tk->action = action;
+
+	return tk;
+}
+
+void
+token_destroy(struct token *tk) [
+	pre: tk = token_create($, $, $);
+	.dealloc tk;
+]{
+	free(tk);
+}
 
 struct lexer {
 	char *pre; char *post;
@@ -71,8 +98,11 @@ struct lexer {
 
 struct lexer *
 lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
-		int ntok, struct token *token)
-{
+		int ntok, struct token *token) [
+	.alloc result;
+	result->pattern = pattern;
+	result->token = token;
+]{
 	struct lexer *l;
 
 	l = malloc(sizeof(struct lexer));
@@ -87,12 +117,256 @@ lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 }
 
 void
-lexer_destroy(struct lexer *l)
-{
+lexer_destroy(struct lexer *l) [
+	pre: {
+		l = lexer_create(
+			$, $,
+			$, malloc(1),
+			$, malloc(1)
+		);
+	}
+
+	.dealloc l->pattern;
+	.dealloc l->token;
+	.dealloc l;
+]{
 	free(l->pattern);
 	free(l->token);
 	free(l);
 }
+
+char *
+substr(char *s, int n) [ .alloc result; ]
+{
+	int len;
+	char *ss;
+
+	len = n + 1;
+	ss = malloc(sizeof(char) * len);
+	strncpy(ss, s, n);
+	ss[n] = '\0';
+	return ss;
+}
+
+char *
+parse_id(char *input) [ .alloc result; ]
+{
+	char *s;
+
+	/*
+	if (!isalpha(*input)) {
+		fprintf(stderr, "id must begin with letter: '%s'", input);
+		exit(1);
+	}
+	*/
+	s = input + 1;
+	/* XXX: '0' is a placeholder to allow this to parse */
+	for (; isalpha(*s) || isdigit(*s) || *s == '_' ; 0) {
+		s++;
+	}
+	return substr(input, s - input);
+}
+
+char *
+skiplinespace(char *s) [
+	result = s; /* XXX */
+]{
+	for (; *s == ' ' || *s == '\t'; s++) {}
+	return s;
+}
+
+#define KEYWORD_OPTION "%option"
+
+char *
+skipoptions(char *pos)
+{
+	char *id;
+
+	if (strncmp(pos, KEYWORD_OPTION, strlen(KEYWORD_OPTION)) != 0) {
+		return pos;
+	}
+	pos += strlen(KEYWORD_OPTION);
+	pos = skiplinespace(pos);
+	id = parse_id(pos);
+	pos += strlen(id);
+	free(id);
+	return pos;
+}
+
+char *
+parse_tonewline(char *input) [ .alloc result; ]
+{
+	char *s;
+	s = input; /* XXX: until loop is understood more */
+	for (s = input; *s != '\n'; 0) {
+		s++;
+	}
+	return substr(input, s - input);
+}
+
+struct patternresult {
+	struct pattern *p;
+	char *pos;
+};
+
+struct patternresult
+parse_pattern(char *pos) [
+	result.p = pattern_create(malloc(1), malloc(1));
+]{
+	char *name; char *pattern;
+	struct patternresult res;
+
+	name = parse_id(pos);
+	pos = pos + strlen(name);
+	pos = skiplinespace(pos);
+	pattern = parse_tonewline(pos);
+	pos = pos + strlen(pattern); /* XXX: support pos += */
+
+	res.p = pattern_create(name, pattern);
+	res.pos = pos;
+	return res;
+}
+
+struct patternet {
+	struct pattern *pattern;
+	int npat;
+	char *pos;
+};
+
+int
+compute_npat(char *pos)
+{
+	int n;
+	struct patternresult r;
+
+	n = 0;
+	for (; strncmp(pos, "%%", 2) != 0; n++) {
+		r = parse_pattern(pos);
+		pos = skipws(r.pos);
+		/* TODO: clean up r.p */
+	}
+
+	return n;
+}
+
+struct pattern *
+parse_defs_n(char *pos, int npat) [
+	if (npat) {
+		.alloc result;
+	}
+]{
+	int i;
+	struct pattern *p;
+	struct patternresult parsed;
+
+	if (npat) {
+		p = malloc(npat);
+		for (i = 0; i < npat; i++) {
+			parsed = parse_pattern(pos);
+			p[i] = *parsed.p;
+			pos = skipws(parsed.pos);
+		}
+		return p;
+	}
+
+	return NULL;
+}
+
+struct patternet
+parse_defsproper(char *pos) [
+	if (compute_npat(pos)) {
+		.alloc result.pattern;
+	}
+]{
+	struct patternet res;
+
+	res.npat = compute_npat(pos);
+	res.pattern = parse_defs_n(pos, res.npat);
+	res.pos = pos;
+	return res;
+}
+
+struct rulesresult {
+	struct token *token;
+	int ntok;
+	char *pos;
+};
+
+struct tokenresult {
+	struct token *tk;
+	char *pos;
+};
+
+int
+compute_ntok(char *pos)
+{
+	int n;
+	struct tokenresult r;
+
+	n = 0;
+	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; ntok++) {
+		r = parse_token(pos);
+		pos = skipws(r.pos);
+		/* TODO: clean up r.tk */
+	}
+
+	return n;
+}
+
+struct token *
+parse_rules_n(char *pos, int ntok) [
+	if (ntok) {
+		.alloc result;
+	}
+]{
+	int i;
+	struct token *t;
+	struct tokenresult parsed;
+
+	if (ntok) {
+		t = malloc(ntok);
+		for (i = 0; i < ntok; i++) {
+			parsed = parse_token(pos);
+			t[i] = *parsed.tk;
+			pos = skipws(parsed.pos);
+		}
+		return t;
+	}
+
+	return NULL;
+}
+
+struct rulesresult
+parse_rules(char *pos) [
+	if (compute_ntok(pos)) {
+		.alloc result.token;
+	}
+]{
+	struct rulesresult res;
+
+	res.ntok = compute_ntok(pos);
+	res.token = parse_rules_n(pos, res.ntok);
+	res.pos = pos;
+	return res;
+}
+
+
+struct lexer;
+
+struct lexer *
+parse(char *input);
+
+void
+lexer_destroy(struct lexer *);
+
+void
+lexer_print(struct lexer *);
+
+void
+pattern_print(struct pattern *);
+
+void
+token_print(struct token *);
 
 void
 lexer_print(struct lexer *l)
@@ -129,12 +403,6 @@ struct defsresult {
 struct defsresult
 parse_defs(char *pos);
 
-struct rulesresult {
-	struct token *token;
-	int ntok;
-	char *pos;
-};
-
 struct rulesresult
 parse_rules(char *pos);
 
@@ -168,77 +436,10 @@ parse(char *pos)
 }
 
 char *
-substr(char *s, int n)
-{
-	int len;
-	char *ss;
-
-	len = n + 1;
-	ss = malloc(sizeof(char) * len);
-	snprintf(ss, len, "%s", s);
-	return ss;
-}
-
-char *
 skipws(char *s)
 {
 	for (; isspace(*s); s++) {}
 	return s;
-}
-
-char *
-skiplinespace(char *s)
-{
-	for (; *s == ' ' || *s == '\t'; s++) {}
-	return s;
-}
-
-char *
-parse_id(char *input);
-
-char *
-skipoptions(char *pos)
-{
-	char *keyword;
-	char *id;
-
-	keyword = "%option";
-	if (strncmp(pos, keyword, strlen(keyword)) != 0) {
-		return pos;
-	}
-	pos += strlen(keyword);
-	pos = skiplinespace(pos);
-	id = parse_id(pos);
-	pos += strlen(id);
-	free(id);
-	return pos;
-}
-
-char *
-parse_id(char *input)
-{
-	char *s;
-
-	if (!isalpha(*input)) {
-		fprintf(stderr, "id must begin with letter: '%s'", input);
-		exit(1);
-	}
-	s = input + 1;
-	/* XXX: '0' is a placeholder to allow this to parse */
-	for (; isalpha(*s) || isdigit(*s) || *s == '_' ; 0) {
-		s++;
-	}
-	return substr(input, s - input);
-}
-
-char *
-parse_tonewline(char *input)
-{
-	char *s;
-	for (s = input; *s != '\n'; 0) {
-		s++;
-	}
-	return substr(input, s - input);
 }
 
 struct stringresult {
@@ -248,12 +449,6 @@ struct stringresult {
 
 struct stringresult
 parse_defsraw(char *input);
-
-struct patternet {
-	struct pattern *pattern;
-	int npat;
-	char *pos;
-};
 
 struct patternet
 parse_defsproper(char *pos);
@@ -303,85 +498,12 @@ parse_defsraw(char *input)
 	return res;
 }
 
-struct pattern *
-pattern_create(char *name, char *pattern)
-{
-	struct pattern *p;
-
-	p = malloc(sizeof(struct pattern));
-	p->name = name;
-	p->pattern = pattern;
-
-	return p;
-}
-
 void
 pattern_print(struct pattern *p)
 {
 	printf("%s\t\t%s", p->name, p->pattern);
 }
 
-
-struct patternresult {
-	struct pattern *p;
-	char *pos;
-};
-
-struct patternresult
-parse_pattern(char *pos);
-
-struct patternet
-parse_defsproper(char *pos)
-{
-	int npat;
-	struct pattern *pattern;
-	struct patternresult parsed;
-	struct patternet res;
-
-	npat = 0;
-	pattern = NULL;
-	for (; strncmp(pos, "%%", 2) != 0 ; npat++) {
-		parsed = parse_pattern(pos);
-		pos = parsed.pos;
-		pattern = realloc(pattern, sizeof(struct pattern) * (npat + 1));
-		pattern[npat] = *parsed.p;
-		pos = skipws(pos);
-	}
-	res.pattern = pattern;
-	res.npat = npat;
-	res.pos = pos;
-	return pos;
-}
-
-struct patternresult
-parse_pattern(char *pos)
-{
-	char *name; char *pattern;
-	struct patternresult res;
-
-	name = parse_id(pos);
-	pos = pos + strlen(name);
-	pos = skiplinespace(pos);
-	pattern = parse_tonewline(pos);
-	pos += strlen(pattern);
-
-	res.p = pattern_create(name, pattern);
-	res.pos = pos;
-	return res;
-}
-
-struct token *
-token_create(int isliteral, char *name, char *action)
-{
-	struct token *tk;
-
-	tk = malloc(sizeof(struct token));
-	tk->isliteral = isliteral;
-	tk->name = name;
-	tk->action = action;
-
-	return tk;
-}
 
 void
 token_print(struct token *t)
@@ -394,36 +516,9 @@ token_print(struct token *t)
 	printf("\t\t%s", t->action);
 }
 
-struct tokenresult {
-	struct token *tk;
-	char *pos;
-};
-
 struct tokenresult
 parse_token(char *pos);
 
-struct rulesresult
-parse_rules(char *pos)
-{
-	int ntok;
-	struct token *token;
-	struct tokenresult parsed;
-	struct rulesresult res;
-
-	ntok = 0;
-	token = NULL;
-	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; ntok++) {
-		parsed = parse_token(pos);
-		pos = parsed.pos;
-		token = realloc(token, sizeof(struct token) * (ntok + 1));
-		token[ntok] = *parsed.tk;
-		pos = skipws(pos);
-	}
-	res.token = token;
-	res.ntok = ntok;
-	res.pos = pos;
-	return res;
-}
 
 struct tknameresult {
 	int isliteral;

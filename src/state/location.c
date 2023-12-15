@@ -135,6 +135,16 @@ location_references(struct location *l1, struct location *l2, struct state *s)
 	return b && block_references(b, l2, s);
 }
 
+bool
+location_referencesheap(struct location *l, struct state *s)
+{
+	if (l->type == LOCATION_DYNAMIC) {
+		return true;
+	}
+	struct object *obj = state_get(s, l, false);
+	return obj && object_referencesheap(obj, s);
+}
+
 struct block *
 location_getblock(struct location *loc, struct vconst *v, struct stack *s,
 		struct heap *h)

@@ -9,6 +9,7 @@
 #include "gram_util.h"
 #include "lex.h"
 #include "literals.h"
+#include "type/type.h"
 #include "util.h"
 
 extern char *yytext;
@@ -138,6 +139,11 @@ variable_array_create(struct ast_variable *v)
 		char *name;
 	} declarator;
 
+	struct declaration {
+		char *name;
+		struct ast_type *t;
+	} declaration;
+
 	int binary_operator;
 	int integer;
 	int type_modifier;
@@ -151,6 +157,7 @@ variable_array_create(struct ast_variable *v)
 %type <block_statement> block_statement
 %type <binary_operator> equality_operator relational_operator
 %type <boolean> struct_or_union
+%type <declaration> declaration
 %type <declarator> declarator init_declarator init_declarator_list
 %type <direct_function_declarator> direct_function_declarator
 
@@ -176,7 +183,7 @@ variable_array_create(struct ast_variable *v)
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
 %type <type_modifier> declaration_modifier storage_class_specifier type_qualifier
 %type <unary_operator> unary_operator
-%type <variable> declaration parameter_declaration struct_declaration
+%type <variable> parameter_declaration struct_declaration
 %type <variable_array> declaration_list parameter_list parameter_type_list
 %type <variable_array> struct_declaration_list
 %%
@@ -280,7 +287,9 @@ multiplicative_expression
 additive_expression
 	: multiplicative_expression
 	| additive_expression '+' multiplicative_expression
+		{ $$ = ast_expr_binary_create($1, BINARY_OP_ADDITION, $3); }
 	| additive_expression '-' multiplicative_expression
+		{ $$ = ast_expr_binary_create($1, BINARY_OP_SUBTRACTION, $3); }
 	;
 
 shift_expression
@@ -378,14 +387,23 @@ constant_expression
 	;
 
 declaration
-	/*: declaration_specifiers ';'*/
-		/*{ $$ = ast_variable_create(dynamic_str(""), $1); }*/
-	: declaration_specifiers init_declarator_list ';' {
+	: declaration_specifiers ';' {
+		char *name = ast_type_struct_tag($1);
+		assert(name);
+		$$ = (struct declaration) {
+			.name	= name,
+			.t	= $1,
+		};
+	}
+	| declaration_specifiers init_declarator_list ';' {
 		for (int i = 0; i < $2.ptr_valence; i++) {
 			assert($1);
 			$1 = ast_type_create_ptr($1);
 		}
-		$$ = ast_variable_create($2.name, $1);
+		$$ = (struct declaration) {
+			.name	= $2.name,
+			.t	= $1,
+		};
 	}
 	;
 
@@ -421,7 +439,7 @@ storage_class_specifier
 		 * concern is to prepare the lexer to return the next string it
 		 * sees as a TYPE_NAME, so that in the type_specifier beneath
 		 * the fact that this is a typedef will be captured */
-		$$ = 0; installclass = IC_TYPE;
+		$$ = MOD_TYPEDEF; installclass = IC_TYPE;
 	}
 	| EXTERN	{ $$ = MOD_EXTERN; }
 	| STATIC	{ $$ = MOD_STATIC; }
@@ -441,12 +459,7 @@ type_specifier
 	/*| UNSIGNED*/
 	| struct_or_union_specifier
 	/*| enum_specifier*/
-	| TYPE_NAME	{ 
-		$$ = ast_type_create_typedef(
-			ast_type_create(TYPE_TYPEDEF, 0),
-			dynamic_str(yytext)
-		);
-	}
+	| TYPE_NAME	{ $$ = ast_type_create_userdef(dynamic_str(yytext)); }
 	;
 
 struct_or_union_specifier
@@ -473,6 +486,7 @@ struct_declaration_list
 struct_declaration
 	/*: specifier_qualifier_list struct_declarator_list ';'*/
 	: declaration /* XXX: added temporarily */
+		{ $$ = ast_variable_create($1.name, $1.t); }
 	;
 
 specifier_qualifier_list
@@ -706,9 +720,9 @@ allocation_statement
 
 declaration_list
 	: declaration
-		{ $$ = variable_array_create($1); }
+		{ $$ = variable_array_create(ast_variable_create($1.name, $1.t)); }
 	| declaration_list declaration
-		{ $$ = variable_array_append($1, $2); }
+		{ $$ = variable_array_append($1, ast_variable_create($2.name, $2.t)); }
 	;
 
 statement_list
@@ -785,10 +799,7 @@ translation_unit
 
 external_declaration
 	: function_definition	{ $$ = ast_functiondecl_create($1); }
-	| declaration		{ $$ = ast_variabledecl_create($1); }
-
-	/* XXX: until we fix declaration */
-	| declaration_specifiers ';' { $$ = ast_typedecl_create($1); }
+	| declaration		{ $$ = ast_decl_create($1.name, $1.t); }
 	;
 
 block_statement

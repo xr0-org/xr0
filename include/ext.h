@@ -23,12 +23,18 @@ void
 externals_declarevar(struct externals *, char *id, struct ast_variable *);
 
 void
-externals_declaretype(struct externals *, char *id, struct ast_type *type);
+externals_declaretypedef(struct externals *, char *id, struct ast_type *type);
+
+void
+externals_declarestruct(struct externals *, struct ast_type *type);
 
 struct ast_function *
 externals_getfunc(struct externals *, char *id);
 
 struct ast_type *
-externals_gettype(struct externals *, char *id);
+externals_gettypedef(struct externals *, char *id);
+
+struct ast_type *
+externals_getstruct(struct externals *, char *id);
 
 #endif
