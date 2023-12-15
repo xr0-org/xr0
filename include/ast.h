@@ -328,15 +328,17 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
 
 enum ast_type_modifier {
+	MOD_TYPEDEF	= 1 << 0,
+
 	/* storage class */
-	MOD_EXTERN	= 1 << 0,
-	MOD_STATIC	= 1 << 1,
-	MOD_AUTO	= 1 << 2,
-	MOD_REGISTER	= 1 << 3,
+	MOD_EXTERN	= 1 << 1,
+	MOD_STATIC	= 1 << 2,
+	MOD_AUTO	= 1 << 3,
+	MOD_REGISTER	= 1 << 4,
 
 	/* qualifier */
-	MOD_CONST	= 1 << 4,
-	MOD_VOLATILE	= 1 << 5,
+	MOD_CONST	= 1 << 5,
+	MOD_VOLATILE	= 1 << 6,
 };
 
 enum ast_type_base { /* base type */
@@ -352,8 +354,6 @@ enum ast_type_base { /* base type */
 
 	TYPE_POINTER,
 	TYPE_ARRAY,
-
-	TYPE_TYPEDEF,
 
 	TYPE_STRUCT,
 	TYPE_UNION,
@@ -372,9 +372,6 @@ ast_type_create_ptr(struct ast_type *type);
 
 struct ast_type *
 ast_type_create_arr(struct ast_type *type, int length);
-
-struct ast_type *
-ast_type_create_typedef(struct ast_type *type, char *name);
 
 struct ast_variable_arr;
 

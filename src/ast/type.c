@@ -15,10 +15,6 @@ struct ast_type {
 			int length;
 		} arr;
 		struct {
-			struct ast_type *type;
-			char *name;
-		} _typedef;
-		struct {
 			char *tag;
 			struct ast_variable_arr *members;
 		} structunion;
@@ -51,16 +47,6 @@ ast_type_create_arr(struct ast_type *base, int length)
 	struct ast_type *t = ast_type_create(TYPE_ARRAY, 0);
 	t->u.arr.type = base;
 	t->u.arr.length = length;
-	return t;
-}
-
-struct ast_type *
-ast_type_create_typedef(struct ast_type *base, char *name)
-{
-	assert(base);
-	struct ast_type *t = ast_type_create(TYPE_TYPEDEF, 0);
-	t->u._typedef.type = base;
-	t->u._typedef.name = name;
 	return t;
 }
 
@@ -126,14 +112,6 @@ void
 ast_type_destroy(struct ast_type *t)
 {
 	switch (t->base) {
-	case TYPE_TYPEDEF:
-		/* XXX: typedef broken type not populating */
-		assert(false);
-		assert(t->u._typedef.type);
-		ast_type_destroy(t->u._typedef.type);
-		assert(t->u._typedef.name);
-		free(t->u._typedef.name);
-		break;
 	case TYPE_POINTER:
 		assert(t->u.ptr_type);
 		ast_type_destroy(t->u.ptr_type);
@@ -152,13 +130,6 @@ ast_type_copy(struct ast_type *t)
 {
 	assert(t);
 	switch (t->base) {
-	case TYPE_TYPEDEF:
-		return ast_type_create_typedef(
-			ast_type_copy(t->u._typedef.type),
-			t->u._typedef.name
-				? dynamic_str(t->u._typedef.name)
-				: NULL
-		);
 	case TYPE_POINTER:
 		return ast_type_create_ptr(
 			ast_type_copy(t->u.ptr_type)
@@ -188,9 +159,6 @@ static void
 ast_type_str_build_arr(struct strbuilder *b, struct ast_type *t);
 
 static void
-ast_type_str_build_typedef(struct strbuilder *b, struct ast_type *t);
-
-static void
 ast_type_str_build_struct(struct strbuilder *b, struct ast_type *t);
 
 char *
@@ -199,6 +167,7 @@ ast_type_str(struct ast_type *t)
 	assert(t);
 	/* XXX */
 	const char *modstr[] = {
+		[MOD_TYPEDEF]   = "typedef",
 		[MOD_EXTERN]	= "extern",
 		[MOD_AUTO]	= "auto",
 		[MOD_STATIC]	= "static",
@@ -234,9 +203,6 @@ ast_type_str(struct ast_type *t)
 		}
 	}
 	switch (t->base) {
-	case TYPE_TYPEDEF:
-		ast_type_str_build_typedef(b, t);
-		break;
 	case TYPE_POINTER:
 		ast_type_str_build_ptr(b, t);
 		break;
@@ -267,14 +233,6 @@ ast_type_str_build_arr(struct strbuilder *b, struct ast_type *t)
 {
 	char *base = ast_type_str(t->u.arr.type);
 	strbuilder_printf(b, "%s[%d]", base, t->u.arr.length);
-	free(base);
-}
-
-static void
-ast_type_str_build_typedef(struct strbuilder *b, struct ast_type *t)
-{
-	char *base = ast_type_str(t->u._typedef.type);
-	strbuilder_printf(b, "typedef %s %s", base, t->u._typedef.type);
 	free(base);
 }
 

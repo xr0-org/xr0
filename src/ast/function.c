@@ -155,6 +155,7 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
+	printf("state: %s\n", state_str(state));
 	struct error *err = path_verify(f, state, ext);
 	state_destroy(state);
 	return err;

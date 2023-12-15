@@ -2,7 +2,22 @@
 #include <stdlib.h>
 
 char *
-read_file(char *path);
+read_file(char *path)
+{
+	FILE *f;
+	char *str;
+	int fsize; /* XXX: should be long */
+
+	f = fopen(path, "rb");
+	fseek(f, 0, SEEK_END);
+	fsize = ftell(f);
+	fseek(f, 0, SEEK_SET);  /* same as rewind(f); */
+	str = malloc(fsize + 1);
+	fread(str, fsize, 1, f);
+	fclose(f);
+	str[fsize] = '\0';
+	return str;
+}
 
 struct lexer;
 
@@ -23,29 +38,13 @@ main()
 
 	file = read_file("gen.l");
 
+	/* XXX: temporarily framing #15
 	l = parse(file);
 	lexer_print(l);
 	lexer_destroy(l);
+	*/
 
 	free(file);
-}
-
-char *
-read_file(char *path)
-{
-	FILE *f;
-	char *str;
-	int fsize; /* XXX: should be long */
-
-	f = fopen(path, "rb");
-	fseek(f, 0, SEEK_END);
-	fsize = ftell(f);
-	fseek(f, 0, SEEK_SET);  /* same as rewind(f); */
-	str = malloc(fsize + 1);
-	fread(str, fsize, 1, f);
-	fclose(f);
-	str[fsize] = '\0';
-	return str;
 }
 
 struct pattern {

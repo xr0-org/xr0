@@ -385,7 +385,10 @@ declaration
 			assert($1);
 			$1 = ast_type_create_ptr($1);
 		}
-		$$ = ast_variable_create($2.name, $1);
+		if () {
+		} else {
+			$$ = ast_variable_create($2.name, $1);
+		}
 	}
 	;
 
@@ -421,7 +424,7 @@ storage_class_specifier
 		 * concern is to prepare the lexer to return the next string it
 		 * sees as a TYPE_NAME, so that in the type_specifier beneath
 		 * the fact that this is a typedef will be captured */
-		$$ = 0; installclass = IC_TYPE;
+		$$ = MOD_TYPEDEF; installclass = IC_TYPE;
 	}
 	| EXTERN	{ $$ = MOD_EXTERN; }
 	| STATIC	{ $$ = MOD_STATIC; }
@@ -443,8 +446,7 @@ type_specifier
 	/*| enum_specifier*/
 	| TYPE_NAME	{ 
 		$$ = ast_type_create_typedef(
-			ast_type_create(TYPE_TYPEDEF, 0),
-			dynamic_str(yytext)
+			0, dynamic_str(yytext)
 		);
 	}
 	;
@@ -477,7 +479,10 @@ struct_declaration
 
 specifier_qualifier_list
 	: type_specifier specifier_qualifier_list
+		/* TODO: handle typedef case here */
+		{ assert(ast_type_base($1) != TYPE_TYPEDEF); }
 	| type_specifier
+		{ assert(ast_type_base($1) != TYPE_TYPEDEF); }
 	| type_qualifier specifier_qualifier_list
 	| type_qualifier
 	;
