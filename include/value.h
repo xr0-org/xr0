@@ -2,6 +2,7 @@
 #define VALUE_H
 
 enum value_type {
+	VALUE_SYNC,
 	VALUE_PTR,
 	VALUE_INT,
 	VALUE_LITERAL,
@@ -16,13 +17,16 @@ struct value *
 value_ptr_create(struct location *loc);
 
 struct value *
+value_ptr_indefinite_create();
+
+struct value *
 value_int_create(int val);
 
 struct value *
 value_literal_create(char *);
 
 struct value *
-value_int_any_create();
+value_int_indefinite_create();
 
 struct value *
 value_int_ne_create(int not_val);
@@ -37,7 +41,7 @@ int
 value_int_up(struct value *);
 
 struct value *
-value_int_sync_create(struct ast_expr *);
+value_sync_create(struct ast_expr *);
 
 struct value *
 value_struct_create(struct ast_type *);
@@ -51,6 +55,9 @@ value_struct_member(struct value *, char *member);
 struct value *
 value_copy(struct value *);
 
+struct value *
+value_abstractcopy(struct value *, struct state *s);
+
 void
 value_destroy(struct value *);
 
@@ -62,6 +69,9 @@ value_type(struct value *);
 
 struct location *
 value_as_ptr(struct value *);
+
+bool
+value_referencesheap(struct value *, struct state *);
 
 bool
 value_isconstant(struct value *v);
@@ -85,6 +95,10 @@ enum ast_binary_operator;
 
 bool
 value_equal(struct value *v1, struct value *v2);
+
+/* value_assume: Returns false if contradiction encountered. */
+bool
+value_assume(struct value *, bool value);
 
 enum number_value_type {
 	NUMBER_VALUE_CONSTANT,

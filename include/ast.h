@@ -66,6 +66,9 @@ enum ast_unary_operator;
 struct ast_expr *
 ast_expr_unary_create(struct ast_expr *, enum ast_unary_operator);
 
+struct ast_expr *
+ast_expr_inverted_copy(struct ast_expr *expr, bool invert);
+
 enum ast_unary_operator
 ast_expr_unary_op(struct ast_expr *);
 
@@ -152,6 +155,11 @@ ast_expr_rangedecide(struct ast_expr *, struct ast_expr *lw,
 struct error *
 ast_expr_exec(struct ast_expr *, struct state *);
 
+struct preresult;
+
+struct preresult *
+ast_expr_assume(struct ast_expr *, struct state *);
+
 struct lvalue;
 
 struct lvalue *
@@ -194,6 +202,9 @@ ast_block_nstmts(struct ast_block *b);
 
 struct ast_stmt **
 ast_block_stmts(struct ast_block *b);
+
+bool
+ast_block_isterminal(struct ast_block *);
 
 enum ast_jump_kind {
 	JUMP_RETURN	= 1 << 0,
@@ -311,11 +322,19 @@ ast_stmt_as_v_block(struct ast_stmt *);
 struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
 
-bool
-ast_stmt_issetup(struct ast_stmt *);
-
 struct error *
 ast_stmt_process(struct ast_stmt *, struct state *);
+
+struct preresult;
+
+struct preresult *
+ast_stmt_preprocess(struct ast_stmt *, struct state *);
+
+bool
+ast_stmt_isterminal(struct ast_stmt *);
+
+bool
+ast_stmt_isselection(struct ast_stmt *);
 
 struct error *
 ast_stmt_verify(struct ast_stmt *, struct state *);
@@ -327,54 +346,17 @@ struct result *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
 
-enum ast_type_modifier {
-	/* storage class */
-	MOD_EXTERN	= 1 << 0,
-	MOD_STATIC	= 1 << 1,
-	MOD_AUTO	= 1 << 2,
-	MOD_REGISTER	= 1 << 3,
-
-	/* qualifier */
-	MOD_CONST	= 1 << 4,
-	MOD_VOLATILE	= 1 << 5,
-};
-
-enum ast_type_base { /* base type */
-	TYPE_VOID,
-	TYPE_CHAR,
-	TYPE_SHORT,
-	TYPE_INT,
-	TYPE_LONG,
-	TYPE_FLOAT,
-	TYPE_DOUBLE,
-	TYPE_SIGNED,
-	TYPE_UNSIGNED,
-
-	TYPE_POINTER,
-	TYPE_ARRAY,
-
-	TYPE_TYPEDEF,
-
-	TYPE_STRUCT,
-	TYPE_UNION,
-	TYPE_ENUM,
-};
-
 struct ast_type;
 
-struct ast_type *
-ast_type_create(enum ast_type_base base, enum ast_type_modifier mod);
-
 /* TODO: allow modifiers for pointer, array and typedef types */
+bool
+ast_type_isint(struct ast_type *type);
 
 struct ast_type *
 ast_type_create_ptr(struct ast_type *type);
 
 struct ast_type *
 ast_type_create_arr(struct ast_type *type, int length);
-
-struct ast_type *
-ast_type_create_typedef(struct ast_type *type, char *name);
 
 struct ast_variable_arr;
 
@@ -393,8 +375,20 @@ ast_type_create_struct_anonym(struct ast_variable_arr *);
 struct ast_type *
 ast_type_create_struct_partial(char *tag);
 
-void
-ast_type_mod_or(struct ast_type *, enum ast_type_modifier);
+struct ast_type *
+ast_type_create_userdef(char *name);
+
+bool
+ast_type_isstruct(struct ast_type *);
+
+bool
+ast_type_istypedef(struct ast_type *);
+
+struct value;
+struct externals;
+
+struct value *
+ast_type_vconst(struct ast_type *, struct externals *ext);
 
 void
 ast_type_destroy(struct ast_type *);
@@ -509,28 +503,19 @@ struct result;
 struct result *
 ast_function_absexec(struct ast_function *, struct state *state);
 
-enum ast_externdecl_kind {
-	EXTERN_FUNCTION = 1 << 0,
-	EXTERN_VARIABLE	= 1 << 1,
-	EXTERN_TYPE	= 1 << 2,
-};
-
 struct ast_externdecl;
 
 struct ast_externdecl *
 ast_functiondecl_create(struct ast_function *);
 
+bool
+ast_externdecl_isfunction(struct ast_externdecl *);
+
 struct ast_function *
 ast_externdecl_as_function(struct ast_externdecl *);
 
 struct ast_externdecl *
-ast_variabledecl_create(struct ast_variable *);
-
-struct ast_externdecl *
-ast_typedecl_create(struct ast_type *);
-
-enum ast_externdecl_kind
-ast_externdecl_kind(struct ast_externdecl *);
+ast_decl_create(char *name, struct ast_type *);
 
 void
 ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext);

@@ -272,7 +272,7 @@ ast_expr_member_str_build(struct ast_expr *expr, struct strbuilder *b)
 
 	char *r = ast_expr_str(root);
 	strbuilder_printf(b, "%s.%s", r, expr->u.string);
-	free(root);
+	free(r);
 }
 
 static void
@@ -305,6 +305,15 @@ ast_expr_unary_create(struct ast_expr *root, enum ast_unary_operator op)
 	expr->root = root;
 	expr->u.unary_op = op;
 	return expr;
+}
+
+struct ast_expr *
+ast_expr_inverted_copy(struct ast_expr *expr, bool invert)
+{
+	struct ast_expr *copy = ast_expr_copy(expr);
+	return invert
+		? ast_expr_unary_create(copy, UNARY_OP_BANG)
+		: copy;
 }
 
 static void
@@ -709,13 +718,29 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 		return e1->u.constant == e2->u.constant;
 	case EXPR_IDENTIFIER:
 		return strcmp(ast_expr_as_identifier(e1), ast_expr_as_identifier(e2)) == 0;
+	case EXPR_STRING_LITERAL:
+		return strcmp(ast_expr_as_literal(e1), ast_expr_as_literal(e2)) == 0;
 	case EXPR_ASSIGNMENT:
 		return ast_expr_equal(e1->root, e2->root)
 			&& ast_expr_equal(e1->u.assignment_value, e2->u.assignment_value); 
+	case EXPR_UNARY:
+		return e1->u.unary_op == e2->u.unary_op &&
+			ast_expr_equal(e1->root, e2->root);
+
 	case EXPR_BINARY:
 		return ast_expr_binary_op(e1) == ast_expr_binary_op(e2) &&
 			ast_expr_equal(ast_expr_binary_e1(e1), ast_expr_binary_e1(e2)) && 
 			ast_expr_equal(ast_expr_binary_e2(e1), ast_expr_binary_e2(e2));
+	case EXPR_CALL:
+		if (e1->u.call.n != e2->u.call.n) {
+			return false;
+		}
+		for (int i = 0; i < e1->u.call.n; i++) {
+			if (!ast_expr_equal(e1->u.call.arg[i], e2->u.call.arg[i])) {
+				return false;
+			}
+		}
+		return ast_expr_equal(e1->root, e2->root);
 	default:
 		assert(false);
 	}

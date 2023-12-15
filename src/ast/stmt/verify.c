@@ -4,6 +4,7 @@
 #include <string.h>
 #include "ast.h"
 #include "intern.h"
+#include "props.h"
 #include "object.h"
 #include "state.h"
 #include "stmt.h"
@@ -24,6 +25,29 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 		return error_prepend(err, "cannot exec statement: ");
 	}
 	return NULL;
+}
+
+static struct preresult *
+stmt_installprop(struct ast_stmt *stmt, struct state *state);
+
+struct preresult *
+ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
+{
+	if (ast_stmt_ispre(stmt)) {
+		struct error *err = ast_stmt_exec(stmt, state);
+		if (err) {
+			return preresult_error_create(err);
+		}
+	} else if (ast_stmt_isassume(stmt)) {
+		return stmt_installprop(stmt, state);
+	}
+	return preresult_empty_create();
+}
+
+static struct preresult *
+stmt_installprop(struct ast_stmt *stmt, struct state *state)
+{
+	return ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), state);
 }
 
 /* stmt_verify */
@@ -168,6 +192,9 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 		if (err) {
 			return err;
 		}
+		if (ast_stmt_isterminal(stmts[i])) {
+			break;
+		}
 	}
 	return NULL;
 }
@@ -236,11 +263,12 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		assert(obj);
 		object_assign(obj, value_copy(result_as_value(res)));
 		result_destroy(res);
-		state_undeclarevars(state);
 	}
 	return NULL;
 }
 
+static struct result *
+sel_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct result *
 iter_absexec(struct ast_stmt *stmt, struct state *state);
@@ -260,6 +288,8 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 		return result_value_create(NULL);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
+	case STMT_SELECTION:
+		return sel_absexec(stmt, state);
 	case STMT_ITERATION:
 		return iter_absexec(stmt, state);
 	case STMT_COMPOUND:
@@ -298,6 +328,9 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 	if (result_iserror(result_up)) {
 		return result_up;
 	}
+
+	/*printf("stmt: %s\n", ast_stmt_str(stmt));*/
+	/*printf("state: %s\n", state_str(state));*/
 
 	struct ast_expr *res_lw = value_to_expr(result_as_value(result_lw)),
 			*res_up = value_to_expr(result_as_value(result_up));
@@ -348,6 +381,46 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	return obj;
 }
 
+static bool
+sel_decide(struct ast_expr *control, struct state *state);
+
+static struct result *
+sel_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	if (sel_decide(ast_stmt_sel_cond(stmt), state)) {
+		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
+	}
+	assert(!ast_stmt_sel_nest(stmt));
+	return result_value_create(NULL);
+}
+
+static struct value *
+underlying_value(struct value *v, struct state *state);
+
+static bool
+sel_decide(struct ast_expr *control, struct state *state)
+{
+	struct result *res = ast_expr_eval(control, state);
+	assert(!result_iserror(res)); /* TODO: process error */
+
+	struct value *zero = value_int_create(0);
+	bool nonzero = !value_equal(
+		zero, underlying_value(result_as_value(res), state)
+	);
+	value_destroy(zero);
+	return nonzero;
+}
+
+static struct value *
+underlying_value(struct value *v, struct state *state)
+{
+	if (value_issync(v)) {
+		return state_getvconst(
+			state, ast_expr_as_identifier(value_as_sync(v))
+		);
+	}
+	return v;
+}
 
 static struct result *
 comp_absexec(struct ast_stmt *stmt, struct state *state)

@@ -43,4 +43,30 @@ lvalue_type(struct lvalue *);
 struct object *
 lvalue_object(struct lvalue *);
 
+struct preresult;
+
+struct preresult *
+preresult_empty_create();
+
+struct preresult *
+preresult_error_create(struct error *err);
+
+struct preresult *
+preresult_contradiction_create();
+
+void
+preresult_destroy(struct preresult *);
+
+bool
+preresult_isempty(struct preresult *);
+
+bool
+preresult_iserror(struct preresult *);
+
+struct error *
+preresult_as_error(struct preresult *);
+
+bool
+preresult_iscontradiction(struct preresult *);
+
 #endif

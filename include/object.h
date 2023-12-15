@@ -16,6 +16,9 @@ object_range_create(struct ast_expr *offset, struct range *);
 struct object *
 object_copy(struct object *old);
 
+struct object *
+object_abstractcopy(struct object *old, struct state *s);
+
 void
 object_destroy(struct object *);
 
@@ -37,6 +40,9 @@ struct location;
 
 bool
 object_references(struct object *, struct location *, struct state *);
+
+bool
+object_referencesheap(struct object *, struct state *);
 
 bool
 object_isvalue(struct object *);

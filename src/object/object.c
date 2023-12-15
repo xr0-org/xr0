@@ -103,6 +103,23 @@ object_copy(struct object *old)
 	return new;
 }
 
+struct object *
+object_abstractcopy(struct object *old, struct state *s)
+{
+	switch (old->type) {
+	case OBJECT_DEALLOCAND_RANGE:
+		/* TODO: reset observations */
+		return object_copy(old);
+	case OBJECT_VALUE:
+		return object_value_create(
+			ast_expr_copy(old->offset),
+			old->value ? value_abstractcopy(old->value, s) : NULL
+		);
+	default:
+		assert(false);
+	}
+}
+
 static char *
 inner_str(struct object *);
 
@@ -135,10 +152,21 @@ inner_str(struct object *obj)
 }
 
 bool
+object_referencesheap(struct object *obj, struct state *s)
+{
+	if (!object_isvalue(obj)) {
+		/* TODO: do we need to exclude the case of ranges on stack? */
+		return true;
+	}
+	return obj->value && value_referencesheap(obj->value, s);
+}
+
+bool
 object_isvalue(struct object *obj)
 {
 	return obj->type == OBJECT_VALUE;
 }
+
 
 struct value *
 object_as_value(struct object *obj)
@@ -431,7 +459,7 @@ usecomplete(struct ast_type *t, struct state *s)
 	}
 	char *tag = ast_type_struct_tag(t);
 	assert(tag);
-	return externals_gettype(state_getext(s), tag);
+	return externals_getstruct(state_getext(s), tag);
 }
 
 struct ast_type *

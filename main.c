@@ -174,16 +174,6 @@ preprocess(char *infile, struct string_arr *includedirs)
 
 struct ast *root;
 
-static bool
-should_verify(struct ast_externdecl *decl)
-{
-	if (ast_externdecl_kind(decl) != EXTERN_FUNCTION) {
-		/* TODO: install global var in table */
-		return false;
-	}
-	return !ast_function_isaxiom(ast_externdecl_as_function(decl));
-}
-
 void
 pass1(struct ast *root, struct externals *ext)
 {
@@ -198,10 +188,13 @@ pass1(struct ast *root, struct externals *ext)
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
 		ast_externdecl_install(decl, ext);
-		if (!should_verify(decl)) {
+		if (!ast_externdecl_isfunction(decl)) {
 			continue;
 		}
 		struct ast_function *f = ast_externdecl_as_function(decl);
+		if (ast_function_isaxiom(f)) {
+			continue;
+		}
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
 		if ((err = ast_function_verify(f, ext))) {

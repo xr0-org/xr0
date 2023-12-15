@@ -76,10 +76,17 @@ ast_stmt_labelled_stmt(struct ast_stmt *stmt)
 }
 
 bool
-ast_stmt_issetup(struct ast_stmt *stmt)
+ast_stmt_ispre(struct ast_stmt *stmt)
 {
 	return stmt->kind == STMT_LABELLED
 		&& strcmp(stmt->u.labelled.label, "pre") == 0;
+}
+
+bool
+ast_stmt_isassume(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_LABELLED
+		&& strcmp(stmt->u.labelled.label, "assume") == 0;
 }
 
 static void
@@ -170,8 +177,27 @@ ast_stmt_create_jump(struct lexememarker *loc, enum ast_jump_kind kind,
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt)
 {
-	assert(stmt->kind == STMT_JUMP && stmt->u.jump.kind == JUMP_RETURN);
+	assert(ast_stmt_isterminal(stmt));
 	return stmt->u.jump.rv;
+}
+
+bool
+ast_stmt_isterminal(struct ast_stmt *stmt)
+{
+	switch (stmt->kind) {
+	case STMT_JUMP:
+		return stmt->u.jump.kind == JUMP_RETURN;
+	case STMT_COMPOUND:
+		return ast_block_isterminal(stmt->u.compound);
+	default:
+		return false;
+	}
+}
+
+bool
+ast_stmt_isselection(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_SELECTION;
 }
 
 static void

@@ -12,6 +12,7 @@ BUILD_DIR = build
 INCLUDE_DIR = include
 SRC_DIR = src
 EXT_DIR = $(SRC_DIR)/ext
+PROPS_DIR = $(SRC_DIR)/props
 STATE_DIR = $(SRC_DIR)/state
 OBJECT_DIR = $(SRC_DIR)/object
 VALUE_DIR = $(SRC_DIR)/value
@@ -31,6 +32,7 @@ HEAP_OBJ = $(BUILD_DIR)/heap.o
 LOCATION_OBJ = $(BUILD_DIR)/location.o
 BLOCK_OBJ = $(BUILD_DIR)/block.o
 EXT_OBJ = $(BUILD_DIR)/ext.o
+PROPS_OBJ = $(BUILD_DIR)/props.o
 OBJECT_OBJ = $(BUILD_DIR)/object.o
 VALUE_OBJ = $(BUILD_DIR)/value.o
 MATH_OBJ = $(BUILD_DIR)/math.o
@@ -57,7 +59,8 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 		$(BLOCK_OBJ) \
 		$(HEAP_OBJ) \
 		$(STACK_OBJ) \
-		$(EXT_OBJ)
+		$(EXT_OBJ) \
+		$(PROPS_OBJ)
 
 OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
@@ -99,6 +102,10 @@ $(EXT_OBJ): $(EXT_DIR)/ext.c
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(EXT_DIR)/ext.c
 
+$(PROPS_OBJ): $(PROPS_DIR)/props.c
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(PROPS_DIR)/props.c
+
 $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/stack.c
@@ -127,7 +134,12 @@ $(UTIL_OBJ): $(UTIL_DIR)/util.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(UTIL_DIR)/util.c
 
-$(AST_OBJ): $(AST_DIR)/ast.c $(AST_DIR)/expr/expr.h $(AST_DIR)/literals.h $(MATH_OBJ)
+$(AST_OBJ): $(AST_DIR)/ast.c \
+	$(AST_DIR)/expr/expr.h \
+	$(AST_DIR)/type/type.h \
+	$(AST_DIR)/literals.h \
+	$(AST_DIR)/function/function.h \
+	$(MATH_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(AST_DIR)/ast.c
 

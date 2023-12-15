@@ -39,7 +39,7 @@ ast_variable_copy(struct ast_variable *v)
 struct ast_variable **
 ast_variables_copy(int n, struct ast_variable **v)
 {
-	assert(v);
+	assert(v || !n);
 	struct ast_variable **new = calloc(n, sizeof(struct variable *));
 	for (int i = 0; i < n; i++) {
 		new[i] = ast_variable_copy(v[i]);
