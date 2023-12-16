@@ -170,6 +170,8 @@ ast_type_copy(struct ast_type *t)
 		);
 	case TYPE_STRUCT:
 		return ast_type_copy_struct(t);
+	case TYPE_USERDEF:
+		return ast_type_create_userdef(dynamic_str(t->userdef));
 
 	case TYPE_VOID:
 	case TYPE_INT:

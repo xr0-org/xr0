@@ -137,7 +137,6 @@ void
 stack_declare(struct stack *stack, struct ast_variable *var, bool isparam)
 {
 	char *id = ast_variable_name(var);
-	printf("declare: %s\n", id);
 	assert(!map_get(stack->varmap, id));
 	map_set(
 		stack->varmap,

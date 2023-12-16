@@ -188,6 +188,7 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = 0; i < nstmts; i++) {
+		printf("%s\n", ast_stmt_str(stmt[i]));
 		if ((err = ast_stmt_process(stmt[i], state))) {
 			return err;
 		}
@@ -209,7 +210,7 @@ parameterise_state(struct state *s, struct ast_function *f)
 	for (int i = 0; i < nparams; i++) {
 		struct ast_variable *p = param[i];
 		state_declare(s, p, true);
-		if (ast_type_base(ast_variable_type(p)) == TYPE_INT) {
+		if (ast_type_isint(ast_variable_type(p))) {
 			struct object *obj = state_getobject(s, ast_variable_name(p));
 			assert(obj);
 			object_assign(obj, state_vconst(s));

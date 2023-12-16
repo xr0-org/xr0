@@ -80,6 +80,11 @@ ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext)
 		v = decl->variable;
 		externals_declarevar(ext, ast_variable_name(v), v);
 		break;
+	case EXTERN_TYPEDEF:
+		externals_declaretypedef(
+			ext, decl->_typedef.name, decl->_typedef.type
+		);
+		break;
 	case EXTERN_STRUCT:
 		externals_declarestruct(ext, decl->_struct);
 		break;

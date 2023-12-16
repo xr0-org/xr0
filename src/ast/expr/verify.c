@@ -391,9 +391,6 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 
 /* expr_call_eval */
 
-struct ast_function *
-expr_as_func(struct ast_expr *expr, struct state *state);
-
 struct result_arr {
 	int n;
 	struct result **res;
@@ -421,29 +418,74 @@ result_arr_append(struct result_arr *arr, struct result *res)
 	arr->res[arr->n-1] = res;
 }
 
+static struct result_arr *
+prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
+		struct ast_variable **param, struct state *state);
+
+static struct error *
+prepare_parameters(int nparams, struct ast_variable **param, 
+		struct result_arr *args, struct state *state);
+
+static struct result *
+expr_call_eval(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(root);
+
+	struct ast_function *f = externals_getfunc(state_getext(state), name);
+	if (!f) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "function `%s' not found", name);
+		return result_error_create(error_create(strbuilder_build(b)));
+	}
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **params = ast_function_params(f);
+
+	struct result_arr *args = prepare_arguments(
+		ast_expr_call_nargs(expr),
+		ast_expr_call_args(expr),
+		nparams, params, state
+	);
+
+	state_pushframe(
+		state, dynamic_str(ast_function_name(f)), ast_function_type(f)
+	);
+
+	struct error *err = prepare_parameters(nparams, params, args, state);
+	if (err) {
+		return result_error_create(err);
+	}
+
+	struct result *res = ast_function_absexec(f, state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	result_arr_destroy(args);
+	if (result_hasvalue(res)) { /* preserve value through pop */
+		res = result_value_create(value_copy(result_as_value(res)));
+	}
+
+	state_popframe(state);
+
+	return res;
+}
+
 static struct result *
 prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state *);
 
-struct result_arr *
-prepare_arguments(struct ast_expr *call, struct state *state)
+static struct result_arr *
+prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
+		struct ast_variable **param, struct state *state)
 {
-	struct result_arr *args = result_arr_create();
-
-	int nargs = ast_expr_call_nargs(call);
-	struct ast_expr **arg = ast_expr_call_args(call);
-
-	struct ast_function *f = expr_as_func(call, state);
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **param = ast_function_params(f);
-
 	assert(nargs == nparams);
 
+	struct result_arr *args = result_arr_create();
 	for (int i = 0; i < nargs; i++) {
 		result_arr_append(
 			args, prepare_argument(arg[i], param[i], state)
 		);
 	}
-
 	return args;
 }
 
@@ -457,69 +499,13 @@ prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state 
 	return result_value_create(state_vconst(s));
 }
 
-
-static struct result *
-call_eval_inframe(struct ast_expr *expr, struct state *state, struct result_arr *args);
-
-static struct result *
-expr_call_eval(struct ast_expr *expr, struct state *state)
-{
-	struct result_arr *args = prepare_arguments(expr, state);
-	struct ast_function *f = expr_as_func(expr, state);
-	state_pushframe(
-		state, dynamic_str(ast_function_name(f)), ast_function_type(f)
-	);
-	struct result *res = call_eval_inframe(expr, state, args);
-	if (result_iserror(res)) {
-		return res;
-	}
-	result_arr_destroy(args);
-	if (result_hasvalue(res)) { /* preserve value through pop */
-		res = result_value_create(value_copy(result_as_value(res)));
-	}
-	state_popframe(state);
-	return res;
-}
-
-/* call_type */
-
-struct ast_function *
-expr_as_func(struct ast_expr *expr, struct state *state)
-{
-	struct ast_expr *root = ast_expr_call_root(expr);
-	/* TODO: allow function-valued expressions */
-	return externals_getfunc(state_getext(state), ast_expr_as_identifier(root));
-}
-
-/* call_eval_inframe */
-
-static struct error *
-prepare_parameters(struct ast_function *f, struct result_arr *args,
-		struct state *state);
-
-static struct result *
-call_eval_inframe(struct ast_expr *expr, struct state *state, struct result_arr *args)
-{
-	struct ast_function *f = expr_as_func(expr, state);
-	assert(f);
-
-	struct error *err = prepare_parameters(f, args, state);
-	if (err) {
-		return result_error_create(err);
-	}
-
-	return ast_function_absexec(f, state);
-}
-
 /* prepare_parameters: Allocate arguments in call expression and assign them to
  * their respective parameters. */
 static struct error *
-prepare_parameters(struct ast_function *f, struct result_arr *args,
-		struct state *state)
+prepare_parameters(int nparams, struct ast_variable **param, 
+		struct result_arr *args, struct state *state)
 {
-	struct ast_variable **param = ast_function_params(f);
-
-	assert(ast_function_nparams(f) == args->n);
+	assert(nparams == args->n);
 
 	for (int i = 0; i < args->n; i++) {
 		state_declare(state, param[i], true);
@@ -558,6 +544,9 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 			*rval = ast_expr_assignment_rval(expr);
 
 	struct result *res = ast_expr_eval(rval, state);
+	if (result_iserror(res)) {
+		return res;
+	}
 	if (result_hasvalue(res)) {
 		struct object *obj = lvalue_object(ast_expr_lvalue(lval, state));
 		assert(obj);

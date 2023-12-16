@@ -9,4 +9,7 @@ putc(int c);
 axiom int
 puts(char *s);
 
+axiom FILE *
+fopen(char *pathname, char *mode);
+
 #endif
