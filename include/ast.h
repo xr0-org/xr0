@@ -356,6 +356,9 @@ ast_type_create_struct_anonym(struct ast_variable_arr *);
 struct ast_type *
 ast_type_create_struct_partial(char *tag);
 
+struct ast_type *
+ast_type_create_userdef(char *name);
+
 bool
 ast_type_isstruct(struct ast_type *);
 

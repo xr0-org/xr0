@@ -19,7 +19,8 @@ struct ast_type {
 			char *tag;
 			struct ast_variable_arr *members;
 		} structunion;
-	} u;
+		char *userdef;
+	};
 };
 
 bool
@@ -43,7 +44,7 @@ ast_type_create_ptr(struct ast_type *ref)
 {
 	assert(ref);
 	struct ast_type *t = ast_type_create(TYPE_POINTER, 0);
-	t->u.ptr_type = ref;
+	t->ptr_type = ref;
 	return t;
 }
 
@@ -52,8 +53,8 @@ ast_type_create_arr(struct ast_type *base, int length)
 {
 	assert(base);
 	struct ast_type *t = ast_type_create(TYPE_ARRAY, 0);
-	t->u.arr.type = base;
-	t->u.arr.length = length;
+	t->arr.type = base;
+	t->arr.length = length;
 	return t;
 }
 
@@ -61,10 +62,19 @@ struct ast_type *
 ast_type_create_struct(char *tag, struct ast_variable_arr *members)
 {
 	struct ast_type *t = ast_type_create(TYPE_STRUCT, 0);
-	t->u.structunion.tag = tag;
-	t->u.structunion.members = members;
+	t->structunion.tag = tag;
+	t->structunion.members = members;
 	return t;
 }
+
+struct ast_type *
+ast_type_create_userdef(char *name)
+{
+	struct ast_type *t = ast_type_create(TYPE_USERDEF, 0);
+	t->userdef = name;
+	return t;
+}
+
 
 bool
 ast_type_isstruct(struct ast_type *t)
@@ -77,7 +87,7 @@ ast_type_struct_members(struct ast_type *t)
 {
 	assert(t->base == TYPE_STRUCT);
 
-	return t->u.structunion.members;
+	return t->structunion.members;
 }
 
 char *
@@ -85,7 +95,7 @@ ast_type_struct_tag(struct ast_type *t)
 {
 	assert(t->base == TYPE_STRUCT);
 
-	return t->u.structunion.tag;
+	return t->structunion.tag;
 }
 
 struct ast_type *
@@ -106,11 +116,11 @@ ast_type_copy_struct(struct ast_type *old)
 	assert(old->base == TYPE_STRUCT);
 
 	struct ast_type *new = ast_type_create(TYPE_STRUCT, old->mod);
-	new->u.structunion.tag = old->u.structunion.tag
-		? dynamic_str(old->u.structunion.tag)
+	new->structunion.tag = old->structunion.tag
+		? dynamic_str(old->structunion.tag)
 		: NULL;
-	new->u.structunion.members = old->u.structunion.members
-		? ast_variable_arr_copy(old->u.structunion.members)
+	new->structunion.members = old->structunion.members
+		? ast_variable_arr_copy(old->structunion.members)
 		: NULL;
 	return new;
 }
@@ -132,12 +142,12 @@ ast_type_destroy(struct ast_type *t)
 {
 	switch (t->base) {
 	case TYPE_POINTER:
-		assert(t->u.ptr_type);
-		ast_type_destroy(t->u.ptr_type);
+		assert(t->ptr_type);
+		ast_type_destroy(t->ptr_type);
 		break;
 	case TYPE_ARRAY:
-		assert(t->u.arr.type);
-		ast_type_destroy(t->u.arr.type);
+		assert(t->arr.type);
+		ast_type_destroy(t->arr.type);
 	default:
 		break;
 	}
@@ -151,12 +161,12 @@ ast_type_copy(struct ast_type *t)
 	switch (t->base) {
 	case TYPE_POINTER:
 		return ast_type_create_ptr(
-			ast_type_copy(t->u.ptr_type)
+			ast_type_copy(t->ptr_type)
 		);
 	case TYPE_ARRAY:
 		return ast_type_create_arr(
-			ast_type_copy(t->u.arr.type),
-			t->u.arr.length
+			ast_type_copy(t->arr.type),
+			t->arr.length
 		);
 	case TYPE_STRUCT:
 		return ast_type_copy_struct(t);
@@ -241,8 +251,8 @@ ast_type_str(struct ast_type *t)
 static void
 ast_type_str_build_ptr(struct strbuilder *b, struct ast_type *t)
 {
-	char *base = ast_type_str(t->u.ptr_type);
-	bool space = t->u.ptr_type->base != TYPE_POINTER;
+	char *base = ast_type_str(t->ptr_type);
+	bool space = t->ptr_type->base != TYPE_POINTER;
 	strbuilder_printf(b, "%s%s*", base, space ? " " : "");
 	free(base);
 }
@@ -250,16 +260,16 @@ ast_type_str_build_ptr(struct strbuilder *b, struct ast_type *t)
 static void
 ast_type_str_build_arr(struct strbuilder *b, struct ast_type *t)
 {
-	char *base = ast_type_str(t->u.arr.type);
-	strbuilder_printf(b, "%s[%d]", base, t->u.arr.length);
+	char *base = ast_type_str(t->arr.type);
+	strbuilder_printf(b, "%s[%d]", base, t->arr.length);
 	free(base);
 }
 
 static void
 ast_type_str_build_struct(struct strbuilder *b, struct ast_type *t)
 {
-	char *tag = t->u.structunion.tag;
-	struct ast_variable_arr *members = t->u.structunion.members;
+	char *tag = t->structunion.tag;
+	struct ast_variable_arr *members = t->structunion.members;
 
 	assert(tag || members);
 
@@ -294,5 +304,5 @@ struct ast_type *
 ast_type_ptr_type(struct ast_type *t)
 {
 	assert(t->base == TYPE_POINTER);
-	return t->u.ptr_type;
+	return t->ptr_type;
 }

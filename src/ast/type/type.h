@@ -16,6 +16,7 @@ enum ast_type_modifier {
 };
 
 enum ast_type_base { /* base type */
+	/* variable type */
 	TYPE_VOID,
 	TYPE_CHAR,
 	TYPE_SHORT,
@@ -25,13 +26,16 @@ enum ast_type_base { /* base type */
 	TYPE_DOUBLE,
 	TYPE_SIGNED,
 	TYPE_UNSIGNED,
-
 	TYPE_POINTER,
 	TYPE_ARRAY,
 
+	/* composite */
 	TYPE_STRUCT,
 	TYPE_UNION,
 	TYPE_ENUM,
+
+	/* derivative */
+	TYPE_USERDEF,
 };
 
 struct ast_type *

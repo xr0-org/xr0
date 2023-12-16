@@ -457,10 +457,7 @@ type_specifier
 	/*| UNSIGNED*/
 	| struct_or_union_specifier
 	/*| enum_specifier*/
-	| TYPE_NAME	{
-		printf("yytext: %s\n", yytext);
-		assert(false);
-	}
+	| TYPE_NAME	{ $$ = ast_type_create_userdef(dynamic_str(yytext)); }
 	;
 
 struct_or_union_specifier
