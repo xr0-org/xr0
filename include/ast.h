@@ -365,6 +365,11 @@ ast_type_isstruct(struct ast_type *);
 bool
 ast_type_istypedef(struct ast_type *);
 
+struct value;
+
+struct value *
+ast_type_vconst(struct ast_type *);
+
 void
 ast_type_destroy(struct ast_type *);
 

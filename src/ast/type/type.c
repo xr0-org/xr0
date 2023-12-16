@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "type.h"
 #include "util.h"
+#include "value.h"
 
 struct ast_type {
 	int mod;
@@ -73,6 +74,19 @@ ast_type_create_userdef(char *name)
 	struct ast_type *t = ast_type_create(TYPE_USERDEF, 0);
 	t->userdef = name;
 	return t;
+}
+
+struct value *
+ast_type_vconst(struct ast_type *t)
+{
+	switch (t->base) {
+	case TYPE_INT:
+		return value_int_any_create();
+	case TYPE_POINTER:
+		return value_ptr_any_create();
+	default:
+		assert(false);
+	}
 }
 
 

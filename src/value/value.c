@@ -11,7 +11,16 @@
 struct value {
 	enum value_type type;
 	union {
-		struct location *loc; /* NULL is represented as NULL location */
+		struct {
+			bool isany;
+			union {
+				/* NULL is represented as NULL location */
+				struct location *loc;
+
+				/* particularly for "any" case */
+				struct number *n;
+			};
+		} ptr;
 
 		/* TODO: int, char, etc */
 		struct number *n;
@@ -30,14 +39,47 @@ value_ptr_create(struct location *loc)
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_PTR;
-	v->loc = loc;
+	v->ptr.isany = false;
+	v->ptr.loc = loc;
 	return v;
+}
+
+struct number *
+number_any_create();
+
+struct value *
+value_ptr_any_create()
+{
+	struct value *v = malloc(sizeof(struct value));
+	assert(v);
+	v->type = VALUE_PTR;
+	v->ptr.isany = true;
+	v->ptr.n = number_any_create();
+	return v;
+}
+
+struct number *
+number_copy(struct number *num);
+
+struct value *
+value_ptr_copy(struct value *old)
+{
+	struct value *new = malloc(sizeof(struct value));
+	assert(new);
+	new->type = VALUE_PTR;
+	new->ptr.isany = old->ptr.isany;
+	if (old->ptr.isany) {
+		new->ptr.n = number_copy(old->ptr.n);
+	} else {
+		new->ptr.loc = location_copy(old->ptr.loc);
+	}
+	return new;
 }
 
 void
 value_ptr_sprint(struct value *v, struct strbuilder *b)
 {
-	char *s = location_str(v->loc);
+	char *s = v->ptr.isany ? number_str(v->ptr.n) : location_str(v->ptr.loc);
 	strbuilder_printf(b, "ptr:%s", s);
 	free(s);
 }
@@ -134,9 +176,6 @@ value_int_sync_create(struct ast_expr *e)
 	v->n = number_sync_create(e);
 	return v;
 }
-
-struct number *
-number_copy(struct number *num);
 
 struct value *
 value_int_copy(struct value *old)
@@ -277,7 +316,7 @@ value_copy(struct value *v)
 {
 	switch (v->type) {
 	case VALUE_PTR:
-		return value_ptr_create(location_copy(v->loc));
+		return value_ptr_copy(v);
 	case VALUE_INT:
 		return value_int_copy(v);
 	case VALUE_LITERAL:
@@ -294,8 +333,12 @@ value_destroy(struct value *v)
 {
 	switch (v->type) {
 	case VALUE_PTR:
-		if (v->loc) {
-			location_destroy(v->loc);
+		if (v->ptr.isany) {
+			number_destroy(v->ptr.n);
+		} else {
+			if (v->ptr.loc) {
+				location_destroy(v->ptr.loc);
+			}
 		}
 		break;
 	case VALUE_INT:
@@ -338,8 +381,8 @@ value_str(struct value *v)
 struct location *
 value_as_ptr(struct value *v)
 {
-	assert(v->type == VALUE_PTR);
-	return v->loc;
+	assert(v->type == VALUE_PTR && !v->ptr.isany);
+	return v->ptr.loc;
 }
 
 bool
@@ -415,7 +458,7 @@ value_references(struct value *v, struct location *loc, struct state *s)
 {
 	switch (v->type) {
 	case VALUE_PTR:
-		return location_references(v->loc, loc, s);
+		return !v->ptr.isany && location_references(v->ptr.loc, loc, s);
 	case VALUE_STRUCT:
 		return struct_references(v, loc, s);
 	default:

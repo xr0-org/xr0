@@ -16,6 +16,9 @@ struct value *
 value_ptr_create(struct location *loc);
 
 struct value *
+value_ptr_any_create();
+
+struct value *
 value_int_create(int val);
 
 struct value *
