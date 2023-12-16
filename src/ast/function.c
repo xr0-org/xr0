@@ -148,7 +148,6 @@ ast_function_params(struct ast_function *f)
 
 struct error *
 path_verify(struct ast_function *f, struct state *state, struct externals *);
-
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
@@ -188,6 +187,7 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = 0; i < nstmts; i++) {
+		printf("state: %s\n", state_str(state));
 		printf("%s\n", ast_stmt_str(stmt[i]));
 		if ((err = ast_stmt_process(stmt[i], state))) {
 			return err;
