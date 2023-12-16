@@ -431,7 +431,7 @@ usecomplete(struct ast_type *t, struct state *s)
 	}
 	char *tag = ast_type_struct_tag(t);
 	assert(tag);
-	return externals_gettype(state_getext(s), tag);
+	return externals_getstruct(state_getext(s), tag);
 }
 
 struct ast_type *

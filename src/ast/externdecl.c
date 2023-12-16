@@ -7,12 +7,21 @@
 #include "util.h"
 
 struct ast_externdecl {
-	enum ast_externdecl_kind kind;
+	enum ast_externdecl_kind {
+		EXTERN_FUNCTION,
+		EXTERN_VARIABLE,
+		EXTERN_TYPEDEF,
+		EXTERN_STRUCT,
+	} kind;
 	union {
 		struct ast_function *function;
 		struct ast_variable *variable;
-		struct ast_type *type;
-	} u;
+		struct {
+			char *name;
+			struct ast_type *type;
+		} _typedef;
+		struct ast_type *_struct;
+	};
 };
 
 struct ast_externdecl *
@@ -20,39 +29,40 @@ ast_functiondecl_create(struct ast_function *f)
 {
 	struct ast_externdecl *decl = malloc(sizeof(struct ast_externdecl));
 	decl->kind = EXTERN_FUNCTION;
-	decl->u.function = f;
+	decl->function = f;
 	return decl;
+}
+
+bool
+ast_externdecl_isfunction(struct ast_externdecl *decl)
+{
+	return decl->kind == EXTERN_FUNCTION;
 }
 
 struct ast_function *
 ast_externdecl_as_function(struct ast_externdecl *decl)
 {
 	assert(decl->kind == EXTERN_FUNCTION);
-	return decl->u.function;
+	return decl->function;
 }
 
 struct ast_externdecl *
-ast_variabledecl_create(struct ast_variable *v)
+ast_decl_create(char *name, struct ast_type *t)
 {
 	struct ast_externdecl *decl = malloc(sizeof(struct ast_externdecl));
-	decl->kind = EXTERN_VARIABLE;
-	decl->u.variable = v;
+	if (ast_type_istypedef(t)) {
+		decl->kind = EXTERN_TYPEDEF;
+		decl->_typedef.name = name;
+		decl->_typedef.type = t;
+	} else if (ast_type_isstruct(t)) {
+		assert(ast_type_struct_tag(t));
+		decl->kind = EXTERN_STRUCT;
+		decl->_struct = t;
+	} else { /* variable */
+		decl->kind = EXTERN_VARIABLE;
+		decl->variable = ast_variable_create(name, t);
+	}
 	return decl;
-}
-
-struct ast_externdecl *
-ast_typedecl_create(struct ast_type *t)
-{
-	struct ast_externdecl *decl = malloc(sizeof(struct ast_externdecl));
-	decl->kind = EXTERN_TYPE;
-	decl->u.type = t;
-	return decl;
-}
-
-enum ast_externdecl_kind
-ast_externdecl_kind(struct ast_externdecl *decl)
-{
-	return decl->kind;
 }
 
 void
@@ -60,21 +70,18 @@ ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext)
 {
 	struct ast_function *f;
 	struct ast_variable *v;
-	struct ast_type *t;
 
 	switch (decl->kind) {
 	case EXTERN_FUNCTION:
-		f = decl->u.function;
+		f = decl->function;
 		externals_declarefunc(ext, ast_function_name(f), f);
 		break;
 	case EXTERN_VARIABLE:
-		v = decl->u.variable;
+		v = decl->variable;
 		externals_declarevar(ext, ast_variable_name(v), v);
 		break;
-	case EXTERN_TYPE:
-		t = decl->u.type;
-		assert(ast_type_base(t) == TYPE_STRUCT && ast_type_struct_tag(t));
-		externals_declaretype(ext, ast_type_struct_tag(t), t);
+	case EXTERN_STRUCT:
+		externals_declarestruct(ext, decl->_struct);
 		break;
 	default:
 		assert(false);
@@ -86,13 +93,13 @@ ast_externdecl_destroy(struct ast_externdecl *decl)
 {
 	switch (decl->kind) {
 	case EXTERN_FUNCTION:
-		ast_function_destroy(decl->u.function);
+		ast_function_destroy(decl->function);
 		break;
 	case EXTERN_VARIABLE:
-		ast_variable_destroy(decl->u.variable);
+		ast_variable_destroy(decl->variable);
 		break;
-	case EXTERN_TYPE:
-		ast_type_destroy(decl->u.type);
+	case EXTERN_STRUCT:
+		ast_type_destroy(decl->_struct);
 		break;
 	default:
 		assert(false);

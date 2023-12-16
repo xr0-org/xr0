@@ -127,7 +127,7 @@ $(UTIL_OBJ): $(UTIL_DIR)/util.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(UTIL_DIR)/util.c
 
-$(AST_OBJ): $(AST_DIR)/ast.c $(AST_DIR)/expr/expr.h $(AST_DIR)/literals.h $(MATH_OBJ)
+$(AST_OBJ): $(AST_DIR)/ast.c $(AST_DIR)/expr/expr.h $(AST_DIR)/type/type.h $(AST_DIR)/literals.h $(MATH_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(AST_DIR)/ast.c
 

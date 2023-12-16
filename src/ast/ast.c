@@ -10,7 +10,7 @@
 #include "expr/expr.c"
 #include "block.c"
 #include "stmt/stmt.c"
-#include "type.c"
+#include "type/type.c"
 #include "variable.c"
 #include "function.c"
 #include "externdecl.c"

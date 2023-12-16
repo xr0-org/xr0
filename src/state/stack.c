@@ -306,20 +306,7 @@ variable_references(struct variable *v, struct location *loc, struct state *s)
 }
 
 bool
-variable_ispointer(struct variable *v)
-{
-	return ast_type_base(v->type) == TYPE_POINTER;
-}
-
-bool
 variable_isparam(struct variable *v)
 {
 	return v->isparam;
-}
-
-bool
-variable_isobservable(struct variable *v)
-{
-	/* TODO: include check for all observable types */
-	return ast_type_base(v->type) == TYPE_INT;
 }

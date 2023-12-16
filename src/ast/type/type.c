@@ -3,10 +3,11 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "type.h"
 #include "util.h"
 
 struct ast_type {
-	enum ast_type_modifier mod;
+	int mod;
 	enum ast_type_base base;
 	union {
 		struct ast_type *ptr_type;
@@ -20,6 +21,12 @@ struct ast_type {
 		} structunion;
 	} u;
 };
+
+bool
+ast_type_isint(struct ast_type *t)
+{
+	return t->base == TYPE_INT;
+}
 
 struct ast_type *
 ast_type_create(enum ast_type_base base, enum ast_type_modifier mod)
@@ -57,6 +64,12 @@ ast_type_create_struct(char *tag, struct ast_variable_arr *members)
 	t->u.structunion.tag = tag;
 	t->u.structunion.members = members;
 	return t;
+}
+
+bool
+ast_type_isstruct(struct ast_type *t)
+{
+	return t->base == TYPE_STRUCT;
 }
 
 struct ast_variable_arr *
@@ -106,6 +119,12 @@ void
 ast_type_mod_or(struct ast_type *t, enum ast_type_modifier m)
 {
 	t->mod |= m;
+}
+
+bool
+ast_type_istypedef(struct ast_type *t)
+{
+	return t->mod & MOD_TYPEDEF;
 }
 
 void
@@ -176,7 +195,7 @@ ast_type_str(struct ast_type *t)
 		[MOD_CONST]	= "const",
 		[MOD_VOLATILE]	= "volatile",
 	};
-	const int modlen = 6;
+	const int modlen = 7;
 	const char *basestr[] = {
 		[TYPE_VOID]	= "void",
 		[TYPE_CHAR]	= "char",
@@ -198,7 +217,7 @@ ast_type_str(struct ast_type *t)
 	for (int i = 0; i < modlen; i++) {
 		int mod = 1 << i;
 		if (mod & t->mod) {
-			char *space = --nmods ? " " : "";
+			char *space = nmods-- ? " " : "";
 			strbuilder_printf(b, "%s%s", modstr[mod], space);
 		}
 	}

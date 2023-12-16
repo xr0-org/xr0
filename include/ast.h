@@ -327,45 +327,11 @@ struct result *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
 
-enum ast_type_modifier {
-	MOD_TYPEDEF	= 1 << 0,
-
-	/* storage class */
-	MOD_EXTERN	= 1 << 1,
-	MOD_STATIC	= 1 << 2,
-	MOD_AUTO	= 1 << 3,
-	MOD_REGISTER	= 1 << 4,
-
-	/* qualifier */
-	MOD_CONST	= 1 << 5,
-	MOD_VOLATILE	= 1 << 6,
-};
-
-enum ast_type_base { /* base type */
-	TYPE_VOID,
-	TYPE_CHAR,
-	TYPE_SHORT,
-	TYPE_INT,
-	TYPE_LONG,
-	TYPE_FLOAT,
-	TYPE_DOUBLE,
-	TYPE_SIGNED,
-	TYPE_UNSIGNED,
-
-	TYPE_POINTER,
-	TYPE_ARRAY,
-
-	TYPE_STRUCT,
-	TYPE_UNION,
-	TYPE_ENUM,
-};
-
 struct ast_type;
 
-struct ast_type *
-ast_type_create(enum ast_type_base base, enum ast_type_modifier mod);
-
 /* TODO: allow modifiers for pointer, array and typedef types */
+bool
+ast_type_isint(struct ast_type *type);
 
 struct ast_type *
 ast_type_create_ptr(struct ast_type *type);
@@ -390,8 +356,11 @@ ast_type_create_struct_anonym(struct ast_variable_arr *);
 struct ast_type *
 ast_type_create_struct_partial(char *tag);
 
-void
-ast_type_mod_or(struct ast_type *, enum ast_type_modifier);
+bool
+ast_type_isstruct(struct ast_type *);
+
+bool
+ast_type_istypedef(struct ast_type *);
 
 void
 ast_type_destroy(struct ast_type *);
@@ -506,28 +475,19 @@ struct result;
 struct result *
 ast_function_absexec(struct ast_function *, struct state *state);
 
-enum ast_externdecl_kind {
-	EXTERN_FUNCTION = 1 << 0,
-	EXTERN_VARIABLE	= 1 << 1,
-	EXTERN_TYPE	= 1 << 2,
-};
-
 struct ast_externdecl;
 
 struct ast_externdecl *
 ast_functiondecl_create(struct ast_function *);
 
+bool
+ast_externdecl_isfunction(struct ast_externdecl *);
+
 struct ast_function *
 ast_externdecl_as_function(struct ast_externdecl *);
 
 struct ast_externdecl *
-ast_variabledecl_create(struct ast_variable *);
-
-struct ast_externdecl *
-ast_typedecl_create(struct ast_type *);
-
-enum ast_externdecl_kind
-ast_externdecl_kind(struct ast_externdecl *);
+ast_decl_create(char *name, struct ast_type *);
 
 void
 ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext);

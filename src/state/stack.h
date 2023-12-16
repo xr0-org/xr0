@@ -72,15 +72,9 @@ struct ast_type *
 variable_type(struct variable *);
 
 bool
-variable_ispointer(struct variable *v);
-
-bool
 variable_references(struct variable *v, struct location *loc, struct state *s);
 
 bool
 variable_isparam(struct variable *);
-
-bool
-variable_isobservable(struct variable *);
 
 #endif

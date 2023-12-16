@@ -453,7 +453,7 @@ prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state 
 	if (ast_expr_kind(arg) != EXPR_ARBARG) {
 		return ast_expr_eval(arg, s);
 	}
-	assert(ast_type_base(ast_variable_type(param)) == TYPE_INT);
+	assert(ast_type_isint(ast_variable_type(param)));
 	return result_value_create(state_vconst(s));
 }
 
