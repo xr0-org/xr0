@@ -54,7 +54,7 @@ char *
 vconst_str(struct vconst *, char *indent);
 
 char *
-vconst_declare(struct vconst *, struct value *);
+vconst_declare(struct vconst *, struct value *, char *comment);
 
 struct value *
 vconst_get(struct vconst *, char *id);

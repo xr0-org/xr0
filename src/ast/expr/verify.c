@@ -448,9 +448,8 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		nparams, params, state
 	);
 
-	state_pushframe(
-		state, dynamic_str(ast_function_name(f)), ast_function_type(f)
-	);
+	struct ast_type *ret_type = ast_function_type(f);
+	state_pushframe(state, dynamic_str(name), ret_type);
 
 	struct error *err = prepare_parameters(nparams, params, args, state);
 	if (err) {
@@ -461,12 +460,17 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	if (result_iserror(res)) {
 		return res;
 	}
-	result_arr_destroy(args);
 	if (result_hasvalue(res)) { /* preserve value through pop */
 		res = result_value_create(value_copy(result_as_value(res)));
+	} else {
+		res = result_value_create(
+			state_vconst(state, ret_type, dynamic_str(name))
+		);
 	}
 
 	state_popframe(state);
+
+	result_arr_destroy(args);
 
 	return res;
 }
@@ -490,12 +494,14 @@ prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 }
 
 static struct result *
-prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state *s)
+prepare_argument(struct ast_expr *arg, struct ast_variable *p, struct state *s)
 {
 	if (ast_expr_kind(arg) != EXPR_ARBARG) {
 		return ast_expr_eval(arg, s);
 	}
-	return result_value_create(state_vconst(s, ast_variable_type(param)));
+	return result_value_create(state_vconst(
+		s, ast_variable_type(p), dynamic_str(ast_variable_name(p))
+	));
 }
 
 /* prepare_parameters: Allocate arguments in call expression and assign them to

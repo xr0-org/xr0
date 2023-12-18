@@ -162,6 +162,7 @@ block_referenced(struct state *s, int addr)
 
 struct vconst {
 	struct map *varmap;
+	struct map *comment;
 };
 
 struct vconst *
@@ -169,6 +170,7 @@ vconst_create()
 {
 	struct vconst *v = malloc(sizeof(struct vconst));
 	v->varmap = map_create();
+	v->comment = map_create();
 	return v;
 }
 
@@ -180,6 +182,7 @@ vconst_destroy(struct vconst *v)
 		value_destroy((struct value *) m->entry[i].value);
 	}
 	map_destroy(m);
+	map_destroy(v->comment);
 	free(v);
 }
 
@@ -197,11 +200,20 @@ vconst_copy(struct vconst *old)
 			value_copy((struct value *) e.value)
 		);
 	}
+	m = old->comment;
+	for (int i = 0; i < m->n; i++) {
+		struct entry e = m->entry[i];
+		map_set(
+			new->comment,
+			dynamic_str(e.key),
+			dynamic_str(e.value)
+		);
+	}
 	return new;
 }
 
 char *
-vconst_declare(struct vconst *v, struct value *val)
+vconst_declare(struct vconst *v, struct value *val, char *comment)
 {
 	struct map *m = v->varmap;
 
@@ -210,6 +222,9 @@ vconst_declare(struct vconst *v, struct value *val)
 	char *s = strbuilder_build(b);
 
 	map_set(m, dynamic_str(s), val);
+	if (comment) {
+		map_set(v->comment, dynamic_str(s), comment);
+	}
 
 	return s;
 }
@@ -228,7 +243,12 @@ vconst_str(struct vconst *v, char *indent)
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
 		char *value = value_str((struct value *) e.value);
-		strbuilder_printf(b, "%s%s: %s\n", indent, e.key, value);
+		strbuilder_printf(b, "%s%s: %s", indent, e.key, value);
+		char *comment = map_get(v->comment, e.key);
+		if (comment) {
+			strbuilder_printf(b, "\t(%s)", comment);
+		}
+		strbuilder_printf(b, "\n");
 		free(value);
 	}
 	return strbuilder_build(b);

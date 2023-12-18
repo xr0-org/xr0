@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "ext.h"
 #include "type.h"
 #include "util.h"
 #include "value.h"
@@ -77,13 +78,17 @@ ast_type_create_userdef(char *name)
 }
 
 struct value *
-ast_type_vconst(struct ast_type *t)
+ast_type_vconst(struct ast_type *t, struct externals *ext)
 {
 	switch (t->base) {
 	case TYPE_INT:
 		return value_int_any_create();
 	case TYPE_POINTER:
 		return value_ptr_any_create();
+	case TYPE_USERDEF:
+		return ast_type_vconst(
+			externals_gettypedef(ext, t->userdef), ext
+		);
 	default:
 		assert(false);
 	}

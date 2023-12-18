@@ -154,7 +154,7 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
-	printf("state: %s\n", state_str(state));
+	/*printf("state: %s\n", state_str(state));*/
 	struct error *err = path_verify(f, state, ext);
 	state_destroy(state);
 	return err;
@@ -187,8 +187,8 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = 0; i < nstmts; i++) {
-		printf("state: %s\n", state_str(state));
-		printf("%s\n", ast_stmt_str(stmt[i]));
+		/*printf("state: %s\n", state_str(state));*/
+		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
 		if ((err = ast_stmt_process(stmt[i], state))) {
 			return err;
 		}
@@ -210,9 +210,13 @@ parameterise_state(struct state *s, struct ast_function *f)
 	for (int i = 0; i < nparams; i++) {
 		struct ast_variable *p = param[i];
 		state_declare(s, p, true);
-		struct object *obj = state_getobject(s, ast_variable_name(p));
+		char *name = ast_variable_name(p);
+		struct object *obj = state_getobject(s, name);
 		assert(obj);
-		object_assign(obj, state_vconst(s, ast_variable_type(p)));
+		object_assign(
+			obj,
+			state_vconst(s, ast_variable_type(p), dynamic_str(name))
+		);
 	}
 
 	struct ast_block *abs = ast_function_abstract(f);
@@ -255,8 +259,8 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 		return result_as_error(res);
 	}
 
-	/*printf("actual: %s\n", state_str(actual_state));*/
-	/*printf("alleged: %s\n", state_str(alleged_state));*/
+	printf("actual: %s\n", state_str(actual_state));
+	printf("alleged: %s\n", state_str(alleged_state));
 
 	bool equiv = state_equal(actual_state, alleged_state);
 

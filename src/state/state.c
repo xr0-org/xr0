@@ -123,9 +123,11 @@ state_undeclarevars(struct state *s)
 }
 
 struct value *
-state_vconst(struct state *state, struct ast_type *t)
+state_vconst(struct state *state, struct ast_type *t, char *comment)
 {
-	char *c = vconst_declare(state->vconst, ast_type_vconst(t));
+	char *c = vconst_declare(
+		state->vconst, ast_type_vconst(t, state_getext(state)), comment
+	);
 	return value_sync_create(ast_expr_identifier_create(c));
 }
 

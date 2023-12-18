@@ -366,9 +366,10 @@ bool
 ast_type_istypedef(struct ast_type *);
 
 struct value;
+struct externals;
 
 struct value *
-ast_type_vconst(struct ast_type *);
+ast_type_vconst(struct ast_type *, struct externals *ext);
 
 void
 ast_type_destroy(struct ast_type *);
