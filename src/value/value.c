@@ -168,13 +168,26 @@ struct number *
 number_sync_create(struct ast_expr *);
 
 struct value *
-value_int_sync_create(struct ast_expr *e)
+value_sync_create(struct ast_expr *e)
 {	
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
-	v->type = VALUE_INT;
+	v->type = VALUE_SYNC;
 	v->n = number_sync_create(e);
 	return v;
+}
+
+struct value *
+value_sync_copy(struct value *old)
+{
+	assert(old->type == VALUE_SYNC);
+
+	struct value *new = malloc(sizeof(struct value));
+	assert(new);
+	new->type = VALUE_INT;
+	new->n = number_copy(old->n);
+
+	return new;
 }
 
 struct value *
@@ -311,10 +324,18 @@ value_int_sprint(struct value *v, struct strbuilder *b)
 	strbuilder_printf(b, "int:%s", number_str(v->n));
 }
 
+void
+value_sync_sprint(struct value *v, struct strbuilder *b)
+{
+	strbuilder_printf(b, "sync:%s", number_str(v->n));
+}
+
 struct value *
 value_copy(struct value *v)
 {
 	switch (v->type) {
+	case VALUE_SYNC:
+		return value_sync_copy(v);
 	case VALUE_PTR:
 		return value_ptr_copy(v);
 	case VALUE_INT:
@@ -332,6 +353,9 @@ void
 value_destroy(struct value *v)
 {
 	switch (v->type) {
+	case VALUE_SYNC:
+		number_destroy(v->n);
+		break;
 	case VALUE_PTR:
 		if (v->ptr.isany) {
 			number_destroy(v->ptr.n);
@@ -363,6 +387,9 @@ value_str(struct value *v)
 {
 	struct strbuilder *b = strbuilder_create();
 	switch (v->type) {
+	case VALUE_SYNC:
+		value_sync_sprint(v, b);
+		break;
 	case VALUE_PTR:
 		value_ptr_sprint(v, b);
 		break;

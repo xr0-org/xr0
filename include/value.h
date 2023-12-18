@@ -2,6 +2,7 @@
 #define VALUE_H
 
 enum value_type {
+	VALUE_SYNC,
 	VALUE_PTR,
 	VALUE_INT,
 	VALUE_LITERAL,
@@ -40,7 +41,7 @@ int
 value_int_up(struct value *);
 
 struct value *
-value_int_sync_create(struct ast_expr *);
+value_sync_create(struct ast_expr *);
 
 struct value *
 value_struct_create(struct ast_type *);

@@ -588,7 +588,7 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 		return res2;
 	}
 	return result_value_create(
-		value_int_sync_create(
+		value_sync_create(
 			ast_expr_binary_create(
 				value_to_expr(result_as_value(res1)),
 				ast_expr_binary_op(expr),

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 char *
-read_file(char *path) [ .alloc result; ]
+read_file(char *path)
 {
 	FILE *f;
 	char *str;
