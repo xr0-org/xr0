@@ -206,22 +206,13 @@ ast_type_str_build_arr(struct strbuilder *b, struct ast_type *t);
 static void
 ast_type_str_build_struct(struct strbuilder *b, struct ast_type *t);
 
+static char *
+mod_str(int mod);
+
 char *
 ast_type_str(struct ast_type *t)
 {
 	assert(t);
-	/* XXX */
-	const char *modstr[] = {
-		[MOD_TYPEDEF]   = "typedef",
-		[MOD_EXTERN]	= "extern",
-		[MOD_AUTO]	= "auto",
-		[MOD_STATIC]	= "static",
-		[MOD_REGISTER]	= "register",
-
-		[MOD_CONST]	= "const",
-		[MOD_VOLATILE]	= "volatile",
-	};
-	const int modlen = 7;
 	const char *basestr[] = {
 		[TYPE_VOID]	= "void",
 		[TYPE_CHAR]	= "char",
@@ -234,19 +225,9 @@ ast_type_str(struct ast_type *t)
 		[TYPE_UNSIGNED]	= "unsigned",
 	};
 	struct strbuilder *b = strbuilder_create();
-	int nmods = 0;
-	for (int i = 0; i < modlen; i++) {
-		if (1 << i & t->mod) {
-			nmods++;
-		}
-	}
-	for (int i = 0; i < modlen; i++) {
-		int mod = 1 << i;
-		if (mod & t->mod) {
-			char *space = nmods-- ? " " : "";
-			strbuilder_printf(b, "%s%s", modstr[mod], space);
-		}
-	}
+	char *mod = mod_str(t->mod);
+	strbuilder_printf(b, "%s", mod);
+	free(mod);
 	switch (t->base) {
 	case TYPE_POINTER:
 		ast_type_str_build_ptr(b, t);
@@ -257,9 +238,44 @@ ast_type_str(struct ast_type *t)
 	case TYPE_STRUCT:
 		ast_type_str_build_struct(b, t);
 		break;
+	case TYPE_USERDEF:
+		strbuilder_printf(b, "%s", t->userdef);
+		break;
 	default:
 		strbuilder_printf(b, basestr[t->base]);
 		break;
+	}
+	return strbuilder_build(b);
+}
+
+static char *
+mod_str(int mod)
+{
+	/* XXX */
+	const char *modstr[] = {
+		[MOD_TYPEDEF]   = "typedef",
+		[MOD_EXTERN]	= "extern",
+		[MOD_AUTO]	= "auto",
+		[MOD_STATIC]	= "static",
+		[MOD_REGISTER]	= "register",
+
+		[MOD_CONST]	= "const",
+		[MOD_VOLATILE]	= "volatile",
+	};
+	const int modlen = 7;
+	struct strbuilder *b = strbuilder_create();
+	int nmods = 0;
+	for (int i = 0; i < modlen; i++) {
+		if (1 << i & mod) {
+			nmods++;
+		}
+	}
+	for (int i = 0; i < modlen; i++) {
+		int m = 1 << i;
+		if (m & mod) {
+			char *space = nmods-- ? " " : "";
+			strbuilder_printf(b, "%s%s", modstr[m], space);
+		}
 	}
 	return strbuilder_build(b);
 }
