@@ -37,7 +37,7 @@ struct error *
 heap_deallocblock(struct heap *h, int block);
 
 void
-heap_undeclare(struct heap *h);
+heap_undeclare(struct heap *, struct state *);
 
 
 /* TODO: extract to own file */

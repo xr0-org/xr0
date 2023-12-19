@@ -135,10 +135,21 @@ inner_str(struct object *obj)
 }
 
 bool
+object_referencesheap(struct object *obj, struct state *s)
+{
+	if (!object_isvalue(obj)) {
+		/* TODO: do we need to exclude the case of ranges on stack? */
+		return true;
+	}
+	return obj->value && value_referencesheap(obj->value, s);
+}
+
+bool
 object_isvalue(struct object *obj)
 {
 	return obj->type == OBJECT_VALUE;
 }
+
 
 struct value *
 object_as_value(struct object *obj)

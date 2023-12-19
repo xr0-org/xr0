@@ -132,13 +132,13 @@ heap_deallocblock(struct heap *h, int address)
 }
 
 void
-heap_undeclare(struct heap *h)
+heap_undeclare(struct heap *h, struct state *s)
 {
 	int n = block_arr_nblocks(h->blocks);
 	struct block **b = block_arr_blocks(h->blocks);
 	for (int i = 0; i < n; i++) {
 		if (!h->freed[i]) {
-			block_undeclare(b[i]);
+			block_undeclare(b[i], s);
 		}
 	}
 }

@@ -49,7 +49,7 @@ block_range_dealloc(struct block *, struct ast_expr *lw, struct ast_expr *up,
 		struct state *);
 
 void
-block_undeclare(struct block *);
+block_undeclare(struct block *, struct state *);
 
 struct block_arr;
 

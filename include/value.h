@@ -68,6 +68,9 @@ struct location *
 value_as_ptr(struct value *);
 
 bool
+value_referencesheap(struct value *, struct state *);
+
+bool
 value_isconstant(struct value *v);
 
 int

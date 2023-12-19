@@ -119,7 +119,7 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 void
 state_undeclarevars(struct state *s)
 {
-	heap_undeclare(s->heap);
+	heap_undeclare(s->heap, s);
 	stack_undeclare(s->stack);
 }
 

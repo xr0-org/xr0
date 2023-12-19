@@ -265,7 +265,7 @@ block_range_dealloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
 }
 
 void
-block_undeclare(struct block *b)
+block_undeclare(struct block *b, struct state *s)
 {
 	struct object_arr *new = object_arr_create();
 
@@ -273,7 +273,7 @@ block_undeclare(struct block *b)
 	struct object **object = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
 		struct object *obj = object[i];
-		if (!object_isvalue(obj)) {
+		if (object_referencesheap(obj, s)) {
 			object_arr_append(new, object_copy(obj));
 		}
 	}

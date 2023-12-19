@@ -413,6 +413,19 @@ value_as_ptr(struct value *v)
 }
 
 bool
+value_referencesheap(struct value *v, struct state *s)
+{
+	switch (v->type) {
+	case VALUE_PTR:
+		assert(false);
+	case VALUE_STRUCT:
+		assert(false);
+	default:
+		return false;
+	}
+}
+
+bool
 value_isconstant(struct value *v);
 
 int

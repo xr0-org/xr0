@@ -39,6 +39,9 @@ bool
 object_references(struct object *, struct location *, struct state *);
 
 bool
+object_referencesheap(struct object *, struct state *);
+
+bool
 object_isvalue(struct object *);
 
 struct value *
