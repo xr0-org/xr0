@@ -264,6 +264,25 @@ block_range_dealloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
 	return NULL;
 }
 
+void
+block_undeclare(struct block *b)
+{
+	struct object_arr *new = object_arr_create();
+
+	int n = object_arr_nobjects(b->arr);
+	struct object **object = object_arr_objects(b->arr);
+	for (int i = 0; i < n; i++) {
+		struct object *obj = object[i];
+		if (!object_isvalue(obj)) {
+			object_arr_append(new, object_copy(obj));
+		}
+	}
+	object_arr_destroy(b->arr);
+
+	b->arr = new;
+}
+
+
 struct block_arr {
 	int n;
 	struct block **block;

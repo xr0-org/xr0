@@ -36,6 +36,9 @@ heap_referenced(struct heap *h, struct state *);
 struct error *
 heap_deallocblock(struct heap *h, int block);
 
+void
+heap_undeclare(struct heap *h);
+
 
 /* TODO: extract to own file */
 

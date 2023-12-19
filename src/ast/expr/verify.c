@@ -130,9 +130,6 @@ struct lvalue *
 expr_identifier_lvalue(struct ast_expr *expr, struct state *state);
 
 struct lvalue *
-expr_access_lvalue(struct ast_expr *expr, struct state *state);
-
-struct lvalue *
 expr_unary_lvalue(struct ast_expr *expr, struct state *state);
 
 struct lvalue *
