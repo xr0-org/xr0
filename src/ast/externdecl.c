@@ -103,6 +103,10 @@ ast_externdecl_destroy(struct ast_externdecl *decl)
 	case EXTERN_VARIABLE:
 		ast_variable_destroy(decl->variable);
 		break;
+	case EXTERN_TYPEDEF:
+		free(decl->_typedef.name);
+		ast_type_destroy(decl->_typedef.type);
+		break;
 	case EXTERN_STRUCT:
 		ast_type_destroy(decl->_struct);
 		break;

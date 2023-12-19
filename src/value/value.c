@@ -143,6 +143,14 @@ value_int_any_create()
 	return v;
 }
 
+struct value *
+value_void_any_create()
+{
+	struct value *v = malloc(sizeof(struct value));
+	assert(v);
+	v->type = VALUE_VOID;
+	return v;
+}
 
 int
 number_range_lw(struct number *);
