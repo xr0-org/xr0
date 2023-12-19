@@ -82,7 +82,7 @@ state_range_aredeallocands(struct state *, struct object *,
 		struct ast_expr *lw, struct ast_expr *up);
 
 struct value *
-state_vconst(struct state *, struct ast_type *, char *comment);
+state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
 
 bool
 state_hasgarbage(struct state *);

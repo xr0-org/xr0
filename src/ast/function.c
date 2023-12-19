@@ -148,13 +148,14 @@ ast_function_params(struct ast_function *f)
 
 struct error *
 path_verify(struct ast_function *f, struct state *state, struct externals *);
+
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
-	/*printf("state: %s\n", state_str(state));*/
+	printf("state: %s\n", state_str(state));
 	struct error *err = path_verify(f, state, ext);
 	state_destroy(state);
 	return err;
@@ -215,7 +216,7 @@ parameterise_state(struct state *s, struct ast_function *f)
 		assert(obj);
 		object_assign(
 			obj,
-			state_vconst(s, ast_variable_type(p), dynamic_str(name))
+			state_vconst(s, ast_variable_type(p), dynamic_str(name), true)
 		);
 	}
 
@@ -259,8 +260,8 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 		return result_as_error(res);
 	}
 
-	printf("actual: %s\n", state_str(actual_state));
-	printf("alleged: %s\n", state_str(alleged_state));
+	/*printf("actual: %s\n", state_str(actual_state));*/
+	/*printf("alleged: %s\n", state_str(alleged_state));*/
 
 	bool equiv = state_equal(actual_state, alleged_state);
 

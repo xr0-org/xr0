@@ -57,10 +57,13 @@ char *
 vconst_str(struct vconst *, char *indent);
 
 char *
-vconst_declare(struct vconst *, struct value *, char *comment);
+vconst_declare(struct vconst *, struct value *, char *comment, bool persist);
 
 struct value *
 vconst_get(struct vconst *, char *id);
+
+void
+vconst_undeclare(struct vconst *);
 
 bool
 vconst_eval(struct vconst *, struct ast_expr *);

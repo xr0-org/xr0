@@ -461,7 +461,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		res = result_value_create(value_copy(result_as_value(res)));
 	} else {
 		res = result_value_create(
-			state_vconst(state, ret_type, dynamic_str(name))
+			state_vconst(state, ret_type, dynamic_str(name), false)
 		);
 	}
 
@@ -497,7 +497,7 @@ prepare_argument(struct ast_expr *arg, struct ast_variable *p, struct state *s)
 		return ast_expr_eval(arg, s);
 	}
 	return result_value_create(state_vconst(
-		s, ast_variable_type(p), dynamic_str(ast_variable_name(p))
+		s, ast_variable_type(p), dynamic_str(ast_variable_name(p)), true
 	));
 }
 
