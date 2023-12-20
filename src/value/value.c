@@ -28,7 +28,7 @@ struct value {
 
 		struct {
 			struct ast_variable_arr *members;
-			struct map *m;
+			struct map *m; /* maps to objects */
 		} _struct;
 	};
 };
@@ -304,6 +304,20 @@ value_struct_member(struct value *v, char *member)
 	return map_get(v->_struct.m, member);
 }
 
+static bool
+struct_referencesheap(struct value *v, struct state *s)
+{
+	struct map *m = v->_struct.m;
+	for (int i = 0; i < m->n; i++) {
+		struct value *val = object_as_value((struct object *) m->entry[i].value);
+		if (val && value_referencesheap(val, s)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
 
 void
 value_struct_sprint(struct value *v, struct strbuilder *b)
@@ -427,7 +441,7 @@ value_referencesheap(struct value *v, struct state *s)
 	case VALUE_PTR:
 		assert(false);
 	case VALUE_STRUCT:
-		assert(false);
+		return struct_referencesheap(v, s);
 	default:
 		return false;
 	}

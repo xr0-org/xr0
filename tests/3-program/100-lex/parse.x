@@ -19,22 +19,11 @@ read_file(char *path) [ .alloc result; ]
 	return str;
 }
 
-struct lexer;
-
-struct lexer *
-parse(char *input);
-
-void
-lexer_destroy(struct lexer *);
-
-void
-lexer_print(struct lexer *);
-
 int
 main()
 {
 	char *file;
-	struct lexer *l;
+	/*struct lexer *l;*/
 
 	file = read_file("gen.l");
 
@@ -51,16 +40,10 @@ struct pattern {
 	char *name; char *pattern;
 };
 
-void
-pattern_print(struct pattern *);
-
 struct token {
 	int isliteral;
 	char *name; char *action;
 };
-
-void
-token_print(struct token *);
 
 struct lexer {
 	char *pre; char *post;
@@ -70,7 +53,7 @@ struct lexer {
 
 struct lexer *
 lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
-		int ntok, struct token *token)
+		int ntok, struct token *token) [ .alloc result; ]
 {
 	struct lexer *l;
 
@@ -92,6 +75,25 @@ lexer_destroy(struct lexer *l)
 	free(l->token);
 	free(l);
 }
+
+
+
+struct lexer;
+
+struct lexer *
+parse(char *input);
+
+void
+lexer_destroy(struct lexer *);
+
+void
+lexer_print(struct lexer *);
+
+void
+pattern_print(struct pattern *);
+
+void
+token_print(struct token *);
 
 void
 lexer_print(struct lexer *l)

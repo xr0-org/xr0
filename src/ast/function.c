@@ -260,8 +260,8 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 		return result_as_error(res);
 	}
 
-	/*printf("actual: %s\n", state_str(actual_state));*/
-	/*printf("alleged: %s\n", state_str(alleged_state));*/
+	printf("actual: %s\n", state_str(actual_state));
+	printf("alleged: %s\n", state_str(alleged_state));
 
 	bool equiv = state_equal(actual_state, alleged_state);
 

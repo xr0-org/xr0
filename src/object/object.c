@@ -427,6 +427,7 @@ getorcreatestruct(struct object *obj, struct ast_type *t, struct state *s)
 	if (v) {
 		return v;
 	}
+	printf("find complete: %s\n", ast_type_str(t));
 	struct ast_type *complete = usecomplete(t, s);
 	assert(complete);
 	v = value_struct_create(complete);

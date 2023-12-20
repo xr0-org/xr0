@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 #include "ast.h"
 #include "util.h"
@@ -74,10 +75,8 @@ externals_declarestruct(struct externals *ext, struct ast_type *t)
 {
 	char *id = ast_type_struct_tag(t);
 	assert(id);
-	map_set(ext->_typedef, dynamic_str(id), t);
+	map_set(ext->_struct, dynamic_str(id), t);
 }
-
-
 
 struct ast_function *
 externals_getfunc(struct externals *ext, char *id)
