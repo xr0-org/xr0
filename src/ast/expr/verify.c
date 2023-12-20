@@ -112,9 +112,6 @@ expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
 	return state_range_aredeallocands(state, obj, lw, up);
 }
 
-
-
-
 struct error *
 ast_expr_exec(struct ast_expr *expr, struct state *state)
 {
@@ -550,6 +547,7 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	if (result_hasvalue(res)) {
+		/*printf("state: %s\n", state_str(state));*/
 		struct object *obj = lvalue_object(ast_expr_lvalue(lval, state));
 		assert(obj);
 		object_assign(obj, value_copy(result_as_value(res)));

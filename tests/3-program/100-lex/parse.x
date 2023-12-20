@@ -45,6 +45,47 @@ struct token {
 	char *name; char *action;
 };
 
+struct pattern *
+pattern_create(char *name, char *pattern) [ .alloc result; ]
+{
+	struct pattern *p;
+
+	p = malloc(sizeof(struct pattern));
+	p->name = name;
+	p->pattern = pattern;
+
+	return p;
+}
+
+void
+pattern_destroy(struct pattern *p) [
+	pre: p = pattern_create($, $);
+	.dealloc p;
+]{
+	free(p);
+}
+
+struct token *
+token_create(int isliteral, char *name, char *action) [ .alloc result; ]
+{
+	struct token *tk;
+
+	tk = malloc(sizeof(struct token));
+	tk->isliteral = isliteral;
+	tk->name = name;
+	tk->action = action;
+
+	return tk;
+}
+
+void
+token_destroy(struct token *tk) [
+	pre: tk = token_create($, $, $);
+	.dealloc tk;
+]{
+	free(tk);
+}
+
 struct lexer {
 	char *pre; char *post;
 	int npat; struct pattern *pattern;
@@ -53,8 +94,11 @@ struct lexer {
 
 struct lexer *
 lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
-		int ntok, struct token *token) [ .alloc result; ]
-{
+		int ntok, struct token *token) [
+	.alloc result;
+	result->pattern = pattern;
+	result->token = token;
+]{
 	struct lexer *l;
 
 	l = malloc(sizeof(struct lexer));
@@ -69,13 +113,21 @@ lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 }
 
 void
-lexer_destroy(struct lexer *l)
-{
-	free(l->pattern);
-	free(l->token);
+lexer_destroy(struct lexer *l) [
+	struct pattern p;
+	struct token t;
+	pre: {
+		p = pattern_create($, $);
+		t = token_create($, $, $);
+		l = lexer_create($, $, $, p, $, t);
+	}
+
+	.dealloc l;
+]{
+	pattern_destroy(l->pattern);
+	token_destroy(l->token);
 	free(l);
 }
-
 
 
 struct lexer;
@@ -304,18 +356,6 @@ parse_defsraw(char *input)
 	return res;
 }
 
-struct pattern *
-pattern_create(char *name, char *pattern)
-{
-	struct pattern *p;
-
-	p = malloc(sizeof(struct pattern));
-	p->name = name;
-	p->pattern = pattern;
-
-	return p;
-}
-
 void
 pattern_print(struct pattern *p)
 {
@@ -369,19 +409,6 @@ parse_pattern(char *pos)
 	res.p = pattern_create(name, pattern);
 	res.pos = pos;
 	return res;
-}
-
-struct token *
-token_create(int isliteral, char *name, char *action)
-{
-	struct token *tk;
-
-	tk = malloc(sizeof(struct token));
-	tk->isliteral = isliteral;
-	tk->name = name;
-	tk->action = action;
-
-	return tk;
 }
 
 void

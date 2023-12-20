@@ -260,17 +260,18 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 		return result_as_error(res);
 	}
 
-	printf("actual: %s\n", state_str(actual_state));
-	printf("alleged: %s\n", state_str(alleged_state));
+	/*printf("actual: %s\n", state_str(actual_state));*/
+	/*printf("alleged: %s\n", state_str(alleged_state));*/
 
 	bool equiv = state_equal(actual_state, alleged_state);
-
-	state_destroy(alleged_state); /* actual_state handled by caller */ 
-	
 	if (!equiv) {
 		/* XXX: print states */
+		printf("actual: %s\n", state_str(actual_state));
+		printf("alleged: %s\n", state_str(alleged_state));
 		return error_create("actual and alleged states differ");
 	}
+
+	state_destroy(alleged_state); /* actual_state handled by caller */ 
 
 	return NULL;
 }
@@ -287,6 +288,8 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 		}
 		result_destroy(res);
 	}
+	state_undeclarevars(state);	
+
 	/* wrap result and return */ 
 	struct object *obj = state_getresult(state);
 	assert(obj);
