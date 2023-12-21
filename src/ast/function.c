@@ -288,7 +288,7 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 		}
 		result_destroy(res);
 	}
-	state_undeclarevars(state);	
+	state_undeclarevars(state);
 
 	/* wrap result and return */ 
 	struct object *obj = state_getresult(state);

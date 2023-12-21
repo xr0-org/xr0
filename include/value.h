@@ -3,7 +3,6 @@
 
 enum value_type {
 	VALUE_SYNC,
-	VALUE_VOID,
 	VALUE_PTR,
 	VALUE_INT,
 	VALUE_LITERAL,
@@ -40,9 +39,6 @@ value_int_lw(struct value *);
 
 int
 value_int_up(struct value *);
-
-struct value *
-value_void_any_create();
 
 struct value *
 value_sync_create(struct ast_expr *);

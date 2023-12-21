@@ -24,6 +24,9 @@ location_destroy(struct location *);
 char *
 location_str(struct location *);
 
+bool
+location_referencesheap(struct location *, struct state *);
+
 enum location_type
 location_type(struct location *loc);
 

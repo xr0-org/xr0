@@ -58,6 +58,12 @@ value_ptr_any_create()
 	return v;
 }
 
+static bool
+ptr_referencesheap(struct value *v, struct state *s)
+{
+	return !v->ptr.isany && location_referencesheap(v->ptr.loc, s);
+}
+
 struct number *
 number_copy(struct number *num);
 
@@ -140,15 +146,6 @@ value_int_any_create()
 	assert(v);
 	v->type = VALUE_INT;
 	v->n = number_any_create();
-	return v;
-}
-
-struct value *
-value_void_any_create()
-{
-	struct value *v = malloc(sizeof(struct value));
-	assert(v);
-	v->type = VALUE_VOID;
 	return v;
 }
 
@@ -418,6 +415,9 @@ value_str(struct value *v)
 	case VALUE_INT:
 		value_int_sprint(v, b);
 		break;
+	case VALUE_LITERAL:
+		strbuilder_printf(b, "\"%s\"", v->s);
+		break;
 	case VALUE_STRUCT:
 		value_struct_sprint(v, b);
 		break;
@@ -439,7 +439,7 @@ value_referencesheap(struct value *v, struct state *s)
 {
 	switch (v->type) {
 	case VALUE_PTR:
-		assert(false);
+		return ptr_referencesheap(v, s);
 	case VALUE_STRUCT:
 		return struct_referencesheap(v, s);
 	default:

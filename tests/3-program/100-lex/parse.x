@@ -114,18 +114,20 @@ lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 
 void
 lexer_destroy(struct lexer *l) [
-	struct pattern p;
-	struct token t;
 	pre: {
-		p = pattern_create($, $);
-		t = token_create($, $, $);
-		l = lexer_create($, $, $, p, $, t);
+		l = lexer_create(
+			$, $,
+			$, malloc(1),
+			$, malloc(1)
+		);
 	}
 
+	.dealloc l->pattern;
+	.dealloc l->token;
 	.dealloc l;
 ]{
-	pattern_destroy(l->pattern);
-	token_destroy(l->token);
+	free(l->pattern);
+	free(l->token);
 	free(l);
 }
 

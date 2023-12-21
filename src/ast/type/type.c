@@ -81,10 +81,9 @@ struct value *
 ast_type_vconst(struct ast_type *t, struct externals *ext)
 {
 	switch (t->base) {
-	case TYPE_VOID:
-		return value_void_any_create();
 	case TYPE_INT:
 		return value_int_any_create();
+	case TYPE_VOID:
 	case TYPE_POINTER:
 		return value_ptr_any_create();
 	case TYPE_USERDEF:

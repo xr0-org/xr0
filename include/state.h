@@ -107,6 +107,12 @@ location_str(struct location *);
 bool
 location_references(struct location *l1, struct location *l2, struct state *);
 
+bool
+location_referencesheap(struct location *, struct state *);
+
+struct object *
+state_get(struct state *state, struct location *loc, bool constructive);
+
 
 /* USED BY OBJECT */
 
