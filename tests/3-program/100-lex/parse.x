@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 char *
 read_file(char *path) [ .alloc result; ]
@@ -131,6 +132,53 @@ lexer_destroy(struct lexer *l) [
 	free(l);
 }
 
+char *
+substr(char *s, int n) [ .alloc result; ]
+{
+	int len;
+	char *ss;
+
+	len = n + 1;
+	ss = malloc(sizeof(char) * len);
+	strncpy(ss, s, n);
+	ss[n] = '\0';
+	return ss;
+}
+
+char *
+parse_id(char *input) [ .alloc result; ]
+{
+	char *s;
+
+	if (!isalpha(*input)) {
+		fprintf(stderr, "id must begin with letter: '%s'", input);
+		exit(1);
+	}
+	s = input + 1;
+	/* XXX: '0' is a placeholder to allow this to parse */
+	for (; isalpha(*s) || isdigit(*s) || *s == '_' ; 0) {
+		s++;
+	}
+	return substr(input, s - input);
+}
+
+char *
+skipoptions(char *pos)
+{
+	char *keyword;
+	char *id;
+
+	keyword = "%option";
+	if (strncmp(pos, keyword, strlen(keyword)) != 0) {
+		return pos;
+	}
+	pos += strlen(keyword);
+	pos = skiplinespace(pos);
+	id = parse_id(pos);
+	pos += strlen(id);
+	free(id);
+	return pos;
+}
 
 struct lexer;
 
@@ -223,18 +271,6 @@ parse(char *pos)
 }
 
 char *
-substr(char *s, int n)
-{
-	int len;
-	char *ss;
-
-	len = n + 1;
-	ss = malloc(sizeof(char) * len);
-	snprintf(ss, len, "%s", s);
-	return ss;
-}
-
-char *
 skipws(char *s)
 {
 	for (; isspace(*s); s++) {}
@@ -246,44 +282,6 @@ skiplinespace(char *s)
 {
 	for (; *s == ' ' || *s == '\t'; s++) {}
 	return s;
-}
-
-char *
-parse_id(char *input);
-
-char *
-skipoptions(char *pos)
-{
-	char *keyword;
-	char *id;
-
-	keyword = "%option";
-	if (strncmp(pos, keyword, strlen(keyword)) != 0) {
-		return pos;
-	}
-	pos += strlen(keyword);
-	pos = skiplinespace(pos);
-	id = parse_id(pos);
-	pos += strlen(id);
-	free(id);
-	return pos;
-}
-
-char *
-parse_id(char *input)
-{
-	char *s;
-
-	if (!isalpha(*input)) {
-		fprintf(stderr, "id must begin with letter: '%s'", input);
-		exit(1);
-	}
-	s = input + 1;
-	/* XXX: '0' is a placeholder to allow this to parse */
-	for (; isalpha(*s) || isdigit(*s) || *s == '_' ; 0) {
-		s++;
-	}
-	return substr(input, s - input);
 }
 
 char *
