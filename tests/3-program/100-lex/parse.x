@@ -209,9 +209,18 @@ parse_pattern(char *pos) [
 	return res;
 }
 
+struct patternet {
+	struct pattern *pattern;
+	int npat;
+	char *pos;
+};
+
 struct patternet
-parse_defsproper(char *pos)
-{
+parse_defsproper(char *pos) [
+	if (strncmp(pos, "%%", 2) == 0) {
+		.alloc result.pattern;
+	}
+]{
 	int npat;
 	struct pattern *pattern;
 	struct patternresult parsed;
@@ -219,7 +228,7 @@ parse_defsproper(char *pos)
 
 	npat = 0;
 	pattern = NULL;
-	for (; strncmp(pos, "%%", 2) != 0 ; npat++) {
+	for (; strncmp(pos, "%%", 2) != 0; npat++) {
 		parsed = parse_pattern(pos);
 		pos = parsed.pos;
 		pattern = realloc(pattern, sizeof(struct pattern) * (npat + 1));
@@ -355,12 +364,6 @@ struct stringresult {
 
 struct stringresult
 parse_defsraw(char *input);
-
-struct patternet {
-	struct pattern *pattern;
-	int npat;
-	char *pos;
-};
 
 struct patternet
 parse_defsproper(char *pos);

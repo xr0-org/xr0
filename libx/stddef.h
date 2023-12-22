@@ -4,4 +4,6 @@
 /* TODO: convert to unsigned */
 typedef int size_t;
 
+#define NULL 0
+
 #endif
