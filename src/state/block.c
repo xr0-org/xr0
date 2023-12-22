@@ -274,7 +274,7 @@ block_undeclare(struct block *b, struct state *s)
 	for (int i = 0; i < n; i++) {
 		struct object *obj = object[i];
 		if (object_referencesheap(obj, s)) {
-			object_arr_append(new, object_copy(obj));
+			object_arr_append(new, object_abstractcopy(obj, s));
 		}
 	}
 	object_arr_destroy(b->arr);

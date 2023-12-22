@@ -287,7 +287,9 @@ multiplicative_expression
 additive_expression
 	: multiplicative_expression
 	| additive_expression '+' multiplicative_expression
+		{ $$ = ast_expr_binary_create($1, BINARY_OP_ADDITION, $3); }
 	| additive_expression '-' multiplicative_expression
+		{ $$ = ast_expr_binary_create($1, BINARY_OP_SUBTRACTION, $3); }
 	;
 
 shift_expression

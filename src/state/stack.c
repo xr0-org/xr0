@@ -145,19 +145,28 @@ stack_declare(struct stack *stack, struct ast_variable *var, bool isparam)
 	);
 }
 
+static struct variable *
+variable_abstractcopy(struct variable *v, struct state *s);
+
 void
-stack_undeclare(struct stack *stack)
+stack_undeclare(struct stack *stack, struct state *state)
 {
+	struct variable *old_result = stack->result;
+	stack->result = variable_abstractcopy(old_result, state);
+	variable_destroy(old_result);
+
 	struct map *m = stack->varmap;
 	stack->varmap = map_create();
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
 		struct variable *v = (struct variable *) e.value;
 		if (variable_isparam(v)) {
-			map_set(stack->varmap, dynamic_str(e.key), v);
-		} else {
-			variable_destroy(v);
+			map_set(
+				stack->varmap, dynamic_str(e.key),
+				variable_abstractcopy(v, state)
+			);
 		}
+		variable_destroy(v);
 	}
 	map_destroy(m);
 }
@@ -243,13 +252,31 @@ variable_destroy(struct variable *v)
 }
 
 struct variable *
-variable_copy(struct variable *v)
+variable_copy(struct variable *old)
 {
-	struct variable *copy = malloc(sizeof(struct variable));
-	copy->type = ast_type_copy(v->type);
-	copy->loc = location_copy(v->loc);
-	copy->isparam = v->isparam;
-	return copy;
+	struct variable *new = malloc(sizeof(struct variable));
+	new->type = ast_type_copy(old->type);
+	new->isparam = old->isparam;
+	new->loc = location_copy(old->loc);
+	return new;
+}
+
+static struct variable *
+variable_abstractcopy(struct variable *old, struct state *s)
+{
+	struct variable *new = malloc(sizeof(struct variable));
+	new->type = ast_type_copy(old->type);
+	new->isparam = old->isparam;
+	new->loc = location_copy(old->loc);
+	struct object *obj = state_get(s, new->loc, false);
+	assert(obj);
+	if (object_isvalue(obj)) {
+		struct value *v = object_as_value(obj);
+		if (v) {
+			object_assign(obj, value_abstractcopy(v, s));
+		}
+	}
+	return new;
 }
 
 static char *

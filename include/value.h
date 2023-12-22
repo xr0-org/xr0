@@ -55,6 +55,9 @@ value_struct_member(struct value *, char *member);
 struct value *
 value_copy(struct value *);
 
+struct value *
+value_abstractcopy(struct value *, struct state *s);
+
 void
 value_destroy(struct value *);
 

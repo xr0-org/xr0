@@ -103,6 +103,23 @@ object_copy(struct object *old)
 	return new;
 }
 
+struct object *
+object_abstractcopy(struct object *old, struct state *s)
+{
+	switch (old->type) {
+	case OBJECT_DEALLOCAND_RANGE:
+		/* TODO: reset observations */
+		return object_copy(old);
+	case OBJECT_VALUE:
+		return object_value_create(
+			ast_expr_copy(old->offset),
+			old->value ? value_abstractcopy(old->value, s) : NULL
+		);
+	default:
+		assert(false);
+	}
+}
+
 static char *
 inner_str(struct object *);
 

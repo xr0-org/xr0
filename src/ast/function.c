@@ -242,8 +242,8 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 {
 	struct error *err = NULL;
 
-	/*printf("actual: %s\n", state_str(actual_state));*/
 	if (!state_hasgarbage(actual_state)) {
+		printf("actual: %s\n", state_str(actual_state));
 		return error_create("garbage on heap");
 	}
 
@@ -259,9 +259,6 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
-
-	/*printf("actual: %s\n", state_str(actual_state));*/
-	/*printf("alleged: %s\n", state_str(alleged_state));*/
 
 	bool equiv = state_equal(actual_state, alleged_state);
 	if (!equiv) {

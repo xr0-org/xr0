@@ -47,8 +47,11 @@ struct token {
 };
 
 struct pattern *
-pattern_create(char *name, char *pattern) [ .alloc result; ]
-{
+pattern_create(char *name, char *pattern) [
+	.alloc result;
+	result->name = name;
+	result->pattern = pattern;
+]{
 	struct pattern *p;
 
 	p = malloc(sizeof(struct pattern));
@@ -150,10 +153,12 @@ parse_id(char *input) [ .alloc result; ]
 {
 	char *s;
 
+	/*
 	if (!isalpha(*input)) {
 		fprintf(stderr, "id must begin with letter: '%s'", input);
 		exit(1);
 	}
+	*/
 	s = input + 1;
 	/* XXX: '0' is a placeholder to allow this to parse */
 	for (; isalpha(*s) || isdigit(*s) || *s == '_' ; 0) {
@@ -162,17 +167,83 @@ parse_id(char *input) [ .alloc result; ]
 	return substr(input, s - input);
 }
 
+struct patternresult {
+	struct pattern *p;
+	char *pos;
+};
+
+char *
+skiplinespace(char *s) [
+	result = s; /* XXX */
+]{
+	for (; *s == ' ' || *s == '\t'; s++) {}
+	return s;
+}
+
+char *
+parse_tonewline(char *input) [ .alloc result; ]
+{
+	char *s;
+	s = input; /* XXX: until loop is understood more */
+	for (s = input; *s != '\n'; 0) {
+		s++;
+	}
+	return substr(input, s - input);
+}
+
+struct patternresult
+parse_pattern(char *pos) [
+	result.p = pattern_create(malloc(1), malloc(1));
+]{
+	char *name; char *pattern;
+	struct patternresult res;
+
+	name = parse_id(pos);
+	pos = pos + strlen(name);
+	pos = skiplinespace(pos);
+	pattern = parse_tonewline(pos);
+	pos = pos + strlen(pattern); /* XXX: support pos += */
+
+	res.p = pattern_create(name, pattern);
+	res.pos = pos;
+	return res;
+}
+
+struct patternet
+parse_defsproper(char *pos)
+{
+	int npat;
+	struct pattern *pattern;
+	struct patternresult parsed;
+	struct patternet res;
+
+	npat = 0;
+	pattern = NULL;
+	for (; strncmp(pos, "%%", 2) != 0 ; npat++) {
+		parsed = parse_pattern(pos);
+		pos = parsed.pos;
+		pattern = realloc(pattern, sizeof(struct pattern) * (npat + 1));
+		pattern[npat] = *parsed.p;
+		pos = skipws(pos);
+	}
+	res.pattern = pattern;
+	res.npat = npat;
+	res.pos = pos;
+	return pos;
+}
+
+
+#define KEYWORD_OPTION "%option"
+
 char *
 skipoptions(char *pos)
 {
-	char *keyword;
 	char *id;
 
-	keyword = "%option";
-	if (strncmp(pos, keyword, strlen(keyword)) != 0) {
+	if (strncmp(pos, KEYWORD_OPTION, strlen(KEYWORD_OPTION)) != 0) {
 		return pos;
 	}
-	pos += strlen(keyword);
+	pos += strlen(KEYWORD_OPTION);
 	pos = skiplinespace(pos);
 	id = parse_id(pos);
 	pos += strlen(id);
@@ -277,23 +348,6 @@ skipws(char *s)
 	return s;
 }
 
-char *
-skiplinespace(char *s)
-{
-	for (; *s == ' ' || *s == '\t'; s++) {}
-	return s;
-}
-
-char *
-parse_tonewline(char *input)
-{
-	char *s;
-	for (s = input; *s != '\n'; 0) {
-		s++;
-	}
-	return substr(input, s - input);
-}
-
 struct stringresult {
 	char *s;
 	char *pos;
@@ -362,54 +416,6 @@ pattern_print(struct pattern *p)
 	printf("%s\t\t%s", p->name, p->pattern);
 }
 
-
-struct patternresult {
-	struct pattern *p;
-	char *pos;
-};
-
-struct patternresult
-parse_pattern(char *pos);
-
-struct patternet
-parse_defsproper(char *pos)
-{
-	int npat;
-	struct pattern *pattern;
-	struct patternresult parsed;
-	struct patternet res;
-
-	npat = 0;
-	pattern = NULL;
-	for (; strncmp(pos, "%%", 2) != 0 ; npat++) {
-		parsed = parse_pattern(pos);
-		pos = parsed.pos;
-		pattern = realloc(pattern, sizeof(struct pattern) * (npat + 1));
-		pattern[npat] = *parsed.p;
-		pos = skipws(pos);
-	}
-	res.pattern = pattern;
-	res.npat = npat;
-	res.pos = pos;
-	return pos;
-}
-
-struct patternresult
-parse_pattern(char *pos)
-{
-	char *name; char *pattern;
-	struct patternresult res;
-
-	name = parse_id(pos);
-	pos = pos + strlen(name);
-	pos = skiplinespace(pos);
-	pattern = parse_tonewline(pos);
-	pos += strlen(pattern);
-
-	res.p = pattern_create(name, pattern);
-	res.pos = pos;
-	return res;
-}
 
 void
 token_print(struct token *t)

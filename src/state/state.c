@@ -121,7 +121,7 @@ state_undeclarevars(struct state *s)
 {
 	heap_undeclare(s->heap, s);
 	vconst_undeclare(s->vconst);
-	stack_undeclare(s->stack);
+	stack_undeclare(s->stack, s);
 }
 
 struct value *

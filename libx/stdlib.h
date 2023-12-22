@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 axiom void *
-malloc(size_t size) [ .alloc result; ];
+malloc(int size) [ .alloc result; ];
 
 axiom void
 free(void *ptr) [ .dealloc ptr; ];

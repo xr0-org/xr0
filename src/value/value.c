@@ -278,6 +278,33 @@ copymembers(struct map *old)
 	return new;
 }
 
+static struct map *
+abstractcopymembers(struct map *old, struct state *s);
+
+struct value *
+value_struct_abstractcopy(struct value *old, struct state *s)
+{
+	struct value *new = malloc(sizeof(struct value));
+	assert(new);
+	new->type = VALUE_STRUCT;
+	new->_struct.members = ast_variable_arr_copy(old->_struct.members);
+	new->_struct.m = abstractcopymembers(old->_struct.m, s);
+	return new;
+}
+
+static struct map *
+abstractcopymembers(struct map *old, struct state *s)
+{
+	struct map *new = map_create();
+	for (int i = 0; i < old->n; i++) {
+		struct entry e = old->entry[i];
+		map_set(
+			new, dynamic_str(e.key),
+			object_abstractcopy((struct object *) e.value, s)
+		);
+	}
+	return new;
+}
 
 struct ast_type *
 value_struct_membertype(struct value *v, char *member)
@@ -363,6 +390,22 @@ value_copy(struct value *v)
 		return value_literal_create(v->s);
 	case VALUE_STRUCT:
 		return value_struct_copy(v);
+	default:
+		assert(false);
+	}
+}
+
+struct value *
+value_abstractcopy(struct value *v, struct state *s)
+{
+	if (!value_referencesheap(v, s)) {
+		return NULL;
+	}
+	switch (v->type) {
+	case VALUE_PTR:
+		return value_copy(v);
+	case VALUE_STRUCT:
+		return value_struct_abstractcopy(v, s);
 	default:
 		assert(false);
 	}
@@ -501,9 +544,13 @@ number_to_expr(struct number *n);
 struct ast_expr *
 value_to_expr(struct value *v)
 {
-	assert(v->type == VALUE_INT);
-
-	return number_to_expr(v->n);
+	switch (v->type) {
+	case VALUE_SYNC:
+	case VALUE_INT:
+		return number_to_expr(v->n);
+	default:
+		assert(false);
+	}
 }
 
 enum value_type

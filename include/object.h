@@ -16,6 +16,9 @@ object_range_create(struct ast_expr *offset, struct range *);
 struct object *
 object_copy(struct object *old);
 
+struct object *
+object_abstractcopy(struct object *old, struct state *s);
+
 void
 object_destroy(struct object *);
 
