@@ -224,11 +224,9 @@ parameterise_state(struct state *s, struct ast_function *f)
 	int nstmts = ast_block_nstmts(abs);
 	struct ast_stmt **stmt = ast_block_stmts(abs);
 	for (int i = 0; i < nstmts; i++) {
-		if (ast_stmt_issetup(stmt[i])) {
-			struct error *err = NULL;
-			if ((err = ast_stmt_exec(stmt[i], s))) {
-				return err;
-			}
+		struct error *err = NULL;
+		if ((err = ast_stmt_preprocess(stmt[i], s))) {
+			return err;
 		}
 	}
 

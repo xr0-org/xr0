@@ -311,11 +311,11 @@ ast_stmt_as_v_block(struct ast_stmt *);
 struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
 
-bool
-ast_stmt_issetup(struct ast_stmt *);
-
 struct error *
 ast_stmt_process(struct ast_stmt *, struct state *);
+
+struct error *
+ast_stmt_preprocess(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_verify(struct ast_stmt *, struct state *);

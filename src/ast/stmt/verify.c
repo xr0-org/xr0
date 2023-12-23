@@ -26,6 +26,19 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 	return NULL;
 }
 
+struct error *
+ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
+{
+	if (ast_stmt_ispre(stmt)) {
+		return ast_stmt_exec(stmt, state);
+	} else if (ast_stmt_isassume(stmt)) {
+		printf("%s\n", ast_stmt_str(stmt));
+		assert(false);
+	} else {
+		return NULL;
+	}
+}
+
 /* stmt_verify */
 
 static struct error *

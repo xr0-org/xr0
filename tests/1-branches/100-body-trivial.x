@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <string.h>
 
 void *
 test(int x) [ .alloc result; ]

@@ -3,7 +3,9 @@
 void *
 test(int x) [
 	assume: x;
-	.alloc result;
+	if (x) {
+		.alloc result;
+	}
 ]{
 	return malloc(1);
 }
@@ -11,7 +13,9 @@ test(int x) [
 void *
 test2(int x) [
 	assume: !x;
-	.alloc result;
+	if (x) {
+		.alloc result;
+	}
 ]{
-	return malloc(1);
+	return NULL;
 }

@@ -235,10 +235,11 @@ parse_defsproper(char *pos) [
 		pattern[npat] = *parsed.p;
 		pos = skipws(pos);
 	}
+
 	res.pattern = pattern;
 	res.npat = npat;
 	res.pos = pos;
-	return pos;
+	return res;
 }
 
 
