@@ -265,6 +265,8 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 	return NULL;
 }
 
+static struct result *
+sel_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct result *
 iter_absexec(struct ast_stmt *stmt, struct state *state);
@@ -284,6 +286,8 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 		return result_value_create(NULL);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
+	case STMT_SELECTION:
+		return sel_absexec(stmt, state);
 	case STMT_ITERATION:
 		return iter_absexec(stmt, state);
 	case STMT_COMPOUND:
@@ -372,6 +376,16 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	return obj;
 }
 
+static struct result *
+sel_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	if (props_get(state_getprops(state), ast_stmt_sel_cond(stmt)))
+	{
+		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
+	}
+	assert(!ast_stmt_sel_nest(stmt));
+	return result_value_create(NULL);
+}
 
 static struct result *
 comp_absexec(struct ast_stmt *stmt, struct state *state)

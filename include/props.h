@@ -1,6 +1,8 @@
 #ifndef XR0_PROPS_H
 #define XR0_PROPS_H
 
+#include <stdbool.h>
+
 struct props;
 
 struct props *
@@ -19,5 +21,8 @@ struct ast_expr;
 
 void
 props_install(struct props *, struct ast_expr *);
+
+bool
+props_get(struct props *, struct ast_expr *);
 
 #endif

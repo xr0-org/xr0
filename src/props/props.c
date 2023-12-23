@@ -59,3 +59,14 @@ props_install(struct props *p, struct ast_expr *e)
 	p->prop = realloc(p->prop, sizeof(struct ast_expr *) * ++p->n);
 	p->prop[p->n-1] = e;
 }
+
+bool
+props_get(struct props *p, struct ast_expr *e)
+{
+	for (int i = 0; i < p->n; i++) {
+		if (ast_expr_equal(e, p->prop[i])) {
+			return true;
+		}	
+	}
+	return false;
+}

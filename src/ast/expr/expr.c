@@ -709,6 +709,8 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 		return e1->u.constant == e2->u.constant;
 	case EXPR_IDENTIFIER:
 		return strcmp(ast_expr_as_identifier(e1), ast_expr_as_identifier(e2)) == 0;
+	case EXPR_STRING_LITERAL:
+		return strcmp(ast_expr_as_literal(e1), ast_expr_as_literal(e2)) == 0;
 	case EXPR_ASSIGNMENT:
 		return ast_expr_equal(e1->root, e2->root)
 			&& ast_expr_equal(e1->u.assignment_value, e2->u.assignment_value); 
@@ -716,6 +718,16 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 		return ast_expr_binary_op(e1) == ast_expr_binary_op(e2) &&
 			ast_expr_equal(ast_expr_binary_e1(e1), ast_expr_binary_e1(e2)) && 
 			ast_expr_equal(ast_expr_binary_e2(e1), ast_expr_binary_e2(e2));
+	case EXPR_CALL:
+		if (e1->u.call.n != e2->u.call.n) {
+			return false;
+		}
+		for (int i = 0; i < e1->u.call.n; i++) {
+			if (!ast_expr_equal(e1->u.call.arg[i], e2->u.call.arg[i])) {
+				return false;
+			}
+		}
+		return ast_expr_equal(e1->root, e2->root);
 	default:
 		assert(false);
 	}
