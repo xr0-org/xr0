@@ -167,6 +167,24 @@ parse_id(char *input) [ .alloc result; ]
 	return substr(input, s - input);
 }
 
+#define KEYWORD_OPTION "%option"
+
+char *
+skipoptions(char *pos)
+{
+	char *id;
+
+	if (strncmp(pos, KEYWORD_OPTION, strlen(KEYWORD_OPTION)) != 0) {
+		return pos;
+	}
+	pos += strlen(KEYWORD_OPTION);
+	pos = skiplinespace(pos);
+	id = parse_id(pos);
+	pos += strlen(id);
+	free(id);
+	return pos;
+}
+
 struct patternresult {
 	struct pattern *p;
 	char *pos;
@@ -242,24 +260,6 @@ parse_defsproper(char *pos) [
 	return res;
 }
 
-
-#define KEYWORD_OPTION "%option"
-
-char *
-skipoptions(char *pos)
-{
-	char *id;
-
-	if (strncmp(pos, KEYWORD_OPTION, strlen(KEYWORD_OPTION)) != 0) {
-		return pos;
-	}
-	pos += strlen(KEYWORD_OPTION);
-	pos = skiplinespace(pos);
-	id = parse_id(pos);
-	pos += strlen(id);
-	free(id);
-	return pos;
-}
 
 struct lexer;
 
