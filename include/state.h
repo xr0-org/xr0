@@ -13,6 +13,9 @@ struct ast_expr;
 /* ext */
 struct externals;
 
+/* props */
+struct props;
+
 /* object */
 struct object;
 
@@ -35,6 +38,9 @@ state_str(struct state *);
 
 struct externals *
 state_getext(struct state *);
+
+struct props *
+state_getprops(struct state *);
 
 void
 state_pushframe(struct state *, char *func, struct ast_type *ret_type);

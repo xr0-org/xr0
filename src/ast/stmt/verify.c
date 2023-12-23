@@ -4,6 +4,7 @@
 #include <string.h>
 #include "ast.h"
 #include "intern.h"
+#include "props.h"
 #include "object.h"
 #include "state.h"
 #include "stmt.h"
@@ -26,17 +27,27 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 	return NULL;
 }
 
+static void
+stmt_installprop(struct ast_stmt *stmt, struct state *state);
+
 struct error *
 ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
 {
 	if (ast_stmt_ispre(stmt)) {
 		return ast_stmt_exec(stmt, state);
 	} else if (ast_stmt_isassume(stmt)) {
-		printf("%s\n", ast_stmt_str(stmt));
-		assert(false);
-	} else {
-		return NULL;
+		stmt_installprop(stmt, state);
 	}
+	return NULL;
+}
+
+static void
+stmt_installprop(struct ast_stmt *stmt, struct state *state)
+{
+	props_install(
+		state_getprops(state),
+		ast_expr_copy(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)))
+	);
 }
 
 /* stmt_verify */

@@ -3,22 +3,24 @@
 #include <assert.h>
 #include <string.h>
 
-#include "ext.h"
-#include "state.h"
-#include "stack.h"
-#include "heap.h"
+#include "ast.h"
 #include "block.h"
+#include "ext.h"
+#include "heap.h"
 #include "location.h"
 #include "object.h"
-#include "value.h"
-#include "ast.h"
+#include "props.h"
+#include "stack.h"
+#include "state.h"
 #include "util.h"
+#include "value.h"
 
 struct state {
 	struct externals *ext;
 	struct vconst *vconst;
 	struct stack *stack;
 	struct heap *heap;
+	struct props *props;
 };
 
 struct state *
@@ -30,6 +32,7 @@ state_create(char *func, struct externals *ext, struct ast_type *result_type)
 	state->vconst = vconst_create();
 	state->stack = stack_create(func, NULL, result_type);
 	state->heap = heap_create();
+	state->props = props_create();
 	return state;
 }
 
@@ -39,6 +42,7 @@ state_destroy(struct state *state)
 	/* vconst_destroy(state->vconst); */
 	stack_destroy(state->stack);
 	heap_destroy(state->heap);
+	props_destroy(state->props);
 	free(state);
 }
 
@@ -70,8 +74,13 @@ state_str(struct state *state)
 	}
 	free(vconst);
 	char *stack = stack_str(state->stack, state);
-	strbuilder_printf(b, "%s", stack);
+	strbuilder_printf(b, "%s\n", stack);
 	free(stack);
+	char *props = props_str(state->props, "\t");
+	if (strlen(props) > 0) {
+		strbuilder_printf(b, "%s", props);
+	}
+	free(props);
 	char *heap = heap_str(state->heap, "\t");
 	if (strlen(heap) > 0) {
 		strbuilder_printf(b, "\n%s\n", heap);
@@ -87,11 +96,10 @@ state_getext(struct state *s)
 	return s->ext;
 }
 
-
-struct ast_function *
-state_getfunc(struct state *state, char *f)
+struct props *
+state_getprops(struct state *s)
 {
-	return externals_getfunc(state->ext, f);
+	return s->props;
 }
 
 void
