@@ -1,23 +1,40 @@
 #include <stdlib.h>
-#include <string.h>
 
 axiom int
 arbitrary(int x);
 
-void *
+void **
 test(int x) [
-	if (strcmp(s, "yes") == 0) {
-		.alloc result;
-	}
+	int i;
+	int n;
+
+	
 ]{
 	int i;
 	int n;
 	void *p;
 
 	n = 0;
-	p = NULL;
 	for (i = x; arbitrary(i); i++) {
-		p = .realloc(p, ++n);
+		n++;
 	}
-	return NULL;
+	return malloc(n);
+}
+
+bool
+check_something(void *p);
+
+bool
+caller(int i) [
+
+]{
+	void *p;
+	bool *res;
+
+	p = test(i);
+	res = check_something(ret);
+	/* to free or not to free */
+	free(res);
+
+	return res;
 }

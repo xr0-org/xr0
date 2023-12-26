@@ -233,32 +233,63 @@ struct patternet {
 	char *pos;
 };
 
+int
+compute_npat(char *pos);
+
+struct pattern *
+parse_defs_n(char *pos, int npat);
+
 struct patternet
 parse_defsproper(char *pos) [
-	if (strncmp(pos, "%%", 2) == 0) {
+	if (compute_npat(pos)) {
 		.alloc result.pattern;
 	}
 ]{
-	int npat;
-	struct pattern *pattern;
-	struct patternresult parsed;
 	struct patternet res;
 
-	npat = 0;
-	pattern = NULL;
-	for (; strncmp(pos, "%%", 2) != 0; npat++) {
-		parsed = parse_pattern(pos);
-		pos = parsed.pos;
-		pattern = realloc(pattern, sizeof(struct pattern) * (npat + 1));
-		pattern[npat] = *parsed.p;
-		pos = skipws(pos);
-	}
-
-	res.pattern = pattern;
-	res.npat = npat;
+	res.npat = compute_npat(pos);
+	res.pattern = parse_defs_n(pos, res.npat);
 	res.pos = pos;
 	return res;
 }
+
+int
+compute_npat(char *pos)
+{
+	int n;
+
+	for (; strncmp(pos, "%%", 2) != 0; n++) {
+		pos = skipws(parse_pattern(pos).pos);
+	}
+
+	return n;
+}
+
+
+struct pattern *
+parse_defs_n(char *pos, int npat) [
+	if (npat) {
+		.alloc result;
+	}
+]{
+	int i;
+	struct pattern *p;
+	struct patternresult parsed;
+
+	if (!npat) {
+		return NULL;
+	}
+
+	p = malloc(npat);
+	for (i = 0; i < npat; i++) {
+		parsed = parse_pattern(pos);
+		pos = parsed.pos;
+		p[i] = *parsed.p;
+		pos = skipws(pos);
+	}
+	return p;
+}
+
 
 
 struct lexer;
