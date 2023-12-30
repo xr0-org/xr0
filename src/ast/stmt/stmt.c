@@ -177,8 +177,14 @@ ast_stmt_create_jump(struct lexememarker *loc, enum ast_jump_kind kind,
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt)
 {
-	assert(stmt->kind == STMT_JUMP && stmt->u.jump.kind == JUMP_RETURN);
+	assert(ast_stmt_isreturn(stmt));
 	return stmt->u.jump.rv;
+}
+
+bool
+ast_stmt_isreturn(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_JUMP && stmt->u.jump.kind == JUMP_RETURN;
 }
 
 static void

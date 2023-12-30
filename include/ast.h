@@ -317,6 +317,9 @@ ast_stmt_process(struct ast_stmt *, struct state *);
 struct error *
 ast_stmt_preprocess(struct ast_stmt *, struct state *);
 
+bool
+ast_stmt_isreturn(struct ast_stmt *);
+
 struct error *
 ast_stmt_verify(struct ast_stmt *, struct state *);
 

@@ -12,7 +12,7 @@
 #include "stmt/stmt.c"
 #include "type/type.c"
 #include "variable.c"
-#include "function.c"
+#include "function/function.c"
 #include "externdecl.c"
 #include "literals.c"
 

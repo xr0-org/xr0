@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
+#include "function.h"
 #include "intern.h"
 #include "object.h"
 #include "state.h"
@@ -147,10 +149,39 @@ ast_function_params(struct ast_function *f)
 }
 
 struct error *
-path_verify(struct ast_function *f, struct state *state, struct externals *);
+paths_verify(struct ast_function_arr *paths, struct externals *);
 
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
+{
+	struct ast_function_arr *paths = paths_fromfunction(f);
+	struct error *err = paths_verify(paths, ext);
+	ast_function_arr_destroy(paths);
+	return err;
+}
+
+struct error *
+path_verify_withstate(struct ast_function *f, struct externals *ext);
+
+struct error *
+paths_verify(struct ast_function_arr *paths, struct externals *ext)
+{	
+	int len = ast_function_arr_len(paths);
+	struct ast_function **path = ast_function_arr_func(paths);
+	for (int i = 0; i < len; i++) {
+		struct error *err = NULL;
+		if ((err = path_verify_withstate(path[i], ext))) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
+struct error *
+path_verify(struct ast_function *f, struct state *state, struct externals *);
+
+struct error *
+path_verify_withstate(struct ast_function *f, struct externals *ext)
 {
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
@@ -192,6 +223,9 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
 		if ((err = ast_stmt_process(stmt[i], state))) {
 			return err;
+		}
+		if (ast_stmt_isreturn(stmt[i])) {
+			break;
 		}
 	}
 	state_undeclarevars(state);
@@ -290,3 +324,6 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 	assert(obj);
 	return result_value_create(object_as_value(obj));
 }
+
+#include "arr.c"
+#include "paths.c"
