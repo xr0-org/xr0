@@ -224,7 +224,7 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 		if ((err = ast_stmt_process(stmt[i], state))) {
 			return err;
 		}
-		if (ast_stmt_isreturn(stmt[i])) {
+		if (ast_stmt_isterminal(stmt[i])) {
 			break;
 		}
 	}

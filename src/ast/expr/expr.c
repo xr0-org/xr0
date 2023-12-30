@@ -307,6 +307,15 @@ ast_expr_unary_create(struct ast_expr *root, enum ast_unary_operator op)
 	return expr;
 }
 
+struct ast_expr *
+ast_expr_inverted_copy(struct ast_expr *expr, bool invert)
+{
+	struct ast_expr *copy = ast_expr_copy(expr);
+	return invert
+		? ast_expr_unary_create(copy, UNARY_OP_BANG)
+		: copy;
+}
+
 static void
 ast_expr_destroy_unary(struct ast_expr *expr)
 {

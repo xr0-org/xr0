@@ -125,3 +125,12 @@ ast_block_stmts(struct ast_block *b)
 	assert(b->nstmt > 0 || !b->stmt);
 	return b->stmt;
 }
+
+bool
+ast_block_isterminal(struct ast_block *b)
+{
+	for (int i = 0; i < b->nstmt; i++) {
+		return ast_stmt_isterminal(b->stmt[i]);
+	}
+	return false;
+}

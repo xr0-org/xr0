@@ -192,6 +192,9 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 		if (err) {
 			return err;
 		}
+		if (ast_stmt_isterminal(stmts[i])) {
+			break;
+		}
 	}
 	return NULL;
 }

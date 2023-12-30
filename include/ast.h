@@ -66,6 +66,9 @@ enum ast_unary_operator;
 struct ast_expr *
 ast_expr_unary_create(struct ast_expr *, enum ast_unary_operator);
 
+struct ast_expr *
+ast_expr_inverted_copy(struct ast_expr *expr, bool invert);
+
 enum ast_unary_operator
 ast_expr_unary_op(struct ast_expr *);
 
@@ -195,6 +198,9 @@ ast_block_nstmts(struct ast_block *b);
 struct ast_stmt **
 ast_block_stmts(struct ast_block *b);
 
+bool
+ast_block_isterminal(struct ast_block *);
+
 enum ast_jump_kind {
 	JUMP_RETURN	= 1 << 0,
 };
@@ -318,7 +324,10 @@ struct error *
 ast_stmt_preprocess(struct ast_stmt *, struct state *);
 
 bool
-ast_stmt_isreturn(struct ast_stmt *);
+ast_stmt_isterminal(struct ast_stmt *);
+
+bool
+ast_stmt_isselection(struct ast_stmt *);
 
 struct error *
 ast_stmt_verify(struct ast_stmt *, struct state *);

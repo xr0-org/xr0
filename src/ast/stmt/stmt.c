@@ -177,14 +177,27 @@ ast_stmt_create_jump(struct lexememarker *loc, enum ast_jump_kind kind,
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt)
 {
-	assert(ast_stmt_isreturn(stmt));
+	assert(ast_stmt_isterminal(stmt));
 	return stmt->u.jump.rv;
 }
 
 bool
-ast_stmt_isreturn(struct ast_stmt *stmt)
+ast_stmt_isterminal(struct ast_stmt *stmt)
 {
-	return stmt->kind == STMT_JUMP && stmt->u.jump.kind == JUMP_RETURN;
+	switch (stmt->kind) {
+	case STMT_JUMP:
+		return stmt->u.jump.kind == JUMP_RETURN;
+	case STMT_COMPOUND:
+		return ast_block_isterminal(stmt->u.compound);
+	default:
+		return false;
+	}
+}
+
+bool
+ast_stmt_isselection(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_SELECTION;
 }
 
 static void
