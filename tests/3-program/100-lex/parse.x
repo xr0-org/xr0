@@ -167,6 +167,14 @@ parse_id(char *input) [ .alloc result; ]
 	return substr(input, s - input);
 }
 
+char *
+skiplinespace(char *s) [
+	result = s; /* XXX */
+]{
+	for (; *s == ' ' || *s == '\t'; s++) {}
+	return s;
+}
+
 #define KEYWORD_OPTION "%option"
 
 char *
@@ -185,19 +193,6 @@ skipoptions(char *pos)
 	return pos;
 }
 
-struct patternresult {
-	struct pattern *p;
-	char *pos;
-};
-
-char *
-skiplinespace(char *s) [
-	result = s; /* XXX */
-]{
-	for (; *s == ' ' || *s == '\t'; s++) {}
-	return s;
-}
-
 char *
 parse_tonewline(char *input) [ .alloc result; ]
 {
@@ -208,6 +203,11 @@ parse_tonewline(char *input) [ .alloc result; ]
 	}
 	return substr(input, s - input);
 }
+
+struct patternresult {
+	struct pattern *p;
+	char *pos;
+};
 
 struct patternresult
 parse_pattern(char *pos) [
@@ -234,37 +234,19 @@ struct patternet {
 };
 
 int
-compute_npat(char *pos);
-
-struct pattern *
-parse_defs_n(char *pos, int npat);
-
-struct patternet
-parse_defsproper(char *pos) [
-	if (compute_npat(pos)) {
-		.alloc result.pattern;
-	}
-]{
-	struct patternet res;
-
-	res.npat = compute_npat(pos);
-	res.pattern = parse_defs_n(pos, res.npat);
-	res.pos = pos;
-	return res;
-}
-
-int
 compute_npat(char *pos)
 {
 	int n;
+	struct patternresult r;
 
 	for (; strncmp(pos, "%%", 2) != 0; n++) {
-		pos = skipws(parse_pattern(pos).pos);
+		r = parse_pattern(pos);
+		pos = skipws(r.pos);
+		/* TODO: clean up r.p */
 	}
 
 	return n;
 }
-
 
 struct pattern *
 parse_defs_n(char *pos, int npat) [
@@ -290,7 +272,19 @@ parse_defs_n(char *pos, int npat) [
 	return p;
 }
 
+struct patternet
+parse_defsproper(char *pos) [
+	if (compute_npat(pos)) {
+		.alloc result.pattern;
+	}
+]{
+	struct patternet res;
 
+	res.npat = compute_npat(pos);
+	res.pattern = parse_defs_n(pos, res.npat);
+	res.pos = pos;
+	return res;
+}
 
 struct lexer;
 

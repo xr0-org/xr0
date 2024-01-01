@@ -36,6 +36,7 @@ paths_fromfunction(struct ast_function *f)
 	} else {
 		ast_function_arr_append(arr, ast_function_copy(f));
 	}
+
 	return arr;
 }
 
@@ -118,6 +119,7 @@ block_withassumption(struct ast_block *old, struct ast_expr *cond)
 	for (int i = 0; i < old_nstmt; i++) {
 		stmt[i+1] = ast_stmt_copy(old_stmt[i]);
 	}
+	/* assume: cond; */
 	stmt[0] = ast_stmt_create_labelled(
 		NULL, dynamic_str("assume"), ast_stmt_create_expr(NULL, cond)
 	);
