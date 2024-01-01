@@ -239,6 +239,7 @@ compute_npat(char *pos)
 	int n;
 	struct patternresult r;
 
+	n = 0;
 	for (; strncmp(pos, "%%", 2) != 0; n++) {
 		r = parse_pattern(pos);
 		pos = skipws(r.pos);
