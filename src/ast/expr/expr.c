@@ -723,6 +723,10 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 	case EXPR_ASSIGNMENT:
 		return ast_expr_equal(e1->root, e2->root)
 			&& ast_expr_equal(e1->u.assignment_value, e2->u.assignment_value); 
+	case EXPR_UNARY:
+		return e1->u.unary_op == e2->u.unary_op &&
+			ast_expr_equal(e1->root, e2->root);
+
 	case EXPR_BINARY:
 		return ast_expr_binary_op(e1) == ast_expr_binary_op(e2) &&
 			ast_expr_equal(ast_expr_binary_e1(e1), ast_expr_binary_e1(e2)) && 

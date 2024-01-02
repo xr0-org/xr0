@@ -25,4 +25,7 @@ props_install(struct props *, struct ast_expr *);
 bool
 props_get(struct props *, struct ast_expr *);
 
+bool
+props_contradict(struct props *);
+
 #endif

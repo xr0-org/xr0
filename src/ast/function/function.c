@@ -7,6 +7,7 @@
 #include "function.h"
 #include "intern.h"
 #include "object.h"
+#include "props.h"
 #include "state.h"
 #include "util.h"
 
@@ -211,6 +212,11 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 
 	if ((err = parameterise_state(state, f))) {
 		return err;
+	}
+
+	if (props_contradict(state_getprops(state))) {
+		/* ex falso quodlibet */
+		return NULL;
 	}
 
 	int ndecls = ast_block_ndecls(body);

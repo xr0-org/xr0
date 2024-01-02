@@ -64,8 +64,31 @@ bool
 props_get(struct props *p, struct ast_expr *e)
 {
 	for (int i = 0; i < p->n; i++) {
+		/* TODO: logical comparison */
 		if (ast_expr_equal(e, p->prop[i])) {
 			return true;
+		}
+	}
+	return false;
+}
+
+bool
+props_contradict(struct props *p)
+{
+	for (int i = 0; i < p->n; i++) {
+		for (int j = 0; j < p->n; j++) {
+			/* TODO: check for logical contradiction */
+			struct ast_expr *p1 = p->prop[i],
+					*p2 = p->prop[j];
+			struct ast_expr *not_p1 = ast_expr_inverted_copy(p1, true),
+					*not_p2 = ast_expr_inverted_copy(p2, true);
+			bool contra = ast_expr_equal(p1, not_p2)
+					|| ast_expr_equal(not_p1, p2);
+			ast_expr_destroy(not_p2);
+			ast_expr_destroy(not_p1);
+			if (contra) {
+				return contra;
+			}
 		}
 	}
 	return false;
