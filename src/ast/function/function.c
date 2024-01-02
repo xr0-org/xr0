@@ -126,7 +126,7 @@ struct ast_block *
 ast_function_body(struct ast_function *f)
 {
 	if (!f->body) {
-		fprintf(stderr, "cannot find body for %s\n", f->name);
+		fprintf(stderr, "cannot find body for `%s'\n", f->name);
 	}
 	assert(f->body);
 	return f->body;

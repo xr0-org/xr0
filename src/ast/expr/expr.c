@@ -272,7 +272,7 @@ ast_expr_member_str_build(struct ast_expr *expr, struct strbuilder *b)
 
 	char *r = ast_expr_str(root);
 	strbuilder_printf(b, "%s.%s", r, expr->u.string);
-	free(root);
+	free(r);
 }
 
 static void

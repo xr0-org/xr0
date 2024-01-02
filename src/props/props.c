@@ -66,7 +66,7 @@ props_get(struct props *p, struct ast_expr *e)
 	for (int i = 0; i < p->n; i++) {
 		if (ast_expr_equal(e, p->prop[i])) {
 			return true;
-		}	
+		}
 	}
 	return false;
 }

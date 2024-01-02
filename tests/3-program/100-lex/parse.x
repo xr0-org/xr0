@@ -259,18 +259,18 @@ parse_defs_n(char *pos, int npat) [
 	struct pattern *p;
 	struct patternresult parsed;
 
-	if (!npat) {
-		return NULL;
+	if (npat) {
+		p = malloc(npat);
+		for (i = 0; i < npat; i++) {
+			parsed = parse_pattern(pos);
+			pos = parsed.pos;
+			p[i] = *parsed.p;
+			pos = skipws(pos);
+		}
+		return p;
 	}
 
-	p = malloc(npat);
-	for (i = 0; i < npat; i++) {
-		parsed = parse_pattern(pos);
-		pos = parsed.pos;
-		p[i] = *parsed.p;
-		pos = skipws(pos);
-	}
-	return p;
+	return NULL;
 }
 
 struct patternet

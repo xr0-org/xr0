@@ -130,7 +130,9 @@ bool
 ast_block_isterminal(struct ast_block *b)
 {
 	for (int i = 0; i < b->nstmt; i++) {
-		return ast_stmt_isterminal(b->stmt[i]);
+		if (ast_stmt_isterminal(b->stmt[i])) {
+			return true;
+		}
 	}
 	return false;
 }
