@@ -6,14 +6,47 @@
 #include "function.h"
 #include "util.h"
 
+static struct ast_function_arr *
+abstract_paths(struct ast_function *f);
+
+static struct ast_function_arr *
+body_paths(struct ast_function *f);
+
+struct ast_function_arr *
+paths_fromfunction(struct ast_function *f)
+{
+	struct ast_function_arr *arr = ast_function_arr_create();
+
+	struct ast_function_arr *abs_paths = abstract_paths(f);
+	int abs_len = ast_function_arr_len(abs_paths);
+	struct ast_function **abs_f = ast_function_arr_func(abs_paths);
+	for (int i = 0; i < abs_len; i++) {
+		struct ast_function_arr *body = body_paths(abs_f[i]);
+		ast_function_arr_appendrange(arr, ast_function_arr_copy(body));
+		ast_function_arr_destroy(body);
+	}
+	ast_function_arr_destroy(abs_paths);
+
+	return arr;
+}
+
+static struct ast_function_arr *
+abstract_paths(struct ast_function *f)
+{
+	struct ast_function_arr *arr = ast_function_arr_create();
+	/* TODO */
+	ast_function_arr_append(arr, ast_function_copy(f));
+	return arr;
+}
+
 static int
 findsel(struct ast_function *f);
 
 static struct ast_function *
 immediate_split(struct ast_function *f, int i, bool enter);
 
-struct ast_function_arr *
-paths_fromfunction(struct ast_function *f)
+static struct ast_function_arr *
+body_paths(struct ast_function *f)
 {
 	struct ast_function_arr *arr = ast_function_arr_create();
 
