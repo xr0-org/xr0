@@ -200,7 +200,7 @@ static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state,
 		struct externals *);
 
-static struct error *
+static struct preresult *
 parameterise_state(struct state *s, struct ast_function *f);
 
 struct error *
@@ -210,11 +210,10 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 
 	struct ast_block *body = ast_function_body(f);
 
-	if ((err = parameterise_state(state, f))) {
-		return err;
-	}
-
-	if (props_contradict(state_getprops(state))) {
+	struct preresult *r = parameterise_state(state, f);
+	if (preresult_iserror(r)) {
+		return preresult_as_error(r);
+	} else if (preresult_iscontradiction(r)) {
 		/* ex falso quodlibet */
 		return NULL;
 	}
@@ -245,7 +244,7 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 	return NULL;
 }
 
-static struct error *
+static struct preresult *
 parameterise_state(struct state *s, struct ast_function *f)
 {
 	/* declare params and locals in stack frame */
@@ -267,13 +266,13 @@ parameterise_state(struct state *s, struct ast_function *f)
 	int nstmts = ast_block_nstmts(abs);
 	struct ast_stmt **stmt = ast_block_stmts(abs);
 	for (int i = 0; i < nstmts; i++) {
-		struct error *err = NULL;
-		if ((err = ast_stmt_preprocess(stmt[i], s))) {
-			return err;
+		struct preresult *r = ast_stmt_preprocess(stmt[i], s);
+		if (!preresult_isempty(r)) {
+			return r;
 		}
 	}
 
-	return NULL;
+	return preresult_empty_create();
 }
 
 
@@ -281,8 +280,6 @@ static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state,
 		struct externals *ext)
 {
-	struct error *err = NULL;
-
 	if (!state_hasgarbage(actual_state)) {
 		printf("actual: %s\n", state_str(actual_state));
 		return error_create("garbage on heap");
@@ -291,9 +288,8 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 	struct state *alleged_state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
-	if ((err = parameterise_state(alleged_state, f))) {
-		return err;
-	}
+	struct preresult *r = parameterise_state(alleged_state, f);
+	assert(preresult_isempty(r));
 
 	/* mutates alleged_state */
 	struct result *res = ast_function_absexec(f, alleged_state);

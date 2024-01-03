@@ -138,3 +138,66 @@ lvalue_object(struct lvalue *l)
 {
 	return l->obj;
 }
+
+struct preresult {
+	bool iscontradiction;
+	struct error *err;
+};
+
+struct preresult *
+preresult_empty_create()
+{
+	return calloc(1, sizeof(struct preresult));
+}
+
+struct preresult *
+preresult_error_create(struct error *err)
+{
+	assert(err);
+
+	struct preresult *r = preresult_empty_create();
+	r->err = err;
+	return r;
+}
+
+struct preresult *
+preresult_contradiction_create()
+{
+	struct preresult *r = preresult_empty_create();
+	r->iscontradiction = true;
+	return r;
+}
+
+void
+preresult_destroy(struct preresult *r)
+{
+	assert(!r->err);
+
+	free(r);
+}
+
+bool
+preresult_isempty(struct preresult *r)
+{
+	return !(r->iscontradiction || r->err);
+}
+
+bool
+preresult_iserror(struct preresult *r)
+{
+	return r->err;
+}
+
+struct error *
+preresult_as_error(struct preresult *r)
+{
+	assert(r->err);
+
+	return r->err;
+}
+
+bool
+preresult_iscontradiction(struct preresult *r)
+{
+	return r->iscontradiction;
+}

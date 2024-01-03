@@ -607,20 +607,18 @@ value_equal(struct value *v1, struct value *v2)
 	}
 }
 
-static void
+static bool
 number_assume(struct number *, bool value);
 
-void
+bool
 value_assume(struct value *v, bool value)
 {
 	switch (v->type) {
 	case VALUE_INT:
-		number_assume(v->n, value);
-		break;
+		return number_assume(v->n, value);
 	case VALUE_PTR:
 		assert(v->ptr.isindefinite);
-		number_assume(v->ptr.n, value);
-		break;
+		return number_assume(v->ptr.n, value);
 	default:
 		assert(false);
 	}
@@ -856,15 +854,24 @@ number_ranges_equal(struct number *n1, struct number *n2)
 	return true;
 }
 
+static bool
+number_range_arr_canbe(struct number_range_arr *arr, bool value);
+
 static struct number_range_arr *
 number_range_assumed_value(bool value);
 
-static void
+static bool
 number_assume(struct number *n, bool value)
 {
 	assert(n->type == NUMBER_KNOWLEDGE_RANGES);
 
+	if (!number_range_arr_canbe(n->ranges, value)) {
+		return false;
+	}
+
 	n->ranges = number_range_assumed_value(value);
+
+	return true;
 }
 
 static struct number_range_arr *
@@ -1017,6 +1024,20 @@ number_ranges_to_expr(struct number_range_arr *arr)
 	);
 }
 
+static bool
+number_range_canbe(struct number_range *, bool value);
+
+static bool
+number_range_arr_canbe(struct number_range_arr *arr, bool value)
+{
+	for (int i = 0; i < arr->n; i++) {
+		if (number_range_canbe(arr->range[i], value)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 
 struct number_range {
 	struct number_value *lower, *upper;
@@ -1078,6 +1099,36 @@ number_range_copy(struct number_range *r)
 	);
 }
 
+/* number_value_le: v ≤ constant */
+static bool
+number_value_le_constant(struct number_value *v, int constant);
+
+static bool
+constant_le_number_value(int constant, struct number_value *v);
+
+bool
+number_value_equal(struct number_value *v1, struct number_value *v2);
+
+static bool
+number_range_canbe(struct number_range *r, bool value)
+{
+	if (value) {
+		/* check if r contains any nonzero value */
+		if (!number_range_issingle(r)) {
+			return false;
+		}
+		struct number_value *zero = number_value_constant_create(0);
+		bool eq = number_value_equal(r->lower, zero);
+		number_value_destroy(zero);
+		return eq;
+	} else {
+		/* check if r contains zero */
+		/* r->lower ≤ 0 && 0 < r->upper (non-inclusive upper)  */
+		return number_value_le_constant(r->lower, 0)
+			&& constant_le_number_value(1, r->upper);
+	}
+}
+
 bool
 number_values_aresingle(struct number_value *v1, struct number_value *v2);
 
@@ -1086,9 +1137,6 @@ number_range_issingle(struct number_range *r)
 {
 	return number_values_aresingle(r->lower, r->upper);
 }
-
-bool
-number_value_equal(struct number_value *v1, struct number_value *v2);
 
 bool
 number_range_equal(struct number_range *r1, struct number_range *r2)
@@ -1227,4 +1275,31 @@ number_value_as_constant(struct number_value *v)
 	assert(v->type == NUMBER_VALUE_CONSTANT);
 
 	return v->constant;
+}
+
+static bool
+number_value_le_constant(struct number_value *v, int constant)
+{
+	switch (v->type) {
+	case NUMBER_VALUE_CONSTANT:
+		return v->constant <= constant;
+	case NUMBER_VALUE_LIMIT:
+		return !v->max;
+	default:
+		assert(false);
+	}
+}
+
+static bool
+constant_le_number_value(int constant, struct number_value *v)
+{
+	switch (v->type) {
+	case NUMBER_VALUE_CONSTANT:
+		return constant <= v->constant;
+	case NUMBER_VALUE_LIMIT:
+		return v->max;
+	default:
+		assert(false);
+	}
+
 }

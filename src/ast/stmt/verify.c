@@ -27,24 +27,27 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 	return NULL;
 }
 
-static void
+static struct preresult *
 stmt_installprop(struct ast_stmt *stmt, struct state *state);
 
-struct error *
+struct preresult *
 ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
 {
 	if (ast_stmt_ispre(stmt)) {
-		return ast_stmt_exec(stmt, state);
+		struct error *err = ast_stmt_exec(stmt, state);
+		if (err) {
+			return preresult_error_create(err);
+		}
 	} else if (ast_stmt_isassume(stmt)) {
-		stmt_installprop(stmt, state);
+		return stmt_installprop(stmt, state);
 	}
-	return NULL;
+	return preresult_empty_create();
 }
 
-static void
+static struct preresult *
 stmt_installprop(struct ast_stmt *stmt, struct state *state)
 {
-	ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), state);
+	return ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), state);
 }
 
 /* stmt_verify */
@@ -379,6 +382,8 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("cond: %s\n", ast_expr_str(ast_stmt_sel_cond(stmt)));
+	assert(false);
 	if (props_get(state_getprops(state), ast_stmt_sel_cond(stmt))) {
 		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
 	}

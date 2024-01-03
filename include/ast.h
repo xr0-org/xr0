@@ -155,7 +155,9 @@ ast_expr_rangedecide(struct ast_expr *, struct ast_expr *lw,
 struct error *
 ast_expr_exec(struct ast_expr *, struct state *);
 
-void
+struct preresult;
+
+struct preresult *
 ast_expr_assume(struct ast_expr *, struct state *);
 
 struct lvalue;
@@ -323,7 +325,9 @@ ast_stmt_as_expr(struct ast_stmt *);
 struct error *
 ast_stmt_process(struct ast_stmt *, struct state *);
 
-struct error *
+struct preresult;
+
+struct preresult *
 ast_stmt_preprocess(struct ast_stmt *, struct state *);
 
 bool

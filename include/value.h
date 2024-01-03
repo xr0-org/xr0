@@ -96,7 +96,8 @@ enum ast_binary_operator;
 bool
 value_equal(struct value *v1, struct value *v2);
 
-void
+/* value_assume: Returns false if contradiction encountered. */
+bool
 value_assume(struct value *, bool value);
 
 enum number_value_type {
