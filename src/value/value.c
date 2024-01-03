@@ -1113,14 +1113,13 @@ static bool
 number_range_canbe(struct number_range *r, bool value)
 {
 	if (value) {
-		/* check if r contains any nonzero value */
-		if (!number_range_issingle(r)) {
+		if (number_value_equal(r->lower, r->upper)) {
+			/* empty range */
 			return false;
 		}
-		struct number_value *zero = number_value_constant_create(0);
-		bool eq = number_value_equal(r->lower, zero);
-		number_value_destroy(zero);
-		return eq;
+		/* r->lower ≤ -1 || 1 ≤ r->lower */
+		return number_value_le_constant(r->lower, -1) ||
+			constant_le_number_value(1, r->lower);
 	} else {
 		/* check if r contains zero */
 		/* r->lower ≤ 0 && 0 < r->upper (non-inclusive upper)  */
@@ -1266,7 +1265,18 @@ number_value_difference(struct number_value *v1, struct number_value *v2)
 bool
 number_value_equal(struct number_value *v1, struct number_value *v2)
 {
-	return number_value_difference(v1, v2) == 0;
+	if (v1->type != v2->type) {
+		return false;
+	}
+	switch (v1->type) {
+	case NUMBER_VALUE_CONSTANT:
+		return number_value_difference(v1, v2) == 0;
+	case NUMBER_VALUE_LIMIT:
+		return v1->max == v2->max;
+	default:
+		assert(false);
+	}
+
 }
 
 int

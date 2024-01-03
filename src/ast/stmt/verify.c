@@ -382,9 +382,17 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("cond: %s\n", ast_expr_str(ast_stmt_sel_cond(stmt)));
+	printf("state: %s\n", state_str(state));
+	struct result *res = ast_expr_eval(ast_stmt_sel_cond(stmt), state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	struct ast_expr *sync = value_as_sync(result_as_value(res));
+	struct value *cond = state_getvconst(state, ast_expr_as_identifier(sync));
+	printf("cond: %s\n", value_str(cond));
 	assert(false);
 	if (props_get(state_getprops(state), ast_stmt_sel_cond(stmt))) {
+		assert(false);
 		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
 	}
 	assert(!ast_stmt_sel_nest(stmt));

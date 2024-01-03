@@ -661,7 +661,7 @@ identifier_assume(char *id, bool value, struct state *state)
 	struct object *obj = state_getobject(state, id);
 	struct ast_expr *sync = value_as_sync(object_as_value(obj));
 	struct value *v = state_getvconst(state, ast_expr_as_identifier(sync));
-	bool iscontradiction = value_assume(v, value);
+	bool iscontradiction = !value_assume(v, value);
 	if (iscontradiction) {
 		return preresult_contradiction_create();
 	}
