@@ -17,7 +17,7 @@ struct value *
 value_ptr_create(struct location *loc);
 
 struct value *
-value_ptr_any_create();
+value_ptr_indefinite_create();
 
 struct value *
 value_int_create(int val);
@@ -26,7 +26,7 @@ struct value *
 value_literal_create(char *);
 
 struct value *
-value_int_any_create();
+value_int_indefinite_create();
 
 struct value *
 value_int_ne_create(int not_val);
@@ -95,6 +95,9 @@ enum ast_binary_operator;
 
 bool
 value_equal(struct value *v1, struct value *v2);
+
+void
+value_assume(struct value *, bool value);
 
 enum number_value_type {
 	NUMBER_VALUE_CONSTANT,

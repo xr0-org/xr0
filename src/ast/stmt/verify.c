@@ -44,10 +44,7 @@ ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
 static void
 stmt_installprop(struct ast_stmt *stmt, struct state *state)
 {
-	props_install(
-		state_getprops(state),
-		ast_expr_copy(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)))
-	);
+	ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), state);
 }
 
 /* stmt_verify */
@@ -382,8 +379,7 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	if (props_get(state_getprops(state), ast_stmt_sel_cond(stmt)))
-	{
+	if (props_get(state_getprops(state), ast_stmt_sel_cond(stmt))) {
 		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
 	}
 	assert(!ast_stmt_sel_nest(stmt));

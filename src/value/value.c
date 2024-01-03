@@ -12,12 +12,12 @@ struct value {
 	enum value_type type;
 	union {
 		struct {
-			bool isany;
+			bool isindefinite;
 			union {
 				/* NULL is represented as NULL location */
 				struct location *loc;
 
-				/* particularly for "any" case */
+				/* particularly for "indefinite" case */
 				struct number *n;
 			};
 		} ptr;
@@ -39,29 +39,29 @@ value_ptr_create(struct location *loc)
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_PTR;
-	v->ptr.isany = false;
+	v->ptr.isindefinite = false;
 	v->ptr.loc = loc;
 	return v;
 }
 
 struct number *
-number_any_create();
+number_indefinite_create();
 
 struct value *
-value_ptr_any_create()
+value_ptr_indefinite_create()
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_PTR;
-	v->ptr.isany = true;
-	v->ptr.n = number_any_create();
+	v->ptr.isindefinite = true;
+	v->ptr.n = number_indefinite_create();
 	return v;
 }
 
 static bool
 ptr_referencesheap(struct value *v, struct state *s)
 {
-	return !v->ptr.isany && location_referencesheap(v->ptr.loc, s);
+	return !v->ptr.isindefinite && location_referencesheap(v->ptr.loc, s);
 }
 
 struct number *
@@ -73,8 +73,8 @@ value_ptr_copy(struct value *old)
 	struct value *new = malloc(sizeof(struct value));
 	assert(new);
 	new->type = VALUE_PTR;
-	new->ptr.isany = old->ptr.isany;
-	if (old->ptr.isany) {
+	new->ptr.isindefinite = old->ptr.isindefinite;
+	if (old->ptr.isindefinite) {
 		new->ptr.n = number_copy(old->ptr.n);
 	} else {
 		new->ptr.loc = location_copy(old->ptr.loc);
@@ -85,7 +85,7 @@ value_ptr_copy(struct value *old)
 void
 value_ptr_sprint(struct value *v, struct strbuilder *b)
 {
-	char *s = v->ptr.isany ? number_str(v->ptr.n) : location_str(v->ptr.loc);
+	char *s = v->ptr.isindefinite ? number_str(v->ptr.n) : location_str(v->ptr.loc);
 	strbuilder_printf(b, "ptr:%s", s);
 	free(s);
 }
@@ -137,15 +137,15 @@ value_int_range_create(int lw, int excl_up)
 }
 
 struct number *
-number_any_create();
+number_indefinite_create();
 
 struct value *
-value_int_any_create()
+value_int_indefinite_create()
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_any_create();
+	v->n = number_indefinite_create();
 	return v;
 }
 
@@ -419,7 +419,7 @@ value_destroy(struct value *v)
 		number_destroy(v->n);
 		break;
 	case VALUE_PTR:
-		if (v->ptr.isany) {
+		if (v->ptr.isindefinite) {
 			number_destroy(v->ptr.n);
 		} else {
 			if (v->ptr.loc) {
@@ -473,7 +473,7 @@ value_str(struct value *v)
 struct location *
 value_as_ptr(struct value *v)
 {
-	assert(v->type == VALUE_PTR && !v->ptr.isany);
+	assert(v->type == VALUE_PTR && !v->ptr.isindefinite);
 	return v->ptr.loc;
 }
 
@@ -522,7 +522,7 @@ number_issync(struct number *n);
 bool
 value_issync(struct value *v)
 {
-	if (v->type != VALUE_INT) {
+	if (v->type != VALUE_SYNC) {
 		return false;
 	}
 	return number_issync(v->n);
@@ -534,7 +534,7 @@ number_as_sync(struct number *n);
 struct ast_expr *
 value_as_sync(struct value *v)
 {
-	assert(v->type == VALUE_INT);
+	assert(v->type == VALUE_SYNC);
 	return number_as_sync(v->n);
 }
 
@@ -567,7 +567,7 @@ value_references(struct value *v, struct location *loc, struct state *s)
 {
 	switch (v->type) {
 	case VALUE_PTR:
-		return !v->ptr.isany && location_references(v->ptr.loc, loc, s);
+		return !v->ptr.isindefinite && location_references(v->ptr.loc, loc, s);
 	case VALUE_STRUCT:
 		return struct_references(v, loc, s);
 	default:
@@ -607,6 +607,25 @@ value_equal(struct value *v1, struct value *v2)
 	}
 }
 
+static void
+number_assume(struct number *, bool value);
+
+void
+value_assume(struct value *v, bool value)
+{
+	switch (v->type) {
+	case VALUE_INT:
+		number_assume(v->n, value);
+		break;
+	case VALUE_PTR:
+		assert(v->ptr.isindefinite);
+		number_assume(v->ptr.n, value);
+		break;
+	default:
+		assert(false);
+	}
+}
+
 struct number {
 	enum number_knowledge_type type;
 	union {
@@ -627,8 +646,17 @@ number_ranges_create(struct number_range_arr *ranges)
 struct number_value *
 number_value_constant_create(int constant);
 
+struct number_range_arr *
+number_range_arr_single_create(int val);
+
 struct number *
 number_single_create(int val)
+{
+	return number_ranges_create(number_range_arr_single_create(val));
+}
+
+struct number_range_arr *
+number_range_arr_single_create(int val)
 {
 	struct number_range_arr *arr = number_range_arr_create();
 	number_range_arr_append(
@@ -638,7 +666,7 @@ number_single_create(int val)
 			number_value_constant_create(val+1)
 		)
 	);
-	return number_ranges_create(arr);
+	return arr;
 }
 
 struct number *
@@ -656,8 +684,8 @@ number_value_min_create();
 struct number_value *
 number_value_max_create();
 
-struct number *
-number_ne_create(int val)
+struct number_range_arr *
+number_range_arr_ne_create(int val)
 {
 	struct number_range_arr *arr = number_range_arr_create();
 	number_range_arr_append(
@@ -674,7 +702,13 @@ number_ne_create(int val)
 			number_value_max_create()
 		)
 	);
-	return number_ranges_create(arr);
+	return arr;
+}
+
+struct number *
+number_ne_create(int val)
+{
+	return number_ranges_create(number_range_arr_ne_create(val));
 }
 
 struct number *
@@ -692,7 +726,7 @@ number_with_range_create(int lw, int excl_up)
 }
 
 struct number *
-number_any_create()
+number_indefinite_create()
 {
 	struct number_range_arr *arr = number_range_arr_create();
 	number_range_arr_append(
@@ -821,6 +855,28 @@ number_ranges_equal(struct number *n1, struct number *n2)
 
 	return true;
 }
+
+static struct number_range_arr *
+number_range_assumed_value(bool value);
+
+static void
+number_assume(struct number *n, bool value)
+{
+	assert(n->type == NUMBER_KNOWLEDGE_RANGES);
+
+	n->ranges = number_range_assumed_value(value);
+}
+
+static struct number_range_arr *
+number_range_assumed_value(bool value)
+{
+	if (value) {
+		return number_range_arr_ne_create(0);
+	} else {
+		return number_range_arr_single_create(0);
+	}
+}
+
 
 bool
 number_range_issingle(struct number_range *r);

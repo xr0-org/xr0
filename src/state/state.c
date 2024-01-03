@@ -142,6 +142,12 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 	return value_sync_create(ast_expr_identifier_create(c));
 }
 
+struct value *
+state_getvconst(struct state *state, char *id)
+{
+	return vconst_get(state->vconst, id);
+}
+
 struct object *
 state_get(struct state *state, struct location *loc, bool constructive)
 {
@@ -258,12 +264,6 @@ struct error *
 state_dealloc(struct state *state, struct value *val)
 {
 	return location_dealloc(value_as_ptr(val), state->heap);
-}
-
-struct value *
-state_getvconst(struct state *state, char *id)
-{
-	return vconst_get(state->vconst, id);
 }
 
 

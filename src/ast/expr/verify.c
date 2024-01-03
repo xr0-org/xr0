@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
 #include "expr.h"
 #include "ext.h"
 #include "intern.h"
 #include "math.h"
 #include "object.h"
+#include "props.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
@@ -617,4 +619,52 @@ static struct result *
 assign_absexec(struct ast_expr *expr, struct state *state)
 {
 	return expr_assign_eval(expr, state);
+}
+
+static void
+reduce_assume(struct ast_expr *, bool value, struct state *);
+
+void
+ast_expr_assume(struct ast_expr *expr, struct state *state)
+{
+	reduce_assume(expr, true, state);
+}
+
+static void
+identifier_assume(char *id, bool value, struct state *state);
+
+static void
+reduce_assume(struct ast_expr *expr, bool value, struct state *state)
+{
+	switch (expr->kind) {
+	case EXPR_IDENTIFIER:
+		identifier_assume(ast_expr_as_identifier(expr), value, state);
+		break;
+	case EXPR_UNARY:
+		assert(ast_expr_unary_op(expr) == UNARY_OP_BANG);
+		reduce_assume(ast_expr_unary_operand(expr), !value, state);
+		break;
+	case EXPR_CALL:
+		/* irreducible */
+		props_install(
+			state_getprops(state),
+			ast_expr_copy(expr)
+		);
+		break;
+	default:
+		assert(false);
+	}
+}
+
+static void
+identifier_assume(char *id, bool value, struct state *state)
+{
+	/* set value of variable corresponding to identifier != 0 */
+	printf("state: %s\n", state_str(state));
+	printf("id: %s\n", id);
+	struct object *obj = state_getobject(state, id);
+	struct ast_expr *sync = value_as_sync(object_as_value(obj));
+	struct value *v = state_getvconst(state, ast_expr_as_identifier(sync));
+	value_assume(v, value);
+	printf("state (after): %s\n", state_str(state));
 }

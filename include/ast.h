@@ -155,6 +155,9 @@ ast_expr_rangedecide(struct ast_expr *, struct ast_expr *lw,
 struct error *
 ast_expr_exec(struct ast_expr *, struct state *);
 
+void
+ast_expr_assume(struct ast_expr *, struct state *);
+
 struct lvalue;
 
 struct lvalue *

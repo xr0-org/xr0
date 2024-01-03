@@ -82,10 +82,10 @@ ast_type_vconst(struct ast_type *t, struct externals *ext)
 {
 	switch (t->base) {
 	case TYPE_INT:
-		return value_int_any_create();
+		return value_int_indefinite_create();
 	case TYPE_VOID:
 	case TYPE_POINTER:
-		return value_ptr_any_create();
+		return value_ptr_indefinite_create();
 	case TYPE_USERDEF:
 		return ast_type_vconst(
 			externals_gettypedef(ext, t->userdef), ext

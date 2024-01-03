@@ -90,6 +90,9 @@ state_range_aredeallocands(struct state *, struct object *,
 struct value *
 state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
 
+struct value *
+state_getvconst(struct state *, char *id);
+
 bool
 state_hasgarbage(struct state *);
 
