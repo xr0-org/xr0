@@ -189,7 +189,7 @@ value_sync_copy(struct value *old)
 
 	struct value *new = malloc(sizeof(struct value));
 	assert(new);
-	new->type = VALUE_INT;
+	new->type = VALUE_SYNC;
 	new->n = number_copy(old->n);
 
 	return new;
@@ -883,7 +883,6 @@ number_range_assumed_value(bool value)
 		return number_range_arr_single_create(0);
 	}
 }
-
 
 bool
 number_range_issingle(struct number_range *r);

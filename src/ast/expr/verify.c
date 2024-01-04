@@ -643,6 +643,7 @@ reduce_assume(struct ast_expr *expr, bool value, struct state *state)
 		assert(ast_expr_unary_op(expr) == UNARY_OP_BANG);
 		return reduce_assume(ast_expr_unary_operand(expr), !value, state);
 	case EXPR_CALL:
+	case EXPR_BINARY:
 		/* irreducible */
 		assert(false);
 		props_install(

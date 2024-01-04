@@ -379,25 +379,43 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	return obj;
 }
 
+static bool
+sel_decide(struct ast_expr *control, struct state *state);
+
 static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("state: %s\n", state_str(state));
-	struct result *res = ast_expr_eval(ast_stmt_sel_cond(stmt), state);
-	if (result_iserror(res)) {
-		return res;
-	}
-	struct ast_expr *sync = value_as_sync(result_as_value(res));
-	struct value *cond = state_getvconst(state, ast_expr_as_identifier(sync));
-	printf("cond: %s\n", value_str(cond));
-	assert(false);
-	if (props_get(state_getprops(state), ast_stmt_sel_cond(stmt))) {
-		assert(false);
+	if (sel_decide(ast_stmt_sel_cond(stmt), state)) {
 		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
 	}
 	assert(!ast_stmt_sel_nest(stmt));
 	return result_value_create(NULL);
 }
+
+static bool
+sel_decide(struct ast_expr *control, struct state *state)
+{
+	struct result *res = ast_expr_eval(control, state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	struct ast_expr *sync = value_as_sync(result_as_value(res));
+	struct value *cond = state_getvconst(state, ast_expr_as_identifier(sync));
+	struct value *zero = value_int_create(0);
+	bool iszero = value_equal(zero, cond);
+	value_destroy(zero);
+	if (!iszero) {
+		return true;
+	}
+
+	if (props_get(state_getprops(state), control)) {
+		assert(false);
+		return true;
+	}
+
+	return false;
+}
+
 
 static struct result *
 comp_absexec(struct ast_stmt *stmt, struct state *state)
