@@ -459,6 +459,10 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	if (result_hasvalue(res)) { /* preserve value through pop */
 		res = result_value_create(value_copy(result_as_value(res)));
 	} else {
+		/* TODO: check if something has been assumed about the call */
+		printf("state: %s\n", state_str(state));
+		printf("call: %s\n", ast_expr_str(expr));
+		assert(false);
 		res = result_value_create(
 			state_vconst(state, ret_type, dynamic_str(name), false)
 		);
@@ -621,94 +625,38 @@ assign_absexec(struct ast_expr *expr, struct state *state)
 	return expr_assign_eval(expr, state);
 }
 
-static struct ast_expr *
-assumption_to_binary(struct ast_expr *);
-
 static struct preresult *
-binary_assume(struct ast_expr *, enum ast_binary_operator, struct ast_expr *,
-		struct state *);
+reduce_assume(struct ast_expr *, bool value, struct state *);
 
 struct preresult *
-ast_expr_assume(struct ast_expr *e, struct state *s)
+ast_expr_assume(struct ast_expr *expr, struct state *state)
 {
-	struct ast_expr *b = assumption_to_binary(e);
-	struct preresult *r = binary_assume(
-		ast_expr_binary_e1(b),
-		ast_expr_binary_op(b),
-		ast_expr_binary_e2(b),
-		s
-	);
-	ast_expr_destroy(b);
-	return r;
+	return reduce_assume(expr, true, state);
 }
-
-static struct ast_expr *
-assumption_to_binary(struct ast_expr *e)
-{
-	switch (e->kind) {
-	case EXPR_BINARY:
-		return ast_expr_copy(e);
-	case EXPR_UNARY:
-		if (ast_expr_unary_op(e) == UNARY_OP_BANG) {
-			/* e == 0 */
-			return ast_expr_binary_create(
-				ast_expr_copy(ast_expr_unary_operand(e)),
-				BINARY_OP_EQ,
-				ast_expr_constant_create(0)
-			);
-		}
-		/* fallthrough */
-	default:
-		/* e != 0 */
-		return ast_expr_binary_create(
-			ast_expr_copy(e), BINARY_OP_NE, ast_expr_constant_create(0)
-		);
-	}
-}
-
-static bool
-iszero(struct ast_expr *);
 
 static struct preresult *
 identifier_assume(char *id, bool value, struct state *state);
 
 static struct preresult *
-binary_assume(struct ast_expr *e1, enum ast_binary_operator op, struct ast_expr *e2,
-		struct state *s)
+irreducible_assume(struct ast_expr *, bool value, struct state *);
+
+static struct preresult *
+reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 {
-	if (e1->kind == EXPR_CONSTANT) {
-		/* wholly constant assumptions can be removed earlier */
-		assert(e2->kind != EXPR_CONSTANT);
-		return binary_assume(e2, op, e1, s);
-	}
-	/* ⊢ e1->kind != EXPR_CONSTANT */
-
-	assert(iszero(e2));
-
-	switch (e1->kind) {
+	switch (expr->kind) {
 	case EXPR_IDENTIFIER:
-		return identifier_assume(
-			ast_expr_as_identifier(e1),
-			op == BINARY_OP_NE,
-			s
-		);
+		return identifier_assume(ast_expr_as_identifier(expr), value, s);
+	case EXPR_UNARY:
+		assert(ast_expr_unary_op(expr) == UNARY_OP_BANG);
+		return reduce_assume(ast_expr_unary_operand(expr), !value, s);
+	case EXPR_BRACKETED:
+		return reduce_assume(expr->root, value, s);
 	case EXPR_CALL:
-		/* irreducible */
-		printf("irreducible: %s\n", ast_expr_str(e1));
-		assert(false);
-		props_install(
-			state_getprops(s),
-			ast_expr_copy(e1)
-		);
+	case EXPR_BINARY:
+		return irreducible_assume(expr, value, s);
 	default:
 		assert(false);
 	}
-}
-
-static bool
-iszero(struct ast_expr *e)
-{
-	return e->kind == EXPR_CONSTANT && e->u.constant == 0;
 }
 
 static struct preresult *
@@ -722,5 +670,28 @@ identifier_assume(char *id, bool value, struct state *state)
 	if (iscontradiction) {
 		return preresult_contradiction_create();
 	}
+	return preresult_empty_create();
+}
+
+static struct preresult *
+irreducible_assume_actual(struct ast_expr *e, struct state *s);
+
+static struct preresult *
+irreducible_assume(struct ast_expr *e, bool value, struct state *s)
+{
+	struct ast_expr *prop = ast_expr_inverted_copy(e, !value);
+	struct preresult *r = irreducible_assume_actual(prop, s);
+	ast_expr_destroy(prop);
+	return r;
+}
+
+static struct preresult *
+irreducible_assume_actual(struct ast_expr *e, struct state *s)
+{
+	struct props *p = state_getprops(s);
+	if (props_contradicts(p, e)) {
+		return preresult_contradiction_create();
+	}
+	props_install(state_getprops(s), ast_expr_copy(e));
 	return preresult_empty_create();
 }

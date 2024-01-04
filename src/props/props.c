@@ -56,6 +56,8 @@ props_str(struct props *p, char *indent)
 void
 props_install(struct props *p, struct ast_expr *e)
 {
+	assert(!props_contradicts(p, e));
+
 	p->prop = realloc(p->prop, sizeof(struct ast_expr *) * ++p->n);
 	p->prop[p->n-1] = e;
 }
@@ -72,23 +74,30 @@ props_get(struct props *p, struct ast_expr *e)
 	return false;
 }
 
+static bool
+props_contradicts_actual(struct props *p, struct ast_expr *p1, struct ast_expr *not_p1);
+
 bool
-props_contradict(struct props *p)
+props_contradicts(struct props *p, struct ast_expr *p1)
+{
+	struct ast_expr *not_p1 = ast_expr_inverted_copy(p1, true);
+	bool iscontradiction = props_contradicts_actual(p, p1, not_p1);
+	ast_expr_destroy(not_p1);
+	return iscontradiction;
+}
+
+static bool
+props_contradicts_actual(struct props *p, struct ast_expr *p1, struct ast_expr *not_p1)
 {
 	for (int i = 0; i < p->n; i++) {
-		for (int j = 0; j < p->n; j++) {
-			/* TODO: check for logical contradiction */
-			struct ast_expr *p1 = p->prop[i],
-					*p2 = p->prop[j];
-			struct ast_expr *not_p1 = ast_expr_inverted_copy(p1, true),
-					*not_p2 = ast_expr_inverted_copy(p2, true);
-			bool contra = ast_expr_equal(p1, not_p2)
-					|| ast_expr_equal(not_p1, p2);
-			ast_expr_destroy(not_p2);
-			ast_expr_destroy(not_p1);
-			if (contra) {
-				return contra;
-			}
+		/* TODO: check for logical contradiction */
+		struct ast_expr *p2 = p->prop[i],
+				*not_p2 = ast_expr_inverted_copy(p2, true);
+		bool contra = ast_expr_equal(p1, not_p2)
+			|| ast_expr_equal(not_p1, p2);
+		ast_expr_destroy(not_p2);
+		if (contra) {
+			return true;
 		}
 	}
 	return false;

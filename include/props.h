@@ -26,6 +26,6 @@ bool
 props_get(struct props *, struct ast_expr *);
 
 bool
-props_contradict(struct props *);
+props_contradicts(struct props *k, struct ast_expr *);
 
 #endif
