@@ -621,38 +621,94 @@ assign_absexec(struct ast_expr *expr, struct state *state)
 	return expr_assign_eval(expr, state);
 }
 
+static struct ast_expr *
+assumption_to_binary(struct ast_expr *);
+
 static struct preresult *
-reduce_assume(struct ast_expr *, bool value, struct state *);
+binary_assume(struct ast_expr *, enum ast_binary_operator, struct ast_expr *,
+		struct state *);
 
 struct preresult *
-ast_expr_assume(struct ast_expr *expr, struct state *state)
+ast_expr_assume(struct ast_expr *e, struct state *s)
 {
-	return reduce_assume(expr, true, state);
+	struct ast_expr *b = assumption_to_binary(e);
+	struct preresult *r = binary_assume(
+		ast_expr_binary_e1(b),
+		ast_expr_binary_op(b),
+		ast_expr_binary_e2(b),
+		s
+	);
+	ast_expr_destroy(b);
+	return r;
 }
+
+static struct ast_expr *
+assumption_to_binary(struct ast_expr *e)
+{
+	switch (e->kind) {
+	case EXPR_BINARY:
+		return ast_expr_copy(e);
+	case EXPR_UNARY:
+		if (ast_expr_unary_op(e) == UNARY_OP_BANG) {
+			/* e == 0 */
+			return ast_expr_binary_create(
+				ast_expr_copy(ast_expr_unary_operand(e)),
+				BINARY_OP_EQ,
+				ast_expr_constant_create(0)
+			);
+		}
+		/* fallthrough */
+	default:
+		/* e != 0 */
+		return ast_expr_binary_create(
+			ast_expr_copy(e), BINARY_OP_NE, ast_expr_constant_create(0)
+		);
+	}
+}
+
+static bool
+iszero(struct ast_expr *);
 
 static struct preresult *
 identifier_assume(char *id, bool value, struct state *state);
 
 static struct preresult *
-reduce_assume(struct ast_expr *expr, bool value, struct state *state)
+binary_assume(struct ast_expr *e1, enum ast_binary_operator op, struct ast_expr *e2,
+		struct state *s)
 {
-	switch (expr->kind) {
+	if (e1->kind == EXPR_CONSTANT) {
+		/* wholly constant assumptions can be removed earlier */
+		assert(e2->kind != EXPR_CONSTANT);
+		return binary_assume(e2, op, e1, s);
+	}
+	/* ⊢ e1->kind != EXPR_CONSTANT */
+
+	assert(iszero(e2));
+
+	switch (e1->kind) {
 	case EXPR_IDENTIFIER:
-		return identifier_assume(ast_expr_as_identifier(expr), value, state);
-	case EXPR_UNARY:
-		assert(ast_expr_unary_op(expr) == UNARY_OP_BANG);
-		return reduce_assume(ast_expr_unary_operand(expr), !value, state);
+		return identifier_assume(
+			ast_expr_as_identifier(e1),
+			op == BINARY_OP_NE,
+			s
+		);
 	case EXPR_CALL:
-	case EXPR_BINARY:
 		/* irreducible */
+		printf("irreducible: %s\n", ast_expr_str(e1));
 		assert(false);
 		props_install(
-			state_getprops(state),
-			ast_expr_copy(expr)
+			state_getprops(s),
+			ast_expr_copy(e1)
 		);
 	default:
 		assert(false);
 	}
+}
+
+static bool
+iszero(struct ast_expr *e)
+{
+	return e->kind == EXPR_CONSTANT && e->u.constant == 0;
 }
 
 static struct preresult *
