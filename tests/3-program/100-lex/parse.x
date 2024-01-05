@@ -263,9 +263,8 @@ parse_defs_n(char *pos, int npat) [
 		p = malloc(npat);
 		for (i = 0; i < npat; i++) {
 			parsed = parse_pattern(pos);
-			pos = parsed.pos;
 			p[i] = *parsed.p;
-			pos = skipws(pos);
+			pos = skipws(parsed.pos);
 		}
 		return p;
 	}
@@ -286,6 +285,71 @@ parse_defsproper(char *pos) [
 	res.pos = pos;
 	return res;
 }
+
+struct rulesresult {
+	struct token *token;
+	int ntok;
+	char *pos;
+};
+
+struct tokenresult {
+	struct token *tk;
+	char *pos;
+};
+
+int
+compute_ntok(char *pos)
+{
+	int n;
+	struct tokenresult r;
+
+	n = 0;
+	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; ntok++) {
+		r = parse_token(pos);
+		pos = skipws(r.pos);
+		/* TODO: clean up r.tk */
+	}
+
+	return n;
+}
+
+struct token *
+parse_rules_n(char *pos, int ntok) [
+	if (ntok) {
+		.alloc result;
+	}
+]{
+	int i;
+	struct token *t;
+	struct tokenresult parsed;
+
+	if (ntok) {
+		t = malloc(ntok);
+		for (i = 0; i < ntok; i++) {
+			parsed = parse_token(pos);
+			t[i] = *parsed.tk;
+			pos = skipws(parsed.pos);
+		}
+		return t;
+	}
+
+	return NULL;
+}
+
+struct rulesresult
+parse_rules(char *pos) [
+	if (compute_ntok(pos)) {
+		.alloc result.token;
+	}
+]{
+	struct rulesresult res;
+
+	res.ntok = compute_ntok(pos);
+	res.token = parse_rules_n(pos, res.ntok);
+	res.pos = pos;
+	return res;
+}
+
 
 struct lexer;
 
@@ -338,12 +402,6 @@ struct defsresult {
 
 struct defsresult
 parse_defs(char *pos);
-
-struct rulesresult {
-	struct token *token;
-	int ntok;
-	char *pos;
-};
 
 struct rulesresult
 parse_rules(char *pos);
@@ -458,36 +516,9 @@ token_print(struct token *t)
 	printf("\t\t%s", t->action);
 }
 
-struct tokenresult {
-	struct token *tk;
-	char *pos;
-};
-
 struct tokenresult
 parse_token(char *pos);
 
-struct rulesresult
-parse_rules(char *pos)
-{
-	int ntok;
-	struct token *token;
-	struct tokenresult parsed;
-	struct rulesresult res;
-
-	ntok = 0;
-	token = NULL;
-	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; ntok++) {
-		parsed = parse_token(pos);
-		pos = parsed.pos;
-		token = realloc(token, sizeof(struct token) * (ntok + 1));
-		token[ntok] = *parsed.tk;
-		pos = skipws(pos);
-	}
-	res.token = token;
-	res.ntok = ntok;
-	res.pos = pos;
-	return res;
-}
 
 struct tknameresult {
 	int isliteral;
