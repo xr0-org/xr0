@@ -392,35 +392,33 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 	return result_value_create(NULL);
 }
 
+static struct value *
+underlying_value(struct value *v, struct state *state);
+
 static bool
 sel_decide(struct ast_expr *control, struct state *state)
 {
 	struct result *res = ast_expr_eval(control, state);
 	assert(!result_iserror(res)); /* TODO: process error */
 
-	struct ast_expr *sync = value_as_sync(result_as_value(res));
-	struct value *cond = state_getvconst(state, ast_expr_as_identifier(sync));
 	struct value *zero = value_int_create(0);
-	bool nonzero = !value_equal(zero, cond);
+	bool nonzero = !value_equal(
+		zero, underlying_value(result_as_value(res), state)
+	);
 	value_destroy(zero);
-	if (nonzero) {
-		return true;
-	}
-
-	struct props *p = state_getprops(state);
-	if (props_get(p, control)) {
-		printf("state: %s\n", state_str(state));
-		assert(false);
-		return true;
-	} else if (props_contradicts(p, control)) {
-		printf("state: %s\n", state_str(state));
-		assert(false);
-		return false;
-	}
-
-	return false;
+	return nonzero;
 }
 
+static struct value *
+underlying_value(struct value *v, struct state *state)
+{
+	if (value_issync(v)) {
+		return state_getvconst(
+			state, ast_expr_as_identifier(value_as_sync(v))
+		);
+	}
+	return v;
+}
 
 static struct result *
 comp_absexec(struct ast_stmt *stmt, struct state *state)

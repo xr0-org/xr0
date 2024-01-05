@@ -34,6 +34,7 @@ ast_expr_decide(struct ast_expr *expr, struct state *state)
 	case EXPR_BINARY:
 		return expr_binary_decide(expr, state);
 	default:
+		printf("expr: %s\n", ast_expr_str(expr));
 		assert(false);
 	}
 }
