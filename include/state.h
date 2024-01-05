@@ -51,9 +51,6 @@ state_popframe(struct state *);
 void
 state_declare(struct state *, struct ast_variable *var, bool isparam);
 
-void
-state_undeclarevars(struct state *s);
-
 struct object *
 state_getresult(struct state *);
 

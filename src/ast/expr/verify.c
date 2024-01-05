@@ -34,7 +34,6 @@ ast_expr_decide(struct ast_expr *expr, struct state *state)
 	case EXPR_BINARY:
 		return expr_binary_decide(expr, state);
 	default:
-		printf("expr: %s\n", ast_expr_str(expr));
 		assert(false);
 	}
 }
@@ -376,12 +375,14 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 	if (result_iserror(res)) {
 		return res;
 	}
-	struct value *v = value_copy(object_as_value(
+	/* XXX */
+	struct value *obj_value = object_as_value(
 		value_struct_member(
 			result_as_value(res),
 			ast_expr_member_field(expr)
 		)
-	));
+	);
+	struct value *v = obj_value ? value_copy(obj_value) : NULL;
 	result_destroy(res);
 	return result_value_create(v);
 }

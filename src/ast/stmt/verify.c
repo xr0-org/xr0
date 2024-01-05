@@ -263,7 +263,6 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		assert(obj);
 		object_assign(obj, value_copy(result_as_value(res)));
 		result_destroy(res);
-		state_undeclarevars(state);
 	}
 	return NULL;
 }
@@ -329,6 +328,9 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 	if (result_iserror(result_up)) {
 		return result_up;
 	}
+
+	/*printf("stmt: %s\n", ast_stmt_str(stmt));*/
+	/*printf("state: %s\n", state_str(state));*/
 
 	struct ast_expr *res_lw = value_to_expr(result_as_value(result_lw)),
 			*res_up = value_to_expr(result_as_value(result_up));

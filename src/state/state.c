@@ -55,6 +55,7 @@ state_copy(struct state *state)
 	copy->vconst = vconst_copy(state->vconst);
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
+	copy->props = props_copy(state->props);
 	return copy;
 }
 
@@ -122,14 +123,6 @@ void
 state_declare(struct state *state, struct ast_variable *var, bool isparam)
 {
 	stack_declare(state->stack, var, isparam);
-}
-
-void
-state_undeclarevars(struct state *s)
-{
-	heap_undeclare(s->heap, s);
-	vconst_undeclare(s->vconst);
-	stack_undeclare(s->stack, s);
 }
 
 struct value *
@@ -342,16 +335,33 @@ state_eval(struct state *s, struct ast_expr *e)
 	return vconst_eval(s->vconst, e);
 }
 
+static void
+state_undeclarevars(struct state *s);
+
 bool
 state_equal(struct state *s1, struct state *s2)
 {
-	bool equal;
-	char *str1 = state_str(s1),
-	     *str2 = state_str(s2);
-	equal = strcmp(str1, str2) == 0;
+	struct state *s1_c = state_copy(s1),
+		     *s2_c = state_copy(s2);
+	state_undeclarevars(s1_c);
+	state_undeclarevars(s2_c);
 
+	char *str1 = state_str(s1_c),
+	     *str2 = state_str(s2_c);
+	bool equal = strcmp(str1, str2) == 0;
 	free(str2);
 	free(str1);
 
+	state_destroy(s2_c);
+	state_destroy(s1_c);
+
 	return equal;
+}
+
+static void
+state_undeclarevars(struct state *s)
+{
+	heap_undeclare(s->heap, s);
+	vconst_undeclare(s->vconst);
+	stack_undeclare(s->stack, s);
 }

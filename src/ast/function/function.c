@@ -236,7 +236,6 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 			break;
 		}
 	}
-	state_undeclarevars(state);
 	/* TODO: verify that `result' is of same type as f->result */
 	if ((err = abstract_audit(f, state, ext))) {
 		return error_prepend(err, "qed error: ");
@@ -322,7 +321,6 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 		}
 		result_destroy(res);
 	}
-	state_undeclarevars(state);
 
 	/* wrap result and return */ 
 	struct object *obj = state_getresult(state);

@@ -93,7 +93,7 @@ result_as_error(struct result *res)
 struct value *
 result_as_value(struct result *res)
 {
-	assert(!res->err && res->val);
+	assert(!res->err);
 	return res->val;
 }
 
