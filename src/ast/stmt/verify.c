@@ -396,21 +396,26 @@ static bool
 sel_decide(struct ast_expr *control, struct state *state)
 {
 	struct result *res = ast_expr_eval(control, state);
-	if (result_iserror(res)) {
-		return res;
-	}
+	assert(!result_iserror(res)); /* TODO: process error */
+
 	struct ast_expr *sync = value_as_sync(result_as_value(res));
 	struct value *cond = state_getvconst(state, ast_expr_as_identifier(sync));
 	struct value *zero = value_int_create(0);
-	bool iszero = value_equal(zero, cond);
+	bool nonzero = !value_equal(zero, cond);
 	value_destroy(zero);
-	if (!iszero) {
+	if (nonzero) {
 		return true;
 	}
 
-	if (props_get(state_getprops(state), control)) {
+	struct props *p = state_getprops(state);
+	if (props_get(p, control)) {
+		printf("state: %s\n", state_str(state));
 		assert(false);
 		return true;
+	} else if (props_contradicts(p, control)) {
+		printf("state: %s\n", state_str(state));
+		assert(false);
+		return false;
 	}
 
 	return false;

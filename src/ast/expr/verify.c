@@ -423,6 +423,9 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		struct result_arr *args, struct state *state);
 
 static struct result *
+call_result(struct ast_expr *expr, struct ast_function *, struct state *);
+
+static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *root = ast_expr_call_root(expr);
@@ -459,13 +462,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	if (result_hasvalue(res)) { /* preserve value through pop */
 		res = result_value_create(value_copy(result_as_value(res)));
 	} else {
-		/* TODO: check if something has been assumed about the call */
-		printf("state: %s\n", state_str(state));
-		printf("call: %s\n", ast_expr_str(expr));
-		assert(false);
-		res = result_value_create(
-			state_vconst(state, ret_type, dynamic_str(name), false)
-		);
+		res = call_result(expr, f, state);
 	}
 
 	state_popframe(state);
@@ -473,6 +470,40 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	result_arr_destroy(args);
 
 	return res;
+}
+
+static bool
+vconst_applyassumptions(struct value *v, struct ast_expr *call, struct state *state);
+
+static struct result *
+call_result(struct ast_expr *expr, struct ast_function *f, struct state *state)
+{
+	/* declare vconst and get underlying value (i.e. the range) */
+	struct value *vconst = state_vconst(
+		state,
+		ast_function_type(f),
+		dynamic_str(ast_function_name(f)),
+		false
+	);
+	struct ast_expr *sync = value_as_sync(vconst);
+	struct value *v = state_getvconst(state, ast_expr_as_identifier(sync));
+
+	bool ok = vconst_applyassumptions(v, expr, state);
+	assert(ok);
+
+	return result_value_create(vconst);
+}
+
+static bool
+vconst_applyassumptions(struct value *v, struct ast_expr *expr, struct state *state)
+{
+	struct props *p = state_getprops(state);
+	if (props_get(p, expr)) {
+		return value_assume(v, true);
+	} else if (props_contradicts(p, expr)) {
+		return value_assume(v, false);
+	}
+	return true;
 }
 
 static struct result *
