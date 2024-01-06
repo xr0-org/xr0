@@ -8,7 +8,7 @@ unit(int K)
 
 	for (i = 0; i != K; i++) {
 		p = malloc(1);
-		[ @p; ]
+		~ [ @p; ]
 		free(p);
 	}
 }

@@ -2,7 +2,7 @@
 #include <string.h>
 
 void *
-test(int x) [
+test(int x) ~ [
 	assume: strcmp(s, "yes") == 0;
 	if (strcmp(s, "yes") == 0) {
 		.alloc result;
@@ -12,7 +12,7 @@ test(int x) [
 }
 
 void *
-test2(int x) [
+test2(int x) ~ [
 	assume: !(strcmp(s, "yes") == 0);
 ]{
 	return NULL;

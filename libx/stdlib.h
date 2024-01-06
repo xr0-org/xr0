@@ -3,9 +3,9 @@
 #include <stddef.h>
 
 axiom void *
-malloc(int size) [ .alloc result; ];
+malloc(int size) ~ [ .alloc result; ];
 
 axiom void
-free(void *ptr) [ .dealloc ptr; ];
+free(void *ptr) ~ [ .dealloc ptr; ];
 
 #endif

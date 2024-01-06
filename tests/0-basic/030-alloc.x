@@ -1,11 +1,11 @@
 #include <stdlib.h>
 
 void *
-unit() [ .alloc result; ]
+unit() ~ [ .alloc result; ]
 {
 	void *p;
 
 	p = malloc(1);
-	[ @p; ]
+	~ [ @p; ]
 	return p;
 }

@@ -1,6 +1,6 @@
 # commands
 CC = gcc -g -Wreturn-type -std=gnu11
-CFLAGS = -I include -I src/ast -Wall
+CFLAGS = -I include -Wall
 VALGRIND = valgrind --fullpath-after=`pwd`/src/
 
 LEX = lex
@@ -11,20 +11,26 @@ BIN_DIR = bin
 BUILD_DIR = build
 INCLUDE_DIR = include
 SRC_DIR = src
-EXT_DIR = $(SRC_DIR)/ext
-PROPS_DIR = $(SRC_DIR)/props
-STATE_DIR = $(SRC_DIR)/state
-OBJECT_DIR = $(SRC_DIR)/object
-VALUE_DIR = $(SRC_DIR)/value
-AST_DIR = $(SRC_DIR)/ast
 UTIL_DIR = $(SRC_DIR)/util
-MATH_DIR = $(SRC_DIR)/math
+
+SRC_0V_DIR = $(SRC_DIR)/0v
+SRC_0C_DIR = $(SRC_DIR)/0c
+
+EXT_DIR = $(SRC_0V_DIR)/ext
+PROPS_DIR = $(SRC_0V_DIR)/props
+STATE_DIR = $(SRC_0V_DIR)/state
+OBJECT_DIR = $(SRC_0V_DIR)/object
+VALUE_DIR = $(SRC_0V_DIR)/value
+AST_DIR = $(SRC_0V_DIR)/ast
+MATH_DIR = $(SRC_0V_DIR)/math
 
 # executable
 XR0V = $(BIN_DIR)/0v
+XR0C = $(BIN_DIR)/0c
 
 # build artifacts
-MAIN_OBJ = $(BUILD_DIR)/main.o
+MAIN_0V_OBJ = $(BUILD_DIR)/0v.o
+MAIN_0C_OBJ = $(BUILD_DIR)/0c.o
 
 STATE_OBJ = $(BUILD_DIR)/state.o
 STACK_OBJ = $(BUILD_DIR)/stack.o
@@ -64,9 +70,9 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 
 OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
-$(XR0V): $(MAIN_OBJ) $(BIN_DIR)
+$(XR0V): $(MAIN_0V_OBJ) $(BIN_DIR)
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ $(MAIN_OBJ) $(OBJECTS)
+	@$(CC) $(CFLAGS) -o $@ $(MAIN_0V_OBJ) $(OBJECTS)
 
 lex: $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx tests/3-program/100-lex/parse.x
@@ -90,9 +96,9 @@ matrix-verbose: $(XR0V)
 	$(VALGRIND) --num-callers=30 \
 		$(XR0V) -I libx tests/3-program/000-matrix.x
 
-$(MAIN_OBJ): main.c $(OBJECTS)
+$(MAIN_0V_OBJ): $(SRC_0V_DIR)/main.c $(OBJECTS)
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c main.c
+	@$(CC) $(CFLAGS) -I $(BUILD_DIR) -o $@ -c $(SRC_0V_DIR)/main.c
 
 $(STATE_OBJ): $(STATE_DIR)/state.c $(STATE_OBJECTS)
 	@printf 'CC\t$@\n'
@@ -141,7 +147,7 @@ $(AST_OBJ): $(AST_DIR)/ast.c \
 	$(AST_DIR)/function/function.h \
 	$(MATH_OBJ)
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(AST_DIR)/ast.c
+	@$(CC) $(CFLAGS) -I $(AST_DIR) -o $@ -c $(AST_DIR)/ast.c
 
 $(MATH_OBJ): $(MATH_DIR)/math.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'
@@ -157,7 +163,7 @@ $(LEX_YY_C): $(INCLUDE_DIR)/lex.h $(AST_DIR)/lex.l $(GRAM_OBJ)
 
 $(GRAM_OBJ): $(GRAM_TAB_C) $(GRAM_TAB_H)
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(GRAM_TAB_C)
+	@$(CC) $(CFLAGS) -I $(AST_DIR) -o $@ -c $(GRAM_TAB_C)
 
 $(GRAM_TAB_C) $(GRAM_TAB_H): $(AST_DIR)/gram.y $(BUILD_DIR)
 	@printf 'YACC\t$@\n'
