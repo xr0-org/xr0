@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 char *
-read_file(char *path) [ .alloc result; ]
+read_file(char *path) ~ [ .alloc result; ]
 {
 	FILE *f;
 	char *str;
@@ -47,7 +48,7 @@ struct token {
 };
 
 struct pattern *
-pattern_create(char *name, char *pattern) [
+pattern_create(char *name, char *pattern) ~ [
 	.alloc result;
 	result->name = name;
 	result->pattern = pattern;
@@ -62,7 +63,7 @@ pattern_create(char *name, char *pattern) [
 }
 
 void
-pattern_destroy(struct pattern *p) [
+pattern_destroy(struct pattern *p) ~ [
 	pre: p = pattern_create($, $);
 	.dealloc p;
 ]{
@@ -70,7 +71,7 @@ pattern_destroy(struct pattern *p) [
 }
 
 struct token *
-token_create(int isliteral, char *name, char *action) [ .alloc result; ]
+token_create(int isliteral, char *name, char *action) ~ [ .alloc result; ]
 {
 	struct token *tk;
 
@@ -83,7 +84,7 @@ token_create(int isliteral, char *name, char *action) [ .alloc result; ]
 }
 
 void
-token_destroy(struct token *tk) [
+token_destroy(struct token *tk) ~ [
 	pre: tk = token_create($, $, $);
 	.dealloc tk;
 ]{
@@ -98,7 +99,7 @@ struct lexer {
 
 struct lexer *
 lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
-		int ntok, struct token *token) [
+		int ntok, struct token *token) ~ [
 	.alloc result;
 	result->pattern = pattern;
 	result->token = token;
@@ -117,7 +118,7 @@ lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 }
 
 void
-lexer_destroy(struct lexer *l) [
+lexer_destroy(struct lexer *l) ~ [
 	pre: {
 		l = lexer_create(
 			$, $,
@@ -136,7 +137,7 @@ lexer_destroy(struct lexer *l) [
 }
 
 char *
-substr(char *s, int n) [ .alloc result; ]
+substr(char *s, int n) ~ [ .alloc result; ]
 {
 	int len;
 	char *ss;
@@ -149,7 +150,7 @@ substr(char *s, int n) [ .alloc result; ]
 }
 
 char *
-parse_id(char *input) [ .alloc result; ]
+parse_id(char *input) ~ [ .alloc result; ]
 {
 	char *s;
 
@@ -168,7 +169,7 @@ parse_id(char *input) [ .alloc result; ]
 }
 
 char *
-skiplinespace(char *s) [
+skiplinespace(char *s) ~ [
 	result = s; /* XXX */
 ]{
 	for (; *s == ' ' || *s == '\t'; s++) {}
@@ -194,7 +195,7 @@ skipoptions(char *pos)
 }
 
 char *
-parse_tonewline(char *input) [ .alloc result; ]
+parse_tonewline(char *input) ~ [ .alloc result; ]
 {
 	char *s;
 	s = input; /* XXX: until loop is understood more */
@@ -210,7 +211,7 @@ struct patternresult {
 };
 
 struct patternresult
-parse_pattern(char *pos) [
+parse_pattern(char *pos) ~ [
 	result.p = pattern_create(malloc(1), malloc(1));
 ]{
 	char *name; char *pattern;
@@ -233,6 +234,13 @@ struct patternet {
 	char *pos;
 };
 
+char *
+skipws(char *s)
+{
+	for (; isspace(*s); s++) {}
+	return s;
+}
+
 int
 compute_npat(char *pos)
 {
@@ -250,7 +258,7 @@ compute_npat(char *pos)
 }
 
 struct pattern *
-parse_defs_n(char *pos, int npat) [
+parse_defs_n(char *pos, int npat) ~ [
 	if (npat) {
 		.alloc result;
 	}
@@ -273,7 +281,7 @@ parse_defs_n(char *pos, int npat) [
 }
 
 struct patternet
-parse_defsproper(char *pos) [
+parse_defsproper(char *pos) ~ [
 	if (compute_npat(pos)) {
 		.alloc result.pattern;
 	}
@@ -304,7 +312,7 @@ compute_ntok(char *pos)
 	struct tokenresult r;
 
 	n = 0;
-	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; ntok++) {
+	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; n++) {
 		r = parse_token(pos);
 		pos = skipws(r.pos);
 		/* TODO: clean up r.tk */
@@ -314,7 +322,7 @@ compute_ntok(char *pos)
 }
 
 struct token *
-parse_rules_n(char *pos, int ntok) [
+parse_rules_n(char *pos, int ntok) ~ [
 	if (ntok) {
 		.alloc result;
 	}
@@ -337,7 +345,7 @@ parse_rules_n(char *pos, int ntok) [
 }
 
 struct rulesresult
-parse_rules(char *pos) [
+parse_rules(char *pos) ~ [
 	if (compute_ntok(pos)) {
 		.alloc result.token;
 	}

@@ -8,7 +8,7 @@ unit()
 
 	for (i = 0; i != 9; i++) {
 		p = malloc(1);
-		[ @p; ]
+		~ [ @p; ]
 		free(p);
 	}
 }

@@ -6,7 +6,7 @@ unit()
 	void *p;
 
 	p = malloc(1);
-	[ @p; ]
+	~ [ @p; ]
 	free(p);
-	[ !@p; ]
+	~ [ !@p; ]
 }

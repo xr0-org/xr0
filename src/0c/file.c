@@ -7,17 +7,7 @@ struct matrix {
 };
 
 struct matrix *
-matrix_create(int rows, int cols) ~ [
-	int i;
-
-	.alloc result;
-	.alloc result->data;
-	result->rows = rows;
-	result->cols = cols;
-	for (i = 0; i < result->rows; i++) {
-		.alloc result->data[i];	
-	}
-]{
+matrix_create(int rows, int cols) {
 	int i;
 	struct matrix *m;
 
@@ -27,7 +17,7 @@ matrix_create(int rows, int cols) ~ [
 	m->cols = cols;
 
 	m->data = malloc(sizeof(int *) * rows);
-	for (i = 0; i < rows; i++) ~ [ .alloc m->data[i]; ] {
+	for (i = 0; i < rows; i++)  {
 		m->data[i] = malloc(sizeof(int) * cols);
 	}
 
@@ -35,20 +25,10 @@ matrix_create(int rows, int cols) ~ [
 }
 
 void
-matrix_destroy(struct matrix *m) ~ [
+matrix_destroy(struct matrix *m) {
 	int i;
 
-	pre: m = matrix_create($, $);
-
-	for (i = 0; i < m->rows; i++) {
-		.dealloc m->data[i];
-	}
-	.dealloc m->data;
-	.dealloc m;
-]{
-	int i;
-
-	for (i = 0; i < m->rows; i++) ~ [ .dealloc m->data[i]; ] {
+	for (i = 0; i < m->rows; i++)  {
 		free(m->data[i]);
 	}
 	free(m->data);
@@ -56,22 +36,7 @@ matrix_destroy(struct matrix *m) ~ [
 }
 
 struct matrix *
-matrix_add(struct matrix *m1, struct matrix *m2) ~ [
-	int i;
-
-	pre: {
-		m1 = matrix_create($, $);
-		m2 = matrix_create($, $);
-	}
-
-	.alloc result;
-	.alloc result->data;
-	result->rows = m1->rows;
-	result->cols = m1->cols;
-	for (i = 0; i < result->rows; i++) {
-		.alloc result->data[i];	
-	}
-]{
+matrix_add(struct matrix *m1, struct matrix *m2) {
 	int i; int j;
 	struct matrix *res;
 
@@ -87,9 +52,7 @@ matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 }
 
 void
-matrix_print(struct matrix *m) ~ [
-	pre: m = matrix_create($, $);
-]{
+matrix_print(struct matrix *m) {
 	int i; int j; int digit;
 
 	for (i = 0; i < m->rows; i++) {
@@ -111,7 +74,7 @@ main()
 
 	puts("matrix program:\n");
 	m1 = matrix_create(2, 2);
-	~ [ @m1; ]
+	
 
 	m1->data[0][0] = 1;
 	m1->data[0][1] = 2;
@@ -121,7 +84,7 @@ main()
 	matrix_print(m1);
 
 	m2 = matrix_create(2, 2);
-	~ [ @m1; @m2; ]
+	
 
 	m2->data[0][0] = 1;
 	m2->data[0][1] = 1;
@@ -131,15 +94,15 @@ main()
 	matrix_print(m2);
 
 	sum = matrix_add(m1, m2);
-	~ [ @m1; @m2; @sum; ]
+	
 
 	puts("sum:\n");
 	matrix_print(sum);
 
 	matrix_destroy(sum);
-	~ [ @m1; @m2; !@sum; ]
+	
 	matrix_destroy(m2);
-	~ [ @m1; !@m2; !@sum; ]
+	
 	matrix_destroy(m1);
-	~ [ !@m1; !@m2; !@sum; ]
+	
 }

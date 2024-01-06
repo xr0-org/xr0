@@ -286,38 +286,16 @@ count()
 	}
 }
 
-static long *
-userdeftk_create(long tk)
-{
-	long *userdeftk = malloc(sizeof(long));
-	*userdeftk = tk;
-	return userdeftk;
-}
-
-static void
-userdeftk_destroy(long *tk)
-{
-	free(tk);
-}
-
-void
-install_refresh(long tk)
-{
-	map_set(table, dynamic_str(yytext), (void *) userdeftk_create(tk));
-	installclass = IC_NONE;
-}
-
 long
 check_type()
 {
-	/* NB: must check table before installing */
-	long *userdeftk = map_get(table, yytext); 
-	if (userdeftk) {
-		return *userdeftk;
+	if (map_get(table, yytext)) {
+		return TYPE_NAME;
 	}
 	switch (installclass) {
 	case IC_TYPE:
-		install_refresh(TYPE_NAME);
+		map_set(table, dynamic_str(yytext), (void *) true);
+		installclass = IC_NONE;
 		break;
 	default:
 		break;
@@ -340,9 +318,6 @@ lex_finish()
 {
 	if (marker.filename) {
 		free(marker.filename);
-	}
-	for (int i = 0; i < table->n; i++) {
-		userdeftk_destroy((long *) table->entry[i].value);
 	}
 	map_destroy(table);
 }

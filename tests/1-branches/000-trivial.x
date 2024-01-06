@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void *
-test(int x) [
+test(int x) ~ [
 	assume: x;
 	.alloc result;
 ]{
@@ -9,7 +9,7 @@ test(int x) [
 }
 
 void *
-test2(int x) [
+test2(int x) ~ [
 	assume: !x;
 	.alloc result;
 ]{
@@ -17,7 +17,7 @@ test2(int x) [
 }
 
 void *
-test3(int x) [
+test3(int x) ~ [
 	assume: x;
 	assume: x;
 	.alloc result;
@@ -26,7 +26,7 @@ test3(int x) [
 }
 
 void *
-test4(int x) [
+test4(int x) ~ [
 	assume: x;
 	assume: !x;
 	/* should ignore everything after the contradiction */

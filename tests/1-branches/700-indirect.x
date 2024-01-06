@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void *
-alloc_if(int num) [
+alloc_if(int num) ~ [
 	if (num) {
 		.alloc result;
 	}
@@ -19,7 +19,7 @@ number()
 }
 
 void *
-test() [
+test() ~ [
 	if (number()) {
 		.alloc result;
 	}

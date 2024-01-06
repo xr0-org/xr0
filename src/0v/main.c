@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "gram_util.h"
-#include "build/gram.tab.h"
+#include "gram.tab.h"
 #include "ast.h"
 #include "lex.h"
 #include "ext.h"
@@ -13,12 +13,13 @@
 #include "util.h"
 #include "verify.h"
 
+/* XXX */
 #define OUTPUT_PATH "0.c"
-
 #define PREPROC_CMD_TEMPLATE "cc %s -nostdinc -E -xc %s"
 #define PREPROC_CMD_BASE_LEN (strlen(PREPROC_CMD_TEMPLATE) - 4)
 
-int yyparse();
+int
+yyparse();
 
 struct string_arr;
 

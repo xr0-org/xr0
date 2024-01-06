@@ -2,7 +2,7 @@
 #include <string.h>
 
 void *
-test(char *s) [
+test(char *s) ~ [
 	if (strcmp(s, "yes") == 0) {
 		.alloc result;
 	}

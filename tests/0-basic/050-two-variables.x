@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void *
-unit() [ .alloc result; ]
+unit() ~ [ .alloc result; ]
 {
 	void *p; void *q;
 

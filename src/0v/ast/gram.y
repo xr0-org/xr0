@@ -707,8 +707,8 @@ iteration_effect_statement
 		{ $$ = $2; }
 
 compound_verification_statement
-	: '[' ']'	{ $$ = ast_block_create(NULL, 0, NULL, 0); }
-	| '[' block ']'	{ $$ = $2; }
+	: '~' '[' ']'		{ $$ = ast_block_create(NULL, 0, NULL, 0); }
+	| '~' '[' block ']'	{ $$ = $3; }
 	;
 
 allocation_statement

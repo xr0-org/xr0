@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void *
-test(int x) [
+test(int x) ~ [
 	assume: x;
 	if (x) {
 		.alloc result;
@@ -11,7 +11,7 @@ test(int x) [
 }
 
 void *
-test2(int x) [
+test2(int x) ~ [
 	assume: !x;
 	if (x) {
 		.alloc result;

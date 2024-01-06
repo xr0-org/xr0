@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void *
-leak() [ .alloc result; ]
+leak() ~ [ .alloc result; ]
 {
 	void *p; void *q;
 
