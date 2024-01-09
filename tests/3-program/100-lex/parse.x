@@ -3,6 +3,9 @@
 #include <string.h>
 #include <ctype.h>
 
+#define true 1
+#define false 0
+
 char *
 read_file(char *path) ~ [ .alloc result; ]
 {
@@ -27,7 +30,7 @@ main()
 	char *file;
 	/*struct lexer *l;*/
 
-	file = read_file("gen.l");
+	file = read_file("/home/ubuntu/xr0/tests/3-program/100-lex/gen.l");
 
 	/* XXX: temporarily framing #15
 	l = parse(file);
@@ -305,6 +308,9 @@ struct tokenresult {
 	char *pos;
 };
 
+struct tokenresult
+parse_token(char *pos);
+
 int
 compute_ntok(char *pos)
 {
@@ -397,10 +403,6 @@ lexer_print(struct lexer *l)
 	}
 }
 
-/* skipws: skip whitespace */
-char *
-skipws(char *s);
-
 struct defsresult {
 	char *pre;
 	struct pattern *pattern;
@@ -443,13 +445,6 @@ parse(char *pos)
 		res.token);
 }
 
-char *
-skipws(char *s)
-{
-	for (; isspace(*s); s++) {}
-	return s;
-}
-
 struct stringresult {
 	char *s;
 	char *pos;
@@ -481,7 +476,7 @@ parse_defs(char *pos)
 	set = parse_defsproper(pos);
 
 	res.pre = raw.s;
-	res.pattern = set.patern;
+	res.pattern = set.pattern;
 	res.npat = set.npat;
 	res.pos = set.pos;
 	return res;
@@ -523,10 +518,6 @@ token_print(struct token *t)
 	}
 	printf("\t\t%s", t->action);
 }
-
-struct tokenresult
-parse_token(char *pos);
-
 
 struct tknameresult {
 	int isliteral;

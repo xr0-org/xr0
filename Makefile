@@ -77,6 +77,15 @@ $(XR0V): $(MAIN_0V_OBJ) $(BIN_DIR)
 lex: $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx tests/3-program/100-lex/parse.x
 
+PARSER = $(BUILD_DIR)/lex-gen
+
+lex-gen:
+	@$(XR0C) tests/3-program/100-lex/parse.x > build/parse.c
+	@c89 -o $(PARSER) $(BUILD_DIR)/parse.c
+	@$(PARSER) > $(BUILD_DIR)/gen_firstchar
+	@echo '%' > $(BUILD_DIR)/percent
+	@diff $(BUILD_DIR)/gen_firstchar $(BUILD_DIR)/percent
+
 lex-leaks: $(XR0V)
 	$(VALGRIND) --leak-check=full \
 		$(XR0V) -I libx tests/3-program/100-lex/parse.x

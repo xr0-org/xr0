@@ -8,6 +8,12 @@ axiom int
 putc(int c);
 
 axiom int
+putchar(int c);
+
+axiom int
+fputs(char *s, FILE *stream);
+
+axiom int
 puts(char *s);
 
 axiom FILE *

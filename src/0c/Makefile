@@ -22,7 +22,7 @@ check: $(XR0C)
 	c89 file.c -o matrix
 	./matrix
 
-$(MAIN_OBJ): main.c
+$(MAIN_OBJ): main.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -I $(BUILD_DIR) -o $@ -c main.c
 
