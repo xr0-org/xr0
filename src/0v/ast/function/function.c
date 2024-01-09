@@ -177,7 +177,6 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 {
 	struct ast_function *proto = proto_stitch(f, ext);
 
-	printf("func: %s\n", ast_function_str(proto));
 	struct ast_function_arr *paths = paths_fromfunction(proto);
 	struct error *err = paths_verify(paths, ext);
 	ast_function_arr_destroy(paths);
@@ -188,7 +187,12 @@ struct ast_function *
 proto_stitch(struct ast_function *f, struct externals *ext)
 {
 	struct ast_function *proto = externals_getfunc(ext, f->name);
-	f->abstract = ast_block_copy(proto->abstract);
+
+	printf("f (before): %s\n", ast_function_str(f));
+	if (proto && proto->abstract) {
+		f->abstract = ast_block_copy(proto->abstract);
+	}
+	printf("f (after): %s\n", ast_function_str(f));
 	/* XXX: leaks */
 	return f;
 }
