@@ -175,6 +175,9 @@ preprocess(char *infile, struct string_arr *includedirs)
 
 struct ast *root;
 
+static bool
+verifyproto(struct ast_function *f, int n, struct ast_externdecl **decl);
+
 void
 pass1(struct ast *root, struct externals *ext)
 {
@@ -188,21 +191,91 @@ pass1(struct ast *root, struct externals *ext)
 	 */
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
-		ast_externdecl_install(decl, ext);
 		if (!ast_externdecl_isfunction(decl)) {
+			ast_externdecl_install(decl, ext);
 			continue;
 		}
 		struct ast_function *f = ast_externdecl_as_function(decl);
 		if (ast_function_isaxiom(f)) {
+			ast_externdecl_install(decl, ext);
 			continue;
 		}
+		if (ast_function_isproto(f)) {
+			if (!verifyproto(f, root->n, root->decl)) {
+				exit(EXIT_FAILURE);
+			}
+			ast_externdecl_install(decl, ext);
+			continue;
+		}
+		if (!externals_getfunc(ext, ast_function_name(f))) {
+			ast_externdecl_install(decl, ext);
+		}
+		
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
+
 		if ((err = ast_function_verify(f, ext))) {
 			fprintf(stderr, "%s", err->msg);
 			exit(EXIT_FAILURE);
 		}
+		printf("%s\n", ast_function_name(f));
 	}
+}
+
+static bool
+proto_defisvalid(struct ast_function *f1, struct ast_function *f2);
+
+static bool
+verifyproto(struct ast_function *proto, int n, struct ast_externdecl **decl)
+{
+	struct ast_function *def;
+	int count = 0;
+
+	char *pname = ast_function_name(proto);
+	for (int i = 0; i < n; i++) {
+		struct ast_externdecl *decl = root->decl[i];
+		if (!ast_externdecl_isfunction(decl)) {
+			continue;
+		}
+		struct ast_function *d = ast_externdecl_as_function(decl);
+		/* skip axioms and declarations */
+		if (ast_function_isaxiom(d) || ast_function_isproto(d)) {
+			continue;
+		}	
+		if (strcmp(pname, ast_function_name(d)) == 0) {
+			def = d;
+			count++;
+		}
+	}
+	if (count == 1) {
+		if (proto_defisvalid(proto, def)) {
+			return true;	
+		}
+		fprintf(
+			stderr,
+			"function `%s' prototype and definition abstracts mismatch\n", 
+			pname
+		);
+	} else if (count == 0) {
+		fprintf(stderr, "function `%s' missing definition\n", pname);
+	} else if (count > 1) {
+		fprintf(stderr, "function `%s' has multiple definitions\n", pname);
+	}
+	return false;
+}
+
+static bool
+proto_defisvalid(struct ast_function *proto, struct ast_function *def)
+{
+	struct ast_block *proto_abs = ast_function_abstract(proto),
+			 *def_abs = ast_function_abstract(def);
+
+	bool abs_match = strcmp(ast_block_str(proto_abs), ast_block_str(def_abs)) == 0,
+	     protoabs_only = proto_abs && ast_function_absisempty(def); 
+	if (abs_match || protoabs_only) {
+		return true;
+	}
+	return false;
 }
 
 int
@@ -223,7 +296,7 @@ main(int argc, char *argv[])
 	/* TODO: move table from lexer to pass1 */
 	struct externals *ext = externals_create();
 	pass1(root, ext);
-	externals_destroy(ext);
 
+	externals_destroy(ext);
 	ast_destroy(root);
 }

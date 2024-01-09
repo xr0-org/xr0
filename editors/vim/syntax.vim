@@ -19,4 +19,4 @@ syntax keyword	Exception	return result undefined
 syntax keyword	Typedef		typedef
 
 " Type
-syntax keyword	StorageClass	auto
+syntax keyword	StorageClass	auto static

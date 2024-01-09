@@ -9,6 +9,7 @@
 #include "object.h"
 #include "props.h"
 #include "state.h"
+#include "ext.h"
 #include "util.h"
 
 struct ast_function {
@@ -82,7 +83,8 @@ ast_function_str(struct ast_function *f)
 		strbuilder_printf(b, "%s%s", v, space);
 		free(v);
 	}
-	strbuilder_printf(b, "] has abstract:\n%s", ast_block_str(f->abstract));
+	strbuilder_printf(b, "] has abstract:\n%s\n", ast_block_str(f->abstract));
+	strbuilder_printf(b, "has body: %s\n", f->body ? ast_block_str(f->body) : "");
 	return strbuilder_build(b);
 }
 
@@ -115,6 +117,18 @@ bool
 ast_function_isaxiom(struct ast_function *f)
 {
 	return f->isaxiom;
+}
+
+bool
+ast_function_isproto(struct ast_function *f)
+{
+	return f->abstract && !f->body;
+}
+
+bool
+ast_function_absisempty(struct ast_function *f)
+{
+	return ast_block_ndecls(f->abstract) == 0 && ast_block_nstmts(f->abstract) == 0;
 }
 
 struct ast_type *
@@ -155,13 +169,30 @@ ast_function_params(struct ast_function *f)
 struct error *
 paths_verify(struct ast_function_arr *paths, struct externals *);
 
+struct ast_function *
+proto_stitch(struct ast_function *f, struct externals *);
+
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
-	struct ast_function_arr *paths = paths_fromfunction(f);
+	struct ast_function *proto = proto_stitch(f, ext);
+
+	struct ast_function_arr *paths = paths_fromfunction(proto);
 	struct error *err = paths_verify(paths, ext);
 	ast_function_arr_destroy(paths);
 	return err;
+}
+
+struct ast_function *
+proto_stitch(struct ast_function *f, struct externals *ext)
+{
+	struct ast_function *proto = externals_getfunc(ext, f->name);
+
+	if (proto && proto->abstract) {
+		f->abstract = ast_block_copy(proto->abstract);
+	}
+	/* XXX: leaks */
+	return f;
 }
 
 struct error *

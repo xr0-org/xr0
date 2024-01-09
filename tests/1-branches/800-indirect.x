@@ -1,22 +1,14 @@
 #include <stdlib.h>
 
+int
+number(int param);
+
 void *
 alloc_if(int num) ~ [
 	if (num) {
 		.alloc result;
 	}
-]{
-	if (num) {
-		return malloc(1);
-	}
-	return NULL;
-}
-
-int
-number(int param)
-{
-	return param;
-}
+];
 
 void *
 test(int x) ~ [
@@ -32,3 +24,20 @@ test(int x) ~ [
 
 	return p;
 }
+
+int
+number(int param)
+{
+	return param;
+}
+
+void *
+alloc_if(int num)
+{
+	if (num) {
+		return malloc(1);
+	}
+	return NULL;
+}
+
+
