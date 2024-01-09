@@ -809,19 +809,24 @@ block_statement
 			.body		= NULL,
 		};
 	}
+	/* {} */
 	| compound_statement {
 		$$ = (struct block_statement) {
 			.abstract	= NULL,
 			.body		= $1,
 		};
 	}
+	/* ~ []; */
 	| compound_verification_statement ';' {
 		$$ = (struct block_statement) {
 			.abstract	= $1,
 			.body		= NULL,
 		};
 	}
+	/* ~ [] { ... } */
 	| compound_verification_statement compound_statement {
+		assert($2);
+		printf("block: %s\n", ast_block_str($2));
 		$$ = (struct block_statement) {
 			.abstract	= $1,
 			.body		= $2,

@@ -175,6 +175,60 @@ preprocess(char *infile, struct string_arr *includedirs)
 
 struct ast *root;
 
+static struct ast_function *
+funcdef(char *fname, int n, struct ast_externdecl **decl);
+
+void
+pass0(struct ast *root, struct externals *ext)
+{
+	/* ensure internal resolution of functions according to:
+	 * https://git.sr.ht/~akiarie/leibniz/tree/master/item/xr0/linkage.md */
+	struct error *err;
+
+	for (int i = 0; i < root->n; i++) {
+		struct ast_externdecl *decl = root->decl[i];
+		if (!ast_externdecl_isfunction(decl)) {
+			ast_externdecl_install(decl, ext);
+			continue;
+		}
+		struct ast_function *f = ast_externdecl_as_function(decl);
+		printf("func: %s\n", ast_function_str(f));
+		if (ast_function_isaxiom(f) || !ast_function_isdeclaration(f)) {
+			ast_externdecl_install(decl, ext);
+			continue;
+		}
+		assert(ast_function_isdeclaration(f));
+
+		char *fname = ast_function_name(f);
+		struct ast_function *def = funcdef(fname, root->n, root->decl);
+		if (!def) { 
+			fprintf(stderr, "function delaration for `%s' missing definition", fname);
+			exit(EXIT_FAILURE);
+		}
+	}
+	/* XXX: detect multiple declarations? */
+}
+
+static struct ast_function *
+funcdef(char *fname, int n, struct ast_externdecl **decl)
+{
+	for (int i = 0; i < n; i++) {
+		struct ast_externdecl *decl = root->decl[i];
+		if (!ast_externdecl_isfunction(decl)) {
+			continue;
+		}
+		struct ast_function *f = ast_externdecl_as_function(decl);
+		/* skip axioms and declarations */
+		if (ast_function_isaxiom(f) || ast_function_isdeclaration(f)) {
+			continue;
+		}	
+		if (strcmp(fname, ast_function_name(f)) == 0) {
+			return f;
+		}
+	}
+	return NULL;
+}
+
 void
 pass1(struct ast *root, struct externals *ext)
 {
@@ -188,12 +242,12 @@ pass1(struct ast *root, struct externals *ext)
 	 */
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
-		ast_externdecl_install(decl, ext);
 		if (!ast_externdecl_isfunction(decl)) {
 			continue;
 		}
 		struct ast_function *f = ast_externdecl_as_function(decl);
-		if (ast_function_isaxiom(f)) {
+		/* skip axioms and declarations */
+		if (ast_function_isaxiom(f) || ast_function_isdeclaration(f)) {
 			continue;
 		}
 		/* XXX: ensure that verified functions always have an abstract */
@@ -222,8 +276,9 @@ main(int argc, char *argv[])
 
 	/* TODO: move table from lexer to pass1 */
 	struct externals *ext = externals_create();
+	pass0(root, ext);
 	pass1(root, ext);
-	externals_destroy(ext);
 
+	externals_destroy(ext);
 	ast_destroy(root);
 }

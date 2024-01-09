@@ -82,7 +82,8 @@ ast_function_str(struct ast_function *f)
 		strbuilder_printf(b, "%s%s", v, space);
 		free(v);
 	}
-	strbuilder_printf(b, "] has abstract:\n%s", ast_block_str(f->abstract));
+	strbuilder_printf(b, "] has abstract:\n%s\n", ast_block_str(f->abstract));
+	strbuilder_printf(b, "has body: %s\n", f->body ? ast_block_str(f->body) : "");
 	return strbuilder_build(b);
 }
 
@@ -115,6 +116,12 @@ bool
 ast_function_isaxiom(struct ast_function *f)
 {
 	return f->isaxiom;
+}
+
+bool
+ast_function_isdeclaration(struct ast_function *f)
+{
+	return f->abstract && !f->body;
 }
 
 struct ast_type *

@@ -477,6 +477,9 @@ ast_function_copy(struct ast_function *);
 bool
 ast_function_isaxiom(struct ast_function *f);
 
+bool
+ast_function_isdeclaration(struct ast_function *f);
+
 struct ast_type *
 ast_function_type(struct ast_function *f);
 

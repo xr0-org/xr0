@@ -13,7 +13,7 @@ main()
 }
 
 void *
-allocating()
+allocating() /* should have matching abstract */
 {
 	void *p;
 
