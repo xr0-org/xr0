@@ -175,7 +175,7 @@ preprocess(char *infile, struct string_arr *includedirs)
 
 struct ast *root;
 
-struct ast_function *
+bool
 verifyproto(struct ast_function *f, int n, struct ast_externdecl **decl);
 
 void
@@ -197,11 +197,10 @@ pass0(struct ast *root, struct externals *ext)
 			continue;
 		}
 		if (ast_function_isproto(f)) {
-			struct ast_function *def = verifyproto(f, root->n, root->decl);
-			if (!def) {
+			if (!verifyproto(f, root->n, root->decl)) {
 				exit(EXIT_FAILURE);
 			}
-			externals_declarefunc(ext, ast_function_name(def), def);
+			ast_externdecl_install(decl, ext);
 		}
 	}
 }
@@ -209,7 +208,7 @@ pass0(struct ast *root, struct externals *ext)
 static bool
 proto_defisvalid(struct ast_function *f1, struct ast_function *f2);
 
-struct ast_function *
+bool
 verifyproto(struct ast_function *proto, int n, struct ast_externdecl **decl)
 {
 	struct ast_function *def;
@@ -233,7 +232,7 @@ verifyproto(struct ast_function *proto, int n, struct ast_externdecl **decl)
 	}
 	if (count == 1) {
 		if (proto_defisvalid(proto, def)) {
-			return proto;	
+			return true;	
 		}
 		fprintf(stderr, "function `%s' prototype and definition abstracts mismatch", pname);
 	} else if (count == 0) {
@@ -241,7 +240,7 @@ verifyproto(struct ast_function *proto, int n, struct ast_externdecl **decl)
 	} else if (count > 1) {
 		fprintf(stderr, "function `%s' has multiple definitions", pname);
 	}
-	return NULL;
+	return false;
 }
 
 static bool
