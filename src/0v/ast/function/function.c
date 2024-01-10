@@ -188,11 +188,9 @@ proto_stitch(struct ast_function *f, struct externals *ext)
 {
 	struct ast_function *proto = externals_getfunc(ext, f->name);
 
-	printf("f (before): %s\n", ast_function_str(f));
 	if (proto && proto->abstract) {
 		f->abstract = ast_block_copy(proto->abstract);
 	}
-	printf("f (after): %s\n", ast_function_str(f));
 	/* XXX: leaks */
 	return f;
 }

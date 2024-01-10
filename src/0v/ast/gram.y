@@ -826,7 +826,6 @@ block_statement
 	/* ~ [] { ... } */
 	| compound_verification_statement compound_statement {
 		assert($2);
-		printf("block: %s\n", ast_block_str($2));
 		$$ = (struct block_statement) {
 			.abstract	= $1,
 			.body		= $2,

@@ -192,6 +192,7 @@ pass1(struct ast *root, struct externals *ext)
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
 		if (!ast_externdecl_isfunction(decl)) {
+			ast_externdecl_install(decl, ext);
 			continue;
 		}
 		struct ast_function *f = ast_externdecl_as_function(decl);
@@ -217,6 +218,7 @@ pass1(struct ast *root, struct externals *ext)
 			fprintf(stderr, "%s", err->msg);
 			exit(EXIT_FAILURE);
 		}
+		printf("%s\n", ast_function_name(f));
 	}
 }
 
@@ -249,11 +251,15 @@ verifyproto(struct ast_function *proto, int n, struct ast_externdecl **decl)
 		if (proto_defisvalid(proto, def)) {
 			return true;	
 		}
-		fprintf(stderr, "function `%s' prototype and definition abstracts mismatch", pname);
+		fprintf(
+			stderr,
+			"function `%s' prototype and definition abstracts mismatch\n", 
+			pname
+		);
 	} else if (count == 0) {
-		fprintf(stderr, "function `%s' missing definition", pname);
+		fprintf(stderr, "function `%s' missing definition\n", pname);
 	} else if (count > 1) {
-		fprintf(stderr, "function `%s' has multiple definitions", pname);
+		fprintf(stderr, "function `%s' has multiple definitions\n", pname);
 	}
 	return false;
 }

@@ -1,4 +1,5 @@
 bin
+build
 *.o
 *.sw*
 *.gch

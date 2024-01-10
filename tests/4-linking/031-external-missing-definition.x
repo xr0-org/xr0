@@ -1,4 +1,4 @@
 #include <stdlib.h>
 
-static void *
+void *
 allocating() ~ [ .alloc result; ];
