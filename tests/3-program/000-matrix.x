@@ -17,7 +17,11 @@ matrix_create(int rows, int cols) ~ [
 	for (i = 0; i < result->rows; i++) {
 		.alloc result->data[i];	
 	}
-]{
+];
+
+struct matrix *
+matrix_create(int rows, int cols)
+{
 	int i;
 	struct matrix *m;
 
@@ -45,7 +49,11 @@ matrix_destroy(struct matrix *m) ~ [
 	}
 	.dealloc m->data;
 	.dealloc m;
-]{
+];
+
+void
+matrix_destroy(struct matrix *m)
+{
 	int i;
 
 	for (i = 0; i < m->rows; i++) ~ [ .dealloc m->data[i]; ] {
@@ -71,7 +79,11 @@ matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 	for (i = 0; i < result->rows; i++) {
 		.alloc result->data[i];	
 	}
-]{
+];
+
+struct matrix *
+matrix_add(struct matrix *m1, struct matrix *m2)
+{
 	int i; int j;
 	struct matrix *res;
 
@@ -89,7 +101,11 @@ matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 void
 matrix_print(struct matrix *m) ~ [
 	pre: m = matrix_create($, $);
-]{
+];
+
+void
+matrix_print(struct matrix *m)
+{
 	int i; int j; int digit;
 
 	for (i = 0; i < m->rows; i++) {
