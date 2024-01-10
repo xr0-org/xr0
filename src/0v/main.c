@@ -249,7 +249,7 @@ verifyproto(struct ast_function *proto, int n, struct ast_externdecl **decl)
 		}
 		fprintf(stderr, "function `%s' prototype and definition abstracts mismatch", pname);
 	} else if (count == 0) {
-		fprintf(stderr, "function `%s' has missing definition", pname);
+		fprintf(stderr, "function `%s' missing definition", pname);
 	} else if (count > 1) {
 		fprintf(stderr, "function `%s' has multiple definitions", pname);
 	}
