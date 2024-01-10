@@ -192,7 +192,6 @@ pass1(struct ast *root, struct externals *ext)
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
 		if (!ast_externdecl_isfunction(decl)) {
-			ast_externdecl_install(decl, ext);
 			continue;
 		}
 		struct ast_function *f = ast_externdecl_as_function(decl);
