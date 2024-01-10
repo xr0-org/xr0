@@ -25,12 +25,12 @@ read_file(char *path) ~ [ .alloc result; ]
 }
 
 int
-main()
+main(int argc, char *argv[])
 {
 	char *file;
 	/*struct lexer *l;*/
 
-	file = read_file("/home/ubuntu/xr0/tests/3-program/100-lex/gen.l");
+	file = read_file(argv[1]);
 
 	/* XXX: temporarily framing #15
 	l = parse(file);
