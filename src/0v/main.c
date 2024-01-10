@@ -207,6 +207,9 @@ pass1(struct ast *root, struct externals *ext)
 			ast_externdecl_install(decl, ext);
 			continue;
 		}
+		if (!externals_getfunc(ext, ast_function_name(f))) {
+			ast_externdecl_install(decl, ext);
+		}
 		
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
