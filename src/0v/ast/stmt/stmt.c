@@ -685,14 +685,24 @@ struct string_arr *
 ast_stmt_getfuncs(struct ast_stmt *stmt)
 {
 	switch (stmt->kind) {
+	case STMT_NOP:
+		return string_arr_create();
+	case STMT_LABELLED:
+		return ast_stmt_getfuncs(stmt->u.labelled.stmt);
+	case STMT_COMPOUND:
+	case STMT_COMPOUND_V:
+		return ast_stmt_compound_getfuncs(stmt);
 	case STMT_EXPR:
 		return ast_stmt_expr_getfuncs(stmt);
 	case STMT_SELECTION:
 		return ast_stmt_selection_getfuncs(stmt);
 	case STMT_ITERATION:
+	case STMT_ITERATION_E:
 		return ast_stmt_iteration_getfuncs(stmt);
-	case STMT_COMPOUND:
-		return ast_stmt_compound_getfuncs(stmt);
+	case STMT_JUMP:
+		return ast_expr_getfuncs(stmt->u.jump.rv);
+	case STMT_ALLOCATION:
+		return ast_expr_getfuncs(stmt->u.alloc.arg);
 	default:
 		assert(false);
 	}
@@ -754,10 +764,11 @@ ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
 	struct ast_block *b = stmt->u.compound;
 	struct ast_stmt **stmts = ast_block_stmts(b);
 	for (int i = 0; i < ast_block_nstmts(b); i++) {
-		string_arr_concat(
+		res = string_arr_concat(
 			res,
 			ast_stmt_getfuncs(stmts[i])
 		);
+		/* XXX: leaks */
 	}
 	return res;
 }

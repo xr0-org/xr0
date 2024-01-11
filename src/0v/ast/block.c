@@ -136,9 +136,3 @@ ast_block_isterminal(struct ast_block *b)
 	}
 	return false;
 }
-
-struct string_arr *
-ast_block_getfuncs(struct ast_block *b)
-{
-	assert(false);
-}
