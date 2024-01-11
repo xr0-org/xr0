@@ -255,13 +255,22 @@ string_arr_copy(struct string_arr *old)
 	return new;
 }
 
+struct string_arr *
+string_arr_concat(struct string_arr *s1, struct string_arr *s2)
+{
+	struct string_arr *new = string_arr_copy(s1);		
+	for (int i = 0; i < s2->n; i++) {
+		string_arr_append(new, s2->s[i]);
+	}
+	return new;
+}
+
 char *
 string_arr_deque(struct string_arr *arr)
 {
 	char *ret = dynamic_str(arr->s[arr->n-1]);
 	free(arr->s[arr->n-1]);
-	struct string_arr *new = realloc(arr, sizeof(struct string_arr) * arr->n-1);
-	assert(new);
+	arr = realloc(arr, sizeof(struct string_arr) * arr->n-1);
 	return ret;
 }
 
@@ -287,9 +296,6 @@ static struct map *
 build_funcgraph(char *fname, struct externals *ext);
 
 static struct map *
-build_testfuncgraph();
-
-static struct map *
 calculate_indegrees(struct map *g);
 
 static struct string_arr *
@@ -298,8 +304,7 @@ build_indegree_zero(struct map *indegrees);
 char *
 topological_order(char *fname, struct externals *ext)
 {
-	/* struct map *g = build_funcgraph(fname, ext); */
-	struct map *g = build_testfuncgraph();
+	struct map *g = build_funcgraph(fname, ext); 
 	struct map *indegrees = calculate_indegrees(g);
 	struct string_arr *indegree_zero = build_indegree_zero(indegrees);
 
@@ -322,6 +327,7 @@ topological_order(char *fname, struct externals *ext)
 		}
 	}
 
+	printf("ordered->n: %d\ng->n: %d\n", ordered->n, g->n);
 	/* no more nodes with incoming edges */
 	if (ordered->n != g->n) {
 		assert(false); /* ERROR: cycle */
@@ -329,79 +335,6 @@ topological_order(char *fname, struct externals *ext)
 
 	printf("order: %s\n", string_arr_str(ordered));
 	return NULL;
-}
-
-static struct map *
-build_testfuncgraph()
-{
-	struct map *g = map_create();
-
-	struct string_arr *main_deps = string_arr_create();
-	string_arr_append(main_deps, dynamic_str("read_file"));
-	string_arr_append(main_deps, dynamic_str("parse"));
-	string_arr_append(main_deps, dynamic_str("lexer_print"));
-	string_arr_append(main_deps, dynamic_str("lexer_destroy"));
-
-	struct string_arr *read_file_deps = string_arr_create();
-	string_arr_append(read_file_deps, dynamic_str("fopen"));
-	string_arr_append(read_file_deps, dynamic_str("fseek"));
-	string_arr_append(read_file_deps, dynamic_str("malloc"));
-	string_arr_append(read_file_deps, dynamic_str("fread"));
-	string_arr_append(read_file_deps, dynamic_str("fclose"));
-
-	struct string_arr *parse_deps = string_arr_create();
-	string_arr_append(parse_deps, dynamic_str("parse_defs"));
-	string_arr_append(parse_deps, dynamic_str("strcmp"));
-	string_arr_append(parse_deps, dynamic_str("parse_rules"));
-	string_arr_append(parse_deps, dynamic_str("parse_toeof"));
-
-	string_arr_append(parse_deps, dynamic_str("skipws"));
-	string_arr_append(parse_deps, dynamic_str("fprintf"));
-	string_arr_append(parse_deps, dynamic_str("exit"));
-
-	struct string_arr *parse_defs_deps = string_arr_create();
-	string_arr_append(parse_defs_deps, dynamic_str("parse_defsrow"));
-	string_arr_append(parse_defs_deps, dynamic_str("skipoptions"));
-	string_arr_append(parse_defs_deps, dynamic_str("parse_defsproper"));
-
-	string_arr_append(parse_defs_deps, dynamic_str("skipws"));
-	string_arr_append(parse_defs_deps, dynamic_str("fprintf"));
-	string_arr_append(parse_defs_deps, dynamic_str("exit"));
-	
-	map_set(g, dynamic_str("main"), main_deps);
-
-	map_set(g, dynamic_str("read_file"), read_file_deps);
-
-	map_set(g, dynamic_str("fopen"), string_arr_create());
-	map_set(g, dynamic_str("fseek"), string_arr_create());
-	map_set(g, dynamic_str("malloc"), string_arr_create());
-	map_set(g, dynamic_str("fread"), string_arr_create());
-	map_set(g, dynamic_str("fclose"), string_arr_create());
-
-	map_set(g, dynamic_str("parse"), parse_deps);
-
-	map_set(g, dynamic_str("parse_defs"), parse_defs_deps);
-
-	map_set(g, dynamic_str("parse_defsrow"), string_arr_create());
-	map_set(g, dynamic_str("skipoptions"), string_arr_create());
-	map_set(g, dynamic_str("parse_defsproper"), string_arr_create());
-
-	map_set(g, dynamic_str("skipws"), string_arr_create());
-	map_set(g, dynamic_str("fprintf"), string_arr_create());
-	map_set(g, dynamic_str("exit"), string_arr_create());
-
-	map_set(g, dynamic_str("strncmp"), string_arr_create());
-	map_set(g, dynamic_str("parse_rules"), string_arr_create());
-	map_set(g, dynamic_str("parse_toeof"), string_arr_create());
-	map_set(g, dynamic_str("lexer_create"), string_arr_create());
-
-	map_set(g, dynamic_str("lexer_print"), string_arr_create());
-
-	map_set(g, dynamic_str("lexer_destroy"), string_arr_create());
-
-	map_set(g, dynamic_str("free"), string_arr_create());
-
-	return g;
 }
 
 static void
@@ -445,13 +378,16 @@ recurse_funcgraph(struct map *g, char *fname, struct externals *ext)
 	map_set(g, dynamic_str(fname), val);
 }
 
+static int *
+dynamic_int(int i);
+
 static struct map *
 calculate_indegrees(struct map *g)
 {
 	struct map *indegrees = map_create();
 	for (int i = 0; i < g->n; i++) {
 		struct entry e = g->entry[i];
-		map_set(indegrees, dynamic_str(e.key), 0);
+		map_set(indegrees, dynamic_str(e.key), dynamic_int(0));
 	}
 
 	for (int i = 0; i < g->n; i++) {
@@ -459,10 +395,19 @@ calculate_indegrees(struct map *g)
 		struct string_arr *n_arr = map_get(g, e.key);
 		for (int j = 0; j < n_arr->n; j++) {
 			int *count = (int *) map_get(indegrees, e.key);
+			printf("[%s:%d]\n", e.key, *count);
 			*count = *count + 1; /* XXX */
 		}
 	}
 	return indegrees;
+}
+
+static int *
+dynamic_int(int i)
+{
+	int *val = malloc(sizeof(int));
+	*val = i;
+	return val;
 }
 
 static struct string_arr *

@@ -16,7 +16,7 @@ struct map {
 		char *key;
 		const void *value;
 	} *entry;
-	size_t n;
+	int n;
 };
 
 struct map *
@@ -91,6 +91,9 @@ string_arr_append(struct string_arr *, char *);
 
 char *
 string_arr_deque(struct string_arr *);
+
+struct string_arr *
+string_arr_concat(struct string_arr *s1, struct string_arr *s2);
 
 char *
 string_arr_str(struct string_arr *);

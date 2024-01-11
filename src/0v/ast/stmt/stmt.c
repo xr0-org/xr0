@@ -707,19 +707,59 @@ ast_stmt_expr_getfuncs(struct ast_stmt *stmt)
 static struct string_arr *
 ast_stmt_selection_getfuncs(struct ast_stmt *stmt)
 {
-	assert(false);		
+	struct ast_expr *cond = stmt->u.selection.cond;
+	struct ast_stmt *body = stmt->u.selection.body,
+			*nest = stmt->u.selection.nest;
+	struct string_arr *cond_arr = ast_expr_getfuncs(cond),
+			  *body_arr = ast_stmt_getfuncs(body),
+			  *nest_arr = ast_stmt_getfuncs(nest);
+	
+	return string_arr_concat(
+		string_arr_create(),
+		string_arr_concat(
+			cond_arr,
+			string_arr_concat(
+				body_arr, nest_arr
+			)
+		)
+	);
 }
 
 static struct string_arr *
 ast_stmt_iteration_getfuncs(struct ast_stmt *stmt)
 {
-	assert(false);
+	struct ast_stmt *init = stmt->u.iteration.init,
+			*cond = stmt->u.iteration.cond,
+			*body = stmt->u.iteration.body;
+	struct ast_expr *iter = stmt->u.iteration.iter;
+	/* XXX: inlucde loop abstracts potentially */
+	struct string_arr *init_arr = ast_stmt_getfuncs(init),
+			  *cond_arr = ast_stmt_getfuncs(cond),
+			  *body_arr = ast_stmt_getfuncs(body),
+			  *iter_arr = ast_expr_getfuncs(iter);
+	
+	return string_arr_concat(
+		string_arr_create(),
+		string_arr_concat(
+			string_arr_concat(init_arr, cond_arr),
+			string_arr_concat(body_arr, iter_arr)
+		)
+	);
 }
 
 static struct string_arr *
 ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
 {
-	assert(false);
+	struct string_arr *res = string_arr_create();
+	struct ast_block *b = stmt->u.compound;
+	struct ast_stmt **stmts = ast_block_stmts(b);
+	for (int i = 0; i < ast_block_nstmts(b); i++) {
+		string_arr_concat(
+			res,
+			ast_stmt_getfuncs(stmts[i])
+		);
+	}
+	return res;
 }
 
 #include "verify.c"
