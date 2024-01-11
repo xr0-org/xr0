@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "lex.h"
 #include "intern.h"
 #include "props.h"
 #include "object.h"
@@ -18,11 +19,23 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 
 	if (ast_stmt_kind(stmt) == STMT_COMPOUND_V) {
 		if ((err = ast_stmt_verify(stmt, state))) {
-			return error_prepend(err, "cannot verify statement: ");
+			struct strbuilder *b = strbuilder_create();
+			struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
+			assert(loc);
+			char *m = lexememarker_str(loc);
+			strbuilder_printf(b, "%s: %s", m, err->msg);
+			free(m);
+			return error_create(strbuilder_build(b));
 		}
 	}
 	if ((err = ast_stmt_exec(stmt, state))) {
-		return error_prepend(err, "cannot exec statement: ");
+		struct strbuilder *b = strbuilder_create();
+		struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
+		assert(loc);
+		char *m = lexememarker_str(loc);
+		strbuilder_printf(b, "%s: cannot exec statement: %s", m, err->msg);
+		free(m);
+		return error_create(strbuilder_build(b));
 	}
 	return NULL;
 }
@@ -74,7 +87,6 @@ ast_stmt_verify(struct ast_stmt *stmt, struct state *state)
 	case STMT_ITERATION:
 		return stmt_iter_verify(stmt, state);
 	default:
-		fprintf(stderr, "cannot verify stmt: %s\n", ast_stmt_str(stmt));
 		assert(false);
 	}
 }
@@ -104,7 +116,7 @@ stmt_expr_verify(struct ast_stmt *stmt, struct state *state)
 	if (ast_expr_decide(expr, state)) {
 		return NULL;
 	}
-	return error_create("cannot verify");
+	return error_create("cannot verify statement");
 }
 
 static bool
@@ -152,6 +164,9 @@ static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
+stmt_sel_exec(struct ast_stmt *stmt, struct state *state);
+
+static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
@@ -169,6 +184,8 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 		return NULL;
 	case STMT_EXPR:
 		return ast_expr_exec(ast_stmt_as_expr(stmt), state);
+	case STMT_SELECTION:
+		return stmt_sel_exec(stmt, state);
 	case STMT_ITERATION:
 		return stmt_iter_exec(stmt, state);
 	case STMT_JUMP:
@@ -192,10 +209,26 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 		if (err) {
 			return err;
 		}
-		if (ast_stmt_isterminal(stmts[i])) {
+		if (ast_stmt_isterminal(stmts[i], state)) {
 			break;
 		}
 	}
+	return NULL;
+}
+
+/* stmt_sel_exec */
+
+static struct error *
+stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
+{
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	if (dec.err) {
+		return dec.err;
+	}
+	if (dec.decision) {
+		return ast_stmt_exec(ast_stmt_sel_body(stmt), state);
+	}
+	assert(!ast_stmt_sel_nest(stmt));
 	return NULL;
 }
 
@@ -381,45 +414,67 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	return obj;
 }
 
-static bool
-sel_decide(struct ast_expr *control, struct state *state);
-
 static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	if (sel_decide(ast_stmt_sel_cond(stmt), state)) {
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	if (dec.err) {
+		return result_error_create(dec.err);
+	}
+	if (dec.decision) {
 		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
 	}
 	assert(!ast_stmt_sel_nest(stmt));
 	return result_value_create(NULL);
 }
 
-static struct value *
-underlying_value(struct value *v, struct state *state);
-
-static bool
+struct decision
 sel_decide(struct ast_expr *control, struct state *state)
 {
-	struct result *res = ast_expr_eval(control, state);
-	assert(!result_iserror(res)); /* TODO: process error */
+	/*printf("(sel_decide) state: %s\n", state_str(state));*/
+	/*printf("(sel_decide) control: %s\n", ast_expr_str(control));*/
+	struct result *res = ast_expr_pf_reduce(control, state);
+	if (result_iserror(res)) {
+		return (struct decision) { .err = result_as_error(res) };
+	}
+	assert(result_hasvalue(res)); /* TODO: user error */
+
+	struct value *v = result_as_value(res);
+	/*printf("(sel_decide) value: %s\n", value_str(v));*/
+	if (value_issync(v)) {
+		struct ast_expr *sync = value_as_sync(v);
+		/*printf("state: %s\n", state_str(state));*/
+		/*printf("sync: %s\n", ast_expr_str(sync));*/
+		struct props *p = state_getprops(state);
+		if (props_get(p, sync)) {
+			return (struct decision) { .decision = true, .err = NULL };
+		} else if (props_contradicts(p, sync)) {
+			return (struct decision) { .decision = false, .err = NULL };
+		}
+
+	}
 
 	struct value *zero = value_int_create(0);
-	bool nonzero = !value_equal(
-		zero, underlying_value(result_as_value(res), state)
-	);
-	value_destroy(zero);
-	return nonzero;
-}
 
-static struct value *
-underlying_value(struct value *v, struct state *state)
-{
-	if (value_issync(v)) {
-		return state_getvconst(
-			state, ast_expr_as_identifier(value_as_sync(v))
+	if (!values_comparable(zero, v)) {
+		struct strbuilder *b = strbuilder_create();
+		char *c_str = ast_expr_str(control);
+		char *v_str = value_str(v);
+		strbuilder_printf(
+			b, "`%s' with value `%s' is undecidable",
+			c_str, v_str
 		);
+		free(v_str);
+		free(c_str);
+		return (struct decision) {
+			.decision = false,
+			.err      = error_create(strbuilder_build(b)),
+		};
 	}
-	return v;
+
+	bool nonzero = !value_equal(zero, v);
+	value_destroy(zero);
+	return (struct decision) { .decision = nonzero, .err = NULL };
 }
 
 static struct result *

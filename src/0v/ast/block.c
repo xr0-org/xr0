@@ -15,6 +15,10 @@ struct ast_block *
 ast_block_create(struct ast_variable **decl, int ndecl, 
 	struct ast_stmt **stmt, int nstmt)
 {
+	/* XXX: commented out in exec-branching work */
+	/*assert(ndecl > 0 || !decl);*/
+	assert(nstmt > 0 || !stmt);
+
 	struct ast_block *b = malloc(sizeof(struct ast_block));
 	b->decl = decl;
 	b->ndecl = ndecl;
@@ -84,17 +88,17 @@ copy_stmt_arr(int len, struct ast_stmt **stmt)
 }
 
 char *
-ast_block_str(struct ast_block *b)
+ast_block_str(struct ast_block *b, char *indent)
 {
 	struct strbuilder *sb = strbuilder_create();
 	for (int i = 0; i < b->ndecl; i++) {
 		char *s = ast_variable_str(b->decl[i]);
-		strbuilder_printf(sb, "%s;\n", s);
+		strbuilder_printf(sb, "%s%s;\n", indent, s);
 		free(s);
 	}
 	for (int i = 0; i < b->nstmt; i++) {
 		char *s = ast_stmt_str(b->stmt[i]);
-		strbuilder_printf(sb, "%s\n", s);
+		strbuilder_printf(sb, "%s%s\n", indent, s);
 		free(s);
 	}
 	return strbuilder_build(sb);
@@ -109,7 +113,8 @@ ast_block_ndecls(struct ast_block *b)
 struct ast_variable **
 ast_block_decls(struct ast_block *b)
 {
-	assert(b->ndecl > 0 || !b->decl);
+	/* TODO: restore assert or fix structure */
+	/*assert(b->ndecl > 0 || !b->decl);*/
 	return b->decl;
 }
 
@@ -127,10 +132,10 @@ ast_block_stmts(struct ast_block *b)
 }
 
 bool
-ast_block_isterminal(struct ast_block *b)
+ast_block_isterminal(struct ast_block *b, struct state *s)
 {
 	for (int i = 0; i < b->nstmt; i++) {
-		if (ast_stmt_isterminal(b->stmt[i])) {
+		if (ast_stmt_isterminal(b->stmt[i], s)) {
 			return true;
 		}
 	}

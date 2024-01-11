@@ -236,14 +236,15 @@ vconst_copy(struct vconst *old)
 	return new;
 }
 
+static char *
+vconst_id(struct map *varmap, struct map *persistmap, bool persist);
+
 char *
 vconst_declare(struct vconst *v, struct value *val, char *comment, bool persist)
 {
 	struct map *m = v->varmap;
 
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "$%d", (int) m->n);
-	char *s = strbuilder_build(b);
+	char *s = vconst_id(m, v->persist, persist);
 
 	map_set(m, dynamic_str(s), val);
 	if (comment) {
@@ -252,6 +253,34 @@ vconst_declare(struct vconst *v, struct value *val, char *comment, bool persist)
 	map_set(v->persist, dynamic_str(s), (void *) persist);
 
 	return s;
+}
+
+static int
+count_true(struct map *m);
+
+static char *
+vconst_id(struct map *varmap, struct map *persistmap, bool persist)
+{
+	int npersist = count_true(persistmap);
+	struct strbuilder *b = strbuilder_create();
+	if (persist) {
+		strbuilder_printf(b, "$%d", (int) npersist);
+	} else {
+		strbuilder_printf(b, "#%d", (int) varmap->n - npersist);
+	}
+	return strbuilder_build(b);
+}
+
+static int
+count_true(struct map *m)
+{
+	int n = 0;
+	for (int i = 0; i < m->n; i++) {
+		if (m->entry[i].value) {
+			n++;
+		}
+	}
+	return n;
 }
 
 struct value *

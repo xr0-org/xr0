@@ -2,10 +2,14 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
-#include "math.h"
-#include "util.h"
+#include "ext.h"
 #include "expr.h"
+#include "math.h"
+#include "state.h"
+#include "stmt/stmt.h"
+#include "util.h"
 
 static struct ast_expr *
 ast_expr_create()
@@ -42,15 +46,70 @@ ast_expr_constant_create(int k)
 	/* TODO: generalise for all constant cases */
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_CONSTANT;
-	expr->u.constant = k;
+	expr->u.constant.ischar = false;
+	expr->u.constant.constant = k;
 	return expr;
+}
+
+struct ast_expr *
+ast_expr_constant_create_char(char c)
+{
+	/* TODO: generalise for all constant cases */
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_CONSTANT;
+	expr->u.constant.ischar = true;
+	expr->u.constant.constant = c;
+	return expr;
+}
+
+static char *
+escape_str(char c);
+
+static void
+ast_expr_constant_str_build(struct ast_expr *expr, struct strbuilder *b)
+{
+	int constant = expr->u.constant.constant;
+	if (!expr->u.constant.ischar) {
+		strbuilder_printf(b, "%d", constant);
+		return;
+	}
+	switch (constant) {
+	case '\n': case '\t': case '\v': case '\b': case '\f':
+	case '\a': case '\\': case '\?': case '\'': case '\"':
+	case '\0':
+		strbuilder_printf(b, "'%s'", escape_str(constant));
+		break;
+	default:
+		strbuilder_printf(b, "'%c'", constant);
+		break;
+	}
+}
+
+static char *
+escape_str(char c)
+{
+	switch (c) { 
+	case '\n': return "\\n";
+	case '\t': return "\\t";
+	case '\v': return "\\v";
+	case '\b': return "\\b";
+	case '\f': return "\\f";
+	case '\a': return "\\a";
+	case '\\': return "\\\\";
+	case '\?': return "\\?";
+	case '\'': return "\\\'";
+	case '\"': return "\\\"";
+	/* TODO: handle octal and hex escapes */
+	case '\0': return "\\0";
+	default: assert(false);
+	}
 }
 
 int
 ast_expr_as_constant(struct ast_expr *expr)
 {
 	assert(expr->kind == EXPR_CONSTANT);
-	return expr->u.constant;
+	return expr->u.constant.constant;
 }
 
 struct ast_expr *
@@ -491,6 +550,7 @@ ast_expr_assignment_create(struct ast_expr *root, struct ast_expr *value)
 	return expr;
 }
 
+
 struct ast_expr *
 ast_expr_assignment_lval(struct ast_expr *expr)
 {
@@ -608,7 +668,7 @@ ast_expr_str(struct ast_expr *expr)
 		strbuilder_printf(b, expr->u.string);
 		break;
 	case EXPR_CONSTANT:
-		strbuilder_printf(b, "%d", expr->u.constant);
+		ast_expr_constant_str_build(expr, b);
 		break;
 	case EXPR_STRING_LITERAL:
 		strbuilder_printf(b, "\"%s\"", expr->u.string);
@@ -654,7 +714,9 @@ ast_expr_copy(struct ast_expr *expr)
 	case EXPR_IDENTIFIER:
 		return ast_expr_identifier_create(dynamic_str(expr->u.string));
 	case EXPR_CONSTANT:
-		return ast_expr_constant_create(expr->u.constant);
+		return expr->u.constant.ischar
+			? ast_expr_constant_create_char(expr->u.constant.constant)
+			: ast_expr_constant_create(expr->u.constant.constant);
 	case EXPR_STRING_LITERAL:
 		return ast_expr_literal_create(dynamic_str(expr->u.string));
 	case EXPR_BRACKETED:
@@ -715,7 +777,7 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 	}
 	switch (e1->kind) {
 	case EXPR_CONSTANT:
-		return e1->u.constant == e2->u.constant;
+		return e1->u.constant.constant == e2->u.constant.constant;
 	case EXPR_IDENTIFIER:
 		return strcmp(ast_expr_as_identifier(e1), ast_expr_as_identifier(e2)) == 0;
 	case EXPR_STRING_LITERAL:
@@ -741,6 +803,13 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 			}
 		}
 		return ast_expr_equal(e1->root, e2->root);
+	case EXPR_STRUCTMEMBER:
+		return ast_expr_equal(
+			ast_expr_member_root(e1),
+			ast_expr_member_root(e2)
+		) && (strcmp(
+			ast_expr_member_field(e1), ast_expr_member_field(e2)
+		) == 0);
 	default:
 		assert(false);
 	}
@@ -798,15 +867,15 @@ math_expr(struct ast_expr *e)
 			math_atom_variable_create(dynamic_str(e->u.string))
 		);
 	case EXPR_CONSTANT:
-		if (e->u.constant < 0) {
+		if (e->u.constant.constant < 0) {
 			return math_expr_neg_create(
 				math_expr_atom_create(
-					math_atom_nat_create(-e->u.constant)
+					math_atom_nat_create(-e->u.constant.constant)
 				)
 			);
 		}
 		return math_expr_atom_create(
-			math_atom_nat_create(e->u.constant)
+			math_atom_nat_create(e->u.constant.constant)
 		);
 	case EXPR_BINARY:
 		return math_expr_sum_create(
@@ -866,6 +935,39 @@ ast_expr_getfuncs(struct ast_expr *expr)
 	}
 }
 
+static struct ast_stmt_splits
+call_splits(struct ast_expr *, struct state *);
+
+static struct ast_stmt_splits
+binary_splits(struct ast_expr *, struct state *);
+
+struct ast_stmt_splits
+ast_expr_splits(struct ast_expr *e, struct state *s)
+{
+	switch (ast_expr_kind(e)) {
+	case EXPR_CALL:
+		return call_splits(e, s);
+	case EXPR_ASSIGNMENT:
+		return ast_expr_splits(ast_expr_assignment_rval(e), s);
+	case EXPR_UNARY:
+		return ast_expr_splits(ast_expr_unary_operand(e), s);
+	case EXPR_BINARY:
+		return binary_splits(e, s);
+	case EXPR_INCDEC:
+		return ast_expr_splits(ast_expr_incdec_root(e), s);
+	case EXPR_STRUCTMEMBER:
+		return ast_expr_splits(ast_expr_member_root(e), s);
+	case EXPR_CONSTANT:
+	case EXPR_IDENTIFIER:
+	case EXPR_STRING_LITERAL:
+	case EXPR_ARBARG:
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	default:
+		/*printf("expr: %s\n", ast_expr_str(e));*/
+		assert(false);
+	}
+}
+
 static struct string_arr *
 ast_expr_call_getfuncs(struct ast_expr *expr)
 {
@@ -881,6 +983,90 @@ ast_expr_call_getfuncs(struct ast_expr *expr)
 		/* XXX: leaks */
 	}
 	return res;
+}
+
+static struct ast_stmt_splits
+call_splits(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(root);
+
+	struct ast_function *f = externals_getfunc(state_getext(state), name);
+	if (!f) {
+		/* TODO: user error */
+		fprintf(stdout, "function `%s' not found\n", name);
+		assert(false);
+	}
+
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **params = ast_function_params(f);
+
+	struct state *s_copy = state_copy(state);
+	struct result_arr *args = prepare_arguments(
+		ast_expr_call_nargs(expr),
+		ast_expr_call_args(expr),
+		nparams, params, s_copy
+	);
+
+	struct ast_type *ret_type = ast_function_type(f);
+	state_pushframe(s_copy, dynamic_str(name), ret_type);
+
+	struct error *err = prepare_parameters(
+		nparams, params, args, name, s_copy
+	);
+	if (err) {
+		fprintf(stderr, "err: %s\n", err->msg);
+		assert(false);
+	}
+
+	int n = 0;
+	struct ast_expr **cond = NULL;
+
+	struct ast_block *abs = ast_function_abstract(f);
+
+	int ndecls = ast_block_ndecls(abs);
+	if (ndecls) {
+		struct ast_variable **var = ast_block_decls(abs);
+		for (int i = 0; i < ndecls; i++) {
+			state_declare(s_copy, var[i], false);
+		}
+	}
+
+	int nstmts = ast_block_nstmts(abs);
+	struct ast_stmt **stmt = ast_block_stmts(abs);
+	for (int i = 0; i < nstmts; i++) {
+		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], s_copy);
+		for (int j = 0; j < splits.n; j++) {
+			cond = realloc(cond, sizeof(struct ast_expr *) * ++n);
+			cond[n-1] = splits.cond[j];
+		}
+		/* XXX: for assignment statements and, well, spare us */
+		ast_stmt_absexec(stmt[i], s_copy);
+	}
+
+	state_popframe(s_copy);
+	result_arr_destroy(args);
+
+	return (struct ast_stmt_splits) { .n = n, .cond = cond };
+}
+
+static struct ast_stmt_splits
+binary_splits(struct ast_expr *e, struct state *s)
+{
+	struct ast_stmt_splits s1 = ast_expr_splits(ast_expr_binary_e1(e), s),
+			       s2 = ast_expr_splits(ast_expr_binary_e2(e), s);
+
+	int n = s1.n + s2.n;
+	struct ast_expr **cond = malloc(sizeof(struct ast_expr *) * n);
+	for (int i = 0; i < s1.n; i++) {
+		cond[i] = s1.cond[i];
+	}
+	for (int i = 0; i < s2.n; i++) {
+		cond[i+s1.n] = s2.cond[i];
+	}
+
+	return (struct ast_stmt_splits) { .n = n, .cond = cond };
 }
 
 #include "verify.c"

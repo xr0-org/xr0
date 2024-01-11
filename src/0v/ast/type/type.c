@@ -4,6 +4,7 @@
 #include <string.h>
 #include "ast.h"
 #include "ext.h"
+#include "state.h"
 #include "type.h"
 #include "util.h"
 #include "value.h"
@@ -78,7 +79,7 @@ ast_type_create_userdef(char *name)
 }
 
 struct value *
-ast_type_vconst(struct ast_type *t, struct externals *ext)
+ast_type_vconst(struct ast_type *t, struct state *s, char *comment, bool persist)
 {
 	switch (t->base) {
 	case TYPE_INT:
@@ -88,8 +89,10 @@ ast_type_vconst(struct ast_type *t, struct externals *ext)
 		return value_ptr_indefinite_create();
 	case TYPE_USERDEF:
 		return ast_type_vconst(
-			externals_gettypedef(ext, t->userdef), ext
+			externals_gettypedef(state_getext(s), t->userdef), s, comment, persist
 		);
+	case TYPE_STRUCT:
+		return value_struct_indefinite_create(t, s, comment, persist);
 	default:
 		assert(false);
 	}
@@ -100,6 +103,17 @@ bool
 ast_type_isstruct(struct ast_type *t)
 {
 	return t->base == TYPE_STRUCT;
+}
+
+struct ast_type *
+ast_type_struct_complete(struct ast_type *t, struct externals *ext)
+{
+	if (ast_type_struct_members(t)) {
+		return t;
+	}
+	char *tag = ast_type_struct_tag(t);
+	assert(tag);
+	return externals_getstruct(ext, tag);
 }
 
 struct ast_variable_arr *

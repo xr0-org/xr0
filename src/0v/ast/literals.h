@@ -4,7 +4,7 @@
 int
 parse_int(char *s);
 
-int
+char
 parse_char(char *s);
 
 #endif

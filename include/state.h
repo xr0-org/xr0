@@ -30,6 +30,9 @@ state_create(char *func, struct externals *, struct ast_type *result_type);
 struct state *
 state_copy(struct state *);
 
+struct state *
+state_copywithname(struct state *, char *func_name);
+
 void
 state_destroy(struct state *state);
 

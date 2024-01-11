@@ -14,6 +14,9 @@ ast_expr_as_identifier(struct ast_expr *);
 struct ast_expr *
 ast_expr_constant_create(int);
 
+struct ast_expr *
+ast_expr_constant_create_char(char);
+
 int
 ast_expr_as_constant(struct ast_expr *expr);
 
@@ -172,6 +175,11 @@ ast_expr_eval(struct ast_expr *, struct state *);
 struct result *
 ast_expr_absexec(struct ast_expr *, struct state *);
 
+/* ast_expr_pf_reduce: Reduce an expression to "parameter form", in which its
+ * only primitives are constants and parameters (vconsts). */
+struct result *
+ast_expr_pf_reduce(struct ast_expr *, struct state *);
+
 struct ast_stmt;
 
 struct ast_block;
@@ -187,7 +195,7 @@ void
 ast_block_destroy(struct ast_block *);
 
 char *
-ast_block_str(struct ast_block *);
+ast_block_str(struct ast_block *, char *indent);
 
 struct ast_block *
 ast_block_copy(struct ast_block *b);
@@ -205,7 +213,7 @@ struct ast_stmt **
 ast_block_stmts(struct ast_block *b);
 
 bool
-ast_block_isterminal(struct ast_block *);
+ast_block_isterminal(struct ast_block *, struct state *);
 
 enum ast_jump_kind {
 	JUMP_RETURN	= 1 << 0,
@@ -214,6 +222,9 @@ enum ast_jump_kind {
 struct ast_stmt;
 
 struct lexememarker;
+
+struct lexememarker *
+ast_stmt_lexememarker(struct ast_stmt *);
 
 struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *, char *label, struct ast_stmt *);
@@ -332,7 +343,7 @@ struct preresult *
 ast_stmt_preprocess(struct ast_stmt *, struct state *);
 
 bool
-ast_stmt_isterminal(struct ast_stmt *);
+ast_stmt_isterminal(struct ast_stmt *, struct state *);
 
 bool
 ast_stmt_isselection(struct ast_stmt *);
@@ -364,6 +375,11 @@ struct ast_variable_arr;
 struct ast_type *
 ast_type_create_struct(char *tag, struct ast_variable_arr *);
 
+struct externals;
+
+struct ast_type *
+ast_type_struct_complete(struct ast_type *t, struct externals *ext);
+
 struct ast_variable_arr *
 ast_type_struct_members(struct ast_type *t);
 
@@ -389,7 +405,7 @@ struct value;
 struct externals;
 
 struct value *
-ast_type_vconst(struct ast_type *, struct externals *ext);
+ast_type_vconst(struct ast_type *, struct state *s, char *comment, bool persist);
 
 void
 ast_type_destroy(struct ast_type *);

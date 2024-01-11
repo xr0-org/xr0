@@ -10,11 +10,15 @@ fail_prefix="FAIL"
 topological_folder="topological"
 main_func="main"
 
+pass="\e[32mPASS\e[0m\n"
+fail="\e[31mFAIL\e[0m\n"
+
 XR0=$(pwd)/bin/0v
 libx=$(pwd)/libx
 cd tests
 length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
 	tail -1 | wc -c)
+
 
 for f in */*.x
 do
@@ -25,7 +29,7 @@ do
 	if [ "$folder" == *"$topological_folder"* ]
 	then
 		output=$($XR0 -s main -I $libx $f 2>&1 >/dev/null)
-	else
+	else 
 		output=$($XR0 -I $libx $f 2>&1 >/dev/null)
 	fi
 
@@ -36,19 +40,19 @@ do
 		expected_output=$(cat $expected_file)
 		
 		# check if output matches expected_output
-		if [[ $output == $expected_output ]]
+		if [[ ${output} == $expected_output ]]
 		then
 			npass=$((npass+1))
-			printf 'PASS\n'
+			printf "$pass"
 		else
-			printf 'FAIL\n'
+			printf "$fail"
 		fi
 	else
 		# silence is golden
 		if [[ $output -eq 0 ]] 
 		then
 			npass=$((npass+1))
-			printf 'PASS\n'
+			printf "$pass"
 		fi
 	fi
 done

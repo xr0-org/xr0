@@ -2,11 +2,16 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
+#include "expr/expr.h"
+#include "intern.h"
 #include "lex.h"
-#include "util.h"
+#include "props.h"
+#include "state.h"
 #include "stmt.h"
-#include "../expr/expr.h"
+#include "util.h"
+#include "value.h"
 
 struct ast_stmt {
 	enum ast_stmt_kind kind;
@@ -40,6 +45,12 @@ struct ast_stmt {
 
 	struct lexememarker *loc;
 };
+
+struct lexememarker *
+ast_stmt_lexememarker(struct ast_stmt *stmt)
+{
+	return stmt->loc;
+}
 
 static struct ast_stmt *
 ast_stmt_create(struct lexememarker *loc)
@@ -150,7 +161,7 @@ static void
 ast_stmt_compound_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_COMPOUND || stmt->kind == STMT_COMPOUND_V);
-	char *s = ast_block_str(stmt->u.compound);
+	char *s = ast_block_str(stmt->u.compound, "\t");
 	strbuilder_printf(b, s);
 	free(s);
 }
@@ -178,21 +189,36 @@ ast_stmt_create_jump(struct lexememarker *loc, enum ast_jump_kind kind,
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt)
 {
-	assert(ast_stmt_isterminal(stmt));
 	return stmt->u.jump.rv;
 }
 
+static bool
+sel_isterminal(struct ast_stmt *stmt, struct state *s);
+
 bool
-ast_stmt_isterminal(struct ast_stmt *stmt)
+ast_stmt_isterminal(struct ast_stmt *stmt, struct state *s)
 {
 	switch (stmt->kind) {
 	case STMT_JUMP:
 		return stmt->u.jump.kind == JUMP_RETURN;
 	case STMT_COMPOUND:
-		return ast_block_isterminal(stmt->u.compound);
+		return ast_block_isterminal(stmt->u.compound, s);
+	case STMT_SELECTION:
+		return sel_isterminal(stmt, s);
 	default:
 		return false;
 	}
+}
+
+static bool
+sel_isterminal(struct ast_stmt *stmt, struct state *s)
+{
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), s);
+	assert(!dec.err);
+	if (dec.decision) {
+		return ast_stmt_isterminal(ast_stmt_sel_body(stmt), s);
+	}
+	return false;
 }
 
 bool
@@ -433,7 +459,7 @@ ast_stmt_iter_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	     *iter = ast_expr_str(stmt->u.iteration.iter);
 
 	char *abs = stmt->u.iteration.abstract ?
-		ast_block_str(stmt->u.iteration.abstract) : "";
+		ast_block_str(stmt->u.iteration.abstract, "\t") : "";
 
 	strbuilder_printf(
 		b,
@@ -708,6 +734,34 @@ ast_stmt_getfuncs(struct ast_stmt *stmt)
 	}
 }
 
+static struct ast_stmt_splits
+stmt_sel_splits(struct ast_stmt *stmt, struct state *s);
+
+struct ast_stmt_splits
+ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
+{
+	/* TODO: consider expressions with calls */
+	switch (stmt->kind) {
+	case STMT_EXPR:
+		return ast_expr_splits(stmt->u.expr, s);
+	case STMT_SELECTION:
+		return stmt_sel_splits(stmt, s);
+	case STMT_JUMP:
+		if (stmt->u.jump.rv) {
+			return ast_expr_splits(stmt->u.jump.rv, s);
+		}
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	case STMT_ALLOCATION:
+	case STMT_LABELLED:
+	case STMT_ITERATION:
+	case STMT_COMPOUND_V:
+		/* disallowed splits for now */
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	default:
+		assert(false);
+	}
+}
+
 static struct string_arr *
 ast_stmt_expr_getfuncs(struct ast_stmt *stmt)
 {
@@ -771,6 +825,36 @@ ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
 		/* XXX: leaks */
 	}
 	return res;
+}
+
+static bool
+condexists(struct ast_expr *cond, struct state *);
+
+static struct ast_stmt_splits
+stmt_sel_splits(struct ast_stmt *stmt, struct state *s)
+{
+	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
+	struct ast_expr *r = value_to_expr(result_as_value(res));
+	if (condexists(r, s)) {
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	}
+	/*printf("cond: %s\n", ast_expr_str(r));*/
+	struct ast_expr **cond = malloc(sizeof(struct ast_expr *));
+	cond[0] = r;
+	return (struct ast_stmt_splits) {
+		.n    = 1,
+		.cond = cond,
+	};
+}
+
+static bool
+condexists(struct ast_expr *cond, struct state *s)
+{
+	struct result *res = ast_expr_pf_reduce(cond, s);
+	assert(!result_iserror(res) && result_hasvalue(res));
+	struct ast_expr *reduced = value_to_expr(result_as_value(res));
+	struct props *p = state_getprops(s);
+	return props_get(p, reduced) || props_contradicts(p, reduced);
 }
 
 #include "verify.c"
