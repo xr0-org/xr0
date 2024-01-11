@@ -6,6 +6,7 @@
 #include "lex.h"
 #include "util.h"
 #include "stmt.h"
+#include "../expr/expr.h"
 
 struct ast_stmt {
 	enum ast_stmt_kind kind;
@@ -666,6 +667,110 @@ ast_stmt_as_expr(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_EXPR);
 	return stmt->u.expr;
+}
+
+static struct string_arr *
+ast_stmt_expr_getfuncs(struct ast_stmt *stmt);
+
+static struct string_arr *
+ast_stmt_selection_getfuncs(struct ast_stmt *stmt);
+
+static struct string_arr *
+ast_stmt_iteration_getfuncs(struct ast_stmt *stmt);
+
+static struct string_arr *
+ast_stmt_compound_getfuncs(struct ast_stmt *stmt);
+
+struct string_arr *
+ast_stmt_getfuncs(struct ast_stmt *stmt)
+{
+	switch (stmt->kind) {
+	case STMT_NOP:
+		return string_arr_create();
+	case STMT_LABELLED:
+		return ast_stmt_getfuncs(stmt->u.labelled.stmt);
+	case STMT_COMPOUND:
+	case STMT_COMPOUND_V:
+		return ast_stmt_compound_getfuncs(stmt);
+	case STMT_EXPR:
+		return ast_stmt_expr_getfuncs(stmt);
+	case STMT_SELECTION:
+		return ast_stmt_selection_getfuncs(stmt);
+	case STMT_ITERATION:
+	case STMT_ITERATION_E:
+		return ast_stmt_iteration_getfuncs(stmt);
+	case STMT_JUMP:
+		return ast_expr_getfuncs(stmt->u.jump.rv);
+	case STMT_ALLOCATION:
+		return ast_expr_getfuncs(stmt->u.alloc.arg);
+	default:
+		assert(false);
+	}
+}
+
+static struct string_arr *
+ast_stmt_expr_getfuncs(struct ast_stmt *stmt)
+{
+	return ast_expr_getfuncs(stmt->u.expr);
+}
+
+static struct string_arr *
+ast_stmt_selection_getfuncs(struct ast_stmt *stmt)
+{
+	struct ast_expr *cond = stmt->u.selection.cond;
+	struct ast_stmt *body = stmt->u.selection.body,
+			*nest = stmt->u.selection.nest;
+	struct string_arr *cond_arr = ast_expr_getfuncs(cond),
+			  *body_arr = ast_stmt_getfuncs(body),
+			  *nest_arr = nest ? ast_stmt_getfuncs(nest) : string_arr_create();
+	
+	return string_arr_concat(
+		string_arr_create(),
+		string_arr_concat(
+			cond_arr,
+			string_arr_concat(
+				body_arr, nest_arr
+			)
+		)
+	);
+}
+
+static struct string_arr *
+ast_stmt_iteration_getfuncs(struct ast_stmt *stmt)
+{
+	struct ast_stmt *init = stmt->u.iteration.init,
+			*cond = stmt->u.iteration.cond,
+			*body = stmt->u.iteration.body;
+	struct ast_expr *iter = stmt->u.iteration.iter;
+	/* XXX: inlucde loop abstracts potentially */
+	struct string_arr *init_arr = ast_stmt_getfuncs(init),
+			  *cond_arr = ast_stmt_getfuncs(cond),
+			  *body_arr = ast_stmt_getfuncs(body),
+			  *iter_arr = ast_expr_getfuncs(iter);
+	
+	return string_arr_concat(
+		string_arr_create(),
+		string_arr_concat(
+			string_arr_concat(init_arr, cond_arr),
+			string_arr_concat(body_arr, iter_arr)
+		)
+	);
+}
+
+static struct string_arr *
+ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
+{
+	struct string_arr *res = string_arr_create();
+	struct ast_block *b = stmt->u.compound;
+	struct ast_stmt **stmts = ast_block_stmts(b);
+	for (int i = 0; i < ast_block_nstmts(b); i++) {
+		res = string_arr_concat(
+			res,
+			ast_stmt_getfuncs(stmts[i])
+		);
+		/* XXX: leaks */
+	}
+	return res;
 }
 
 #include "verify.c"

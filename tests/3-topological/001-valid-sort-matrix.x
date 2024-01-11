@@ -17,7 +17,11 @@ matrix_create(int rows, int cols) ~ [
 	for (i = 0; i < result->rows; i++) {
 		.alloc result->data[i];	
 	}
-]{
+];
+
+struct matrix *
+matrix_create(int rows, int cols)
+{
 	int i;
 	struct matrix *m;
 
@@ -89,11 +93,7 @@ matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 void
 matrix_print(struct matrix *m) ~ [
 	pre: m = matrix_create($, $);
-];
-
-void
-matrix_print(struct matrix *m)
-{
+] {
 	int i; int j; int digit;
 
 	for (i = 0; i < m->rows; i++) {

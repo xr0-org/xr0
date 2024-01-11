@@ -1,6 +1,8 @@
 #ifndef XR0_AST_EXPR_H
 #define XR0_AST_EXPR_H
 
+#include "util.h"
+
 struct ast_expr {
 	enum ast_expr_kind {
 		EXPR_IDENTIFIER		= 1 << 0,
@@ -69,5 +71,8 @@ ast_expr_binary_create(struct ast_expr *e1, enum ast_binary_operator,
 
 enum ast_binary_operator
 ast_expr_binary_op(struct ast_expr *expr);
+
+struct string_arr *
+ast_expr_getfuncs(struct ast_expr *);
 
 #endif
