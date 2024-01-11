@@ -842,6 +842,8 @@ ast_expr_getfuncs(struct ast_expr *expr)
 	case EXPR_CONSTANT:
 	case EXPR_STRING_LITERAL:
 	case EXPR_STRUCTMEMBER:
+	case EXPR_ISDEALLOCAND:
+	case EXPR_ARBARG:
 		return string_arr_create();	
 	case EXPR_CALL:
 		return ast_expr_call_getfuncs(expr);
