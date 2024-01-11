@@ -477,7 +477,7 @@ value_islocation(struct value *v)
 }
 
 struct location *
-value_as_ptr(struct value *v)
+value_as_location(struct value *v)
 {
 	assert(value_islocation(v));
 	return v->ptr.loc;

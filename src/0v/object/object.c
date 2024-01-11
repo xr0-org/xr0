@@ -181,7 +181,7 @@ object_isdeallocand(struct object *obj, struct state *s)
 {
 	switch (obj->type) {
 	case OBJECT_VALUE:
-		return obj->value && state_isdeallocand(s, value_as_ptr(obj->value));
+		return obj->value && state_isdeallocand(s, value_as_location(obj->value));
 	case OBJECT_DEALLOCAND_RANGE:
 		return range_isdeallocand(obj->range, s);
 	default:
@@ -361,7 +361,7 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 		ast_expr_copy(obj->offset),
 		range_create(
 			ast_expr_difference_create(excl_up, lw),
-			value_as_ptr(state_alloc(s))
+			value_as_location(state_alloc(s))
 		)
 	);
 }
@@ -405,7 +405,7 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 				up,
 				ast_expr_copy(incl_lw)
 			),
-			value_as_ptr(state_alloc(s))
+			value_as_location(state_alloc(s))
 		)
 	);
 }

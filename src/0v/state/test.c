@@ -116,7 +116,7 @@ test_value_ptr()
 	}
 	free(s);
 
-	if (value_as_ptr(val) != loc) {
+	if (value_as_location(val) != loc) {
 		return false;
 	}
 

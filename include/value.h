@@ -71,7 +71,7 @@ bool
 value_islocation(struct value *);
 
 struct location *
-value_as_ptr(struct value *);
+value_as_location(struct value *);
 
 bool
 value_referencesheap(struct value *, struct state *);

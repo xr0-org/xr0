@@ -210,7 +210,7 @@ state_getobject(struct state *state, char *id)
 struct object *
 state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 {
-	struct location *deref_base = value_as_ptr(ptr_val);
+	struct location *deref_base = value_as_location(ptr_val);
 	assert(deref_base);
 
 	/* `*(ptr+offset)` */
@@ -231,7 +231,7 @@ state_range_alloc(struct state *state, struct object *obj,
 	}
 
 	/* assume pointer */
-	struct location *deref = value_as_ptr(arr_val);
+	struct location *deref = value_as_location(arr_val);
 
 	struct block *b = location_getblock(
 		deref, state->vconst, state->stack, state->heap
@@ -256,7 +256,10 @@ state_alloc(struct state *state)
 struct error *
 state_dealloc(struct state *state, struct value *val)
 {
-	return location_dealloc(value_as_ptr(val), state->heap);
+	if (!value_islocation(val)) {
+		return error_create("dealloc on non-location");
+	}
+	return location_dealloc(value_as_location(val), state->heap);
 }
 
 
@@ -269,7 +272,7 @@ state_range_dealloc(struct state *state, struct object *obj,
 	if (!arr_val) {
 		return error_create("no value");
 	}
-	struct location *deref = value_as_ptr(arr_val);
+	struct location *deref = value_as_location(arr_val);
 	return location_range_dealloc(deref, lw, up, state);
 }
 
@@ -277,7 +280,7 @@ bool
 state_addresses_deallocand(struct state *state, struct object *obj)
 {
 	struct value *val = object_as_value(obj);
-	struct location *loc = value_as_ptr(val); 
+	struct location *loc = value_as_location(val); 
 	
 	return state_isdeallocand(state, loc);
 }
@@ -303,7 +306,7 @@ state_range_aredeallocands(struct state *state, struct object *obj,
 	if (!arr_val) {
 		return false;
 	}
-	struct location *deref = value_as_ptr(arr_val);
+	struct location *deref = value_as_location(arr_val);
 	
 	struct block *b = location_getblock(
 		deref, state->vconst, state->stack, state->heap
