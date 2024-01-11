@@ -214,6 +214,9 @@ struct ast_stmt;
 
 struct lexememarker;
 
+struct lexememarker *
+ast_stmt_lexememarker(struct ast_stmt *);
+
 struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *, char *label, struct ast_stmt *);
 

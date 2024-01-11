@@ -457,8 +457,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(err);
 	}
 
-	printf("state: %s\n", state_str(state));
-	printf("call: %s\n", ast_expr_str(expr));
 	struct result *res = ast_function_absexec(f, state);
 	if (result_iserror(res)) {
 		return res;

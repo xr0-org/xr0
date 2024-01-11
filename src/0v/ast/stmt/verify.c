@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "lex.h"
 #include "intern.h"
 #include "props.h"
 #include "object.h"
@@ -18,11 +19,23 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 
 	if (ast_stmt_kind(stmt) == STMT_COMPOUND_V) {
 		if ((err = ast_stmt_verify(stmt, state))) {
-			return error_prepend(err, "cannot verify statement: ");
+			struct strbuilder *b = strbuilder_create();
+			struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
+			assert(loc);
+			char *m = lexememarker_str(loc);
+			strbuilder_printf(b, "%s: cannot verify statement: %s", m, err->msg);
+			free(m);
+			return error_create(strbuilder_build(b));
 		}
 	}
 	if ((err = ast_stmt_exec(stmt, state))) {
-		return error_prepend(err, "cannot exec statement: ");
+		struct strbuilder *b = strbuilder_create();
+		struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
+		assert(loc);
+		char *m = lexememarker_str(loc);
+		strbuilder_printf(b, "%s: cannot exec statement: %s", m, err->msg);
+		free(m);
+		return error_create(strbuilder_build(b));
 	}
 	return NULL;
 }

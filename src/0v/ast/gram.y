@@ -893,7 +893,8 @@ yyerror(char *s)
 	if (verbose) {
 		fprintf(stderr, "\n%*s\n", marker.column, "^");
 	}
-	fprintf(stderr, "%s:%d:%d: %s\n",
-		marker.filename, marker.linenum, marker.column, s);
+	char *mark = lexememarker_str(&marker);
+	fprintf(stderr, "%s: %s\n", mark, s);
+	free(mark);
 	exit(EXIT_FAILURE);
 }

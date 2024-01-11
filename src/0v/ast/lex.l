@@ -336,8 +336,7 @@ lexememarker_create(int linenum, int column, char *filename,
 
 struct lexememarker *
 lexememarker_copy(struct lexememarker *loc)
-{
-	return lexememarker_create(
+{ return lexememarker_create(
 		loc->linenum,
 		loc->column,
 		dynamic_str(loc->filename),
@@ -350,4 +349,12 @@ lexememarker_destroy(struct lexememarker *loc)
 {
 	free(loc->filename);
 	free(loc);
+}
+
+char *
+lexememarker_str(struct lexememarker *loc)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s:%d:%d", loc->filename, loc->linenum, loc->column);
+	return strbuilder_build(b);
 }

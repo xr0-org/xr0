@@ -40,6 +40,12 @@ struct ast_stmt {
 	struct lexememarker *loc;
 };
 
+struct lexememarker *
+ast_stmt_lexememarker(struct ast_stmt *stmt)
+{
+	return stmt->loc;
+}
+
 static struct ast_stmt *
 ast_stmt_create(struct lexememarker *loc)
 {

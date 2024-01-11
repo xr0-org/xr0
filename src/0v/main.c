@@ -215,7 +215,7 @@ pass1(struct ast *root, struct externals *ext)
 		assert(ast_function_abstract(f));
 
 		if ((err = ast_function_verify(f, ext))) {
-			fprintf(stderr, "%s", err->msg);
+			fprintf(stderr, "%s\n", err->msg);
 			exit(EXIT_FAILURE);
 		}
 		printf("done %s\n", ast_function_name(f));
