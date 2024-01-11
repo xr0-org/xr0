@@ -328,12 +328,12 @@ topological_order(char *fname, struct externals *ext)
 	}
 
 	printf("ordered->n: %d\ng->n: %d\n", ordered->n, g->n);
+	printf("order: %s\n", string_arr_str(ordered));
 	/* no more nodes with incoming edges */
 	if (ordered->n != g->n) {
 		assert(false); /* ERROR: cycle */
 	}
 
-	printf("order: %s\n", string_arr_str(ordered));
 	return NULL;
 }
 
@@ -354,6 +354,9 @@ static void
 recurse_funcgraph(struct map *g, char *fname, struct externals *ext)
 {
 	struct ast_function *f = externals_getfunc(ext, fname);
+	if (ast_function_isaxiom(f) || ast_function_isproto(f)) {
+		return;
+	} 
 	struct ast_block *body = ast_function_body(f);
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
@@ -364,14 +367,15 @@ recurse_funcgraph(struct map *g, char *fname, struct externals *ext)
 		if (!farr) {
 			continue;
 		}
+		printf("farr: %s\n", string_arr_str(farr));
 
 		char **func = string_arr_s(farr); 
 		for (int j = 0; j < string_arr_n(farr); j++) {
 			/* XXX: avoid duplicates, check for/ use set */
-			string_arr_append(val, func[i]);	
+			string_arr_append(val, func[j]);	
 
 			/* recursively build for other funcs */
-			recurse_funcgraph(g, func[i], ext);
+			recurse_funcgraph(g, func[j], ext);
 		}
 	}
 

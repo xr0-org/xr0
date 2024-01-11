@@ -870,6 +870,9 @@ static struct string_arr *
 ast_expr_call_getfuncs(struct ast_expr *expr)
 {
 	struct string_arr *res = string_arr_create();
+	struct ast_expr *root = expr->root;
+	assert(root->kind == EXPR_IDENTIFIER);
+	string_arr_append(res, dynamic_str(root->u.string));
 	for (int i = 0; i < expr->u.call.n; i++) {
 		res = string_arr_concat(
 			res,

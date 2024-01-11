@@ -684,6 +684,7 @@ ast_stmt_compound_getfuncs(struct ast_stmt *stmt);
 struct string_arr *
 ast_stmt_getfuncs(struct ast_stmt *stmt)
 {
+	printf("stmt: %s\n", ast_stmt_str(stmt));
 	switch (stmt->kind) {
 	case STMT_NOP:
 		return string_arr_create();
