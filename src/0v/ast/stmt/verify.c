@@ -394,13 +394,18 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	return obj;
 }
 
-static bool
+/* TODO: change to more regular tuple */
+static struct decision { bool decision; struct error *err; }
 sel_decide(struct ast_expr *control, struct state *state);
 
 static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	if (sel_decide(ast_stmt_sel_cond(stmt), state)) {
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	if (dec.err) {
+		return result_error_create(dec.err);
+	}
+	if (dec.decision) {
 		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
 	}
 	assert(!ast_stmt_sel_nest(stmt));
@@ -410,18 +415,20 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 static struct value *
 underlying_value(struct value *v, struct state *state);
 
-static bool
+static struct decision
 sel_decide(struct ast_expr *control, struct state *state)
 {
 	struct result *res = ast_expr_eval(control, state);
-	assert(!result_iserror(res)); /* TODO: process error */
+	if (result_iserror(res)) {
+		return (struct decision) { .err = result_as_error(res) };
+	}
 
 	struct value *zero = value_int_create(0);
 	bool nonzero = !value_equal(
 		zero, underlying_value(result_as_value(res), state)
 	);
 	value_destroy(zero);
-	return nonzero;
+	return (struct decision) { .decision = nonzero, .err = NULL };
 }
 
 static struct value *

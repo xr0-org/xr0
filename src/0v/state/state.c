@@ -352,6 +352,10 @@ state_equal(struct state *s1, struct state *s2)
 	char *str1 = state_str(s1_c),
 	     *str2 = state_str(s2_c);
 	bool equal = strcmp(str1, str2) == 0;
+	if (!equal) {
+		printf("s1: %s\n", str1);
+		printf("s2: %s\n", str2);
+	}
 	free(str2);
 	free(str1);
 

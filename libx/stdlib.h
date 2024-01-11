@@ -8,4 +8,7 @@ malloc(int size) ~ [ .alloc result; ];
 axiom void
 free(void *ptr) ~ [ .dealloc ptr; ];
 
+axiom void
+exit(int status);
+
 #endif

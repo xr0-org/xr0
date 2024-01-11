@@ -209,7 +209,7 @@ skiplinespace(char *s)
 }
 
 char *
-parse_id(char *input);
+parse_id(char *input) ~ [ .alloc result; ];
 
 char *
 skipoptions(char *pos)
@@ -235,7 +235,8 @@ parse_id(char *input)
 	char *s;
 
 	if (!isalpha(*input)) {
-		fprintf(stderr, "id must begin with letter: '%s'", input);
+		/* TODO: print to stderr */
+		puts("id must begin with letter");
 		exit(1);
 	}
 	s = input + 1;
@@ -247,10 +248,11 @@ parse_id(char *input)
 }
 
 char *
-parse_tonewline(char *input)
+parse_tonewline(char *input) ~ [ .alloc result; ]
 {
 	char *s;
-	for (s = input; *s != '\n'; 0) {
+	s = input;
+	for (; *s != '\n'; 0) {
 		s++;
 	}
 	return substr(input, s - input);
@@ -262,7 +264,11 @@ struct stringresult {
 };
 
 struct stringresult
-parse_defsraw(char *input);
+parse_defsraw(char *input) ~ [
+	if (!(strncmp(input, "%{", 2) != 0)) {
+		.alloc result.s;
+	}
+];
 
 struct patternet {
 	struct pattern *pattern;
@@ -276,27 +282,7 @@ parse_defsproper(char *pos);
 struct defsresult
 parse_defs(char *pos)
 {
-	struct stringresult raw;
-	struct patternet set;
-	struct defsresult res;
-
-	pos = skipws(pos);
-	if (*pos == '\0') {
-		fprintf(stderr, "EOF in defs\n");
-		exit(1);
-	}
-	raw = parse_defsraw(pos);
-	pos = raw.pos;
-	pos = skipws(pos);
-	pos = skipoptions(pos);
-	pos = skipws(pos);
-	set = parse_defsproper(pos);
-
-	res.pre = raw.s;
-	res.pattern = set.pattern;
-	res.npat = set.npat;
-	res.pos = set.pos;
-	return res;
+	assert(false);
 }
 
 struct stringresult
