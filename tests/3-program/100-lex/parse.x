@@ -281,7 +281,7 @@ struct patternet {
 
 struct patternet
 parse_defsproper(char *pos) ~ [
-	if (count_patterns(pos)) {
+	if (count_patterns(pos).n) {
 		.alloc result.pattern;
 	}
 ];

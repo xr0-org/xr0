@@ -226,6 +226,36 @@ value_struct_create(struct ast_type *t)
 	return v;
 }
 
+struct value *
+value_struct_indefinite_create(struct ast_type *t, struct state *s,
+		char *comment, bool persist)
+{
+	t = ast_type_struct_complete(t, state_getext(s));
+	assert(ast_type_struct_members(t));
+
+	struct value *v = value_struct_create(t);
+
+	int n = ast_variable_arr_n(v->_struct.members);
+	struct ast_variable **var = ast_variable_arr_v(v->_struct.members);
+	for (int i = 0; i < n; i++) {
+		char *field = ast_variable_name(var[i]);
+		struct object *obj = map_get(v->_struct.m, field);
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "%s.%s", comment, field);
+		object_assign(
+			obj,
+			state_vconst(
+				s,
+				ast_variable_type(var[i]),
+				strbuilder_build(b), /* comment */
+				persist
+			)
+		);
+	}
+
+	return v;
+}
+
 static struct map *
 frommembers(struct ast_variable_arr *members)
 {

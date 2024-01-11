@@ -366,6 +366,11 @@ struct ast_variable_arr;
 struct ast_type *
 ast_type_create_struct(char *tag, struct ast_variable_arr *);
 
+struct externals;
+
+struct ast_type *
+ast_type_struct_complete(struct ast_type *t, struct externals *ext);
+
 struct ast_variable_arr *
 ast_type_struct_members(struct ast_type *t);
 
@@ -391,7 +396,7 @@ struct value;
 struct externals;
 
 struct value *
-ast_type_vconst(struct ast_type *, struct externals *ext);
+ast_type_vconst(struct ast_type *, struct state *s, char *comment, bool persist);
 
 void
 ast_type_destroy(struct ast_type *);

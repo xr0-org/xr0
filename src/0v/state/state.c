@@ -129,7 +129,7 @@ struct value *
 state_vconst(struct state *state, struct ast_type *t, char *comment, bool persist)
 {
 	char *c = vconst_declare(
-		state->vconst, ast_type_vconst(t, state_getext(state)),
+		state->vconst, ast_type_vconst(t, state, comment, persist),
 		comment, persist
 	);
 	return value_sync_create(ast_expr_identifier_create(c));
