@@ -283,7 +283,6 @@ string_arr_str(struct string_arr *string_arr)
 	for (int i = 0; i < n; i++) {
 		char *str = s[i];
 		strbuilder_printf(b, "%s%s", str, (i + 1 < n) ? ", " : "");
-		free(s);
 	}
 	return strbuilder_build(b);
 }
@@ -308,6 +307,13 @@ topological_order(char *fname, struct externals *ext)
 	struct map *indegrees = calculate_indegrees(g);
 	struct string_arr *indegree_zero = build_indegree_zero(indegrees);
 
+	for (int i = 0; i < g->n; i ++) {
+		struct entry e = g->entry[i];
+		struct string_arr *v = (struct string_arr *) map_get(g, e.key);
+		printf("[%s:{%s}]\n", e.key, string_arr_str(v));
+	}
+	printf("indegree_zero: %s\n", string_arr_str(indegree_zero));
+
 	struct string_arr *ordered = string_arr_create();
 	/* while there are nodes of indegree zero */
 	while (indegree_zero->n > 0) {
@@ -317,14 +323,18 @@ topological_order(char *fname, struct externals *ext)
 
 		/* decrement indegree of that nodes neighbours */
 		struct string_arr *neighbours = (struct string_arr *) map_get(g, curr);
+		printf("nodes: ");
 		for (int i = 0; i < neighbours->n; i++) {
 			char *node = neighbours->s[i];
 			int *count = (int *) map_get(indegrees, node);
+			
+			printf("[%s:%d], ", node, *count);
 			if (*count == 0) {
 				string_arr_append(indegree_zero, dynamic_str(node));
 			}
 			*count = *count - 1;
 		}
+		printf("\n");
 	}
 
 	printf("ordered->n: %d\ng->n: %d\n", ordered->n, g->n);
@@ -353,6 +363,8 @@ build_funcgraph(char *fname, struct externals *ext)
 static void
 recurse_funcgraph(struct map *g, char *fname, struct externals *ext)
 {
+	struct map *dedup = map_create();
+
 	struct ast_function *f = externals_getfunc(ext, fname);
 	if (ast_function_isaxiom(f) || ast_function_isproto(f)) {
 		return;
@@ -371,8 +383,13 @@ recurse_funcgraph(struct map *g, char *fname, struct externals *ext)
 
 		char **func = string_arr_s(farr); 
 		for (int j = 0; j < string_arr_n(farr); j++) {
-			/* XXX: avoid duplicates, check for/ use set */
+			/* avoid duplicates, check for/ use set */
+			if (map_get(dedup, func[j]) != NULL) {
+				continue;
+			}
+				
 			string_arr_append(val, func[j]);	
+			map_set(dedup, func[j], (void *) true);
 
 			/* recursively build for other funcs */
 			recurse_funcgraph(g, func[j], ext);
