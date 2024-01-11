@@ -7,6 +7,8 @@ npass=0
 
 expected_suffix="EXPECTED"
 fail_prefix="FAIL"
+topological_folder="topological"
+main_func="main"
 
 XR0=$(pwd)/bin/0v
 libx=$(pwd)/libx
@@ -17,33 +19,36 @@ length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
 for f in */*.x
 do
 	ntests=$((ntests+1))
+	folder=$(dirname "$f")
+
 	printf "%-${length}s ..." "$f"
-	output=$($XR0 -I $libx $f 2>&1 >/dev/null)
-	if [[ "$f" != *"${fail_prefix}"* && $output -eq 0 ]]
+	if [ "$folder" == *"$topological_folder"* ]
 	then
-		npass=$((npass+1))
-		printf 'PASS\n'
+		output=$($XR0 -s main -I $libx $f 2>&1 >/dev/null)
 	else
-		# negative tests
+		output=$($XR0 -I $libx $f 2>&1 >/dev/null)
+	fi
 
-		#echo "expected filename: ${expected_file}\n"
-		#echo "output: ${output} expected_output: ${expected_output}\n"
-
-		# check if fail prefix present and output matches expected error
-		if [[ "$f" == *"${fail_prefix}"* ]]
+	# cases where we have an expected output to compare with
+	if [[ "$f" == *"${fail_prefix}"* || "$folder" == *"$topological_folder"* ]]
+	then
+		expected_file="${f}.${expected_suffix}"
+		expected_output=$(cat $expected_file)
+		
+		# check if output matches expected_output
+		if [[ $output == $expected_output ]]
 		then
-			expected_file="${f}.${expected_suffix}"
-			expected_output=$(cat $expected_file)
-			
-			if [[ $output == $expected_output ]]
-			then
-				npass=$((npass+1))
-				printf 'PASS\n'
-			else
-				printf 'FAIL\n'
-			fi
+			npass=$((npass+1))
+			printf 'PASS\n'
 		else
 			printf 'FAIL\n'
+		fi
+	else
+		# silence is golden
+		if [[ $output -eq 0 ]] 
+		then
+			npass=$((npass+1))
+			printf 'PASS\n'
 		fi
 	fi
 done

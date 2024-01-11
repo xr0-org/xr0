@@ -1,6 +1,8 @@
 #ifndef XR0_AST_STMT_H
 #define XR0_AST_STMT_H
 
+#include "util.h"
+
 enum ast_stmt_kind {
 	STMT_NOP		= 1 << 0,
 	STMT_LABELLED		= 1 << 1,
@@ -22,5 +24,8 @@ ast_stmt_ispre(struct ast_stmt *stmt);
 
 bool
 ast_stmt_isassume(struct ast_stmt *stmt);
+
+struct string_arr *
+ast_stmt_getfuncs(struct ast_stmt *stmt);
 
 #endif

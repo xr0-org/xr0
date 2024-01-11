@@ -8,6 +8,7 @@
 #include "util.h"
 
 #include "expr/expr.c"
+#include "topological.c"
 #include "block.c"
 #include "stmt/stmt.c"
 #include "type/type.c"
@@ -201,3 +202,16 @@ preresult_iscontradiction(struct preresult *r)
 {
 	return r->iscontradiction;
 }
+
+struct string_arr *
+ast_topological_order(char *fname, struct externals *ext)
+{
+	return topological_order(fname, ext);
+}
+
+struct ast_function *
+ast_protostitch(struct ast_function *f, struct externals *ext)
+{
+	return ast_function_protostitch(f, ext);
+}
+

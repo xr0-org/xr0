@@ -831,4 +831,56 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 	}
 }
 
+static struct string_arr *
+ast_expr_call_getfuncs(struct ast_expr *expr);
+
+struct string_arr *
+ast_expr_getfuncs(struct ast_expr *expr)
+{
+	switch (expr->kind) {
+	case EXPR_IDENTIFIER:
+	case EXPR_CONSTANT:
+	case EXPR_STRING_LITERAL:
+	case EXPR_STRUCTMEMBER:
+	case EXPR_ISDEALLOCAND:
+	case EXPR_ARBARG:
+		return string_arr_create();	
+	case EXPR_CALL:
+		return ast_expr_call_getfuncs(expr);
+	case EXPR_BRACKETED:
+	case EXPR_UNARY:
+	case EXPR_INCDEC:
+		return ast_expr_getfuncs(expr->root);
+	case EXPR_ASSIGNMENT:
+		return string_arr_concat(
+			ast_expr_getfuncs(expr->root),
+			ast_expr_getfuncs(expr->u.assignment_value)
+		);
+	case EXPR_BINARY:
+		return string_arr_concat(
+			ast_expr_getfuncs(expr->u.binary.e1),
+			ast_expr_getfuncs(expr->u.binary.e2)
+		);
+	default:
+		assert(false);
+	}
+}
+
+static struct string_arr *
+ast_expr_call_getfuncs(struct ast_expr *expr)
+{
+	struct string_arr *res = string_arr_create();
+	struct ast_expr *root = expr->root;
+	assert(root->kind == EXPR_IDENTIFIER);
+	string_arr_append(res, dynamic_str(root->u.string));
+	for (int i = 0; i < expr->u.call.n; i++) {
+		res = string_arr_concat(
+			res,
+			ast_expr_getfuncs(expr->u.call.arg[i])
+		);	
+		/* XXX: leaks */
+	}
+	return res;
+}
+
 #include "verify.c"

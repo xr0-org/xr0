@@ -150,6 +150,7 @@ $(UTIL_OBJ): $(UTIL_DIR)/util.c $(BUILD_DIR)
 	@$(CC) $(CFLAGS) -o $@ -c $(UTIL_DIR)/util.c
 
 $(AST_OBJ): $(AST_DIR)/ast.c \
+	$(AST_DIR)/topological.h \
 	$(AST_DIR)/expr/expr.h \
 	$(AST_DIR)/type/type.h \
 	$(AST_DIR)/literals.h \
