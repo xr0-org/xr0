@@ -79,7 +79,9 @@ struct pattern {
 };
 
 void
-pattern_print(struct pattern *);
+pattern_print(struct pattern *p) ~ [
+	pre: p = pattern_create("", "");
+];
 
 struct token {
 	int isliteral;
@@ -191,6 +193,7 @@ substr(char *s, int n) ~ [ .alloc result; ]
 	len = n + 1;
 	ss = malloc(sizeof(char) * len);
 	strncpy(ss, s, len);
+	ss[len-1] = '\0';
 	return ss;
 }
 
@@ -277,7 +280,11 @@ struct patternet {
 };
 
 struct patternet
-parse_defsproper(char *pos);
+parse_defsproper(char *pos) ~ [
+	if (count_patterns(pos)) {
+		.alloc result.pattern;
+	}
+];
 
 struct defsresult
 parse_defs(char *pos)
@@ -305,8 +312,11 @@ parse_defsraw(char *input)
 }
 
 struct pattern *
-pattern_create(char *name, char *pattern)
-{
+pattern_create(char *name, char *pattern) ~ [
+	.alloc result;
+	result->name = name;
+	result->pattern = pattern;
+]{
 	struct pattern *p;
 
 	p = malloc(sizeof(struct pattern));
@@ -319,7 +329,10 @@ pattern_create(char *name, char *pattern)
 void
 pattern_print(struct pattern *p)
 {
-	printf("%s\t\t%s", p->name, p->pattern);
+	puts("pattern:");
+	puts(p->name);
+	puts(p->pattern);
+	puts("end pattern");
 }
 
 
@@ -328,28 +341,54 @@ struct patternresult {
 	char *pos;
 };
 
-struct patternresult
-parse_pattern(char *pos);
+struct patterncount {
+	int n; /* number of patterns */
+	char *pos; /* final pos */
+};
+
+struct patterncount
+count_patterns(char *pos);
+
+struct pattern *
+parse_defs_n(char *pos, int npat) ~ [
+	if (npat) {
+		.alloc result;
+	}
+];
 
 struct patternet
 parse_defsproper(char *pos)
 {
-	int npat;
-	struct pattern *pattern;
-	struct patternresult parsed;
+	struct patterncount c;
 	struct patternet res;
 
-	npat = 0;
-	pattern = NULL;
-	for (; strncmp(pos, "%%", 2) != 0 ; npat++) {
+	c = count_patterns(pos);
+	res.npat = c.n;
+	res.pos = c.pos;
+	res.pattern = parse_defs_n(pos, res.npat);
+	return res;
+}
+
+struct patternresult
+parse_pattern(char *pos) ~ [
+	result.p = pattern_create(malloc(1), malloc(1));
+];
+
+struct patterncount
+count_patterns(char *pos)
+{
+	int n;
+	struct patternresult parsed;
+	struct patterncount res;
+
+	n = 0;
+	for (; strncmp(pos, "%%", 2) != 0; n++) {
 		parsed = parse_pattern(pos);
-		pos = parsed.pos;
-		pattern = realloc(pattern, sizeof(struct pattern) * (npat + 1));
-		pattern[npat] = *parsed.p;
-		pos = skipws(pos);
+		pos = skipws(parsed.pos);
+		/* TODO: clean up r.p */
 	}
-	res.pattern = pattern;
-	res.npat = npat;
+
+	res.n = n;
 	res.pos = pos;
 	return res;
 }
@@ -369,6 +408,26 @@ parse_pattern(char *pos)
 	res.p = pattern_create(name, pattern);
 	res.pos = pos;
 	return res;
+}
+
+struct pattern *
+parse_defs_n(char *pos, int npat)
+{
+	int i;
+	struct pattern *p;
+	struct patternresult parsed;
+
+	if (npat) {
+		p = malloc(npat);
+		for (i = 0; i < npat; i++) {
+			parsed = parse_pattern(pos);
+			p[i] = *parsed.p;
+			pos = skipws(parsed.pos);
+		}
+		return p;
+	}
+
+	return NULL;
 }
 
 struct token *
