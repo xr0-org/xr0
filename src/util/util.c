@@ -428,7 +428,7 @@ recurse_funcgraph(struct map *g, char *fname, struct externals *ext)
 
 	struct string_arr *val = string_arr_create();
 	for (int i = 0; i < nstmts; i++) {
-		struct string_arr *farr = ast_stmt_getfuncs(stmt[i]);		
+		struct string_arr *farr = ast_getfuncs(stmt[i]);		
 		if (!farr) {
 			continue;
 		}

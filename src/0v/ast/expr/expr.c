@@ -831,4 +831,10 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 	}
 }
 
+struct string_arr *
+ast_expr_getfuncs(struct ast_expr *expr)
+{
+	assert(false);	
+}
+
 #include "verify.c"

@@ -1,6 +1,7 @@
 #ifndef XR0_AST_H
 #define XR0_AST_H
 #include <stdbool.h>
+#include "util.h"
 
 struct ast_expr;
 
@@ -542,5 +543,8 @@ ast_append(struct ast *, struct ast_externdecl *);
 
 void
 ast_destroy(struct ast *);
+
+struct string_arr *
+ast_getfuncs(struct ast_stmt *);
 
 #endif

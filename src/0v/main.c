@@ -21,23 +21,6 @@
 int
 yyparse();
 
-struct string_arr;
-
-struct string_arr *
-string_arr_create();
-
-void
-string_arr_destroy(struct string_arr *);
-
-void
-string_arr_append(struct string_arr *, char *);
-
-char **
-string_arr_s(struct string_arr *);
-
-int
-string_arr_n(struct string_arr *);
-
 struct config {
 	char *infile;
 	char *outfile;
@@ -79,46 +62,6 @@ parse_config(int argc, char *argv[])
 		.verbose	= verbose,
 	};
 }
-
-struct string_arr {
-	int n;
-	char **s;
-};
-
-struct string_arr *
-string_arr_create()
-{
-	return calloc(1, sizeof(struct string_arr));
-}
-
-void
-string_arr_destroy(struct string_arr *arr)
-{
-	for (int i = 0; i < arr->n; i++) {
-		free(arr->s[i]);
-	}
-	free(arr);
-}
-
-void
-string_arr_append(struct string_arr *arr, char *s)
-{
-	arr->s = realloc(arr->s, sizeof(char *) * ++arr->n);
-	arr->s[arr->n-1] = s;
-}
-
-char **
-string_arr_s(struct string_arr *arr)
-{
-	return arr->s;
-}
-
-int
-string_arr_n(struct string_arr *arr)
-{
-	return arr->n;
-}
-
 
 char *
 genincludes(struct string_arr *includedirs)

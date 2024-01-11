@@ -668,4 +668,57 @@ ast_stmt_as_expr(struct ast_stmt *stmt)
 	return stmt->u.expr;
 }
 
+static struct string_arr *
+ast_stmt_expr_getfuncs(struct ast_stmt *stmt);
+
+static struct string_arr *
+ast_stmt_selection_getfuncs(struct ast_stmt *stmt);
+
+static struct string_arr *
+ast_stmt_iteration_getfuncs(struct ast_stmt *stmt);
+
+static struct string_arr *
+ast_stmt_compound_getfuncs(struct ast_stmt *stmt);
+
+struct string_arr *
+ast_stmt_getfuncs(struct ast_stmt *stmt)
+{
+	switch (stmt->kind) {
+	case STMT_EXPR:
+		return ast_stmt_expr_getfuncs(stmt);
+	case STMT_SELECTION:
+		return ast_stmt_selection_getfuncs(stmt);
+	case STMT_ITERATION:
+		return ast_stmt_iteration_getfuncs(stmt);
+	case STMT_COMPOUND:
+		return ast_stmt_compound_getfuncs(stmt);
+	default:
+		assert(false);
+	}
+}
+
+static struct string_arr *
+ast_stmt_expr_getfuncs(struct ast_stmt *stmt)
+{
+	return ast_expr_getfuncs(stmt->u.expr);
+}
+
+static struct string_arr *
+ast_stmt_selection_getfuncs(struct ast_stmt *stmt)
+{
+	assert(false);		
+}
+
+static struct string_arr *
+ast_stmt_iteration_getfuncs(struct ast_stmt *stmt)
+{
+	assert(false);
+}
+
+static struct string_arr *
+ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
+{
+	assert(false);
+}
+
 #include "verify.c"
