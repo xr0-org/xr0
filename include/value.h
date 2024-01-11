@@ -67,6 +67,9 @@ value_str(struct value *);
 enum value_type
 value_type(struct value *);
 
+bool
+value_islocation(struct value *);
+
 struct location *
 value_as_ptr(struct value *);
 

@@ -202,7 +202,10 @@ block_withassumption(struct ast_block *old, struct ast_expr *cond)
 		NULL, dynamic_str("assume"), ast_stmt_create_expr(NULL, cond)
 	);
 
-	return ast_block_create(decl, ndecl, stmt, nstmt);
+	return ast_block_create(
+		ndecl ? decl : NULL, ndecl,
+		nstmt ? stmt : NULL, nstmt
+	);
 }
 
 struct ast_stmt *

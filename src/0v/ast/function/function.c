@@ -175,6 +175,7 @@ proto_stitch(struct ast_function *f, struct externals *);
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
+	printf("%s...\n", f->name);
 	struct ast_function *proto = proto_stitch(f, ext);
 
 	struct ast_function_arr *paths = paths_fromfunction(proto);

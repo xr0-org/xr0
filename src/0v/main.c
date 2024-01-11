@@ -218,7 +218,7 @@ pass1(struct ast *root, struct externals *ext)
 			fprintf(stderr, "%s", err->msg);
 			exit(EXIT_FAILURE);
 		}
-		printf("%s\n", ast_function_name(f));
+		printf("done %s\n", ast_function_name(f));
 	}
 }
 

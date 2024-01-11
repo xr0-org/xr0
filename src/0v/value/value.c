@@ -470,10 +470,16 @@ value_str(struct value *v)
 	return strbuilder_build(b);
 }
 
+bool
+value_islocation(struct value *v)
+{
+	return v->type == VALUE_PTR && !v->ptr.isindefinite;
+}
+
 struct location *
 value_as_ptr(struct value *v)
 {
-	assert(v->type == VALUE_PTR && !v->ptr.isindefinite);
+	assert(value_islocation(v));
 	return v->ptr.loc;
 }
 
