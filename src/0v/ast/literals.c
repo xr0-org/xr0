@@ -18,7 +18,7 @@ parse_int(char *s)
 int
 parse_escape(char c);
 
-int
+char
 parse_char(char *s)
 {
 	/* literal must be nonempty and begin in a quote */

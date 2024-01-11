@@ -196,7 +196,7 @@ primary_expression
 	| CONSTANT
 		{ $$ = ast_expr_constant_create(parse_int(yytext)); } /* XXX */
 	| CHAR_LITERAL
-		{ $$ = ast_expr_constant_create(parse_char(yytext)); }
+		{ $$ = ast_expr_constant_create_char(parse_char(yytext)); }
 	| STRING_LITERAL
 		{ $$ = ast_expr_literal_create(strip_quotes(yytext)); }
 	| '(' expression ')'
@@ -893,7 +893,8 @@ yyerror(char *s)
 	if (verbose) {
 		fprintf(stderr, "\n%*s\n", marker.column, "^");
 	}
-	fprintf(stderr, "%s:%d:%d: %s\n",
-		marker.filename, marker.linenum, marker.column, s);
+	char *mark = lexememarker_str(&marker);
+	fprintf(stderr, "%s: %s\n", mark, s);
+	free(mark);
 	exit(EXIT_FAILURE);
 }

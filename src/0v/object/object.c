@@ -181,7 +181,7 @@ object_isdeallocand(struct object *obj, struct state *s)
 {
 	switch (obj->type) {
 	case OBJECT_VALUE:
-		return obj->value && state_isdeallocand(s, value_as_ptr(obj->value));
+		return obj->value && state_isdeallocand(s, value_as_location(obj->value));
 	case OBJECT_DEALLOCAND_RANGE:
 		return range_isdeallocand(obj->range, s);
 	default:
@@ -361,7 +361,7 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 		ast_expr_copy(obj->offset),
 		range_create(
 			ast_expr_difference_create(excl_up, lw),
-			value_as_ptr(state_alloc(s))
+			value_as_location(state_alloc(s))
 		)
 	);
 }
@@ -405,7 +405,7 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 				up,
 				ast_expr_copy(incl_lw)
 			),
-			value_as_ptr(state_alloc(s))
+			value_as_location(state_alloc(s))
 		)
 	);
 }
@@ -434,9 +434,6 @@ object_getmember(struct object *obj, struct ast_type *t, char *member,
 	return value_struct_member(getorcreatestruct(obj, t, s), member);
 }
 
-static struct ast_type *
-usecomplete(struct ast_type *, struct state *);
-
 static struct value *
 getorcreatestruct(struct object *obj, struct ast_type *t, struct state *s)
 {
@@ -444,22 +441,11 @@ getorcreatestruct(struct object *obj, struct ast_type *t, struct state *s)
 	if (v) {
 		return v;
 	}
-	struct ast_type *complete = usecomplete(t, s);
+	struct ast_type *complete = ast_type_struct_complete(t, state_getext(s));
 	assert(complete);
 	v = value_struct_create(complete);
 	object_assign(obj, v);
 	return v;
-}
-
-static struct ast_type *
-usecomplete(struct ast_type *t, struct state *s)
-{
-	if (ast_type_struct_members(t)) {
-		return t;
-	}
-	char *tag = ast_type_struct_tag(t);
-	assert(tag);
-	return externals_getstruct(state_getext(s), tag);
 }
 
 struct ast_type *

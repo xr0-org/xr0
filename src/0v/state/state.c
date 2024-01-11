@@ -50,10 +50,23 @@ struct state *
 state_copy(struct state *state)
 {
 	struct state *copy = malloc(sizeof(struct state));
-	assert(state);
+	assert(copy);
 	copy->ext = state->ext;
 	copy->vconst = vconst_copy(state->vconst);
 	copy->stack = stack_copy(state->stack);
+	copy->heap = heap_copy(state->heap);
+	copy->props = props_copy(state->props);
+	return copy;
+}
+
+struct state *
+state_copywithname(struct state *state, char *func_name)
+{
+	struct state *copy = malloc(sizeof(struct state));
+	assert(copy);
+	copy->ext = state->ext;
+	copy->vconst = vconst_copy(state->vconst);
+	copy->stack = stack_copywithname(state->stack, func_name);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
 	return copy;
@@ -128,8 +141,12 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 struct value *
 state_vconst(struct state *state, struct ast_type *t, char *comment, bool persist)
 {
+	struct value *v = ast_type_vconst(t, state, comment, persist);
+	if (value_isstruct(v)) {
+		return v;
+	}
 	char *c = vconst_declare(
-		state->vconst, ast_type_vconst(t, state_getext(state)),
+		state->vconst, v,
 		comment, persist
 	);
 	return value_sync_create(ast_expr_identifier_create(c));
@@ -201,7 +218,11 @@ state_getobject(struct state *state, char *id)
 	}
 
 	struct variable *v = stack_getvariable(state->stack, id);
-	assert(v);
+	if (!v) {
+		printf("state: %s\n", state_str(state));
+		printf("id: %s\n", id);
+		assert(false);
+	}
 
 	return state_get(state, variable_location(v), true);
 }
@@ -210,7 +231,7 @@ state_getobject(struct state *state, char *id)
 struct object *
 state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 {
-	struct location *deref_base = value_as_ptr(ptr_val);
+	struct location *deref_base = value_as_location(ptr_val);
 	assert(deref_base);
 
 	/* `*(ptr+offset)` */
@@ -231,7 +252,7 @@ state_range_alloc(struct state *state, struct object *obj,
 	}
 
 	/* assume pointer */
-	struct location *deref = value_as_ptr(arr_val);
+	struct location *deref = value_as_location(arr_val);
 
 	struct block *b = location_getblock(
 		deref, state->vconst, state->stack, state->heap
@@ -256,7 +277,10 @@ state_alloc(struct state *state)
 struct error *
 state_dealloc(struct state *state, struct value *val)
 {
-	return location_dealloc(value_as_ptr(val), state->heap);
+	if (!value_islocation(val)) {
+		return error_create("dealloc on non-location");
+	}
+	return location_dealloc(value_as_location(val), state->heap);
 }
 
 
@@ -269,7 +293,7 @@ state_range_dealloc(struct state *state, struct object *obj,
 	if (!arr_val) {
 		return error_create("no value");
 	}
-	struct location *deref = value_as_ptr(arr_val);
+	struct location *deref = value_as_location(arr_val);
 	return location_range_dealloc(deref, lw, up, state);
 }
 
@@ -277,7 +301,7 @@ bool
 state_addresses_deallocand(struct state *state, struct object *obj)
 {
 	struct value *val = object_as_value(obj);
-	struct location *loc = value_as_ptr(val); 
+	struct location *loc = value_as_location(val); 
 	
 	return state_isdeallocand(state, loc);
 }
@@ -303,7 +327,7 @@ state_range_aredeallocands(struct state *state, struct object *obj,
 	if (!arr_val) {
 		return false;
 	}
-	struct location *deref = value_as_ptr(arr_val);
+	struct location *deref = value_as_location(arr_val);
 	
 	struct block *b = location_getblock(
 		deref, state->vconst, state->stack, state->heap
@@ -338,6 +362,9 @@ state_eval(struct state *s, struct ast_expr *e)
 static void
 state_undeclarevars(struct state *s);
 
+static void
+state_popprops(struct state *s);
+
 bool
 state_equal(struct state *s1, struct state *s2)
 {
@@ -345,10 +372,16 @@ state_equal(struct state *s1, struct state *s2)
 		     *s2_c = state_copy(s2);
 	state_undeclarevars(s1_c);
 	state_undeclarevars(s2_c);
+	state_popprops(s1_c);
+	state_popprops(s2_c);
 
 	char *str1 = state_str(s1_c),
 	     *str2 = state_str(s2_c);
 	bool equal = strcmp(str1, str2) == 0;
+	if (!equal) {
+		printf("actual: %s\n", str1);
+		printf("alleged: %s\n", str2);
+	}
 	free(str2);
 	free(str1);
 
@@ -364,4 +397,11 @@ state_undeclarevars(struct state *s)
 	heap_undeclare(s->heap, s);
 	vconst_undeclare(s->vconst);
 	stack_undeclare(s->stack, s);
+}
+
+static void
+state_popprops(struct state *s)
+{
+	/* XXX: */
+	s->props = props_create();
 }

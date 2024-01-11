@@ -1,1 +1,1 @@
-cannot exec statement: double free
+0-basic/130-FAIL-double-free.x:10:9: cannot exec statement: double free

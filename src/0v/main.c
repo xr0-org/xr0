@@ -179,10 +179,12 @@ pass1(struct ast *root, struct externals *ext)
 		}
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
+
 		if ((err = ast_function_verify(f, ext))) {
-			fprintf(stderr, "%s", err->msg);
+			fprintf(stderr, "%s\n", err->msg);
 			exit(EXIT_FAILURE);
 		}
+		printf("done %s\n", ast_function_name(f));
 	}
 }
 
@@ -234,7 +236,7 @@ proto_defisvalid(struct ast_function *proto, struct ast_function *def)
 	struct ast_block *proto_abs = ast_function_abstract(proto),
 			 *def_abs = ast_function_abstract(def);
 
-	bool abs_match = strcmp(ast_block_str(proto_abs), ast_block_str(def_abs)) == 0,
+	bool abs_match = strcmp(ast_block_str(proto_abs, ""), ast_block_str(def_abs, "")) == 0,
 	     protoabs_only = proto_abs && ast_function_absisempty(def); 
 	if (abs_match || protoabs_only) {
 		return true;

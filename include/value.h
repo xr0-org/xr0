@@ -46,6 +46,16 @@ value_sync_create(struct ast_expr *);
 struct value *
 value_struct_create(struct ast_type *);
 
+bool
+value_isstruct(struct value *v);
+
+struct value *
+value_struct_indefinite_create(struct ast_type *, struct state *,
+		char *comment, bool persist);
+
+struct value *
+value_pf_augment(struct value *, struct ast_expr *root);
+
 struct ast_type *
 value_struct_membertype(struct value *, char *member);
 
@@ -67,8 +77,11 @@ value_str(struct value *);
 enum value_type
 value_type(struct value *);
 
+bool
+value_islocation(struct value *);
+
 struct location *
-value_as_ptr(struct value *);
+value_as_location(struct value *);
 
 bool
 value_referencesheap(struct value *, struct state *);
@@ -89,9 +102,18 @@ struct ast_expr *
 value_to_expr(struct value *);
 
 bool
+value_isliteral(struct value *v);
+
+struct ast_expr *
+value_as_literal(struct value *v);
+
+bool
 value_references(struct value *, struct location *, struct state *);
 
 enum ast_binary_operator;
+
+bool
+values_comparable(struct value *v1, struct value *v2);
 
 bool
 value_equal(struct value *v1, struct value *v2);
@@ -139,9 +161,9 @@ int
 number_range_arr_append(struct number_range_arr *, struct number_range *);
 
 
-enum number_knowledge_type {
-	NUMBER_KNOWLEDGE_RANGES,
-	NUMBER_KNOWLEDGE_SYNC_CONSTANT,
+enum number_type {
+	NUMBER_RANGES,
+	NUMBER_COMPUTED,
 };
 
 struct number;

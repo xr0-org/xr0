@@ -16,13 +16,11 @@ test(int x) ~ [
 		.alloc result;
 	}
 ]{
-	int num;
-	void *p;
+	int n;
 
-	num = number(x);
-	p = alloc_if(num);
+	n = x;
 
-	return p;
+	return alloc_if(number(n));
 }
 
 int
