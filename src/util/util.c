@@ -328,7 +328,6 @@ topological_order(char *fname, struct externals *ext)
 	}
 
 	printf("order: %s\n", string_arr_str(ordered));
-	assert(false);
 	return NULL;
 }
 
@@ -452,7 +451,7 @@ calculate_indegrees(struct map *g)
 	struct map *indegrees = map_create();
 	for (int i = 0; i < g->n; i++) {
 		struct entry e = g->entry[i];
-		map_set(indegrees, dynamic_str(e.key), 0);	
+		map_set(indegrees, dynamic_str(e.key), 0);
 	}
 
 	for (int i = 0; i < g->n; i++) {

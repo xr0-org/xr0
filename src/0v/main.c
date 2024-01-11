@@ -124,7 +124,6 @@ verifyproto(struct ast_function *f, int n, struct ast_externdecl **decl);
 void
 pass1(struct ast *root, struct externals *ext)
 {
-	struct error *err;
 	/* TODO:
 	 * - enforce syntax rules
 	 * - check that sfuncs have no bodies
@@ -156,12 +155,6 @@ pass1(struct ast *root, struct externals *ext)
 		
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
-
-		if ((err = ast_function_verify(f, ext))) {
-			fprintf(stderr, "%s", err->msg);
-			exit(EXIT_FAILURE);
-		}
-		printf("%s\n", ast_function_name(f));
 	}
 }
 
@@ -239,6 +232,8 @@ main(int argc, char *argv[])
 	/* TODO: move table from lexer to pass1 */
 	struct externals *ext = externals_create();
 	pass1(root, ext);
+
+	topological_order("main", ext);
 
 	externals_destroy(ext);
 	ast_destroy(root);

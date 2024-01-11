@@ -6,6 +6,7 @@
 #include "lex.h"
 #include "util.h"
 #include "stmt.h"
+#include "../expr/expr.h"
 
 struct ast_stmt {
 	enum ast_stmt_kind kind;
