@@ -67,4 +67,37 @@ error_create(char *s);
 struct error *
 error_prepend(struct error *, char *msg);
 
+/* XXX: string_arr: to be macro */
+
+struct string_arr {
+	int n;
+	char **s;
+};
+
+struct string_arr *
+string_arr_create();
+
+void
+string_arr_destroy();
+
+char **
+string_arr_s(struct string_arr *);
+
+int
+string_arr_n(struct string_arr *);
+
+int
+string_arr_append(struct string_arr *, char *);
+
+char *
+string_arr_deque(struct string_arr *);
+
+char *
+string_arr_str(struct string_arr *);
+
+struct externals;
+
+char *
+topological_order(char *func_name, struct externals *);
+
 #endif

@@ -4,6 +4,8 @@
 #include <string.h>
 #include <assert.h>
 #include "util.h"
+#include "ast.h"
+#include "ext.h"
 
 char *
 dynamic_str(const char *s)
