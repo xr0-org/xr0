@@ -256,6 +256,12 @@ value_struct_indefinite_create(struct ast_type *t, struct state *s,
 	return v;
 }
 
+bool
+value_isstruct(struct value *v)
+{
+	return v->type == VALUE_STRUCT;
+}
+
 static struct map *
 frommembers(struct ast_variable_arr *members)
 {

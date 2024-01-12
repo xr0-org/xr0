@@ -487,12 +487,13 @@ call_result(struct ast_expr *expr, struct ast_function *f, struct state *state)
 		dynamic_str(ast_function_name(f)),
 		false
 	);
-	struct ast_expr *sync = value_as_sync(vconst);
-	struct value *v = state_getvconst(state, ast_expr_as_identifier(sync));
+	if (value_issync(vconst)) {
+		struct ast_expr *sync = value_as_sync(vconst);
+		struct value *v = state_getvconst(state, ast_expr_as_identifier(sync));
 
-	bool ok = vconst_applyassumptions(v, expr, state);
-	assert(ok);
-
+		bool ok = vconst_applyassumptions(v, expr, state);
+		assert(ok);
+	}
 	return result_value_create(vconst);
 }
 

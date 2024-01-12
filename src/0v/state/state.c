@@ -128,8 +128,12 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 struct value *
 state_vconst(struct state *state, struct ast_type *t, char *comment, bool persist)
 {
+	struct value *v = ast_type_vconst(t, state, comment, persist);
+	if (value_isstruct(v)) {
+		return v;
+	}
 	char *c = vconst_declare(
-		state->vconst, ast_type_vconst(t, state, comment, persist),
+		state->vconst, v,
 		comment, persist
 	);
 	return value_sync_create(ast_expr_identifier_create(c));

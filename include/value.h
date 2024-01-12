@@ -46,6 +46,9 @@ value_sync_create(struct ast_expr *);
 struct value *
 value_struct_create(struct ast_type *);
 
+bool
+value_isstruct(struct value *v);
+
 struct value *
 value_struct_indefinite_create(struct ast_type *, struct state *,
 		char *comment, bool persist);
