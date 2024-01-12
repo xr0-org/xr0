@@ -89,11 +89,7 @@ matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 void
 matrix_print(struct matrix *m) ~ [
 	pre: m = matrix_create($, $);
-];
-
-void
-matrix_print(struct matrix *m)
-{
+] {
 	int i; int j; int digit;
 
 	for (i = 0; i < m->rows; i++) {

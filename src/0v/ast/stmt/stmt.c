@@ -760,6 +760,7 @@ ast_stmt_iteration_getfuncs(struct ast_stmt *stmt)
 static struct string_arr *
 ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
 {
+	printf("comp: %s\n", ast_stmt_str(stmt));
 	struct string_arr *res = string_arr_create();
 	struct ast_block *b = stmt->u.compound;
 	struct ast_stmt **stmts = ast_block_stmts(b);
@@ -770,6 +771,7 @@ ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
 		);
 		/* XXX: leaks */
 	}
+	printf("res: %s\n", string_arr_str(res));
 	return res;
 }
 

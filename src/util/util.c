@@ -307,34 +307,43 @@ topological_order(char *fname, struct externals *ext)
 	struct map *indegrees = calculate_indegrees(g);
 	struct string_arr *indegree_zero = build_indegree_zero(indegrees);
 
+	printf("func graph:\n");
 	for (int i = 0; i < g->n; i ++) {
 		struct entry e = g->entry[i];
 		struct string_arr *v = (struct string_arr *) map_get(g, e.key);
-		printf("[%s:{%s}]\n", e.key, string_arr_str(v));
+		printf("[%s:%s]\n", e.key, string_arr_str(v));
+	}
+	printf("indegree map:\n");
+	for (int i = 0; i < indegrees->n; i ++) {
+		struct entry e = indegrees->entry[i];
+		int *v = (int *) map_get(indegrees, e.key);
+		printf("[%s:%d]\n", e.key, *v);
 	}
 	printf("indegree_zero: %s\n", string_arr_str(indegree_zero));
 
 	struct string_arr *ordered = string_arr_create();
 	/* while there are nodes of indegree zero */
 	while (indegree_zero->n > 0) {
+		printf("id0: %s", string_arr_str(indegree_zero));
 		/* add one node with indegree zero to ordered */
 		char *curr = string_arr_deque(indegree_zero);
 		string_arr_append(ordered, curr);
 
 		/* decrement indegree of that nodes neighbours */
 		struct string_arr *neighbours = (struct string_arr *) map_get(g, curr);
-		printf("nodes: ");
-		for (int i = 0; i < neighbours->n; i++) {
-			char *node = neighbours->s[i];
-			int *count = (int *) map_get(indegrees, node);
-			
-			printf("[%s:%d], ", node, *count);
-			if (*count == 0) {
-				string_arr_append(indegree_zero, dynamic_str(node));
+		if (neighbours) {
+			for (int i = 0; i < neighbours->n; i++) {
+				char *node = neighbours->s[i];
+				int *count = (int *) map_get(indegrees, node);
+				
+				printf("[%s:%d], ", node, *count);
+				if (*count == 0) {
+					string_arr_append(indegree_zero, dynamic_str(node));
+				}
+				*count = *count - 1;
 			}
-			*count = *count - 1;
+			printf("\n");
 		}
-		printf("\n");
 	}
 
 	printf("ordered->n: %d\ng->n: %d\n", ordered->n, g->n);
@@ -366,9 +375,12 @@ recurse_funcgraph(struct map *g, char *fname, struct externals *ext)
 	struct map *dedup = map_create();
 
 	struct ast_function *f = externals_getfunc(ext, fname);
-	if (ast_function_isaxiom(f) || ast_function_isproto(f)) {
+	if (ast_function_isaxiom(f)) {
 		return;
 	} 
+
+	/* XXX: look in abstractst */
+	/* XXX: handle prototypes */
 	struct ast_block *body = ast_function_body(f);
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
@@ -383,7 +395,7 @@ recurse_funcgraph(struct map *g, char *fname, struct externals *ext)
 
 		char **func = string_arr_s(farr); 
 		for (int j = 0; j < string_arr_n(farr); j++) {
-			/* avoid duplicates, check for/ use set */
+			/* avoid duplicates */
 			if (map_get(dedup, func[j]) != NULL) {
 				continue;
 			}
@@ -408,15 +420,30 @@ calculate_indegrees(struct map *g)
 	struct map *indegrees = map_create();
 	for (int i = 0; i < g->n; i++) {
 		struct entry e = g->entry[i];
+		struct string_arr *deps = (struct string_arr *) map_get(g, e.key);
+
+		/* init all nodes and their dependencies to 0 */
+		if (map_get(indegrees, e.key) != NULL) {
+			continue;
+		}
 		map_set(indegrees, dynamic_str(e.key), dynamic_int(0));
+		for (int j = 0; j < deps->n; j++) {
+			char *dep_key = deps->s[j]; 
+			if (map_get(indegrees, dep_key) != NULL) {
+				continue;
+			}		
+			map_set(indegrees, dynamic_str(dep_key), dynamic_int(0));
+		}
 	}
 
-	for (int i = 0; i < g->n; i++) {
-		struct entry e = g->entry[i];
+	for (int i = 0; i < indegrees->n; i++) {
+		struct entry e = indegrees->entry[i];
 		struct string_arr *n_arr = map_get(g, e.key);
+		if (!n_arr) {
+			continue;
+		}
 		for (int j = 0; j < n_arr->n; j++) {
 			int *count = (int *) map_get(indegrees, e.key);
-			printf("[%s:%d]\n", e.key, *count);
 			*count = *count + 1; /* XXX */
 		}
 	}
@@ -437,10 +464,11 @@ build_indegree_zero(struct map *indegrees)
 	struct string_arr *indegree_zero = string_arr_create();
 	for (int i = 0; i < indegrees->n; i++) {
 		struct entry e = indegrees->entry[i];
-		if (map_get(indegrees, e.key) == 0) {
+		int *val = (int *) map_get(indegrees, e.key);
+		if (*val == 0) {
 			string_arr_append(
 				indegree_zero,
-				dynamic_str((char *) e.value)
+				dynamic_str(e.key)
 			);
 		}
 	}
