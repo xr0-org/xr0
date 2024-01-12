@@ -268,10 +268,23 @@ string_arr_concat(struct string_arr *s1, struct string_arr *s2)
 char *
 string_arr_deque(struct string_arr *arr)
 {
-	char *ret = dynamic_str(arr->s[arr->n-1]);
-	free(arr->s[arr->n-1]);
-	arr = realloc(arr, sizeof(struct string_arr) * arr->n-1);
+	char *ret = dynamic_str(arr->s[0]);
+	for (int i = 0; i < arr->n-1; i++) {
+		arr->s[i] = arr->s[i+1];
+	}
+	arr->s = realloc(arr->s, sizeof(char *) * --arr->n);
 	return ret;
+}
+
+bool
+string_arr_contains(struct string_arr *arr, char *s)
+{
+	for (int i = 0; i < arr->n; i++) {
+		if (strcmp(s, arr->s[i]) == 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 char *
@@ -324,32 +337,30 @@ topological_order(char *fname, struct externals *ext)
 	struct string_arr *ordered = string_arr_create();
 	/* while there are nodes of indegree zero */
 	while (indegree_zero->n > 0) {
-		printf("id0: %s", string_arr_str(indegree_zero));
+		printf("id0: %s\n", string_arr_str(indegree_zero));
 		/* add one node with indegree zero to ordered */
 		char *curr = string_arr_deque(indegree_zero);
 		string_arr_append(ordered, curr);
 
-		/* decrement indegree of that nodes neighbours */
-		struct string_arr *neighbours = (struct string_arr *) map_get(g, curr);
-		if (neighbours) {
-			for (int i = 0; i < neighbours->n; i++) {
-				char *node = neighbours->s[i];
-				int *count = (int *) map_get(indegrees, node);
-				
-				printf("[%s:%d], ", node, *count);
-				if (*count == 0) {
-					string_arr_append(indegree_zero, dynamic_str(node));
-				}
+		for (int i = 0; i < g->n; i++) {
+			struct entry e = g->entry[i];
+			struct string_arr *v = (struct string_arr *) map_get(g, e.key);
+			if (string_arr_contains(v, curr)) {
+				/* decrement indegree */
+				int *count = (int *) map_get(indegrees, e.key);
 				*count = *count - 1;
-			}
-			printf("\n");
+				if (*count == 0) {
+					string_arr_append(indegree_zero, dynamic_str(e.key));
+				}
+			}	
 		}
+		printf("\n");
 	}
 
-	printf("ordered->n: %d\ng->n: %d\n", ordered->n, g->n);
+	printf("ordered->n: %d\nindegrees->n: %d\n", ordered->n, indegrees->n);
 	printf("order: %s\n", string_arr_str(ordered));
 	/* no more nodes with incoming edges */
-	if (ordered->n != g->n) {
+	if (ordered->n != indegrees->n) {
 		assert(false); /* ERROR: cycle */
 	}
 
