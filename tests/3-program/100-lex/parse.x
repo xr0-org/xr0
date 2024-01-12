@@ -178,7 +178,7 @@ struct rulesresult
 parse_rules(char *pos);
 
 char *
-parse_toeof(char *input);
+parse_toeof(char *input) ~ [ .alloc result; ];
 
 struct lexer *
 parse(char *pos)
@@ -256,7 +256,7 @@ char *
 parse_tonewline(char *input) ~ [ .alloc result; ]
 {
 	char *s;
-	s = input;
+	s = input; /* must be here because not seen with skip loop hack */
 	for (; *s != '\n'; 0) {
 		s++;
 	}
@@ -496,46 +496,37 @@ struct tknameresult {
 };
 
 struct tknameresult
-parse_name(char *pos);
+parse_name(char *pos) ~ [ .alloc result.name; ];
 
 struct stringresult
-parse_action(char *input);
+parse_action(char *input) ~ [ .alloc result.s; ];
 
 struct tokenresult
 parse_token(char *pos)
 {
-	struct tknameresult nameres;
-	struct stringresult actionres;
-	struct tokenresult res;
-
-	nameres = parse_name(pos);
-	actionres = parse_action(skiplinespace(nameres.pos));
-
-	res.tk = token_create(nameres.isliteral, nameres.name, actionres.s);
-	res.pos = actionres.pos;
-	return res;
+	assert(false);
 }
 
 struct tknameresult
-parse_token_id(char *pos);
+parse_token_id(char *pos) ~ [ .alloc result.name; ];
 
 struct tknameresult
-parse_token_literal(char *input);
+parse_token_literal(char *input) ~ [ .alloc result.name; ];
 
 struct tknameresult
-parse_token_pattern(char *pos);
+parse_token_pattern(char *pos) ~ [ .alloc result.name; ];
 
 struct tknameresult
 parse_name(char *pos)
 {
-	switch (*pos) {
-	case '{':
+	/* TODO: make into switch */
+	if (*pos == '{') {
 		return parse_token_id(pos);
-	case '"':
-		return parse_token_literal(pos);
-	default:
-		return parse_token_pattern(pos);
 	}
+	if (*pos == '"') {
+		return parse_token_literal(pos);
+	}
+	return parse_token_pattern(pos);
 }
 
 struct tknameresult
@@ -547,8 +538,7 @@ parse_token_id(char *pos)
 	id = parse_id(++pos); /* skip '{' */
 	pos += strlen(id);
 	if (*pos != '}') {
-		fprintf(stderr, "token id must end in '}' but has '%.*s\n'", 5,
-			pos);
+		puts("token id must end in '}'");
 		exit(1);
 	}
 
@@ -595,8 +585,7 @@ parse_action(char *input)
 	struct stringresult res;
 
 	if (*input != '{') {
-		fprintf(stderr, "action must begin with '{' but has '%.*s\n",
-			10, input);
+		puts("action must begin with '{'");
 		exit(1);
 	}
 	input++; /* skip '{' */
@@ -613,7 +602,8 @@ parse_toeof(char *input)
 {
 	char *s;
 
-	for (s = input; *s != '\0'; 0) {
+	s = input; /* must be here because not seen with skip loop hack */
+	for (; *s != '\0'; 0) {
 		s++;
 	}
 	return substr(input, s - input);
