@@ -504,16 +504,7 @@ parse_action(char *input) ~ [ .alloc result.s; ];
 struct tokenresult
 parse_token(char *pos)
 {
-	struct tknameresult nameres;
-	struct stringresult actionres;
-	struct tokenresult res;
-
-	nameres = parse_name(pos);
-	actionres = parse_action(skiplinespace(nameres.pos));
-
-	res.tk = token_create(nameres.isliteral, nameres.name, actionres.s);
-	res.pos = actionres.pos;
-	return res;
+	assert(false);
 }
 
 struct tknameresult
