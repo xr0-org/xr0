@@ -689,7 +689,6 @@ reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 	case EXPR_BINARY:
 		return irreducible_assume(expr, value, s);
 	default:
-		printf("reduce: %s\n", ast_expr_str(expr));
 		assert(false);
 	}
 }

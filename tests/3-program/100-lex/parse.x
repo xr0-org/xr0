@@ -89,7 +89,9 @@ struct token {
 };
 
 void
-token_print(struct token *);
+token_print(struct token *t) ~ [
+	pre: t = token_create(0, "", "");
+];
 
 struct lexer {
 	char *pre; char *post;
@@ -431,8 +433,12 @@ parse_defs_n(char *pos, int npat)
 }
 
 struct token *
-token_create(int isliteral, char *name, char *action)
-{
+token_create(int isliteral, char *name, char *action) ~ [
+	.alloc result;
+	result->isliteral = isliteral;
+	result->name = name;
+	result->action = action;
+]{
 	struct token *tk;
 
 	tk = malloc(sizeof(struct token));
@@ -446,12 +452,10 @@ token_create(int isliteral, char *name, char *action)
 void
 token_print(struct token *t)
 {
-	if (t->isliteral) {
-		printf("\"%s\"", t->name);
-	} else {
-		printf("{%s}", t->name);
-	}
-	printf("\t\t%s", t->action);
+	puts("token:");
+	puts(t->name);
+	puts(t->action);
+	puts("end token");
 }
 
 struct tokenresult {
