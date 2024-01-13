@@ -285,9 +285,11 @@ struct patternet {
 
 struct patternet
 parse_defsproper(char *pos) ~ [
+	result.pattern = $; /* TODO: put in else block */
 	if (count_patterns(pos)) {
 		.alloc result.pattern;
 	}
+	result.pos = $;
 ];
 
 struct defsresult
@@ -355,11 +357,11 @@ struct patternpos {
 
 struct patternpos
 parse_defs_n(char *pos, int npat) ~ [
-	result.p = $; /* TODO: put in else block */
+	result.p = NULL; /* TODO: put in else block */
 	if (npat) {
 		.alloc result.p;
 	}
-	result.pos = $;
+	result.pos = pos;
 ];
 
 struct patternet

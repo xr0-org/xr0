@@ -42,7 +42,19 @@ ast_expr_constant_create(int k)
 	/* TODO: generalise for all constant cases */
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_CONSTANT;
-	expr->u.constant = k;
+	expr->u.constant.ischar = false;
+	expr->u.constant.constant = k;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_constant_create_char(char c)
+{
+	/* TODO: generalise for all constant cases */
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_CONSTANT;
+	expr->u.constant.ischar = true;
+	expr->u.constant.constant = c;
 	return expr;
 }
 
@@ -50,7 +62,7 @@ int
 ast_expr_as_constant(struct ast_expr *expr)
 {
 	assert(expr->kind == EXPR_CONSTANT);
-	return expr->u.constant;
+	return expr->u.constant.constant;
 }
 
 struct ast_expr *
@@ -608,7 +620,11 @@ ast_expr_str(struct ast_expr *expr)
 		strbuilder_printf(b, expr->u.string);
 		break;
 	case EXPR_CONSTANT:
-		strbuilder_printf(b, "%d", expr->u.constant);
+		if (expr->u.constant.ischar) {
+			strbuilder_printf(b, "'%c'", expr->u.constant.constant);
+		} else {
+			strbuilder_printf(b, "%d", expr->u.constant.constant);
+		}
 		break;
 	case EXPR_STRING_LITERAL:
 		strbuilder_printf(b, "\"%s\"", expr->u.string);
@@ -654,7 +670,9 @@ ast_expr_copy(struct ast_expr *expr)
 	case EXPR_IDENTIFIER:
 		return ast_expr_identifier_create(dynamic_str(expr->u.string));
 	case EXPR_CONSTANT:
-		return ast_expr_constant_create(expr->u.constant);
+		return expr->u.constant.ischar
+			? ast_expr_constant_create_char(expr->u.constant.constant)
+			: ast_expr_constant_create(expr->u.constant.constant);
 	case EXPR_STRING_LITERAL:
 		return ast_expr_literal_create(dynamic_str(expr->u.string));
 	case EXPR_BRACKETED:
@@ -715,7 +733,7 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 	}
 	switch (e1->kind) {
 	case EXPR_CONSTANT:
-		return e1->u.constant == e2->u.constant;
+		return e1->u.constant.constant == e2->u.constant.constant;
 	case EXPR_IDENTIFIER:
 		return strcmp(ast_expr_as_identifier(e1), ast_expr_as_identifier(e2)) == 0;
 	case EXPR_STRING_LITERAL:
@@ -798,15 +816,15 @@ math_expr(struct ast_expr *e)
 			math_atom_variable_create(dynamic_str(e->u.string))
 		);
 	case EXPR_CONSTANT:
-		if (e->u.constant < 0) {
+		if (e->u.constant.constant < 0) {
 			return math_expr_neg_create(
 				math_expr_atom_create(
-					math_atom_nat_create(-e->u.constant)
+					math_atom_nat_create(-e->u.constant.constant)
 				)
 			);
 		}
 		return math_expr_atom_create(
-			math_atom_nat_create(e->u.constant)
+			math_atom_nat_create(e->u.constant.constant)
 		);
 	case EXPR_BINARY:
 		return math_expr_sum_create(

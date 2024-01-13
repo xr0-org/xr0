@@ -25,7 +25,10 @@ struct ast_expr {
 	struct ast_expr *root;
 	union {
 		char *string; /* identifier, literal, assertion */
-		int constant;
+		struct { 
+			int constant;
+			bool ischar;
+		} constant;
 		struct {
 			int n;
 			struct ast_expr **arg;

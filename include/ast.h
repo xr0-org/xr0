@@ -13,6 +13,9 @@ ast_expr_as_identifier(struct ast_expr *);
 struct ast_expr *
 ast_expr_constant_create(int);
 
+struct ast_expr *
+ast_expr_constant_create_char(char);
+
 int
 ast_expr_as_constant(struct ast_expr *expr);
 
