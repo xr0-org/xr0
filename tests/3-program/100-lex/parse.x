@@ -468,7 +468,10 @@ struct tokenresult {
 };
 
 struct tokenresult
-parse_token(char *pos);
+parse_token(char *pos) ~ [
+	result.tk = token_create($, malloc($), malloc($));
+	result.pos = $;
+];
 
 struct rulesresult
 parse_rules(char *pos)
@@ -500,10 +503,17 @@ struct tknameresult {
 };
 
 struct tknameresult
-parse_name(char *pos) ~ [ .alloc result.name; ];
+parse_name(char *pos) ~ [
+	.alloc result.name;
+	result.isliteral = $;
+	result.pos = $;
+];
 
 struct stringresult
-parse_action(char *input) ~ [ .alloc result.s; ];
+parse_action(char *input) ~ [
+	.alloc result.s;
+	result.pos = $;
+];
 
 struct tokenresult
 parse_token(char *pos)
