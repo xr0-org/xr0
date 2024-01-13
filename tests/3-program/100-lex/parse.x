@@ -103,6 +103,8 @@ struct lexer *
 lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 		int ntok, struct token *token) ~ [
 	.alloc result; 
+	result->pre = pre;
+	result->post = post;
 	result->pattern = pattern;
 	result->token = token;
 ]{
@@ -353,9 +355,11 @@ struct patternpos {
 
 struct patternpos
 parse_defs_n(char *pos, int npat) ~ [
+	result.p = $; /* TODO: put in else block */
 	if (npat) {
 		.alloc result.p;
 	}
+	result.pos = $;
 ];
 
 struct patternet

@@ -29,6 +29,7 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 		}
 	}
 	if ((err = ast_stmt_exec(stmt, state))) {
+		printf("error state: %s\n", state_str(state));
 		struct strbuilder *b = strbuilder_create();
 		struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
 		assert(loc);

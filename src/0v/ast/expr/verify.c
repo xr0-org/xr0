@@ -13,6 +13,7 @@
 #include "state.h"
 #include "util.h"
 #include "value.h"
+#include "type/type.h"
 
 static bool
 expr_unary_decide(struct ast_expr *expr, struct state *state);
@@ -286,6 +287,9 @@ expr_incdec_eval(struct ast_expr *expr, struct state *state);
 static struct result *
 expr_binary_eval(struct ast_expr *expr, struct state *state);
 
+static struct result *
+arbarg_eval(struct ast_expr *expr, struct state *state);
+
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
@@ -310,6 +314,8 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 		return expr_incdec_eval(expr, state);
 	case EXPR_BINARY:
 		return expr_binary_eval(expr, state);
+	case EXPR_ARBARG:
+		return arbarg_eval(expr, state);
 	default:
 		assert(false);
 	}
@@ -428,7 +434,7 @@ prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 
 static struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
-		struct result_arr *args, struct state *state);
+		struct result_arr *args, char *fname, struct state *state);
 
 static struct result *
 call_absexec(struct ast_expr *call, struct ast_function *, struct state *);
@@ -458,7 +464,9 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	struct ast_type *ret_type = ast_function_type(f);
 	state_pushframe(state, dynamic_str(name), ret_type);
 
-	struct error *err = prepare_parameters(nparams, params, args, state);
+	struct error *err = prepare_parameters(
+		nparams, params, args, name, state
+	);
 	if (err) {
 		return result_error_create(err);
 	}
@@ -482,6 +490,7 @@ call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
 		return res;
 	}
 	if (result_hasvalue(res)) {
+
 		/* copy to preserve value through popping of frame */
 		return result_value_create(value_copy(result_as_value(res)));
 	}
@@ -523,9 +532,6 @@ vconst_applyassumptions(struct value *v, struct ast_expr *expr, struct state *st
 	return true;
 }
 
-static struct result *
-prepare_argument(struct ast_expr *arg, struct ast_variable *param, struct state *);
-
 static struct result_arr *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 		struct ast_variable **param, struct state *state)
@@ -534,29 +540,16 @@ prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 
 	struct result_arr *args = result_arr_create();
 	for (int i = 0; i < nargs; i++) {
-		result_arr_append(
-			args, prepare_argument(arg[i], param[i], state)
-		);
+		result_arr_append(args, ast_expr_eval(arg[i], state));
 	}
 	return args;
-}
-
-static struct result *
-prepare_argument(struct ast_expr *arg, struct ast_variable *p, struct state *s)
-{
-	if (ast_expr_kind(arg) != EXPR_ARBARG) {
-		return ast_expr_eval(arg, s);
-	}
-	return result_value_create(state_vconst(
-		s, ast_variable_type(p), dynamic_str(ast_variable_name(p)), true
-	));
 }
 
 /* prepare_parameters: Allocate arguments in call expression and assign them to
  * their respective parameters. */
 static struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
-		struct result_arr *args, struct state *state)
+		struct result_arr *args, char *fname, struct state *state)
 {
 	assert(nparams == args->n);
 
@@ -565,18 +558,16 @@ prepare_parameters(int nparams, struct ast_variable **param,
 
 		struct result *res = args->res[i];
 		if (result_iserror(res)) {
-			struct strbuilder *b = strbuilder_create();
-			strbuilder_printf(
-				b, "param `%s': ",
-				ast_variable_name(param[i])
-			);
-			return error_prepend(
-				result_as_error(res), strbuilder_build(b)
-			);
+			return result_as_error(res);
 		}
 
 		if (!result_hasvalue(res)) {
-			continue;
+			struct strbuilder *b = strbuilder_create();
+			strbuilder_printf(
+				b, "parameter `%s' of function `%s' has no value",
+				ast_variable_name(param[i]), fname
+			);
+			return error_create(strbuilder_build(b));
 		}
 
 		struct ast_expr *name = ast_expr_identifier_create(
@@ -600,12 +591,16 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	if (result_iserror(res)) {
 		return res;
 	}
-	if (result_hasvalue(res)) {
-		/*printf("state: %s\n", state_str(state));*/
-		struct object *obj = lvalue_object(ast_expr_lvalue(lval, state));
-		assert(obj);
-		object_assign(obj, value_copy(result_as_value(res)));
+	if (!result_hasvalue(res)) {
+		struct strbuilder *b = strbuilder_create();
+		char *s = ast_expr_str(rval);
+		strbuilder_printf(b, "`%s' has no value", s);
+		free(s);
+		return result_error_create(error_create(strbuilder_build(b)));
 	}
+	struct object *obj = lvalue_object(ast_expr_lvalue(lval, state));
+	assert(obj);
+	object_assign(obj, value_copy(result_as_value(res)));
 	return res;
 }
 
@@ -651,6 +646,18 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 			)
 		)
 	);
+}
+
+static struct result *
+arbarg_eval(struct ast_expr *expr, struct state *state)
+{
+	return result_value_create(state_vconst(
+		state,
+		/* XXX: we will investigate type conversions later */
+		ast_type_create_ptr(ast_type_create(TYPE_VOID, 0)),
+		NULL,
+		false
+	));
 }
 
 static struct result *
