@@ -58,6 +58,49 @@ ast_expr_constant_create_char(char c)
 	return expr;
 }
 
+static char *
+escape_str(char c);
+
+static void
+ast_expr_constant_str_build(struct ast_expr *expr, struct strbuilder *b)
+{
+	int constant = expr->u.constant.constant;
+	if (!expr->u.constant.ischar) {
+		strbuilder_printf(b, "%d", constant);
+		return;
+	}
+	switch (constant) {
+	case '\n': case '\t': case '\v': case '\b': case '\f':
+	case '\a': case '\\': case '\?': case '\'': case '\"':
+	case '\0':
+		strbuilder_printf(b, "%s", escape_str(constant));
+		break;
+	default:
+		strbuilder_printf(b, "'%c'", constant);
+		break;
+	}
+}
+
+static char *
+escape_str(char c)
+{
+	switch (c) { 
+	case '\n': return "\\n";
+	case '\t': return "\\t";
+	case '\v': return "\\v";
+	case '\b': return "\\b";
+	case '\f': return "\\f";
+	case '\a': return "\\a";
+	case '\\': return "\\";
+	case '\?': return "\?";
+	case '\'': return "\'";
+	case '\"': return "\"";
+	/* TODO: handle octal and hex escapes */
+	case '\0': return "\0";
+	default: assert(false);
+	}
+}
+
 int
 ast_expr_as_constant(struct ast_expr *expr)
 {
@@ -620,11 +663,7 @@ ast_expr_str(struct ast_expr *expr)
 		strbuilder_printf(b, expr->u.string);
 		break;
 	case EXPR_CONSTANT:
-		if (expr->u.constant.ischar) {
-			strbuilder_printf(b, "'%c'", expr->u.constant.constant);
-		} else {
-			strbuilder_printf(b, "%d", expr->u.constant.constant);
-		}
+		ast_expr_constant_str_build(expr, b);
 		break;
 	case EXPR_STRING_LITERAL:
 		strbuilder_printf(b, "\"%s\"", expr->u.string);

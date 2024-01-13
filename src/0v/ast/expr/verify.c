@@ -185,22 +185,23 @@ expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 struct lvalue *
 expr_structmember_lvalue(struct ast_expr *expr, struct state *state)
 {
-	struct lvalue *root = ast_expr_lvalue(ast_expr_member_root(expr), state);
-	struct object *root_obj = lvalue_object(root);
+	struct ast_expr *root = ast_expr_member_root(expr);
+	struct lvalue *root_lval = ast_expr_lvalue(root, state);
+	struct object *root_obj = lvalue_object(root_lval);
 	assert(root_obj);
-	struct object *obj = object_getmember(
-		root_obj,
-		lvalue_type(root),
-		ast_expr_member_field(expr),
-		state
+	char *field = ast_expr_member_field(expr);
+	struct object *member = object_getmember(
+		root_obj, lvalue_type(root_lval), field, state
 	);
+	if (!member) {
+		/* TODO: lvalue error */
+		return lvalue_create(NULL, NULL);
+	}
 	struct ast_type *t = object_getmembertype(
-		root_obj,
-		lvalue_type(root),
-		ast_expr_member_field(expr),
-		state
+		root_obj, lvalue_type(root_lval), field, state
 	);
-	return lvalue_create(t, obj);
+	assert(t);
+	return lvalue_create(t, member);
 }
 
 
@@ -383,17 +384,24 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 expr_structmember_eval(struct ast_expr *expr, struct state *s)
 {
-	struct result *res = ast_expr_eval(ast_expr_member_root(expr), s);
+	struct ast_expr *root = ast_expr_member_root(expr);
+	struct result *res = ast_expr_eval(root, s);
 	if (result_iserror(res)) {
 		return res;
 	}
+	char *field = ast_expr_member_field(expr);
+	struct object *member = value_struct_member(result_as_value(res), field);
+	if (!member) {
+		struct strbuilder *b = strbuilder_create();
+		char *root_str = ast_expr_str(root);
+		strbuilder_printf(
+			b, "`%s' has no field `%s'", root_str, field
+		);
+		free(root_str);
+		return result_error_create(error_create(strbuilder_build(b)));
+	}
+	struct value *obj_value = object_as_value(member);
 	/* XXX */
-	struct value *obj_value = object_as_value(
-		value_struct_member(
-			result_as_value(res),
-			ast_expr_member_field(expr)
-		)
-	);
 	struct value *v = obj_value ? value_copy(obj_value) : NULL;
 	result_destroy(res);
 	return result_value_create(v);
@@ -599,7 +607,13 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	struct object *obj = lvalue_object(ast_expr_lvalue(lval, state));
-	assert(obj);
+	if (!obj) {
+		struct strbuilder *b = strbuilder_create();
+		char *s = ast_expr_str(lval);
+		strbuilder_printf(b, "`%s' is not a valid object", s);
+		free(s);
+		return result_error_create(error_create(strbuilder_build(b)));
+	}
 	object_assign(obj, value_copy(result_as_value(res)));
 	return res;
 }

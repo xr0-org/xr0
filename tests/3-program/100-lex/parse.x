@@ -167,8 +167,27 @@ struct defsresult {
 	char *pos;
 };
 
+int
+beginsdefs(char *s);
+
+int
+count_patterns(char *pos);
+
 struct defsresult
-parse_defs(char *pos);
+parse_defs(char *input) ~ [
+	if (beginsdefs(input)) {
+		.alloc result.pre;
+	}
+	if (count_patterns(input)) {
+		.alloc result.pattern;
+	}
+];
+
+int
+beginsdefs(char *s)
+{
+	return strncmp(s, "%{", 2) == 0;
+}
 
 struct rulesresult {
 	struct token *token;
@@ -278,9 +297,11 @@ struct stringresult {
 
 struct stringresult
 parse_defsraw(char *input) ~ [
-	if (!(strncmp(input, "%{", 2) != 0)) {
+	result.s = $;
+	if (beginsdefs(input)) {
 		.alloc result.s;
 	}
+	result.pos = $;
 ];
 
 struct patternet {
@@ -290,18 +311,39 @@ struct patternet {
 };
 
 struct patternet
-parse_defsproper(char *pos) ~ [
+parse_defsproper(char *input) ~ [
 	result.pattern = $; /* TODO: put in else block */
-	if (count_patterns(pos)) {
+	if (count_patterns(input)) {
 		.alloc result.pattern;
 	}
+	result.npat = $;
 	result.pos = $;
 ];
 
 struct defsresult
-parse_defs(char *pos)
+parse_defs(char *input)
 {
-	assert(false);
+	struct stringresult raw;
+	struct patternet set;
+	struct defsresult res;
+
+	input = skipws(input);
+	if (*input == '\0') {
+		puts("EOF in defs");
+		exit(1);
+	}
+	raw = parse_defsraw(input);
+	input = raw.pos;
+	input = skipws(input);
+	input = skipoptions(input);
+	input = skipws(input);
+	set = parse_defsproper(input);
+
+	res.pre = raw.s;
+	res.pattern = set.pattern;
+	res.npat = set.npat;
+	res.pos = set.pos;
+	return res;
 }
 
 struct stringresult
@@ -310,7 +352,7 @@ parse_defsraw(char *input)
 	char *pos;
 	struct stringresult res;
 
-	if (strncmp(input, "%{", 2) != 0) {
+	if (!beginsdefs(input)) {
 		res.s = "";
 		res.pos = input;
 		return res;
@@ -353,9 +395,6 @@ struct patternresult {
 	char *pos;
 };
 
-int
-count_patterns(char *pos);
-
 struct patternpos {
 	struct pattern *p;
 	char *pos;
@@ -371,13 +410,13 @@ parse_defs_n(char *pos, int npat) ~ [
 ];
 
 struct patternet
-parse_defsproper(char *pos)
+parse_defsproper(char *input)
 {
 	struct patternet res;
 	struct patternpos defs_n;
 
-	res.npat = count_patterns(pos);
-	defs_n = parse_defs_n(pos, res.npat);
+	res.npat = count_patterns(input);
+	defs_n = parse_defs_n(input, res.npat);
 	res.pattern = defs_n.p;
 	res.pos = defs_n.pos;
 	return res;
