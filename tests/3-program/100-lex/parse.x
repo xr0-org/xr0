@@ -177,7 +177,13 @@ struct rulesresult {
 };
 
 struct rulesresult
-parse_rules(char *pos);
+parse_rules(char *pos) ~ [
+	result.token = $; /* TODO: put in else block */
+	if (count_tokens(pos)) {
+		.alloc result.token;
+	}
+	result.pos = $;
+];
 
 char *
 parse_toeof(char *input) ~ [ .alloc result; ];
@@ -425,7 +431,7 @@ parse_defs_n(char *pos, int npat)
 
 	p = NULL;
 	if (npat) {
-		p = malloc(npat);
+		p = malloc(sizeof(struct pattern) * npat);
 		for (i = 0; i < npat; i++) {
 			parsed = parse_pattern(pos);
 			p[i] = *parsed.p;
@@ -464,6 +470,36 @@ token_print(struct token *t)
 	puts("end token");
 }
 
+int
+count_tokens(char *pos);
+
+struct tokenpos {
+	struct token *t;
+	char *pos;
+};
+
+struct tokenpos
+parse_rules_n(char *pos, int ntok) ~ [
+	result.t = $; /* TODO: put in else block */
+	if (ntok) {
+		.alloc result.t;
+	}
+	result.pos = $;
+];
+
+struct rulesresult
+parse_rules(char *pos)
+{
+	struct rulesresult res;
+	struct tokenpos rules_n;
+
+	res.ntok = count_tokens(pos);
+	rules_n = parse_rules_n(pos, res.ntok);
+	res.token = rules_n.t;
+	res.pos = rules_n.pos;
+	return res;
+}
+
 struct tokenresult {
 	struct token *tk;
 	char *pos;
@@ -475,25 +511,41 @@ parse_token(char *pos) ~ [
 	result.pos = $;
 ];
 
-struct rulesresult
-parse_rules(char *pos)
+int
+count_tokens(char *pos)
 {
-	int ntok;
-	struct token *token;
-	struct tokenresult parsed;
-	struct rulesresult res;
+	int n;
+	struct tokenresult r;
 
-	ntok = 0;
-	token = NULL;
-	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; ntok++) {
-		parsed = parse_token(pos);
-		pos = parsed.pos;
-		token = realloc(token, sizeof(struct token) * (ntok + 1));
-		token[ntok] = *parsed.tk;
-		pos = skipws(pos);
+	n = 0;
+	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; n++) {
+		r = parse_token(pos);
+		pos = skipws(r.pos);
+		/* TODO: clean up r.tk */
 	}
-	res.token = token;
-	res.ntok = ntok;
+
+	return n;
+}
+
+struct tokenpos
+parse_rules_n(char *pos, int ntok)
+{
+	int i;
+	struct token *t;
+	struct tokenresult parsed;
+	struct tokenpos res;
+
+	t = NULL;
+	if (ntok) {
+		t = malloc(sizeof(struct token) * ntok);
+		for (i = 0; i < ntok; i++) {
+			parsed = parse_token(pos);
+			t[i] = *parsed.tk;
+			pos = skipws(parsed.pos);
+		}
+	}
+
+	res.t = t;
 	res.pos = pos;
 	return res;
 }
