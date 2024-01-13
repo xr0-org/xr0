@@ -340,6 +340,8 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	}
 	struct value *val = object_as_value(obj);
 	if (!val) {
+		printf("state: %s\n", state_str(state));
+		printf("id: %s\n", ast_expr_str(expr));
 		return result_error_create(error_create("no value"));
 	}
 	return result_value_create(value_copy(val));
