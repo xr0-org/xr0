@@ -357,11 +357,11 @@ struct patternpos {
 
 struct patternpos
 parse_defs_n(char *pos, int npat) ~ [
-	result.p = NULL; /* TODO: put in else block */
+	result.p = $; /* TODO: put in else block */
 	if (npat) {
 		.alloc result.p;
 	}
-	result.pos = pos;
+	result.pos = $;
 ];
 
 struct patternet

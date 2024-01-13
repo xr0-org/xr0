@@ -656,7 +656,7 @@ arbarg_eval(struct ast_expr *expr, struct state *state)
 		/* XXX: we will investigate type conversions later */
 		ast_type_create_ptr(ast_type_create(TYPE_VOID, 0)),
 		NULL,
-		true
+		false
 	));
 }
 
