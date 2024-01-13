@@ -199,7 +199,3 @@ error_prepend(struct error* e, char *prefix)
 
 	return error_create(new_msg);
 }
-
-
-
-

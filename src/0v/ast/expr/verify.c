@@ -334,15 +334,19 @@ expr_constant_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 expr_identifier_eval(struct ast_expr *expr, struct state *state)
 {
-	struct object *obj = state_getobject(state, ast_expr_as_identifier(expr));
+	char *id = ast_expr_as_identifier(expr);
+	struct object *obj = state_getobject(state, id);
 	if (!obj) {
-		return result_error_create(error_create("no object"));
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "unknown idenitfier `%s'", id);
+		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	struct value *val = object_as_value(obj);
 	if (!val) {
 		printf("state: %s\n", state_str(state));
-		printf("id: %s\n", ast_expr_str(expr));
-		return result_error_create(error_create("no value"));
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "`%s' has no value", id);
+		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	return result_value_create(value_copy(val));
 }
@@ -427,7 +431,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		struct result_arr *args, struct state *state);
 
 static struct result *
-call_result(struct ast_expr *expr, struct ast_function *, struct state *);
+call_absexec(struct ast_expr *call, struct ast_function *, struct state *);
 
 static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
@@ -459,28 +463,36 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(err);
 	}
 
+	struct result *res = call_absexec(expr, f, state);
+
+	state_popframe(state);
+	result_arr_destroy(args);
+
+	return res;
+}
+
+static struct result *
+call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state *);
+
+static struct result *
+call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
+{
 	struct result *res = ast_function_absexec(f, state);
 	if (result_iserror(res)) {
 		return res;
 	}
-	if (result_hasvalue(res)) { /* preserve value through pop */
-		res = result_value_create(value_copy(result_as_value(res)));
-	} else {
-		res = call_result(expr, f, state);
+	if (result_hasvalue(res)) {
+		/* copy to preserve value through popping of frame */
+		return result_value_create(value_copy(result_as_value(res)));
 	}
-
-	state_popframe(state);
-
-	result_arr_destroy(args);
-
-	return res;
+	return call_arbitraryresult(expr, f, state);
 }
 
 static bool
 vconst_applyassumptions(struct value *v, struct ast_expr *call, struct state *state);
 
 static struct result *
-call_result(struct ast_expr *expr, struct ast_function *f, struct state *state)
+call_arbitraryresult(struct ast_expr *expr, struct ast_function *f, struct state *state)
 {
 	/* declare vconst and get underlying value (i.e. the range) */
 	struct value *vconst = state_vconst(
