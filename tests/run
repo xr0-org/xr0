@@ -19,10 +19,15 @@ do
 	ntests=$((ntests+1))
 	printf "%-${length}s ..." "$f"
 	output=$($XR0 -I $libx $f 2>&1 >/dev/null)
-	if [[ "$f" != *"${fail_prefix}"* && $output -eq 0 ]]
+	if [[ $? -eq 0 ]]
 	then
-		npass=$((npass+1))
-		printf 'PASS\n'
+		if [[ "$f" != *"${fail_prefix}"* ]]
+		then
+			npass=$((npass+1))
+			printf 'PASS\n'
+		else
+			printf 'FAIL\n'
+		fi
 	else
 		# negative tests
 
