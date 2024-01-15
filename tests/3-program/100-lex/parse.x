@@ -175,15 +175,12 @@ count_patterns(char *pos);
 
 struct defsresult
 parse_defs(char *input) ~ [
-	struct stringresult raw;
-	char *pos;
-
-	raw = parse_defsraw(input);
-	pos = skipws(skipoptions(skipws(raw.pos)));
-	if (count_patterns(pos)) {
+	if (beginsdefs(input)) {
+		.alloc result.pre;
+	}
+	if (count_patterns(input)) {
 		.alloc result.pattern;
 	}
-	result.pre = raw.s;
 ];
 
 int

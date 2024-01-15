@@ -239,6 +239,7 @@ expr_binary_decide(struct ast_expr *expr, struct state *state)
 
 	assert(!result_iserror(root) && !result_iserror(last));
 
+	printf("expr: %s\n", ast_expr_str(expr));
 	return value_compare(
 		result_as_value(root),
 		ast_expr_binary_op(expr),

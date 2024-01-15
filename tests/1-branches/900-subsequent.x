@@ -1,7 +1,10 @@
 #include <stdlib.h>
 
 int
-number(int param);
+f(int param);
+
+int
+g(int param);
 
 void *
 alloc_if(int num) ~ [
@@ -12,18 +15,28 @@ alloc_if(int num) ~ [
 
 void *
 test(int x) ~ [
-	if (number(x)) {
+	if (f(g(x))) {
 		.alloc result;
 	}
 ]{
+	int m;
 	int n;
 
-	n = x;
-	return alloc_if(number(n));
+	m = x;
+	~ [ m == x; ]
+	n = g(m);
+	~ [ n == g(x); ]
+	return alloc_if(f(n));
 }
 
 int
-number(int param)
+f(int param)
+{
+	return param;
+}
+
+int
+g(int param)
 {
 	return param;
 }
@@ -36,5 +49,3 @@ alloc_if(int num)
 	}
 	return NULL;
 }
-
-

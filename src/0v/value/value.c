@@ -643,6 +643,7 @@ value_equal(struct value *v1, struct value *v2)
 
 	switch (v1->type) {
 	case VALUE_INT:
+	case VALUE_SYNC:
 		return number_equal(v1->n, v2->n);
 	default:
 		assert(false);
@@ -867,6 +868,8 @@ number_equal(struct number *n1, struct number *n2)
 	switch (n1->type) {
 	case NUMBER_KNOWLEDGE_RANGES:
 		return number_ranges_equal(n1, n2);
+	case NUMBER_KNOWLEDGE_SYNC_CONSTANT:
+		return ast_expr_equal(n1->sync_const, n2->sync_const);
 	default:
 		assert(false);
 	}

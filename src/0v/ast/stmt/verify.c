@@ -88,7 +88,6 @@ ast_stmt_verify(struct ast_stmt *stmt, struct state *state)
 	case STMT_ITERATION:
 		return stmt_iter_verify(stmt, state);
 	default:
-		fprintf(stderr, "cannot verify stmt: %s\n", ast_stmt_str(stmt));
 		assert(false);
 	}
 }
