@@ -149,9 +149,9 @@ int
 number_range_arr_append(struct number_range_arr *, struct number_range *);
 
 
-enum number_knowledge_type {
-	NUMBER_KNOWLEDGE_RANGES,
-	NUMBER_KNOWLEDGE_SYNC_CONSTANT,
+enum number_type {
+	NUMBER_RANGES,
+	NUMBER_COMPUTED,
 };
 
 struct number;

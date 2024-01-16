@@ -239,8 +239,8 @@ expr_binary_decide(struct ast_expr *expr, struct state *state)
 
 	assert(!result_iserror(root) && !result_iserror(last));
 
-	printf("state: %s\n", state_str(state));
-	printf("expr: %s\n", ast_expr_str(expr));
+	/*printf("state: %s\n", state_str(state));*/
+	/*printf("expr: %s\n", ast_expr_str(expr));*/
 	return value_compare(
 		result_as_value(root),
 		ast_expr_binary_op(expr),
@@ -506,42 +506,53 @@ call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
 	return call_arbitraryresult(expr, f, state);
 }
 
-static bool
-vconst_applyassumptions(struct value *v, struct ast_expr *call, struct state *state);
+static struct result *
+call_to_computed_value(struct ast_function *, struct state *s);
 
 static struct result *
 call_arbitraryresult(struct ast_expr *expr, struct ast_function *f,
 		struct state *state)
 {
-	/* declare vconst and get underlying value (i.e. the range) */
-	struct value *vconst = state_vconst(
-		state,
-		ast_function_type(f),
-		dynamic_str(ast_function_name(f)),
-		false
-	);
-	if (value_issync(vconst)) {
-		struct ast_expr *sync = value_as_sync(vconst);
-		struct value *v = state_getvconst(
-			state, ast_expr_as_identifier(sync)
-		);
-
-		bool ok = vconst_applyassumptions(v, expr, state);
-		assert(ok);
+	struct result *res = call_to_computed_value(f, state);
+	if (result_iserror(res)) {
+		return res;
 	}
-	return result_value_create(vconst);
+	assert(result_hasvalue(res));
+	return res;
 }
 
-static bool
-vconst_applyassumptions(struct value *v, struct ast_expr *expr, struct state *state)
+static struct result *
+call_to_computed_value(struct ast_function *f, struct state *s)
 {
-	struct props *p = state_getprops(state);
-	if (props_get(p, expr)) {
-		return value_assume(v, true);
-	} else if (props_contradicts(p, expr)) {
-		return value_assume(v, false);
+	/* TODO: function-valued root */
+	char *root = ast_function_name(f);
+
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **uncomputed_param = ast_function_params(f);
+	struct ast_expr **computed_param = malloc(
+		sizeof(struct ast_expr *) * nparams
+	);
+	for (int i = 0; i < nparams; i++) {
+		struct ast_expr *param = ast_expr_identifier_create(
+			dynamic_str(ast_variable_name(uncomputed_param[i]))
+		);
+		struct result *res = ast_expr_eval(param, s);
+		ast_expr_destroy(param);
+		if (result_iserror(res)) {
+			return res;
+		}
+		assert(result_hasvalue(res));
+		computed_param[i] = value_as_sync(result_as_value(res));
 	}
-	return true;
+
+	return result_value_create(
+		value_sync_create(
+			ast_expr_call_create(
+				ast_expr_identifier_create(dynamic_str(root)),
+				nparams, computed_param
+			)
+		)
+	);
 }
 
 static struct result_arr *

@@ -423,6 +423,8 @@ sel_decide(struct ast_expr *control, struct state *state)
 		return (struct decision) { .err = result_as_error(res) };
 	}
 
+	printf("state: %s\n", state_str(state));
+	printf("control: %s\n", ast_expr_str(control));
 	struct value *zero = value_int_create(0);
 	bool nonzero = !value_equal(
 		zero, underlying_value(result_as_value(res), state)

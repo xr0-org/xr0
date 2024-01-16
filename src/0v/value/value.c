@@ -170,7 +170,7 @@ value_int_up(struct value *v)
 
 
 struct number *
-number_sync_create(struct ast_expr *);
+number_computed_create(struct ast_expr *);
 
 struct value *
 value_sync_create(struct ast_expr *e)
@@ -178,7 +178,7 @@ value_sync_create(struct ast_expr *e)
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_SYNC;
-	v->n = number_sync_create(e);
+	v->n = number_computed_create(e);
 	return v;
 }
 
@@ -409,7 +409,7 @@ value_int_sprint(struct value *v, struct strbuilder *b)
 void
 value_sync_sprint(struct value *v, struct strbuilder *b)
 {
-	strbuilder_printf(b, "sync:%s", number_str(v->n));
+	strbuilder_printf(b, "comp:%s", number_str(v->n));
 }
 
 struct value *
@@ -668,10 +668,10 @@ value_assume(struct value *v, bool value)
 }
 
 struct number {
-	enum number_knowledge_type type;
+	enum number_type type;
 	union {
 		struct number_range_arr *ranges;
-		struct ast_expr *sync_const;
+		struct ast_expr *computation;
 	};
 };
 
@@ -679,7 +679,7 @@ struct number *
 number_ranges_create(struct number_range_arr *ranges)
 {
 	struct number *num = calloc(1, sizeof(struct number));
-	num->type = NUMBER_KNOWLEDGE_RANGES;
+	num->type = NUMBER_RANGES;
 	num->ranges = ranges;
 	return num;
 }
@@ -711,11 +711,11 @@ number_range_arr_single_create(int val)
 }
 
 struct number *
-number_sync_create(struct ast_expr *e)
+number_computed_create(struct ast_expr *e)
 {
 	struct number *num = calloc(1, sizeof(struct number));
-	num->type = NUMBER_KNOWLEDGE_SYNC_CONSTANT;
-	num->sync_const = e;
+	num->type = NUMBER_COMPUTED;
+	num->computation = e;
 	return num;
 }
 
@@ -811,11 +811,11 @@ void
 number_destroy(struct number *n)
 {
 	switch (n->type) {
-	case NUMBER_KNOWLEDGE_RANGES:
+	case NUMBER_RANGES:
 		number_range_arr_destroy(n->ranges);
 		break;
-	case NUMBER_KNOWLEDGE_SYNC_CONSTANT:
-		ast_expr_destroy(n->sync_const);
+	case NUMBER_COMPUTED:
+		ast_expr_destroy(n->computation);
 		break;
 	default:
 		assert(false);
@@ -829,7 +829,7 @@ number_range_str(struct number_range *r);
 char *
 number_ranges_sprint(struct number *num)
 {
-	assert(num->type == NUMBER_KNOWLEDGE_RANGES);
+	assert(num->type == NUMBER_RANGES);
 
 	struct strbuilder *b = strbuilder_create();
 	int n = number_range_arr_n(num->ranges);
@@ -848,10 +848,10 @@ char *
 number_str(struct number *num)
 {
 	switch (num->type) {
-	case NUMBER_KNOWLEDGE_RANGES:
+	case NUMBER_RANGES:
 		return number_ranges_sprint(num);
-	case NUMBER_KNOWLEDGE_SYNC_CONSTANT:
-		return ast_expr_str(num->sync_const);
+	case NUMBER_COMPUTED:
+		return ast_expr_str(num->computation);
 	default:
 		assert(false);
 	}
@@ -866,10 +866,10 @@ number_equal(struct number *n1, struct number *n2)
 	assert(n1->type == n2->type);
 
 	switch (n1->type) {
-	case NUMBER_KNOWLEDGE_RANGES:
+	case NUMBER_RANGES:
 		return number_ranges_equal(n1, n2);
-	case NUMBER_KNOWLEDGE_SYNC_CONSTANT:
-		return ast_expr_equal(n1->sync_const, n2->sync_const);
+	case NUMBER_COMPUTED:
+		return ast_expr_equal(n1->computation, n2->computation);
 	default:
 		assert(false);
 	}
@@ -881,7 +881,7 @@ number_range_equal(struct number_range *, struct number_range *);
 bool
 number_ranges_equal(struct number *n1, struct number *n2)
 {
-	assert(n1->type == n2->type && n1->type == NUMBER_KNOWLEDGE_RANGES);
+	assert(n1->type == n2->type && n1->type == NUMBER_RANGES);
 
 	int len = number_range_arr_n(n1->ranges);
 	if (len != number_range_arr_n(n2->ranges)) {
@@ -908,7 +908,7 @@ number_range_assumed_value(bool value);
 static bool
 number_assume(struct number *n, bool value)
 {
-	assert(n->type == NUMBER_KNOWLEDGE_RANGES);
+	assert(n->type == NUMBER_RANGES);
 
 	if (!number_range_arr_canbe(n->ranges, value)) {
 		return false;
@@ -935,7 +935,7 @@ number_range_issingle(struct number_range *r);
 bool
 number_isconstant(struct number *n)
 {
-	assert(n->type == NUMBER_KNOWLEDGE_RANGES);
+	assert(n->type == NUMBER_RANGES);
 
 	return number_range_arr_n(n->ranges) == 1 &&
 		number_range_issingle(number_range_arr_range(n->ranges)[0]);
@@ -947,7 +947,7 @@ number_range_as_constant(struct number_range *r);
 int
 number_as_constant(struct number *n)
 {
-	assert(n->type == NUMBER_KNOWLEDGE_RANGES
+	assert(n->type == NUMBER_RANGES
 			&& number_range_arr_n(n->ranges) == 1);
 
 	return number_range_as_constant(number_range_arr_range(n->ranges)[0]);
@@ -956,15 +956,15 @@ number_as_constant(struct number *n)
 bool
 number_issync(struct number *n)
 {
-	return n->type == NUMBER_KNOWLEDGE_SYNC_CONSTANT;
+	return n->type == NUMBER_COMPUTED;
 }
 
 struct ast_expr *
 number_as_sync(struct number *n)
 {
-	assert(n->type == NUMBER_KNOWLEDGE_SYNC_CONSTANT);
+	assert(n->type == NUMBER_COMPUTED);
 
-	return n->sync_const;
+	return n->computation;
 }
 
 struct ast_expr *
@@ -974,9 +974,9 @@ struct ast_expr *
 number_to_expr(struct number *n)
 {
 	switch (n->type) {
-	case NUMBER_KNOWLEDGE_RANGES:
+	case NUMBER_RANGES:
 		return number_ranges_to_expr(n->ranges);
-	case NUMBER_KNOWLEDGE_SYNC_CONSTANT:
+	case NUMBER_COMPUTED:
 		return ast_expr_copy(number_as_sync(n));
 	default:
 		assert(false);
@@ -990,10 +990,10 @@ struct number *
 number_copy(struct number *num)
 {
 	switch (num->type) {
-	case NUMBER_KNOWLEDGE_RANGES:
+	case NUMBER_RANGES:
 		return number_ranges_create(number_range_arr_copy(num->ranges));
-	case NUMBER_KNOWLEDGE_SYNC_CONSTANT:
-		return number_sync_create(ast_expr_copy(num->sync_const));
+	case NUMBER_COMPUTED:
+		return number_computed_create(ast_expr_copy(num->computation));
 	default:
 		assert(false);
 	}
