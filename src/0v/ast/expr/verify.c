@@ -360,20 +360,50 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	return result_value_create(value_copy(val));
 }
 
+static struct ast_expr *
+expr_to_binary(struct ast_expr *expr);
+
+static struct result *
+binary_deref_eval(struct ast_expr *expr, struct state *state);
+
 static struct result *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
 	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
 
-	struct ast_expr *inner = ast_expr_unary_operand(expr); /* arr+offset */
+	struct ast_expr *binary = expr_to_binary(ast_expr_unary_operand(expr));
+	struct result *res = binary_deref_eval(binary, state);
+	ast_expr_destroy(binary);
+	return res;
+}
 
-	struct result *res = ast_expr_eval(ast_expr_binary_e1(inner), state);
+static struct ast_expr *
+expr_to_binary(struct ast_expr *expr)
+{
+	switch (ast_expr_kind(expr)) {
+	case EXPR_BINARY:
+		return ast_expr_copy(expr);
+	default:
+		return ast_expr_binary_create(
+			ast_expr_copy(expr),
+			BINARY_OP_ADDITION,
+			ast_expr_constant_create(0)
+		);
+	}
+}
+
+static struct result *
+binary_deref_eval(struct ast_expr *expr, struct state *state)
+{
+	printf("state: %s\n", state_str(state));
+	printf("expr: %s\n", ast_expr_str(expr));
+	struct result *res = ast_expr_eval(ast_expr_binary_e1(expr), state);
 	if (result_iserror(res)) {
 		return res;
 	}
 	struct value *arr = result_as_value(res);
 	assert(arr);
-	struct object *obj = state_deref(state, arr, ast_expr_binary_e2(inner));
+	struct object *obj = state_deref(state, arr, ast_expr_binary_e2(expr));
 	assert(obj);
 	result_destroy(res);
 
