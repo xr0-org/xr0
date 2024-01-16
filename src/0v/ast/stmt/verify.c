@@ -412,9 +412,6 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 	return result_value_create(NULL);
 }
 
-static struct value *
-underlying_value(struct value *v, struct state *state);
-
 static struct decision
 sel_decide(struct ast_expr *control, struct state *state)
 {
@@ -422,26 +419,23 @@ sel_decide(struct ast_expr *control, struct state *state)
 	if (result_iserror(res)) {
 		return (struct decision) { .err = result_as_error(res) };
 	}
+	assert(result_hasvalue(res)); /* TODO: user error */
 
-	printf("state: %s\n", state_str(state));
-	printf("control: %s\n", ast_expr_str(control));
+	struct value *v = result_as_value(res);
+	if (value_issync(v)) {
+		struct ast_expr *sync = value_as_sync(v);
+		struct props *p = state_getprops(state);
+		if (props_get(p, sync)) {
+			return (struct decision) { .decision = true, .err = NULL };
+		} else if (props_contradicts(p, sync)) {
+			return (struct decision) { .decision = false, .err = NULL };
+		}
+	}
+
 	struct value *zero = value_int_create(0);
-	bool nonzero = !value_equal(
-		zero, underlying_value(result_as_value(res), state)
-	);
+	bool nonzero = !value_equal(zero, v);
 	value_destroy(zero);
 	return (struct decision) { .decision = nonzero, .err = NULL };
-}
-
-static struct value *
-underlying_value(struct value *v, struct state *state)
-{
-	if (value_issync(v)) {
-		return state_getvconst(
-			state, ast_expr_as_identifier(value_as_sync(v))
-		);
-	}
-	return v;
 }
 
 static struct result *
