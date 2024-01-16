@@ -421,7 +421,10 @@ sel_decide(struct ast_expr *control, struct state *state)
 	}
 	assert(result_hasvalue(res)); /* TODO: user error */
 
+	/*printf("state: %s\n", state_str(state));*/
+	/*printf("control: %s\n", ast_expr_str(control));*/
 	struct value *v = result_as_value(res);
+	/*printf("value: %s\n", value_str(v));*/
 	if (value_issync(v)) {
 		struct ast_expr *sync = value_as_sync(v);
 		struct props *p = state_getprops(state);

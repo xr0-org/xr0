@@ -726,7 +726,7 @@ ast_expr_assume(struct ast_expr *expr, struct state *state)
 }
 
 static struct preresult *
-identifier_assume(char *id, bool value, struct state *state);
+identifier_assume(struct ast_expr *expr, bool value, struct state *state);
 
 static struct preresult *
 call_assume(struct ast_expr *, bool value, struct state *);
@@ -739,7 +739,7 @@ reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 {
 	switch (expr->kind) {
 	case EXPR_IDENTIFIER:
-		return identifier_assume(ast_expr_as_identifier(expr), value, s);
+		return identifier_assume(expr, value, s);
 	case EXPR_UNARY:
 		assert(ast_expr_unary_op(expr) == UNARY_OP_BANG);
 		return reduce_assume(ast_expr_unary_operand(expr), !value, s);
@@ -755,17 +755,17 @@ reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 }
 
 static struct preresult *
-identifier_assume(char *id, bool value, struct state *state)
+identifier_assume(struct ast_expr *expr, bool value, struct state *s)
 {
-	/* set value of variable corresponding to identifier != 0 */
-	struct object *obj = state_getobject(state, id);
-	struct ast_expr *sync = value_as_sync(object_as_value(obj));
-	struct value *v = state_getvconst(state, ast_expr_as_identifier(sync));
-	bool iscontradiction = !value_assume(v, value);
-	if (iscontradiction) {
-		return preresult_contradiction_create();
-	}
-	return preresult_empty_create();
+	struct state *s_copy = state_copy(s);
+	struct result *res = ast_expr_eval(expr, s_copy);
+
+	/* TODO: user errors */
+	assert(!result_iserror(res) && result_hasvalue(res));
+
+	state_destroy(s_copy);
+
+	return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
 }
 
 static struct preresult *
