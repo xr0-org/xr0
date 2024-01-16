@@ -23,7 +23,7 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 			struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
 			assert(loc);
 			char *m = lexememarker_str(loc);
-			strbuilder_printf(b, "%s: cannot verify statement: %s", m, err->msg);
+			strbuilder_printf(b, "%s: %s", m, err->msg);
 			free(m);
 			return error_create(strbuilder_build(b));
 		}
@@ -117,7 +117,7 @@ stmt_expr_verify(struct ast_stmt *stmt, struct state *state)
 	if (ast_expr_decide(expr, state)) {
 		return NULL;
 	}
-	return error_create("cannot verify");
+	return error_create("cannot verify statement");
 }
 
 static bool

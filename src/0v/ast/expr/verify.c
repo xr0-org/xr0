@@ -239,6 +239,7 @@ expr_binary_decide(struct ast_expr *expr, struct state *state)
 
 	assert(!result_iserror(root) && !result_iserror(last));
 
+	printf("state: %s\n", state_str(state));
 	printf("expr: %s\n", ast_expr_str(expr));
 	return value_compare(
 		result_as_value(root),
@@ -499,7 +500,6 @@ call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
 		return res;
 	}
 	if (result_hasvalue(res)) {
-
 		/* copy to preserve value through popping of frame */
 		return result_value_create(value_copy(result_as_value(res)));
 	}
@@ -510,7 +510,8 @@ static bool
 vconst_applyassumptions(struct value *v, struct ast_expr *call, struct state *state);
 
 static struct result *
-call_arbitraryresult(struct ast_expr *expr, struct ast_function *f, struct state *state)
+call_arbitraryresult(struct ast_expr *expr, struct ast_function *f,
+		struct state *state)
 {
 	/* declare vconst and get underlying value (i.e. the range) */
 	struct value *vconst = state_vconst(
@@ -521,7 +522,9 @@ call_arbitraryresult(struct ast_expr *expr, struct ast_function *f, struct state
 	);
 	if (value_issync(vconst)) {
 		struct ast_expr *sync = value_as_sync(vconst);
-		struct value *v = state_getvconst(state, ast_expr_as_identifier(sync));
+		struct value *v = state_getvconst(
+			state, ast_expr_as_identifier(sync)
+		);
 
 		bool ok = vconst_applyassumptions(v, expr, state);
 		assert(ok);

@@ -21,6 +21,9 @@ test(int x) ~ [
 ]{
 	int m;
 	int n;
+	int k;
+
+	k = 5;
 
 	m = x;
 	~ [ m == x; ]
