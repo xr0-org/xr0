@@ -542,7 +542,14 @@ call_to_computed_value(struct ast_function *f, struct state *s)
 			return res;
 		}
 		assert(result_hasvalue(res));
-		computed_param[i] = value_as_sync(result_as_value(res));
+		struct value *v = result_as_value(res);
+		if (value_issync(v)) {
+			computed_param[i] = value_as_sync(result_as_value(res));
+		} else {
+			computed_param[i] = ast_expr_identifier_create(
+				dynamic_str(ast_variable_name(uncomputed_param[i]))
+			);
+		}
 	}
 
 	return result_value_create(
