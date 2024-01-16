@@ -26,14 +26,19 @@ struct config {
 	char *outfile;
 	struct string_arr *includedirs;
 	bool verbose;
+
+	char *sortfile;
+	bool sort;
 };
 
 struct config
 parse_config(int argc, char *argv[])
 {
 	bool verbose = false;
+	bool sort = false;
 	struct string_arr *includedirs = string_arr_create();
 	char *outfile = OUTPUT_PATH;
+	char *sortfile = NULL;
 	int opt;
 	while ((opt = getopt(argc, argv, "vo:I:")) != -1) {
 		switch (opt) {
@@ -46,6 +51,9 @@ parse_config(int argc, char *argv[])
 		case 'v':
 			verbose = true;
 			break;
+		case 's':
+			sortfile = optarg;
+			sort = true;
 		default:
 			fprintf(stderr, "Usage: %s [-o output] input_file\n", argv[0]);
 			exit(EXIT_FAILURE);
@@ -60,6 +68,8 @@ parse_config(int argc, char *argv[])
 		.outfile	= outfile,
 		.includedirs	= includedirs,
 		.verbose	= verbose,
+		.sort		= sort,
+		.sortfile	= sortfile,
 	};
 }
 
@@ -122,14 +132,10 @@ static bool
 verifyproto(struct ast_function *f, int n, struct ast_externdecl **decl);
 
 void
-pass1(struct ast *root, struct externals *ext)
+pass0(struct ast *root, struct externals *ext)
 {
 	/* TODO:
 	 * - enforce syntax rules
-	 * - check that sfuncs have no bodies
-	 * - unify declarations and definitions so that each function appears
-	 *   once in the array passed to verify
-	 * - check that chains do not have contradictory operators
 	 */
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
@@ -151,10 +157,29 @@ pass1(struct ast *root, struct externals *ext)
 		}
 		if (!externals_getfunc(ext, ast_function_name(f))) {
 			ast_externdecl_install(decl, ext);
+		}	
+	}
+}
+
+void
+pass1(struct ast *root, struct externals *ext)
+{
+	struct error *err;
+	for (int i = 0; i < root->n; i++) {
+		struct ast_externdecl *decl = root->decl[i];
+		if (!ast_externdecl_isfunction(decl)) {
+			continue;
 		}
-		
+		struct ast_function *f = ast_externdecl_as_function(decl);
+		if (ast_function_isaxiom(f) || ast_function_isproto(f)) {
+			continue;
+		}
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
+		if ((err = ast_function_verify(f, ext))) {
+			fprintf(stderr, "%s", err->msg);
+			exit(EXIT_FAILURE);
+		}
 	}
 }
 
@@ -231,9 +256,8 @@ main(int argc, char *argv[])
 
 	/* TODO: move table from lexer to pass1 */
 	struct externals *ext = externals_create();
+	pass0(root, ext);
 	pass1(root, ext);
-
-	topological_order("main", ext);
 
 	externals_destroy(ext);
 	ast_destroy(root);

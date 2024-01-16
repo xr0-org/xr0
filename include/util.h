@@ -89,14 +89,14 @@ string_arr_n(struct string_arr *);
 int
 string_arr_append(struct string_arr *, char *);
 
-int
-string_arr_enque(struct string_arr *, char *);
-
 char *
 string_arr_deque(struct string_arr *);
 
 struct string_arr *
 string_arr_concat(struct string_arr *s1, struct string_arr *s2);
+
+bool
+string_arr_contains(struct string_arr *, char *s);
 
 char *
 string_arr_str(struct string_arr *);

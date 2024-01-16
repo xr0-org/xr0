@@ -11,6 +11,7 @@
 #include "state.h"
 #include "ext.h"
 #include "util.h"
+#include "stmt/stmt.h"
 
 struct ast_function {
 	bool isaxiom;
@@ -357,6 +358,47 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 	struct object *obj = state_getresult(state);
 	assert(obj);
 	return result_value_create(object_as_value(obj));
+}
+
+struct string_arr *
+ast_function_getfuncs(char *fname, struct externals *ext)
+{
+	struct string_arr *funcs = string_arr_create();
+	struct map *dedup = map_create();
+
+	struct ast_function *f = externals_getfunc(ext, fname);
+	if (f->isaxiom) {
+		return funcs;
+	}
+
+	struct ast_block *body = f->body;
+	int nstmts = ast_block_nstmts(body);
+	struct ast_stmt **stmt = ast_block_stmts(body);
+
+	for (int i = 0; i < nstmts; i++) {
+		struct string_arr *farr = ast_stmt_getfuncs(stmt[i]);		
+		if (!farr) {
+			continue;
+		}
+
+		char **func = string_arr_s(farr); 
+		for (int j = 0; j < string_arr_n(farr); j++) {
+			/* avoid duplicates */
+			if (map_get(dedup, func[j]) != NULL) {
+				continue;
+			}
+				
+			string_arr_append(funcs, func[j]);	
+			map_set(dedup, func[j], (void *) true);
+
+			/* recursively build for other funcs */
+			return string_arr_concat(
+				funcs,
+				ast_function_getfuncs(func[j], ext)
+			);
+		}
+	}
+	return funcs;
 }
 
 #include "arr.c"

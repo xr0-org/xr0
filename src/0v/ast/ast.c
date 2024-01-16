@@ -201,9 +201,3 @@ preresult_iscontradiction(struct preresult *r)
 {
 	return r->iscontradiction;
 }
-
-struct string_arr *
-ast_getfuncs(struct ast_stmt *stmt)
-{
-	return ast_stmt_getfuncs(stmt);
-}

@@ -544,7 +544,4 @@ ast_append(struct ast *, struct ast_externdecl *);
 void
 ast_destroy(struct ast *);
 
-struct string_arr *
-ast_getfuncs(struct ast_stmt *);
-
 #endif
