@@ -203,7 +203,7 @@ preresult_iscontradiction(struct preresult *r)
 	return r->iscontradiction;
 }
 
-char *
+struct string_arr *
 ast_topological_order(char *fname, struct externals *ext)
 {
 	return topological_order(fname, ext);

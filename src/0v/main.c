@@ -27,7 +27,7 @@ struct config {
 	struct string_arr *includedirs;
 	bool verbose;
 
-	char *sortfile;
+	char *sortfunc;
 	bool sort;
 };
 
@@ -38,9 +38,9 @@ parse_config(int argc, char *argv[])
 	bool sort = false;
 	struct string_arr *includedirs = string_arr_create();
 	char *outfile = OUTPUT_PATH;
-	char *sortfile = NULL;
+	char *sortfunc = NULL;
 	int opt;
-	while ((opt = getopt(argc, argv, "vo:I:")) != -1) {
+	while ((opt = getopt(argc, argv, "vos:I:")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
@@ -52,8 +52,9 @@ parse_config(int argc, char *argv[])
 			verbose = true;
 			break;
 		case 's':
-			sortfile = optarg;
+			sortfunc = optarg;
 			sort = true;
+			break;
 		default:
 			fprintf(stderr, "Usage: %s [-o output] input_file\n", argv[0]);
 			exit(EXIT_FAILURE);
@@ -69,7 +70,7 @@ parse_config(int argc, char *argv[])
 		.includedirs	= includedirs,
 		.verbose	= verbose,
 		.sort		= sort,
-		.sortfile	= sortfile,
+		.sortfunc	= sortfunc,
 	};
 }
 
@@ -256,9 +257,23 @@ main(int argc, char *argv[])
 
 	/* TODO: move table from lexer to pass1 */
 	struct externals *ext = externals_create();
+
+	/* setup externals */
 	pass0(root, ext);
-	ast_topological_order("main", ext);
-	pass1(root, ext);
+
+	/* if -s param specified output topological eval order */
+	if (c.sort) {
+		/* TODO: pass up error conditions */
+		if (!c.sortfunc) {
+			fprintf(stderr, "supply function to `-s' flag to evaluate dependencies for");
+			exit(EXIT_FAILURE);
+		}
+		struct string_arr *order = ast_topological_order(c.sortfunc, ext);
+		printf("evaluation order: %s\n", string_arr_str(order));
+	} else { 
+		/* TODO: verify in topological order */
+		pass1(root, ext);
+	}
 
 	externals_destroy(ext);
 	ast_destroy(root);

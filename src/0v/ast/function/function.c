@@ -379,11 +379,16 @@ recurse_buildgraph(struct map *g, char *fname, struct externals *ext)
 	struct map *dedup = map_create();
 
 	struct ast_function *f = externals_getfunc(ext, fname);
+	if (!f) {
+		/* TODO: pass up an error */
+		fprintf(stderr, "function `%s' is not declared\n", fname);	
+		exit(EXIT_FAILURE);
+	}
 	if (f->isaxiom) {
 		return;
 	} 
 
-	/* XXX: look in abstractst */
+	/* XXX: look in abstracts */
 	/* XXX: handle prototypes */
 	struct ast_block *body = f->body;
 	int nstmts = ast_block_nstmts(body);

@@ -17,7 +17,7 @@ calculate_indegrees(struct map *g);
 static struct string_arr *
 build_indegree_zero(struct map *indegrees);
 
-char *
+struct string_arr *
 topological_order(char *fname, struct externals *ext)
 {
 	struct string_arr *order = string_arr_create();
@@ -45,13 +45,14 @@ topological_order(char *fname, struct externals *ext)
 		}
 	}
 
-	printf("order: %s\n", string_arr_str(order));
 	/* no more nodes with incoming edges */
 	if (order->n != indegrees->n) {
-		assert(false); /* ERROR: cycle */
+		/* TODO: pass up error */
+		fprintf(stderr, "cycle detected in graph");		
+		exit(EXIT_FAILURE);
 	}
 
-	return NULL;
+	return order;
 }
 
 static int *

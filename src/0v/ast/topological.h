@@ -3,7 +3,7 @@
 
 struct externals;
 
-char *
+struct string_arr *
 topological_order(char *fname, struct externals *);
 
 #endif

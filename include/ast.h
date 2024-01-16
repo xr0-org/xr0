@@ -544,7 +544,7 @@ ast_append(struct ast *, struct ast_externdecl *);
 void
 ast_destroy(struct ast *);
 
-char *
+struct string_arr *
 ast_topological_order(char *fname, struct externals *ext);
 
 #endif
