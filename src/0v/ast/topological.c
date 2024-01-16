@@ -12,9 +12,6 @@
  */
 
 static struct map *
-build_funcgraph(char *fname, struct externals *ext);
-
-static struct map *
 calculate_indegrees(struct map *g);
 
 static struct string_arr *
@@ -25,7 +22,7 @@ topological_order(char *fname, struct externals *ext)
 {
 	struct string_arr *order = string_arr_create();
 
-	struct map *g = build_funcgraph(fname, ext); 
+	struct map *g = ast_function_buildgraph(fname, ext); 
 	struct map *indegrees = calculate_indegrees(g);
 	struct string_arr *indegree_zero = build_indegree_zero(indegrees);
 	/* while there are nodes of indegree zero */
@@ -55,23 +52,6 @@ topological_order(char *fname, struct externals *ext)
 	}
 
 	return NULL;
-}
-
-static void
-recurse_funcgraph(struct map *m, char *name, struct externals *ext);
-
-struct map *
-build_funcgraph(char *fname, struct externals *ext)
-{
-	struct map *g = map_create();
-
-	map_set(
-		g,
-		dynamic_str(fname),
-		ast_function_getfuncs(fname, ext)
-	);
-
-	return g;
 }
 
 static int *

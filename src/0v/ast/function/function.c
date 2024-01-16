@@ -5,13 +5,13 @@
 
 #include "ast.h"
 #include "function.h"
+#include "stmt/stmt.h"
 #include "intern.h"
 #include "object.h"
 #include "props.h"
 #include "state.h"
 #include "ext.h"
 #include "util.h"
-#include "stmt/stmt.h"
 
 struct ast_function {
 	bool isaxiom;
@@ -360,21 +360,36 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 	return result_value_create(object_as_value(obj));
 }
 
-struct string_arr *
-ast_function_getfuncs(char *fname, struct externals *ext)
+static void
+recurse_buildgraph(struct map *g, char *fname, struct externals *ext);
+
+struct map *
+ast_function_buildgraph(char *fname, struct externals *ext)
 {
-	struct string_arr *funcs = string_arr_create();
+	struct map *g = map_create();
+	
+	recurse_buildgraph(g, fname, ext);
+
+	return g;
+}
+
+static void
+recurse_buildgraph(struct map *g, char *fname, struct externals *ext)
+{
 	struct map *dedup = map_create();
 
 	struct ast_function *f = externals_getfunc(ext, fname);
 	if (f->isaxiom) {
-		return funcs;
-	}
+		return;
+	} 
 
+	/* XXX: look in abstractst */
+	/* XXX: handle prototypes */
 	struct ast_block *body = f->body;
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 
+	struct string_arr *val = string_arr_create();
 	for (int i = 0; i < nstmts; i++) {
 		struct string_arr *farr = ast_stmt_getfuncs(stmt[i]);		
 		if (!farr) {
@@ -388,17 +403,15 @@ ast_function_getfuncs(char *fname, struct externals *ext)
 				continue;
 			}
 				
-			string_arr_append(funcs, func[j]);	
+			string_arr_append(val, func[j]);	
 			map_set(dedup, func[j], (void *) true);
 
 			/* recursively build for other funcs */
-			return string_arr_concat(
-				funcs,
-				ast_function_getfuncs(func[j], ext)
-			);
+			recurse_buildgraph(g, func[j], ext);
 		}
 	}
-	return funcs;
+
+	map_set(g, dynamic_str(fname), val);
 }
 
 #include "arr.c"

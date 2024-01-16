@@ -8,6 +8,7 @@
 #include "util.h"
 
 #include "expr/expr.c"
+#include "topological.c"
 #include "block.c"
 #include "stmt/stmt.c"
 #include "type/type.c"
@@ -200,4 +201,10 @@ bool
 preresult_iscontradiction(struct preresult *r)
 {
 	return r->iscontradiction;
+}
+
+char *
+ast_topological_order(char *fname, struct externals *ext)
+{
+	return topological_order(fname, ext);
 }

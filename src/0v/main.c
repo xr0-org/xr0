@@ -257,6 +257,7 @@ main(int argc, char *argv[])
 	/* TODO: move table from lexer to pass1 */
 	struct externals *ext = externals_create();
 	pass0(root, ext);
+	ast_topological_order("main", ext);
 	pass1(root, ext);
 
 	externals_destroy(ext);

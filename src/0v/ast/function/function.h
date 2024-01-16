@@ -31,7 +31,7 @@ paths_fromfunction(struct ast_function *f);
 
 struct externals;
 
-struct string_arr *
-ast_function_getfuncs(char *fname, struct externals *ext);
+struct map *
+ast_function_buildgraph(char *fname, struct externals *ext);
 
 #endif

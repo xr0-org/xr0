@@ -103,7 +103,4 @@ string_arr_str(struct string_arr *);
 
 struct externals;
 
-char *
-topological_order(char *func_name, struct externals *);
-
 #endif
