@@ -722,6 +722,9 @@ static struct preresult *
 identifier_assume(char *id, bool value, struct state *state);
 
 static struct preresult *
+call_assume(struct ast_expr *, bool value, struct state *);
+
+static struct preresult *
 irreducible_assume(struct ast_expr *, bool value, struct state *);
 
 static struct preresult *
@@ -736,6 +739,7 @@ reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 	case EXPR_BRACKETED:
 		return reduce_assume(expr->root, value, s);
 	case EXPR_CALL:
+		return call_assume(expr, value, s);
 	case EXPR_BINARY:
 		return irreducible_assume(expr, value, s);
 	default:
@@ -755,6 +759,20 @@ identifier_assume(char *id, bool value, struct state *state)
 		return preresult_contradiction_create();
 	}
 	return preresult_empty_create();
+}
+
+static struct preresult *
+call_assume(struct ast_expr *expr, bool value, struct state *s)
+{
+	struct state *s_copy = state_copy(s);
+	struct result *res = ast_expr_eval(expr, s_copy);
+
+	/* TODO: user errors */
+	assert(!result_iserror(res) && result_hasvalue(res));
+
+	state_destroy(s_copy);
+
+	return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
 }
 
 static struct preresult *
