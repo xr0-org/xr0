@@ -806,10 +806,82 @@ pf_reduce(struct ast_expr *, struct state *);
 static struct preresult *
 call_assume(struct ast_expr *expr, bool value, struct state *s)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
+	struct result *res = pf_reduce(expr, s);
+	/* TODO: user errors */
+	assert(!result_iserror(res) && result_hasvalue(res));
 
-	assert(false);
-	/*return irreducible_assume(value_as_sync(result_as_value(res)), value, s);*/
+	return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
+}
+
+static struct result *
+unary_pf_reduce(struct ast_expr *, struct state *);
+
+static struct result *
+call_pf_reduce(struct ast_expr *, struct state *);
+
+static struct result *
+pf_reduce(struct ast_expr *e, struct state *s)
+{
+	switch (ast_expr_kind(e)) {
+	case EXPR_IDENTIFIER:
+		/* the actual reduction */
+		return expr_identifier_eval(e, s);
+	case EXPR_UNARY:
+		return unary_pf_reduce(e, s);
+	case EXPR_CALL:
+		return call_pf_reduce(e, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct result *
+unary_pf_reduce(struct ast_expr *e, struct state *s)
+{
+	/* TODO: reduce by actually dereferencing if expr is a deref and this is
+	 * possible in the current state */
+	struct result *res = pf_reduce(ast_expr_unary_operand(e), s);
+	if (result_iserror(res)) {
+		return res;
+	}
+	assert(result_hasvalue(res));
+	return result_value_create(
+		value_sync_create(
+			ast_expr_unary_create(
+				value_as_sync(result_as_value(res)),
+				ast_expr_unary_op(e)
+			)
+		)
+	);
+}
+
+static struct result *
+call_pf_reduce(struct ast_expr *e, struct state *s)
+{
+	/* TODO: allow for exprs as root */
+	char *root = ast_expr_as_identifier(ast_expr_call_root(e));
+
+	int nargs = ast_expr_call_nargs(e);
+	struct ast_expr **unreduced_arg = ast_expr_call_args(e);
+	struct ast_expr **reduced_arg = malloc(sizeof(struct ast_expr *) *nargs);
+	for (int i = 0; i < nargs; i++) {
+		struct result *res = pf_reduce(unreduced_arg[i], s);
+		if (result_iserror(res)) {
+			return res;
+		}
+		assert(result_hasvalue(res));
+		struct value *v = result_as_value(res);
+		assert(value_issync(v));
+		reduced_arg[i] = value_as_sync(v);
+	}
+	return result_value_create(
+		value_sync_create(
+			ast_expr_call_create(
+				ast_expr_identifier_create(dynamic_str(root)),
+				nargs, reduced_arg
+			)
+		)
+	);
 }
 
 static struct preresult *
