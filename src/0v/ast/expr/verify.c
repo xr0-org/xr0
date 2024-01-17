@@ -798,18 +798,18 @@ identifier_assume(struct ast_expr *expr, bool value, struct state *s)
 	return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
 }
 
+/* pf_reduce: Reduce an expression to "parameter form", in which its only
+ * primitives are constants and parameters (vconsts). */
+static struct result *
+pf_reduce(struct ast_expr *, struct state *);
+
 static struct preresult *
 call_assume(struct ast_expr *expr, bool value, struct state *s)
 {
-	struct state *s_copy = state_copy(s);
-	struct result *res = ast_expr_eval(expr, s_copy);
+	printf("expr: %s\n", ast_expr_str(expr));
 
-	/* TODO: user errors */
-	assert(!result_iserror(res) && result_hasvalue(res));
-
-	state_destroy(s_copy);
-
-	return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
+	assert(false);
+	/*return irreducible_assume(value_as_sync(result_as_value(res)), value, s);*/
 }
 
 static struct preresult *
