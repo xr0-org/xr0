@@ -156,9 +156,11 @@ pass0(struct ast *root, struct externals *ext)
 			ast_externdecl_install(decl, ext);
 			continue;
 		}
-		if (!externals_getfunc(ext, ast_function_name(f))) {
-			ast_externdecl_install(decl, ext);
-		}	
+		struct ast_function *stitched = ast_protostitch(f, ext);
+		ast_externdecl_install(
+			ast_functiondecl_create(ast_function_copy(stitched)),
+			ext
+		);
 	}
 }
 
@@ -211,7 +213,7 @@ verifyproto(struct ast_function *proto, int n, struct ast_externdecl **decl)
 	}
 	if (count == 1) {
 		if (proto_defisvalid(proto, def)) {
-			return true;	
+			return true;
 		}
 		fprintf(
 			stderr,

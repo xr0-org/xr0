@@ -547,4 +547,7 @@ ast_destroy(struct ast *);
 struct string_arr *
 ast_topological_order(char *fname, struct externals *ext);
 
+struct ast_function *
+ast_protostitch(struct ast_function *, struct externals *);
+
 #endif

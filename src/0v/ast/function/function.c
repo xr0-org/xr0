@@ -170,22 +170,17 @@ ast_function_params(struct ast_function *f)
 struct error *
 paths_verify(struct ast_function_arr *paths, struct externals *);
 
-struct ast_function *
-proto_stitch(struct ast_function *f, struct externals *);
-
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
-	struct ast_function *proto = proto_stitch(f, ext);
-
-	struct ast_function_arr *paths = paths_fromfunction(proto);
+	struct ast_function_arr *paths = paths_fromfunction(f);
 	struct error *err = paths_verify(paths, ext);
 	ast_function_arr_destroy(paths);
 	return err;
 }
 
 struct ast_function *
-proto_stitch(struct ast_function *f, struct externals *ext)
+ast_function_protostitch(struct ast_function *f, struct externals *ext)
 {
 	struct ast_function *proto = externals_getfunc(ext, f->name);
 
@@ -361,23 +356,28 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 }
 
 static void
-recurse_buildgraph(struct map *g, char *fname, struct externals *ext);
+recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externals *ext);
 
 struct map *
 ast_function_buildgraph(char *fname, struct externals *ext)
 {
-	struct map *g = map_create();
+	struct map *dedup = map_create(),
+		   *g = map_create();
 	
-	recurse_buildgraph(g, fname, ext);
+	recurse_buildgraph(g, dedup, fname, ext);
 
 	return g;
 }
 
 static void
-recurse_buildgraph(struct map *g, char *fname, struct externals *ext)
+recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externals *ext)
 {
-	struct map *dedup = map_create();
+	struct map *local_dedup = map_create();
 
+	if (map_get(dedup, fname) != NULL) {
+		return;
+	}
+	map_set(dedup, fname, (void *) true);
 	struct ast_function *f = externals_getfunc(ext, fname);
 	if (!f) {
 		/* TODO: pass up an error */
@@ -391,7 +391,9 @@ recurse_buildgraph(struct map *g, char *fname, struct externals *ext)
 	/* XXX: look in abstracts */
 	/* XXX: handle prototypes */
 	struct ast_block *body = f->body;
-	assert(body);
+	if (!body) {
+		return;
+	}
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 
@@ -405,15 +407,15 @@ recurse_buildgraph(struct map *g, char *fname, struct externals *ext)
 		char **func = string_arr_s(farr); 
 		for (int j = 0; j < string_arr_n(farr); j++) {
 			/* avoid duplicates */
-			if (map_get(dedup, func[j]) != NULL) {
+			if (map_get(local_dedup, func[j]) != NULL) {
 				continue;
 			}
 				
 			string_arr_append(val, func[j]);	
-			map_set(dedup, func[j], (void *) true);
+			map_set(local_dedup, func[j], (void *) true);
 
 			/* recursively build for other funcs */
-			recurse_buildgraph(g, func[j], ext);
+			recurse_buildgraph(g, dedup, func[j], ext);
 		}
 	}
 
