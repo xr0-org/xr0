@@ -391,6 +391,7 @@ recurse_buildgraph(struct map *g, char *fname, struct externals *ext)
 	/* XXX: look in abstracts */
 	/* XXX: handle prototypes */
 	struct ast_block *body = f->body;
+	assert(body);
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 

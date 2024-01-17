@@ -269,7 +269,8 @@ main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 		struct string_arr *order = ast_topological_order(c.sortfunc, ext);
-		printf("evaluation order: %s\n", string_arr_str(order));
+		/* TODO: our tests run 2>&1 > /dev/null */
+		fprintf(stderr, "evaluation order: %s\n", string_arr_str(order));
 	} else { 
 		/* TODO: verify in topological order */
 		pass1(root, ext);
