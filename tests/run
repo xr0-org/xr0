@@ -24,7 +24,7 @@ do
 	printf "%-${length}s ..." "$f"
 	if [ "$folder" == *"$topological_folder"* ]
 	then
-		output=$($XR0 -s $main_func -I $libx $f 2>&1 >/dev/null)
+		output=$($XR0 -s main -I $libx $f 2>&1 >/dev/null)
 	else
 		output=$($XR0 -I $libx $f 2>&1 >/dev/null)
 	fi

@@ -1,17 +1,18 @@
+#include <stdlib.h>
+#include <stdio.h>
+
 void
-func2()
-{
+main();
+
+void *
+func2() {
 	main();
+	return NULL;
 }
 
-void
-func1()
-{
-	func2();
-}
-
-void
+void *
 main()
 {
-	func1();	
+	func2();	
+	return NULL;
 }

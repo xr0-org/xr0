@@ -48,7 +48,7 @@ topological_order(char *fname, struct externals *ext)
 	/* no more nodes with incoming edges */
 	if (order->n != indegrees->n) {
 		/* TODO: pass up error */
-		fprintf(stderr, "cycle detected in graph.");		
+		fprintf(stderr, "cycle detected in graph");		
 		exit(EXIT_FAILURE);
 	}
 
