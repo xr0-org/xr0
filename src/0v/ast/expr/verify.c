@@ -395,8 +395,6 @@ expr_to_binary(struct ast_expr *expr)
 static struct result *
 binary_deref_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("state: %s\n", state_str(state));
-	printf("expr: %s\n", ast_expr_str(expr));
 	struct result *res = ast_expr_eval(ast_expr_binary_e1(expr), state);
 	if (result_iserror(res)) {
 		return res;

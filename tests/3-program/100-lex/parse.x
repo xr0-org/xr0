@@ -175,7 +175,7 @@ count_patterns(char *pos);
 
 struct defsresult
 parse_defs(char *input) ~ [
-	if (beginsdefs(input)) {
+	if (beginsdefs(skipws(input))) {
 		.alloc result.pre;
 	}
 	if (count_patterns(input)) {
