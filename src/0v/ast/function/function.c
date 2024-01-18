@@ -377,19 +377,16 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 	if (map_get(dedup, fname) != NULL) {
 		return;
 	}
-	printf("fname: %s\n", fname);
 	map_set(dedup, fname, (void *) true);
 	struct ast_function *f = externals_getfunc(ext, fname);
 	if (!f) {
 		/* TODO: pass up an error */
-		printf("here\n");
 		fprintf(stderr, "function `%s' is not declared\n", fname);	
 		exit(EXIT_FAILURE);
 	}
 	assert(f);
 
 	if (f->isaxiom) {
-		printf("axiom\n");
 		return;
 	} 
 
@@ -403,7 +400,6 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 	assert(stmt);
 	struct string_arr *val = string_arr_create();
 	for (int i = 0; i < nstmts; i++) {
-		printf("stmt: %s\n", ast_stmt_str(stmt[i]));
 		struct string_arr *farr = ast_stmt_getfuncs(stmt[i]);		
 		if (!farr) {
 			continue;
@@ -416,7 +412,10 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 				continue;
 			}
 				
-			string_arr_append(val, func[j]);	
+			struct ast_function *f = externals_getfunc(ext, func[j]);
+			if (!f->isaxiom) {
+				string_arr_append(val, func[j]);	
+			}
 			map_set(local_dedup, func[j], (void *) true);
 
 			/* recursively build for other funcs */

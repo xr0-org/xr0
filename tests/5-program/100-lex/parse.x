@@ -3,60 +3,11 @@
 #include <string.h>
 #include <ctype.h>
 
-#define false 0
 #define true 1
+#define false 0
 
 char *
-read_file(char *path) ~ [ .alloc result; ];
-
-struct lexer;
-
-struct lexer *
-parse(char *input);
-
-void
-lexer_destroy(struct lexer *) ~ [
-	pre: {
-		l = lexer_create(
-			$, $,
-			$, malloc(1),
-			$, malloc(1)
-		);
-	}
-
-	.dealloc l->pattern;
-	.dealloc l->token;
-	.dealloc l;
-];
-
-void
-lexer_print(struct lexer *) ~ [
-	pre: {
-		l = lexer_create(
-			$, $,
-			$, malloc(1),
-			$, malloc(1)
-		);
-	}
-];
-
-int
-main()
-{
-	char *file;
-	struct lexer *l;
-
-	file = read_file("tests/3-program/100-lex/gen.l");
-
-	l = parse(file);
-	lexer_print(l);
-	lexer_destroy(l);
-
-	free(file);
-}
-
-char *
-read_file(char *path)
+read_file(char *path) ~ [ .alloc result; ]
 {
 	FILE *f;
 	char *str;
@@ -73,24 +24,75 @@ read_file(char *path)
 	return str;
 }
 
+int
+main()
+{
+	char *file;
+	/*struct lexer *l;*/
+
+	file = read_file("/home/ubuntu/xr0/tests/3-program/100-lex/gen.l");
+
+	/* XXX: temporarily framing #15
+	l = parse(file);
+	lexer_print(l);
+	lexer_destroy(l);
+	*/
+
+	free(file);
+}
+
 struct pattern {
 	char *name; char *pattern;
 };
-
-void
-pattern_print(struct pattern *p) ~ [
-	pre: p = pattern_create("", "");
-];
 
 struct token {
 	int isliteral;
 	char *name; char *action;
 };
 
+struct pattern *
+pattern_create(char *name, char *pattern) ~ [
+	.alloc result;
+	result->name = name;
+	result->pattern = pattern;
+]{
+	struct pattern *p;
+
+	p = malloc(sizeof(struct pattern));
+	p->name = name;
+	p->pattern = pattern;
+
+	return p;
+}
+
 void
-token_print(struct token *t) ~ [
-	pre: t = token_create(0, "", "");
-];
+pattern_destroy(struct pattern *p) ~ [
+	pre: p = pattern_create($, $);
+	.dealloc p;
+]{
+	free(p);
+}
+
+struct token *
+token_create(int isliteral, char *name, char *action) ~ [ .alloc result; ]
+{
+	struct token *tk;
+
+	tk = malloc(sizeof(struct token));
+	tk->isliteral = isliteral;
+	tk->name = name;
+	tk->action = action;
+
+	return tk;
+}
+
+void
+token_destroy(struct token *tk) ~ [
+	pre: tk = token_create($, $, $);
+	.dealloc tk;
+]{
+	free(tk);
+}
 
 struct lexer {
 	char *pre; char *post;
@@ -101,9 +103,7 @@ struct lexer {
 struct lexer *
 lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 		int ntok, struct token *token) ~ [
-	.alloc result; 
-	result->pre = pre;
-	result->post = post;
+	.alloc result;
 	result->pattern = pattern;
 	result->token = token;
 ]{
@@ -128,110 +128,6 @@ lexer_destroy(struct lexer *l)
 	free(l);
 }
 
-void
-lexer_print(struct lexer *l)
-{
-	int i;
-
-	puts("\tpre:");
-	puts(l->pre);
-
-	puts("\tpost:");
-	puts(l->post);
-
-	puts("\tpatterns:");
-	for (i = 0; i < l->npat; i++) {
-		putchar('\t');
-		putchar('\t');
-		pattern_print(&l->pattern[i]);
-		putchar('\n');
-	}
-	puts("\ttokens:");
-	for (i = 0; i < l->ntok; i++) {
-		putchar('\t');
-		putchar('\t');
-		token_print(&l->token[i]);
-		putchar('\n');
-	}
-}
-
-/* skipws: skip whitespace */
-char *
-skipws(char *s);
-
-struct defsresult {
-	char *pre;
-	struct pattern *pattern;
-	int npat;
-	char *pos;
-};
-
-int
-beginsdefs(char *s);
-
-int
-count_patterns(char *pos);
-
-struct defsresult
-parse_defs(char *input) ~ [
-	if (beginsdefs(skipws(input))) {
-		.alloc result.pre;
-	}
-	if (count_patterns(input)) {
-		.alloc result.pattern;
-	}
-];
-
-int
-beginsdefs(char *s)
-{
-	return strncmp(s, "%{", 2) == 0;
-}
-
-struct rulesresult {
-	struct token *token;
-	int ntok;
-	char *pos;
-};
-
-struct rulesresult
-parse_rules(char *pos) ~ [
-	result.token = $; /* TODO: put in else block */
-	if (count_tokens(pos)) {
-		.alloc result.token;
-	}
-	result.pos = $;
-];
-
-char *
-parse_toeof(char *input) ~ [ .alloc result; ];
-
-struct lexer *
-parse(char *pos)
-{
-	struct defsresult def;
-	struct rulesresult res;
-	char *post;
-
-	def = parse_defs(pos);
-	pos = def.pos;
-	if (strncmp(pos, "%%", 2) != 0) {
-		/* TODO: fprintf breaks */
-		/*fprintf(stderr, "invalid transition to rules: '%.*s'\n", 10, pos);*/
-		exit(1);
-	}
-	pos = skipws(pos + 2); /* %% */
-	res = parse_rules(pos);
-	pos = res.pos;
-	post = "";
-	if (strncmp(pos, "%%", 2) == 0) {
-		pos += 2;
-		post = parse_toeof(pos);
-	}
-	return lexer_create(def.pre, post, def.npat, def.pattern, res.ntok,
-		res.token);
-}
-
 char *
 substr(char *s, int n) ~ [ .alloc result; ]
 {
@@ -240,56 +136,22 @@ substr(char *s, int n) ~ [ .alloc result; ]
 
 	len = n + 1;
 	ss = malloc(sizeof(char) * len);
-	strncpy(ss, s, len);
-	ss[len-1] = '\0';
+	strncpy(ss, s, n);
+	ss[n] = '\0';
 	return ss;
 }
 
 char *
-skipws(char *s)
-{
-	for (; isspace(*s); s++) {}
-	return s;
-}
-
-char *
-skiplinespace(char *s)
-{
-	for (; *s == ' ' || *s == '\t'; s++) {}
-	return s;
-}
-
-char *
-parse_id(char *input) ~ [ .alloc result; ];
-
-char *
-skipoptions(char *pos)
-{
-	char *keyword;
-	char *id;
-
-	keyword = "%option";
-	if (strncmp(pos, keyword, strlen(keyword)) != 0) {
-		return pos;
-	}
-	pos += strlen(keyword);
-	pos = skiplinespace(pos);
-	id = parse_id(pos);
-	pos += strlen(id);
-	free(id);
-	return pos;
-}
-
-char *
-parse_id(char *input)
+parse_id(char *input) ~ [ .alloc result; ]
 {
 	char *s;
 
+	/*
 	if (!isalpha(*input)) {
-		/* TODO: print to stderr */
-		puts("id must begin with letter");
+		fprintf(stderr, "id must begin with letter: '%s'", input);
 		exit(1);
 	}
+	*/
 	s = input + 1;
 	/* XXX: '0' is a placeholder to allow this to parse */
 	for (; isalpha(*s) || isdigit(*s) || *s == '_' ; 0) {
@@ -299,172 +161,51 @@ parse_id(char *input)
 }
 
 char *
+skiplinespace(char *s) ~ [
+	result = s; /* XXX */
+]{
+	for (; *s == ' ' || *s == '\t'; s++) {}
+	return s;
+}
+
+#define KEYWORD_OPTION "%option"
+
+char *
+skipoptions(char *pos)
+{
+	char *id;
+
+	if (strncmp(pos, KEYWORD_OPTION, strlen(KEYWORD_OPTION)) != 0) {
+		return pos;
+	}
+	pos += strlen(KEYWORD_OPTION);
+	pos = skiplinespace(pos);
+	id = parse_id(pos);
+	pos += strlen(id);
+	free(id);
+	return pos;
+}
+
+char *
 parse_tonewline(char *input) ~ [ .alloc result; ]
 {
 	char *s;
-	s = input; /* must be here because not seen with skip loop hack */
-	for (; *s != '\n'; 0) {
+	s = input; /* XXX: until loop is understood more */
+	for (s = input; *s != '\n'; 0) {
 		s++;
 	}
 	return substr(input, s - input);
 }
-
-struct stringresult {
-	char *s;
-	char *pos;
-};
-
-struct stringresult
-parse_defsraw(char *input) ~ [
-	result.s = $;
-	if (beginsdefs(input)) {
-		.alloc result.s;
-	}
-	result.pos = $;
-];
-
-struct patternet {
-	struct pattern *pattern;
-	int npat;
-	char *pos;
-};
-
-struct patternet
-parse_defsproper(char *input) ~ [
-	result.pattern = $; /* TODO: put in else block */
-	if (count_patterns(input)) {
-		.alloc result.pattern;
-	}
-	result.npat = $;
-	result.pos = $;
-];
-
-struct defsresult
-parse_defs(char *input)
-{
-	struct stringresult raw;
-	struct patternet set;
-	struct defsresult res;
-
-	input = skipws(input);
-	if (*input == '\0') {
-		puts("EOF in defs");
-		exit(1);
-	}
-	raw = parse_defsraw(input);
-	input = raw.pos;
-	input = skipws(input);
-	input = skipoptions(input);
-	input = skipws(input);
-	set = parse_defsproper(input);
-
-	res.pre = raw.s;
-	res.pattern = set.pattern;
-	res.npat = set.npat;
-	res.pos = set.pos;
-	return res;
-}
-
-struct stringresult
-parse_defsraw(char *input)
-{
-	char *pos;
-	struct stringresult res;
-
-	if (!beginsdefs(input)) {
-		res.s = "";
-		res.pos = input;
-		return res;
-	}
-	input += 2;
-	pos = input;
-	for (; strncmp(pos, "%}", 2) != 0; pos++) {}
-	res.s = substr(input, pos - input);
-	res.pos = pos + 2;
-	return res;
-}
-
-struct pattern *
-pattern_create(char *name, char *pattern) ~ [
-	.alloc result;
-	result->name = name;
-	result->pattern = pattern;
-]{
-	struct pattern *p;
-
-	p = malloc(sizeof(struct pattern));
-	p->name = name;
-	p->pattern = pattern;
-
-	return p;
-}
-
-void
-pattern_print(struct pattern *p)
-{
-	puts("pattern:");
-	puts(p->name);
-	puts(p->pattern);
-	puts("end pattern");
-}
-
 
 struct patternresult {
 	struct pattern *p;
 	char *pos;
 };
 
-struct patternpos {
-	struct pattern *p;
-	char *pos;
-};
-
-struct patternpos
-parse_defs_n(char *pos, int npat) ~ [
-	result.p = $; /* TODO: put in else block */
-	if (npat) {
-		.alloc result.p;
-	}
-	result.pos = $;
-];
-
-struct patternet
-parse_defsproper(char *input)
-{
-	struct patternet res;
-	struct patternpos defs_n;
-
-	res.npat = count_patterns(input);
-	defs_n = parse_defs_n(input, res.npat);
-	res.pattern = defs_n.p;
-	res.pos = defs_n.pos;
-	return res;
-}
-
 struct patternresult
 parse_pattern(char *pos) ~ [
 	result.p = pattern_create(malloc(1), malloc(1));
-];
-
-int
-count_patterns(char *pos)
-{
-	int n;
-	struct patternresult parsed;
-
-	n = 0;
-	for (; strncmp(pos, "%%", 2) != 0; n++) {
-		parsed = parse_pattern(pos);
-		pos = skipws(parsed.pos);
-		/* TODO: clean up r.p */
-	}
-
-	return n;
-}
-
-struct patternresult
-parse_pattern(char *pos)
-{
+]{
 	char *name; char *pattern;
 	struct patternresult res;
 
@@ -472,91 +213,84 @@ parse_pattern(char *pos)
 	pos = pos + strlen(name);
 	pos = skiplinespace(pos);
 	pattern = parse_tonewline(pos);
-	pos += strlen(pattern);
+	pos = pos + strlen(pattern); /* XXX: support pos += */
 
 	res.p = pattern_create(name, pattern);
 	res.pos = pos;
 	return res;
 }
 
-struct patternpos
-parse_defs_n(char *pos, int npat)
+struct patternet {
+	struct pattern *pattern;
+	int npat;
+	char *pos;
+};
+
+char *
+skipws(char *s)
 {
+	for (; isspace(*s); s++) {}
+	return s;
+}
+
+int
+compute_npat(char *pos)
+{
+	int n;
+	struct patternresult r;
+
+	n = 0;
+	for (; strncmp(pos, "%%", 2) != 0; n++) {
+		r = parse_pattern(pos);
+		pos = skipws(r.pos);
+		/* TODO: clean up r.p */
+	}
+
+	return n;
+}
+
+struct pattern *
+parse_defs_n(char *pos, int npat) ~ [
+	if (npat) {
+		.alloc result;
+	}
+]{
 	int i;
 	struct pattern *p;
 	struct patternresult parsed;
-	struct patternpos res;
 
-	p = NULL;
 	if (npat) {
-		p = malloc(sizeof(struct pattern) * npat);
+		p = malloc(npat);
 		for (i = 0; i < npat; i++) {
 			parsed = parse_pattern(pos);
 			p[i] = *parsed.p;
 			pos = skipws(parsed.pos);
 		}
+		return p;
 	}
 
-	res.p = p;
+	return NULL;
+}
+
+struct patternet
+parse_defsproper(char *pos) ~ [
+	if (compute_npat(pos)) {
+		.alloc result.pattern;
+	}
+]{
+	struct patternet res;
+
+	res.npat = compute_npat(pos);
+	res.pattern = parse_defs_n(pos, res.npat);
 	res.pos = pos;
 	return res;
 }
 
-struct token *
-token_create(int isliteral, char *name, char *action) ~ [
-	.alloc result;
-	result->isliteral = isliteral;
-	result->name = name;
-	result->action = action;
-]{
-	struct token *tk;
-
-	tk = malloc(sizeof(struct token));
-	tk->isliteral = isliteral;
-	tk->name = name;
-	tk->action = action;
-
-	return tk;
-}
-
-void
-token_print(struct token *t)
-{
-	puts("token:");
-	puts(t->name);
-	puts(t->action);
-	puts("end token");
-}
-
-int
-count_tokens(char *pos);
-
-struct tokenpos {
-	struct token *t;
+struct rulesresult {
+	struct token *token;
+	int ntok;
 	char *pos;
 };
-
-struct tokenpos
-parse_rules_n(char *pos, int ntok) ~ [
-	result.t = $; /* TODO: put in else block */
-	if (ntok) {
-		.alloc result.t;
-	}
-	result.pos = $;
-];
-
-struct rulesresult
-parse_rules(char *pos)
-{
-	struct rulesresult res;
-	struct tokenpos rules_n;
-
-	res.ntok = count_tokens(pos);
-	rules_n = parse_rules_n(pos, res.ntok);
-	res.token = rules_n.t;
-	res.pos = rules_n.pos;
-	return res;
-}
 
 struct tokenresult {
 	struct token *tk;
@@ -564,13 +298,10 @@ struct tokenresult {
 };
 
 struct tokenresult
-parse_token(char *pos) ~ [
-	result.tk = token_create($, malloc($), malloc($));
-	result.pos = $;
-];
+parse_token(char *pos);
 
 int
-count_tokens(char *pos)
+compute_ntok(char *pos)
 {
 	int n;
 	struct tokenresult r;
@@ -585,27 +316,208 @@ count_tokens(char *pos)
 	return n;
 }
 
-struct tokenpos
-parse_rules_n(char *pos, int ntok)
-{
+struct token *
+parse_rules_n(char *pos, int ntok) ~ [
+	if (ntok) {
+		.alloc result;
+	}
+]{
 	int i;
 	struct token *t;
 	struct tokenresult parsed;
-	struct tokenpos res;
 
-	t = NULL;
 	if (ntok) {
-		t = malloc(sizeof(struct token) * ntok);
+		t = malloc(ntok);
 		for (i = 0; i < ntok; i++) {
 			parsed = parse_token(pos);
 			t[i] = *parsed.tk;
 			pos = skipws(parsed.pos);
 		}
+		return t;
 	}
 
-	res.t = t;
+	return NULL;
+}
+
+struct rulesresult
+parse_rules(char *pos) ~ [
+	if (compute_ntok(pos)) {
+		.alloc result.token;
+	}
+]{
+	struct rulesresult res;
+
+	res.ntok = compute_ntok(pos);
+	res.token = parse_rules_n(pos, res.ntok);
 	res.pos = pos;
 	return res;
+}
+
+
+struct lexer;
+
+struct lexer *
+parse(char *input);
+
+void
+lexer_destroy(struct lexer *) ~ [
+	pre: {
+		l = lexer_create(
+			$, $,
+			$, malloc(1),
+			$, malloc(1)
+		);
+	}
+
+	.dealloc l->pattern;
+	.dealloc l->token;
+	.dealloc l;
+];
+
+void
+lexer_print(struct lexer *);
+
+void
+pattern_print(struct pattern *);
+
+void
+token_print(struct token *);
+
+void
+lexer_print(struct lexer *l)
+{
+	int i;
+
+	printf("\tpre: %s\n", l->pre);
+	printf("\tpost: %s\n", l->post);
+	printf("\tpatterns:\n");
+	for (i = 0; i < l->npat; i++) {
+		printf("\t\t");
+		pattern_print(&l->pattern[i]);
+		printf("\n");
+	}
+	printf("\ttokens:\n");
+	for (i = 0; i < l->ntok; i++) {
+		printf("\t\t");
+		token_print(&l->token[i]);
+		printf("\n");
+	}
+}
+
+struct defsresult {
+	char *pre;
+	struct pattern *pattern;
+	int npat;
+	char *pos;
+};
+
+struct defsresult
+parse_defs(char *pos);
+
+struct rulesresult
+parse_rules(char *pos);
+
+char *
+parse_toeof(char *input);
+
+struct lexer *
+parse(char *pos)
+{
+	struct defsresult def;
+	struct rulesresult res;
+	char *post;
+
+	def = parse_defs(pos);
+	pos = def.pos;
+	if (strncmp(pos, "%%", 2) != 0) {
+		fprintf(stderr, "invalid transition to rules: '%.*s'\n", 10,
+			pos);
+		exit(1);
+	}
+	pos = skipws(pos + 2); /* %% */
+	res = parse_rules(pos);
+	pos = res.pos;
+	post = "";
+	if (strncmp(pos, "%%", 2) == 0) {
+		pos += 2;
+		post = parse_toeof(pos);
+	}
+	return lexer_create(def.pre, post, def.npat, def.pattern, res.ntok,
+		res.token);
+}
+
+struct stringresult {
+	char *s;
+	char *pos;
+};
+
+struct stringresult
+parse_defsraw(char *input);
+
+struct patternet
+parse_defsproper(char *pos);
+
+struct defsresult
+parse_defs(char *pos)
+{
+	struct stringresult raw;
+	struct patternet set;
+	struct defsresult res;
+
+	pos = skipws(pos);
+	if (*pos == '\0') {
+		fprintf(stderr, "EOF in defs\n");
+		exit(1);
+	}
+	raw = parse_defsraw(pos);
+	pos = raw.pos;
+	pos = skipws(pos);
+	pos = skipoptions(pos);
+	pos = skipws(pos);
+	set = parse_defsproper(pos);
+
+	res.pre = raw.s;
+	res.pattern = set.pattern;
+	res.npat = set.npat;
+	res.pos = set.pos;
+	return res;
+}
+
+struct stringresult
+parse_defsraw(char *input)
+{
+	char *pos;
+	struct stringresult res;
+
+	if (strncmp(input, "%{", 2) != 0) {
+		res.s = "";
+		res.pos = input;
+		return res;
+	}
+	input += 2;
+	pos = input;
+	for (; strncmp(pos, "%}", 2) != 0; pos++) {}
+	res.s = substr(input, pos - input);
+	res.pos = pos + 2;
+	return res;
+}
+
+void
+pattern_print(struct pattern *p)
+{
+	printf("%s\t\t%s", p->name, p->pattern);
+}
+
+
+void
+token_print(struct token *t)
+{
+	if (t->isliteral) {
+		printf("\"%s\"", t->name);
+	} else {
+		printf("{%s}", t->name);
+	}
+	printf("\t\t%s", t->action);
 }
 
 struct tknameresult {
@@ -615,17 +527,10 @@ struct tknameresult {
 };
 
 struct tknameresult
-parse_name(char *pos) ~ [
-	.alloc result.name;
-	result.isliteral = $;
-	result.pos = $;
-];
+parse_name(char *pos);
 
 struct stringresult
-parse_action(char *input) ~ [
-	.alloc result.s;
-	result.pos = $;
-];
+parse_action(char *input);
 
 struct tokenresult
 parse_token(char *pos)
@@ -643,25 +548,25 @@ parse_token(char *pos)
 }
 
 struct tknameresult
-parse_token_id(char *pos) ~ [ .alloc result.name; ];
+parse_token_id(char *pos);
 
 struct tknameresult
-parse_token_literal(char *input) ~ [ .alloc result.name; ];
+parse_token_literal(char *input);
 
 struct tknameresult
-parse_token_pattern(char *pos) ~ [ .alloc result.name; ];
+parse_token_pattern(char *pos);
 
 struct tknameresult
 parse_name(char *pos)
 {
-	/* TODO: make into switch */
-	if (*pos == '{') {
+	switch (*pos) {
+	case '{':
 		return parse_token_id(pos);
-	}
-	if (*pos == '"') {
+	case '"':
 		return parse_token_literal(pos);
+	default:
+		return parse_token_pattern(pos);
 	}
-	return parse_token_pattern(pos);
 }
 
 struct tknameresult
@@ -673,7 +578,8 @@ parse_token_id(char *pos)
 	id = parse_id(++pos); /* skip '{' */
 	pos += strlen(id);
 	if (*pos != '}') {
-		puts("token id must end in '}'");
+		fprintf(stderr, "token id must end in '}' but has '%.*s\n'", 5,
+			pos);
 		exit(1);
 	}
 
@@ -720,7 +626,8 @@ parse_action(char *input)
 	struct stringresult res;
 
 	if (*input != '{') {
-		puts("action must begin with '{'");
+		fprintf(stderr, "action must begin with '{' but has '%.*s\n",
+			10, input);
 		exit(1);
 	}
 	input++; /* skip '{' */
@@ -737,8 +644,7 @@ parse_toeof(char *input)
 {
 	char *s;
 
-	s = input; /* must be here because not seen with skip loop hack */
-	for (; *s != '\0'; 0) {
+	for (s = input; *s != '\0'; 0) {
 		s++;
 	}
 	return substr(input, s - input);

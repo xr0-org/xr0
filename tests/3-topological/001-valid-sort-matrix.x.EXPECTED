@@ -1,1 +1,1 @@
-evaluation order: malloc, putchar, puts, free, matrix_create, matrix_print, matrix_destroy, matrix_add, main
+matrix_create, matrix_print, matrix_destroy, matrix_add, main
