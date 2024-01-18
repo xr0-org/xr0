@@ -17,7 +17,11 @@ matrix_create(int rows, int cols) ~ [
 	for (i = 0; i < result->rows; i++) {
 		.alloc result->data[i];	
 	}
-]{
+];
+
+struct matrix *
+matrix_create(int rows, int cols)
+{
 	int i;
 	struct matrix *m;
 
