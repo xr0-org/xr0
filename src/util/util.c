@@ -258,6 +258,7 @@ string_arr_copy(struct string_arr *old)
 struct string_arr *
 string_arr_concat(struct string_arr *s1, struct string_arr *s2)
 {
+	assert(s1 && s2);
 	struct string_arr *new = string_arr_copy(s1);		
 	for (int i = 0; i < s2->n; i++) {
 		string_arr_append(new, s2->s[i]);

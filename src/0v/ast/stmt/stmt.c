@@ -722,7 +722,7 @@ ast_stmt_selection_getfuncs(struct ast_stmt *stmt)
 			*nest = stmt->u.selection.nest;
 	struct string_arr *cond_arr = ast_expr_getfuncs(cond),
 			  *body_arr = ast_stmt_getfuncs(body),
-			  *nest_arr = ast_stmt_getfuncs(nest);
+			  *nest_arr = nest ? ast_stmt_getfuncs(nest) : string_arr_create();
 	
 	return string_arr_concat(
 		string_arr_create(),

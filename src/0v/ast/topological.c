@@ -22,7 +22,9 @@ topological_order(char *fname, struct externals *ext)
 {
 	struct string_arr *order = string_arr_create();
 
+	printf("before\n");
 	struct map *g = ast_function_buildgraph(fname, ext); 
+	printf("after\n");
 	struct map *indegrees = calculate_indegrees(g);
 	struct string_arr *indegree_zero = build_indegree_zero(indegrees);
 	/* while there are nodes of indegree zero */
