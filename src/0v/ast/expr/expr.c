@@ -73,7 +73,7 @@ ast_expr_constant_str_build(struct ast_expr *expr, struct strbuilder *b)
 	case '\n': case '\t': case '\v': case '\b': case '\f':
 	case '\a': case '\\': case '\?': case '\'': case '\"':
 	case '\0':
-		strbuilder_printf(b, "%s", escape_str(constant));
+		strbuilder_printf(b, "'%s'", escape_str(constant));
 		break;
 	default:
 		strbuilder_printf(b, "'%c'", constant);
@@ -91,12 +91,12 @@ escape_str(char c)
 	case '\b': return "\\b";
 	case '\f': return "\\f";
 	case '\a': return "\\a";
-	case '\\': return "\\";
-	case '\?': return "\?";
-	case '\'': return "\'";
-	case '\"': return "\"";
+	case '\\': return "\\\\";
+	case '\?': return "\\?";
+	case '\'': return "\\\'";
+	case '\"': return "\\\"";
 	/* TODO: handle octal and hex escapes */
-	case '\0': return "\0";
+	case '\0': return "\\0";
 	default: assert(false);
 	}
 }

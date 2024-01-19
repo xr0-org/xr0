@@ -174,12 +174,12 @@ int
 count_patterns(char *pos);
 
 struct defsresult
-parse_defs(char *input) ~ [
-	if (beginsdefs(skipws(input))) {
+parse_defs(char *pos) ~ [
+	if (beginsdefs(skipws(pos))) {
 		.alloc result.pre;
-	}
-	if (count_patterns(input)) {
-		.alloc result.pattern;
+		if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
+			.alloc result.pattern;
+		}
 	}
 ];
 
@@ -249,6 +249,7 @@ skipoptions(char *pos)
 	char *keyword;
 	char *id;
 
+	pos = skipws(pos);
 	keyword = "%option";
 	if (strncmp(pos, keyword, strlen(keyword)) != 0) {
 		return pos;
@@ -258,7 +259,7 @@ skipoptions(char *pos)
 	id = parse_id(pos);
 	pos += strlen(id);
 	free(id);
-	return pos;
+	return skipws(pos);
 }
 
 char *
@@ -321,23 +322,21 @@ parse_defsproper(char *input) ~ [
 ];
 
 struct defsresult
-parse_defs(char *input)
+parse_defs(char *pos)
 {
 	struct stringresult raw;
 	struct patternet set;
 	struct defsresult res;
 
-	input = skipws(input);
-	if (*input == '\0') {
+	pos = skipws(pos);
+	if (*pos == '\0') {
 		puts("EOF in defs");
 		exit(1);
 	}
-	raw = parse_defsraw(input);
-	input = raw.pos;
-	input = skipws(input);
-	input = skipoptions(input);
-	input = skipws(input);
-	set = parse_defsproper(input);
+	raw = parse_defsraw(pos);
+	pos = raw.pos;
+	pos = skipoptions(pos);
+	set = parse_defsproper(pos);
 
 	res.pre = raw.s;
 	res.pattern = set.pattern;
