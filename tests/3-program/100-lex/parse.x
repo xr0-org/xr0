@@ -313,7 +313,8 @@ struct patternet {
 
 struct patternet
 parse_defsproper(char *input) ~ [
-	result.pattern = $; /* TODO: put in else block */
+	/* TODO: put in else block */
+	result.pattern = $;
 	if (count_patterns(input)) {
 		.alloc result.pattern;
 	}

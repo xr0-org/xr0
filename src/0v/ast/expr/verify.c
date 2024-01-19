@@ -818,6 +818,9 @@ static struct result *
 call_pf_reduce(struct ast_expr *, struct state *);
 
 static struct result *
+structmember_pf_reduce(struct ast_expr *, struct state *);
+
+static struct result *
 pf_reduce(struct ast_expr *e, struct state *s)
 {
 	switch (ast_expr_kind(e)) {
@@ -828,6 +831,8 @@ pf_reduce(struct ast_expr *e, struct state *s)
 		return unary_pf_reduce(e, s);
 	case EXPR_CALL:
 		return call_pf_reduce(e, s);
+	case EXPR_STRUCTMEMBER:
+		return structmember_pf_reduce(e, s);
 	default:
 		assert(false);
 	}
@@ -881,6 +886,25 @@ call_pf_reduce(struct ast_expr *e, struct state *s)
 		)
 	);
 }
+
+static struct result *
+structmember_pf_reduce(struct ast_expr *expr, struct state *s)
+{
+	struct result *res = pf_reduce(ast_expr_member_root(expr), s);
+	if (result_iserror(res)) {
+		return res;
+	}
+	assert(result_hasvalue(res));
+	return result_value_create(
+		value_sync_create(
+			ast_expr_member_create(
+				value_as_sync(result_as_value(res)),
+				dynamic_str(ast_expr_member_field(expr))
+			)
+		)
+	);
+}
+
 
 static struct preresult *
 irreducible_assume_actual(struct ast_expr *e, struct state *s);

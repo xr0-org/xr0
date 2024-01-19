@@ -4,6 +4,7 @@
 
 #include "ast.h"
 #include "function.h"
+#include "stmt/stmt.h"
 #include "util.h"
 
 static struct ast_function_arr *
@@ -211,14 +212,21 @@ block_withassumption(struct ast_block *old, struct ast_expr *cond)
 struct ast_stmt *
 choose_split_path(struct ast_stmt *stmt, bool should_split, bool enter);
 
+struct ast_stmt_arr {
+	int n;
+	struct ast_stmt **stmt;
+};
+
+static void
+stmt_arr_appendbody(struct ast_stmt_arr *arr, struct ast_stmt *body);
+
 static struct ast_block *
 split_block_index(struct ast_block *b, int split_index, bool enter)
 {
 	int nstmts = ast_block_nstmts(b);
 	struct ast_stmt **old_stmt = ast_block_stmts(b);
 
-	int n = 0;
-	struct ast_stmt **stmt = NULL;
+	struct ast_stmt_arr arr = { 0, NULL };
 	for (int i = 0; i < nstmts; i++) {
 		struct ast_stmt *s = choose_split_path(
 			old_stmt[i], i == split_index, enter
@@ -226,8 +234,7 @@ split_block_index(struct ast_block *b, int split_index, bool enter)
 		if (!s) {
 			continue;
 		}
-		stmt = realloc(stmt, sizeof(struct ast_stmt *) * ++n);
-		stmt[n-1] = ast_stmt_copy(s);
+		stmt_arr_appendbody(&arr, s);
 	}
 
 	int ndecl = ast_block_ndecls(b);
@@ -238,7 +245,7 @@ split_block_index(struct ast_block *b, int split_index, bool enter)
 		: NULL;
 	return ast_block_create(
 		decl, ndecl,
-		stmt, n
+		arr.stmt, arr.n
 	);
 }
 
@@ -249,4 +256,21 @@ choose_split_path(struct ast_stmt *stmt, bool should_split, bool enter)
 		return enter ? ast_stmt_sel_body(stmt) : NULL;
 	}
 	return stmt;
+}
+
+static void
+stmt_arr_appendbody(struct ast_stmt_arr *arr, struct ast_stmt *body)
+{
+	/* TODO: carefully sift through all ast_stmt_kinds */
+	if (ast_stmt_kind(body) == STMT_COMPOUND) {
+		struct ast_block *b = ast_stmt_as_block(body);
+		int nstmts = ast_block_nstmts(b);
+		struct ast_stmt **stmt = ast_block_stmts(b);
+		for (int i = 0; i < nstmts; i++) {
+			stmt_arr_appendbody(arr, stmt[i]);
+		}
+	} else {
+		arr->stmt = realloc(arr->stmt, sizeof(struct ast_stmt *) * ++arr->n);
+		arr->stmt[arr->n-1] = ast_stmt_copy(body);
+	}
 }
