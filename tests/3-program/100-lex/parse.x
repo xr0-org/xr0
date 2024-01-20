@@ -177,9 +177,9 @@ struct defsresult
 parse_defs(char *pos) ~ [
 	if (beginsdefs(skipws(pos))) {
 		.alloc result.pre;
-		if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
-			.alloc result.pattern;
-		}
+	}
+	if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
+		.alloc result.pattern;
 	}
 ];
 

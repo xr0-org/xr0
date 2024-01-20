@@ -478,6 +478,9 @@ static struct result *
 call_absexec(struct ast_expr *call, struct ast_function *, struct state *);
 
 static struct result *
+pf_augment(struct value *v, struct ast_expr *root, struct state *);
+
+static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *root = ast_expr_call_root(expr);
@@ -510,15 +513,24 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	struct result *res = call_absexec(expr, f, state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	/* copy to preserve value through popping of frame */
+	struct value *v = NULL;
+	if (result_hasvalue(res)) {
+		v = value_copy(result_as_value(res));
+	}
 
 	state_popframe(state);
 	result_arr_destroy(args);
 
+	if (v) {
+		return pf_augment(v, expr, state);
+	}
+
 	return res;
 }
-
-static struct result *
-pf_augment(struct value *v, struct ast_expr *root, struct state *);
 
 static struct result *
 call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state *);
@@ -527,12 +539,8 @@ static struct result *
 call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
 {
 	struct result *res = ast_function_absexec(f, state);
-	if (result_iserror(res)) {
+	if (result_iserror(res) || result_hasvalue(res)) {
 		return res;
-	}
-	if (result_hasvalue(res)) {
-		/* copy to preserve value through popping of frame */
-		return pf_augment(result_as_value(res), expr, state);
 	}
 	return call_arbitraryresult(expr, f, state);
 }
@@ -915,11 +923,20 @@ structmember_pf_reduce(struct ast_expr *expr, struct state *s)
 		return res;
 	}
 	assert(result_hasvalue(res));
+	char *field = ast_expr_member_field(expr);
+	struct value *v = result_as_value(res);
+	if (value_isstruct(v)) {
+		struct object *obj = value_struct_member(v, field);
+		struct value *obj_value = object_as_value(obj);
+		assert(obj_value);
+		return result_value_create(value_copy(obj_value));
+	}
+	assert(value_issync(v));
 	return result_value_create(
 		value_sync_create(
 			ast_expr_member_create(
-				value_as_sync(result_as_value(res)),
-				dynamic_str(ast_expr_member_field(expr))
+				value_as_sync(v),
+				dynamic_str(field)
 			)
 		)
 	);
