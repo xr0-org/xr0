@@ -1,28 +1,40 @@
 #include <stdlib.h>
 
-struct tuple {
-	int x;
-	void *p;
-};
+struct tuple { int x; int y; };
+
+struct tuple
+tuple_create() ~ [
+	result.x = $;
+	result.y = $;
+];
 
 int
 condition(int x);
 
-struct tuple
-tuple_create(int x) ~ [
-	result.p = $;
+void *
+conditional_alloc(int x) ~ [
 	if (condition(x)) {
-		.alloc result.p;
+		.alloc result;
 	}
-	result.x = $;
-]{
+];
+
+void *
+test()
+{
 	struct tuple t;
 
-	t.x = x;
-	t.p = NULL;
-	if (condition(x)) {
-		t.p = malloc(1);
-	}
+	t = tuple_create();
+
+	return conditional_alloc(t.x);
+}
+
+struct tuple
+tuple_create()
+{
+	struct tuple t;
+
+	t.x = 0;
+	t.y = 0;
 	return t;
 }
 
@@ -32,17 +44,11 @@ condition(int x)
 	return 0;
 }
 
-void
-test(int x)
+void *
+conditional_alloc(int x)
 {
-	struct tuple t;
-
-	t = tuple_create(x);
 	if (condition(x)) {
-		free(t.p);
+		return malloc(1);
 	}
-	t = tuple_create(t.x);
-	if (condition(t.x)) {
-		free(t.p);
-	}
+	return NULL;
 }
