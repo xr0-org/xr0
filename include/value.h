@@ -53,6 +53,9 @@ struct value *
 value_struct_indefinite_create(struct ast_type *, struct state *,
 		char *comment, bool persist);
 
+struct value *
+value_pf_augment(struct value *, struct ast_expr *root);
+
 struct ast_type *
 value_struct_membertype(struct value *, char *member);
 

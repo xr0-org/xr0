@@ -518,21 +518,44 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct result *
+pf_augment(struct value *v, struct ast_expr *root, struct state *);
+
+static struct result *
 call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state *);
 
 static struct result *
 call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	struct result *res = ast_function_absexec(f, state);
 	if (result_iserror(res)) {
 		return res;
 	}
 	if (result_hasvalue(res)) {
 		/* copy to preserve value through popping of frame */
-		return result_value_create(value_copy(result_as_value(res)));
+		return pf_augment(result_as_value(res), expr, state);
 	}
 	return call_arbitraryresult(expr, f, state);
+}
+
+/* pf_reduce: Reduce an expression to "parameter form", in which its only
+ * primitives are constants and parameters (vconsts). */
+static struct result *
+pf_reduce(struct ast_expr *, struct state *);
+
+static struct result *
+pf_augment(struct value *v, struct ast_expr *call, struct state *state)
+{
+	if (!value_isstruct(v)) {
+		return result_value_create(value_copy(v));
+	}
+	struct result *res = pf_reduce(call, state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	assert(result_hasvalue(res));
+	return result_value_create(
+		value_pf_augment(v, value_as_sync(result_as_value(res)))
+	);
 }
 
 static struct result *
@@ -758,7 +781,7 @@ static struct preresult *
 identifier_assume(struct ast_expr *expr, bool value, struct state *state);
 
 static struct preresult *
-call_assume(struct ast_expr *, bool value, struct state *);
+pf_reduce_assume(struct ast_expr *, bool value, struct state *);
 
 static struct preresult *
 irreducible_assume(struct ast_expr *, bool value, struct state *);
@@ -775,7 +798,8 @@ reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 	case EXPR_BRACKETED:
 		return reduce_assume(expr->root, value, s);
 	case EXPR_CALL:
-		return call_assume(expr, value, s);
+	case EXPR_STRUCTMEMBER:
+		return pf_reduce_assume(expr, value, s);
 	case EXPR_BINARY:
 		return irreducible_assume(expr, value, s);
 	default:
@@ -797,13 +821,8 @@ identifier_assume(struct ast_expr *expr, bool value, struct state *s)
 	return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
 }
 
-/* pf_reduce: Reduce an expression to "parameter form", in which its only
- * primitives are constants and parameters (vconsts). */
-static struct result *
-pf_reduce(struct ast_expr *, struct state *);
-
 static struct preresult *
-call_assume(struct ast_expr *expr, bool value, struct state *s)
+pf_reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 {
 	struct result *res = pf_reduce(expr, s);
 	/* TODO: user errors */

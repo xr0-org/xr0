@@ -256,6 +256,36 @@ value_struct_indefinite_create(struct ast_type *t, struct state *s,
 	return v;
 }
 
+struct value *
+value_pf_augment(struct value *old, struct ast_expr *root)
+{
+	struct value *v = value_copy(old);
+	if (!value_isstruct(v)) {
+		return v;
+	}
+
+	int n = ast_variable_arr_n(v->_struct.members);
+	struct ast_variable **var = ast_variable_arr_v(v->_struct.members);
+	for (int i = 0; i < n; i++) {
+		char *field = ast_variable_name(var[i]);
+		struct object *obj = map_get(v->_struct.m, field);
+		object_assign(
+			obj,
+			value_sync_create(
+				ast_expr_member_create(
+					ast_expr_copy(root), dynamic_str(field)
+				)
+			)
+		);
+	}
+	/*printf("root: %s\n", ast_expr_str(root));*/
+	/*printf("old: %s\n", value_str(old));*/
+	/*printf("new: %s\n", value_str(v));*/
+
+	/*assert(false);*/
+	return v;
+}
+
 bool
 value_isstruct(struct value *v)
 {

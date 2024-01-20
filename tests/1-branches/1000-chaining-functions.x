@@ -8,22 +8,12 @@ tuple_create() ~ [
 	result.y = $;
 ];
 
-int
-condition(int x);
+void *
+conditional_alloc(int x) ~ [ if (x) .alloc result; ];
 
 void *
-conditional_alloc(int x) ~ [
-	if (condition(x)) {
-		.alloc result;
-	}
-];
-
-void *
-test() ~ [
-	if (condition(tuple_create().x)) {
-		.alloc result;
-	}
-]{
+test() ~ [ if (tuple_create().x) .alloc result; ]
+{
 	struct tuple t;
 
 	t = tuple_create();
@@ -41,16 +31,10 @@ tuple_create()
 	return t;
 }
 
-int
-condition(int x)
-{
-	return 0;
-}
-
 void *
 conditional_alloc(int x)
 {
-	if (condition(x)) {
+	if (x) {
 		return malloc(1);
 	}
 	return NULL;

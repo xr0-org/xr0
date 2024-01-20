@@ -798,6 +798,13 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 			}
 		}
 		return ast_expr_equal(e1->root, e2->root);
+	case EXPR_STRUCTMEMBER:
+		return ast_expr_equal(
+			ast_expr_member_root(e1),
+			ast_expr_member_root(e2)
+		) && (strcmp(
+			ast_expr_member_field(e1), ast_expr_member_field(e2)
+		) == 0);
 	default:
 		assert(false);
 	}
