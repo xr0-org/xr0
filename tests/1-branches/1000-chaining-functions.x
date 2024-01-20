@@ -19,8 +19,11 @@ conditional_alloc(int x) ~ [
 ];
 
 void *
-test()
-{
+test() ~ [
+	if (condition(tuple_create().x)) {
+		.alloc result;
+	}
+]{
 	struct tuple t;
 
 	t = tuple_create();

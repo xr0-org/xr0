@@ -523,6 +523,7 @@ call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state 
 static struct result *
 call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	struct result *res = ast_function_absexec(f, state);
 	if (result_iserror(res)) {
 		return res;
