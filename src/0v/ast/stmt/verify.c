@@ -415,8 +415,8 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 static struct decision
 sel_decide(struct ast_expr *control, struct state *state)
 {
-	/*printf("state: %s\n", state_str(state));*/
-	/*printf("control: %s\n", ast_expr_str(control));*/
+	printf("state: %s\n", state_str(state));
+	printf("control: %s\n", ast_expr_str(control));
 	struct state *s_copy = state_copy(state);
 	struct result *res = ast_expr_eval(control, s_copy);
 	free(s_copy);
@@ -426,7 +426,7 @@ sel_decide(struct ast_expr *control, struct state *state)
 	assert(result_hasvalue(res)); /* TODO: user error */
 
 	struct value *v = result_as_value(res);
-	/*printf("value: %s\n", value_str(v));*/
+	printf("value: %s\n", value_str(v));
 	if (value_issync(v)) {
 		struct ast_expr *sync = value_as_sync(v);
 		struct props *p = state_getprops(state);

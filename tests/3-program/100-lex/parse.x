@@ -32,10 +32,13 @@ parse_defsraw(char *input) ~ [
 	result.pos = $;
 ];
 
+/* skipws: skip whitespace */
+char *
+skipws(char *s);
+
 struct lexer *
 parse(char *pos) ~ [
-	char *pre;
-	char *post;
+	char *pre; char *post;
 	struct pattern *pattern;
 	struct token *token;
 	pre = $; post = $; pattern = $; token = $; /* TODO: put in else */
@@ -53,12 +56,6 @@ parse(char *pos) ~ [
 	}
 	result = lexer_create(pre, post, $, pattern, $, token);
 ];
-
-int
-isboundary(char *s)
-{
-	return strncmp(s, "%%", 2) == 0;
-}
 
 void
 lexer_destroy(struct lexer *) ~ [
@@ -87,16 +84,16 @@ lexer_print(struct lexer *) ~ [
 ];
 
 int
-main()
-{
+main() ~ [
+]{
 	char *file;
 	struct lexer *l;
 
 	file = read_file("tests/3-program/100-lex/gen.l");
 
-	/*l = parse(file);*/
-	/*lexer_print(l);*/
-	/*lexer_destroy(l);*/
+	l = parse(file);
+	lexer_print(l);
+	lexer_destroy(l);
 
 	free(file);
 }
@@ -201,10 +198,6 @@ lexer_print(struct lexer *l)
 	}
 }
 
-/* skipws: skip whitespace */
-char *
-skipws(char *s);
-
 struct defsresult {
 	char *pre;
 	struct pattern *pattern;
@@ -279,6 +272,12 @@ parse(char *pos)
 	post = parse_toeof(pos);
 	return lexer_create(defs.pre, post, defs.npat, defs.pattern, rules.ntok,
 		rules.token);
+}
+
+int
+isboundary(char *s)
+{
+	return strncmp(s, "%%", 2) == 0;
 }
 
 char *
