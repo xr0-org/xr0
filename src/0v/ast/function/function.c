@@ -342,6 +342,12 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 struct result *
 ast_function_absexec(struct ast_function *f, struct state *state)
 {
+	int ndecls = ast_block_ndecls(f->abstract);
+	struct ast_variable **var = ast_block_decls(f->abstract);
+	for (int i = 0; i < ndecls; i++) {
+		state_declare(state, var[i], false);
+	}
+
 	int nstmts = ast_block_nstmts(f->abstract);
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
 	for (int i = 0; i < nstmts; i++) {

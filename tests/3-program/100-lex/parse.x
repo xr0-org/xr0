@@ -15,6 +15,9 @@ struct lexer;
 int
 beginsdefs(char *s);
 
+int
+isboundary(char *s);
+
 struct stringresult {
 	char *s;
 	char *pos;
@@ -32,9 +35,10 @@ parse_defsraw(char *input) ~ [
 struct lexer *
 parse(char *pos) ~ [
 	char *pre;
+	char *post;
 	struct pattern *pattern;
 	struct token *token;
-	pre = $; pattern = $; token = $; /* TODO: put in else */
+	pre = $; post = $; pattern = $; token = $; /* TODO: put in else */
 	if (beginsdefs(skipws(pos))) {
 		.alloc pre;
 	}
@@ -44,8 +48,17 @@ parse(char *pos) ~ [
 	if (count_tokens(skipws(parse_defs(pos).pos+2))) {
 		.alloc token;
 	}
-	result = lexer_create(pre, $, $, pattern, $, token);
+	if (isboundary(parse_rules(skipws(parse_defs(pos).pos+2)).pos)) {
+		.alloc post;
+	}
+	result = lexer_create(pre, post, $, pattern, $, token);
 ];
+
+int
+isboundary(char *s)
+{
+	return strncmp(s, "%%", 2) == 0;
+}
 
 void
 lexer_destroy(struct lexer *) ~ [
@@ -207,6 +220,8 @@ count_patterns(char *pos);
 
 struct defsresult
 parse_defs(char *pos) ~ [
+	result.pre = $;
+	result.pattern = $;
 	if (beginsdefs(skipws(pos))) {
 		.alloc result.pre;
 	}
@@ -243,7 +258,7 @@ parse_rules(char *pos) ~ [
 ];
 
 char *
-parse_toeof(char *input) ~ [ .alloc result; ];
+parse_toeof(char *input) ~ [ if (isboundary(input)) .alloc result; ];
 
 struct lexer *
 parse(char *pos)
@@ -254,18 +269,14 @@ parse(char *pos)
 
 	defs = parse_defs(pos);
 	pos = defs.pos;
-	if (strncmp(pos, "%%", 2) != 0) {
+	if (!isboundary(pos)) {
 		puts("invalid transition to rules");
 		exit(1);
 	}
 	pos = skipws(pos + 2); /* %% */
 	rules = parse_rules(pos);
 	pos = rules.pos;
-	post = "";
-	if (strncmp(pos, "%%", 2) == 0) {
-		pos += 2;
-		post = parse_toeof(pos);
-	}
+	post = parse_toeof(pos);
 	return lexer_create(defs.pre, post, defs.npat, defs.pattern, rules.ntok,
 		rules.token);
 }
@@ -758,7 +769,12 @@ parse_toeof(char *input)
 {
 	char *s;
 
+	if (!isboundary(input)) {
+		return "";
+	}
+
 	s = input; /* must be here because not seen with skip loop hack */
+	input += 2;
 	for (; *s != '\0'; 0) {
 		s++;
 	}
