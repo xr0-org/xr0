@@ -417,7 +417,9 @@ sel_decide(struct ast_expr *control, struct state *state)
 {
 	printf("state: %s\n", state_str(state));
 	printf("control: %s\n", ast_expr_str(control));
-	struct result *res = ast_expr_eval(control, state);
+	struct state *s_copy = state_copy(state);
+	struct result *res = ast_expr_eval(control, s_copy);
+	free(s_copy);
 	if (result_iserror(res)) {
 		return (struct decision) { .err = result_as_error(res) };
 	}
