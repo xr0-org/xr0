@@ -31,13 +31,20 @@ parse_defsraw(char *input) ~ [
 
 struct lexer *
 parse(char *pos) ~ [
+	char *pre;
+	struct pattern *pattern;
+	struct token *token;
+	pre = $; pattern = $; token = $; /* TODO: put in else */
 	if (beginsdefs(skipws(pos))) {
+		.alloc pre;
 	}
 	if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
+		.alloc pattern;
 	}
 	if (count_tokens(skipws(parse_defs(pos).pos+2))) {
+		.alloc token;
 	}
-	result = lexer_create($, $, $, $, $, $);
+	result = lexer_create(pre, $, $, pattern, $, token);
 ];
 
 void
@@ -241,26 +248,26 @@ parse_toeof(char *input) ~ [ .alloc result; ];
 struct lexer *
 parse(char *pos)
 {
-	struct defsresult def;
-	struct rulesresult res;
+	struct defsresult defs;
+	struct rulesresult rules;
 	char *post;
 
-	def = parse_defs(pos);
-	pos = def.pos;
+	defs = parse_defs(pos);
+	pos = defs.pos;
 	if (strncmp(pos, "%%", 2) != 0) {
 		puts("invalid transition to rules");
 		exit(1);
 	}
 	pos = skipws(pos + 2); /* %% */
-	res = parse_rules(pos);
-	pos = res.pos;
+	rules = parse_rules(pos);
+	pos = rules.pos;
 	post = "";
 	if (strncmp(pos, "%%", 2) == 0) {
 		pos += 2;
 		post = parse_toeof(pos);
 	}
-	return lexer_create(def.pre, post, def.npat, def.pattern, res.ntok,
-		res.token);
+	return lexer_create(defs.pre, post, defs.npat, defs.pattern, rules.ntok,
+		rules.token);
 }
 
 char *
