@@ -840,6 +840,10 @@ pf_reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 }
 
 static struct result *
+binary_pf_reduce(struct ast_expr *e1, enum ast_binary_operator,
+		struct ast_expr *e2, struct state *);
+
+static struct result *
 unary_pf_reduce(struct ast_expr *, struct state *);
 
 static struct result *
@@ -852,11 +856,22 @@ static struct result *
 pf_reduce(struct ast_expr *e, struct state *s)
 {
 	switch (ast_expr_kind(e)) {
+	case EXPR_CONSTANT:
+		return result_value_create(
+			value_int_create(ast_expr_as_constant(e))
+		);
 	case EXPR_IDENTIFIER:
 		/* the actual reduction */
 		return expr_identifier_eval(e, s);
 	case EXPR_UNARY:
 		return unary_pf_reduce(e, s);
+	case EXPR_BINARY:
+		return binary_pf_reduce(
+			ast_expr_binary_e1(e),
+			ast_expr_binary_op(e),
+			ast_expr_binary_e2(e),
+			s
+		);
 	case EXPR_CALL:
 		return call_pf_reduce(e, s);
 	case EXPR_STRUCTMEMBER:
@@ -881,6 +896,31 @@ unary_pf_reduce(struct ast_expr *e, struct state *s)
 			ast_expr_unary_create(
 				value_as_sync(result_as_value(res)),
 				ast_expr_unary_op(e)
+			)
+		)
+	);
+}
+
+static struct result *
+binary_pf_reduce(struct ast_expr *e1, enum ast_binary_operator op,
+		struct ast_expr *e2, struct state *s)
+{
+	struct result *res1 = pf_reduce(e1, s);
+	if (result_iserror(res1)) {
+		return res1;
+	}
+	assert(result_hasvalue(res1));
+	struct result *res2 = pf_reduce(e2, s);
+	if (result_iserror(res2)) {
+		return res2;
+	}
+	assert(result_hasvalue(res2));
+	return result_value_create(
+		value_sync_create(
+			ast_expr_binary_create(
+				value_to_expr(result_as_value(res1)),
+				op,
+				value_to_expr(result_as_value(res2))
 			)
 		)
 	);

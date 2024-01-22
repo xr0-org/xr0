@@ -35,6 +35,8 @@ parse(char *pos) ~ [
 	}
 	if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
 	}
+	if (count_tokens(skipws(parse_defs(pos).pos+2))) {
+	}
 	result = lexer_create($, $, $, $, $, $);
 ];
 
@@ -205,6 +207,7 @@ parse_defs(char *pos) ~ [
 		.alloc result.pattern;
 	}
 	result.pos = $;
+	result.npat = $;
 ];
 
 int
@@ -229,6 +232,7 @@ parse_rules(char *pos) ~ [
 		.alloc result.token;
 	}
 	result.pos = $;
+	result.ntok = $;
 ];
 
 char *
