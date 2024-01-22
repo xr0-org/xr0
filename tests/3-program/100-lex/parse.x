@@ -12,8 +12,31 @@ read_file(char *path) ~ [ .alloc result; ];
 
 struct lexer;
 
+int
+beginsdefs(char *s);
+
+struct stringresult {
+	char *s;
+	char *pos;
+};
+
+struct stringresult
+parse_defsraw(char *input) ~ [
+	result.s = $;
+	if (beginsdefs(input)) {
+		.alloc result.s;
+	}
+	result.pos = $;
+];
+
 struct lexer *
-parse(char *input);
+parse(char *pos) ~ [
+	if (beginsdefs(skipws(pos))) {
+	}
+	if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
+	}
+	result = lexer_create($, $, $, $, $, $);
+];
 
 void
 lexer_destroy(struct lexer *) ~ [
@@ -167,8 +190,8 @@ struct defsresult {
 	char *pos;
 };
 
-int
-beginsdefs(char *s);
+char *
+skipoptions(char *pos);
 
 int
 count_patterns(char *pos);
@@ -181,6 +204,7 @@ parse_defs(char *pos) ~ [
 	if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
 		.alloc result.pattern;
 	}
+	result.pos = $;
 ];
 
 int
@@ -194,6 +218,9 @@ struct rulesresult {
 	int ntok;
 	char *pos;
 };
+
+int
+count_tokens(char *pos);
 
 struct rulesresult
 parse_rules(char *pos) ~ [
@@ -210,7 +237,26 @@ parse_toeof(char *input) ~ [ .alloc result; ];
 struct lexer *
 parse(char *pos)
 {
-	assert(false);
+	struct defsresult def;
+	struct rulesresult res;
+	char *post;
+
+	def = parse_defs(pos);
+	pos = def.pos;
+	if (strncmp(pos, "%%", 2) != 0) {
+		puts("invalid transition to rules");
+		exit(1);
+	}
+	pos = skipws(pos + 2); /* %% */
+	res = parse_rules(pos);
+	pos = res.pos;
+	post = "";
+	if (strncmp(pos, "%%", 2) == 0) {
+		pos += 2;
+		post = parse_toeof(pos);
+	}
+	return lexer_create(def.pre, post, def.npat, def.pattern, res.ntok,
+		res.token);
 }
 
 char *
@@ -290,20 +336,6 @@ parse_tonewline(char *input) ~ [ .alloc result; ]
 	}
 	return substr(input, s - input);
 }
-
-struct stringresult {
-	char *s;
-	char *pos;
-};
-
-struct stringresult
-parse_defsraw(char *input) ~ [
-	result.s = $;
-	if (beginsdefs(input)) {
-		.alloc result.s;
-	}
-	result.pos = $;
-];
 
 struct patternet {
 	struct pattern *pattern;
@@ -508,9 +540,6 @@ token_print(struct token *t)
 	puts(t->action);
 	puts("end token");
 }
-
-int
-count_tokens(char *pos);
 
 struct tokenpos {
 	struct token *t;
