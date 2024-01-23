@@ -427,6 +427,7 @@ sel_decide(struct ast_expr *control, struct state *state)
 
 	struct value *v = result_as_value(res);
 	printf("value: %s\n", value_str(v));
+	printf("valkind: %d\n", value_type(v));
 	if (value_issync(v)) {
 		struct ast_expr *sync = value_as_sync(v);
 		struct props *p = state_getprops(state);

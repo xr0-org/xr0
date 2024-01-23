@@ -85,17 +85,31 @@ lexer_print(struct lexer *) ~ [
 
 int
 main() ~ [
-]{
-	char *file;
+	char *pos; char *pre; char *post;
+
+	struct pattern *pattern;
+	struct token *token;
+	.alloc pos;
+	pre = $; post = $; pattern = $; token = $; /* TODO: put in else */
+	if (beginsdefs(skipws(pos))) {
+	}
+	if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
+	}
+	if (count_tokens(skipws(parse_defs(pos).pos+2))) {
+	}
+	if (isboundary(parse_rules(skipws(parse_defs(pos).pos+2)).pos)) {
+	}
+] {
 	struct lexer *l;
+	void *pos;
 
-	file = read_file("tests/3-program/100-lex/gen.l");
+	pos = read_file("tests/3-program/100-lex/gen.l");
 
-	l = parse(file);
+	l = parse(pos);
 	lexer_print(l);
 	lexer_destroy(l);
 
-	free(file);
+	free(pos);
 }
 
 char *
