@@ -28,7 +28,7 @@ struct ast_stmt_paths {
 	struct ast_expr *assumption;
 };
 
-struct ast_stmt_paths *
+struct ast_stmt_paths
 ast_stmt_paths(struct ast_stmt *, struct state *);
 
 #endif

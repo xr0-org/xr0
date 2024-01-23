@@ -168,22 +168,18 @@ ast_function_params(struct ast_function *f)
 	return f->param;
 }
 
-struct error *
-paths_verify(struct ast_function_arr *paths, struct externals *);
-
 struct ast_function *
 proto_stitch(struct ast_function *f, struct externals *);
 
 struct error *
+path_verify_withstate(struct ast_function *f, struct externals *ext);
+
+struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
-	printf("%s...\n", f->name);
 	struct ast_function *proto = proto_stitch(f, ext);
 
-	struct ast_function_arr *paths = paths_fromfunction(proto);
-	struct error *err = paths_verify(paths, ext);
-	ast_function_arr_destroy(paths);
-	return err;
+	return path_verify_withstate(proto, ext);
 }
 
 struct ast_function *
@@ -196,23 +192,6 @@ proto_stitch(struct ast_function *f, struct externals *ext)
 	}
 	/* XXX: leaks */
 	return f;
-}
-
-struct error *
-path_verify_withstate(struct ast_function *f, struct externals *ext);
-
-struct error *
-paths_verify(struct ast_function_arr *paths, struct externals *ext)
-{	
-	int len = ast_function_arr_len(paths);
-	struct ast_function **path = ast_function_arr_func(paths);
-	for (int i = 0; i < len; i++) {
-		struct error *err = NULL;
-		if ((err = path_verify_withstate(path[i], ext))) {
-			return err;
-		}
-	}
-	return NULL;
 }
 
 struct error *
@@ -246,8 +225,6 @@ path_verify_withstate(struct ast_function *f, struct externals *ext)
 		state_declare(state, var[i], false);
 	}
 
-	assert(false);
-
 	struct error *err = path_verify(f, state, ext);
 	state_destroy(state);
 	return err;
@@ -267,8 +244,8 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = 0; i < nstmts; i++) {
-		struct ast_stmt_paths *p = ast_stmt_paths(stmt[i], state);
-		if (p->assumption) {
+		struct ast_stmt_paths p = ast_stmt_paths(stmt[i], state);
+		if (p.assumption) {
 			/* create two functions with abstracts and bodies
 			 * adjusted accordingly */
 		}

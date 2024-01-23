@@ -674,4 +674,15 @@ ast_stmt_as_expr(struct ast_stmt *stmt)
 	return stmt->u.expr;
 }
 
+struct ast_stmt_paths
+ast_stmt_paths(struct ast_stmt *stmt, struct state *s)
+{
+	if (stmt->kind != STMT_SELECTION) {
+		struct ast_stmt_paths paths = { .yes = stmt, .no = NULL, .assumption = NULL };
+		return paths;
+	}
+	assert(false);
+}
+
+
 #include "verify.c"
