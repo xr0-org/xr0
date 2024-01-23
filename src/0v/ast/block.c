@@ -15,7 +15,8 @@ struct ast_block *
 ast_block_create(struct ast_variable **decl, int ndecl, 
 	struct ast_stmt **stmt, int nstmt)
 {
-	assert(ndecl > 0 || !decl);
+	/* XXX: commented out in exec-branching work */
+	/*assert(ndecl > 0 || !decl);*/
 	assert(nstmt > 0 || !stmt);
 
 	struct ast_block *b = malloc(sizeof(struct ast_block));

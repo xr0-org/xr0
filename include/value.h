@@ -102,6 +102,12 @@ struct ast_expr *
 value_to_expr(struct value *);
 
 bool
+value_isliteral(struct value *v);
+
+struct ast_expr *
+value_as_literal(struct value *v);
+
+bool
 value_references(struct value *, struct location *, struct state *);
 
 enum ast_binary_operator;

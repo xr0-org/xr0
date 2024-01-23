@@ -855,9 +855,9 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 {
 	switch (ast_expr_kind(e)) {
 	case EXPR_CONSTANT:
-		return result_value_create(
-			value_int_create(ast_expr_as_constant(e))
-		);
+		return expr_constant_eval(e, s);
+	case EXPR_STRING_LITERAL:
+		return expr_literal_eval(e, s);
 	case EXPR_IDENTIFIER:
 		return identifier_pf_reduce(e, s);
 	case EXPR_UNARY:
@@ -874,6 +874,7 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 	case EXPR_STRUCTMEMBER:
 		return structmember_pf_reduce(e, s);
 	default:
+		printf("expr: %s\n", ast_expr_str(e));
 		assert(false);
 	}
 }
@@ -957,8 +958,11 @@ call_pf_reduce(struct ast_expr *e, struct state *s)
 		}
 		assert(result_hasvalue(res));
 		struct value *v = result_as_value(res);
-		assert(value_issync(v));
-		reduced_arg[i] = value_as_sync(v);
+		if (value_issync(v)) {
+			reduced_arg[i] = value_as_sync(v);
+		} else if (value_isliteral(v)) {
+			reduced_arg[i] = value_as_literal(v);
+		}
 	}
 	return result_value_create(
 		value_sync_create(

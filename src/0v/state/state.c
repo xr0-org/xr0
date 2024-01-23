@@ -349,6 +349,9 @@ state_eval(struct state *s, struct ast_expr *e)
 static void
 state_undeclarevars(struct state *s);
 
+static void
+state_popprops(struct state *s);
+
 bool
 state_equal(struct state *s1, struct state *s2)
 {
@@ -356,6 +359,8 @@ state_equal(struct state *s1, struct state *s2)
 		     *s2_c = state_copy(s2);
 	state_undeclarevars(s1_c);
 	state_undeclarevars(s2_c);
+	state_popprops(s1_c);
+	state_popprops(s2_c);
 
 	char *str1 = state_str(s1_c),
 	     *str2 = state_str(s2_c);
@@ -379,4 +384,11 @@ state_undeclarevars(struct state *s)
 	heap_undeclare(s->heap, s);
 	vconst_undeclare(s->vconst);
 	stack_undeclare(s->stack, s);
+}
+
+static void
+state_popprops(struct state *s)
+{
+	/* XXX: */
+	s->props = props_create();
 }

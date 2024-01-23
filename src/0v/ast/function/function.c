@@ -222,6 +222,7 @@ path_verify_withstate(struct ast_function *f, struct externals *ext)
 	int ndecls = ast_block_ndecls(body);
 	struct ast_variable **var = ast_block_decls(body);
 	for (int i = 0; i < ndecls; i++) {
+		printf("declaring\n");
 		state_declare(state, var[i], false);
 	}
 
@@ -234,9 +235,13 @@ static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state,
 		struct externals *);
 
+static struct ast_function_arr *
+split_paths(struct ast_function *f, int index, struct ast_stmt_paths);
+
 struct error *
 path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 {
+	printf("function: %s\n", ast_function_str(f));
 	struct error *err = NULL;
 
 	struct ast_block *body = ast_function_body(f);
@@ -248,6 +253,18 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 		if (p.assumption) {
 			/* create two functions with abstracts and bodies
 			 * adjusted accordingly */
+			struct ast_function_arr *paths = split_paths(f, i, p);
+			assert(ast_function_arr_len(paths) == 2);
+			struct ast_function **func = ast_function_arr_func(paths);
+			err = path_verify(func[0], state_copy(state), ext);
+			if (err) {
+				return err;
+			}
+			err = path_verify(func[1], state_copy(state), ext);
+			if (err) {
+				return err;
+			}
+			return NULL;
 		}
 		/*printf("state: %s\n", state_str(state));*/
 		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
@@ -329,13 +346,137 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 	return NULL;
 }
 
+static char *
+split_name(char *name, struct ast_expr *assumption);
+
+static struct ast_block *
+block_withassumption(struct ast_block *old, struct ast_expr *cond);
+
+static struct ast_block *
+split_block_index(struct ast_block *b, int split_index, bool enter);
+
+static struct ast_function_arr *
+split_paths(struct ast_function *f, int index, struct ast_stmt_paths paths)
+{
+	struct ast_function_arr *res = ast_function_arr_create();
+	
+	struct ast_function *f_true = ast_function_create(
+		f->isaxiom,
+		ast_type_copy(f->ret),
+		f->name,
+		f->nparam,
+		ast_variables_copy(f->nparam, f->param),
+		block_withassumption(f->abstract, ast_expr_copy(paths.assumption)),
+		split_block_index(f->body, index, true)
+	);
+
+	struct ast_expr *inv_assumption = ast_expr_inverted_copy(paths.assumption, true);
+	struct ast_function *f_false = ast_function_create(
+		f->isaxiom,
+		ast_type_copy(f->ret),
+		f->name,
+		f->nparam,
+		ast_variables_copy(f->nparam, f->param),
+		block_withassumption(f->abstract, inv_assumption),
+		split_block_index(f->body, index, false)
+	);
+	
+	ast_function_arr_append(res, f_true);
+	ast_function_arr_append(res, f_false);
+	return res;
+}
+
+static struct ast_block *
+block_withassumption(struct ast_block *old, struct ast_expr *cond)
+{
+	int ndecl = ast_block_ndecls(old);
+	struct ast_variable **old_decl = ast_block_decls(old);
+	struct ast_variable **decl = malloc(sizeof(struct ast_variable *) * ndecl); 
+	for (int i = 0; i < ndecl; i++) {
+		decl[i] = ast_variable_copy(old_decl[i]);
+	}
+
+	int old_nstmt = ast_block_nstmts(old);
+	struct ast_stmt **old_stmt = ast_block_stmts(old);
+	int nstmt = old_nstmt+1;
+	struct ast_stmt **stmt = malloc(sizeof(struct ast_stmt *) * nstmt);
+	for (int i = 0; i < old_nstmt; i++) {
+		stmt[i+1] = ast_stmt_copy(old_stmt[i]);
+	}
+	/* assume: cond; */
+	stmt[0] = ast_stmt_create_labelled(
+		NULL, dynamic_str("assume"), ast_stmt_create_expr(NULL, cond)
+	);
+
+	printf("block (old): %s\n", ast_block_str(old));
+	struct ast_block *new = ast_block_create(decl, ndecl, stmt, nstmt);
+	printf("block (new): %s\n", ast_block_str(new));
+	return new;
+}
+
+
+static char *
+split_name(char *name, struct ast_expr *assumption)
+{
+	struct strbuilder *b = strbuilder_create();
+	char *assumption_str = ast_expr_str(assumption);
+	strbuilder_printf(b, "%s | %s", name, assumption_str);
+	free(assumption_str);
+	return strbuilder_build(b);
+}
+
+struct ast_stmt *
+choose_split_path(struct ast_stmt *stmt, bool should_split, bool enter);
+
+static struct ast_block *
+split_block_index(struct ast_block *b, int split_index, bool enter)
+{
+	int nstmts = ast_block_nstmts(b);
+	struct ast_stmt **old_stmt = ast_block_stmts(b);
+
+	int n = 0;
+	struct ast_stmt **stmt = NULL;
+	for (int i = 0; i < nstmts; i++) {
+		struct ast_stmt *s = choose_split_path(
+			old_stmt[i], i == split_index, enter
+		);
+		if (!s) {
+			continue;
+		}
+		stmt = realloc(stmt, sizeof(struct ast_stmt *) * ++n);
+		stmt[n-1] = ast_stmt_copy(s);
+	}
+
+	int ndecl = ast_block_ndecls(b);
+	struct ast_variable **old_decl = ast_block_decls(b);
+	struct ast_variable **decl =
+		old_decl
+		? ast_variables_copy(ndecl, old_decl)
+		: NULL;
+	return ast_block_create(
+		decl, ndecl,
+		stmt, n
+	);	
+}
+
+struct ast_stmt *
+choose_split_path(struct ast_stmt *stmt, bool should_split, bool enter)
+{
+	if (should_split) {
+		return enter ? ast_stmt_sel_body(stmt) : NULL;
+	}
+	return stmt;
+}
+
 struct result *
 ast_function_absexec(struct ast_function *f, struct state *state)
 {
 	int ndecls = ast_block_ndecls(f->abstract);
-	struct ast_variable **var = ast_block_decls(f->abstract);
-	for (int i = 0; i < ndecls; i++) {
-		state_declare(state, var[i], false);
+	if (ndecls) {
+		struct ast_variable **var = ast_block_decls(f->abstract);
+		for (int i = 0; i < ndecls; i++) {
+			state_declare(state, var[i], false);
+		}
 	}
 
 	int nstmts = ast_block_nstmts(f->abstract);

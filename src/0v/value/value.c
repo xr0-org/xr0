@@ -631,6 +631,22 @@ value_to_expr(struct value *v)
 	}
 }
 
+bool
+value_isliteral(struct value *v)
+{
+	if (v->type != VALUE_LITERAL) {
+		return false;
+	}
+	return true;
+}
+
+struct ast_expr *
+value_as_literal(struct value *v)
+{
+	assert(v->type == VALUE_LITERAL);
+	return ast_expr_identifier_create(v->s);
+}
+
 enum value_type
 value_type(struct value *v)
 {
@@ -675,9 +691,13 @@ number_equal(struct number *n1, struct number *n2);
 bool
 value_equal(struct value *v1, struct value *v2)
 {
-	assert(v1 && v2 && v1->type == v2->type);
+	if (!v1 || !v2 || v1->type != v2->type) {
+		return false;
+	}
 
 	switch (v1->type) {
+	case VALUE_LITERAL:
+		return ast_expr_equal(value_as_literal(v1), value_as_literal(v2));
 	case VALUE_INT:
 	case VALUE_SYNC:
 		return number_equal(v1->n, v2->n);

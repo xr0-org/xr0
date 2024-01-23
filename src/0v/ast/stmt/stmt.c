@@ -681,8 +681,12 @@ ast_stmt_paths(struct ast_stmt *stmt, struct state *s)
 		struct ast_stmt_paths paths = { .yes = stmt, .no = NULL, .assumption = NULL };
 		return paths;
 	}
-	assert(false);
+	struct ast_stmt_paths paths = {
+		.yes = stmt->u.selection.body,
+		.no = NULL, /* TODO: else blocks */
+		.assumption = stmt->u.selection.cond
+	};
+	return paths;
 }
-
 
 #include "verify.c"

@@ -8,6 +8,9 @@ npass=0
 expected_suffix="EXPECTED"
 fail_prefix="FAIL"
 
+pass="\e[32mPASS\e[0m\n"
+fail="\e[31mFAIL\e[0m\n"
+
 XR0=$(pwd)/bin/0v
 libx=$(pwd)/libx
 cd tests
@@ -24,9 +27,9 @@ do
 		if [[ "$f" != *"${fail_prefix}"* ]]
 		then
 			npass=$((npass+1))
-			printf 'PASS\n'
+			printf "$pass"
 		else
-			printf 'FAIL\n'
+			printf "$fail"
 		fi
 	else
 		# negative tests
@@ -43,12 +46,12 @@ do
 			if [[ $output == *$expected_output ]]
 			then
 				npass=$((npass+1))
-				printf 'PASS\n'
+				printf "$pass"
 			else
-				printf 'FAIL\n'
+				printf "$fail"
 			fi
 		else
-			printf 'FAIL\n'
+			printf "$fail"
 		fi
 	fi
 done
