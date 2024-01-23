@@ -691,13 +691,12 @@ number_equal(struct number *n1, struct number *n2);
 bool
 value_equal(struct value *v1, struct value *v2)
 {
-	if (!v1 || !v2 || v1->type != v2->type) {
-		return false;
-	}
+	assert(!v1 && !v2 && v1->type == v2->type);
 
+	printf("v1: %s, v2: %s\n", v1->s, v2->s);
 	switch (v1->type) {
 	case VALUE_LITERAL:
-		return ast_expr_equal(value_as_literal(v1), value_as_literal(v2));
+		return strcmp(v1->s, v2->s) == 0;
 	case VALUE_INT:
 	case VALUE_SYNC:
 		return number_equal(v1->n, v2->n);

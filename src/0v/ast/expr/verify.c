@@ -1009,6 +1009,7 @@ static struct preresult *
 irreducible_assume(struct ast_expr *e, bool value, struct state *s)
 {
 	struct ast_expr *prop = ast_expr_inverted_copy(e, !value);
+	printf("prop: %s\n", ast_expr_str(prop));
 	struct preresult *r = irreducible_assume_actual(prop, s);
 	ast_expr_destroy(prop);
 	return r;

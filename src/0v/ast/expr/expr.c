@@ -666,7 +666,7 @@ ast_expr_str(struct ast_expr *expr)
 		ast_expr_constant_str_build(expr, b);
 		break;
 	case EXPR_STRING_LITERAL:
-		strbuilder_printf(b, "\"%s\"", expr->u.string);
+		strbuilder_printf(b, "%s", expr->u.string);
 		break;
 	case EXPR_BRACKETED:
 		ast_expr_bracketed_str_build(expr, b);

@@ -425,12 +425,16 @@ sel_decide(struct ast_expr *control, struct state *state)
 
 	struct value *v = result_as_value(res);
 	printf("value: %s\n", value_str(v));
-	struct ast_expr *sync = value_to_expr(v);
-	struct props *p = state_getprops(state);
-	if (props_get(p, sync)) {
-		return (struct decision) { .decision = true, .err = NULL };
-	} else if (props_contradicts(p, sync)) {
-		return (struct decision) { .decision = false, .err = NULL };
+	if (value_issync(v)) {
+		struct ast_expr *sync = value_as_sync(v);
+		printf("state: %s\n", state_str(state));
+		printf("sync: %s\n", ast_expr_str(sync));
+		struct props *p = state_getprops(state);
+		if (props_get(p, sync)) {
+			return (struct decision) { .decision = true, .err = NULL };
+		} else if (props_contradicts(p, sync)) {
+			return (struct decision) { .decision = false, .err = NULL };
+		}
 	}
 
 	struct value *zero = value_int_create(0);

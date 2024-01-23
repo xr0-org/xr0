@@ -65,7 +65,9 @@ props_install(struct props *p, struct ast_expr *e)
 bool
 props_get(struct props *p, struct ast_expr *e)
 {
+	printf("looking for: %s\n", ast_expr_str(e));
 	for (int i = 0; i < p->n; i++) {
+		printf("val: %s\n", ast_expr_str(p->prop[i]));
 		/* TODO: logical comparison */
 		if (ast_expr_equal(e, p->prop[i])) {
 			return true;
