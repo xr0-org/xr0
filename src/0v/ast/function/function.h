@@ -26,7 +26,6 @@ ast_function_arr_len(struct ast_function_arr *);
 struct ast_function **
 ast_function_arr_func(struct ast_function_arr *);
 
-
 struct ast_function_arr *
 paths_fromfunction(struct ast_function *f);
 

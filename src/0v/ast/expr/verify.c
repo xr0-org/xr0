@@ -545,18 +545,13 @@ call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
 	return call_arbitraryresult(expr, f, state);
 }
 
-/* pf_reduce: Reduce an expression to "parameter form", in which its only
- * primitives are constants and parameters (vconsts). */
-static struct result *
-pf_reduce(struct ast_expr *, struct state *);
-
 static struct result *
 pf_augment(struct value *v, struct ast_expr *call, struct state *state)
 {
 	if (!value_isstruct(v)) {
 		return result_value_create(value_copy(v));
 	}
-	struct result *res = pf_reduce(call, state);
+	struct result *res = ast_expr_pf_reduce(call, state);
 	if (result_iserror(res)) {
 		return res;
 	}
@@ -789,7 +784,7 @@ static struct preresult *
 identifier_assume(struct ast_expr *expr, bool value, struct state *state);
 
 static struct preresult *
-pf_reduce_assume(struct ast_expr *, bool value, struct state *);
+ast_expr_pf_reduce_assume(struct ast_expr *, bool value, struct state *);
 
 static struct preresult *
 irreducible_assume(struct ast_expr *, bool value, struct state *);
@@ -807,7 +802,7 @@ reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 		return reduce_assume(expr->root, value, s);
 	case EXPR_CALL:
 	case EXPR_STRUCTMEMBER:
-		return pf_reduce_assume(expr, value, s);
+		return ast_expr_pf_reduce_assume(expr, value, s);
 	case EXPR_BINARY:
 		return irreducible_assume(expr, value, s);
 	default:
@@ -830,14 +825,17 @@ identifier_assume(struct ast_expr *expr, bool value, struct state *s)
 }
 
 static struct preresult *
-pf_reduce_assume(struct ast_expr *expr, bool value, struct state *s)
+ast_expr_pf_reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 {
-	struct result *res = pf_reduce(expr, s);
+	struct result *res = ast_expr_pf_reduce(expr, s);
 	/* TODO: user errors */
 	assert(!result_iserror(res) && result_hasvalue(res));
 
 	return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
 }
+
+static struct result *
+identifier_pf_reduce(struct ast_expr *id, struct state *);
 
 static struct result *
 binary_pf_reduce(struct ast_expr *e1, enum ast_binary_operator,
@@ -852,8 +850,8 @@ call_pf_reduce(struct ast_expr *, struct state *);
 static struct result *
 structmember_pf_reduce(struct ast_expr *, struct state *);
 
-static struct result *
-pf_reduce(struct ast_expr *e, struct state *s)
+struct result *
+ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 {
 	switch (ast_expr_kind(e)) {
 	case EXPR_CONSTANT:
@@ -861,8 +859,7 @@ pf_reduce(struct ast_expr *e, struct state *s)
 			value_int_create(ast_expr_as_constant(e))
 		);
 	case EXPR_IDENTIFIER:
-		/* the actual reduction */
-		return expr_identifier_eval(e, s);
+		return identifier_pf_reduce(e, s);
 	case EXPR_UNARY:
 		return unary_pf_reduce(e, s);
 	case EXPR_BINARY:
@@ -882,11 +879,29 @@ pf_reduce(struct ast_expr *e, struct state *s)
 }
 
 static struct result *
+identifier_pf_reduce(struct ast_expr *id, struct state *s)
+{
+	/* the actual reduction */
+	struct result *res = expr_identifier_eval(id, s);
+	if (result_iserror(res)) {
+		return res;
+	}
+	assert(result_hasvalue(res));
+	struct value *v = result_as_value(res);
+	if (!value_issync(v)) {
+		return result_value_create(
+			value_sync_create(ast_expr_copy(id))
+		);
+	}
+	return res;
+}
+
+static struct result *
 unary_pf_reduce(struct ast_expr *e, struct state *s)
 {
 	/* TODO: reduce by actually dereferencing if expr is a deref and this is
 	 * possible in the current state */
-	struct result *res = pf_reduce(ast_expr_unary_operand(e), s);
+	struct result *res = ast_expr_pf_reduce(ast_expr_unary_operand(e), s);
 	if (result_iserror(res)) {
 		return res;
 	}
@@ -905,12 +920,12 @@ static struct result *
 binary_pf_reduce(struct ast_expr *e1, enum ast_binary_operator op,
 		struct ast_expr *e2, struct state *s)
 {
-	struct result *res1 = pf_reduce(e1, s);
+	struct result *res1 = ast_expr_pf_reduce(e1, s);
 	if (result_iserror(res1)) {
 		return res1;
 	}
 	assert(result_hasvalue(res1));
-	struct result *res2 = pf_reduce(e2, s);
+	struct result *res2 = ast_expr_pf_reduce(e2, s);
 	if (result_iserror(res2)) {
 		return res2;
 	}
@@ -936,7 +951,7 @@ call_pf_reduce(struct ast_expr *e, struct state *s)
 	struct ast_expr **unreduced_arg = ast_expr_call_args(e);
 	struct ast_expr **reduced_arg = malloc(sizeof(struct ast_expr *) *nargs);
 	for (int i = 0; i < nargs; i++) {
-		struct result *res = pf_reduce(unreduced_arg[i], s);
+		struct result *res = ast_expr_pf_reduce(unreduced_arg[i], s);
 		if (result_iserror(res)) {
 			return res;
 		}
@@ -958,7 +973,7 @@ call_pf_reduce(struct ast_expr *e, struct state *s)
 static struct result *
 structmember_pf_reduce(struct ast_expr *expr, struct state *s)
 {
-	struct result *res = pf_reduce(ast_expr_member_root(expr), s);
+	struct result *res = ast_expr_pf_reduce(ast_expr_member_root(expr), s);
 	if (result_iserror(res)) {
 		return res;
 	}

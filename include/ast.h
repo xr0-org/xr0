@@ -174,6 +174,11 @@ ast_expr_eval(struct ast_expr *, struct state *);
 struct result *
 ast_expr_absexec(struct ast_expr *, struct state *);
 
+/* ast_expr_pf_reduce: Reduce an expression to "parameter form", in which its
+ * only primitives are constants and parameters (vconsts). */
+struct result *
+ast_expr_pf_reduce(struct ast_expr *, struct state *);
+
 struct ast_stmt;
 
 struct ast_block;

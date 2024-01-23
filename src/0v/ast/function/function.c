@@ -9,6 +9,8 @@
 #include "object.h"
 #include "props.h"
 #include "state.h"
+#include "type/type.h"
+#include "stmt/stmt.h"
 #include "ext.h"
 #include "util.h"
 
@@ -216,30 +218,17 @@ paths_verify(struct ast_function_arr *paths, struct externals *ext)
 struct error *
 path_verify(struct ast_function *f, struct state *state, struct externals *);
 
+static struct preresult *
+parameterise_state(struct state *s, struct ast_function *f);
+
 struct error *
 path_verify_withstate(struct ast_function *f, struct externals *ext)
 {
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
-	printf("state (before): %s\n", state_str(state));
-	printf("function: %s\n", ast_function_str(f));
-	struct error *err = path_verify(f, state, ext);
-	state_destroy(state);
-	return err;
-}
-
-static struct error *
-abstract_audit(struct ast_function *f, struct state *actual_state,
-		struct externals *);
-
-static struct preresult *
-parameterise_state(struct state *s, struct ast_function *f);
-
-struct error *
-path_verify(struct ast_function *f, struct state *state, struct externals *ext)
-{
-	struct error *err = NULL;
+	/*printf("state (before): %s\n", state_str(state));*/
+	/*printf("function: %s\n", ast_function_str(f));*/
 
 	struct ast_block *body = ast_function_body(f);
 
@@ -257,9 +246,32 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext)
 		state_declare(state, var[i], false);
 	}
 
+	assert(false);
+
+	struct error *err = path_verify(f, state, ext);
+	state_destroy(state);
+	return err;
+}
+
+static struct error *
+abstract_audit(struct ast_function *f, struct state *actual_state,
+		struct externals *);
+
+struct error *
+path_verify(struct ast_function *f, struct state *state, struct externals *ext)
+{
+	struct error *err = NULL;
+
+	struct ast_block *body = ast_function_body(f);
+
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = 0; i < nstmts; i++) {
+		struct ast_stmt_paths *p = ast_stmt_paths(stmt[i], state);
+		if (p->assumption) {
+			/* create two functions with abstracts and bodies
+			 * adjusted accordingly */
+		}
 		/*printf("state: %s\n", state_str(state));*/
 		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
 		if ((err = ast_stmt_process(stmt[i], state))) {
@@ -366,4 +378,3 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 }
 
 #include "arr.c"
-#include "paths.c"

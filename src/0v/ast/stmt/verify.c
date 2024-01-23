@@ -417,9 +417,7 @@ sel_decide(struct ast_expr *control, struct state *state)
 {
 	printf("state: %s\n", state_str(state));
 	printf("control: %s\n", ast_expr_str(control));
-	struct state *s_copy = state_copy(state);
-	struct result *res = ast_expr_eval(control, s_copy);
-	free(s_copy);
+	struct result *res = ast_expr_pf_reduce(control, state);
 	if (result_iserror(res)) {
 		return (struct decision) { .err = result_as_error(res) };
 	}
@@ -427,7 +425,6 @@ sel_decide(struct ast_expr *control, struct state *state)
 
 	struct value *v = result_as_value(res);
 	printf("value: %s\n", value_str(v));
-	printf("valkind: %d\n", value_type(v));
 	if (value_issync(v)) {
 		struct ast_expr *sync = value_as_sync(v);
 		struct props *p = state_getprops(state);
