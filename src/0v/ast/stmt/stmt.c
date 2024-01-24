@@ -155,7 +155,7 @@ static void
 ast_stmt_compound_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_COMPOUND || stmt->kind == STMT_COMPOUND_V);
-	char *s = ast_block_str(stmt->u.compound);
+	char *s = ast_block_str(stmt->u.compound, "\t");
 	strbuilder_printf(b, s);
 	free(s);
 }
@@ -438,7 +438,7 @@ ast_stmt_iter_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	     *iter = ast_expr_str(stmt->u.iteration.iter);
 
 	char *abs = stmt->u.iteration.abstract ?
-		ast_block_str(stmt->u.iteration.abstract) : "";
+		ast_block_str(stmt->u.iteration.abstract, "\t") : "";
 
 	strbuilder_printf(
 		b,

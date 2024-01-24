@@ -70,23 +70,30 @@ char *
 ast_function_str(struct ast_function *f)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "func");
 	if (f->isaxiom) {
-		strbuilder_printf(b, " <axiom>");
+		strbuilder_printf(b, "axiom ");
 	}
-	strbuilder_printf(b, " `%s'", f->name);
 	char *ret = ast_type_str(f->ret);
-	strbuilder_printf(b, " returns %s ", ret);
+	strbuilder_printf(b, "%s\n", ret);
 	free(ret);
-	strbuilder_printf(b, "takes [");
+	strbuilder_printf(b, "%s(", f->name);
 	for (int i = 0; i < f->nparam; i++) {
 		char *v = ast_variable_str(f->param[i]);
 		char *space = (i + 1 < f->nparam) ? ", " : "";
 		strbuilder_printf(b, "%s%s", v, space);
 		free(v);
 	}
-	strbuilder_printf(b, "] has abstract:\n%s\n", ast_block_str(f->abstract));
-	strbuilder_printf(b, "has body: %s\n", f->body ? ast_block_str(f->body) : "");
+	char *abs = ast_block_str(f->abstract, "\t");
+	strbuilder_printf(b, ") ~ [\n%s]", abs);
+	free(abs);
+	if (f->body) {
+		char *body = ast_block_str(f->body, "\t");
+		strbuilder_printf(b, "{\n%s}", body);
+		free(body);
+	} else {
+		strbuilder_printf(b, ";");
+	}
+	strbuilder_printf(b, "\n");
 	return strbuilder_build(b);
 }
 
@@ -217,8 +224,8 @@ install_props(struct state *s, struct ast_function *f);
 struct error *
 path_verify_withstate(struct ast_function *f, struct state *state, int index)
 {
+	printf("%s\n", ast_function_str(f));
 	printf("state (before): %s\n", state_str(state));
-	printf("function: %s\n", ast_function_str(f));
 
 	struct ast_block *body = ast_function_body(f);
 
@@ -367,16 +374,13 @@ split_paths_verify(struct ast_function *f, struct state *state, int index,
 	struct ast_function **func = ast_function_arr_func(paths);
 	for (int i = 0; i < n; i++) {
 		struct state *s_copy = state_copy(state);
-		err = path_verify_withstate(func[i], s_copy, index);
-		if (err) {
+		if ((err = path_verify_withstate(func[i], s_copy, index))) {
 			return err;
 		}
-		state_destroy(s_copy);
+		/*state_destroy(s_copy);*/
 	}
 	return NULL;
 }
-
-
 
 static char *
 split_name(char *name, struct ast_expr *assumption);
@@ -395,7 +399,7 @@ split_paths(struct ast_function *f, int index, struct ast_expr *cond)
 	struct ast_function *f_true = ast_function_create(
 		f->isaxiom,
 		ast_type_copy(f->ret),
-		f->name,
+		split_name(f->name, cond),
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
 		block_withassumption(f->abstract, ast_expr_copy(cond)),
@@ -406,7 +410,7 @@ split_paths(struct ast_function *f, int index, struct ast_expr *cond)
 	struct ast_function *f_false = ast_function_create(
 		f->isaxiom,
 		ast_type_copy(f->ret),
-		f->name,
+		split_name(f->name, inv_assumption),
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
 		block_withassumption(f->abstract, inv_assumption),
@@ -441,9 +445,7 @@ block_withassumption(struct ast_block *old, struct ast_expr *cond)
 		NULL, dynamic_str("assume"), ast_stmt_create_expr(NULL, cond)
 	);
 
-	printf("block (old): %s\n", ast_block_str(old));
 	struct ast_block *new = ast_block_create(decl, ndecl, stmt, nstmt);
-	printf("block (new): %s\n", ast_block_str(new));
 	return new;
 }
 
@@ -461,14 +463,21 @@ split_name(char *name, struct ast_expr *assumption)
 struct ast_stmt *
 choose_split_path(struct ast_stmt *stmt, bool should_split, bool enter);
 
+struct ast_stmt_arr {
+	int n;
+	struct ast_stmt **stmt;
+};
+
+static void
+stmt_arr_appendbody(struct ast_stmt_arr *arr, struct ast_stmt *body);
+
 static struct ast_block *
 split_block_index(struct ast_block *b, int split_index, bool enter)
 {
 	int nstmts = ast_block_nstmts(b);
 	struct ast_stmt **old_stmt = ast_block_stmts(b);
 
-	int n = 0;
-	struct ast_stmt **stmt = NULL;
+	struct ast_stmt_arr arr = { 0, NULL };
 	for (int i = 0; i < nstmts; i++) {
 		struct ast_stmt *s = choose_split_path(
 			old_stmt[i], i == split_index, enter
@@ -476,8 +485,7 @@ split_block_index(struct ast_block *b, int split_index, bool enter)
 		if (!s) {
 			continue;
 		}
-		stmt = realloc(stmt, sizeof(struct ast_stmt *) * ++n);
-		stmt[n-1] = ast_stmt_copy(s);
+		stmt_arr_appendbody(&arr, s);
 	}
 
 	int ndecl = ast_block_ndecls(b);
@@ -488,7 +496,7 @@ split_block_index(struct ast_block *b, int split_index, bool enter)
 		: NULL;
 	return ast_block_create(
 		decl, ndecl,
-		stmt, n
+		arr.stmt, arr.n
 	);	
 }
 
@@ -499,6 +507,23 @@ choose_split_path(struct ast_stmt *stmt, bool should_split, bool enter)
 		return enter ? ast_stmt_sel_body(stmt) : NULL;
 	}
 	return stmt;
+}
+
+static void
+stmt_arr_appendbody(struct ast_stmt_arr *arr, struct ast_stmt *body)
+{
+	/* TODO: carefully sift through all ast_stmt_kinds */
+	if (ast_stmt_kind(body) == STMT_COMPOUND) {
+		struct ast_block *b = ast_stmt_as_block(body);
+		int nstmts = ast_block_nstmts(b);
+		struct ast_stmt **stmt = ast_block_stmts(b);
+		for (int i = 0; i < nstmts; i++) {
+			stmt_arr_appendbody(arr, stmt[i]);
+		}
+	} else {
+		arr->stmt = realloc(arr->stmt, sizeof(struct ast_stmt *) * ++arr->n);
+		arr->stmt[arr->n-1] = ast_stmt_copy(body);
+	}
 }
 
 struct result *

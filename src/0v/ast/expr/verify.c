@@ -777,7 +777,6 @@ reduce_assume(struct ast_expr *, bool value, struct state *);
 struct preresult *
 ast_expr_assume(struct ast_expr *expr, struct state *state)
 {
-	printf("expr (assume): %s\n", ast_expr_str(expr));
 	return reduce_assume(expr, true, state);
 }
 
@@ -878,7 +877,6 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 	case EXPR_STRUCTMEMBER:
 		return structmember_pf_reduce(e, s);
 	default:
-		printf("expr: %s\n", ast_expr_str(e));
 		assert(false);
 	}
 }
@@ -1013,7 +1011,6 @@ static struct preresult *
 irreducible_assume(struct ast_expr *e, bool value, struct state *s)
 {
 	struct ast_expr *prop = ast_expr_inverted_copy(e, !value);
-	printf("prop: %s\n", ast_expr_str(prop));
 	struct preresult *r = irreducible_assume_actual(prop, s);
 	ast_expr_destroy(prop);
 	return r;
@@ -1039,7 +1036,6 @@ binary_assume(struct ast_expr *expr, bool value, struct state *s)
 	/* TODO: user errors */
 	struct value *v1 = result_as_value(r1),
 		     *v2 = result_as_value(r2);
-	printf("v1: %s, v2: %s\n", value_str(v1), value_str(v2));
 
 	return irreducible_assume(
 		ast_expr_binary_create(

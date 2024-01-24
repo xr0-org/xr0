@@ -88,17 +88,17 @@ copy_stmt_arr(int len, struct ast_stmt **stmt)
 }
 
 char *
-ast_block_str(struct ast_block *b)
+ast_block_str(struct ast_block *b, char *indent)
 {
 	struct strbuilder *sb = strbuilder_create();
 	for (int i = 0; i < b->ndecl; i++) {
 		char *s = ast_variable_str(b->decl[i]);
-		strbuilder_printf(sb, "%s;\n", s);
+		strbuilder_printf(sb, "%s%s;\n", indent, s);
 		free(s);
 	}
 	for (int i = 0; i < b->nstmt; i++) {
 		char *s = ast_stmt_str(b->stmt[i]);
-		strbuilder_printf(sb, "%s\n", s);
+		strbuilder_printf(sb, "%s%s\n", indent, s);
 		free(s);
 	}
 	return strbuilder_build(sb);

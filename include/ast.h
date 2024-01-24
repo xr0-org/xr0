@@ -194,7 +194,7 @@ void
 ast_block_destroy(struct ast_block *);
 
 char *
-ast_block_str(struct ast_block *);
+ast_block_str(struct ast_block *, char *indent);
 
 struct ast_block *
 ast_block_copy(struct ast_block *b);
