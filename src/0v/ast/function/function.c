@@ -178,11 +178,11 @@ ast_function_params(struct ast_function *f)
 struct ast_function *
 proto_stitch(struct ast_function *f, struct externals *);
 
-struct error *
+static struct error *
 path_verify_withstate(struct ast_function *f, struct state *, int index);
 
-static struct preresult *
-parameterise_state(struct state *s, struct ast_function *f);
+static void
+declare_parameters(struct state *s, struct ast_function *f);
 
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
@@ -191,15 +191,7 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
-
-	struct preresult *r = parameterise_state(state, f);
-	if (preresult_iserror(r)) {
-		return preresult_as_error(r);
-	} else if (preresult_iscontradiction(r)) {
-		/* ex falso quodlibet */
-		return NULL;
-	}
-
+	declare_parameters(state, f);
 	return path_verify_withstate(proto, state, 0);
 }
 
@@ -215,18 +207,15 @@ proto_stitch(struct ast_function *f, struct externals *ext)
 	return f;
 }
 
-struct error *
+static struct error *
 path_verify(struct ast_function *f, struct state *state, int index);
 
 static struct preresult *
 install_props(struct state *s, struct ast_function *f);
 
-struct error *
+static struct error *
 path_verify_withstate(struct ast_function *f, struct state *state, int index)
 {
-	printf("%s\n", ast_function_str(f));
-	printf("state (before): %s\n", state_str(state));
-
 	struct ast_block *body = ast_function_body(f);
 
 	struct preresult *r = install_props(state, f);
@@ -254,16 +243,19 @@ abstract_audit(struct ast_function *f, struct state *actual_state);
 static struct error *
 split_paths_verify(struct ast_function *f, struct state *, int index, struct ast_expr *);
 
-struct error *
+static struct error *
 path_verify(struct ast_function *f, struct state *state, int index)
 {
+	printf("%s\n", ast_function_str(f));
+	printf("state (before): %s\n", state_str(state));
+
 	struct error *err = NULL;
 
 	struct ast_block *body = ast_function_body(f);
 
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
-	for (int i = 0; i < nstmts; i++) {
+	for (int i = index; i < nstmts; i++) {
 		struct ast_stmt_paths p = ast_stmt_paths(stmt[i], state);
 		if (p.cond) {
 			return split_paths_verify(f, state, i, p.cond);
@@ -284,8 +276,8 @@ path_verify(struct ast_function *f, struct state *state, int index)
 	return NULL;
 }
 
-static struct preresult *
-parameterise_state(struct state *s, struct ast_function *f)
+static void
+declare_parameters(struct state *s, struct ast_function *f)
 {
 	/* declare params and locals in stack frame */
 	struct ast_variable **param = ast_function_params(f);
@@ -301,11 +293,11 @@ parameterise_state(struct state *s, struct ast_function *f)
 			state_vconst(s, ast_variable_type(p), dynamic_str(name), true)
 		);
 	}
-	return preresult_empty_create();
 }
 
 static struct preresult *
-install_props(struct state *s, struct ast_function *f) {
+install_props(struct state *s, struct ast_function *f)
+{
 	struct ast_block *abs = ast_function_abstract(f);
 	int nstmts = ast_block_nstmts(abs);
 	struct ast_stmt **stmt = ast_block_stmts(abs);
@@ -315,7 +307,6 @@ install_props(struct state *s, struct ast_function *f) {
 			return r;
 		}
 	}
-
 	return preresult_empty_create();
 }
 
@@ -332,15 +323,13 @@ abstract_audit(struct ast_function *f, struct state *actual_state)
 		state_getext(actual_state),
 		ast_function_type(f)
 	);
-	struct preresult *r = parameterise_state(alleged_state, f);
-	assert(preresult_isempty(r));
-	struct preresult *r2 = install_props(alleged_state, f);
-	if (preresult_iscontradiction(r2)) {
-		printf("contradition\n");
+	declare_parameters(alleged_state, f);
+
+	struct preresult *r = install_props(alleged_state, f);
+	if (preresult_iscontradiction(r)) {
 		return NULL;
 	}
 
-	/* mutates alleged_state */
 	struct result *res = ast_function_absexec(f, alleged_state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
@@ -376,8 +365,15 @@ split_paths_verify(struct ast_function *f, struct state *state, int index,
 		struct state *s_copy = state_copywithname(
 			state, ast_function_name(func[i])
 		);
-		if ((err = path_verify_withstate(func[i], s_copy, index))) {
-			return err;
+		struct preresult *r = ast_expr_assume(cond, s_copy);
+		if (preresult_iserror(r)) {
+			return preresult_as_error(r);
+		}
+		if (!preresult_iscontradiction(r)) {
+			/* only run if no contradiction because "ex falso" */
+			if ((err = path_verify(func[i], s_copy, index))) {
+				return err;
+			}
 		}
 		/*state_destroy(s_copy);*/
 	}
@@ -528,6 +524,9 @@ stmt_arr_appendbody(struct ast_stmt_arr *arr, struct ast_stmt *body)
 	}
 }
 
+static struct error *
+path_absverify(struct ast_function *, struct state *, int index);
+
 struct result *
 ast_function_absexec(struct ast_function *f, struct state *state)
 {
@@ -539,20 +538,30 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 		}
 	}
 
-	int nstmts = ast_block_nstmts(f->abstract);
-	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
-	for (int i = 0; i < nstmts; i++) {
-		struct result *res = ast_stmt_absexec(stmt[i], state);
-		if (result_iserror(res)) {
-			return res;
-		}
-		result_destroy(res);
+	struct error *err = path_absverify(f, state, 0);
+	if (err) {
+		return result_error_create(err);
 	}
 
 	/* wrap result and return */ 
 	struct object *obj = state_getresult(state);
 	assert(obj);
 	return result_value_create(object_as_value(obj));
+}
+
+static struct error *
+path_absverify(struct ast_function *f, struct state *state, int index)
+{
+	int nstmts = ast_block_nstmts(f->abstract);
+	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
+	for (int i = index; i < nstmts; i++) {
+		struct result *res = ast_stmt_absexec(stmt[i], state);
+		if (result_iserror(res)) {
+			return result_as_error(res);
+		}
+		result_destroy(res);
+	}
+	return NULL;
 }
 
 #include "arr.c"
