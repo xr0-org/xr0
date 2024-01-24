@@ -76,7 +76,7 @@ ast_function_str(struct ast_function *f)
 	char *ret = ast_type_str(f->ret);
 	strbuilder_printf(b, "%s\n", ret);
 	free(ret);
-	strbuilder_printf(b, "<%s>(", f->name);
+	strbuilder_printf(b, "%s(", f->name);
 	for (int i = 0; i < f->nparam; i++) {
 		char *v = ast_variable_str(f->param[i]);
 		char *space = (i + 1 < f->nparam) ? ", " : "";
