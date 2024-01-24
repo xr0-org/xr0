@@ -677,16 +677,19 @@ ast_stmt_as_expr(struct ast_stmt *stmt)
 struct ast_stmt_paths
 ast_stmt_paths(struct ast_stmt *stmt, struct state *s)
 {
-	if (stmt->kind != STMT_SELECTION) {
+	/* TODO: consider expressions with calls */
+	switch (stmt->kind) {
+	case STMT_SELECTION:
+		return (struct ast_stmt_paths) {
+			.yes	= stmt->u.selection.body,
+			.cond	= stmt->u.selection.cond,
+		};
+	default:
 		return (struct ast_stmt_paths) {
 			.yes	= stmt,
 			.cond	= NULL,
 		};
 	}
-	return (struct ast_stmt_paths) {
-		.yes	= stmt->u.selection.body,
-		.cond	= stmt->u.selection.cond,
-	};
 }
 
 #include "verify.c"
