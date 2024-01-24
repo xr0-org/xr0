@@ -172,7 +172,7 @@ struct ast_function *
 proto_stitch(struct ast_function *f, struct externals *);
 
 struct error *
-path_verify_withstate(struct ast_function *f, struct state *, struct externals *, int index);
+path_verify_withstate(struct ast_function *f, struct state *, int index);
 
 static struct preresult *
 parameterise_state(struct state *s, struct ast_function *f);
@@ -193,7 +193,7 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 		return NULL;
 	}
 
-	return path_verify_withstate(proto, state, ext, 0);
+	return path_verify_withstate(proto, state, 0);
 }
 
 struct ast_function *
@@ -209,13 +209,13 @@ proto_stitch(struct ast_function *f, struct externals *ext)
 }
 
 struct error *
-path_verify(struct ast_function *f, struct state *state, struct externals *, int index);
+path_verify(struct ast_function *f, struct state *state, int index);
 
 static struct preresult *
 install_props(struct state *s, struct ast_function *f);
 
 struct error *
-path_verify_withstate(struct ast_function *f, struct state *state, struct externals *ext, int index)
+path_verify_withstate(struct ast_function *f, struct state *state, int index)
 {
 	printf("state (before): %s\n", state_str(state));
 	printf("function: %s\n", ast_function_str(f));
@@ -236,20 +236,19 @@ path_verify_withstate(struct ast_function *f, struct state *state, struct extern
 		state_declare(state, var[i], false);
 	}
 
-	struct error *err = path_verify(f, state, ext, index);
+	struct error *err = path_verify(f, state, index);
 	state_destroy(state);
 	return err;
 }
 
 static struct error *
-abstract_audit(struct ast_function *f, struct state *actual_state,
-		struct externals *);
+abstract_audit(struct ast_function *f, struct state *actual_state);
 
-static struct ast_function_arr *
-split_paths(struct ast_function *f, int index, struct ast_expr *);
+static struct error *
+split_paths_verify(struct ast_function *f, struct state *, int index, struct ast_expr *);
 
 struct error *
-path_verify(struct ast_function *f, struct state *state, struct externals *ext, int index)
+path_verify(struct ast_function *f, struct state *state, int index)
 {
 	struct error *err = NULL;
 
@@ -259,21 +258,8 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext, 
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = 0; i < nstmts; i++) {
 		struct ast_stmt_paths p = ast_stmt_paths(stmt[i], state);
-		if (p.assumption) {
-			/* create two functions with abstracts and bodies
-			 * adjusted accordingly */
-			struct ast_function_arr *paths = split_paths(f, i, p.assumption);
-			assert(ast_function_arr_len(paths) == 2);
-			struct ast_function **func = ast_function_arr_func(paths);
-			err = path_verify_withstate(func[0], state_copy(state), ext, i);
-			if (err) {
-				return err;
-			}
-			err = path_verify_withstate(func[1], state_copy(state), ext, i);
-			if (err) {
-				return err;
-			}
-			return NULL;
+		if (p.cond) {
+			return split_paths_verify(f, state, i, p.cond);
 		}
 		/*printf("state: %s\n", state_str(state));*/
 		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
@@ -285,7 +271,7 @@ path_verify(struct ast_function *f, struct state *state, struct externals *ext, 
 		}
 	}
 	/* TODO: verify that `result' is of same type as f->result */
-	if ((err = abstract_audit(f, state, ext))) {
+	if ((err = abstract_audit(f, state))) {
 		return error_prepend(err, "qed error: ");
 	}
 	return NULL;
@@ -327,8 +313,7 @@ install_props(struct state *s, struct ast_function *f) {
 }
 
 static struct error *
-abstract_audit(struct ast_function *f, struct state *actual_state,
-		struct externals *ext)
+abstract_audit(struct ast_function *f, struct state *actual_state)
 {
 	if (!state_hasgarbage(actual_state)) {
 		printf("actual: %s\n", state_str(actual_state));
@@ -336,7 +321,9 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 	}
 
 	struct state *alleged_state = state_create(
-		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
+		dynamic_str(ast_function_name(f)),
+		state_getext(actual_state),
+		ast_function_type(f)
 	);
 	struct preresult *r = parameterise_state(alleged_state, f);
 	assert(preresult_isempty(r));
@@ -362,6 +349,34 @@ abstract_audit(struct ast_function *f, struct state *actual_state,
 
 	return NULL;
 }
+
+static struct ast_function_arr *
+split_paths(struct ast_function *f, int index, struct ast_expr *);
+
+static struct error *
+split_paths_verify(struct ast_function *f, struct state *state, int index,
+		struct ast_expr *cond)
+{
+	struct error *err = NULL;
+
+	/* create two functions with abstracts and bodies
+	 * adjusted accordingly */
+	struct ast_function_arr *paths = split_paths(f, index, cond);
+	int n = ast_function_arr_len(paths);
+	assert(n == 2);
+	struct ast_function **func = ast_function_arr_func(paths);
+	for (int i = 0; i < n; i++) {
+		struct state *s_copy = state_copy(state);
+		err = path_verify_withstate(func[i], s_copy, index);
+		if (err) {
+			return err;
+		}
+		state_destroy(s_copy);
+	}
+	return NULL;
+}
+
+
 
 static char *
 split_name(char *name, struct ast_expr *assumption);

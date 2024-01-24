@@ -678,15 +678,15 @@ struct ast_stmt_paths
 ast_stmt_paths(struct ast_stmt *stmt, struct state *s)
 {
 	if (stmt->kind != STMT_SELECTION) {
-		struct ast_stmt_paths paths = { .yes = stmt, .no = NULL, .assumption = NULL };
-		return paths;
+		return (struct ast_stmt_paths) {
+			.yes	= stmt,
+			.cond	= NULL,
+		};
 	}
-	struct ast_stmt_paths paths = {
-		.yes = stmt->u.selection.body,
-		.no = NULL, /* TODO: else blocks */
-		.assumption = stmt->u.selection.cond
+	return (struct ast_stmt_paths) {
+		.yes	= stmt->u.selection.body,
+		.cond	= stmt->u.selection.cond,
 	};
-	return paths;
 }
 
 #include "verify.c"

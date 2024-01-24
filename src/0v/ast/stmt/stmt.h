@@ -24,8 +24,8 @@ bool
 ast_stmt_isassume(struct ast_stmt *stmt);
 
 struct ast_stmt_paths {
-	struct ast_stmt *yes, *no;
-	struct ast_expr *assumption;
+	struct ast_stmt *yes;
+	struct ast_expr *cond;
 };
 
 struct ast_stmt_paths
