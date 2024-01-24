@@ -179,7 +179,7 @@ struct ast_function *
 proto_stitch(struct ast_function *f, struct externals *);
 
 static struct error *
-path_verify_withstate(struct ast_function *f, struct state *, int index);
+path_verify_withstate(struct ast_function *f, struct state *);
 
 static void
 declare_parameters(struct state *s, struct ast_function *f);
@@ -192,7 +192,9 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
 	declare_parameters(state, f);
-	return path_verify_withstate(proto, state, 0);
+	struct error *err = path_verify_withstate(proto, state);
+	state_destroy(state);
+	return err;
 }
 
 struct ast_function *
@@ -214,7 +216,7 @@ static struct preresult *
 install_props(struct state *s, struct ast_function *f);
 
 static struct error *
-path_verify_withstate(struct ast_function *f, struct state *state, int index)
+path_verify_withstate(struct ast_function *f, struct state *state)
 {
 	struct ast_block *body = ast_function_body(f);
 
@@ -232,9 +234,7 @@ path_verify_withstate(struct ast_function *f, struct state *state, int index)
 		state_declare(state, var[i], false);
 	}
 
-	struct error *err = path_verify(f, state, index);
-	state_destroy(state);
-	return err;
+	return path_verify(f, state, 0);
 }
 
 static struct error *
@@ -268,6 +268,10 @@ path_verify(struct ast_function *f, struct state *state, int index)
 		if (ast_stmt_isterminal(stmt[i])) {
 			break;
 		}
+	}
+	if (!state_hasgarbage(state)) {
+		printf("actual: %s\n", state_str(state));
+		return error_create("qed error: garbage on heap");
 	}
 	/* TODO: verify that `result' is of same type as f->result */
 	if ((err = abstract_audit(f, state))) {
@@ -311,39 +315,47 @@ install_props(struct state *s, struct ast_function *f)
 }
 
 static struct error *
+path_absverify(struct ast_function *, struct state *state, int index,
+		struct state *actual_state);
+
+static struct error *
+abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
+		struct state *actual_state);
+
+static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state)
 {
-	if (!state_hasgarbage(actual_state)) {
-		printf("actual: %s\n", state_str(actual_state));
-		return error_create("garbage on heap");
-	}
-
 	struct state *alleged_state = state_create(
 		dynamic_str(ast_function_name(f)),
 		state_getext(actual_state),
 		ast_function_type(f)
 	);
 	declare_parameters(alleged_state, f);
+	struct error *err = abstract_auditwithstate(
+		f, alleged_state, actual_state
+	);
+	state_destroy(alleged_state); /* actual_state handled by caller */ 
+	return err;
+}
 
+static struct error *
+abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
+		struct state *actual_state)
+{
 	struct preresult *r = install_props(alleged_state, f);
 	if (preresult_iscontradiction(r)) {
 		return NULL;
 	}
 
-	struct result *res = ast_function_absexec(f, alleged_state);
-	if (result_iserror(res)) {
-		return result_as_error(res);
+	int ndecls = ast_block_ndecls(f->abstract);
+	if (ndecls) {
+		struct ast_variable **var = ast_block_decls(f->abstract);
+		for (int i = 0; i < ndecls; i++) {
+			state_declare(alleged_state, var[i], false);
+		}
 	}
 
-	bool equiv = state_equal(actual_state, alleged_state);
-	if (!equiv) {
-		/* XXX: print states */
-		return error_create("actual and alleged states differ");
-	}
-
-	state_destroy(alleged_state); /* actual_state handled by caller */ 
-
-	return NULL;
+	return path_absverify(f, alleged_state, 0, actual_state);
 }
 
 static struct ast_function_arr *
@@ -524,9 +536,6 @@ stmt_arr_appendbody(struct ast_stmt_arr *arr, struct ast_stmt *body)
 	}
 }
 
-static struct error *
-path_absverify(struct ast_function *, struct state *, int index);
-
 struct result *
 ast_function_absexec(struct ast_function *f, struct state *state)
 {
@@ -538,9 +547,14 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 		}
 	}
 
-	struct error *err = path_absverify(f, state, 0);
-	if (err) {
-		return result_error_create(err);
+	int nstmts = ast_block_nstmts(f->abstract);
+	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
+	for (int i = 0; i < nstmts; i++) {
+		struct result *res = ast_stmt_absexec(stmt[i], state);
+		if (result_iserror(res)) {
+			return res;
+		}
+		result_destroy(res);
 	}
 
 	/* wrap result and return */ 
@@ -550,17 +564,25 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 }
 
 static struct error *
-path_absverify(struct ast_function *f, struct state *state, int index)
+path_absverify(struct ast_function *f, struct state *alleged_state, int index,
+		struct state *actual_state)
 {
 	int nstmts = ast_block_nstmts(f->abstract);
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
 	for (int i = index; i < nstmts; i++) {
-		struct result *res = ast_stmt_absexec(stmt[i], state);
+		struct result *res = ast_stmt_absexec(stmt[i], alleged_state);
 		if (result_iserror(res)) {
 			return result_as_error(res);
 		}
 		result_destroy(res);
 	}
+
+	bool equiv = state_equal(actual_state, alleged_state);
+	if (!equiv) {
+		/* XXX: print states */
+		return error_create("actual and alleged states differ");
+	}
+
 	return NULL;
 }
 
