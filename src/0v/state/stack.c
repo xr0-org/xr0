@@ -89,6 +89,15 @@ stack_copy(struct stack *stack)
 	return copy;
 }
 
+struct stack *
+stack_copywithname(struct stack *stack, char *new_name)
+{
+	struct stack *copy = stack_copy(stack);
+	free(copy->name);
+	copy->name = new_name;
+	return copy;
+}
+
 static struct map *
 varmap_copy(struct map *m)
 {

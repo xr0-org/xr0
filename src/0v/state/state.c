@@ -50,10 +50,23 @@ struct state *
 state_copy(struct state *state)
 {
 	struct state *copy = malloc(sizeof(struct state));
-	assert(state);
+	assert(copy);
 	copy->ext = state->ext;
 	copy->vconst = vconst_copy(state->vconst);
 	copy->stack = stack_copy(state->stack);
+	copy->heap = heap_copy(state->heap);
+	copy->props = props_copy(state->props);
+	return copy;
+}
+
+struct state *
+state_copywithname(struct state *state, char *func_name)
+{
+	struct state *copy = malloc(sizeof(struct state));
+	assert(copy);
+	copy->ext = state->ext;
+	copy->vconst = vconst_copy(state->vconst);
+	copy->stack = stack_copywithname(state->stack, func_name);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
 	return copy;

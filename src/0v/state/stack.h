@@ -18,6 +18,9 @@ stack_destroy(struct stack *);
 struct stack *
 stack_copy(struct stack *);
 
+struct stack *
+stack_copywithname(struct stack *, char *new_name);
+
 char *
 stack_str(struct stack *, struct state *);
 

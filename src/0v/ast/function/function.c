@@ -76,7 +76,7 @@ ast_function_str(struct ast_function *f)
 	char *ret = ast_type_str(f->ret);
 	strbuilder_printf(b, "%s\n", ret);
 	free(ret);
-	strbuilder_printf(b, "%s(", f->name);
+	strbuilder_printf(b, "<%s>(", f->name);
 	for (int i = 0; i < f->nparam; i++) {
 		char *v = ast_variable_str(f->param[i]);
 		char *space = (i + 1 < f->nparam) ? ", " : "";
@@ -373,7 +373,9 @@ split_paths_verify(struct ast_function *f, struct state *state, int index,
 	assert(n == 2);
 	struct ast_function **func = ast_function_arr_func(paths);
 	for (int i = 0; i < n; i++) {
-		struct state *s_copy = state_copy(state);
+		struct state *s_copy = state_copywithname(
+			state, ast_function_name(func[i])
+		);
 		if ((err = path_verify_withstate(func[i], s_copy, index))) {
 			return err;
 		}
