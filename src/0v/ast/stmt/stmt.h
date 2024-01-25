@@ -23,12 +23,7 @@ ast_stmt_ispre(struct ast_stmt *stmt);
 bool
 ast_stmt_isassume(struct ast_stmt *stmt);
 
-struct ast_stmt_paths {
-	struct ast_stmt *yes;
-	struct ast_expr *cond;
-};
-
-struct ast_stmt_paths
-ast_stmt_paths(struct ast_stmt *, struct state *);
+bool
+ast_stmt_shouldsplit(struct ast_stmt *, struct state *);
 
 #endif

@@ -241,7 +241,7 @@ static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state);
 
 static struct error *
-split_paths_verify(struct ast_function *f, struct state *, int index, struct ast_expr *);
+split_paths_verify(struct ast_function *f, struct state *, int index);
 
 static struct error *
 path_verify(struct ast_function *f, struct state *state, int index)
@@ -253,9 +253,8 @@ path_verify(struct ast_function *f, struct state *state, int index)
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = index; i < nstmts; i++) {
-		struct ast_stmt_paths p = ast_stmt_paths(stmt[i], state);
-		if (p.cond) {
-			return split_paths_verify(f, state, i, p.cond);
+		if (ast_stmt_shouldsplit(stmt[i], state)) {
+			return split_paths_verify(f, state, i);
 		}
 		/*printf("state: %s\n", state_str(state));*/
 		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
@@ -359,10 +358,14 @@ static struct ast_function_arr *
 body_paths(struct ast_function *f, int index, struct ast_expr *);
 
 static struct error *
-split_paths_verify(struct ast_function *f, struct state *state, int index,
-		struct ast_expr *cond)
+split_paths_verify(struct ast_function *f, struct state *state, int index)
 {
 	struct error *err = NULL;
+
+	assert(ast_block_nstmts(f->body) > index);
+	struct ast_expr *cond = ast_stmt_sel_cond(
+		ast_block_stmts(f->body)[index]
+	);
 
 	/* create two functions with abstracts and bodies
 	 * adjusted accordingly */
@@ -393,7 +396,7 @@ split_paths_verify(struct ast_function *f, struct state *state, int index,
 
 static struct error *
 split_paths_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_expr *cond, struct state *actual_state);
+		int index, struct state *actual_state);
 
 static struct error *
 path_absverify(struct ast_function *f, struct state *alleged_state, int index,
@@ -402,10 +405,9 @@ path_absverify(struct ast_function *f, struct state *alleged_state, int index,
 	int nstmts = ast_block_nstmts(f->abstract);
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
 	for (int i = index; i < nstmts; i++) {
-		struct ast_stmt_paths p = ast_stmt_paths(stmt[i], alleged_state);
-		if (p.cond) {
+		if (ast_stmt_shouldsplit(stmt[i], alleged_state)) {
 			return split_paths_absverify(
-				f, alleged_state, i, p.cond, actual_state
+				f, alleged_state, i, actual_state
 			);
 		}
 		struct result *res = ast_stmt_absexec(stmt[i], alleged_state);
@@ -429,9 +431,14 @@ abstract_paths(struct ast_function *f, int index, struct ast_expr *cond);
 
 static struct error *
 split_paths_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_expr *cond, struct state *actual_state)
+		int index, struct state *actual_state)
 {
 	struct error *err = NULL;
+
+	assert(ast_block_nstmts(f->abstract) > index);
+	struct ast_expr *cond = ast_stmt_sel_cond(
+		ast_block_stmts(f->abstract)[index]
+	);
 
 	/* create two functions with abstracts and bodies
 	 * adjusted accordingly */

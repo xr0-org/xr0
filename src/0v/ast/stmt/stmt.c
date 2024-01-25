@@ -674,21 +674,18 @@ ast_stmt_as_expr(struct ast_stmt *stmt)
 	return stmt->u.expr;
 }
 
-struct ast_stmt_paths
-ast_stmt_paths(struct ast_stmt *stmt, struct state *s)
+bool
+ast_stmt_shouldsplit(struct ast_stmt *stmt, struct state *s)
 {
 	/* TODO: consider expressions with calls */
 	switch (stmt->kind) {
+	case STMT_EXPR:
+		/* TODO */
+		return false;
 	case STMT_SELECTION:
-		return (struct ast_stmt_paths) {
-			.yes	= stmt->u.selection.body,
-			.cond	= stmt->u.selection.cond,
-		};
+		return true;
 	default:
-		return (struct ast_stmt_paths) {
-			.yes	= stmt,
-			.cond	= NULL,
-		};
+		return false;
 	}
 }
 
