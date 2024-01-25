@@ -367,8 +367,6 @@ split_paths_verify(struct ast_function *f, struct state *state, int index)
 		ast_block_stmts(f->body)[index]
 	);
 
-	/* create two functions with abstracts and bodies
-	 * adjusted accordingly */
 	struct ast_function_arr *paths = body_paths(f, index, cond);
 	int n = ast_function_arr_len(paths);
 	assert(n == 2);
