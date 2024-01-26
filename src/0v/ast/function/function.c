@@ -636,7 +636,7 @@ static char *
 split_name(char *name, struct ast_expr *assumption)
 {
 	struct strbuilder *b = strbuilder_create();
-	char *assumption_str = ast_expr_str(assumption);
+	char *assumption_str = assumption ? ast_expr_str(assumption) : "";
 	strbuilder_printf(b, "%s | %s", name, assumption_str);
 	free(assumption_str);
 	return strbuilder_build(b);

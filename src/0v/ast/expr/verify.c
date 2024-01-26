@@ -118,6 +118,7 @@ expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
 struct error *
 ast_expr_exec(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	struct result *res = ast_expr_eval(expr, state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
@@ -478,6 +479,9 @@ pf_augment(struct value *v, struct ast_expr *root, struct state *);
 static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("call: %s\n", ast_expr_str(expr));
+	printf("state: %s\n", state_str(state));
+
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -516,6 +520,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	if (result_hasvalue(res)) {
 		v = value_copy(result_as_value(res));
 	}
+	printf("state (after): %s\n", state_str(state));
 
 	state_popframe(state);
 	result_arr_destroy(args);

@@ -931,6 +931,7 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 static struct ast_stmt_splits
 call_splits(struct ast_expr *expr, struct state *state)
 {
+	printf("callsplits (after): %s\n", state_str(state));
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -945,19 +946,22 @@ call_splits(struct ast_expr *expr, struct state *state)
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
 
+	struct state *s_copy = state_copy(state);
 	struct result_arr *args = prepare_arguments(
 		ast_expr_call_nargs(expr),
 		ast_expr_call_args(expr),
-		nparams, params, state
+		nparams, params, s_copy
 	);
 
 	struct ast_type *ret_type = ast_function_type(f);
-	state_pushframe(state, dynamic_str(name), ret_type);
+	state_pushframe(s_copy, dynamic_str(name), ret_type);
 
 	struct error *err = prepare_parameters(
-		nparams, params, args, name, state
+		nparams, params, args, name, s_copy
 	);
 	assert(!err);
+
+	printf("callsplits (after): %s\n", state_str(s_copy));
 
 	int n = 0;
 	struct ast_expr **cond = NULL;
@@ -966,14 +970,14 @@ call_splits(struct ast_expr *expr, struct state *state)
 	int nstmts = ast_block_nstmts(abs);
 	struct ast_stmt **stmt = ast_block_stmts(abs);
 	for (int i = 0; i < nstmts; i++) {
-		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], state);
+		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], s_copy);
 		for (int j = 0; j < splits.n; j++) {
 			cond = realloc(cond, sizeof(struct ast_expr *) * ++n);
 			cond[n-1] = splits.cond[j];
 		}
 	}
 
-	state_popframe(state);
+	state_popframe(s_copy);
 	result_arr_destroy(args);
 
 	return (struct ast_stmt_splits) { .n = n, .cond = cond };

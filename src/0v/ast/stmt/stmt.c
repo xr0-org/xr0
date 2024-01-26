@@ -718,8 +718,9 @@ condexists(struct ast_expr *cond, struct state *);
 static struct ast_stmt_splits
 stmt_splits(struct ast_stmt *stmt, struct state *s)
 {
-	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
-	struct ast_expr *cond = value_to_expr(result_as_value(res));
+	/*struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);*/
+	/*struct ast_expr *cond = value_to_expr(result_as_value(res));*/
+	struct ast_expr *cond = stmt->u.selection.cond;
 	if (condexists(cond, s)) {
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	}
