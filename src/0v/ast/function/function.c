@@ -241,7 +241,8 @@ static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state);
 
 static struct error *
-split_paths_verify(struct ast_function *f, struct state *, int index);
+split_paths_verify(struct ast_function *f, struct state *, int index,
+		struct ast_stmt_splits *splits);
 
 static struct error *
 path_verify(struct ast_function *f, struct state *state, int index)
@@ -253,8 +254,9 @@ path_verify(struct ast_function *f, struct state *state, int index)
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = index; i < nstmts; i++) {
-		if (ast_stmt_shouldsplit(stmt[i], state)) {
-			return split_paths_verify(f, state, i);
+		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], state);
+		if (splits.n) {
+			return split_paths_verify(f, state, i, &splits);
 		}
 		/*printf("state: %s\n", state_str(state));*/
 		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
@@ -358,14 +360,28 @@ static struct ast_function_arr *
 body_paths(struct ast_function *f, int index, struct ast_expr *);
 
 static struct error *
-split_paths_verify(struct ast_function *f, struct state *state, int index)
+split_path_verify(struct ast_function *f, struct state *state, int index,
+		struct ast_expr *cond);
+
+static struct error *
+split_paths_verify(struct ast_function *f, struct state *state, int index,
+		struct ast_stmt_splits *splits)
+{
+	struct error *err;
+	for (int i = 0; i < splits->n; i++) {
+		err = split_path_verify(f, state, index, splits->cond[i]);
+		if (err) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
+static struct error *
+split_path_verify(struct ast_function *f, struct state *state, int index,
+		struct ast_expr *cond)
 {
 	struct error *err = NULL;
-
-	assert(ast_block_nstmts(f->body) > index);
-	struct ast_expr *cond = ast_stmt_sel_cond(
-		ast_block_stmts(f->body)[index]
-	);
 
 	struct ast_function_arr *paths = body_paths(f, index, cond);
 	int n = ast_function_arr_len(paths);
@@ -394,7 +410,7 @@ split_paths_verify(struct ast_function *f, struct state *state, int index)
 
 static struct error *
 split_paths_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct state *actual_state);
+		int index, struct ast_stmt_splits *splits, struct state *actual_state);
 
 static struct error *
 path_absverify(struct ast_function *f, struct state *alleged_state, int index,
@@ -403,9 +419,12 @@ path_absverify(struct ast_function *f, struct state *alleged_state, int index,
 	int nstmts = ast_block_nstmts(f->abstract);
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
 	for (int i = index; i < nstmts; i++) {
-		if (ast_stmt_shouldsplit(stmt[i], alleged_state)) {
+		struct ast_stmt_splits splits = ast_stmt_splits(
+			stmt[i], alleged_state
+		);
+		if (splits.n) {
 			return split_paths_absverify(
-				f, alleged_state, i, actual_state
+				f, alleged_state, i, &splits, actual_state
 			);
 		}
 		struct result *res = ast_stmt_absexec(stmt[i], alleged_state);
@@ -428,15 +447,30 @@ static struct ast_function_arr *
 abstract_paths(struct ast_function *f, int index, struct ast_expr *cond);
 
 static struct error *
+split_path_absverify(struct ast_function *f, struct state *alleged_state,
+		int index, struct ast_expr *cond, struct state *actual_state);
+
+static struct error *
 split_paths_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct state *actual_state)
+		int index, struct ast_stmt_splits *splits, struct state *actual_state)
+{
+	struct error *err;
+	for (int i = 0; i < splits->n; i++) {
+		err = split_path_absverify(
+			f, alleged_state, index, splits->cond[i], actual_state
+		);
+		if (err) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
+static struct error *
+split_path_absverify(struct ast_function *f, struct state *alleged_state,
+		int index, struct ast_expr *cond, struct state *actual_state)
 {
 	struct error *err = NULL;
-
-	assert(ast_block_nstmts(f->abstract) > index);
-	struct ast_expr *cond = ast_stmt_sel_cond(
-		ast_block_stmts(f->abstract)[index]
-	);
 
 	/* create two functions with abstracts and bodies
 	 * adjusted accordingly */

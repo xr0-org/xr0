@@ -23,7 +23,12 @@ ast_stmt_ispre(struct ast_stmt *stmt);
 bool
 ast_stmt_isassume(struct ast_stmt *stmt);
 
-bool
-ast_stmt_shouldsplit(struct ast_stmt *, struct state *);
+struct ast_stmt_splits {
+	int n;
+	struct ast_expr **cond;
+};
+
+struct ast_stmt_splits
+ast_stmt_splits(struct ast_stmt *, struct state *);
 
 #endif

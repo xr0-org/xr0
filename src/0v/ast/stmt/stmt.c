@@ -674,18 +674,20 @@ ast_stmt_as_expr(struct ast_stmt *stmt)
 	return stmt->u.expr;
 }
 
-bool
-ast_stmt_shouldsplit(struct ast_stmt *stmt, struct state *s)
+struct ast_stmt_splits
+ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 {
 	/* TODO: consider expressions with calls */
 	switch (stmt->kind) {
+	case STMT_SELECTION:
+		return (struct ast_stmt_splits) {
+			.n    = 1,
+			.cond = &stmt->u.selection.cond,
+		};
 	case STMT_EXPR:
 		/* TODO */
-		return false;
-	case STMT_SELECTION:
-		return true;
 	default:
-		return false;
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	}
 }
 
