@@ -553,10 +553,7 @@ abstract_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		split_name(f->name, cond),
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
-		block_withassumption(
-			split_block_index(f->abstract, index, true),
-			ast_expr_copy(cond)
-		),
+		block_withassumption(f->abstract, ast_expr_copy(cond)),
 		ast_block_copy(f->body)
 	);
 
@@ -567,10 +564,7 @@ abstract_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		split_name(f->name, inv_assumption),
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
-		block_withassumption(
-			split_block_index(f->abstract, index, false),
-			inv_assumption
-		),
+		block_withassumption(f->abstract, inv_assumption),
 		ast_block_copy(f->body)
 	);
 	
@@ -591,7 +585,7 @@ body_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
 		block_withassumption(f->abstract, ast_expr_copy(cond)),
-		split_block_index(f->body, index, true)
+		f->body
 	);
 
 	struct ast_expr *inv_assumption = ast_expr_inverted_copy(cond, true);
@@ -602,7 +596,7 @@ body_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
 		block_withassumption(f->abstract, inv_assumption),
-		split_block_index(f->body, index, false)
+		f->body
 	);
 	
 	ast_function_arr_append(res, f_true);
