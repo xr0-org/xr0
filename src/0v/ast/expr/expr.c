@@ -2,10 +2,15 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
-#include "math.h"
-#include "util.h"
+#include "ext.h"
+#include "intern.h"
 #include "expr.h"
+#include "math.h"
+#include "state.h"
+#include "stmt/stmt.h"
+#include "util.h"
 
 static struct ast_expr *
 ast_expr_create()
@@ -894,5 +899,53 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 		assert(false);
 	}
 }
+
+static struct ast_stmt_splits
+call_splits(struct ast_expr *, struct state *);
+
+struct ast_stmt_splits
+ast_expr_splits(struct ast_expr *e, struct state *s)
+{
+	switch (ast_expr_kind(e)) {
+	case EXPR_ASSIGNMENT:
+		return ast_expr_splits(ast_expr_assignment_rval(e), s);
+	case EXPR_CALL:
+		return call_splits(e, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_stmt_splits
+call_splits(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(root);
+
+	struct ast_function *f = externals_getfunc(state_getext(state), name);
+	if (!f) {
+		/* TODO: user error */
+		fprintf(stdout, "function `%s' not found\n", name);
+		assert(false);
+	}
+
+	int n = 0;
+	struct ast_expr **cond = NULL;
+
+	struct ast_block *abs = ast_function_abstract(f);
+	int nstmts = ast_block_nstmts(abs);
+	struct ast_stmt **stmt = ast_block_stmts(abs);
+	for (int i = 0; i < nstmts; i++) {
+		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], state);
+		for (int j = 0; j < splits.n; j++) {
+			cond = realloc(cond, sizeof(struct ast_expr *) * ++n);
+			cond[n-1] = splits.cond[j];
+		}
+	}
+
+	return (struct ast_stmt_splits) { .n = n, .cond = cond };
+}
+
 
 #include "verify.c"

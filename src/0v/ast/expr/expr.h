@@ -71,6 +71,9 @@ ast_expr_binary_create(struct ast_expr *e1, enum ast_binary_operator,
 		struct ast_expr *e2);
 
 enum ast_binary_operator
-ast_expr_binary_op(struct ast_expr *expr);
+ast_expr_binary_op(struct ast_expr *);
+
+struct ast_stmt_splits
+ast_expr_splits(struct ast_expr *, struct state *);
 
 #endif

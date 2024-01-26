@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "expr/expr.h"
 #include "lex.h"
 #include "util.h"
 #include "stmt.h"
@@ -679,13 +680,13 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 {
 	/* TODO: consider expressions with calls */
 	switch (stmt->kind) {
+	case STMT_EXPR:
+		return ast_expr_splits(stmt->u.expr, s);
 	case STMT_SELECTION:
 		return (struct ast_stmt_splits) {
 			.n    = 1,
 			.cond = &stmt->u.selection.cond,
 		};
-	case STMT_EXPR:
-		/* TODO */
 	default:
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	}
