@@ -667,7 +667,6 @@ split_block_index(struct ast_block *b, int split_index, bool enter)
 
 	struct ast_stmt_arr arr = { 0, NULL };
 	for (int i = 0; i < nstmts; i++) {
-		printf("stmt: %s\n", ast_stmt_str(old_stmt[i]));
 		struct ast_stmt *s = choose_split_path(
 			old_stmt[i], i == split_index, enter
 		);

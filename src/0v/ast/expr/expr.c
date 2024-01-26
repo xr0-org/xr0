@@ -903,14 +903,26 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 static struct ast_stmt_splits
 call_splits(struct ast_expr *, struct state *);
 
+static struct ast_stmt_splits
+binary_splits(struct ast_expr *, struct state *);
+
 struct ast_stmt_splits
 ast_expr_splits(struct ast_expr *e, struct state *s)
 {
 	switch (ast_expr_kind(e)) {
-	case EXPR_ASSIGNMENT:
-		return ast_expr_splits(ast_expr_assignment_rval(e), s);
 	case EXPR_CALL:
 		return call_splits(e, s);
+	case EXPR_ASSIGNMENT:
+		return ast_expr_splits(ast_expr_assignment_rval(e), s);
+	case EXPR_UNARY:
+		return ast_expr_splits(ast_expr_unary_operand(e), s);
+	case EXPR_BINARY:
+		return binary_splits(e, s);
+	case EXPR_STRUCTMEMBER:
+		return ast_expr_splits(ast_expr_member_root(e), s);
+	case EXPR_CONSTANT:
+	case EXPR_IDENTIFIER:
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	default:
 		assert(false);
 	}
@@ -942,6 +954,24 @@ call_splits(struct ast_expr *expr, struct state *state)
 			cond = realloc(cond, sizeof(struct ast_expr *) * ++n);
 			cond[n-1] = splits.cond[j];
 		}
+	}
+
+	return (struct ast_stmt_splits) { .n = n, .cond = cond };
+}
+
+static struct ast_stmt_splits
+binary_splits(struct ast_expr *e, struct state *s)
+{
+	struct ast_stmt_splits s1 = ast_expr_splits(ast_expr_binary_e1(e), s),
+			       s2 = ast_expr_splits(ast_expr_binary_e2(e), s);
+
+	int n = s1.n + s2.n;
+	struct ast_expr **cond = malloc(sizeof(struct ast_expr *) * n);
+	for (int i = 0; i < s1.n; i++) {
+		cond[i] = s1.cond[i];
+	}
+	for (int i = 0; i < s2.n; i++) {
+		cond[i+s1.n] = s2.cond[i];
 	}
 
 	return (struct ast_stmt_splits) { .n = n, .cond = cond };
