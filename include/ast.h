@@ -212,7 +212,7 @@ struct ast_stmt **
 ast_block_stmts(struct ast_block *b);
 
 bool
-ast_block_isterminal(struct ast_block *);
+ast_block_isterminal(struct ast_block *, struct state *);
 
 enum ast_jump_kind {
 	JUMP_RETURN	= 1 << 0,
@@ -342,7 +342,7 @@ struct preresult *
 ast_stmt_preprocess(struct ast_stmt *, struct state *);
 
 bool
-ast_stmt_isterminal(struct ast_stmt *);
+ast_stmt_isterminal(struct ast_stmt *, struct state *);
 
 bool
 ast_stmt_isselection(struct ast_stmt *);

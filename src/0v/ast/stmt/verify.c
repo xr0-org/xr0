@@ -165,6 +165,9 @@ static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
+stmt_sel_exec(struct ast_stmt *stmt, struct state *state);
+
+static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
@@ -182,6 +185,8 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 		return NULL;
 	case STMT_EXPR:
 		return ast_expr_exec(ast_stmt_as_expr(stmt), state);
+	case STMT_SELECTION:
+		return stmt_sel_exec(stmt, state);
 	case STMT_ITERATION:
 		return stmt_iter_exec(stmt, state);
 	case STMT_JUMP:
@@ -205,10 +210,26 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 		if (err) {
 			return err;
 		}
-		if (ast_stmt_isterminal(stmts[i])) {
+		if (ast_stmt_isterminal(stmts[i], state)) {
 			break;
 		}
 	}
+	return NULL;
+}
+
+/* stmt_sel_exec */
+
+static struct error *
+stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
+{
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	if (dec.err) {
+		return dec.err;
+	}
+	if (dec.decision) {
+		return ast_stmt_exec(ast_stmt_sel_body(stmt), state);
+	}
+	assert(!ast_stmt_sel_nest(stmt));
 	return NULL;
 }
 
@@ -394,10 +415,6 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	return obj;
 }
 
-/* TODO: change to more regular tuple */
-static struct decision { bool decision; struct error *err; }
-sel_decide(struct ast_expr *control, struct state *state);
-
 static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
@@ -412,7 +429,7 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 	return result_value_create(NULL);
 }
 
-static struct decision
+struct decision
 sel_decide(struct ast_expr *control, struct state *state)
 {
 	printf("state: %s\n", state_str(state));

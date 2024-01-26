@@ -263,7 +263,7 @@ path_verify(struct ast_function *f, struct state *state, int index)
 		if ((err = ast_stmt_process(stmt[i], state))) {
 			return err;
 		}
-		if (ast_stmt_isterminal(stmt[i])) {
+		if (ast_stmt_isterminal(stmt[i], state)) {
 			break;
 		}
 	}

@@ -132,10 +132,10 @@ ast_block_stmts(struct ast_block *b)
 }
 
 bool
-ast_block_isterminal(struct ast_block *b)
+ast_block_isterminal(struct ast_block *b, struct state *s)
 {
 	for (int i = 0; i < b->nstmt; i++) {
-		if (ast_stmt_isterminal(b->stmt[i])) {
+		if (ast_stmt_isterminal(b->stmt[i], s)) {
 			return true;
 		}
 	}

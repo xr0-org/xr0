@@ -439,11 +439,6 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 
 /* expr_call_eval */
 
-struct result_arr {
-	int n;
-	struct result **res;
-};
-
 struct result_arr *
 result_arr_create()
 {
@@ -466,11 +461,11 @@ result_arr_append(struct result_arr *arr, struct result *res)
 	arr->res[arr->n-1] = res;
 }
 
-static struct result_arr *
+struct result_arr *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 		struct ast_variable **param, struct state *state);
 
-static struct error *
+struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
 		struct result_arr *args, char *fname, struct state *state);
 
@@ -617,7 +612,7 @@ call_to_computed_value(struct ast_function *f, struct state *s)
 	);
 }
 
-static struct result_arr *
+struct result_arr *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 		struct ast_variable **param, struct state *state)
 {
@@ -632,7 +627,7 @@ prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 
 /* prepare_parameters: Allocate arguments in call expression and assign them to
  * their respective parameters. */
-static struct error *
+struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
 		struct result_arr *args, char *fname, struct state *state)
 {

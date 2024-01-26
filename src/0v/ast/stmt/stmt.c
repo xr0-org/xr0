@@ -2,11 +2,16 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
 #include "expr/expr.h"
+#include "intern.h"
 #include "lex.h"
-#include "util.h"
+#include "props.h"
+#include "state.h"
 #include "stmt.h"
+#include "util.h"
+#include "value.h"
 
 struct ast_stmt {
 	enum ast_stmt_kind kind;
@@ -184,21 +189,36 @@ ast_stmt_create_jump(struct lexememarker *loc, enum ast_jump_kind kind,
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt)
 {
-	assert(ast_stmt_isterminal(stmt));
 	return stmt->u.jump.rv;
 }
 
+static bool
+sel_isterminal(struct ast_stmt *stmt, struct state *s);
+
 bool
-ast_stmt_isterminal(struct ast_stmt *stmt)
+ast_stmt_isterminal(struct ast_stmt *stmt, struct state *s)
 {
 	switch (stmt->kind) {
 	case STMT_JUMP:
 		return stmt->u.jump.kind == JUMP_RETURN;
 	case STMT_COMPOUND:
-		return ast_block_isterminal(stmt->u.compound);
+		return ast_block_isterminal(stmt->u.compound, s);
+	case STMT_SELECTION:
+		return sel_isterminal(stmt, s);
 	default:
 		return false;
 	}
+}
+
+static bool
+sel_isterminal(struct ast_stmt *stmt, struct state *s)
+{
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), s);
+	assert(!dec.err);
+	if (dec.decision) {
+		return ast_stmt_isterminal(ast_stmt_sel_body(stmt), s);
+	}
+	return false;
 }
 
 bool
@@ -675,6 +695,9 @@ ast_stmt_as_expr(struct ast_stmt *stmt)
 	return stmt->u.expr;
 }
 
+static struct ast_stmt_splits
+stmt_splits(struct ast_stmt *stmt, struct state *s);
+
 struct ast_stmt_splits
 ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 {
@@ -683,13 +706,37 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 	case STMT_EXPR:
 		return ast_expr_splits(stmt->u.expr, s);
 	case STMT_SELECTION:
-		return (struct ast_stmt_splits) {
-			.n    = 1,
-			.cond = &stmt->u.selection.cond,
-		};
+		return stmt_splits(stmt, s);
 	default:
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	}
+}
+
+static bool
+condexists(struct ast_expr *cond, struct state *);
+
+static struct ast_stmt_splits
+stmt_splits(struct ast_stmt *stmt, struct state *s)
+{
+	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
+	struct ast_expr *cond = value_to_expr(result_as_value(res));
+	if (condexists(cond, s)) {
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	}
+	return (struct ast_stmt_splits) {
+		.n    = 1,
+		.cond = &cond,
+	};
+}
+
+static bool
+condexists(struct ast_expr *cond, struct state *s)
+{
+	struct result *res = ast_expr_pf_reduce(cond, s);
+	assert(!result_iserror(res) && result_hasvalue(res));
+	struct ast_expr *reduced = value_to_expr(result_as_value(res));
+	struct props *p = state_getprops(s);
+	return props_get(p, reduced) || props_contradicts(p, reduced);
 }
 
 #include "verify.c"

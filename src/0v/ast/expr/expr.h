@@ -76,4 +76,29 @@ ast_expr_binary_op(struct ast_expr *);
 struct ast_stmt_splits
 ast_expr_splits(struct ast_expr *, struct state *);
 
+struct result_arr {
+	int n;
+	struct result **res;
+};
+
+struct result_arr *
+result_arr_create();
+
+void
+result_arr_destroy(struct result_arr *arr);
+
+void
+result_arr_append(struct result_arr *arr, struct result *res);
+
+
+struct result_arr *
+prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
+		struct ast_variable **param, struct state *state);
+
+struct error *
+prepare_parameters(int nparams, struct ast_variable **param, 
+		struct result_arr *args, char *fname, struct state *state);
+
+
+
 #endif

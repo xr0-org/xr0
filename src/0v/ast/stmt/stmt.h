@@ -31,4 +31,11 @@ struct ast_stmt_splits {
 struct ast_stmt_splits
 ast_stmt_splits(struct ast_stmt *, struct state *);
 
+struct state;
+struct error;
+
+/* TODO: change to more regular tuple */
+struct decision { bool decision; struct error *err; }
+sel_decide(struct ast_expr *control, struct state *state);
+
 #endif

@@ -942,6 +942,23 @@ call_splits(struct ast_expr *expr, struct state *state)
 		assert(false);
 	}
 
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **params = ast_function_params(f);
+
+	struct result_arr *args = prepare_arguments(
+		ast_expr_call_nargs(expr),
+		ast_expr_call_args(expr),
+		nparams, params, state
+	);
+
+	struct ast_type *ret_type = ast_function_type(f);
+	state_pushframe(state, dynamic_str(name), ret_type);
+
+	struct error *err = prepare_parameters(
+		nparams, params, args, name, state
+	);
+	assert(!err);
+
 	int n = 0;
 	struct ast_expr **cond = NULL;
 
@@ -955,6 +972,9 @@ call_splits(struct ast_expr *expr, struct state *state)
 			cond[n-1] = splits.cond[j];
 		}
 	}
+
+	state_popframe(state);
+	result_arr_destroy(args);
 
 	return (struct ast_stmt_splits) { .n = n, .cond = cond };
 }
