@@ -734,7 +734,7 @@ stmt_sel_splits(struct ast_stmt *stmt, struct state *s)
 	if (condexists(r, s)) {
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	}
-	printf("cond: %s\n", ast_expr_str(r));
+	/*printf("cond: %s\n", ast_expr_str(r));*/
 	struct ast_expr **cond = malloc(sizeof(struct ast_expr *));
 	cond[0] = r;
 	return (struct ast_stmt_splits) {

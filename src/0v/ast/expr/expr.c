@@ -551,6 +551,7 @@ ast_expr_assignment_create(struct ast_expr *root, struct ast_expr *value)
 	return expr;
 }
 
+
 struct ast_expr *
 ast_expr_assignment_lval(struct ast_expr *expr)
 {
@@ -918,6 +919,8 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 		return ast_expr_splits(ast_expr_unary_operand(e), s);
 	case EXPR_BINARY:
 		return binary_splits(e, s);
+	case EXPR_INCDEC:
+		return ast_expr_splits(ast_expr_incdec_root(e), s);
 	case EXPR_STRUCTMEMBER:
 		return ast_expr_splits(ast_expr_member_root(e), s);
 	case EXPR_CONSTANT:

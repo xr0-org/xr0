@@ -341,12 +341,16 @@ expr_constant_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct result *
+hack_identifier_builtin_eval(char *id, struct state *state);
+
+static struct result *
 expr_identifier_eval(struct ast_expr *expr, struct state *state)
 {
-	if (state_getvconst(state, ast_expr_as_identifier(expr))) {
-		return result_value_create(
-			value_sync_create(ast_expr_copy(expr))
-		);
+	struct result *res = hack_identifier_builtin_eval(
+		ast_expr_as_identifier(expr), state
+	);
+	if (!result_iserror(res) && result_hasvalue(res)) {
+		return res;
 	}
 
 	char *id = ast_expr_as_identifier(expr);
@@ -364,6 +368,17 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	return result_value_create(value_copy(val));
+}
+
+static struct result *
+hack_identifier_builtin_eval(char *id, struct state *state)
+{
+	if (state_getvconst(state, id) || strncmp(id, "ptr:", 4) == 0) {
+		return result_value_create(
+			value_sync_create(ast_expr_identifier_create(dynamic_str(id)))
+		);
+	}
+	return result_error_create(error_create("not built-in"));
 }
 
 static struct ast_expr *
@@ -599,12 +614,10 @@ call_to_computed_value(struct ast_function *f, struct state *s)
 		}
 		assert(result_hasvalue(res));
 		struct value *v = result_as_value(res);
-		if (value_issync(v)) {
-			computed_param[i] = value_as_sync(result_as_value(res));
+		if (value_islocation(v)) {
+			computed_param[i] = ast_expr_identifier_create(value_str(v));
 		} else {
-			computed_param[i] = ast_expr_identifier_create(
-				dynamic_str(ast_variable_name(uncomputed_param[i]))
-			);
+			computed_param[i] = value_to_expr(v);
 		}
 	}
 

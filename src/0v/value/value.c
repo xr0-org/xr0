@@ -630,6 +630,7 @@ value_to_expr(struct value *v)
 	case VALUE_INT:
 		return number_to_expr(v->n);
 	default:
+		printf("v: %s\n", value_str(v));
 		assert(false);
 	}
 }

@@ -693,7 +693,7 @@ parse_token_id(char *pos)
 	struct tknameresult res;
 
 	id = parse_id(++pos); /* skip '{' */
-	pos += strlen(id);
+	pos = pos + strlen(id);
 	if (*pos != '}') {
 		puts("token id must end in '}'");
 		exit(1);
