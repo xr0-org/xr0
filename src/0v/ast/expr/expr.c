@@ -931,7 +931,6 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 static struct ast_stmt_splits
 call_splits(struct ast_expr *expr, struct state *state)
 {
-	printf("callsplits (after): %s\n", state_str(state));
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -960,8 +959,6 @@ call_splits(struct ast_expr *expr, struct state *state)
 		nparams, params, args, name, s_copy
 	);
 	assert(!err);
-
-	printf("callsplits (after): %s\n", state_str(s_copy));
 
 	int n = 0;
 	struct ast_expr **cond = NULL;

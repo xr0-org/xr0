@@ -696,7 +696,7 @@ ast_stmt_as_expr(struct ast_stmt *stmt)
 }
 
 static struct ast_stmt_splits
-stmt_splits(struct ast_stmt *stmt, struct state *s);
+stmt_sel_splits(struct ast_stmt *stmt, struct state *s);
 
 struct ast_stmt_splits
 ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
@@ -706,7 +706,7 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 	case STMT_EXPR:
 		return ast_expr_splits(stmt->u.expr, s);
 	case STMT_SELECTION:
-		return stmt_splits(stmt, s);
+		return stmt_sel_splits(stmt, s);
 	default:
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	}
@@ -716,11 +716,10 @@ static bool
 condexists(struct ast_expr *cond, struct state *);
 
 static struct ast_stmt_splits
-stmt_splits(struct ast_stmt *stmt, struct state *s)
+stmt_sel_splits(struct ast_stmt *stmt, struct state *s)
 {
-	/*struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);*/
-	/*struct ast_expr *cond = value_to_expr(result_as_value(res));*/
-	struct ast_expr *cond = stmt->u.selection.cond;
+	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
+	struct ast_expr *cond = value_to_expr(result_as_value(res));
 	if (condexists(cond, s)) {
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	}

@@ -256,6 +256,7 @@ path_verify(struct ast_function *f, struct state *state, int index)
 	for (int i = index; i < nstmts; i++) {
 		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], state);
 		if (splits.n) {
+			assert(splits.cond);
 			return split_paths_verify(f, state, i, &splits);
 		}
 		/*printf("state: %s\n", state_str(state));*/
@@ -368,7 +369,9 @@ split_paths_verify(struct ast_function *f, struct state *state, int index,
 		struct ast_stmt_splits *splits)
 {
 	struct error *err;
+	printf("splits->n: %d\n", splits->n);
 	for (int i = 0; i < splits->n; i++) {
+		printf("cond[%d]: %s\n", i, ast_expr_str(splits->cond[i]));
 		err = split_path_verify(f, state, index, splits->cond[i]);
 		if (err) {
 			return err;
@@ -607,6 +610,9 @@ body_paths(struct ast_function *f, int index, struct ast_expr *cond)
 static struct ast_block *
 block_withassumption(struct ast_block *old, struct ast_expr *cond)
 {
+	if (!cond) {
+		return old;
+	}
 	int ndecl = ast_block_ndecls(old);
 	struct ast_variable **old_decl = ast_block_decls(old);
 	struct ast_variable **decl = malloc(sizeof(struct ast_variable *) * ndecl); 
@@ -636,7 +642,7 @@ static char *
 split_name(char *name, struct ast_expr *assumption)
 {
 	struct strbuilder *b = strbuilder_create();
-	char *assumption_str = assumption ? ast_expr_str(assumption) : "";
+	char *assumption_str = ast_expr_str(assumption);
 	strbuilder_printf(b, "%s | %s", name, assumption_str);
 	free(assumption_str);
 	return strbuilder_build(b);
