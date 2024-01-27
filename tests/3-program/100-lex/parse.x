@@ -40,10 +40,7 @@ struct stringresult {
 
 struct stringresult
 parse_defsraw(char *input) ~ [
-	result.s = $;
-	if (beginsdefs(input)) {
-		.alloc result.s;
-	}
+	.alloc result.s;
 	result.pos = $;
 ];
 
@@ -56,19 +53,10 @@ parse(char *pos) ~ [
 	char *pre; char *post;
 	struct pattern *pattern;
 	struct token *token;
-	pre = $; post = $; pattern = $; token = $; /* TODO: put in else */
-	if (beginsdefs(skipws(pos))) {
-		.alloc pre;
-	}
-	if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
-		.alloc pattern;
-	}
-	if (count_tokens(skipws(parse_defs(pos).pos+2))) {
-		.alloc token;
-	}
-	if (isboundary(parse_rules(skipws(parse_defs(pos).pos+2)).pos)) {
-		.alloc post;
-	}
+	pre = malloc(1);
+	pattern = malloc(1);
+	token = malloc(1);
+	post = malloc(1);
 	result = lexer_create(pre, post, $, pattern, $, token);
 ];
 
@@ -76,12 +64,14 @@ void
 lexer_destroy(struct lexer *l) ~ [
 	pre: {
 		l = lexer_create(
-			$, $,
+			malloc(1), malloc(1),
 			$, malloc(1),
 			$, malloc(1)
 		);
 	}
 
+	.dealloc l->pre;
+	.dealloc l->post;
 	.dealloc l->pattern;
 	.dealloc l->token;
 	.dealloc l;
@@ -170,6 +160,8 @@ lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 void
 lexer_destroy(struct lexer *l)
 {
+	free(l->pre);
+	free(l->post);
 	free(l->pattern);
 	free(l->token);
 	free(l);
@@ -217,14 +209,8 @@ count_patterns(char *pos);
 
 struct defsresult
 parse_defs(char *pos) ~ [
-	result.pre = $;
-	result.pattern = $;
-	if (beginsdefs(skipws(pos))) {
-		.alloc result.pre;
-	}
-	if (count_patterns(skipoptions(parse_defsraw(skipws(pos)).pos))) {
-		.alloc result.pattern;
-	}
+	.alloc result.pre;
+	.alloc result.pattern;
 	result.pos = $;
 	result.npat = $;
 ];
@@ -246,16 +232,13 @@ count_tokens(char *pos);
 
 struct rulesresult
 parse_rules(char *pos) ~ [
-	result.token = $; /* TODO: put in else block */
-	if (count_tokens(pos)) {
-		.alloc result.token;
-	}
+	.alloc result.token;
 	result.pos = $;
 	result.ntok = $;
 ];
 
 char *
-parse_toeof(char *input) ~ [ if (isboundary(input)) .alloc result; ];
+parse_toeof(char *input) ~ [ .alloc result; ];
 
 struct lexer *
 parse(char *pos)
@@ -370,11 +353,7 @@ struct patternet {
 
 struct patternet
 parse_defsproper(char *input) ~ [
-	/* TODO: put in else block */
-	result.pattern = $;
-	if (count_patterns(input)) {
-		.alloc result.pattern;
-	}
+	.alloc result.pattern;
 	result.npat = $;
 	result.pos = $;
 ];
@@ -410,7 +389,8 @@ parse_defsraw(char *input)
 	struct stringresult res;
 
 	if (!beginsdefs(input)) {
-		res.s = "";
+		res.s = malloc(1);
+		res.s[0] = '\0';
 		res.pos = input;
 		return res;
 	}
@@ -459,10 +439,7 @@ struct patternpos {
 
 struct patternpos
 parse_defs_n(char *pos, int npat) ~ [
-	result.p = $; /* TODO: put in else block */
-	if (npat) {
-		.alloc result.p;
-	}
+	.alloc result.p;
 	result.pos = $;
 ];
 
@@ -525,7 +502,9 @@ parse_defs_n(char *pos, int npat)
 	struct patternresult parsed;
 	struct patternpos res;
 
-	p = NULL;
+	if (!npat) {
+		p = malloc(1);
+	}
 	if (npat) {
 		p = malloc(sizeof(struct pattern) * npat);
 		for (i = 0; i < npat; i++) {
@@ -573,10 +552,7 @@ struct tokenpos {
 
 struct tokenpos
 parse_rules_n(char *pos, int ntok) ~ [
-	result.t = $; /* TODO: put in else block */
-	if (ntok) {
-		.alloc result.t;
-	}
+	.alloc result.t;
 	result.pos = $;
 ];
 
@@ -628,7 +604,9 @@ parse_rules_n(char *pos, int ntok)
 	struct tokenresult parsed;
 	struct tokenpos res;
 
-	t = NULL;
+	if (!ntok) {
+		t = malloc(1);
+	}
 	if (ntok) {
 		t = malloc(sizeof(struct token) * ntok);
 		for (i = 0; i < ntok; i++) {
@@ -773,7 +751,9 @@ parse_toeof(char *input)
 	char *s;
 
 	if (!isboundary(input)) {
-		return "";
+		s = malloc(1);
+		s[0] = '\0';
+		return s;
 	}
 
 	s = input; /* must be here because not seen with skip loop hack */

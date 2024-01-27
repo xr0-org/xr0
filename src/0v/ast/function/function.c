@@ -254,8 +254,8 @@ path_verify(struct ast_function *f, struct state *state, int index)
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = index; i < nstmts; i++) {
-		printf("state: %s\n", state_str(state));
-		printf("%s\n", ast_stmt_str(stmt[i]));
+		/*printf("state: %s\n", state_str(state));*/
+		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
 		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], state);
 		if (splits.n) {
 			assert(splits.cond);
