@@ -214,6 +214,7 @@ pass1(struct ast *root, struct externals *ext)
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
 
+		printf("%s...\n", ast_function_name(f));
 		if ((err = ast_function_verify(f, ext))) {
 			fprintf(stderr, "%s\n", err->msg);
 			exit(EXIT_FAILURE);

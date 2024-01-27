@@ -922,9 +922,11 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 		return ast_expr_splits(ast_expr_member_root(e), s);
 	case EXPR_CONSTANT:
 	case EXPR_IDENTIFIER:
+	case EXPR_STRING_LITERAL:
 	case EXPR_ARBARG:
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	default:
+		/*printf("expr: %s\n", ast_expr_str(e));*/
 		assert(false);
 	}
 }

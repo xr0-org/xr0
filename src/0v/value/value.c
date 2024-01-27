@@ -623,7 +623,10 @@ struct ast_expr *
 value_to_expr(struct value *v)
 {
 	switch (v->type) {
+	case VALUE_LITERAL:
+		return value_as_literal(v);
 	case VALUE_SYNC:
+		return value_as_sync(v);
 	case VALUE_INT:
 		return number_to_expr(v->n);
 	default:

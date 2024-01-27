@@ -118,7 +118,6 @@ expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
 struct error *
 ast_expr_exec(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	struct result *res = ast_expr_eval(expr, state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
@@ -485,9 +484,6 @@ pf_augment(struct value *v, struct ast_expr *root, struct state *);
 static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("call: %s\n", ast_expr_str(expr));
-	printf("state: %s\n", state_str(state));
-
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -843,9 +839,6 @@ ast_expr_pf_reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 }
 
 static struct result *
-identifier_pf_reduce(struct ast_expr *id, struct state *);
-
-static struct result *
 binary_pf_reduce(struct ast_expr *e1, enum ast_binary_operator,
 		struct ast_expr *e2, struct state *);
 
@@ -863,11 +856,9 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 {
 	switch (ast_expr_kind(e)) {
 	case EXPR_CONSTANT:
-		return expr_constant_eval(e, s);
 	case EXPR_STRING_LITERAL:
-		return expr_literal_eval(e, s);
 	case EXPR_IDENTIFIER:
-		return identifier_pf_reduce(e, s);
+		return ast_expr_eval(e, s);
 	case EXPR_UNARY:
 		return unary_pf_reduce(e, s);
 	case EXPR_BINARY:
@@ -884,24 +875,6 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 	default:
 		assert(false);
 	}
-}
-
-static struct result *
-identifier_pf_reduce(struct ast_expr *id, struct state *s)
-{
-	/* the actual reduction */
-	struct result *res = expr_identifier_eval(id, s);
-	if (result_iserror(res)) {
-		return res;
-	}
-	assert(result_hasvalue(res));
-	struct value *v = result_as_value(res);
-	if (!value_issync(v)) {
-		return result_value_create(
-			value_sync_create(ast_expr_copy(id))
-		);
-	}
-	return res;
 }
 
 static struct result *
@@ -964,12 +937,7 @@ call_pf_reduce(struct ast_expr *e, struct state *s)
 			return res;
 		}
 		assert(result_hasvalue(res));
-		struct value *v = result_as_value(res);
-		if (value_issync(v)) {
-			reduced_arg[i] = value_as_sync(v);
-		} else if (value_isliteral(v)) {
-			reduced_arg[i] = value_as_literal(v);
-		}
+		reduced_arg[i] = ast_expr_copy(value_to_expr(result_as_value(res)));
 	}
 	return result_value_create(
 		value_sync_create(
