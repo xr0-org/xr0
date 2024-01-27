@@ -160,9 +160,19 @@ lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 void
 lexer_destroy(struct lexer *l)
 {
+	int i;
+
 	free(l->pre);
 	free(l->post);
+	for (i = 0; i < l->npat; i++) {
+		free(l->pattern[i].name);
+		free(l->pattern[i].pattern);
+	}
 	free(l->pattern);
+	for (i = 0; i < l->ntok; i++) {
+		free(l->token[i].name);
+		free(l->token[i].action);
+	}
 	free(l->token);
 	free(l);
 }
@@ -471,7 +481,9 @@ count_patterns(char *pos)
 	for (; strncmp(pos, "%%", 2) != 0; n++) {
 		parsed = parse_pattern(pos);
 		pos = skipws(parsed.pos);
-		/* TODO: clean up r.p */
+		free(parsed.p->name);
+		free(parsed.p->pattern);
+		free(parsed.p);
 	}
 
 	return n;
@@ -510,6 +522,7 @@ parse_defs_n(char *pos, int npat)
 		for (i = 0; i < npat; i++) {
 			parsed = parse_pattern(pos);
 			p[i] = *parsed.p;
+			free(parsed.p);
 			pos = skipws(parsed.pos);
 		}
 	}
@@ -590,7 +603,9 @@ count_tokens(char *pos)
 	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; n++) {
 		r = parse_token(pos);
 		pos = skipws(r.pos);
-		/* TODO: clean up r.tk */
+		free(r.tk->name);
+		free(r.tk->action);
+		free(r.tk);
 	}
 
 	return n;
@@ -612,6 +627,7 @@ parse_rules_n(char *pos, int ntok)
 		for (i = 0; i < ntok; i++) {
 			parsed = parse_token(pos);
 			t[i] = *parsed.tk;
+			free(parsed.tk);
 			pos = skipws(parsed.pos);
 		}
 	}

@@ -81,7 +81,7 @@ PARSER = $(BUILD_DIR)/lex-gen
 
 lex-gen:
 	@$(XR0C) tests/3-program/100-lex/parse.x > build/parse.c
-	@c89 -o $(PARSER) $(BUILD_DIR)/parse.c
+	@c89 -g -o $(PARSER) $(BUILD_DIR)/parse.c
 	@$(PARSER) > $(BUILD_DIR)/gen_firstchar
 	@echo '%' > $(BUILD_DIR)/percent
 	@diff $(BUILD_DIR)/gen_firstchar $(BUILD_DIR)/percent
