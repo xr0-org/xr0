@@ -10,7 +10,22 @@
 char *
 read_file(char *path) ~ [ .alloc result; ];
 
-struct lexer;
+struct lexer {
+	char *pre; char *post;
+	int npat; struct pattern *pattern;
+	int ntok; struct token *token;
+};
+
+struct lexer *
+lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
+		int ntok, struct token *token) ~ [
+	.alloc result; 
+	result->pre = pre;
+	result->post = post;
+	result->pattern = pattern;
+	result->token = token;
+];
+
 
 int
 beginsdefs(char *s);
@@ -58,7 +73,7 @@ parse(char *pos) ~ [
 ];
 
 void
-lexer_destroy(struct lexer *) ~ [
+lexer_destroy(struct lexer *l) ~ [
 	pre: {
 		l = lexer_create(
 			$, $,
@@ -73,7 +88,7 @@ lexer_destroy(struct lexer *) ~ [
 ];
 
 void
-lexer_print(struct lexer *) ~ [
+lexer_print(struct lexer *l) ~ [
 	pre: {
 		l = lexer_create(
 			$, $,
@@ -86,7 +101,16 @@ lexer_print(struct lexer *) ~ [
 int
 main() ~ []
 {
-	assert(false);
+	char *file;
+	struct lexer *l;
+
+	file = read_file("tests/3-program/100-lex/gen.l");
+
+	l = parse(file);
+	lexer_print(l);
+	lexer_destroy(l);
+
+	free(file);
 }
 
 char *
@@ -126,21 +150,10 @@ token_print(struct token *t) ~ [
 	pre: t = token_create(0, "", "");
 ];
 
-struct lexer {
-	char *pre; char *post;
-	int npat; struct pattern *pattern;
-	int ntok; struct token *token;
-};
-
 struct lexer *
 lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
-		int ntok, struct token *token) ~ [
-	.alloc result; 
-	result->pre = pre;
-	result->post = post;
-	result->pattern = pattern;
-	result->token = token;
-]{
+		int ntok, struct token *token) 
+{
 	struct lexer *l;
 
 	l = malloc(sizeof(struct lexer));

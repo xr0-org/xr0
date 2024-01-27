@@ -964,12 +964,24 @@ call_splits(struct ast_expr *expr, struct state *state)
 	struct error *err = prepare_parameters(
 		nparams, params, args, name, s_copy
 	);
-	assert(!err);
+	if (err) {
+		fprintf(stderr, "err: %s\n", err->msg);
+		assert(false);
+	}
 
 	int n = 0;
 	struct ast_expr **cond = NULL;
 
 	struct ast_block *abs = ast_function_abstract(f);
+
+	int ndecls = ast_block_ndecls(abs);
+	if (ndecls) {
+		struct ast_variable **var = ast_block_decls(abs);
+		for (int i = 0; i < ndecls; i++) {
+			state_declare(s_copy, var[i], false);
+		}
+	}
+
 	int nstmts = ast_block_nstmts(abs);
 	struct ast_stmt **stmt = ast_block_stmts(abs);
 	for (int i = 0; i < nstmts; i++) {
@@ -978,6 +990,8 @@ call_splits(struct ast_expr *expr, struct state *state)
 			cond = realloc(cond, sizeof(struct ast_expr *) * ++n);
 			cond[n-1] = splits.cond[j];
 		}
+		/* XXX: for assignment statements and, well, spare us */
+		ast_stmt_absexec(stmt[i], s_copy);
 	}
 
 	state_popframe(s_copy);

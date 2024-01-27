@@ -623,6 +623,8 @@ struct ast_expr *
 value_to_expr(struct value *v)
 {
 	switch (v->type) {
+	case VALUE_PTR:
+		return ast_expr_identifier_create(value_str(v));
 	case VALUE_LITERAL:
 		return ast_expr_copy(value_as_literal(v));
 	case VALUE_SYNC:
