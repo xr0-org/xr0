@@ -369,9 +369,7 @@ split_paths_verify(struct ast_function *f, struct state *state, int index,
 		struct ast_stmt_splits *splits)
 {
 	struct error *err;
-	printf("splits->n: %d\n", splits->n);
 	for (int i = 0; i < splits->n; i++) {
-		printf("cond[%d]: %s\n", i, ast_expr_str(splits->cond[i]));
 		err = split_path_verify(f, state, index, splits->cond[i]);
 		if (err) {
 			return err;
@@ -610,9 +608,6 @@ body_paths(struct ast_function *f, int index, struct ast_expr *cond)
 static struct ast_block *
 block_withassumption(struct ast_block *old, struct ast_expr *cond)
 {
-	if (!cond) {
-		return old;
-	}
 	int ndecl = ast_block_ndecls(old);
 	struct ast_variable **old_decl = ast_block_decls(old);
 	struct ast_variable **decl = malloc(sizeof(struct ast_variable *) * ndecl); 

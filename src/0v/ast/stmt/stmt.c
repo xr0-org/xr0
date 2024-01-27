@@ -719,13 +719,15 @@ static struct ast_stmt_splits
 stmt_sel_splits(struct ast_stmt *stmt, struct state *s)
 {
 	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
-	struct ast_expr *cond = value_to_expr(result_as_value(res));
-	if (condexists(cond, s)) {
+	struct ast_expr *r = value_to_expr(result_as_value(res));
+	if (condexists(r, s)) {
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	}
+	struct ast_expr **cond = malloc(sizeof(struct ast_expr *));
+	cond[0] = r;
 	return (struct ast_stmt_splits) {
 		.n    = 1,
-		.cond = &cond,
+		.cond = cond,
 	};
 }
 
