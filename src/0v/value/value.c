@@ -624,13 +624,13 @@ value_to_expr(struct value *v)
 {
 	switch (v->type) {
 	case VALUE_LITERAL:
-		return value_as_literal(v);
+		return ast_expr_copy(value_as_literal(v));
 	case VALUE_SYNC:
-		return value_as_sync(v);
+		return ast_expr_copy(value_as_sync(v));
 	case VALUE_INT:
 		return number_to_expr(v->n);
 	default:
-		printf("v: %s\n", value_str(v));
+		/*printf("v: %s\n", value_str(v));*/
 		assert(false);
 	}
 }
