@@ -104,7 +104,7 @@ value_to_expr(struct value *);
 bool
 value_isliteral(struct value *v);
 
-struct ast_expr *
+char *
 value_as_literal(struct value *v);
 
 bool

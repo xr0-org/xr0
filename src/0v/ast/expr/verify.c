@@ -344,6 +344,12 @@ expr_constant_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 expr_identifier_eval(struct ast_expr *expr, struct state *state)
 {
+	if (state_getvconst(state, ast_expr_as_identifier(expr))) {
+		return result_value_create(
+			value_sync_create(ast_expr_copy(expr))
+		);
+	}
+
 	char *id = ast_expr_as_identifier(expr);
 	struct object *obj = state_getobject(state, id);
 	if (!obj) {
@@ -884,11 +890,6 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 static struct result *
 identifier_pf_reduce(struct ast_expr *id, struct state *s)
 {
-	if (state_getvconst(s, ast_expr_as_identifier(id))) {
-		return result_value_create(
-			value_sync_create(ast_expr_copy(id))
-		);
-	}
 	/* the actual reduction */
 	struct result *res = expr_identifier_eval(id, s);
 	if (result_iserror(res)) {
@@ -968,7 +969,7 @@ call_pf_reduce(struct ast_expr *e, struct state *s)
 		if (value_issync(v)) {
 			reduced_arg[i] = value_as_sync(v);
 		} else if (value_isliteral(v)) {
-			reduced_arg[i] = value_as_literal(v);
+			reduced_arg[i] = ast_expr_literal_create(value_as_literal(v));
 		}
 	}
 	return result_value_create(

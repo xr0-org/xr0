@@ -640,11 +640,11 @@ value_isliteral(struct value *v)
 	return true;
 }
 
-struct ast_expr *
+char *
 value_as_literal(struct value *v)
 {
 	assert(v->type == VALUE_LITERAL);
-	return ast_expr_identifier_create(v->s);
+	return v->s;
 }
 
 enum value_type
