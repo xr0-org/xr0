@@ -707,8 +707,19 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 		return ast_expr_splits(stmt->u.expr, s);
 	case STMT_SELECTION:
 		return stmt_sel_splits(stmt, s);
-	default:
+	case STMT_JUMP:
+		if (stmt->u.jump.rv) {
+			return ast_expr_splits(stmt->u.jump.rv, s);
+		}
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	case STMT_ALLOCATION:
+	case STMT_LABELLED:
+	case STMT_ITERATION:
+	case STMT_COMPOUND_V:
+		/* disallowed splits for now */
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	default:
+		assert(false);
 	}
 }
 

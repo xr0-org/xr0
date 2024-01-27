@@ -540,9 +540,6 @@ split_name(char *name, struct ast_expr *assumption);
 static struct ast_block *
 block_withassumption(struct ast_block *old, struct ast_expr *cond);
 
-static struct ast_block *
-split_block_index(struct ast_block *b, int split_index, bool enter);
-
 static struct ast_function_arr *
 abstract_paths(struct ast_function *f, int index, struct ast_expr *cond)
 {
@@ -642,73 +639,5 @@ split_name(char *name, struct ast_expr *assumption)
 	free(assumption_str);
 	return strbuilder_build(b);
 }
-
-struct ast_stmt *
-choose_split_path(struct ast_stmt *stmt, bool should_split, bool enter);
-
-struct ast_stmt_arr {
-	int n;
-	struct ast_stmt **stmt;
-};
-
-static void
-stmt_arr_appendbody(struct ast_stmt_arr *arr, struct ast_stmt *body);
-
-static struct ast_block *
-split_block_index(struct ast_block *b, int split_index, bool enter)
-{
-	int nstmts = ast_block_nstmts(b);
-	struct ast_stmt **old_stmt = ast_block_stmts(b);
-
-	struct ast_stmt_arr arr = { 0, NULL };
-	for (int i = 0; i < nstmts; i++) {
-		struct ast_stmt *s = choose_split_path(
-			old_stmt[i], i == split_index, enter
-		);
-		if (!s) {
-			continue;
-		}
-		stmt_arr_appendbody(&arr, s);
-	}
-
-	int ndecl = ast_block_ndecls(b);
-	struct ast_variable **old_decl = ast_block_decls(b);
-	struct ast_variable **decl =
-		old_decl
-		? ast_variables_copy(ndecl, old_decl)
-		: NULL;
-	return ast_block_create(
-		decl, ndecl,
-		arr.stmt, arr.n
-	);	
-}
-
-struct ast_stmt *
-choose_split_path(struct ast_stmt *stmt, bool should_split, bool enter)
-{
-	if (should_split) {
-		return enter ? ast_stmt_sel_body(stmt) : NULL;
-	}
-	return stmt;
-}
-
-static void
-stmt_arr_appendbody(struct ast_stmt_arr *arr, struct ast_stmt *body)
-{
-	/* TODO: carefully sift through all ast_stmt_kinds */
-	if (ast_stmt_kind(body) == STMT_COMPOUND) {
-		struct ast_block *b = ast_stmt_as_block(body);
-		int nstmts = ast_block_nstmts(b);
-		struct ast_stmt **stmt = ast_block_stmts(b);
-		for (int i = 0; i < nstmts; i++) {
-			stmt_arr_appendbody(arr, stmt[i]);
-		}
-	} else {
-		arr->stmt = realloc(arr->stmt, sizeof(struct ast_stmt *) * ++arr->n);
-		arr->stmt[arr->n-1] = ast_stmt_copy(body);
-	}
-}
-
-
 
 #include "arr.c"

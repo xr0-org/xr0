@@ -19,6 +19,7 @@ test(int x) ~ [
 	int n;
 
 	n = x;
+
 	return alloc_if(number(n));
 }
 

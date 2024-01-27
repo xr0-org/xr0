@@ -452,9 +452,27 @@ sel_decide(struct ast_expr *control, struct state *state)
 		} else if (props_contradicts(p, sync)) {
 			return (struct decision) { .decision = false, .err = NULL };
 		}
+
 	}
 
 	struct value *zero = value_int_create(0);
+
+	if (!values_comparable(zero, v)) {
+		struct strbuilder *b = strbuilder_create();
+		char *c_str = ast_expr_str(control);
+		char *v_str = value_str(v);
+		strbuilder_printf(
+			b, "`%s' with value `%s' is undecidable",
+			c_str, v_str
+		);
+		free(v_str);
+		free(c_str);
+		return (struct decision) {
+			.decision = false,
+			.err      = error_create(strbuilder_build(b)),
+		};
+	}
+
 	bool nonzero = !value_equal(zero, v);
 	value_destroy(zero);
 	return (struct decision) { .decision = nonzero, .err = NULL };

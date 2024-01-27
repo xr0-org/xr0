@@ -640,11 +640,11 @@ value_isliteral(struct value *v)
 	return true;
 }
 
-char *
+struct ast_expr *
 value_as_literal(struct value *v)
 {
 	assert(v->type == VALUE_LITERAL);
-	return v->s;
+	return ast_expr_literal_create(v->s);
 }
 
 enum value_type
@@ -688,12 +688,18 @@ struct_references(struct value *v, struct location *loc, struct state *s)
 bool
 number_equal(struct number *n1, struct number *n2);
 
+
+bool
+values_comparable(struct value *v1, struct value *v2)
+{
+	return v1->type == v2->type;
+}
+
 bool
 value_equal(struct value *v1, struct value *v2)
 {
-	assert(!v1 && !v2 && v1->type == v2->type);
+	assert(v1->type == v2->type);
 
-	printf("v1: %s, v2: %s\n", v1->s, v2->s);
 	switch (v1->type) {
 	case VALUE_LITERAL:
 		return strcmp(v1->s, v2->s) == 0;

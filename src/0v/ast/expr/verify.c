@@ -526,7 +526,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	if (result_hasvalue(res)) {
 		v = value_copy(result_as_value(res));
 	}
-	printf("state (after): %s\n", state_str(state));
 
 	state_popframe(state);
 	result_arr_destroy(args);
@@ -969,7 +968,7 @@ call_pf_reduce(struct ast_expr *e, struct state *s)
 		if (value_issync(v)) {
 			reduced_arg[i] = value_as_sync(v);
 		} else if (value_isliteral(v)) {
-			reduced_arg[i] = ast_expr_literal_create(value_as_literal(v));
+			reduced_arg[i] = value_as_literal(v);
 		}
 	}
 	return result_value_create(
