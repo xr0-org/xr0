@@ -587,4 +587,7 @@ history_record(struct history *, int linenumber, struct state *);
 struct state_arr *
 history_getstates(struct history *, int linenumber);
 
+char *
+history_str(struct history *);
+
 #endif

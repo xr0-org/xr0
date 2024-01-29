@@ -141,7 +141,7 @@ void
 state_arr_destroy(struct state_arr *arr);
 
 struct state **
-state_arr_s(struct state_arr *arr);
+state_arr_states(struct state_arr *arr);
 
 int
 state_arr_n(struct state_arr *arr);

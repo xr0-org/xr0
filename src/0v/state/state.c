@@ -79,7 +79,7 @@ char *
 state_str(struct state *state)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "[[\n");
+	strbuilder_printf(b, "%d[[\n", state->linenum);
 	char *ext = externals_types_str(state->ext, "\t");
 	if (strlen(ext) > 0) {
 		strbuilder_printf(b, "%s\n", ext);
@@ -436,7 +436,7 @@ state_arr_destroy(struct state_arr *arr)
 }
 
 struct state **
-state_arr_s(struct state_arr *arr)
+state_arr_states(struct state_arr *arr)
 {
 	return arr->s;
 }

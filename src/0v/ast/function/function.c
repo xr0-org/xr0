@@ -213,25 +213,27 @@ static struct error *
 path_verify(struct ast_function *f, struct state *state, int index, struct history *h);
 
 static struct preresult *
-install_props(struct state *s, struct ast_function *f);
+install_props(struct state *s, struct ast_function *f, struct history *h);
 
 static struct error *
 path_verify_withstate(struct ast_function *f, struct state *state, struct history *h)
 {
 	struct ast_block *body = ast_function_body(f);
 
-	struct preresult *r = install_props(state, f);
+	struct preresult *r = install_props(state, f, h);
 	if (preresult_iserror(r)) {
 		return preresult_as_error(r);
 	} else if (preresult_iscontradiction(r)) {
 		/* ex falso quodlibet */
 		return NULL;
 	}
+	/* TODO: figure out how to record props with splitting logic */
 
 	int ndecls = ast_block_ndecls(body);
 	struct ast_variable **var = ast_block_decls(body);
 	for (int i = 0; i < ndecls; i++) {
 		state_declare(state, var[i], false);
+		history_record(h, ast_variable_linenumber(var[i]), state_copy(state));
 	}
 
 	return path_verify(f, state, 0, h);
@@ -262,6 +264,7 @@ path_verify(struct ast_function *f, struct state *state, int index, struct histo
 			return split_paths_verify(f, state, i, &splits, h);
 		}
 		if ((err = ast_stmt_process(stmt[i], state))) {
+			history_record(h, ast_stmt_linenumber(stmt[i]), state_copy(state));
 			return err;
 		}
 		if (ast_stmt_isterminal(stmt[i], state)) {
@@ -301,7 +304,7 @@ declare_parameters(struct state *s, struct ast_function *f, struct history *h)
 }
 
 static struct preresult *
-install_props(struct state *s, struct ast_function *f)
+install_props(struct state *s, struct ast_function *f, struct history *h)
 {
 	struct ast_block *abs = ast_function_abstract(f);
 	int nstmts = ast_block_nstmts(abs);
@@ -317,11 +320,11 @@ install_props(struct state *s, struct ast_function *f)
 
 static struct error *
 path_absverify(struct ast_function *, struct state *state, int index,
-		struct state *actual_state);
+		struct state *actual_state, struct history *);
 
 static struct error *
 abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
-		struct state *actual_state);
+		struct state *actual_state, struct history *h);
 
 static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state, struct history *h)
@@ -333,7 +336,7 @@ abstract_audit(struct ast_function *f, struct state *actual_state, struct histor
 	);
 	declare_parameters(alleged_state, f, h);
 	struct error *err = abstract_auditwithstate(
-		f, alleged_state, actual_state
+		f, alleged_state, actual_state, h
 	);
 	state_destroy(alleged_state); /* actual_state handled by caller */ 
 	return err;
@@ -341,9 +344,9 @@ abstract_audit(struct ast_function *f, struct state *actual_state, struct histor
 
 static struct error *
 abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
-		struct state *actual_state)
+		struct state *actual_state, struct history *h)
 {
-	struct preresult *r = install_props(alleged_state, f);
+	struct preresult *r = install_props(alleged_state, f, h);
 	if (preresult_iscontradiction(r)) {
 		return NULL;
 	}
@@ -353,10 +356,15 @@ abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
 		struct ast_variable **var = ast_block_decls(f->abstract);
 		for (int i = 0; i < ndecls; i++) {
 			state_declare(alleged_state, var[i], false);
+			history_record(
+				h,
+				ast_variable_linenumber(var[i]),
+				state_copy(alleged_state)
+			);
 		}
 	}
 
-	return path_absverify(f, alleged_state, 0, actual_state);
+	return path_absverify(f, alleged_state, 0, actual_state, h);
 }
 
 static struct ast_function_arr *
@@ -413,11 +421,12 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 
 static struct error *
 split_paths_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_stmt_splits *splits, struct state *actual_state);
+		int index, struct ast_stmt_splits *splits, struct state *actual_state,
+		struct history *);
 
 static struct error *
 path_absverify(struct ast_function *f, struct state *alleged_state, int index,
-		struct state *actual_state)
+		struct state *actual_state, struct history *h)
 {
 	int nstmts = ast_block_nstmts(f->abstract);
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
@@ -427,7 +436,7 @@ path_absverify(struct ast_function *f, struct state *alleged_state, int index,
 		);
 		if (splits.n) {
 			return split_paths_absverify(
-				f, alleged_state, i, &splits, actual_state
+				f, alleged_state, i, &splits, actual_state, h
 			);
 		}
 		struct result *res = ast_stmt_absexec(stmt[i], alleged_state);
@@ -435,6 +444,8 @@ path_absverify(struct ast_function *f, struct state *alleged_state, int index,
 			return result_as_error(res);
 		}
 		result_destroy(res);
+
+		history_record(h, ast_stmt_linenumber(stmt[i]), state_copy(alleged_state));
 	}
 
 	bool equiv = state_equal(actual_state, alleged_state);
@@ -451,16 +462,18 @@ abstract_paths(struct ast_function *f, int index, struct ast_expr *cond);
 
 static struct error *
 split_path_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_expr *cond, struct state *actual_state);
+		int index, struct ast_expr *cond, struct state *actual_state,
+		struct history *);
 
 static struct error *
 split_paths_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_stmt_splits *splits, struct state *actual_state)
+		int index, struct ast_stmt_splits *splits, struct state *actual_state,
+		struct history *h)
 {
 	struct error *err;
 	for (int i = 0; i < splits->n; i++) {
 		err = split_path_absverify(
-			f, alleged_state, index, splits->cond[i], actual_state
+			f, alleged_state, index, splits->cond[i], actual_state, h
 		);
 		if (err) {
 			return err;
@@ -471,7 +484,8 @@ split_paths_absverify(struct ast_function *f, struct state *alleged_state,
 
 static struct error *
 split_path_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_expr *cond, struct state *actual_state)
+		int index, struct ast_expr *cond, struct state *actual_state,
+		struct history *h)
 {
 	struct error *err = NULL;
 
@@ -497,7 +511,7 @@ split_path_absverify(struct ast_function *f, struct state *alleged_state,
 		}
 		if (!preresult_iscontradiction(r)) {
 			/* only run if no contradiction because "ex falso" */
-			if ((err = path_absverify(func[i], alleged_copy, index, actual_copy))) {
+			if ((err = path_absverify(func[i], alleged_copy, index, actual_copy, h))) {
 				return err;
 			}
 		}

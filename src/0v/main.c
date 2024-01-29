@@ -285,9 +285,7 @@ main(int argc, char *argv[])
 		/* TODO: verify in topological order */
 		pass1(root, ext, hist);
 
-		if (c.render) {
-			/* TODO: dump history file */
-		}
+		printf("%s\n", history_str(hist));
 	}
 
 	externals_destroy(ext);

@@ -230,7 +230,8 @@ ast_stmt_isselection(struct ast_stmt *stmt)
 int
 ast_stmt_linenumber(struct ast_stmt *stmt)
 {
-	assert(false);
+	assert(stmt->loc);
+	return lexememarker_line(stmt->loc);
 }
 
 static void
