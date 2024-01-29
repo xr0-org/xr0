@@ -224,7 +224,9 @@ struct history {
 struct history *
 history_create()
 {
-	return malloc(sizeof(struct history));
+	struct history *h = malloc(sizeof(struct history));
+	h->states = state_arr_create();
+	return h;
 }
 
 void
