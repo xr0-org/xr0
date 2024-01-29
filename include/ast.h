@@ -582,7 +582,7 @@ void
 history_destroy(struct history *);
 
 void
-history_write(struct history *, int linenumber, struct state *);
+history_record(struct history *, int linenumber, struct state *);
 
 struct state_arr *
 history_getstates(struct history *, int linenumber);

@@ -149,6 +149,12 @@ state_arr_n(struct state_arr *arr);
 int
 state_arr_append(struct state_arr *arr, struct state *s);
 
+int
+state_arr_appendwithline(struct state_arr *arr, int linenum, struct state *s);
+
+struct state_arr *
+state_arr_getlinestates(struct state_arr *, int linenum);
+
 struct state_arr *
 state_arr_copy(struct state_arr *old);
 

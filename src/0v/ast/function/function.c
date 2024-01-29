@@ -295,6 +295,8 @@ declare_parameters(struct state *s, struct ast_function *f, struct history *h)
 			obj,
 			state_vconst(s, ast_variable_type(p), dynamic_str(name), true)
 		);
+
+		history_record(h, ast_variable_linenumber(p), state_copy(s));
 	}
 }
 

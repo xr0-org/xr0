@@ -21,6 +21,8 @@ struct state {
 	struct stack *stack;
 	struct heap *heap;
 	struct props *props;
+	
+	int linenum;
 };
 
 struct state *
@@ -56,6 +58,7 @@ state_copy(struct state *state)
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
+	copy->linenum = state->linenum;
 	return copy;
 }
 
@@ -444,7 +447,6 @@ state_arr_n(struct state_arr *arr)
 	return arr->n;
 }
 
-/* state_arr_append: Append struct node to array and return index (address). */
 int
 state_arr_append(struct state_arr *arr, struct state *s)
 {
@@ -453,6 +455,25 @@ state_arr_append(struct state_arr *arr, struct state *s)
 	int loc = arr->n-1;
 	arr->s[loc] = s;
 	return loc;
+}
+
+int
+state_arr_appendwithline(struct state_arr *arr, int linenum, struct state *s)
+{
+	s->linenum = linenum;
+	return state_arr_append(arr, s);
+}
+
+struct state_arr *
+state_arr_getlinestates(struct state_arr *arr, int linenum)
+{
+	struct state_arr *res = state_arr_create();
+	for (int i = 0; i < arr->n; i++) {
+		if (arr->s[i]->linenum == linenum) {
+			state_arr_append(res, state_copy(arr->s[i]));
+		}
+	}
+	return res;
 }
 
 struct state_arr *

@@ -218,7 +218,7 @@ ast_protostitch(struct ast_function *f, struct externals *ext)
 /* XXX: extract to own file */
 
 struct history {
-	struct map *states;
+	struct state_arr *states;
 };
 
 struct history *
@@ -230,23 +230,18 @@ history_create()
 void
 history_destroy(struct history *h)
 {
-	struct map *states = h->states;
-	for (int i = 0; i < states->n; i++) {
-		struct entry e = states->entry[i];
-		state_arr_destroy((struct state_arr *) e.value);
-		free(e.key);
-	}
+	state_arr_destroy(h->states);
 	free(h);
 }
 
 void
-history_write(struct history *h, int linenumber, struct state *s)
+history_record(struct history *h, int linenumber, struct state *s)
 {
-	assert(false);
+	state_arr_appendwithline(h->states, linenumber, s);
 }
 
 struct state_arr *
 history_getstates(struct history *h, int linenumber)
 {
-	assert(false);
+	return state_arr_getlinestates(h->states, linenumber);
 }

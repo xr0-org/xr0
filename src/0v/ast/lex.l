@@ -178,6 +178,12 @@ lexloc()
 	return lexememarker_copy(&marker);
 }
 
+int
+lexememarker_line(struct lexememarker *l)
+{
+	return l->linenum;
+}
+
 struct lexememarker
 process_linemarker()
 {
