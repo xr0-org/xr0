@@ -192,31 +192,31 @@ struct error *
 paths_verify(struct ast_function_arr *paths, struct externals *);
 
 static struct error *
-path_verify_withstate(struct ast_function *f, struct state *);
+path_verify_withstate(struct ast_function *f, struct state *, struct history *);
 
 static void
-declare_parameters(struct state *s, struct ast_function *f);
+declare_parameters(struct state *s, struct ast_function *f, struct history *);
 
 struct error *
-ast_function_verify(struct ast_function *f, struct externals *ext, bool render)
+ast_function_verify(struct ast_function *f, struct externals *ext, struct history *h)
 {
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
-	declare_parameters(state, f);
-	struct error *err = path_verify_withstate(f, state);
+	declare_parameters(state, f, h);
+	struct error *err = path_verify_withstate(f, state, h);
 	state_destroy(state);
 	return err;
 }
 
 static struct error *
-path_verify(struct ast_function *f, struct state *state, int index);
+path_verify(struct ast_function *f, struct state *state, int index, struct history *h);
 
 static struct preresult *
 install_props(struct state *s, struct ast_function *f);
 
 static struct error *
-path_verify_withstate(struct ast_function *f, struct state *state)
+path_verify_withstate(struct ast_function *f, struct state *state, struct history *h)
 {
 	struct ast_block *body = ast_function_body(f);
 
@@ -234,18 +234,18 @@ path_verify_withstate(struct ast_function *f, struct state *state)
 		state_declare(state, var[i], false);
 	}
 
-	return path_verify(f, state, 0);
+	return path_verify(f, state, 0, h);
 }
 
 static struct error *
-abstract_audit(struct ast_function *f, struct state *actual_state);
+abstract_audit(struct ast_function *f, struct state *actual_state, struct history *h);
 
 static struct error *
 split_paths_verify(struct ast_function *f, struct state *, int index,
-		struct ast_stmt_splits *splits);
+		struct ast_stmt_splits *splits, struct history *);
 
 static struct error *
-path_verify(struct ast_function *f, struct state *state, int index)
+path_verify(struct ast_function *f, struct state *state, int index, struct history *h)
 {
 	struct error *err = NULL;
 
@@ -259,7 +259,7 @@ path_verify(struct ast_function *f, struct state *state, int index)
 		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], state);
 		if (splits.n) {
 			assert(splits.cond);
-			return split_paths_verify(f, state, i, &splits);
+			return split_paths_verify(f, state, i, &splits, h);
 		}
 		if ((err = ast_stmt_process(stmt[i], state))) {
 			return err;
@@ -273,14 +273,14 @@ path_verify(struct ast_function *f, struct state *state, int index)
 		return error_create("qed error: garbage on heap");
 	}
 	/* TODO: verify that `result' is of same type as f->result */
-	if ((err = abstract_audit(f, state))) {
+	if ((err = abstract_audit(f, state, h))) {
 		return error_prepend(err, "qed error: ");
 	}
 	return NULL;
 }
 
 static void
-declare_parameters(struct state *s, struct ast_function *f)
+declare_parameters(struct state *s, struct ast_function *f, struct history *h)
 {
 	/* declare params and locals in stack frame */
 	struct ast_variable **param = ast_function_params(f);
@@ -322,14 +322,14 @@ abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
 		struct state *actual_state);
 
 static struct error *
-abstract_audit(struct ast_function *f, struct state *actual_state)
+abstract_audit(struct ast_function *f, struct state *actual_state, struct history *h)
 {
 	struct state *alleged_state = state_create(
 		dynamic_str(ast_function_name(f)),
 		state_getext(actual_state),
 		ast_function_type(f)
 	);
-	declare_parameters(alleged_state, f);
+	declare_parameters(alleged_state, f, h);
 	struct error *err = abstract_auditwithstate(
 		f, alleged_state, actual_state
 	);
@@ -362,15 +362,15 @@ body_paths(struct ast_function *f, int index, struct ast_expr *);
 
 static struct error *
 split_path_verify(struct ast_function *f, struct state *state, int index,
-		struct ast_expr *cond);
+		struct ast_expr *cond, struct history *);
 
 static struct error *
 split_paths_verify(struct ast_function *f, struct state *state, int index,
-		struct ast_stmt_splits *splits)
+		struct ast_stmt_splits *splits, struct history *h)
 {
 	struct error *err;
 	for (int i = 0; i < splits->n; i++) {
-		err = split_path_verify(f, state, index, splits->cond[i]);
+		err = split_path_verify(f, state, index, splits->cond[i], h);
 		if (err) {
 			return err;
 		}
@@ -380,7 +380,7 @@ split_paths_verify(struct ast_function *f, struct state *state, int index,
 
 static struct error *
 split_path_verify(struct ast_function *f, struct state *state, int index,
-		struct ast_expr *cond)
+		struct ast_expr *cond, struct history *h)
 {
 	struct error *err = NULL;
 
@@ -400,7 +400,7 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 		}
 		if (!preresult_iscontradiction(r)) {
 			/* only run if no contradiction because "ex falso" */
-			if ((err = path_verify(func[i], s_copy, index))) {
+			if ((err = path_verify(func[i], s_copy, index, h))) {
 				return err;
 			}
 		}

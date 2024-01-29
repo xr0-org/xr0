@@ -405,3 +405,73 @@ state_popprops(struct state *s)
 	/* XXX: */
 	s->props = props_create();
 }
+
+
+/* state_arr */
+
+struct state_arr {
+	int n;
+	struct state **s;
+};
+
+struct state_arr *
+state_arr_create()
+{
+	struct state_arr *arr = calloc(1, sizeof(struct state_arr));
+	assert(arr);
+	return arr;
+}
+
+void
+state_arr_destroy(struct state_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		free(arr->s[i]);
+	}
+	free(arr->s);
+	free(arr);
+}
+
+struct state **
+state_arr_s(struct state_arr *arr)
+{
+	return arr->s;
+}
+
+int
+state_arr_n(struct state_arr *arr)
+{
+	return arr->n;
+}
+
+/* state_arr_append: Append struct node to array and return index (address). */
+int
+state_arr_append(struct state_arr *arr, struct state *s)
+{
+	arr->s = realloc(arr->s, sizeof(struct state_arr) * ++arr->n);
+	assert(arr->s);
+	int loc = arr->n-1;
+	arr->s[loc] = s;
+	return loc;
+}
+
+struct state_arr *
+state_arr_copy(struct state_arr *old)
+{
+	struct state_arr *new = state_arr_create();
+	for (int i = 0; i < old->n; i++) {
+		state_arr_append(new, state_copy(old->s[i]));
+	}
+	return new;
+}
+
+struct state_arr *
+state_arr_concat(struct state_arr *s1, struct state_arr *s2)
+{
+	assert(s1 && s2);
+	struct state_arr *new = state_arr_copy(s1);		
+	for (int i = 0; i < s2->n; i++) {
+		state_arr_append(new, s2->s[i]);
+	}
+	return new;
+}

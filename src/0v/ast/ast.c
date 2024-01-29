@@ -215,3 +215,38 @@ ast_protostitch(struct ast_function *f, struct externals *ext)
 	return ast_function_protostitch(f, ext);
 }
 
+/* XXX: extract to own file */
+
+struct history {
+	struct map *states;
+};
+
+struct history *
+history_create()
+{
+	return malloc(sizeof(struct history));
+}
+
+void
+history_destroy(struct history *h)
+{
+	struct map *states = h->states;
+	for (int i = 0; i < states->n; i++) {
+		struct entry e = states->entry[i];
+		state_arr_destroy((struct state_arr *) e.value);
+		free(e.key);
+	}
+	free(h);
+}
+
+void
+history_write(struct history *h, int linenumber, struct state *s)
+{
+	assert(false);
+}
+
+struct state_arr *
+history_getstates(struct history *h, int linenumber)
+{
+	assert(false);
+}

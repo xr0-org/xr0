@@ -131,4 +131,28 @@ state_isdeallocand(struct state *s, struct location *loc);
 bool
 state_eval(struct state *, struct ast_expr *);
 
+
+/* USED BY HISTORY */
+
+struct state_arr *
+state_arr_create();
+
+void
+state_arr_destroy(struct state_arr *arr);
+
+struct state **
+state_arr_s(struct state_arr *arr);
+
+int
+state_arr_n(struct state_arr *arr);
+
+int
+state_arr_append(struct state_arr *arr, struct state *s);
+
+struct state_arr *
+state_arr_copy(struct state_arr *old);
+
+struct state_arr *
+state_arr_concat(struct state_arr *s1, struct state_arr *s2);
+
 #endif

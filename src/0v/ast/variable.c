@@ -82,6 +82,12 @@ ast_variable_type(struct ast_variable *v)
 	return v->type;
 }
 
+int
+ast_variable_linenumber(struct ast_variable *v)
+{
+	assert(false);
+}
+
 
 struct ast_variable_arr {
 	int n;

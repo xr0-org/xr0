@@ -170,7 +170,7 @@ pass0(struct ast *root, struct externals *ext)
 }
 
 void
-pass1(struct ast *root, struct externals *ext, bool render)
+pass1(struct ast *root, struct externals *ext, struct history *hist)
 {
 	struct error *err;
 	for (int i = 0; i < root->n; i++) {
@@ -185,7 +185,7 @@ pass1(struct ast *root, struct externals *ext, bool render)
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
 
-		if ((err = ast_function_verify(f, ext, render))) {
+		if ((err = ast_function_verify(f, ext, hist))) {
 			fprintf(stderr, "%s\n", err->msg);
 			exit(EXIT_FAILURE);
 		}
@@ -266,6 +266,7 @@ main(int argc, char *argv[])
 
 	/* TODO: move table from lexer to pass1 */
 	struct externals *ext = externals_create();
+	struct history *hist = history_create();
 
 	/* setup externals */
 	pass0(root, ext);
@@ -282,7 +283,11 @@ main(int argc, char *argv[])
 		fprintf(stderr, "%s\n", string_arr_str(order));
 	} else { 
 		/* TODO: verify in topological order */
-		pass1(root, ext, c.render);
+		pass1(root, ext, hist);
+
+		if (c.render) {
+			/* TODO: dump history file */
+		}
 	}
 
 	externals_destroy(ext);

@@ -357,6 +357,9 @@ ast_stmt_exec(struct ast_stmt *, struct state *);
 struct result *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
+int
+ast_stmt_linenumber(struct ast_stmt *);
+
 
 struct ast_type;
 
@@ -465,6 +468,9 @@ ast_variable_name(struct ast_variable *);
 struct ast_type *
 ast_variable_type(struct ast_variable *);
 
+int
+ast_variable_linenumber(struct ast_variable *);
+
 struct ast_function;
 
 /* ast_function_create: name must be allocated on the heap */
@@ -517,9 +523,10 @@ ast_function_params(struct ast_function *f);
 
 struct externals;
 struct error;
+struct history;
 
 struct error *
-ast_function_verify(struct ast_function *, struct externals *, bool render);
+ast_function_verify(struct ast_function *, struct externals *, struct history *);
 
 struct result;
 
@@ -565,5 +572,19 @@ ast_topological_order(char *fname, struct externals *ext);
 
 struct ast_function *
 ast_protostitch(struct ast_function *, struct externals *);
+
+struct history;
+
+struct history *
+history_create();
+
+void
+history_destroy(struct history *);
+
+void
+history_write(struct history *, int linenumber, struct state *);
+
+struct state_arr *
+history_getstates(struct history *, int linenumber);
 
 #endif

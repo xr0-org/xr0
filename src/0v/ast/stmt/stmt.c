@@ -227,6 +227,12 @@ ast_stmt_isselection(struct ast_stmt *stmt)
 	return stmt->kind == STMT_SELECTION;
 }
 
+int
+ast_stmt_linenumber(struct ast_stmt *stmt)
+{
+	assert(false);
+}
+
 static void
 ast_stmt_destroy_jump(struct ast_stmt *stmt)
 {
