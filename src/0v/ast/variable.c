@@ -3,17 +3,21 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "lex.h"
 #include "util.h"
 
 struct ast_variable {
 	char *name;
 	struct ast_type *type;
+
+	struct lexememarker *loc;
 };
 
 struct ast_variable *
-ast_variable_create(char *name, struct ast_type *type)
+ast_variable_create(struct lexememarker *loc, char *name, struct ast_type *type)
 {
 	struct ast_variable *v = malloc(sizeof(struct ast_variable));
+	v->loc = loc;
 	v->name = name;
 	v->type = type;
 	return v;
@@ -24,6 +28,9 @@ ast_variable_destroy(struct ast_variable *v)
 {
 	ast_type_destroy(v->type);
 	free(v->name);
+	if (v->loc) {
+		lexememarker_destroy(v->loc);
+	}
 	free(v);
 }
 
@@ -31,8 +38,12 @@ struct ast_variable *
 ast_variable_copy(struct ast_variable *v)
 {
 	assert(v);
+	struct lexememarker *loc = v->loc
+		? lexememarker_copy(v->loc)
+		: NULL;
+
 	return ast_variable_create(
-		dynamic_str(v->name), ast_type_copy(v->type)
+		loc, dynamic_str(v->name), ast_type_copy(v->type)
 	);
 }
 

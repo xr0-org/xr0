@@ -486,7 +486,7 @@ struct_declaration_list
 struct_declaration
 	/*: specifier_qualifier_list struct_declarator_list ';'*/
 	: declaration /* XXX: added temporarily */
-		{ $$ = ast_variable_create($1.name, $1.t); }
+		{ $$ = ast_variable_create(lexloc(), $1.name, $1.t); }
 	;
 
 specifier_qualifier_list
@@ -610,11 +610,11 @@ parameter_declaration
 			assert($1);
 			$1 = ast_type_create_ptr($1);
 		}
-		$$ = ast_variable_create($2.name, $1);
+		$$ = ast_variable_create(lexloc(), $2.name, $1);
 	}
 	/*| declaration_specifiers abstract_declarator*/
 	| declaration_specifiers {
-		$$ = ast_variable_create(dynamic_str(""), $1);
+		$$ = ast_variable_create(lexloc(), dynamic_str(""), $1);
 	}
 	;
 
@@ -720,9 +720,9 @@ allocation_statement
 
 declaration_list
 	: declaration
-		{ $$ = variable_array_create(ast_variable_create($1.name, $1.t)); }
+		{ $$ = variable_array_create(ast_variable_create(lexloc(), $1.name, $1.t)); }
 	| declaration_list declaration
-		{ $$ = variable_array_append($1, ast_variable_create($2.name, $2.t)); }
+		{ $$ = variable_array_append($1, ast_variable_create(lexloc(), $2.name, $2.t)); }
 	;
 
 statement_list
@@ -799,7 +799,7 @@ translation_unit
 
 external_declaration
 	: function_definition	{ $$ = ast_functiondecl_create($1); }
-	| declaration		{ $$ = ast_decl_create($1.name, $1.t); }
+	| declaration		{ $$ = ast_decl_create(lexloc(), $1.name, $1.t); }
 	;
 
 block_statement

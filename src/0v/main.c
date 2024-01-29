@@ -29,6 +29,7 @@ struct config {
 
 	char *sortfunc;
 	bool sort;
+	bool render;
 };
 
 struct config
@@ -36,6 +37,7 @@ parse_config(int argc, char *argv[])
 {
 	bool verbose = false;
 	bool sort = false;
+	bool render = false;
 	struct string_arr *includedirs = string_arr_create();
 	char *outfile = OUTPUT_PATH;
 	char *sortfunc = NULL;
@@ -55,6 +57,9 @@ parse_config(int argc, char *argv[])
 			sortfunc = optarg;
 			sort = true;
 			break;
+		case 'r':
+			render = true;
+			break;
 		default:
 			fprintf(stderr, "Usage: %s [-o output] input_file\n", argv[0]);
 			exit(EXIT_FAILURE);
@@ -71,13 +76,13 @@ parse_config(int argc, char *argv[])
 		.verbose	= verbose,
 		.sort		= sort,
 		.sortfunc	= sortfunc,
+		.render		= render,
 	};
 }
 
 char *
 genincludes(struct string_arr *includedirs)
-{
-	struct strbuilder *b = strbuilder_create();
+{ struct strbuilder *b = strbuilder_create();
 	char **s = string_arr_s(includedirs);
 	int n = string_arr_n(includedirs);
 	for (int i = 0; i < n; i++) {
@@ -165,7 +170,7 @@ pass0(struct ast *root, struct externals *ext)
 }
 
 void
-pass1(struct ast *root, struct externals *ext)
+pass1(struct ast *root, struct externals *ext, bool render)
 {
 	struct error *err;
 	for (int i = 0; i < root->n; i++) {
@@ -180,7 +185,7 @@ pass1(struct ast *root, struct externals *ext)
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
 
-		if ((err = ast_function_verify(f, ext))) {
+		if ((err = ast_function_verify(f, ext, render))) {
 			fprintf(stderr, "%s\n", err->msg);
 			exit(EXIT_FAILURE);
 		}
@@ -277,7 +282,7 @@ main(int argc, char *argv[])
 		fprintf(stderr, "%s\n", string_arr_str(order));
 	} else { 
 		/* TODO: verify in topological order */
-		pass1(root, ext);
+		pass1(root, ext, c.render);
 	}
 
 	externals_destroy(ext);

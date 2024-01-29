@@ -47,7 +47,7 @@ ast_externdecl_as_function(struct ast_externdecl *decl)
 }
 
 struct ast_externdecl *
-ast_decl_create(char *name, struct ast_type *t)
+ast_decl_create(struct lexememarker *loc, char *name, struct ast_type *t)
 {
 	struct ast_externdecl *decl = malloc(sizeof(struct ast_externdecl));
 	if (ast_type_istypedef(t)) {
@@ -60,7 +60,7 @@ ast_decl_create(char *name, struct ast_type *t)
 		decl->_struct = t;
 	} else { /* variable */
 		decl->kind = EXTERN_VARIABLE;
-		decl->variable = ast_variable_create(name, t);
+		decl->variable = ast_variable_create(loc, name, t);
 	}
 	return decl;
 }

@@ -445,7 +445,7 @@ ast_variable_arr_copy(struct ast_variable_arr *arr);
 struct ast_variable;
 
 struct ast_variable *
-ast_variable_create(char *name, struct ast_type *type);
+ast_variable_create(struct lexememarker *loc, char *name, struct ast_type *type);
 
 void
 ast_variable_destroy(struct ast_variable *);
@@ -519,7 +519,7 @@ struct externals;
 struct error;
 
 struct error *
-ast_function_verify(struct ast_function *, struct externals *);
+ast_function_verify(struct ast_function *, struct externals *, bool render);
 
 struct result;
 
@@ -538,7 +538,7 @@ struct ast_function *
 ast_externdecl_as_function(struct ast_externdecl *);
 
 struct ast_externdecl *
-ast_decl_create(char *name, struct ast_type *);
+ast_decl_create(struct lexememarker *loc, char *name, struct ast_type *);
 
 void
 ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext);

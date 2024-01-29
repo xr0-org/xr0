@@ -198,7 +198,7 @@ static void
 declare_parameters(struct state *s, struct ast_function *f);
 
 struct error *
-ast_function_verify(struct ast_function *f, struct externals *ext)
+ast_function_verify(struct ast_function *f, struct externals *ext, bool render)
 {
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
