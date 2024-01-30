@@ -29,7 +29,7 @@ struct config {
 
 	char *sortfunc;
 	bool sort;
-	bool render;
+	bool history;
 };
 
 struct config
@@ -37,12 +37,12 @@ parse_config(int argc, char *argv[])
 {
 	bool verbose = false;
 	bool sort = false;
-	bool render = false;
+	bool history = false;
 	struct string_arr *includedirs = string_arr_create();
 	char *outfile = OUTPUT_PATH;
 	char *sortfunc = NULL;
 	int opt;
-	while ((opt = getopt(argc, argv, "vos:I:")) != -1) {
+	while ((opt = getopt(argc, argv, "vos:I:h")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
@@ -57,8 +57,8 @@ parse_config(int argc, char *argv[])
 			sortfunc = optarg;
 			sort = true;
 			break;
-		case 'r':
-			render = true;
+		case 'h':
+			history = true;
 			break;
 		default:
 			fprintf(stderr, "Usage: %s [-o output] input_file\n", argv[0]);
@@ -76,13 +76,14 @@ parse_config(int argc, char *argv[])
 		.verbose	= verbose,
 		.sort		= sort,
 		.sortfunc	= sortfunc,
-		.render		= render,
+		.history	= history,
 	};
 }
 
 char *
 genincludes(struct string_arr *includedirs)
-{ struct strbuilder *b = strbuilder_create();
+{
+	struct strbuilder *b = strbuilder_create();
 	char **s = string_arr_s(includedirs);
 	int n = string_arr_n(includedirs);
 	for (int i = 0; i < n; i++) {
@@ -189,7 +190,6 @@ pass1(struct ast *root, struct externals *ext, struct history *hist)
 			fprintf(stderr, "%s\n", err->msg);
 			exit(EXIT_FAILURE);
 		}
-		printf("done %s\n", ast_function_name(f));
 	}
 }
 
@@ -285,7 +285,9 @@ main(int argc, char *argv[])
 		/* TODO: verify in topological order */
 		pass1(root, ext, hist);
 
-		printf("%s\n", history_str(hist));
+		if (c.history) {
+			printf("%s\n", history_tojson(hist));
+		}
 	}
 
 	externals_destroy(ext);

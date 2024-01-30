@@ -45,6 +45,9 @@ state_getext(struct state *);
 struct props *
 state_getprops(struct state *);
 
+int
+state_getlinenum(struct state *);
+
 void
 state_pushframe(struct state *, char *func, struct ast_type *ret_type);
 

@@ -11,8 +11,9 @@ BIN_DIR = bin
 BUILD_DIR = build
 INCLUDE_DIR = include
 SRC_DIR = src
-UTIL_DIR = $(SRC_DIR)/util
+LIB_DIR = lib
 
+UTIL_DIR = $(SRC_DIR)/util
 SRC_0V_DIR = $(SRC_DIR)/0v
 SRC_0C_DIR = $(SRC_DIR)/0c
 
@@ -23,6 +24,8 @@ OBJECT_DIR = $(SRC_0V_DIR)/object
 VALUE_DIR = $(SRC_0V_DIR)/value
 AST_DIR = $(SRC_0V_DIR)/ast
 MATH_DIR = $(SRC_0V_DIR)/math
+
+CJSON_DIR = $(LIB_DIR)/cJSON
 
 # executable
 XR0V = $(BIN_DIR)/0v
@@ -48,6 +51,8 @@ LEX_OBJ = $(BUILD_DIR)/lex.o
 UTIL_OBJ = $(BUILD_DIR)/util.o
 GRAM_OBJ = $(BUILD_DIR)/gram.o
 
+CJSON_OBJ = $(BUILD_DIR)/cJSON.o
+
 GRAM_TAB_C = $(BUILD_DIR)/gram.tab.c
 GRAM_TAB_H = $(BUILD_DIR)/gram.tab.h
 LEX_YY_C = $(BUILD_DIR)/lex.yy.c
@@ -57,7 +62,8 @@ XR0_OBJECTS = $(AST_OBJ) \
 	      $(GRAM_OBJ) \
 	      $(STATE_OBJ) \
 	      $(UTIL_OBJ) \
-	      $(MATH_OBJ)
+	      $(MATH_OBJ) \
+	      $(CJSON_OBJ)
 
 STATE_OBJECTS = $(VALUE_OBJ) \
 		$(LOCATION_OBJ) \
@@ -155,9 +161,14 @@ $(AST_OBJ): $(AST_DIR)/ast.c \
 	$(AST_DIR)/type/type.h \
 	$(AST_DIR)/literals.h \
 	$(AST_DIR)/function/function.h \
-	$(MATH_OBJ)
+	$(MATH_OBJ) \
+	$(CJSON_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -I $(AST_DIR) -o $@ -c $(AST_DIR)/ast.c
+
+$(CJSON_OBJ): $(CJSON_DIR)/cJSON.c $(BUILD_DIR)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(CJSON_DIR)/cJSON.c
 
 $(MATH_OBJ): $(MATH_DIR)/math.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'

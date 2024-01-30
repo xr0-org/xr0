@@ -9,6 +9,8 @@
 char *
 dynamic_str(const char *);
 
+char *
+int_tostring(const int i);
 
 /* XXX: We know. */
 struct map {

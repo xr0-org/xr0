@@ -6,6 +6,7 @@
 #include "lex.h"
 #include "math.h"
 #include "util.h"
+#include "cJSON.h"
 
 #include "expr/expr.c"
 #include "topological.c"
@@ -258,4 +259,20 @@ history_str(struct history *h)
 		strbuilder_printf(b, "%s\n\n", state_str(states[i]));
 	}
 	return strbuilder_build(b);
+}
+
+char *
+history_tojson(struct history *h)
+{
+	struct cJSON *root = cJSON_CreateArray();
+	
+	struct state **states = state_arr_states(h->states);
+	for (int i = 0; i < state_arr_n(h->states); i++) {
+		struct cJSON *entry = cJSON_CreateObject();
+		char *key = int_tostring(state_getlinenum(states[i]));
+		struct cJSON *val = cJSON_CreateString(state_str(states[i]));
+		cJSON_AddItemToObject(entry, key, val);
+		cJSON_AddItemToArray(root, entry);
+	}
+	return cJSON_Print(root);
 }

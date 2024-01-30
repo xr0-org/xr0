@@ -79,7 +79,7 @@ char *
 state_str(struct state *state)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "%d[[\n", state->linenum);
+	strbuilder_printf(b, "[[\n");
 	char *ext = externals_types_str(state->ext, "\t");
 	if (strlen(ext) > 0) {
 		strbuilder_printf(b, "%s\n", ext);
@@ -117,6 +117,12 @@ struct props *
 state_getprops(struct state *s)
 {
 	return s->props;
+}
+
+int
+state_getlinenum(struct state *s)
+{
+	return s->linenum;
 }
 
 void

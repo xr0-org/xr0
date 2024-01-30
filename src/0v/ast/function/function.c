@@ -264,12 +264,13 @@ path_verify(struct ast_function *f, struct state *state, int index, struct histo
 			return split_paths_verify(f, state, i, &splits, h);
 		}
 		if ((err = ast_stmt_process(stmt[i], state))) {
-			history_record(h, ast_stmt_linenumber(stmt[i]), state_copy(state));
 			return err;
 		}
 		if (ast_stmt_isterminal(stmt[i], state)) {
 			break;
 		}
+
+		history_record(h, ast_stmt_linenumber(stmt[i]), state_copy(state));
 	}
 	if (!state_hasgarbage(state)) {
 		printf("actual: %s\n", state_str(state));
