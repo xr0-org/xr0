@@ -269,9 +269,10 @@ history_tojson(struct history *h)
 	struct state **states = state_arr_states(h->states);
 	for (int i = 0; i < state_arr_n(h->states); i++) {
 		struct cJSON *entry = cJSON_CreateObject();
-		char *key = int_tostring(state_getlinenum(states[i]));
-		struct cJSON *val = cJSON_CreateString(state_str(states[i]));
-		cJSON_AddItemToObject(entry, key, val);
+		struct cJSON *linenum = cJSON_CreateNumber(state_getlinenum(states[i]));
+		struct cJSON *state = cJSON_CreateString(state_str(states[i]));
+		cJSON_AddItemToObjectCS(entry, "line", linenum);
+		cJSON_AddItemToObjectCS(entry, "state", state);
 		cJSON_AddItemToArray(root, entry);
 	}
 	return cJSON_Print(root);
