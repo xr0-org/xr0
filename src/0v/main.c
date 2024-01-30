@@ -170,7 +170,7 @@ pass0(struct ast *root, struct externals *ext)
 	}
 }
 
-void
+struct error *
 pass1(struct ast *root, struct externals *ext, struct history *hist)
 {
 	struct error *err;
@@ -188,9 +188,10 @@ pass1(struct ast *root, struct externals *ext, struct history *hist)
 
 		if ((err = ast_function_verify(f, ext, hist))) {
 			fprintf(stderr, "%s\n", err->msg);
-			exit(EXIT_FAILURE);
+			return err;
 		}
 	}
+	return NULL;
 }
 
 static bool
@@ -283,10 +284,13 @@ main(int argc, char *argv[])
 		fprintf(stderr, "%s\n", string_arr_str(order));
 	} else { 
 		/* TODO: verify in topological order */
-		pass1(root, ext, hist);
+		struct error *err = pass1(root, ext, hist);
 
 		if (c.history) {
 			printf("%s\n", history_tojson(hist));
+		}
+		if (err) {
+			exit(EXIT_FAILURE);
 		}
 	}
 

@@ -250,18 +250,6 @@ history_getstates(struct history *h, int linenumber)
 }
 
 char *
-history_str(struct history *h)
-{
-	struct strbuilder *b = strbuilder_create();
-	struct state **states = state_arr_states(h->states);
-	strbuilder_printf(b, "history:\n");
-	for (int i = 0; i < state_arr_n(h->states); i++) {
-		strbuilder_printf(b, "%s\n\n", state_str(states[i]));
-	}
-	return strbuilder_build(b);
-}
-
-char *
 history_tojson(struct history *h)
 {
 	struct cJSON *root = cJSON_CreateArray();

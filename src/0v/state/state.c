@@ -79,7 +79,7 @@ char *
 state_str(struct state *state)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "[[\n");
+	strbuilder_printf(b, "\n");
 	char *ext = externals_types_str(state->ext, "\t");
 	if (strlen(ext) > 0) {
 		strbuilder_printf(b, "%s\n", ext);
@@ -103,7 +103,7 @@ state_str(struct state *state)
 		strbuilder_printf(b, "\n%s\n", heap);
 	}
 	free(heap);
-	strbuilder_printf(b, "]]\n");
+	strbuilder_printf(b, "\n");
 	return strbuilder_build(b);
 }
 

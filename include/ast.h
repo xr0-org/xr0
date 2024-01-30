@@ -588,9 +588,6 @@ struct state_arr *
 history_getstates(struct history *, int linenumber);
 
 char *
-history_str(struct history *);
-
-char *
 history_tojson(struct history *);
 
 #endif

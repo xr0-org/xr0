@@ -273,7 +273,6 @@ path_verify(struct ast_function *f, struct state *state, int index, struct histo
 		history_record(h, ast_stmt_linenumber(stmt[i]), state_copy(state));
 	}
 	if (!state_hasgarbage(state)) {
-		printf("actual: %s\n", state_str(state));
 		return error_create("qed error: garbage on heap");
 	}
 	/* TODO: verify that `result' is of same type as f->result */
