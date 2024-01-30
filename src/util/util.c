@@ -16,15 +16,6 @@ dynamic_str(const char *s)
 	return t;
 }
 
-char *
-int_tostring(const int i)
-{
-	int len = snprintf(NULL, 0, "%d", i);
-	char *s = (char *) malloc(len + 1);
-	snprintf(s, len + 1, "%d", i);
-	return s;
-}
-
 static struct entry
 entry_create(const char *key, const void *value)
 {
