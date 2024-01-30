@@ -92,7 +92,7 @@ object_copy(struct object *old)
 	new->type = old->type;
 	switch (old->type) {
 	case OBJECT_VALUE:
-		new->value = old->value ?  value_copy(old->value) : NULL;
+		new->value = old->value ? value_copy(old->value) : NULL;
 		break;
 	case OBJECT_DEALLOCAND_RANGE:
 		new->range = range_copy(old->range);

@@ -232,8 +232,8 @@ path_verify_withstate(struct ast_function *f, struct state *state, struct histor
 	int ndecls = ast_block_ndecls(body);
 	struct ast_variable **var = ast_block_decls(body);
 	for (int i = 0; i < ndecls; i++) {
-		state_declare(state, var[i], false);
 		history_record(h, ast_variable_linenumber(var[i]), state_copy(state));
+		state_declare(state, var[i], false);
 	}
 
 	return path_verify(f, state, 0, h);
@@ -263,14 +263,13 @@ path_verify(struct ast_function *f, struct state *state, int index, struct histo
 			assert(splits.cond);
 			return split_paths_verify(f, state, i, &splits, h);
 		}
+		history_record(h, ast_stmt_linenumber(stmt[i]), state_copy(state));
 		if ((err = ast_stmt_process(stmt[i], state))) {
 			return err;
 		}
 		if (ast_stmt_isterminal(stmt[i], state)) {
 			break;
 		}
-
-		history_record(h, ast_stmt_linenumber(stmt[i]), state_copy(state));
 	}
 	if (!state_hasgarbage(state)) {
 		return error_create("qed error: garbage on heap");
@@ -353,12 +352,12 @@ abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
 	if (ndecls) {
 		struct ast_variable **var = ast_block_decls(f->abstract);
 		for (int i = 0; i < ndecls; i++) {
-			state_declare(alleged_state, var[i], false);
 			history_record(
 				h,
 				ast_variable_linenumber(var[i]),
 				state_copy(alleged_state)
 			);
+			state_declare(alleged_state, var[i], false);
 		}
 	}
 
@@ -437,13 +436,12 @@ path_absverify(struct ast_function *f, struct state *alleged_state, int index,
 				f, alleged_state, i, &splits, actual_state, h
 			);
 		}
+		history_record(h, ast_stmt_linenumber(stmt[i]), state_copy(alleged_state));
 		struct result *res = ast_stmt_absexec(stmt[i], alleged_state);
 		if (result_iserror(res)) {
 			return result_as_error(res);
 		}
 		result_destroy(res);
-
-		history_record(h, ast_stmt_linenumber(stmt[i]), state_copy(alleged_state));
 	}
 
 	bool equiv = state_equal(actual_state, alleged_state);
