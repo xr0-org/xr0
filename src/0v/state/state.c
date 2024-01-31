@@ -22,7 +22,7 @@ struct state {
 	struct heap *heap;
 	struct props *props;
 	
-	int linenum;
+	int linenum, col;
 };
 
 struct state *
@@ -59,6 +59,7 @@ state_copy(struct state *state)
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
 	copy->linenum = state->linenum;
+	copy->col = state->col;
 	return copy;
 }
 
@@ -123,6 +124,12 @@ int
 state_getlinenum(struct state *s)
 {
 	return s->linenum;
+}
+
+int
+state_getcol(struct state *s)
+{
+	return s->col;
 }
 
 void
@@ -464,18 +471,19 @@ state_arr_append(struct state_arr *arr, struct state *s)
 }
 
 int
-state_arr_appendwithline(struct state_arr *arr, int linenum, struct state *s)
+state_arr_appendwithline(struct state_arr *arr, int linenum, int col, struct state *s)
 {
 	s->linenum = linenum;
+	s->col = col;
 	return state_arr_append(arr, s);
 }
 
 struct state_arr *
-state_arr_getlinestates(struct state_arr *arr, int linenum)
+state_arr_getlinestates(struct state_arr *arr, int linenum, int col)
 {
 	struct state_arr *res = state_arr_create();
 	for (int i = 0; i < arr->n; i++) {
-		if (arr->s[i]->linenum == linenum) {
+		if (arr->s[i]->linenum == linenum && arr->s[i]->col == col) {
 			state_arr_append(res, state_copy(arr->s[i]));
 		}
 	}

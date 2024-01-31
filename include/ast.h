@@ -360,6 +360,9 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
 int
 ast_stmt_linenumber(struct ast_stmt *);
 
+int
+ast_stmt_col(struct ast_stmt *);
+
 
 struct ast_type;
 
@@ -470,6 +473,9 @@ ast_variable_type(struct ast_variable *);
 
 int
 ast_variable_linenumber(struct ast_variable *);
+
+int
+ast_variable_col(struct ast_variable *);
 
 struct ast_function;
 
@@ -582,10 +588,10 @@ void
 history_destroy(struct history *);
 
 void
-history_record(struct history *, int linenumber, struct state *);
+history_record(struct history *, int linenumber, int col, struct state *);
 
 struct state_arr *
-history_getstates(struct history *, int linenumber);
+history_getstates(struct history *, int linenumber, int col);
 
 char *
 history_tojson(struct history *);

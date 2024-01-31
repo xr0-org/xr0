@@ -234,6 +234,13 @@ ast_stmt_linenumber(struct ast_stmt *stmt)
 	return lexememarker_line(stmt->loc);
 }
 
+int
+ast_stmt_col(struct ast_stmt *stmt)
+{
+	assert(stmt->loc);
+	return stmt->loc->column;
+}
+
 static void
 ast_stmt_destroy_jump(struct ast_stmt *stmt)
 {

@@ -48,6 +48,9 @@ state_getprops(struct state *);
 int
 state_getlinenum(struct state *);
 
+int
+state_getcol(struct state *);
+
 void
 state_pushframe(struct state *, char *func, struct ast_type *ret_type);
 
@@ -153,10 +156,10 @@ int
 state_arr_append(struct state_arr *arr, struct state *s);
 
 int
-state_arr_appendwithline(struct state_arr *arr, int linenum, struct state *s);
+state_arr_appendwithline(struct state_arr *arr, int linenum, int col, struct state *s);
 
 struct state_arr *
-state_arr_getlinestates(struct state_arr *, int linenum);
+state_arr_getlinestates(struct state_arr *, int linenum, int col);
 
 struct state_arr *
 state_arr_copy(struct state_arr *old);

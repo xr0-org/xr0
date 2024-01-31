@@ -238,15 +238,15 @@ history_destroy(struct history *h)
 }
 
 void
-history_record(struct history *h, int linenumber, struct state *s)
+history_record(struct history *h, int linenumber, int col, struct state *s)
 {
-	state_arr_appendwithline(h->states, linenumber, s);
+	state_arr_appendwithline(h->states, linenumber, col, s);
 }
 
 struct state_arr *
-history_getstates(struct history *h, int linenumber)
+history_getstates(struct history *h, int linenumber, int col)
 {
-	return state_arr_getlinestates(h->states, linenumber);
+	return state_arr_getlinestates(h->states, linenumber, col);
 }
 
 char *
@@ -258,8 +258,10 @@ history_tojson(struct history *h)
 	for (int i = 0; i < state_arr_n(h->states); i++) {
 		struct cJSON *entry = cJSON_CreateObject();
 		struct cJSON *linenum = cJSON_CreateNumber(state_getlinenum(states[i]));
+		struct cJSON *col = cJSON_CreateNumber(state_getcol(states[i]));
 		struct cJSON *state = cJSON_CreateString(state_str(states[i]));
 		cJSON_AddItemToObjectCS(entry, "line", linenum);
+		cJSON_AddItemToObjectCS(entry, "column", col);
 		cJSON_AddItemToObjectCS(entry, "state", state);
 		cJSON_AddItemToArray(root, entry);
 	}

@@ -89,6 +89,13 @@ ast_variable_linenumber(struct ast_variable *v)
 	return lexememarker_line(v->loc);
 }
 
+int
+ast_variable_col(struct ast_variable *v)
+{
+	assert(v->loc);
+	return v->loc->column;
+}
+
 struct ast_variable_arr {
 	int n;
 	struct ast_variable **v;
