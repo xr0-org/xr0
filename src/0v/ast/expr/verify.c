@@ -118,6 +118,7 @@ expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
 struct error *
 ast_expr_exec(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	struct result *res = ast_expr_eval(expr, state);
 	if (result_iserror(res)) {
 		return result_as_error(res);

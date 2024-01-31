@@ -4,6 +4,19 @@
 #include "util.h"
 
 struct ast_expr;
+struct lexememarker;
+
+struct lexememarker *
+ast_expr_getstart(struct ast_expr *);
+
+struct lexememarker *
+ast_expr_getend(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_setstart(struct ast_expr *, struct lexememarker *);
+
+struct ast_expr *
+ast_expr_setend(struct ast_expr *, struct lexememarker *);
 
 struct ast_expr *
 ast_expr_identifier_create(char *);
@@ -220,8 +233,6 @@ enum ast_jump_kind {
 };
 
 struct ast_stmt;
-
-struct lexememarker;
 
 struct lexememarker *
 ast_stmt_lexememarker(struct ast_stmt *);

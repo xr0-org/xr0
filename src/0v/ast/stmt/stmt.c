@@ -637,6 +637,7 @@ ast_stmt_copy(struct ast_stmt *stmt)
 		assert(false);
 	}
 
+	assert(copy);
 	copy->loc = stmt->loc
 		? lexememarker_copy(stmt->loc)
 		: NULL;

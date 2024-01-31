@@ -63,6 +63,8 @@ struct ast_expr {
 		} binary;
 		struct ast_expr *assignment_value;
 	} u;
+
+	struct lexememarker *start, *end;
 };
 
 enum ast_expr_kind

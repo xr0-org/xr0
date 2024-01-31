@@ -5,11 +5,38 @@
 
 #include "ast.h"
 #include "ext.h"
+#include "lex.h"
 #include "expr.h"
 #include "math.h"
 #include "state.h"
 #include "stmt/stmt.h"
 #include "util.h"
+
+struct lexememarker *
+ast_expr_getstart(struct ast_expr *expr)
+{
+	return expr->start;
+}
+
+struct lexememarker *
+ast_expr_getend(struct ast_expr *expr)
+{
+	return expr->end;
+}
+
+struct ast_expr *
+ast_expr_setstart(struct ast_expr *expr, struct lexememarker *loc)
+{
+	expr->start = lexememarker_copy(loc);
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_setend(struct ast_expr *expr, struct lexememarker *loc)
+{
+	expr->end = lexememarker_copy(loc);
+	return expr;
+}
 
 static struct ast_expr *
 ast_expr_create()
@@ -663,6 +690,12 @@ char *
 ast_expr_str(struct ast_expr *expr)
 {
 	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(
+		b,
+		"[start: %s, end: %s]: ",
+		lexememarker_str(expr->start),
+		lexememarker_str(expr->end)
+	);
 	switch (expr->kind) {
 	case EXPR_IDENTIFIER:
 		strbuilder_printf(b, expr->u.string);
@@ -709,55 +742,79 @@ ast_expr_str(struct ast_expr *expr)
 struct ast_expr *
 ast_expr_copy(struct ast_expr *expr)
 {
+	struct ast_expr *copy;
+	
 	assert(expr);
 	switch (expr->kind) {
 	case EXPR_IDENTIFIER:
-		return ast_expr_identifier_create(dynamic_str(expr->u.string));
+		copy = ast_expr_identifier_create(dynamic_str(expr->u.string));
+		break;
 	case EXPR_CONSTANT:
-		return expr->u.constant.ischar
+		copy = expr->u.constant.ischar
 			? ast_expr_constant_create_char(expr->u.constant.constant)
 			: ast_expr_constant_create(expr->u.constant.constant);
+		break;
 	case EXPR_STRING_LITERAL:
-		return ast_expr_literal_create(dynamic_str(expr->u.string));
+		copy = ast_expr_literal_create(dynamic_str(expr->u.string));
+		break;
 	case EXPR_BRACKETED:
-		return ast_expr_bracketed_create(ast_expr_copy(expr->root));
+		copy = ast_expr_bracketed_create(ast_expr_copy(expr->root));
+		break;
 	case EXPR_CALL:
-		return ast_expr_copy_call(expr);
+		copy = ast_expr_copy_call(expr);
+		break;
 	case EXPR_INCDEC:
-		return ast_expr_incdec_create(
+		copy = ast_expr_incdec_create(
 			ast_expr_copy(expr->root),
 			expr->u.incdec.inc,
 			expr->u.incdec.pre
 		);
+		break;
 	case EXPR_STRUCTMEMBER:
-		return ast_expr_member_create(
+		copy = ast_expr_member_create(
 			ast_expr_copy(expr->root), dynamic_str(expr->u.string)
 		);
+		break;
 	case EXPR_UNARY:
-		return ast_expr_unary_create(
+		copy = ast_expr_unary_create(
 			ast_expr_copy(expr->root),
 			expr->u.unary_op
 		);
+		break;
 	case EXPR_BINARY:
-		return ast_expr_binary_create(
+		copy = ast_expr_binary_create(
 			ast_expr_copy(expr->u.binary.e1),
 			expr->u.binary.op,
 			ast_expr_copy(expr->u.binary.e2)
 		);
+		break;
 	case EXPR_ASSIGNMENT:
-		return ast_expr_assignment_create(
+		copy = ast_expr_assignment_create(
 			ast_expr_copy(expr->root),
 			ast_expr_copy(expr->u.assignment_value)
 		);
+		break;
 	case EXPR_ISDEALLOCAND:
-		return ast_expr_isdeallocand_create(
+		copy = ast_expr_isdeallocand_create(
 			ast_expr_copy(expr->root)
 		);
+		break;
 	case EXPR_ARBARG:
-		return ast_expr_arbarg_create();
+		copy = ast_expr_arbarg_create();
+		break;
 	default:
 		assert(false);
 	}
+
+	assert(copy);
+	copy->start = expr->start
+		? lexememarker_copy(expr->start)
+		: NULL;
+	copy->end = expr->end
+		? lexememarker_copy(expr->end)
+		: NULL;
+
+	return copy;
 }
 
 enum ast_expr_kind
