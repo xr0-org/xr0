@@ -52,19 +52,25 @@ ast_stmt_lexememarker(struct ast_stmt *stmt)
 	return stmt->loc;
 }
 
-static struct ast_stmt *
-ast_stmt_create(struct lexememarker *loc)
+struct ast_stmt *
+ast_stmt_setlexememarker(struct ast_stmt *stmt, struct lexememarker *loc)
 {
-	struct ast_stmt *stmt = calloc(1, sizeof(struct ast_stmt));
+	assert(!stmt->loc);
 	stmt->loc = loc;
 	return stmt;
 }
 
-struct ast_stmt *
-ast_stmt_create_labelled(struct lexememarker *loc, char *label,
-		struct ast_stmt *substmt)
+static struct ast_stmt *
+ast_stmt_create()
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = calloc(1, sizeof(struct ast_stmt));
+	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_create_labelled(char *label, struct ast_stmt *substmt)
+{
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_LABELLED;
 	stmt->u.labelled.label = label;
 	stmt->u.labelled.stmt = substmt;
@@ -110,9 +116,9 @@ ast_stmt_labelled_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 }
 
 struct ast_stmt *
-ast_stmt_create_nop(struct lexememarker *loc)
+ast_stmt_create_nop()
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_NOP;
 	return stmt;
 }
@@ -124,9 +130,9 @@ ast_stmt_nop_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 }
 
 struct ast_stmt *
-ast_stmt_create_expr(struct lexememarker *loc, struct ast_expr *expr)
+ast_stmt_create_expr(struct ast_expr *expr)
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_EXPR;
 	stmt->u.expr = expr;
 	return stmt;
@@ -142,9 +148,9 @@ ast_stmt_expr_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 }
 
 struct ast_stmt *
-ast_stmt_create_compound(struct lexememarker *loc, struct ast_block *b)
+ast_stmt_create_compound(struct ast_block *b)
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_COMPOUND;
 	stmt->u.compound = b;
 	return stmt;
@@ -167,19 +173,18 @@ ast_stmt_compound_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 }
 
 struct ast_stmt *
-ast_stmt_create_compound_v(struct lexememarker *loc, struct ast_block *b)
+ast_stmt_create_compound_v(struct ast_block *b)
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_COMPOUND_V;
 	stmt->u.compound = b;
 	return stmt;
 }
 
 struct ast_stmt *
-ast_stmt_create_jump(struct lexememarker *loc, enum ast_jump_kind kind,
-		struct ast_expr *rv)
+ast_stmt_create_jump(enum ast_jump_kind kind, struct ast_expr *rv)
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_JUMP;
 	stmt->u.jump.kind = JUMP_RETURN;
 	stmt->u.jump.rv = rv;
@@ -253,9 +258,9 @@ ast_stmt_destroy_jump(struct ast_stmt *stmt)
 }
 
 struct ast_stmt *
-ast_stmt_create_alloc(struct lexememarker *loc, struct ast_expr *arg)
+ast_stmt_create_alloc(struct ast_expr *arg)
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_ALLOCATION;
 	stmt->u.alloc.isalloc = true;
 	stmt->u.alloc.arg = arg;
@@ -263,9 +268,9 @@ ast_stmt_create_alloc(struct lexememarker *loc, struct ast_expr *arg)
 }
 
 struct ast_stmt *
-ast_stmt_create_dealloc(struct lexememarker *loc, struct ast_expr *arg)
+ast_stmt_create_dealloc(struct ast_expr *arg)
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_ALLOCATION;
 	stmt->u.alloc.isalloc = false;
 	stmt->u.alloc.arg = arg;
@@ -273,12 +278,12 @@ ast_stmt_create_dealloc(struct lexememarker *loc, struct ast_expr *arg)
 }
 
 static struct ast_stmt *
-ast_stmt_copy_alloc(struct lexememarker *loc, struct ast_stmt *stmt)
+ast_stmt_copy_alloc(struct ast_stmt *stmt)
 {
 	struct ast_expr *arg = ast_expr_copy(stmt->u.alloc.arg);
 	return stmt->u.alloc.isalloc
-		? ast_stmt_create_alloc(loc, arg)
-		: ast_stmt_create_dealloc(loc, arg);
+		? ast_stmt_create_alloc(arg)
+		: ast_stmt_create_dealloc(arg);
 }
 
 static void
@@ -321,12 +326,12 @@ ast_stmt_alloc_isalloc(struct ast_stmt *stmt)
 
 
 struct ast_stmt *
-ast_stmt_create_sel(struct lexememarker *loc, bool isswitch, struct ast_expr *cond,
+ast_stmt_create_sel(bool isswitch, struct ast_expr *cond,
 		struct ast_stmt *body, struct ast_stmt *nest)
 {
 	assert(!isswitch); /* XXX */
 	assert(cond);
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_SELECTION;
 	stmt->u.selection.isswitch = isswitch;
 	stmt->u.selection.cond = cond;
@@ -385,13 +390,13 @@ ast_stmt_sel_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 }
 
 struct ast_stmt *
-ast_stmt_create_iter(struct lexememarker *loc,
+ast_stmt_create_iter(
 		struct ast_stmt *init, struct ast_stmt *cond,
 		struct ast_expr *iter, struct ast_block *abstract,
 		struct ast_stmt *body)
 {
 	assert(init && cond && iter && abstract && body);
-	struct ast_stmt *stmt = ast_stmt_create(loc);
+	struct ast_stmt *stmt = ast_stmt_create();
 	stmt->kind = STMT_ITERATION;
 	stmt->u.iteration.init = init;
 	stmt->u.iteration.cond = cond;
@@ -576,31 +581,29 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 struct ast_stmt *
 ast_stmt_copy(struct ast_stmt *stmt)
 {
-	struct lexememarker *loc = stmt->loc
-		? lexememarker_copy(stmt->loc)
-		: NULL;
+	struct ast_stmt *copy;
+	
 	switch (stmt->kind) {
 	case STMT_LABELLED:
-		return ast_stmt_create_labelled(
-			loc,
+		copy = ast_stmt_create_labelled(
 			dynamic_str(stmt->u.labelled.label),
 			ast_stmt_copy(stmt->u.labelled.stmt)
 		);
+		break;
 	case STMT_NOP:
-		return ast_stmt_create_nop(loc);
+		copy = ast_stmt_create_nop();
+		break;
 	case STMT_EXPR:
-		return ast_stmt_create_expr(loc, ast_expr_copy(stmt->u.expr));
+		copy = ast_stmt_create_expr(ast_expr_copy(stmt->u.expr));
+		break;
 	case STMT_COMPOUND:
-		return ast_stmt_create_compound(
-			loc, ast_block_copy(stmt->u.compound)
-		);
+		copy = ast_stmt_create_compound(ast_block_copy(stmt->u.compound));
+		break; 
 	case STMT_COMPOUND_V:
-		return ast_stmt_create_compound_v(
-			loc, ast_block_copy(stmt->u.compound)
-		);
+		copy = ast_stmt_create_compound_v(ast_block_copy(stmt->u.compound));
+		break;
 	case STMT_SELECTION:
-		return ast_stmt_create_sel(
-			loc,
+		copy = ast_stmt_create_sel(
 			stmt->u.selection.isswitch,
 			ast_expr_copy(stmt->u.selection.cond),
 			ast_stmt_copy(stmt->u.selection.body),
@@ -608,27 +611,37 @@ ast_stmt_copy(struct ast_stmt *stmt)
 				? ast_stmt_copy(stmt->u.selection.nest)
 				: NULL
 		);
+		break;
 	case STMT_ITERATION:
-		return ast_stmt_create_iter(
-			loc,
+		copy = ast_stmt_create_iter(
 			ast_stmt_copy(stmt->u.iteration.init),
 			ast_stmt_copy(stmt->u.iteration.cond),
 			ast_expr_copy(stmt->u.iteration.iter),
 			ast_block_copy(stmt->u.iteration.abstract),
 			ast_stmt_copy(stmt->u.iteration.body)
 		);
+		break;
 	case STMT_ITERATION_E:
-		return ast_stmt_copy_iter(stmt);
+		copy = ast_stmt_copy_iter(stmt);
+		break;
 	case STMT_JUMP:
-		return ast_stmt_create_jump(
-			loc, stmt->u.jump.kind,
+		copy = ast_stmt_create_jump(
+			stmt->u.jump.kind,
 			ast_expr_copy_ifnotnull(stmt->u.jump.rv)
 		);
+		break;
 	case STMT_ALLOCATION:
-		return ast_stmt_copy_alloc(loc, stmt);
+		copy = ast_stmt_copy_alloc(stmt);
+		break;
 	default:
 		assert(false);
 	}
+
+	copy->loc = stmt->loc
+		? lexememarker_copy(stmt->loc)
+		: NULL;
+
+	return copy;
 }
 
 char *

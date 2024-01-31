@@ -660,7 +660,7 @@ abstract_declarator
 statement
 	: labelled_statement
 	| compound_statement
-		{ $$ = ast_stmt_create_compound(lexloc(), $1); }
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_compound($1), lexloc()); }
 	| expression_statement
 	| selection_statement
 	| iteration_statement
@@ -668,17 +668,17 @@ statement
 	| iteration_effect_statement
 		{ $$ = ast_stmt_create_iter_e($1); }
 	| compound_verification_statement
-		{ $$ = ast_stmt_create_compound_v(lexloc(), $1); }
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_compound_v($1), lexloc()); }
 	| allocation_statement
 	;
 
 labelled_statement
 	: identifier ':' statement
-		{ $$ = ast_stmt_create_labelled(lexloc(), $1, $3); }
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_labelled($1, $3), lexloc()); }
 	| CASE constant_expression ':' statement
-		{ $$ = ast_stmt_create_nop(lexloc()); }
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_nop(), lexloc()); }
 	| DEFAULT ':' statement
-		{ $$ = ast_stmt_create_nop(lexloc()); }
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_nop(lexloc()), lexloc()); }
 	;
 
 compound_statement
@@ -713,9 +713,9 @@ compound_verification_statement
 
 allocation_statement
 	: ALLOC postfix_expression ';'
-		{ $$ = ast_stmt_create_alloc(lexloc(), $2); }
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_alloc($2), lexloc()); }
 	| DEALLOC postfix_expression ';'
-		{ $$ = ast_stmt_create_dealloc(lexloc(), $2); }
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_dealloc($2), lexloc()); }
 	;
 
 declaration_list
@@ -733,25 +733,33 @@ statement_list
 	;
 
 expression_statement
-	: ';' 			{ $$ = ast_stmt_create_nop(lexloc()); }
-	| expression ';'	{ $$ = ast_stmt_create_expr(lexloc(), $1); }
+	: ';' 
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_nop(), lexloc()); }
+	| expression ';'
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_expr($1), lexloc()); }
 	;
 
 selection_statement
-	: IF '(' expression ')' statement
-		{ $$ = ast_stmt_create_sel(lexloc(), false, $3, $5, NULL); }
-	| IF '(' expression ')' statement ELSE statement
-		{
-			struct ast_expr *neg_cond = ast_expr_unary_create(
-				ast_expr_copy($3), UNARY_OP_BANG
-			);
-			struct ast_stmt *_else = ast_stmt_create_sel(
-				lexloc(), false, neg_cond, $7, NULL
-			); 
-			$$ = ast_stmt_create_sel(lexloc(), false, $3, $5, _else);
-		}
+	: IF '(' expression ')' statement {
+		$$ = ast_stmt_setlexememarker(
+			ast_stmt_create_sel(false, $3, $5, NULL), lexloc()
+		);
+	}
+	| IF '(' expression ')' statement ELSE statement {
+		struct ast_expr *neg_cond = ast_expr_unary_create(
+			ast_expr_copy($3), UNARY_OP_BANG
+		);
+		struct ast_stmt *_else = ast_stmt_setlexememarker(
+			ast_stmt_create_sel(false, neg_cond, $7, NULL),
+			lexloc()
+		); 
+		$$ = ast_stmt_setlexememarker(
+			ast_stmt_create_sel(false, $3, $5, _else),
+			lexloc()
+		);
+	}
 	| SWITCH '(' expression ')' statement
-		{ $$ = ast_stmt_create_nop(lexloc()); }
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_nop(), lexloc()); }
 	;
 
 for_some
@@ -771,7 +779,10 @@ for_iteration_statement
 	: for_some '(' expression_statement expression_statement expression ')' optional_compound_verification statement
 		{
 		/*struct ast_stmt *stmt = $8; */
-		$$ = ast_stmt_create_iter(lexloc(), $3, $4, $5, $7, $8); }
+		$$ = ast_stmt_setlexememarker(
+			ast_stmt_create_iter($3, $4, $5, $7, $8), lexloc()
+		);
+	}
 	;
 
 iteration_statement
@@ -786,8 +797,12 @@ jump_statement
 	/*| CONTINUE ';'*/
 	/*| BREAK ';'*/
 	/*| RETURN ';'*/
-	: RETURN expression ';'
-		{ $$ = ast_stmt_create_jump(lexloc(), JUMP_RETURN, $2); }
+	: RETURN expression ';' {
+		$$ = ast_stmt_setlexememarker(
+			ast_stmt_create_jump(JUMP_RETURN, $2),
+			lexloc()
+		);
+	}
 	;
 
 translation_unit

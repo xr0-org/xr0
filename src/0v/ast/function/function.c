@@ -704,7 +704,7 @@ block_withassumption(struct ast_block *old, struct ast_expr *cond)
 
 	/* assume: cond; */
 	stmt[0] = ast_stmt_create_labelled(
-		NULL, dynamic_str("assume"), ast_stmt_create_expr(NULL, cond)
+		dynamic_str("assume"), ast_stmt_create_expr(cond)
 	);
 
 	struct ast_block *new = ast_block_create(decl, ndecl, stmt, nstmt);

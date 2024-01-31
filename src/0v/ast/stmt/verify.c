@@ -273,13 +273,12 @@ iter_neteffect(struct ast_stmt *iter)
 	assert(ast_block_ndecls(abs) == 0 && nstmts == 1);
 
 	return ast_stmt_create_iter(
-		NULL,
 		ast_stmt_copy(ast_stmt_iter_init(iter)),
 		ast_stmt_copy(ast_stmt_iter_cond(iter)),
 		ast_expr_copy(ast_stmt_iter_iter(iter)),
 		ast_block_create(NULL, 0, NULL, 0),
 		ast_stmt_create_compound(
-			NULL, ast_block_copy(ast_stmt_iter_abstract(iter))
+			ast_block_copy(ast_stmt_iter_abstract(iter))
 		)
 	);
 }
