@@ -27,6 +27,9 @@ lexememarker_str(struct lexememarker *);
 int
 lexememarker_line(struct lexememarker *);
 
+char *
+lexememarker_coords(struct lexememarker *);
+
 extern int verbose;
 extern struct ast *root;
 extern struct map *table;

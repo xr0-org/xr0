@@ -206,50 +206,37 @@ primary_expression
 	;
 
 postfix_expression
-	: primary_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-	}
+	: primary_expression
 	| postfix_expression '[' expression ']' {
-		$$ = ast_expr_setend(
-			ast_expr_unary_create(
-				ast_expr_binary_create($1, BINARY_OP_ADDITION, $3),
-				UNARY_OP_DEREFERENCE
-			),
-			lexloc()
+		$$ = ast_expr_unary_create(
+			ast_expr_binary_create($1, BINARY_OP_ADDITION, $3),
+			UNARY_OP_DEREFERENCE
 		);
 	}
 	| postfix_expression '(' ')'
-		{ $$ = ast_expr_setend(ast_expr_call_create($1, 0, NULL), lexloc()); }
+		{ $$ = ast_expr_call_create($1, 0, NULL); }
 	| postfix_expression '(' argument_expression_list ')'
-		{ $$ = ast_expr_setend(ast_expr_call_create($1, $3.n, $3.expr), lexloc()); }
+		{ $$ = ast_expr_call_create($1, $3.n, $3.expr); }
 	| postfix_expression '.' identifier
-		{ $$ = ast_expr_setend(ast_expr_member_create($1, $3), lexloc()); }
+		{ $$ = ast_expr_member_create($1, $3); }
 	| postfix_expression PTR_OP identifier {
-		$$ = ast_expr_setend(
-			ast_expr_member_create(
-				ast_expr_unary_create(
-					ast_expr_binary_create(
-						$1,
-						BINARY_OP_ADDITION,
-						ast_expr_constant_create(0)
-					),
-					UNARY_OP_DEREFERENCE
+		$$ = ast_expr_member_create(
+			ast_expr_unary_create(
+				ast_expr_binary_create(
+					$1,
+					BINARY_OP_ADDITION,
+					ast_expr_constant_create(0)
 				),
-				$3
+				UNARY_OP_DEREFERENCE
 			),
-			lexloc()
+			$3
 		);
 	}
 	| postfix_expression INC_OP {
-		$$ = ast_expr_setend(
-			ast_expr_incdec_create($1, true, false), lexloc()
-		);
+		$$ = ast_expr_incdec_create($1, true, false);
 	}
 	| postfix_expression DEC_OP {
-		$$ = ast_expr_setend(
-			ast_expr_incdec_create($1, false, false), lexloc()
-		);
+		$$ = ast_expr_incdec_create($1, false, false);
 	}
 	;
 
@@ -261,42 +248,26 @@ argument_expression_list
 	;
 
 isdeallocand_expression
-	: postfix_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: postfix_expression
 	| ISDEALLOCAND_OP isdeallocand_expression {
-		$$ = ast_expr_setend(ast_expr_isdeallocand_create($2), lexloc());
+		$$ = ast_expr_isdeallocand_create($2);
 	}
 	;
 
 unary_expression
-	: isdeallocand_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: isdeallocand_expression
 	| INC_OP unary_expression {
-		$$ = ast_expr_setend(
-			ast_expr_incdec_create($2, true, true), lexloc()
-		);
+		$$ = ast_expr_incdec_create($2, true, true);
 	}
 	| DEC_OP unary_expression {
-		$$ = ast_expr_setend(
-			ast_expr_incdec_create($2, false, true), lexloc()
-		);
+		$$ = ast_expr_incdec_create($2, false, true);
 	}
 	| unary_operator cast_expression {
-		$$ = ast_expr_setend(
-			ast_expr_unary_create($2, $1), lexloc()
-		);
+		$$ = ast_expr_unary_create($2, $1);
 	}
 	/*| SIZEOF unary_expression*/
 	| SIZEOF '(' type_name ')' {
-		$$ = ast_expr_setend(
-			ast_expr_constant_create(1), lexloc()
-		); /* XXX */
+		$$ = ast_expr_constant_create(1); /* XXX */
 	}
 	;
 
@@ -310,49 +281,29 @@ unary_operator
 	;
 
 cast_expression
-	: unary_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: unary_expression
 	/*| '(' type_name ')' cast_expression*/
 	;
 
 multiplicative_expression
-	: cast_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: cast_expression
 	| multiplicative_expression '*' cast_expression
 	/*| multiplicative_expression '/' cast_expression*/
 /*| multiplicative_expression '%' cast_expression*/
 ;
 
 additive_expression
-	: multiplicative_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: multiplicative_expression
 	| additive_expression '+' multiplicative_expression {
-		$$ = ast_expr_setend(
-			ast_expr_binary_create($1, BINARY_OP_ADDITION, $3), lexloc()
-		);
+		$$ = ast_expr_binary_create($1, BINARY_OP_ADDITION, $3);
 	}
 	| additive_expression '-' multiplicative_expression {
-		$$ = ast_expr_setend(
-			ast_expr_binary_create($1, BINARY_OP_SUBTRACTION, $3), lexloc()
-		);
+		$$ = ast_expr_binary_create($1, BINARY_OP_SUBTRACTION, $3);
 	}
 	;
 
 shift_expression
-	: additive_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: additive_expression
 	| shift_expression LEFT_OP additive_expression
 	| shift_expression RIGHT_OP additive_expression
 	;
@@ -370,15 +321,9 @@ justification
 	;
 
 relational_expression
-	: shift_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: shift_expression
 	| relational_expression relational_operator justification shift_expression {
-		$$ = ast_expr_setend(
-			ast_expr_binary_create($1, $2, $4), lexloc()
-		);
+		$$ = ast_expr_binary_create($1, $2, $4);
 	}
 	;
 
@@ -388,81 +333,46 @@ equality_operator
 	;
 
 equality_expression
-	: relational_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: relational_expression
 	| equality_expression equality_operator justification relational_expression {
-		$$ = ast_expr_setend(
-			ast_expr_binary_create($1, $2, $4), lexloc()
-		);
+		$$ = ast_expr_binary_create($1, $2, $4);
 	}
 	;
 
 and_expression
-	: equality_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: equality_expression
 	/*| and_expression '&' equality_expression*/
 	;
 
 exclusive_or_expression
-	: and_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: and_expression
 	/*| exclusive_or_expression '^' and_expression*/
 	;
 
 inclusive_or_expression
-	: exclusive_or_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: exclusive_or_expression
 	/*| inclusive_or_expression '|' exclusive_or_expression*/
 	;
 
 logical_and_expression
-	: inclusive_or_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: inclusive_or_expression
 	| logical_and_expression AND_OP inclusive_or_expression
 	;
 
 logical_or_expression
-	: logical_and_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: logical_and_expression
 	| logical_or_expression OR_OP logical_and_expression
 	;
 
 conditional_expression
-	: logical_or_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
-
+	: logical_or_expression
 	/*| logical_or_expression '?' expression ':' conditional_expression*/
 	;
 
 assignment_expression
-	: conditional_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: conditional_expression
 	| unary_expression assignment_operator assignment_expression {
-		$$ = ast_expr_setend(ast_expr_assignment_create($1, $3), lexloc());
+		$$ = ast_expr_assignment_create($1, $3);
 	}
 	;
 
@@ -481,11 +391,7 @@ assignment_operator
 	;
 
 expression
-	: assignment_expression {
-		struct lexememarker *end = lexloc();
-		$$ = ast_expr_setend(ast_expr_setstart($1, start), end);
-		start = lexloc();
-	}
+	: assignment_expression
 	/*| expression ',' assignment_expression*/
 	;
 
@@ -766,28 +672,32 @@ abstract_declarator
 
 statement
 	: labelled_statement
+		{ $$ = ast_stmt_setlexememarker($1, lexloc()); }
 	| compound_statement
 		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_compound($1), lexloc()); }
-	| expression_statement {
-		start = lexloc();
-	}
+	| expression_statement
+		{ $$ = ast_stmt_setlexememarker($1, lexloc()); }
 	| selection_statement
+		{ $$ = ast_stmt_setlexememarker($1, lexloc()); }
 	| iteration_statement
+		{ $$ = ast_stmt_setlexememarker($1, lexloc()); }
 	| jump_statement
+		{ $$ = ast_stmt_setlexememarker($1, lexloc()); }
 	| iteration_effect_statement
-		{ $$ = ast_stmt_create_iter_e($1); }
+		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_iter_e($1), lexloc()); }
 	| compound_verification_statement
 		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_compound_v($1), lexloc()); }
 	| allocation_statement
+		{ $$ = ast_stmt_setlexememarker($1, lexloc()); }
 	;
 
 labelled_statement
 	: identifier ':' statement
-		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_labelled($1, $3), lexloc()); }
+		{ $$ = ast_stmt_create_labelled($1, $3); }
 	| CASE constant_expression ':' statement
-		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_nop(), lexloc()); }
+		{ $$ = ast_stmt_create_nop(); }
 	| DEFAULT ':' statement
-		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_nop(lexloc()), lexloc()); }
+		{ $$ = ast_stmt_create_nop(); }
 	;
 
 compound_statement
@@ -822,9 +732,9 @@ compound_verification_statement
 
 allocation_statement
 	: ALLOC postfix_expression ';'
-		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_alloc($2), lexloc()); }
+		{ $$ = ast_stmt_create_alloc($2); }
 	| DEALLOC postfix_expression ';'
-		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_dealloc($2), lexloc()); }
+		{ $$ = ast_stmt_create_dealloc($2); }
 	;
 
 declaration_list
@@ -843,32 +753,26 @@ statement_list
 
 expression_statement
 	: ';' 
-		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_nop(), lexloc()); }
+		{ $$ = ast_stmt_create_nop(); }
 	| expression ';'
-		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_expr($1), lexloc()); }
+		{ $$ = ast_stmt_create_expr($1); }
 	;
 
 selection_statement
 	: IF '(' expression ')' statement {
-		$$ = ast_stmt_setlexememarker(
-			ast_stmt_create_sel(false, $3, $5, NULL), lexloc()
-		);
+		$$ = ast_stmt_create_sel(false, $3, $5, NULL);
 	}
 	| IF '(' expression ')' statement ELSE statement {
 		struct ast_expr *neg_cond = ast_expr_unary_create(
 			ast_expr_copy($3), UNARY_OP_BANG
 		);
-		struct ast_stmt *_else = ast_stmt_setlexememarker(
-			ast_stmt_create_sel(false, neg_cond, $7, NULL),
-			lexloc()
-		); 
-		$$ = ast_stmt_setlexememarker(
-			ast_stmt_create_sel(false, $3, $5, _else),
-			lexloc()
+		struct ast_stmt *_else = ast_stmt_create_sel(
+			false, neg_cond, $7, NULL
 		);
+		$$ = ast_stmt_create_sel(false, $3, $5, _else);
 	}
 	| SWITCH '(' expression ')' statement
-		{ $$ = ast_stmt_setlexememarker(ast_stmt_create_nop(), lexloc()); }
+		{ $$ = ast_stmt_create_nop(); }
 	;
 
 for_some
@@ -888,9 +792,7 @@ for_iteration_statement
 	: for_some '(' expression_statement expression_statement expression ')' optional_compound_verification statement
 		{
 		/*struct ast_stmt *stmt = $8; */
-		$$ = ast_stmt_setlexememarker(
-			ast_stmt_create_iter($3, $4, $5, $7, $8), lexloc()
-		);
+		$$ = ast_stmt_create_iter($3, $4, $5, $7, $8);
 	}
 	;
 
@@ -907,10 +809,7 @@ jump_statement
 	/*| BREAK ';'*/
 	/*| RETURN ';'*/
 	: RETURN expression ';' {
-		$$ = ast_stmt_setlexememarker(
-			ast_stmt_create_jump(JUMP_RETURN, $2),
-			lexloc()
-		);
+		$$ = ast_stmt_create_jump(JUMP_RETURN, $2);
 	}
 	;
 

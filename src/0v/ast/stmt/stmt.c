@@ -55,7 +55,6 @@ ast_stmt_lexememarker(struct ast_stmt *stmt)
 struct ast_stmt *
 ast_stmt_setlexememarker(struct ast_stmt *stmt, struct lexememarker *loc)
 {
-	assert(!stmt->loc);
 	stmt->loc = loc;
 	return stmt;
 }

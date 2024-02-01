@@ -690,12 +690,14 @@ char *
 ast_expr_str(struct ast_expr *expr)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(
-		b,
-		"[start: %s, end: %s]: ",
-		lexememarker_str(expr->start),
-		lexememarker_str(expr->end)
-	);
+	if (expr->start && expr->end) {
+		strbuilder_printf(
+			b,
+			"[%s-%s]",
+			lexememarker_coords(expr->start),
+			lexememarker_coords(expr->end)
+		);
+	}
 	switch (expr->kind) {
 	case EXPR_IDENTIFIER:
 		strbuilder_printf(b, expr->u.string);
@@ -742,7 +744,7 @@ ast_expr_str(struct ast_expr *expr)
 struct ast_expr *
 ast_expr_copy(struct ast_expr *expr)
 {
-	struct ast_expr *copy;
+	struct ast_expr *copy = NULL;
 	
 	assert(expr);
 	switch (expr->kind) {
@@ -805,14 +807,6 @@ ast_expr_copy(struct ast_expr *expr)
 	default:
 		assert(false);
 	}
-
-	assert(copy);
-	copy->start = expr->start
-		? lexememarker_copy(expr->start)
-		: NULL;
-	copy->end = expr->end
-		? lexememarker_copy(expr->end)
-		: NULL;
 
 	return copy;
 }

@@ -364,3 +364,11 @@ lexememarker_str(struct lexememarker *loc)
 	strbuilder_printf(b, "%s:%d:%d", loc->filename, loc->linenum, loc->column);
 	return strbuilder_build(b);
 }
+
+char *
+lexememarker_coords(struct lexememarker *loc)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%d:%d", loc->linenum, loc->column);
+	return strbuilder_build(b);
+}
