@@ -210,6 +210,15 @@ state_getobjecttype(struct state *state, char *id)
 	return variable_type(v);
 }
 
+struct value *
+state_getloc(struct state *state, char *id)
+{
+	struct variable *v = stack_getvariable(state->stack, id);
+	assert(v);
+
+	return value_ptr_create(variable_location(v));
+}
+
 struct object *
 state_getobject(struct state *state, char *id)
 {

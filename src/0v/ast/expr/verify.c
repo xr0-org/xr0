@@ -166,6 +166,23 @@ expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
 	struct ast_expr *inner = ast_expr_unary_operand(expr);
 
+	/* XXX: expr for args (scanf()) in function not of form `*(ptr+offset)
+	 * for some reason */
+	if (ast_expr_kind(inner) == EXPR_IDENTIFIER) {
+		struct lvalue *root = ast_expr_lvalue(inner, state);
+		struct object *root_obj = lvalue_object(root);
+		if (!root_obj) { /* `root` freed */
+			return NULL;
+		}
+		struct ast_type *t = ast_type_ptr_type(lvalue_type(root));
+		struct value *root_val = object_as_value(root_obj);
+		assert(root_val);
+		struct object *obj = state_deref(
+			state, root_val, ast_expr_constant_create(0)
+		);
+		return lvalue_create(t, obj);
+	}
+
 	struct lvalue *root = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
 	struct object *root_obj = lvalue_object(root);
 	if (!root_obj) { /* `root` freed */
@@ -394,8 +411,14 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 
 	switch (ast_expr_unary_op(expr)) {
 	case UNARY_OP_DEREFERENCE:
-	case UNARY_OP_ADDRESS:
 		return dereference_eval(expr, state);
+	case UNARY_OP_ADDRESS:
+		return result_value_create(
+			state_getloc(
+				state,
+				ast_expr_as_identifier(ast_expr_unary_operand(expr))
+			)
+		);
 	default:
 		assert(false);
 	}
@@ -411,6 +434,8 @@ static struct result *
 dereference_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *binary = expr_to_binary(ast_expr_unary_operand(expr));
+	printf("(deref eval) expr: %s\n", ast_expr_str(expr));
+	printf("(deref eval) binary: %s\n", ast_expr_str(binary));
 	struct result *res = binary_deref_eval(binary, state);
 	ast_expr_destroy(binary);
 	return res;
@@ -701,9 +726,12 @@ prepare_parameters(int nparams, struct ast_variable **param,
 static struct result *
 expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
+
+	printf("state: %s\n", state_str(state));
+	printf("lval: %s\n", ast_expr_str(lval));
+	printf("rval: %s\n", ast_expr_str(rval));
 
 	struct result *res = ast_expr_eval(rval, state);
 	if (result_iserror(res)) {
@@ -725,6 +753,7 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	object_assign(obj, value_copy(result_as_value(res)));
+	printf("(assign_eval) state: %s\n", state_str(state));
 	return res;
 }
 

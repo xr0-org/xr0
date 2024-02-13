@@ -15,7 +15,6 @@ int
 main()
 {
 	int x, y, r;
-
 	/* 11 is Maximum length of a 32 but integer including sign */
 	char str[11];
 
