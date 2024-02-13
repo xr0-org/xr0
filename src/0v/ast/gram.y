@@ -280,8 +280,8 @@ cast_expression
 multiplicative_expression
 	: cast_expression
 	| multiplicative_expression '*' cast_expression
-	/*| multiplicative_expression '/' cast_expression*/
-/*| multiplicative_expression '%' cast_expression*/
+	| multiplicative_expression '/' cast_expression
+	/*| multiplicative_expression '%' cast_expression*/
 ;
 
 additive_expression
@@ -571,7 +571,7 @@ declarator
 direct_declarator
 	: identifier	/* XXX */
 	/*| '(' declarator ')'*/
-	/*| direct_declarator '[' constant_expression ']'*/
+	| direct_declarator '[' constant_expression ']'
 	/*| direct_declarator '[' ']'*/
 	| direct_declarator '(' parameter_type_list ')'
 	/*| direct_declarator '(' identifier_list ')'*/

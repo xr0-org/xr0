@@ -101,8 +101,6 @@ struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
 		struct result_arr *args, char *fname, struct state *state);
 
-
-
 struct string_arr *
 ast_expr_getfuncs(struct ast_expr *);
 

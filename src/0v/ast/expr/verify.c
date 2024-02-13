@@ -381,6 +381,26 @@ hack_identifier_builtin_eval(char *id, struct state *state)
 	return result_error_create(error_create("not built-in"));
 }
 
+static struct result *
+dereference_eval(struct ast_expr *, struct state *);
+
+static struct result *
+expr_unary_eval(struct ast_expr *expr, struct state *state)
+{
+	assert(
+		ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE ||
+		ast_expr_unary_op(expr) == UNARY_OP_ADDRESS
+	);
+
+	switch (ast_expr_unary_op(expr)) {
+	case UNARY_OP_DEREFERENCE:
+	case UNARY_OP_ADDRESS:
+		return dereference_eval(expr, state);
+	default:
+		assert(false);
+	}
+}
+
 static struct ast_expr *
 expr_to_binary(struct ast_expr *expr);
 
@@ -388,10 +408,8 @@ static struct result *
 binary_deref_eval(struct ast_expr *expr, struct state *state);
 
 static struct result *
-expr_unary_eval(struct ast_expr *expr, struct state *state)
+dereference_eval(struct ast_expr *expr, struct state *state)
 {
-	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
-
 	struct ast_expr *binary = expr_to_binary(ast_expr_unary_operand(expr));
 	struct result *res = binary_deref_eval(binary, state);
 	ast_expr_destroy(binary);
@@ -683,6 +701,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 static struct result *
 expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
@@ -893,6 +912,7 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 static struct result *
 unary_pf_reduce(struct ast_expr *e, struct state *s)
 {
+	printf("unary: %s\n", ast_expr_str(e));
 	/* TODO: reduce by actually dereferencing if expr is a deref and this is
 	 * possible in the current state */
 	struct result *res = ast_expr_pf_reduce(ast_expr_unary_operand(e), s);

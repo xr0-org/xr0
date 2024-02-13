@@ -95,6 +95,13 @@ ast_stmt_ispre(struct ast_stmt *stmt)
 }
 
 bool
+ast_stmt_iseff(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_LABELLED
+		&& strcmp(stmt->u.labelled.label, "eff") == 0;
+}
+
+bool
 ast_stmt_isassume(struct ast_stmt *stmt)
 {
 	return stmt->kind == STMT_LABELLED

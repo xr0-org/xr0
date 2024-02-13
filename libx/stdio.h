@@ -35,4 +35,15 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
 axiom int
 fclose(FILE *stream);
 
+/* XXX: provisionally rigid for preconditions example */
+axiom char *
+sprintf(char *buf, char *format, int *);
+
+/* XXX: provisionally rigid for preconditions example */
+axiom int
+scanf(char *format, void *arg) ~ [
+	/* since there's a sideeffect here for arg, we need to characterise it */
+	*arg = $;
+];
+
 #endif
