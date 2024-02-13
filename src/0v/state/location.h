@@ -15,6 +15,12 @@ struct location;
 struct location *
 location_create(enum location_type type, int block, struct ast_expr *offset);
 
+void
+location_setframe(struct location *loc, int frame);
+
+int
+location_getframe(struct location *loc);
+
 struct location *
 location_copy(struct location *loc);
 

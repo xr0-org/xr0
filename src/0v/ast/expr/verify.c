@@ -402,8 +402,12 @@ static struct result *
 dereference_eval(struct ast_expr *, struct state *);
 
 static struct result *
+address_eval(struct ast_expr *, struct state *);
+
+static struct result *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("(unary_eval) expr: %s\n", ast_expr_str(expr));
 	assert(
 		ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE ||
 		ast_expr_unary_op(expr) == UNARY_OP_ADDRESS
@@ -413,12 +417,7 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 	case UNARY_OP_DEREFERENCE:
 		return dereference_eval(expr, state);
 	case UNARY_OP_ADDRESS:
-		return result_value_create(
-			state_getloc(
-				state,
-				ast_expr_as_identifier(ast_expr_unary_operand(expr))
-			)
-		);
+		return address_eval(expr, state);
 	default:
 		assert(false);
 	}
@@ -473,6 +472,18 @@ binary_deref_eval(struct ast_expr *expr, struct state *state)
 	assert(v);
 
 	return result_value_create(value_copy(v));
+}
+
+static struct result *
+address_eval(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *operand = ast_expr_unary_operand(expr);
+	char *id = ast_expr_as_identifier(operand);
+	struct value *v = state_getloc(state, id);
+	printf("operand: %s\n", ast_expr_str(operand));
+	printf("id: %s\n", id);
+	printf("value: %s\n", value_str(v));
+	return result_value_create(v);
 }
 
 static struct result *
@@ -582,7 +593,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	state_popframe(state);
-	result_arr_destroy(args);
+	/*result_arr_destroy(args);*/
 
 	if (v) {
 		return pf_augment(v, expr, state);

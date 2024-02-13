@@ -20,6 +20,7 @@ struct stack {
 	struct map *varmap;
 	struct variable *result;
 
+	int id;
 	struct stack *prev;
 };
 
@@ -27,9 +28,11 @@ struct location *
 stack_newblock(struct stack *stack)
 {
 	int address = block_arr_append(stack->frame, block_create());
-	return location_create(
+	struct location *loc = location_create(
 		LOCATION_AUTOMATIC, address, ast_expr_constant_create(0)
 	);
+	location_setframe(loc, stack->id);
+	return loc;
 }
 
 struct stack *
@@ -45,6 +48,7 @@ stack_create(char *name, struct stack *prev, struct ast_type *result_type)
 
 	stack->result = variable_create(result_type, stack, false);
 
+	stack->id = prev ? prev->id + 1 : 0;
 	stack->prev = prev;
 
 	return stack;
@@ -82,6 +86,7 @@ stack_copy(struct stack *stack)
 	copy->name = dynamic_str(stack->name);
 	copy->frame = block_arr_copy(stack->frame);
 	copy->varmap = varmap_copy(stack->varmap);
+	copy->id = stack->id;
 	copy->result = variable_copy(stack->result);
 	if (stack->prev) {
 		copy->prev = stack_copy(stack->prev);
@@ -203,6 +208,9 @@ stack_getvariable(struct stack *s, char *id)
 bool
 stack_references(struct stack *s, struct location *loc, struct state *state)
 {
+	if (s->id != location_getframe(loc)) {
+		assert(false);
+	}
 	/* TODO: check globals */
 	struct variable *result = stack_getresult(s);
 	if (result && variable_references(result, loc, state)) {

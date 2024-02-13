@@ -16,6 +16,7 @@
 struct location {
 	enum location_type type;
 	int block;
+	int frame;
 	struct ast_expr *offset;
 };
 
@@ -29,6 +30,20 @@ location_create(enum location_type type, int block, struct ast_expr *offset)
 	assert(offset);
 	loc->offset = offset;
 	return loc;
+}
+
+void
+location_setframe(struct location *loc, int frame)
+{
+	assert(loc->type == LOCATION_AUTOMATIC);
+	loc->frame = frame;
+}
+
+int
+location_getframe(struct location *loc)
+{
+	assert(loc->type == LOCATION_AUTOMATIC);
+	return loc->frame;
 }
 
 void
@@ -47,7 +62,7 @@ location_str(struct location *loc)
 	struct strbuilder *b = strbuilder_create();
 	switch (loc->type) {
 	case LOCATION_AUTOMATIC:
-		strbuilder_printf(b, "stack:");
+		strbuilder_printf(b, "stack[%d]:", loc->frame);
 		break;
 	case LOCATION_DYNAMIC:
 		strbuilder_printf(b, "heap:");

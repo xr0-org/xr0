@@ -14,7 +14,10 @@ ratio(int x, int y) ~ [
 int
 main()
 {
-	int x, y, r;
+	/* TODO: declarator lists are truncated, only first declared in state */
+	int x;
+	int y;
+	int r;
 	/* 11 is Maximum length of a 32 but integer including sign */
 	char str[11];
 
