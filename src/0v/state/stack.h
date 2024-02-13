@@ -9,6 +9,9 @@ struct stack;
 struct stack *
 stack_create(char *name, struct stack *prev, struct ast_type *ret_type);
 
+struct stack *
+stack_getframe(struct stack *s, int frame);
+
 struct location *
 stack_newblock(struct stack *stack);
 

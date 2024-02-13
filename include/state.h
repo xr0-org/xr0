@@ -63,6 +63,9 @@ state_getobject(struct state *, char *id);
 struct ast_type *
 state_getobjecttype(struct state *, char *id);
 
+struct value *
+state_getloc(struct state *state, char *id);
+
 struct object *
 state_deref(struct state *, struct value *ptr, struct ast_expr *index);
 

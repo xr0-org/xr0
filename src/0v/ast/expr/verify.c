@@ -154,6 +154,7 @@ struct lvalue *
 expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
 {
 	char *id = ast_expr_as_identifier(expr);
+
 	return lvalue_create(
 		state_getobjecttype(state, id),
 		state_getobject(state, id)
@@ -165,6 +166,12 @@ expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 {
 	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
 	struct ast_expr *inner = ast_expr_unary_operand(expr);
+
+	/* XXX: expr for args (scanf()) in function not of form `*(ptr+offset)
+	 * for some reason */
+	if (ast_expr_kind(inner) == EXPR_IDENTIFIER) {
+		return ast_expr_lvalue(inner, state);
+	}
 
 	struct lvalue *root = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
 	struct object *root_obj = lvalue_object(root);
@@ -381,6 +388,25 @@ hack_identifier_builtin_eval(char *id, struct state *state)
 	return result_error_create(error_create("not built-in"));
 }
 
+static struct result *
+dereference_eval(struct ast_expr *, struct state *);
+
+static struct result *
+address_eval(struct ast_expr *, struct state *);
+
+static struct result *
+expr_unary_eval(struct ast_expr *expr, struct state *state)
+{
+	switch (ast_expr_unary_op(expr)) {
+	case UNARY_OP_DEREFERENCE:
+		return dereference_eval(expr, state);
+	case UNARY_OP_ADDRESS:
+		return address_eval(expr, state);
+	default:
+		assert(false);
+	}
+}
+
 static struct ast_expr *
 expr_to_binary(struct ast_expr *expr);
 
@@ -388,10 +414,8 @@ static struct result *
 binary_deref_eval(struct ast_expr *expr, struct state *state);
 
 static struct result *
-expr_unary_eval(struct ast_expr *expr, struct state *state)
+dereference_eval(struct ast_expr *expr, struct state *state)
 {
-	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
-
 	struct ast_expr *binary = expr_to_binary(ast_expr_unary_operand(expr));
 	struct result *res = binary_deref_eval(binary, state);
 	ast_expr_destroy(binary);
@@ -430,6 +454,15 @@ binary_deref_eval(struct ast_expr *expr, struct state *state)
 	assert(v);
 
 	return result_value_create(value_copy(v));
+}
+
+static struct result *
+address_eval(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *operand = ast_expr_unary_operand(expr);
+	char *id = ast_expr_as_identifier(operand);
+	struct value *v = state_getloc(state, id);
+	return result_value_create(v);
 }
 
 static struct result *
@@ -539,7 +572,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	state_popframe(state);
-	result_arr_destroy(args);
+	/*result_arr_destroy(args);*/
 
 	if (v) {
 		return pf_augment(v, expr, state);
@@ -704,6 +737,11 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		strbuilder_printf(b, "`%s' is not a valid object", s);
 		free(s);
 		return result_error_create(error_create(strbuilder_build(b)));
+	}
+	struct value *val = object_as_value(obj);
+	while (val && value_islocation(val)) {
+		obj = state_deref(state, val, ast_expr_constant_create(0)); 	
+		val = object_as_value(obj);
 	}
 	object_assign(obj, value_copy(result_as_value(res)));
 	return res;

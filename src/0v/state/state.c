@@ -210,6 +210,15 @@ state_getobjecttype(struct state *state, char *id)
 	return variable_type(v);
 }
 
+struct value *
+state_getloc(struct state *state, char *id)
+{
+	struct variable *v = stack_getvariable(state->stack, id);
+	assert(v);
+
+	return value_ptr_create(variable_location(v));
+}
+
 struct object *
 state_getobject(struct state *state, char *id)
 {
@@ -219,8 +228,6 @@ state_getobject(struct state *state, char *id)
 
 	struct variable *v = stack_getvariable(state->stack, id);
 	if (!v) {
-		printf("state: %s\n", state_str(state));
-		printf("id: %s\n", id);
 		assert(false);
 	}
 
@@ -237,7 +244,7 @@ state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 	/* `*(ptr+offset)` */
 	struct location *deref = location_with_offset(deref_base, index);
 	struct object *res = state_get(state, deref, true);
-	location_destroy(deref);
+	/*location_destroy(deref);*/
 	return res;
 }
 

@@ -1017,7 +1017,13 @@ call_splits(struct ast_expr *expr, struct state *state)
 	);
 	if (err) {
 		fprintf(stderr, "err: %s\n", err->msg);
-		assert(false);
+		/* Sometimes a param is uninitialised e.g. 
+		 *
+		 * 	int c;
+		 * 	scanf("%d", &c);
+		 *
+		 * */
+		/* assert(false); */
 	}
 
 	int n = 0;

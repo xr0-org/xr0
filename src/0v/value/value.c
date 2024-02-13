@@ -545,6 +545,7 @@ value_str(struct value *v)
 bool
 value_islocation(struct value *v)
 {
+	assert(v);
 	return v->type == VALUE_PTR && !v->ptr.isindefinite;
 }
 
