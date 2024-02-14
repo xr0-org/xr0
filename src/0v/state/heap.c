@@ -102,8 +102,8 @@ heap_newblock(struct heap *h)
 	h->freed = realloc(h->freed, sizeof(bool) * n);
 	h->freed[address] = false;
 		
-	return location_create(
-		LOCATION_DYNAMIC, address, ast_expr_constant_create(0)
+	return location_create_dynamic(
+		address, ast_expr_constant_create(0)
 	);
 }
 
@@ -161,8 +161,8 @@ heap_referenced(struct heap *h, struct state *s)
 static bool
 block_referenced(struct state *s, int addr)
 {
-	struct location *loc = location_create(
-		LOCATION_DYNAMIC, addr, ast_expr_constant_create(0)
+	struct location *loc = location_create_dynamic(
+		addr, ast_expr_constant_create(0)
 	);
 	bool referenced = state_references(s, loc); 
 	location_destroy(loc);

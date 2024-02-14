@@ -13,7 +13,13 @@ enum location_type {
 struct location;
 
 struct location *
-location_create(enum location_type type, int block, struct ast_expr *offset);
+location_create_vconst(int block, struct ast_expr *offset);
+
+struct location *
+location_create_dynamic(int block, struct ast_expr *offset);
+
+struct location *
+location_create_automatic(int frame, int block, struct ast_expr *offset);
 
 void
 location_setframe(struct location *loc, int frame);
@@ -29,6 +35,9 @@ location_destroy(struct location *);
 
 char *
 location_str(struct location *);
+
+bool
+location_isauto(struct location *);
 
 bool
 location_referencesheap(struct location *, struct state *);

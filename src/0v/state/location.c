@@ -15,35 +15,48 @@
 
 struct location {
 	enum location_type type;
+	union {
+		int frame; /* LOCATION_AUTOMATIC */
+	} u;
 	int block;
-	int frame;
 	struct ast_expr *offset;
 };
 
 struct location *
-location_create(enum location_type type, int block, struct ast_expr *offset)
+location_create_dynamic(int block, struct ast_expr *offset)
 {
 	struct location *loc = malloc(sizeof(struct location));
 	assert(loc);
-	loc->type = type;
+	loc->type = LOCATION_DYNAMIC;
 	loc->block = block;
 	assert(offset);
 	loc->offset = offset;
 	return loc;
 }
 
-void
-location_setframe(struct location *loc, int frame)
+struct location *
+location_create_vconst(int block, struct ast_expr *offset)
 {
-	assert(loc->type == LOCATION_AUTOMATIC);
-	loc->frame = frame;
+	struct location *loc = malloc(sizeof(struct location));
+	assert(loc);
+	loc->type = LOCATION_VCONST;
+	loc->block = block;
+	assert(offset);
+	loc->offset = offset;
+	return loc;
 }
 
-int
-location_getframe(struct location *loc)
+struct location *
+location_create_automatic(int frame, int block, struct ast_expr *offset)
 {
-	assert(loc->type == LOCATION_AUTOMATIC);
-	return loc->frame;
+	struct location *loc = malloc(sizeof(struct location));
+	assert(loc);
+	loc->type = LOCATION_AUTOMATIC;
+	loc->u.frame = frame;
+	loc->block = block;
+	assert(offset);
+	loc->offset = offset;
+	return loc;
 }
 
 void
@@ -62,7 +75,7 @@ location_str(struct location *loc)
 	struct strbuilder *b = strbuilder_create();
 	switch (loc->type) {
 	case LOCATION_AUTOMATIC:
-		strbuilder_printf(b, "stack[%d]:", loc->frame);
+		strbuilder_printf(b, "stack[%d]:", loc->u.frame);
 		break;
 	case LOCATION_DYNAMIC:
 		strbuilder_printf(b, "heap:");
@@ -109,9 +122,22 @@ location_offset(struct location *loc)
 struct location *
 location_copy(struct location *loc)
 {
-	return location_create(
-		loc->type, loc->block, ast_expr_copy(loc->offset)
-	);
+	switch (loc->type) {
+	case LOCATION_VCONST:
+		return location_create_vconst(
+			loc->block, ast_expr_copy(loc->offset)
+		);
+	case LOCATION_AUTOMATIC:
+		return location_create_automatic(
+			loc->u.frame, loc->block, ast_expr_copy(loc->offset)
+		);
+	case LOCATION_DYNAMIC:
+		return location_create_dynamic(
+			loc->block, ast_expr_copy(loc->offset)
+		);
+	default:
+		assert(false);
+	}
 }
 
 struct location *
@@ -120,7 +146,8 @@ location_with_offset(struct location *loc, struct ast_expr *offset)
 	/* TODO: arithemtically recompute offset */
 	assert(offsetzero(loc));
 
-	return location_create(loc->type, loc->block, ast_expr_copy(offset));
+	loc->offset = ast_expr_copy(offset);
+	return loc;
 }
 
 bool
@@ -151,6 +178,12 @@ location_references(struct location *l1, struct location *l2, struct state *s)
 }
 
 bool
+location_isauto(struct location *loc)
+{
+	return loc->type == LOCATION_AUTOMATIC;
+}
+
+bool
 location_referencesheap(struct location *l, struct state *s)
 {
 	if (l->type == LOCATION_DYNAMIC) {
@@ -164,7 +197,7 @@ struct block *
 location_getblock(struct location *loc, struct vconst *v, struct stack *s,
 		struct heap *h)
 {
-	struct stack *f = stack_getframe(s, loc->frame);
+	struct stack *f = stack_getframe(s, loc->u.frame);
 	switch (loc->type) {
 	case LOCATION_AUTOMATIC:
 		return stack_getblock(f, loc->block);

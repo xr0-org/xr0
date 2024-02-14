@@ -33,13 +33,14 @@ main()
 	
 	if (y == 0) {
 		puts("Cannot divide by 0");
-		exit(1);
+		return NULL;
 	}
 
 	r = ratio(x, y);
 
 	/* use sprintf to convert int to string */
 	sprintf(res, "%d", r);
-
         puts(res);
+
+	free(res);
 }

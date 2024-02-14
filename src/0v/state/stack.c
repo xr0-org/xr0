@@ -28,10 +28,9 @@ struct location *
 stack_newblock(struct stack *stack)
 {
 	int address = block_arr_append(stack->frame, block_create());
-	struct location *loc = location_create(
-		LOCATION_AUTOMATIC, address, ast_expr_constant_create(0)
+	struct location *loc = location_create_automatic(
+		stack->id, address, ast_expr_constant_create(0)
 	);
-	location_setframe(loc, stack->id);
 	return loc;
 }
 
@@ -57,7 +56,6 @@ stack_create(char *name, struct stack *prev, struct ast_type *result_type)
 struct stack *
 stack_getframe(struct stack *s, int frame) {
 	assert(s);
-	assert(s->id >= frame); /* we are in a nested call can only look down */
 
 	if (s->id == frame) {
 		return s;
@@ -222,9 +220,7 @@ stack_getvariable(struct stack *s, char *id)
 bool
 stack_references(struct stack *s, struct location *loc, struct state *state)
 {
-	if (s->id != location_getframe(loc)) {
-		assert(false);
-	}
+	printf("state: %s\n", state_str(state));
 	/* TODO: check globals */
 	struct variable *result = stack_getresult(s);
 	if (result && variable_references(result, loc, state)) {
@@ -237,6 +233,10 @@ stack_references(struct stack *s, struct location *loc, struct state *state)
 		if (variable_isparam(var) && variable_references(var, loc, state)) {
 			return true;
 		}
+	}
+
+	if (s->prev) {
+		return stack_references(s->prev, loc, state);
 	}
 
 	return false;

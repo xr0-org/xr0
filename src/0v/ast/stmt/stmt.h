@@ -23,9 +23,6 @@ bool
 ast_stmt_ispre(struct ast_stmt *stmt);
 
 bool
-ast_stmt_iseff(struct ast_stmt *stmt);
-
-bool
 ast_stmt_isassume(struct ast_stmt *stmt);
 
 struct string_arr *
