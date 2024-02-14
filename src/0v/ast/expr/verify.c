@@ -153,7 +153,9 @@ ast_expr_lvalue(struct ast_expr *expr, struct state *state)
 struct lvalue *
 expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
 {
+	printf("idlval: %s\n", ast_expr_str(expr));
 	char *id = ast_expr_as_identifier(expr);
+
 	return lvalue_create(
 		state_getobjecttype(state, id),
 		state_getobject(state, id)
@@ -166,20 +168,17 @@ expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
 	struct ast_expr *inner = ast_expr_unary_operand(expr);
 
+	printf("inner: %s\n", ast_expr_str(inner));
 	/* XXX: expr for args (scanf()) in function not of form `*(ptr+offset)
 	 * for some reason */
 	if (ast_expr_kind(inner) == EXPR_IDENTIFIER) {
 		struct lvalue *root = ast_expr_lvalue(inner, state);
-		struct object *root_obj = lvalue_object(root);
-		if (!root_obj) { /* `root` freed */
-			return NULL;
-		}
+		printf("lvalue obj: %s\n", object_str(lvalue_object(root)));
+		struct value *v = object_as_value(lvalue_object(root));
+		printf("value: %s\n", value_str(v));
+		struct object *obj = state_get(state, value_as_location(v), false);
+
 		struct ast_type *t = ast_type_ptr_type(lvalue_type(root));
-		struct value *root_val = object_as_value(root_obj);
-		assert(root_val);
-		struct object *obj = state_deref(
-			state, root_val, ast_expr_constant_create(0)
-		);
 		return lvalue_create(t, obj);
 	}
 
@@ -407,7 +406,6 @@ address_eval(struct ast_expr *, struct state *);
 static struct result *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("(unary_eval) expr: %s\n", ast_expr_str(expr));
 	assert(
 		ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE ||
 		ast_expr_unary_op(expr) == UNARY_OP_ADDRESS
@@ -433,8 +431,6 @@ static struct result *
 dereference_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *binary = expr_to_binary(ast_expr_unary_operand(expr));
-	printf("(deref eval) expr: %s\n", ast_expr_str(expr));
-	printf("(deref eval) binary: %s\n", ast_expr_str(binary));
 	struct result *res = binary_deref_eval(binary, state);
 	ast_expr_destroy(binary);
 	return res;

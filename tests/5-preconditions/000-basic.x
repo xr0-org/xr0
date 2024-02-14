@@ -7,6 +7,7 @@ ratio(int x, int y) ~ [
 	pre: {
 		y != 0;
 	}
+	result = x/y;
 ]{
 	return x/y;
 } 
@@ -18,8 +19,12 @@ main()
 	int x;
 	int y;
 	int r;
+	
 	/* 11 is Maximum length of a 32 but integer including sign */
-	char str[11];
+	/*char res[11];*/
+	char *res;
+
+	res = malloc(11);
 
 	puts("Enter x: ");
         scanf("%d", &x);
@@ -34,7 +39,7 @@ main()
 	r = ratio(x, y);
 
 	/* use sprintf to convert int to string */
-	sprintf(res, "%d", num);
+	sprintf(res, "%d", r);
 
         puts(res);
 }

@@ -54,6 +54,20 @@ stack_create(char *name, struct stack *prev, struct ast_type *result_type)
 	return stack;
 }
 
+struct stack *
+stack_getframe(struct stack *s, int frame) {
+	assert(s);
+	assert(s->id >= frame); /* we are in a nested call can only look down */
+
+	if (s->id == frame) {
+		return s;
+	}
+	if (s->prev == NULL) {
+		assert(false);
+	}
+	return stack_getframe(s->prev, frame);
+}
+
 void
 stack_destroy(struct stack *stack)
 {

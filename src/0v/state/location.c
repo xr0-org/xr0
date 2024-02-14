@@ -164,9 +164,10 @@ struct block *
 location_getblock(struct location *loc, struct vconst *v, struct stack *s,
 		struct heap *h)
 {
+	struct stack *f = stack_getframe(s, loc->frame);
 	switch (loc->type) {
 	case LOCATION_AUTOMATIC:
-		return stack_getblock(s, loc->block);
+		return stack_getblock(f, loc->block);
 	case LOCATION_DYNAMIC:
 		return heap_getblock(h, loc->block);
 	default:
