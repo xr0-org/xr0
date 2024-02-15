@@ -31,11 +31,6 @@ main()
 	puts("Enter y: ");
         scanf("%d", &y);
 	
-	if (y == 0) {
-		puts("Cannot divide by 0");
-		return NULL;
-	}
-
 	r = ratio(x, y);
 
 	/* use sprintf to convert int to string */

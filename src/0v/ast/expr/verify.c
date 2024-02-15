@@ -738,6 +738,11 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		free(s);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
+	struct value *val = object_as_value(obj);
+	while (val && value_islocation(val)) {
+		obj = state_deref(state, val, ast_expr_constant_create(0)); 	
+		val = object_as_value(obj);
+	}
 	object_assign(obj, value_copy(result_as_value(res)));
 	return res;
 }
