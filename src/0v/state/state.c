@@ -244,7 +244,7 @@ state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 	/* `*(ptr+offset)` */
 	struct location *deref = location_with_offset(deref_base, index);
 	struct object *res = state_get(state, deref, true);
-	location_destroy(deref);
+	/*location_destroy(deref);*/
 	return res;
 }
 

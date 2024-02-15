@@ -62,7 +62,6 @@ location_create_automatic(int frame, int block, struct ast_expr *offset)
 void
 location_destroy(struct location *loc)
 {
-	/* TODO: leaks */
 	ast_expr_destroy(loc->offset);
 	free(loc);
 }
@@ -147,8 +146,11 @@ location_with_offset(struct location *loc, struct ast_expr *offset)
 	/* TODO: arithemtically recompute offset */
 	assert(offsetzero(loc));
 
-	loc->offset = ast_expr_copy(offset);
-	return loc;
+	struct location *copy = location_copy(loc);
+	copy->offset = ast_expr_copy(offset);
+
+	/* XXX: leaks */
+	return copy;
 }
 
 bool
