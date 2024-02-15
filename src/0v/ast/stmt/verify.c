@@ -175,6 +175,7 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("stmt: %s\n", ast_stmt_str(stmt));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_LABELLED:
 		return ast_stmt_exec(ast_stmt_labelled_stmt(stmt), state);

@@ -170,12 +170,7 @@ expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 	/* XXX: expr for args (scanf()) in function not of form `*(ptr+offset)
 	 * for some reason */
 	if (ast_expr_kind(inner) == EXPR_IDENTIFIER) {
-		struct lvalue *root = ast_expr_lvalue(inner, state);
-		struct value *v = object_as_value(lvalue_object(root));
-		struct object *obj = state_get(state, value_as_location(v), false);
-
-		struct ast_type *t = ast_type_ptr_type(lvalue_type(root));
-		return lvalue_create(t, obj);
+		return ast_expr_lvalue(inner, state);
 	}
 
 	struct lvalue *root = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
@@ -540,6 +535,7 @@ pf_augment(struct value *v, struct ast_expr *root, struct state *);
 static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("call: %s\n", ast_expr_str(expr));
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -693,6 +689,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 {
 	assert(nparams == args->n);
 
+	printf("state (PRE): %s\n", state_str(state));
 	for (int i = 0; i < args->n; i++) {
 		state_declare(state, param[i], true);
 
@@ -717,6 +714,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		ast_expr_destroy(name);
 
 		object_assign(obj, value_copy(result_as_value(res)));
+		printf("state (POST): %s\n", state_str(state));
 	}
 	return NULL;
 }

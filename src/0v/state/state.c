@@ -228,8 +228,6 @@ state_getobject(struct state *state, char *id)
 
 	struct variable *v = stack_getvariable(state->stack, id);
 	if (!v) {
-		printf("state: %s\n", state_str(state));
-		printf("id: %s\n", id);
 		assert(false);
 	}
 

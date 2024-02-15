@@ -45,9 +45,9 @@ stack_create(char *name, struct stack *prev, struct ast_type *result_type)
 
 	stack->varmap = map_create();
 
-	stack->result = variable_create(result_type, stack, false);
-
 	stack->id = prev ? prev->id + 1 : 0;
+
+	stack->result = variable_create(result_type, stack, false);
 	stack->prev = prev;
 
 	return stack;
@@ -57,6 +57,7 @@ struct stack *
 stack_getframe(struct stack *s, int frame) {
 	assert(s);
 
+	printf("sid: %d, frame: %d\n", s->id, frame);
 	if (s->id == frame) {
 		return s;
 	}
@@ -220,7 +221,6 @@ stack_getvariable(struct stack *s, char *id)
 bool
 stack_references(struct stack *s, struct location *loc, struct state *state)
 {
-	printf("state: %s\n", state_str(state));
 	/* TODO: check globals */
 	struct variable *result = stack_getresult(s);
 	if (result && variable_references(result, loc, state)) {
@@ -233,10 +233,6 @@ stack_references(struct stack *s, struct location *loc, struct state *state)
 		if (variable_isparam(var) && variable_references(var, loc, state)) {
 			return true;
 		}
-	}
-
-	if (s->prev) {
-		return stack_references(s->prev, loc, state);
 	}
 
 	return false;
