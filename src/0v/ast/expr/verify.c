@@ -462,9 +462,6 @@ address_eval(struct ast_expr *expr, struct state *state)
 	struct ast_expr *operand = ast_expr_unary_operand(expr);
 	char *id = ast_expr_as_identifier(operand);
 	struct value *v = state_getloc(state, id);
-	printf("operand: %s\n", ast_expr_str(operand));
-	printf("id: %s\n", id);
-	printf("value: %s\n", value_str(v));
 	return result_value_create(v);
 }
 
@@ -535,7 +532,6 @@ pf_augment(struct value *v, struct ast_expr *root, struct state *);
 static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("call: %s\n", ast_expr_str(expr));
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -689,7 +685,6 @@ prepare_parameters(int nparams, struct ast_variable **param,
 {
 	assert(nparams == args->n);
 
-	printf("state (PRE): %s\n", state_str(state));
 	for (int i = 0; i < args->n; i++) {
 		state_declare(state, param[i], true);
 
@@ -714,7 +709,6 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		ast_expr_destroy(name);
 
 		object_assign(obj, value_copy(result_as_value(res)));
-		printf("state (POST): %s\n", state_str(state));
 	}
 	return NULL;
 }
@@ -932,7 +926,6 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 static struct result *
 unary_pf_reduce(struct ast_expr *e, struct state *s)
 {
-	printf("unary: %s\n", ast_expr_str(e));
 	/* TODO: reduce by actually dereferencing if expr is a deref and this is
 	 * possible in the current state */
 	struct result *res = ast_expr_pf_reduce(ast_expr_unary_operand(e), s);

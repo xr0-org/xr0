@@ -62,6 +62,7 @@ location_create_automatic(int frame, int block, struct ast_expr *offset)
 void
 location_destroy(struct location *loc)
 {
+	/* TODO: leaks */
 	ast_expr_destroy(loc->offset);
 	free(loc);
 }
@@ -197,10 +198,13 @@ struct block *
 location_getblock(struct location *loc, struct vconst *v, struct stack *s,
 		struct heap *h)
 {
-	struct stack *f = stack_getframe(s, loc->u.frame);
+	assert(s);
 	switch (loc->type) {
 	case LOCATION_AUTOMATIC:
-		return stack_getblock(f, loc->block);
+		return stack_getblock(
+			stack_getframe(s, loc->u.frame),
+			loc->block
+		);
 	case LOCATION_DYNAMIC:
 		return heap_getblock(h, loc->block);
 	default:

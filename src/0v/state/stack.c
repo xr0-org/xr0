@@ -45,10 +45,10 @@ stack_create(char *name, struct stack *prev, struct ast_type *result_type)
 
 	stack->varmap = map_create();
 
+	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
 
 	stack->result = variable_create(result_type, stack, false);
-	stack->prev = prev;
 
 	return stack;
 }
@@ -56,12 +56,12 @@ stack_create(char *name, struct stack *prev, struct ast_type *result_type)
 struct stack *
 stack_getframe(struct stack *s, int frame) {
 	assert(s);
+	assert(frame >= 0);
 
-	printf("sid: %d, frame: %d\n", s->id, frame);
 	if (s->id == frame) {
 		return s;
 	}
-	if (s->prev == NULL) {
+	if (!s->prev) {
 		assert(false);
 	}
 	return stack_getframe(s->prev, frame);
