@@ -30,6 +30,9 @@ struct ast_expr *
 ast_expr_bracketed_create(struct ast_expr *);
 
 struct ast_expr *
+ast_expr_bracketed_root(struct ast_expr *);
+
+struct ast_expr *
 ast_expr_iteration_create();
 
 struct ast_expr *
@@ -163,6 +166,9 @@ struct preresult;
 
 struct preresult *
 ast_expr_assume(struct ast_expr *, struct state *);
+
+struct error *
+ast_expr_precondsverify(struct ast_expr *, struct state *);
 
 struct lvalue;
 
@@ -515,6 +521,9 @@ ast_function_nparams(struct ast_function *f);
 struct ast_variable **
 ast_function_params(struct ast_function *f);
 
+struct ast_stmt *
+ast_function_preconditions(struct ast_function *f);
+
 struct externals;
 struct error;
 
@@ -525,6 +534,9 @@ struct result;
 
 struct result *
 ast_function_absexec(struct ast_function *, struct state *state);
+
+struct error *
+ast_function_precondsverify(struct ast_function *, struct state *);
 
 struct ast_externdecl;
 

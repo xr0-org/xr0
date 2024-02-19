@@ -361,6 +361,10 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	char *id = ast_expr_as_identifier(expr);
+	if (id[0] == '#') {
+		return result_value_create(value_literal_create(id));
+	}
+
 	struct object *obj = state_getobject(state, id);
 	if (!obj) {
 		struct strbuilder *b = strbuilder_create();
@@ -402,6 +406,11 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 		return dereference_eval(expr, state);
 	case UNARY_OP_ADDRESS:
 		return address_eval(expr, state);
+	case UNARY_OP_BANG:
+		/* XXX: hack because we stmt_exec pre as a preproces to verify
+		 * constructors, this breaks any preconditions like: pre: !(p ==
+		 * 0) */
+		return result_value_create(value_literal_create("hack"));
 	default:
 		assert(false);
 	}
@@ -542,6 +551,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		strbuilder_printf(b, "function `%s' not found", name);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
+
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
 
@@ -585,13 +595,18 @@ static struct result *
 call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state *);
 
 static struct result *
-call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
+call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *s)
 {
-	struct result *res = ast_function_absexec(f, state);
+	struct error *err = ast_function_precondsverify(f, s);
+	if (err) {
+		return result_error_create(err);
+	}
+
+	struct result *res = ast_function_absexec(f, s);
 	if (result_iserror(res) || result_hasvalue(res)) {
 		return res;
 	}
-	return call_arbitraryresult(expr, f, state);
+	return call_arbitraryresult(expr, f, s);
 }
 
 static struct result *
@@ -923,6 +938,8 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 		return call_pf_reduce(e, s);
 	case EXPR_STRUCTMEMBER:
 		return structmember_pf_reduce(e, s);
+	case EXPR_BRACKETED:
+		return ast_expr_pf_reduce(ast_expr_bracketed_root(e), s);
 	default:
 		assert(false);
 	}
@@ -1070,4 +1087,28 @@ binary_assume(struct ast_expr *expr, bool value, struct state *s)
 		value,
 		s
 	);
+}
+
+struct error *
+ast_expr_precondsverify(struct ast_expr *e, struct state *s)
+{
+	struct props *p = state_getprops(s);
+
+	assert(!props_contradicts(p, e));
+	
+	/* XXX: hack ignore m = matrix_create($, $) */
+	if (ast_expr_kind(e) == EXPR_ASSIGNMENT) {
+		return NULL;
+	}
+		
+	struct result *red = ast_expr_pf_reduce(e, s);
+	struct value *v = result_as_value(red);
+	struct ast_expr *red_e = value_to_expr(v);
+	bool valid = props_get(p, red_e);
+	if (!valid) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "prop: %s is not present in state", ast_expr_str(e));
+		return error_create(strbuilder_build(b));		
+	}
+	return NULL;
 }

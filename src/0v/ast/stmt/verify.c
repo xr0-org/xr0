@@ -52,6 +52,7 @@ ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
 			return preresult_error_create(err);
 		}
 	} else if (ast_stmt_isassume(stmt)) {
+		printf("assume: %s\n", ast_stmt_str(stmt));
 		return stmt_installprop(stmt, state);
 	}
 	return preresult_empty_create();
@@ -317,7 +318,8 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_LABELLED:
-		/* ignore labelled statements for now */
+		/* labelled statements are verified not executed when we
+		 * transitively call a function */
 		return result_value_create(NULL);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
@@ -539,4 +541,37 @@ alloc_process(struct ast_stmt *alloc, struct state *state)
 	}
 	value_destroy(val);
 	return result_value_create(NULL);
+}
+
+static struct error *
+ast_stmt_compound_precondsverify(struct ast_stmt *, struct state *);
+
+struct error *
+ast_stmt_precondsverify(struct ast_stmt *stmt, struct state *s)
+{
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_EXPR:
+		return ast_expr_precondsverify(ast_stmt_as_expr(stmt), s);
+	case STMT_COMPOUND:
+		return ast_stmt_compound_precondsverify(stmt, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+ast_stmt_compound_precondsverify(struct ast_stmt *stmt, struct state *s)
+{
+	struct error *err;
+
+	struct ast_block *b = ast_stmt_as_block(stmt);
+	int n = ast_block_nstmts(b);
+	struct ast_stmt **stmts = ast_block_stmts(b);
+
+	for (int i = 0; i < n; i++) {
+		if ((err = ast_stmt_precondsverify(stmts[i], s))) {
+			return err;
+		}
+	}
+	return NULL;
 }
