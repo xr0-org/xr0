@@ -175,6 +175,8 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("stmt: %s\n", ast_stmt_str(stmt));
+	printf("state: %s\n", state_str(state));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_LABELLED:
 		return ast_stmt_exec(ast_stmt_labelled_stmt(stmt), state);
@@ -301,9 +303,6 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct result *
-labelled_absexec(struct ast_stmt *stmt, struct state *state);
-
-static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct result *
@@ -320,7 +319,9 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_LABELLED:
-		return labelled_absexec(stmt, state);
+		/* labelled statements are verified not executed when we
+		 * transitively call a function */
+		return result_value_create(NULL);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
@@ -334,44 +335,6 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	default:
 		assert(false);
 	}
-}
-
-static struct result *
-verify_precondition(struct ast_stmt *stmt, struct state *state)
-{
-	struct props *p = state_getprops(state);
-	struct ast_expr *e = ast_stmt_as_expr(stmt);
-	bool valid = props_get(p, e);
-	if (!valid) {
-		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "prop: %s is not present in state", ast_expr_str(e));
-		return result_error_create(error_create(strbuilder_build(b)));		
-	}
-	return result_value_create(NULL);
-}
-
-static struct result *
-labelled_compound_absexec(struct ast_stmt *stmt, struct state *state);
-
-static struct result *
-labelled_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	struct ast_stmt *nest = ast_stmt_labelled_stmt(stmt);
-
-	switch (ast_stmt_kind(nest)) {
-	case STMT_EXPR:
-		return verify_precondition(nest, state);
-	case STMT_COMPOUND:
-		return labelled_compound_absexec(nest, state);	
-	default:
-		assert(false);
-	}
-}
-
-static struct result *
-labelled_compound_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	assert(false);	
 }
 
 static struct ast_stmt *
@@ -579,4 +542,38 @@ alloc_process(struct ast_stmt *alloc, struct state *state)
 	}
 	value_destroy(val);
 	return result_value_create(NULL);
+}
+
+static struct error *
+ast_stmt_compound_precondsverify(struct ast_stmt *, struct state *);
+
+struct error *
+ast_stmt_precondsverify(struct ast_stmt *stmt, struct state *s)
+{
+	/* TODO: converge pre: and pre: { ... } in ast */
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_EXPR:
+		return ast_expr_precondsverify(ast_stmt_as_expr(stmt), s);
+	case STMT_COMPOUND:
+		return ast_stmt_compound_precondsverify(stmt, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+ast_stmt_compound_precondsverify(struct ast_stmt *stmt, struct state *s)
+{
+	struct error *err;
+
+	struct ast_block *b = ast_stmt_as_block(stmt);
+	int n = ast_block_nstmts(b);
+	struct ast_stmt **stmts = ast_block_stmts(b);
+
+	for (int i = 0; i < n; i++) {
+		if ((err = ast_stmt_precondsverify(stmts[i], s))) {
+			return err;
+		}
+	}
+	return NULL;
 }

@@ -397,6 +397,7 @@ address_eval(struct ast_expr *, struct state *);
 static struct result *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_unary_op(expr)) {
 	case UNARY_OP_DEREFERENCE:
 		return dereference_eval(expr, state);
@@ -542,6 +543,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		strbuilder_printf(b, "function `%s' not found", name);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
+
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
 
@@ -585,13 +587,18 @@ static struct result *
 call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state *);
 
 static struct result *
-call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *state)
+call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *s)
 {
-	struct result *res = ast_function_absexec(f, state);
+	struct error *err = ast_function_precondsverify(f, s);
+	if (err) {
+		return result_error_create(err);
+	}
+
+	struct result *res = ast_function_absexec(f, s);
 	if (result_iserror(res) || result_hasvalue(res)) {
 		return res;
 	}
-	return call_arbitraryresult(expr, f, state);
+	return call_arbitraryresult(expr, f, s);
 }
 
 static struct result *
@@ -1070,4 +1077,20 @@ binary_assume(struct ast_expr *expr, bool value, struct state *s)
 		value,
 		s
 	);
+}
+
+struct error *
+ast_expr_precondsverify(struct ast_expr *e, struct state *s)
+{
+	struct props *p = state_getprops(s);
+
+	assert(!props_contradicts(p, e));
+
+	bool valid = props_get(p, e);
+	if (!valid) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "prop: %s is not present in state", ast_expr_str(e));
+		return error_create(strbuilder_build(b));		
+	}
+	return NULL;
 }

@@ -27,6 +27,12 @@ main()
         scanf("%d", &x);
 	puts("Enter y: ");
         scanf("%d", &y);
+
+	if (y != 0) {
+		free(res); 
+		/* XXX: should be `exit'. ignore memory concerns for `exit'? */
+		return 0;
+	}
 	
 	r = ratio(x, y);
 
@@ -35,4 +41,5 @@ main()
         puts(res);
 
 	free(res);
+	return 1;
 }

@@ -43,4 +43,7 @@ struct error;
 struct decision { bool decision; struct error *err; }
 sel_decide(struct ast_expr *control, struct state *state);
 
+struct error *
+ast_stmt_precondsverify(struct ast_stmt *, struct state *);
+
 #endif

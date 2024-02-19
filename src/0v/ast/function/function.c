@@ -176,6 +176,21 @@ ast_function_params(struct ast_function *f)
 	return f->param;
 }
 
+struct ast_stmt *
+ast_function_preconds(struct ast_function *f)
+{
+	/* XXX: should we allow multiple pre tags */
+	struct ast_block *b = ast_function_abstract(f);	
+	int n = ast_block_nstmts(b);
+	struct ast_stmt **stmt = ast_block_stmts(b);
+	for (int i = 0; i < n; i++) {
+		if (ast_stmt_ispre(stmt[i])) {
+			return ast_stmt_labelled_stmt(stmt[i]);
+		}							
+	}
+	return NULL;
+}
+
 struct ast_function *
 ast_function_protostitch(struct ast_function *f, struct externals *ext)
 {
@@ -384,6 +399,7 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 {
 	struct error *err = NULL;
 
+	printf("func: %s\n", ast_function_str(f));
 	struct ast_function_arr *paths = body_paths(f, index, cond);
 	int n = ast_function_arr_len(paths);
 	assert(n == 2);
@@ -392,9 +408,11 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 		struct state *s_copy = state_copywithname(
 			state, ast_function_name(func[i])
 		);
+		printf("state (before): %s\n", state_str(s_copy));
 		struct preresult *r = ast_expr_assume(
 			ast_expr_inverted_copy(cond, i==1), s_copy
 		);
+		printf("state (after): %s\n", state_str(s_copy));
 		if (preresult_iserror(r)) {
 			return preresult_as_error(r);
 		}
@@ -404,6 +422,8 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 				return err;
 			}
 		}
+		/* XXX: error? */
+
 		/*state_destroy(s_copy);*/
 	}
 	return NULL;
@@ -530,6 +550,16 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 	struct object *obj = state_getresult(state);
 	assert(obj);
 	return result_value_create(object_as_value(obj));
+}
+
+struct error *
+ast_function_precondsverify(struct ast_function *f, struct state *s)
+{
+	struct ast_stmt *stmt = ast_function_preconds(f);
+	if (!stmt) {
+		return NULL;
+	}
+	return ast_stmt_precondsverify(stmt, s);
 }
 
 static void
