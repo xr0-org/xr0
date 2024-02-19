@@ -3,9 +3,7 @@
 
 int
 ratio(int x, int y) ~ [
-	pre: {
-		y != 0;
-	}
+	pre: y != 0;
 	result = x/y;
 ]{
 	return x/y;

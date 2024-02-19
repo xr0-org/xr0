@@ -301,6 +301,9 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct result *
+labelled_absexec(struct ast_stmt *stmt, struct state *state);
+
+static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct result *
@@ -317,8 +320,7 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_LABELLED:
-		/* ignore labelled statements for now */
-		return result_value_create(NULL);
+		return labelled_absexec(stmt, state);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
@@ -332,6 +334,44 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	default:
 		assert(false);
 	}
+}
+
+static struct result *
+verify_precondition(struct ast_stmt *stmt, struct state *state)
+{
+	struct props *p = state_getprops(state);
+	struct ast_expr *e = ast_stmt_as_expr(stmt);
+	bool valid = props_get(p, e);
+	if (!valid) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "prop: %s is not present in state", ast_expr_str(e));
+		return result_error_create(error_create(strbuilder_build(b)));		
+	}
+	return result_value_create(NULL);
+}
+
+static struct result *
+labelled_compound_absexec(struct ast_stmt *stmt, struct state *state);
+
+static struct result *
+labelled_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	struct ast_stmt *nest = ast_stmt_labelled_stmt(stmt);
+
+	switch (ast_stmt_kind(nest)) {
+	case STMT_EXPR:
+		return verify_precondition(nest, state);
+	case STMT_COMPOUND:
+		return labelled_compound_absexec(nest, state);	
+	default:
+		assert(false);
+	}
+}
+
+static struct result *
+labelled_compound_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	assert(false);	
 }
 
 static struct ast_stmt *
