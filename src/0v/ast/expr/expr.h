@@ -56,8 +56,11 @@ struct ast_expr {
 				BINARY_OP_LE	= 1 << 4,
 				BINARY_OP_GE	= 1 << 5,
 
-				BINARY_OP_ADDITION	= 1 << 6,
-				BINARY_OP_SUBTRACTION	= 1 << 7,
+				BINARY_OP_ADDITION		= 1 << 6,
+				BINARY_OP_SUBTRACTION		= 1 << 7,
+				BINARY_OP_MULTIPLICATION	= 1 << 8,
+				BINARY_OP_DIVISION		= 1 << 9,
+				BINARY_OP_MODULO		= 1 << 10,
 			} op;
 			struct ast_expr *e1, *e2;
 		} binary;

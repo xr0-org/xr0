@@ -280,8 +280,11 @@ cast_expression
 multiplicative_expression
 	: cast_expression
 	| multiplicative_expression '*' cast_expression
+		{ $$ = ast_expr_binary_create($1, BINARY_OP_MULTIPLICATION, $3); }
 	| multiplicative_expression '/' cast_expression
-	/*| multiplicative_expression '%' cast_expression*/
+		{ $$ = ast_expr_binary_create($1, BINARY_OP_DIVISION, $3); }
+	| multiplicative_expression '%' cast_expression
+		{ $$ = ast_expr_binary_create($1, BINARY_OP_MODULO, $3); }
 ;
 
 additive_expression

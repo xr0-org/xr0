@@ -785,6 +785,7 @@ expr_incdec_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 expr_binary_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	struct ast_expr *e1 = ast_expr_binary_e1(expr),
 			*e2 = ast_expr_binary_e2(expr);
 	struct result *res1 = ast_expr_eval(e1, state),
