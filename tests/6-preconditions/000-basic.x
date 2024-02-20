@@ -5,6 +5,7 @@ int
 ratio(int x, int y) ~ [ 
 	/* XXX: need logic engine to phrase nicely i.e. y != 0; */
 	pre: !(y == 0);
+	result = x/y;
 ]{
 	return x/y;
 } 

@@ -1,1 +1,1 @@
-possible division by 0
+6-preconditions/010-FAIL-division-builtin.x:16:9: cannot exec statement: possible division by zero with variable: 'y'

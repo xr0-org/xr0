@@ -408,8 +408,11 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 		return address_eval(expr, state);
 	case UNARY_OP_BANG:
 		/* XXX: hack because we stmt_exec pre as a preproces to verify
-		 * constructors, this breaks any preconditions like: pre: !(p ==
-		 * 0) */
+		 * constructors, this breaks any preconditions like: pre: !(p == 0)
+		 */
+
+		/* install !(y == 0) */
+		ast_expr_assume(expr, state);
 		return result_value_create(value_literal_create("hack"));
 	default:
 		assert(false);
@@ -782,10 +785,17 @@ expr_incdec_eval(struct ast_expr *expr, struct state *state)
 	return res;
 }
 
+static struct error *
+semantic_eval(struct ast_expr *, struct state *);
+
 static struct result *
 expr_binary_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
+	struct error *err = semantic_eval(expr, state);
+	if (err) {
+		return result_error_create(err);
+	}
+
 	struct ast_expr *e1 = ast_expr_binary_e1(expr),
 			*e2 = ast_expr_binary_e2(expr);
 	struct result *res1 = ast_expr_eval(e1, state),
@@ -805,6 +815,75 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 			)
 		)
 	);
+}
+
+
+static struct error *
+semantic_binary_eval(struct ast_expr *, struct state *);
+
+static struct error *
+semantic_eval(struct ast_expr *expr, struct state *state)
+{
+	switch (ast_expr_kind(expr)) {
+	case EXPR_BINARY:
+		return semantic_binary_eval(expr, state);
+	default:
+		return NULL;
+	}
+}
+
+static struct error *
+builtin_division(struct ast_expr *, struct state *);
+
+static struct error *
+semantic_binary_eval(struct ast_expr *e, struct state *s)
+{
+	switch (ast_expr_binary_op(e)) {
+	case BINARY_OP_LT:
+	case BINARY_OP_GT:
+	case BINARY_OP_LE:
+	case BINARY_OP_GE:
+	case BINARY_OP_NE:
+	case BINARY_OP_EQ:
+	case BINARY_OP_ADDITION:
+	case BINARY_OP_SUBTRACTION:
+	case BINARY_OP_MULTIPLICATION:
+		return NULL;
+	case BINARY_OP_DIVISION:
+	case BINARY_OP_MODULO:
+		return builtin_division(e, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+builtin_division(struct ast_expr *e, struct state *s)
+{
+	struct result *r1 = ast_expr_pf_reduce(e->u.binary.e1, s),
+		      *r2 = ast_expr_pf_reduce(e->u.binary.e2, s);
+
+	struct ast_expr *e1 = value_to_expr(result_as_value(r1)),
+		    	*e2 = value_to_expr(result_as_value(r2));
+
+	/* construct !(e2 == 0) */
+	struct ast_expr *prop = ast_expr_unary_create(
+		ast_expr_binary_create(e2, BINARY_OP_EQ, ast_expr_constant_create(0)),
+		UNARY_OP_BANG
+	);
+
+	struct props *p = state_getprops(s);
+	bool valid = props_get(p, prop);
+	if (!valid) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(
+			b,
+			"possible division by zero with variable: '%s'",
+			ast_expr_str(e->u.binary.e2)
+		);
+		return error_create(strbuilder_build(b));		
+	}
+	return NULL;
 }
 
 static struct result *
