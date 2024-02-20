@@ -399,7 +399,6 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 {
 	struct error *err = NULL;
 
-	printf("func: %s\n", ast_function_str(f));
 	struct ast_function_arr *paths = body_paths(f, index, cond);
 	int n = ast_function_arr_len(paths);
 	assert(n == 2);
@@ -408,11 +407,9 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 		struct state *s_copy = state_copywithname(
 			state, ast_function_name(func[i])
 		);
-		printf("state (before): %s\n", state_str(s_copy));
 		struct preresult *r = ast_expr_assume(
 			ast_expr_inverted_copy(cond, i==1), s_copy
 		);
-		printf("state (after): %s\n", state_str(s_copy));
 		if (preresult_iserror(r)) {
 			return preresult_as_error(r);
 		}

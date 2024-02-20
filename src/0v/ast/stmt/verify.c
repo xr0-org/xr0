@@ -52,6 +52,7 @@ ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
 			return preresult_error_create(err);
 		}
 	} else if (ast_stmt_isassume(stmt)) {
+		printf("assume: %s\n", ast_stmt_str(stmt));
 		return stmt_installprop(stmt, state);
 	}
 	return preresult_empty_create();
@@ -175,8 +176,6 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("stmt: %s\n", ast_stmt_str(stmt));
-	printf("state: %s\n", state_str(state));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_LABELLED:
 		return ast_stmt_exec(ast_stmt_labelled_stmt(stmt), state);
@@ -550,7 +549,6 @@ ast_stmt_compound_precondsverify(struct ast_stmt *, struct state *);
 struct error *
 ast_stmt_precondsverify(struct ast_stmt *stmt, struct state *s)
 {
-	/* TODO: converge pre: and pre: { ... } in ast */
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_EXPR:
 		return ast_expr_precondsverify(ast_stmt_as_expr(stmt), s);

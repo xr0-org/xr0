@@ -30,6 +30,9 @@ struct ast_expr *
 ast_expr_bracketed_create(struct ast_expr *);
 
 struct ast_expr *
+ast_expr_bracketed_root(struct ast_expr *);
+
+struct ast_expr *
 ast_expr_iteration_create();
 
 struct ast_expr *

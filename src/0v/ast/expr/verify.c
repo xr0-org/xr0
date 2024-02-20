@@ -361,6 +361,10 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	char *id = ast_expr_as_identifier(expr);
+	if (id[0] == '#') {
+		return result_value_create(value_literal_create(id));
+	}
+
 	struct object *obj = state_getobject(state, id);
 	if (!obj) {
 		struct strbuilder *b = strbuilder_create();
@@ -397,12 +401,16 @@ address_eval(struct ast_expr *, struct state *);
 static struct result *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_unary_op(expr)) {
 	case UNARY_OP_DEREFERENCE:
 		return dereference_eval(expr, state);
 	case UNARY_OP_ADDRESS:
 		return address_eval(expr, state);
+	case UNARY_OP_BANG:
+		/* hack because we stmt_exec pre as a preproces to verify
+		 * constructors, this breaks any preconditions like: pre: !(p ==
+		 * 0) */
+		return result_value_create(value_literal_create("hi"));
 	default:
 		assert(false);
 	}
@@ -930,6 +938,8 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 		return call_pf_reduce(e, s);
 	case EXPR_STRUCTMEMBER:
 		return structmember_pf_reduce(e, s);
+	case EXPR_BRACKETED:
+		return ast_expr_pf_reduce(ast_expr_bracketed_root(e), s);
 	default:
 		assert(false);
 	}
@@ -1085,8 +1095,16 @@ ast_expr_precondsverify(struct ast_expr *e, struct state *s)
 	struct props *p = state_getprops(s);
 
 	assert(!props_contradicts(p, e));
-
-	bool valid = props_get(p, e);
+	
+	/* XXX: hack ignore m = matrix_create($, $) */
+	if (ast_expr_kind(e) == EXPR_ASSIGNMENT) {
+		return NULL;
+	}
+		
+	struct result *red = ast_expr_pf_reduce(e, s);
+	struct value *v = result_as_value(red);
+	struct ast_expr *red_e = value_to_expr(v);
+	bool valid = props_get(p, red_e);
 	if (!valid) {
 		struct strbuilder *b = strbuilder_create();
 		strbuilder_printf(b, "prop: %s is not present in state", ast_expr_str(e));

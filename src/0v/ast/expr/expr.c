@@ -144,6 +144,13 @@ ast_expr_bracketed_create(struct ast_expr *root)
 	return expr;
 }
 
+struct ast_expr *
+ast_expr_bracketed_root(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_BRACKETED);
+	return expr->root;
+}
+
 static void
 ast_expr_bracketed_str_build(struct ast_expr *expr, struct strbuilder *b)
 {

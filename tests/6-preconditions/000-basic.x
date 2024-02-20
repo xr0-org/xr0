@@ -2,8 +2,9 @@
 #include <stdlib.h>
 
 int
-ratio(int x, int y) ~ [
-	pre: y != 0;
+ratio(int x, int y) ~ [ 
+	/* XXX: need logic engine to phrase nicely i.e. y != 0; */
+	pre: !(y == 0);
 	result = x/y;
 ]{
 	return x/y;
@@ -28,12 +29,13 @@ main()
 	puts("Enter y: ");
         scanf("%d", &y);
 
-	if (y != 0) {
+	if (y == 0) {
 		free(res); 
-		/* XXX: should be `exit'. ignore memory concerns for `exit'? */
-		return 0;
+		/* XXX: should be `exit'. should Xr0 ignore memory concerns on
+		 * `exit'? */
+		return 1;
 	}
-	
+
 	r = ratio(x, y);
 
 	/* use sprintf to convert int to string */
@@ -41,5 +43,5 @@ main()
         puts(res);
 
 	free(res);
-	return 1;
+	return 0;
 }
