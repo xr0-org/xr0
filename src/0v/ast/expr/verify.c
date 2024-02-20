@@ -407,10 +407,10 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 	case UNARY_OP_ADDRESS:
 		return address_eval(expr, state);
 	case UNARY_OP_BANG:
-		/* hack because we stmt_exec pre as a preproces to verify
+		/* XXX: hack because we stmt_exec pre as a preproces to verify
 		 * constructors, this breaks any preconditions like: pre: !(p ==
 		 * 0) */
-		return result_value_create(value_literal_create("hi"));
+		return result_value_create(value_literal_create("hack"));
 	default:
 		assert(false);
 	}
