@@ -529,16 +529,19 @@ static void
 ast_expr_binary_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
 	const char *opstr[] = {
-		[BINARY_OP_EQ]		= "==",
-		[BINARY_OP_NE]		= "!=",
+		[BINARY_OP_EQ]			= "==",
+		[BINARY_OP_NE]			= "!=",
 
-		[BINARY_OP_LT]		= "<",
-		[BINARY_OP_GT]		= ">",
-		[BINARY_OP_LE]		= "<=",
-		[BINARY_OP_GE]		= ">=",
+		[BINARY_OP_LT]			= "<",
+		[BINARY_OP_GT]			= ">",
+		[BINARY_OP_LE]			= "<=",
+		[BINARY_OP_GE]			= ">=",
 
-		[BINARY_OP_ADDITION]	= "+",
-		[BINARY_OP_SUBTRACTION]	= "-",
+		[BINARY_OP_ADDITION]		= "+",
+		[BINARY_OP_SUBTRACTION]		= "-",
+		[BINARY_OP_MULTIPLICATION]	= "*",
+		[BINARY_OP_DIVISION]		= "/",
+		[BINARY_OP_MODULO]		= "%",
 	};
 	char *e1 = ast_expr_str(expr->u.binary.e1),
 	     *e2 = ast_expr_str(expr->u.binary.e2);
