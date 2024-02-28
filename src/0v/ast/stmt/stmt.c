@@ -38,7 +38,7 @@ struct ast_stmt {
 			struct ast_expr *rv;
 		} jump;
 		struct {
-			bool isalloc;
+			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
 		} alloc;
 	} u;
@@ -243,7 +243,7 @@ ast_stmt_create_alloc(struct lexememarker *loc, struct ast_expr *arg)
 {
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_ALLOCATION;
-	stmt->u.alloc.isalloc = true;
+	stmt->u.alloc.kind = ALLOC;
 	stmt->u.alloc.arg = arg;
 	return stmt;
 }
@@ -253,7 +253,17 @@ ast_stmt_create_dealloc(struct lexememarker *loc, struct ast_expr *arg)
 {
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_ALLOCATION;
-	stmt->u.alloc.isalloc = false;
+	stmt->u.alloc.kind = DEALLOC;
+	stmt->u.alloc.arg = arg;
+	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_create_clump(struct lexememarker *loc, struct ast_expr *arg)
+{
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_ALLOCATION;
+	stmt->u.alloc.kind= CLUMP;
 	stmt->u.alloc.arg = arg;
 	return stmt;
 }
@@ -262,9 +272,16 @@ static struct ast_stmt *
 ast_stmt_copy_alloc(struct lexememarker *loc, struct ast_stmt *stmt)
 {
 	struct ast_expr *arg = ast_expr_copy(stmt->u.alloc.arg);
-	return stmt->u.alloc.isalloc
-		? ast_stmt_create_alloc(loc, arg)
-		: ast_stmt_create_dealloc(loc, arg);
+	switch (stmt->u.alloc.kind) {
+	case ALLOC:
+		return ast_stmt_create_alloc(loc, arg);
+	case DEALLOC:
+		return ast_stmt_create_dealloc(loc, arg);
+	case CLUMP:
+		return ast_stmt_create_clump(loc, arg);
+	default:
+		assert(false);
+	}
 }
 
 static void
@@ -281,11 +298,20 @@ ast_stmt_alloc_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	assert(stmt->kind == STMT_ALLOCATION);
 
 	char *arg = ast_expr_str(stmt->u.alloc.arg);
-	strbuilder_printf(
-		b, ".%s %s;",
-		stmt->u.alloc.isalloc ? "alloc" : "dealloc",
-		arg
-	);
+
+	switch (stmt->u.alloc.kind) {
+	case ALLOC:
+		strbuilder_printf(b, ".%s %s;", "alloc", arg);
+		break;
+	case DEALLOC:
+		strbuilder_printf(b, ".%s %s;", "dealloc", arg);
+		break;
+	case CLUMP:
+		strbuilder_printf(b, ".%s %s;", "clump", arg);
+		break;
+	default:
+		assert(false);
+	}
 	free(arg);
 }
 
@@ -293,16 +319,14 @@ struct ast_expr *
 ast_stmt_alloc_arg(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ALLOCATION);
-
 	return stmt->u.alloc.arg;
 }
 
-bool
-ast_stmt_alloc_isalloc(struct ast_stmt *stmt)
+enum ast_alloc_kind
+ast_stmt_alloc_kind(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ALLOCATION);
-
-	return stmt->u.alloc.isalloc;
+	return stmt->u.alloc.kind;
 }
 
 
@@ -620,6 +644,7 @@ ast_stmt_copy(struct ast_stmt *stmt)
 char *
 ast_stmt_str(struct ast_stmt *stmt)
 {
+	assert(stmt);
 	struct strbuilder *b = strbuilder_create();
 	switch (stmt->kind) {
 	case STMT_LABELLED:
@@ -742,6 +767,8 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 {
 	/* TODO: consider expressions with calls */
 	switch (stmt->kind) {
+	case STMT_NOP:
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	case STMT_EXPR:
 		return ast_expr_splits(stmt->u.expr, s);
 	case STMT_SELECTION:
@@ -751,15 +778,48 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 			return ast_expr_splits(stmt->u.jump.rv, s);
 		}
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
-	case STMT_ALLOCATION:
 	case STMT_LABELLED:
+		return ast_stmt_splits(stmt->u.labelled.stmt, s);
+	case STMT_ALLOCATION:
 	case STMT_ITERATION:
+	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:
 		/* disallowed splits for now */
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	default:
 		assert(false);
 	}
+}
+
+static bool
+condexists(struct ast_expr *cond, struct state *);
+
+static struct ast_stmt_splits
+stmt_sel_splits(struct ast_stmt *stmt, struct state *s)
+{
+	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
+	struct value *v = result_as_value(res);
+	struct ast_expr *e = value_to_expr(v);
+	if (condexists(e, s) || value_isconstant(v)) {
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	}
+	/*printf("cond: %s\n", ast_expr_str(r));*/
+	struct ast_expr **cond = malloc(sizeof(struct ast_expr *));
+	cond[0] = e;
+	return (struct ast_stmt_splits) {
+		.n    = 1,
+		.cond = cond,
+	};
+}
+
+static bool
+condexists(struct ast_expr *cond, struct state *s)
+{
+	struct result *res = ast_expr_pf_reduce(cond, s);
+	assert(!result_iserror(res) && result_hasvalue(res));
+	struct ast_expr *reduced = value_to_expr(result_as_value(res));
+	struct props *p = state_getprops(s);
+	return props_get(p, reduced) || props_contradicts(p, reduced);
 }
 
 static struct string_arr *
@@ -827,34 +887,50 @@ ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
 	return res;
 }
 
-static bool
-condexists(struct ast_expr *cond, struct state *);
+static struct error *
+preconds_selection_verify(struct ast_stmt *stmt);
 
-static struct ast_stmt_splits
-stmt_sel_splits(struct ast_stmt *stmt, struct state *s)
+static struct error *
+preconds_compound_verify(struct ast_stmt *);
+
+struct error *
+ast_stmt_preconds_validate(struct ast_stmt *stmt)
 {
-	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
-	struct ast_expr *r = value_to_expr(result_as_value(res));
-	if (condexists(r, s)) {
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	switch (stmt->kind) {
+	case STMT_EXPR:
+	case STMT_ALLOCATION:
+	case STMT_ITERATION:
+		return NULL;
+	case STMT_SELECTION:
+		return preconds_selection_verify(stmt);	
+	case STMT_COMPOUND:
+		return preconds_compound_verify(stmt);
+	default:
+		assert(false);
 	}
-	/*printf("cond: %s\n", ast_expr_str(r));*/
-	struct ast_expr **cond = malloc(sizeof(struct ast_expr *));
-	cond[0] = r;
-	return (struct ast_stmt_splits) {
-		.n    = 1,
-		.cond = cond,
-	};
 }
 
-static bool
-condexists(struct ast_expr *cond, struct state *s)
+static struct error *
+preconds_selection_verify(struct ast_stmt *stmt)
 {
-	struct result *res = ast_expr_pf_reduce(cond, s);
-	assert(!result_iserror(res) && result_hasvalue(res));
-	struct ast_expr *reduced = value_to_expr(result_as_value(res));
-	struct props *p = state_getprops(s);
-	return props_get(p, reduced) || props_contradicts(p, reduced);
+	struct strbuilder *b = strbuilder_create();
+	struct lexememarker *l = ast_stmt_lexememarker(stmt);
+	strbuilder_printf(b, "%s setup preconditions must be decidable", lexememarker_str(l));
+	return error_create(strbuilder_build(b));
+}
+
+static struct error *
+preconds_compound_verify(struct ast_stmt *stmt)
+{
+	struct error *err;
+	struct ast_block *b = stmt->u.compound;
+	struct ast_stmt **stmts = ast_block_stmts(b);
+	for (int i = 0; i < ast_block_nstmts(b); i++) {
+		if ((err = ast_stmt_preconds_validate(stmts[i]))) {
+			return err;
+		}
+	}
+	return NULL;
 }
 
 #include "verify.c"

@@ -5,19 +5,24 @@
 
 #include "ast.h"
 #include "block.h"
+#include "clump.h"
 #include "ext.h"
 #include "heap.h"
+#include "static.h"
 #include "location.h"
 #include "object.h"
 #include "props.h"
 #include "stack.h"
 #include "state.h"
+#include "static.h"
 #include "util.h"
 #include "value.h"
 
 struct state {
 	struct externals *ext;
 	struct vconst *vconst;
+	struct static_memory *static_memory;
+	struct clump *clump;
 	struct stack *stack;
 	struct heap *heap;
 	struct props *props;
@@ -29,10 +34,28 @@ state_create(char *func, struct externals *ext, struct ast_type *result_type)
 	struct state *state = malloc(sizeof(struct state));
 	assert(state);
 	state->ext = ext;
+	state->static_memory = static_memory_create();
 	state->vconst = vconst_create();
+	state->clump = clump_create();
 	state->stack = stack_create(func, NULL, result_type);
 	state->heap = heap_create();
 	state->props = props_create();
+	return state;
+}
+
+struct state *
+state_create_withprops(char *func, struct externals *ext, struct ast_type *result_type,
+		struct props *props)
+{
+	struct state *state = malloc(sizeof(struct state));
+	assert(state);
+	state->ext = ext;
+	state->static_memory = static_memory_create();
+	state->vconst = vconst_create();
+	state->clump = clump_create();
+	state->stack = stack_create(func, NULL, result_type);
+	state->heap = heap_create();
+	state->props = props_copy(props);
 	return state;
 }
 
@@ -40,6 +63,8 @@ void
 state_destroy(struct state *state)
 {
 	/* vconst_destroy(state->vconst); */
+	static_memory_destroy(state->static_memory);
+	clump_destroy(state->clump);
 	stack_destroy(state->stack);
 	heap_destroy(state->heap);
 	props_destroy(state->props);
@@ -52,7 +77,9 @@ state_copy(struct state *state)
 	struct state *copy = malloc(sizeof(struct state));
 	assert(copy);
 	copy->ext = state->ext;
+	copy->static_memory = static_memory_copy(state->static_memory);
 	copy->vconst = vconst_copy(state->vconst);
+	copy->clump = clump_copy(state->clump);
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
@@ -65,7 +92,9 @@ state_copywithname(struct state *state, char *func_name)
 	struct state *copy = malloc(sizeof(struct state));
 	assert(copy);
 	copy->ext = state->ext;
+	copy->static_memory = static_memory_copy(state->static_memory);
 	copy->vconst = vconst_copy(state->vconst);
+	copy->clump = clump_copy(state->clump);
 	copy->stack = stack_copywithname(state->stack, func_name);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
@@ -82,11 +111,17 @@ state_str(struct state *state)
 		strbuilder_printf(b, "%s\n", ext);
 	}
 	free(ext);
+	char *static_mem = static_memory_str(state->static_memory, "\t");
+	strbuilder_printf(b, "%s\n", static_mem);
+	free(static_mem);
 	char *vconst = vconst_str(state->vconst, "\t");
 	if (strlen(vconst) > 0) {
 		strbuilder_printf(b, "%s\n", vconst);
 	}
 	free(vconst);
+	char *clump = clump_str(state->clump, "\t");
+	strbuilder_printf(b, "%s\n", clump);
+	free(clump);
 	char *stack = stack_str(state->stack, state);
 	strbuilder_printf(b, "%s\n", stack);
 	free(stack);
@@ -108,6 +143,12 @@ struct externals *
 state_getext(struct state *s)
 {
 	return s->ext;
+}
+
+struct heap *
+state_getheap(struct state *s)
+{
+	return s->heap;
 }
 
 struct props *
@@ -153,30 +194,118 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 }
 
 struct value *
+state_static_init(struct state *state, struct ast_expr *expr)
+{
+	char *lit = ast_expr_as_literal(expr);
+	struct location *loc = static_memory_checkpool(state->static_memory, lit);
+	if (loc) {
+		return value_ptr_create(loc);
+	}
+	int address = static_memory_newblock(state->static_memory);
+	loc = location_create_static(
+		address,
+		ast_expr_constant_create(0)
+	);
+	struct object_res res = state_get(state, loc, true);
+	if (res.err) {
+		assert(false);
+	}
+	if (!res.obj) {
+		assert(false);
+	}
+	object_assign(res.obj, value_literal_create(dynamic_str(lit)));
+
+	static_memory_stringpool(state->static_memory, lit, loc);
+	
+	return value_ptr_create(loc);
+}
+
+struct value *
+state_clump(struct state *state)
+{
+	/* XXX: should type be associated with blocks for type checking when we
+	 * assign? */
+	int address = clump_newblock(state->clump);
+	struct location *loc = location_create_dereferencable(
+		address,
+		ast_expr_constant_create(0)
+	);
+	return value_ptr_create(loc);
+}
+
+bool
+state_islval(struct state *state, struct value *v)
+{
+	assert(v);
+	if (!value_islocation(v)) {
+		return false;
+	}
+	struct location *loc = value_as_location(v);
+	struct object_res res= state_get(state, loc, true); /* put object there */
+	if (res.err) {
+		assert(false);
+	}
+	return location_tostatic(loc, state->static_memory) ||
+		location_toheap(loc, state->heap) ||
+		location_tostack(loc, state->stack) ||
+		location_toclump(loc, state->clump);
+}
+
+bool
+state_isalloc(struct state *state, struct value *v)
+{
+	assert(v);
+	if (!value_islocation(v)) {
+		return false;
+	}
+	struct location *loc = value_as_location(v);
+	struct object_res res = state_get(state, loc, true); /* put object there */
+	if (res.err) {
+		assert(false);
+	}
+	return location_toheap(loc, state->heap);
+}
+
+struct value *
 state_getvconst(struct state *state, char *id)
 {
 	return vconst_get(state->vconst, id);
 }
 
-struct object *
+struct object_res
 state_get(struct state *state, struct location *loc, bool constructive)
 {
-	struct block *b = location_getblock(
-		loc, state->vconst, state->stack, state->heap
+	struct block_res res = location_getblock(
+		loc, state->static_memory, state->vconst, state->stack, state->heap, state->clump
 	);
-	if (!b) {
-		assert(location_type(loc) == LOCATION_DYNAMIC);
-		return NULL;
+	if (res.err) {
+		return (struct object_res) { .obj = NULL, .err = res.err };
 	}
-	return block_observe(b, location_offset(loc), state, constructive);
+	if (!res.b) {
+		assert(location_type(loc) == LOCATION_DYNAMIC ||
+			location_type(loc) == LOCATION_DEREFERENCABLE);
+		return (struct object_res) { .obj = NULL, .err = NULL };
+	}
+	struct object *obj = block_observe(res.b, location_offset(loc), state, constructive);
+	return (struct object_res) { .obj = obj, .err = NULL };
+}
+
+void
+state_blockinstall(struct block *b, struct object *obj)
+{
+	block_install(b, obj);
 }
 
 struct block *
 state_getblock(struct state *state, struct location *loc)
 {
-	return location_getblock(
-		loc, state->vconst, state->stack, state->heap
+	struct block_res res = location_getblock(
+		loc, state->static_memory, state->vconst, state->stack, state->heap, state->clump
 	);
+	if (res.err) {
+		assert(false);
+	}
+	return res.b;
 }
 
 struct object *
@@ -185,7 +314,11 @@ state_getresult(struct state *state)
 	struct variable *v = stack_getresult(state->stack);
 	assert(v);
 
-	return state_get(state, variable_location(v), true);
+	struct object_res res = state_get(state, variable_location(v), true);
+	if (res.err) {
+		assert(false);
+	}
+	return res.obj;
 }
 
 static struct ast_type *
@@ -231,19 +364,30 @@ state_getobject(struct state *state, char *id)
 		assert(false);
 	}
 
-	return state_get(state, variable_location(v), true);
+	struct object_res res = state_get(state, variable_location(v), true);
+	if (res.err) {
+		assert(false);
+	}
+	return res.obj;
 }
 
-
-struct object *
+struct object_res
 state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 {
+	if (value_issync(ptr_val)) {
+		return (struct object_res) { .obj = NULL, .err = NULL};
+	}
 	struct location *deref_base = value_as_location(ptr_val);
 	assert(deref_base);
 
 	/* `*(ptr+offset)` */
 	struct location *deref = location_with_offset(deref_base, index);
-	struct object *res = state_get(state, deref, true);
+	struct object_res res = state_get(state, deref, true);
+	if (res.err) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "undefined indirection: %s", res.err->msg);
+		return (struct object_res) { .obj = NULL, .err = error_create(strbuilder_build(b))};
+	}
 	/*location_destroy(deref);*/
 	return res;
 }
@@ -261,10 +405,13 @@ state_range_alloc(struct state *state, struct object *obj,
 	/* assume pointer */
 	struct location *deref = value_as_location(arr_val);
 
-	struct block *b = location_getblock(
-		deref, state->vconst, state->stack, state->heap
+	struct block_res res = location_getblock(
+		deref, state->static_memory, state->vconst, state->stack, state->heap, state->clump
 	);
-	if (!b) {
+	if (res.err) {
+		assert(false);
+	}
+	if (!res.b) {
 		return error_create("no block");
 	}
 
@@ -272,7 +419,7 @@ state_range_alloc(struct state *state, struct object *obj,
 	assert(!ast_expr_equal(lw, up));
 
 	/* virtual block to represents range of values allocated */
-	return block_range_alloc(b, lw, up, state->heap);
+	return block_range_alloc(res.b, lw, up, state->heap);
 }
 
 struct value *
@@ -289,7 +436,6 @@ state_dealloc(struct state *state, struct value *val)
 	}
 	return location_dealloc(value_as_location(val), state->heap);
 }
-
 
 struct error *
 state_range_dealloc(struct state *state, struct object *obj,
@@ -336,16 +482,19 @@ state_range_aredeallocands(struct state *state, struct object *obj,
 	}
 	struct location *deref = value_as_location(arr_val);
 	
-	struct block *b = location_getblock(
-		deref, state->vconst, state->stack, state->heap
+	struct block_res res = location_getblock(
+		deref, state->static_memory, state->vconst, state->stack, state->heap, state->clump
 	);
-	return (bool) b && block_range_aredeallocands(b, lw, up, state);
+	if (res.err) {
+		assert(false);
+	}
+	return (bool) res.b && block_range_aredeallocands(res.b, lw, up, state);
 }
 
 bool
 state_hasgarbage(struct state *state)
 {
-	return heap_referenced(state->heap, state);
+	return !heap_referenced(state->heap, state);
 }
 
 void
@@ -367,6 +516,9 @@ state_eval(struct state *s, struct ast_expr *e)
 }
 
 static void
+state_undeclareliterals(struct state *s);
+
+static void
 state_undeclarevars(struct state *s);
 
 static void
@@ -377,6 +529,8 @@ state_equal(struct state *s1, struct state *s2)
 {
 	struct state *s1_c = state_copy(s1),
 		     *s2_c = state_copy(s2);
+	state_undeclareliterals(s1_c);
+	state_undeclareliterals(s2_c);
 	state_undeclarevars(s1_c);
 	state_undeclarevars(s2_c);
 	state_popprops(s1_c);
@@ -399,6 +553,14 @@ state_equal(struct state *s1, struct state *s2)
 }
 
 static void
+state_undeclareliterals(struct state *s)
+{
+	static_memory_destroy(s->static_memory);
+	/* XXX: map leaks */
+	s->static_memory = static_memory_create();
+}
+
+static void
 state_undeclarevars(struct state *s)
 {
 	heap_undeclare(s->heap, s);
@@ -409,6 +571,6 @@ state_undeclarevars(struct state *s)
 static void
 state_popprops(struct state *s)
 {
-	/* XXX: */
+	props_destroy(s->props);
 	s->props = props_create();
 }

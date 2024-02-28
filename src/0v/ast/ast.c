@@ -214,4 +214,3 @@ ast_protostitch(struct ast_function *f, struct externals *ext)
 {
 	return ast_function_protostitch(f, ext);
 }
-

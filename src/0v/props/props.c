@@ -53,6 +53,18 @@ props_str(struct props *p, char *indent)
 	return strbuilder_build(b);
 }
 
+int
+props_n(struct props *p)
+{
+	return p->n;
+}
+
+struct ast_expr **
+props_props(struct props *p)
+{
+	return p->prop;
+}
+
 void
 props_install(struct props *p, struct ast_expr *e)
 {

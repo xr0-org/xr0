@@ -22,7 +22,8 @@ struct ast_expr {
 		EXPR_ASSIGNMENT		= 1 << 10,
 
 		EXPR_ISDEALLOCAND	= 1 << 11,
-		EXPR_ARBARG		= 1 << 12,
+		EXPR_ISDEREFERENCABLE	= 1 << 12,
+		EXPR_ARBARG		= 1 << 13,
 	} kind;
 	struct ast_expr *root;
 	union {
@@ -78,9 +79,6 @@ ast_expr_binary_op(struct ast_expr *);
 struct ast_stmt_splits
 ast_expr_splits(struct ast_expr *, struct state *);
 
-struct error *
-ast_expr_precondsverify(struct ast_expr *, struct state *);
-
 struct result_arr {
 	int n;
 	struct result **res;
@@ -94,7 +92,6 @@ result_arr_destroy(struct result_arr *arr);
 
 void
 result_arr_append(struct result_arr *arr, struct result *res);
-
 
 struct result_arr *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,

@@ -33,8 +33,10 @@ MAIN_0V_OBJ = $(BUILD_DIR)/0v.o
 MAIN_0C_OBJ = $(BUILD_DIR)/0c.o
 
 STATE_OBJ = $(BUILD_DIR)/state.o
+STATIC_OBJ = $(BUILD_DIR)/static.o
 STACK_OBJ = $(BUILD_DIR)/stack.o
 HEAP_OBJ = $(BUILD_DIR)/heap.o
+CLUMP_OBJ = $(BUILD_DIR)/clump.o
 LOCATION_OBJ = $(BUILD_DIR)/location.o
 BLOCK_OBJ = $(BUILD_DIR)/block.o
 EXT_OBJ = $(BUILD_DIR)/ext.o
@@ -63,8 +65,10 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 		$(LOCATION_OBJ) \
 		$(OBJECT_OBJ) \
 		$(BLOCK_OBJ) \
+		$(CLUMP_OBJ) \
 		$(HEAP_OBJ) \
 		$(STACK_OBJ) \
+		$(STATIC_OBJ) \
 		$(EXT_OBJ) \
 		$(PROPS_OBJ)
 
@@ -75,7 +79,7 @@ $(XR0V): $(MAIN_0V_OBJ) $(BIN_DIR)
 	@$(CC) $(CFLAGS) -o $@ $(MAIN_0V_OBJ) $(OBJECTS)
 
 lex: $(XR0V)
-	$(VALGRIND) $(XR0V) -I libx tests/5-program/100-lex/parse.x
+	$(VALGRIND) $(XR0V) -I libx tests/99-program/100-lex/parse.x
 
 PARSER = $(BUILD_DIR)/lex-gen
 
@@ -128,6 +132,14 @@ $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 $(HEAP_OBJ): $(STATE_DIR)/heap.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/heap.c
+
+$(CLUMP_OBJ): $(STATE_DIR)/clump.c $(BLOCK_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/clump.c
+
+$(STATIC_OBJ): $(STATE_DIR)/static.c $(BLOCK_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/static.c
 
 $(BLOCK_OBJ): $(STATE_DIR)/block.c $(OBJECT_OBJ)
 	@printf 'CC\t$@\n'

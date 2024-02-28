@@ -55,7 +55,6 @@ strbuilder_build(struct strbuilder *b);
 char *
 strbuilder_preview(struct strbuilder *b);
 
-
 struct error {
 	char *msg;
 	struct error *inner;
@@ -100,7 +99,5 @@ string_arr_contains(struct string_arr *, char *s);
 
 char *
 string_arr_str(struct string_arr *);
-
-struct externals;
 
 #endif

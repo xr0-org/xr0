@@ -28,6 +28,10 @@ struct state *
 state_create(char *func, struct externals *, struct ast_type *result_type);
 
 struct state *
+state_create_withprops(char *func, struct externals *, struct ast_type *result_type,
+		struct props *props);
+
+struct state *
 state_copy(struct state *);
 
 struct state *
@@ -44,6 +48,9 @@ state_getext(struct state *);
 
 struct props *
 state_getprops(struct state *);
+
+struct heap *
+state_getheap(struct state *);
 
 void
 state_pushframe(struct state *, char *func, struct ast_type *ret_type);
@@ -66,7 +73,7 @@ state_getobjecttype(struct state *, char *id);
 struct value *
 state_getloc(struct state *state, char *id);
 
-struct object *
+struct object_res
 state_deref(struct state *, struct value *ptr, struct ast_expr *index);
 
 struct value *
@@ -92,6 +99,18 @@ state_range_aredeallocands(struct state *, struct object *,
 
 struct value *
 state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
+
+struct value *
+state_static_init(struct state *, struct ast_expr *);
+
+struct value *
+state_clump(struct state *);
+
+bool
+state_islval(struct state *, struct value *);
+
+bool
+state_isalloc(struct state *, struct value *);
 
 struct value *
 state_getvconst(struct state *, char *id);
@@ -122,7 +141,15 @@ location_references(struct location *l1, struct location *l2, struct state *);
 bool
 location_referencesheap(struct location *, struct state *);
 
-struct object *
+struct value *
+location_transfigure(struct location *, struct state *compare);
+
+struct object_res {
+	struct object *obj;
+	struct error *err;
+};
+
+struct object_res
 state_get(struct state *state, struct location *loc, bool constructive);
 
 
@@ -133,5 +160,13 @@ state_isdeallocand(struct state *s, struct location *loc);
 
 bool
 state_eval(struct state *, struct ast_expr *);
+
+struct block;
+
+void
+state_blockinstall(struct block *, struct object *);
+
+struct block *
+state_getblock(struct state *, struct location *);
 
 #endif

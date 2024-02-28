@@ -6,20 +6,32 @@
 struct ast_expr;
 
 enum location_type {
-	/* TODO: STATIC */
-	LOCATION_VCONST, LOCATION_AUTOMATIC, LOCATION_DYNAMIC,
+	LOCATION_STATIC,
+	LOCATION_VCONST,
+	LOCATION_DEREFERENCABLE,
+	LOCATION_AUTOMATIC,
+	LOCATION_DYNAMIC,
 };
 
 struct location;
 
 struct location *
+location_create_static(int block, struct ast_expr *offset);
+
+struct location *
 location_create_vconst(int block, struct ast_expr *offset);
+
+struct location *
+location_create_dereferencable(int block, struct ast_expr *offset);
 
 struct location *
 location_create_dynamic(int block, struct ast_expr *offset);
 
 struct location *
 location_create_automatic(int frame, int block, struct ast_expr *offset);
+
+struct value *
+location_transfigure(struct location *, struct state *compare);
 
 void
 location_setframe(struct location *loc, int frame);
@@ -38,6 +50,26 @@ location_str(struct location *);
 
 bool
 location_isauto(struct location *);
+
+struct static_memory;
+
+bool
+location_tostatic(struct location *, struct static_memory *);
+
+struct heap;
+
+bool
+location_toheap(struct location *, struct heap *);
+
+struct stack;
+
+bool
+location_tostack(struct location *, struct stack *);
+
+struct clump;
+
+bool
+location_toclump(struct location *, struct clump *);
 
 bool
 location_referencesheap(struct location *, struct state *);
@@ -61,17 +93,26 @@ location_equal(struct location *loc1, struct location *loc2);
 bool
 location_references(struct location *loc1, struct location *loc2, struct state *);
 
+struct static_memory;
+
 struct vconst;
 
-struct stack;
+struct clump;
 
 struct stack;
+
 struct object;
 
 struct block;
 
-struct block *
-location_getblock(struct location *, struct vconst *, struct stack *, struct heap *);
+struct block_res {
+	struct block *b;
+	struct error *err;
+};
+
+struct block_res
+location_getblock(struct location *, struct static_memory *, struct vconst *, struct stack *,
+		struct heap *, struct clump *);
 
 struct block *
 location_getstackblock(struct location *loc, struct stack *s);

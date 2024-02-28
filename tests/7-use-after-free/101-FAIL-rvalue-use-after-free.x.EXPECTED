@@ -1,0 +1,1 @@
+7-use-after-free/101-FAIL-rvalue-use-after-free.x:12:8: cannot exec statement: undefined indirection (rvalue)

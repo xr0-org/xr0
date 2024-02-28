@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ast.h"
+#include "intern.h"
 #include "ext.h"
 #include "expr.h"
 #include "math.h"
@@ -409,6 +410,9 @@ ast_expr_unary_operand(struct ast_expr *expr)
 bool
 ast_expr_unary_isdereference(struct ast_expr *expr)
 {
+	if (ast_expr_kind(expr) != EXPR_UNARY) {
+		return false;
+	}
 	return ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE;
 }
 
@@ -606,11 +610,41 @@ ast_expr_isdeallocand_assertand(struct ast_expr *expr)
 	return expr->root;
 }
 
+struct ast_expr *
+ast_expr_isdereferencable_create(struct ast_expr *assertand)
+{
+	struct ast_expr *new = ast_expr_create();
+	new->kind = EXPR_ISDEREFERENCABLE;
+	new->root = assertand;
+	return new;
+}
+
+struct ast_expr *
+ast_expr_isdereferencable_assertand(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_ISDEREFERENCABLE);
+	return expr->root;
+}
+
+bool
+ast_expr_isisdereferencable(struct ast_expr *expr)
+{
+	return expr->kind == EXPR_ISDEREFERENCABLE;
+}
+
 static void
 ast_expr_isdeallocand_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
 	char *root = ast_expr_str(expr->root);
 	strbuilder_printf(b, "@%s", root);
+	free(root);
+}
+
+static void
+ast_expr_isdereferencable_str_build(struct ast_expr *expr, struct strbuilder *b)
+{
+	char *root = ast_expr_str(expr->root);
+	strbuilder_printf(b, "$%s", root);
 	free(root);
 }
 
@@ -658,6 +692,9 @@ ast_expr_destroy(struct ast_expr *expr)
 	case EXPR_ISDEALLOCAND:
 		ast_expr_destroy(expr->root);
 		break;
+	case EXPR_ISDEREFERENCABLE:
+		ast_expr_destroy(expr->root);
+		break;
 	case EXPR_ARBARG:
 		break;
 	default:
@@ -703,6 +740,9 @@ ast_expr_str(struct ast_expr *expr)
 		break;
 	case EXPR_ISDEALLOCAND:
 		ast_expr_isdeallocand_str_build(expr, b);
+		break;
+	case EXPR_ISDEREFERENCABLE:
+		ast_expr_isdereferencable_str_build(expr, b);
 		break;
 	case EXPR_ARBARG:
 		strbuilder_putc(b, '$');
@@ -758,6 +798,10 @@ ast_expr_copy(struct ast_expr *expr)
 		);
 	case EXPR_ISDEALLOCAND:
 		return ast_expr_isdeallocand_create(
+			ast_expr_copy(expr->root)
+		);
+	case EXPR_ISDEREFERENCABLE:
+		return ast_expr_isdereferencable_create(
 			ast_expr_copy(expr->root)
 		);
 	case EXPR_ARBARG:
@@ -919,6 +963,7 @@ ast_expr_getfuncs(struct ast_expr *expr)
 	case EXPR_STRING_LITERAL:
 	case EXPR_STRUCTMEMBER:
 	case EXPR_ISDEALLOCAND:
+	case EXPR_ISDEREFERENCABLE:
 	case EXPR_ARBARG:
 		return string_arr_create();	
 	case EXPR_CALL:
@@ -968,42 +1013,28 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 	case EXPR_IDENTIFIER:
 	case EXPR_STRING_LITERAL:
 	case EXPR_ARBARG:
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	case EXPR_ISDEREFERENCABLE:
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = NULL };
 	default:
-		/*printf("expr: %s\n", ast_expr_str(e));*/
 		assert(false);
 	}
-}
-
-static struct string_arr *
-ast_expr_call_getfuncs(struct ast_expr *expr)
-{
-	struct string_arr *res = string_arr_create();
-	struct ast_expr *root = expr->root;
-	assert(root->kind == EXPR_IDENTIFIER);
-	string_arr_append(res, dynamic_str(root->u.string));
-	for (int i = 0; i < expr->u.call.n; i++) {
-		res = string_arr_concat(
-			res,
-			ast_expr_getfuncs(expr->u.call.arg[i])
-		);	
-		/* XXX: leaks */
-	}
-	return res;
 }
 
 static struct ast_stmt_splits
 call_splits(struct ast_expr *expr, struct state *state)
 {
+	struct error *err;
+
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
 
 	struct ast_function *f = externals_getfunc(state_getext(state), name);
 	if (!f) {
-		/* TODO: user error */
-		fprintf(stdout, "function `%s' not found\n", name);
-		assert(false);
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "function: `%s' not found", name);
+		err = error_create(strbuilder_build(b));
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = err };
 	}
 
 	int nparams = ast_function_nparams(f);
@@ -1019,20 +1050,15 @@ call_splits(struct ast_expr *expr, struct state *state)
 	struct ast_type *ret_type = ast_function_type(f);
 	state_pushframe(s_copy, dynamic_str(name), ret_type);
 
-	struct error *err = prepare_parameters(
-		nparams, params, args, name, s_copy
-	);
-	if (err) {
-		fprintf(stderr, "err: %s\n", err->msg);
+	if ((err = prepare_parameters( nparams, params, args, name, s_copy))) {
 		/* Sometimes a param is uninitialised e.g. 
 		 *
 		 * 	int c;
 		 * 	scanf("%d", &c);
 		 *
 		 * */
-		/* assert(false); */
-	}
-
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = err };
+	} 
 	int n = 0;
 	struct ast_expr **cond = NULL;
 
@@ -1055,13 +1081,12 @@ call_splits(struct ast_expr *expr, struct state *state)
 			cond[n-1] = splits.cond[j];
 		}
 		/* XXX: for assignment statements and, well, spare us */
-		ast_stmt_absexec(stmt[i], s_copy);
 	}
 
 	state_popframe(s_copy);
 	result_arr_destroy(args);
 
-	return (struct ast_stmt_splits) { .n = n, .cond = cond };
+	return (struct ast_stmt_splits) { .n = n, .cond = cond, .err = NULL };
 }
 
 static struct ast_stmt_splits
@@ -1079,7 +1104,24 @@ binary_splits(struct ast_expr *e, struct state *s)
 		cond[i+s1.n] = s2.cond[i];
 	}
 
-	return (struct ast_stmt_splits) { .n = n, .cond = cond };
+	return (struct ast_stmt_splits) { .n = n, .cond = cond, .err = NULL };
+}
+
+static struct string_arr *
+ast_expr_call_getfuncs(struct ast_expr *expr)
+{
+	struct string_arr *res = string_arr_create();
+	struct ast_expr *root = expr->root;
+	assert(root->kind == EXPR_IDENTIFIER);
+	string_arr_append(res, dynamic_str(root->u.string));
+	for (int i = 0; i < expr->u.call.n; i++) {
+		res = string_arr_concat(
+			res,
+			ast_expr_getfuncs(expr->u.call.arg[i])
+		);	
+		/* XXX: leaks */
+	}
+	return res;
 }
 
 #include "verify.c"

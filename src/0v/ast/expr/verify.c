@@ -28,6 +28,8 @@ bool
 ast_expr_decide(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
+	case EXPR_CONSTANT:
+		return (bool) ast_expr_as_constant(expr);
 	case EXPR_UNARY:
 		return expr_unary_decide(expr, state);
 	case EXPR_ISDEALLOCAND:
@@ -107,9 +109,11 @@ expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
 	ast_expr_destroy(j);
 	ast_expr_destroy(i);
 
-	struct object *obj = lvalue_object(
-		ast_expr_lvalue(ast_expr_binary_e1(acc), state)
-	);
+	struct lvalue_res res = ast_expr_lvalue(ast_expr_binary_e1(acc), state);
+	if (res.err) {
+		assert(false);
+	}	
+	struct object *obj = lvalue_object(res.lval);
 	assert(obj);
 
 	return state_range_aredeallocands(state, obj, lw, up);
@@ -122,20 +126,20 @@ ast_expr_exec(struct ast_expr *expr, struct state *state)
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
-	result_destroy(res);
+	/* result_destroy(res); */
 	return NULL;
 }
 
-struct lvalue *
+struct lvalue_res
 expr_identifier_lvalue(struct ast_expr *expr, struct state *state);
 
-struct lvalue *
+struct lvalue_res
 expr_unary_lvalue(struct ast_expr *expr, struct state *state);
 
-struct lvalue *
+struct lvalue_res
 expr_structmember_lvalue(struct ast_expr *expr, struct state *state);
 
-struct lvalue *
+struct lvalue_res
 ast_expr_lvalue(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
@@ -150,18 +154,18 @@ ast_expr_lvalue(struct ast_expr *expr, struct state *state)
 	}
 }
 
-struct lvalue *
+struct lvalue_res
 expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
 {
 	char *id = ast_expr_as_identifier(expr);
 
-	return lvalue_create(
-		state_getobjecttype(state, id),
-		state_getobject(state, id)
-	);
+	return (struct lvalue_res) {
+		.lval = lvalue_create( state_getobjecttype(state, id), state_getobject(state, id)),
+		.err = NULL
+	};
 }
 
-struct lvalue *
+struct lvalue_res
 expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 {
 	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
@@ -170,45 +174,73 @@ expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 	/* XXX: expr for args (scanf()) in function not of form `*(ptr+offset)
 	 * for some reason */
 	if (ast_expr_kind(inner) == EXPR_IDENTIFIER) {
-		return ast_expr_lvalue(inner, state);
+		struct lvalue_res root_res = ast_expr_lvalue(inner, state);
+		if (root_res.err) {
+			return root_res;
+		}
+		struct object *root_obj = lvalue_object(root_res.lval);
+		if (!root_obj) { /* `root` freed */
+			return (struct lvalue_res) { .lval = NULL, .err = NULL };
+		}
+		struct ast_type *t = ast_type_ptr_type(lvalue_type(root_res.lval));
+		struct value *root_val = object_as_value(root_obj);
+		assert(root_val);
+		struct object_res res = state_deref(
+			state, root_val, ast_expr_constant_create(0)
+		);
+		if (res.err) {
+			return (struct lvalue_res) { .lval = NULL, .err = res.err };
+		}
+		return (struct lvalue_res) { .lval = lvalue_create(t, res.obj), .err = NULL };
 	}
 
-	struct lvalue *root = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
-	struct object *root_obj = lvalue_object(root);
-	if (!root_obj) { /* `root` freed */
-		return NULL;
+	struct lvalue_res root_res = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
+	if (root_res.err) {
+		return root_res;
 	}
-	struct ast_type *t = ast_type_ptr_type(lvalue_type(root));
+	struct object *root_obj = lvalue_object(root_res.lval);
+	if (!root_obj) { /* `root` freed */
+		return (struct lvalue_res) { .lval = NULL, .err = NULL }; 
+	}
+	struct ast_type *t = ast_type_ptr_type(lvalue_type(root_res.lval));
 
 	struct value *root_val = object_as_value(root_obj);
 	assert(root_val);
-	struct object *obj = state_deref(
+	struct object_res res = state_deref(
 		state, root_val, ast_expr_binary_e2(inner)
 	);
-
-	return lvalue_create(t, obj);
+	if (res.err) {
+		return (struct lvalue_res) { .lval = NULL, .err = NULL };
+	}
+	return (struct lvalue_res) { .lval = lvalue_create(t, res.obj), .err = NULL };
 }
 
-struct lvalue *
+struct lvalue_res
 expr_structmember_lvalue(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *root = ast_expr_member_root(expr);
-	struct lvalue *root_lval = ast_expr_lvalue(root, state);
-	struct object *root_obj = lvalue_object(root_lval);
+	struct lvalue_res root_res = ast_expr_lvalue(root, state);
+	struct object *root_obj = lvalue_object(root_res.lval);
 	assert(root_obj);
 	char *field = ast_expr_member_field(expr);
 	struct object *member = object_getmember(
-		root_obj, lvalue_type(root_lval), field, state
+		root_obj, lvalue_type(root_res.lval), field, state
 	);
 	if (!member) {
 		/* TODO: lvalue error */
-		return lvalue_create(NULL, NULL);
+		return (struct lvalue_res) {
+			.lval = NULL,
+			.err = error_create("lvalue error")
+		};
 	}
 	struct ast_type *t = object_getmembertype(
-		root_obj, lvalue_type(root_lval), field, state
+		root_obj, lvalue_type(root_res.lval), field, state
 	);
 	assert(t);
-	return lvalue_create(t, member);
+	return (struct lvalue_res) {
+		.lval = lvalue_create(t, member),
+		.err = NULL
+	};
 }
 
 
@@ -219,7 +251,11 @@ hack_object_from_assertion(struct ast_expr *expr, struct state *state)
 	struct ast_expr *assertand = ast_expr_isdeallocand_assertand(expr);
 
 	/* get `assertand' variable */
-	struct object *obj = lvalue_object(ast_expr_lvalue(assertand, state));
+	struct lvalue_res res = ast_expr_lvalue(assertand, state);
+	if (res.err) {
+		assert(false);
+	}
+	struct object *obj = lvalue_object(res.lval);
 	assert(obj);
 	return obj;
 }
@@ -246,8 +282,6 @@ expr_binary_decide(struct ast_expr *expr, struct state *state)
 
 	assert(!result_iserror(root) && !result_iserror(last));
 
-	/*printf("state: %s\n", state_str(state));*/
-	/*printf("expr: %s\n", ast_expr_str(expr));*/
 	return value_compare(
 		result_as_value(root),
 		ast_expr_binary_op(expr),
@@ -303,8 +337,6 @@ arbarg_eval(struct ast_expr *expr, struct state *state);
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
-	/* TODO: verify preconditions of expr (statement) are satisfied */
-	/* now add postconditions */
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 		return expr_constant_eval(expr, state);
@@ -334,9 +366,10 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 expr_literal_eval(struct ast_expr *expr, struct state *state)
 {
-	return result_value_create(
-		value_literal_create(ast_expr_as_literal(expr))
+	struct result *res = result_value_create(
+		state_static_init(state, expr)
 	);
+	return res;
 }
 
 static struct result *
@@ -375,7 +408,7 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	if (!val) {
 		printf("state: %s\n", state_str(state));
 		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "`%s' has no value", id);
+		strbuilder_printf(b, "undefined memory access: `%s' has no value", id);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	return result_value_create(value_copy(val));
@@ -455,12 +488,19 @@ binary_deref_eval(struct ast_expr *expr, struct state *state)
 	}
 	struct value *arr = result_as_value(res);
 	assert(arr);
-	struct object *obj = state_deref(state, arr, ast_expr_binary_e2(expr));
-	assert(obj);
+	struct object_res deref_res = state_deref(state, arr, ast_expr_binary_e2(expr));
+	if (deref_res.err) {
+		return result_error_create(deref_res.err);
+	}
+	if (!deref_res.obj) {
+		return result_error_create(error_create("undefined indirection (rvalue)"));
+	}
 	result_destroy(res);
 
-	struct value *v = object_as_value(obj);
-	assert(v);
+	struct value *v = object_as_value(deref_res.obj);
+	if (!v) {
+		return result_error_create(error_create("undefined indirection (rvalue)"));
+	}
 
 	return result_value_create(value_copy(v));
 }
@@ -532,8 +572,11 @@ struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
 		struct result_arr *args, char *fname, struct state *state);
 
+static struct error *
+call_setupverify(struct ast_function *, struct state *state);
+
 static struct result *
-call_absexec(struct ast_expr *call, struct ast_function *, struct state *);
+call_absexec(struct ast_expr *call, struct state *);
 
 static struct result *
 pf_augment(struct value *v, struct ast_expr *root, struct state *);
@@ -541,6 +584,8 @@ pf_augment(struct value *v, struct ast_expr *root, struct state *);
 static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
+	struct error *err;
+
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -554,6 +599,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
+	struct ast_type *rtype = ast_function_type(f);
 
 	struct result_arr *args = prepare_arguments(
 		ast_expr_call_nargs(expr),
@@ -561,20 +607,22 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		nparams, params, state
 	);
 
-	struct ast_type *ret_type = ast_function_type(f);
-	state_pushframe(state, dynamic_str(name), ret_type);
-
-	struct error *err = prepare_parameters(
-		nparams, params, args, name, state
-	);
-	if (err) {
+	state_pushframe(state, dynamic_str(name), rtype);
+	if ((err = prepare_parameters(nparams, params, args, name, state))) {
 		return result_error_create(err);
 	}
 
-	struct result *res = call_absexec(expr, f, state);
+	/* XXX: pass copy so we don't observe */
+	if ((err = call_setupverify(f, state_copy(state)))) {
+		return result_error_create(err);
+	}
+
+	struct result *res = call_absexec(expr, state);
 	if (result_iserror(res)) {
 		return res;
 	}
+
+	/* XXX: pass copy so we don't observe */
 	/* copy to preserve value through popping of frame */
 	struct value *v = NULL;
 	if (result_hasvalue(res)) {
@@ -595,18 +643,95 @@ static struct result *
 call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state *);
 
 static struct result *
-call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *s)
+call_absexec(struct ast_expr *expr, struct state *s)
 {
-	struct error *err = ast_function_precondsverify(f, s);
-	if (err) {
-		return result_error_create(err);
-	}
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(root);
 
+	struct ast_function *f = externals_getfunc(state_getext(s), name);
+	if (!f) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "function `%s' not found", name);
+		return result_error_create(error_create(strbuilder_build(b)));
+	}
 	struct result *res = ast_function_absexec(f, s);
 	if (result_iserror(res) || result_hasvalue(res)) {
 		return res;
 	}
 	return call_arbitraryresult(expr, f, s);
+}
+
+static struct error *
+verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
+		struct state *arg_state);
+
+static struct error *
+call_setupverify(struct ast_function *f, struct state *arg_state)
+{
+	struct error *err;
+
+	struct state *param_state = state_create(
+		dynamic_str(ast_function_name(f)),
+		state_getext(arg_state),
+		ast_function_type(f)
+	);
+	if ((err = ast_function_initparams(f, param_state))) {
+		return err;
+	}
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **param = ast_function_params(f);
+
+	for (int i = 0; i < nparams; i++) {
+		char *id = ast_variable_name(param[i]);
+		struct value *param = state_getloc(param_state, id);
+		struct value *arg = state_getloc(arg_state, id);
+		if ((err = verify_paramspec(param, arg, param_state, arg_state))) {
+			struct strbuilder *b = strbuilder_create();
+			strbuilder_printf(b, "parameter '%s' %s", id, err->msg);
+			return error_create(strbuilder_build(b));
+		}
+	}
+	return NULL;
+}
+
+static struct error *
+verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
+		struct state *arg_state)
+{
+	if (!state_islval(param_state, param)) {
+		return NULL;
+	}
+	if (!state_islval(arg_state, arg)) {
+		return error_create("must be lvalue");
+	}
+	if (state_isalloc(param_state, param) && !state_isalloc(arg_state, arg)) {
+		return error_create("must be heap allocated");
+	}
+	struct object_res param_res = state_get(
+		param_state, value_as_location(param), false
+	);
+	if (param_res.err) {
+		return param_res.err;
+	}
+	struct object_res arg_res = state_get(
+		arg_state, value_as_location(arg), false
+	);
+	if (arg_res.err) {
+		return arg_res.err;
+	}
+	assert(param_res.obj);
+	assert(arg_res.obj);
+	if (!object_hasvalue(param_res.obj)) {
+		return NULL;
+	}
+	if (!object_hasvalue(arg_res.obj)) {
+		return error_create("must be rvalue");
+	}
+	return verify_paramspec(
+		object_as_value(param_res.obj), object_as_value(arg_res.obj),
+		param_state, arg_state
+	);
 }
 
 static struct result *
@@ -720,7 +845,11 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		struct ast_expr *name = ast_expr_identifier_create(
 			dynamic_str(ast_variable_name(param[i]))
 		);
-		struct object *obj = lvalue_object(ast_expr_lvalue(name, state));
+		struct lvalue_res lval_res = ast_expr_lvalue(name, state);
+		if (lval_res.err) {
+			return lval_res.err;
+		}
+		struct object *obj = lvalue_object(lval_res.lval);
 		ast_expr_destroy(name);
 
 		object_assign(obj, value_copy(result_as_value(res)));
@@ -739,26 +868,20 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	if (!result_hasvalue(res)) {
-		struct strbuilder *b = strbuilder_create();
-		char *s = ast_expr_str(rval);
-		strbuilder_printf(b, "`%s' has no value", s);
-		free(s);
-		return result_error_create(error_create(strbuilder_build(b)));
+		assert(false);
+		return result_error_create(error_create("undefined indirection (rvalue)"));
 	}
-	struct object *obj = lvalue_object(ast_expr_lvalue(lval, state));
+	struct lvalue_res lval_res = ast_expr_lvalue(lval, state);
+	if (lval_res.err) {
+		return result_error_create(lval_res.err);
+	}
+	struct object *obj = lvalue_object(lval_res.lval);
 	if (!obj) {
-		struct strbuilder *b = strbuilder_create();
-		char *s = ast_expr_str(lval);
-		strbuilder_printf(b, "`%s' is not a valid object", s);
-		free(s);
-		return result_error_create(error_create(strbuilder_build(b)));
+		return result_error_create(error_create("undefined indirection (lvalue)"));
 	}
-	struct value *val = object_as_value(obj);
-	while (val && value_islocation(val)) {
-		obj = state_deref(state, val, ast_expr_constant_create(0)); 	
-		val = object_as_value(obj);
-	}
+
 	object_assign(obj, value_copy(result_as_value(res)));
+
 	return res;
 }
 
@@ -821,12 +944,19 @@ arbarg_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 assign_absexec(struct ast_expr *expr, struct state *state);
 
+static struct result *
+isdereferencable_absexec(struct ast_expr *expr, struct state *state);
+
 struct result *
 ast_expr_absexec(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
+	case EXPR_CALL:
+		return expr_call_eval(expr, state);
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
+	case EXPR_ISDEREFERENCABLE:
+		return isdereferencable_absexec(expr, state);
 	default:
 		assert(false);
 	}
@@ -836,6 +966,14 @@ static struct result *
 assign_absexec(struct ast_expr *expr, struct state *state)
 {
 	return expr_assign_eval(expr, state);
+}
+
+static struct result *
+isdereferencable_absexec(struct ast_expr *expr, struct state *state)
+{
+	struct props *p = state_getprops(state);
+	props_install(p, expr);
+	return result_value_create(NULL);
 }
 
 static struct preresult *
@@ -1087,28 +1225,4 @@ binary_assume(struct ast_expr *expr, bool value, struct state *s)
 		value,
 		s
 	);
-}
-
-struct error *
-ast_expr_precondsverify(struct ast_expr *e, struct state *s)
-{
-	struct props *p = state_getprops(s);
-
-	assert(!props_contradicts(p, e));
-	
-	/* XXX: hack ignore m = matrix_create($, $) */
-	if (ast_expr_kind(e) == EXPR_ASSIGNMENT) {
-		return NULL;
-	}
-		
-	struct result *red = ast_expr_pf_reduce(e, s);
-	struct value *v = result_as_value(red);
-	struct ast_expr *red_e = value_to_expr(v);
-	bool valid = props_get(p, red_e);
-	if (!valid) {
-		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "prop: %s is not present in state", ast_expr_str(e));
-		return error_create(strbuilder_build(b));		
-	}
-	return NULL;
 }

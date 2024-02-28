@@ -1,0 +1,1 @@
+6-preconditions/101-FAIL-need-alloced-rval.x:21:13: cannot exec statement: parameter 'x' must be rvalue

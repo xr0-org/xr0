@@ -99,7 +99,7 @@ variable_array_create(struct ast_variable *v)
 %token ARB_ARG
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR SOME GOTO CONTINUE BREAK RETURN
-%token ALLOC DEALLOC
+%token ALLOC DEALLOC CLUMP
 
 %start translation_unit
 
@@ -247,6 +247,9 @@ isdeallocand_expression
 	: postfix_expression 
 	| ISDEALLOCAND_OP isdeallocand_expression {
 		$$ = ast_expr_isdeallocand_create($2);
+	}
+	| ARB_ARG isdeallocand_expression {
+		$$ = ast_expr_isdereferencable_create($2);
 	}
 	;
 
@@ -716,6 +719,8 @@ allocation_statement
 		{ $$ = ast_stmt_create_alloc(lexloc(), $2); }
 	| DEALLOC postfix_expression ';'
 		{ $$ = ast_stmt_create_dealloc(lexloc(), $2); }
+	| CLUMP postfix_expression ';'
+		{ $$ = ast_stmt_create_clump(lexloc(), $2); }
 	;
 
 declaration_list

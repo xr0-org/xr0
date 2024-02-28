@@ -162,11 +162,19 @@ object_referencesheap(struct object *obj, struct state *s)
 }
 
 bool
+object_hasvalue(struct object *obj)
+{
+	if (object_isvalue(obj)) {
+		return obj->value;
+	}
+	return false;
+}
+
+bool
 object_isvalue(struct object *obj)
 {
 	return obj->type == OBJECT_VALUE;
 }
-
 
 struct value *
 object_as_value(struct object *obj)
@@ -202,7 +210,7 @@ object_references(struct object *obj, struct location *loc, struct state *s)
 	return v ? value_references(v, loc, s) : false;
 }
 
-void
+struct error *
 object_assign(struct object *obj, struct value *val)
 {
 	assert(obj->type == OBJECT_VALUE);
@@ -211,6 +219,7 @@ object_assign(struct object *obj, struct value *val)
 	 * potentially */
 
 	obj->value = val;
+	return NULL;
 }
 
 static struct ast_expr *
@@ -457,6 +466,68 @@ object_getmembertype(struct object *obj, struct ast_type *t, char *member,
 	);
 }
 
+struct object_result {
+	struct object *val;
+	struct error *err;
+};
+
+
+struct object_result *
+object_result_error_create(struct error *err)
+{
+	assert(err);
+
+	struct object_result *r = malloc(sizeof(struct object_result));
+	r->val = NULL;
+	r->err = err;
+	return r;
+}
+
+struct object_result *
+object_result_value_create(struct object *val)
+{
+	struct object_result *r = malloc(sizeof(struct object_result));
+	r->val = val;
+	r->err = NULL;
+	return r;
+}
+
+void
+object_result_destroy(struct object_result *res)
+{
+	assert(!res->err);
+	if (res->val) {
+		object_destroy(res->val);
+	}
+	free(res);
+}
+
+bool
+object_result_iserror(struct object_result *res)
+{
+	return res->err;
+}
+
+struct error *
+object_result_as_error(struct object_result *res)
+{
+	assert(res->err);
+	return res->err;
+}
+
+struct object *
+object_result_as_value(struct object_result *res)
+{
+	assert(!res->err);
+	return res->val;
+}
+
+bool
+object_result_hasvalue(struct object_result *res)
+{
+	assert(!object_result_iserror(res));
+	return res->val; /* implicit cast */
+}
 
 struct range {
 	struct ast_expr *size;

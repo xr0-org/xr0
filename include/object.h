@@ -45,13 +45,20 @@ bool
 object_referencesheap(struct object *, struct state *);
 
 bool
+object_hasvalue(struct object *);
+
+bool
 object_isvalue(struct object *);
 
 struct value *
 object_as_value(struct object *);
 
-void
+struct error *
 object_assign(struct object *, struct value *);
+
+struct error *
+object_transfigure(struct object *obj, struct value *val, struct state *actual,
+		struct state *compare, bool islval);
 
 bool
 object_contains(struct object *, struct ast_expr *, struct state *);

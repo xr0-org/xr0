@@ -34,6 +34,9 @@ value_int_ne_create(int not_val);
 struct value *
 value_int_range_create(int lw, int excl_up);
 
+struct value *
+value_transfigure(struct value *, struct state *compare, bool islval);
+
 int
 value_int_lw(struct value *);
 

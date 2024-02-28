@@ -15,7 +15,7 @@
 struct error *
 ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 {
-	struct error *err = NULL;
+	struct error *err;
 
 	if (ast_stmt_kind(stmt) == STMT_COMPOUND_V) {
 		if ((err = ast_stmt_verify(stmt, state))) {
@@ -46,13 +46,7 @@ stmt_installprop(struct ast_stmt *stmt, struct state *state);
 struct preresult *
 ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
 {
-	if (ast_stmt_ispre(stmt)) {
-		struct error *err = ast_stmt_exec(stmt, state);
-		if (err) {
-			return preresult_error_create(err);
-		}
-	} else if (ast_stmt_isassume(stmt)) {
-		printf("assume: %s\n", ast_stmt_str(stmt));
+	if (ast_stmt_isassume(stmt)) {
 		return stmt_installprop(stmt, state);
 	}
 	return preresult_empty_create();
@@ -177,6 +171,8 @@ struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_NOP:
+		return NULL;
 	case STMT_LABELLED:
 		return ast_stmt_exec(ast_stmt_labelled_stmt(stmt), state);
 	case STMT_COMPOUND:
@@ -248,7 +244,7 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 		return NULL;
 	}
 
-	struct result *res = ast_stmt_absexec(neteffect, state);
+	struct result *res = ast_stmt_absexec(neteffect, state, true);
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
@@ -288,6 +284,8 @@ iter_neteffect(struct ast_stmt *iter)
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
+	/* TODO: install propositions corresponding to dereferencability */
+
 	struct result *res = ast_expr_eval(ast_stmt_jump_rv(stmt), state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
@@ -296,44 +294,133 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		struct object *obj = state_getresult(state); 
 		assert(obj);
 		object_assign(obj, value_copy(result_as_value(res)));
-		result_destroy(res);
+		/* destroy result if exists */
+		
 	}
 	return NULL;
 }
 
 static struct result *
-sel_absexec(struct ast_stmt *stmt, struct state *state);
+labelled_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup);
+
+static struct result *
+sel_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup);
 
 static struct result *
 iter_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct result *
-comp_absexec(struct ast_stmt *stmt, struct state *state);
+comp_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup);
 
 static struct result *
 alloc_absexec(struct ast_stmt *stmt, struct state *state);
 
 struct result *
-ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
+ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 {
 	switch (ast_stmt_kind(stmt)) {
-	case STMT_LABELLED:
-		/* labelled statements are verified not executed when we
-		 * transitively call a function */
+	case STMT_NOP:
 		return result_value_create(NULL);
+	case STMT_LABELLED:
+		return labelled_absexec(stmt, state, should_setup);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
-		return sel_absexec(stmt, state);
+		return sel_absexec(stmt, state, should_setup);
 	case STMT_ITERATION:
 		return iter_absexec(stmt, state);
 	case STMT_COMPOUND:
-		return comp_absexec(stmt, state);
+		return comp_absexec(stmt, state, should_setup);
 	case STMT_ALLOCATION:
 		return alloc_absexec(stmt, state);
 	default:
 		assert(false);
 	}
+}
+
+static struct result *
+labelled_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
+{
+	if (!ast_stmt_ispre(stmt)) {
+		assert(false);
+	}
+	struct ast_stmt *setup = ast_stmt_labelled_stmt(stmt);
+	if (!setup) {
+		assert(false);
+	}
+	if (!should_setup) {
+		/* if abstract is called we don't execute setup */
+		return result_value_create(NULL);
+	}
+	return ast_stmt_absexec(setup, state, should_setup);
+}
+
+static struct result *
+sel_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
+{
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	if (dec.err) {
+		return result_error_create(dec.err);
+	}
+	if (dec.decision) {
+		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state, should_setup);
+	}
+	assert(!ast_stmt_sel_nest(stmt));
+	return result_value_create(NULL);
+}
+
+struct decision
+sel_decide(struct ast_expr *control, struct state *state)
+{
+	/*printf("(sel_decide) state: %s\n", state_str(state));*/
+	/*printf("(sel_decide) control: %s\n", ast_expr_str(control));*/
+	struct result *res = ast_expr_pf_reduce(control, state);
+	if (result_iserror(res)) {
+		return (struct decision) { .err = result_as_error(res) };
+	}
+	assert(result_hasvalue(res)); /* TODO: user error */
+
+	struct value *v = result_as_value(res);
+	/*printf("(sel_decide) value: %s\n", value_str(v));*/
+	if (value_issync(v)) {
+		struct ast_expr *sync = value_as_sync(v);
+		/*printf("state: %s\n", state_str(state));*/
+		/*printf("sync: %s\n", ast_expr_str(sync));*/
+		struct props *p = state_getprops(state);
+		if (props_get(p, sync)) {
+			return (struct decision) { .decision = true, .err = NULL };
+		} else if (props_contradicts(p, sync)) {
+			return (struct decision) { .decision = false, .err = NULL };
+		}
+	}
+	if (value_isconstant(v)) {
+		if (value_as_constant(v)) {
+			return (struct decision) { .decision = true, .err = NULL };	
+		}
+		return (struct decision) { .decision = false, .err = NULL };
+	} 
+
+	struct value *zero = value_int_create(0);
+
+	if (!values_comparable(zero, v)) {
+		struct strbuilder *b = strbuilder_create();
+		char *c_str = ast_expr_str(control);
+		char *v_str = value_str(v);
+		strbuilder_printf(
+			b, "`%s' with value `%s' is undecidable",
+			c_str, v_str
+		);
+		free(v_str);
+		free(c_str);
+		return (struct decision) {
+			.decision = false,
+			.err      = error_create(strbuilder_build(b)),
+		};
+	}
+
+	bool nonzero = !value_equal(zero, v);
+	value_destroy(zero);
+	return (struct decision) { .decision = nonzero, .err = NULL };
 }
 
 static struct ast_stmt *
@@ -373,10 +460,15 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 	result_destroy(result_up);
 	result_destroy(result_lw);
 
-	if (ast_stmt_alloc_isalloc(alloc)) {
+	switch (ast_stmt_alloc_kind(alloc)) {
+	case ALLOC:
 		err = state_range_alloc(state, obj, res_lw, res_up);
-	} else {
+		break;
+	case DEALLOC:
 		err = state_range_dealloc(state, obj, res_lw, res_up);
+		break;
+	default:
+		assert(false);
 	}
 	
 	ast_expr_destroy(res_up);
@@ -409,83 +501,22 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
 	assert(ast_expr_equal(ast_expr_binary_e2(inner), i)); 
 	ast_expr_destroy(i);
-	struct object *obj = lvalue_object(
-		ast_expr_lvalue(ast_expr_binary_e1(inner), state)
-	);
+	struct lvalue_res res = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
+	if (res.err) {
+		assert(false);
+	}
+	struct object *obj = lvalue_object(res.lval);
 	assert(obj);
 	return obj;
 }
 
 static struct result *
-sel_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
-	if (dec.err) {
-		return result_error_create(dec.err);
-	}
-	if (dec.decision) {
-		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
-	}
-	assert(!ast_stmt_sel_nest(stmt));
-	return result_value_create(NULL);
-}
-
-struct decision
-sel_decide(struct ast_expr *control, struct state *state)
-{
-	/*printf("(sel_decide) state: %s\n", state_str(state));*/
-	/*printf("(sel_decide) control: %s\n", ast_expr_str(control));*/
-	struct result *res = ast_expr_pf_reduce(control, state);
-	if (result_iserror(res)) {
-		return (struct decision) { .err = result_as_error(res) };
-	}
-	assert(result_hasvalue(res)); /* TODO: user error */
-
-	struct value *v = result_as_value(res);
-	/*printf("(sel_decide) value: %s\n", value_str(v));*/
-	if (value_issync(v)) {
-		struct ast_expr *sync = value_as_sync(v);
-		/*printf("state: %s\n", state_str(state));*/
-		/*printf("sync: %s\n", ast_expr_str(sync));*/
-		struct props *p = state_getprops(state);
-		if (props_get(p, sync)) {
-			return (struct decision) { .decision = true, .err = NULL };
-		} else if (props_contradicts(p, sync)) {
-			return (struct decision) { .decision = false, .err = NULL };
-		}
-
-	}
-
-	struct value *zero = value_int_create(0);
-
-	if (!values_comparable(zero, v)) {
-		struct strbuilder *b = strbuilder_create();
-		char *c_str = ast_expr_str(control);
-		char *v_str = value_str(v);
-		strbuilder_printf(
-			b, "`%s' with value `%s' is undecidable",
-			c_str, v_str
-		);
-		free(v_str);
-		free(c_str);
-		return (struct decision) {
-			.decision = false,
-			.err      = error_create(strbuilder_build(b)),
-		};
-	}
-
-	bool nonzero = !value_equal(zero, v);
-	value_destroy(zero);
-	return (struct decision) { .decision = nonzero, .err = NULL };
-}
-
-static struct result *
-comp_absexec(struct ast_stmt *stmt, struct state *state)
+comp_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 {
 	struct ast_block *b = ast_stmt_as_block(stmt);
 	struct ast_stmt **stmts = ast_block_stmts(b);
 	for (int i = 0; i < ast_block_nstmts(b); i++) {
-		struct result *res = ast_stmt_absexec(stmts[i], state);
+		struct result *res = ast_stmt_absexec(stmts[i], state, should_setup);
 		if (result_iserror(res)) {
 			return res;
 		}
@@ -504,29 +535,44 @@ alloc_absexec(struct ast_stmt *alloc, struct state *state)
 		return res;
 	}
 	if (result_hasvalue(res)) {
-		struct object *obj = lvalue_object(
-			ast_expr_lvalue(ast_stmt_alloc_arg(alloc), state)
-		);
+		struct lvalue_res lval_res = ast_expr_lvalue(ast_stmt_alloc_arg(alloc), state);
+		if (lval_res.err) {
+			return result_error_create(lval_res.err);
+		}
+		struct object *obj = lvalue_object(lval_res.lval);
 		assert(obj);
 		object_assign(obj, value_copy(result_as_value(res)));
 	}
 	return res;
 }
 
+static struct result *
+dealloc_process(struct ast_stmt *, struct state *);
+
 /* operates at location level. It either creates an object on the heap and returns
  * a location or gets the location pointed to by an lvalue and attempts to free
  * possibly returning an error
  * */
 static struct result *
-alloc_process(struct ast_stmt *alloc, struct state *state)
+alloc_process(struct ast_stmt *stmt, struct state *state)
 {
-	if (ast_stmt_alloc_isalloc(alloc)) {
+	switch (ast_stmt_alloc_kind(stmt)) {
+	case ALLOC:
 		/* TODO: size needs to be passed in here when added to .alloc */
 		return result_value_create(state_alloc(state));
+	case DEALLOC:
+		return dealloc_process(stmt, state);
+	case CLUMP:
+		return result_value_create(state_clump(state));
+	default:
+		assert(false);
 	}
+}
 
-	/* dealloc */
-	struct ast_expr *arg = ast_stmt_alloc_arg(alloc);
+static struct result *
+dealloc_process(struct ast_stmt *stmt, struct state *state)
+{
+	struct ast_expr *arg = ast_stmt_alloc_arg(stmt);
 	/* arg is pointing at the heap location we want to free, so we want its
 	 * value rather than location */
 	struct result *res = ast_expr_eval(arg, state);
@@ -544,33 +590,85 @@ alloc_process(struct ast_stmt *alloc, struct state *state)
 }
 
 static struct error *
-ast_stmt_compound_precondsverify(struct ast_stmt *, struct state *);
+stmt_setupabsexec(struct ast_stmt *, struct state *);
+
+static struct error *
+labelled_setupabsexec(struct ast_stmt *, struct state *);
+
+static struct error *
+sel_setupabsexec(struct ast_stmt *, struct state *);
+
+static struct error *
+comp_setupabsexec(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_precondsverify(struct ast_stmt *stmt, struct state *s)
+ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
-	switch (ast_stmt_kind(stmt)) {
+	if (ast_stmt_kind(stmt) != STMT_SELECTION) {
+		return NULL;
+	}
+	return stmt_setupabsexec(stmt, state);
+}
+
+static struct error *
+stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
+{
+	switch (ast_stmt_kind(stmt)) {	
 	case STMT_EXPR:
-		return ast_expr_precondsverify(ast_stmt_as_expr(stmt), s);
+	case STMT_ALLOCATION:
+		return NULL;
+	case STMT_LABELLED:
+		return labelled_setupabsexec(stmt, state);
+	case STMT_SELECTION:
+		return sel_setupabsexec(stmt, state);
 	case STMT_COMPOUND:
-		return ast_stmt_compound_precondsverify(stmt, s);
+		return comp_setupabsexec(stmt, state);
 	default:
 		assert(false);
 	}
 }
 
 static struct error *
-ast_stmt_compound_precondsverify(struct ast_stmt *stmt, struct state *s)
+labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
+{
+	/* XXX: dedupe the execution of setups */
+	struct result *res = ast_stmt_absexec(stmt, state, true);
+	if (result_iserror(res)) {
+		return result_as_error(res);
+	}
+	return NULL;
+}
+
+static struct error *
+sel_setupabsexec(struct ast_stmt *stmt, struct state *state)
+{
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	if (dec.err) {
+		return dec.err;
+	}
+	if (dec.decision) {
+		return stmt_setupabsexec(ast_stmt_sel_body(stmt), state);
+	}
+	assert(!ast_stmt_sel_nest(stmt));
+	return NULL;
+}
+
+static struct error *
+comp_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
 	struct error *err;
-
 	struct ast_block *b = ast_stmt_as_block(stmt);
-	int n = ast_block_nstmts(b);
+	assert(ast_block_ndecls(b) == 0);
+	int nstmt = ast_block_nstmts(b);
 	struct ast_stmt **stmts = ast_block_stmts(b);
-
-	for (int i = 0; i < n; i++) {
-		if ((err = ast_stmt_precondsverify(stmts[i], s))) {
-			return err;
+	for (int i = 0; i < nstmt; i++) {
+		if (ast_stmt_ispre(stmts[i])) {
+			if ((err = stmt_setupabsexec(stmts[i], state))) {
+				return err;
+			}
+			if (ast_stmt_isterminal(stmts[i], state)) {
+				break;
+			}
 		}
 	}
 	return NULL;

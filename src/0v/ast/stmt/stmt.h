@@ -3,6 +3,12 @@
 
 #include "util.h"
 
+enum ast_alloc_kind {
+	ALLOC			= 1 << 0,
+	DEALLOC			= 1 << 1,
+	CLUMP			= 1 << 2,
+};
+
 enum ast_stmt_kind {
 	STMT_NOP		= 1 << 0,
 	STMT_LABELLED		= 1 << 1,
@@ -28,22 +34,24 @@ ast_stmt_isassume(struct ast_stmt *stmt);
 struct string_arr *
 ast_stmt_getfuncs(struct ast_stmt *stmt);
 
+struct error;
+
 struct ast_stmt_splits {
 	int n;
 	struct ast_expr **cond;
+	struct error *err;
 };
 
 struct ast_stmt_splits
 ast_stmt_splits(struct ast_stmt *, struct state *);
 
 struct state;
-struct error;
 
 /* TODO: change to more regular tuple */
 struct decision { bool decision; struct error *err; }
 sel_decide(struct ast_expr *control, struct state *state);
 
 struct error *
-ast_stmt_precondsverify(struct ast_stmt *, struct state *);
+ast_stmt_precondsinit(struct ast_stmt *, struct state *);
 
 #endif
