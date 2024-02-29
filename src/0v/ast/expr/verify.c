@@ -170,7 +170,18 @@ expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 	/* XXX: expr for args (scanf()) in function not of form `*(ptr+offset)
 	 * for some reason */
 	if (ast_expr_kind(inner) == EXPR_IDENTIFIER) {
-		return ast_expr_lvalue(inner, state);
+		struct lvalue *root = ast_expr_lvalue(inner, state);
+		struct object *root_obj = lvalue_object(root);
+		if (!root_obj) { /* `root` freed */
+			return NULL;
+		}
+		struct ast_type *t = ast_type_ptr_type(lvalue_type(root));
+		struct value *root_val = object_as_value(root_obj);
+		assert(root_val);
+		struct object *obj = state_deref(
+			state, root_val, ast_expr_constant_create(0)
+		);
+		return lvalue_create(t, obj);
 	}
 
 	struct lvalue *root = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
@@ -733,6 +744,8 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
+	printf("lval: %s\nrval: %s\n", ast_expr_str(lval), ast_expr_str(rval));
+	printf("state: %s\n", state_str(state));
 
 	struct result *res = ast_expr_eval(rval, state);
 	if (result_iserror(res)) {
@@ -753,11 +766,7 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		free(s);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
-	struct value *val = object_as_value(obj);
-	while (val && value_islocation(val)) {
-		obj = state_deref(state, val, ast_expr_constant_create(0)); 	
-		val = object_as_value(obj);
-	}
+
 	object_assign(obj, value_copy(result_as_value(res)));
 	return res;
 }

@@ -2,6 +2,7 @@
 
 void *
 assign(void *p) ~ [
+	pre: p = malloc(1);
 	*p = 1;
 ] {
 	/* TODO: internal verification */

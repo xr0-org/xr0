@@ -162,6 +162,15 @@ object_referencesheap(struct object *obj, struct state *s)
 }
 
 bool
+object_hasvalue(struct object *obj)
+{
+	if (object_isvalue(obj)) {
+		return obj->value;
+	}
+	return false;
+}
+
+bool
 object_isvalue(struct object *obj)
 {
 	return obj->type == OBJECT_VALUE;
