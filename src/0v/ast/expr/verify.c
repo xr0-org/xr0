@@ -467,7 +467,9 @@ binary_deref_eval(struct ast_expr *expr, struct state *state)
 	struct value *arr = result_as_value(res);
 	assert(arr);
 	struct object *obj = state_deref(state, arr, ast_expr_binary_e2(expr));
-	assert(obj);
+	if (!obj) {
+		return result_error_create(error_create("unjustified indirection (rvalue)"));
+	}
 	result_destroy(res);
 
 	struct value *v = object_as_value(obj);
@@ -744,17 +746,16 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
-	printf("lval: %s\nrval: %s\n", ast_expr_str(lval), ast_expr_str(rval));
-	printf("state: %s\n", state_str(state));
 
 	struct result *res = ast_expr_eval(rval, state);
 	if (result_iserror(res)) {
 		return res;
 	}
 	if (!result_hasvalue(res)) {
+		assert(false);
 		struct strbuilder *b = strbuilder_create();
 		char *s = ast_expr_str(rval);
-		strbuilder_printf(b, "`%s' has no value", s);
+		strbuilder_printf(b, "unjustified indirection (rvalue)", s);
 		free(s);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
@@ -762,7 +763,7 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	if (!obj) {
 		struct strbuilder *b = strbuilder_create();
 		char *s = ast_expr_str(lval);
-		strbuilder_printf(b, "`%s' is not a valid object", s);
+		strbuilder_printf(b, "unjustified indirection (lvalue)", s);
 		free(s);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
