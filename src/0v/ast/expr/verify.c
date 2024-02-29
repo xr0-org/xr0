@@ -314,6 +314,7 @@ arbarg_eval(struct ast_expr *expr, struct state *state);
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	/* TODO: verify preconditions of expr (statement) are satisfied */
 	/* now add postconditions */
 	switch (ast_expr_kind(expr)) {
@@ -412,6 +413,7 @@ address_eval(struct ast_expr *, struct state *);
 static struct result *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("unary: %s\n", ast_expr_str(expr));
 	switch (ast_expr_unary_op(expr)) {
 	case UNARY_OP_DEREFERENCE:
 		return dereference_eval(expr, state);
@@ -436,6 +438,7 @@ binary_deref_eval(struct ast_expr *expr, struct state *state);
 static struct result *
 dereference_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("derefeval: %s\n", ast_expr_str(expr));
 	struct ast_expr *binary = expr_to_binary(ast_expr_unary_operand(expr));
 	struct result *res = binary_deref_eval(binary, state);
 	ast_expr_destroy(binary);
@@ -460,6 +463,7 @@ expr_to_binary(struct ast_expr *expr)
 static struct result *
 binary_deref_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("bin deref: %s\n", ast_expr_str(expr));
 	struct result *res = ast_expr_eval(ast_expr_binary_e1(expr), state);
 	if (result_iserror(res)) {
 		return res;

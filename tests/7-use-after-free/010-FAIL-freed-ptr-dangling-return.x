@@ -14,7 +14,7 @@ main()
 
 int *
 func() ~ [
-	!$result;	/* not necessary */
+	//!$result;	/* not necessary */
 ] {
 	int *p;
 	p = malloc(1);
