@@ -7,18 +7,17 @@ main()
 	int *j;
 
 	i = func();
-	j = *i;		/* ERROR: deref dangling ptr */
+	j = *i;		/* ERROR: unjusitified indirection */
 
 	return 0;
 }
 
 int *
-func() ~ [
-	!@result;
-] {
+func() /* not annotated */
+{
 	int *p;
 	p = malloc(1);
 	free(p);	/* p dangling */
-	
-	return p;	/* return dangling ptr */		
+
+	return p;	/* return dangling ptr */
 }
