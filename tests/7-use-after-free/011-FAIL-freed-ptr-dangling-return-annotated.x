@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 int *
-func()
+func() ~ [ !$result; ]
 {
 	int *p;
 	p = malloc(1);
@@ -17,9 +17,7 @@ main()
 	int *j;
 
 	i = func();
-	j = *i;		/* ERROR: unjustified indirection */
+	j = *i;		/* ERROR: unjusitified indirection */
 
 	return 0;
 }
-
-

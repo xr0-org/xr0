@@ -1,5 +1,14 @@
 #include <stdlib.h>
 
+int *
+dangling_return()
+{
+	int p;
+
+	p = 5;
+	return &p;	/* returning dangling pointer */
+}
+
 int
 main()
 {
@@ -7,15 +16,5 @@ main()
 	int q;
 
 	p = dangling_return();
-	q = *p;		/* ERROR: unjustified dereference */
-}
-
-int *
-dangling_return() ~ [
-
-] {
-	int p;
-
-	p = 5;
-	return &p;	/* returning dangling pointer */
+	q = *p;			/* ERROR: unjustified dereference */
 }

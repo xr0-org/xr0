@@ -296,7 +296,7 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		struct object *obj = state_getresult(state); 
 		assert(obj);
 		object_assign(obj, value_copy(result_as_value(res)));
-		result_destroy(res);
+		/* destroy result if exists */
 	}
 	return NULL;
 }

@@ -1,5 +1,8 @@
 #include <stdlib.h>
 
+int *
+func() ~ [ $result; /* false claim */ ];
+
 int
 main()
 {
@@ -13,7 +16,7 @@ main()
 }
 
 int *
-func() /* not annotated */
+func()
 {
 	int *p;
 	p = malloc(1);

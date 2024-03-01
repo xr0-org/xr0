@@ -122,7 +122,7 @@ ast_expr_exec(struct ast_expr *expr, struct state *state)
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
-	result_destroy(res);
+	/* result_destroy(res); */
 	return NULL;
 }
 
@@ -475,7 +475,9 @@ binary_deref_eval(struct ast_expr *expr, struct state *state)
 	result_destroy(res);
 
 	struct value *v = object_as_value(obj);
-	assert(v);
+	if (!v) {
+		return result_error_create(error_create("unjustified indirection (rvalue)"));
+	}
 
 	return result_value_create(value_copy(v));
 }
