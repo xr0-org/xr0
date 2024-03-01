@@ -1,5 +1,8 @@
 #include <stdlib.h>
 
+int *
+func();
+
 int
 main()
 {
@@ -7,15 +10,14 @@ main()
 	int *j;
 
 	i = func();
-	j = *i;		/* ERROR: unjusitified indirection */
+	j = *i;		/* ERROR: unjustified indirection */
 
 	return 0;
 }
 
 int *
-func() ~ [
-	//!$result;	/* not necessary */
-] {
+func()
+{
 	int *p;
 	p = malloc(1);
 	free(p);	/* p dangling */

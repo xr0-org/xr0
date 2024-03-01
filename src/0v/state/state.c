@@ -238,6 +238,9 @@ state_getobject(struct state *state, char *id)
 struct object *
 state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 {
+	if (value_issync(ptr_val)) {
+		return NULL;
+	}
 	struct location *deref_base = value_as_location(ptr_val);
 	assert(deref_base);
 
