@@ -742,6 +742,8 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 {
 	/* TODO: consider expressions with calls */
 	switch (stmt->kind) {
+	case STMT_NOP:
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	case STMT_EXPR:
 		return ast_expr_splits(stmt->u.expr, s);
 	case STMT_SELECTION:

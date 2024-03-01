@@ -164,6 +164,8 @@ expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
 struct lvalue *
 expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
+	printf("state: %s\n", state_str(state));
 	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
 	struct ast_expr *inner = ast_expr_unary_operand(expr);
 
@@ -314,7 +316,6 @@ arbarg_eval(struct ast_expr *expr, struct state *state);
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	/* TODO: verify preconditions of expr (statement) are satisfied */
 	/* now add postconditions */
 	switch (ast_expr_kind(expr)) {
@@ -413,7 +414,6 @@ address_eval(struct ast_expr *, struct state *);
 static struct result *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("unary: %s\n", ast_expr_str(expr));
 	switch (ast_expr_unary_op(expr)) {
 	case UNARY_OP_DEREFERENCE:
 		return dereference_eval(expr, state);
@@ -835,12 +835,17 @@ arbarg_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 assign_absexec(struct ast_expr *expr, struct state *state);
 
+static struct result *
+isdereferencable_absexec(struct ast_expr *expr, struct state *state);
+
 struct result *
 ast_expr_absexec(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
+	case EXPR_ISDEREFERENCABLE:
+		return isdereferencable_absexec(expr, state);
 	default:
 		assert(false);
 	}
@@ -850,6 +855,14 @@ static struct result *
 assign_absexec(struct ast_expr *expr, struct state *state)
 {
 	return expr_assign_eval(expr, state);
+}
+
+static struct result *
+isdereferencable_absexec(struct ast_expr *expr, struct state *state)
+{
+	struct props *p = state_getprops(state);
+	props_install(p, expr);
+	return result_value_create(NULL);
 }
 
 static struct preresult *

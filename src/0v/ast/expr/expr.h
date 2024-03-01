@@ -22,7 +22,8 @@ struct ast_expr {
 		EXPR_ASSIGNMENT		= 1 << 10,
 
 		EXPR_ISDEALLOCAND	= 1 << 11,
-		EXPR_ARBARG		= 1 << 12,
+		EXPR_ISDEREFERENCABLE	= 1 << 12,
+		EXPR_ARBARG		= 1 << 13,
 	} kind;
 	struct ast_expr *root;
 	union {

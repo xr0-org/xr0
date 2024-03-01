@@ -177,6 +177,8 @@ struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_NOP:
+		return NULL;
 	case STMT_LABELLED:
 		return ast_stmt_exec(ast_stmt_labelled_stmt(stmt), state);
 	case STMT_COMPOUND:
@@ -288,6 +290,8 @@ iter_neteffect(struct ast_stmt *iter)
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
+	/* TODO: install propositions corresponding to dereferencability */
+
 	struct result *res = ast_expr_eval(ast_stmt_jump_rv(stmt), state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
@@ -297,6 +301,7 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		assert(obj);
 		object_assign(obj, value_copy(result_as_value(res)));
 		/* destroy result if exists */
+		
 	}
 	return NULL;
 }

@@ -102,3 +102,15 @@ props_contradicts_actual(struct props *p, struct ast_expr *p1, struct ast_expr *
 	}
 	return false;
 }
+
+struct props *
+props_filter(struct props *p)
+{
+	struct props *new = props_create();
+	for (int i = 0; i < p->n; i++) {
+		if (ast_expr_isisdereferencable(p->prop[i])) {
+			props_install(new, ast_expr_copy(p->prop[i]));
+		}
+	}
+	return new;
+}

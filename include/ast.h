@@ -131,6 +131,15 @@ struct ast_expr *
 ast_expr_isdeallocand_assertand(struct ast_expr *expr);
 
 struct ast_expr *
+ast_expr_isdereferencable_create(struct ast_expr *assertand);
+
+struct ast_expr *
+ast_expr_isdereferencable_assertand(struct ast_expr *expr);
+
+bool
+ast_expr_isisdereferencable(struct ast_expr *expr);
+
+struct ast_expr *
 ast_expr_arbarg_create();
 
 void

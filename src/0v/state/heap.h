@@ -33,6 +33,9 @@ heap_getblock(struct heap *h, int block);
 bool
 heap_referenced(struct heap *h, struct state *);
 
+bool
+heap_blockisfreed(struct heap *h, int block);
+
 struct error *
 heap_deallocblock(struct heap *h, int block);
 

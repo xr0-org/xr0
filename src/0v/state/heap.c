@@ -131,6 +131,12 @@ heap_deallocblock(struct heap *h, int address)
 	return NULL;
 }
 
+bool
+heap_blockisfreed(struct heap *h, int address)
+{
+	return h->freed[address];
+}
+
 void
 heap_undeclare(struct heap *h, struct state *s)
 {

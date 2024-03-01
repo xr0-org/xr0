@@ -116,6 +116,12 @@ state_getprops(struct state *s)
 	return s->props;
 }
 
+struct heap *
+state_getheap(struct state *s)
+{
+	return s->heap;
+}
+
 void
 state_pushframe(struct state *state, char *func, struct ast_type *ret_type)
 {
@@ -348,7 +354,7 @@ state_range_aredeallocands(struct state *state, struct object *obj,
 bool
 state_hasgarbage(struct state *state)
 {
-	return heap_referenced(state->heap, state);
+	return !heap_referenced(state->heap, state);
 }
 
 void
@@ -413,5 +419,5 @@ static void
 state_popprops(struct state *s)
 {
 	/* XXX: */
-	s->props = props_create();
+	s->props = props_filter(s->props);
 }

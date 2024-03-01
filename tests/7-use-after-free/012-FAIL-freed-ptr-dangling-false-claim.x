@@ -1,7 +1,15 @@
 #include <stdlib.h>
 
 int *
-func() ~ [ $result; /* false claim */ ];
+func() ~ [ $result; /* false claim */ ]
+{
+	int *p;
+	p = malloc(1);
+
+	free(p);	/* p dangling */
+
+	return p;	/* return dangling ptr */
+}
 
 int
 main()
@@ -13,14 +21,4 @@ main()
 	j = *i;		/* ERROR: unjusitified indirection */
 
 	return 0;
-}
-
-int *
-func()
-{
-	int *p;
-	p = malloc(1);
-	free(p);	/* p dangling */
-
-	return p;	/* return dangling ptr */
 }

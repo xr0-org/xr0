@@ -5,8 +5,9 @@ func()
 {
 	int *p;
 	p = malloc(1);
-	free(p);	/* p dangling */
 
+	free(p);	/* p dangling */
+	~ [ !@p; ];
 	return p;	/* return dangling ptr */
 }
 
@@ -21,5 +22,3 @@ main()
 
 	return 0;
 }
-
-

@@ -190,6 +190,9 @@ bool
 location_referencesheap(struct location *l, struct state *s)
 {
 	if (l->type == LOCATION_DYNAMIC) {
+		if (heap_blockisfreed(state_getheap(s), l->block)) {
+			return false;
+		}
 		return true;
 	}
 	struct object *obj = state_get(s, l, false);

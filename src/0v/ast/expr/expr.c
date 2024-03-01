@@ -606,11 +606,41 @@ ast_expr_isdeallocand_assertand(struct ast_expr *expr)
 	return expr->root;
 }
 
+struct ast_expr *
+ast_expr_isdereferencable_create(struct ast_expr *assertand)
+{
+	struct ast_expr *new = ast_expr_create();
+	new->kind = EXPR_ISDEREFERENCABLE;
+	new->root = assertand;
+	return new;
+}
+
+struct ast_expr *
+ast_expr_isdereferencable_assertand(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_ISDEREFERENCABLE);
+	return expr->root;
+}
+
+bool
+ast_expr_isisdereferencable(struct ast_expr *expr)
+{
+	return expr->kind == EXPR_ISDEREFERENCABLE;
+}
+
 static void
 ast_expr_isdeallocand_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
 	char *root = ast_expr_str(expr->root);
 	strbuilder_printf(b, "@%s", root);
+	free(root);
+}
+
+static void
+ast_expr_isdereferencable_str_build(struct ast_expr *expr, struct strbuilder *b)
+{
+	char *root = ast_expr_str(expr->root);
+	strbuilder_printf(b, "$%s", root);
 	free(root);
 }
 
@@ -658,6 +688,9 @@ ast_expr_destroy(struct ast_expr *expr)
 	case EXPR_ISDEALLOCAND:
 		ast_expr_destroy(expr->root);
 		break;
+	case EXPR_ISDEREFERENCABLE:
+		ast_expr_destroy(expr->root);
+		break;
 	case EXPR_ARBARG:
 		break;
 	default:
@@ -703,6 +736,9 @@ ast_expr_str(struct ast_expr *expr)
 		break;
 	case EXPR_ISDEALLOCAND:
 		ast_expr_isdeallocand_str_build(expr, b);
+		break;
+	case EXPR_ISDEREFERENCABLE:
+		ast_expr_isdereferencable_str_build(expr, b);
 		break;
 	case EXPR_ARBARG:
 		strbuilder_putc(b, '$');
@@ -758,6 +794,10 @@ ast_expr_copy(struct ast_expr *expr)
 		);
 	case EXPR_ISDEALLOCAND:
 		return ast_expr_isdeallocand_create(
+			ast_expr_copy(expr->root)
+		);
+	case EXPR_ISDEREFERENCABLE:
+		return ast_expr_isdereferencable_create(
 			ast_expr_copy(expr->root)
 		);
 	case EXPR_ARBARG:
@@ -919,6 +959,7 @@ ast_expr_getfuncs(struct ast_expr *expr)
 	case EXPR_STRING_LITERAL:
 	case EXPR_STRUCTMEMBER:
 	case EXPR_ISDEALLOCAND:
+	case EXPR_ISDEREFERENCABLE:
 	case EXPR_ARBARG:
 		return string_arr_create();	
 	case EXPR_CALL:
@@ -951,6 +992,7 @@ binary_splits(struct ast_expr *, struct state *);
 struct ast_stmt_splits
 ast_expr_splits(struct ast_expr *e, struct state *s)
 {
+	printf("expr: %s\n", ast_expr_str(e));
 	switch (ast_expr_kind(e)) {
 	case EXPR_CALL:
 		return call_splits(e, s);
@@ -968,6 +1010,7 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 	case EXPR_IDENTIFIER:
 	case EXPR_STRING_LITERAL:
 	case EXPR_ARBARG:
+	case EXPR_ISDEREFERENCABLE:
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	default:
 		/*printf("expr: %s\n", ast_expr_str(e));*/

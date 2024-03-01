@@ -45,6 +45,9 @@ state_getext(struct state *);
 struct props *
 state_getprops(struct state *);
 
+struct heap *
+state_getheap(struct state *);
+
 void
 state_pushframe(struct state *, char *func, struct ast_type *ret_type);
 
