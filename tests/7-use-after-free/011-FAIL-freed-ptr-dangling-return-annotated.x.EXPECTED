@@ -1,1 +1,0 @@
-7-use-after-free/011-FAIL-free-ptr-dangling-return-annotated.x:20:8: cannot exec statement: unjustified indirection (rvalue)

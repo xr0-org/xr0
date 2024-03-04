@@ -164,8 +164,6 @@ expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
 struct lvalue *
 expr_unary_lvalue(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
-	printf("state: %s\n", state_str(state));
 	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
 	struct ast_expr *inner = ast_expr_unary_operand(expr);
 
@@ -316,6 +314,7 @@ arbarg_eval(struct ast_expr *expr, struct state *state);
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	/* TODO: verify preconditions of expr (statement) are satisfied */
 	/* now add postconditions */
 	switch (ast_expr_kind(expr)) {
@@ -748,6 +747,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 static struct result *
 expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("state: (before): %s", state_str(state));
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
@@ -773,6 +773,8 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	object_assign(obj, value_copy(result_as_value(res)));
+
+	printf("state: (after): %s", state_str(state));
 	return res;
 }
 

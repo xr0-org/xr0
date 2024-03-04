@@ -2,7 +2,7 @@
 
 int *
 dangling_static_return() ~ [
-	$result;
+	*result = $;
 ] {
 	static int p;
 	

@@ -28,7 +28,4 @@ props_get(struct props *, struct ast_expr *);
 bool
 props_contradicts(struct props *k, struct ast_expr *);
 
-struct props *
-props_filter(struct props *p);
-
 #endif

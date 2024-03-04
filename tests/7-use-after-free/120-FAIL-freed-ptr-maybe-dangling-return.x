@@ -2,10 +2,10 @@
 
 int *
 func(int x) ~ [
-	if (x) {
-		!$result;	/* not necessary */
+	.alloc result;
+	if (!x) {
+		*result = $;
 	}
-	$result;
 ] {
 	int *p;
 	p = malloc(1);
@@ -13,7 +13,7 @@ func(int x) ~ [
 	if (x) {
 		free(p);	/* p dangling */
 	}
-	
+
 	return p;		/* p not may be dangling */
 }
 

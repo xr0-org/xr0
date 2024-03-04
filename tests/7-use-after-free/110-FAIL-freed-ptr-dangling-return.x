@@ -1,12 +1,13 @@
 #include <stdlib.h>
 
 int *
-func() ~ [ !$result; ]
+func()
 {
 	int *p;
 	p = malloc(1);
-	free(p);	/* p dangling */
 
+	free(p);	/* p dangling */
+	~ [ !@p; ];
 	return p;	/* return dangling ptr */
 }
 
@@ -17,7 +18,7 @@ main()
 	int *j;
 
 	i = func();
-	j = *i;		/* ERROR: unjusitified indirection */
+	j = *i;		/* ERROR: unjustified indirection (rvalue) */
 
 	return 0;
 }

@@ -1,12 +1,12 @@
 #include <stdlib.h>
 
 int *
-func() ~ [
-	.alloc result;
-	$result;
-] {
+func() ~ [ *result = $; ]	/* ERROR: */
+{
 	int *p;
 	p = malloc(1);
+
+	free(p);	/* p dangling */
 
 	return p;	/* return dangling ptr */
 }
@@ -17,7 +17,7 @@ main()
 	int *i;
 	int *j;
 
-	i = func();
+	i = func();	/* should work based on func abstract? */
 	j = *i;
 
 	return 0;

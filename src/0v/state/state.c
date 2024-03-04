@@ -110,16 +110,16 @@ state_getext(struct state *s)
 	return s->ext;
 }
 
-struct props *
-state_getprops(struct state *s)
-{
-	return s->props;
-}
-
 struct heap *
 state_getheap(struct state *s)
 {
 	return s->heap;
+}
+
+struct props *
+state_getprops(struct state *s)
+{
+	return s->props;
 }
 
 void
@@ -418,6 +418,6 @@ state_undeclarevars(struct state *s)
 static void
 state_popprops(struct state *s)
 {
-	/* XXX: */
-	s->props = props_filter(s->props);
+	props_destroy(s->props);
+	s->props = props_create();
 }
