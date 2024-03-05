@@ -17,22 +17,11 @@ struct location {
 	enum location_type type;
 	union {
 		int frame; /* LOCATION_AUTOMATIC */
+		enum deref_type dtype;
 	} u;
 	int block;
 	struct ast_expr *offset;
 };
-
-struct location *
-location_create_dynamic(int block, struct ast_expr *offset)
-{
-	struct location *loc = malloc(sizeof(struct location));
-	assert(loc);
-	loc->type = LOCATION_DYNAMIC;
-	loc->block = block;
-	assert(offset);
-	loc->offset = offset;
-	return loc;
-}
 
 struct location *
 location_create_vconst(int block, struct ast_expr *offset)
@@ -40,6 +29,31 @@ location_create_vconst(int block, struct ast_expr *offset)
 	struct location *loc = malloc(sizeof(struct location));
 	assert(loc);
 	loc->type = LOCATION_VCONST;
+	loc->block = block;
+	assert(offset);
+	loc->offset = offset;
+	return loc;
+}
+
+struct location *
+location_create_dereferencable(int block, enum deref_type dtype, struct ast_expr *offset)
+{
+	struct location *loc = malloc(sizeof(struct location));
+	assert(loc);
+	loc->type = LOCATION_DEREFERENCABLE;
+	loc->u.dtype = dtype;
+	loc->block = block;
+	assert(offset);
+	loc->offset = offset;
+	return loc;
+}
+
+struct location *
+location_create_dynamic(int block, struct ast_expr *offset)
+{
+	struct location *loc = malloc(sizeof(struct location));
+	assert(loc);
+	loc->type = LOCATION_DYNAMIC;
 	loc->block = block;
 	assert(offset);
 	loc->offset = offset;

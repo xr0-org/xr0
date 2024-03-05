@@ -12,5 +12,5 @@ main()
 	int p;
 	p = 1;
 	assign(&p);
-	~ [ p = 1 ];
+	~ [ p = 1; ];
 }

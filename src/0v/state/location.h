@@ -5,15 +5,25 @@
 
 struct ast_expr;
 
+enum deref_type {
+	LVALUE, RVALUE
+};
+
 enum location_type {
 	/* TODO: STATIC */
-	LOCATION_VCONST, LOCATION_AUTOMATIC, LOCATION_DYNAMIC,
+	LOCATION_VCONST,
+	LOCATION_DEREFERENCABLE,
+	LOCATION_AUTOMATIC,
+	LOCATION_DYNAMIC,
 };
 
 struct location;
 
 struct location *
 location_create_vconst(int block, struct ast_expr *offset);
+
+struct location *
+location_create_dereferencable(int block, enum deref_type dtype, struct ast_expr *offset);
 
 struct location *
 location_create_dynamic(int block, struct ast_expr *offset);
