@@ -294,23 +294,68 @@ path_verify(struct ast_function *f, struct state *state, int index)
 	return NULL;
 }
 
+static struct map *
+ast_function_params_analyse(struct ast_function *, struct state *);
+
+static void
+inititalise_parameter(struct state *, struct paraminfo *);
+
 static void
 declare_parameters(struct state *s, struct ast_function *f)
 {
 	/* declare params and locals in stack frame */
-	struct ast_variable **param = ast_function_params(f);
+	struct map *m = ast_function_params_analyse(f, s);
+	
 	int nparams = ast_function_nparams(f);
+	struct ast_variable **params = ast_function_params(f);
 	for (int i = 0; i < nparams; i++) {
-		struct ast_variable *p = param[i];
-		state_declare(s, p, true);
-		char *name = ast_variable_name(p);
-		struct object *obj = state_getobject(s, name);
-		assert(obj);
-		object_assign(
-			obj,
-			state_vconst(s, ast_variable_type(p), dynamic_str(name), true)
-		);
+		state_declare(s, params[i], true);
 	}
+}
+
+static void
+build_paramsinfomap(struct map *m, int n, struct ast_stmt **stmt, struct state *);
+
+static struct map *
+ast_function_params_analyse(struct ast_function *f, struct state *s)
+{
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **params = ast_function_params(f);
+	struct ast_block *abs = ast_function_abstract(f);
+	
+	int nstmts = ast_block_nstmts(abs);
+	struct ast_stmt **stmt = ast_block_stmts(abs);
+
+	struct map *m = map_create();
+	build_paramsinfomap(m, nstmts, stmt, s);
+
+}
+
+static void
+build_paramsinfomap(struct map *m, int n, struct ast_stmt **stmt, struct state *s)
+{
+	for (int i = 0; i < n; i++) {
+		ast_stmt_paramsinfomap(m, stmt[i], s);
+	}
+}
+
+static void
+inititalise_param(struct state *s, struct paraminfo *p)
+{
+	struct ast_variable *v = p->param;
+	char *name = ast_variable_name(v);
+	struct ast_type *t = ast_variable_type(v);
+
+	struct object *obj = state_getobject(s, name);
+	assert(obj);
+	struct value *val;
+	if (p->isderef) {
+		val = state_dereferenceable(s, t, p->isrval);
+	} else {
+		val = state_vconst(s, t, dynamic_str(name), true);
+	}
+	assert(val);
+	object_assign(obj, val);
 }
 
 static struct preresult *

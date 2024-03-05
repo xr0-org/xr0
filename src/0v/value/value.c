@@ -470,7 +470,6 @@ value_copy(struct value *v)
 struct value *
 value_abstractcopy(struct value *v, struct state *s)
 {
-	printf("value: %s\n", value_str(v));
 	if (!value_referencesheap(v, s)) {
 		return NULL;
 	}

@@ -345,7 +345,6 @@ vconst_str(struct vconst *v, char *indent)
 	}
 	return strbuilder_build(b);
 }
-
 bool
 vconst_eval(struct vconst *v, struct ast_expr *e)
 {

@@ -47,7 +47,6 @@ ast_variables_copy(int n, struct ast_variable **v)
 	return new;
 }
 
-
 char *
 ast_variable_str(struct ast_variable *v)
 {

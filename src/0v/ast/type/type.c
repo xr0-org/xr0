@@ -32,6 +32,12 @@ ast_type_isint(struct ast_type *t)
 	return t->base == TYPE_INT;
 }
 
+bool
+ast_type_ispointer(struct ast_type *t)
+{
+	return t->base == TYPE_POINTER;
+}
+
 struct ast_type *
 ast_type_create(enum ast_type_base base, enum ast_type_modifier mod)
 {
@@ -84,7 +90,6 @@ ast_type_vconst(struct ast_type *t, struct state *s, char *comment, bool persist
 	switch (t->base) {
 	case TYPE_INT:
 		return value_int_indefinite_create();
-	case TYPE_VOID:
 	case TYPE_POINTER:
 		return value_ptr_indefinite_create();
 	case TYPE_USERDEF:
@@ -97,7 +102,6 @@ ast_type_vconst(struct ast_type *t, struct state *s, char *comment, bool persist
 		assert(false);
 	}
 }
-
 
 bool
 ast_type_isstruct(struct ast_type *t)

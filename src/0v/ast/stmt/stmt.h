@@ -46,4 +46,7 @@ sel_decide(struct ast_expr *control, struct state *state);
 struct error *
 ast_stmt_precondsverify(struct ast_stmt *, struct state *);
 
+void
+ast_stmt_paramsinfomap(struct map *, struct ast_stmt *, struct state *);
+
 #endif

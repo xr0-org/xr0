@@ -300,3 +300,23 @@ string_arr_str(struct string_arr *string_arr)
 	}
 	return strbuilder_build(b);
 }
+
+
+/* paraminfo */
+
+struct paraminfo *
+paraminfo_create(struct ast_variable *param, bool isderef, bool isrval)
+{
+	struct paraminfo *p = malloc(sizeof(struct paraminfo));
+	p->param = param;
+	p->isderef = isderef;
+	p->isrval = isrval;
+	return p;
+}
+
+void
+paraminfo_destroy(struct paraminfo *p)
+{
+	/* paraminfo just wraps a param the param should be destroyed separately */
+	free(p);
+}

@@ -372,12 +372,14 @@ ast_stmt_exec(struct ast_stmt *, struct state *);
 struct result *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
-
 struct ast_type;
 
 /* TODO: allow modifiers for pointer, array and typedef types */
 bool
 ast_type_isint(struct ast_type *type);
+
+bool
+ast_type_ispointer(struct ast_type *type);
 
 struct ast_type *
 ast_type_create_ptr(struct ast_type *type);

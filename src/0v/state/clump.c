@@ -2,6 +2,8 @@
 #include <stdbool.h>
 #include <assert.h>
 
+#include "ast.h"
+#include "location.h"
 #include "block.h"
 #include "util.h"
 
@@ -44,4 +46,24 @@ clump_copy(struct clump *c)
 	struct clump *copy = malloc(sizeof(struct clump));	
 	copy->blocks = block_arr_copy(c->blocks);
 	return copy;
+}
+
+int
+clump_newblock(struct clump *c)
+{
+	int address = block_arr_append(c->blocks, block_create());
+
+	int n = block_arr_nblocks(c->blocks);
+	assert(n > 0);
+		
+	return address;	
+}
+
+struct block *
+clump_getblock(struct clump *c, int address)
+{
+	if (address >= block_arr_nblocks(c->blocks)) {
+		return NULL;
+	}
+	return block_arr_blocks(c->blocks)[address];
 }

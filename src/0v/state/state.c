@@ -168,6 +168,20 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 }
 
 struct value *
+state_dereferencable(struct state *state, struct ast_type *t, bool isrval)
+{
+	/* XXX: should type be associated with blocks for type checking when we
+	 * assign? */
+	int address = clump_newblock(state->clump);
+	struct location *loc = location_create_dereferencable(
+		address,
+		isrval ? RVALUE : LVALUE,
+		ast_expr_constant_create(0)
+	);
+	return value_ptr_create(loc);
+}
+
+struct value *
 state_getvconst(struct state *state, char *id)
 {
 	return vconst_get(state->vconst, id);
