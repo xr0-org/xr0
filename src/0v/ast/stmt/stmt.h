@@ -47,6 +47,6 @@ struct error *
 ast_stmt_precondsverify(struct ast_stmt *, struct state *);
 
 void
-ast_stmt_paramsinfomap(struct map *, struct ast_stmt *, struct state *);
+ast_stmt_varinfomap(struct map *, struct ast_stmt *, struct state *);
 
 #endif

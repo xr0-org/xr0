@@ -302,21 +302,21 @@ string_arr_str(struct string_arr *string_arr)
 }
 
 
-/* paraminfo */
+/* varinfo */
 
-struct paraminfo *
-paraminfo_create(struct ast_variable *param, bool isderef, bool isrval)
+struct varinfo *
+varinfo_create(struct ast_type *t, bool isderef, bool isrval)
 {
-	struct paraminfo *p = malloc(sizeof(struct paraminfo));
-	p->param = param;
-	p->isderef = isderef;
-	p->isrval = isrval;
-	return p;
+	struct varinfo *v = malloc(sizeof(struct varinfo));
+	v->type = t;
+	v->isderef = isderef;
+	v->isrval = isrval;
+	return v;
 }
 
 void
-paraminfo_destroy(struct paraminfo *p)
+varinfo_destroy(struct varinfo *v)
 {
-	/* paraminfo just wraps a param the param should be destroyed separately */
-	free(p);
+	/* varinfo just wraps a param the param should be destroyed separately */
+	free(v);
 }

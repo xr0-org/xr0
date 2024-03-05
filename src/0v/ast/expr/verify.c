@@ -1141,3 +1141,58 @@ ast_expr_precondsverify(struct ast_expr *e, struct state *s)
 	}
 	return NULL;
 }
+
+void
+unary_varinfomap(struct map *, struct ast_expr *, struct state *);
+
+void
+assignment_varinfomap(struct map *, struct ast_expr *, struct state *);
+
+void
+ast_expr_varinfomap(struct map *m, struct ast_expr *expr, struct state *s)
+{
+	switch (expr->kind) {
+	case EXPR_UNARY:
+		unary_varinfomap(m, expr, s);
+		break;
+	case EXPR_ASSIGNMENT:
+		assignment_varinfomap(m, expr, s);
+		break;
+	default:
+		assert(false);
+	}
+}
+
+void
+unary_varinfomap(struct map *m, struct ast_expr *expr, struct state *s)
+{
+	char *key = ast_expr_as_identifier(ast_expr_unary_operand(expr));
+	struct varinfo *vinfo = varinfo_create(
+		state_getobjecttype(s, key), true, false
+	);
+	map_set(m, dynamic_str(key), vinfo);
+}
+
+void
+assignment_varinfomap(struct map *m, struct ast_expr *expr, struct state *s)
+{
+	struct ast_expr *lval = ast_expr_assignment_lval(expr),
+			*rval = ast_expr_assignment_rval(expr);
+
+	assert(!ast_expr_equal(lval, rval)); /* TODO: surface as user error */
+
+	if (ast_expr_unary_isdereference(lval)) {
+		char *key = ast_expr_as_identifier(ast_expr_unary_operand(lval));
+		struct varinfo *vinfo = varinfo_create(
+			state_getobjecttype(s, key), true, false
+		);
+		map_set(m, dynamic_str(key), vinfo);
+	}
+	if (ast_expr_unary_isdereference(rval)) {
+		char *key = ast_expr_as_identifier(ast_expr_unary_operand(rval));
+		struct varinfo *vinfo = varinfo_create(
+			state_getobjecttype(s, key), true, true
+		);
+		map_set(m, dynamic_str(key), vinfo);
+	}
+}

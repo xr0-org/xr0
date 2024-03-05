@@ -295,64 +295,68 @@ path_verify(struct ast_function *f, struct state *state, int index)
 }
 
 static struct map *
-ast_function_params_analyse(struct ast_function *, struct state *);
+abstract_analyse(struct ast_block *abs, struct state *);
 
 static void
-inititalise_parameter(struct state *, struct paraminfo *);
+inititalise_param(char *name, struct varinfo *, struct state *);
 
 static void
 declare_parameters(struct state *s, struct ast_function *f)
 {
-	/* declare params and locals in stack frame */
-	struct map *m = ast_function_params_analyse(f, s);
-	
+	/* declare params and locals in stack frame */	
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
 	for (int i = 0; i < nparams; i++) {
 		state_declare(s, params[i], true);
 	}
-}
 
-static void
-build_paramsinfomap(struct map *m, int n, struct ast_stmt **stmt, struct state *);
+	/* analyse variables in abstract against lval/rval semantics */
+	struct map *m = abstract_analyse(ast_function_abstract(f), s);
 
-static struct map *
-ast_function_params_analyse(struct ast_function *f, struct state *s)
-{
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **params = ast_function_params(f);
-	struct ast_block *abs = ast_function_abstract(f);
-	
-	int nstmts = ast_block_nstmts(abs);
-	struct ast_stmt **stmt = ast_block_stmts(abs);
-
-	struct map *m = map_create();
-	build_paramsinfomap(m, nstmts, stmt, s);
-
-}
-
-static void
-build_paramsinfomap(struct map *m, int n, struct ast_stmt **stmt, struct state *s)
-{
-	for (int i = 0; i < n; i++) {
-		ast_stmt_paramsinfomap(m, stmt[i], s);
+	/* appropriately initialise param depending */
+	for (int i = 0; i < nparams; i++) {
+		char *key = ast_variable_name(params[i]);
+		struct varinfo *vi = (struct varinfo *) map_get(m, key);
+		assert(vi);
+		inititalise_param(key, vi, s);
 	}
 }
 
 static void
-inititalise_param(struct state *s, struct paraminfo *p)
-{
-	struct ast_variable *v = p->param;
-	char *name = ast_variable_name(v);
-	struct ast_type *t = ast_variable_type(v);
+variableinfomap(struct map *m, int n, struct ast_stmt **stmt, struct state *);
 
-	struct object *obj = state_getobject(s, name);
+static struct map *
+abstract_analyse(struct ast_block *abs, struct state *s)
+{
+	int nstmts = ast_block_nstmts(abs);
+	struct ast_stmt **stmt = ast_block_stmts(abs);
+
+	struct map *m = map_create();
+	variableinfomap(m, nstmts, stmt, s);
+
+	return m;
+}
+
+static void
+variableinfomap(struct map *m, int n, struct ast_stmt **stmt, struct state *s)
+{
+	for (int i = 0; i < n; i++) {
+		ast_stmt_varinfomap(m, stmt[i], s);
+	}
+}
+
+static void
+inititalise_param(char *name, struct varinfo *v, struct state *state)
+{
+	struct ast_type *t = v->type;
+
+	struct object *obj = state_getobject(state, name);
 	assert(obj);
 	struct value *val;
-	if (p->isderef) {
-		val = state_dereferenceable(s, t, p->isrval);
+	if (v->isderef) {
+		val = state_clump(state, t, v->isrval);
 	} else {
-		val = state_vconst(s, t, dynamic_str(name), true);
+		val = state_vconst(state, t, dynamic_str(name), true);
 	}
 	assert(val);
 	object_assign(obj, val);

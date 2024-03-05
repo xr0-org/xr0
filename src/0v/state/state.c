@@ -168,7 +168,7 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 }
 
 struct value *
-state_dereferencable(struct state *state, struct ast_type *t, bool isrval)
+state_clump(struct state *state, struct ast_type *t, bool isrval)
 {
 	/* XXX: should type be associated with blocks for type checking when we
 	 * assign? */
@@ -278,6 +278,13 @@ state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 	struct object *res = state_get(state, deref, true);
 	/*location_destroy(deref);*/
 	return res;
+}
+
+struct variable *
+state_getvariable(struct state *state, char *id)
+{
+	/* does not traverse frames */	
+	return stack_getvariable(state->stack, id);
 }
 
 struct error *

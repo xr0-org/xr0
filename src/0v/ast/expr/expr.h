@@ -108,4 +108,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 struct string_arr *
 ast_expr_getfuncs(struct ast_expr *);
 
+void
+ast_expr_varinfomap(struct map *m, struct ast_expr *expr, struct state *s);
+
 #endif

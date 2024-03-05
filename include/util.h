@@ -101,18 +101,18 @@ string_arr_contains(struct string_arr *, char *s);
 char *
 string_arr_str(struct string_arr *);
 
-/* paraminfo */
+/* varinfo */
 
-struct paraminfo {
-	struct ast_variable *param;
-	bool isderef;	/* true: param is rval or lval deref-ed, false: neither */
+struct varinfo {
+	struct ast_type *type;
+	bool isderef;		/* true: param is rval or lval deref-ed, false: neither */
 	bool isrval;
 };
 
-struct paraminfo *
-paraminfo_create(struct ast_variable *param, bool isderef, bool isrval);
+struct varinfo *
+varinfo_create(struct ast_type *t, bool isderef, bool isrval);
 
 void
-paraminfo_destroy(struct paraminfo *p);
+varinfo_destroy(struct varinfo *p);
 
 #endif

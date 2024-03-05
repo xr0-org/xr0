@@ -97,7 +97,7 @@ struct value *
 state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
 
 struct value *
-state_dereferenceable(struct state *, struct ast_type *, bool isrval);
+state_clump(struct state *, struct ast_type *, bool isrval);
 
 struct value *
 state_getvconst(struct state *, char *id);

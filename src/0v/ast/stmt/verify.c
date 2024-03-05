@@ -580,3 +580,18 @@ ast_stmt_compound_precondsverify(struct ast_stmt *stmt, struct state *s)
 	}
 	return NULL;
 }
+
+void
+ast_stmt_varinfomap(struct map *m, struct ast_stmt *stmt, struct state *s)
+{
+	printf("stmt: %s\n", ast_stmt_str(stmt));
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_ALLOCATION:
+		break;
+	case STMT_EXPR:
+		ast_expr_varinfomap(m, ast_stmt_as_expr(stmt), s);
+		break;
+	default:
+		assert(false);
+	}
+}
