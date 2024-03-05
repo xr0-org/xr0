@@ -1,6 +1,6 @@
 void
 assign(int *q) ~ [
-	pre: $ = *q;	/* no side effect */
+	pre: *q;	/* no side effect */
 ] {
 	int p;
 	p = *q;

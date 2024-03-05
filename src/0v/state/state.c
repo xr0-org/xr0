@@ -5,6 +5,7 @@
 
 #include "ast.h"
 #include "block.h"
+#include "clump.h"
 #include "ext.h"
 #include "heap.h"
 #include "location.h"
@@ -18,6 +19,7 @@
 struct state {
 	struct externals *ext;
 	struct vconst *vconst;
+	struct clump *clump;
 	struct stack *stack;
 	struct heap *heap;
 	struct props *props;
@@ -30,6 +32,7 @@ state_create(char *func, struct externals *ext, struct ast_type *result_type)
 	assert(state);
 	state->ext = ext;
 	state->vconst = vconst_create();
+	state->clump = clump_create();
 	state->stack = stack_create(func, NULL, result_type);
 	state->heap = heap_create();
 	state->props = props_create();
@@ -40,6 +43,7 @@ void
 state_destroy(struct state *state)
 {
 	/* vconst_destroy(state->vconst); */
+	clump_destroy(state->clump);
 	stack_destroy(state->stack);
 	heap_destroy(state->heap);
 	props_destroy(state->props);
@@ -53,6 +57,7 @@ state_copy(struct state *state)
 	assert(copy);
 	copy->ext = state->ext;
 	copy->vconst = vconst_copy(state->vconst);
+	copy->clump = clump_copy(state->clump);
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
@@ -66,6 +71,7 @@ state_copywithname(struct state *state, char *func_name)
 	assert(copy);
 	copy->ext = state->ext;
 	copy->vconst = vconst_copy(state->vconst);
+	copy->clump = clump_copy(state->clump);
 	copy->stack = stack_copywithname(state->stack, func_name);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
@@ -87,6 +93,9 @@ state_str(struct state *state)
 		strbuilder_printf(b, "%s\n", vconst);
 	}
 	free(vconst);
+	char *clump = clump_str(state->clump, "\t");
+	strbuilder_printf(b, "%s\n", clump);
+	free(clump);
 	char *stack = stack_str(state->stack, state);
 	strbuilder_printf(b, "%s\n", stack);
 	free(stack);

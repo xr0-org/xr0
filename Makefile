@@ -35,6 +35,7 @@ MAIN_0C_OBJ = $(BUILD_DIR)/0c.o
 STATE_OBJ = $(BUILD_DIR)/state.o
 STACK_OBJ = $(BUILD_DIR)/stack.o
 HEAP_OBJ = $(BUILD_DIR)/heap.o
+CLUMP_OBJ = $(BUILD_DIR)/clump.o
 LOCATION_OBJ = $(BUILD_DIR)/location.o
 BLOCK_OBJ = $(BUILD_DIR)/block.o
 EXT_OBJ = $(BUILD_DIR)/ext.o
@@ -63,6 +64,7 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 		$(LOCATION_OBJ) \
 		$(OBJECT_OBJ) \
 		$(BLOCK_OBJ) \
+		$(CLUMP_OBJ) \
 		$(HEAP_OBJ) \
 		$(STACK_OBJ) \
 		$(EXT_OBJ) \
@@ -128,6 +130,10 @@ $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 $(HEAP_OBJ): $(STATE_DIR)/heap.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/heap.c
+
+$(CLUMP_OBJ): $(STATE_DIR)/clump.c $(BLOCK_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/clump.c
 
 $(BLOCK_OBJ): $(STATE_DIR)/block.c $(OBJECT_OBJ)
 	@printf 'CC\t$@\n'
