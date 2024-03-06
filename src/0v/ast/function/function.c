@@ -298,7 +298,7 @@ static struct map *
 abstract_analyse(struct ast_block *abs, struct state *);
 
 static void
-inititalise_param(char *name, struct varinfo *, struct state *);
+inititalise_param(struct ast_variable *v, struct map *, struct state *);
 
 static void
 declare_parameters(struct state *s, struct ast_function *f)
@@ -314,16 +314,11 @@ declare_parameters(struct state *s, struct ast_function *f)
 	struct map *m = abstract_analyse(ast_function_abstract(f), s);
 
 	/* appropriately initialise param depending */
-	for (int i = 0; i < nparams; i++) {
-		char *key = ast_variable_name(params[i]);
-		struct varinfo *vi = (struct varinfo *) map_get(m, key);
-		assert(vi);
-		inititalise_param(key, vi, s);
+	for (int i = 0; i < nparams; i++) {	
+		inititalise_param(params[i], m, s);
 	}
+	printf("state (postinit): %s\n", state_str(s));
 }
-
-static void
-variableinfomap(struct map *m, int n, struct ast_stmt **stmt, struct state *);
 
 static struct map *
 abstract_analyse(struct ast_block *abs, struct state *s)
@@ -332,31 +327,28 @@ abstract_analyse(struct ast_block *abs, struct state *s)
 	struct ast_stmt **stmt = ast_block_stmts(abs);
 
 	struct map *m = map_create();
-	variableinfomap(m, nstmts, stmt, s);
+	for (int i = 0; i < nstmts; i++) {
+		ast_stmt_varinfomap(m, stmt[i], s);
+	}
 
 	return m;
 }
 
 static void
-variableinfomap(struct map *m, int n, struct ast_stmt **stmt, struct state *s)
+inititalise_param(struct ast_variable *param, struct map *m, struct state *state)
 {
-	for (int i = 0; i < n; i++) {
-		ast_stmt_varinfomap(m, stmt[i], s);
-	}
-}
+	char *key = ast_variable_name(param);
+	struct ast_type *t = ast_variable_type(param);
 
-static void
-inititalise_param(char *name, struct varinfo *v, struct state *state)
-{
-	struct ast_type *t = v->type;
+	struct varinfo *vinfo = (struct varinfo *) map_get(m, key);
 
-	struct object *obj = state_getobject(state, name);
+	struct object *obj = state_getobject(state, key);
 	assert(obj);
 	struct value *val;
-	if (v->isderef) {
-		val = state_clump(state, t, v->isrval);
+	if (vinfo && vinfo->isderef) {
+		val = state_clump(state, t, vinfo->isrval);
 	} else {
-		val = state_vconst(state, t, dynamic_str(name), true);
+		val = state_vconst(state, t, dynamic_str(key), true);
 	}
 	assert(val);
 	object_assign(obj, val);

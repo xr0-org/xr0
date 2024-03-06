@@ -305,12 +305,20 @@ string_arr_str(struct string_arr *string_arr)
 /* varinfo */
 
 struct varinfo *
-varinfo_create(struct ast_type *t, bool isderef, bool isrval)
+varinfo_lval()
 {
 	struct varinfo *v = malloc(sizeof(struct varinfo));
-	v->type = t;
-	v->isderef = isderef;
-	v->isrval = isrval;
+	v->isderef = true;
+	v->isrval = false;
+	return v;
+}
+
+struct varinfo *
+varinfo_rval()
+{
+	struct varinfo *v = malloc(sizeof(struct varinfo));
+	v->isderef = true;
+	v->isrval = true;
 	return v;
 }
 

@@ -16,8 +16,8 @@
 struct location {
 	enum location_type type;
 	union {
-		int frame; /* LOCATION_AUTOMATIC */
-		enum deref_type dtype;
+		int frame;		/* LOCATION_AUTOMATIC */
+		enum deref_type dtype;	/* LOCATION_DEREFERENCABLE */
 	} u;
 	int block;
 	struct ast_expr *offset;
@@ -94,6 +94,9 @@ location_str(struct location *loc)
 	case LOCATION_DYNAMIC:
 		strbuilder_printf(b, "heap:");
 		break;
+	case LOCATION_DEREFERENCABLE:
+		strbuilder_printf(b, "clump:");
+		break;
 	default:
 		assert(false);
 	}
@@ -140,6 +143,10 @@ location_copy(struct location *loc)
 	case LOCATION_VCONST:
 		return location_create_vconst(
 			loc->block, ast_expr_copy(loc->offset)
+		);
+	case LOCATION_DEREFERENCABLE:
+		return location_create_dereferencable(
+			loc->block, loc->u.dtype, ast_expr_copy(loc->offset)
 		);
 	case LOCATION_AUTOMATIC:
 		return location_create_automatic(

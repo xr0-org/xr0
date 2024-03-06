@@ -409,6 +409,9 @@ ast_expr_unary_operand(struct ast_expr *expr)
 bool
 ast_expr_unary_isdereference(struct ast_expr *expr)
 {
+	if (ast_expr_kind(expr) != EXPR_UNARY) {
+		return false;
+	}
 	return ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE;
 }
 

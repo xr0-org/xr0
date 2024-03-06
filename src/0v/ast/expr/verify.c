@@ -1149,14 +1149,26 @@ void
 assignment_varinfomap(struct map *, struct ast_expr *, struct state *);
 
 void
+binary_varinfomap(struct map *, struct ast_expr *, struct state *);
+
+void
 ast_expr_varinfomap(struct map *m, struct ast_expr *expr, struct state *s)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	switch (expr->kind) {
+	case EXPR_IDENTIFIER:
+	case EXPR_CALL:
+	case EXPR_INCDEC:
+	case EXPR_STRUCTMEMBER:
+		break;
 	case EXPR_UNARY:
 		unary_varinfomap(m, expr, s);
 		break;
 	case EXPR_ASSIGNMENT:
 		assignment_varinfomap(m, expr, s);
+		break;
+	case EXPR_BINARY:
+		binary_varinfomap(m, expr, s);
 		break;
 	default:
 		assert(false);
@@ -1166,11 +1178,10 @@ ast_expr_varinfomap(struct map *m, struct ast_expr *expr, struct state *s)
 void
 unary_varinfomap(struct map *m, struct ast_expr *expr, struct state *s)
 {
-	char *key = ast_expr_as_identifier(ast_expr_unary_operand(expr));
-	struct varinfo *vinfo = varinfo_create(
-		state_getobjecttype(s, key), true, false
-	);
-	map_set(m, dynamic_str(key), vinfo);
+	if (ast_expr_unary_isdereference(expr)) {
+		char *key = ast_expr_as_identifier(ast_expr_unary_operand(expr));
+		map_set(m, dynamic_str(key), varinfo_rval());
+	}
 }
 
 void
@@ -1183,16 +1194,26 @@ assignment_varinfomap(struct map *m, struct ast_expr *expr, struct state *s)
 
 	if (ast_expr_unary_isdereference(lval)) {
 		char *key = ast_expr_as_identifier(ast_expr_unary_operand(lval));
-		struct varinfo *vinfo = varinfo_create(
-			state_getobjecttype(s, key), true, false
-		);
-		map_set(m, dynamic_str(key), vinfo);
+		map_set(m, dynamic_str(key), varinfo_lval());
 	}
 	if (ast_expr_unary_isdereference(rval)) {
 		char *key = ast_expr_as_identifier(ast_expr_unary_operand(rval));
-		struct varinfo *vinfo = varinfo_create(
-			state_getobjecttype(s, key), true, true
-		);
-		map_set(m, dynamic_str(key), vinfo);
+		map_set(m, dynamic_str(key), varinfo_rval());
+	}
+}
+
+void
+binary_varinfomap(struct map *m, struct ast_expr *expr, struct state *s)
+{
+	struct ast_expr *e1 = ast_expr_binary_e1(expr),
+			*e2 = ast_expr_binary_e2(expr);
+
+	if (ast_expr_unary_isdereference(e1)) {
+		char *key = ast_expr_as_identifier(ast_expr_unary_operand(e1));
+		map_set(m, dynamic_str(key), varinfo_rval());
+	}
+	if (ast_expr_unary_isdereference(e2)) {
+		char *key = ast_expr_as_identifier(ast_expr_unary_operand(e2));
+		map_set(m, dynamic_str(key), varinfo_rval());
 	}
 }

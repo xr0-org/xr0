@@ -104,13 +104,15 @@ string_arr_str(struct string_arr *);
 /* varinfo */
 
 struct varinfo {
-	struct ast_type *type;
 	bool isderef;		/* true: param is rval or lval deref-ed, false: neither */
 	bool isrval;
 };
 
 struct varinfo *
-varinfo_create(struct ast_type *t, bool isderef, bool isrval);
+varinfo_lval();
+
+struct varinfo *
+varinfo_rval();
 
 void
 varinfo_destroy(struct varinfo *p);

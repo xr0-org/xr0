@@ -1,7 +1,11 @@
 int
 snapshot_and_change(int *arg) ~ [
+	pre: {
+		.clump arg;
+		*arg = $;
+	}
 	result = *arg;
-	*arg = 2;
+	*arg2 = 2;
 ] {
 	int j;
 	j = *arg;
@@ -11,8 +15,12 @@ snapshot_and_change(int *arg) ~ [
 
 void
 modify(int *p, int *q) ~ [
-	pre: *p;	/* p must be rvalue dereferencable */
-	*q = $;		/* q must be lvalue dereferencable */
+	pre: {
+		.clump p;
+		*p = $;
+		.clump q;
+	};
+	*q = $;
 ] {
 	int i;
 	i = 0;

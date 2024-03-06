@@ -586,6 +586,16 @@ ast_stmt_varinfomap(struct map *m, struct ast_stmt *stmt, struct state *s)
 {
 	printf("stmt: %s\n", ast_stmt_str(stmt));
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_LABELLED:
+		ast_stmt_varinfomap(m, ast_stmt_labelled_stmt(stmt), s);
+		break;
+	case STMT_SELECTION:
+		ast_expr_varinfomap(m, ast_stmt_sel_cond(stmt), s);
+		break;
+	case STMT_ITERATION:
+		ast_stmt_varinfomap(m, ast_stmt_iter_cond(stmt), s);
+		ast_expr_varinfomap(m, ast_stmt_iter_iter(stmt), s);
+		break;
 	case STMT_ALLOCATION:
 		break;
 	case STMT_EXPR:
