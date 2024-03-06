@@ -5,10 +5,6 @@
 
 struct ast_expr;
 
-enum deref_type {
-	LVALUE, RVALUE
-};
-
 enum location_type {
 	/* TODO: STATIC */
 	LOCATION_VCONST,
@@ -23,7 +19,7 @@ struct location *
 location_create_vconst(int block, struct ast_expr *offset);
 
 struct location *
-location_create_dereferencable(int block, enum deref_type dtype, struct ast_expr *offset);
+location_create_dereferencable(int block, struct ast_expr *offset);
 
 struct location *
 location_create_dynamic(int block, struct ast_expr *offset);
@@ -73,15 +69,17 @@ location_references(struct location *loc1, struct location *loc2, struct state *
 
 struct vconst;
 
-struct stack;
+struct clump;
 
 struct stack;
+
 struct object;
 
 struct block;
 
 struct block *
-location_getblock(struct location *, struct vconst *, struct stack *, struct heap *);
+location_getblock(struct location *, struct vconst *, struct stack *,
+		struct heap *, struct clump *);
 
 struct block *
 location_getstackblock(struct location *loc, struct stack *s);

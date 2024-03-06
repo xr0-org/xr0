@@ -4,6 +4,7 @@
 #include <assert.h>
 #include "ast.h"
 #include "block.h"
+#include "clump.h"
 #include "heap.h"
 #include "intern.h"
 #include "location.h"
@@ -17,7 +18,6 @@ struct location {
 	enum location_type type;
 	union {
 		int frame;		/* LOCATION_AUTOMATIC */
-		enum deref_type dtype;	/* LOCATION_DEREFERENCABLE */
 	} u;
 	int block;
 	struct ast_expr *offset;
@@ -36,12 +36,11 @@ location_create_vconst(int block, struct ast_expr *offset)
 }
 
 struct location *
-location_create_dereferencable(int block, enum deref_type dtype, struct ast_expr *offset)
+location_create_dereferencable(int block, struct ast_expr *offset)
 {
 	struct location *loc = malloc(sizeof(struct location));
 	assert(loc);
 	loc->type = LOCATION_DEREFERENCABLE;
-	loc->u.dtype = dtype;
 	loc->block = block;
 	assert(offset);
 	loc->offset = offset;
@@ -146,7 +145,7 @@ location_copy(struct location *loc)
 		);
 	case LOCATION_DEREFERENCABLE:
 		return location_create_dereferencable(
-			loc->block, loc->u.dtype, ast_expr_copy(loc->offset)
+			loc->block, ast_expr_copy(loc->offset)
 		);
 	case LOCATION_AUTOMATIC:
 		return location_create_automatic(
@@ -222,7 +221,7 @@ location_referencesheap(struct location *l, struct state *s)
 
 struct block *
 location_getblock(struct location *loc, struct vconst *v, struct stack *s,
-		struct heap *h)
+		struct heap *h, struct clump *c)
 {
 	assert(s);
 	switch (loc->type) {
@@ -233,6 +232,8 @@ location_getblock(struct location *loc, struct vconst *v, struct stack *s,
 		);
 	case LOCATION_DYNAMIC:
 		return heap_getblock(h, loc->block);
+	case LOCATION_DEREFERENCABLE:
+		return clump_getblock(c, loc->block);
 	default:
 		assert(false);
 	}

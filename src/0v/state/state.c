@@ -168,14 +168,13 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 }
 
 struct value *
-state_clump(struct state *state, struct ast_type *t, bool isrval)
+state_clump(struct state *state)
 {
 	/* XXX: should type be associated with blocks for type checking when we
 	 * assign? */
 	int address = clump_newblock(state->clump);
 	struct location *loc = location_create_dereferencable(
 		address,
-		isrval ? RVALUE : LVALUE,
 		ast_expr_constant_create(0)
 	);
 	return value_ptr_create(loc);
@@ -191,7 +190,7 @@ struct object *
 state_get(struct state *state, struct location *loc, bool constructive)
 {
 	struct block *b = location_getblock(
-		loc, state->vconst, state->stack, state->heap
+		loc, state->vconst, state->stack, state->heap, state->clump
 	);
 	if (!b) {
 		assert(location_type(loc) == LOCATION_DYNAMIC);
@@ -204,7 +203,7 @@ struct block *
 state_getblock(struct state *state, struct location *loc)
 {
 	return location_getblock(
-		loc, state->vconst, state->stack, state->heap
+		loc, state->vconst, state->stack, state->heap, state->clump
 	);
 }
 
@@ -301,7 +300,7 @@ state_range_alloc(struct state *state, struct object *obj,
 	struct location *deref = value_as_location(arr_val);
 
 	struct block *b = location_getblock(
-		deref, state->vconst, state->stack, state->heap
+		deref, state->vconst, state->stack, state->heap, state->clump
 	);
 	if (!b) {
 		return error_create("no block");
@@ -376,7 +375,7 @@ state_range_aredeallocands(struct state *state, struct object *obj,
 	struct location *deref = value_as_location(arr_val);
 	
 	struct block *b = location_getblock(
-		deref, state->vconst, state->stack, state->heap
+		deref, state->vconst, state->stack, state->heap, state->clump
 	);
 	return (bool) b && block_range_aredeallocands(b, lw, up, state);
 }

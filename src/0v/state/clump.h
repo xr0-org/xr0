@@ -20,4 +20,9 @@ clump_copy(struct clump *);
 int
 clump_newblock(struct clump *);
 
+struct block;
+
+struct block *
+clump_getblock(struct clump *c, int address);
+
 #endif

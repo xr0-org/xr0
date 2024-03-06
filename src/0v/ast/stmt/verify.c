@@ -535,11 +535,10 @@ alloc_process(struct ast_stmt *stmt, struct state *state)
 	case DEALLOC:
 		return dealloc_process(stmt, state);
 	case CLUMP:
+		return result_value_create(state_clump(state));
 	default:
 		assert(false);
 	}
-
-	
 }
 
 static struct result *
