@@ -330,8 +330,8 @@ ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
 struct ast_expr *
 ast_stmt_alloc_arg(struct ast_stmt *);
 
-bool
-ast_stmt_alloc_isalloc(struct ast_stmt *);
+enum ast_alloc_kind
+ast_stmt_alloc_kind(struct ast_stmt *);
 
 void
 ast_stmt_destroy(struct ast_stmt *);

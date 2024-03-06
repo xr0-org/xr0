@@ -319,16 +319,14 @@ struct ast_expr *
 ast_stmt_alloc_arg(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ALLOCATION);
-
 	return stmt->u.alloc.arg;
 }
 
-bool
-ast_stmt_alloc_isalloc(struct ast_stmt *stmt)
+enum ast_alloc_kind
+ast_stmt_alloc_kind(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ALLOCATION);
-
-	return stmt->u.alloc.kind == ALLOC;
+	return stmt->u.alloc.kind;
 }
 
 

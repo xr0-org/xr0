@@ -373,10 +373,15 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 	result_destroy(result_up);
 	result_destroy(result_lw);
 
-	if (ast_stmt_alloc_isalloc(alloc)) {
+	switch (ast_stmt_alloc_kind(alloc)) {
+	case ALLOC:
 		err = state_range_alloc(state, obj, res_lw, res_up);
-	} else {
+		break;
+	case DEALLOC:
 		err = state_range_dealloc(state, obj, res_lw, res_up);
+		break;
+	default:
+		assert(false);
 	}
 	
 	ast_expr_destroy(res_up);
@@ -513,20 +518,34 @@ alloc_absexec(struct ast_stmt *alloc, struct state *state)
 	return res;
 }
 
+static struct result *
+dealloc_process(struct ast_stmt *, struct state *);
+
 /* operates at location level. It either creates an object on the heap and returns
  * a location or gets the location pointed to by an lvalue and attempts to free
  * possibly returning an error
  * */
 static struct result *
-alloc_process(struct ast_stmt *alloc, struct state *state)
+alloc_process(struct ast_stmt *stmt, struct state *state)
 {
-	if (ast_stmt_alloc_isalloc(alloc)) {
+	switch (ast_stmt_alloc_kind(stmt)) {
+	case ALLOC:
 		/* TODO: size needs to be passed in here when added to .alloc */
 		return result_value_create(state_alloc(state));
+	case DEALLOC:
+		return dealloc_process(stmt, state);
+	case CLUMP:
+	default:
+		assert(false);
 	}
 
-	/* dealloc */
-	struct ast_expr *arg = ast_stmt_alloc_arg(alloc);
+	
+}
+
+static struct result *
+dealloc_process(struct ast_stmt *stmt, struct state *state)
+{
+	struct ast_expr *arg = ast_stmt_alloc_arg(stmt);
 	/* arg is pointing at the heap location we want to free, so we want its
 	 * value rather than location */
 	struct result *res = ast_expr_eval(arg, state);
