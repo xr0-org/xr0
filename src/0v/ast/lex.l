@@ -32,6 +32,7 @@ check_type();
 "/*"			{ comment(); }
 ".alloc"		{ count(); return(ALLOC); }
 ".dealloc"		{ count(); return(DEALLOC); }
+".clump"		{ count(); return(CLUMP); }
 
 "auto"			{ count(); return(AUTO); }
 "axiom"			{ count(); return(AXIOM); }

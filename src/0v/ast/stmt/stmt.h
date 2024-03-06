@@ -3,6 +3,12 @@
 
 #include "util.h"
 
+enum ast_alloc_kind {
+	ALLOC			= 1 << 0,
+	DEALLOC			= 1 << 1,
+	CLUMP			= 1 << 2,
+};
+
 enum ast_stmt_kind {
 	STMT_NOP		= 1 << 0,
 	STMT_LABELLED		= 1 << 1,

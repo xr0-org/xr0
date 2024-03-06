@@ -233,10 +233,6 @@ ast_block_stmts(struct ast_block *b);
 bool
 ast_block_isterminal(struct ast_block *, struct state *);
 
-enum ast_jump_kind {
-	JUMP_RETURN	= 1 << 0,
-};
-
 struct ast_stmt;
 
 struct lexememarker;
@@ -312,6 +308,10 @@ ast_stmt_as_block(struct ast_stmt *);
 struct ast_stmt *
 ast_stmt_create_compound_v(struct lexememarker *, struct ast_block *);
 
+enum ast_jump_kind {
+	JUMP_RETURN	= 1 << 0,
+};
+
 struct ast_stmt *
 ast_stmt_create_jump(struct lexememarker *, enum ast_jump_kind, struct ast_expr *rv);
 
@@ -323,6 +323,9 @@ ast_stmt_create_alloc(struct lexememarker *, struct ast_expr *arg);
 
 struct ast_stmt *
 ast_stmt_create_dealloc(struct lexememarker *, struct ast_expr *arg);
+
+struct ast_stmt *
+ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
 
 struct ast_expr *
 ast_stmt_alloc_arg(struct ast_stmt *);

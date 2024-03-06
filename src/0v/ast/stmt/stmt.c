@@ -38,7 +38,7 @@ struct ast_stmt {
 			struct ast_expr *rv;
 		} jump;
 		struct {
-			bool isalloc;
+			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
 		} alloc;
 	} u;
@@ -243,7 +243,7 @@ ast_stmt_create_alloc(struct lexememarker *loc, struct ast_expr *arg)
 {
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_ALLOCATION;
-	stmt->u.alloc.isalloc = true;
+	stmt->u.alloc.kind = ALLOC;
 	stmt->u.alloc.arg = arg;
 	return stmt;
 }
@@ -253,7 +253,17 @@ ast_stmt_create_dealloc(struct lexememarker *loc, struct ast_expr *arg)
 {
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_ALLOCATION;
-	stmt->u.alloc.isalloc = false;
+	stmt->u.alloc.kind = DEALLOC;
+	stmt->u.alloc.arg = arg;
+	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_create_clump(struct lexememarker *loc, struct ast_expr *arg)
+{
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_ALLOCATION;
+	stmt->u.alloc.kind= CLUMP;
 	stmt->u.alloc.arg = arg;
 	return stmt;
 }
@@ -262,9 +272,16 @@ static struct ast_stmt *
 ast_stmt_copy_alloc(struct lexememarker *loc, struct ast_stmt *stmt)
 {
 	struct ast_expr *arg = ast_expr_copy(stmt->u.alloc.arg);
-	return stmt->u.alloc.isalloc
-		? ast_stmt_create_alloc(loc, arg)
-		: ast_stmt_create_dealloc(loc, arg);
+	switch (stmt->u.alloc.kind) {
+	case ALLOC:
+		return ast_stmt_create_alloc(loc, arg);
+	case DEALLOC:
+		return ast_stmt_create_dealloc(loc, arg);
+	case CLUMP:
+		return ast_stmt_create_clump(loc, arg);
+	default:
+		assert(false);
+	}
 }
 
 static void
@@ -281,11 +298,20 @@ ast_stmt_alloc_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	assert(stmt->kind == STMT_ALLOCATION);
 
 	char *arg = ast_expr_str(stmt->u.alloc.arg);
-	strbuilder_printf(
-		b, ".%s %s;",
-		stmt->u.alloc.isalloc ? "alloc" : "dealloc",
-		arg
-	);
+
+	switch (stmt->u.alloc.kind) {
+	case ALLOC:
+		strbuilder_printf(b, ".%s %s;", "alloc", arg);
+		break;
+	case DEALLOC:
+		strbuilder_printf(b, ".%s %s;", "dealloc", arg);
+		break;
+	case CLUMP:
+		strbuilder_printf(b, ".%s %s;", "clump", arg);
+		break;
+	default:
+		assert(false);
+	}
 	free(arg);
 }
 
@@ -302,7 +328,7 @@ ast_stmt_alloc_isalloc(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ALLOCATION);
 
-	return stmt->u.alloc.isalloc;
+	return stmt->u.alloc.kind == ALLOC;
 }
 
 

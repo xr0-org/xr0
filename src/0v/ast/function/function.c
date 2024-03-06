@@ -316,7 +316,7 @@ declare_parameters(struct state *s, struct ast_function *f)
 	}
 	
 	for (int i = 0; i < nparams; i++) {
-		if ((inititalise_param(params[i], s))) {
+		if ((err = inititalise_param(params[i], s))) {
 			return err;
 		}
 	}
@@ -326,8 +326,6 @@ declare_parameters(struct state *s, struct ast_function *f)
 static struct error *
 ast_function_precondsinit(struct ast_function *f, struct state *s)
 {
-	struct error *err;
-
 	struct ast_stmt *stmt = ast_function_preconds(f);
 	if (!stmt) {
 		return NULL;
