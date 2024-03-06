@@ -300,31 +300,3 @@ string_arr_str(struct string_arr *string_arr)
 	}
 	return strbuilder_build(b);
 }
-
-
-/* varinfo */
-
-struct varinfo *
-varinfo_lval()
-{
-	struct varinfo *v = malloc(sizeof(struct varinfo));
-	v->isderef = true;
-	v->isrval = false;
-	return v;
-}
-
-struct varinfo *
-varinfo_rval()
-{
-	struct varinfo *v = malloc(sizeof(struct varinfo));
-	v->isderef = true;
-	v->isrval = true;
-	return v;
-}
-
-void
-varinfo_destroy(struct varinfo *v)
-{
-	/* varinfo just wraps a param the param should be destroyed separately */
-	free(v);
-}

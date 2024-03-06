@@ -152,6 +152,14 @@ inner_str(struct object *obj)
 }
 
 bool
+object_isdereferencable(struct object *obj, struct state *s)
+{
+	if (!object_isvalue(obj)) {
+		return true;
+	}	
+}
+
+bool
 object_referencesheap(struct object *obj, struct state *s)
 {
 	if (!object_isvalue(obj)) {

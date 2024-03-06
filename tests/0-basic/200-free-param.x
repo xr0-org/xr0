@@ -2,7 +2,7 @@
 
 void
 unit(void *p) ~ [
-	pre: p = malloc($);
+	pre: .alloc p;
 
 	.dealloc p;
 ]{

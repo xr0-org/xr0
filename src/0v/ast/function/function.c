@@ -209,7 +209,7 @@ paths_verify(struct ast_function_arr *paths, struct externals *);
 static struct error *
 path_verify_withstate(struct ast_function *f, struct state *);
 
-static void
+static struct error *
 declare_parameters(struct state *s, struct ast_function *f);
 
 struct error *
@@ -294,15 +294,16 @@ path_verify(struct ast_function *f, struct state *state, int index)
 	return NULL;
 }
 
-static struct map *
-abstract_analyse(struct ast_block *abs, struct state *);
+static struct error *
+ast_function_precondsinit(struct ast_function *, struct state *);
 
-static void
-inititalise_param(struct ast_variable *v, struct map *, struct state *);
+static struct error *
+inititalise_param(struct ast_variable *v, struct state *);
 
-static void
+static struct error *
 declare_parameters(struct state *s, struct ast_function *f)
 {
+	struct error *err;
 	/* declare params and locals in stack frame */	
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
@@ -310,48 +311,52 @@ declare_parameters(struct state *s, struct ast_function *f)
 		state_declare(s, params[i], true);
 	}
 
-	/* analyse variables in abstract against lval/rval semantics */
-	struct map *m = abstract_analyse(ast_function_abstract(f), s);
-
-	/* appropriately initialise param depending */
-	for (int i = 0; i < nparams; i++) {	
-		inititalise_param(params[i], m, s);
+	if ((err = ast_function_precondsinit(f, s))) {
+		return err;
 	}
-	printf("state (postinit): %s\n", state_str(s));
+	
+	for (int i = 0; i < nparams; i++) {
+		if ((inititalise_param(params[i], s))) {
+			return err;
+		}
+	}
+	return NULL;
 }
 
-static struct map *
-abstract_analyse(struct ast_block *abs, struct state *s)
+static struct error *
+ast_function_precondsinit(struct ast_function *f, struct state *s)
 {
-	int nstmts = ast_block_nstmts(abs);
-	struct ast_stmt **stmt = ast_block_stmts(abs);
+	struct error *err;
 
-	struct map *m = map_create();
-	for (int i = 0; i < nstmts; i++) {
-		ast_stmt_varinfomap(m, stmt[i], s);
+	struct ast_stmt *stmt = ast_function_preconds(f);
+	if (!stmt) {
+		return NULL;
 	}
-
-	return m;
+	return ast_stmt_precondsinit(stmt, s);
 }
 
-static void
-inititalise_param(struct ast_variable *param, struct map *m, struct state *state)
+static struct error *
+inititalise_param(struct ast_variable *param, struct state *state)
 {
-	char *key = ast_variable_name(param);
+	char *name = ast_variable_name(param);
 	struct ast_type *t = ast_variable_type(param);
 
-	struct varinfo *vinfo = (struct varinfo *) map_get(m, key);
-
-	struct object *obj = state_getobject(state, key);
+	struct object *obj = state_getobject(state, name);
 	assert(obj);
-	struct value *val;
-	if (vinfo && vinfo->isderef) {
-		val = state_clump(state, t, vinfo->isrval);
+	if (object_hasvalue(obj)) {
+		/* must on the clump or heap */
+		struct value *val = object_as_value(obj);	
+	//struct location *loc = value_as_location(val);
+	//assert(
+	//	location_type(loc) == LOCATION_DEREFERENCABLE ||
+	//	location_type(loc) == LOCATION_DYNAMIC
+	//);
 	} else {
-		val = state_vconst(state, t, dynamic_str(key), true);
+		/* variables that aren't talked about by the preconditions */
+		struct value *val = state_vconst(state, t, dynamic_str(name), true);
+		object_assign(obj, val);
 	}
-	assert(val);
-	object_assign(obj, val);
+	return NULL;
 }
 
 static struct preresult *
@@ -380,17 +385,21 @@ abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
 static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state)
 {
+	struct error *err;
+
 	struct state *alleged_state = state_create(
 		dynamic_str(ast_function_name(f)),
 		state_getext(actual_state),
 		ast_function_type(f)
 	);
-	declare_parameters(alleged_state, f);
-	struct error *err = abstract_auditwithstate(
-		f, alleged_state, actual_state
-	);
+	if ((err = declare_parameters(alleged_state, f))) {
+		return err;
+	}
+	if ((err = abstract_auditwithstate(f, alleged_state, actual_state))) {
+		return err;	
+	}
 	state_destroy(alleged_state); /* actual_state handled by caller */ 
-	return err;
+	return NULL;
 }
 
 static struct error *

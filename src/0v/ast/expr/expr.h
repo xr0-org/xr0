@@ -96,7 +96,6 @@ result_arr_destroy(struct result_arr *arr);
 void
 result_arr_append(struct result_arr *arr, struct result *res);
 
-
 struct result_arr *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 		struct ast_variable **param, struct state *state);
@@ -107,8 +106,5 @@ prepare_parameters(int nparams, struct ast_variable **param,
 
 struct string_arr *
 ast_expr_getfuncs(struct ast_expr *);
-
-void
-ast_expr_varinfomap(struct map *m, struct ast_expr *expr, struct state *s);
 
 #endif

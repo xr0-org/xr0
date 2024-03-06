@@ -1,6 +1,7 @@
 void
 modify(int *q) ~ [
-	*q = $;
+	pre: .clump q;
+	*q = 1;
 ] {
 	*q = 1;
 }
@@ -12,5 +13,5 @@ main()
 	p = 1;
 	~ [ p == 1; ];
 	modify(&p);
-	~ [ p == $; ];
+	~ [ p == 1; ];
 }

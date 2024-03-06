@@ -46,12 +46,7 @@ stmt_installprop(struct ast_stmt *stmt, struct state *state);
 struct preresult *
 ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
 {
-	if (ast_stmt_ispre(stmt)) {
-		struct error *err = ast_stmt_exec(stmt, state);
-		if (err) {
-			return preresult_error_create(err);
-		}
-	} else if (ast_stmt_isassume(stmt)) {
+	if (ast_stmt_isassume(stmt)) {
 		printf("assume: %s\n", ast_stmt_str(stmt));
 		return stmt_installprop(stmt, state);
 	}
@@ -549,6 +544,54 @@ alloc_process(struct ast_stmt *alloc, struct state *state)
 }
 
 static struct error *
+ast_stmt_compound_precondsinit(struct ast_stmt *, struct state *);
+
+static struct error *
+ast_stmt_allocation_precondsinit(struct ast_stmt *, struct state *);
+
+struct error *
+ast_stmt_precondsinit(struct ast_stmt *stmt, struct state *s)
+{
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_EXPR:
+		return ast_stmt_exec(stmt, s);
+	case STMT_COMPOUND:
+		return ast_stmt_compound_precondsinit(stmt, s);
+	case STMT_ALLOCATION:
+		return ast_stmt_allocation_precondsinit(stmt, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+ast_stmt_compound_precondsinit(struct ast_stmt *stmt, struct state *s)
+{
+	struct error *err;
+
+	struct ast_block *b = ast_stmt_as_block(stmt);
+	int n = ast_block_nstmts(b);
+	struct ast_stmt **stmts = ast_block_stmts(b);
+
+	for (int i = 0; i < n; i++) {
+		if ((err = ast_stmt_precondsinit(stmts[i], s))) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
+static struct error *
+ast_stmt_allocation_precondsinit(struct ast_stmt *stmt, struct state *s)
+{
+	struct result *res = ast_stmt_absexec(stmt, s);
+	if (result_iserror(res)) {
+		return result_as_error(res);
+	}
+	return NULL;
+}
+
+static struct error *
 ast_stmt_compound_precondsverify(struct ast_stmt *, struct state *);
 
 struct error *
@@ -579,29 +622,4 @@ ast_stmt_compound_precondsverify(struct ast_stmt *stmt, struct state *s)
 		}
 	}
 	return NULL;
-}
-
-void
-ast_stmt_varinfomap(struct map *m, struct ast_stmt *stmt, struct state *s)
-{
-	printf("stmt: %s\n", ast_stmt_str(stmt));
-	switch (ast_stmt_kind(stmt)) {
-	case STMT_LABELLED:
-		ast_stmt_varinfomap(m, ast_stmt_labelled_stmt(stmt), s);
-		break;
-	case STMT_SELECTION:
-		ast_expr_varinfomap(m, ast_stmt_sel_cond(stmt), s);
-		break;
-	case STMT_ITERATION:
-		ast_stmt_varinfomap(m, ast_stmt_iter_cond(stmt), s);
-		ast_expr_varinfomap(m, ast_stmt_iter_iter(stmt), s);
-		break;
-	case STMT_ALLOCATION:
-		break;
-	case STMT_EXPR:
-		ast_expr_varinfomap(m, ast_stmt_as_expr(stmt), s);
-		break;
-	default:
-		assert(false);
-	}
 }

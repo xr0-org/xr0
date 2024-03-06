@@ -1,6 +1,9 @@
-void
+int
 assign(int *q) ~ [
-	pre: *q;	/* no side effect */
+	pre: {
+		.clump q;	/* no side effect */
+		*q = $;
+	}
 ] {
 	int p;
 	p = *q;

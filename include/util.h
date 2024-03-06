@@ -101,20 +101,4 @@ string_arr_contains(struct string_arr *, char *s);
 char *
 string_arr_str(struct string_arr *);
 
-/* varinfo */
-
-struct varinfo {
-	bool isderef;		/* true: param is rval or lval deref-ed, false: neither */
-	bool isrval;
-};
-
-struct varinfo *
-varinfo_lval();
-
-struct varinfo *
-varinfo_rval();
-
-void
-varinfo_destroy(struct varinfo *p);
-
 #endif
