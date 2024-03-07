@@ -176,9 +176,6 @@ struct preresult;
 struct preresult *
 ast_expr_assume(struct ast_expr *, struct state *);
 
-struct error *
-ast_expr_precondsverify(struct ast_expr *, struct state *);
-
 void
 ast_expr_varinfomap(struct map *, struct ast_expr *, struct state *s);
 

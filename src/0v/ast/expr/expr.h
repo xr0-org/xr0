@@ -79,9 +79,6 @@ ast_expr_binary_op(struct ast_expr *);
 struct ast_stmt_splits
 ast_expr_splits(struct ast_expr *, struct state *);
 
-struct error *
-ast_expr_precondsverify(struct ast_expr *, struct state *);
-
 struct result_arr {
 	int n;
 	struct result **res;

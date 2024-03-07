@@ -587,6 +587,12 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(err);
 	}
 
+	err = ast_function_precondsverify(f, state);
+	if (err) {
+		return result_error_create(err);
+	}
+
+	printf("state: %s\n", state_str(state));
 	struct result *res = call_absexec(expr, f, state);
 	if (result_iserror(res)) {
 		return res;
@@ -1114,27 +1120,4 @@ binary_assume(struct ast_expr *expr, bool value, struct state *s)
 		value,
 		s
 	);
-}
-
-struct error *
-assign_precondmet(struct ast_expr *, struct state *);
-
-struct error *
-ast_expr_precondsverify(struct ast_expr *expr, struct state *s)
-{
-	switch (ast_expr_kind(expr)) {
-	case EXPR_ASSIGNMENT:
-		return assign_precondmet(expr, s);
-	default:
-		assert(false);
-	}
-}
-
-struct error *
-assign_precondmet(struct ast_expr *expr, struct state *s)
-{
-	struct ast_expr *lval = ast_expr_assignment_lval(expr),
-			*rval = ast_expr_assignment_rval(expr);
-
-	assert(false);
 }

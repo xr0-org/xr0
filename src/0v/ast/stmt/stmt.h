@@ -52,7 +52,4 @@ sel_decide(struct ast_expr *control, struct state *state);
 struct error *
 ast_stmt_precondsinit(struct ast_stmt *, struct state *);
 
-struct error *
-ast_stmt_precondsverify(struct ast_stmt *, struct state *);
-
 #endif

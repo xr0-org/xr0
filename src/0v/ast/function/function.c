@@ -406,7 +406,7 @@ abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
 {
 	struct preresult *r = install_props(alleged_state, f);
 	if (preresult_iscontradiction(r)) {
-		return NULL;
+		return NULL; /* XXX: error? */
 	}
 
 	int ndecls = ast_block_ndecls(f->abstract);
@@ -598,13 +598,25 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 }
 
 struct error *
-ast_function_precondsverify(struct ast_function *f, struct state *s)
+ast_function_precondsverify(struct ast_function *f, struct state *actual_state)
 {
+	struct error *err;
+
 	struct ast_stmt *stmt = ast_function_preconds(f);
 	if (!stmt) {
 		return NULL;
 	}
-	return ast_stmt_precondsverify(stmt, s);
+	struct state *precond_state = state_create(
+		dynamic_str(ast_function_name(f)),
+		state_getext(actual_state),
+		ast_function_type(f)
+	);
+	if ((err = declare_parameters(precond_state, f))) {
+		return err;
+	}
+	printf("actual_state: %s\n", state_str(actual_state));
+	printf("precond_state: %s\n", state_str(precond_state));
+	assert(false);
 }
 
 static void
