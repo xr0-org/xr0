@@ -2,7 +2,7 @@
 
 void *
 assign(void *p) ~ [
-	pre: p = malloc(1);
+	pre: .clump p;
 	*p = 1;
 ] {
 	/* TODO: internal verification */

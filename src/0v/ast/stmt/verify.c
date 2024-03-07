@@ -652,23 +652,34 @@ ast_stmt_alloc_precondsverify(struct ast_stmt *stmt, struct state *s)
 static struct error *
 alloc_precondmet(struct ast_stmt *stmt, struct state *s)
 {
-	bool isalloc = state_isalloced(
-		s, ast_expr_as_identifier(ast_stmt_alloc_arg(stmt))
-	);
+	struct ast_expr *arg = ast_stmt_alloc_arg(stmt);
+	bool isalloc = state_isalloced(s, ast_expr_as_identifier(arg));
 	if (!isalloc) {
-		return error_create("precondition not met: need alloc");
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(
+			b,
+			"precondition not met: `%s' must be on malloced",
+			ast_expr_str(arg)
+		);
+		return error_create(strbuilder_build(b));
 	}
 }
 
 static struct error *
 clump_precondmet(struct ast_stmt *stmt, struct state *s)
 {
-	printf("state: %s\n", state_str(s));
+	struct ast_expr *arg = ast_stmt_alloc_arg(stmt);
 	bool isclump = state_isclumped(
-		s, ast_expr_as_identifier(ast_stmt_alloc_arg(stmt))
+		s, ast_expr_as_identifier(arg)
 	);
 	if (!isclump) {
-		return error_create("precondition not met: need clump");
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(
+			b,
+			"precondition not met: `%s' must be lvalue dereferencable",
+			ast_expr_str(arg)
+		);
+		return error_create(strbuilder_build(b));
 	}
 	return NULL;
 }

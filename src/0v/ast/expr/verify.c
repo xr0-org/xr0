@@ -747,7 +747,6 @@ prepare_parameters(int nparams, struct ast_variable **param,
 static struct result *
 expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("state: (before): %s", state_str(state));
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
@@ -774,7 +773,6 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 
 	object_assign(obj, value_copy(result_as_value(res)));
 
-	printf("state: (after): %s", state_str(state));
 	return res;
 }
 
@@ -1119,25 +1117,24 @@ binary_assume(struct ast_expr *expr, bool value, struct state *s)
 }
 
 struct error *
-ast_expr_precondsverify(struct ast_expr *e, struct state *s)
-{
-	struct props *p = state_getprops(s);
+assign_precondmet(struct ast_expr *, struct state *);
 
-	assert(!props_contradicts(p, e));
-	
-	/* XXX: hack ignore m = matrix_create($, $) */
-	if (ast_expr_kind(e) == EXPR_ASSIGNMENT) {
-		return NULL;
+struct error *
+ast_expr_precondsverify(struct ast_expr *expr, struct state *s)
+{
+	switch (ast_expr_kind(expr)) {
+	case EXPR_ASSIGNMENT:
+		return assign_precondmet(expr, s);
+	default:
+		assert(false);
 	}
-		
-	struct result *red = ast_expr_pf_reduce(e, s);
-	struct value *v = result_as_value(red);
-	struct ast_expr *red_e = value_to_expr(v);
-	bool valid = props_get(p, red_e);
-	if (!valid) {
-		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "prop: %s is not present in state", ast_expr_str(e));
-		return error_create(strbuilder_build(b));		
-	}
-	return NULL;
+}
+
+struct error *
+assign_precondmet(struct ast_expr *expr, struct state *s)
+{
+	struct ast_expr *lval = ast_expr_assignment_lval(expr),
+			*rval = ast_expr_assignment_rval(expr);
+
+	assert(false);
 }
