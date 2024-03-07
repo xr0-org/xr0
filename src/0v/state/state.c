@@ -180,6 +180,31 @@ state_clump(struct state *state)
 	return value_ptr_create(loc);
 }
 
+bool
+state_isalloced(struct state *state, char *id)
+{
+	struct variable *v = stack_getvariable(state->stack, id);
+	assert(v);
+	struct location *loc = variable_location(v);
+	if (!loc) {
+		return false;
+	}
+	return location_toheap(loc, state->heap);
+}
+
+bool
+state_isclumped(struct state *state, char *id)
+{
+	struct variable *v = stack_getvariable(state->stack, id);
+	assert(v);
+	struct location *loc = variable_location(v);
+	if (!loc) {
+		return false;
+	}
+	return location_tostack(loc, state->stack) ||
+		location_toheap(loc, state->heap);
+}
+
 struct value *
 state_getvconst(struct state *state, char *id)
 {
@@ -277,13 +302,6 @@ state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 	struct object *res = state_get(state, deref, true);
 	/*location_destroy(deref);*/
 	return res;
-}
-
-struct variable *
-state_getvariable(struct state *state, char *id)
-{
-	/* does not traverse frames */	
-	return stack_getvariable(state->stack, id);
 }
 
 struct error *

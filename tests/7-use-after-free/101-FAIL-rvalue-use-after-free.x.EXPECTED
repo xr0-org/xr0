@@ -1,1 +1,1 @@
-7-use-after-free/001-FAIL-rvalue-use-after-free.x:12:8: cannot exec statement: unjustified indirection (rvalue)
+7-use-after-free/101-FAIL-rvalue-use-after-free.x:12:8: cannot exec statement: unjustified indirection (rvalue)

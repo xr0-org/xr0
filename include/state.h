@@ -99,6 +99,12 @@ state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
 struct value *
 state_clump(struct state *);
 
+bool
+state_isclumped(struct state *, char *id);
+
+bool
+state_isalloced(struct state *, char *id);
+
 struct value *
 state_getvconst(struct state *, char *id);
 

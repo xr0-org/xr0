@@ -2,7 +2,13 @@
 
 void
 dangling_assign(int **i) ~ [
-	pre: $i;
+	int p;
+
+	pre: .clump i;
+
+	/* alleged state needs to capture that i gets an address of local var p */
+	p = 5;
+ 	*i = &p;
 ] {
 	int p;
 

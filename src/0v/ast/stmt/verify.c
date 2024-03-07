@@ -565,7 +565,7 @@ static struct error *
 ast_stmt_compound_precondsinit(struct ast_stmt *, struct state *);
 
 static struct error *
-ast_stmt_allocation_precondsinit(struct ast_stmt *, struct state *);
+ast_stmt_alloc_precondsinit(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_precondsinit(struct ast_stmt *stmt, struct state *s)
@@ -576,7 +576,7 @@ ast_stmt_precondsinit(struct ast_stmt *stmt, struct state *s)
 	case STMT_COMPOUND:
 		return ast_stmt_compound_precondsinit(stmt, s);
 	case STMT_ALLOCATION:
-		return ast_stmt_allocation_precondsinit(stmt, s);
+		return ast_stmt_alloc_precondsinit(stmt, s);
 	default:
 		assert(false);
 	}
@@ -600,7 +600,7 @@ ast_stmt_compound_precondsinit(struct ast_stmt *stmt, struct state *s)
 }
 
 static struct error *
-ast_stmt_allocation_precondsinit(struct ast_stmt *stmt, struct state *s)
+ast_stmt_alloc_precondsinit(struct ast_stmt *stmt, struct state *s)
 {
 	struct result *res = ast_stmt_absexec(stmt, s);
 	if (result_iserror(res)) {
@@ -608,6 +608,9 @@ ast_stmt_allocation_precondsinit(struct ast_stmt *stmt, struct state *s)
 	}
 	return NULL;
 }
+
+static struct error *
+ast_stmt_alloc_precondsverify(struct ast_stmt *, struct state *);
 
 static struct error *
 ast_stmt_compound_precondsverify(struct ast_stmt *, struct state *);
@@ -618,11 +621,56 @@ ast_stmt_precondsverify(struct ast_stmt *stmt, struct state *s)
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_EXPR:
 		return ast_expr_precondsverify(ast_stmt_as_expr(stmt), s);
+	case STMT_ALLOCATION:
+		return ast_stmt_alloc_precondsverify(stmt, s);
 	case STMT_COMPOUND:
 		return ast_stmt_compound_precondsverify(stmt, s);
 	default:
 		assert(false);
 	}
+}
+
+static struct error *
+alloc_precondmet(struct ast_stmt *, struct state *);
+
+static struct error *
+clump_precondmet(struct ast_stmt *, struct state *);
+
+static struct error *
+ast_stmt_alloc_precondsverify(struct ast_stmt *stmt, struct state *s)
+{
+	switch (ast_stmt_alloc_kind(stmt)) {
+	case ALLOC:
+		return alloc_precondmet(stmt, s);
+	case CLUMP:
+		return clump_precondmet(stmt, s);	
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+alloc_precondmet(struct ast_stmt *stmt, struct state *s)
+{
+	bool isalloc = state_isalloced(
+		s, ast_expr_as_identifier(ast_stmt_alloc_arg(stmt))
+	);
+	if (!isalloc) {
+		return error_create("precondition not met: need alloc");
+	}
+}
+
+static struct error *
+clump_precondmet(struct ast_stmt *stmt, struct state *s)
+{
+	printf("state: %s\n", state_str(s));
+	bool isclump = state_isclumped(
+		s, ast_expr_as_identifier(ast_stmt_alloc_arg(stmt))
+	);
+	if (!isclump) {
+		return error_create("precondition not met: need clump");
+	}
+	return NULL;
 }
 
 static struct error *

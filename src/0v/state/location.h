@@ -45,6 +45,16 @@ location_str(struct location *);
 bool
 location_isauto(struct location *);
 
+struct heap;
+
+bool
+location_toheap(struct location *, struct heap *);
+
+struct stack;
+
+bool
+location_tostack(struct location *, struct stack *);
+
 bool
 location_referencesheap(struct location *, struct state *);
 

@@ -174,10 +174,19 @@ location_with_offset(struct location *loc, struct ast_expr *offset)
 }
 
 bool
-location_isdeallocand(struct location *loc, struct heap *h)
+location_toheap(struct location *loc, struct heap *h)
 {
 	bool type_equal = loc->type == LOCATION_DYNAMIC;
 	struct block *b = heap_getblock(h, loc->block);
+	return type_equal && b;
+}
+
+bool
+location_tostack(struct location *loc, struct stack *s)
+{
+	bool type_equal = loc->type == LOCATION_AUTOMATIC;
+	/* XXX: should probably check that frame is greater than current frame */
+	struct block *b = stack_getblock(s, loc->block);
 	return type_equal && b;
 }
 

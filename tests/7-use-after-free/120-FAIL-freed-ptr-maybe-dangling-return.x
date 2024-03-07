@@ -3,8 +3,8 @@
 int *
 func(int x) ~ [
 	.alloc result;
-	if (!x) {
-		*result = $;
+	if (x) {
+		.dealloc result;	
 	}
 ] {
 	int *p;
