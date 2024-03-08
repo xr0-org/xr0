@@ -126,8 +126,7 @@ value_transfigure(struct object *o_comp, struct value *v_act,
 	}
 
 	struct object *deref = state_deref(actual, v_act, ast_expr_constant_create(0));
-	assert(deref);
-	if (object_hasvalue(deref)) {
+	if (deref && object_hasvalue(deref)) {
 		struct value *v_deref = object_as_value(deref);
 
 		struct block *b_comp = state_getblock(compare, value_as_location(val));
