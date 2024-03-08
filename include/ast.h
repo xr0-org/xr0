@@ -388,6 +388,9 @@ struct ast_type *
 ast_type_create_ptr(struct ast_type *type);
 
 struct ast_type *
+ast_type_create_voidptr();
+
+struct ast_type *
 ast_type_create_arr(struct ast_type *type, int length);
 
 struct ast_variable_arr;

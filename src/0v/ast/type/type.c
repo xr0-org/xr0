@@ -58,6 +58,14 @@ ast_type_create_ptr(struct ast_type *ref)
 }
 
 struct ast_type *
+ast_type_create_voidptr()
+{
+	struct ast_type *t = ast_type_create(TYPE_POINTER, 0);
+	t->ptr_type = TYPE_VOID;
+	return t;
+}
+
+struct ast_type *
 ast_type_create_arr(struct ast_type *base, int length)
 {
 	assert(base);

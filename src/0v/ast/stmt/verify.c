@@ -73,6 +73,7 @@ stmt_iter_verify(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_verify(struct ast_stmt *stmt, struct state *state)
 {
+	printf("stmt: %s\n", ast_stmt_str(stmt));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;

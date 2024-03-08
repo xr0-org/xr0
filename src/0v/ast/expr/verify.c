@@ -27,6 +27,7 @@ expr_binary_decide(struct ast_expr *expr, struct state *state);
 bool
 ast_expr_decide(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_UNARY:
 		return expr_unary_decide(expr, state);
@@ -791,7 +792,7 @@ prepare_comparisonstate(int nparams, struct ast_variable **param,
 		ast_expr_destroy(name);
 
 		struct value *argval = value_copy(result_as_value(res));
-		if ((err = value_transfigure(o_compare, argval, actual, compare))) {
+		if ((err = object_transfigure(o_compare, argval, actual, compare))) {
 			return err;
 		}
 	}
