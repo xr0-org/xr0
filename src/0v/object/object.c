@@ -240,23 +240,23 @@ object_transfigure(struct object *o_comp, struct value *v_act, struct state *act
 	}
 
 	struct object *deref = state_deref(actual, v_act, ast_expr_constant_create(0));
-	if (deref && object_hasvalue(deref)) {
-		struct value *v_deref = object_as_value(deref);
+	if (!(deref && object_hasvalue(deref))) {
+		return NULL;
+	}
+	struct value *v_deref = object_as_value(deref);
+	struct block *b_comp = state_getblock(compare, value_as_location(val));
+	if (!b_comp) {
+		return NULL;
+	}
 
-		struct block *b_comp = state_getblock(compare, value_as_location(val));
+	struct object *b_obj = object_value_create(
+		ast_expr_constant_create(0),
+		value_transfigure(value_copy(v_deref), compare)
+	);
+	block_install(b_comp, b_obj);
 
-		if (b_comp) {
-			printf("val: %s\n", value_str(v_deref));
-			struct object *b_obj = object_value_create(
-				ast_expr_constant_create(0),
-				value_transfigure(value_copy(v_deref), compare)
-			);
-			block_install(b_comp, b_obj);
-
-			if (!value_islocation(val)) {
-				return object_transfigure(b_obj, v_deref, actual, compare);
-			}
-		}
+	if (!value_islocation(val)) {
+		return object_transfigure(b_obj, v_deref, actual, compare);
 	}
 	return NULL;
 }
