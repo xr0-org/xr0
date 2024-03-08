@@ -53,7 +53,7 @@ object_isvalue(struct object *);
 struct value *
 object_as_value(struct object *);
 
-void
+struct error *
 object_assign(struct object *, struct value *);
 
 bool

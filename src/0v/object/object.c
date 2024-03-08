@@ -176,7 +176,6 @@ object_isvalue(struct object *obj)
 	return obj->type == OBJECT_VALUE;
 }
 
-
 struct value *
 object_as_value(struct object *obj)
 {
@@ -211,7 +210,7 @@ object_references(struct object *obj, struct location *loc, struct state *s)
 	return v ? value_references(v, loc, s) : false;
 }
 
-void
+struct error *
 object_assign(struct object *obj, struct value *val)
 {
 	assert(obj->type == OBJECT_VALUE);
@@ -220,6 +219,7 @@ object_assign(struct object *obj, struct value *val)
 	 * potentially */
 
 	obj->value = val;
+	return NULL;
 }
 
 static struct ast_expr *

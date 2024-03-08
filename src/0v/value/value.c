@@ -109,13 +109,42 @@ value_literal_create(char *lit)
 	return v;
 }
 
-struct value *
-value_transfigure(struct value *v, struct state *comparison)
+struct error *
+value_transfigure(struct object *o_comp, struct value *v_act,
+		struct state *actual, struct state *compare)
 {
-	if (!value_islocation(v)) {
-		return v;
+	struct error *err;
+
+	if (!value_islocation(v_act)) {
+		return object_assign(o_comp, v_act);
 	}
-	return location_transfigure(value_as_location(v), comparison);
+	struct location *loc = value_as_location(v_act);
+
+	struct value *val = location_transfigure(loc, actual, compare);
+	if ((err = object_assign(o_comp, val))) {
+		return err;
+	}
+
+	struct object *deref = state_deref(actual, v_act, ast_expr_constant_create(0));
+	assert(deref);
+	if (object_hasvalue(deref)) {
+		struct value *v_deref = object_as_value(deref);
+
+		struct block *b_comp = state_getblock(compare, value_as_location(val));
+		assert(b_comp);
+
+		struct object *b_obj = object_value_create(
+			ast_expr_constant_create(0),
+			value_copy(v_deref)
+		);
+		printf("comp: %s\n", state_str(compare));
+		block_install(b_comp, b_obj);
+
+		if (!value_islocation(val)) {
+			return value_transfigure(b_obj, v_deref, actual, compare);
+		}
+	}
+	return NULL;
 }
 
 struct number *

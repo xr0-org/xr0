@@ -618,8 +618,8 @@ ast_function_precondsverify(struct ast_function *f, struct externals *ext,
 
 	bool equiv = state_equal(precond_state, comparison_state);
 	if (!equiv) {
-		printf("comparison_state: %s\n", state_str(comparison_state));
 		printf("precond_state: %s\n", state_str(precond_state));
+		printf("comparison_state: %s\n", state_str(comparison_state));
 		return error_create("preconditions not met");
 	}
 	return NULL;

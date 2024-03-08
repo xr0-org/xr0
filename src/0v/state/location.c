@@ -73,11 +73,11 @@ location_create_automatic(int frame, int block, struct ast_expr *offset)
 }
 
 struct value *
-location_transfigure(struct location *loc, struct state *comparison)
+location_transfigure(struct location *loc, struct state *actual, struct state *compare)
 {
 	switch (loc->type) {
 	case LOCATION_AUTOMATIC:
-		return state_clump(comparison);
+		return state_clump(compare);
 	case LOCATION_DYNAMIC:
 		return value_ptr_create(loc);
 	default:

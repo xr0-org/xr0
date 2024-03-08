@@ -550,7 +550,8 @@ prepare_parameters(int nparams, struct ast_variable **param,
 
 static struct error *
 prepare_comparisonstate(int nparams, struct ast_variable **param,
-		struct result_arr *args, char *fname, struct state *);
+		struct result_arr *args, char *fname, struct state *actual,
+		struct state *comparison);
 
 static struct result *
 call_absexec(struct ast_expr *call, struct ast_function *, struct state *);
@@ -584,12 +585,12 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	);
 
 	struct ast_type *ret_type = ast_function_type(f);
-	struct state *comparison_state = state_create(
+	struct state *comparison = state_create(
 		name,
 		state_getext(state),
 		ret_type
 	);
-	if ((err = prepare_comparisonstate(nparams, params, args, name, comparison_state))) {
+	if ((err = prepare_comparisonstate(nparams, params, args, name, state, comparison))) {
 		return result_error_create(err);
 	}
 
@@ -598,11 +599,10 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(err);
 	}
 
-	if ((err = ast_function_precondsverify(f, state_getext(state), comparison_state))) {
+	if ((err = ast_function_precondsverify(f, state_getext(state), comparison))) {
 		return result_error_create(err);
 	}
 
-	printf("state: %s\n", state_str(state));
 	struct result *res = call_absexec(expr, f, state);
 	if (result_iserror(res)) {
 		return res;
@@ -757,12 +757,18 @@ prepare_parameters(int nparams, struct ast_variable **param,
 
 static struct error *
 prepare_comparisonstate(int nparams, struct ast_variable **param,
-		struct result_arr *args, char *fname, struct state *comparison_state)
+		struct result_arr *args, char *fname, struct state *actual,
+		struct state *compare)
 {
+	printf("actual (before): %s\n", state_str(actual));
+	printf("compare (before): %s\n", state_str(compare));
+
+	struct error *err;
+
 	assert(nparams == args->n);	
 	
 	for (int i = 0; i < args->n; i++) {
-		state_declare(comparison_state, param[i], true);
+		state_declare(compare, param[i], true);
 
 		struct result *res = args->res[i];
 		if (result_iserror(res)) {
@@ -781,17 +787,14 @@ prepare_comparisonstate(int nparams, struct ast_variable **param,
 		struct ast_expr *name = ast_expr_identifier_create(
 			dynamic_str(ast_variable_name(param[i]))
 		);
-		struct object *obj = lvalue_object(ast_expr_lvalue(name, comparison_state));
-
+		struct object *o_compare = lvalue_object(ast_expr_lvalue(name, compare));
 		ast_expr_destroy(name);
 
-		struct value *v = value_transfigure(
-			value_copy(result_as_value(res)), comparison_state
-		);
-
-		object_assign(obj, v);
+		struct value *argval = value_copy(result_as_value(res));
+		if ((err = value_transfigure(o_compare, argval, actual, compare))) {
+			return err;
+		}
 	}
-	printf("comp state: %s\n", state_str(comparison_state));
 	return NULL;
 }
 
