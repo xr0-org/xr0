@@ -1,3 +1,4 @@
+
 int
 snapshot_and_change(int *arg) ~ [
 	pre: {
@@ -5,30 +6,32 @@ snapshot_and_change(int *arg) ~ [
 		*arg = $;
 	}
 	result = *arg;
-	*arg = 2;
+	*arg = 3;
 ] {
 	int j;
 	j = *arg;
-	*arg = 2;
+	*arg = 3;
 	return j;
 }
 
 void
 modify(int *p, int *q) ~ [
+	int i;
 	pre: {
 		.clump p;
 		*p = $;
 		.clump q;
 	};
-	*q = $;
+	*q = 2;
+	*p = 3;
+	i = *p;
 ] {
 	int i;
 	i = 0;
 	i = snapshot_and_change(p);
-	~ [ i == 1; ];
-	~ [ *p == 2; ];
+	~ [ *p == 3; ];
 
-	*q = i;
+	*q = 2;
 }
 
 int *
@@ -39,6 +42,6 @@ main()
 	p = 9;
 	~ [ p == 9; ];
 	modify(&p, &q);
-	~ [ p == 2; ];
-	~ [ q == 1; ];
+	~ [ p == 3; ];
+	~ [ q == 2; ];
 }

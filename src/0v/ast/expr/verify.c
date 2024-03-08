@@ -27,7 +27,6 @@ expr_binary_decide(struct ast_expr *expr, struct state *state);
 bool
 ast_expr_decide(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_UNARY:
 		return expr_unary_decide(expr, state);
@@ -258,8 +257,6 @@ expr_binary_decide(struct ast_expr *expr, struct state *state)
 
 	assert(!result_iserror(root) && !result_iserror(last));
 
-	/*printf("state: %s\n", state_str(state));*/
-	/*printf("expr: %s\n", ast_expr_str(expr));*/
 	return value_compare(
 		result_as_value(root),
 		ast_expr_binary_op(expr),
@@ -315,7 +312,6 @@ arbarg_eval(struct ast_expr *expr, struct state *state);
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	/* TODO: verify preconditions of expr (statement) are satisfied */
 	/* now add postconditions */
 	switch (ast_expr_kind(expr)) {
@@ -761,9 +757,6 @@ prepare_comparisonstate(int nparams, struct ast_variable **param,
 		struct result_arr *args, char *fname, struct state *actual,
 		struct state *compare)
 {
-	printf("actual (before): %s\n", state_str(actual));
-	printf("compare (before): %s\n", state_str(compare));
-
 	struct error *err;
 
 	assert(nparams == args->n);	

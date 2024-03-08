@@ -502,7 +502,8 @@ path_absverify(struct ast_function *f, struct state *alleged_state, int index,
 
 	bool equiv = state_equal(actual_state, alleged_state);
 	if (!equiv) {
-		/* XXX: print states */
+		printf("actual: %s\n", state_str(actual_state));
+		printf("alleged: %s\n", state_str(alleged_state));
 		return error_create("actual and alleged states differ");
 	}
 

@@ -296,7 +296,6 @@ variable_abstractcopy(struct variable *old, struct state *s)
 	new->isparam = old->isparam;
 	new->loc = location_copy(old->loc);
 	struct object *obj = state_get(s, new->loc, false);
-	printf("obj: %s\n", object_str(obj));
 	assert(obj);
 	if (object_isvalue(obj)) {
 		struct value *v = object_as_value(obj);

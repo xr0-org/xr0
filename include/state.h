@@ -135,7 +135,7 @@ bool
 location_referencesheap(struct location *, struct state *);
 
 struct value *
-location_transfigure(struct location *, struct state *actual, struct state *compare);
+location_transfigure(struct location *, struct state *compare);
 
 struct object *
 state_get(struct state *state, struct location *loc, bool constructive);

@@ -73,7 +73,6 @@ stmt_iter_verify(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_verify(struct ast_stmt *stmt, struct state *state)
 {
-	printf("stmt: %s\n", ast_stmt_str(stmt));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
@@ -318,6 +317,7 @@ struct result *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_NOP:
 	case STMT_LABELLED:
 		/* labelled statements are verified not executed when we
 		 * transitively call a function */

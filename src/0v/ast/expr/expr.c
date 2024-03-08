@@ -995,7 +995,6 @@ binary_splits(struct ast_expr *, struct state *);
 struct ast_stmt_splits
 ast_expr_splits(struct ast_expr *e, struct state *s)
 {
-	printf("expr: %s\n", ast_expr_str(e));
 	switch (ast_expr_kind(e)) {
 	case EXPR_CALL:
 		return call_splits(e, s);

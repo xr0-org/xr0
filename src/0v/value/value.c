@@ -109,12 +109,14 @@ value_literal_create(char *lit)
 	return v;
 }
 
+static struct value *
+value_ptr_transfigure(struct value *v, struct state *compare);
+
 struct value *
 value_transfigure(struct value *v, struct state *compare)
 {
 	switch (v->type) {
 	case VALUE_SYNC:
-	case VALUE_PTR:
 	case VALUE_STRUCT:
 	case VALUE_LITERAL:
 		return v;
@@ -126,6 +128,8 @@ value_transfigure(struct value *v, struct state *compare)
 			NULL,
 			false
 		);
+	case VALUE_PTR:
+		return location_transfigure(value_as_location(v), compare);
 	default:
 		assert(false);
 	}
