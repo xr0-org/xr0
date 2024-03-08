@@ -598,7 +598,8 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 }
 
 struct error *
-ast_function_precondsverify(struct ast_function *f, struct state *actual_state)
+ast_function_precondsverify(struct ast_function *f, struct externals *ext,
+		struct state *comparison_state)
 {
 	struct error *err;
 
@@ -608,15 +609,20 @@ ast_function_precondsverify(struct ast_function *f, struct state *actual_state)
 	}
 	struct state *precond_state = state_create(
 		dynamic_str(ast_function_name(f)),
-		state_getext(actual_state),
+		ext,
 		ast_function_type(f)
 	);
 	if ((err = declare_parameters(precond_state, f))) {
 		return err;
 	}
-	printf("actual_state: %s\n", state_str(actual_state));
-	printf("precond_state: %s\n", state_str(precond_state));
-	assert(false);
+
+	bool equiv = state_equal(precond_state, comparison_state);
+	if (!equiv) {
+		printf("comparison_state: %s\n", state_str(comparison_state));
+		printf("precond_state: %s\n", state_str(precond_state));
+		return error_create("preconditions not met");
+	}
+	return NULL;
 }
 
 static void

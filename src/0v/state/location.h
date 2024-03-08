@@ -27,6 +27,9 @@ location_create_dynamic(int block, struct ast_expr *offset);
 struct location *
 location_create_automatic(int frame, int block, struct ast_expr *offset);
 
+struct value *
+location_transfigure(struct location *, struct state *);
+
 void
 location_setframe(struct location *loc, int frame);
 

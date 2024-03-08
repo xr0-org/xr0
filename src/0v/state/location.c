@@ -72,6 +72,19 @@ location_create_automatic(int frame, int block, struct ast_expr *offset)
 	return loc;
 }
 
+struct value *
+location_transfigure(struct location *loc, struct state *comparison)
+{
+	switch (loc->type) {
+	case LOCATION_AUTOMATIC:
+		return state_clump(comparison);
+	case LOCATION_DYNAMIC:
+		return value_ptr_create(loc);
+	default:
+		assert(false);
+	}
+}
+
 void
 location_destroy(struct location *loc)
 {

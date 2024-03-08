@@ -31,8 +31,7 @@ struct value {
 			struct map *m; /* maps to objects */
 		} _struct;
 	};
-};
-
+}; 
 struct value *
 value_ptr_create(struct location *loc)
 {
@@ -108,6 +107,15 @@ value_literal_create(char *lit)
 	v->type = VALUE_LITERAL;
 	v->s = dynamic_str(lit);
 	return v;
+}
+
+struct value *
+value_transfigure(struct value *v, struct state *comparison)
+{
+	if (!value_islocation(v)) {
+		return v;
+	}
+	return location_transfigure(value_as_location(v), comparison);
 }
 
 struct number *

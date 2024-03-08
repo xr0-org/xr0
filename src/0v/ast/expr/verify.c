@@ -548,6 +548,10 @@ struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
 		struct result_arr *args, char *fname, struct state *state);
 
+static struct error *
+prepare_comparisonstate(int nparams, struct ast_variable **param,
+		struct result_arr *args, char *fname, struct state *);
+
 static struct result *
 call_absexec(struct ast_expr *call, struct ast_function *, struct state *);
 
@@ -557,6 +561,8 @@ pf_augment(struct value *v, struct ast_expr *root, struct state *);
 static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
+	struct error *err;
+
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -578,17 +584,21 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	);
 
 	struct ast_type *ret_type = ast_function_type(f);
-	state_pushframe(state, dynamic_str(name), ret_type);
-
-	struct error *err = prepare_parameters(
-		nparams, params, args, name, state
+	struct state *comparison_state = state_create(
+		name,
+		state_getext(state),
+		ret_type
 	);
-	if (err) {
+	if ((err = prepare_comparisonstate(nparams, params, args, name, comparison_state))) {
 		return result_error_create(err);
 	}
 
-	err = ast_function_precondsverify(f, state);
-	if (err) {
+	state_pushframe(state, dynamic_str(name), ret_type);
+	if ((err = prepare_parameters(nparams, params, args, name, state))) {
+		return result_error_create(err);
+	}
+
+	if ((err = ast_function_precondsverify(f, state_getext(state), comparison_state))) {
 		return result_error_create(err);
 	}
 
@@ -619,11 +629,6 @@ call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state 
 static struct result *
 call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *s)
 {
-	struct error *err = ast_function_precondsverify(f, s);
-	if (err) {
-		return result_error_create(err);
-	}
-
 	struct result *res = ast_function_absexec(f, s);
 	if (result_iserror(res) || result_hasvalue(res)) {
 		return res;
@@ -747,6 +752,46 @@ prepare_parameters(int nparams, struct ast_variable **param,
 
 		object_assign(obj, value_copy(result_as_value(res)));
 	}
+	return NULL;
+}
+
+static struct error *
+prepare_comparisonstate(int nparams, struct ast_variable **param,
+		struct result_arr *args, char *fname, struct state *comparison_state)
+{
+	assert(nparams == args->n);	
+	
+	for (int i = 0; i < args->n; i++) {
+		state_declare(comparison_state, param[i], true);
+
+		struct result *res = args->res[i];
+		if (result_iserror(res)) {
+			return result_as_error(res);
+		}
+
+		if (!result_hasvalue(res)) {
+			struct strbuilder *b = strbuilder_create();
+			strbuilder_printf(
+				b, "parameter `%s' of function `%s' has no value",
+				ast_variable_name(param[i]), fname
+			);
+			return error_create(strbuilder_build(b));
+		}
+
+		struct ast_expr *name = ast_expr_identifier_create(
+			dynamic_str(ast_variable_name(param[i]))
+		);
+		struct object *obj = lvalue_object(ast_expr_lvalue(name, comparison_state));
+
+		ast_expr_destroy(name);
+
+		struct value *v = value_transfigure(
+			value_copy(result_as_value(res)), comparison_state
+		);
+
+		object_assign(obj, v);
+	}
+	printf("comp state: %s\n", state_str(comparison_state));
 	return NULL;
 }
 
