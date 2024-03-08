@@ -5,7 +5,7 @@ snapshot_and_change(int *arg) ~ [
 		*arg = $;
 	}
 	result = *arg;
-	*arg2 = 2;
+	*arg = 2;
 ] {
 	int j;
 	j = *arg;

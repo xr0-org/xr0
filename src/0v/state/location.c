@@ -79,6 +79,7 @@ location_transfigure(struct location *loc, struct state *actual, struct state *c
 	case LOCATION_AUTOMATIC:
 		return state_clump(compare);
 	case LOCATION_DYNAMIC:
+	case LOCATION_DEREFERENCABLE:
 		return value_ptr_create(loc);
 	default:
 		assert(false);

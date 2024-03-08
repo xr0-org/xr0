@@ -248,7 +248,6 @@ object_transfigure(struct object *o_comp, struct value *v_act, struct state *act
 	if (!b_comp) {
 		return NULL;
 	}
-
 	struct object *b_obj = object_value_create(
 		ast_expr_constant_create(0),
 		value_transfigure(value_copy(v_deref), compare)

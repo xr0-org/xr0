@@ -218,7 +218,8 @@ state_get(struct state *state, struct location *loc, bool constructive)
 		loc, state->vconst, state->stack, state->heap, state->clump
 	);
 	if (!b) {
-		assert(location_type(loc) == LOCATION_DYNAMIC);
+		assert(location_type(loc) == LOCATION_DYNAMIC ||
+			location_type(loc) == LOCATION_DEREFERENCABLE);
 		return NULL;
 	}
 	return block_observe(b, location_offset(loc), state, constructive);
