@@ -1,4 +1,3 @@
-
 int
 snapshot_and_change(int *arg) ~ [
 	pre: {

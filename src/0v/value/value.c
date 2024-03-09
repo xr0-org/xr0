@@ -117,9 +117,10 @@ value_transfigure(struct value *v, struct state *compare)
 {
 	switch (v->type) {
 	case VALUE_SYNC:
-	case VALUE_STRUCT:
 	case VALUE_LITERAL:
 		return v;
+	case VALUE_STRUCT:
+		assert(false);
 	case VALUE_INT:
 		return state_vconst(
 			compare,

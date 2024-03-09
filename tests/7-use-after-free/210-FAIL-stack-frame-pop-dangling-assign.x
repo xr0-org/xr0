@@ -2,18 +2,18 @@
 
 void
 dangling_assign(int **i) ~ [
-	int p;
+	int j;
 
 	pre: .clump i;
 
 	/* alleged state needs to capture that i gets an address of local var p */
-	p = 5;
- 	*i = &p;
+	j = 5;
+ 	*i = &j;
 ] {
-	int p;
+	int j;
 
-	p = 5;
-	*i = &p;
+	j = 5;
+	*i = &j;
 
 	/* after this point i is dangling */
 }
