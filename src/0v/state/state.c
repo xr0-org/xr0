@@ -39,6 +39,21 @@ state_create(char *func, struct externals *ext, struct ast_type *result_type)
 	return state;
 }
 
+struct state *
+state_create_withprops(char *func, struct externals *ext, struct ast_type *result_type,
+		struct props *props)
+{
+	struct state *state = malloc(sizeof(struct state));
+	assert(state);
+	state->ext = ext;
+	state->vconst = vconst_create();
+	state->clump = clump_create();
+	state->stack = stack_create(func, NULL, result_type);
+	state->heap = heap_create();
+	state->props = props_copy(props);
+	return state;
+}
+
 void
 state_destroy(struct state *state)
 {

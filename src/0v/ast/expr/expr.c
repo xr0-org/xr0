@@ -1020,23 +1020,6 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 	}
 }
 
-static struct string_arr *
-ast_expr_call_getfuncs(struct ast_expr *expr)
-{
-	struct string_arr *res = string_arr_create();
-	struct ast_expr *root = expr->root;
-	assert(root->kind == EXPR_IDENTIFIER);
-	string_arr_append(res, dynamic_str(root->u.string));
-	for (int i = 0; i < expr->u.call.n; i++) {
-		res = string_arr_concat(
-			res,
-			ast_expr_getfuncs(expr->u.call.arg[i])
-		);	
-		/* XXX: leaks */
-	}
-	return res;
-}
-
 static struct ast_stmt_splits
 call_splits(struct ast_expr *expr, struct state *state)
 {
@@ -1125,6 +1108,23 @@ binary_splits(struct ast_expr *e, struct state *s)
 	}
 
 	return (struct ast_stmt_splits) { .n = n, .cond = cond };
+}
+
+static struct string_arr *
+ast_expr_call_getfuncs(struct ast_expr *expr)
+{
+	struct string_arr *res = string_arr_create();
+	struct ast_expr *root = expr->root;
+	assert(root->kind == EXPR_IDENTIFIER);
+	string_arr_append(res, dynamic_str(root->u.string));
+	for (int i = 0; i < expr->u.call.n; i++) {
+		res = string_arr_concat(
+			res,
+			ast_expr_getfuncs(expr->u.call.arg[i])
+		);	
+		/* XXX: leaks */
+	}
+	return res;
 }
 
 #include "verify.c"

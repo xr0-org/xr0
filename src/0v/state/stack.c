@@ -164,7 +164,7 @@ void
 stack_declare(struct stack *stack, struct ast_variable *var, bool isparam)
 {
 	char *id = ast_variable_name(var);
-	assert(!map_get(stack->varmap, id));
+	assert(!map_get(stack->varmap, id)); /* XXX: user error */
 	map_set(
 		stack->varmap,
 		dynamic_str(id),

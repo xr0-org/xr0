@@ -28,6 +28,10 @@ struct state *
 state_create(char *func, struct externals *, struct ast_type *result_type);
 
 struct state *
+state_create_withprops(char *func, struct externals *, struct ast_type *result_type,
+		struct props *props);
+
+struct state *
 state_copy(struct state *);
 
 struct state *

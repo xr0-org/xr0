@@ -459,8 +459,13 @@ sel_decide(struct ast_expr *control, struct state *state)
 		} else if (props_contradicts(p, sync)) {
 			return (struct decision) { .decision = false, .err = NULL };
 		}
-
 	}
+	if (value_isconstant(v)) {
+		if (value_as_constant(v)) {
+			return (struct decision) { .decision = true, .err = NULL };	
+		}
+		return (struct decision) { .decision = false, .err = NULL };
+	} 
 
 	struct value *zero = value_int_create(0);
 

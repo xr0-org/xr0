@@ -227,21 +227,11 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 static struct error *
 path_verify(struct ast_function *f, struct state *state, int index);
 
-static struct preresult *
-install_props(struct state *s, struct ast_function *f);
-
 static struct error *
 path_verify_withstate(struct ast_function *f, struct state *state)
 {
-	struct ast_block *body = ast_function_body(f);
 
-	struct preresult *r = install_props(state, f);
-	if (preresult_iserror(r)) {
-		return preresult_as_error(r);
-	} else if (preresult_iscontradiction(r)) {
-		/* ex falso quodlibet */
-		return NULL;
-	}
+	struct ast_block *body = ast_function_body(f);
 
 	int ndecls = ast_block_ndecls(body);
 	struct ast_variable **var = ast_block_decls(body);
@@ -269,8 +259,6 @@ path_verify(struct ast_function *f, struct state *state, int index)
 	int nstmts = ast_block_nstmts(body);
 	struct ast_stmt **stmt = ast_block_stmts(body);
 	for (int i = index; i < nstmts; i++) {
-		/*printf("state: %s\n", state_str(state));*/
-		/*printf("%s\n", ast_stmt_str(stmt[i]));*/
 		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], state);
 		if (splits.n) {
 			assert(splits.cond);
@@ -357,21 +345,6 @@ inititalise_param(struct ast_variable *param, struct state *state)
 	return NULL;
 }
 
-static struct preresult *
-install_props(struct state *s, struct ast_function *f)
-{
-	struct ast_block *abs = ast_function_abstract(f);
-	int nstmts = ast_block_nstmts(abs);
-	struct ast_stmt **stmt = ast_block_stmts(abs);
-	for (int i = 0; i < nstmts; i++) {
-		struct preresult *r = ast_stmt_preprocess(stmt[i], s);
-		if (!preresult_isempty(r)) {
-			return r;
-		}
-	}
-	return preresult_empty_create();
-}
-
 static struct error *
 path_absverify(struct ast_function *, struct state *state, int index,
 		struct state *actual_state);
@@ -385,11 +358,13 @@ abstract_audit(struct ast_function *f, struct state *actual_state)
 {
 	struct error *err;
 
-	struct state *alleged_state = state_create(
+	struct state *alleged_state = state_create_withprops(
 		dynamic_str(ast_function_name(f)),
 		state_getext(actual_state),
-		ast_function_type(f)
+		ast_function_type(f),
+		state_getprops(actual_state)
 	);
+
 	if ((err = declare_parameters(alleged_state, f))) {
 		return err;
 	}
@@ -404,11 +379,6 @@ static struct error *
 abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
 		struct state *actual_state)
 {
-	struct preresult *r = install_props(alleged_state, f);
-	if (preresult_iscontradiction(r)) {
-		return NULL; /* XXX: error? */
-	}
-
 	int ndecls = ast_block_ndecls(f->abstract);
 	if (ndecls) {
 		struct ast_variable **var = ast_block_decls(f->abstract);
@@ -700,9 +670,6 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 static char *
 split_name(char *name, struct ast_expr *assumption);
 
-static struct ast_block *
-block_withassumption(struct ast_block *old, struct ast_expr *cond);
-
 static struct ast_function_arr *
 abstract_paths(struct ast_function *f, int index, struct ast_expr *cond)
 {
@@ -714,7 +681,7 @@ abstract_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		split_name(f->name, cond),
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
-		block_withassumption(f->abstract, ast_expr_copy(cond)),
+		ast_block_copy(f->abstract),
 		ast_block_copy(f->body)
 	);
 
@@ -725,7 +692,7 @@ abstract_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		split_name(f->name, inv_assumption),
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
-		block_withassumption(f->abstract, inv_assumption),
+		ast_block_copy(f->abstract),
 		ast_block_copy(f->body)
 	);
 	
@@ -745,7 +712,7 @@ body_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		split_name(f->name, cond),
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
-		block_withassumption(f->abstract, ast_expr_copy(cond)),
+		ast_block_copy(f->abstract),
 		f->body
 	);
 
@@ -756,7 +723,7 @@ body_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		split_name(f->name, inv_assumption),
 		f->nparam,
 		ast_variables_copy(f->nparam, f->param),
-		block_withassumption(f->abstract, inv_assumption),
+		ast_block_copy(f->abstract),
 		f->body
 	);
 	
@@ -764,34 +731,6 @@ body_paths(struct ast_function *f, int index, struct ast_expr *cond)
 	ast_function_arr_append(res, f_false);
 	return res;
 }
-
-static struct ast_block *
-block_withassumption(struct ast_block *old, struct ast_expr *cond)
-{
-	int ndecl = ast_block_ndecls(old);
-	struct ast_variable **old_decl = ast_block_decls(old);
-	struct ast_variable **decl = malloc(sizeof(struct ast_variable *) * ndecl); 
-	for (int i = 0; i < ndecl; i++) {
-		decl[i] = ast_variable_copy(old_decl[i]);
-	}
-
-	int old_nstmt = ast_block_nstmts(old);
-	struct ast_stmt **old_stmt = ast_block_stmts(old);
-	int nstmt = old_nstmt+1;
-	struct ast_stmt **stmt = malloc(sizeof(struct ast_stmt *) * nstmt);
-	for (int i = 0; i < old_nstmt; i++) {
-		stmt[i+1] = ast_stmt_copy(old_stmt[i]);
-	}
-
-	/* assume: cond; */
-	stmt[0] = ast_stmt_create_labelled(
-		NULL, dynamic_str("assume"), ast_stmt_create_expr(NULL, cond)
-	);
-
-	struct ast_block *new = ast_block_create(decl, ndecl, stmt, nstmt);
-	return new;
-}
-
 
 static char *
 split_name(char *name, struct ast_expr *assumption)

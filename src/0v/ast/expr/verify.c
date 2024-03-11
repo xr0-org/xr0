@@ -312,8 +312,6 @@ arbarg_eval(struct ast_expr *expr, struct state *state);
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
-	/* TODO: verify preconditions of expr (statement) are satisfied */
-	/* now add postconditions */
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 		return expr_constant_eval(expr, state);
