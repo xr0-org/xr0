@@ -27,7 +27,6 @@ expr_binary_decide(struct ast_expr *expr, struct state *state);
 bool
 ast_expr_decide(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 		return (bool) ast_expr_as_constant(expr);
@@ -388,7 +387,6 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 		strbuilder_printf(b, "`%s' has no value", id);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
-	printf("val: %s\n", value_str(val));
 	return result_value_create(value_copy(val));
 }
 

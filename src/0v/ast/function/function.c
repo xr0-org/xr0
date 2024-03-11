@@ -380,11 +380,9 @@ abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
 		struct state *actual_state)
 {
 	int ndecls = ast_block_ndecls(f->abstract);
-	if (ndecls) {
-		struct ast_variable **var = ast_block_decls(f->abstract);
-		for (int i = 0; i < ndecls; i++) {
-			state_declare(alleged_state, var[i], false);
-		}
+	struct ast_variable **var = ast_block_decls(f->abstract);
+	for (int i = 0; i < ndecls; i++) {
+		state_declare(alleged_state, var[i], false);
 	}
 
 	return path_absverify(f, alleged_state, 0, actual_state);
@@ -469,9 +467,9 @@ path_absverify(struct ast_function *f, struct state *alleged_state, int index,
 		if (result_iserror(res)) {
 			return result_as_error(res);
 		}
-		result_destroy(res);
+		/* result_destroy(res); */
 	}
-
+	
 	bool equiv = state_equal(actual_state, alleged_state);
 	if (!equiv) {
 		printf("actual: %s\n", state_str(actual_state));
@@ -561,7 +559,7 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 		if (result_iserror(res)) {
 			return res;
 		}
-		result_destroy(res);
+		/* result_destroy(res); */
 	}
 
 	/* wrap result and return */ 
@@ -590,9 +588,9 @@ ast_function_precondsverify(struct ast_function *f, struct externals *ext,
 	}
 
 	bool equiv = state_equal(precond_state, comparison_state);
-	printf("precond_state: %s\n", state_str(precond_state));
-	printf("comparison_state: %s\n", state_str(comparison_state));
 	if (!equiv) {
+		printf("precond_state: %s\n", state_str(precond_state));
+		printf("comparison_state: %s\n", state_str(comparison_state));
 		return error_create("preconditions not met");
 	}
 	return NULL;
