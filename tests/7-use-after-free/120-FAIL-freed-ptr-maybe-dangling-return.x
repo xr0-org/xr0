@@ -26,10 +26,10 @@ main()
 	int *j;
 	
 	i = func(0);
-	res1 = *i;	/* fine */
+	*i = 1;	/* fine */
 
 	j = func(1);
-	res2 = *j;	/* ERROR: unjustified indirection */
+	*j = 1;	/* ERROR: unjustified indirection */
 
 	return 0;
 }

@@ -1047,9 +1047,11 @@ call_splits(struct ast_expr *expr, struct state *state)
 	struct ast_type *ret_type = ast_function_type(f);
 	state_pushframe(s_copy, dynamic_str(name), ret_type);
 
+	printf("state (before): %s\n", state_str(s_copy));
 	struct error *err = prepare_parameters(
 		nparams, params, args, name, s_copy
 	);
+	printf("state (after): %s\n", state_str(s_copy));
 	if (err) {
 		fprintf(stderr, "err: %s\n", err->msg);
 		/* Sometimes a param is uninitialised e.g. 

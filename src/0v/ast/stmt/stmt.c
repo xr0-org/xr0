@@ -788,6 +788,37 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 	}
 }
 
+static bool
+condexists(struct ast_expr *cond, struct state *);
+
+static struct ast_stmt_splits
+stmt_sel_splits(struct ast_stmt *stmt, struct state *s)
+{
+	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
+	struct value *v = result_as_value(res);
+	struct ast_expr *e = value_to_expr(v);
+	if (condexists(e, s) || value_isconstant(v)) {
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+	}
+	/*printf("cond: %s\n", ast_expr_str(r));*/
+	struct ast_expr **cond = malloc(sizeof(struct ast_expr *));
+	cond[0] = e;
+	return (struct ast_stmt_splits) {
+		.n    = 1,
+		.cond = cond,
+	};
+}
+
+static bool
+condexists(struct ast_expr *cond, struct state *s)
+{
+	struct result *res = ast_expr_pf_reduce(cond, s);
+	assert(!result_iserror(res) && result_hasvalue(res));
+	struct ast_expr *reduced = value_to_expr(result_as_value(res));
+	struct props *p = state_getprops(s);
+	return props_get(p, reduced) || props_contradicts(p, reduced);
+}
+
 static struct string_arr *
 ast_stmt_expr_getfuncs(struct ast_stmt *stmt)
 {
@@ -851,36 +882,6 @@ ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
 		/* XXX: leaks */
 	}
 	return res;
-}
-
-static bool
-condexists(struct ast_expr *cond, struct state *);
-
-static struct ast_stmt_splits
-stmt_sel_splits(struct ast_stmt *stmt, struct state *s)
-{
-	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
-	struct ast_expr *r = value_to_expr(result_as_value(res));
-	if (condexists(r, s)) {
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
-	}
-	/*printf("cond: %s\n", ast_expr_str(r));*/
-	struct ast_expr **cond = malloc(sizeof(struct ast_expr *));
-	cond[0] = r;
-	return (struct ast_stmt_splits) {
-		.n    = 1,
-		.cond = cond,
-	};
-}
-
-static bool
-condexists(struct ast_expr *cond, struct state *s)
-{
-	struct result *res = ast_expr_pf_reduce(cond, s);
-	assert(!result_iserror(res) && result_hasvalue(res));
-	struct ast_expr *reduced = value_to_expr(result_as_value(res));
-	struct props *p = state_getprops(s);
-	return props_get(p, reduced) || props_contradicts(p, reduced);
 }
 
 #include "verify.c"

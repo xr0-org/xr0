@@ -171,6 +171,7 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("state: %s\n", state_str(state));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
@@ -461,6 +462,7 @@ sel_decide(struct ast_expr *control, struct state *state)
 		}
 	}
 	if (value_isconstant(v)) {
+		printf("value: %s\n", value_str(v));
 		if (value_as_constant(v)) {
 			return (struct decision) { .decision = true, .err = NULL };	
 		}
