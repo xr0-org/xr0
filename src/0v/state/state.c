@@ -23,6 +23,7 @@ struct state {
 	struct stack *stack;
 	struct heap *heap;
 	struct props *props;
+	struct map *dedup;
 };
 
 struct state *
@@ -36,12 +37,16 @@ state_create(char *func, struct externals *ext, struct ast_type *result_type)
 	state->stack = stack_create(func, NULL, result_type);
 	state->heap = heap_create();
 	state->props = props_create();
+	state->dedup = map_create();
 	return state;
 }
 
+static struct map *
+dedup_copy(struct map *dedup);
+
 struct state *
 state_create_withprops(char *func, struct externals *ext, struct ast_type *result_type,
-		struct props *props)
+		struct props *props, struct map *dedup)
 {
 	struct state *state = malloc(sizeof(struct state));
 	assert(state);
@@ -51,7 +56,19 @@ state_create_withprops(char *func, struct externals *ext, struct ast_type *resul
 	state->stack = stack_create(func, NULL, result_type);
 	state->heap = heap_create();
 	state->props = props_copy(props);
+	state->dedup = dedup_copy(dedup);
 	return state;
+}
+
+static struct map *
+dedup_copy(struct map *dedup)
+{
+	struct map *copy = map_create();
+	for (int i = 0; i < dedup->n; i++) {
+		struct entry e = dedup->entry[i]; 
+		map_set(copy, dynamic_str(e.key), e.value);
+	}
+	return copy;
 }
 
 void
@@ -62,8 +79,10 @@ state_destroy(struct state *state)
 	stack_destroy(state->stack);
 	heap_destroy(state->heap);
 	props_destroy(state->props);
+	map_destroy(state->dedup);
 	free(state);
 }
+
 
 struct state *
 state_copy(struct state *state)
@@ -76,6 +95,7 @@ state_copy(struct state *state)
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
+	copy->dedup = dedup_copy(state->dedup);
 	return copy;
 }
 
@@ -90,6 +110,7 @@ state_copywithname(struct state *state, char *func_name)
 	copy->stack = stack_copywithname(state->stack, func_name);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
+	copy->dedup = dedup_copy(state->dedup);
 	return copy;
 }
 
@@ -144,6 +165,12 @@ struct props *
 state_getprops(struct state *s)
 {
 	return s->props;
+}
+
+struct map *
+state_getdedup(struct state *s)
+{
+	return s->dedup;
 }
 
 void

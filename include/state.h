@@ -29,7 +29,7 @@ state_create(char *func, struct externals *, struct ast_type *result_type);
 
 struct state *
 state_create_withprops(char *func, struct externals *, struct ast_type *result_type,
-		struct props *props);
+		struct props *props, struct map *dedup);
 
 struct state *
 state_copy(struct state *);
@@ -51,6 +51,9 @@ state_getprops(struct state *);
 
 struct heap *
 state_getheap(struct state *);
+
+struct map *
+state_getdedup(struct state *);
 
 void
 state_pushframe(struct state *, char *func, struct ast_type *ret_type);

@@ -358,7 +358,8 @@ abstract_audit(struct ast_function *f, struct state *actual_state)
 		dynamic_str(ast_function_name(f)),
 		state_getext(actual_state),
 		ast_function_type(f),
-		state_getprops(actual_state)
+		state_getprops(actual_state),
+		state_getdedup(actual_state)
 	);
 
 	if ((err = declare_parameters(alleged_state, f))) {
@@ -467,10 +468,13 @@ path_absverify(struct ast_function *f, struct state *alleged_state, int index,
 				f, alleged_state, i, &splits, actual_state
 			);
 		}
+		printf("stmt: %s\n", ast_stmt_str(stmt[i]));
+		printf("state (before): %s\n", state_str(alleged_state));
 		struct result *res = ast_stmt_absexec(stmt[i], alleged_state);
 		if (result_iserror(res)) {
 			return result_as_error(res);
 		}
+		printf("state (after): %s\n", state_str(alleged_state));
 		/* result_destroy(res); */
 	}
 	

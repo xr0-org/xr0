@@ -320,11 +320,10 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
-		return result_value_create(NULL);
 	case STMT_LABELLED:
 		/* labelled statements are verified not executed when we
 		 * transitively call a function */
-		return labelled_absexec(stmt, state);
+		return result_value_create(NULL);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
@@ -338,15 +337,6 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	default:
 		assert(false);
 	}
-}
-
-static struct result *
-labelled_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	if (ast_stmt_ispre(stmt)) {
-		return ast_stmt_absexec(ast_stmt_labelled_stmt(stmt), state);
-	}
-	return result_value_create(NULL);
 }
 
 static struct ast_stmt *
@@ -625,7 +615,6 @@ static struct error *
 labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
 	/* XXX: dedupe the execution of setups */
-	struct error *err;
 	struct result *res = ast_stmt_absexec(stmt, state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
@@ -655,11 +644,13 @@ comp_setupabsexec(struct ast_stmt *stmt, struct state *state)
 	int nstmt = ast_block_nstmts(b);
 	struct ast_stmt **stmts = ast_block_stmts(b);
 	for (int i = 0; i < nstmt; i++) {
-		if ((err = stmt_setupabsexec(stmts[i], state))) {
-			return err;
-		}
-		if (ast_stmt_isterminal(stmts[i], state)) {
-			break;
+		if (ast_stmt_ispre(stmts[i])) {
+			if ((err = stmt_setupabsexec(stmts[i], state))) {
+				return err;
+			}
+			if (ast_stmt_isterminal(stmts[i], state)) {
+				break;
+			}
 		}
 	}
 	return NULL;

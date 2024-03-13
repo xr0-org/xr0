@@ -109,9 +109,6 @@ value_literal_create(char *lit)
 	return v;
 }
 
-static struct value *
-value_ptr_transfigure(struct value *v, struct state *compare);
-
 struct value *
 value_transfigure(struct value *v, struct state *compare, bool islval)
 {
