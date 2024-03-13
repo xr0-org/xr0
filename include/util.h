@@ -55,7 +55,6 @@ strbuilder_build(struct strbuilder *b);
 char *
 strbuilder_preview(struct strbuilder *b);
 
-
 struct error {
 	char *msg;
 	struct error *inner;

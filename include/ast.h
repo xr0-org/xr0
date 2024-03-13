@@ -230,6 +230,9 @@ ast_block_stmts(struct ast_block *b);
 bool
 ast_block_isterminal(struct ast_block *, struct state *);
 
+struct ast_stmt *
+ast_block_preconds(struct ast_block *b);
+
 struct ast_stmt;
 
 struct lexememarker;
@@ -239,6 +242,9 @@ ast_stmt_lexememarker(struct ast_stmt *);
 
 struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *, char *label, struct ast_stmt *);
+
+bool
+ast_stmt_ispre(struct ast_stmt *);
 
 char *
 ast_stmt_labelled_label(struct ast_stmt *);

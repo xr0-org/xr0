@@ -229,8 +229,10 @@ object_transfigure(struct object *o_comp, struct value *v_act, struct state *act
 	struct error *err;
 
 	struct value *val = value_transfigure(v_act, compare);
-	if ((err = object_assign(o_comp, val))) {
-		return err;
+	if (val) {
+		if ((err = object_assign(o_comp, val))) {
+			return err;
+		}
 	}
 	
 	if (!value_islocation(v_act)) {
@@ -248,6 +250,9 @@ object_transfigure(struct object *o_comp, struct value *v_act, struct state *act
 		return NULL;
 	}
 	struct value *v_deref = object_as_value(deref);
+	if (!value_islocation(v_deref)) {
+		return NULL;
+	}
 	
 	struct object *b_obj = object_value_create(
 		ast_expr_constant_create(0),
@@ -502,6 +507,68 @@ object_getmembertype(struct object *obj, struct ast_type *t, char *member,
 	);
 }
 
+struct object_result {
+	struct object *val;
+	struct error *err;
+};
+
+
+struct object_result *
+object_result_error_create(struct error *err)
+{
+	assert(err);
+
+	struct object_result *r = malloc(sizeof(struct object_result));
+	r->val = NULL;
+	r->err = err;
+	return r;
+}
+
+struct object_result *
+object_result_value_create(struct object *val)
+{
+	struct object_result *r = malloc(sizeof(struct object_result));
+	r->val = val;
+	r->err = NULL;
+	return r;
+}
+
+void
+object_result_destroy(struct object_result *res)
+{
+	assert(!res->err);
+	if (res->val) {
+		object_destroy(res->val);
+	}
+	free(res);
+}
+
+bool
+object_result_iserror(struct object_result *res)
+{
+	return res->err;
+}
+
+struct error *
+object_result_as_error(struct object_result *res)
+{
+	assert(res->err);
+	return res->err;
+}
+
+struct object *
+object_result_as_value(struct object_result *res)
+{
+	assert(!res->err);
+	return res->val;
+}
+
+bool
+object_result_hasvalue(struct object_result *res)
+{
+	assert(!object_result_iserror(res));
+	return res->val; /* implicit cast */
+}
 
 struct range {
 	struct ast_expr *size;

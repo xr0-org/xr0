@@ -777,8 +777,9 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 			return ast_expr_splits(stmt->u.jump.rv, s);
 		}
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
-	case STMT_ALLOCATION:
 	case STMT_LABELLED:
+		return ast_stmt_splits(stmt->u.labelled.stmt, s);
+	case STMT_ALLOCATION:
 	case STMT_ITERATION:
 	case STMT_COMPOUND_V:
 		/* disallowed splits for now */

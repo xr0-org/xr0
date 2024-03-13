@@ -1,18 +1,18 @@
 void
 modify0(int *q, int x) ~ [
+	pre: .clump q;
 	if (x) {
-		pre: .clump q;
-		*q = 2;
+		*q = 1;
 	}
 ] {
 	if (x) {
-		*q = 2;
+		*q = 1;
 	}
 }
 
 void
 modify1(int *q, int x) ~ [
-	pre: .clump q;
+	pre: if (x) { .clump q; } /* setup must be decidable */
 	if (x) {
 		*q = 2;
 	}
@@ -24,13 +24,16 @@ modify1(int *q, int x) ~ [
 
 void
 modify2(int *q, int x) ~ [
-	pre: if (x) .clump q;
 	if (x) {
-		*q = 2;
+		pre: .clump q;
+		*q = 3;
 	}
 ] {
 	if (x) {
-		*q = 2;
+		*q = 3;
+	}
+	if (x) {
+
 	}
 }
 

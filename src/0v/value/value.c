@@ -122,13 +122,7 @@ value_transfigure(struct value *v, struct state *compare)
 	case VALUE_STRUCT:
 		assert(false);
 	case VALUE_INT:
-		return state_vconst(
-			compare,
-			/* XXX: we will investigate type conversions later */
-			ast_type_create_voidptr(),
-			NULL,
-			false
-		);
+		return NULL;
 	case VALUE_PTR:
 		return location_transfigure(value_as_location(v), compare);
 	default:

@@ -47,7 +47,6 @@ struct preresult *
 ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
 {
 	if (ast_stmt_isassume(stmt)) {
-		printf("assume: %s\n", ast_stmt_str(stmt));
 		return stmt_installprop(stmt, state);
 	}
 	return preresult_empty_create();
@@ -302,6 +301,9 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct result *
+labelled_absexec(struct ast_stmt *stmt, struct state *state);
+
+static struct result *
 sel_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct result *
@@ -321,7 +323,7 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	case STMT_LABELLED:
 		/* labelled statements are verified not executed when we
 		 * transitively call a function */
-		return result_value_create(NULL);
+		return labelled_absexec(ast_stmt_labelled_stmt(stmt), state);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
@@ -335,6 +337,15 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	default:
 		assert(false);
 	}
+}
+
+static struct result *
+labelled_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	if (ast_stmt_ispre(stmt)) {
+		return ast_stmt_absexec(stmt, state);
+	}
+	return result_value_create(NULL);
 }
 
 static struct ast_stmt *
@@ -565,52 +576,4 @@ dealloc_process(struct ast_stmt *stmt, struct state *state)
 	}
 	value_destroy(val);
 	return result_value_create(NULL);
-}
-
-static struct error *
-ast_stmt_compound_precondsinit(struct ast_stmt *, struct state *);
-
-static struct error *
-ast_stmt_alloc_precondsinit(struct ast_stmt *, struct state *);
-
-struct error *
-ast_stmt_precondsinit(struct ast_stmt *stmt, struct state *s)
-{
-	switch (ast_stmt_kind(stmt)) {
-	case STMT_EXPR:
-		return ast_stmt_exec(stmt, s);
-	case STMT_COMPOUND:
-		return ast_stmt_compound_precondsinit(stmt, s);
-	case STMT_ALLOCATION:
-		return ast_stmt_alloc_precondsinit(stmt, s);
-	default:
-		assert(false);
-	}
-}
-
-static struct error *
-ast_stmt_compound_precondsinit(struct ast_stmt *stmt, struct state *s)
-{
-	struct error *err;
-
-	struct ast_block *b = ast_stmt_as_block(stmt);
-	int n = ast_block_nstmts(b);
-	struct ast_stmt **stmts = ast_block_stmts(b);
-
-	for (int i = 0; i < n; i++) {
-		if ((err = ast_stmt_precondsinit(stmts[i], s))) {
-			return err;
-		}
-	}
-	return NULL;
-}
-
-static struct error *
-ast_stmt_alloc_precondsinit(struct ast_stmt *stmt, struct state *s)
-{
-	struct result *res = ast_stmt_absexec(stmt, s);
-	if (result_iserror(res)) {
-		return result_as_error(res);
-	}
-	return NULL;
 }

@@ -180,15 +180,7 @@ struct ast_stmt *
 ast_function_preconds(struct ast_function *f)
 {
 	/* XXX: should we allow multiple pre tags */
-	struct ast_block *b = ast_function_abstract(f);	
-	int n = ast_block_nstmts(b);
-	struct ast_stmt **stmt = ast_block_stmts(b);
-	for (int i = 0; i < n; i++) {
-		if (ast_stmt_ispre(stmt[i])) {
-			return ast_stmt_labelled_stmt(stmt[i]);
-		}							
-	}
-	return NULL;
+	return ast_block_preconds(ast_function_abstract(f));	
 }
 
 struct ast_function *
@@ -314,11 +306,15 @@ declare_parameters(struct state *s, struct ast_function *f)
 static struct error *
 ast_function_precondsinit(struct ast_function *f, struct state *s)
 {
-	struct ast_stmt *stmt = ast_function_preconds(f);
-	if (!stmt) {
+	struct ast_stmt *pre = ast_function_preconds(f);
+	if (!pre) {
 		return NULL;
 	}
-	return ast_stmt_precondsinit(stmt, s);
+	struct result *res = ast_stmt_absexec(pre, s);
+	if (result_iserror(res)) {
+		return result_as_error(res);
+	}
+	return NULL;
 }
 
 static struct error *
@@ -570,7 +566,7 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 
 struct error *
 ast_function_precondsverify(struct ast_function *f, struct externals *ext,
-		struct state *comparison_state)
+		struct state *transfigure_state)
 {
 	struct error *err;
 
@@ -587,10 +583,10 @@ ast_function_precondsverify(struct ast_function *f, struct externals *ext,
 		return err;
 	}
 
-	bool equiv = state_equal(precond_state, comparison_state);
+	bool equiv = state_equal(precond_state, transfigure_state);
 	if (!equiv) {
+		printf("transfigure_state: %s\n", state_str(transfigure_state));
 		printf("precond_state: %s\n", state_str(precond_state));
-		printf("comparison_state: %s\n", state_str(comparison_state));
 		return error_create("preconditions not met");
 	}
 	return NULL;
@@ -604,7 +600,7 @@ ast_function_buildgraph(char *fname, struct externals *ext)
 {
 	struct map *dedup = map_create(),
 		   *g = map_create();
-	
+
 	recurse_buildgraph(g, dedup, fname, ext);
 
 	return g;
@@ -652,7 +648,7 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 			if (map_get(local_dedup, func[j]) != NULL) {
 				continue;
 			}
-				
+			
 			struct ast_function *f = externals_getfunc(ext, func[j]);
 			if (!f->isaxiom) {
 				string_arr_append(val, func[j]);	
@@ -674,7 +670,7 @@ static struct ast_function_arr *
 abstract_paths(struct ast_function *f, int index, struct ast_expr *cond)
 {
 	struct ast_function_arr *res = ast_function_arr_create();
-	
+
 	struct ast_function *f_true = ast_function_create(
 		f->isaxiom,
 		ast_type_copy(f->ret),
@@ -695,7 +691,7 @@ abstract_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		ast_block_copy(f->abstract),
 		ast_block_copy(f->body)
 	);
-	
+
 	ast_function_arr_append(res, f_true);
 	ast_function_arr_append(res, f_false);
 	return res;
@@ -705,7 +701,7 @@ static struct ast_function_arr *
 body_paths(struct ast_function *f, int index, struct ast_expr *cond)
 {
 	struct ast_function_arr *res = ast_function_arr_create();
-	
+
 	struct ast_function *f_true = ast_function_create(
 		f->isaxiom,
 		ast_type_copy(f->ret),
@@ -726,7 +722,7 @@ body_paths(struct ast_function *f, int index, struct ast_expr *cond)
 		ast_block_copy(f->abstract),
 		f->body
 	);
-	
+
 	ast_function_arr_append(res, f_true);
 	ast_function_arr_append(res, f_false);
 	return res;

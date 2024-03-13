@@ -141,3 +141,17 @@ ast_block_isterminal(struct ast_block *b, struct state *s)
 	}
 	return false;
 }
+
+struct ast_stmt *
+ast_block_preconds(struct ast_block *b)
+{
+	int n = ast_block_nstmts(b);
+	struct ast_stmt **stmt = ast_block_stmts(b);
+	for (int i = 0; i < n; i++) {
+		/* XXX: either enforce one pre block or concat */
+		if (ast_stmt_ispre(stmt[i])) {
+			return ast_stmt_labelled_stmt(stmt[i]);
+		}
+	}
+	return NULL;
+}
