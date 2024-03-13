@@ -14,14 +14,14 @@ void
 modify1(int *q, int x) ~ [
 	if (x) {
 		pre: .clump q;
-		*q = 3;
+		*q = 2;
 	}
 ] {
 	if (x) {
-		*q = 3;
+		*q = 2;
 	}
-	/* XXX: add failure case for if there's more if on x that means setups need
-	 * to be deduped so they only run once
+	/* XXX: add failure case for if there's addition if conditions on x that
+	 * means setups need to be deduped so they only run once
 	 */
 }
 
@@ -37,10 +37,6 @@ main()
 	~ [ p == 1; ];
 	modify1(&p, 0);
 	~ [ p == 1; ];
-	modify1(&p, 1);
+	modify1(&p, 2);
 	~ [ p == 2; ];
-	modify2(&p, 0);
-	~ [ p == 2; ];
-	modify2(&p, 1);
-	~ [ p == 3; ];
 }

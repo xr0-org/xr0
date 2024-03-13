@@ -19,6 +19,12 @@ props_str(struct props *, char *indent);
 
 struct ast_expr;
 
+int
+props_n(struct props *);
+
+struct ast_expr **
+props_prop(struct props *);
+
 void
 props_install(struct props *, struct ast_expr *);
 

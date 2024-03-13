@@ -324,7 +324,7 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	case STMT_LABELLED:
 		/* labelled statements are verified not executed when we
 		 * transitively call a function */
-		return labelled_absexec(ast_stmt_labelled_stmt(stmt), state);
+		return labelled_absexec(stmt, state);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
@@ -344,7 +344,7 @@ static struct result *
 labelled_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	if (ast_stmt_ispre(stmt)) {
-		return ast_stmt_absexec(stmt, state);
+		return ast_stmt_absexec(ast_stmt_labelled_stmt(stmt), state);
 	}
 	return result_value_create(NULL);
 }
@@ -577,4 +577,90 @@ dealloc_process(struct ast_stmt *stmt, struct state *state)
 	}
 	value_destroy(val);
 	return result_value_create(NULL);
+}
+
+static struct error *
+stmt_setupabsexec(struct ast_stmt *, struct state *);
+
+static struct error *
+labelled_setupabsexec(struct ast_stmt *, struct state *);
+
+static struct error *
+sel_setupabsexec(struct ast_stmt *, struct state *);
+
+static struct error *
+comp_setupabsexec(struct ast_stmt *, struct state *);
+
+static struct error *
+alloc_setupabsexec(struct ast_stmt *, struct state *);
+
+struct error *
+ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
+{
+	if (ast_stmt_kind(stmt) != STMT_SELECTION) {
+		return NULL;
+	}
+	return stmt_setupabsexec(stmt, state);
+}
+
+static struct error *
+stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
+{
+	switch (ast_stmt_kind(stmt)) {	
+	case STMT_EXPR:
+	case STMT_ALLOCATION:
+		return NULL;
+	case STMT_LABELLED:
+		return labelled_setupabsexec(stmt, state);
+	case STMT_SELECTION:
+		return sel_setupabsexec(stmt, state);
+	case STMT_COMPOUND:
+		return comp_setupabsexec(stmt, state);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
+{
+	/* XXX: dedupe the execution of setups */
+	struct error *err;
+	struct result *res = ast_stmt_absexec(stmt, state);
+	if (result_iserror(res)) {
+		return result_as_error(res);
+	}
+}
+
+static struct error *
+sel_setupabsexec(struct ast_stmt *stmt, struct state *state)
+{
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	if (dec.err) {
+		return dec.err;
+	}
+	if (dec.decision) {
+		return stmt_setupabsexec(ast_stmt_sel_body(stmt), state);
+	}
+	assert(!ast_stmt_sel_nest(stmt));
+	return NULL;
+}
+
+static struct error *
+comp_setupabsexec(struct ast_stmt *stmt, struct state *state)
+{
+	struct error *err;
+	struct ast_block *b = ast_stmt_as_block(stmt);
+	assert(ast_block_ndecls(b) == 0);
+	int nstmt = ast_block_nstmts(b);
+	struct ast_stmt **stmts = ast_block_stmts(b);
+	for (int i = 0; i < nstmt; i++) {
+		if ((err = stmt_setupabsexec(stmts[i], state))) {
+			return err;
+		}
+		if (ast_stmt_isterminal(stmts[i], state)) {
+			break;
+		}
+	}
+	return NULL;
 }

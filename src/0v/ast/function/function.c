@@ -406,6 +406,9 @@ split_paths_verify(struct ast_function *f, struct state *state, int index,
 }
 
 static struct error *
+ast_function_setupabsexec(struct ast_function *f, struct state *state);
+
+static struct error *
 split_path_verify(struct ast_function *f, struct state *state, int index,
 		struct ast_expr *cond)
 {
@@ -428,7 +431,12 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 			return preresult_as_error(r);
 		}
 		if (!preresult_iscontradiction(r)) {
-			/* only run if no contradiction because "ex falso" */
+			printf("state (before): %s\n", state_str(s_copy));
+			if ((err = ast_function_setupabsexec(func[i], s_copy))) {
+				return err;
+			}
+			printf("state (after): %s\n", state_str(s_copy));
+			/* only run if no contradiction because "ex falso" */	
 			if ((err = path_verify(func[i], s_copy, index))) {
 				return err;
 			}
@@ -533,6 +541,20 @@ split_path_absverify(struct ast_function *f, struct state *alleged_state,
 		}
 		/*state_destroy(actual_copy);*/
 		/*state_destroy(alleged_copy);*/
+	}
+	return NULL;
+}
+
+static struct error *
+ast_function_setupabsexec(struct ast_function *f, struct state *state)
+{
+	struct error *err;
+	int nstmts = ast_block_nstmts(f->abstract);
+	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
+	for (int i = 0; i < nstmts; i++) {
+		if ((err = ast_stmt_setupabsexec(stmt[i], state))) {
+			return err;
+		}
 	}
 	return NULL;
 }

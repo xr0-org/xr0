@@ -379,7 +379,10 @@ struct error *
 ast_stmt_exec(struct ast_stmt *, struct state *);
 
 struct result *
-ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
+ast_stmt_absexec(struct ast_stmt *stmt, struct state *);
+
+struct error *
+ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *);
 
 struct ast_type;
 
