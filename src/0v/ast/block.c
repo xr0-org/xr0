@@ -150,6 +150,7 @@ ast_block_preconds(struct ast_block *b)
 	for (int i = 0; i < n; i++) {
 		/* XXX: either enforce one pre block or concat */
 		if (ast_stmt_ispre(stmt[i])) {
+			printf("stmtm: %s\n", ast_stmt_str(stmt[i]));
 			return ast_stmt_labelled_stmt(stmt[i]);
 		}
 	}

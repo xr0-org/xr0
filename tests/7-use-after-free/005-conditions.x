@@ -12,18 +12,6 @@ modify0(int *q, int x) ~ [
 
 void
 modify1(int *q, int x) ~ [
-	pre: if (x) { .clump q; } /* setup must be decidable */
-	if (x) {
-		*q = 2;
-	}
-] {
-	if (x) {
-		*q = 2;
-	}
-}
-
-void
-modify2(int *q, int x) ~ [
 	if (x) {
 		pre: .clump q;
 		*q = 3;
@@ -34,6 +22,18 @@ modify2(int *q, int x) ~ [
 	}
 	if (x) {
 
+	}
+}
+
+void
+modify2(int *q, int x) ~ [
+	pre: if (x) { .clump q; } /* ERROR: setup must be decidable */
+	if (x) {
+		*q = 2;
+	}
+] {
+	if (x) {
+		*q = 2;
 	}
 }
 

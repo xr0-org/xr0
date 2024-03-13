@@ -644,6 +644,7 @@ ast_stmt_copy(struct ast_stmt *stmt)
 char *
 ast_stmt_str(struct ast_stmt *stmt)
 {
+	assert(stmt);
 	struct strbuilder *b = strbuilder_create();
 	switch (stmt->kind) {
 	case STMT_LABELLED:
