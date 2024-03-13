@@ -58,7 +58,7 @@ object_assign(struct object *, struct value *);
 
 struct error *
 object_transfigure(struct object *obj, struct value *val, struct state *actual,
-		struct state *compare);
+		struct state *compare, bool islval);
 
 bool
 object_contains(struct object *, struct ast_expr *, struct state *);

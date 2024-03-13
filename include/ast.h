@@ -560,7 +560,7 @@ ast_function_absexec(struct ast_function *, struct state *state);
 
 struct error *
 ast_function_precondsverify(struct ast_function *, struct externals *,
-		struct state *comparison);
+		struct state *lval_tstate, struct state *rval_tstate);
 
 struct ast_externdecl;
 

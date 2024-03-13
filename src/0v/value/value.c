@@ -113,16 +113,22 @@ static struct value *
 value_ptr_transfigure(struct value *v, struct state *compare);
 
 struct value *
-value_transfigure(struct value *v, struct state *compare)
+value_transfigure(struct value *v, struct state *compare, bool islval)
 {
 	switch (v->type) {
 	case VALUE_SYNC:
 	case VALUE_LITERAL:
-		return v;
+		return islval ? NULL: v;
 	case VALUE_STRUCT:
 		assert(false);
 	case VALUE_INT:
-		return NULL;
+		return islval ? NULL: state_vconst(
+			compare,
+			/* XXX: we will investigate type conversions later */
+			ast_type_create_voidptr(),
+			NULL,
+			false
+		);
 	case VALUE_PTR:
 		return location_transfigure(value_as_location(v), compare);
 	default:

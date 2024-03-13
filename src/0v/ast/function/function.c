@@ -566,7 +566,7 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 
 struct error *
 ast_function_precondsverify(struct ast_function *f, struct externals *ext,
-		struct state *transfigure_state)
+		struct state *lval_tstate, struct state *rval_tstate)
 {
 	struct error *err;
 
@@ -583,9 +583,11 @@ ast_function_precondsverify(struct ast_function *f, struct externals *ext,
 		return err;
 	}
 
-	bool equiv = state_equal(precond_state, transfigure_state);
-	if (!equiv) {
-		printf("transfigure_state: %s\n", state_str(transfigure_state));
+	bool equiv_lval = state_equal(precond_state, lval_tstate),
+	     equiv_rval = state_equal(precond_state, rval_tstate);
+	if (!equiv_lval && !equiv_rval) {
+		printf("lval_tstate: %s\n", state_str(lval_tstate));
+		printf("rval_tstate: %s\n", state_str(rval_tstate));
 		printf("precond_state: %s\n", state_str(precond_state));
 		return error_create("preconditions not met");
 	}

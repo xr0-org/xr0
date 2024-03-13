@@ -546,7 +546,12 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		struct result_arr *args, char *fname, struct state *state);
 
 static struct error *
-prepare_comparisonstate(int nparams, struct ast_variable **param,
+prepare_transfigurestate_lval(int nparams, struct ast_variable **param,
+		struct result_arr *args, char *fname, struct state *actual,
+		struct state *comparison);
+
+static struct error *
+prepare_transfigurestate_rval(int nparams, struct ast_variable **param,
 		struct result_arr *args, char *fname, struct state *actual,
 		struct state *comparison);
 
@@ -582,12 +587,16 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	);
 
 	struct ast_type *ret_type = ast_function_type(f);
-	struct state *comparison = state_create(
-		name,
-		state_getext(state),
-		ret_type
+	struct state *lval_tstate = state_create(
+		name, state_getext(state), ret_type
 	);
-	if ((err = prepare_comparisonstate(nparams, params, args, name, state, comparison))) {
+	if ((err = prepare_transfigurestate_lval(nparams, params, args, name, state, lval_tstate))) {
+		return result_error_create(err);
+	}
+	struct state *rval_tstate = state_create(
+		name, state_getext(state), ret_type
+	);
+	if ((err = prepare_transfigurestate_rval(nparams, params, args, name, state, rval_tstate))) {
 		return result_error_create(err);
 	}
 
@@ -596,7 +605,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(err);
 	}
 
-	if ((err = ast_function_precondsverify(f, state_getext(state), comparison))) {
+	if ((err = ast_function_precondsverify(f, state_getext(state), lval_tstate, rval_tstate))) {
 		return result_error_create(err);
 	}
 
@@ -753,9 +762,9 @@ prepare_parameters(int nparams, struct ast_variable **param,
 }
 
 static struct error *
-prepare_comparisonstate(int nparams, struct ast_variable **param,
+prepare_transfigurestate(int nparams, struct ast_variable **param,
 		struct result_arr *args, char *fname, struct state *actual,
-		struct state *compare)
+		struct state *compare, bool islval)
 {
 	struct error *err;
 
@@ -785,11 +794,31 @@ prepare_comparisonstate(int nparams, struct ast_variable **param,
 		ast_expr_destroy(name);
 
 		struct value *argval = value_copy(result_as_value(res));
-		if ((err = object_transfigure(o_compare, argval, actual, compare))) {
+		if ((err = object_transfigure(o_compare, argval, actual, compare, islval))) {
 			return err;
 		}
 	}
 	return NULL;
+}
+
+static struct error *
+prepare_transfigurestate_lval(int nparams, struct ast_variable **param,
+		struct result_arr *args, char *fname, struct state *actual,
+		struct state *compare)
+{
+	return prepare_transfigurestate(
+		nparams, param,  args, fname, actual, compare, true
+	);
+}
+
+static struct error *
+prepare_transfigurestate_rval(int nparams, struct ast_variable **param,
+		struct result_arr *args, char *fname, struct state *actual,
+		struct state *compare)
+{
+	return prepare_transfigurestate(
+		nparams, param, args, fname, actual, compare, false
+	);
 }
 
 static struct result *
