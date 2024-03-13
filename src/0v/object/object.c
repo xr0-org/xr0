@@ -250,6 +250,9 @@ object_transfigure(struct object *o_comp, struct value *v_act, struct state *act
 		return NULL;
 	}
 	struct value *v_deref = object_as_value(deref);
+	if (islval && !value_islocation(v_deref)) {
+		return NULL;
+	}
 	
 	struct object *b_obj = object_value_create(
 		ast_expr_constant_create(0),

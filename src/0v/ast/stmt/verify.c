@@ -320,6 +320,7 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
+		return result_value_create(NULL);
 	case STMT_LABELLED:
 		/* labelled statements are verified not executed when we
 		 * transitively call a function */
