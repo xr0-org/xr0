@@ -649,7 +649,9 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 		struct value *param = state_getloc(param_state, id);
 		struct value *arg = state_getloc(arg_state, id);
 		if ((err = verify_paramspec(param, arg, param_state, arg_state))) {
-			return err;
+			struct strbuilder *b = strbuilder_create();
+			strbuilder_printf(b, "parameter '%s' %s", id, err->msg);
+			return error_create(strbuilder_build(b));
 		}
 	}
 	return NULL;
@@ -663,10 +665,11 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 		return NULL;
 	}
 	if (!state_islval(arg_state, arg)) {
-		return error_create("argument must be lvalue");
+		assert(false);	/* XXX: doesn't seem reachable from user space */
+		return error_create("must be lvalue");
 	}
 	if (state_isalloc(param_state, param) && !state_isalloc(arg_state, arg)) {
-		return error_create("argument must be heap allocated");
+		return error_create("must be heap allocated");
 	}
 	struct object *param_obj = state_get(
 		param_state, value_as_location(param), false
@@ -680,7 +683,7 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 		return NULL;
 	}
 	if (!object_hasvalue(arg_obj)) {
-		return error_create("argument must be rvalue");
+		return error_create("must be rvalue");
 	}
 	return verify_paramspec(
 		object_as_value(param_obj), object_as_value(arg_obj),

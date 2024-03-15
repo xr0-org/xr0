@@ -1,0 +1,1 @@
+6-preconditions/100-FAIL-need-alloced-lval.x:15:10: cannot exec statement: parameter 'x' must be heap allocated

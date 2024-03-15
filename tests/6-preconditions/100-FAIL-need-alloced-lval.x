@@ -2,7 +2,7 @@
 
 int
 func(int *x) ~ [ 
-	pre: .clump x;
+	pre: .alloc x;
 	*x = 5;
 ]{
 	*x = 5;	
@@ -11,6 +11,6 @@ func(int *x) ~ [
 int
 main()
 {
-	int *p;
-	func(p);	
+	int p;
+	func(&p);	/* ERROR: spec requires heap */
 }
