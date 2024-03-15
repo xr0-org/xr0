@@ -384,7 +384,7 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	if (!val) {
 		printf("state: %s\n", state_str(state));
 		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "`%s' has no value", id);
+		strbuilder_printf(b, "uninitialised memory access: `%s' has no value", id);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	return result_value_create(value_copy(val));

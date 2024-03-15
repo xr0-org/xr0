@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ast.h"
+#include "intern.h"
 #include "ext.h"
 #include "expr.h"
 #include "math.h"
@@ -1013,9 +1014,8 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 	case EXPR_STRING_LITERAL:
 	case EXPR_ARBARG:
 	case EXPR_ISDEREFERENCABLE:
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = NULL };
 	default:
-		/*printf("expr: %s\n", ast_expr_str(e));*/
 		assert(false);
 	}
 }
@@ -1023,15 +1023,18 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 static struct ast_stmt_splits
 call_splits(struct ast_expr *expr, struct state *state)
 {
+	struct error *err;
+
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
 
 	struct ast_function *f = externals_getfunc(state_getext(state), name);
 	if (!f) {
-		/* TODO: user error */
-		fprintf(stdout, "function `%s' not found\n", name);
-		assert(false);
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "function: `%s' not found", name);
+		err = error_create(strbuilder_build(b));
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = err };
 	}
 
 	int nparams = ast_function_nparams(f);
@@ -1047,20 +1050,15 @@ call_splits(struct ast_expr *expr, struct state *state)
 	struct ast_type *ret_type = ast_function_type(f);
 	state_pushframe(s_copy, dynamic_str(name), ret_type);
 
-	struct error *err = prepare_parameters(
-		nparams, params, args, name, s_copy
-	);
-	if (err) {
-		fprintf(stderr, "err: %s\n", err->msg);
+	if ((err = prepare_parameters( nparams, params, args, name, s_copy))) {
 		/* Sometimes a param is uninitialised e.g. 
 		 *
 		 * 	int c;
 		 * 	scanf("%d", &c);
 		 *
 		 * */
-		/* assert(false); */
-	}
-
+		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = err };
+	} 
 	int n = 0;
 	struct ast_expr **cond = NULL;
 
@@ -1083,13 +1081,18 @@ call_splits(struct ast_expr *expr, struct state *state)
 			cond[n-1] = splits.cond[j];
 		}
 		/* XXX: for assignment statements and, well, spare us */
-		ast_stmt_absexec(stmt[i], s_copy);
+		struct result *res = ast_stmt_absexec(stmt[i], s_copy);
+		if (result_iserror(res)) {
+			return (struct ast_stmt_splits) {
+				.n = n, .cond = cond, .err = result_as_error(res)
+			};
+		}
 	}
 
 	state_popframe(s_copy);
 	result_arr_destroy(args);
 
-	return (struct ast_stmt_splits) { .n = n, .cond = cond };
+	return (struct ast_stmt_splits) { .n = n, .cond = cond, .err = NULL };
 }
 
 static struct ast_stmt_splits
@@ -1107,7 +1110,7 @@ binary_splits(struct ast_expr *e, struct state *s)
 		cond[i+s1.n] = s2.cond[i];
 	}
 
-	return (struct ast_stmt_splits) { .n = n, .cond = cond };
+	return (struct ast_stmt_splits) { .n = n, .cond = cond, .err = NULL };
 }
 
 static struct string_arr *

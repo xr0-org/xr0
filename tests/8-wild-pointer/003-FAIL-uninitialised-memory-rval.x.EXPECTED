@@ -1,1 +1,0 @@
-8-wild-pointer/003-FAIL-uninitialised-memory-rval.x:10:8: cannot exec statement: unjustified indirection (rvalue)

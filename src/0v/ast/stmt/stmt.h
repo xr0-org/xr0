@@ -34,16 +34,18 @@ ast_stmt_isassume(struct ast_stmt *stmt);
 struct string_arr *
 ast_stmt_getfuncs(struct ast_stmt *stmt);
 
+struct error;
+
 struct ast_stmt_splits {
 	int n;
 	struct ast_expr **cond;
+	struct error *err;
 };
 
 struct ast_stmt_splits
 ast_stmt_splits(struct ast_stmt *, struct state *);
 
 struct state;
-struct error;
 
 /* TODO: change to more regular tuple */
 struct decision { bool decision; struct error *err; }

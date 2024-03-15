@@ -6,5 +6,5 @@ uninitialised_memory2()
 	int r;
 
 	q = &p;
-	r = *q;
+	r = *q;		/* ERROR: unjustified indirection */
 }
