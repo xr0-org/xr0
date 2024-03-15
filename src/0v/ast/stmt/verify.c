@@ -15,7 +15,7 @@
 struct error *
 ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 {
-	struct error *err = NULL;
+	struct error *err;
 
 	if (ast_stmt_kind(stmt) == STMT_COMPOUND_V) {
 		if ((err = ast_stmt_verify(stmt, state))) {
@@ -33,6 +33,10 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 		struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
 		assert(loc);
 		char *m = lexememarker_str(loc);
+
+		assert(err);
+		assert(err->msg);
+		assert(m);
 		strbuilder_printf(b, "%s: cannot exec statement: %s", m, err->msg);
 		free(m);
 		return error_create(strbuilder_build(b));
@@ -619,6 +623,7 @@ labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
+	return NULL;
 }
 
 static struct error *

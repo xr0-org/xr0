@@ -1,6 +1,8 @@
 void
 modify(int *q) ~ [
-	pre: .clump q;
+	pre: {
+		.clump q;
+	}
 	*q = 2;
 ] {
 	*q = 2;

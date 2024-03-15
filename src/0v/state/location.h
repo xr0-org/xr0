@@ -58,6 +58,11 @@ struct stack;
 bool
 location_tostack(struct location *, struct stack *);
 
+struct clump;
+
+bool
+location_toclump(struct location *, struct clump *);
+
 bool
 location_referencesheap(struct location *, struct state *);
 

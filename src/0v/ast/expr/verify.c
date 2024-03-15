@@ -546,14 +546,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		struct result_arr *args, char *fname, struct state *state);
 
 static struct error *
-prepare_transfigurestate_lval(int nparams, struct ast_variable **param,
-		struct result_arr *args, char *fname, struct state *actual,
-		struct state *comparison);
-
-static struct error *
-prepare_transfigurestate_rval(int nparams, struct ast_variable **param,
-		struct result_arr *args, char *fname, struct state *actual,
-		struct state *comparison);
+call_setupverify(struct ast_function *, struct state *state);
 
 static struct result *
 call_absexec(struct ast_expr *call, struct ast_function *, struct state *);
@@ -579,6 +572,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
+	struct ast_type *rtype = ast_function_type(f);
 
 	struct result_arr *args = prepare_arguments(
 		ast_expr_call_nargs(expr),
@@ -586,26 +580,13 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		nparams, params, state
 	);
 
-	struct ast_type *ret_type = ast_function_type(f);
-	struct state *lval_tstate = state_create(
-		name, state_getext(state), ret_type
-	);
-	if ((err = prepare_transfigurestate_lval(nparams, params, args, name, state, lval_tstate))) {
-		return result_error_create(err);
-	}
-	struct state *rval_tstate = state_create(
-		name, state_getext(state), ret_type
-	);
-	if ((err = prepare_transfigurestate_rval(nparams, params, args, name, state, rval_tstate))) {
-		return result_error_create(err);
-	}
-
-	state_pushframe(state, dynamic_str(name), ret_type);
+	state_pushframe(state, dynamic_str(name), rtype);
 	if ((err = prepare_parameters(nparams, params, args, name, state))) {
 		return result_error_create(err);
 	}
 
-	if ((err = ast_function_precondsverify(f, state_getext(state), lval_tstate, rval_tstate))) {
+	/* XXX: pass copy so we don't observe */
+	if ((err = call_setupverify(f, state_copy(state)))) {
 		return result_error_create(err);
 	}
 
@@ -640,6 +621,71 @@ call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *s)
 		return res;
 	}
 	return call_arbitraryresult(expr, f, s);
+}
+
+static struct error *
+verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
+		struct state *arg_state);
+
+static struct error *
+call_setupverify(struct ast_function *f, struct state *arg_state)
+{
+	struct error *err;
+
+	struct externals *ext = state_getext(arg_state);
+	struct state *param_state = state_create(
+		dynamic_str(ast_function_name(f)),
+		state_getext(arg_state),
+		ast_function_type(f)
+	);
+	if ((err = ast_function_initparams(f, param_state))) {
+		return err;
+	}
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **param = ast_function_params(f);
+
+	for (int i = 0; i < nparams; i++) {
+		char *id = ast_variable_name(param[i]);
+		struct value *param = state_getloc(param_state, id);
+		struct value *arg = state_getloc(arg_state, id);
+		if ((err = verify_paramspec(param, arg, param_state, arg_state))) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
+static struct error *
+verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
+		struct state *arg_state)
+{
+	if (!state_islval(param_state, param)) {
+		return NULL;
+	}
+	if (!state_islval(arg_state, arg)) {
+		return error_create("argument must be lvalue");
+	}
+	if (state_isalloc(param_state, param) && !state_isalloc(arg_state, arg)) {
+		return error_create("argument must be heap allocated");
+	}
+	struct object *param_obj = state_get(
+		param_state, value_as_location(param), false
+	);
+	struct object *arg_obj = state_get(
+		arg_state, value_as_location(arg), false
+	);
+	assert(param_obj);
+	assert(arg_obj);
+	if (!object_hasvalue(param_obj)) {
+		return NULL;
+	}
+	if (!object_hasvalue(arg_obj)) {
+		return error_create("argument must be rvalue");
+	}
+	return verify_paramspec(
+		object_as_value(param_obj), object_as_value(arg_obj),
+		param_state, arg_state
+	);
 }
 
 static struct result *
@@ -759,66 +805,6 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		object_assign(obj, value_copy(result_as_value(res)));
 	}
 	return NULL;
-}
-
-static struct error *
-prepare_transfigurestate(int nparams, struct ast_variable **param,
-		struct result_arr *args, char *fname, struct state *actual,
-		struct state *compare, bool islval)
-{
-	struct error *err;
-
-	assert(nparams == args->n);	
-	
-	for (int i = 0; i < args->n; i++) {
-		state_declare(compare, param[i], true);
-
-		struct result *res = args->res[i];
-		if (result_iserror(res)) {
-			return result_as_error(res);
-		}
-
-		if (!result_hasvalue(res)) {
-			struct strbuilder *b = strbuilder_create();
-			strbuilder_printf(
-				b, "parameter `%s' of function `%s' has no value",
-				ast_variable_name(param[i]), fname
-			);
-			return error_create(strbuilder_build(b));
-		}
-
-		struct ast_expr *name = ast_expr_identifier_create(
-			dynamic_str(ast_variable_name(param[i]))
-		);
-		struct object *o_compare = lvalue_object(ast_expr_lvalue(name, compare));
-		ast_expr_destroy(name);
-
-		struct value *argval = value_copy(result_as_value(res));
-		if ((err = object_transfigure(o_compare, argval, actual, compare, islval))) {
-			return err;
-		}
-	}
-	return NULL;
-}
-
-static struct error *
-prepare_transfigurestate_lval(int nparams, struct ast_variable **param,
-		struct result_arr *args, char *fname, struct state *actual,
-		struct state *compare)
-{
-	return prepare_transfigurestate(
-		nparams, param,  args, fname, actual, compare, true
-	);
-}
-
-static struct error *
-prepare_transfigurestate_rval(int nparams, struct ast_variable **param,
-		struct result_arr *args, char *fname, struct state *actual,
-		struct state *compare)
-{
-	return prepare_transfigurestate(
-		nparams, param, args, fname, actual, compare, false
-	);
 }
 
 static struct result *

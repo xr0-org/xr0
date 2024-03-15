@@ -205,6 +205,14 @@ location_tostack(struct location *loc, struct stack *s)
 }
 
 bool
+location_toclump(struct location *loc, struct clump *c)
+{
+	bool type_equal = loc->type == LOCATION_DEREFERENCABLE;
+	struct block *b = clump_getblock(c, loc->block);
+	return type_equal && b;
+}
+
+bool
 location_equal(struct location *l1, struct location *l2)
 {
 	return l1->type == l2->type

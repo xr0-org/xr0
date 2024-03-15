@@ -177,7 +177,7 @@ ast_function_params(struct ast_function *f)
 }
 
 struct ast_stmt *
-ast_function_preconds(struct ast_function *f)
+ast_function_preconditions(struct ast_function *f)
 {
 	/* XXX: should we allow multiple pre tags */
 	return ast_block_preconds(ast_function_abstract(f));	
@@ -201,19 +201,24 @@ paths_verify(struct ast_function_arr *paths, struct externals *);
 static struct error *
 path_verify_withstate(struct ast_function *f, struct state *);
 
-static struct error *
-declare_parameters(struct state *s, struct ast_function *f);
+struct error *
+ast_function_initparams(struct ast_function *f, struct state *);
 
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
+	struct error *err;
 	struct state *state = state_create(
 		dynamic_str(ast_function_name(f)), ext, ast_function_type(f)
 	);
-	declare_parameters(state, f);
-	struct error *err = path_verify_withstate(f, state);
+	if ((err = ast_function_initparams(f, state))) {
+		return err;
+	}
+	if ((err = path_verify_withstate(f, state))) {
+		return err;
+	}
 	state_destroy(state);
-	return err;
+	return NULL;
 }
 
 static struct error *
@@ -280,8 +285,8 @@ ast_function_precondsinit(struct ast_function *, struct state *);
 static struct error *
 inititalise_param(struct ast_variable *v, struct state *);
 
-static struct error *
-declare_parameters(struct state *s, struct ast_function *f)
+struct error *
+ast_function_initparams(struct ast_function *f, struct state *s)
 {
 	struct error *err;
 	/* declare params and locals in stack frame */	
@@ -306,7 +311,7 @@ declare_parameters(struct state *s, struct ast_function *f)
 static struct error *
 ast_function_precondsinit(struct ast_function *f, struct state *s)
 {
-	struct ast_stmt *pre = ast_function_preconds(f);
+	struct ast_stmt *pre = ast_function_preconditions(f);
 	if (!pre) {
 		return NULL;
 	}
@@ -358,12 +363,10 @@ abstract_audit(struct ast_function *f, struct state *actual_state)
 		dynamic_str(ast_function_name(f)),
 		state_getext(actual_state),
 		ast_function_type(f),
-		state_getprops(actual_state),
-		state_getdedup(actual_state)
+		state_getprops(actual_state)
 	);
-
-	if ((err = declare_parameters(alleged_state, f))) {
-		return err;
+	if ((err = ast_function_initparams(f, alleged_state))) {
+		assert(false);
 	}
 	if ((err = abstract_auditwithstate(f, alleged_state, actual_state))) {
 		return err;	
@@ -432,11 +435,9 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 			return preresult_as_error(r);
 		}
 		if (!preresult_iscontradiction(r)) {
-			printf("state (before): %s\n", state_str(s_copy));
 			if ((err = ast_function_setupabsexec(func[i], s_copy))) {
 				return err;
 			}
-			printf("state (after): %s\n", state_str(s_copy));
 			/* only run if no contradiction because "ex falso" */	
 			if ((err = path_verify(func[i], s_copy, index))) {
 				return err;
@@ -468,13 +469,10 @@ path_absverify(struct ast_function *f, struct state *alleged_state, int index,
 				f, alleged_state, i, &splits, actual_state
 			);
 		}
-		printf("stmt: %s\n", ast_stmt_str(stmt[i]));
-		printf("state (before): %s\n", state_str(alleged_state));
 		struct result *res = ast_stmt_absexec(stmt[i], alleged_state);
 		if (result_iserror(res)) {
 			return result_as_error(res);
 		}
-		printf("state (after): %s\n", state_str(alleged_state));
 		/* result_destroy(res); */
 	}
 	
@@ -589,37 +587,6 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 	assert(obj);
 	return result_value_create(object_as_value(obj));
 }
-
-struct error *
-ast_function_precondsverify(struct ast_function *f, struct externals *ext,
-		struct state *lval_tstate, struct state *rval_tstate)
-{
-	struct error *err;
-
-	struct ast_stmt *stmt = ast_function_preconds(f);
-	if (!stmt) {
-		return NULL;
-	}
-	struct state *precond_state = state_create(
-		dynamic_str(ast_function_name(f)),
-		ext,
-		ast_function_type(f)
-	);
-	if ((err = declare_parameters(precond_state, f))) {
-		return err;
-	}
-
-	bool equiv_lval = state_equal(precond_state, lval_tstate),
-	     equiv_rval = state_equal(precond_state, rval_tstate);
-	if (!equiv_lval && !equiv_rval) {
-		printf("lval_tstate: %s\n", state_str(lval_tstate));
-		printf("rval_tstate: %s\n", state_str(rval_tstate));
-		printf("precond_state: %s\n", state_str(precond_state));
-		return error_create("preconditions not met");
-	}
-	return NULL;
-}
-
 static void
 recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externals *ext);
 

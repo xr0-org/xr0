@@ -23,7 +23,6 @@ struct state {
 	struct stack *stack;
 	struct heap *heap;
 	struct props *props;
-	struct map *dedup;
 };
 
 struct state *
@@ -37,16 +36,12 @@ state_create(char *func, struct externals *ext, struct ast_type *result_type)
 	state->stack = stack_create(func, NULL, result_type);
 	state->heap = heap_create();
 	state->props = props_create();
-	state->dedup = map_create();
 	return state;
 }
 
-static struct map *
-dedup_copy(struct map *dedup);
-
 struct state *
 state_create_withprops(char *func, struct externals *ext, struct ast_type *result_type,
-		struct props *props, struct map *dedup)
+		struct props *props)
 {
 	struct state *state = malloc(sizeof(struct state));
 	assert(state);
@@ -56,19 +51,7 @@ state_create_withprops(char *func, struct externals *ext, struct ast_type *resul
 	state->stack = stack_create(func, NULL, result_type);
 	state->heap = heap_create();
 	state->props = props_copy(props);
-	state->dedup = dedup_copy(dedup);
 	return state;
-}
-
-static struct map *
-dedup_copy(struct map *dedup)
-{
-	struct map *copy = map_create();
-	for (int i = 0; i < dedup->n; i++) {
-		struct entry e = dedup->entry[i]; 
-		map_set(copy, dynamic_str(e.key), e.value);
-	}
-	return copy;
 }
 
 void
@@ -79,7 +62,6 @@ state_destroy(struct state *state)
 	stack_destroy(state->stack);
 	heap_destroy(state->heap);
 	props_destroy(state->props);
-	map_destroy(state->dedup);
 	free(state);
 }
 
@@ -95,7 +77,6 @@ state_copy(struct state *state)
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
-	copy->dedup = dedup_copy(state->dedup);
 	return copy;
 }
 
@@ -110,7 +91,6 @@ state_copywithname(struct state *state, char *func_name)
 	copy->stack = stack_copywithname(state->stack, func_name);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
-	copy->dedup = dedup_copy(state->dedup);
 	return copy;
 }
 
@@ -167,12 +147,6 @@ state_getprops(struct state *s)
 	return s->props;
 }
 
-struct map *
-state_getdedup(struct state *s)
-{
-	return s->dedup;
-}
-
 void
 state_pushframe(struct state *state, char *func, struct ast_type *ret_type)
 {
@@ -223,28 +197,29 @@ state_clump(struct state *state)
 }
 
 bool
-state_isalloced(struct state *state, char *id)
+state_islval(struct state *state, struct value *v)
 {
-	struct variable *v = stack_getvariable(state->stack, id);
 	assert(v);
-	struct location *loc = variable_location(v);
-	if (!loc) {
+	if (!value_islocation(v)) {
 		return false;
 	}
-	return location_toheap(loc, state->heap);
+	struct location *loc = value_as_location(v);
+	struct object *obj = state_get(state, loc, true); /* put object there */
+	return location_toheap(loc, state->heap) ||
+		location_tostack(loc, state->stack) ||
+		location_toclump(loc, state->clump);
 }
 
 bool
-state_isclumped(struct state *state, char *id)
+state_isalloc(struct state *state, struct value *v)
 {
-	struct variable *v = stack_getvariable(state->stack, id);
 	assert(v);
-	struct location *loc = variable_location(v);
-	if (!loc) {
+	if (!value_islocation(v)) {
 		return false;
 	}
-	return location_tostack(loc, state->stack) ||
-		location_toheap(loc, state->heap);
+	struct location *loc = value_as_location(v);
+	struct object *obj = state_get(state, loc, true); /* put object there */
+	return location_toheap(loc, state->heap);
 }
 
 struct value *
@@ -388,7 +363,6 @@ state_dealloc(struct state *state, struct value *val)
 	}
 	return location_dealloc(value_as_location(val), state->heap);
 }
-
 
 struct error *
 state_range_dealloc(struct state *state, struct object *obj,

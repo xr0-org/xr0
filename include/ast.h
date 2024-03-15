@@ -550,6 +550,9 @@ ast_function_params(struct ast_function *f);
 struct ast_stmt *
 ast_function_preconditions(struct ast_function *f);
 
+struct error *
+ast_function_initparams(struct ast_function *, struct state *);
+
 struct externals;
 struct error;
 
@@ -560,10 +563,6 @@ struct result;
 
 struct result *
 ast_function_absexec(struct ast_function *, struct state *state);
-
-struct error *
-ast_function_precondsverify(struct ast_function *, struct externals *,
-		struct state *lval_tstate, struct state *rval_tstate);
 
 struct ast_externdecl;
 
