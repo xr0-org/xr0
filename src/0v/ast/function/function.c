@@ -199,7 +199,7 @@ struct error *
 paths_verify(struct ast_function_arr *paths, struct externals *);
 
 static struct error *
-path_verify_withstate(struct ast_function *f, struct state *);
+path_absverify_withstate(struct ast_function *f, struct state *);
 
 struct error *
 ast_function_initparams(struct ast_function *f, struct state *);
@@ -214,7 +214,7 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 	if ((err = ast_function_initparams(f, state))) {
 		return err;
 	}
-	if ((err = path_verify_withstate(f, state))) {
+	if ((err = path_absverify_withstate(f, state))) {
 		return err;
 	}
 	state_destroy(state);
@@ -222,56 +222,54 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 }
 
 static struct error *
-path_verify(struct ast_function *f, struct state *state, int index);
+path_absverify(struct ast_function *f, struct state *state, int index);
 
 static struct error *
-path_verify_withstate(struct ast_function *f, struct state *state)
+path_absverify_withstate(struct ast_function *f, struct state *state)
 {
+	struct ast_block *abs = ast_function_abstract(f);
 
-	struct ast_block *body = ast_function_body(f);
-
-	int ndecls = ast_block_ndecls(body);
-	struct ast_variable **var = ast_block_decls(body);
+	int ndecls = ast_block_ndecls(abs);
+	struct ast_variable **var = ast_block_decls(abs);
 	for (int i = 0; i < ndecls; i++) {
 		state_declare(state, var[i], false);
 	}
 
-	return path_verify(f, state, 0);
+	return path_absverify(f, state, 0);
 }
 
 static struct error *
 abstract_audit(struct ast_function *f, struct state *actual_state);
 
 static struct error *
-split_paths_verify(struct ast_function *f, struct state *, int index,
+split_paths_absverify(struct ast_function *f, struct state *, int index,
 		struct ast_stmt_splits *splits);
 
 static struct error *
-path_verify(struct ast_function *f, struct state *state, int index)
+path_absverify(struct ast_function *f, struct state *state, int index)
 {
 	struct error *err = NULL;
 
-	struct ast_block *body = ast_function_body(f);
+	struct ast_block *abs = ast_function_abstract(f);
 
-	int nstmts = ast_block_nstmts(body);
-	struct ast_stmt **stmt = ast_block_stmts(body);
+	int nstmts = ast_block_nstmts(abs);
+	struct ast_stmt **stmt = ast_block_stmts(abs);
 	for (int i = index; i < nstmts; i++) {
 		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], state);
+		if (splits.err) {
+			return splits.err;
+		}
 		if (splits.n) {
 			assert(splits.cond);
-			return split_paths_verify(f, state, i, &splits);
+			return split_paths_absverify(f, state, i, &splits);
 		}
-		if ((err = ast_stmt_process(stmt[i], state))) {
-			return err;
-		}
-		if (ast_stmt_isterminal(stmt[i], state)) {
-			break;
-		}
+		struct result *res = ast_stmt_absexec(stmt[i], state);
+		if (result_iserror(res)) {
+			return result_as_error(res);
+		}	
+		/* result_destroy(res); */
 	}
-	if (state_hasgarbage(state)) {
-		printf("actual: %s\n", state_str(state));
-		return error_create("qed error: garbage on heap");
-	}
+	
 	/* TODO: verify that `result' is of same type as f->result */
 	if ((err = abstract_audit(f, state))) {
 		return error_prepend(err, "qed error: ");
@@ -347,80 +345,75 @@ inititalise_param(struct ast_variable *param, struct state *state)
 }
 
 static struct error *
-path_absverify(struct ast_function *, struct state *state, int index,
-		struct state *actual_state);
+path_verify(struct ast_function *, struct state *state, int index,
+		struct state *abstract_state);
 
 static struct error *
-abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
-		struct state *actual_state);
+abstract_auditwithstate(struct ast_function *f, struct state *actual_state,
+		struct state *abstract_state);
 
 static struct error *
-abstract_audit(struct ast_function *f, struct state *actual_state)
+abstract_audit(struct ast_function *f, struct state *abstract_state)
 {
 	struct error *err;
 
-	struct state *alleged_state = state_create_withprops(
+	struct state *actual_state = state_create_withprops(
 		dynamic_str(ast_function_name(f)),
-		state_getext(actual_state),
+		state_getext(abstract_state),
 		ast_function_type(f),
-		state_getprops(actual_state)
+		state_getprops(abstract_state)
 	);
-	if ((err = ast_function_initparams(f, alleged_state))) {
+	if ((err = ast_function_initparams(f, actual_state))) {
 		assert(false);
 	}
-	if ((err = abstract_auditwithstate(f, alleged_state, actual_state))) {
+	if ((err = abstract_auditwithstate(f, actual_state, abstract_state))) {
 		return err;	
 	}
-	state_destroy(alleged_state); /* actual_state handled by caller */ 
+	state_destroy(actual_state); /* actual_state handled by caller */ 
 	return NULL;
 }
 
 static struct error *
-abstract_auditwithstate(struct ast_function *f, struct state *alleged_state,
-		struct state *actual_state)
+abstract_auditwithstate(struct ast_function *f, struct state *actual_state,
+		struct state *abstract_state)
 {
-	int ndecls = ast_block_ndecls(f->abstract);
-	struct ast_variable **var = ast_block_decls(f->abstract);
+	int ndecls = ast_block_ndecls(f->body);
+	struct ast_variable **var = ast_block_decls(f->body);
 	for (int i = 0; i < ndecls; i++) {
-		state_declare(alleged_state, var[i], false);
+		state_declare(actual_state, var[i], false);
 	}
 
-	return path_absverify(f, alleged_state, 0, actual_state);
+	return path_verify(f, actual_state, 0, abstract_state);
 }
 
-static struct ast_function_arr *
-body_paths(struct ast_function *f, int index, struct ast_expr *);
-
 static struct error *
-split_path_verify(struct ast_function *f, struct state *state, int index,
+split_path_absverify(struct ast_function *f, struct state *state, int index,
 		struct ast_expr *cond);
 
 static struct error *
-split_paths_verify(struct ast_function *f, struct state *state, int index,
+split_paths_absverify(struct ast_function *f, struct state *state, int index,
 		struct ast_stmt_splits *splits)
 {
 	struct error *err;
 	for (int i = 0; i < splits->n; i++) {
-		err = split_path_verify(f, state, index, splits->cond[i]);
-		if (err) {
+		if ((err = split_path_absverify(f, state, index, splits->cond[i]))) {
 			return err;
 		}
 	}
 	return NULL;
 }
 
-static struct error *
-ast_function_setupabsexec(struct ast_function *f, struct state *state);
+static struct ast_function_arr *
+abstract_paths(struct ast_function *f, int index, struct ast_expr *cond);
 
 static struct error *
-split_path_verify(struct ast_function *f, struct state *state, int index,
-		struct ast_expr *cond)
+split_path_absverify(struct ast_function *f, struct state *state, int index, struct ast_expr *cond)
 {
 	struct error *err = NULL;
 
 	/* XXX: we are just changing function name now, makes sense to split
 	 * state */
-	struct ast_function_arr *paths = body_paths(f, index, cond);
+	struct ast_function_arr *paths = abstract_paths(f, index, cond);
 	int n = ast_function_arr_len(paths);
 	assert(n == 2);
 	struct ast_function **func = ast_function_arr_func(paths);
@@ -435,11 +428,8 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 			return preresult_as_error(r);
 		}
 		if (!preresult_iscontradiction(r)) {
-			if ((err = ast_function_setupabsexec(func[i], s_copy))) {
-				return err;
-			}
 			/* only run if no contradiction because "ex falso" */	
-			if ((err = path_verify(func[i], s_copy, index))) {
+			if ((err = path_absverify(func[i], s_copy, index))) {
 				return err;
 			}
 		}
@@ -451,56 +441,61 @@ split_path_verify(struct ast_function *f, struct state *state, int index,
 }
 
 static struct error *
-split_paths_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_stmt_splits *splits, struct state *actual_state);
+split_paths_verify(struct ast_function *f, struct state *actual_state,
+		int index, struct ast_stmt_splits *splits, struct state *abstract_state);
 
 static struct error *
-path_absverify(struct ast_function *f, struct state *alleged_state, int index,
-		struct state *actual_state)
+path_verify(struct ast_function *f, struct state *actual_state, int index,
+		struct state *abstract_state)
 {
-	int nstmts = ast_block_nstmts(f->abstract);
-	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
+	struct error *err;
+
+	int nstmts = ast_block_nstmts(f->body);
+	struct ast_stmt **stmt = ast_block_stmts(f->body);
 	for (int i = index; i < nstmts; i++) {
 		struct ast_stmt_splits splits = ast_stmt_splits(
-			stmt[i], alleged_state
+			stmt[i], actual_state
 		);
 		if (splits.n) {
-			return split_paths_absverify(
-				f, alleged_state, i, &splits, actual_state
+			return split_paths_verify(
+				f, actual_state, i, &splits, abstract_state
 			);
 		}
-		struct result *res = ast_stmt_absexec(stmt[i], alleged_state);
-		if (result_iserror(res)) {
-			return result_as_error(res);
+		if ((err = ast_stmt_exec(stmt[i], actual_state))) {
+			return err;
+		}
+		if (ast_stmt_isterminal(stmt[i], actual_state)) {
+			break;
 		}
 		/* result_destroy(res); */
 	}
+	if (state_hasgarbage(actual_state)) {
+		printf("actual: %s\n", state_str(actual_state));
+		return error_create("garbage on heap");
+	}
 	
-	bool equiv = state_equal(actual_state, alleged_state);
+	bool equiv = state_equal(actual_state, abstract_state);
 	if (!equiv) {
 		printf("actual: %s\n", state_str(actual_state));
-		printf("alleged: %s\n", state_str(alleged_state));
+		printf("abstract: %s\n", state_str(abstract_state));
 		return error_create("actual and alleged states differ");
 	}
 
 	return NULL;
 }
 
-static struct ast_function_arr *
-abstract_paths(struct ast_function *f, int index, struct ast_expr *cond);
+static struct error *
+split_path_verify(struct ast_function *f, struct state *actual_state,
+		int index, struct ast_expr *cond, struct state *abstract_state);
 
 static struct error *
-split_path_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_expr *cond, struct state *actual_state);
-
-static struct error *
-split_paths_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_stmt_splits *splits, struct state *actual_state)
+split_paths_verify(struct ast_function *f, struct state *actual_state,
+		int index, struct ast_stmt_splits *splits, struct state *abstract_state)
 {
 	struct error *err;
 	for (int i = 0; i < splits->n; i++) {
-		err = split_path_absverify(
-			f, alleged_state, index, splits->cond[i], actual_state
+		err = split_path_verify(
+			f, actual_state, index, splits->cond[i], abstract_state
 		);
 		if (err) {
 			return err;
@@ -509,35 +504,38 @@ split_paths_absverify(struct ast_function *f, struct state *alleged_state,
 	return NULL;
 }
 
+static struct ast_function_arr *
+body_paths(struct ast_function *f, int index, struct ast_expr *);
+
 static struct error *
-split_path_absverify(struct ast_function *f, struct state *alleged_state,
-		int index, struct ast_expr *cond, struct state *actual_state)
+split_path_verify(struct ast_function *f, struct state *actual_state,
+		int index, struct ast_expr *cond, struct state *abstract_state)
 {
-	struct error *err = NULL;
+	struct error *err;
 
 	/* create two functions with abstracts and bodies
 	 * adjusted accordingly */
-	struct ast_function_arr *paths = abstract_paths(f, index, cond);
+	struct ast_function_arr *paths = body_paths(f, index, cond);
 	int n = ast_function_arr_len(paths);
 	assert(n == 2);
 	struct ast_function **func = ast_function_arr_func(paths);
 	for (int i = 0; i < n; i++) {
-		struct state *alleged_copy = state_copywithname(
-			alleged_state, ast_function_name(func[i])
-		);
 		struct state *actual_copy = state_copywithname(
 			actual_state, ast_function_name(func[i])
 		);
+		struct state *abstract_copy = state_copywithname(
+			abstract_state, ast_function_name(func[i])
+		);
 		struct preresult *r = ast_expr_assume(
 			/* XXX */
-			ast_expr_inverted_copy(cond, i==1), alleged_copy
+			ast_expr_inverted_copy(cond, i==1), actual_copy
 		);
 		if (preresult_iserror(r)) {
 			return preresult_as_error(r);
 		}
 		if (!preresult_iscontradiction(r)) {
 			/* only run if no contradiction because "ex falso" */
-			if ((err = path_absverify(func[i], alleged_copy, index, actual_copy))) {
+			if ((err = path_verify(func[i], actual_copy, index, abstract_copy))) {
 				return err;
 			}
 		}
