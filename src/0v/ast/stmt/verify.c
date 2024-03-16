@@ -320,10 +320,9 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
-	case STMT_LABELLED:
-		/* labelled statements are verified not executed when we
-		 * transitively call a function */
 		return result_value_create(NULL);
+	case STMT_LABELLED:
+		return labelled_absexec(stmt, state);
 	case STMT_EXPR:
 		return ast_expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
@@ -337,6 +336,88 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	default:
 		assert(false);
 	}
+}
+
+static struct result *
+labelled_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	if (!ast_stmt_ispre(stmt)) {
+		assert(false);
+	}
+	struct ast_stmt *setup = ast_stmt_labelled_stmt(stmt);
+	if (!setup) {
+		assert(false);
+		return result_value_create(NULL);
+	}
+	return ast_stmt_absexec(setup, state);
+}
+
+static struct result *
+sel_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	if (dec.err) {
+		return result_error_create(dec.err);
+	}
+	if (dec.decision) {
+		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
+	}
+	assert(!ast_stmt_sel_nest(stmt));
+	return result_value_create(NULL);
+}
+
+struct decision
+sel_decide(struct ast_expr *control, struct state *state)
+{
+	/*printf("(sel_decide) state: %s\n", state_str(state));*/
+	/*printf("(sel_decide) control: %s\n", ast_expr_str(control));*/
+	struct result *res = ast_expr_pf_reduce(control, state);
+	if (result_iserror(res)) {
+		return (struct decision) { .err = result_as_error(res) };
+	}
+	assert(result_hasvalue(res)); /* TODO: user error */
+
+	struct value *v = result_as_value(res);
+	/*printf("(sel_decide) value: %s\n", value_str(v));*/
+	if (value_issync(v)) {
+		struct ast_expr *sync = value_as_sync(v);
+		/*printf("state: %s\n", state_str(state));*/
+		/*printf("sync: %s\n", ast_expr_str(sync));*/
+		struct props *p = state_getprops(state);
+		if (props_get(p, sync)) {
+			return (struct decision) { .decision = true, .err = NULL };
+		} else if (props_contradicts(p, sync)) {
+			return (struct decision) { .decision = false, .err = NULL };
+		}
+	}
+	if (value_isconstant(v)) {
+		if (value_as_constant(v)) {
+			return (struct decision) { .decision = true, .err = NULL };	
+		}
+		return (struct decision) { .decision = false, .err = NULL };
+	} 
+
+	struct value *zero = value_int_create(0);
+
+	if (!values_comparable(zero, v)) {
+		struct strbuilder *b = strbuilder_create();
+		char *c_str = ast_expr_str(control);
+		char *v_str = value_str(v);
+		strbuilder_printf(
+			b, "`%s' with value `%s' is undecidable",
+			c_str, v_str
+		);
+		free(v_str);
+		free(c_str);
+		return (struct decision) {
+			.decision = false,
+			.err      = error_create(strbuilder_build(b)),
+		};
+	}
+
+	bool nonzero = !value_equal(zero, v);
+	value_destroy(zero);
+	return (struct decision) { .decision = nonzero, .err = NULL };
 }
 
 static struct ast_stmt *
@@ -422,74 +503,6 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	);
 	assert(obj);
 	return obj;
-}
-
-static struct result *
-sel_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
-	if (dec.err) {
-		return result_error_create(dec.err);
-	}
-	if (dec.decision) {
-		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state);
-	}
-	assert(!ast_stmt_sel_nest(stmt));
-	return result_value_create(NULL);
-}
-
-struct decision
-sel_decide(struct ast_expr *control, struct state *state)
-{
-	/*printf("(sel_decide) state: %s\n", state_str(state));*/
-	/*printf("(sel_decide) control: %s\n", ast_expr_str(control));*/
-	struct result *res = ast_expr_pf_reduce(control, state);
-	if (result_iserror(res)) {
-		return (struct decision) { .err = result_as_error(res) };
-	}
-	assert(result_hasvalue(res)); /* TODO: user error */
-
-	struct value *v = result_as_value(res);
-	/*printf("(sel_decide) value: %s\n", value_str(v));*/
-	if (value_issync(v)) {
-		struct ast_expr *sync = value_as_sync(v);
-		/*printf("state: %s\n", state_str(state));*/
-		/*printf("sync: %s\n", ast_expr_str(sync));*/
-		struct props *p = state_getprops(state);
-		if (props_get(p, sync)) {
-			return (struct decision) { .decision = true, .err = NULL };
-		} else if (props_contradicts(p, sync)) {
-			return (struct decision) { .decision = false, .err = NULL };
-		}
-	}
-	if (value_isconstant(v)) {
-		if (value_as_constant(v)) {
-			return (struct decision) { .decision = true, .err = NULL };	
-		}
-		return (struct decision) { .decision = false, .err = NULL };
-	} 
-
-	struct value *zero = value_int_create(0);
-
-	if (!values_comparable(zero, v)) {
-		struct strbuilder *b = strbuilder_create();
-		char *c_str = ast_expr_str(control);
-		char *v_str = value_str(v);
-		strbuilder_printf(
-			b, "`%s' with value `%s' is undecidable",
-			c_str, v_str
-		);
-		free(v_str);
-		free(c_str);
-		return (struct decision) {
-			.decision = false,
-			.err      = error_create(strbuilder_build(b)),
-		};
-	}
-
-	bool nonzero = !value_equal(zero, v);
-	value_destroy(zero);
-	return (struct decision) { .decision = nonzero, .err = NULL };
 }
 
 static struct result *

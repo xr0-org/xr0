@@ -263,6 +263,9 @@ path_absverify(struct ast_function *f, struct state *state, int index)
 			assert(splits.cond);
 			return split_paths_absverify(f, state, i, &splits);
 		}
+		if (ast_stmt_ispre(stmt[i])) {
+			continue;
+		}
 		struct result *res = ast_stmt_absexec(stmt[i], state);
 		if (result_iserror(res)) {
 			return result_as_error(res);
@@ -570,6 +573,9 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 	int nstmts = ast_block_nstmts(f->abstract);
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
 	for (int i = 0; i < nstmts; i++) {
+		if (ast_stmt_ispre(stmt[i])) {
+			continue;
+		}
 		struct result *res = ast_stmt_absexec(stmt[i], state);
 		if (result_iserror(res)) {
 			return res;
