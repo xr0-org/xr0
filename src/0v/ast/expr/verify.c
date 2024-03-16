@@ -314,7 +314,6 @@ arbarg_eval(struct ast_expr *expr, struct state *state);
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 		return expr_constant_eval(expr, state);
@@ -560,7 +559,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	struct error *err;
 
-	printf("callstate (before): %s\n", state_str(state));
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -587,7 +585,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(err);
 	}
 
-	printf("callstate (prepparams): %s\n", state_str(state));
 	/* XXX: pass copy so we don't observe */
 	if ((err = call_setupverify(f, state_copy(state)))) {
 		return result_error_create(err);
@@ -598,7 +595,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 
-	printf("callstate (absexec): %s\n", state_str(state));
 	/* XXX: pass copy so we don't observe */
 	/* copy to preserve value through popping of frame */
 	struct value *v = NULL;

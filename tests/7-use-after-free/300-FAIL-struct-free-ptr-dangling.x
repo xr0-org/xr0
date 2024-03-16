@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 struct report {
 	int n;
@@ -7,13 +8,18 @@ struct report {
 
 struct score {
 	char *subject;
-	char grade;
+	int grade;
 };
 
 struct score *
-create_score(char *subject, char grade)
-{
-	struct score *s = malloc(sizeof(struct score));
+create_score(char *subject, int grade) ~ [
+	pre: .alloc subject;
+	.alloc result;
+	result->subject = subject;
+	result->grade = grade;
+] {
+	struct score *s;
+	s = malloc(sizeof(struct score));
 
 	s->subject = subject;
 	s->grade = grade;
@@ -24,12 +30,13 @@ create_score(char *subject, char grade)
 struct report *
 create_report()
 {
-	char *lang = malloc(sizeof(char) * 7);
-	*lang = "english";
+	struct score *s;
+	char *sub;
 
-	struct score *s = create_score(lang, 'A');
+	sub = malloc(sizeof(char) * 7);
+	*sub = "english";
 
-	free(english);		/* dangling ptr */
-
-	*s->subject = "math";	/* ERROR: unjustified indirection */
+	s = create_score(sub, 1);
+	free(sub);		/* dangling ptr */
+	puts(s->subject);
 }
