@@ -266,7 +266,7 @@ path_absverify(struct ast_function *f, struct state *state, int index)
 		if (ast_stmt_ispre(stmt[i])) {
 			continue;
 		}
-		struct result *res = ast_stmt_absexec(stmt[i], state);
+		struct result *res = ast_stmt_absexec(stmt[i], state, true);
 		if (result_iserror(res)) {
 			return result_as_error(res);
 		}	
@@ -316,7 +316,7 @@ ast_function_precondsinit(struct ast_function *f, struct state *s)
 	if (!pre) {
 		return NULL;
 	}
-	struct result *res = ast_stmt_absexec(pre, s);
+	struct result *res = ast_stmt_absexec(pre, s, true);
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}
@@ -348,6 +348,9 @@ inititalise_param(struct ast_variable *param, struct state *state)
 }
 
 static struct error *
+ast_function_setupabsexec(struct ast_function *f, struct state *state);
+
+static struct error *
 path_verify(struct ast_function *, struct state *state, int index,
 		struct state *abstract_state);
 
@@ -369,12 +372,31 @@ abstract_audit(struct ast_function *f, struct state *abstract_state)
 	if ((err = ast_function_initparams(f, actual_state))) {
 		assert(false);
 	}
+	if ((err = ast_function_setupabsexec(f, actual_state))) {
+		return err;
+	}
 	if ((err = abstract_auditwithstate(f, actual_state, abstract_state))) {
 		return err;	
 	}
 	state_destroy(actual_state); /* actual_state handled by caller */ 
 	return NULL;
 }
+
+static struct error *
+ast_function_setupabsexec(struct ast_function *f, struct state *state)
+{
+	struct error *err;
+	int nstmts = ast_block_nstmts(f->abstract);
+	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
+	for (int i = 0; i < nstmts; i++) {
+		if ((err = ast_stmt_setupabsexec(stmt[i], state))) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
+
 
 static struct error *
 abstract_auditwithstate(struct ast_function *f, struct state *actual_state,
@@ -545,20 +567,6 @@ split_path_verify(struct ast_function *f, struct state *actual_state,
 	return NULL;
 }
 
-static struct error *
-ast_function_setupabsexec(struct ast_function *f, struct state *state)
-{
-	struct error *err;
-	int nstmts = ast_block_nstmts(f->abstract);
-	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
-	for (int i = 0; i < nstmts; i++) {
-		if ((err = ast_stmt_setupabsexec(stmt[i], state))) {
-			return err;
-		}
-	}
-	return NULL;
-}
-
 struct result *
 ast_function_absexec(struct ast_function *f, struct state *state)
 {
@@ -573,10 +581,8 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 	int nstmts = ast_block_nstmts(f->abstract);
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
 	for (int i = 0; i < nstmts; i++) {
-		if (ast_stmt_ispre(stmt[i])) {
-			continue;
-		}
-		struct result *res = ast_stmt_absexec(stmt[i], state);
+		/* called from call_exec, hence we should not run setups */
+		struct result *res = ast_stmt_absexec(stmt[i], state, false);
 		if (result_iserror(res)) {
 			return res;
 		}

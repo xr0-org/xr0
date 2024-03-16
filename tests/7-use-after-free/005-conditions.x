@@ -20,9 +20,6 @@ modify1(int *q, int x) ~ [
 	if (x) {
 		*q = 2;
 	}
-	/* XXX: add failure case for if there's addition if conditions on x that
-	 * means setups need to be deduped so they only run once
-	 */
 }
 
 int *
@@ -37,6 +34,6 @@ main()
 	~ [ p == 1; ];
 	modify1(&p, 0);
 	~ [ p == 1; ];
-	modify1(&p, 2);
+	modify1(&p, 1);
 	~ [ p == 2; ];
 }
