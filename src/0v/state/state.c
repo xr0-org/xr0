@@ -242,6 +242,12 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	return block_observe(b, location_offset(loc), state, constructive);
 }
 
+void
+state_blockinstall(struct block *b, struct object *obj)
+{
+	block_install(b, obj);
+}
+
 struct block *
 state_getblock(struct state *state, struct location *loc)
 {

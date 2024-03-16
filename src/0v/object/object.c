@@ -258,7 +258,7 @@ object_transfigure(struct object *o_comp, struct value *v_act, struct state *act
 		ast_expr_constant_create(0),
 		value_copy(v_deref)
 	);
-	block_install(b_comp, b_obj);
+	state_blockinstall(b_comp, b_obj);
 
 	return object_transfigure(b_obj, v_deref, actual, compare, islval);
 }

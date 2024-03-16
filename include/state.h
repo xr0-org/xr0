@@ -153,4 +153,12 @@ state_isdeallocand(struct state *s, struct location *loc);
 bool
 state_eval(struct state *, struct ast_expr *);
 
+struct block;
+
+void
+state_blockinstall(struct block *, struct object *);
+
+struct block *
+state_getblock(struct state *, struct location *);
+
 #endif
