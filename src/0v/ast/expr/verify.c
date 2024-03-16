@@ -821,19 +821,11 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	}
 	if (!result_hasvalue(res)) {
 		assert(false);
-		struct strbuilder *b = strbuilder_create();
-		char *s = ast_expr_str(rval);
-		strbuilder_printf(b, "unjustified indirection (rvalue)", s);
-		free(s);
-		return result_error_create(error_create(strbuilder_build(b)));
+		return result_error_create(error_create("unjustified indirection (rvalue)"));
 	}
 	struct object *obj = lvalue_object(ast_expr_lvalue(lval, state));
 	if (!obj) {
-		struct strbuilder *b = strbuilder_create();
-		char *s = ast_expr_str(lval);
-		strbuilder_printf(b, "unjustified indirection (lvalue)", s);
-		free(s);
-		return result_error_create(error_create(strbuilder_build(b)));
+		return result_error_create(error_create("unjustified indirection (lvalue)"));
 	}
 
 	object_assign(obj, value_copy(result_as_value(res)));

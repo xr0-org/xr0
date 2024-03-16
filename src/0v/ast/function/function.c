@@ -476,7 +476,7 @@ path_verify(struct ast_function *f, struct state *actual_state, int index,
 	if (!equiv) {
 		printf("actual: %s\n", state_str(actual_state));
 		printf("abstract: %s\n", state_str(abstract_state));
-		return error_create("qed error: actual and alleged states differ");
+		return error_create("qed error: actual and abstract states differ");
 	}
 
 	return NULL;
@@ -537,7 +537,7 @@ split_path_verify(struct ast_function *f, struct state *actual_state,
 			}
 		}
 		/*state_destroy(actual_copy);*/
-		/*state_destroy(alleged_copy);*/
+		/*state_destroy(abstract_copy);*/
 	}
 	return NULL;
 }
