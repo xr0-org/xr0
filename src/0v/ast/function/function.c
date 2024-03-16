@@ -272,7 +272,7 @@ path_absverify(struct ast_function *f, struct state *state, int index)
 	
 	/* TODO: verify that `result' is of same type as f->result */
 	if ((err = abstract_audit(f, state))) {
-		return error_prepend(err, "qed error: ");
+		return err;
 	}
 	return NULL;
 }
@@ -433,8 +433,6 @@ split_path_absverify(struct ast_function *f, struct state *state, int index, str
 				return err;
 			}
 		}
-		/* XXX: error? */
-
 		/*state_destroy(s_copy);*/
 	}
 	return NULL;
@@ -461,7 +459,7 @@ path_verify(struct ast_function *f, struct state *actual_state, int index,
 				f, actual_state, i, &splits, abstract_state
 			);
 		}
-		if ((err = ast_stmt_exec(stmt[i], actual_state))) {
+		if ((err = ast_stmt_process(stmt[i], actual_state))) {
 			return err;
 		}
 		if (ast_stmt_isterminal(stmt[i], actual_state)) {
@@ -471,14 +469,14 @@ path_verify(struct ast_function *f, struct state *actual_state, int index,
 	}
 	if (state_hasgarbage(actual_state)) {
 		printf("actual: %s\n", state_str(actual_state));
-		return error_create("garbage on heap");
+		return error_create("qed error: garbage on heap");
 	}
 	
 	bool equiv = state_equal(actual_state, abstract_state);
 	if (!equiv) {
 		printf("actual: %s\n", state_str(actual_state));
 		printf("abstract: %s\n", state_str(abstract_state));
-		return error_create("actual and alleged states differ");
+		return error_create("qed error: actual and alleged states differ");
 	}
 
 	return NULL;
@@ -527,7 +525,6 @@ split_path_verify(struct ast_function *f, struct state *actual_state,
 			abstract_state, ast_function_name(func[i])
 		);
 		struct preresult *r = ast_expr_assume(
-			/* XXX */
 			ast_expr_inverted_copy(cond, i==1), actual_copy
 		);
 		if (preresult_iserror(r)) {

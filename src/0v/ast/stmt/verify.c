@@ -33,10 +33,6 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 		struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
 		assert(loc);
 		char *m = lexememarker_str(loc);
-
-		assert(err);
-		assert(err->msg);
-		assert(m);
 		strbuilder_printf(b, "%s: cannot exec statement: %s", m, err->msg);
 		free(m);
 		return error_create(strbuilder_build(b));

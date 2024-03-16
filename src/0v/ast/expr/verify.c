@@ -665,10 +665,7 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 		return NULL;
 	}
 	if (!state_islval(arg_state, arg)) {
-		/* XXX: doesn't seem reachable from user space, we would fail on
-		 * uninitialised memory  */
-		assert(false);
-		/* return error_create("must be lvalue"); */
+		return error_create("must be lvalue");
 	}
 	if (state_isalloc(param_state, param) && !state_isalloc(arg_state, arg)) {
 		return error_create("must be heap allocated");
