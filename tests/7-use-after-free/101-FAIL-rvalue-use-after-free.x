@@ -9,5 +9,5 @@ func()
 	p = malloc(1);
 	free(p);
 
-	q = *p;		/* ERROR: unjustified indirection (rvalue) */
+	q = *p;		/* ERROR: undefined indirection (rvalue) */
 }

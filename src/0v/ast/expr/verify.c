@@ -384,7 +384,7 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	if (!val) {
 		printf("state: %s\n", state_str(state));
 		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "uninitialised memory access: `%s' has no value", id);
+		strbuilder_printf(b, "undefined memory access: `%s' has no value", id);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	return result_value_create(value_copy(val));
@@ -466,13 +466,13 @@ binary_deref_eval(struct ast_expr *expr, struct state *state)
 	assert(arr);
 	struct object *obj = state_deref(state, arr, ast_expr_binary_e2(expr));
 	if (!obj) {
-		return result_error_create(error_create("unjustified indirection (rvalue)"));
+		return result_error_create(error_create("undefined indirection (rvalue)"));
 	}
 	result_destroy(res);
 
 	struct value *v = object_as_value(obj);
 	if (!v) {
-		return result_error_create(error_create("unjustified indirection (rvalue)"));
+		return result_error_create(error_create("undefined indirection (rvalue)"));
 	}
 
 	return result_value_create(value_copy(v));
@@ -823,11 +823,11 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	}
 	if (!result_hasvalue(res)) {
 		assert(false);
-		return result_error_create(error_create("unjustified indirection (rvalue)"));
+		return result_error_create(error_create("undefined indirection (rvalue)"));
 	}
 	struct object *obj = lvalue_object(ast_expr_lvalue(lval, state));
 	if (!obj) {
-		return result_error_create(error_create("unjustified indirection (lvalue)"));
+		return result_error_create(error_create("undefined indirection (lvalue)"));
 	}
 
 	object_assign(obj, value_copy(result_as_value(res)));

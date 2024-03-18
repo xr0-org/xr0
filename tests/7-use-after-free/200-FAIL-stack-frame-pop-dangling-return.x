@@ -16,5 +16,5 @@ main()
 	int q;
 
 	p = dangling_return();
-	q = *p;			/* ERROR: unjustified dereference */
+	q = *p;			/* ERROR: undefined dereference */
 }

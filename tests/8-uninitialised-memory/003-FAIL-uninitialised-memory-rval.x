@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void
-uninitialised_memory3()
+undefined_memory3()
 {
 	int *p;
 	int *q;

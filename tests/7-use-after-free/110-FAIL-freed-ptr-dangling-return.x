@@ -18,7 +18,7 @@ main()
 	int *j;
 
 	i = func();
-	j = *i;		/* ERROR: unjustified indirection (rvalue) */
+	j = *i;		/* ERROR: undefined indirection (rvalue) */
 
 	return 0;
 }

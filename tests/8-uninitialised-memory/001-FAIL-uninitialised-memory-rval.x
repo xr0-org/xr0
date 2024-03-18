@@ -1,5 +1,5 @@
 void
-uninitialised_memory1()
+undefined_memory1()
 {
 	int *p;
 	int *q;

@@ -29,7 +29,7 @@ main()
 	*i = 1;	/* fine */
 
 	j = func(1);
-	*j = 1;	/* ERROR: unjustified indirection */
+	*j = 1;	/* ERROR: undefined indirection */
 
 	return 0;
 }
