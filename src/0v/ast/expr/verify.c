@@ -343,9 +343,10 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 expr_literal_eval(struct ast_expr *expr, struct state *state)
 {
-	return result_value_create(
-		value_literal_create(ast_expr_as_literal(expr))
+	struct result *res = result_value_create(
+		state_static_init(state, expr)
 	);
+	return res;
 }
 
 static struct result *

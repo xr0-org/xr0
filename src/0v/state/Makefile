@@ -22,6 +22,7 @@ LEX_OBJ = $(BUILD_DIR)/lex.o
 GRAM_OBJ = $(BUILD_DIR)/gram.o
 UTIL_OBJ = $(BUILD_DIR)/util.o
 LOCATION_OBJ = $(BUILD_DIR)/location.o
+STATIC_OBJ = $(BUILD_DIR)/static.o
 CLUMP_OBJ = $(BUILD_DIR)/clump.o
 HEAP_OBJ = $(BUILD_DIR)/heap.o
 STACK_OBJ = $(BUILD_DIR)/stack.o
@@ -34,6 +35,7 @@ OBJECTS = $(XR0_OBJECTS) \
 	  $(VALUE_OBJ) \
 	  $(LOCATION_OBJ) \
 	  $(BLOCK_OBJ) \
+	  $(STATIC_OBJ) \
 	  $(OBJECT_OBJ) \
 	  $(CLUMP_OBJ) \
 	  $(HEAP_OBJ) \
@@ -68,6 +70,10 @@ $(HEAP_OBJ): heap.c $(BLOCK_OBJ)
 $(CLUMP_OBJ): clump.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c clump.c
+
+$(STATIC_OBJ): static.c $(BLOCK_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c static.c
 
 $(BLOCK_OBJ): block.c $(OBJECT_OBJ)
 	@printf 'CC\t$@\n'

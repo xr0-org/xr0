@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "block.h"
 #include "clump.h"
+#include "static.h"
 #include "heap.h"
 #include "intern.h"
 #include "location.h"
@@ -41,6 +42,18 @@ location_create_dereferencable(int block, struct ast_expr *offset)
 	struct location *loc = malloc(sizeof(struct location));
 	assert(loc);
 	loc->type = LOCATION_DEREFERENCABLE;
+	loc->block = block;
+	assert(offset);
+	loc->offset = offset;
+	return loc;
+}
+
+struct location *
+location_create_static(int block, struct ast_expr *offset)
+{
+	struct location *loc = malloc(sizeof(struct location));
+	assert(loc);
+	loc->type = LOCATION_STATIC;
 	loc->block = block;
 	assert(offset);
 	loc->offset = offset;
@@ -101,6 +114,9 @@ location_str(struct location *loc)
 {
 	struct strbuilder *b = strbuilder_create();
 	switch (loc->type) {
+	case LOCATION_STATIC:
+		strbuilder_printf(b, "static:");
+		break;
 	case LOCATION_AUTOMATIC:
 		strbuilder_printf(b, "stack[%d]:", loc->u.frame);
 		break;
@@ -153,6 +169,10 @@ struct location *
 location_copy(struct location *loc)
 {
 	switch (loc->type) {
+	case LOCATION_STATIC:
+		return location_create_static(
+			loc->block, ast_expr_copy(loc->offset)
+		);
 	case LOCATION_VCONST:
 		return location_create_vconst(
 			loc->block, ast_expr_copy(loc->offset)
@@ -185,6 +205,14 @@ location_with_offset(struct location *loc, struct ast_expr *offset)
 
 	/* XXX: leaks */
 	return copy;
+}
+
+bool
+location_tostatic(struct location *loc, struct static_memory *sm)
+{
+	bool type_equal = loc->type == LOCATION_STATIC;
+	struct block *b = static_memory_getblock(sm, loc->block);
+	return type_equal && b;
 }
 
 bool
@@ -251,11 +279,16 @@ location_referencesheap(struct location *l, struct state *s)
 }
 
 struct block *
-location_getblock(struct location *loc, struct vconst *v, struct stack *s,
+location_getblock(struct location *loc, struct static_memory *sm, struct vconst *v, struct stack *s,
 		struct heap *h, struct clump *c)
 {
 	assert(s);
 	switch (loc->type) {
+	case LOCATION_STATIC:
+		return static_memory_getblock(
+			sm,
+			loc->block
+		);
 	case LOCATION_AUTOMATIC:
 		return stack_getblock(
 			stack_getframe(s, loc->u.frame),

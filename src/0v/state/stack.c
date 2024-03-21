@@ -263,7 +263,7 @@ variable_create(struct ast_type *type, struct stack *stack, bool isparam)
 
 	/* create block with uninitialised object at offset 0 */
 	v->loc = stack_newblock(stack);
-	struct block *b = location_getblock(v->loc, NULL, stack, NULL, NULL);
+	struct block *b = location_getblock(v->loc, NULL, NULL, stack, NULL, NULL);
 	assert(b);
 	block_install(b, object_value_create(ast_expr_constant_create(0), NULL));
 

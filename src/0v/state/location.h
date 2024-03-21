@@ -6,7 +6,7 @@
 struct ast_expr;
 
 enum location_type {
-	/* TODO: STATIC */
+	LOCATION_STATIC,
 	LOCATION_VCONST,
 	LOCATION_DEREFERENCABLE,
 	LOCATION_AUTOMATIC,
@@ -14,6 +14,9 @@ enum location_type {
 };
 
 struct location;
+
+struct location *
+location_create_static(int block, struct ast_expr *offset);
 
 struct location *
 location_create_vconst(int block, struct ast_expr *offset);
@@ -47,6 +50,11 @@ location_str(struct location *);
 
 bool
 location_isauto(struct location *);
+
+struct static_memory;
+
+bool
+location_tostatic(struct location *, struct static_memory *);
 
 struct heap;
 
@@ -85,6 +93,8 @@ location_equal(struct location *loc1, struct location *loc2);
 bool
 location_references(struct location *loc1, struct location *loc2, struct state *);
 
+struct static_memory;
+
 struct vconst;
 
 struct clump;
@@ -96,7 +106,7 @@ struct object;
 struct block;
 
 struct block *
-location_getblock(struct location *, struct vconst *, struct stack *,
+location_getblock(struct location *, struct static_memory *, struct vconst *, struct stack *,
 		struct heap *, struct clump *);
 
 struct block *

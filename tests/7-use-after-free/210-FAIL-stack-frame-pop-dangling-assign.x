@@ -6,7 +6,6 @@ dangling_assign(int **i) ~ [
 
 	pre: { .clump i; }
 
-	/* alleged state needs to capture that i gets an address of local var p */
 	j = 5;
  	*i = &j;
 ] {

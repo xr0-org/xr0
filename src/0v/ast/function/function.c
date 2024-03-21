@@ -581,7 +581,6 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 	int nstmts = ast_block_nstmts(f->abstract);
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
 	for (int i = 0; i < nstmts; i++) {
-		/* called from call_exec, hence we should not run setups */
 		struct result *res = ast_stmt_absexec(stmt[i], state, false);
 		if (result_iserror(res)) {
 			return res;

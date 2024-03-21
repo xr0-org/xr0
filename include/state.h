@@ -101,6 +101,9 @@ struct value *
 state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
 
 struct value *
+state_static_init(struct state *, struct ast_expr *);
+
+struct value *
 state_clump(struct state *);
 
 bool
