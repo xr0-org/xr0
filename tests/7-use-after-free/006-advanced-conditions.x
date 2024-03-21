@@ -11,29 +11,29 @@ modifyY(int *q, int x, int y) ~ [
 }
 
 void
-modify1(int *q, int x) ~ [
-	modifyY(q, x, 1);
-] {
-	if (x) {
+modify1(int *q, int c) ~ [
+	if (c) {
+		pre: .clump q;
 		*q = 1;
 	}
-}
-
-void
-modify2(int *q, int x) ~ [
-	modify(q, x, 2);
 ] {
-	modify(q, x, 2);
+	modifyY(q, c, 1);
 }
 
 void
-modify3(int *q, int x) ~ [
-	if (x) {
-		pre: .clump q;
-		*q = 3;
+modify2(int *q, int c) ~ [
+	modifyY(q, c, 2);
+] {
+	if (c) {
+		*q = 2;
 	}
+}
+
+void
+modify3(int *q, int c) ~ [
+	modifyY(q, c, 3);
 ] {
-	modify(q, x, 3);
+	modifyY(q, c, 3);
 }
 
 int *
