@@ -176,7 +176,7 @@ ast_function_params(struct ast_function *f)
 	return f->param;
 }
 
-struct ast_stmt *
+struct preconds_result
 ast_function_preconditions(struct ast_function *f)
 {
 	/* XXX: should we allow multiple pre tags */
@@ -312,11 +312,14 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 static struct error *
 ast_function_precondsinit(struct ast_function *f, struct state *s)
 {
-	struct ast_stmt *pre = ast_function_preconditions(f);
-	if (!pre) {
+	struct preconds_result pre = ast_function_preconditions(f);
+	if (pre.err) {
+		return pre.err;
+	}
+	if (!pre.stmt) {
 		return NULL;
 	}
-	struct result *res = ast_stmt_absexec(pre, s, true);
+	struct result *res = ast_stmt_absexec(pre.stmt, s, true);
 	if (result_iserror(res)) {
 		return result_as_error(res);
 	}

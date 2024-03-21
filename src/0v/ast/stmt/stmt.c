@@ -887,4 +887,51 @@ ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
 	return res;
 }
 
+static struct error *
+preconds_selection_verify(struct ast_stmt *stmt);
+
+static struct error *
+preconds_compound_verify(struct ast_stmt *);
+
+struct error *
+ast_stmt_preconds_validate(struct ast_stmt *stmt)
+{
+	printf("stmt: %s\n", ast_stmt_str(stmt));
+	switch (stmt->kind) {
+	case STMT_EXPR:
+	case STMT_ALLOCATION:
+	case STMT_ITERATION:
+		return NULL;
+	case STMT_SELECTION:
+		return preconds_selection_verify(stmt);	
+	case STMT_COMPOUND:
+		return preconds_compound_verify(stmt);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+preconds_selection_verify(struct ast_stmt *stmt)
+{
+	struct strbuilder *b = strbuilder_create();
+	struct lexememarker *l = ast_stmt_lexememarker(stmt);
+	strbuilder_printf(b, "%s setup preconditions must be decidable", lexememarker_str(l));
+	return error_create(strbuilder_build(b));
+}
+
+static struct error *
+preconds_compound_verify(struct ast_stmt *stmt)
+{
+	struct error *err;
+	struct ast_block *b = stmt->u.compound;
+	struct ast_stmt **stmts = ast_block_stmts(b);
+	for (int i = 0; i < ast_block_nstmts(b); i++) {
+		if ((err = ast_stmt_preconds_validate(stmts[i]))) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
 #include "verify.c"
