@@ -222,47 +222,6 @@ object_assign(struct object *obj, struct value *val)
 	return NULL;
 }
 
-struct error *
-object_transfigure(struct object *o_comp, struct value *v_act, struct state *actual,
-		struct state *compare, bool islval)
-{
-	struct error *err;
-
-	struct value *val = value_transfigure(v_act, compare, islval);
-	if (val) {
-		if ((err = object_assign(o_comp, val))) {
-			return err;
-		}
-	}
-	
-	if (!value_islocation(v_act)) {
-		return NULL;
-	}
-	struct object *deref = state_deref(actual, v_act, ast_expr_constant_create(0));
-	if (!deref) {
-		return NULL;
-	}
-	struct block *b_comp = state_getblock(compare, value_as_location(val));
-	if (!b_comp) {
-		return NULL;
-	}
-	if (!object_hasvalue(deref)) {
-		return NULL;
-	}
-	struct value *v_deref = object_as_value(deref);
-	if (islval && !value_islocation(v_deref)) {
-		return NULL;
-	}
-	
-	struct object *b_obj = object_value_create(
-		ast_expr_constant_create(0),
-		value_copy(v_deref)
-	);
-	state_blockinstall(b_comp, b_obj);
-
-	return object_transfigure(b_obj, v_deref, actual, compare, islval);
-}
-
 static struct ast_expr *
 object_size(struct object *obj)
 {

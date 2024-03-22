@@ -337,11 +337,11 @@ inititalise_param(struct ast_variable *param, struct state *state)
 	if (object_hasvalue(obj)) {
 		/* must on the clump or heap */
 		struct value *val = object_as_value(obj);	
-	//struct location *loc = value_as_location(val);
-	//assert(
-	//	location_type(loc) == LOCATION_DEREFERENCABLE ||
-	//	location_type(loc) == LOCATION_DYNAMIC
-	//);
+		//struct location *loc = value_as_location(val);
+		//assert(
+		//	location_type(loc) == LOCATION_DEREFERENCABLE ||
+		//	location_type(loc) == LOCATION_DYNAMIC
+		//);
 	} else {
 		/* variables that aren't talked about by the preconditions */
 		struct value *val = state_vconst(state, t, dynamic_str(name), true);

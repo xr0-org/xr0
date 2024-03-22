@@ -183,7 +183,12 @@ ast_expr_varinfomap(struct map *, struct ast_expr *, struct state *s);
 
 struct lvalue;
 
-struct lvalue *
+struct lvalue_res {
+	struct lvalue *lval;
+	struct error *err;
+};
+
+struct lvalue_res
 ast_expr_lvalue(struct ast_expr *, struct state *);
 
 struct result *

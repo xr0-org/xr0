@@ -73,7 +73,7 @@ state_getobjecttype(struct state *, char *id);
 struct value *
 state_getloc(struct state *state, char *id);
 
-struct object *
+struct object_res
 state_deref(struct state *, struct value *ptr, struct ast_expr *index);
 
 struct value *
@@ -144,7 +144,12 @@ location_referencesheap(struct location *, struct state *);
 struct value *
 location_transfigure(struct location *, struct state *compare);
 
-struct object *
+struct object_res {
+	struct object *obj;
+	struct error *err;
+};
+
+struct object_res
 state_get(struct state *state, struct location *loc, bool constructive);
 
 

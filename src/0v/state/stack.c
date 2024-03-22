@@ -62,7 +62,7 @@ stack_getframe(struct stack *s, int frame) {
 		return s;
 	}
 	if (!s->prev) {
-		assert(false);
+		return NULL;
 	}
 	return stack_getframe(s->prev, frame);
 }
@@ -263,9 +263,12 @@ variable_create(struct ast_type *type, struct stack *stack, bool isparam)
 
 	/* create block with uninitialised object at offset 0 */
 	v->loc = stack_newblock(stack);
-	struct block *b = location_getblock(v->loc, NULL, NULL, stack, NULL, NULL);
-	assert(b);
-	block_install(b, object_value_create(ast_expr_constant_create(0), NULL));
+	struct block_res res = location_getblock(v->loc, NULL, NULL, stack, NULL, NULL);
+	if (res.err) {
+		assert(false);
+	}
+	assert(res.b);
+	block_install(res.b, object_value_create(ast_expr_constant_create(0), NULL));
 
 	return v;
 }
@@ -295,12 +298,15 @@ variable_abstractcopy(struct variable *old, struct state *s)
 	new->type = ast_type_copy(old->type);
 	new->isparam = old->isparam;
 	new->loc = location_copy(old->loc);
-	struct object *obj = state_get(s, new->loc, false);
-	assert(obj);
-	if (object_isvalue(obj)) {
-		struct value *v = object_as_value(obj);
+	struct object_res res = state_get(s, new->loc, false);
+	if (res.err) {
+		assert(false);
+	}
+	assert(res.obj);
+	if (object_isvalue(res.obj)) {
+		struct value *v = object_as_value(res.obj);
 		if (v) {
-			object_assign(obj, value_abstractcopy(v, s));
+			object_assign(res.obj, value_abstractcopy(v, s));
 		}
 	}
 	return new;

@@ -501,9 +501,11 @@ hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
 	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
 	assert(ast_expr_equal(ast_expr_binary_e2(inner), i)); 
 	ast_expr_destroy(i);
-	struct object *obj = lvalue_object(
-		ast_expr_lvalue(ast_expr_binary_e1(inner), state)
-	);
+	struct lvalue_res res = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
+	if (res.err) {
+		assert(false);
+	}
+	struct object *obj = lvalue_object(res.lval);
 	assert(obj);
 	return obj;
 }
@@ -533,9 +535,11 @@ alloc_absexec(struct ast_stmt *alloc, struct state *state)
 		return res;
 	}
 	if (result_hasvalue(res)) {
-		struct object *obj = lvalue_object(
-			ast_expr_lvalue(ast_stmt_alloc_arg(alloc), state)
-		);
+		struct lvalue_res lval_res = ast_expr_lvalue(ast_stmt_alloc_arg(alloc), state);
+		if (lval_res.err) {
+			return result_error_create(lval_res.err);
+		}
+		struct object *obj = lvalue_object(lval_res.lval);
 		assert(obj);
 		object_assign(obj, value_copy(result_as_value(res)));
 	}

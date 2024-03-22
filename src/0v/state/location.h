@@ -105,7 +105,12 @@ struct object;
 
 struct block;
 
-struct block *
+struct block_res {
+	struct block *b;
+	struct error *err;
+};
+
+struct block_res
 location_getblock(struct location *, struct static_memory *, struct vconst *, struct stack *,
 		struct heap *, struct clump *);
 

@@ -274,33 +274,58 @@ location_referencesheap(struct location *l, struct state *s)
 		}
 		return true;
 	}
-	struct object *obj = state_get(s, l, false);
-	return obj && object_referencesheap(obj, s);
+	struct object_res res = state_get(s, l, false);
+	if (res.err) {
+		assert(false);
+	}
+	return res.obj && object_referencesheap(res.obj, s);
 }
 
-struct block *
+static struct block_res
+location_auto_getblock(struct location *, struct stack *);
+
+struct block_res
 location_getblock(struct location *loc, struct static_memory *sm, struct vconst *v, struct stack *s,
 		struct heap *h, struct clump *c)
 {
 	assert(s);
 	switch (loc->type) {
 	case LOCATION_STATIC:
-		return static_memory_getblock(
-			sm,
-			loc->block
-		);
+		return (struct block_res) {
+			.b = static_memory_getblock( sm, loc->block),
+			.err = NULL
+		};
 	case LOCATION_AUTOMATIC:
-		return stack_getblock(
-			stack_getframe(s, loc->u.frame),
-			loc->block
-		);
+		return location_auto_getblock(loc, s);	
 	case LOCATION_DYNAMIC:
-		return heap_getblock(h, loc->block);
+		return (struct block_res) {
+			.b = heap_getblock(h, loc->block),
+			.err = NULL
+		};
 	case LOCATION_DEREFERENCABLE:
-		return clump_getblock(c, loc->block);
+		return (struct block_res) {
+			.b = clump_getblock(c, loc->block),
+			.err = NULL
+		};
 	default:
 		assert(false);
 	}
+}
+
+static struct block_res
+location_auto_getblock(struct location *loc, struct stack *s)
+{
+	struct stack *f = stack_getframe(s, loc->u.frame);
+	if (!f) {
+		return (struct block_res) {
+			.b = NULL,
+			.err = error_create("stack frame doesn't exist")
+		};
+	}
+	return (struct block_res) {
+		.b = stack_getblock(f, loc->block),
+		.err = NULL
+	};
 }
 
 struct block *
