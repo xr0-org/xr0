@@ -79,7 +79,7 @@ $(XR0V): $(MAIN_0V_OBJ) $(BIN_DIR)
 	@$(CC) $(CFLAGS) -o $@ $(MAIN_0V_OBJ) $(OBJECTS)
 
 lex: $(XR0V)
-	$(VALGRIND) $(XR0V) -I libx tests/5-program/100-lex/parse.x
+	$(VALGRIND) $(XR0V) -I libx tests/99-program/100-lex/parse.x
 
 PARSER = $(BUILD_DIR)/lex-gen
 

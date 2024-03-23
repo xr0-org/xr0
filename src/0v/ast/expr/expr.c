@@ -1081,12 +1081,6 @@ call_splits(struct ast_expr *expr, struct state *state)
 			cond[n-1] = splits.cond[j];
 		}
 		/* XXX: for assignment statements and, well, spare us */
-		struct result *res = ast_stmt_absexec(stmt[i], s_copy, false);
-		if (result_iserror(res)) {
-			return (struct ast_stmt_splits) {
-				.n = n, .cond = cond, .err = result_as_error(res)
-			};
-		}
 	}
 
 	state_popframe(s_copy);

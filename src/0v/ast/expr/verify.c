@@ -337,6 +337,7 @@ arbarg_eval(struct ast_expr *expr, struct state *state);
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 		return expr_constant_eval(expr, state);
@@ -576,7 +577,7 @@ static struct error *
 call_setupverify(struct ast_function *, struct state *state);
 
 static struct result *
-call_absexec(struct ast_expr *call, struct ast_function *, struct state *);
+call_absexec(struct ast_expr *call, struct state *);
 
 static struct result *
 pf_augment(struct value *v, struct ast_expr *root, struct state *);
@@ -617,7 +618,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(err);
 	}
 
-	struct result *res = call_absexec(expr, f, state);
+	struct result *res = call_absexec(expr, state);
 	if (result_iserror(res)) {
 		return res;
 	}
@@ -643,8 +644,18 @@ static struct result *
 call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state *);
 
 static struct result *
-call_absexec(struct ast_expr *expr, struct ast_function *f, struct state *s)
+call_absexec(struct ast_expr *expr, struct state *s)
 {
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(root);
+
+	struct ast_function *f = externals_getfunc(state_getext(s), name);
+	if (!f) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "function `%s' not found", name);
+		return result_error_create(error_create(strbuilder_build(b)));
+	}
 	struct result *res = ast_function_absexec(f, s);
 	if (result_iserror(res) || result_hasvalue(res)) {
 		return res;
@@ -941,6 +952,8 @@ struct result *
 ast_expr_absexec(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
+	case EXPR_CALL:
+		return expr_call_eval(expr, state);
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
 	case EXPR_ISDEREFERENCABLE:

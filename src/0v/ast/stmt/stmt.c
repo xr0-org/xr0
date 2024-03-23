@@ -896,7 +896,6 @@ preconds_compound_verify(struct ast_stmt *);
 struct error *
 ast_stmt_preconds_validate(struct ast_stmt *stmt)
 {
-	printf("stmt: %s\n", ast_stmt_str(stmt));
 	switch (stmt->kind) {
 	case STMT_EXPR:
 	case STMT_ALLOCATION:
