@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 axiom void *
-malloc(int size) ~ [ result = .alloc(1); ];
+malloc(int size) ~ [ result = .alloc(size); ];
 
 axiom void
 free(void *ptr) ~ [ .dealloc(ptr); ];
