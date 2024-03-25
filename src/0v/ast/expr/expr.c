@@ -686,13 +686,6 @@ ast_expr_clump_create(struct ast_expr *arg)
 	return expr;
 }
 
-struct ast_expr *
-ast_expr_as_allocation(struct ast_expr *expr)
-{
-	assert(expr->kind = EXPR_ALLOCATION);
-	return expr;
-}
-
 static struct ast_expr *
 ast_expr_alloc_copy(struct ast_expr *expr)
 {
@@ -718,10 +711,10 @@ ast_expr_alloc_str_build(struct ast_expr *expr, struct strbuilder *b)
 
 	switch (expr->u.alloc.kind) {
 	case ALLOC:
-		strbuilder_printf(b, ".%s %s;", "alloc", arg);
+		strbuilder_printf(b, ".%s %s;", "malloc", arg);
 		break;
 	case DEALLOC:
-		strbuilder_printf(b, ".%s %s;", "dealloc", arg);
+		strbuilder_printf(b, ".%s %s;", "free", arg);
 		break;
 	case CLUMP:
 		strbuilder_printf(b, ".%s %s;", "clump", arg);

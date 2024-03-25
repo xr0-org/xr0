@@ -177,8 +177,6 @@ static struct error *
 rangeprocess_alloc(struct ast_expr *expr, struct ast_expr *lw, struct ast_expr *up,
 		struct state *state)
 {
-	struct error *err;
-
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 	assert(ast_expr_kind(rval) == EXPR_ALLOCATION);

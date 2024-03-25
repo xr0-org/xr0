@@ -372,8 +372,6 @@ sel_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 struct decision
 sel_decide(struct ast_expr *control, struct state *state)
 {
-	/*printf("(sel_decide) state: %s\n", state_str(state));*/
-	/*printf("(sel_decide) control: %s\n", ast_expr_str(control));*/
 	struct result *res = ast_expr_pf_reduce(control, state);
 	if (result_iserror(res)) {
 		return (struct decision) { .err = result_as_error(res) };
@@ -381,11 +379,8 @@ sel_decide(struct ast_expr *control, struct state *state)
 	assert(result_hasvalue(res)); /* TODO: user error */
 
 	struct value *v = result_as_value(res);
-	/*printf("(sel_decide) value: %s\n", value_str(v));*/
 	if (value_issync(v)) {
 		struct ast_expr *sync = value_as_sync(v);
-		/*printf("state: %s\n", state_str(state));*/
-		/*printf("sync: %s\n", ast_expr_str(sync));*/
 		struct props *p = state_getprops(state);
 		if (props_get(p, sync)) {
 			return (struct decision) { .decision = true, .err = NULL };
