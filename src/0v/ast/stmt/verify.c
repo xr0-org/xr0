@@ -446,9 +446,7 @@ hack_alloc_from_neteffect(struct ast_stmt *stmt)
 	assert(ast_stmt_kind(body) == STMT_COMPOUND);
 	struct ast_block *block = ast_stmt_as_block(body);
 	assert(ast_block_ndecls(block) == 0 && ast_block_nstmts(block) == 1);
-	return ast_expr_as_allocation(
-		ast_stmt_as_expr(ast_block_stmts(block)[0])
-	);
+	return ast_stmt_as_expr(ast_block_stmts(block)[0]);
 }
 
 static struct result *

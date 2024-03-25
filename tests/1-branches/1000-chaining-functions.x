@@ -4,15 +4,17 @@ struct tuple { int x; int y; };
 
 struct tuple
 tuple_create() ~ [
-	result.x = $;
-	result.y = $;
+	struct tuple t;
+	t.x = $;
+	t.y = $;
+	result = t;
 ];
 
 void *
-conditional_alloc(int x) ~ [ if (x) .alloc result; ];
+conditional_alloc(int x) ~ [ if (x) { result = .alloc(1); } ];
 
 void *
-test() ~ [ if (tuple_create().x) .alloc result; ]
+test() ~ [ if (tuple_create().x) { result = .alloc(1); } ]
 {
 	struct tuple t;
 

@@ -1,6 +1,6 @@
 void
 modify0(int *q, int x) ~ [
-	pre: .clump q;
+	pre: q = .clump(1);
 	if (x) {
 		*q = 1;
 	}
@@ -13,7 +13,7 @@ modify0(int *q, int x) ~ [
 void
 modify1(int *q, int x) ~ [
 	if (x) {
-		pre: .clump q;
+		pre: q = .clump(1);
 		*q = 2;
 	}
 ] {

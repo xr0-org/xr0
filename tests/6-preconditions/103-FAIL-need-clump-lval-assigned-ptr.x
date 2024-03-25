@@ -2,7 +2,7 @@
 
 int
 func(int *x) ~ [ 
-	pre: .clump x;
+	pre: x = .clump(1);
 ]{
 	
 }

@@ -1,7 +1,7 @@
 int
 assign(int *q) ~ [
 	pre: {
-		.clump q;	/* no side effect */
+		q = .clump(1);
 		*q = $;
 	}
 ] {

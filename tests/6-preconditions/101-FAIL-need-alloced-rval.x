@@ -4,7 +4,7 @@ int
 func(int *x) ~ [ 
 	int i;
 	pre: {
-		.alloc x;
+		x = .alloc(1);
 		*x = $;
 	}
 	result = *x;

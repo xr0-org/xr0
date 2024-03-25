@@ -2,9 +2,9 @@
 
 int *
 func(int x) ~ [
-	.alloc result;
+	result = .alloc(1);
 	if (x) {
-		.dealloc result;	
+		.dealloc(result);	
 	}
 ] {
 	int *p;

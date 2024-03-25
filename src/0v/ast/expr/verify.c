@@ -119,6 +119,12 @@ expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
 	return state_range_aredeallocands(state, obj, lw, up);
 }
 
+static struct error *
+rangeprocess_alloc(struct ast_expr *, struct ast_expr *lw, struct ast_expr *up, struct state *);
+
+static struct error *
+rangeprocess_dealloc(struct ast_expr *, struct ast_expr *lw, struct ast_expr *up, struct state *);
+
 static struct object *
 hack_base_object_from_alloc(struct ast_expr *, struct state *);
 
@@ -127,9 +133,7 @@ ast_expr_alloc_rangeprocess(struct ast_expr *alloc, struct ast_expr *lw, struct 
 		struct state *state)
 {
 	struct error *err;
-
-	struct object *obj = hack_base_object_from_alloc(alloc, state);
-
+	
 	struct result *result_lw = ast_expr_eval(lw, state),
 		      *result_up = ast_expr_eval(up, state);
 
@@ -149,12 +153,12 @@ ast_expr_alloc_rangeprocess(struct ast_expr *alloc, struct ast_expr *lw, struct 
 	result_destroy(result_up);
 	result_destroy(result_lw);
 
-	switch (ast_expr_alloc_kind(alloc)) {
-	case ALLOC:
-		err = state_range_alloc(state, obj, res_lw, res_up);
+	switch (alloc->kind) {
+	case EXPR_ASSIGNMENT:
+		err = rangeprocess_alloc(alloc, res_lw, res_up, state);
 		break;
-	case DEALLOC:
-		err = state_range_dealloc(state, obj, res_lw, res_up);
+	case EXPR_ALLOCATION:
+		err = rangeprocess_dealloc(alloc, res_lw, res_up, state);
 		break;
 	default:
 		assert(false);
@@ -169,13 +173,34 @@ ast_expr_alloc_rangeprocess(struct ast_expr *alloc, struct ast_expr *lw, struct 
 	return NULL;
 }
 
+static struct error *
+rangeprocess_alloc(struct ast_expr *expr, struct ast_expr *lw, struct ast_expr *up,
+		struct state *state)
+{
+	struct error *err;
+
+	struct ast_expr *lval = ast_expr_assignment_lval(expr),
+			*rval = ast_expr_assignment_rval(expr);
+	assert(ast_expr_kind(rval) == EXPR_ALLOCATION);
+	assert(ast_expr_alloc_kind(rval) != DEALLOC);
+	struct object *obj = hack_base_object_from_alloc(lval, state);
+	return state_range_alloc(state, obj, lw, up);
+}
+
+static struct error *
+rangeprocess_dealloc(struct ast_expr *dealloc, struct ast_expr *lw, struct ast_expr *up,
+		struct state *state)
+{
+	struct object *obj = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), state);
+	return state_range_dealloc(state, obj, lw, up);
+}
+
 static struct object *
 hack_base_object_from_alloc(struct ast_expr *expr, struct state *state)
 {
 	/* we're currently discarding analysis of `offset` and relying on the
-	 * bounds (lower, upper beneath) alone */
-	struct ast_expr *acc = ast_expr_alloc_arg(expr); /* `*(arr+offset)` */
-	struct ast_expr *inner = ast_expr_unary_operand(acc); /* `arr+offset` */
+	 * bounds (lower, upper beneath) alone. We passed in `*(arr+offset)` */
+	struct ast_expr *inner = ast_expr_unary_operand(expr); /* `arr+offset` */
 	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
 	assert(ast_expr_equal(ast_expr_binary_e2(inner), i)); 
 	ast_expr_destroy(i);
@@ -1022,15 +1047,22 @@ alloc_absexec(struct ast_expr *, struct state *);
 struct result *
 ast_expr_absexec(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
+	printf("state: %s\n", state_str(state));
 	switch (ast_expr_kind(expr)) {
-	case EXPR_CALL:
-		return expr_call_eval(expr, state);
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
 	case EXPR_ISDEREFERENCABLE:
 		return isdereferencable_absexec(expr, state);
 	case EXPR_ALLOCATION:
 		return alloc_absexec(expr, state);
+	case EXPR_IDENTIFIER:
+	case EXPR_CONSTANT:
+	case EXPR_UNARY:
+	case EXPR_CALL:
+	case EXPR_STRUCTMEMBER:
+	case EXPR_ARBARG:
+		return ast_expr_eval(expr, state);	
 	default:
 		assert(false);
 	}

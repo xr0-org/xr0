@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void *
-allocating() ~ [ .dealloc result; ];
+allocating() ~ [ .dealloc(result); ];
 
 int
 main()
@@ -13,7 +13,7 @@ main()
 }
 
 void *
-allocating() ~ [ .alloc result; ]
+allocating() ~ [ result = .alloc(1); ]
 {
 	void *p;
 

@@ -13,10 +13,14 @@ struct score {
 
 struct score *
 create_score(char *subject, int grade) ~ [
-	pre: .alloc subject;
-	.alloc result;
-	result->subject = subject;
-	result->grade = grade;
+	struct score *s;
+
+	pre: subject = .alloc(1);
+
+	s = .alloc(1);
+	s->subject = subject;
+	s->grade = grade;
+	result = s;
 ] {
 	struct score *s;
 	s = malloc(sizeof(struct score));

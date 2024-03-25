@@ -3,10 +3,10 @@
 void *
 test(int x) ~ [
 	if (x) {
-		.alloc result;
+		result = .alloc(1);
 	}
 	if (!x) {
-		.alloc result;
+		result = .alloc(1);
 	}
 ]{
 	return malloc(1);
