@@ -9,14 +9,14 @@ g(int param);
 void *
 alloc_if(int num) ~ [
 	if (num) {
-		return .alloc(1);
+		return .malloc(1);
 	}
 ];
 
 void *
 test(int x) ~ [
 	if (f(g(x))) {
-		return .alloc(1);
+		return .malloc(1);
 	}
 ]{
 	int m;

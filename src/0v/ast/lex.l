@@ -30,8 +30,8 @@ check_type();
 %%
 "#"			{ preproc(); }
 "/*"			{ comment(); }
-".alloc"		{ count(); return(TK_ALLOC); }
-".dealloc"		{ count(); return(TK_DEALLOC); }
+".malloc"		{ count(); return(TK_ALLOC); }
+".free"			{ count(); return(TK_DEALLOC); }
 ".clump"		{ count(); return(TK_CLUMP); }
 
 "auto"			{ count(); return(AUTO); }

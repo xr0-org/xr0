@@ -2,7 +2,7 @@
 
 int
 func(int *x) ~ [ 
-	pre: x = .alloc(1);
+	pre: x = .malloc(1);
 	*x = 5;
 ]{
 	*x = 5;	

@@ -7,7 +7,7 @@
 #define true 1
 
 char *
-read_file(char *path) ~ [ return .alloc(1); ];
+read_file(char *path) ~ [ return .malloc(1); ];
 
 struct lexer;
 
@@ -31,9 +31,9 @@ lexer_destroy(struct lexer *l) ~ [
 			$, malloc(1)
 		);
 	}
-	.dealloc(l->pattern);
-	.dealloc(l->token);
-	.dealloc(l);
+	.free(l->pattern);
+	.free(l->token);
+	.free(l);
 ];
 
 void
@@ -41,8 +41,8 @@ lexer_print(struct lexer *l) ~ [
 	pre: {
 		l = lexer_create(
 			.clump(1), .clump(1),
-			$, .alloc(1),
-			$, .alloc(1)
+			$, .malloc(1),
+			$, .malloc(1)
 		);
 	}
 ];
@@ -109,7 +109,7 @@ struct lexer *
 lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 		int ntok, struct token *token) ~ [
 	struct lexer *l;
-	l = .alloc(sizeof(struct lexer)); 
+	l = .malloc(sizeof(struct lexer)); 
 	l->pre = pre;
 	l->post = post;
 	l->pattern = pattern;
@@ -185,10 +185,10 @@ struct defsresult
 parse_defs(char *input) ~ [
 	struct defsresult res;
 	if (beginsdefs(skipws(input))) {
-		res.pre = .alloc(1);
+		res.pre = .malloc(1);
 	}
 	if (count_patterns(input)) {
-		res.pattern = .alloc(1);
+		res.pattern = .malloc(1);
 	}
 	return res;
 ];
@@ -210,14 +210,14 @@ parse_rules(char *pos) ~ [
 	struct rulesresult res;
 	res.token = $; /* TODO: put in else block */
 	if (count_tokens(pos)) {
-		res.token = .alloc(sizeof(struct token));
+		res.token = .malloc(sizeof(struct token));
 	}
 	res.pos = $;
 	return res;
 ];
 
 char *
-parse_toeof(char *input) ~ [ return .alloc(1); ];
+parse_toeof(char *input) ~ [ return .malloc(1); ];
 
 struct lexer *
 parse(char *pos)
@@ -246,7 +246,7 @@ parse(char *pos)
 }
 
 char *
-substr(char *s, int n) ~ [ return .alloc(1); ]
+substr(char *s, int n) ~ [ return .malloc(1); ]
 {
 	int len;
 	char *ss;
@@ -273,7 +273,7 @@ skiplinespace(char *s)
 }
 
 char *
-parse_id(char *input) ~ [ return .alloc(1); ];
+parse_id(char *input) ~ [ return .malloc(1); ];
 
 char *
 skipoptions(char *pos)
@@ -312,7 +312,7 @@ parse_id(char *input)
 }
 
 char *
-parse_tonewline(char *input) ~ [ return .alloc(1); ]
+parse_tonewline(char *input) ~ [ return .malloc(1); ]
 {
 	char *s;
 	s = input; /* must be here because not seen with skip loop hack */
@@ -333,7 +333,7 @@ parse_defsraw(char *input) ~ [
 
 	res.s = $;
 	if (beginsdefs(input)) {
-		res.s = .alloc(1);
+		res.s = .malloc(1);
 	}
 	res.pos = $;
 	return res;
@@ -350,7 +350,7 @@ parse_defsproper(char *input) ~ [
 	struct patternet res;
 	res.pattern = $; /* TODO: put in else block */
 	if (count_patterns(input)) {
-		res.pattern = .alloc(1);
+		res.pattern = .malloc(1);
 	}
 	res.npat = $;
 	res.pos = $;
@@ -405,7 +405,7 @@ parse_defsraw(char *input)
 struct pattern *
 pattern_create(char *name, char *pattern) ~ [
 	struct pattern p;
-	p = .alloc(sizeof(struct pattern));
+	p = .malloc(sizeof(struct pattern));
 	p->name = name;
 	p->pattern = pattern;
 	return p;
@@ -444,7 +444,7 @@ parse_defs_n(char *pos, int npat) ~ [
 	struct patternpos res;
 	res.p = $; /* TODO: put in else block */
 	if (npat) {
-		res.p = .alloc(1);
+		res.p = .malloc(1);
 	}
 	res.pos = $;
 	return res;
@@ -527,7 +527,7 @@ parse_defs_n(char *pos, int npat)
 struct token *
 token_create(int isliteral, char *name, char *action) ~ [
 	struct token *tk;
-	tk = .alloc(sizeof(struct token));
+	tk = .malloc(sizeof(struct token));
 	tk->isliteral = isliteral;
 	tk->name = name;
 	tk->action = action;
@@ -565,7 +565,7 @@ parse_rules_n(char *pos, int ntok) ~ [
 	struct tokenpos tpos;
 	tpos.t = $; /* TODO: put in else block */
 	if (ntok) {
-		tpos.t = .alloc(1);
+		tpos.t = .malloc(1);
 	}
 	tpos.pos = $;
 	return tpos;
@@ -645,7 +645,7 @@ struct tknameresult {
 struct tknameresult
 parse_name(char *pos) ~ [
 	struct tknameresult res;
-	res.name = .alloc(1);
+	res.name = .malloc(1);
 	res.isliteral = $;
 	res.pos = $;
 	return res;
@@ -654,7 +654,7 @@ parse_name(char *pos) ~ [
 struct stringresult
 parse_action(char *input) ~ [
 	struct stringresult res;
-	res.s = .alloc(1);
+	res.s = .malloc(1);
 	res.pos = $;
 	return res;
 ];
@@ -677,21 +677,21 @@ parse_token(char *pos)
 struct tknameresult
 parse_token_id(char *pos) ~ [
 	struct tknameresult res;
-	res.name = .alloc(1);
+	res.name = .malloc(1);
 	return res;
 ];
 
 struct tknameresult
 parse_token_literal(char *input) ~ [
 	struct tknameresult res;
-	res.name = .alloc(1);
+	res.name = .malloc(1);
 	return res;
 ];
 
 struct tknameresult
 parse_token_pattern(char *pos) ~ [
 	struct tknameresult res;
-	res.name = .alloc(1);
+	res.name = .malloc(1);
 	return res;
 ];
 

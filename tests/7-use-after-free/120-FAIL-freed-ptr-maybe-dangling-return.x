@@ -3,9 +3,9 @@
 int *
 func(int x) ~ [
 	int *p;
-	p = .alloc(sizeof(int));
+	p = .malloc(sizeof(int));
 	if (x) {
-		.dealloc(p);	
+		.free(p);	
 	}
 	return p;
 ] {

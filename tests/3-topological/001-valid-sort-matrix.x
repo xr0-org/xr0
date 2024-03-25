@@ -11,12 +11,12 @@ matrix_create(int rows, int cols) ~ [
 	int i;
 	struct matrix *m;
 
-	m = .alloc(sizeof(struct matrix));
+	m = .malloc(sizeof(struct matrix));
 	m->rows = rows;
 	m->cols = cols;
-	m->data = .alloc(sizeof(int *) * rows);
+	m->data = .malloc(sizeof(int *) * rows);
 	for (i = 0; i < m->rows; i++) {
-		m->data[i] = .alloc(1);	
+		m->data[i] = .malloc(1);	
 	}
 	return m;
 ];
@@ -33,7 +33,7 @@ matrix_create(int rows, int cols)
 	m->cols = cols;
 
 	m->data = malloc(sizeof(int *) * rows);
-	for (i = 0; i < m->rows; i++) ~ [ m->data[i] = .alloc(1); ] {
+	for (i = 0; i < m->rows; i++) ~ [ m->data[i] = .malloc(1); ] {
 		m->data[i] = malloc(sizeof(int) * cols);
 	}
 
@@ -47,14 +47,14 @@ matrix_destroy(struct matrix *m) ~ [
 	pre: m = matrix_create($, $);
 
 	for (i = 0; i < m->rows; i++) {
-		.dealloc(m->data[i]);
+		.free(m->data[i]);
 	}
-	.dealloc(m->data);
-	.dealloc(m);
+	.free(m->data);
+	.free(m);
 ]{
 	int i;
 
-	for (i = 0; i < m->rows; i++) ~ [ .dealloc(m->data[i]); ] {
+	for (i = 0; i < m->rows; i++) ~ [ .free(m->data[i]); ] {
 		free(m->data[i]);
 	}
 	free(m->data);
@@ -71,12 +71,12 @@ matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 		m2 = matrix_create($, $);
 	}
 
-	sum = .alloc(sizeof(struct matrix));
+	sum = .malloc(sizeof(struct matrix));
 	sum->rows = m1->rows;
 	sum->cols = m1->cols;
-	sum->data = .alloc(sizeof(int *) * rows);
+	sum->data = .malloc(sizeof(int *) * rows);
 	for (i = 0; i < sum->rows; i++) {
-		sum->data[i] = .alloc(1);	
+		sum->data[i] = .malloc(1);	
 	}
 	return sum;
 ]{

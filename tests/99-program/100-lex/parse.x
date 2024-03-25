@@ -8,7 +8,7 @@
 #define true 1
 
 char *
-read_file(char *path) ~ [ .alloc result; ];
+read_file(char *path) ~ [ .malloc result; ];
 
 struct lexer {
 	char *pre; char *post;
@@ -19,7 +19,7 @@ struct lexer {
 struct lexer *
 lexer_create(char *pre, char *post, int npat, struct pattern *pattern,
 		int ntok, struct token *token) ~ [
-	.alloc result; 
+	.malloc result; 
 	result->pre = pre;
 	result->post = post;
 	result->pattern = pattern;
@@ -40,7 +40,7 @@ struct stringresult {
 
 struct stringresult
 parse_defsraw(char *input) ~ [
-	.alloc result.s;
+	.malloc result.s;
 	result.pos = $;
 ];
 
@@ -70,11 +70,11 @@ lexer_destroy(struct lexer *l) ~ [
 		);
 	}
 
-	.dealloc l->pre;
-	.dealloc l->post;
-	.dealloc l->pattern;
-	.dealloc l->token;
-	.dealloc l;
+	.free l->pre;
+	.free l->post;
+	.free l->pattern;
+	.free l->token;
+	.free l;
 ];
 
 void
@@ -219,8 +219,8 @@ count_patterns(char *pos);
 
 struct defsresult
 parse_defs(char *pos) ~ [
-	.alloc result.pre;
-	.alloc result.pattern;
+	.malloc result.pre;
+	.malloc result.pattern;
 	result.pos = $;
 	result.npat = $;
 ];
@@ -242,13 +242,13 @@ count_tokens(char *pos);
 
 struct rulesresult
 parse_rules(char *pos) ~ [
-	.alloc result.token;
+	.malloc result.token;
 	result.pos = $;
 	result.ntok = $;
 ];
 
 char *
-parse_toeof(char *input) ~ [ .alloc result; ];
+parse_toeof(char *input) ~ [ .malloc result; ];
 
 struct lexer *
 parse(char *pos)
@@ -278,7 +278,7 @@ isboundary(char *s)
 }
 
 char *
-substr(char *s, int n) ~ [ .alloc result; ]
+substr(char *s, int n) ~ [ .malloc result; ]
 {
 	int len;
 	char *ss;
@@ -305,7 +305,7 @@ skiplinespace(char *s)
 }
 
 char *
-parse_id(char *input) ~ [ .alloc result; ];
+parse_id(char *input) ~ [ .malloc result; ];
 
 char *
 skipoptions(char *pos)
@@ -345,7 +345,7 @@ parse_id(char *input)
 }
 
 char *
-parse_tonewline(char *input) ~ [ .alloc result; ]
+parse_tonewline(char *input) ~ [ .malloc result; ]
 {
 	char *s;
 	s = input; /* must be here because not seen with skip loop hack */
@@ -363,7 +363,7 @@ struct patternet {
 
 struct patternet
 parse_defsproper(char *input) ~ [
-	.alloc result.pattern;
+	.malloc result.pattern;
 	result.npat = $;
 	result.pos = $;
 ];
@@ -414,7 +414,7 @@ parse_defsraw(char *input)
 
 struct pattern *
 pattern_create(char *name, char *pattern) ~ [
-	.alloc result;
+	.malloc result;
 	result->name = name;
 	result->pattern = pattern;
 ]{
@@ -449,7 +449,7 @@ struct patternpos {
 
 struct patternpos
 parse_defs_n(char *pos, int npat) ~ [
-	.alloc result.p;
+	.malloc result.p;
 	result.pos = $;
 ];
 
@@ -534,7 +534,7 @@ parse_defs_n(char *pos, int npat)
 
 struct token *
 token_create(int isliteral, char *name, char *action) ~ [
-	.alloc result;
+	.malloc result;
 	result->isliteral = isliteral;
 	result->name = name;
 	result->action = action;
@@ -565,7 +565,7 @@ struct tokenpos {
 
 struct tokenpos
 parse_rules_n(char *pos, int ntok) ~ [
-	.alloc result.t;
+	.malloc result.t;
 	result.pos = $;
 ];
 
@@ -645,14 +645,14 @@ struct tknameresult {
 
 struct tknameresult
 parse_name(char *pos) ~ [
-	.alloc result.name;
+	.malloc result.name;
 	result.isliteral = $;
 	result.pos = $;
 ];
 
 struct stringresult
 parse_action(char *input) ~ [
-	.alloc result.s;
+	.malloc result.s;
 	result.pos = $;
 ];
 
@@ -672,13 +672,13 @@ parse_token(char *pos)
 }
 
 struct tknameresult
-parse_token_id(char *pos) ~ [ .alloc result.name; ];
+parse_token_id(char *pos) ~ [ .malloc result.name; ];
 
 struct tknameresult
-parse_token_literal(char *input) ~ [ .alloc result.name; ];
+parse_token_literal(char *input) ~ [ .malloc result.name; ];
 
 struct tknameresult
-parse_token_pattern(char *pos) ~ [ .alloc result.name; ];
+parse_token_pattern(char *pos) ~ [ .malloc result.name; ];
 
 struct tknameresult
 parse_name(char *pos)

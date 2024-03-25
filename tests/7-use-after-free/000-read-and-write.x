@@ -3,7 +3,7 @@
 int *
 read_and_write_definite() ~ [
 	int *p;
-	p = .alloc(sizeof(int));
+	p = .malloc(sizeof(int));
 	*p = 1;
 	return p;
 ] {

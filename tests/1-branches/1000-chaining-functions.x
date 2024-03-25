@@ -11,10 +11,10 @@ tuple_create() ~ [
 ];
 
 void *
-conditional_alloc(int x) ~ [ if (x) { return .alloc(1); } ];
+conditional_alloc(int x) ~ [ if (x) { return .malloc(1); } ];
 
 void *
-test() ~ [ if (tuple_create().x) { return .alloc(1); } ]
+test() ~ [ if (tuple_create().x) { return .malloc(1); } ]
 {
 	struct tuple t;
 

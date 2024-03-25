@@ -2,9 +2,9 @@
 
 void
 unit(void *p) ~ [
-	pre: p = .alloc(1);
+	pre: p = .malloc(1);
 
-	.dealloc(p);
+	.free(p);
 ]{
 	free(p);
 }
