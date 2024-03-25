@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 int *
-read_and_write_definite() ~ [ .alloc result; *result = 1; ]
+read_and_write_definite() ~ [ result = .alloc(1); *result = 1; ]
 {
 	int *p;
 	p = malloc(1);

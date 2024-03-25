@@ -3,6 +3,12 @@
 
 #include "util.h"
 
+enum ast_alloc_kind {
+	ALLOC		= 1 << 0,
+	DEALLOC		= 1 << 1,
+	CLUMP		= 1 << 2,
+};
+
 struct ast_expr {
 	enum ast_expr_kind {
 		EXPR_IDENTIFIER		= 1 << 0,
@@ -24,6 +30,7 @@ struct ast_expr {
 		EXPR_ISDEALLOCAND	= 1 << 11,
 		EXPR_ISDEREFERENCABLE	= 1 << 12,
 		EXPR_ARBARG		= 1 << 13,
+		EXPR_ALLOCATION		= 1 << 14,
 	} kind;
 	struct ast_expr *root;
 	union {
@@ -63,6 +70,10 @@ struct ast_expr {
 			struct ast_expr *e1, *e2;
 		} binary;
 		struct ast_expr *assignment_value;
+		struct {
+			enum ast_alloc_kind kind;
+			struct ast_expr *arg;
+		} alloc;
 	} u;
 };
 

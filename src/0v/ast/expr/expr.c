@@ -656,6 +656,105 @@ ast_expr_arbarg_create()
 	return expr;
 }
 
+struct ast_expr *
+ast_expr_alloc_create(struct ast_expr *arg)
+{
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_ALLOCATION;
+	expr->u.alloc.kind = ALLOC;
+	expr->u.alloc.arg = arg;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_dealloc_create(struct ast_expr *arg)
+{
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_ALLOCATION;
+	expr->u.alloc.kind = DEALLOC;
+	expr->u.alloc.arg = arg;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_clump_create(struct ast_expr *arg)
+{
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_ALLOCATION;
+	expr->u.alloc.kind= CLUMP;
+	expr->u.alloc.arg = arg;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_as_allocation(struct ast_expr *expr)
+{
+	assert(expr->kind = EXPR_ALLOCATION);
+	return expr;
+}
+
+static struct ast_expr *
+ast_expr_alloc_copy(struct ast_expr *expr)
+{
+	struct ast_expr *arg = ast_expr_copy(expr->u.alloc.arg);
+	switch (expr->u.alloc.kind) {
+	case ALLOC:
+		return ast_expr_alloc_create(arg);
+	case DEALLOC:
+		return ast_expr_dealloc_create(arg);
+	case CLUMP:
+		return ast_expr_clump_create(arg);
+	default:
+		assert(false);
+	}
+}
+
+static void
+ast_expr_destroy_alloc(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_ALLOCATION);
+	ast_expr_destroy(expr->u.alloc.arg);
+}
+
+static void
+ast_expr_alloc_str_build(struct ast_expr *expr, struct strbuilder *b)
+{
+	assert(expr->kind == EXPR_ALLOCATION);
+
+	char *arg = ast_expr_str(expr->u.alloc.arg);
+
+	switch (expr->u.alloc.kind) {
+	case ALLOC:
+		strbuilder_printf(b, ".%s %s;", "alloc", arg);
+		break;
+	case DEALLOC:
+		strbuilder_printf(b, ".%s %s;", "dealloc", arg);
+		break;
+	case CLUMP:
+		strbuilder_printf(b, ".%s %s;", "clump", arg);
+		break;
+	default:
+		assert(false);
+	}
+	free(arg);
+}
+
+struct ast_expr *
+ast_expr_alloc_arg(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_ALLOCATION);
+	return expr->u.alloc.arg;
+}
+
+enum ast_alloc_kind
+ast_expr_alloc_kind(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_ALLOCATION);
+	return expr->u.alloc.kind;
+}
+
+
+
 void
 ast_expr_destroy(struct ast_expr *expr)
 {
@@ -696,6 +795,9 @@ ast_expr_destroy(struct ast_expr *expr)
 		ast_expr_destroy(expr->root);
 		break;
 	case EXPR_ARBARG:
+		break;
+	case EXPR_ALLOCATION:
+		ast_expr_destroy(expr->u.alloc.arg);
 		break;
 	default:
 		assert(false);
@@ -746,6 +848,9 @@ ast_expr_str(struct ast_expr *expr)
 		break;
 	case EXPR_ARBARG:
 		strbuilder_putc(b, '$');
+		break;
+	case EXPR_ALLOCATION:
+		ast_expr_alloc_str_build(expr, b);
 		break;
 	default:
 		assert(false);
@@ -806,6 +911,8 @@ ast_expr_copy(struct ast_expr *expr)
 		);
 	case EXPR_ARBARG:
 		return ast_expr_arbarg_create();
+	case EXPR_ALLOCATION:
+		return ast_expr_alloc_copy(expr);
 	default:
 		assert(false);
 	}
@@ -1014,6 +1121,7 @@ ast_expr_splits(struct ast_expr *e, struct state *s)
 	case EXPR_STRING_LITERAL:
 	case EXPR_ARBARG:
 	case EXPR_ISDEREFERENCABLE:
+	case EXPR_ALLOCATION:
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = NULL };
 	default:
 		assert(false);

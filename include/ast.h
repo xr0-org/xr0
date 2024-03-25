@@ -26,6 +26,9 @@ char *
 ast_expr_as_literal(struct ast_expr *);
 
 struct ast_expr *
+ast_expr_as_allocation(struct ast_expr *);
+
+struct ast_expr *
 ast_expr_literal_create(char *);
 
 struct ast_expr *
@@ -144,6 +147,27 @@ ast_expr_isisdereferencable(struct ast_expr *expr);
 struct ast_expr *
 ast_expr_arbarg_create();
 
+struct ast_expr *
+ast_expr_alloc_create(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_dealloc_create(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_clump_create(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_alloc_arg(struct ast_expr *);
+
+enum ast_alloc_kind
+ast_expr_alloc_kind(struct ast_expr *);
+
+struct state;
+
+struct error *
+ast_expr_alloc_rangeprocess(struct ast_expr *expr, struct ast_expr *lw,
+	struct ast_expr *up, struct state *);
+
 void
 ast_expr_destroy(struct ast_expr *);
 
@@ -160,8 +184,6 @@ struct math_state;
 
 bool
 ast_expr_matheval(struct ast_expr *e);
-
-struct state;
 
 bool
 ast_expr_decide(struct ast_expr *, struct state *);
@@ -344,12 +366,6 @@ ast_stmt_create_dealloc(struct lexememarker *, struct ast_expr *arg);
 
 struct ast_stmt *
 ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
-
-struct ast_expr *
-ast_stmt_alloc_arg(struct ast_stmt *);
-
-enum ast_alloc_kind
-ast_stmt_alloc_kind(struct ast_stmt *);
 
 void
 ast_stmt_destroy(struct ast_stmt *);

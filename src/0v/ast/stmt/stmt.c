@@ -239,98 +239,6 @@ ast_stmt_destroy_jump(struct ast_stmt *stmt)
 }
 
 struct ast_stmt *
-ast_stmt_create_alloc(struct lexememarker *loc, struct ast_expr *arg)
-{
-	struct ast_stmt *stmt = ast_stmt_create(loc);
-	stmt->kind = STMT_ALLOCATION;
-	stmt->u.alloc.kind = ALLOC;
-	stmt->u.alloc.arg = arg;
-	return stmt;
-}
-
-struct ast_stmt *
-ast_stmt_create_dealloc(struct lexememarker *loc, struct ast_expr *arg)
-{
-	struct ast_stmt *stmt = ast_stmt_create(loc);
-	stmt->kind = STMT_ALLOCATION;
-	stmt->u.alloc.kind = DEALLOC;
-	stmt->u.alloc.arg = arg;
-	return stmt;
-}
-
-struct ast_stmt *
-ast_stmt_create_clump(struct lexememarker *loc, struct ast_expr *arg)
-{
-	struct ast_stmt *stmt = ast_stmt_create(loc);
-	stmt->kind = STMT_ALLOCATION;
-	stmt->u.alloc.kind= CLUMP;
-	stmt->u.alloc.arg = arg;
-	return stmt;
-}
-
-static struct ast_stmt *
-ast_stmt_copy_alloc(struct lexememarker *loc, struct ast_stmt *stmt)
-{
-	struct ast_expr *arg = ast_expr_copy(stmt->u.alloc.arg);
-	switch (stmt->u.alloc.kind) {
-	case ALLOC:
-		return ast_stmt_create_alloc(loc, arg);
-	case DEALLOC:
-		return ast_stmt_create_dealloc(loc, arg);
-	case CLUMP:
-		return ast_stmt_create_clump(loc, arg);
-	default:
-		assert(false);
-	}
-}
-
-static void
-ast_stmt_destroy_alloc(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ALLOCATION);
-
-	ast_expr_destroy(stmt->u.alloc.arg);
-}
-
-static void
-ast_stmt_alloc_sprint(struct ast_stmt *stmt, struct strbuilder *b)
-{
-	assert(stmt->kind == STMT_ALLOCATION);
-
-	char *arg = ast_expr_str(stmt->u.alloc.arg);
-
-	switch (stmt->u.alloc.kind) {
-	case ALLOC:
-		strbuilder_printf(b, ".%s %s;", "alloc", arg);
-		break;
-	case DEALLOC:
-		strbuilder_printf(b, ".%s %s;", "dealloc", arg);
-		break;
-	case CLUMP:
-		strbuilder_printf(b, ".%s %s;", "clump", arg);
-		break;
-	default:
-		assert(false);
-	}
-	free(arg);
-}
-
-struct ast_expr *
-ast_stmt_alloc_arg(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ALLOCATION);
-	return stmt->u.alloc.arg;
-}
-
-enum ast_alloc_kind
-ast_stmt_alloc_kind(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ALLOCATION);
-	return stmt->u.alloc.kind;
-}
-
-
-struct ast_stmt *
 ast_stmt_create_sel(struct lexememarker *loc, bool isswitch, struct ast_expr *cond,
 		struct ast_stmt *body, struct ast_stmt *nest)
 {
@@ -570,9 +478,6 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 	case STMT_JUMP:
 		ast_stmt_destroy_jump(stmt);
 		break;
-	case STMT_ALLOCATION:
-		ast_stmt_destroy_alloc(stmt);
-		break;
 	default:
 		assert(false);
 		break;
@@ -634,8 +539,6 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			loc, stmt->u.jump.kind,
 			ast_expr_copy_ifnotnull(stmt->u.jump.rv)
 		);
-	case STMT_ALLOCATION:
-		return ast_stmt_copy_alloc(loc, stmt);
 	default:
 		assert(false);
 	}
@@ -673,9 +576,6 @@ ast_stmt_str(struct ast_stmt *stmt)
 		break;
 	case STMT_JUMP:
 		ast_stmt_jump_sprint(stmt, b);
-		break;
-	case STMT_ALLOCATION:
-		ast_stmt_alloc_sprint(stmt, b);
 		break;
 	default:
 		assert(false);
@@ -752,8 +652,6 @@ ast_stmt_getfuncs(struct ast_stmt *stmt)
 		return ast_stmt_iteration_getfuncs(stmt);
 	case STMT_JUMP:
 		return ast_expr_getfuncs(stmt->u.jump.rv);
-	case STMT_ALLOCATION:
-		return ast_expr_getfuncs(stmt->u.alloc.arg);
 	default:
 		assert(false);
 	}
@@ -780,7 +678,6 @@ ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
 		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
 	case STMT_LABELLED:
 		return ast_stmt_splits(stmt->u.labelled.stmt, s);
-	case STMT_ALLOCATION:
 	case STMT_ITERATION:
 	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:

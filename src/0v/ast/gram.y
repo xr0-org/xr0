@@ -62,8 +62,7 @@ expr_array_create(struct ast_expr *v)
 }
 
 struct expr_array
-expr_array_append(struct expr_array *arr, struct ast_expr *v)
-{
+expr_array_append(struct expr_array *arr, struct ast_expr *v) {
 	arr->expr = realloc(arr->expr, sizeof(struct ast_expr *) * ++arr->n);
 	arr->expr[arr->n-1] = v;
 	return *arr;
@@ -99,7 +98,7 @@ variable_array_create(struct ast_variable *v)
 %token ARB_ARG
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR SOME GOTO CONTINUE BREAK RETURN
-%token ALLOC DEALLOC CLUMP
+%token TK_ALLOC TK_DEALLOC TK_CLUMP
 
 %start translation_unit
 
@@ -167,7 +166,7 @@ variable_array_create(struct ast_variable *v)
 %type <expr> exclusive_or_expression and_expression equality_expression
 %type <expr> relational_expression shift_expression additive_expression
 %type <expr> multiplicative_expression cast_expression
-%type <expr> isdeallocand_expression
+%type <expr> allocation_expression isdeallocand_expression
 
 %type <expr_array> argument_expression_list
 
@@ -177,7 +176,7 @@ variable_array_create(struct ast_variable *v)
 %type <integer> pointer
 %type <statement> statement expression_statement selection_statement jump_statement 
 %type <statement> labelled_statement iteration_statement for_iteration_statement
-%type <statement> iteration_effect_statement allocation_statement
+%type <statement> iteration_effect_statement
 %type <stmt_array> statement_list
 %type <string> identifier direct_declarator
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
@@ -201,6 +200,15 @@ primary_expression
 		{ $$ = ast_expr_literal_create(strip_quotes(yytext)); }
 	| '(' expression ')'
 		{ $$ = ast_expr_bracketed_create($2); }
+	;
+
+allocation_expression
+	: TK_ALLOC '(' expression ')'
+		{ $$ = ast_expr_alloc_create($3); }
+	| TK_DEALLOC '(' expression ')'
+		{ $$ = ast_expr_dealloc_create($3); }
+	| TK_CLUMP '(' expression ')'
+		{ $$ = ast_expr_clump_create($3); }
 	;
 
 postfix_expression
@@ -234,6 +242,7 @@ postfix_expression
 		{ $$ = ast_expr_incdec_create($1, true, false); }
 	| postfix_expression DEC_OP
 		{ $$ = ast_expr_incdec_create($1, false, false); }
+	| allocation_expression
 	;
 
 argument_expression_list
@@ -672,7 +681,6 @@ statement
 		{ $$ = ast_stmt_create_iter_e($1); }
 	| compound_verification_statement
 		{ $$ = ast_stmt_create_compound_v(lexloc(), $1); }
-	| allocation_statement
 	;
 
 labelled_statement
@@ -712,15 +720,6 @@ iteration_effect_statement
 compound_verification_statement
 	: '~' '[' ']'		{ $$ = ast_block_create(NULL, 0, NULL, 0); }
 	| '~' '[' block ']'	{ $$ = $3; }
-	;
-
-allocation_statement
-	: ALLOC postfix_expression ';'
-		{ $$ = ast_stmt_create_alloc(lexloc(), $2); }
-	| DEALLOC postfix_expression ';'
-		{ $$ = ast_stmt_create_dealloc(lexloc(), $2); }
-	| CLUMP postfix_expression ';'
-		{ $$ = ast_stmt_create_clump(lexloc(), $2); }
 	;
 
 declaration_list

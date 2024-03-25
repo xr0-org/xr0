@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 int *
-read_and_write_arbitrary() ~ [ .alloc result; *result = $; ]
+read_and_write_arbitrary() ~ [ result = .alloc(1); *result = $; ]
 {
 	int *p;
 	p = malloc(1);
