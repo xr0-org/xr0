@@ -313,7 +313,7 @@ static struct result *
 comp_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup);
 
 static struct result *
-alloc_absexec(struct ast_expr *, struct state *);
+jump_absexec(struct ast_stmt *, struct state *);
 
 struct result *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
@@ -331,6 +331,8 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 		return iter_absexec(stmt, state);
 	case STMT_COMPOUND:
 		return comp_absexec(stmt, state, should_setup);
+	case STMT_JUMP:
+		return jump_absexec(stmt, state);
 	default:
 		assert(false);
 	}
@@ -463,6 +465,18 @@ comp_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 	return result_value_create(NULL);
 }
 
+static struct result *
+jump_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	return ast_expr_absexec(
+		ast_expr_assignment_create(
+			ast_expr_identifier_create("return"),
+			ast_stmt_jump_rv(stmt)
+		), 
+		state
+	);
+}
+
 static struct error *
 stmt_setupabsexec(struct ast_stmt *, struct state *);
 
@@ -490,6 +504,7 @@ stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 	switch (ast_stmt_kind(stmt)) {	
 	case STMT_EXPR:
 	case STMT_ALLOCATION:
+	case STMT_JUMP:
 		return NULL;
 	case STMT_LABELLED:
 		return labelled_setupabsexec(stmt, state);

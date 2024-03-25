@@ -95,6 +95,4 @@ state_alloc(struct state *state);
 char *
 state_str(struct state *state);
 
-#define KEYWORD_RESULT "result"
-
 #endif

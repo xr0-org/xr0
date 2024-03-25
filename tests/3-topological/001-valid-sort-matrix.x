@@ -18,7 +18,7 @@ matrix_create(int rows, int cols) ~ [
 	for (i = 0; i < m->rows; i++) {
 		m->data[i] = .alloc(1);	
 	}
-	result = m;
+	return m;
 ];
 
 struct matrix *
@@ -64,21 +64,21 @@ matrix_destroy(struct matrix *m) ~ [
 struct matrix *
 matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 	int i;
-	struct matrix *m;
+	struct matrix *sum;
 
 	pre: {
 		m1 = matrix_create($, $);
 		m2 = matrix_create($, $);
 	}
 
-	m = .alloc(sizeof(struct matrix));
-	m->rows = m1->rows;
-	m->cols = m1->cols;
-	m->data = .alloc(sizeof(int *) * rows);
-	for (i = 0; i < m->rows; i++) {
-		m->data[i] = .alloc(1);	
+	sum = .alloc(sizeof(struct matrix));
+	sum->rows = m1->rows;
+	sum->cols = m1->cols;
+	sum->data = .alloc(sizeof(int *) * rows);
+	for (i = 0; i < sum->rows; i++) {
+		sum->data[i] = .alloc(1);	
 	}
-	result = m;
+	return sum;
 ]{
 	int i; int j;
 	struct matrix *res;

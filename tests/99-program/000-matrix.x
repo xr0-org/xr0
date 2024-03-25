@@ -18,7 +18,7 @@ matrix_create(int rows, int cold) ~ [
 	for (i = 0; i < m->rows; i++) {
 		m->data[i] = .alloc(sizeof(int));	
 	}
-	result = m;
+	return m;
 ];
 
 struct matrix *
@@ -36,7 +36,6 @@ matrix_create(int rows, int cols)
 	for (i = 0; i < rows; i++) ~ [ m->data[i] = .alloc(sizeof(int *) * cols); ] {
 		m->data[i] = malloc(sizeof(int *) * cols);
 	}
-
 	return m;
 }
 
@@ -78,7 +77,7 @@ matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 	for (i = 0; i < sum->rows; i++) {
 		sum->data[i] = .alloc(sizeof(int));
 	}
-	result = sum;
+	return sum;
 ]{
 	int i; int j;
 	struct matrix *res;

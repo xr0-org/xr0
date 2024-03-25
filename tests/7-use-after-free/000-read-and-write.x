@@ -1,10 +1,14 @@
 #include <stdlib.h>
 
 int *
-read_and_write_definite() ~ [ result = .alloc(1); *result = 1; ]
-{
+read_and_write_definite() ~ [
 	int *p;
-	p = malloc(1);
+	p = .alloc(sizeof(int));
+	*p = 1;
+	return p;
+] {
+	int *p;
+	p = malloc(sizeof(int));
 	*p = 1;
 	return p;
 }

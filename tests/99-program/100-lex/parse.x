@@ -57,7 +57,7 @@ parse(char *pos) ~ [
 	pattern = malloc(1);
 	token = malloc(1);
 	post = malloc(1);
-	result = lexer_create(pre, post, $, pattern, $, token);
+	return .exer_create(pre, post, $, pattern, $, token);
 ];
 
 void

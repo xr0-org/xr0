@@ -710,13 +710,6 @@ ast_expr_alloc_copy(struct ast_expr *expr)
 }
 
 static void
-ast_expr_destroy_alloc(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_ALLOCATION);
-	ast_expr_destroy(expr->u.alloc.arg);
-}
-
-static void
 ast_expr_alloc_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
 	assert(expr->kind == EXPR_ALLOCATION);

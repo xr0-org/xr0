@@ -7,14 +7,14 @@ tuple_create() ~ [
 	struct tuple t;
 	t.x = $;
 	t.y = $;
-	result = t;
+	return t;
 ];
 
 void *
-conditional_alloc(int x) ~ [ if (x) { result = .alloc(1); } ];
+conditional_alloc(int x) ~ [ if (x) { return .alloc(1); } ];
 
 void *
-test() ~ [ if (tuple_create().x) { result = .alloc(1); } ]
+test() ~ [ if (tuple_create().x) { return .alloc(1); } ]
 {
 	struct tuple t;
 

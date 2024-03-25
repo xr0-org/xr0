@@ -7,7 +7,7 @@ func(int *x) ~ [
 		x = .alloc(1);
 		*x = $;
 	}
-	result = *x;
+	return *x;
 ]{
 	return *x;	
 }

@@ -6,14 +6,14 @@ number();
 void *
 alloc_if(int num) ~ [
 	if (num) {
-		result = .alloc(1);
+		return .alloc(1);
 	}
 ];
 
 void *
 test() ~ [
 	if (number()) {
-		result = .alloc(1);
+		return .alloc(1);
 	}
 ]{
 	int num;

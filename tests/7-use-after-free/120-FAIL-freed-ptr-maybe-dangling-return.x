@@ -2,10 +2,12 @@
 
 int *
 func(int x) ~ [
-	result = .alloc(1);
+	int *p;
+	p = .alloc(sizeof(int));
 	if (x) {
-		.dealloc(result);	
+		.dealloc(p);	
 	}
+	return p;
 ] {
 	int *p;
 	p = malloc(1);

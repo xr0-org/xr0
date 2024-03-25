@@ -35,7 +35,7 @@ stack_newblock(struct stack *stack)
 }
 
 struct stack *
-stack_create(char *name, struct stack *prev, struct ast_type *result_type)
+stack_create(char *name, struct stack *prev, struct ast_type *return_type)
 {
 	struct stack *stack = calloc(1, sizeof(struct stack));
 	assert(stack);
@@ -48,7 +48,7 @@ stack_create(char *name, struct stack *prev, struct ast_type *result_type)
 	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
 
-	stack->result = variable_create(result_type, stack, false);
+	stack->result = variable_create(return_type, stack, false);
 
 	return stack;
 }
@@ -144,7 +144,7 @@ stack_str(struct stack *stack, struct state *state)
 		strbuilder_putc(b, '\n');
 	}
 	char *result = variable_str(stack->result, stack, state);
-	strbuilder_printf(b, "\tresult: %s\n", result);
+	strbuilder_printf(b, "\treturn: %s\n", result);
 	free(result);
 	strbuilder_printf(b, "\t");
 	/* TODO: fix length of line */
@@ -213,7 +213,7 @@ stack_getvarmap(struct stack *s)
 struct variable *
 stack_getvariable(struct stack *s, char *id)
 {
-	assert(strcmp(id, KEYWORD_RESULT) != 0);
+	assert(strcmp(id, KEYWORD_RETURN) != 0);
 
 	return map_get(s->varmap, id);
 }

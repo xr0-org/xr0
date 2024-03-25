@@ -238,7 +238,6 @@ expr_structmember_lvalue(struct ast_expr *expr, struct state *state);
 struct lvalue_res
 ast_expr_lvalue(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_IDENTIFIER:
 		return expr_identifier_lvalue(expr, state);
@@ -257,7 +256,7 @@ expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
 	char *id = ast_expr_as_identifier(expr);
 
 	return (struct lvalue_res) {
-		.lval = lvalue_create( state_getobjecttype(state, id), state_getobject(state, id)),
+		.lval = lvalue_create(state_getobjecttype(state, id), state_getobject(state, id)),
 		.err = NULL
 	};
 }
@@ -1047,8 +1046,6 @@ alloc_absexec(struct ast_expr *, struct state *);
 struct result *
 ast_expr_absexec(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
-	printf("state: %s\n", state_str(state));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
