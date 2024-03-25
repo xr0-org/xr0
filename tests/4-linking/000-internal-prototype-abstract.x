@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void *
-allocating() ~ [ .alloc result; ];
+allocating() ~ [ return .malloc(1); ];
 
 int
 main()

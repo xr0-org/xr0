@@ -1,7 +1,7 @@
-int
+void
 assign(int *q) ~ [
 	pre: {
-		.clump q;	/* no side effect */
+		q = .clump(sizeof(int));
 		*q = $;
 	}
 ] {

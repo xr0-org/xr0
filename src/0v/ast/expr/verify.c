@@ -119,6 +119,100 @@ expr_isdeallocand_rangedecide(struct ast_expr *expr, struct ast_expr *lw,
 	return state_range_aredeallocands(state, obj, lw, up);
 }
 
+static struct error *
+rangeprocess_alloc(struct ast_expr *, struct ast_expr *lw, struct ast_expr *up, struct state *);
+
+static struct error *
+rangeprocess_dealloc(struct ast_expr *, struct ast_expr *lw, struct ast_expr *up, struct state *);
+
+static struct object *
+hack_base_object_from_alloc(struct ast_expr *, struct state *);
+
+struct error *
+ast_expr_alloc_rangeprocess(struct ast_expr *alloc, struct ast_expr *lw, struct ast_expr *up,
+		struct state *state)
+{
+	struct error *err;
+	
+	struct result *result_lw = ast_expr_eval(lw, state),
+		      *result_up = ast_expr_eval(up, state);
+
+	if (result_iserror(result_lw)) {
+		return result_as_error(result_lw);
+	}
+	if (result_iserror(result_up)) {
+		return result_as_error(result_up);
+	}
+
+	/*printf("stmt: %s\n", ast_stmt_str(stmt));*/
+	/*printf("state: %s\n", state_str(state));*/
+
+	struct ast_expr *res_lw = value_to_expr(result_as_value(result_lw)),
+			*res_up = value_to_expr(result_as_value(result_up));
+
+	result_destroy(result_up);
+	result_destroy(result_lw);
+
+	switch (alloc->kind) {
+	case EXPR_ASSIGNMENT:
+		err = rangeprocess_alloc(alloc, res_lw, res_up, state);
+		break;
+	case EXPR_ALLOCATION:
+		err = rangeprocess_dealloc(alloc, res_lw, res_up, state);
+		break;
+	default:
+		assert(false);
+	}
+
+	ast_expr_destroy(res_up);
+	ast_expr_destroy(res_lw);
+
+	if (err) {
+		return err;
+	}
+	return NULL;
+}
+
+static struct error *
+rangeprocess_alloc(struct ast_expr *expr, struct ast_expr *lw, struct ast_expr *up,
+		struct state *state)
+{
+	struct ast_expr *lval = ast_expr_assignment_lval(expr),
+			*rval = ast_expr_assignment_rval(expr);
+	assert(ast_expr_kind(rval) == EXPR_ALLOCATION);
+	assert(ast_expr_alloc_kind(rval) != DEALLOC);
+	struct object *obj = hack_base_object_from_alloc(lval, state);
+	return state_range_alloc(state, obj, lw, up);
+}
+
+static struct error *
+rangeprocess_dealloc(struct ast_expr *dealloc, struct ast_expr *lw, struct ast_expr *up,
+		struct state *state)
+{
+	struct object *obj = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), state);
+	return state_range_dealloc(state, obj, lw, up);
+}
+
+static struct object *
+hack_base_object_from_alloc(struct ast_expr *expr, struct state *state)
+{
+	/* we're currently discarding analysis of `offset` and relying on the
+	 * bounds (lower, upper beneath) alone. We passed in `*(arr+offset)` */
+	struct ast_expr *inner = ast_expr_unary_operand(expr); /* `arr+offset` */
+	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
+	assert(ast_expr_equal(ast_expr_binary_e2(inner), i)); 
+	ast_expr_destroy(i);
+	struct lvalue_res res = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
+	if (res.err) {
+		assert(false);
+	}
+	struct object *obj = lvalue_object(res.lval);
+	assert(obj);
+	return obj;
+}
+
+
+
 struct error *
 ast_expr_exec(struct ast_expr *expr, struct state *state)
 {
@@ -160,7 +254,7 @@ expr_identifier_lvalue(struct ast_expr *expr, struct state *state)
 	char *id = ast_expr_as_identifier(expr);
 
 	return (struct lvalue_res) {
-		.lval = lvalue_create( state_getobjecttype(state, id), state_getobject(state, id)),
+		.lval = lvalue_create(state_getobjecttype(state, id), state_getobject(state, id)),
 		.err = NULL
 	};
 }
@@ -267,9 +361,6 @@ expr_isdeallocand_decide(struct ast_expr *expr, struct state *state)
 	bool isdeallocand = state_addresses_deallocand(state, obj);
 	return isdeallocand;
 }
-
-struct result *
-ast_expr_eval(struct ast_expr *expr, struct state *state);
 
 static bool
 value_compare(struct value *, enum ast_binary_operator, struct value *);
@@ -942,30 +1033,105 @@ arbarg_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct result *
-assign_absexec(struct ast_expr *expr, struct state *state);
+assign_absexec(struct ast_expr *, struct state *);
 
 static struct result *
-isdereferencable_absexec(struct ast_expr *expr, struct state *state);
+isdereferencable_absexec(struct ast_expr *, struct state *);
+
+static struct result *
+alloc_absexec(struct ast_expr *, struct state *);
 
 struct result *
 ast_expr_absexec(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
-	case EXPR_CALL:
-		return expr_call_eval(expr, state);
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
 	case EXPR_ISDEREFERENCABLE:
 		return isdereferencable_absexec(expr, state);
+	case EXPR_ALLOCATION:
+		return alloc_absexec(expr, state);
+	case EXPR_IDENTIFIER:
+	case EXPR_CONSTANT:
+	case EXPR_UNARY:
+	case EXPR_CALL:
+	case EXPR_STRUCTMEMBER:
+	case EXPR_ARBARG:
+		return ast_expr_eval(expr, state);	
 	default:
 		assert(false);
 	}
 }
 
 static struct result *
+dealloc_process(struct ast_expr *, struct state *);
+
+/* operates at location level. It either creates an object on the heap and returns
+ * a location or gets the location pointed to by an lvalue and attempts to free
+ * possibly returning an error
+ * */
+static struct result *
+alloc_absexec(struct ast_expr *expr, struct state *state)
+{
+	switch (ast_expr_alloc_kind(expr)) {
+	case ALLOC:
+		/* TODO: size needs to be passed in here when added to .alloc */
+		return result_value_create(state_alloc(state));
+	case DEALLOC:
+		return dealloc_process(expr, state);
+	case CLUMP:
+		return result_value_create(state_clump(state));
+	default:
+		assert(false);
+	}
+}
+
+static struct result *
+dealloc_process(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *arg = ast_expr_alloc_arg(expr);
+	/* arg is pointing at the heap location we want to free, so we want its
+	 * value rather than location */
+	struct result *res = ast_expr_eval(arg, state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	struct value *val = result_as_value(res);
+	assert(val);
+	struct error *err = state_dealloc(state, val);
+	if (err) {
+		return result_error_create(err);
+	}
+	value_destroy(val);
+	return result_value_create(NULL);
+}
+
+static struct result *
 assign_absexec(struct ast_expr *expr, struct state *state)
 {
-	return expr_assign_eval(expr, state);
+	struct ast_expr *lval = ast_expr_assignment_lval(expr),
+			*rval = ast_expr_assignment_rval(expr);
+
+	struct result *res = ast_expr_absexec(rval, state);
+	if (result_iserror(res)) {
+		return res;
+	}
+	if (!result_hasvalue(res)) {
+		assert(false);
+		return result_error_create(error_create("undefined indirection (rvalue)"));
+	}
+	struct lvalue_res lval_res = ast_expr_lvalue(lval, state);
+	if (lval_res.err) {
+		return result_error_create(lval_res.err);
+	}
+	struct object *obj = lvalue_object(lval_res.lval);
+	if (!obj) {
+		return result_error_create(error_create("undefined indirection (lvalue)"));
+	}
+
+	object_assign(obj, value_copy(result_as_value(res)));
+
+	return res;
 }
 
 static struct result *

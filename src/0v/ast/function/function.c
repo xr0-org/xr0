@@ -336,7 +336,7 @@ inititalise_param(struct ast_variable *param, struct state *state)
 	assert(obj);
 	if (object_hasvalue(obj)) {
 		/* must on the clump or heap */
-		struct value *val = object_as_value(obj);	
+		//struct value *val = object_as_value(obj);	
 		//struct location *loc = value_as_location(val);
 		//assert(
 		//	location_type(loc) == LOCATION_DEREFERENCABLE ||

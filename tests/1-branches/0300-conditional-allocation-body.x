@@ -3,7 +3,7 @@
 void *
 test(int x) ~ [
 	if (x) {
-		.alloc result;
+		return .malloc(1);
 	}
 ]{
 	if (x) {

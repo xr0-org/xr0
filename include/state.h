@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#define KEYWORD_RESULT "result"
+#define KEYWORD_RETURN "return"
 
 /* ast */
 struct ast_type;

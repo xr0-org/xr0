@@ -4,7 +4,7 @@
 void *
 test(char *s) ~ [
 	if (strcmp(s, "yes") == 0) {
-		.alloc result;
+		return .malloc(1);
 	}
 ]{
 	if (strcmp(s, "yes") == 0) {

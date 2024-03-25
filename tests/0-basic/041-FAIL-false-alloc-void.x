@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
 void *
-unit() ~ [ .alloc result; ]
+unit() ~ [ return .malloc(1); ]
 {
 }

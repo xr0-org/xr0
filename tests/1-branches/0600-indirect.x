@@ -3,7 +3,7 @@
 void *
 alloc_if(int num) ~ [
 	if (num) {
-		.alloc result;
+		return .malloc(1);
 	}
 ]{
 	if (num) {
@@ -15,7 +15,7 @@ alloc_if(int num) ~ [
 void *
 test(int x) ~ [
 	if (x) {
-		.alloc result;
+		return .malloc(1);
 	}
 ]{
 	void *p;

@@ -313,7 +313,7 @@ static struct result *
 comp_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup);
 
 static struct result *
-alloc_absexec(struct ast_stmt *stmt, struct state *state);
+jump_absexec(struct ast_stmt *, struct state *);
 
 struct result *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
@@ -331,8 +331,8 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 		return iter_absexec(stmt, state);
 	case STMT_COMPOUND:
 		return comp_absexec(stmt, state, should_setup);
-	case STMT_ALLOCATION:
-		return alloc_absexec(stmt, state);
+	case STMT_JUMP:
+		return jump_absexec(stmt, state);
 	default:
 		assert(false);
 	}
@@ -372,8 +372,6 @@ sel_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 struct decision
 sel_decide(struct ast_expr *control, struct state *state)
 {
-	/*printf("(sel_decide) state: %s\n", state_str(state));*/
-	/*printf("(sel_decide) control: %s\n", ast_expr_str(control));*/
 	struct result *res = ast_expr_pf_reduce(control, state);
 	if (result_iserror(res)) {
 		return (struct decision) { .err = result_as_error(res) };
@@ -381,11 +379,8 @@ sel_decide(struct ast_expr *control, struct state *state)
 	assert(result_hasvalue(res)); /* TODO: user error */
 
 	struct value *v = result_as_value(res);
-	/*printf("(sel_decide) value: %s\n", value_str(v));*/
 	if (value_issync(v)) {
 		struct ast_expr *sync = value_as_sync(v);
-		/*printf("state: %s\n", state_str(state));*/
-		/*printf("sync: %s\n", ast_expr_str(sync));*/
 		struct props *p = state_getprops(state);
 		if (props_get(p, sync)) {
 			return (struct decision) { .decision = true, .err = NULL };
@@ -423,91 +418,32 @@ sel_decide(struct ast_expr *control, struct state *state)
 	return (struct decision) { .decision = nonzero, .err = NULL };
 }
 
-static struct ast_stmt *
+static struct ast_expr *
 hack_alloc_from_neteffect(struct ast_stmt *);
-
-static struct object *
-hack_base_object_from_alloc(struct ast_stmt *, struct state *);
 
 static struct result *
 iter_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	struct error *err;
 
-	struct ast_stmt *alloc = hack_alloc_from_neteffect(stmt);
-
-	struct object *obj = hack_base_object_from_alloc(alloc, state);
-
-	struct ast_expr *lw = ast_stmt_iter_lower_bound(stmt),
+	struct ast_expr *alloc = hack_alloc_from_neteffect(stmt),
+			*lw = ast_stmt_iter_lower_bound(stmt),
 			*up = ast_stmt_iter_upper_bound(stmt);
 
-	struct result *result_lw = ast_expr_eval(lw, state),
-		      *result_up = ast_expr_eval(up, state);
-
-	if (result_iserror(result_lw)) {
-		return result_lw;
-	}
-	if (result_iserror(result_up)) {
-		return result_up;
-	}
-
-	/*printf("stmt: %s\n", ast_stmt_str(stmt));*/
-	/*printf("state: %s\n", state_str(state));*/
-
-	struct ast_expr *res_lw = value_to_expr(result_as_value(result_lw)),
-			*res_up = value_to_expr(result_as_value(result_up));
-
-	result_destroy(result_up);
-	result_destroy(result_lw);
-
-	switch (ast_stmt_alloc_kind(alloc)) {
-	case ALLOC:
-		err = state_range_alloc(state, obj, res_lw, res_up);
-		break;
-	case DEALLOC:
-		err = state_range_dealloc(state, obj, res_lw, res_up);
-		break;
-	default:
-		assert(false);
-	}
-	
-	ast_expr_destroy(res_up);
-	ast_expr_destroy(res_lw);
-
-	if (err) {
+	if ((err = ast_expr_alloc_rangeprocess(alloc, lw, up, state))) {
 		return result_error_create(err);
 	}
-
 	return result_value_create(NULL);
 }
 
-static struct ast_stmt *
+static struct ast_expr *
 hack_alloc_from_neteffect(struct ast_stmt *stmt)
 {
 	struct ast_stmt *body = ast_stmt_iter_body(stmt);
 	assert(ast_stmt_kind(body) == STMT_COMPOUND);
 	struct ast_block *block = ast_stmt_as_block(body);
 	assert(ast_block_ndecls(block) == 0 && ast_block_nstmts(block) == 1);
-	return ast_block_stmts(block)[0];
-}
-
-static struct object *
-hack_base_object_from_alloc(struct ast_stmt *alloc, struct state *state)
-{
-	/* we're currently discarding analysis of `offset` and relying on the
-	 * bounds (lower, upper beneath) alone */
-	struct ast_expr *acc = ast_stmt_alloc_arg(alloc); /* `*(arr+offset)` */
-	struct ast_expr *inner = ast_expr_unary_operand(acc); /* `arr+offset` */
-	struct ast_expr *i = ast_expr_identifier_create(dynamic_str("i"));
-	assert(ast_expr_equal(ast_expr_binary_e2(inner), i)); 
-	ast_expr_destroy(i);
-	struct lvalue_res res = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
-	if (res.err) {
-		assert(false);
-	}
-	struct object *obj = lvalue_object(res.lval);
-	assert(obj);
-	return obj;
+	return ast_stmt_as_expr(ast_block_stmts(block)[0]);
 }
 
 static struct result *
@@ -525,68 +461,15 @@ comp_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 }
 
 static struct result *
-alloc_process(struct ast_stmt *, struct state *);
-
-static struct result *
-alloc_absexec(struct ast_stmt *alloc, struct state *state)
+jump_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	struct result *res = alloc_process(alloc, state);
-	if (result_iserror(res)) {
-		return res;
-	}
-	if (result_hasvalue(res)) {
-		struct lvalue_res lval_res = ast_expr_lvalue(ast_stmt_alloc_arg(alloc), state);
-		if (lval_res.err) {
-			return result_error_create(lval_res.err);
-		}
-		struct object *obj = lvalue_object(lval_res.lval);
-		assert(obj);
-		object_assign(obj, value_copy(result_as_value(res)));
-	}
-	return res;
-}
-
-static struct result *
-dealloc_process(struct ast_stmt *, struct state *);
-
-/* operates at location level. It either creates an object on the heap and returns
- * a location or gets the location pointed to by an lvalue and attempts to free
- * possibly returning an error
- * */
-static struct result *
-alloc_process(struct ast_stmt *stmt, struct state *state)
-{
-	switch (ast_stmt_alloc_kind(stmt)) {
-	case ALLOC:
-		/* TODO: size needs to be passed in here when added to .alloc */
-		return result_value_create(state_alloc(state));
-	case DEALLOC:
-		return dealloc_process(stmt, state);
-	case CLUMP:
-		return result_value_create(state_clump(state));
-	default:
-		assert(false);
-	}
-}
-
-static struct result *
-dealloc_process(struct ast_stmt *stmt, struct state *state)
-{
-	struct ast_expr *arg = ast_stmt_alloc_arg(stmt);
-	/* arg is pointing at the heap location we want to free, so we want its
-	 * value rather than location */
-	struct result *res = ast_expr_eval(arg, state);
-	if (result_iserror(res)) {
-		return res;
-	}
-	struct value *val = result_as_value(res);
-	assert(val);
-	struct error *err = state_dealloc(state, val);
-	if (err) {
-		return result_error_create(err);
-	}
-	value_destroy(val);
-	return result_value_create(NULL);
+	return ast_expr_absexec(
+		ast_expr_assignment_create(
+			ast_expr_identifier_create("return"),
+			ast_stmt_jump_rv(stmt)
+		), 
+		state
+	);
 }
 
 static struct error *
@@ -616,6 +499,7 @@ stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 	switch (ast_stmt_kind(stmt)) {	
 	case STMT_EXPR:
 	case STMT_ALLOCATION:
+	case STMT_JUMP:
 		return NULL;
 	case STMT_LABELLED:
 		return labelled_setupabsexec(stmt, state);

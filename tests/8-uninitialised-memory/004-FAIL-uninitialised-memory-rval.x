@@ -1,6 +1,6 @@
 int
 func(int i) ~ [
-	result = i;
+	return i;
 ]{
 	return i;
 }

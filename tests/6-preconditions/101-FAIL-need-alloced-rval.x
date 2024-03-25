@@ -4,10 +4,10 @@ int
 func(int *x) ~ [ 
 	int i;
 	pre: {
-		.alloc x;
+		x = .malloc(1);
 		*x = $;
 	}
-	result = *x;
+	return *x;
 ]{
 	return *x;	
 }

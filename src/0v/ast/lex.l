@@ -30,9 +30,9 @@ check_type();
 %%
 "#"			{ preproc(); }
 "/*"			{ comment(); }
-".alloc"		{ count(); return(ALLOC); }
-".dealloc"		{ count(); return(DEALLOC); }
-".clump"		{ count(); return(CLUMP); }
+".malloc"		{ count(); return(TK_ALLOC); }
+".free"			{ count(); return(TK_DEALLOC); }
+".clump"		{ count(); return(TK_CLUMP); }
 
 "auto"			{ count(); return(AUTO); }
 "axiom"			{ count(); return(AXIOM); }

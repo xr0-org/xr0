@@ -1,10 +1,10 @@
 int
 snapshot_and_change(int *arg) ~ [
 	pre: {
-		.clump arg;
+		arg = .clump(sizeof(int));
 		*arg = $;
 	}
-	result = *arg;
+	return *arg;
 	*arg = 3;
 ] {
 	int j;
@@ -17,9 +17,9 @@ void
 modify(int *p, int *q) ~ [
 	int i;
 	pre: {
-		.clump p;
+		p = .clump(sizeof(int));
 		*p = $;
-		.clump q;
+		q = .clump(sizeof(int));
 	};
 	*q = 2;
 	*p = 3;

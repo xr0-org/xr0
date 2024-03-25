@@ -333,7 +333,7 @@ state_getresulttype(struct state *state)
 struct ast_type *
 state_getobjecttype(struct state *state, char *id)
 {
-	if (strcmp(id, KEYWORD_RESULT) == 0) {
+	if (strcmp(id, KEYWORD_RETURN) == 0) {
 		return state_getresulttype(state);
 	}
 
@@ -355,7 +355,7 @@ state_getloc(struct state *state, char *id)
 struct object *
 state_getobject(struct state *state, char *id)
 {
-	if (strcmp(id, KEYWORD_RESULT) == 0) {
+	if (strcmp(id, KEYWORD_RETURN) == 0) {
 		return state_getresult(state);
 	}
 
