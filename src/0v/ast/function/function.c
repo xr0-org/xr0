@@ -496,14 +496,14 @@ path_verify(struct ast_function *f, struct state *actual_state, int index,
 		/* result_destroy(res); */
 	}
 	if (state_hasgarbage(actual_state)) {
-		printf("actual: %s\n", state_str(actual_state));
+		v_printf("actual: %s\n", state_str(actual_state));
 		return error_create("qed error: garbage on heap");
 	}
 	
 	bool equiv = state_equal(actual_state, abstract_state);
 	if (!equiv) {
-		printf("actual: %s\n", state_str(actual_state));
-		printf("abstract: %s\n", state_str(abstract_state));
+		v_printf("actual: %s\n", state_str(actual_state));
+		v_printf("abstract: %s\n", state_str(abstract_state));
 		return error_create("qed error: actual and abstract states differ");
 	}
 
