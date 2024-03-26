@@ -13,8 +13,7 @@ INCLUDE_DIR = include
 SRC_DIR = src
 UTIL_DIR = $(SRC_DIR)/util
 
-SRC_0V_DIR = $(SRC_DIR)/0v
-SRC_0C_DIR = $(SRC_DIR)/0c
+SRC_0V_DIR = $(SRC_DIR)
 
 EXT_DIR = $(SRC_0V_DIR)/ext
 PROPS_DIR = $(SRC_0V_DIR)/props
@@ -26,11 +25,9 @@ MATH_DIR = $(SRC_0V_DIR)/math
 
 # executable
 XR0V = $(BIN_DIR)/0v
-XR0C = $(BIN_DIR)/0c
 
 # build artifacts
 MAIN_0V_OBJ = $(BUILD_DIR)/0v.o
-MAIN_0C_OBJ = $(BUILD_DIR)/0c.o
 
 STATE_OBJ = $(BUILD_DIR)/state.o
 STATIC_OBJ = $(BUILD_DIR)/static.o

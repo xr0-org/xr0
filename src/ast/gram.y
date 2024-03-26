@@ -885,6 +885,7 @@ function_definition
 #include <stdio.h>
 
 extern struct lexememarker marker; 
+extern int VERBOSE_MODE;
 
 int
 yyerror(char *s)
@@ -894,7 +895,7 @@ yyerror(char *s)
 		fprintf(stderr, "error: %s with no lexeme marker\n", s);
 		exit(EXIT_FAILURE);
 	}
-	if (verbose) {
+	if (VERBOSE_MODE) {
 		fprintf(stderr, "\n%*s\n", marker.column, "^");
 	}
 	char *mark = lexememarker_str(&marker);

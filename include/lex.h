@@ -24,7 +24,6 @@ lexememarker_destroy(struct lexememarker *);
 char *
 lexememarker_str(struct lexememarker *);
 
-extern int verbose;
 extern struct ast *root;
 extern struct map *table;
 
