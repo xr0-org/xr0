@@ -50,7 +50,7 @@ parse_config(int argc, char *argv[])
 	char *outfile = OUTPUT_PATH;
 	char *sortfunc = NULL;
 	int opt;
-	while ((opt = getopt(argc, argv, "vost:I:")) != -1) {
+	while ((opt = getopt(argc, argv, "vso:t:I:")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
