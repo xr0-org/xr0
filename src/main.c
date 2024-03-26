@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <ctype.h>
 #include <string.h>
 #include <unistd.h>
+
 #include "gram_util.h"
 #include "gram.tab.h"
 #include "ast.h"
@@ -22,11 +24,14 @@
 int
 yyparse();
 
+enum execmode { EXECMODE_VERIFY, EXECMODE_STRIP, };
+
 struct config {
 	char *infile;
 	char *outfile;
 	struct string_arr *includedirs;
 	bool verbose;
+	enum execmode mode;
 
 	char *sortfunc;
 	bool sort;
@@ -38,13 +43,14 @@ default_includes();
 struct config
 parse_config(int argc, char *argv[])
 {
+	enum execmode mode = EXECMODE_VERIFY;
 	bool verbose = false;
 	bool sort = false;
 	struct string_arr *includedirs = default_includes();
 	char *outfile = OUTPUT_PATH;
 	char *sortfunc = NULL;
 	int opt;
-	while ((opt = getopt(argc, argv, "vos:I:")) != -1) {
+	while ((opt = getopt(argc, argv, "vost:I:")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
@@ -56,6 +62,9 @@ parse_config(int argc, char *argv[])
 			verbose = true;
 			break;
 		case 's':
+			mode = EXECMODE_STRIP;
+			break;
+		case 't':
 			sortfunc = optarg;
 			sort = true;
 			break;
@@ -69,6 +78,7 @@ parse_config(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 	return (struct config) {
+		.mode		= mode,
 		.infile		= argv[optind],
 		.outfile	= outfile,
 		.includedirs	= includedirs,
@@ -260,19 +270,39 @@ proto_defisvalid(struct ast_function *proto, struct ast_function *def)
 	return false;
 }
 
+static int
+verify(struct config *c);
+
+static int
+strip(struct config *c);
+
 int
 main(int argc, char *argv[])
 {
 	extern int VERBOSE_MODE;
 
-	/* read file and preprocess */
-	extern FILE *yyin;
 	struct config c = parse_config(argc, argv);
-	yyin = preprocess(c.infile, c.includedirs);
+	VERBOSE_MODE = c.verbose;
+
+	switch (c.mode) {
+	case EXECMODE_VERIFY:
+		return verify(&c);
+	case EXECMODE_STRIP:
+		return strip(&c);
+	default:
+		assert(false);
+	}
+}
+
+static int
+verify(struct config *c)
+{
+	/* preprocess */
+	extern FILE *yyin;
+	yyin = preprocess(c->infile, c->includedirs);
 
 	/* lex and parse */
 	lex_begin();
-	VERBOSE_MODE = c.verbose;
 	yyparse();
 	yylex_destroy();
 	lex_finish();
@@ -284,13 +314,13 @@ main(int argc, char *argv[])
 	pass0(root, ext);
 
 	/* if -s param specified output topological eval order */
-	if (c.sort) {
+	if (c->sort) {
 		/* TODO: pass up error conditions */
-		if (!c.sortfunc) {
-			fprintf(stderr, "supply function to `-s' flag to evaluate dependencies for");
+		if (!c->sortfunc) {
+			fprintf(stderr, "supply function to `-t' flag to evaluate dependencies for");
 			exit(EXIT_FAILURE);
 		}
-		struct string_arr *order = ast_topological_order(c.sortfunc, ext);
+		struct string_arr *order = ast_topological_order(c->sortfunc, ext);
 		/* TODO: our tests run 2>&1 > /dev/null */
 		fprintf(stderr, "%s\n", string_arr_str(order));
 	} else { 
@@ -300,4 +330,83 @@ main(int argc, char *argv[])
 
 	externals_destroy(ext);
 	ast_destroy(root);
+
+	return 0;
+}
+
+bool
+isvblock(char c, FILE *);
+
+void
+skipvblock(FILE *);
+
+
+static int
+strip(struct config *config)
+{
+	FILE *in = fopen(config->infile, "rb"),
+	     *out = fopen(config->outfile, "w");
+
+	char c;
+
+	while ((c = fgetc(in)) != EOF) {
+		if (isvblock(c, in)) {
+			skipvblock(in);
+		} else {
+			fputc(c, out);
+		}
+	}
+
+	fclose(in);
+	fclose(out);
+
+	return 0;
+}
+
+void
+skipws(FILE *f);
+
+bool
+isvblock(char c, FILE *f)
+{
+	if (c != '~') {
+		return false;
+	}
+
+	long pos = ftell(f);
+
+	/* skip whitespace */
+	for (c = fgetc(f); isspace(c); c = fgetc(f))
+		;
+
+	switch (c) {
+	case '[':
+		return true;
+	case EOF:
+		/* EOF will be processed above */
+		fseek(f, -1, SEEK_CUR);
+		return false;
+	default:
+		/* found nothing so reset */
+		fseek(f, pos, SEEK_SET);
+		return false;
+	}
+}
+
+void
+skipvblock(FILE *f)
+{
+	char c;
+
+	int count = 0; /* counts additional pairs */
+	while ((c = fgetc(f)) != ']' || count) {
+		switch (c) {
+		case '[':
+			count++;
+			break;
+		case ']':
+			count--;
+			break;
+		}
+	}
 }
