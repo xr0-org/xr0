@@ -300,3 +300,20 @@ string_arr_str(struct string_arr *string_arr)
 	}
 	return strbuilder_build(b);
 }
+
+int VERBOSE_MODE;
+
+
+/* v_printf: Print if Xr0 is in verbose mode. */
+int
+v_printf(char *fmt, ...)
+{
+	if (!VERBOSE_MODE) {
+		return 0;
+	}
+	va_list ap;
+	va_start(ap, fmt);
+	int r = vprintf(fmt, ap);
+	va_end(ap);
+	return r;
+}

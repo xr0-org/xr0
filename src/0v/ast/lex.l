@@ -163,8 +163,6 @@ comment()
 	}
 }
 
-int verbose;
-
 struct lexememarker marker = (struct lexememarker) {
 	.linenum = 0,
 	.column = 0,
@@ -281,9 +279,6 @@ count()
 			marker.column++;
 			break;
 		}
-	}
-	if (verbose) {
-		printf("%s", yytext);
 	}
 }
 

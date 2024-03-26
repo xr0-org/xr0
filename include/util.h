@@ -100,4 +100,8 @@ string_arr_contains(struct string_arr *, char *s);
 char *
 string_arr_str(struct string_arr *);
 
+/* v_printf: Print if Xr0 is in verbose mode. */
+int
+v_printf(char *fmt, ...);
+
 #endif

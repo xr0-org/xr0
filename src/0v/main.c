@@ -200,7 +200,7 @@ pass1(struct ast *root, struct externals *ext)
 			fprintf(stderr, "%s\n", err->msg);
 			exit(EXIT_FAILURE);
 		}
-		printf("done %s\n", ast_function_name(f));
+		v_printf("qed %s\n", ast_function_name(f));
 	}
 }
 
@@ -263,6 +263,8 @@ proto_defisvalid(struct ast_function *proto, struct ast_function *def)
 int
 main(int argc, char *argv[])
 {
+	extern int VERBOSE_MODE;
+
 	/* read file and preprocess */
 	extern FILE *yyin;
 	struct config c = parse_config(argc, argv);
@@ -270,7 +272,7 @@ main(int argc, char *argv[])
 
 	/* lex and parse */
 	lex_begin();
-	verbose = c.verbose;
+	VERBOSE_MODE = c.verbose;
 	yyparse();
 	yylex_destroy();
 	lex_finish();
