@@ -14,6 +14,7 @@
 #include "verify.h"
 
 /* XXX */
+#define INCLUDE_ENVVAR "XR0_INCLUDES"
 #define OUTPUT_PATH "0.c"
 #define PREPROC_CMD_TEMPLATE "cc %s -nostdinc -E -xc %s"
 #define PREPROC_CMD_BASE_LEN (strlen(PREPROC_CMD_TEMPLATE) - 4)
@@ -31,12 +32,15 @@ struct config {
 	bool sort;
 };
 
+static struct string_arr *
+default_includes();
+
 struct config
 parse_config(int argc, char *argv[])
 {
 	bool verbose = false;
 	bool sort = false;
-	struct string_arr *includedirs = string_arr_create();
+	struct string_arr *includedirs = default_includes();
 	char *outfile = OUTPUT_PATH;
 	char *sortfunc = NULL;
 	int opt;
@@ -56,7 +60,7 @@ parse_config(int argc, char *argv[])
 			sort = true;
 			break;
 		default:
-			fprintf(stderr, "Usage: %s [-o output] input_file\n", argv[0]);
+			fprintf(stderr, "Usage: %s [-I libx] input_file\n", argv[0]);
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -72,6 +76,18 @@ parse_config(int argc, char *argv[])
 		.sort		= sort,
 		.sortfunc	= sortfunc,
 	};
+}
+
+
+static struct string_arr *
+default_includes()
+{
+	struct string_arr *dirs = string_arr_create();
+	char *env = getenv(INCLUDE_ENVVAR);
+	if (env) {
+		string_arr_append(dirs, env);
+	}
+	return dirs;
 }
 
 char *
