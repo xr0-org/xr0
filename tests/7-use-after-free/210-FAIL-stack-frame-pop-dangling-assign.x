@@ -4,7 +4,7 @@ void
 dangling_assign(int **i) ~ [
 	int j;
 
-	pre: i = .clump(sizeof(int *));
+	setup: i = .clump(sizeof(int *));
 
 	j = 5;
  	*i = &j;

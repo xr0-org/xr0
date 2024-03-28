@@ -3,7 +3,7 @@
 int
 func(int *x) ~ [ 
 	int i;
-	pre: {
+	setup: {
 		x = .malloc(1);
 		*x = $;
 	}

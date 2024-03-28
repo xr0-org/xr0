@@ -40,7 +40,7 @@ do
 		expected_output=$(cat $expected_file)
 		
 		# check if output matches expected_output
-		if [[ ${output} == $expected_output ]]
+		if [[ "${output}" == "$expected_output" ]]
 		then
 			npass=$((npass+1))
 			printf "$pass"

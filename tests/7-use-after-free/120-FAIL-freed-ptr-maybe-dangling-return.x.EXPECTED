@@ -1,1 +1,1 @@
-7-use-after-free/120-FAIL-freed-ptr-maybe-dangling-return.x:34:8: cannot exec statement: undefined indirection (lvalue)
+7-use-after-free/120-FAIL-freed-ptr-maybe-dangling-return.x:34:8:main: cannot exec statement: undefined indirection: *(j) is not an lvalue

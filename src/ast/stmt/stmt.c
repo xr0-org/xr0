@@ -91,7 +91,7 @@ bool
 ast_stmt_ispre(struct ast_stmt *stmt)
 {
 	return stmt->kind == STMT_LABELLED
-		&& strcmp(stmt->u.labelled.label, "pre") == 0;
+		&& strcmp(stmt->u.labelled.label, "setup") == 0;
 }
 
 bool

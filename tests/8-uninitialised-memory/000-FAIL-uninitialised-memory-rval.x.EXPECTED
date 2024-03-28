@@ -1,1 +1,1 @@
-8-uninitialised-memory/000-FAIL-uninitialised-memory-rval.x:7:7: cannot exec statement: undefined memory access: `j' has no value
+8-uninitialised-memory/000-FAIL-uninitialised-memory-rval.x:7:7:main: cannot exec statement: undefined memory access: j has no value

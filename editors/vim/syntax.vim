@@ -11,7 +11,7 @@ syntax keyword	Operator        sizeof
 syntax keyword	Keyword	        const exit
 syntax keyword	Type	        unsigned int char double void bool size_t FILE
 syntax keyword	Structure	struct enum union
-syntax keyword	Conditional	if else for some while switch assume pre
+syntax keyword	Conditional	if else for some while switch assume setup
 syntax keyword	Include	        axiom malloc free realloc clump
 syntax keyword	Label		case default
 syntax keyword	Boolean		true false

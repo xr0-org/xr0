@@ -1,6 +1,6 @@
 int
 snapshot_and_change(int *arg) ~ [
-	pre: {
+	setup: {
 		arg = .clump(sizeof(int));
 		*arg = $;
 	}
@@ -16,7 +16,7 @@ snapshot_and_change(int *arg) ~ [
 void
 modify(int *p, int *q) ~ [
 	int i;
-	pre: {
+	setup: {
 		p = .clump(sizeof(int));
 		*p = $;
 		q = .clump(sizeof(int));

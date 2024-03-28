@@ -13,7 +13,7 @@
 #include "value.h"
 
 struct error *
-ast_stmt_process(struct ast_stmt *stmt, struct state *state)
+ast_stmt_process(struct ast_stmt *stmt, char *fname, struct state *state)
 {
 	struct error *err;
 
@@ -33,7 +33,7 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 		struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
 		assert(loc);
 		char *m = lexememarker_str(loc);
-		strbuilder_printf(b, "%s: cannot exec statement: %s", m, err->msg);
+		strbuilder_printf(b, "%s:%s: cannot exec statement: %s", m, fname, err->msg);
 		free(m);
 		return error_create(strbuilder_build(b));
 	}

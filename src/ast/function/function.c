@@ -476,6 +476,7 @@ path_verify(struct ast_function *f, struct state *actual_state, int index,
 {
 	struct error *err;
 
+	char *fname = ast_function_name(f);
 	int nstmts = ast_block_nstmts(f->body);
 	struct ast_stmt **stmt = ast_block_stmts(f->body);
 	for (int i = index; i < nstmts; i++) {
@@ -487,7 +488,7 @@ path_verify(struct ast_function *f, struct state *actual_state, int index,
 				f, actual_state, i, &splits, abstract_state
 			);
 		}
-		if ((err = ast_stmt_process(stmt[i], actual_state))) {
+		if ((err = ast_stmt_process(stmt[i], fname, actual_state))) {
 			return err;
 		}
 		if (ast_stmt_isterminal(stmt[i], actual_state)) {
@@ -496,15 +497,23 @@ path_verify(struct ast_function *f, struct state *actual_state, int index,
 		/* result_destroy(res); */
 	}
 	if (state_hasgarbage(actual_state)) {
-		v_printf("actual: %s\n", state_str(actual_state));
-		return error_create("qed error: garbage on heap");
+		v_printf("actual: %s", state_str(actual_state));
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(
+			b, "%s: garbage on heap", ast_function_name(f)
+		);
+		return error_create(strbuilder_build(b));
 	}
 	
 	bool equiv = state_equal(actual_state, abstract_state);
 	if (!equiv) {
-		v_printf("actual: %s\n", state_str(actual_state));
-		v_printf("abstract: %s\n", state_str(abstract_state));
-		return error_create("qed error: actual and abstract states differ");
+		/*v_printf("actual: %s\n", state_str(actual_state));*/
+		/*v_printf("abstract: %s\n", state_str(abstract_state));*/
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(
+			b, "%s: actual and abstract states differ", ast_function_name(f)
+		);
+		return error_create(strbuilder_build(b));
 	}
 
 	return NULL;

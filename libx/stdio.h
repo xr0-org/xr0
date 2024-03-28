@@ -15,7 +15,7 @@ axiom int
 fputs(char *s, FILE *stream);
 
 axiom int
-puts(char *s) ~ [ pre: s = .clump(1); ];
+puts(char *s) ~ [ setup: s = .clump(1); ];
 
 axiom FILE *
 fopen(char *pathname, char *mode);

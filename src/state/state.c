@@ -112,7 +112,9 @@ state_str(struct state *state)
 	}
 	free(ext);
 	char *static_mem = static_memory_str(state->static_memory, "\t");
-	strbuilder_printf(b, "%s\n", static_mem);
+	if (strlen(static_mem) > 0) {
+		strbuilder_printf(b, "%s\n", static_mem);
+	}
 	free(static_mem);
 	char *vconst = vconst_str(state->vconst, "\t");
 	if (strlen(vconst) > 0) {
@@ -120,7 +122,9 @@ state_str(struct state *state)
 	}
 	free(vconst);
 	char *clump = clump_str(state->clump, "\t");
-	strbuilder_printf(b, "%s\n", clump);
+	if (strlen(clump) > 0) {
+		strbuilder_printf(b, "%s\n", clump);
+	}
 	free(clump);
 	char *stack = stack_str(state->stack, state);
 	strbuilder_printf(b, "%s\n", stack);
@@ -432,7 +436,7 @@ struct error *
 state_dealloc(struct state *state, struct value *val)
 {
 	if (!value_islocation(val)) {
-		return error_create("dealloc on non-location");
+		return error_create("undefined free of value not pointing at heap");
 	}
 	return location_dealloc(value_as_location(val), state->heap);
 }
@@ -540,8 +544,8 @@ state_equal(struct state *s1, struct state *s2)
 	     *str2 = state_str(s2_c);
 	bool equal = strcmp(str1, str2) == 0;
 	if (!equal) {
-		printf("actual: %s\n", str1);
-		printf("alleged: %s\n", str2);
+		v_printf("actual: %s", str1);
+		v_printf("abstract: %s", str2);
 	}
 	free(str2);
 	free(str1);

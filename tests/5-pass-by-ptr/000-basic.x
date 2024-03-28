@@ -2,7 +2,7 @@
 
 void *
 assign(void *p) ~ [
-	pre: p = .clump(1);
+	setup: p = .clump(1);
 	*p = 1;
 ] {
 	/* TODO: internal verification */

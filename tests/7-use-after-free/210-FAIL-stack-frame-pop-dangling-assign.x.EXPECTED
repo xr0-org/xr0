@@ -1,1 +1,1 @@
-7-use-after-free/210-FAIL-stack-frame-pop-dangling-assign.x:27:8: cannot exec statement: undefined indirection: stack frame doesn't exist
+7-use-after-free/210-FAIL-stack-frame-pop-dangling-assign.x:27:8:main: cannot exec statement: undefined indirection: stack frame doesn't exist

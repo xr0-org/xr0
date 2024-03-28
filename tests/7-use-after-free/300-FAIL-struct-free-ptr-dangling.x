@@ -15,7 +15,7 @@ struct score *
 create_score(char *subject, int grade) ~ [
 	struct score *s;
 
-	pre: subject = .malloc(sizeof(char *) * 100);
+	setup: subject = .malloc(sizeof(char *) * 100);
 
 	s = .malloc(sizeof(struct score));
 	s->subject = subject;

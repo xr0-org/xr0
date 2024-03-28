@@ -1,6 +1,6 @@
 void
 assign(int *q) ~ [
-	pre: {
+	setup: {
 		q = .clump(sizeof(int));
 		*q = $;
 	}

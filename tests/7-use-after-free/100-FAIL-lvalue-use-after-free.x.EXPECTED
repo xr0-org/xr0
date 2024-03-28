@@ -1,1 +1,1 @@
-7-use-after-free/100-FAIL-lvalue-use-after-free.x:11:8: cannot exec statement: undefined indirection (lvalue)
+7-use-after-free/100-FAIL-lvalue-use-after-free.x:11:8:func: cannot exec statement: undefined indirection: *(p) is not an lvalue

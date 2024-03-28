@@ -390,7 +390,7 @@ struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
 
 struct error *
-ast_stmt_process(struct ast_stmt *, struct state *);
+ast_stmt_process(struct ast_stmt *, char *fname, struct state *);
 
 struct preresult;
 

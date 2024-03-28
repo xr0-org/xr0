@@ -492,14 +492,14 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	struct object *obj = state_getobject(state, id);
 	if (!obj) {
 		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "unknown idenitfier `%s'", id);
+		strbuilder_printf(b, "unknown idenitfier %s", id);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	struct value *val = object_as_value(obj);
 	if (!val) {
-		printf("state: %s\n", state_str(state));
+		v_printf("state: %s\n", state_str(state));
 		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "undefined memory access: `%s' has no value", id);
+		strbuilder_printf(b, "undefined memory access: %s has no value", id);
 		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	return result_value_create(value_copy(val));
@@ -584,13 +584,21 @@ binary_deref_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(deref_res.err);
 	}
 	if (!deref_res.obj) {
-		return result_error_create(error_create("undefined indirection (rvalue)"));
+		struct strbuilder *b = strbuilder_create();
+		char *s = ast_expr_str(expr);
+		strbuilder_printf(b, "undefined indirection: *(%s) has no value", s);
+		free(s);
+		return result_error_create(error_create(strbuilder_build(b)));
 	}
 	result_destroy(res);
 
 	struct value *v = object_as_value(deref_res.obj);
 	if (!v) {
-		return result_error_create(error_create("undefined indirection (rvalue)"));
+		struct strbuilder *b = strbuilder_create();
+		char *s = ast_expr_str(expr);
+		strbuilder_printf(b, "undefined indirection: *(%s) has no value", s);
+		free(s);
+		return result_error_create(error_create(strbuilder_build(b)));
 	}
 
 	return result_value_create(value_copy(v));
@@ -762,8 +770,9 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 {
 	struct error *err;
 
+	char *fname = ast_function_name(f);
 	struct state *param_state = state_create(
-		dynamic_str(ast_function_name(f)),
+		dynamic_str(fname),
 		state_getext(arg_state),
 		ast_function_type(f)
 	);
@@ -779,7 +788,7 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 		struct value *arg = state_getloc(arg_state, id);
 		if ((err = verify_paramspec(param, arg, param_state, arg_state))) {
 			struct strbuilder *b = strbuilder_create();
-			strbuilder_printf(b, "parameter '%s' %s", id, err->msg);
+			strbuilder_printf(b, "parameter %s of %s %s", id, fname, err->msg);
 			return error_create(strbuilder_build(b));
 		}
 	}
@@ -968,7 +977,11 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	}
 	struct object *obj = lvalue_object(lval_res.lval);
 	if (!obj) {
-		return result_error_create(error_create("undefined indirection (lvalue)"));
+		struct strbuilder *b = strbuilder_create();
+		char *s = ast_expr_str(lval);
+		strbuilder_printf(b, "undefined indirection: %s is not an lvalue", s);
+		free(s);
+		return result_error_create(error_create(strbuilder_build(b)));
 	}
 
 	object_assign(obj, value_copy(result_as_value(res)));

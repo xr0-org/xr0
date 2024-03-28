@@ -2,7 +2,7 @@
 
 void
 unit(void *p) ~ [
-	pre: p = .malloc(1);
+	setup: p = .malloc(1);
 
 	.free(p);
 ]{
