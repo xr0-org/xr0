@@ -28,7 +28,12 @@ do
 	printf "%-${length}s ..." "$f"
 	if [ "$folder" == *"$topological_folder"* ]
 	then
-		output=$($XR0 -t main -I $libx $f 2>&1 >/dev/null)
+		if [[ "$f" == *"verification"* ]]
+		then
+			output=$($XR0 -x main -I $libx -v $f 2>&1 >/dev/null)
+		else
+			output=$($XR0 -t main -I $libx $f 2>&1 >/dev/null)
+		fi
 	else 
 		output=$($XR0 -I $libx $f 2>&1 >/dev/null)
 	fi

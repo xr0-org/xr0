@@ -14,17 +14,21 @@
 #include "state.h"
 #include "util.h"
 #include "verify.h"
-
 /* XXX */
-#define INCLUDE_ENVVAR "XR0_INCLUDES"
-#define OUTPUT_PATH "0.c"
-#define PREPROC_CMD_TEMPLATE "cc %s -nostdinc -E -xc %s"
-#define PREPROC_CMD_BASE_LEN (strlen(PREPROC_CMD_TEMPLATE) - 4)
+#define INCLUDE_ENVVAR		"XR0_INCLUDES"
+#define OUTPUT_PATH		"0.c"
+#define PREPROC_CMD_TEMPLATE	"cc %s -nostdinc -E -xc %s"
+#define PREPROC_CMD_BASE_LEN 	(strlen(PREPROC_CMD_TEMPLATE) - 4)
+
+#define ERROR_NO_INPUT		"must provide input as string"
+#define ERROR_NO_SORTFUNC	"supply function to `-t' flag to evaluate dependencies for"
+
 
 int
 yyparse();
 
 enum execmode { EXECMODE_VERIFY, EXECMODE_STRIP, };
+enum sortmode { SORTMODE_NONE, SORTMODE_SORT, SORTMODE_VERIFY };
 
 struct config {
 	char *infile;
@@ -34,23 +38,30 @@ struct config {
 	enum execmode mode;
 
 	char *sortfunc;
-	bool sort;
+	enum sortmode sortmode;
 };
 
 static struct string_arr *
 default_includes();
+
+struct sortconfig {
+	enum sortmode mode;
+	char *sortfunc;
+};
+
+static struct sortconfig
+sortconfig_create(enum sortmode mode, char *sortfunc);
 
 struct config
 parse_config(int argc, char *argv[])
 {
 	enum execmode mode = EXECMODE_VERIFY;
 	bool verbose = false;
-	bool sort = false;
+	struct sortconfig sortconf = sortconfig_create(SORTMODE_NONE, "");
 	struct string_arr *includedirs = default_includes();
 	char *outfile = OUTPUT_PATH;
-	char *sortfunc = NULL;
 	int opt;
-	while ((opt = getopt(argc, argv, "vso:t:I:")) != -1) {
+	while ((opt = getopt(argc, argv, "vso:t:x:I:")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
@@ -65,8 +76,10 @@ parse_config(int argc, char *argv[])
 			mode = EXECMODE_STRIP;
 			break;
 		case 't':
-			sortfunc = optarg;
-			sort = true;
+			sortconf = sortconfig_create(SORTMODE_SORT, optarg);
+			break;
+		case 'x':
+			sortconf = sortconfig_create(SORTMODE_VERIFY, optarg);
 			break;
 		default:
 			fprintf(stderr, "Usage: %s [-I libx] input_file\n", argv[0]);
@@ -74,7 +87,7 @@ parse_config(int argc, char *argv[])
 		}
 	}
 	if (optind >= argc) {
-		fprintf(stderr, "must provide input as string\n");
+		fprintf(stderr, "%s\n", ERROR_NO_INPUT);
 		exit(EXIT_FAILURE);
 	}
 	return (struct config) {
@@ -83,9 +96,32 @@ parse_config(int argc, char *argv[])
 		.outfile	= outfile,
 		.includedirs	= includedirs,
 		.verbose	= verbose,
-		.sort		= sort,
-		.sortfunc	= sortfunc,
+		.sortmode	= sortconf.mode,
+		.sortfunc	= sortconf.sortfunc,
 	};
+}
+
+static struct sortconfig
+sortconfig_create(enum sortmode mode, char *sortfunc)
+{
+	switch (mode) {
+	case SORTMODE_NONE:
+		return (struct sortconfig) {
+			.mode = mode, .sortfunc = sortfunc,
+		};
+
+	case SORTMODE_SORT:
+	case SORTMODE_VERIFY:
+		if (!sortfunc) {
+			fprintf(stderr, "%s\n", ERROR_NO_SORTFUNC);
+			exit(EXIT_FAILURE);
+		}
+		return (struct sortconfig) {
+			.mode = mode, .sortfunc = sortfunc,
+		};
+	default:
+		assert(false);
+	}
 }
 
 
@@ -214,6 +250,28 @@ pass1(struct ast *root, struct externals *ext)
 	}
 }
 
+void
+pass_inorder(struct string_arr *order, struct externals *ext)
+{
+	struct error *err;
+	int n = string_arr_n(order);
+	char **name = string_arr_s(order);
+	for (int i = 0; i < n; i++) {
+		struct ast_function *f = externals_getfunc(ext, name[i]);
+		if (ast_function_isaxiom(f) || ast_function_isproto(f)) {
+			continue;
+		}
+		/* XXX: ensure that verified functions always have an abstract */
+		assert(ast_function_abstract(f));
+
+		if ((err = ast_function_verify(f, ext))) {
+			fprintf(stderr, "%s\n", err->msg);
+			exit(EXIT_FAILURE);
+		}
+		fprintf(stderr, "qed %s\n", ast_function_name(f));
+	}
+}
+
 static bool
 proto_defisvalid(struct ast_function *f1, struct ast_function *f2);
 
@@ -314,18 +372,24 @@ verify(struct config *c)
 	pass0(root, ext);
 
 	/* if -s param specified output topological eval order */
-	if (c->sort) {
-		/* TODO: pass up error conditions */
-		if (!c->sortfunc) {
-			fprintf(stderr, "supply function to `-t' flag to evaluate dependencies for");
-			exit(EXIT_FAILURE);
-		}
-		struct string_arr *order = ast_topological_order(c->sortfunc, ext);
+	struct string_arr *order;
+	switch (c->sortmode) {
+	case SORTMODE_NONE:
+		pass1(root, ext);
+		break;
+	case SORTMODE_SORT:
+		order = ast_topological_order(c->sortfunc, ext);
 		/* TODO: our tests run 2>&1 > /dev/null */
 		fprintf(stderr, "%s\n", string_arr_str(order));
-	} else { 
-		/* TODO: verify in topological order */
-		pass1(root, ext);
+		break;
+	case SORTMODE_VERIFY:
+		order = ast_topological_order(c->sortfunc, ext);
+		/* TODO: our tests run 2>&1 > /dev/null */
+		fprintf(stderr, "%s\n", string_arr_str(order));
+		pass_inorder(order, ext);
+		break;
+	default:
+		assert(false);
 	}
 
 	externals_destroy(ext);
