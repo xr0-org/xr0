@@ -27,6 +27,7 @@ expr_binary_decide(struct ast_expr *expr, struct state *state);
 bool
 ast_expr_decide(struct ast_expr *expr, struct state *state)
 {
+	printf("state: %s\n", state_str(state));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 		return (bool) ast_expr_as_constant(expr);
@@ -314,6 +315,9 @@ expr_structmember_lvalue(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *root = ast_expr_member_root(expr);
 	struct lvalue_res root_res = ast_expr_lvalue(root, state);
+	if (root_res.err) {
+		return root_res;
+	}
 	struct object *root_obj = lvalue_object(root_res.lval);
 	assert(root_obj);
 	char *field = ast_expr_member_field(expr);
@@ -1167,6 +1171,8 @@ static struct preresult *
 reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 {
 	switch (expr->kind) {
+	case EXPR_CONSTANT:
+		return preresult_empty_create();
 	case EXPR_IDENTIFIER:
 		return identifier_assume(expr, value, s);
 	case EXPR_UNARY:
@@ -1226,6 +1232,7 @@ ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
 {
 	switch (ast_expr_kind(e)) {
 	case EXPR_CONSTANT:
+		return result_value_create(value_int_create(ast_expr_as_constant(e)));
 	case EXPR_STRING_LITERAL:
 	case EXPR_IDENTIFIER:
 		return ast_expr_eval(e, s);
@@ -1262,7 +1269,7 @@ unary_pf_reduce(struct ast_expr *e, struct state *s)
 	return result_value_create(
 		value_sync_create(
 			ast_expr_unary_create(
-				value_as_sync(result_as_value(res)),
+				value_as_numberexpr(result_as_value(res)),
 				ast_expr_unary_op(e)
 			)
 		)

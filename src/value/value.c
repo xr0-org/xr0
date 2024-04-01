@@ -661,6 +661,20 @@ value_to_expr(struct value *v)
 	}
 }
 
+struct ast_expr *
+value_as_numberexpr(struct value *v)
+{
+	switch (v->type) {
+	case VALUE_SYNC:
+		return ast_expr_copy(value_as_sync(v));
+	case VALUE_INT:
+		return number_to_expr(v->n);
+	default:
+		/*printf("v: %s\n", value_str(v));*/
+		assert(false);
+	}
+}
+
 bool
 value_isliteral(struct value *v)
 {

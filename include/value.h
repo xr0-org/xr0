@@ -104,6 +104,9 @@ value_as_sync(struct value *v);
 struct ast_expr *
 value_to_expr(struct value *);
 
+struct ast_expr *
+value_as_numberexpr(struct value *v);
+
 bool
 value_isliteral(struct value *v);
 
