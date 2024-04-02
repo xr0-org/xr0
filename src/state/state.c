@@ -26,6 +26,8 @@ struct state {
 	struct stack *stack;
 	struct heap *heap;
 	struct props *props;
+
+	int linenum, col;
 };
 
 struct state *
@@ -159,6 +161,18 @@ struct props *
 state_getprops(struct state *s)
 {
 	return s->props;
+}
+
+int
+state_getlinenum(struct state *s)
+{
+	return s->linenum;
+}
+
+int
+state_getcol(struct state *s)
+{
+	return s->col;
 }
 
 void
@@ -577,4 +591,93 @@ state_popprops(struct state *s)
 {
 	props_destroy(s->props);
 	s->props = props_create();
+}
+
+
+/* state_arr */
+
+struct state_arr {
+	int n;
+	struct state **s;
+};
+
+struct state_arr *
+state_arr_create()
+{
+	struct state_arr *arr = calloc(1, sizeof(struct state_arr));
+	assert(arr);
+	return arr;
+}
+
+void
+state_arr_destroy(struct state_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		free(arr->s[i]);
+	}
+	free(arr->s);
+	free(arr);
+}
+
+struct state **
+state_arr_states(struct state_arr *arr)
+{
+	return arr->s;
+}
+
+int
+state_arr_n(struct state_arr *arr)
+{
+	return arr->n;
+}
+
+int
+state_arr_append(struct state_arr *arr, struct state *s)
+{
+	arr->s = realloc(arr->s, sizeof(struct state_arr) * ++arr->n);
+	assert(arr->s);
+	int loc = arr->n-1;
+	arr->s[loc] = s;
+	return loc;
+}
+
+int
+state_arr_appendwithline(struct state_arr *arr, int linenum, int col, struct state *s)
+{
+	s->linenum = linenum;
+	s->col = col;
+	return state_arr_append(arr, s);
+}
+
+struct state_arr *
+state_arr_getlinestates(struct state_arr *arr, int linenum, int col)
+{
+	struct state_arr *res = state_arr_create();
+	for (int i = 0; i < arr->n; i++) {
+		if (arr->s[i]->linenum == linenum && arr->s[i]->col == col) {
+			state_arr_append(res, state_copy(arr->s[i]));
+		}
+	}
+	return res;
+}
+
+struct state_arr *
+state_arr_copy(struct state_arr *old)
+{
+	struct state_arr *new = state_arr_create();
+	for (int i = 0; i < old->n; i++) {
+		state_arr_append(new, state_copy(old->s[i]));
+	}
+	return new;
+}
+
+struct state_arr *
+state_arr_concat(struct state_arr *s1, struct state_arr *s2)
+{
+	assert(s1 && s2);
+	struct state_arr *new = state_arr_copy(s1);
+	for (int i = 0; i < s2->n; i++) {
+		state_arr_append(new, s2->s[i]);
+	}
+	return new;
 }

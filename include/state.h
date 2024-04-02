@@ -52,6 +52,12 @@ state_getprops(struct state *);
 struct heap *
 state_getheap(struct state *);
 
+int
+state_getlinenum(struct state *);
+
+int
+state_getcol(struct state *);
+
 void
 state_pushframe(struct state *, char *func, struct ast_type *ret_type);
 
@@ -168,5 +174,35 @@ state_blockinstall(struct block *, struct object *);
 
 struct block *
 state_getblock(struct state *, struct location *);
+
+
+/* USED BY HISTORY */
+
+struct state_arr *
+state_arr_create();
+
+void
+state_arr_destroy(struct state_arr *);
+
+struct state **
+state_arr_states(struct state_arr *);
+
+int
+state_arr_n(struct state_arr *);
+
+int
+state_arr_append(struct state_arr *, struct state *);
+
+int
+state_arr_appendwithline(struct state_arr *, int linenum, int col, struct state *);
+
+struct state_arr *
+state_arr_getlinestates(struct state_arr *, int linenum, int col);
+
+struct state_arr *
+state_arr_copy(struct state_arr *old);
+
+struct state_arr *
+state_arr_concat(struct state_arr *s1, struct state_arr *s2);
 
 #endif
