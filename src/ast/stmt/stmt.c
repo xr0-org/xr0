@@ -657,68 +657,6 @@ ast_stmt_getfuncs(struct ast_stmt *stmt)
 	}
 }
 
-static struct ast_stmt_splits
-stmt_sel_splits(struct ast_stmt *stmt, struct state *s);
-
-struct ast_stmt_splits
-ast_stmt_splits(struct ast_stmt *stmt, struct state *s)
-{
-	/* TODO: consider expressions with calls */
-	switch (stmt->kind) {
-	case STMT_NOP:
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
-	case STMT_EXPR:
-		return ast_expr_splits(stmt->u.expr, s);
-	case STMT_SELECTION:
-		return stmt_sel_splits(stmt, s);
-	case STMT_JUMP:
-		if (stmt->u.jump.rv) {
-			return ast_expr_splits(stmt->u.jump.rv, s);
-		}
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
-	case STMT_LABELLED:
-		return ast_stmt_splits(stmt->u.labelled.stmt, s);
-	case STMT_ITERATION:
-	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
-		/* disallowed splits for now */
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
-	default:
-		assert(false);
-	}
-}
-
-static bool
-condexists(struct ast_expr *cond, struct state *);
-
-static struct ast_stmt_splits
-stmt_sel_splits(struct ast_stmt *stmt, struct state *s)
-{
-	struct result *res = ast_expr_pf_reduce(stmt->u.selection.cond, s);
-	struct value *v = result_as_value(res);
-	struct ast_expr *e = value_to_expr(v);
-	if (condexists(e, s) || value_isconstant(v)) {
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL };
-	}
-	/*printf("cond: %s\n", ast_expr_str(r));*/
-	struct ast_expr **cond = malloc(sizeof(struct ast_expr *));
-	cond[0] = e;
-	return (struct ast_stmt_splits) {
-		.n    = 1,
-		.cond = cond,
-	};
-}
-
-static bool
-condexists(struct ast_expr *cond, struct state *s)
-{
-	struct result *res = ast_expr_pf_reduce(cond, s);
-	assert(!result_iserror(res) && result_hasvalue(res));
-	struct ast_expr *reduced = value_to_expr(result_as_value(res));
-	struct props *p = state_getprops(s);
-	return props_get(p, reduced) || props_contradicts(p, reduced);
-}
-
 static struct string_arr *
 ast_stmt_expr_getfuncs(struct ast_stmt *stmt)
 {
@@ -810,10 +748,10 @@ ast_stmt_preconds_validate(struct ast_stmt *stmt)
 static struct error *
 preconds_selection_verify(struct ast_stmt *stmt)
 {
-	struct strbuilder *b = strbuilder_create();
 	struct lexememarker *l = ast_stmt_lexememarker(stmt);
-	strbuilder_printf(b, "%s setup preconditions must be decidable", lexememarker_str(l));
-	return error_create(strbuilder_build(b));
+	return error_printf(
+		"%s setup preconditions must be decidable", lexememarker_str(l)
+	);
 }
 
 static struct error *

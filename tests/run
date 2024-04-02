@@ -42,10 +42,9 @@ do
 	if [[ "$f" == *"${fail_prefix}"* || "$folder" == *"$topological_folder"* ]]
 	then
 		expected_file="${f}.${expected_suffix}"
-		expected_output=$(cat $expected_file)
 		
-		# check if output matches expected_output
-		if [[ "${output}" == "$expected_output" ]]
+		echo "$output" | diff - $expected_file
+		if [[ $? -eq 0 ]]
 		then
 			npass=$((npass+1))
 			printf "$pass"

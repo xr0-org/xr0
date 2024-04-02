@@ -30,15 +30,6 @@ ast_stmt_getfuncs(struct ast_stmt *stmt);
 
 struct error;
 
-struct ast_stmt_splits {
-	int n;
-	struct ast_expr **cond;
-	struct error *err;
-};
-
-struct ast_stmt_splits
-ast_stmt_splits(struct ast_stmt *, struct state *);
-
 struct state;
 
 /* TODO: change to more regular tuple */

@@ -24,7 +24,7 @@ parse(char *input) ~ [
 
 void
 lexer_destroy(struct lexer *l) ~ [
-	pre: {
+	setup: {
 		l = lexer_create(
 			$, $,
 			$, malloc(1),
@@ -38,7 +38,7 @@ lexer_destroy(struct lexer *l) ~ [
 
 void
 lexer_print(struct lexer *l) ~ [
-	pre: {
+	setup: {
 		l = lexer_create(
 			.clump(1), .clump(1),
 			$, .malloc(1),
@@ -86,7 +86,7 @@ struct pattern {
 
 void
 pattern_print(struct pattern *p) ~ [
-	pre: p = pattern_create("", "");
+	setup: p = pattern_create("", "");
 ];
 
 struct token {
@@ -96,7 +96,7 @@ struct token {
 
 void
 token_print(struct token *t) ~ [
-	pre: t = token_create(0, "", "");
+	setup: t = token_create(0, "", "");
 ];
 
 struct lexer {
@@ -142,7 +142,7 @@ lexer_print(struct lexer *l)
 {
 	int i;
 
-	puts("\tpre:");
+	puts("\pre:");
 	puts(l->pre);
 
 	puts("\tpost:");

@@ -217,7 +217,7 @@ struct result *
 ast_expr_eval(struct ast_expr *, struct state *);
 
 struct result *
-ast_expr_absexec(struct ast_expr *, struct state *);
+ast_expr_abseval(struct ast_expr *, struct state *);
 
 /* ast_expr_pf_reduce: Reduce an expression to "parameter form", in which its
  * only primitives are constants and parameters (vconsts). */
@@ -409,8 +409,8 @@ ast_stmt_verify(struct ast_stmt *, struct state *);
 struct error *
 ast_stmt_exec(struct ast_stmt *, struct state *);
 
-struct result *
-ast_stmt_absexec(struct ast_stmt *stmt, struct state *, bool iscall);
+struct error *
+ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *, bool iscall);
 
 struct error *
 ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *);

@@ -32,40 +32,6 @@ void
 map_set(struct map *, const char *key, const void *value);
 
 
-struct strbuilder;
-
-struct strbuilder *
-strbuilder_create();
-
-int
-strbuilder_printf(struct strbuilder *b, const char *fmt, ...);
-
-int
-strbuilder_vprintf(struct strbuilder *b, const char *fmt, va_list ap);
-
-void
-strbuilder_putc(struct strbuilder *b, char c);
-
-int
-strbuilder_puts(struct strbuilder *b, char *s);
-
-char *
-strbuilder_build(struct strbuilder *b);
-
-char *
-strbuilder_preview(struct strbuilder *b);
-
-struct error {
-	char *msg;
-	struct error *inner;
-};
-
-struct error *
-error_create(char *s);
-
-struct error *
-error_prepend(struct error *, char *msg);
-
 /* XXX: string_arr: to be macro */
 
 struct string_arr {
@@ -100,8 +66,53 @@ string_arr_contains(struct string_arr *, char *s);
 char *
 string_arr_str(struct string_arr *);
 
+
+struct strbuilder;
+
+struct strbuilder *
+strbuilder_create();
+
+int
+strbuilder_printf(struct strbuilder *b, const char *fmt, ...);
+
+int
+strbuilder_vprintf(struct strbuilder *b, const char *fmt, va_list ap);
+
+void
+strbuilder_putc(struct strbuilder *b, char c);
+
+int
+strbuilder_puts(struct strbuilder *b, char *s);
+
+char *
+strbuilder_build(struct strbuilder *b);
+
+char *
+strbuilder_preview(struct strbuilder *b);
+
+
 /* v_printf: Print if Xr0 is in verbose mode. */
 int
 v_printf(char *fmt, ...);
+
+
+struct error;
+
+struct error *
+error_printf(char *fmt, ...);
+
+struct ast_expr;
+
+struct error *
+error_undecideable_cond(struct ast_expr *cond);
+
+struct error *
+error_to_undecideable_cond(struct error *);
+
+struct ast_expr *
+error_get_undecideable_cond(struct error *);
+
+char *
+error_str(struct error *);
 
 #endif

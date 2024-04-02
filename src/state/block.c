@@ -223,12 +223,12 @@ block_range_dealloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
 
 	int lw_index = object_arr_index(b->arr, lw, s);
 	if (lw_index == -1) {
-		return error_create("lower bound not allocated");
+		return error_printf("lower bound not allocated");
 	}
 
 	int up_index = object_arr_index_upperincl(b->arr, up, s);
 	if (up_index == -1) {
-		return error_create("upper bound not allocated");
+		return error_printf("upper bound not allocated");
 	}
 
 	int n = object_arr_nobjects(b->arr);

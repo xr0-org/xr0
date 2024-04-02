@@ -127,7 +127,9 @@ state_str(struct state *state)
 	}
 	free(clump);
 	char *stack = stack_str(state->stack, state);
-	strbuilder_printf(b, "%s\n", stack);
+	if (strlen(stack) > 0) {
+		strbuilder_printf(b, "%s\n", stack);
+	}
 	free(stack);
 	char *props = props_str(state->props, "\t");
 	if (strlen(props) > 0) {
@@ -286,9 +288,14 @@ state_get(struct state *state, struct location *loc, bool constructive)
 		return (struct object_res) { .obj = NULL, .err = res.err };
 	}
 	if (!res.b) {
-		assert(location_type(loc) == LOCATION_DYNAMIC ||
-			location_type(loc) == LOCATION_DEREFERENCABLE);
-		return (struct object_res) { .obj = NULL, .err = NULL };
+		switch (location_type(loc)) {
+		case LOCATION_DYNAMIC:
+		case LOCATION_DEREFERENCABLE:
+		case LOCATION_STATIC:
+			return (struct object_res) { .obj = NULL, .err = NULL };
+		default:
+			assert(false);
+		}
 	}
 	struct object *obj = block_observe(res.b, location_offset(loc), state, constructive);
 	return (struct object_res) { .obj = obj, .err = NULL };
@@ -312,7 +319,7 @@ state_getblock(struct state *state, struct location *loc)
 	return res.b;
 }
 
-struct object *
+struct object_res
 state_getresult(struct state *state)
 {
 	struct variable *v = stack_getresult(state->stack);
@@ -322,7 +329,7 @@ state_getresult(struct state *state)
 	if (res.err) {
 		assert(false);
 	}
-	return res.obj;
+	return res;
 }
 
 static struct ast_type *
@@ -356,7 +363,7 @@ state_getloc(struct state *state, char *id)
 	return value_ptr_create(variable_location(v));
 }
 
-struct object *
+struct object_res
 state_getobject(struct state *state, char *id)
 {
 	if (strcmp(id, KEYWORD_RETURN) == 0) {
@@ -365,14 +372,12 @@ state_getobject(struct state *state, char *id)
 
 	struct variable *v = stack_getvariable(state->stack, id);
 	if (!v) {
-		assert(false);
+		return (struct object_res) {
+			.err = error_printf("unknown variable `%s'", id)
+		};
 	}
 
-	struct object_res res = state_get(state, variable_location(v), true);
-	if (res.err) {
-		assert(false);
-	}
-	return res.obj;
+	return state_get(state, variable_location(v), true);
 }
 
 struct object_res
@@ -388,9 +393,12 @@ state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
 	struct location *deref = location_with_offset(deref_base, index);
 	struct object_res res = state_get(state, deref, true);
 	if (res.err) {
-		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "undefined indirection: %s", res.err->msg);
-		return (struct object_res) { .obj = NULL, .err = error_create(strbuilder_build(b))};
+		return (struct object_res) {
+			.obj = NULL,
+			.err = error_printf(
+				"undefined indirection: %s", error_str(res.err)
+			)
+		};
 	}
 	/*location_destroy(deref);*/
 	return res;
@@ -403,7 +411,7 @@ state_range_alloc(struct state *state, struct object *obj,
 	/* loc corresponds to, say, `arr`, so we dereference */
 	struct value *arr_val = object_as_value(obj);
 	if (!arr_val) {
-		return error_create("no value");
+		return error_printf("no value");
 	}
 
 	/* assume pointer */
@@ -416,7 +424,7 @@ state_range_alloc(struct state *state, struct object *obj,
 		assert(false);
 	}
 	if (!res.b) {
-		return error_create("no block");
+		return error_printf("no block");
 	}
 
 	/* TODO: prevent creation of virtual block for empty ranges */ 
@@ -436,7 +444,7 @@ struct error *
 state_dealloc(struct state *state, struct value *val)
 {
 	if (!value_islocation(val)) {
-		return error_create("undefined free of value not pointing at heap");
+		return error_printf("undefined free of value not pointing at heap");
 	}
 	return location_dealloc(value_as_location(val), state->heap);
 }
@@ -448,7 +456,7 @@ state_range_dealloc(struct state *state, struct object *obj,
 	/* obj corresponds to, say, `arr`, so we dereference */
 	struct value *arr_val = object_as_value(obj);
 	if (!arr_val) {
-		return error_create("no value");
+		return error_printf("no value");
 	}
 	struct location *deref = value_as_location(arr_val);
 	return location_range_dealloc(deref, lw, up, state);

@@ -1,1 +1,2 @@
-6-preconditions/100-FAIL-need-alloced-lval.x:15:10:main: cannot exec statement: parameter x of func must be heap allocated
+6-preconditions/100-FAIL-need-alloced-lval.x:15:10:main: `func' precondition failure
+	parameter `x' of `func' must be heap allocated

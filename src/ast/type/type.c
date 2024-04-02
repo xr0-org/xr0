@@ -61,7 +61,7 @@ struct ast_type *
 ast_type_create_voidptr()
 {
 	struct ast_type *t = ast_type_create(TYPE_POINTER, 0);
-	t->ptr_type = TYPE_VOID;
+	t->ptr_type = ast_type_create(TYPE_VOID, 0);
 	return t;
 }
 

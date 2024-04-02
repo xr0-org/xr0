@@ -318,6 +318,9 @@ lex_finish()
 	map_destroy(table);
 }
 
+static char *
+strip_iflibx(char *filename);
+
 struct lexememarker *
 lexememarker_create(int linenum, int column, char *filename,
 		enum linemarker_flag flags)
@@ -325,9 +328,25 @@ lexememarker_create(int linenum, int column, char *filename,
 	struct lexememarker *loc = malloc(sizeof(struct lexememarker));
 	loc->linenum = linenum;
 	loc->column = column;
-	loc->filename = filename;
+	loc->filename = strip_iflibx(filename);
 	loc->flags = flags;
 	return loc;
+}
+
+static char *
+strip_iflibx(char *filename)
+{
+	int includes_len = strlen(XR0_INCLUDES_SEGMENT);
+
+	char *libx_start = strstr(filename, XR0_INCLUDES_SEGMENT);
+	if (!libx_start) {
+		return filename;
+	}
+	int len = (strlen(libx_start) - includes_len) + 1;
+	char *s = malloc(sizeof(char) * len);
+	strcpy(s, libx_start + includes_len);
+	free(filename);
+	return s;
 }
 
 struct lexememarker *

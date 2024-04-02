@@ -1,6 +1,8 @@
 #ifndef XR0_LEX_H
 #define XR0_LEX_H
 
+#define XR0_INCLUDES_SEGMENT "libx/"
+
 struct lexememarker {
 	int linenum, column;
 	char *filename;

@@ -61,10 +61,10 @@ state_popframe(struct state *);
 void
 state_declare(struct state *, struct ast_variable *var, bool isparam);
 
-struct object *
+struct object_res
 state_getresult(struct state *);
 
-struct object *
+struct object_res
 state_getobject(struct state *, char *id);
 
 struct ast_type *

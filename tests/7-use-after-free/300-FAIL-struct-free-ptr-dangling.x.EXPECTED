@@ -1,1 +1,2 @@
-7-use-after-free/300-FAIL-struct-free-ptr-dangling.x:45:18:create_report: cannot exec statement: parameter s of puts must be lvalue
+7-use-after-free/300-FAIL-struct-free-ptr-dangling.x:45:18:create_report: `puts' precondition failure
+	parameter `s' of `puts' must be lvalue
