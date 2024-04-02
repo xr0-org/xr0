@@ -416,6 +416,12 @@ ast_expr_unary_isdereference(struct ast_expr *expr)
 	return ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE;
 }
 
+bool
+ast_expr_isnot(struct ast_expr *expr)
+{
+	return ast_expr_kind(expr) == EXPR_UNARY &&
+		ast_expr_unary_op(expr) == UNARY_OP_BANG;
+}
 
 static void
 ast_expr_unary_str_build(struct ast_expr *expr, struct strbuilder *b)

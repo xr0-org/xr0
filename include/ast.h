@@ -87,6 +87,9 @@ ast_expr_unary_op(struct ast_expr *);
 bool
 ast_expr_unary_isdereference(struct ast_expr *);
 
+bool
+ast_expr_isnot(struct ast_expr *);
+
 struct ast_expr *
 ast_expr_unary_operand(struct ast_expr *);
 
