@@ -1,11 +1,13 @@
 int
 snapshot_and_change(int *arg) ~ [
+	int j;
 	setup: {
 		arg = .clump(sizeof(int));
 		*arg = $;
 	}
-	return *arg;
+	j = *arg;
 	*arg = 3;
+	return j;
 ] {
 	int j;
 	j = *arg;

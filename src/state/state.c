@@ -29,7 +29,8 @@ struct state {
 };
 
 struct state *
-state_create(char *func, struct externals *ext, struct ast_type *result_type)
+state_create(char *name, struct ast_block *block, struct ast_type *ret_type,
+		bool abstract, struct externals *ext)
 {
 	struct state *state = malloc(sizeof(struct state));
 	assert(state);
@@ -37,24 +38,18 @@ state_create(char *func, struct externals *ext, struct ast_type *result_type)
 	state->static_memory = static_memory_create();
 	state->vconst = vconst_create();
 	state->clump = clump_create();
-	state->stack = stack_create(func, NULL, result_type);
+	state->stack = stack_create(name, block, ret_type, abstract, NULL);
 	state->heap = heap_create();
 	state->props = props_create();
 	return state;
 }
 
 struct state *
-state_create_withprops(char *func, struct externals *ext, struct ast_type *result_type,
+state_create_withprops(char *name, struct ast_block *block,
+		struct ast_type *ret_type, bool abstract, struct externals *ext,
 		struct props *props)
 {
-	struct state *state = malloc(sizeof(struct state));
-	assert(state);
-	state->ext = ext;
-	state->static_memory = static_memory_create();
-	state->vconst = vconst_create();
-	state->clump = clump_create();
-	state->stack = stack_create(func, NULL, result_type);
-	state->heap = heap_create();
+	struct state *state = state_create(name, block, ret_type, abstract, ext);
 	state->props = props_copy(props);
 	return state;
 }
@@ -89,15 +84,8 @@ state_copy(struct state *state)
 struct state *
 state_copywithname(struct state *state, char *func_name)
 {
-	struct state *copy = malloc(sizeof(struct state));
-	assert(copy);
-	copy->ext = state->ext;
-	copy->static_memory = static_memory_copy(state->static_memory);
-	copy->vconst = vconst_copy(state->vconst);
-	copy->clump = clump_copy(state->clump);
+	struct state *copy = state_copy(state);
 	copy->stack = stack_copywithname(state->stack, func_name);
-	copy->heap = heap_copy(state->heap);
-	copy->props = props_copy(state->props);
 	return copy;
 }
 
@@ -145,6 +133,19 @@ state_str(struct state *state)
 	return strbuilder_build(b);
 }
 
+bool
+state_atend(struct state *s)
+{
+	return stack_atend(s->stack);
+}
+
+struct error *
+state_step(struct state *s)
+{
+	return stack_step(s->stack, s);
+}
+
+
 struct externals *
 state_getext(struct state *s)
 {
@@ -164,9 +165,10 @@ state_getprops(struct state *s)
 }
 
 void
-state_pushframe(struct state *state, char *func, struct ast_type *ret_type)
+state_pushframe(struct state *state, char *name, struct ast_block *b,
+		struct ast_type *t, bool abstract)
 {
-	state->stack = stack_create(func, state->stack, ret_type);
+	state->stack = stack_create(name, b, t, abstract, state->stack);
 }
 
 void
@@ -552,8 +554,8 @@ state_equal(struct state *s1, struct state *s2)
 	     *str2 = state_str(s2_c);
 	bool equal = strcmp(str1, str2) == 0;
 	if (!equal) {
-		v_printf("actual: %s", str1);
 		v_printf("abstract: %s", str2);
+		v_printf("actual: %s", str1);
 	}
 	free(str2);
 	free(str1);

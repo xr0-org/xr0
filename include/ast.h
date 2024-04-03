@@ -551,6 +551,9 @@ ast_function_destroy(struct ast_function *);
 char *
 ast_function_str(struct ast_function *f);
 
+void
+ast_function_setname(struct ast_function *f, char *name);
+
 char *
 ast_function_name(struct ast_function *f);
 
@@ -594,6 +597,9 @@ struct error *
 ast_function_verify(struct ast_function *, struct externals *);
 
 struct result;
+
+struct error *
+ast_function_setupabsexec(struct ast_function *f, struct state *state);
 
 struct result *
 ast_function_absexec(struct ast_function *, struct state *state);

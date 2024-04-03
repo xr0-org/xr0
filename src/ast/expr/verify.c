@@ -706,7 +706,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
-	struct ast_type *rtype = ast_function_type(f);
 
 	int nargs = ast_expr_call_nargs(expr);
 	if (nargs != nparams) {
@@ -724,7 +723,13 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		state
 	);
 
-	state_pushframe(state, dynamic_str(name), rtype);
+	state_pushframe(
+		state,
+		ast_function_name(f),
+		ast_function_abstract(f),
+		ast_function_type(f),
+		true
+	);
 	if ((err = prepare_parameters(nparams, params, args, name, state))) {
 		return result_error_create(err);
 	}
@@ -798,9 +803,11 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 
 	char *fname = ast_function_name(f);
 	struct state *param_state = state_create(
-		dynamic_str(fname),
-		state_getext(arg_state),
-		ast_function_type(f)
+		fname,
+		ast_function_abstract(f),
+		ast_function_type(f),
+		true,
+		state_getext(arg_state)
 	);
 	if ((err = ast_function_initparams(f, param_state))) {
 		return err;
