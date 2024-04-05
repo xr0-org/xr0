@@ -5,9 +5,10 @@
     non_snake_case,
     non_upper_case_globals,
     unused_assignments,
-    unused_mut
+    unused_mut,
+    unused_variables
 )]
-#![feature(extern_types, linkage)]
+#![feature(c_variadic, extern_types, linkage)]
 
 mod ast;
 mod ext;
@@ -18,45 +19,41 @@ mod state;
 mod util;
 mod value;
 
+use crate::ast::{
+    ast_block, ast_externdecl, ast_function, ast_type, ast_variable, ast_variable_arr, AstExpr,
+};
+use crate::ext::Externals;
+use crate::math::{MathAtom, MathExpr};
+use crate::object::{object_arr, Object, Range};
+use crate::props::Props;
+use crate::state::block::{block_arr, Block};
+use crate::state::clump::Clump;
+use crate::state::heap::{vconst, Heap};
+use crate::state::location::Location;
+use crate::state::r#static::static_memory;
+use crate::state::stack::{Stack, Variable};
+use crate::state::State;
+use crate::util::StrBuilder;
+use crate::value::Value;
+
+// NOTE: libc::isspace may be slower than the inlined definition i deleted
+use libc::isspace;
+
+use libc::{
+    exit, fgetc, fgets, fprintf, fputs, free, fseek, getenv, malloc, pclose, popen, rewind,
+    snprintf, tmpfile,
+};
+
 extern "C" {
-    pub type __sFILEX;
-    pub type ast_block;
-    pub type ast_function;
-    pub type ast_externdecl;
-    pub type strbuilder;
-    pub type externals;
-    static mut __stderrp: *mut FILE;
-    fn fclose(_: *mut FILE) -> libc::c_int;
-    fn fgetc(_: *mut FILE) -> libc::c_int;
-    fn fgets(_: *mut libc::c_char, _: libc::c_int, _: *mut FILE) -> *mut libc::c_char;
-    fn fopen(_: *const libc::c_char, _: *const libc::c_char) -> *mut FILE;
-    fn fprintf(_: *mut FILE, _: *const libc::c_char, _: ...) -> libc::c_int;
-    fn fputc(_: libc::c_int, _: *mut FILE) -> libc::c_int;
-    fn fputs(_: *const libc::c_char, _: *mut FILE) -> libc::c_int;
-    fn fseek(_: *mut FILE, _: libc::c_long, _: libc::c_int) -> libc::c_int;
-    fn ftell(_: *mut FILE) -> libc::c_long;
-    fn rewind(_: *mut FILE);
-    fn tmpfile() -> *mut FILE;
-    fn pclose(_: *mut FILE) -> libc::c_int;
-    fn popen(_: *const libc::c_char, _: *const libc::c_char) -> *mut FILE;
-    fn snprintf(
-        _: *mut libc::c_char,
-        _: libc::c_ulong,
-        _: *const libc::c_char,
-        _: ...
-    ) -> libc::c_int;
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
-    fn exit(_: libc::c_int) -> !;
-    fn getenv(_: *const libc::c_char) -> *mut libc::c_char;
+    static mut __stderrp: *mut libc::FILE;
+
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn __maskrune(_: __darwin_ct_rune_t, _: libc::c_ulong) -> libc::c_int;
-    static mut _DefaultRuneLocale: _RuneLocale;
+
     fn strcmp(_: *const libc::c_char, _: *const libc::c_char) -> libc::c_int;
     fn strlen(_: *const libc::c_char) -> libc::c_ulong;
     fn getopt(_: libc::c_int, _: *const *mut libc::c_char, _: *const libc::c_char) -> libc::c_int;
@@ -69,130 +66,38 @@ extern "C" {
     fn ast_function_isproto(f: *mut ast_function) -> bool;
     fn ast_function_absisempty(f: *mut ast_function) -> bool;
     fn ast_function_abstract(f: *mut ast_function) -> *mut ast_block;
-    fn ast_function_verify(_: *mut ast_function, _: *mut externals) -> *mut error;
+    fn ast_function_verify(_: *mut ast_function, _: *mut Externals) -> *mut error;
     fn ast_functiondecl_create(_: *mut ast_function) -> *mut ast_externdecl;
     fn ast_externdecl_isfunction(_: *mut ast_externdecl) -> bool;
     fn ast_externdecl_as_function(_: *mut ast_externdecl) -> *mut ast_function;
-    fn ast_externdecl_install(decl: *mut ast_externdecl, ext: *mut externals);
+    fn ast_externdecl_install(decl: *mut ast_externdecl, ext: *mut Externals);
     fn v_printf(fmt: *mut libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_create() -> *mut strbuilder;
-    fn strbuilder_printf(b: *mut strbuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_build(b: *mut strbuilder) -> *mut libc::c_char;
+    fn strbuilder_create() -> *mut StrBuilder;
+    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
+    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
     fn string_arr_create() -> *mut string_arr;
     fn string_arr_s(_: *mut string_arr) -> *mut *mut libc::c_char;
     fn string_arr_n(_: *mut string_arr) -> libc::c_int;
     fn string_arr_append(_: *mut string_arr, _: *mut libc::c_char) -> libc::c_int;
     fn string_arr_str(_: *mut string_arr) -> *mut libc::c_char;
-    fn ast_destroy(_: *mut ast);
-    fn ast_topological_order(fname: *mut libc::c_char, ext: *mut externals) -> *mut string_arr;
-    fn ast_protostitch(_: *mut ast_function, _: *mut externals) -> *mut ast_function;
+    fn ast_destroy(_: *mut Ast);
+    fn ast_topological_order(fname: *mut libc::c_char, ext: *mut Externals) -> *mut string_arr;
+    fn ast_protostitch(_: *mut ast_function, _: *mut Externals) -> *mut ast_function;
     fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
     fn lex_begin();
     fn lex_finish();
     fn yylex_destroy() -> libc::c_int;
-    fn externals_create() -> *mut externals;
-    fn externals_destroy(_: *mut externals);
-    fn externals_getfunc(_: *mut externals, id: *mut libc::c_char) -> *mut ast_function;
+    fn externals_create() -> *mut Externals;
+    fn externals_destroy(_: *mut Externals);
+    fn externals_getfunc(_: *mut Externals, id: *mut libc::c_char) -> *mut ast_function;
     fn yyparse() -> libc::c_int;
 }
 pub type __uint32_t = libc::c_uint;
 pub type __int64_t = libc::c_longlong;
-pub type __darwin_ct_rune_t = libc::c_int;
-pub type __darwin_size_t = libc::c_ulong;
-pub type __darwin_wchar_t = libc::c_int;
-pub type __darwin_rune_t = __darwin_wchar_t;
-pub type __darwin_off_t = __int64_t;
-pub type fpos_t = __darwin_off_t;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct __sbuf {
-    pub _base: *mut libc::c_uchar,
-    pub _size: libc::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __sFILE {
-    pub _p: *mut libc::c_uchar,
-    pub _r: libc::c_int,
-    pub _w: libc::c_int,
-    pub _flags: libc::c_short,
-    pub _file: libc::c_short,
-    pub _bf: __sbuf,
-    pub _lbfsize: libc::c_int,
-    pub _cookie: *mut libc::c_void,
-    pub _close: Option<unsafe extern "C" fn(*mut libc::c_void) -> libc::c_int>,
-    pub _read: Option<
-        unsafe extern "C" fn(*mut libc::c_void, *mut libc::c_char, libc::c_int) -> libc::c_int,
-    >,
-    pub _seek: Option<unsafe extern "C" fn(*mut libc::c_void, fpos_t, libc::c_int) -> fpos_t>,
-    pub _write: Option<
-        unsafe extern "C" fn(*mut libc::c_void, *const libc::c_char, libc::c_int) -> libc::c_int,
-    >,
-    pub _ub: __sbuf,
-    pub _extra: *mut __sFILEX,
-    pub _ur: libc::c_int,
-    pub _ubuf: [libc::c_uchar; 3],
-    pub _nbuf: [libc::c_uchar; 1],
-    pub _lb: __sbuf,
-    pub _blksize: libc::c_int,
-    pub _offset: fpos_t,
-}
-pub type FILE = __sFILE;
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct _RuneEntry {
-    pub __min: __darwin_rune_t,
-    pub __max: __darwin_rune_t,
-    pub __map: __darwin_rune_t,
-    pub __types: *mut __uint32_t,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct _RuneRange {
-    pub __nranges: libc::c_int,
-    pub __ranges: *mut _RuneEntry,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct _RuneCharClass {
-    pub __name: [libc::c_char; 14],
-    pub __mask: __uint32_t,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct _RuneLocale {
-    pub __magic: [libc::c_char; 8],
-    pub __encoding: [libc::c_char; 32],
-    pub __sgetrune: Option<
-        unsafe extern "C" fn(
-            *const libc::c_char,
-            __darwin_size_t,
-            *mut *const libc::c_char,
-        ) -> __darwin_rune_t,
-    >,
-    pub __sputrune: Option<
-        unsafe extern "C" fn(
-            __darwin_rune_t,
-            *mut libc::c_char,
-            __darwin_size_t,
-            *mut *mut libc::c_char,
-        ) -> libc::c_int,
-    >,
-    pub __invalid_rune: __darwin_rune_t,
-    pub __runetype: [__uint32_t; 256],
-    pub __maplower: [__darwin_rune_t; 256],
-    pub __mapupper: [__darwin_rune_t; 256],
-    pub __runetype_ext: _RuneRange,
-    pub __maplower_ext: _RuneRange,
-    pub __mapupper_ext: _RuneRange,
-    pub __variable: *mut libc::c_void,
-    pub __variable_len: libc::c_int,
-    pub __ncharclasses: libc::c_int,
-    pub __charclasses: *mut _RuneCharClass,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ast {
+pub struct Ast {
     pub n: libc::c_int,
     pub decl: *mut *mut ast_externdecl,
 }
@@ -236,20 +141,7 @@ pub struct sortconfig {
 unsafe extern "C" fn isascii(mut _c: libc::c_int) -> libc::c_int {
     return (_c & !(0x7f as libc::c_int) == 0 as libc::c_int) as libc::c_int;
 }
-#[inline]
-unsafe extern "C" fn __istype(mut _c: __darwin_ct_rune_t, mut _f: libc::c_ulong) -> libc::c_int {
-    return if isascii(_c) != 0 {
-        (_DefaultRuneLocale.__runetype[_c as usize] as libc::c_ulong & _f != 0) as libc::c_int
-    } else {
-        (__maskrune(_c, _f) != 0) as libc::c_int
-    };
-}
-#[no_mangle]
-#[inline]
-#[linkage = "external"]
-pub unsafe extern "C" fn isspace(mut _c: libc::c_int) -> libc::c_int {
-    return __istype(_c, 0x4000 as libc::c_long as libc::c_ulong);
-}
+
 #[no_mangle]
 pub unsafe extern "C" fn parse_config(
     mut argc: libc::c_int,
@@ -383,7 +275,7 @@ unsafe extern "C" fn default_includes() -> *mut string_arr {
 }
 #[no_mangle]
 pub unsafe extern "C" fn genincludes(mut includedirs: *mut string_arr) -> *mut libc::c_char {
-    let mut b: *mut strbuilder = strbuilder_create();
+    let mut b: *mut StrBuilder = strbuilder_create();
     let mut s: *mut *mut libc::c_char = string_arr_s(includedirs);
     let mut n: libc::c_int = string_arr_n(includedirs);
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -394,10 +286,10 @@ pub unsafe extern "C" fn genincludes(mut includedirs: *mut string_arr) -> *mut l
             *s.offset(i as isize),
         );
         i += 1;
-        i;
     }
     return strbuilder_build(b);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn preprocesscmd_fmt(
     mut includedirs: *mut string_arr,
@@ -410,26 +302,26 @@ pub unsafe extern "C" fn preprocesscmd_fmt(
             .wrapping_add(strlen(includes))
             .wrapping_add(strlen(infile))
             .wrapping_add(1 as libc::c_int as libc::c_ulong) as libc::c_int;
-    let mut s: *mut libc::c_char = malloc(
-        (::core::mem::size_of::<libc::c_char>() as libc::c_ulong)
-            .wrapping_mul(len as libc::c_ulong),
-    ) as *mut libc::c_char;
+    let mut s: *mut libc::c_char =
+        malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len as usize))
+            as *mut libc::c_char;
     snprintf(
         s,
-        len as libc::c_ulong,
+        len as usize,
         b"cc %s -nostdinc -E -xc %s\0" as *const u8 as *const libc::c_char,
         includes,
         infile,
     );
     return s;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn open_preprocessor(
     mut infile: *mut libc::c_char,
     mut includedirs: *mut string_arr,
-) -> *mut FILE {
+) -> *mut libc::FILE {
     let mut cmd: *mut libc::c_char = preprocesscmd_fmt(includedirs, infile);
-    let mut pipe: *mut FILE = popen(cmd, b"r\0" as *const u8 as *const libc::c_char);
+    let mut pipe: *mut libc::FILE = popen(cmd, b"r\0" as *const u8 as *const libc::c_char);
     free(cmd as *mut libc::c_void);
     return pipe;
 }
@@ -437,8 +329,8 @@ pub unsafe extern "C" fn open_preprocessor(
 pub unsafe extern "C" fn preprocess(
     mut infile: *mut libc::c_char,
     mut includedirs: *mut string_arr,
-) -> *mut FILE {
-    let mut pipe: *mut FILE = open_preprocessor(infile, includedirs);
+) -> *mut libc::FILE {
+    let mut pipe: *mut libc::FILE = open_preprocessor(infile, includedirs);
     if pipe.is_null() {
         fprintf(
             __stderrp,
@@ -446,7 +338,7 @@ pub unsafe extern "C" fn preprocess(
         );
         exit(1 as libc::c_int);
     }
-    let mut tmp: *mut FILE = tmpfile();
+    let mut tmp: *mut libc::FILE = tmpfile();
     if tmp.is_null() {
         fprintf(
             __stderrp,
@@ -469,9 +361,9 @@ pub unsafe extern "C" fn preprocess(
     return tmp;
 }
 #[no_mangle]
-pub static mut root: *mut ast = 0 as *const ast as *mut ast;
+pub static mut root: *mut Ast = 0 as *const Ast as *mut Ast;
 #[no_mangle]
-pub unsafe extern "C" fn pass0(mut root_0: *mut ast, mut ext: *mut externals) {
+pub unsafe extern "C" fn pass0(mut root_0: *mut Ast, mut ext: *mut Externals) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*root_0).n {
         let mut decl: *mut ast_externdecl = *((*root_0).decl).offset(i as isize);
@@ -492,11 +384,10 @@ pub unsafe extern "C" fn pass0(mut root_0: *mut ast, mut ext: *mut externals) {
             }
         }
         i += 1;
-        i;
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn pass1(mut root_0: *mut ast, mut ext: *mut externals) {
+pub unsafe extern "C" fn pass1(mut root_0: *mut Ast, mut ext: *mut Externals) {
     let mut err: *mut error = 0 as *mut error;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*root_0).n {
@@ -532,11 +423,10 @@ pub unsafe extern "C" fn pass1(mut root_0: *mut ast, mut ext: *mut externals) {
             }
         }
         i += 1;
-        i;
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn pass_inorder(mut order: *mut string_arr, mut ext: *mut externals) {
+pub unsafe extern "C" fn pass_inorder(mut order: *mut string_arr, mut ext: *mut Externals) {
     let mut err: *mut error = 0 as *mut error;
     let mut n: libc::c_int = string_arr_n(order);
     let mut name: *mut *mut libc::c_char = string_arr_s(order);
@@ -572,7 +462,6 @@ pub unsafe extern "C" fn pass_inorder(mut order: *mut string_arr, mut ext: *mut 
             );
         }
         i += 1;
-        i;
     }
 }
 unsafe extern "C" fn verifyproto(
@@ -594,12 +483,10 @@ unsafe extern "C" fn verifyproto(
                 if strcmp(pname, ast_function_name(d)) == 0 as libc::c_int {
                     def = d;
                     count += 1;
-                    count;
                 }
             }
         }
         i += 1;
-        i;
     }
     if count == 1 as libc::c_int {
         if proto_defisvalid(proto, def) {
@@ -674,14 +561,14 @@ unsafe fn main_0(mut argc: libc::c_int, mut argv: *mut *mut libc::c_char) -> lib
 }
 unsafe extern "C" fn verify(mut c: *mut config) -> libc::c_int {
     extern "C" {
-        static mut yyin: *mut FILE;
+        static mut yyin: *mut libc::FILE;
     }
     yyin = preprocess((*c).infile, (*c).includedirs);
     lex_begin();
     yyparse();
     yylex_destroy();
     lex_finish();
-    let mut ext: *mut externals = externals_create();
+    let mut ext: *mut Externals = externals_create();
     pass0(root, ext);
     let mut order: *mut string_arr = 0 as *mut string_arr;
     match (*c).sortmode as libc::c_uint {
@@ -722,11 +609,11 @@ unsafe extern "C" fn verify(mut c: *mut config) -> libc::c_int {
     return 0 as libc::c_int;
 }
 unsafe extern "C" fn strip(mut config: *mut config) -> libc::c_int {
-    let mut in_0: *mut FILE = fopen(
+    let mut in_0: *mut libc::FILE = libc::fopen(
         (*config).infile,
         b"rb\0" as *const u8 as *const libc::c_char,
     );
-    let mut out: *mut FILE = fopen(
+    let mut out: *mut libc::FILE = libc::fopen(
         (*config).outfile,
         b"w\0" as *const u8 as *const libc::c_char,
     );
@@ -739,19 +626,19 @@ unsafe extern "C" fn strip(mut config: *mut config) -> libc::c_int {
         if isvblock(c, in_0) {
             skipvblock(in_0);
         } else {
-            fputc(c as libc::c_int, out);
+            libc::fputc(c as libc::c_int, out);
         }
     }
-    fclose(in_0);
-    fclose(out);
+    libc::fclose(in_0);
+    libc::fclose(out);
     return 0 as libc::c_int;
 }
 #[no_mangle]
-pub unsafe extern "C" fn isvblock(mut c: libc::c_char, mut f: *mut FILE) -> bool {
+pub unsafe extern "C" fn isvblock(mut c: libc::c_char, mut f: *mut libc::FILE) -> bool {
     if c as libc::c_int != '~' as i32 {
         return 0 as libc::c_int != 0;
     }
-    let mut pos: libc::c_long = ftell(f);
+    let mut pos: libc::c_long = libc::ftell(f);
     c = fgetc(f) as libc::c_char;
     while isspace(c as libc::c_int) != 0 {
         c = fgetc(f) as libc::c_char;
@@ -768,8 +655,9 @@ pub unsafe extern "C" fn isvblock(mut c: libc::c_char, mut f: *mut FILE) -> bool
         }
     };
 }
+
 #[no_mangle]
-pub unsafe extern "C" fn skipvblock(mut f: *mut FILE) {
+pub unsafe extern "C" fn skipvblock(mut f: *mut libc::FILE) {
     let mut c: libc::c_char = 0;
     let mut count: libc::c_int = 0 as libc::c_int;
     loop {
@@ -780,16 +668,15 @@ pub unsafe extern "C" fn skipvblock(mut f: *mut FILE) {
         match c as libc::c_int {
             91 => {
                 count += 1;
-                count;
             }
             93 => {
                 count -= 1;
-                count;
             }
             _ => {}
         }
     }
 }
+
 pub fn main() {
     let mut args: Vec<*mut libc::c_char> = Vec::new();
     for arg in ::std::env::args() {

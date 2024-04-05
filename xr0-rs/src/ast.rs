@@ -1,23 +1,20 @@
-#![allow(dead_code, mutable_transmutes, non_camel_case_types, non_snake_case, non_upper_case_globals, unused_assignments, unused_mut)]
-#![feature(extern_types)]
+#![allow(
+    dead_code,
+    mutable_transmutes,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    unused_assignments,
+    unused_mut,
+    unused_variables
+)]
+
+use crate::{
+    Externals, Location, MathAtom, MathExpr, Object, Props, State, StrBuilder, Value, Variable,
+};
 extern "C" {
-    pub type __sFILEX;
-    pub type strbuilder;
-    pub type ast_unary_operator_0;
-    pub type ast_alloc_kind_0;
-    pub type state;
-    pub type value;
-    pub type object;
-    pub type externals;
-    pub type props;
-    pub type location;
-    pub type math_expr;
-    pub type math_atom;
-    pub type ast_type_base_0;
-    pub type variable;
-    pub type ast_binary_operator_0;
-    static mut __stderrp: *mut FILE;
-    fn fprintf(_: *mut FILE, _: *const libc::c_char, _: ...) -> libc::c_int;
+    static mut __stderrp: *mut libc::FILE;
+    fn fprintf(_: *mut libc::FILE, _: *const libc::c_char, _: ...) -> libc::c_int;
     fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
     fn calloc(_: libc::c_ulong, _: libc::c_ulong) -> *mut libc::c_void;
     fn free(_: *mut libc::c_void);
@@ -30,25 +27,17 @@ extern "C" {
         _: *const libc::c_char,
     ) -> !;
     fn strlen(_: *const libc::c_char) -> libc::c_ulong;
-    fn strncmp(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_ulong,
-    ) -> libc::c_int;
+    fn strncmp(_: *const libc::c_char, _: *const libc::c_char, _: libc::c_ulong) -> libc::c_int;
     fn strcmp(_: *const libc::c_char, _: *const libc::c_char) -> libc::c_int;
     fn map_create() -> *mut map;
     fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
     fn map_get(_: *mut map, key: *const libc::c_char) -> *mut libc::c_void;
-    fn strbuilder_create() -> *mut strbuilder;
-    fn strbuilder_printf(
-        b: *mut strbuilder,
-        fmt: *const libc::c_char,
-        _: ...
-    ) -> libc::c_int;
-    fn strbuilder_putc(b: *mut strbuilder, c: libc::c_char);
-    fn strbuilder_build(b: *mut strbuilder) -> *mut libc::c_char;
+    fn strbuilder_create() -> *mut StrBuilder;
+    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
+    fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char);
+    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
     fn error_create(s: *mut libc::c_char) -> *mut error;
-    fn map_set(_: *mut map, key: *const libc::c_char, value: *const libc::c_void);
+    fn map_set(_: *mut map, key: *const libc::c_char, Value: *const libc::c_void);
     fn string_arr_create() -> *mut string_arr;
     fn string_arr_s(_: *mut string_arr) -> *mut *mut libc::c_char;
     fn string_arr_n(_: *mut string_arr) -> libc::c_int;
@@ -60,194 +49,133 @@ extern "C" {
     fn lexememarker_copy(_: *mut lexememarker) -> *mut lexememarker;
     fn lexememarker_destroy(_: *mut lexememarker);
     fn lexememarker_str(_: *mut lexememarker) -> *mut libc::c_char;
-    fn math_le(e1: *mut math_expr, e2: *mut math_expr) -> bool;
-    fn math_eq(e1: *mut math_expr, e2: *mut math_expr) -> bool;
-    fn math_lt(e1: *mut math_expr, e2: *mut math_expr) -> bool;
-    fn math_gt(e1: *mut math_expr, e2: *mut math_expr) -> bool;
-    fn math_ge(e1: *mut math_expr, e2: *mut math_expr) -> bool;
-    fn math_expr_atom_create(_: *mut math_atom) -> *mut math_expr;
-    fn math_expr_sum_create(_: *mut math_expr, _: *mut math_expr) -> *mut math_expr;
-    fn math_expr_neg_create(_: *mut math_expr) -> *mut math_expr;
-    fn math_expr_destroy(_: *mut math_expr);
-    fn math_atom_nat_create(_: libc::c_uint) -> *mut math_atom;
-    fn math_atom_variable_create(_: *mut libc::c_char) -> *mut math_atom;
-    fn state_str(_: *mut state) -> *mut libc::c_char;
-    fn state_getvconst(_: *mut state, id: *mut libc::c_char) -> *mut value;
-    fn state_static_init(_: *mut state, _: *mut ast_expr) -> *mut value;
+    fn math_le(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
+    fn math_eq(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
+    fn math_lt(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
+    fn math_gt(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
+    fn math_ge(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
+    fn math_expr_atom_create(_: *mut MathAtom) -> *mut MathExpr;
+    fn math_expr_sum_create(_: *mut MathExpr, _: *mut MathExpr) -> *mut MathExpr;
+    fn math_expr_neg_create(_: *mut MathExpr) -> *mut MathExpr;
+    fn math_expr_destroy(_: *mut MathExpr);
+    fn math_atom_nat_create(_: libc::c_uint) -> *mut MathAtom;
+    fn math_atom_variable_create(_: *mut libc::c_char) -> *mut MathAtom;
+    fn state_str(_: *mut State) -> *mut libc::c_char;
+    fn state_getvconst(_: *mut State, id: *mut libc::c_char) -> *mut Value;
+    fn state_static_init(_: *mut State, _: *mut AstExpr) -> *mut Value;
     fn state_range_dealloc(
-        _: *mut state,
-        _: *mut object,
-        lw: *mut ast_expr,
-        up: *mut ast_expr,
+        _: *mut State,
+        _: *mut Object,
+        lw: *mut AstExpr,
+        up: *mut AstExpr,
     ) -> *mut error;
     fn state_range_alloc(
-        _: *mut state,
-        _: *mut object,
-        lw: *mut ast_expr,
-        up: *mut ast_expr,
+        _: *mut State,
+        _: *mut Object,
+        lw: *mut AstExpr,
+        up: *mut AstExpr,
     ) -> *mut error;
-    fn state_addresses_deallocand(_: *mut state, _: *mut object) -> bool;
+    fn state_addresses_deallocand(_: *mut State, _: *mut Object) -> bool;
     fn state_range_aredeallocands(
-        _: *mut state,
-        _: *mut object,
-        lw: *mut ast_expr,
-        up: *mut ast_expr,
+        _: *mut State,
+        _: *mut Object,
+        lw: *mut AstExpr,
+        up: *mut AstExpr,
     ) -> bool;
-    fn state_destroy(state: *mut state);
+    fn state_destroy(State: *mut State);
     fn state_vconst(
-        _: *mut state,
+        _: *mut State,
         _: *mut ast_type,
         comment: *mut libc::c_char,
         persist: bool,
-    ) -> *mut value;
-    fn value_to_expr(_: *mut value) -> *mut ast_expr;
-    fn value_sync_create(_: *mut ast_expr) -> *mut value;
-    fn value_copy(_: *mut value) -> *mut value;
+    ) -> *mut Value;
+    fn value_to_expr(_: *mut Value) -> *mut AstExpr;
+    fn value_sync_create(_: *mut AstExpr) -> *mut Value;
+    fn value_copy(_: *mut Value) -> *mut Value;
     fn object_getmember(
-        obj: *mut object,
+        obj: *mut Object,
         t: *mut ast_type,
         member: *mut libc::c_char,
-        s: *mut state,
-    ) -> *mut object;
+        s: *mut State,
+    ) -> *mut Object;
     fn object_getmembertype(
-        obj: *mut object,
+        obj: *mut Object,
         t: *mut ast_type,
         member: *mut libc::c_char,
-        s: *mut state,
+        s: *mut State,
     ) -> *mut ast_type;
-    fn object_as_value(_: *mut object) -> *mut value;
-    fn value_literal_create(_: *mut libc::c_char) -> *mut value;
-    fn state_deref(_: *mut state, ptr: *mut value, index: *mut ast_expr) -> object_res;
-    fn state_getobject(_: *mut state, id: *mut libc::c_char) -> *mut object;
-    fn state_getobjecttype(_: *mut state, id: *mut libc::c_char) -> *mut ast_type;
-    fn object_assign(_: *mut object, _: *mut value) -> *mut error;
-    fn value_destroy(_: *mut value);
-    fn state_getext(_: *mut state) -> *mut externals;
-    fn externals_getfunc(_: *mut externals, id: *mut libc::c_char) -> *mut ast_function;
-    fn value_str(_: *mut value) -> *mut libc::c_char;
-    fn value_islocation(_: *mut value) -> bool;
-    fn state_getresult(_: *mut state) -> *mut object;
-    fn state_clump(_: *mut state) -> *mut value;
-    fn state_dealloc(_: *mut state, _: *mut value) -> *mut error;
-    fn state_pushframe(_: *mut state, func: *mut libc::c_char, ret_type: *mut ast_type);
-    fn state_alloc(_: *mut state) -> *mut value;
-    fn externals_getstruct(_: *mut externals, id: *mut libc::c_char) -> *mut ast_type;
+    fn object_as_value(_: *mut Object) -> *mut Value;
+    fn value_literal_create(_: *mut libc::c_char) -> *mut Value;
+    fn state_deref(_: *mut State, ptr: *mut Value, index: *mut AstExpr) -> object_res;
+    fn state_getobject(_: *mut State, id: *mut libc::c_char) -> *mut Object;
+    fn state_getobjecttype(_: *mut State, id: *mut libc::c_char) -> *mut ast_type;
+    fn object_assign(_: *mut Object, _: *mut Value) -> *mut error;
+    fn value_destroy(_: *mut Value);
+    fn state_getext(_: *mut State) -> *mut Externals;
+    fn externals_getfunc(_: *mut Externals, id: *mut libc::c_char) -> *mut ast_function;
+    fn value_str(_: *mut Value) -> *mut libc::c_char;
+    fn value_islocation(_: *mut Value) -> bool;
+    fn state_getresult(_: *mut State) -> *mut Object;
+    fn state_clump(_: *mut State) -> *mut Value;
+    fn state_dealloc(_: *mut State, _: *mut Value) -> *mut error;
+    fn state_pushframe(_: *mut State, func: *mut libc::c_char, ret_type: *mut ast_type);
+    fn state_alloc(_: *mut State) -> *mut Value;
+    fn externals_getstruct(_: *mut Externals, id: *mut libc::c_char) -> *mut ast_type;
     fn value_struct_indefinite_create(
         _: *mut ast_type,
-        _: *mut state,
+        _: *mut State,
         comment: *mut libc::c_char,
         persist: bool,
-    ) -> *mut value;
-    fn externals_gettypedef(_: *mut externals, id: *mut libc::c_char) -> *mut ast_type;
-    fn value_ptr_indefinite_create() -> *mut value;
-    fn value_int_indefinite_create() -> *mut value;
-    fn state_getprops(_: *mut state) -> *mut props;
-    fn props_install(_: *mut props, _: *mut ast_expr);
+    ) -> *mut Value;
+    fn externals_gettypedef(_: *mut Externals, id: *mut libc::c_char) -> *mut ast_type;
+    fn value_ptr_indefinite_create() -> *mut Value;
+    fn value_int_indefinite_create() -> *mut Value;
+    fn state_getprops(_: *mut State) -> *mut Props;
+    fn props_install(_: *mut Props, _: *mut AstExpr);
     fn state_create_withprops(
         func: *mut libc::c_char,
-        _: *mut externals,
+        _: *mut Externals,
         result_type: *mut ast_type,
-        props: *mut props,
-    ) -> *mut state;
-    fn state_equal(s1: *mut state, s2: *mut state) -> bool;
-    fn state_hasgarbage(_: *mut state) -> bool;
-    fn state_copywithname(_: *mut state, func_name: *mut libc::c_char) -> *mut state;
-    fn externals_declarestruct(_: *mut externals, type_0: *mut ast_type);
-    fn externals_declaretypedef(
-        _: *mut externals,
-        id: *mut libc::c_char,
-        type_0: *mut ast_type,
-    );
-    fn externals_declarevar(
-        _: *mut externals,
-        id: *mut libc::c_char,
-        _: *mut ast_variable,
-    );
-    fn externals_declarefunc(
-        _: *mut externals,
-        id: *mut libc::c_char,
-        _: *mut ast_function,
-    );
-    fn state_islval(_: *mut state, _: *mut value) -> bool;
-    fn state_isalloc(_: *mut state, _: *mut value) -> bool;
-    fn object_hasvalue(_: *mut object) -> bool;
-    fn state_get(
-        state: *mut state,
-        loc: *mut location,
-        constructive: bool,
-    ) -> object_res;
-    fn value_as_location(_: *mut value) -> *mut location;
-    fn state_getloc(state: *mut state, id: *mut libc::c_char) -> *mut value;
+        Props: *mut Props,
+    ) -> *mut State;
+    fn state_equal(s1: *mut State, s2: *mut State) -> bool;
+    fn state_hasgarbage(_: *mut State) -> bool;
+    fn state_copywithname(_: *mut State, func_name: *mut libc::c_char) -> *mut State;
+    fn externals_declarestruct(_: *mut Externals, type_0: *mut ast_type);
+    fn externals_declaretypedef(_: *mut Externals, id: *mut libc::c_char, type_0: *mut ast_type);
+    fn externals_declarevar(_: *mut Externals, id: *mut libc::c_char, _: *mut ast_variable);
+    fn externals_declarefunc(_: *mut Externals, id: *mut libc::c_char, _: *mut ast_function);
+    fn state_islval(_: *mut State, _: *mut Value) -> bool;
+    fn state_isalloc(_: *mut State, _: *mut Value) -> bool;
+    fn object_hasvalue(_: *mut Object) -> bool;
+    fn state_get(State: *mut State, loc: *mut Location, constructive: bool) -> object_res;
+    fn value_as_location(_: *mut Value) -> *mut Location;
+    fn state_getloc(State: *mut State, id: *mut libc::c_char) -> *mut Value;
     fn state_create(
         func: *mut libc::c_char,
-        _: *mut externals,
+        _: *mut Externals,
         result_type: *mut ast_type,
-    ) -> *mut state;
-    fn state_copy(_: *mut state) -> *mut state;
-    fn state_popframe(_: *mut state);
-    fn value_pf_augment(_: *mut value, root: *mut ast_expr) -> *mut value;
-    fn object_destroy(_: *mut object);
-    fn state_declare(_: *mut state, var: *mut ast_variable, isparam: bool);
-    fn props_get(_: *mut props, _: *mut ast_expr) -> bool;
-    fn props_contradicts(k: *mut props, _: *mut ast_expr) -> bool;
-    fn value_isconstant(v: *mut value) -> bool;
-    fn value_as_constant(v: *mut value) -> libc::c_int;
-    fn values_comparable(v1: *mut value, v2: *mut value) -> bool;
-    fn value_equal(v1: *mut value, v2: *mut value) -> bool;
-    fn value_int_create(val: libc::c_int) -> *mut value;
-    fn value_isstruct(v: *mut value) -> bool;
-    fn value_struct_member(_: *mut value, member: *mut libc::c_char) -> *mut object;
-    fn value_issync(v: *mut value) -> bool;
-    fn value_as_sync(v: *mut value) -> *mut ast_expr;
+    ) -> *mut State;
+    fn state_copy(_: *mut State) -> *mut State;
+    fn state_popframe(_: *mut State);
+    fn value_pf_augment(_: *mut Value, root: *mut AstExpr) -> *mut Value;
+    fn object_destroy(_: *mut Object);
+    fn state_declare(_: *mut State, var: *mut ast_variable, isparam: bool);
+    fn props_get(_: *mut Props, _: *mut AstExpr) -> bool;
+    fn props_contradicts(k: *mut Props, _: *mut AstExpr) -> bool;
+    fn value_isconstant(v: *mut Value) -> bool;
+    fn value_as_constant(v: *mut Value) -> libc::c_int;
+    fn values_comparable(v1: *mut Value, v2: *mut Value) -> bool;
+    fn value_equal(v1: *mut Value, v2: *mut Value) -> bool;
+    fn value_int_create(val: libc::c_int) -> *mut Value;
+    fn value_isstruct(v: *mut Value) -> bool;
+    fn value_struct_member(_: *mut Value, member: *mut libc::c_char) -> *mut Object;
+    fn value_issync(v: *mut Value) -> bool;
+    fn value_as_sync(v: *mut Value) -> *mut AstExpr;
 }
 pub type __int64_t = libc::c_longlong;
 pub type __darwin_off_t = __int64_t;
 pub type fpos_t = __darwin_off_t;
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __sbuf {
-    pub _base: *mut libc::c_uchar,
-    pub _size: libc::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __sFILE {
-    pub _p: *mut libc::c_uchar,
-    pub _r: libc::c_int,
-    pub _w: libc::c_int,
-    pub _flags: libc::c_short,
-    pub _file: libc::c_short,
-    pub _bf: __sbuf,
-    pub _lbfsize: libc::c_int,
-    pub _cookie: *mut libc::c_void,
-    pub _close: Option::<unsafe extern "C" fn(*mut libc::c_void) -> libc::c_int>,
-    pub _read: Option::<
-        unsafe extern "C" fn(
-            *mut libc::c_void,
-            *mut libc::c_char,
-            libc::c_int,
-        ) -> libc::c_int,
-    >,
-    pub _seek: Option::<
-        unsafe extern "C" fn(*mut libc::c_void, fpos_t, libc::c_int) -> fpos_t,
-    >,
-    pub _write: Option::<
-        unsafe extern "C" fn(
-            *mut libc::c_void,
-            *const libc::c_char,
-            libc::c_int,
-        ) -> libc::c_int,
-    >,
-    pub _ub: __sbuf,
-    pub _extra: *mut __sFILEX,
-    pub _ur: libc::c_int,
-    pub _ubuf: [libc::c_uchar; 3],
-    pub _nbuf: [libc::c_uchar; 1],
-    pub _lb: __sbuf,
-    pub _blksize: libc::c_int,
-    pub _offset: fpos_t,
-}
-pub type FILE = __sFILE;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct map {
@@ -258,7 +186,7 @@ pub struct map {
 #[repr(C)]
 pub struct entry {
     pub key: *mut libc::c_char,
-    pub value: *const libc::c_void,
+    pub Value: *const libc::c_void,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -274,9 +202,9 @@ pub struct string_arr {
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct ast_expr {
+pub struct AstExpr {
     pub kind: ast_expr_kind,
-    pub root: *mut ast_expr,
+    pub root: *mut AstExpr,
     pub u: C2RustUnnamed,
 }
 #[derive(Copy, Clone)]
@@ -288,42 +216,83 @@ pub union C2RustUnnamed {
     pub incdec: C2RustUnnamed_2,
     pub unary_op: ast_unary_operator,
     pub binary: C2RustUnnamed_1,
-    pub assignment_value: *mut ast_expr,
+    pub assignment_value: *mut AstExpr,
     pub alloc: C2RustUnnamed_0,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct C2RustUnnamed_0 {
     pub kind: ast_alloc_kind,
-    pub arg: *mut ast_expr,
+    pub arg: *mut AstExpr,
 }
-pub type ast_alloc_kind = libc::c_uint;
-pub const CLUMP: ast_alloc_kind_0 = 4;
-pub const DEALLOC: ast_alloc_kind_0 = 2;
-pub const ALLOC: ast_alloc_kind_0 = 1;
+
+bitflags::bitflags! {
+    #[repr(transparent)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    pub struct ast_alloc_kind: libc::c_uint {
+        const ALLOC = 1;
+        const DEALLOC = 2;
+        const CLUMP = 4;
+    }
+}
+
+const ALLOC: ast_alloc_kind = ast_alloc_kind::ALLOC;
+const DEALLOC: ast_alloc_kind = ast_alloc_kind::DEALLOC;
+const CLUMP: ast_alloc_kind = ast_alloc_kind::CLUMP;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct C2RustUnnamed_1 {
     pub op: ast_binary_operator,
-    pub e1: *mut ast_expr,
-    pub e2: *mut ast_expr,
+    pub e1: *mut AstExpr,
+    pub e2: *mut AstExpr,
 }
-pub type ast_binary_operator = libc::c_uint;
-pub const BINARY_OP_SUBTRACTION: ast_binary_operator_0 = 128;
-pub const BINARY_OP_ADDITION: ast_binary_operator_0 = 64;
-pub const BINARY_OP_GE: ast_binary_operator_0 = 32;
-pub const BINARY_OP_LE: ast_binary_operator_0 = 16;
-pub const BINARY_OP_GT: ast_binary_operator_0 = 8;
-pub const BINARY_OP_LT: ast_binary_operator_0 = 4;
-pub const BINARY_OP_NE: ast_binary_operator_0 = 2;
-pub const BINARY_OP_EQ: ast_binary_operator_0 = 1;
-pub type ast_unary_operator = libc::c_uint;
-pub const UNARY_OP_BANG: ast_unary_operator_0 = 32;
-pub const UNARY_OP_ONES_COMPLEMENT: ast_unary_operator_0 = 16;
-pub const UNARY_OP_NEGATIVE: ast_unary_operator_0 = 8;
-pub const UNARY_OP_POSITIVE: ast_unary_operator_0 = 4;
-pub const UNARY_OP_DEREFERENCE: ast_unary_operator_0 = 2;
-pub const UNARY_OP_ADDRESS: ast_unary_operator_0 = 1;
+
+bitflags::bitflags! {
+    #[repr(transparent)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    pub struct ast_binary_operator: libc::c_uint {
+        const BINARY_OP_EQ = 1;
+        const BINARY_OP_NE = 2;
+        const BINARY_OP_LT = 4;
+        const BINARY_OP_GT = 8;
+        const BINARY_OP_LE = 16;
+        const BINARY_OP_GE = 32;
+        const BINARY_OP_ADDITION = 64;
+        const BINARY_OP_SUBTRACTION = 128;
+    }
+}
+
+pub const BINARY_OP_EQ: ast_binary_operator = ast_binary_operator::BINARY_OP_EQ;
+pub const BINARY_OP_NE: ast_binary_operator = ast_binary_operator::BINARY_OP_NE;
+pub const BINARY_OP_LT: ast_binary_operator = ast_binary_operator::BINARY_OP_LT;
+pub const BINARY_OP_GT: ast_binary_operator = ast_binary_operator::BINARY_OP_GT;
+pub const BINARY_OP_LE: ast_binary_operator = ast_binary_operator::BINARY_OP_LE;
+pub const BINARY_OP_GE: ast_binary_operator = ast_binary_operator::BINARY_OP_GE;
+pub const BINARY_OP_ADDITION: ast_binary_operator = ast_binary_operator::BINARY_OP_ADDITION;
+pub const BINARY_OP_SUBTRACTION: ast_binary_operator = ast_binary_operator::BINARY_OP_SUBTRACTION;
+
+bitflags::bitflags! {
+    #[repr(transparent)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    pub struct ast_unary_operator: libc::c_uint {
+        const UNARY_OP_ADDRESS = 1;
+        const UNARY_OP_DEREFERENCE = 2;
+        const UNARY_OP_POSITIVE = 4;
+        const UNARY_OP_NEGATIVE = 8;
+        const UNARY_OP_ONES_COMPLEMENT = 16;
+        const UNARY_OP_BANG = 32;
+    }
+}
+
+pub const UNARY_OP_ADDRESS: ast_unary_operator = ast_unary_operator::UNARY_OP_ADDRESS;
+pub const UNARY_OP_DEREFERENCE: ast_unary_operator = ast_unary_operator::UNARY_OP_DEREFERENCE;
+pub const UNARY_OP_POSITIVE: ast_unary_operator = ast_unary_operator::UNARY_OP_POSITIVE;
+pub const UNARY_OP_NEGATIVE: ast_unary_operator = ast_unary_operator::UNARY_OP_NEGATIVE;
+pub const UNARY_OP_ONES_COMPLEMENT: ast_unary_operator =
+    ast_unary_operator::UNARY_OP_ONES_COMPLEMENT;
+pub const UNARY_OP_BANG: ast_unary_operator = ast_unary_operator::UNARY_OP_BANG;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct C2RustUnnamed_2 {
@@ -334,7 +303,7 @@ pub struct C2RustUnnamed_2 {
 #[repr(C)]
 pub struct C2RustUnnamed_3 {
     pub n: libc::c_int,
-    pub arg: *mut *mut ast_expr,
+    pub arg: *mut *mut AstExpr,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -342,26 +311,29 @@ pub struct C2RustUnnamed_4 {
     pub constant: libc::c_int,
     pub ischar: bool,
 }
+
 pub type ast_expr_kind = libc::c_uint;
-pub const EXPR_ALLOCATION: ast_expr_kind = 16384;
-pub const EXPR_ARBARG: ast_expr_kind = 8192;
-pub const EXPR_ISDEREFERENCABLE: ast_expr_kind = 4096;
-pub const EXPR_ISDEALLOCAND: ast_expr_kind = 2048;
-pub const EXPR_ASSIGNMENT: ast_expr_kind = 1024;
-pub const EXPR_BINARY: ast_expr_kind = 512;
-pub const EXPR_UNARY: ast_expr_kind = 256;
-pub const EXPR_STRUCTMEMBER: ast_expr_kind = 128;
-pub const EXPR_INCDEC: ast_expr_kind = 64;
-pub const EXPR_CALL: ast_expr_kind = 32;
-pub const EXPR_ITERATION: ast_expr_kind = 16;
-pub const EXPR_BRACKETED: ast_expr_kind = 8;
-pub const EXPR_STRING_LITERAL: ast_expr_kind = 4;
-pub const EXPR_CONSTANT: ast_expr_kind = 2;
+
 pub const EXPR_IDENTIFIER: ast_expr_kind = 1;
+pub const EXPR_CONSTANT: ast_expr_kind = 2;
+pub const EXPR_STRING_LITERAL: ast_expr_kind = 4;
+pub const EXPR_BRACKETED: ast_expr_kind = 8;
+pub const EXPR_ITERATION: ast_expr_kind = 16;
+pub const EXPR_CALL: ast_expr_kind = 32;
+pub const EXPR_INCDEC: ast_expr_kind = 64;
+pub const EXPR_STRUCTMEMBER: ast_expr_kind = 128;
+pub const EXPR_UNARY: ast_expr_kind = 256;
+pub const EXPR_BINARY: ast_expr_kind = 512;
+pub const EXPR_ASSIGNMENT: ast_expr_kind = 1024;
+pub const EXPR_ISDEALLOCAND: ast_expr_kind = 2048;
+pub const EXPR_ISDEREFERENCABLE: ast_expr_kind = 4096;
+pub const EXPR_ARBARG: ast_expr_kind = 8192;
+pub const EXPR_ALLOCATION: ast_expr_kind = 16384;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct result {
-    pub val: *mut value,
+    pub val: *mut Value,
     pub err: *mut error,
 }
 #[derive(Copy, Clone)]
@@ -403,35 +375,56 @@ pub struct C2RustUnnamed_7 {
     pub type_0: *mut ast_type,
     pub length: libc::c_int,
 }
-pub type ast_type_base = libc::c_uint;
-pub const TYPE_USERDEF: ast_type_base_0 = 14;
-pub const TYPE_ENUM: ast_type_base_0 = 13;
-pub const TYPE_UNION: ast_type_base_0 = 12;
-pub const TYPE_STRUCT: ast_type_base_0 = 11;
-pub const TYPE_ARRAY: ast_type_base_0 = 10;
-pub const TYPE_POINTER: ast_type_base_0 = 9;
-pub const TYPE_UNSIGNED: ast_type_base_0 = 8;
-pub const TYPE_SIGNED: ast_type_base_0 = 7;
-pub const TYPE_DOUBLE: ast_type_base_0 = 6;
-pub const TYPE_FLOAT: ast_type_base_0 = 5;
-pub const TYPE_LONG: ast_type_base_0 = 4;
-pub const TYPE_INT: ast_type_base_0 = 3;
-pub const TYPE_SHORT: ast_type_base_0 = 2;
-pub const TYPE_CHAR: ast_type_base_0 = 1;
-pub const TYPE_VOID: ast_type_base_0 = 0;
-pub type ast_type_modifier = libc::c_uint;
-pub const MOD_VOLATILE: ast_type_modifier = 64;
-pub const MOD_CONST: ast_type_modifier = 32;
-pub const MOD_REGISTER: ast_type_modifier = 16;
-pub const MOD_AUTO: ast_type_modifier = 8;
-pub const MOD_STATIC: ast_type_modifier = 4;
-pub const MOD_EXTERN: ast_type_modifier = 2;
-pub const MOD_TYPEDEF: ast_type_modifier = 1;
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub enum ast_type_base {
+    TYPE_VOID = 0,
+    TYPE_CHAR = 1,
+    TYPE_SHORT = 2,
+    TYPE_INT = 3,
+    TYPE_LONG = 4,
+    TYPE_FLOAT = 5,
+    TYPE_DOUBLE = 6,
+    TYPE_SIGNED = 7,
+    TYPE_UNSIGNED = 8,
+    TYPE_POINTER = 9,
+    TYPE_ARRAY = 10,
+    TYPE_STRUCT = 11,
+    TYPE_UNION = 12,
+    TYPE_ENUM = 13,
+    TYPE_USERDEF = 14,
+}
+
+pub use ast_type_base::*;
+
+bitflags::bitflags! {
+    #[repr(transparent)]
+    #[derive(Debug, Copy, Clone)]
+    pub struct ast_type_modifier: libc::c_uint {
+        const MOD_TYPEDEF = 1;
+        const MOD_EXTERN = 2;
+        const MOD_STATIC = 4;
+        const MOD_AUTO = 8;
+        const MOD_REGISTER = 16;
+        const MOD_CONST = 32;
+        const MOD_VOLATILE = 64;
+    }
+}
+
+pub const MOD_TYPEDEF: ast_type_modifier = ast_type_modifier::MOD_TYPEDEF;
+pub const MOD_EXTERN: ast_type_modifier = ast_type_modifier::MOD_EXTERN;
+pub const MOD_STATIC: ast_type_modifier = ast_type_modifier::MOD_STATIC;
+pub const MOD_AUTO: ast_type_modifier = ast_type_modifier::MOD_AUTO;
+pub const MOD_REGISTER: ast_type_modifier = ast_type_modifier::MOD_REGISTER;
+pub const MOD_CONST: ast_type_modifier = ast_type_modifier::MOD_CONST;
+pub const MOD_VOLATILE: ast_type_modifier = ast_type_modifier::MOD_VOLATILE;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct lvalue {
     pub t: *mut ast_type,
-    pub obj: *mut object,
+    pub obj: *mut Object,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -442,7 +435,7 @@ pub struct lvalue_res {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct object_res {
-    pub obj: *mut object,
+    pub obj: *mut Object,
     pub err: *mut error,
 }
 #[derive(Copy, Clone)]
@@ -484,6 +477,7 @@ pub const LM_FLAG_IMPLICIT_EXTERN: linemarker_flag = 8;
 pub const LM_FLAG_SYS_HEADER: linemarker_flag = 4;
 pub const LM_FLAG_RESUME_FILE: linemarker_flag = 2;
 pub const LM_FLAG_NEW_FILE: linemarker_flag = 1;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union C2RustUnnamed_8 {
@@ -491,7 +485,7 @@ pub union C2RustUnnamed_8 {
     pub compound: *mut ast_block,
     pub selection: C2RustUnnamed_12,
     pub iteration: C2RustUnnamed_11,
-    pub expr: *mut ast_expr,
+    pub expr: *mut AstExpr,
     pub jump: C2RustUnnamed_10,
     pub alloc: C2RustUnnamed_9,
 }
@@ -499,13 +493,13 @@ pub union C2RustUnnamed_8 {
 #[repr(C)]
 pub struct C2RustUnnamed_9 {
     pub kind: ast_alloc_kind,
-    pub arg: *mut ast_expr,
+    pub arg: *mut AstExpr,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct C2RustUnnamed_10 {
     pub kind: ast_jump_kind,
-    pub rv: *mut ast_expr,
+    pub rv: *mut AstExpr,
 }
 pub type ast_jump_kind = libc::c_uint;
 pub const JUMP_RETURN: ast_jump_kind = 1;
@@ -515,14 +509,14 @@ pub struct C2RustUnnamed_11 {
     pub init: *mut ast_stmt,
     pub cond: *mut ast_stmt,
     pub body: *mut ast_stmt,
-    pub iter: *mut ast_expr,
+    pub iter: *mut AstExpr,
     pub abstract_0: *mut ast_block,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct C2RustUnnamed_12 {
     pub isswitch: bool,
-    pub cond: *mut ast_expr,
+    pub cond: *mut AstExpr,
     pub body: *mut ast_stmt,
     pub nest: *mut ast_stmt,
 }
@@ -571,7 +565,7 @@ pub struct preresult {
 #[repr(C)]
 pub struct ast_stmt_splits {
     pub n: libc::c_int,
-    pub cond: *mut *mut ast_expr,
+    pub cond: *mut *mut AstExpr,
     pub err: *mut error,
 }
 #[derive(Copy, Clone)]
@@ -590,7 +584,7 @@ pub struct ast_externdecl {
 #[repr(C)]
 pub union C2RustUnnamed_14 {
     pub function: *mut ast_function,
-    pub variable: *mut ast_variable,
+    pub Variable: *mut ast_variable,
     pub _typedef: C2RustUnnamed_15,
     pub _struct: *mut ast_type,
 }
@@ -607,19 +601,16 @@ pub const EXTERN_VARIABLE: ast_externdecl_kind = 1;
 pub const EXTERN_FUNCTION: ast_externdecl_kind = 0;
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct ast {
+pub struct Ast {
     pub n: libc::c_int,
     pub decl: *mut *mut ast_externdecl,
 }
-unsafe extern "C" fn ast_expr_bracketed_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_expr_bracketed_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
     let mut root: *mut libc::c_char = ast_expr_str((*expr).root);
     strbuilder_printf(b, b"(%s)\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
-unsafe extern "C" fn expr_to_binary(mut expr: *mut ast_expr) -> *mut ast_expr {
+unsafe extern "C" fn expr_to_binary(mut expr: *mut AstExpr) -> *mut AstExpr {
     match ast_expr_kind(expr) as libc::c_uint {
         512 => return ast_expr_copy(expr),
         _ => {
@@ -632,51 +623,47 @@ unsafe extern "C" fn expr_to_binary(mut expr: *mut ast_expr) -> *mut ast_expr {
     };
 }
 unsafe extern "C" fn binary_deref_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    let mut res: *mut result = ast_expr_eval(ast_expr_binary_e1(expr), state);
+    let mut res: *mut result = ast_expr_eval(ast_expr_binary_e1(expr), State);
     if result_iserror(res) {
         return res;
     }
-    let mut arr: *mut value = result_as_value(res);
+    let mut arr: *mut Value = result_as_value(res);
     if arr.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"binary_deref_eval\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"binary_deref_eval\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             581 as libc::c_int,
             b"arr\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut deref_res: object_res = state_deref(state, arr, ast_expr_binary_e2(expr));
+    } else {
+    };
+    let mut deref_res: object_res = state_deref(State, arr, ast_expr_binary_e2(expr));
     if !(deref_res.err).is_null() {
         return result_error_create(deref_res.err);
     }
     if (deref_res.obj).is_null() {
-        let mut b: *mut strbuilder = strbuilder_create();
+        let mut b: *mut StrBuilder = strbuilder_create();
         let mut s: *mut libc::c_char = ast_expr_str(expr);
         strbuilder_printf(
             b,
-            b"undefined indirection: *(%s) has no value\0" as *const u8
-                as *const libc::c_char,
+            b"undefined indirection: *(%s) has no Value\0" as *const u8 as *const libc::c_char,
             s,
         );
         free(s as *mut libc::c_void);
         return result_error_create(error_create(strbuilder_build(b)));
     }
     result_destroy(res);
-    let mut v: *mut value = object_as_value(deref_res.obj);
+    let mut v: *mut Value = object_as_value(deref_res.obj);
     if v.is_null() {
-        let mut b_0: *mut strbuilder = strbuilder_create();
+        let mut b_0: *mut StrBuilder = strbuilder_create();
         let mut s_0: *mut libc::c_char = ast_expr_str(expr);
         strbuilder_printf(
             b_0,
-            b"undefined indirection: *(%s) has no value\0" as *const u8
-                as *const libc::c_char,
+            b"undefined indirection: *(%s) has no Value\0" as *const u8 as *const libc::c_char,
             s_0,
         );
         free(s_0 as *mut libc::c_void);
@@ -685,13 +672,10 @@ unsafe extern "C" fn binary_deref_eval(
     return result_value_create(value_copy(v));
 }
 unsafe extern "C" fn expr_identifier_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    let mut res: *mut result = hack_identifier_builtin_eval(
-        ast_expr_as_identifier(expr),
-        state,
-    );
+    let mut res: *mut result = hack_identifier_builtin_eval(ast_expr_as_identifier(expr), State);
     if !result_iserror(res) && result_hasvalue(res) as libc::c_int != 0 {
         return res;
     }
@@ -699,9 +683,9 @@ unsafe extern "C" fn expr_identifier_eval(
     if *id.offset(0 as libc::c_int as isize) as libc::c_int == '#' as i32 {
         return result_value_create(value_literal_create(id));
     }
-    let mut obj: *mut object = state_getobject(state, id);
+    let mut obj: *mut Object = state_getobject(State, id);
     if obj.is_null() {
-        let mut b: *mut strbuilder = strbuilder_create();
+        let mut b: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b,
             b"unknown idenitfier %s\0" as *const u8 as *const libc::c_char,
@@ -709,17 +693,16 @@ unsafe extern "C" fn expr_identifier_eval(
         );
         return result_error_create(error_create(strbuilder_build(b)));
     }
-    let mut val: *mut value = object_as_value(obj);
+    let mut val: *mut Value = object_as_value(obj);
     if val.is_null() {
         v_printf(
-            b"state: %s\n\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-            state_str(state),
+            b"State: %s\n\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+            state_str(State),
         );
-        let mut b_0: *mut strbuilder = strbuilder_create();
+        let mut b_0: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b_0,
-            b"undefined memory access: %s has no value\0" as *const u8
-                as *const libc::c_char,
+            b"undefined memory access: %s has no Value\0" as *const u8 as *const libc::c_char,
             id,
         );
         return result_error_create(error_create(strbuilder_build(b_0)));
@@ -728,192 +711,166 @@ unsafe extern "C" fn expr_identifier_eval(
 }
 unsafe extern "C" fn hack_identifier_builtin_eval(
     mut id: *mut libc::c_char,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut result {
-    if !(state_getvconst(state, id)).is_null()
+    if !(state_getvconst(State, id)).is_null()
         || strncmp(
             id,
             b"ptr:\0" as *const u8 as *const libc::c_char,
             4 as libc::c_int as libc::c_ulong,
         ) == 0 as libc::c_int
     {
-        return result_value_create(
-            value_sync_create(ast_expr_identifier_create(dynamic_str(id))),
-        );
+        return result_value_create(value_sync_create(ast_expr_identifier_create(dynamic_str(
+            id,
+        ))));
     }
-    return result_error_create(
-        error_create(
-            b"not built-in\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ),
-    );
+    return result_error_create(error_create(
+        b"not built-in\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+    ));
 }
 unsafe extern "C" fn expr_literal_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    let mut res: *mut result = result_value_create(state_static_init(state, expr));
+    let mut res: *mut result = result_value_create(state_static_init(State, expr));
     return res;
 }
 unsafe extern "C" fn expr_constant_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
     return result_value_create(value_int_create(ast_expr_as_constant(expr)));
 }
 unsafe extern "C" fn rangeprocess_dealloc(
-    mut dealloc: *mut ast_expr,
-    mut lw: *mut ast_expr,
-    mut up: *mut ast_expr,
-    mut state: *mut state,
+    mut dealloc: *mut AstExpr,
+    mut lw: *mut AstExpr,
+    mut up: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut error {
-    let mut obj: *mut object = hack_base_object_from_alloc(
-        ast_expr_alloc_arg(dealloc),
-        state,
-    );
-    return state_range_dealloc(state, obj, lw, up);
+    let mut obj: *mut Object = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), State);
+    return state_range_dealloc(State, obj, lw, up);
 }
 unsafe extern "C" fn hack_base_object_from_alloc(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> *mut object {
-    let mut inner: *mut ast_expr = ast_expr_unary_operand(expr);
-    let mut i: *mut ast_expr = ast_expr_identifier_create(
-        dynamic_str(b"i\0" as *const u8 as *const libc::c_char),
-    );
-    if !ast_expr_equal(ast_expr_binary_e2(inner), i) as libc::c_int as libc::c_long != 0
-    {
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
+) -> *mut Object {
+    let mut inner: *mut AstExpr = ast_expr_unary_operand(expr);
+    let mut i: *mut AstExpr =
+        ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
+    if !ast_expr_equal(ast_expr_binary_e2(inner), i) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 28],
-                &[libc::c_char; 28],
-            >(b"hack_base_object_from_alloc\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 28], &[libc::c_char; 28]>(
+                b"hack_base_object_from_alloc\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             203 as libc::c_int,
-            b"ast_expr_equal(ast_expr_binary_e2(inner), i)\0" as *const u8
-                as *const libc::c_char,
+            b"ast_expr_equal(ast_expr_binary_e2(inner), i)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     ast_expr_destroy(i);
-    let mut res: lvalue_res = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
+    let mut res: lvalue_res = ast_expr_lvalue(ast_expr_binary_e1(inner), State);
     if !(res.err).is_null() {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 28],
-                    &[libc::c_char; 28],
-                >(b"hack_base_object_from_alloc\0"))
-                    .as_ptr(),
+                (*::core::mem::transmute::<&[u8; 28], &[libc::c_char; 28]>(
+                    b"hack_base_object_from_alloc\0",
+                ))
+                .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 207 as libc::c_int,
                 b"false\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
     }
-    let mut obj: *mut object = lvalue_object(res.lval);
+    let mut obj: *mut Object = lvalue_object(res.lval);
     if obj.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 28],
-                &[libc::c_char; 28],
-            >(b"hack_base_object_from_alloc\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 28], &[libc::c_char; 28]>(
+                b"hack_base_object_from_alloc\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             210 as libc::c_int,
             b"obj\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return obj;
 }
 unsafe extern "C" fn rangeprocess_alloc(
-    mut expr: *mut ast_expr,
-    mut lw: *mut ast_expr,
-    mut up: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut lw: *mut AstExpr,
+    mut up: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut error {
-    let mut lval: *mut ast_expr = ast_expr_assignment_lval(expr);
-    let mut rval: *mut ast_expr = ast_expr_assignment_rval(expr);
-    if !(ast_expr_kind(rval) as libc::c_uint
-        == EXPR_ALLOCATION as libc::c_int as libc::c_uint) as libc::c_int as libc::c_long
+    let mut lval: *mut AstExpr = ast_expr_assignment_lval(expr);
+    let mut rval: *mut AstExpr = ast_expr_assignment_rval(expr);
+    if !(ast_expr_kind(rval) as libc::c_uint == EXPR_ALLOCATION as libc::c_int as libc::c_uint)
+        as libc::c_int as libc::c_long
         != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"rangeprocess_alloc\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"rangeprocess_alloc\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             182 as libc::c_int,
-            b"ast_expr_kind(rval) == EXPR_ALLOCATION\0" as *const u8
-                as *const libc::c_char,
+            b"ast_expr_kind(rval) == EXPR_ALLOCATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    if !(ast_expr_alloc_kind(rval) as libc::c_uint
-        != DEALLOC as libc::c_int as libc::c_uint) as libc::c_int as libc::c_long != 0
-    {
+    } else {
+    };
+    if !(ast_expr_alloc_kind(rval) != DEALLOC) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"rangeprocess_alloc\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"rangeprocess_alloc\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             183 as libc::c_int,
             b"ast_expr_alloc_kind(rval) != DEALLOC\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut obj: *mut object = hack_base_object_from_alloc(lval, state);
-    return state_range_alloc(state, obj, lw, up);
+    } else {
+    };
+    let mut obj: *mut Object = hack_base_object_from_alloc(lval, State);
+    return state_range_alloc(State, obj, lw, up);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_decide(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> bool {
+pub unsafe extern "C" fn ast_expr_decide(mut expr: *mut AstExpr, mut State: *mut State) -> bool {
     match ast_expr_kind(expr) as libc::c_uint {
         2 => return ast_expr_as_constant(expr) != 0,
-        256 => return expr_unary_decide(expr, state),
-        2048 => return expr_isdeallocand_decide(expr, state),
-        512 => return expr_binary_decide(expr, state),
+        256 => return expr_unary_decide(expr, State),
+        2048 => return expr_isdeallocand_decide(expr, State),
+        512 => return expr_binary_decide(expr, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 16],
-                        &[libc::c_char; 16],
-                    >(b"ast_expr_decide\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(
+                        b"ast_expr_decide\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     40 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn expr_binary_decide(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> bool {
-    let mut root: *mut result = ast_expr_eval(ast_expr_binary_e1(expr), state);
-    let mut last: *mut result = ast_expr_eval(ast_expr_binary_e2(expr), state);
-    if !(!result_iserror(root) && !result_iserror(last)) as libc::c_int as libc::c_long
-        != 0
-    {
+unsafe extern "C" fn expr_binary_decide(mut expr: *mut AstExpr, mut State: *mut State) -> bool {
+    let mut root: *mut result = ast_expr_eval(ast_expr_binary_e1(expr), State);
+    let mut last: *mut result = ast_expr_eval(ast_expr_binary_e2(expr), State);
+    if !(!result_iserror(root) && !result_iserror(last)) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"expr_binary_decide\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"expr_binary_decide\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             374 as libc::c_int,
-            b"!result_iserror(root) && !result_iserror(last)\0" as *const u8
-                as *const libc::c_char,
+            b"!result_iserror(root) && !result_iserror(last)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return value_compare(
         result_as_value(root),
         ast_expr_binary_op(expr),
@@ -921,157 +878,147 @@ unsafe extern "C" fn expr_binary_decide(
     );
 }
 unsafe extern "C" fn value_compare(
-    mut v1: *mut value,
+    mut v1: *mut Value,
     mut op: ast_binary_operator,
-    mut v2: *mut value,
+    mut v2: *mut Value,
 ) -> bool {
-    match op as libc::c_uint {
+    match op.bits() {
         1 => return value_equal(v1, v2),
         2 => return !value_compare(v1, BINARY_OP_EQ, v2),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 14],
-                        &[libc::c_char; 14],
-                    >(b"value_compare\0"))
+                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"value_compare\0"))
                         .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     392 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 unsafe extern "C" fn expr_isdeallocand_decide(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> bool {
-    let mut obj: *mut object = hack_object_from_assertion(expr, state);
-    let mut isdeallocand: bool = state_addresses_deallocand(state, obj);
+    let mut obj: *mut Object = hack_object_from_assertion(expr, State);
+    let mut isdeallocand: bool = state_addresses_deallocand(State, obj);
     return isdeallocand;
 }
 unsafe extern "C" fn hack_object_from_assertion(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> *mut object {
-    let mut assertand: *mut ast_expr = ast_expr_isdeallocand_assertand(expr);
-    let mut res: lvalue_res = ast_expr_lvalue(assertand, state);
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
+) -> *mut Object {
+    let mut assertand: *mut AstExpr = ast_expr_isdeallocand_assertand(expr);
+    let mut res: lvalue_res = ast_expr_lvalue(assertand, State);
     if !(res.err).is_null() {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 27],
-                    &[libc::c_char; 27],
-                >(b"hack_object_from_assertion\0"))
-                    .as_ptr(),
+                (*::core::mem::transmute::<&[u8; 27], &[libc::c_char; 27]>(
+                    b"hack_object_from_assertion\0",
+                ))
+                .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 350 as libc::c_int,
                 b"false\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
     }
-    let mut obj: *mut object = lvalue_object(res.lval);
+    let mut obj: *mut Object = lvalue_object(res.lval);
     if obj.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 27],
-                &[libc::c_char; 27],
-            >(b"hack_object_from_assertion\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 27], &[libc::c_char; 27]>(
+                b"hack_object_from_assertion\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             353 as libc::c_int,
             b"obj\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return obj;
 }
-unsafe extern "C" fn expr_unary_decide(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> bool {
-    let mut operand: *mut ast_expr = ast_expr_unary_operand(expr);
-    match ast_expr_unary_op(expr) as libc::c_uint {
-        32 => return !ast_expr_decide(operand, state),
+unsafe extern "C" fn expr_unary_decide(mut expr: *mut AstExpr, mut State: *mut State) -> bool {
+    let mut operand: *mut AstExpr = ast_expr_unary_operand(expr);
+    match ast_expr_unary_op(expr).bits() {
+        32 => return !ast_expr_decide(operand, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 18],
-                        &[libc::c_char; 18],
-                    >(b"expr_unary_decide\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
+                        b"expr_unary_decide\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     52 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_rangedecide(
-    mut expr: *mut ast_expr,
-    mut lw: *mut ast_expr,
-    mut up: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut lw: *mut AstExpr,
+    mut up: *mut AstExpr,
+    mut State: *mut State,
 ) -> bool {
-    match ast_expr_kind(expr) as libc::c_uint {
-        256 => return unary_rangedecide(expr, lw, up, state),
-        2048 => return expr_isdeallocand_rangedecide(expr, lw, up, state),
+    match ast_expr_kind(expr) {
+        256 => return unary_rangedecide(expr, lw, up, State),
+        2048 => return expr_isdeallocand_rangedecide(expr, lw, up, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 21],
-                        &[libc::c_char; 21],
-                    >(b"ast_expr_rangedecide\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(
+                        b"ast_expr_rangedecide\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     75 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 unsafe extern "C" fn expr_isdeallocand_rangedecide(
-    mut expr: *mut ast_expr,
-    mut lw: *mut ast_expr,
-    mut up: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut lw: *mut AstExpr,
+    mut up: *mut AstExpr,
+    mut State: *mut State,
 ) -> bool {
-    let mut acc: *mut ast_expr = ast_expr_isdeallocand_assertand(expr);
-    if !(ast_expr_unary_op(acc) as libc::c_uint
-        == UNARY_OP_DEREFERENCE as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
-    {
+    let mut acc: *mut AstExpr = ast_expr_isdeallocand_assertand(expr);
+    if !(ast_expr_unary_op(acc) == UNARY_OP_DEREFERENCE) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 30],
-                &[libc::c_char; 30],
-            >(b"expr_isdeallocand_rangedecide\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 30], &[libc::c_char; 30]>(
+                b"expr_isdeallocand_rangedecide\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             98 as libc::c_int,
-            b"ast_expr_unary_op(acc) == UNARY_OP_DEREFERENCE\0" as *const u8
-                as *const libc::c_char,
+            b"ast_expr_unary_op(acc) == UNARY_OP_DEREFERENCE\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut inner: *mut ast_expr = ast_expr_unary_operand(acc);
-    let mut i: *mut ast_expr = ast_expr_identifier_create(
-        dynamic_str(b"i\0" as *const u8 as *const libc::c_char),
-    );
-    let mut j: *mut ast_expr = ast_expr_identifier_create(
-        dynamic_str(b"j\0" as *const u8 as *const libc::c_char),
-    );
+    } else {
+    };
+    let mut inner: *mut AstExpr = ast_expr_unary_operand(acc);
+    let mut i: *mut AstExpr =
+        ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
+    let mut j: *mut AstExpr =
+        ast_expr_identifier_create(dynamic_str(b"j\0" as *const u8 as *const libc::c_char));
     if !(ast_expr_equal(ast_expr_binary_e2(inner), i) as libc::c_int != 0
-        || ast_expr_equal(ast_expr_binary_e2(inner), j) as libc::c_int != 0)
-        as libc::c_int as libc::c_long != 0
+        || ast_expr_equal(ast_expr_binary_e2(inner), j) as libc::c_int != 0) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
             (*::core::mem::transmute::<
@@ -1084,71 +1031,72 @@ unsafe extern "C" fn expr_isdeallocand_rangedecide(
             b"ast_expr_equal(ast_expr_binary_e2(inner), i) || ast_expr_equal(ast_expr_binary_e2(inner), j)\0"
                 as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     ast_expr_destroy(j);
     ast_expr_destroy(i);
-    let mut res: lvalue_res = ast_expr_lvalue(ast_expr_binary_e1(acc), state);
+    let mut res: lvalue_res = ast_expr_lvalue(ast_expr_binary_e1(acc), State);
     if !(res.err).is_null() {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 30],
-                    &[libc::c_char; 30],
-                >(b"expr_isdeallocand_rangedecide\0"))
-                    .as_ptr(),
+                (*::core::mem::transmute::<&[u8; 30], &[libc::c_char; 30]>(
+                    b"expr_isdeallocand_rangedecide\0",
+                ))
+                .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 114 as libc::c_int,
                 b"false\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
     }
-    let mut obj: *mut object = lvalue_object(res.lval);
+    let mut obj: *mut Object = lvalue_object(res.lval);
     if obj.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 30],
-                &[libc::c_char; 30],
-            >(b"expr_isdeallocand_rangedecide\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 30], &[libc::c_char; 30]>(
+                b"expr_isdeallocand_rangedecide\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             117 as libc::c_int,
             b"obj\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    return state_range_aredeallocands(state, obj, lw, up);
+    } else {
+    };
+    return state_range_aredeallocands(State, obj, lw, up);
 }
 unsafe extern "C" fn unary_rangedecide(
-    mut expr: *mut ast_expr,
-    mut lw: *mut ast_expr,
-    mut up: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut lw: *mut AstExpr,
+    mut up: *mut AstExpr,
+    mut State: *mut State,
 ) -> bool {
-    let mut operand: *mut ast_expr = ast_expr_unary_operand(expr);
-    match ast_expr_unary_op(expr) as libc::c_uint {
-        32 => return !ast_expr_rangedecide(operand, lw, up, state),
+    let mut operand: *mut AstExpr = ast_expr_unary_operand(expr);
+    match ast_expr_unary_op(expr).bits() {
+        32 => return !ast_expr_rangedecide(operand, lw, up, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 18],
-                        &[libc::c_char; 18],
-                    >(b"unary_rangedecide\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
+                        b"unary_rangedecide\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     88 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_exec(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut error {
-    let mut res: *mut result = ast_expr_eval(expr, state);
+    let mut res: *mut result = ast_expr_eval(expr, State);
     if result_iserror(res) {
         return result_as_error(res);
     }
@@ -1156,91 +1104,80 @@ pub unsafe extern "C" fn ast_expr_exec(
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_assume(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut preresult {
-    return reduce_assume(expr, 1 as libc::c_int != 0, state);
+    return reduce_assume(expr, 1 as libc::c_int != 0, State);
 }
 unsafe extern "C" fn reduce_assume(
-    mut expr: *mut ast_expr,
-    mut value: bool,
-    mut s: *mut state,
+    mut expr: *mut AstExpr,
+    mut Value: bool,
+    mut s: *mut State,
 ) -> *mut preresult {
-    match (*expr).kind as libc::c_uint {
-        1 => return identifier_assume(expr, value, s),
+    match (*expr).kind {
+        1 => return identifier_assume(expr, Value, s),
         256 => {
-            if !(ast_expr_unary_op(expr) as libc::c_uint
-                == UNARY_OP_BANG as libc::c_int as libc::c_uint) as libc::c_int
-                as libc::c_long != 0
-            {
+            if !(ast_expr_unary_op(expr) == UNARY_OP_BANG) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 14],
-                        &[libc::c_char; 14],
-                    >(b"reduce_assume\0"))
+                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"reduce_assume\0"))
                         .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     1186 as libc::c_int,
                     b"ast_expr_unary_op(expr) == UNARY_OP_BANG\0" as *const u8
                         as *const libc::c_char,
                 );
-            } else {};
-            return reduce_assume(ast_expr_unary_operand(expr), !value, s);
+            } else {
+            };
+            return reduce_assume(ast_expr_unary_operand(expr), !Value, s);
         }
-        8 => return reduce_assume((*expr).root, value, s),
-        32 | 128 => return ast_expr_pf_reduce_assume(expr, value, s),
-        512 => return binary_assume(expr, value, s),
+        8 => return reduce_assume((*expr).root, Value, s),
+        32 | 128 => return ast_expr_pf_reduce_assume(expr, Value, s),
+        512 => return binary_assume(expr, Value, s),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 14],
-                        &[libc::c_char; 14],
-                    >(b"reduce_assume\0"))
+                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"reduce_assume\0"))
                         .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     1196 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 unsafe extern "C" fn binary_assume(
-    mut expr: *mut ast_expr,
-    mut value: bool,
-    mut s: *mut state,
+    mut expr: *mut AstExpr,
+    mut Value: bool,
+    mut s: *mut State,
 ) -> *mut preresult {
     let mut r1: *mut result = ast_expr_pf_reduce((*expr).u.binary.e1, s);
     let mut r2: *mut result = ast_expr_pf_reduce((*expr).u.binary.e2, s);
-    let mut v1: *mut value = result_as_value(r1);
-    let mut v2: *mut value = result_as_value(r2);
+    let mut v1: *mut Value = result_as_value(r1);
+    let mut v2: *mut Value = result_as_value(r2);
     return irreducible_assume(
-        ast_expr_binary_create(
-            value_to_expr(v1),
-            (*expr).u.binary.op,
-            value_to_expr(v2),
-        ),
-        value,
+        ast_expr_binary_create(value_to_expr(v1), (*expr).u.binary.op, value_to_expr(v2)),
+        Value,
         s,
     );
 }
 unsafe extern "C" fn irreducible_assume(
-    mut e: *mut ast_expr,
-    mut value: bool,
-    mut s: *mut state,
+    mut e: *mut AstExpr,
+    mut Value: bool,
+    mut s: *mut State,
 ) -> *mut preresult {
-    let mut prop: *mut ast_expr = ast_expr_inverted_copy(e, !value);
+    let mut prop: *mut AstExpr = ast_expr_inverted_copy(e, !Value);
     let mut r: *mut preresult = irreducible_assume_actual(prop, s);
     ast_expr_destroy(prop);
     return r;
 }
 unsafe extern "C" fn irreducible_assume_actual(
-    mut e: *mut ast_expr,
-    mut s: *mut state,
+    mut e: *mut AstExpr,
+    mut s: *mut State,
 ) -> *mut preresult {
-    let mut p: *mut props = state_getprops(s);
+    let mut p: *mut Props = state_getprops(s);
     if props_contradicts(p, e) {
         return preresult_contradiction_create();
     }
@@ -1248,66 +1185,64 @@ unsafe extern "C" fn irreducible_assume_actual(
     return preresult_empty_create();
 }
 unsafe extern "C" fn ast_expr_pf_reduce_assume(
-    mut expr: *mut ast_expr,
-    mut value: bool,
-    mut s: *mut state,
+    mut expr: *mut AstExpr,
+    mut Value: bool,
+    mut s: *mut State,
 ) -> *mut preresult {
     let mut res: *mut result = ast_expr_pf_reduce(expr, s);
     if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) as libc::c_int
-        as libc::c_long != 0
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 26],
-                &[libc::c_char; 26],
-            >(b"ast_expr_pf_reduce_assume\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
+                b"ast_expr_pf_reduce_assume\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             1219 as libc::c_int,
-            b"!result_iserror(res) && result_hasvalue(res)\0" as *const u8
-                as *const libc::c_char,
+            b"!result_iserror(res) && result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
+    } else {
+    };
+    return irreducible_assume(value_as_sync(result_as_value(res)), Value, s);
 }
 unsafe extern "C" fn identifier_assume(
-    mut expr: *mut ast_expr,
-    mut value: bool,
-    mut s: *mut state,
+    mut expr: *mut AstExpr,
+    mut Value: bool,
+    mut s: *mut State,
 ) -> *mut preresult {
-    let mut s_copy: *mut state = state_copy(s);
+    let mut s_copy: *mut State = state_copy(s);
     let mut res: *mut result = ast_expr_eval(expr, s_copy);
     if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) as libc::c_int
-        as libc::c_long != 0
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"identifier_assume\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"identifier_assume\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             1207 as libc::c_int,
-            b"!result_iserror(res) && result_hasvalue(res)\0" as *const u8
-                as *const libc::c_char,
+            b"!result_iserror(res) && result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     state_destroy(s_copy);
-    return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
+    return irreducible_assume(value_as_sync(result_as_value(res)), Value, s);
 }
 unsafe extern "C" fn expr_structmember_eval(
-    mut expr: *mut ast_expr,
-    mut s: *mut state,
+    mut expr: *mut AstExpr,
+    mut s: *mut State,
 ) -> *mut result {
-    let mut root: *mut ast_expr = ast_expr_member_root(expr);
+    let mut root: *mut AstExpr = ast_expr_member_root(expr);
     let mut res: *mut result = ast_expr_eval(root, s);
     if result_iserror(res) {
         return res;
     }
     let mut field: *mut libc::c_char = ast_expr_member_field(expr);
-    let mut member: *mut object = value_struct_member(result_as_value(res), field);
+    let mut member: *mut Object = value_struct_member(result_as_value(res), field);
     if member.is_null() {
-        let mut b: *mut strbuilder = strbuilder_create();
+        let mut b: *mut StrBuilder = strbuilder_create();
         let mut root_str: *mut libc::c_char = ast_expr_str(root);
         strbuilder_printf(
             b,
@@ -1318,64 +1253,61 @@ unsafe extern "C" fn expr_structmember_eval(
         free(root_str as *mut libc::c_void);
         return result_error_create(error_create(strbuilder_build(b)));
     }
-    let mut obj_value: *mut value = object_as_value(member);
-    let mut v: *mut value = if !obj_value.is_null() {
+    let mut obj_value: *mut Value = object_as_value(member);
+    let mut v: *mut Value = if !obj_value.is_null() {
         value_copy(obj_value)
     } else {
-        0 as *mut value
+        0 as *mut Value
     };
     result_destroy(res);
     return result_value_create(v);
 }
-unsafe extern "C" fn address_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> *mut result {
-    let mut operand: *mut ast_expr = ast_expr_unary_operand(expr);
+unsafe extern "C" fn address_eval(mut expr: *mut AstExpr, mut State: *mut State) -> *mut result {
+    let mut operand: *mut AstExpr = ast_expr_unary_operand(expr);
     let mut id: *mut libc::c_char = ast_expr_as_identifier(operand);
-    let mut v: *mut value = state_getloc(state, id);
+    let mut v: *mut Value = state_getloc(State, id);
     return result_value_create(v);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_alloc_rangeprocess(
-    mut alloc: *mut ast_expr,
-    mut lw: *mut ast_expr,
-    mut up: *mut ast_expr,
-    mut state: *mut state,
+    mut alloc: *mut AstExpr,
+    mut lw: *mut AstExpr,
+    mut up: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
-    let mut result_lw: *mut result = ast_expr_eval(lw, state);
-    let mut result_up: *mut result = ast_expr_eval(up, state);
+    let mut result_lw: *mut result = ast_expr_eval(lw, State);
+    let mut result_up: *mut result = ast_expr_eval(up, State);
     if result_iserror(result_lw) {
         return result_as_error(result_lw);
     }
     if result_iserror(result_up) {
         return result_as_error(result_up);
     }
-    let mut res_lw: *mut ast_expr = value_to_expr(result_as_value(result_lw));
-    let mut res_up: *mut ast_expr = value_to_expr(result_as_value(result_up));
+    let mut res_lw: *mut AstExpr = value_to_expr(result_as_value(result_lw));
+    let mut res_up: *mut AstExpr = value_to_expr(result_as_value(result_up));
     result_destroy(result_up);
     result_destroy(result_lw);
-    match (*alloc).kind as libc::c_uint {
+    match (*alloc).kind {
         1024 => {
-            err = rangeprocess_alloc(alloc, res_lw, res_up, state);
+            err = rangeprocess_alloc(alloc, res_lw, res_up, State);
         }
         16384 => {
-            err = rangeprocess_dealloc(alloc, res_lw, res_up, state);
+            err = rangeprocess_dealloc(alloc, res_lw, res_up, State);
         }
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 28],
-                        &[libc::c_char; 28],
-                    >(b"ast_expr_alloc_rangeprocess\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 28], &[libc::c_char; 28]>(
+                        b"ast_expr_alloc_rangeprocess\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     164 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     ast_expr_destroy(res_up);
@@ -1387,166 +1319,145 @@ pub unsafe extern "C" fn ast_expr_alloc_rangeprocess(
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    match ast_expr_kind(expr) as libc::c_uint {
-        2 => return expr_constant_eval(expr, state),
-        4 => return expr_literal_eval(expr, state),
-        1 => return expr_identifier_eval(expr, state),
-        256 => return expr_unary_eval(expr, state),
-        128 => return expr_structmember_eval(expr, state),
-        32 => return expr_call_eval(expr, state),
-        1024 => return expr_assign_eval(expr, state),
-        64 => return expr_incdec_eval(expr, state),
-        512 => return expr_binary_eval(expr, state),
-        8192 => return arbarg_eval(expr, state),
+    match ast_expr_kind(expr) {
+        2 => return expr_constant_eval(expr, State),
+        4 => return expr_literal_eval(expr, State),
+        1 => return expr_identifier_eval(expr, State),
+        256 => return expr_unary_eval(expr, State),
+        128 => return expr_structmember_eval(expr, State),
+        32 => return expr_call_eval(expr, State),
+        1024 => return expr_assign_eval(expr, State),
+        64 => return expr_incdec_eval(expr, State),
+        512 => return expr_binary_eval(expr, State),
+        8192 => return arbarg_eval(expr, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 14],
-                        &[libc::c_char; 14],
-                    >(b"ast_expr_eval\0"))
+                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"ast_expr_eval\0"))
                         .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     453 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn arbarg_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> *mut result {
-    return result_value_create(
-        state_vconst(
-            state,
-            ast_type_create_ptr(ast_type_create(TYPE_VOID, 0 as ast_type_modifier)),
-            0 as *mut libc::c_char,
-            0 as libc::c_int != 0,
-        ),
-    );
+unsafe extern "C" fn arbarg_eval(mut expr: *mut AstExpr, mut State: *mut State) -> *mut result {
+    return result_value_create(state_vconst(
+        State,
+        ast_type_create_ptr(ast_type_create(TYPE_VOID, ast_type_modifier::empty())),
+        0 as *mut libc::c_char,
+        0 as libc::c_int != 0,
+    ));
 }
 unsafe extern "C" fn expr_binary_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    let mut e1: *mut ast_expr = ast_expr_binary_e1(expr);
-    let mut e2: *mut ast_expr = ast_expr_binary_e2(expr);
-    let mut res1: *mut result = ast_expr_eval(e1, state);
-    let mut res2: *mut result = ast_expr_eval(e2, state);
+    let mut e1: *mut AstExpr = ast_expr_binary_e1(expr);
+    let mut e2: *mut AstExpr = ast_expr_binary_e2(expr);
+    let mut res1: *mut result = ast_expr_eval(e1, State);
+    let mut res2: *mut result = ast_expr_eval(e2, State);
     if result_iserror(res1) {
         return res1;
     }
     if result_iserror(res2) {
         return res2;
     }
-    return result_value_create(
-        value_sync_create(
-            ast_expr_binary_create(
-                value_to_expr(result_as_value(res1)),
-                ast_expr_binary_op(expr),
-                value_to_expr(result_as_value(res2)),
-            ),
-        ),
-    );
+    return result_value_create(value_sync_create(ast_expr_binary_create(
+        value_to_expr(result_as_value(res1)),
+        ast_expr_binary_op(expr),
+        value_to_expr(result_as_value(res2)),
+    )));
 }
 unsafe extern "C" fn expr_incdec_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    let mut assign: *mut ast_expr = ast_expr_incdec_to_assignment(expr);
+    let mut assign: *mut AstExpr = ast_expr_incdec_to_assignment(expr);
     let mut res: *mut result = 0 as *mut result;
     if ast_expr_incdec_pre(expr) {
-        res = expr_assign_eval(assign, state);
+        res = expr_assign_eval(assign, State);
     } else {
-        res = ast_expr_eval(ast_expr_incdec_root(expr), state);
-        result_destroy(expr_assign_eval(assign, state));
+        res = ast_expr_eval(ast_expr_incdec_root(expr), State);
+        result_destroy(expr_assign_eval(assign, State));
     }
     ast_expr_destroy(assign);
     return res;
 }
-unsafe extern "C" fn ast_expr_destroy_literal(mut expr: *mut ast_expr) {
-    if !((*expr).kind as libc::c_uint
-        == EXPR_STRING_LITERAL as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
-    {
+unsafe extern "C" fn ast_expr_destroy_literal(mut expr: *mut AstExpr) {
+    if !((*expr).kind == EXPR_STRING_LITERAL) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 25],
-                &[libc::c_char; 25],
-            >(b"ast_expr_destroy_literal\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
+                b"ast_expr_destroy_literal\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             135 as libc::c_int,
             b"expr->kind == EXPR_STRING_LITERAL\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     free((*expr).u.string as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_expr_destroy_identifier(mut expr: *mut ast_expr) {
-    if !((*expr).kind as libc::c_uint == EXPR_IDENTIFIER as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+unsafe extern "C" fn ast_expr_destroy_identifier(mut expr: *mut AstExpr) {
+    if !((*expr).kind == EXPR_IDENTIFIER) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 28],
-                &[libc::c_char; 28],
-            >(b"ast_expr_destroy_identifier\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 28], &[libc::c_char; 28]>(
+                b"ast_expr_destroy_identifier\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             40 as libc::c_int,
             b"expr->kind == EXPR_IDENTIFIER\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     free((*expr).u.string as *mut libc::c_void);
 }
 unsafe extern "C" fn expr_assign_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    let mut lval: *mut ast_expr = ast_expr_assignment_lval(expr);
-    let mut rval: *mut ast_expr = ast_expr_assignment_rval(expr);
-    let mut res: *mut result = ast_expr_eval(rval, state);
+    let mut lval: *mut AstExpr = ast_expr_assignment_lval(expr);
+    let mut rval: *mut AstExpr = ast_expr_assignment_rval(expr);
+    let mut res: *mut result = ast_expr_eval(rval, State);
     if result_iserror(res) {
         return res;
     }
     if !result_hasvalue(res) {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 17],
-                    &[libc::c_char; 17],
-                >(b"expr_assign_eval\0"))
+                (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"expr_assign_eval\0"))
                     .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 971 as libc::c_int,
                 b"false\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
-        return result_error_create(
-            error_create(
-                b"undefined indirection (rvalue)\0" as *const u8 as *const libc::c_char
-                    as *mut libc::c_char,
-            ),
-        );
+        } else {
+        };
+        return result_error_create(error_create(
+            b"undefined indirection (rvalue)\0" as *const u8 as *const libc::c_char
+                as *mut libc::c_char,
+        ));
     }
-    let mut lval_res: lvalue_res = ast_expr_lvalue(lval, state);
+    let mut lval_res: lvalue_res = ast_expr_lvalue(lval, State);
     if !(lval_res.err).is_null() {
         return result_error_create(lval_res.err);
     }
-    let mut obj: *mut object = lvalue_object(lval_res.lval);
+    let mut obj: *mut Object = lvalue_object(lval_res.lval);
     if obj.is_null() {
-        let mut b: *mut strbuilder = strbuilder_create();
+        let mut b: *mut StrBuilder = strbuilder_create();
         let mut s: *mut libc::c_char = ast_expr_str(lval);
         strbuilder_printf(
             b,
-            b"undefined indirection: %s is not an lvalue\0" as *const u8
-                as *const libc::c_char,
+            b"undefined indirection: %s is not an lvalue\0" as *const u8 as *const libc::c_char,
             s,
         );
         free(s as *mut libc::c_void);
@@ -1557,87 +1468,78 @@ unsafe extern "C" fn expr_assign_eval(
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_lvalue(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> lvalue_res {
-    match ast_expr_kind(expr) as libc::c_uint {
-        1 => return expr_identifier_lvalue(expr, state),
-        256 => return expr_unary_lvalue(expr, state),
-        128 => return expr_structmember_lvalue(expr, state),
+    match ast_expr_kind(expr) {
+        1 => return expr_identifier_lvalue(expr, State),
+        256 => return expr_unary_lvalue(expr, State),
+        128 => return expr_structmember_lvalue(expr, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 16],
-                        &[libc::c_char; 16],
-                    >(b"ast_expr_lvalue\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(
+                        b"ast_expr_lvalue\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     247 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
 pub unsafe extern "C" fn expr_structmember_lvalue(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> lvalue_res {
-    let mut root: *mut ast_expr = ast_expr_member_root(expr);
-    let mut root_res: lvalue_res = ast_expr_lvalue(root, state);
-    let mut root_obj: *mut object = lvalue_object(root_res.lval);
+    let mut root: *mut AstExpr = ast_expr_member_root(expr);
+    let mut root_res: lvalue_res = ast_expr_lvalue(root, State);
+    let mut root_obj: *mut Object = lvalue_object(root_res.lval);
     if root_obj.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 25],
-                &[libc::c_char; 25],
-            >(b"expr_structmember_lvalue\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
+                b"expr_structmember_lvalue\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             318 as libc::c_int,
             b"root_obj\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut field: *mut libc::c_char = ast_expr_member_field(expr);
-    let mut member: *mut object = object_getmember(
-        root_obj,
-        lvalue_type(root_res.lval),
-        field,
-        state,
-    );
+    let mut member: *mut Object =
+        object_getmember(root_obj, lvalue_type(root_res.lval), field, State);
     if member.is_null() {
         return {
             let mut init = lvalue_res {
                 lval: 0 as *mut lvalue,
                 err: error_create(
-                    b"lvalue error\0" as *const u8 as *const libc::c_char
-                        as *mut libc::c_char,
+                    b"lvalue error\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
                 ),
             };
             init
         };
     }
-    let mut t: *mut ast_type = object_getmembertype(
-        root_obj,
-        lvalue_type(root_res.lval),
-        field,
-        state,
-    );
+    let mut t: *mut ast_type =
+        object_getmembertype(root_obj, lvalue_type(root_res.lval), field, State);
     if t.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 25],
-                &[libc::c_char; 25],
-            >(b"expr_structmember_lvalue\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
+                b"expr_structmember_lvalue\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             333 as libc::c_int,
             b"t\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return {
         let mut init = lvalue_res {
             lval: lvalue_create(t, member),
@@ -1648,34 +1550,27 @@ pub unsafe extern "C" fn expr_structmember_lvalue(
 }
 #[no_mangle]
 pub unsafe extern "C" fn expr_unary_lvalue(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> lvalue_res {
-    if !(ast_expr_unary_op(expr) as libc::c_uint
-        == UNARY_OP_DEREFERENCE as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
-    {
+    if !(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"expr_unary_lvalue\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"expr_unary_lvalue\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             265 as libc::c_int,
             b"ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE\0" as *const u8
                 as *const libc::c_char,
         );
-    } else {};
-    let mut inner: *mut ast_expr = ast_expr_unary_operand(expr);
-    if ast_expr_kind(inner) as libc::c_uint
-        == EXPR_IDENTIFIER as libc::c_int as libc::c_uint
-    {
-        let mut root_res: lvalue_res = ast_expr_lvalue(inner, state);
+    } else {
+    };
+    let mut inner: *mut AstExpr = ast_expr_unary_operand(expr);
+    if ast_expr_kind(inner) == EXPR_IDENTIFIER {
+        let mut root_res: lvalue_res = ast_expr_lvalue(inner, State);
         if !(root_res.err).is_null() {
             return root_res;
         }
-        let mut root_obj: *mut object = lvalue_object(root_res.lval);
+        let mut root_obj: *mut Object = lvalue_object(root_res.lval);
         if root_obj.is_null() {
             return {
                 let mut init = lvalue_res {
@@ -1686,24 +1581,19 @@ pub unsafe extern "C" fn expr_unary_lvalue(
             };
         }
         let mut t: *mut ast_type = ast_type_ptr_type(lvalue_type(root_res.lval));
-        let mut root_val: *mut value = object_as_value(root_obj);
+        let mut root_val: *mut Value = object_as_value(root_obj);
         if root_val.is_null() as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 18],
-                    &[libc::c_char; 18],
-                >(b"expr_unary_lvalue\0"))
+                (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"expr_unary_lvalue\0"))
                     .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 281 as libc::c_int,
                 b"root_val\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
-        let mut res: object_res = state_deref(
-            state,
-            root_val,
-            ast_expr_constant_create(0 as libc::c_int),
-        );
+        } else {
+        };
+        let mut res: object_res =
+            state_deref(State, root_val, ast_expr_constant_create(0 as libc::c_int));
         if !(res.err).is_null() {
             return {
                 let mut init = lvalue_res {
@@ -1721,11 +1611,11 @@ pub unsafe extern "C" fn expr_unary_lvalue(
             init
         };
     }
-    let mut root_res_0: lvalue_res = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
+    let mut root_res_0: lvalue_res = ast_expr_lvalue(ast_expr_binary_e1(inner), State);
     if !(root_res_0.err).is_null() {
         return root_res_0;
     }
-    let mut root_obj_0: *mut object = lvalue_object(root_res_0.lval);
+    let mut root_obj_0: *mut Object = lvalue_object(root_res_0.lval);
     if root_obj_0.is_null() {
         return {
             let mut init = lvalue_res {
@@ -1736,24 +1626,18 @@ pub unsafe extern "C" fn expr_unary_lvalue(
         };
     }
     let mut t_0: *mut ast_type = ast_type_ptr_type(lvalue_type(root_res_0.lval));
-    let mut root_val_0: *mut value = object_as_value(root_obj_0);
+    let mut root_val_0: *mut Value = object_as_value(root_obj_0);
     if root_val_0.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"expr_unary_lvalue\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"expr_unary_lvalue\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             302 as libc::c_int,
             b"root_val\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut res_0: object_res = state_deref(
-        state,
-        root_val_0,
-        ast_expr_binary_e2(inner),
-    );
+    } else {
+    };
+    let mut res_0: object_res = state_deref(State, root_val_0, ast_expr_binary_e2(inner));
     if !(res_0.err).is_null() {
         return {
             let mut init = lvalue_res {
@@ -1773,34 +1657,28 @@ pub unsafe extern "C" fn expr_unary_lvalue(
 }
 #[no_mangle]
 pub unsafe extern "C" fn expr_identifier_lvalue(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> lvalue_res {
     let mut id: *mut libc::c_char = ast_expr_as_identifier(expr);
     return {
         let mut init = lvalue_res {
-            lval: lvalue_create(
-                state_getobjecttype(state, id),
-                state_getobject(state, id),
-            ),
+            lval: lvalue_create(state_getobjecttype(State, id), state_getobject(State, id)),
             err: 0 as *mut error,
         };
         init
     };
 }
 unsafe extern "C" fn dereference_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    let mut binary: *mut ast_expr = expr_to_binary(ast_expr_unary_operand(expr));
-    let mut res: *mut result = binary_deref_eval(binary, state);
+    let mut binary: *mut AstExpr = expr_to_binary(ast_expr_unary_operand(expr));
+    let mut res: *mut result = binary_deref_eval(binary, State);
     ast_expr_destroy(binary);
     return res;
 }
-unsafe extern "C" fn ast_expr_constant_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_expr_constant_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
     let mut constant: libc::c_int = (*expr).u.constant.constant;
     if !(*expr).u.constant.ischar {
         strbuilder_printf(b, b"%d\0" as *const u8 as *const libc::c_char, constant);
@@ -1815,11 +1693,7 @@ unsafe extern "C" fn ast_expr_constant_str_build(
             );
         }
         _ => {
-            strbuilder_printf(
-                b,
-                b"'%c'\0" as *const u8 as *const libc::c_char,
-                constant,
-            );
+            strbuilder_printf(b, b"'%c'\0" as *const u8 as *const libc::c_char, constant);
         }
     };
 }
@@ -1839,30 +1713,25 @@ unsafe extern "C" fn escape_str(mut c: libc::c_char) -> *mut libc::c_char {
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 11],
-                        &[libc::c_char; 11],
-                    >(b"escape_str\0"))
+                    (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"escape_str\0"))
                         .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     105 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn expr_call_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> *mut result {
+unsafe extern "C" fn expr_call_eval(mut expr: *mut AstExpr, mut State: *mut State) -> *mut result {
     let mut err: *mut error = 0 as *mut error;
-    let mut root: *mut ast_expr = ast_expr_call_root(expr);
+    let mut root: *mut AstExpr = ast_expr_call_root(expr);
     let mut name: *mut libc::c_char = ast_expr_as_identifier(root);
-    let mut f: *mut ast_function = externals_getfunc(state_getext(state), name);
+    let mut f: *mut ast_function = externals_getfunc(state_getext(State), name);
     if f.is_null() {
-        let mut b: *mut strbuilder = strbuilder_create();
+        let mut b: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b,
             b"function `%s' not found\0" as *const u8 as *const libc::c_char,
@@ -1878,40 +1747,37 @@ unsafe extern "C" fn expr_call_eval(
         ast_expr_call_args(expr),
         nparams,
         params,
-        state,
+        State,
     );
-    state_pushframe(state, dynamic_str(name), rtype);
-    err = prepare_parameters(nparams, params, args, name, state);
+    state_pushframe(State, dynamic_str(name), rtype);
+    err = prepare_parameters(nparams, params, args, name, State);
     if !err.is_null() {
         return result_error_create(err);
     }
-    err = call_setupverify(f, state_copy(state));
+    err = call_setupverify(f, state_copy(State));
     if !err.is_null() {
         return result_error_create(err);
     }
-    let mut res: *mut result = call_absexec(expr, state);
+    let mut res: *mut result = call_absexec(expr, State);
     if result_iserror(res) {
         return res;
     }
-    let mut v: *mut value = 0 as *mut value;
+    let mut v: *mut Value = 0 as *mut Value;
     if result_hasvalue(res) {
         v = value_copy(result_as_value(res));
     }
-    state_popframe(state);
+    state_popframe(State);
     if !v.is_null() {
-        return pf_augment(v, expr, state);
+        return pf_augment(v, expr, State);
     }
     return res;
 }
-unsafe extern "C" fn call_absexec(
-    mut expr: *mut ast_expr,
-    mut s: *mut state,
-) -> *mut result {
-    let mut root: *mut ast_expr = ast_expr_call_root(expr);
+unsafe extern "C" fn call_absexec(mut expr: *mut AstExpr, mut s: *mut State) -> *mut result {
+    let mut root: *mut AstExpr = ast_expr_call_root(expr);
     let mut name: *mut libc::c_char = ast_expr_as_identifier(root);
     let mut f: *mut ast_function = externals_getfunc(state_getext(s), name);
     if f.is_null() {
-        let mut b: *mut strbuilder = strbuilder_create();
+        let mut b: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b,
             b"function `%s' not found\0" as *const u8 as *const libc::c_char,
@@ -1920,52 +1786,48 @@ unsafe extern "C" fn call_absexec(
         return result_error_create(error_create(strbuilder_build(b)));
     }
     let mut res: *mut result = ast_function_absexec(f, s);
-    if result_iserror(res) as libc::c_int != 0
-        || result_hasvalue(res) as libc::c_int != 0
-    {
+    if result_iserror(res) as libc::c_int != 0 || result_hasvalue(res) as libc::c_int != 0 {
         return res;
     }
     return call_arbitraryresult(expr, f, s);
 }
 unsafe extern "C" fn call_arbitraryresult(
-    mut expr: *mut ast_expr,
+    mut expr: *mut AstExpr,
     mut f: *mut ast_function,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut result {
-    let mut res: *mut result = call_to_computed_value(f, state);
+    let mut res: *mut result = call_to_computed_value(f, State);
     if result_iserror(res) {
         return res;
     }
     if !result_hasvalue(res) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"call_arbitraryresult\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"call_arbitraryresult\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             864 as libc::c_int,
             b"result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return res;
 }
 unsafe extern "C" fn call_to_computed_value(
     mut f: *mut ast_function,
-    mut s: *mut state,
+    mut s: *mut State,
 ) -> *mut result {
     let mut root: *mut libc::c_char = ast_function_name(f);
     let mut nparams: libc::c_int = ast_function_nparams(f);
     let mut uncomputed_param: *mut *mut ast_variable = ast_function_params(f);
-    let mut computed_param: *mut *mut ast_expr = malloc(
-        (::core::mem::size_of::<*mut ast_expr>() as libc::c_ulong)
+    let mut computed_param: *mut *mut AstExpr = malloc(
+        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
             .wrapping_mul(nparams as libc::c_ulong),
-    ) as *mut *mut ast_expr;
+    ) as *mut *mut AstExpr;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nparams {
-        let mut param: *mut ast_expr = ast_expr_identifier_create(
-            dynamic_str(ast_variable_name(*uncomputed_param.offset(i as isize))),
-        );
+        let mut param: *mut AstExpr = ast_expr_identifier_create(dynamic_str(ast_variable_name(
+            *uncomputed_param.offset(i as isize),
+        )));
         let mut res: *mut result = ast_expr_eval(param, s);
         ast_expr_destroy(param);
         if result_iserror(res) {
@@ -1973,17 +1835,17 @@ unsafe extern "C" fn call_to_computed_value(
         }
         if !result_hasvalue(res) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 23],
-                    &[libc::c_char; 23],
-                >(b"call_to_computed_value\0"))
-                    .as_ptr(),
+                (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                    b"call_to_computed_value\0",
+                ))
+                .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 888 as libc::c_int,
                 b"result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
-        let mut v: *mut value = result_as_value(res);
+        } else {
+        };
+        let mut v: *mut Value = result_as_value(res);
         if value_islocation(v) {
             let ref mut fresh0 = *computed_param.offset(i as isize);
             *fresh0 = ast_expr_identifier_create(value_str(v));
@@ -1992,129 +1854,109 @@ unsafe extern "C" fn call_to_computed_value(
             *fresh1 = value_to_expr(v);
         }
         i += 1;
-        i;
     }
-    return result_value_create(
-        value_sync_create(
-            ast_expr_call_create(
-                ast_expr_identifier_create(dynamic_str(root)),
-                nparams,
-                computed_param,
-            ),
-        ),
-    );
+    return result_value_create(value_sync_create(ast_expr_call_create(
+        ast_expr_identifier_create(dynamic_str(root)),
+        nparams,
+        computed_param,
+    )));
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_absexec(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    match ast_expr_kind(expr) as libc::c_uint {
-        1024 => return assign_absexec(expr, state),
-        4096 => return isdereferencable_absexec(expr, state),
-        16384 => return alloc_absexec(expr, state),
-        1 | 2 | 256 | 32 | 128 | 8192 => return ast_expr_eval(expr, state),
+    match ast_expr_kind(expr) {
+        1024 => return assign_absexec(expr, State),
+        4096 => return isdereferencable_absexec(expr, State),
+        16384 => return alloc_absexec(expr, State),
+        1 | 2 | 256 | 32 | 128 | 8192 => return ast_expr_eval(expr, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 17],
-                        &[libc::c_char; 17],
-                    >(b"ast_expr_absexec\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(
+                        b"ast_expr_absexec\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     1075 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn expr_unary_eval(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> *mut result {
-    match ast_expr_unary_op(expr) as libc::c_uint {
-        2 => return dereference_eval(expr, state),
-        1 => return address_eval(expr, state),
+unsafe extern "C" fn expr_unary_eval(mut expr: *mut AstExpr, mut State: *mut State) -> *mut result {
+    match ast_expr_unary_op(expr).bits() {
+        2 => return dereference_eval(expr, State),
+        1 => return address_eval(expr, State),
         32 => {
-            return result_value_create(
-                value_literal_create(
-                    b"hack\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-                ),
-            );
+            return result_value_create(value_literal_create(
+                b"hack\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+            ));
         }
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 16],
-                        &[libc::c_char; 16],
-                    >(b"expr_unary_eval\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(
+                        b"expr_unary_eval\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     539 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn alloc_absexec(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> *mut result {
-    match ast_expr_alloc_kind(expr) as libc::c_uint {
-        1 => return result_value_create(state_alloc(state)),
-        2 => return dealloc_process(expr, state),
-        4 => return result_value_create(state_clump(state)),
+unsafe extern "C" fn alloc_absexec(mut expr: *mut AstExpr, mut State: *mut State) -> *mut result {
+    match ast_expr_alloc_kind(expr).bits() {
+        1 => return result_value_create(state_alloc(State)),
+        2 => return dealloc_process(expr, State),
+        4 => return result_value_create(state_clump(State)),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 14],
-                        &[libc::c_char; 14],
-                    >(b"alloc_absexec\0"))
+                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"alloc_absexec\0"))
                         .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     1098 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn dealloc_process(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> *mut result {
-    let mut arg: *mut ast_expr = ast_expr_alloc_arg(expr);
-    let mut res: *mut result = ast_expr_eval(arg, state);
+unsafe extern "C" fn dealloc_process(mut expr: *mut AstExpr, mut State: *mut State) -> *mut result {
+    let mut arg: *mut AstExpr = ast_expr_alloc_arg(expr);
+    let mut res: *mut result = ast_expr_eval(arg, State);
     if result_iserror(res) {
         return res;
     }
-    let mut val: *mut value = result_as_value(res);
+    let mut val: *mut Value = result_as_value(res);
     if val.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 16],
-                &[libc::c_char; 16],
-            >(b"dealloc_process\0"))
+            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"dealloc_process\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             1113 as libc::c_int,
             b"val\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut err: *mut error = state_dealloc(state, val);
+    } else {
+    };
+    let mut err: *mut error = state_dealloc(State, val);
     if !err.is_null() {
         return result_error_create(err);
     }
     value_destroy(val);
-    return result_value_create(0 as *mut value);
+    return result_value_create(0 as *mut Value);
 }
 #[no_mangle]
 pub unsafe extern "C" fn prepare_parameters(
@@ -2122,61 +1964,53 @@ pub unsafe extern "C" fn prepare_parameters(
     mut param: *mut *mut ast_variable,
     mut args: *mut result_arr,
     mut fname: *mut libc::c_char,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     if !(nparams == (*args).n) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"prepare_parameters\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"prepare_parameters\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             926 as libc::c_int,
             b"nparams == args->n\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*args).n {
-        state_declare(state, *param.offset(i as isize), 1 as libc::c_int != 0);
+        state_declare(State, *param.offset(i as isize), 1 as libc::c_int != 0);
         let mut res: *mut result = *((*args).res).offset(i as isize);
         if result_iserror(res) {
             return result_as_error(res);
         }
         if !result_hasvalue(res) {
-            let mut b: *mut strbuilder = strbuilder_create();
+            let mut b: *mut StrBuilder = strbuilder_create();
             strbuilder_printf(
                 b,
-                b"parameter `%s' of function `%s' has no value\0" as *const u8
+                b"parameter `%s' of function `%s' has no Value\0" as *const u8
                     as *const libc::c_char,
                 ast_variable_name(*param.offset(i as isize)),
                 fname,
             );
             return error_create(strbuilder_build(b));
         }
-        let mut name: *mut ast_expr = ast_expr_identifier_create(
-            dynamic_str(ast_variable_name(*param.offset(i as isize))),
-        );
-        let mut lval_res: lvalue_res = ast_expr_lvalue(name, state);
+        let mut name: *mut AstExpr =
+            ast_expr_identifier_create(dynamic_str(ast_variable_name(*param.offset(i as isize))));
+        let mut lval_res: lvalue_res = ast_expr_lvalue(name, State);
         if !(lval_res.err).is_null() {
             return lval_res.err;
         }
-        let mut obj: *mut object = lvalue_object(lval_res.lval);
+        let mut obj: *mut Object = lvalue_object(lval_res.lval);
         ast_expr_destroy(name);
         object_assign(obj, value_copy(result_as_value(res)));
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
 #[no_mangle]
-pub unsafe extern "C" fn result_arr_append(
-    mut arr: *mut result_arr,
-    mut res: *mut result,
-) {
+pub unsafe extern "C" fn result_arr_append(mut arr: *mut result_arr, mut res: *mut result) {
     (*arr).n += 1;
-    (*arr)
-        .res = realloc(
+    (*arr).res = realloc(
         (*arr).res as *mut libc::c_void,
         (::core::mem::size_of::<*mut result>() as libc::c_ulong)
             .wrapping_mul((*arr).n as libc::c_ulong),
@@ -2185,12 +2019,12 @@ pub unsafe extern "C" fn result_arr_append(
     *fresh2 = res;
 }
 unsafe extern "C" fn isdereferencable_absexec(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
+    mut expr: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
-    let mut p: *mut props = state_getprops(state);
+    let mut p: *mut Props = state_getprops(State);
     props_install(p, expr);
-    return result_value_create(0 as *mut value);
+    return result_value_create(0 as *mut Value);
 }
 #[no_mangle]
 pub unsafe extern "C" fn result_arr_create() -> *mut result_arr {
@@ -2202,74 +2036,62 @@ pub unsafe extern "C" fn result_arr_create() -> *mut result_arr {
 #[no_mangle]
 pub unsafe extern "C" fn prepare_arguments(
     mut nargs: libc::c_int,
-    mut arg: *mut *mut ast_expr,
+    mut arg: *mut *mut AstExpr,
     mut nparams: libc::c_int,
     mut param: *mut *mut ast_variable,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut result_arr {
     if !(nargs == nparams) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"prepare_arguments\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"prepare_arguments\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             911 as libc::c_int,
             b"nargs == nparams\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut args: *mut result_arr = result_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nargs {
-        result_arr_append(args, ast_expr_eval(*arg.offset(i as isize), state));
+        result_arr_append(args, ast_expr_eval(*arg.offset(i as isize), State));
         i += 1;
-        i;
     }
     return args;
 }
-unsafe extern "C" fn assign_absexec(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> *mut result {
-    let mut lval: *mut ast_expr = ast_expr_assignment_lval(expr);
-    let mut rval: *mut ast_expr = ast_expr_assignment_rval(expr);
-    let mut res: *mut result = ast_expr_absexec(rval, state);
+unsafe extern "C" fn assign_absexec(mut expr: *mut AstExpr, mut State: *mut State) -> *mut result {
+    let mut lval: *mut AstExpr = ast_expr_assignment_lval(expr);
+    let mut rval: *mut AstExpr = ast_expr_assignment_rval(expr);
+    let mut res: *mut result = ast_expr_absexec(rval, State);
     if result_iserror(res) {
         return res;
     }
     if !result_hasvalue(res) {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 15],
-                    &[libc::c_char; 15],
-                >(b"assign_absexec\0"))
+                (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"assign_absexec\0"))
                     .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 1133 as libc::c_int,
                 b"false\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
-        return result_error_create(
-            error_create(
-                b"undefined indirection (rvalue)\0" as *const u8 as *const libc::c_char
-                    as *mut libc::c_char,
-            ),
-        );
+        } else {
+        };
+        return result_error_create(error_create(
+            b"undefined indirection (rvalue)\0" as *const u8 as *const libc::c_char
+                as *mut libc::c_char,
+        ));
     }
-    let mut lval_res: lvalue_res = ast_expr_lvalue(lval, state);
+    let mut lval_res: lvalue_res = ast_expr_lvalue(lval, State);
     if !(lval_res.err).is_null() {
         return result_error_create(lval_res.err);
     }
-    let mut obj: *mut object = lvalue_object(lval_res.lval);
+    let mut obj: *mut Object = lvalue_object(lval_res.lval);
     if obj.is_null() {
-        return result_error_create(
-            error_create(
-                b"undefined indirection (lvalue)\0" as *const u8 as *const libc::c_char
-                    as *mut libc::c_char,
-            ),
-        );
+        return result_error_create(error_create(
+            b"undefined indirection (lvalue)\0" as *const u8 as *const libc::c_char
+                as *mut libc::c_char,
+        ));
     }
     object_assign(obj, value_copy(result_as_value(res)));
     return res;
@@ -2280,15 +2102,14 @@ pub unsafe extern "C" fn result_arr_destroy(mut arr: *mut result_arr) {
     while i < (*arr).n {
         result_destroy(*((*arr).res).offset(i as isize));
         i += 1;
-        i;
     }
     free(arr as *mut libc::c_void);
 }
 unsafe extern "C" fn verify_paramspec(
-    mut param: *mut value,
-    mut arg: *mut value,
-    mut param_state: *mut state,
-    mut arg_state: *mut state,
+    mut param: *mut Value,
+    mut arg: *mut Value,
+    mut param_state: *mut State,
+    mut arg_state: *mut State,
 ) -> *mut error {
     if !state_islval(param_state, param) {
         return 0 as *mut error;
@@ -2298,54 +2119,41 @@ unsafe extern "C" fn verify_paramspec(
             b"must be lvalue\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
     }
-    if state_isalloc(param_state, param) as libc::c_int != 0
-        && !state_isalloc(arg_state, arg)
-    {
+    if state_isalloc(param_state, param) as libc::c_int != 0 && !state_isalloc(arg_state, arg) {
         return error_create(
-            b"must be heap allocated\0" as *const u8 as *const libc::c_char
-                as *mut libc::c_char,
+            b"must be Heap allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
     }
-    let mut param_res: object_res = state_get(
-        param_state,
-        value_as_location(param),
-        0 as libc::c_int != 0,
-    );
+    let mut param_res: object_res =
+        state_get(param_state, value_as_location(param), 0 as libc::c_int != 0);
     if !(param_res.err).is_null() {
         return param_res.err;
     }
-    let mut arg_res: object_res = state_get(
-        arg_state,
-        value_as_location(arg),
-        0 as libc::c_int != 0,
-    );
+    let mut arg_res: object_res =
+        state_get(arg_state, value_as_location(arg), 0 as libc::c_int != 0);
     if !(arg_res.err).is_null() {
         return arg_res.err;
     }
     if (param_res.obj).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 17],
-                &[libc::c_char; 17],
-            >(b"verify_paramspec\0"))
+            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"verify_paramspec\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             823 as libc::c_int,
             b"param_res.obj\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     if (arg_res.obj).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 17],
-                &[libc::c_char; 17],
-            >(b"verify_paramspec\0"))
+            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"verify_paramspec\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             824 as libc::c_int,
             b"arg_res.obj\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     if !object_hasvalue(param_res.obj) {
         return 0 as *mut error;
     }
@@ -2363,11 +2171,11 @@ unsafe extern "C" fn verify_paramspec(
 }
 unsafe extern "C" fn call_setupverify(
     mut f: *mut ast_function,
-    mut arg_state: *mut state,
+    mut arg_state: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
     let mut fname: *mut libc::c_char = ast_function_name(f);
-    let mut param_state: *mut state = state_create(
+    let mut param_state: *mut State = state_create(
         dynamic_str(fname),
         state_getext(arg_state),
         ast_function_type(f),
@@ -2381,11 +2189,11 @@ unsafe extern "C" fn call_setupverify(
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nparams {
         let mut id: *mut libc::c_char = ast_variable_name(*param.offset(i as isize));
-        let mut param_0: *mut value = state_getloc(param_state, id);
-        let mut arg: *mut value = state_getloc(arg_state, id);
+        let mut param_0: *mut Value = state_getloc(param_state, id);
+        let mut arg: *mut Value = state_getloc(arg_state, id);
         err = verify_paramspec(param_0, arg, param_state, arg_state);
         if !err.is_null() {
-            let mut b: *mut strbuilder = strbuilder_create();
+            let mut b: *mut StrBuilder = strbuilder_create();
             strbuilder_printf(
                 b,
                 b"parameter %s of %s %s\0" as *const u8 as *const libc::c_char,
@@ -2396,194 +2204,157 @@ unsafe extern "C" fn call_setupverify(
             return error_create(strbuilder_build(b));
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_bracketed_root(
-    mut expr: *mut ast_expr,
-) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint == EXPR_BRACKETED as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_bracketed_root(mut expr: *mut AstExpr) -> *mut AstExpr {
+    if !((*expr).kind == EXPR_BRACKETED) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 24],
-                &[libc::c_char; 24],
-            >(b"ast_expr_bracketed_root\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
+                b"ast_expr_bracketed_root\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             151 as libc::c_int,
             b"expr->kind == EXPR_BRACKETED\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).root;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_bracketed_create(
-    mut root: *mut ast_expr,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_bracketed_create(mut root: *mut AstExpr) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_BRACKETED;
     (*expr).root = root;
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_literal_create(
-    mut s: *mut libc::c_char,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_literal_create(mut s: *mut libc::c_char) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_STRING_LITERAL;
     (*expr).u.string = s;
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_as_literal(
-    mut expr: *mut ast_expr,
-) -> *mut libc::c_char {
-    if !((*expr).kind as libc::c_uint
-        == EXPR_STRING_LITERAL as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_as_literal(mut expr: *mut AstExpr) -> *mut libc::c_char {
+    if !((*expr).kind == EXPR_STRING_LITERAL) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_expr_as_literal\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_expr_as_literal\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             128 as libc::c_int,
             b"expr->kind == EXPR_STRING_LITERAL\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.string;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_as_constant(mut expr: *mut ast_expr) -> libc::c_int {
-    if !((*expr).kind as libc::c_uint == EXPR_CONSTANT as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_as_constant(mut expr: *mut AstExpr) -> libc::c_int {
+    if !((*expr).kind == EXPR_CONSTANT) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"ast_expr_as_constant\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"ast_expr_as_constant\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             112 as libc::c_int,
             b"expr->kind == EXPR_CONSTANT\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.constant.constant;
 }
 unsafe extern "C" fn pf_augment(
-    mut v: *mut value,
-    mut call: *mut ast_expr,
-    mut state: *mut state,
+    mut v: *mut Value,
+    mut call: *mut AstExpr,
+    mut State: *mut State,
 ) -> *mut result {
     if !value_isstruct(v) {
         return result_value_create(value_copy(v));
     }
-    let mut res: *mut result = ast_expr_pf_reduce(call, state);
+    let mut res: *mut result = ast_expr_pf_reduce(call, State);
     if result_iserror(res) {
         return res;
     }
     if !result_hasvalue(res) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"pf_augment\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"pf_augment\0")).as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             847 as libc::c_int,
             b"result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return result_value_create(value_pf_augment(v, value_as_sync(result_as_value(res))));
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_constant_create_char(
-    mut c: libc::c_char,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_constant_create_char(mut c: libc::c_char) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_CONSTANT;
     (*expr).u.constant.ischar = 1 as libc::c_int != 0;
     (*expr).u.constant.constant = c as libc::c_int;
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_constant_create(mut k: libc::c_int) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_constant_create(mut k: libc::c_int) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_CONSTANT;
     (*expr).u.constant.ischar = 0 as libc::c_int != 0;
     (*expr).u.constant.constant = k;
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_as_identifier(
-    mut expr: *mut ast_expr,
-) -> *mut libc::c_char {
-    if !((*expr).kind as libc::c_uint == EXPR_IDENTIFIER as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_as_identifier(mut expr: *mut AstExpr) -> *mut libc::c_char {
+    if !((*expr).kind == EXPR_IDENTIFIER) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"ast_expr_as_identifier\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"ast_expr_as_identifier\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             33 as libc::c_int,
             b"expr->kind == EXPR_IDENTIFIER\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.string;
 }
-unsafe extern "C" fn ast_expr_create() -> *mut ast_expr {
-    return malloc(::core::mem::size_of::<ast_expr>() as libc::c_ulong) as *mut ast_expr;
+unsafe extern "C" fn ast_expr_create() -> *mut AstExpr {
+    return malloc(::core::mem::size_of::<AstExpr>() as libc::c_ulong) as *mut AstExpr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_identifier_create(
-    mut s: *mut libc::c_char,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_identifier_create(mut s: *mut libc::c_char) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_IDENTIFIER;
     (*expr).u.string = s;
     return expr;
 }
-unsafe extern "C" fn unary_pf_reduce(
-    mut e: *mut ast_expr,
-    mut s: *mut state,
-) -> *mut result {
+unsafe extern "C" fn unary_pf_reduce(mut e: *mut AstExpr, mut s: *mut State) -> *mut result {
     let mut res: *mut result = ast_expr_pf_reduce(ast_expr_unary_operand(e), s);
     if result_iserror(res) {
         return res;
     }
     if !result_hasvalue(res) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 16],
-                &[libc::c_char; 16],
-            >(b"unary_pf_reduce\0"))
+            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"unary_pf_reduce\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             1274 as libc::c_int,
             b"result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    return result_value_create(
-        value_sync_create(
-            ast_expr_unary_create(
-                value_as_sync(result_as_value(res)),
-                ast_expr_unary_op(e),
-            ),
-        ),
-    );
+    } else {
+    };
+    return result_value_create(value_sync_create(ast_expr_unary_create(
+        value_as_sync(result_as_value(res)),
+        ast_expr_unary_op(e),
+    )));
 }
 unsafe extern "C" fn binary_pf_reduce(
-    mut e1: *mut ast_expr,
+    mut e1: *mut AstExpr,
     mut op: ast_binary_operator,
-    mut e2: *mut ast_expr,
-    mut s: *mut state,
+    mut e2: *mut AstExpr,
+    mut s: *mut State,
 ) -> *mut result {
     let mut res1: *mut result = ast_expr_pf_reduce(e1, s);
     if result_iserror(res1) {
@@ -2591,92 +2362,71 @@ unsafe extern "C" fn binary_pf_reduce(
     }
     if !result_hasvalue(res1) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 17],
-                &[libc::c_char; 17],
-            >(b"binary_pf_reduce\0"))
+            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"binary_pf_reduce\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             1293 as libc::c_int,
             b"result_hasvalue(res1)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut res2: *mut result = ast_expr_pf_reduce(e2, s);
     if result_iserror(res2) {
         return res2;
     }
     if !result_hasvalue(res2) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 17],
-                &[libc::c_char; 17],
-            >(b"binary_pf_reduce\0"))
+            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"binary_pf_reduce\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             1298 as libc::c_int,
             b"result_hasvalue(res2)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    return result_value_create(
-        value_sync_create(
-            ast_expr_binary_create(
-                value_to_expr(result_as_value(res1)),
-                op,
-                value_to_expr(result_as_value(res2)),
-            ),
-        ),
-    );
+    } else {
+    };
+    return result_value_create(value_sync_create(ast_expr_binary_create(
+        value_to_expr(result_as_value(res1)),
+        op,
+        value_to_expr(result_as_value(res2)),
+    )));
 }
-unsafe extern "C" fn call_pf_reduce(
-    mut e: *mut ast_expr,
-    mut s: *mut state,
-) -> *mut result {
+unsafe extern "C" fn call_pf_reduce(mut e: *mut AstExpr, mut s: *mut State) -> *mut result {
     let mut root: *mut libc::c_char = ast_expr_as_identifier(ast_expr_call_root(e));
     let mut nargs: libc::c_int = ast_expr_call_nargs(e);
-    let mut unreduced_arg: *mut *mut ast_expr = ast_expr_call_args(e);
-    let mut reduced_arg: *mut *mut ast_expr = malloc(
-        (::core::mem::size_of::<*mut ast_expr>() as libc::c_ulong)
+    let mut unreduced_arg: *mut *mut AstExpr = ast_expr_call_args(e);
+    let mut reduced_arg: *mut *mut AstExpr = malloc(
+        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
             .wrapping_mul(nargs as libc::c_ulong),
-    ) as *mut *mut ast_expr;
+    ) as *mut *mut AstExpr;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nargs {
-        let mut res: *mut result = ast_expr_pf_reduce(
-            *unreduced_arg.offset(i as isize),
-            s,
-        );
+        let mut res: *mut result = ast_expr_pf_reduce(*unreduced_arg.offset(i as isize), s);
         if result_iserror(res) {
             return res;
         }
         if !result_hasvalue(res) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 15],
-                    &[libc::c_char; 15],
-                >(b"call_pf_reduce\0"))
+                (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"call_pf_reduce\0"))
                     .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 1324 as libc::c_int,
                 b"result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
         let ref mut fresh3 = *reduced_arg.offset(i as isize);
         *fresh3 = ast_expr_copy(value_to_expr(result_as_value(res)));
         i += 1;
-        i;
     }
-    return result_value_create(
-        value_sync_create(
-            ast_expr_call_create(
-                ast_expr_identifier_create(dynamic_str(root)),
-                nargs,
-                reduced_arg,
-            ),
-        ),
-    );
+    return result_value_create(value_sync_create(ast_expr_call_create(
+        ast_expr_identifier_create(dynamic_str(root)),
+        nargs,
+        reduced_arg,
+    )));
 }
 unsafe extern "C" fn structmember_pf_reduce(
-    mut expr: *mut ast_expr,
-    mut s: *mut state,
+    mut expr: *mut AstExpr,
+    mut s: *mut State,
 ) -> *mut result {
     let mut res: *mut result = ast_expr_pf_reduce(ast_expr_member_root(expr), s);
     if result_iserror(res) {
@@ -2684,57 +2434,55 @@ unsafe extern "C" fn structmember_pf_reduce(
     }
     if !result_hasvalue(res) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"structmember_pf_reduce\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"structmember_pf_reduce\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             1344 as libc::c_int,
             b"result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut field: *mut libc::c_char = ast_expr_member_field(expr);
-    let mut v: *mut value = result_as_value(res);
+    let mut v: *mut Value = result_as_value(res);
     if value_isstruct(v) {
-        let mut obj: *mut object = value_struct_member(v, field);
-        let mut obj_value: *mut value = object_as_value(obj);
+        let mut obj: *mut Object = value_struct_member(v, field);
+        let mut obj_value: *mut Value = object_as_value(obj);
         if obj_value.is_null() as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 23],
-                    &[libc::c_char; 23],
-                >(b"structmember_pf_reduce\0"))
-                    .as_ptr(),
+                (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                    b"structmember_pf_reduce\0",
+                ))
+                .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 1350 as libc::c_int,
                 b"obj_value\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
         return result_value_create(value_copy(obj_value));
     }
     if !value_issync(v) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"structmember_pf_reduce\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"structmember_pf_reduce\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             1353 as libc::c_int,
             b"value_issync(v)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    return result_value_create(
-        value_sync_create(ast_expr_member_create(value_as_sync(v), dynamic_str(field))),
-    );
+    } else {
+    };
+    return result_value_create(value_sync_create(ast_expr_member_create(
+        value_as_sync(v),
+        dynamic_str(field),
+    )));
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_pf_reduce(
-    mut e: *mut ast_expr,
-    mut s: *mut state,
-) -> *mut result {
-    match ast_expr_kind(e) as libc::c_uint {
+pub unsafe extern "C" fn ast_expr_pf_reduce(mut e: *mut AstExpr, mut s: *mut State) -> *mut result {
+    match ast_expr_kind(e) {
         2 | 4 | 1 => return ast_expr_eval(e, s),
         256 => return unary_pf_reduce(e, s),
         512 => {
@@ -2751,43 +2499,38 @@ pub unsafe extern "C" fn ast_expr_pf_reduce(
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 19],
-                        &[libc::c_char; 19],
-                    >(b"ast_expr_pf_reduce\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(
+                        b"ast_expr_pf_reduce\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     1261 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn ast_expr_destroy_unary(mut expr: *mut ast_expr) {
-    if !((*expr).kind as libc::c_uint == EXPR_UNARY as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+unsafe extern "C" fn ast_expr_destroy_unary(mut expr: *mut AstExpr) {
+    if !((*expr).kind == EXPR_UNARY) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"ast_expr_destroy_unary\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"ast_expr_destroy_unary\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             389 as libc::c_int,
             b"expr->kind == EXPR_UNARY\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     ast_expr_destroy((*expr).root);
 }
-unsafe extern "C" fn ast_expr_member_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
-) {
-    let mut root: *mut ast_expr = (*expr).root;
-    if (*root).kind as libc::c_uint == EXPR_UNARY as libc::c_int as libc::c_uint {
+unsafe extern "C" fn ast_expr_member_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
+    let mut root: *mut AstExpr = (*expr).root;
+    if (*root).kind == EXPR_UNARY {
         return ast_expr_member_deref_str_build(root, (*expr).u.string, b);
     }
     let mut r: *mut libc::c_char = ast_expr_str(root);
@@ -2800,33 +2543,28 @@ unsafe extern "C" fn ast_expr_member_str_build(
     free(r as *mut libc::c_void);
 }
 unsafe extern "C" fn ast_expr_member_deref_str_build(
-    mut root: *mut ast_expr,
+    mut root: *mut AstExpr,
     mut member: *mut libc::c_char,
-    mut b: *mut strbuilder,
+    mut b: *mut StrBuilder,
 ) {
-    if !(ast_expr_unary_op(root) as libc::c_uint
-        == UNARY_OP_DEREFERENCE as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
-    {
+    if !(ast_expr_unary_op(root) == UNARY_OP_DEREFERENCE) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 32],
-                &[libc::c_char; 32],
-            >(b"ast_expr_member_deref_str_build\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 32], &[libc::c_char; 32]>(
+                b"ast_expr_member_deref_str_build\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             349 as libc::c_int,
             b"ast_expr_unary_op(root) == UNARY_OP_DEREFERENCE\0" as *const u8
                 as *const libc::c_char,
         );
-    } else {};
-    let mut inner: *mut ast_expr = ast_expr_unary_operand(root);
-    let mut e1: *mut ast_expr = ast_expr_binary_e1(inner);
-    let mut e2: *mut ast_expr = ast_expr_binary_e2(inner);
+    } else {
+    };
+    let mut inner: *mut AstExpr = ast_expr_unary_operand(root);
+    let mut e1: *mut AstExpr = ast_expr_binary_e1(inner);
+    let mut e2: *mut AstExpr = ast_expr_binary_e2(inner);
     let mut left: *mut libc::c_char = ast_expr_str(e1);
-    if (*e2).kind as libc::c_uint == EXPR_CONSTANT as libc::c_int as libc::c_uint
-        && ast_expr_as_constant(e2) == 0 as libc::c_int
-    {
+    if (*e2).kind == EXPR_CONSTANT && ast_expr_as_constant(e2) == 0 as libc::c_int {
         strbuilder_printf(
             b,
             b"%s->%s\0" as *const u8 as *const libc::c_char,
@@ -2846,10 +2584,7 @@ unsafe extern "C" fn ast_expr_member_deref_str_build(
     }
     free(left as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_expr_incdec_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_expr_incdec_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
     let mut root: *mut libc::c_char = ast_expr_str((*expr).root);
     let mut op: *mut libc::c_char = (if (*expr).u.incdec.inc != 0 {
         b"++\0" as *const u8 as *const libc::c_char
@@ -2863,17 +2598,12 @@ unsafe extern "C" fn ast_expr_incdec_str_build(
     }
     free(root as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_expr_call_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_expr_call_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
     let mut root: *mut libc::c_char = ast_expr_str((*expr).root);
     strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, root);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*expr).u.call.n {
-        let mut arg: *mut libc::c_char = ast_expr_str(
-            *((*expr).u.call.arg).offset(i as isize),
-        );
+        let mut arg: *mut libc::c_char = ast_expr_str(*((*expr).u.call.arg).offset(i as isize));
         strbuilder_printf(
             b,
             b"%s%s\0" as *const u8 as *const libc::c_char,
@@ -2886,58 +2616,50 @@ unsafe extern "C" fn ast_expr_call_str_build(
         );
         free(arg as *mut libc::c_void);
         i += 1;
-        i;
     }
     strbuilder_printf(b, b")\0" as *const u8 as *const libc::c_char);
     free(root as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_expr_destroy_call(mut expr: *mut ast_expr) {
-    if !((*expr).kind as libc::c_uint == EXPR_CALL as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+unsafe extern "C" fn ast_expr_destroy_call(mut expr: *mut AstExpr) {
+    if !((*expr).kind == EXPR_CALL) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 22],
-                &[libc::c_char; 22],
-            >(b"ast_expr_destroy_call\0"))
+            (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(b"ast_expr_destroy_call\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             219 as libc::c_int,
             b"expr->kind == EXPR_CALL\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     ast_expr_destroy((*expr).root);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*expr).u.call.n {
         ast_expr_destroy(*((*expr).u.call.arg).offset(i as isize));
         i += 1;
-        i;
     }
     free((*expr).u.call.arg as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_expr_destroy_incdec(mut expr: *mut ast_expr) {
-    if !((*expr).kind as libc::c_uint == EXPR_INCDEC as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+unsafe extern "C" fn ast_expr_destroy_incdec(mut expr: *mut AstExpr) {
+    if !((*expr).kind == EXPR_INCDEC) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 24],
-                &[libc::c_char; 24],
-            >(b"ast_expr_destroy_incdec\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
+                b"ast_expr_destroy_incdec\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             286 as libc::c_int,
             b"expr->kind == EXPR_INCDEC\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     ast_expr_destroy((*expr).root);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_inverted_copy(
-    mut expr: *mut ast_expr,
+    mut expr: *mut AstExpr,
     mut invert: bool,
-) -> *mut ast_expr {
-    let mut copy: *mut ast_expr = ast_expr_copy(expr);
+) -> *mut AstExpr {
+    let mut copy: *mut AstExpr = ast_expr_copy(expr);
     return if invert as libc::c_int != 0 {
         ast_expr_unary_create(copy, UNARY_OP_BANG)
     } else {
@@ -2945,101 +2667,80 @@ pub unsafe extern "C" fn ast_expr_inverted_copy(
     };
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_member_field(
-    mut expr: *mut ast_expr,
-) -> *mut libc::c_char {
-    if !((*expr).kind as libc::c_uint
-        == EXPR_STRUCTMEMBER as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_member_field(mut expr: *mut AstExpr) -> *mut libc::c_char {
+    if !((*expr).kind == EXPR_STRUCTMEMBER) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 22],
-                &[libc::c_char; 22],
-            >(b"ast_expr_member_field\0"))
+            (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(b"ast_expr_member_field\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             323 as libc::c_int,
             b"expr->kind == EXPR_STRUCTMEMBER\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.string;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_member_root(mut expr: *mut ast_expr) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint
-        == EXPR_STRUCTMEMBER as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_member_root(mut expr: *mut AstExpr) -> *mut AstExpr {
+    if !((*expr).kind == EXPR_STRUCTMEMBER) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"ast_expr_member_root\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"ast_expr_member_root\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             316 as libc::c_int,
             b"expr->kind == EXPR_STRUCTMEMBER\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).root;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_incdec_pre(mut expr: *mut ast_expr) -> bool {
-    if !((*expr).kind as libc::c_uint == EXPR_INCDEC as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_incdec_pre(mut expr: *mut AstExpr) -> bool {
+    if !((*expr).kind == EXPR_INCDEC) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_expr_incdec_pre\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_expr_incdec_pre\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             270 as libc::c_int,
             b"expr->kind == EXPR_INCDEC\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.incdec.pre != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_incdec_root(mut expr: *mut ast_expr) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint == EXPR_INCDEC as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_incdec_root(mut expr: *mut AstExpr) -> *mut AstExpr {
+    if !((*expr).kind == EXPR_INCDEC) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"ast_expr_incdec_root\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"ast_expr_incdec_root\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             278 as libc::c_int,
             b"expr->kind == EXPR_INCDEC\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).root;
 }
-unsafe extern "C" fn ast_expr_copy_call(mut expr: *mut ast_expr) -> *mut ast_expr {
-    let mut arg: *mut *mut ast_expr = malloc(
-        (::core::mem::size_of::<*mut ast_expr>() as libc::c_ulong)
+unsafe extern "C" fn ast_expr_copy_call(mut expr: *mut AstExpr) -> *mut AstExpr {
+    let mut arg: *mut *mut AstExpr = malloc(
+        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
             .wrapping_mul((*expr).u.call.n as libc::c_ulong),
-    ) as *mut *mut ast_expr;
+    ) as *mut *mut AstExpr;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*expr).u.call.n {
         let ref mut fresh4 = *arg.offset(i as isize);
         *fresh4 = ast_expr_copy(*((*expr).u.call.arg).offset(i as isize));
         i += 1;
-        i;
     }
     return ast_expr_call_create(ast_expr_copy((*expr).root), (*expr).u.call.n, arg);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_member_create(
-    mut _struct: *mut ast_expr,
+    mut _struct: *mut AstExpr,
     mut field: *mut libc::c_char,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_STRUCTMEMBER;
     (*expr).root = _struct;
     (*expr).u.string = field;
@@ -3047,53 +2748,49 @@ pub unsafe extern "C" fn ast_expr_member_create(
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_unary_create(
-    mut root: *mut ast_expr,
+    mut root: *mut AstExpr,
     mut op: ast_unary_operator,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_UNARY;
     (*expr).root = root;
     (*expr).u.unary_op = op;
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_incdec_to_assignment(
-    mut expr: *mut ast_expr,
-) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint == EXPR_INCDEC as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_incdec_to_assignment(mut expr: *mut AstExpr) -> *mut AstExpr {
+    if !((*expr).kind == EXPR_INCDEC) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 30],
-                &[libc::c_char; 30],
-            >(b"ast_expr_incdec_to_assignment\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 30], &[libc::c_char; 30]>(
+                b"ast_expr_incdec_to_assignment\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             255 as libc::c_int,
             b"expr->kind == EXPR_INCDEC\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return ast_expr_assignment_create(
         ast_expr_copy((*expr).root),
         ast_expr_binary_create(
             ast_expr_copy((*expr).root),
-            (if (*expr).u.incdec.inc != 0 {
-                BINARY_OP_ADDITION as libc::c_int
+            if (*expr).u.incdec.inc != 0 {
+                BINARY_OP_ADDITION
             } else {
-                BINARY_OP_SUBTRACTION as libc::c_int
-            }) as ast_binary_operator,
+                BINARY_OP_SUBTRACTION
+            },
             ast_expr_constant_create(1 as libc::c_int),
         ),
     );
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_incdec_create(
-    mut root: *mut ast_expr,
+    mut root: *mut AstExpr,
     mut inc: bool,
     mut pre: bool,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_INCDEC;
     (*expr).root = root;
     (*expr).u.incdec.inc = inc as libc::c_int;
@@ -3101,26 +2798,24 @@ pub unsafe extern "C" fn ast_expr_incdec_create(
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_call_args(
-    mut expr: *mut ast_expr,
-) -> *mut *mut ast_expr {
+pub unsafe extern "C" fn ast_expr_call_args(mut expr: *mut AstExpr) -> *mut *mut AstExpr {
     return (*expr).u.call.arg;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_call_nargs(mut expr: *mut ast_expr) -> libc::c_int {
+pub unsafe extern "C" fn ast_expr_call_nargs(mut expr: *mut AstExpr) -> libc::c_int {
     return (*expr).u.call.n;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_call_root(mut expr: *mut ast_expr) -> *mut ast_expr {
+pub unsafe extern "C" fn ast_expr_call_root(mut expr: *mut AstExpr) -> *mut AstExpr {
     return (*expr).root;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_call_create(
-    mut root: *mut ast_expr,
+    mut root: *mut AstExpr,
     mut narg: libc::c_int,
-    mut arg: *mut *mut ast_expr,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+    mut arg: *mut *mut AstExpr,
+) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_CALL;
     (*expr).root = root;
     (*expr).u.call.n = narg;
@@ -3128,66 +2823,55 @@ pub unsafe extern "C" fn ast_expr_call_create(
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_iteration_create() -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_iteration_create() -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ITERATION;
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_alloc_kind(mut expr: *mut ast_expr) -> ast_alloc_kind {
-    if !((*expr).kind as libc::c_uint == EXPR_ALLOCATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_alloc_kind(mut expr: *mut AstExpr) -> ast_alloc_kind {
+    if !((*expr).kind == EXPR_ALLOCATION) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_expr_alloc_kind\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_expr_alloc_kind\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             738 as libc::c_int,
             b"expr->kind == EXPR_ALLOCATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.alloc.kind;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_alloc_arg(mut expr: *mut ast_expr) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint == EXPR_ALLOCATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_alloc_arg(mut expr: *mut AstExpr) -> *mut AstExpr {
+    if !((*expr).kind == EXPR_ALLOCATION) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"ast_expr_alloc_arg\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"ast_expr_alloc_arg\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             731 as libc::c_int,
             b"expr->kind == EXPR_ALLOCATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.alloc.arg;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_isisdereferencable(mut expr: *mut ast_expr) -> bool {
-    return (*expr).kind as libc::c_uint
-        == EXPR_ISDEREFERENCABLE as libc::c_int as libc::c_uint;
+pub unsafe extern "C" fn ast_expr_isisdereferencable(mut expr: *mut AstExpr) -> bool {
+    return (*expr).kind == EXPR_ISDEREFERENCABLE;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_dealloc_create(
-    mut arg: *mut ast_expr,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_dealloc_create(mut arg: *mut AstExpr) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ALLOCATION;
     (*expr).u.alloc.kind = DEALLOC;
     (*expr).u.alloc.arg = arg;
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_str(mut expr: *mut ast_expr) -> *mut libc::c_char {
-    let mut b: *mut strbuilder = strbuilder_create();
-    match (*expr).kind as libc::c_uint {
+pub unsafe extern "C" fn ast_expr_str(mut expr: *mut AstExpr) -> *mut libc::c_char {
+    let mut b: *mut StrBuilder = strbuilder_create();
+    match (*expr).kind {
         1 => {
             strbuilder_printf(b, (*expr).u.string);
         }
@@ -3237,40 +2921,33 @@ pub unsafe extern "C" fn ast_expr_str(mut expr: *mut ast_expr) -> *mut libc::c_c
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 13],
-                        &[libc::c_char; 13],
-                    >(b"ast_expr_str\0"))
+                    (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"ast_expr_str\0"))
                         .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     842 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     return strbuilder_build(b);
 }
-unsafe extern "C" fn ast_expr_alloc_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
-) {
-    if !((*expr).kind as libc::c_uint == EXPR_ALLOCATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
+unsafe extern "C" fn ast_expr_alloc_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
+    if !((*expr).kind == EXPR_ALLOCATION) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 25],
-                &[libc::c_char; 25],
-            >(b"ast_expr_alloc_str_build\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
+                b"ast_expr_alloc_str_build\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             708 as libc::c_int,
             b"expr->kind == EXPR_ALLOCATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut arg: *mut libc::c_char = ast_expr_str((*expr).u.alloc.arg);
-    match (*expr).u.alloc.kind as libc::c_uint {
+    match (*expr).u.alloc.kind.bits() {
         1 => {
             strbuilder_printf(
                 b,
@@ -3291,72 +2968,68 @@ unsafe extern "C" fn ast_expr_alloc_str_build(
             strbuilder_printf(
                 b,
                 b".%s %s;\0" as *const u8 as *const libc::c_char,
-                b"clump\0" as *const u8 as *const libc::c_char,
+                b"Clump\0" as *const u8 as *const libc::c_char,
                 arg,
             );
         }
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 25],
-                        &[libc::c_char; 25],
-                    >(b"ast_expr_alloc_str_build\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
+                        b"ast_expr_alloc_str_build\0",
+                    ))
+                    .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     723 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     free(arg as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_alloc_create(mut arg: *mut ast_expr) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_alloc_create(mut arg: *mut AstExpr) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ALLOCATION;
     (*expr).u.alloc.kind = ALLOC;
     (*expr).u.alloc.arg = arg;
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_equal(
-    mut e1: *mut ast_expr,
-    mut e2: *mut ast_expr,
-) -> bool {
+pub unsafe extern "C" fn ast_expr_equal(mut e1: *mut AstExpr, mut e2: *mut AstExpr) -> bool {
     if e1.is_null() || e2.is_null() {
         return 0 as libc::c_int != 0;
     }
-    if (*e1).kind as libc::c_uint != (*e2).kind as libc::c_uint {
+    if (*e1).kind != (*e2).kind {
         return 0 as libc::c_int != 0;
     }
-    match (*e1).kind as libc::c_uint {
+    match (*e1).kind {
         2 => return (*e1).u.constant.constant == (*e2).u.constant.constant,
         1 => {
             return strcmp(ast_expr_as_identifier(e1), ast_expr_as_identifier(e2))
                 == 0 as libc::c_int;
         }
         4 => {
-            return strcmp(ast_expr_as_literal(e1), ast_expr_as_literal(e2))
-                == 0 as libc::c_int;
+            return strcmp(ast_expr_as_literal(e1), ast_expr_as_literal(e2)) == 0 as libc::c_int;
         }
         1024 => {
             return ast_expr_equal((*e1).root, (*e2).root) as libc::c_int != 0
                 && ast_expr_equal((*e1).u.assignment_value, (*e2).u.assignment_value)
-                    as libc::c_int != 0;
+                    as libc::c_int
+                    != 0;
         }
         256 => {
-            return (*e1).u.unary_op as libc::c_uint == (*e2).u.unary_op as libc::c_uint
+            return (*e1).u.unary_op == (*e2).u.unary_op
                 && ast_expr_equal((*e1).root, (*e2).root) as libc::c_int != 0;
         }
         512 => {
-            return ast_expr_binary_op(e1) as libc::c_uint
-                == ast_expr_binary_op(e2) as libc::c_uint
-                && ast_expr_equal(ast_expr_binary_e1(e1), ast_expr_binary_e1(e2))
-                    as libc::c_int != 0
-                && ast_expr_equal(ast_expr_binary_e2(e1), ast_expr_binary_e2(e2))
-                    as libc::c_int != 0;
+            return ast_expr_binary_op(e1) == ast_expr_binary_op(e2)
+                && ast_expr_equal(ast_expr_binary_e1(e1), ast_expr_binary_e1(e2)) as libc::c_int
+                    != 0
+                && ast_expr_equal(ast_expr_binary_e2(e1), ast_expr_binary_e2(e2)) as libc::c_int
+                    != 0;
         }
         32 => {
             if (*e1).u.call.n != (*e2).u.call.n {
@@ -3371,147 +3044,120 @@ pub unsafe extern "C" fn ast_expr_equal(
                     return 0 as libc::c_int != 0;
                 }
                 i += 1;
-                i;
             }
             return ast_expr_equal((*e1).root, (*e2).root);
         }
         128 => {
             return ast_expr_equal(ast_expr_member_root(e1), ast_expr_member_root(e2))
-                as libc::c_int != 0
+                as libc::c_int
+                != 0
                 && strcmp(ast_expr_member_field(e1), ast_expr_member_field(e2))
                     == 0 as libc::c_int;
         }
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 15],
-                        &[libc::c_char; 15],
-                    >(b"ast_expr_equal\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(
+                        b"ast_expr_equal\0",
+                    ))
+                    .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     958 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_isdereferencable_assertand(
-    mut expr: *mut ast_expr,
-) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint
-        == EXPR_ISDEREFERENCABLE as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
-    {
+    mut expr: *mut AstExpr,
+) -> *mut AstExpr {
+    if !((*expr).kind == EXPR_ISDEREFERENCABLE) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 36],
-                &[libc::c_char; 36],
-            >(b"ast_expr_isdereferencable_assertand\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 36], &[libc::c_char; 36]>(
+                b"ast_expr_isdereferencable_assertand\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             625 as libc::c_int,
             b"expr->kind == EXPR_ISDEREFERENCABLE\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).root;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_isdeallocand_assertand(
-    mut expr: *mut ast_expr,
-) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint
-        == EXPR_ISDEALLOCAND as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
-    {
+pub unsafe extern "C" fn ast_expr_isdeallocand_assertand(mut expr: *mut AstExpr) -> *mut AstExpr {
+    if !((*expr).kind == EXPR_ISDEALLOCAND) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 32],
-                &[libc::c_char; 32],
-            >(b"ast_expr_isdeallocand_assertand\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 32], &[libc::c_char; 32]>(
+                b"ast_expr_isdeallocand_assertand\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             609 as libc::c_int,
             b"expr->kind == EXPR_ISDEALLOCAND\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).root;
 }
-unsafe extern "C" fn ast_expr_alloc_copy(mut expr: *mut ast_expr) -> *mut ast_expr {
-    let mut arg: *mut ast_expr = ast_expr_copy((*expr).u.alloc.arg);
-    match (*expr).u.alloc.kind as libc::c_uint {
-        1 => return ast_expr_alloc_create(arg),
-        2 => return ast_expr_dealloc_create(arg),
-        4 => return ast_expr_clump_create(arg),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 20],
-                        &[libc::c_char; 20],
-                    >(b"ast_expr_alloc_copy\0"))
-                        .as_ptr(),
-                    b"expr.c\0" as *const u8 as *const libc::c_char,
-                    701 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {};
-        }
+unsafe extern "C" fn ast_expr_alloc_copy(mut expr: *mut AstExpr) -> *mut AstExpr {
+    let mut arg: *mut AstExpr = ast_expr_copy((*expr).u.alloc.arg);
+    match (*expr).u.alloc.kind {
+        ALLOC => return ast_expr_alloc_create(arg),
+        DEALLOC => return ast_expr_dealloc_create(arg),
+        CLUMP => return ast_expr_clump_create(arg),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 unsafe extern "C" fn ast_expr_isdereferencable_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
+    mut expr: *mut AstExpr,
+    mut b: *mut StrBuilder,
 ) {
     let mut root: *mut libc::c_char = ast_expr_str((*expr).root);
     strbuilder_printf(b, b"$%s\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_assignment_rval(
-    mut expr: *mut ast_expr,
-) -> *mut ast_expr {
+pub unsafe extern "C" fn ast_expr_assignment_rval(mut expr: *mut AstExpr) -> *mut AstExpr {
     if !((*expr).kind as libc::c_uint == EXPR_ASSIGNMENT as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 25],
-                &[libc::c_char; 25],
-            >(b"ast_expr_assignment_rval\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
+                b"ast_expr_assignment_rval\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             575 as libc::c_int,
             b"expr->kind == EXPR_ASSIGNMENT\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.assignment_value;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_copy(mut expr: *mut ast_expr) -> *mut ast_expr {
+pub unsafe extern "C" fn ast_expr_copy(mut expr: *mut AstExpr) -> *mut AstExpr {
     if expr.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 14],
-                &[libc::c_char; 14],
-            >(b"ast_expr_copy\0"))
+            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"ast_expr_copy\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             850 as libc::c_int,
             b"expr\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     match (*expr).kind as libc::c_uint {
         1 => return ast_expr_identifier_create(dynamic_str((*expr).u.string)),
         2 => {
             return if (*expr).u.constant.ischar as libc::c_int != 0 {
-                ast_expr_constant_create_char(
-                    (*expr).u.constant.constant as libc::c_char,
-                )
+                ast_expr_constant_create_char((*expr).u.constant.constant as libc::c_char)
             } else {
                 ast_expr_constant_create((*expr).u.constant.constant)
             };
@@ -3555,80 +3201,75 @@ pub unsafe extern "C" fn ast_expr_copy(mut expr: *mut ast_expr) -> *mut ast_expr
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 14],
-                        &[libc::c_char; 14],
-                    >(b"ast_expr_copy\0"))
+                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"ast_expr_copy\0"))
                         .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     903 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_assignment_lval(
-    mut expr: *mut ast_expr,
-) -> *mut ast_expr {
+pub unsafe extern "C" fn ast_expr_assignment_lval(mut expr: *mut AstExpr) -> *mut AstExpr {
     if !((*expr).kind as libc::c_uint == EXPR_ASSIGNMENT as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 25],
-                &[libc::c_char; 25],
-            >(b"ast_expr_assignment_lval\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
+                b"ast_expr_assignment_lval\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             568 as libc::c_int,
             b"expr->kind == EXPR_ASSIGNMENT\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).root;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_binary_e2(mut expr: *mut ast_expr) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+pub unsafe extern "C" fn ast_expr_binary_e2(mut expr: *mut AstExpr) -> *mut AstExpr {
+    if !((*expr).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"ast_expr_binary_e2\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"ast_expr_binary_e2\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             510 as libc::c_int,
             b"expr->kind == EXPR_BINARY\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.binary.e2;
 }
 unsafe extern "C" fn ast_expr_isdeallocand_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
+    mut expr: *mut AstExpr,
+    mut b: *mut StrBuilder,
 ) {
     let mut root: *mut libc::c_char = ast_expr_str((*expr).root);
     strbuilder_printf(b, b"@%s\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_expr_assignment_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_expr_assignment_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
     let mut root: *mut libc::c_char = ast_expr_str((*expr).root);
-    let mut value: *mut libc::c_char = ast_expr_str((*expr).u.assignment_value);
-    strbuilder_printf(b, b"%s = %s\0" as *const u8 as *const libc::c_char, root, value);
-    free(value as *mut libc::c_void);
+    let mut Value: *mut libc::c_char = ast_expr_str((*expr).u.assignment_value);
+    strbuilder_printf(
+        b,
+        b"%s = %s\0" as *const u8 as *const libc::c_char,
+        root,
+        Value,
+    );
+    free(Value as *mut libc::c_void);
     free(root as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_expr_binary_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_expr_binary_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
     let mut opstr: [*const libc::c_char; 129] = [
         0 as *const libc::c_char,
         b"==\0" as *const u8 as *const libc::c_char,
@@ -3766,65 +3407,48 @@ unsafe extern "C" fn ast_expr_binary_str_build(
         b,
         b"%s%s%s\0" as *const u8 as *const libc::c_char,
         e1,
-        opstr[(*expr).u.binary.op as usize],
+        opstr[(*expr).u.binary.op.bits() as usize],
         e2,
     );
     free(e1 as *mut libc::c_void);
     free(e2 as *mut libc::c_void);
 }
+
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_binary_e1(mut expr: *mut ast_expr) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+pub unsafe extern "C" fn ast_expr_binary_e1(mut expr: *mut AstExpr) -> *mut AstExpr {
+    if !((*expr).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"ast_expr_binary_e1\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"ast_expr_binary_e1\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             503 as libc::c_int,
             b"expr->kind == EXPR_BINARY\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.binary.e1;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_difference_create(
-    mut e1: *mut ast_expr,
-    mut e2: *mut ast_expr,
-) -> *mut ast_expr {
+    mut e1: *mut AstExpr,
+    mut e2: *mut AstExpr,
+) -> *mut AstExpr {
     return ast_expr_binary_create(e1, BINARY_OP_SUBTRACTION, e2);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_sum_create(
-    mut e1: *mut ast_expr,
-    mut e2: *mut ast_expr,
-) -> *mut ast_expr {
+    mut e1: *mut AstExpr,
+    mut e2: *mut AstExpr,
+) -> *mut AstExpr {
     return ast_expr_binary_create(e1, BINARY_OP_ADDITION, e2);
 }
-unsafe extern "C" fn ast_expr_unary_str_build(
-    mut expr: *mut ast_expr,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_expr_unary_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
     let mut op: ast_unary_operator = (*expr).u.unary_op;
-    if !(UNARY_OP_ADDRESS as libc::c_int as libc::c_uint <= op as libc::c_uint
-        && op as libc::c_uint <= UNARY_OP_BANG as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
-    {
-        __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 25],
-                &[libc::c_char; 25],
-            >(b"ast_expr_unary_str_build\0"))
-                .as_ptr(),
-            b"expr.c\0" as *const u8 as *const libc::c_char,
-            424 as libc::c_int,
-            b"UNARY_OP_ADDRESS <= op && op <= UNARY_OP_BANG\0" as *const u8
-                as *const libc::c_char,
-        );
-    } else {};
+    assert!(UNARY_OP_ADDRESS.bits() <= op.bits() && op.bits() <= UNARY_OP_BANG.bits());
+
     let opchar: [libc::c_char; 33] = [
         0,
         '&' as i32 as libc::c_char,
@@ -3864,40 +3488,37 @@ unsafe extern "C" fn ast_expr_unary_str_build(
     strbuilder_printf(
         b,
         b"%c(%s)\0" as *const u8 as *const libc::c_char,
-        opchar[op as usize] as libc::c_int,
+        opchar[op.bits() as usize] as libc::c_int,
         root,
     );
     free(root as *mut libc::c_void);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_ge_create(
-    mut e1: *mut ast_expr,
-    mut e2: *mut ast_expr,
-) -> *mut ast_expr {
+    mut e1: *mut AstExpr,
+    mut e2: *mut AstExpr,
+) -> *mut AstExpr {
     return ast_expr_binary_create(e1, BINARY_OP_GE, e2);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_binary_op(
-    mut expr: *mut ast_expr,
-) -> ast_binary_operator {
-    if !((*expr).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+pub unsafe extern "C" fn ast_expr_binary_op(mut expr: *mut AstExpr) -> ast_binary_operator {
+    if !((*expr).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"ast_expr_binary_op\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"ast_expr_binary_op\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             517 as libc::c_int,
             b"expr->kind == EXPR_BINARY\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.binary.op;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_destroy(mut expr: *mut ast_expr) {
+pub unsafe extern "C" fn ast_expr_destroy(mut expr: *mut AstExpr) {
     match (*expr).kind as libc::c_uint {
         1 => {
             ast_expr_destroy_identifier(expr);
@@ -3940,84 +3561,82 @@ pub unsafe extern "C" fn ast_expr_destroy(mut expr: *mut ast_expr) {
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 17],
-                        &[libc::c_char; 17],
-                    >(b"ast_expr_destroy\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(
+                        b"ast_expr_destroy\0",
+                    ))
+                    .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     789 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     free(expr as *mut libc::c_void);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_le_create(
-    mut e1: *mut ast_expr,
-    mut e2: *mut ast_expr,
-) -> *mut ast_expr {
+    mut e1: *mut AstExpr,
+    mut e2: *mut AstExpr,
+) -> *mut AstExpr {
     return ast_expr_binary_create(e1, BINARY_OP_LE, e2);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_clump_create(mut arg: *mut ast_expr) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_clump_create(mut arg: *mut AstExpr) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ALLOCATION;
     (*expr).u.alloc.kind = CLUMP;
     (*expr).u.alloc.arg = arg;
     return expr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_arbarg_create() -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_arbarg_create() -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ARBARG;
     return expr;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_isdereferencable_create(
-    mut assertand: *mut ast_expr,
-) -> *mut ast_expr {
-    let mut new: *mut ast_expr = ast_expr_create();
+    mut assertand: *mut AstExpr,
+) -> *mut AstExpr {
+    let mut new: *mut AstExpr = ast_expr_create();
     (*new).kind = EXPR_ISDEREFERENCABLE;
     (*new).root = assertand;
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_isdeallocand_create(
-    mut assertand: *mut ast_expr,
-) -> *mut ast_expr {
-    let mut new: *mut ast_expr = ast_expr_create();
+pub unsafe extern "C" fn ast_expr_isdeallocand_create(mut assertand: *mut AstExpr) -> *mut AstExpr {
+    let mut new: *mut AstExpr = ast_expr_create();
     (*new).kind = EXPR_ISDEALLOCAND;
     (*new).root = assertand;
     return new;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_gt_create(
-    mut e1: *mut ast_expr,
-    mut e2: *mut ast_expr,
-) -> *mut ast_expr {
+    mut e1: *mut AstExpr,
+    mut e2: *mut AstExpr,
+) -> *mut AstExpr {
     return ast_expr_binary_create(e1, BINARY_OP_GT, e2);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_assignment_create(
-    mut root: *mut ast_expr,
-    mut value: *mut ast_expr,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+    mut root: *mut AstExpr,
+    mut Value: *mut AstExpr,
+) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ASSIGNMENT;
     (*expr).root = root;
-    (*expr).u.assignment_value = value;
+    (*expr).u.assignment_value = Value;
     return expr;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_binary_create(
-    mut e1: *mut ast_expr,
+    mut e1: *mut AstExpr,
     mut op: ast_binary_operator,
-    mut e2: *mut ast_expr,
-) -> *mut ast_expr {
-    let mut expr: *mut ast_expr = ast_expr_create();
+    mut e2: *mut AstExpr,
+) -> *mut AstExpr {
+    let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_BINARY;
     (*expr).u.binary.e1 = e1;
     (*expr).u.binary.op = op;
@@ -4026,142 +3645,138 @@ pub unsafe extern "C" fn ast_expr_binary_create(
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_lt_create(
-    mut e1: *mut ast_expr,
-    mut e2: *mut ast_expr,
-) -> *mut ast_expr {
+    mut e1: *mut AstExpr,
+    mut e2: *mut AstExpr,
+) -> *mut AstExpr {
     return ast_expr_binary_create(e1, BINARY_OP_LT, e2);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_ne_create(
-    mut e1: *mut ast_expr,
-    mut e2: *mut ast_expr,
-) -> *mut ast_expr {
+    mut e1: *mut AstExpr,
+    mut e2: *mut AstExpr,
+) -> *mut AstExpr {
     return ast_expr_binary_create(e1, BINARY_OP_NE, e2);
 }
-unsafe extern "C" fn ast_expr_destroy_binary(mut expr: *mut ast_expr) {
-    if !((*expr).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+unsafe extern "C" fn ast_expr_destroy_binary(mut expr: *mut AstExpr) {
+    if !((*expr).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 24],
-                &[libc::c_char; 24],
-            >(b"ast_expr_destroy_binary\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
+                b"ast_expr_destroy_binary\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             524 as libc::c_int,
             b"expr->kind == EXPR_BINARY\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     ast_expr_destroy((*expr).u.binary.e1);
     ast_expr_destroy((*expr).u.binary.e2);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_eq_create(
-    mut e1: *mut ast_expr,
-    mut e2: *mut ast_expr,
-) -> *mut ast_expr {
+    mut e1: *mut AstExpr,
+    mut e2: *mut AstExpr,
+) -> *mut AstExpr {
     return ast_expr_binary_create(e1, BINARY_OP_EQ, e2);
 }
-unsafe extern "C" fn ast_expr_destroy_assignment(mut expr: *mut ast_expr) {
+unsafe extern "C" fn ast_expr_destroy_assignment(mut expr: *mut AstExpr) {
     if !((*expr).kind as libc::c_uint == EXPR_ASSIGNMENT as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 28],
-                &[libc::c_char; 28],
-            >(b"ast_expr_destroy_assignment\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 28], &[libc::c_char; 28]>(
+                b"ast_expr_destroy_assignment\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             582 as libc::c_int,
             b"expr->kind == EXPR_ASSIGNMENT\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     ast_expr_destroy((*expr).root);
     ast_expr_destroy((*expr).u.assignment_value);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_unary_operand(
-    mut expr: *mut ast_expr,
-) -> *mut ast_expr {
-    if !((*expr).kind as libc::c_uint == EXPR_UNARY as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+pub unsafe extern "C" fn ast_expr_unary_operand(mut expr: *mut AstExpr) -> *mut AstExpr {
+    if !((*expr).kind as libc::c_uint == EXPR_UNARY as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"ast_expr_unary_operand\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"ast_expr_unary_operand\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             405 as libc::c_int,
             b"expr->kind == EXPR_UNARY\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).root;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_kind(mut expr: *mut ast_expr) -> ast_expr_kind {
+pub unsafe extern "C" fn ast_expr_kind(mut expr: *mut AstExpr) -> ast_expr_kind {
     return (*expr).kind;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_unary_isdereference(mut expr: *mut ast_expr) -> bool {
+pub unsafe extern "C" fn ast_expr_unary_isdereference(mut expr: *mut AstExpr) -> bool {
     if ast_expr_kind(expr) as libc::c_uint != EXPR_UNARY as libc::c_int as libc::c_uint {
         return 0 as libc::c_int != 0;
     }
-    return ast_expr_unary_op(expr) as libc::c_uint
-        == UNARY_OP_DEREFERENCE as libc::c_int as libc::c_uint;
+    return ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_unary_op(
-    mut expr: *mut ast_expr,
-) -> ast_unary_operator {
-    if !((*expr).kind as libc::c_uint == EXPR_UNARY as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+pub unsafe extern "C" fn ast_expr_unary_op(mut expr: *mut AstExpr) -> ast_unary_operator {
+    if !((*expr).kind as libc::c_uint == EXPR_UNARY as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_expr_unary_op\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_expr_unary_op\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             397 as libc::c_int,
             b"expr->kind == EXPR_UNARY\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*expr).u.unary_op;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_matheval(mut e: *mut ast_expr) -> bool {
-    if !((*e).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+pub unsafe extern "C" fn ast_expr_matheval(mut e: *mut AstExpr) -> bool {
+    if !((*e).kind as libc::c_uint == EXPR_BINARY as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_expr_matheval\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_expr_matheval\0"))
                 .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             968 as libc::c_int,
             b"e->kind == EXPR_BINARY\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut e1: *mut math_expr = math_expr((*e).u.binary.e1);
-    let mut e2: *mut math_expr = math_expr((*e).u.binary.e2);
+    } else {
+    };
+    let mut e1: *mut MathExpr = math_expr((*e).u.binary.e1);
+    let mut e2: *mut MathExpr = math_expr((*e).u.binary.e2);
     let mut val: bool = eval_prop(e1, (*e).u.binary.op, e2);
     math_expr_destroy(e2);
     math_expr_destroy(e1);
     return val;
 }
 unsafe extern "C" fn eval_prop(
-    mut e1: *mut math_expr,
+    mut e1: *mut MathExpr,
     mut op: ast_binary_operator,
-    mut e2: *mut math_expr,
+    mut e2: *mut MathExpr,
 ) -> bool {
-    match op as libc::c_uint {
+    match op.bits() {
         1 => return math_eq(e1, e2),
         2 => return !math_eq(e1, e2),
         4 => return math_lt(e1, e2),
@@ -4171,38 +3786,32 @@ unsafe extern "C" fn eval_prop(
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 10],
-                        &[libc::c_char; 10],
-                    >(b"eval_prop\0"))
+                    (*::core::mem::transmute::<&[u8; 10], &[libc::c_char; 10]>(b"eval_prop\0"))
                         .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     998 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn math_expr(mut e: *mut ast_expr) -> *mut math_expr {
+unsafe extern "C" fn math_expr(mut e: *mut AstExpr) -> *mut MathExpr {
     match (*e).kind as libc::c_uint {
         1 => {
-            return math_expr_atom_create(
-                math_atom_variable_create(dynamic_str((*e).u.string)),
-            );
+            return math_expr_atom_create(math_atom_variable_create(dynamic_str((*e).u.string)));
         }
         2 => {
             if (*e).u.constant.constant < 0 as libc::c_int {
-                return math_expr_neg_create(
-                    math_expr_atom_create(
-                        math_atom_nat_create(-(*e).u.constant.constant as libc::c_uint),
-                    ),
-                );
+                return math_expr_neg_create(math_expr_atom_create(math_atom_nat_create(
+                    -(*e).u.constant.constant as libc::c_uint,
+                )));
             }
-            return math_expr_atom_create(
-                math_atom_nat_create((*e).u.constant.constant as libc::c_uint),
-            );
+            return math_expr_atom_create(math_atom_nat_create(
+                (*e).u.constant.constant as libc::c_uint,
+            ));
         }
         512 => {
             return math_expr_sum_create(
@@ -4213,46 +3822,39 @@ unsafe extern "C" fn math_expr(mut e: *mut ast_expr) -> *mut math_expr {
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 10],
-                        &[libc::c_char; 10],
-                    >(b"math_expr\0"))
+                    (*::core::mem::transmute::<&[u8; 10], &[libc::c_char; 10]>(b"math_expr\0"))
                         .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     1030 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn binary_e2(
-    mut e2: *mut ast_expr,
-    mut op: ast_binary_operator,
-) -> *mut math_expr {
-    match op as libc::c_uint {
+unsafe extern "C" fn binary_e2(mut e2: *mut AstExpr, mut op: ast_binary_operator) -> *mut MathExpr {
+    match op.bits() {
         64 => return math_expr(e2),
         128 => return math_expr_neg_create(math_expr(e2)),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 10],
-                        &[libc::c_char; 10],
-                    >(b"binary_e2\0"))
+                    (*::core::mem::transmute::<&[u8; 10], &[libc::c_char; 10]>(b"binary_e2\0"))
                         .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     1043 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_expr_getfuncs(mut expr: *mut ast_expr) -> *mut string_arr {
+pub unsafe extern "C" fn ast_expr_getfuncs(mut expr: *mut AstExpr) -> *mut string_arr {
     match (*expr).kind as libc::c_uint {
         1 | 2 | 4 | 128 | 2048 | 4096 | 8192 => return string_arr_create(),
         32 => return ast_expr_call_getfuncs(expr),
@@ -4272,24 +3874,24 @@ pub unsafe extern "C" fn ast_expr_getfuncs(mut expr: *mut ast_expr) -> *mut stri
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 18],
-                        &[libc::c_char; 18],
-                    >(b"ast_expr_getfuncs\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
+                        b"ast_expr_getfuncs\0",
+                    ))
+                    .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     1079 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_splits(
-    mut e: *mut ast_expr,
-    mut s: *mut state,
+    mut e: *mut AstExpr,
+    mut s: *mut State,
 ) -> ast_stmt_splits {
     match ast_expr_kind(e) as libc::c_uint {
         32 => return call_splits(e, s),
@@ -4302,7 +3904,7 @@ pub unsafe extern "C" fn ast_expr_splits(
             return {
                 let mut init = ast_stmt_splits {
                     n: 0 as libc::c_int,
-                    cond: 0 as *mut *mut ast_expr,
+                    cond: 0 as *mut *mut AstExpr,
                     err: 0 as *mut error,
                 };
                 init
@@ -4311,30 +3913,27 @@ pub unsafe extern "C" fn ast_expr_splits(
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 16],
-                        &[libc::c_char; 16],
-                    >(b"ast_expr_splits\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(
+                        b"ast_expr_splits\0",
+                    ))
+                    .as_ptr(),
                     b"expr.c\0" as *const u8 as *const libc::c_char,
                     1113 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn call_splits(
-    mut expr: *mut ast_expr,
-    mut state: *mut state,
-) -> ast_stmt_splits {
+unsafe extern "C" fn call_splits(mut expr: *mut AstExpr, mut State: *mut State) -> ast_stmt_splits {
     let mut err: *mut error = 0 as *mut error;
-    let mut root: *mut ast_expr = ast_expr_call_root(expr);
+    let mut root: *mut AstExpr = ast_expr_call_root(expr);
     let mut name: *mut libc::c_char = ast_expr_as_identifier(root);
-    let mut f: *mut ast_function = externals_getfunc(state_getext(state), name);
+    let mut f: *mut ast_function = externals_getfunc(state_getext(State), name);
     if f.is_null() {
-        let mut b: *mut strbuilder = strbuilder_create();
+        let mut b: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b,
             b"function: `%s' not found\0" as *const u8 as *const libc::c_char,
@@ -4344,7 +3943,7 @@ unsafe extern "C" fn call_splits(
         return {
             let mut init = ast_stmt_splits {
                 n: 0 as libc::c_int,
-                cond: 0 as *mut *mut ast_expr,
+                cond: 0 as *mut *mut AstExpr,
                 err: err,
             };
             init
@@ -4352,7 +3951,7 @@ unsafe extern "C" fn call_splits(
     }
     let mut nparams: libc::c_int = ast_function_nparams(f);
     let mut params: *mut *mut ast_variable = ast_function_params(f);
-    let mut s_copy: *mut state = state_copy(state);
+    let mut s_copy: *mut State = state_copy(State);
     let mut args: *mut result_arr = prepare_arguments(
         ast_expr_call_nargs(expr),
         ast_expr_call_args(expr),
@@ -4367,14 +3966,14 @@ unsafe extern "C" fn call_splits(
         return {
             let mut init = ast_stmt_splits {
                 n: 0 as libc::c_int,
-                cond: 0 as *mut *mut ast_expr,
+                cond: 0 as *mut *mut AstExpr,
                 err: err,
             };
             init
         };
     }
     let mut n: libc::c_int = 0 as libc::c_int;
-    let mut cond: *mut *mut ast_expr = 0 as *mut *mut ast_expr;
+    let mut cond: *mut *mut AstExpr = 0 as *mut *mut AstExpr;
     let mut abs: *mut ast_block = ast_function_abstract(f);
     let mut ndecls: libc::c_int = ast_block_ndecls(abs);
     if ndecls != 0 {
@@ -4383,32 +3982,26 @@ unsafe extern "C" fn call_splits(
         while i < ndecls {
             state_declare(s_copy, *var.offset(i as isize), 0 as libc::c_int != 0);
             i += 1;
-            i;
         }
     }
     let mut nstmts: libc::c_int = ast_block_nstmts(abs);
     let mut stmt: *mut *mut ast_stmt = ast_block_stmts(abs);
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < nstmts {
-        let mut splits: ast_stmt_splits = ast_stmt_splits(
-            *stmt.offset(i_0 as isize),
-            s_copy,
-        );
+        let mut splits: ast_stmt_splits = ast_stmt_splits(*stmt.offset(i_0 as isize), s_copy);
         let mut j: libc::c_int = 0 as libc::c_int;
         while j < splits.n {
             n += 1;
             cond = realloc(
                 cond as *mut libc::c_void,
-                (::core::mem::size_of::<*mut ast_expr>() as libc::c_ulong)
+                (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
                     .wrapping_mul(n as libc::c_ulong),
-            ) as *mut *mut ast_expr;
+            ) as *mut *mut AstExpr;
             let ref mut fresh5 = *cond.offset((n - 1 as libc::c_int) as isize);
             *fresh5 = *(splits.cond).offset(j as isize);
             j += 1;
-            j;
         }
         i_0 += 1;
-        i_0;
     }
     state_popframe(s_copy);
     result_arr_destroy(args);
@@ -4421,30 +4014,24 @@ unsafe extern "C" fn call_splits(
         init
     };
 }
-unsafe extern "C" fn binary_splits(
-    mut e: *mut ast_expr,
-    mut s: *mut state,
-) -> ast_stmt_splits {
+unsafe extern "C" fn binary_splits(mut e: *mut AstExpr, mut s: *mut State) -> ast_stmt_splits {
     let mut s1: ast_stmt_splits = ast_expr_splits(ast_expr_binary_e1(e), s);
     let mut s2: ast_stmt_splits = ast_expr_splits(ast_expr_binary_e2(e), s);
     let mut n: libc::c_int = s1.n + s2.n;
-    let mut cond: *mut *mut ast_expr = malloc(
-        (::core::mem::size_of::<*mut ast_expr>() as libc::c_ulong)
-            .wrapping_mul(n as libc::c_ulong),
-    ) as *mut *mut ast_expr;
+    let mut cond: *mut *mut AstExpr = malloc(
+        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
+    ) as *mut *mut AstExpr;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < s1.n {
         let ref mut fresh6 = *cond.offset(i as isize);
         *fresh6 = *(s1.cond).offset(i as isize);
         i += 1;
-        i;
     }
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < s2.n {
         let ref mut fresh7 = *cond.offset((i_0 + s1.n) as isize);
         *fresh7 = *(s2.cond).offset(i_0 as isize);
         i_0 += 1;
-        i_0;
     }
     return {
         let mut init = ast_stmt_splits {
@@ -4455,23 +4042,24 @@ unsafe extern "C" fn binary_splits(
         init
     };
 }
-unsafe extern "C" fn ast_expr_call_getfuncs(mut expr: *mut ast_expr) -> *mut string_arr {
+unsafe extern "C" fn ast_expr_call_getfuncs(mut expr: *mut AstExpr) -> *mut string_arr {
     let mut res: *mut string_arr = string_arr_create();
-    let mut root: *mut ast_expr = (*expr).root;
+    let mut root: *mut AstExpr = (*expr).root;
     if !((*root).kind as libc::c_uint == EXPR_IDENTIFIER as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"ast_expr_call_getfuncs\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"ast_expr_call_getfuncs\0",
+            ))
+            .as_ptr(),
             b"expr.c\0" as *const u8 as *const libc::c_char,
             1209 as libc::c_int,
             b"root->kind == EXPR_IDENTIFIER\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     string_arr_append(res, dynamic_str((*root).u.string));
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*expr).u.call.n {
@@ -4480,7 +4068,6 @@ unsafe extern "C" fn ast_expr_call_getfuncs(mut expr: *mut ast_expr) -> *mut str
             ast_expr_getfuncs(*((*expr).u.call.arg).offset(i as isize)),
         );
         i += 1;
-        i;
     }
     return res;
 }
@@ -4507,11 +4094,9 @@ unsafe extern "C" fn calculate_indegrees(mut g: *mut map) -> *mut map {
                     );
                 }
                 j += 1;
-                j;
             }
         }
         i += 1;
-        i;
     }
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < (*indegrees).n {
@@ -4520,22 +4105,18 @@ unsafe extern "C" fn calculate_indegrees(mut g: *mut map) -> *mut map {
         if !n_arr.is_null() {
             let mut j_0: libc::c_int = 0 as libc::c_int;
             while j_0 < (*n_arr).n {
-                let mut count: *mut libc::c_int = map_get(indegrees, e_0.key)
-                    as *mut libc::c_int;
+                let mut count: *mut libc::c_int = map_get(indegrees, e_0.key) as *mut libc::c_int;
                 *count = *count + 1 as libc::c_int;
                 j_0 += 1;
-                j_0;
             }
         }
         i_0 += 1;
-        i_0;
     }
     return indegrees;
 }
 unsafe extern "C" fn dynamic_int(mut i: libc::c_int) -> *mut libc::c_int {
-    let mut val: *mut libc::c_int = malloc(
-        ::core::mem::size_of::<libc::c_int>() as libc::c_ulong,
-    ) as *mut libc::c_int;
+    let mut val: *mut libc::c_int =
+        malloc(::core::mem::size_of::<libc::c_int>() as libc::c_ulong) as *mut libc::c_int;
     *val = i;
     return val;
 }
@@ -4549,14 +4130,13 @@ unsafe extern "C" fn build_indegree_zero(mut indegrees: *mut map) -> *mut string
             string_arr_append(indegree_zero, dynamic_str(e.key));
         }
         i += 1;
-        i;
     }
     return indegree_zero;
 }
 #[no_mangle]
 pub unsafe extern "C" fn topological_order(
     mut fname: *mut libc::c_char,
-    mut ext: *mut externals,
+    mut ext: *mut Externals,
 ) -> *mut string_arr {
     let mut order: *mut string_arr = string_arr_create();
     let mut g: *mut map = ast_function_buildgraph(fname, ext);
@@ -4570,15 +4150,13 @@ pub unsafe extern "C" fn topological_order(
             let mut e: entry = *((*g).entry).offset(i as isize);
             let mut v: *mut string_arr = map_get(g, e.key) as *mut string_arr;
             if string_arr_contains(v, curr) {
-                let mut count: *mut libc::c_int = map_get(indegrees, e.key)
-                    as *mut libc::c_int;
+                let mut count: *mut libc::c_int = map_get(indegrees, e.key) as *mut libc::c_int;
                 *count = *count - 1 as libc::c_int;
                 if *count == 0 as libc::c_int {
                     string_arr_append(indegree_zero, dynamic_str(e.key));
                 }
             }
             i += 1;
-            i;
         }
     }
     if (*order).n != (*indegrees).n {
@@ -4597,22 +4175,18 @@ pub unsafe extern "C" fn ast_block_create(
     mut stmt: *mut *mut ast_stmt,
     mut nstmt: libc::c_int,
 ) -> *mut ast_block {
-    if !(nstmt > 0 as libc::c_int || stmt.is_null()) as libc::c_int as libc::c_long != 0
-    {
+    if !(nstmt > 0 as libc::c_int || stmt.is_null()) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 17],
-                &[libc::c_char; 17],
-            >(b"ast_block_create\0"))
+            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"ast_block_create\0"))
                 .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
+            b"Block.c\0" as *const u8 as *const libc::c_char,
             20 as libc::c_int,
             b"nstmt > 0 || !stmt\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut b: *mut ast_block = malloc(
-        ::core::mem::size_of::<ast_block>() as libc::c_ulong,
-    ) as *mut ast_block;
+    } else {
+    };
+    let mut b: *mut ast_block =
+        malloc(::core::mem::size_of::<ast_block>() as libc::c_ulong) as *mut ast_block;
     (*b).decl = decl;
     (*b).ndecl = ndecl;
     (*b).stmt = stmt;
@@ -4625,14 +4199,12 @@ pub unsafe extern "C" fn ast_block_destroy(mut b: *mut ast_block) {
     while i < (*b).ndecl {
         ast_variable_destroy(*((*b).decl).offset(i as isize));
         i += 1;
-        i;
     }
     free((*b).decl as *mut libc::c_void);
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < (*b).nstmt {
         ast_stmt_destroy(*((*b).stmt).offset(i_0 as isize));
         i_0 += 1;
-        i_0;
     }
     free((*b).stmt as *mut libc::c_void);
     free(b as *mut libc::c_void);
@@ -4641,16 +4213,14 @@ pub unsafe extern "C" fn ast_block_destroy(mut b: *mut ast_block) {
 pub unsafe extern "C" fn ast_block_copy(mut b: *mut ast_block) -> *mut ast_block {
     if b.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 15],
-                &[libc::c_char; 15],
-            >(b"ast_block_copy\0"))
+            (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"ast_block_copy\0"))
                 .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
+            b"Block.c\0" as *const u8 as *const libc::c_char,
             53 as libc::c_int,
             b"b\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return ast_block_create(
         copy_var_arr((*b).ndecl, (*b).decl),
         (*b).ndecl,
@@ -4664,16 +4234,13 @@ unsafe extern "C" fn copy_var_arr(
 ) -> *mut *mut ast_variable {
     if !(len == 0 as libc::c_int || !var.is_null()) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 13],
-                &[libc::c_char; 13],
-            >(b"copy_var_arr\0"))
-                .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
+            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"copy_var_arr\0")).as_ptr(),
+            b"Block.c\0" as *const u8 as *const libc::c_char,
             65 as libc::c_int,
             b"len == 0 || var\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     if len == 0 as libc::c_int {
         return 0 as *mut *mut ast_variable;
     }
@@ -4686,7 +4253,6 @@ unsafe extern "C" fn copy_var_arr(
         let ref mut fresh8 = *new.offset(i as isize);
         *fresh8 = ast_variable_copy(*var.offset(i as isize));
         i += 1;
-        i;
     }
     return new;
 }
@@ -4694,19 +4260,16 @@ unsafe extern "C" fn copy_stmt_arr(
     mut len: libc::c_int,
     mut stmt: *mut *mut ast_stmt,
 ) -> *mut *mut ast_stmt {
-    if !(len == 0 as libc::c_int || !stmt.is_null()) as libc::c_int as libc::c_long != 0
-    {
+    if !(len == 0 as libc::c_int || !stmt.is_null()) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 14],
-                &[libc::c_char; 14],
-            >(b"copy_stmt_arr\0"))
+            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"copy_stmt_arr\0"))
                 .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
+            b"Block.c\0" as *const u8 as *const libc::c_char,
             79 as libc::c_int,
             b"len == 0 || stmt\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     if len == 0 as libc::c_int {
         return 0 as *mut *mut ast_stmt;
     }
@@ -4719,7 +4282,6 @@ unsafe extern "C" fn copy_stmt_arr(
         let ref mut fresh9 = *new.offset(i as isize);
         *fresh9 = ast_stmt_copy(*stmt.offset(i as isize));
         i += 1;
-        i;
     }
     return new;
 }
@@ -4728,7 +4290,7 @@ pub unsafe extern "C" fn ast_block_str(
     mut b: *mut ast_block,
     mut indent: *mut libc::c_char,
 ) -> *mut libc::c_char {
-    let mut sb: *mut strbuilder = strbuilder_create();
+    let mut sb: *mut StrBuilder = strbuilder_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*b).ndecl {
         let mut s: *mut libc::c_char = ast_variable_str(*((*b).decl).offset(i as isize));
@@ -4740,7 +4302,6 @@ pub unsafe extern "C" fn ast_block_str(
         );
         free(s as *mut libc::c_void);
         i += 1;
-        i;
     }
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < (*b).nstmt {
@@ -4753,7 +4314,6 @@ pub unsafe extern "C" fn ast_block_str(
         );
         free(s_0 as *mut libc::c_void);
         i_0 += 1;
-        i_0;
     }
     return strbuilder_build(sb);
 }
@@ -4762,9 +4322,7 @@ pub unsafe extern "C" fn ast_block_ndecls(mut b: *mut ast_block) -> libc::c_int 
     return (*b).ndecl;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_block_decls(
-    mut b: *mut ast_block,
-) -> *mut *mut ast_variable {
+pub unsafe extern "C" fn ast_block_decls(mut b: *mut ast_block) -> *mut *mut ast_variable {
     return (*b).decl;
 }
 #[no_mangle]
@@ -4773,34 +4331,27 @@ pub unsafe extern "C" fn ast_block_nstmts(mut b: *mut ast_block) -> libc::c_int 
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_block_stmts(mut b: *mut ast_block) -> *mut *mut ast_stmt {
-    if !((*b).nstmt > 0 as libc::c_int || ((*b).stmt).is_null()) as libc::c_int
-        as libc::c_long != 0
+    if !((*b).nstmt > 0 as libc::c_int || ((*b).stmt).is_null()) as libc::c_int as libc::c_long != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 16],
-                &[libc::c_char; 16],
-            >(b"ast_block_stmts\0"))
+            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"ast_block_stmts\0"))
                 .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
+            b"Block.c\0" as *const u8 as *const libc::c_char,
             130 as libc::c_int,
             b"b->nstmt > 0 || !b->stmt\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*b).stmt;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_block_isterminal(
-    mut b: *mut ast_block,
-    mut s: *mut state,
-) -> bool {
+pub unsafe extern "C" fn ast_block_isterminal(mut b: *mut ast_block, mut s: *mut State) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*b).nstmt {
         if ast_stmt_isterminal(*((*b).stmt).offset(i as isize), s) {
             return 1 as libc::c_int != 0;
         }
         i += 1;
-        i;
     }
     return 0 as libc::c_int != 0;
 }
@@ -4811,9 +4362,7 @@ pub unsafe extern "C" fn ast_block_preconds(mut b: *mut ast_block) -> preconds_r
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         if ast_stmt_ispre(*stmt.offset(i as isize)) {
-            let mut preconds: *mut ast_stmt = ast_stmt_labelled_stmt(
-                *stmt.offset(i as isize),
-            );
+            let mut preconds: *mut ast_stmt = ast_stmt_labelled_stmt(*stmt.offset(i as isize));
             let mut err: *mut error = ast_stmt_preconds_validate(preconds);
             if !err.is_null() {
                 return {
@@ -4833,7 +4382,6 @@ pub unsafe extern "C" fn ast_block_preconds(mut b: *mut ast_block) -> preconds_r
             };
         }
         i += 1;
-        i;
     }
     return {
         let mut init = preconds_result {
@@ -4847,28 +4395,26 @@ pub unsafe extern "C" fn ast_block_preconds(mut b: *mut ast_block) -> preconds_r
 pub unsafe extern "C" fn ast_stmt_process(
     mut stmt: *mut ast_stmt,
     mut fname: *mut libc::c_char,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
-    if ast_stmt_kind(stmt) as libc::c_uint
-        == STMT_COMPOUND_V as libc::c_int as libc::c_uint
-    {
-        err = ast_stmt_verify(stmt, state);
+    if ast_stmt_kind(stmt) as libc::c_uint == STMT_COMPOUND_V as libc::c_int as libc::c_uint {
+        err = ast_stmt_verify(stmt, State);
         if !err.is_null() {
-            let mut b: *mut strbuilder = strbuilder_create();
+            let mut b: *mut StrBuilder = strbuilder_create();
             let mut loc: *mut lexememarker = ast_stmt_lexememarker(stmt);
             if loc.is_null() as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 17],
-                        &[libc::c_char; 17],
-                    >(b"ast_stmt_process\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(
+                        b"ast_stmt_process\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     24 as libc::c_int,
                     b"loc\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
             let mut m: *mut libc::c_char = lexememarker_str(loc);
             strbuilder_printf(
                 b,
@@ -4880,22 +4426,20 @@ pub unsafe extern "C" fn ast_stmt_process(
             return error_create(strbuilder_build(b));
         }
     }
-    err = ast_stmt_exec(stmt, state);
+    err = ast_stmt_exec(stmt, State);
     if !err.is_null() {
-        let mut b_0: *mut strbuilder = strbuilder_create();
+        let mut b_0: *mut StrBuilder = strbuilder_create();
         let mut loc_0: *mut lexememarker = ast_stmt_lexememarker(stmt);
         if loc_0.is_null() as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 17],
-                    &[libc::c_char; 17],
-                >(b"ast_stmt_process\0"))
+                (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"ast_stmt_process\0"))
                     .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 34 as libc::c_int,
                 b"loc\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
         let mut m_0: *mut libc::c_char = lexememarker_str(loc_0);
         strbuilder_printf(
             b_0,
@@ -4912,18 +4456,15 @@ pub unsafe extern "C" fn ast_stmt_process(
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_preprocess(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut preresult {
     if ast_stmt_isassume(stmt) {
-        return stmt_installprop(stmt, state);
+        return stmt_installprop(stmt, State);
     }
     return preresult_empty_create();
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_equal(
-    mut s1: *mut ast_stmt,
-    mut s2: *mut ast_stmt,
-) -> bool {
+pub unsafe extern "C" fn ast_stmt_equal(mut s1: *mut ast_stmt, mut s2: *mut ast_stmt) -> bool {
     if s1.is_null() || s2.is_null() {
         return 0 as libc::c_int != 0;
     }
@@ -4935,78 +4476,73 @@ pub unsafe extern "C" fn ast_stmt_equal(
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 15],
-                        &[libc::c_char; 15],
-                    >(b"ast_stmt_equal\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(
+                        b"ast_stmt_equal\0",
+                    ))
+                    .as_ptr(),
                     b"stmt.c\0" as *const u8 as *const libc::c_char,
                     599 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_labelled_stmt(
-    mut stmt: *mut ast_stmt,
-) -> *mut ast_stmt {
+pub unsafe extern "C" fn ast_stmt_labelled_stmt(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
     if !((*stmt).kind as libc::c_uint == STMT_LABELLED as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"ast_stmt_labelled_stmt\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"ast_stmt_labelled_stmt\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             85 as libc::c_int,
             b"stmt->kind == STMT_LABELLED\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.labelled.stmt;
 }
 unsafe extern "C" fn labelled_absexec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
     mut should_setup: bool,
 ) -> *mut result {
     if !ast_stmt_ispre(stmt) {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 17],
-                    &[libc::c_char; 17],
-                >(b"labelled_absexec\0"))
+                (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"labelled_absexec\0"))
                     .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 345 as libc::c_int,
                 b"false\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
     }
     let mut setup: *mut ast_stmt = ast_stmt_labelled_stmt(stmt);
     if setup.is_null() {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 17],
-                    &[libc::c_char; 17],
-                >(b"labelled_absexec\0"))
+                (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"labelled_absexec\0"))
                     .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 349 as libc::c_int,
                 b"false\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
     }
     if !should_setup {
-        return result_value_create(0 as *mut value);
+        return result_value_create(0 as *mut Value);
     }
-    return ast_stmt_absexec(setup, state, should_setup);
+    return ast_stmt_absexec(setup, State, should_setup);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_copy(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
@@ -5061,25 +4597,23 @@ pub unsafe extern "C" fn ast_stmt_copy(mut stmt: *mut ast_stmt) -> *mut ast_stmt
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 14],
-                        &[libc::c_char; 14],
-                    >(b"ast_stmt_copy\0"))
+                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"ast_stmt_copy\0"))
                         .as_ptr(),
                     b"stmt.c\0" as *const u8 as *const libc::c_char,
                     543 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 unsafe extern "C" fn labelled_setupabsexec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
-    let mut res: *mut result = ast_stmt_absexec(stmt, state, 1 as libc::c_int != 0);
+    let mut res: *mut result = ast_stmt_absexec(stmt, State, 1 as libc::c_int != 0);
     if result_iserror(res) {
         return result_as_error(res);
     }
@@ -5087,87 +4621,82 @@ unsafe extern "C" fn labelled_setupabsexec(
 }
 unsafe extern "C" fn sel_setupabsexec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
-    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), state);
+    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), State);
     if !(dec.err).is_null() {
         return dec.err;
     }
     if dec.decision {
-        return stmt_setupabsexec(ast_stmt_sel_body(stmt), state);
+        return stmt_setupabsexec(ast_stmt_sel_body(stmt), State);
     }
     if !(ast_stmt_sel_nest(stmt)).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 17],
-                &[libc::c_char; 17],
-            >(b"sel_setupabsexec\0"))
+            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"sel_setupabsexec\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             536 as libc::c_int,
             b"!ast_stmt_sel_nest(stmt)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return 0 as *mut error;
 }
 unsafe extern "C" fn comp_setupabsexec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
     let mut b: *mut ast_block = ast_stmt_as_block(stmt);
     if !(ast_block_ndecls(b) == 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"comp_setupabsexec\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"comp_setupabsexec\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             545 as libc::c_int,
             b"ast_block_ndecls(b) == 0\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut nstmt: libc::c_int = ast_block_nstmts(b);
     let mut stmts: *mut *mut ast_stmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmt {
         if ast_stmt_ispre(*stmts.offset(i as isize)) {
-            err = stmt_setupabsexec(*stmts.offset(i as isize), state);
+            err = stmt_setupabsexec(*stmts.offset(i as isize), State);
             if !err.is_null() {
                 return err;
             }
-            if ast_stmt_isterminal(*stmts.offset(i as isize), state) {
+            if ast_stmt_isterminal(*stmts.offset(i as isize), State) {
                 break;
             }
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
 unsafe extern "C" fn stmt_setupabsexec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     match ast_stmt_kind(stmt) as libc::c_uint {
         16 | 512 | 256 => return 0 as *mut error,
-        2 => return labelled_setupabsexec(stmt, state),
-        32 => return sel_setupabsexec(stmt, state),
-        4 => return comp_setupabsexec(stmt, state),
+        2 => return labelled_setupabsexec(stmt, State),
+        32 => return sel_setupabsexec(stmt, State),
+        4 => return comp_setupabsexec(stmt, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 18],
-                        &[libc::c_char; 18],
-                    >(b"stmt_setupabsexec\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
+                        b"stmt_setupabsexec\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     511 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
@@ -5175,14 +4704,12 @@ unsafe extern "C" fn stmt_setupabsexec(
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_setupabsexec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
-    if ast_stmt_kind(stmt) as libc::c_uint
-        != STMT_SELECTION as libc::c_int as libc::c_uint
-    {
+    if ast_stmt_kind(stmt) as libc::c_uint != STMT_SELECTION as libc::c_int as libc::c_uint {
         return 0 as *mut error;
     }
-    return stmt_setupabsexec(stmt, state);
+    return stmt_setupabsexec(stmt, State);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_isselection(mut stmt: *mut ast_stmt) -> bool {
@@ -5198,9 +4725,9 @@ pub unsafe extern "C" fn ast_stmt_isassume(mut stmt: *mut ast_stmt) -> bool {
 }
 unsafe extern "C" fn stmt_installprop(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut preresult {
-    return ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), state);
+    return ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), State);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_ispre(mut stmt: *mut ast_stmt) -> bool {
@@ -5212,109 +4739,99 @@ pub unsafe extern "C" fn ast_stmt_ispre(mut stmt: *mut ast_stmt) -> bool {
 }
 unsafe extern "C" fn stmt_v_block_verify(
     mut v_block_stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     let mut b: *mut ast_block = ast_stmt_as_v_block(v_block_stmt);
     if !(ast_block_ndecls(b) == 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"stmt_v_block_verify\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"stmt_v_block_verify\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             93 as libc::c_int,
             b"ast_block_ndecls(b) == 0\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut nstmts: libc::c_int = ast_block_nstmts(b);
     let mut stmt: *mut *mut ast_stmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmts {
-        let mut err: *mut error = ast_stmt_verify(*stmt.offset(i as isize), state);
+        let mut err: *mut error = ast_stmt_verify(*stmt.offset(i as isize), State);
         if !err.is_null() {
             return err;
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
 unsafe extern "C" fn stmt_expr_verify(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
-    let mut expr: *mut ast_expr = ast_stmt_as_expr(stmt);
-    if ast_expr_decide(expr, state) {
+    let mut expr: *mut AstExpr = ast_stmt_as_expr(stmt);
+    if ast_expr_decide(expr, State) {
         return 0 as *mut error;
     }
     return error_create(
-        b"cannot verify statement\0" as *const u8 as *const libc::c_char
-            as *mut libc::c_char,
+        b"cannot verify statement\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
 }
-unsafe extern "C" fn iter_empty(mut stmt: *mut ast_stmt, mut state: *mut state) -> bool {
-    let mut err: *mut error = ast_stmt_exec(ast_stmt_iter_init(stmt), state);
+unsafe extern "C" fn iter_empty(mut stmt: *mut ast_stmt, mut State: *mut State) -> bool {
+    let mut err: *mut error = ast_stmt_exec(ast_stmt_iter_init(stmt), State);
     if !err.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"iter_empty\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"iter_empty\0")).as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             150 as libc::c_int,
             b"!err\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    return !ast_expr_decide(ast_stmt_as_expr(ast_stmt_iter_cond(stmt)), state);
+    } else {
+    };
+    return !ast_expr_decide(ast_stmt_as_expr(ast_stmt_iter_cond(stmt)), State);
 }
 unsafe extern "C" fn stmt_iter_verify(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
-    if iter_empty(stmt, state) {
+    if iter_empty(stmt, State) {
         return 0 as *mut error;
     }
     let mut body: *mut ast_stmt = ast_stmt_iter_body(stmt);
-    if !(ast_stmt_kind(body) as libc::c_uint
-        == STMT_COMPOUND as libc::c_int as libc::c_uint) as libc::c_int as libc::c_long
+    if !(ast_stmt_kind(body) as libc::c_uint == STMT_COMPOUND as libc::c_int as libc::c_uint)
+        as libc::c_int as libc::c_long
         != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 17],
-                &[libc::c_char; 17],
-            >(b"stmt_iter_verify\0"))
+            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"stmt_iter_verify\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             130 as libc::c_int,
             b"ast_stmt_kind(body) == STMT_COMPOUND\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut block: *mut ast_block = ast_stmt_as_block(body);
-    if !(ast_block_ndecls(block) == 0 as libc::c_int
-        && ast_block_nstmts(block) == 1 as libc::c_int) as libc::c_int as libc::c_long
+    } else {
+    };
+    let mut Block: *mut ast_block = ast_stmt_as_block(body);
+    if !(ast_block_ndecls(Block) == 0 as libc::c_int && ast_block_nstmts(Block) == 1 as libc::c_int)
+        as libc::c_int as libc::c_long
         != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 17],
-                &[libc::c_char; 17],
-            >(b"stmt_iter_verify\0"))
+            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"stmt_iter_verify\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             132 as libc::c_int,
-            b"ast_block_ndecls(block) == 0 && ast_block_nstmts(block) == 1\0"
-                as *const u8 as *const libc::c_char,
+            b"ast_block_ndecls(Block) == 0 && ast_block_nstmts(Block) == 1\0" as *const u8
+                as *const libc::c_char,
         );
-    } else {};
-    let mut assertion: *mut ast_expr = ast_stmt_as_expr(
-        *(ast_block_stmts(block)).offset(0 as libc::c_int as isize),
-    );
-    let mut lw: *mut ast_expr = ast_stmt_iter_lower_bound(stmt);
-    let mut up: *mut ast_expr = ast_stmt_iter_upper_bound(stmt);
-    if !ast_expr_rangedecide(assertion, lw, up, state) {
+    } else {
+    };
+    let mut assertion: *mut AstExpr =
+        ast_stmt_as_expr(*(ast_block_stmts(Block)).offset(0 as libc::c_int as isize));
+    let mut lw: *mut AstExpr = ast_stmt_iter_lower_bound(stmt);
+    let mut up: *mut AstExpr = ast_stmt_iter_upper_bound(stmt);
+    if !ast_expr_rangedecide(assertion, lw, up, State) {
         return error_create(
-            b"could not verify\0" as *const u8 as *const libc::c_char
-                as *mut libc::c_char,
+            b"could not verify\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
     }
     return 0 as *mut error;
@@ -5322,121 +4839,109 @@ unsafe extern "C" fn stmt_iter_verify(
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_verify(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     match ast_stmt_kind(stmt) as libc::c_uint {
         1 => return 0 as *mut error,
-        8 => return stmt_v_block_verify(stmt, state),
-        16 => return stmt_expr_verify(stmt, state),
-        64 => return stmt_iter_verify(stmt, state),
+        8 => return stmt_v_block_verify(stmt, State),
+        16 => return stmt_expr_verify(stmt, State),
+        64 => return stmt_iter_verify(stmt, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 16],
-                        &[libc::c_char; 16],
-                    >(b"ast_stmt_verify\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(
+                        b"ast_stmt_verify\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     85 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 unsafe extern "C" fn stmt_compound_exec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     let mut b: *mut ast_block = ast_stmt_as_block(stmt);
     if !(ast_block_ndecls(b) == 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"stmt_compound_exec\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"stmt_compound_exec\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             201 as libc::c_int,
             b"ast_block_ndecls(b) == 0\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut nstmt: libc::c_int = ast_block_nstmts(b);
     let mut stmts: *mut *mut ast_stmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmt {
-        let mut err: *mut error = ast_stmt_exec(*stmts.offset(i as isize), state);
+        let mut err: *mut error = ast_stmt_exec(*stmts.offset(i as isize), State);
         if !err.is_null() {
             return err;
         }
-        if ast_stmt_isterminal(*stmts.offset(i as isize), state) {
+        if ast_stmt_isterminal(*stmts.offset(i as isize), State) {
             break;
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
-unsafe extern "C" fn stmt_sel_exec(
-    mut stmt: *mut ast_stmt,
-    mut state: *mut state,
-) -> *mut error {
-    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), state);
+unsafe extern "C" fn stmt_sel_exec(mut stmt: *mut ast_stmt, mut State: *mut State) -> *mut error {
+    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), State);
     if !(dec.err).is_null() {
         return dec.err;
     }
     if dec.decision {
-        return ast_stmt_exec(ast_stmt_sel_body(stmt), state);
+        return ast_stmt_exec(ast_stmt_sel_body(stmt), State);
     }
     if !(ast_stmt_sel_nest(stmt)).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 14],
-                &[libc::c_char; 14],
-            >(b"stmt_sel_exec\0"))
+            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"stmt_sel_exec\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             228 as libc::c_int,
             b"!ast_stmt_sel_nest(stmt)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return 0 as *mut error;
 }
 unsafe extern "C" fn iter_neteffect(mut iter: *mut ast_stmt) -> *mut ast_stmt {
     let mut abs: *mut ast_block = ast_stmt_iter_abstract(iter);
     if abs.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 15],
-                &[libc::c_char; 15],
-            >(b"iter_neteffect\0"))
+            (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"iter_neteffect\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             263 as libc::c_int,
             b"abs\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut nstmts: libc::c_int = ast_block_nstmts(abs);
     if nstmts == 0 {
         return 0 as *mut ast_stmt;
     }
-    if !(ast_block_ndecls(abs) == 0 as libc::c_int && nstmts == 1 as libc::c_int)
-        as libc::c_int as libc::c_long != 0
+    if !(ast_block_ndecls(abs) == 0 as libc::c_int && nstmts == 1 as libc::c_int) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 15],
-                &[libc::c_char; 15],
-            >(b"iter_neteffect\0"))
+            (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"iter_neteffect\0"))
                 .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             270 as libc::c_int,
-            b"ast_block_ndecls(abs) == 0 && nstmts == 1\0" as *const u8
-                as *const libc::c_char,
+            b"ast_block_ndecls(abs) == 0 && nstmts == 1\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return ast_stmt_create_iter(
         0 as *mut lexememarker,
         ast_stmt_copy(ast_stmt_iter_init(iter)),
@@ -5454,43 +4959,35 @@ unsafe extern "C" fn iter_neteffect(mut iter: *mut ast_stmt) -> *mut ast_stmt {
         ),
     );
 }
-unsafe extern "C" fn stmt_iter_exec(
-    mut stmt: *mut ast_stmt,
-    mut state: *mut state,
-) -> *mut error {
+unsafe extern "C" fn stmt_iter_exec(mut stmt: *mut ast_stmt, mut State: *mut State) -> *mut error {
     let mut neteffect: *mut ast_stmt = iter_neteffect(stmt);
     if neteffect.is_null() {
         return 0 as *mut error;
     }
-    let mut res: *mut result = ast_stmt_absexec(neteffect, state, 1 as libc::c_int != 0);
+    let mut res: *mut result = ast_stmt_absexec(neteffect, State, 1 as libc::c_int != 0);
     if result_iserror(res) {
         return result_as_error(res);
     }
     ast_stmt_destroy(neteffect);
     return 0 as *mut error;
 }
-unsafe extern "C" fn stmt_jump_exec(
-    mut stmt: *mut ast_stmt,
-    mut state: *mut state,
-) -> *mut error {
-    let mut res: *mut result = ast_expr_eval(ast_stmt_jump_rv(stmt), state);
+unsafe extern "C" fn stmt_jump_exec(mut stmt: *mut ast_stmt, mut State: *mut State) -> *mut error {
+    let mut res: *mut result = ast_expr_eval(ast_stmt_jump_rv(stmt), State);
     if result_iserror(res) {
         return result_as_error(res);
     }
     if result_hasvalue(res) {
-        let mut obj: *mut object = state_getresult(state);
+        let mut obj: *mut Object = state_getresult(State);
         if obj.is_null() as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 15],
-                    &[libc::c_char; 15],
-                >(b"stmt_jump_exec\0"))
+                (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"stmt_jump_exec\0"))
                     .as_ptr(),
                 b"verify.c\0" as *const u8 as *const libc::c_char,
                 295 as libc::c_int,
                 b"obj\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
         object_assign(obj, value_copy(result_as_value(res)));
     }
     return 0 as *mut error;
@@ -5498,142 +4995,126 @@ unsafe extern "C" fn stmt_jump_exec(
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_exec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     match ast_stmt_kind(stmt) as libc::c_uint {
         1 => return 0 as *mut error,
-        2 => return ast_stmt_exec(ast_stmt_labelled_stmt(stmt), state),
-        4 => return stmt_compound_exec(stmt, state),
+        2 => return ast_stmt_exec(ast_stmt_labelled_stmt(stmt), State),
+        4 => return stmt_compound_exec(stmt, State),
         8 => return 0 as *mut error,
-        16 => return ast_expr_exec(ast_stmt_as_expr(stmt), state),
-        32 => return stmt_sel_exec(stmt, state),
-        64 => return stmt_iter_exec(stmt, state),
-        256 => return stmt_jump_exec(stmt, state),
+        16 => return ast_expr_exec(ast_stmt_as_expr(stmt), State),
+        32 => return stmt_sel_exec(stmt, State),
+        64 => return stmt_iter_exec(stmt, State),
+        256 => return stmt_jump_exec(stmt, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 14],
-                        &[libc::c_char; 14],
-                    >(b"ast_stmt_exec\0"))
+                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"ast_stmt_exec\0"))
                         .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     191 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn ast_stmt_jump_sprint(
-    mut stmt: *mut ast_stmt,
-    mut b: *mut strbuilder,
-) {
-    if !((*stmt).kind as libc::c_uint == STMT_JUMP as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+unsafe extern "C" fn ast_stmt_jump_sprint(mut stmt: *mut ast_stmt, mut b: *mut StrBuilder) {
+    if !((*stmt).kind as libc::c_uint == STMT_JUMP as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"ast_stmt_jump_sprint\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"ast_stmt_jump_sprint\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             428 as libc::c_int,
             b"stmt->kind == STMT_JUMP\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut rv: *mut libc::c_char = ast_expr_str((*stmt).u.jump.rv);
     strbuilder_printf(b, b"return %s;\n\0" as *const u8 as *const libc::c_char, rv);
     free(rv as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_iter_abstract(
-    mut stmt: *mut ast_stmt,
-) -> *mut ast_block {
+pub unsafe extern "C" fn ast_stmt_iter_abstract(mut stmt: *mut ast_stmt) -> *mut ast_block {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"ast_stmt_iter_abstract\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"ast_stmt_iter_abstract\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             346 as libc::c_int,
             b"stmt->kind == STMT_ITERATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.iteration.abstract_0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_iter_iter(mut stmt: *mut ast_stmt) -> *mut ast_expr {
+pub unsafe extern "C" fn ast_stmt_iter_iter(mut stmt: *mut ast_stmt) -> *mut AstExpr {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"ast_stmt_iter_iter\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"ast_stmt_iter_iter\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             339 as libc::c_int,
             b"stmt->kind == STMT_ITERATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.iteration.iter;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_lexememarker(
-    mut stmt: *mut ast_stmt,
-) -> *mut lexememarker {
+pub unsafe extern "C" fn ast_stmt_lexememarker(mut stmt: *mut ast_stmt) -> *mut lexememarker {
     return (*stmt).loc;
 }
-unsafe extern "C" fn ast_stmt_iter_e_sprint(
-    mut stmt: *mut ast_stmt,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_stmt_iter_e_sprint(mut stmt: *mut ast_stmt, mut b: *mut StrBuilder) {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION_E as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"ast_stmt_iter_e_sprint\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"ast_stmt_iter_e_sprint\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             417 as libc::c_int,
             b"stmt->kind == STMT_ITERATION_E\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     (*stmt).kind = STMT_ITERATION;
     let mut s: *mut libc::c_char = ast_stmt_str(stmt);
     (*stmt).kind = STMT_ITERATION_E;
     strbuilder_printf(b, b".%s\0" as *const u8 as *const libc::c_char, s);
     free(s as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_stmt_iter_sprint(
-    mut stmt: *mut ast_stmt,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_stmt_iter_sprint(mut stmt: *mut ast_stmt, mut b: *mut StrBuilder) {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"ast_stmt_iter_sprint\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"ast_stmt_iter_sprint\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             387 as libc::c_int,
             b"stmt->kind == STMT_ITERATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut init: *mut libc::c_char = ast_stmt_str((*stmt).u.iteration.init);
     let mut cond: *mut libc::c_char = ast_stmt_str((*stmt).u.iteration.cond);
     let mut body: *mut libc::c_char = ast_stmt_str((*stmt).u.iteration.body);
@@ -5664,17 +5145,14 @@ unsafe extern "C" fn ast_stmt_iter_sprint(
 pub unsafe extern "C" fn ast_stmt_str(mut stmt: *mut ast_stmt) -> *mut libc::c_char {
     if stmt.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 13],
-                &[libc::c_char; 13],
-            >(b"ast_stmt_str\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"ast_stmt_str\0")).as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             550 as libc::c_int,
             b"stmt\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut b: *mut strbuilder = strbuilder_create();
+    } else {
+    };
+    let mut b: *mut StrBuilder = strbuilder_create();
     match (*stmt).kind as libc::c_uint {
         2 => {
             ast_stmt_labelled_sprint(stmt, b);
@@ -5706,93 +5184,90 @@ pub unsafe extern "C" fn ast_stmt_str(mut stmt: *mut ast_stmt) -> *mut libc::c_c
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 13],
-                        &[libc::c_char; 13],
-                    >(b"ast_stmt_str\0"))
+                    (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"ast_stmt_str\0"))
                         .as_ptr(),
                     b"stmt.c\0" as *const u8 as *const libc::c_char,
                     581 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     return strbuilder_build(b);
 }
-unsafe extern "C" fn ast_expr_copy_ifnotnull(mut expr: *mut ast_expr) -> *mut ast_expr {
-    return if !expr.is_null() { ast_expr_copy(expr) } else { 0 as *mut ast_expr };
+unsafe extern "C" fn ast_expr_copy_ifnotnull(mut expr: *mut AstExpr) -> *mut AstExpr {
+    return if !expr.is_null() {
+        ast_expr_copy(expr)
+    } else {
+        0 as *mut AstExpr
+    };
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_iter_cond(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"ast_stmt_iter_cond\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"ast_stmt_iter_cond\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             332 as libc::c_int,
             b"stmt->kind == STMT_ITERATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.iteration.cond;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_iter_init(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"ast_stmt_iter_init\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"ast_stmt_iter_init\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             325 as libc::c_int,
             b"stmt->kind == STMT_ITERATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.iteration.init;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_labelled_label(
-    mut stmt: *mut ast_stmt,
-) -> *mut libc::c_char {
+pub unsafe extern "C" fn ast_stmt_labelled_label(mut stmt: *mut ast_stmt) -> *mut libc::c_char {
     if !((*stmt).kind as libc::c_uint == STMT_LABELLED as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 24],
-                &[libc::c_char; 24],
-            >(b"ast_stmt_labelled_label\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
+                b"ast_stmt_labelled_label\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             77 as libc::c_int,
             b"stmt->kind == STMT_LABELLED\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.labelled.label;
 }
-unsafe extern "C" fn sel_isterminal(mut stmt: *mut ast_stmt, mut s: *mut state) -> bool {
+unsafe extern "C" fn sel_isterminal(mut stmt: *mut ast_stmt, mut s: *mut State) -> bool {
     let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), s);
     if !(dec.err).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 15],
-                &[libc::c_char; 15],
-            >(b"sel_isterminal\0"))
+            (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"sel_isterminal\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             217 as libc::c_int,
             b"!dec.err\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     if dec.decision {
         return ast_stmt_isterminal(ast_stmt_sel_body(stmt), s);
     }
@@ -5800,52 +5275,43 @@ unsafe extern "C" fn sel_isterminal(mut stmt: *mut ast_stmt, mut s: *mut state) 
 }
 unsafe extern "C" fn comp_absexec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
     mut should_setup: bool,
 ) -> *mut result {
     let mut b: *mut ast_block = ast_stmt_as_block(stmt);
     let mut stmts: *mut *mut ast_stmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < ast_block_nstmts(b) {
-        let mut res: *mut result = ast_stmt_absexec(
-            *stmts.offset(i as isize),
-            state,
-            should_setup,
-        );
+        let mut res: *mut result = ast_stmt_absexec(*stmts.offset(i as isize), State, should_setup);
         if result_iserror(res) {
             return res;
         }
         i += 1;
-        i;
     }
-    return result_value_create(0 as *mut value);
+    return result_value_create(0 as *mut Value);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_as_block(mut stmt: *mut ast_stmt) -> *mut ast_block {
     if !((*stmt).kind as libc::c_uint == STMT_COMPOUND as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_stmt_as_block\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_stmt_as_block\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             156 as libc::c_int,
             b"stmt->kind == STMT_COMPOUND\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.compound;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_jump_rv(mut stmt: *mut ast_stmt) -> *mut ast_expr {
+pub unsafe extern "C" fn ast_stmt_jump_rv(mut stmt: *mut ast_stmt) -> *mut AstExpr {
     return (*stmt).u.jump.rv;
 }
-unsafe extern "C" fn jump_absexec(
-    mut stmt: *mut ast_stmt,
-    mut state: *mut state,
-) -> *mut result {
+unsafe extern "C" fn jump_absexec(mut stmt: *mut ast_stmt, mut State: *mut State) -> *mut result {
     return ast_expr_absexec(
         ast_expr_assignment_create(
             ast_expr_identifier_create(
@@ -5853,58 +5319,54 @@ unsafe extern "C" fn jump_absexec(
             ),
             ast_stmt_jump_rv(stmt),
         ),
-        state,
+        State,
     );
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_absexec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
     mut should_setup: bool,
 ) -> *mut result {
     match ast_stmt_kind(stmt) as libc::c_uint {
-        1 => return result_value_create(0 as *mut value),
-        2 => return labelled_absexec(stmt, state, should_setup),
-        16 => return ast_expr_absexec(ast_stmt_as_expr(stmt), state),
-        32 => return sel_absexec(stmt, state, should_setup),
-        64 => return iter_absexec(stmt, state),
-        4 => return comp_absexec(stmt, state, should_setup),
-        256 => return jump_absexec(stmt, state),
+        1 => return result_value_create(0 as *mut Value),
+        2 => return labelled_absexec(stmt, State, should_setup),
+        16 => return ast_expr_absexec(ast_stmt_as_expr(stmt), State),
+        32 => return sel_absexec(stmt, State, should_setup),
+        64 => return iter_absexec(stmt, State),
+        4 => return comp_absexec(stmt, State, should_setup),
+        256 => return jump_absexec(stmt, State),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 17],
-                        &[libc::c_char; 17],
-                    >(b"ast_stmt_absexec\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(
+                        b"ast_stmt_absexec\0",
+                    ))
+                    .as_ptr(),
                     b"verify.c\0" as *const u8 as *const libc::c_char,
                     337 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn ast_stmt_sel_sprint(
-    mut stmt: *mut ast_stmt,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_stmt_sel_sprint(mut stmt: *mut ast_stmt, mut b: *mut StrBuilder) {
     if !((*stmt).kind as libc::c_uint == STMT_SELECTION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_stmt_sel_sprint\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_stmt_sel_sprint\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             280 as libc::c_int,
             b"stmt->kind == STMT_SELECTION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut cond: *mut libc::c_char = ast_expr_str((*stmt).u.selection.cond);
     let mut body: *mut libc::c_char = ast_stmt_str((*stmt).u.selection.body);
     strbuilder_printf(
@@ -5923,10 +5385,7 @@ unsafe extern "C" fn ast_stmt_sel_sprint(
     free(body as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_isterminal(
-    mut stmt: *mut ast_stmt,
-    mut s: *mut state,
-) -> bool {
+pub unsafe extern "C" fn ast_stmt_isterminal(mut stmt: *mut ast_stmt, mut s: *mut State) -> bool {
     match (*stmt).kind as libc::c_uint {
         256 => {
             return (*stmt).u.jump.kind as libc::c_uint
@@ -5941,7 +5400,7 @@ pub unsafe extern "C" fn ast_stmt_isterminal(
 pub unsafe extern "C" fn ast_stmt_create_jump(
     mut loc: *mut lexememarker,
     mut kind: ast_jump_kind,
-    mut rv: *mut ast_expr,
+    mut rv: *mut AstExpr,
 ) -> *mut ast_stmt {
     let mut stmt: *mut ast_stmt = ast_stmt_create(loc);
     (*stmt).kind = STMT_JUMP;
@@ -5950,11 +5409,8 @@ pub unsafe extern "C" fn ast_stmt_create_jump(
     return stmt;
 }
 #[no_mangle]
-pub unsafe extern "C" fn sel_decide(
-    mut control: *mut ast_expr,
-    mut state: *mut state,
-) -> decision {
-    let mut res: *mut result = ast_expr_pf_reduce(control, state);
+pub unsafe extern "C" fn sel_decide(mut control: *mut AstExpr, mut State: *mut State) -> decision {
+    let mut res: *mut result = ast_expr_pf_reduce(control, State);
     if result_iserror(res) {
         return {
             let mut init = decision {
@@ -5966,17 +5422,17 @@ pub unsafe extern "C" fn sel_decide(
     }
     if !result_hasvalue(res) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"sel_decide\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"sel_decide\0")).as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             379 as libc::c_int,
             b"result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut v: *mut value = result_as_value(res);
+    } else {
+    };
+    let mut v: *mut Value = result_as_value(res);
     if value_issync(v) {
-        let mut sync: *mut ast_expr = value_as_sync(v);
-        let mut p: *mut props = state_getprops(state);
+        let mut sync: *mut AstExpr = value_as_sync(v);
+        let mut p: *mut Props = state_getprops(State);
         if props_get(p, sync) {
             return {
                 let mut init = decision {
@@ -5984,7 +5440,7 @@ pub unsafe extern "C" fn sel_decide(
                     err: 0 as *mut error,
                 };
                 init
-            }
+            };
         } else if props_contradicts(p, sync) {
             return {
                 let mut init = decision {
@@ -5992,7 +5448,7 @@ pub unsafe extern "C" fn sel_decide(
                     err: 0 as *mut error,
                 };
                 init
-            }
+            };
         }
     }
     if value_isconstant(v) {
@@ -6013,14 +5469,14 @@ pub unsafe extern "C" fn sel_decide(
             init
         };
     }
-    let mut zero: *mut value = value_int_create(0 as libc::c_int);
+    let mut zero: *mut Value = value_int_create(0 as libc::c_int);
     if !values_comparable(zero, v) {
-        let mut b: *mut strbuilder = strbuilder_create();
+        let mut b: *mut StrBuilder = strbuilder_create();
         let mut c_str: *mut libc::c_char = ast_expr_str(control);
         let mut v_str: *mut libc::c_char = value_str(v);
         strbuilder_printf(
             b,
-            b"`%s' with value `%s' is undecidable\0" as *const u8 as *const libc::c_char,
+            b"`%s' with Value `%s' is undecidable\0" as *const u8 as *const libc::c_char,
             c_str,
             v_str,
         );
@@ -6044,27 +5500,24 @@ pub unsafe extern "C" fn sel_decide(
         init
     };
 }
-unsafe extern "C" fn ast_stmt_compound_sprint(
-    mut stmt: *mut ast_stmt,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_stmt_compound_sprint(mut stmt: *mut ast_stmt, mut b: *mut StrBuilder) {
     if !((*stmt).kind as libc::c_uint == STMT_COMPOUND as libc::c_int as libc::c_uint
-        || (*stmt).kind as libc::c_uint
-            == STMT_COMPOUND_V as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long != 0
+        || (*stmt).kind as libc::c_uint == STMT_COMPOUND_V as libc::c_int as libc::c_uint)
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 25],
-                &[libc::c_char; 25],
-            >(b"ast_stmt_compound_sprint\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
+                b"ast_stmt_compound_sprint\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             163 as libc::c_int,
-            b"stmt->kind == STMT_COMPOUND || stmt->kind == STMT_COMPOUND_V\0"
-                as *const u8 as *const libc::c_char,
+            b"stmt->kind == STMT_COMPOUND || stmt->kind == STMT_COMPOUND_V\0" as *const u8
+                as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut s: *mut libc::c_char = ast_block_str(
         (*stmt).u.compound,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
@@ -6072,24 +5525,20 @@ unsafe extern "C" fn ast_stmt_compound_sprint(
     strbuilder_printf(b, s);
     free(s as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_stmt_expr_sprint(
-    mut stmt: *mut ast_stmt,
-    mut b: *mut strbuilder,
-) {
-    if !((*stmt).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+unsafe extern "C" fn ast_stmt_expr_sprint(mut stmt: *mut ast_stmt, mut b: *mut StrBuilder) {
+    if !((*stmt).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"ast_stmt_expr_sprint\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"ast_stmt_expr_sprint\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             138 as libc::c_int,
             b"stmt->kind == STMT_EXPR\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut s: *mut libc::c_char = ast_expr_str((*stmt).u.expr);
     strbuilder_printf(b, b"%s;\0" as *const u8 as *const libc::c_char, s);
     free(s as *mut libc::c_void);
@@ -6109,23 +5558,22 @@ unsafe extern "C" fn ast_stmt_copy_iter(mut stmt: *mut ast_stmt) -> *mut ast_stm
     return ast_stmt_create_iter_e(copy);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_create_iter_e(
-    mut stmt: *mut ast_stmt,
-) -> *mut ast_stmt {
+pub unsafe extern "C" fn ast_stmt_create_iter_e(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"ast_stmt_create_iter_e\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"ast_stmt_create_iter_e\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             409 as libc::c_int,
             b"stmt->kind == STMT_ITERATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     (*stmt).kind = STMT_ITERATION_E;
     return stmt;
 }
@@ -6134,25 +5582,26 @@ pub unsafe extern "C" fn ast_stmt_create_iter(
     mut loc: *mut lexememarker,
     mut init: *mut ast_stmt,
     mut cond: *mut ast_stmt,
-    mut iter: *mut ast_expr,
+    mut iter: *mut AstExpr,
     mut abstract_0: *mut ast_block,
     mut body: *mut ast_stmt,
 ) -> *mut ast_stmt {
-    if !(!init.is_null() && !cond.is_null() && !iter.is_null() && !abstract_0.is_null()
-        && !body.is_null()) as libc::c_int as libc::c_long != 0
+    if !(!init.is_null()
+        && !cond.is_null()
+        && !iter.is_null()
+        && !abstract_0.is_null()
+        && !body.is_null()) as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"ast_stmt_create_iter\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"ast_stmt_create_iter\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             311 as libc::c_int,
-            b"init && cond && iter && abstract && body\0" as *const u8
-                as *const libc::c_char,
+            b"init && cond && iter && abstract && body\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut stmt: *mut ast_stmt = ast_stmt_create(loc);
     (*stmt).kind = STMT_ITERATION;
     (*stmt).u.iteration.init = init;
@@ -6162,62 +5611,54 @@ pub unsafe extern "C" fn ast_stmt_create_iter(
     (*stmt).u.iteration.abstract_0 = abstract_0;
     return stmt;
 }
-unsafe extern "C" fn ast_stmt_nop_sprint(
-    mut stmt: *mut ast_stmt,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_stmt_nop_sprint(mut stmt: *mut ast_stmt, mut b: *mut StrBuilder) {
     strbuilder_printf(b, b";\0" as *const u8 as *const libc::c_char);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_iter_body(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"ast_stmt_iter_body\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"ast_stmt_iter_body\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             353 as libc::c_int,
             b"stmt->kind == STMT_ITERATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.iteration.body;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_create_sel(
     mut loc: *mut lexememarker,
     mut isswitch: bool,
-    mut cond: *mut ast_expr,
+    mut cond: *mut AstExpr,
     mut body: *mut ast_stmt,
     mut nest: *mut ast_stmt,
 ) -> *mut ast_stmt {
     if isswitch as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_stmt_create_sel\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_stmt_create_sel\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             245 as libc::c_int,
             b"!isswitch\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     if cond.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_stmt_create_sel\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_stmt_create_sel\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             246 as libc::c_int,
             b"cond\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut stmt: *mut ast_stmt = ast_stmt_create(loc);
     (*stmt).kind = STMT_SELECTION;
     (*stmt).u.selection.isswitch = isswitch;
@@ -6236,83 +5677,78 @@ pub unsafe extern "C" fn ast_stmt_create_compound_v(
     (*stmt).u.compound = b;
     return stmt;
 }
-unsafe extern "C" fn hack_alloc_from_neteffect(
-    mut stmt: *mut ast_stmt,
-) -> *mut ast_expr {
+unsafe extern "C" fn hack_alloc_from_neteffect(mut stmt: *mut ast_stmt) -> *mut AstExpr {
     let mut body: *mut ast_stmt = ast_stmt_iter_body(stmt);
-    if !(ast_stmt_kind(body) as libc::c_uint
-        == STMT_COMPOUND as libc::c_int as libc::c_uint) as libc::c_int as libc::c_long
+    if !(ast_stmt_kind(body) as libc::c_uint == STMT_COMPOUND as libc::c_int as libc::c_uint)
+        as libc::c_int as libc::c_long
         != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 26],
-                &[libc::c_char; 26],
-            >(b"hack_alloc_from_neteffect\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
+                b"hack_alloc_from_neteffect\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             443 as libc::c_int,
             b"ast_stmt_kind(body) == STMT_COMPOUND\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut block: *mut ast_block = ast_stmt_as_block(body);
-    if !(ast_block_ndecls(block) == 0 as libc::c_int
-        && ast_block_nstmts(block) == 1 as libc::c_int) as libc::c_int as libc::c_long
+    } else {
+    };
+    let mut Block: *mut ast_block = ast_stmt_as_block(body);
+    if !(ast_block_ndecls(Block) == 0 as libc::c_int && ast_block_nstmts(Block) == 1 as libc::c_int)
+        as libc::c_int as libc::c_long
         != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 26],
-                &[libc::c_char; 26],
-            >(b"hack_alloc_from_neteffect\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
+                b"hack_alloc_from_neteffect\0",
+            ))
+            .as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             445 as libc::c_int,
-            b"ast_block_ndecls(block) == 0 && ast_block_nstmts(block) == 1\0"
-                as *const u8 as *const libc::c_char,
+            b"ast_block_ndecls(Block) == 0 && ast_block_nstmts(Block) == 1\0" as *const u8
+                as *const libc::c_char,
         );
-    } else {};
-    return ast_stmt_as_expr(*(ast_block_stmts(block)).offset(0 as libc::c_int as isize));
+    } else {
+    };
+    return ast_stmt_as_expr(*(ast_block_stmts(Block)).offset(0 as libc::c_int as isize));
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_iter_lower_bound(
-    mut stmt: *mut ast_stmt,
-) -> *mut ast_expr {
+pub unsafe extern "C" fn ast_stmt_iter_lower_bound(mut stmt: *mut ast_stmt) -> *mut AstExpr {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 26],
-                &[libc::c_char; 26],
-            >(b"ast_stmt_iter_lower_bound\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
+                b"ast_stmt_iter_lower_bound\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             360 as libc::c_int,
             b"stmt->kind == STMT_ITERATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut init: *mut ast_stmt = (*stmt).u.iteration.init;
-    if !((*init).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+    if !((*init).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 26],
-                &[libc::c_char; 26],
-            >(b"ast_stmt_iter_lower_bound\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
+                b"ast_stmt_iter_lower_bound\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             362 as libc::c_int,
             b"init->kind == STMT_EXPR\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return ast_expr_assignment_rval((*init).u.expr);
 }
-unsafe extern "C" fn ast_stmt_labelled_sprint(
-    mut stmt: *mut ast_stmt,
-    mut b: *mut strbuilder,
-) {
+unsafe extern "C" fn ast_stmt_labelled_sprint(mut stmt: *mut ast_stmt, mut b: *mut StrBuilder) {
     let mut s: *mut libc::c_char = ast_stmt_str((*stmt).u.labelled.stmt);
     strbuilder_printf(
         b,
@@ -6324,43 +5760,42 @@ unsafe extern "C" fn ast_stmt_labelled_sprint(
 }
 unsafe extern "C" fn sel_absexec(
     mut stmt: *mut ast_stmt,
-    mut state: *mut state,
+    mut State: *mut State,
     mut should_setup: bool,
 ) -> *mut result {
-    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), state);
+    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), State);
     if !(dec.err).is_null() {
         return result_error_create(dec.err);
     }
     if dec.decision {
-        return ast_stmt_absexec(ast_stmt_sel_body(stmt), state, should_setup);
+        return ast_stmt_absexec(ast_stmt_sel_body(stmt), State, should_setup);
     }
     if !(ast_stmt_sel_nest(stmt)).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"sel_absexec\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"sel_absexec\0")).as_ptr(),
             b"verify.c\0" as *const u8 as *const libc::c_char,
             368 as libc::c_int,
             b"!ast_stmt_sel_nest(stmt)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    return result_value_create(0 as *mut value);
+    } else {
+    };
+    return result_value_create(0 as *mut Value);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_sel_nest(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
     if !((*stmt).kind as libc::c_uint == STMT_SELECTION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_stmt_sel_nest\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_stmt_sel_nest\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             273 as libc::c_int,
             b"stmt->kind == STMT_SELECTION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.selection.nest;
 }
 #[no_mangle]
@@ -6376,9 +5811,7 @@ pub unsafe extern "C" fn ast_stmt_create_labelled(
     return stmt;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_create_nop(
-    mut loc: *mut lexememarker,
-) -> *mut ast_stmt {
+pub unsafe extern "C" fn ast_stmt_create_nop(mut loc: *mut lexememarker) -> *mut ast_stmt {
     let mut stmt: *mut ast_stmt = ast_stmt_create(loc);
     (*stmt).kind = STMT_NOP;
     return stmt;
@@ -6386,7 +5819,7 @@ pub unsafe extern "C" fn ast_stmt_create_nop(
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_create_expr(
     mut loc: *mut lexememarker,
-    mut expr: *mut ast_expr,
+    mut expr: *mut AstExpr,
 ) -> *mut ast_stmt {
     let mut stmt: *mut ast_stmt = ast_stmt_create(loc);
     (*stmt).kind = STMT_EXPR;
@@ -6404,89 +5837,84 @@ pub unsafe extern "C" fn ast_stmt_create_compound(
     return stmt;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_sel_cond(mut stmt: *mut ast_stmt) -> *mut ast_expr {
+pub unsafe extern "C" fn ast_stmt_sel_cond(mut stmt: *mut ast_stmt) -> *mut AstExpr {
     if !((*stmt).kind as libc::c_uint == STMT_SELECTION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_stmt_sel_cond\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_stmt_sel_cond\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             259 as libc::c_int,
             b"stmt->kind == STMT_SELECTION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.selection.cond;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_sel_body(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
     if !((*stmt).kind as libc::c_uint == STMT_SELECTION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_stmt_sel_body\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_stmt_sel_body\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             266 as libc::c_int,
             b"stmt->kind == STMT_SELECTION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.selection.body;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_iter_upper_bound(
-    mut stmt: *mut ast_stmt,
-) -> *mut ast_expr {
+pub unsafe extern "C" fn ast_stmt_iter_upper_bound(mut stmt: *mut ast_stmt) -> *mut AstExpr {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 26],
-                &[libc::c_char; 26],
-            >(b"ast_stmt_iter_upper_bound\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
+                b"ast_stmt_iter_upper_bound\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             369 as libc::c_int,
             b"stmt->kind == STMT_ITERATION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut cond: *mut ast_stmt = (*stmt).u.iteration.cond;
-    if !((*cond).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+    if !((*cond).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 26],
-                &[libc::c_char; 26],
-            >(b"ast_stmt_iter_upper_bound\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
+                b"ast_stmt_iter_upper_bound\0",
+            ))
+            .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             371 as libc::c_int,
             b"cond->kind == STMT_EXPR\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return ast_expr_binary_e2((*cond).u.expr);
 }
-unsafe extern "C" fn iter_absexec(
-    mut stmt: *mut ast_stmt,
-    mut state: *mut state,
-) -> *mut result {
+unsafe extern "C" fn iter_absexec(mut stmt: *mut ast_stmt, mut State: *mut State) -> *mut result {
     let mut err: *mut error = 0 as *mut error;
-    let mut alloc: *mut ast_expr = hack_alloc_from_neteffect(stmt);
-    let mut lw: *mut ast_expr = ast_stmt_iter_lower_bound(stmt);
-    let mut up: *mut ast_expr = ast_stmt_iter_upper_bound(stmt);
-    err = ast_expr_alloc_rangeprocess(alloc, lw, up, state);
+    let mut alloc: *mut AstExpr = hack_alloc_from_neteffect(stmt);
+    let mut lw: *mut AstExpr = ast_stmt_iter_lower_bound(stmt);
+    let mut up: *mut AstExpr = ast_stmt_iter_upper_bound(stmt);
+    err = ast_expr_alloc_rangeprocess(alloc, lw, up, State);
     if !err.is_null() {
         return result_error_create(err);
     }
-    return result_value_create(0 as *mut value);
+    return result_value_create(0 as *mut Value);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_destroy(mut stmt: *mut ast_stmt) {
@@ -6522,16 +5950,16 @@ pub unsafe extern "C" fn ast_stmt_destroy(mut stmt: *mut ast_stmt) {
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 17],
-                        &[libc::c_char; 17],
-                    >(b"ast_stmt_destroy\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(
+                        b"ast_stmt_destroy\0",
+                    ))
+                    .as_ptr(),
                     b"stmt.c\0" as *const u8 as *const libc::c_char,
                     482 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     if !((*stmt).loc).is_null() {
@@ -6540,61 +5968,57 @@ pub unsafe extern "C" fn ast_stmt_destroy(mut stmt: *mut ast_stmt) {
     free(stmt as *mut libc::c_void);
 }
 unsafe extern "C" fn ast_stmt_destroy_jump(mut stmt: *mut ast_stmt) {
-    let mut rv: *mut ast_expr = (*stmt).u.jump.rv;
+    let mut rv: *mut AstExpr = (*stmt).u.jump.rv;
     if rv.is_null() {
         return;
     }
-    if !((*stmt).u.jump.kind as libc::c_uint
-        == JUMP_RETURN as libc::c_int as libc::c_uint) as libc::c_int as libc::c_long
+    if !((*stmt).u.jump.kind as libc::c_uint == JUMP_RETURN as libc::c_int as libc::c_uint)
+        as libc::c_int as libc::c_long
         != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 22],
-                &[libc::c_char; 22],
-            >(b"ast_stmt_destroy_jump\0"))
+            (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(b"ast_stmt_destroy_jump\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             237 as libc::c_int,
             b"stmt->u.jump.kind == JUMP_RETURN\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     ast_expr_destroy(rv);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_as_expr(mut stmt: *mut ast_stmt) -> *mut ast_expr {
-    if !((*stmt).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+pub unsafe extern "C" fn ast_stmt_as_expr(mut stmt: *mut ast_stmt) -> *mut AstExpr {
+    if !((*stmt).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 17],
-                &[libc::c_char; 17],
-            >(b"ast_stmt_as_expr\0"))
+            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"ast_stmt_as_expr\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             619 as libc::c_int,
             b"stmt->kind == STMT_EXPR\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.expr;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_as_v_block(mut stmt: *mut ast_stmt) -> *mut ast_block {
     if !((*stmt).kind as libc::c_uint == STMT_COMPOUND_V as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_stmt_as_v_block\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_stmt_as_v_block\0"))
                 .as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             612 as libc::c_int,
             b"stmt->kind == STMT_COMPOUND_V\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*stmt).u.compound;
 }
 #[no_mangle]
@@ -6614,16 +6038,16 @@ pub unsafe extern "C" fn ast_stmt_getfuncs(mut stmt: *mut ast_stmt) -> *mut stri
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 18],
-                        &[libc::c_char; 18],
-                    >(b"ast_stmt_getfuncs\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
+                        b"ast_stmt_getfuncs\0",
+                    ))
+                    .as_ptr(),
                     b"stmt.c\0" as *const u8 as *const libc::c_char,
                     656 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
@@ -6631,14 +6055,14 @@ pub unsafe extern "C" fn ast_stmt_getfuncs(mut stmt: *mut ast_stmt) -> *mut stri
 #[no_mangle]
 pub unsafe extern "C" fn ast_stmt_splits(
     mut stmt: *mut ast_stmt,
-    mut s: *mut state,
+    mut s: *mut State,
 ) -> ast_stmt_splits {
     match (*stmt).kind as libc::c_uint {
         1 => {
             return {
                 let mut init = ast_stmt_splits {
                     n: 0 as libc::c_int,
-                    cond: 0 as *mut *mut ast_expr,
+                    cond: 0 as *mut *mut AstExpr,
                     err: 0 as *mut error,
                 };
                 init
@@ -6653,7 +6077,7 @@ pub unsafe extern "C" fn ast_stmt_splits(
             return {
                 let mut init = ast_stmt_splits {
                     n: 0 as libc::c_int,
-                    cond: 0 as *mut *mut ast_expr,
+                    cond: 0 as *mut *mut AstExpr,
                     err: 0 as *mut error,
                 };
                 init
@@ -6664,7 +6088,7 @@ pub unsafe extern "C" fn ast_stmt_splits(
             return {
                 let mut init = ast_stmt_splits {
                     n: 0 as libc::c_int,
-                    cond: 0 as *mut *mut ast_expr,
+                    cond: 0 as *mut *mut AstExpr,
                     err: 0 as *mut error,
                 };
                 init
@@ -6673,40 +6097,39 @@ pub unsafe extern "C" fn ast_stmt_splits(
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 16],
-                        &[libc::c_char; 16],
-                    >(b"ast_stmt_splits\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(
+                        b"ast_stmt_splits\0",
+                    ))
+                    .as_ptr(),
                     b"stmt.c\0" as *const u8 as *const libc::c_char,
                     687 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 unsafe extern "C" fn stmt_sel_splits(
     mut stmt: *mut ast_stmt,
-    mut s: *mut state,
+    mut s: *mut State,
 ) -> ast_stmt_splits {
     let mut res: *mut result = ast_expr_pf_reduce((*stmt).u.selection.cond, s);
-    let mut v: *mut value = result_as_value(res);
-    let mut e: *mut ast_expr = value_to_expr(v);
+    let mut v: *mut Value = result_as_value(res);
+    let mut e: *mut AstExpr = value_to_expr(v);
     if condexists(e, s) as libc::c_int != 0 || value_isconstant(v) as libc::c_int != 0 {
         return {
             let mut init = ast_stmt_splits {
                 n: 0 as libc::c_int,
-                cond: 0 as *mut *mut ast_expr,
+                cond: 0 as *mut *mut AstExpr,
                 err: 0 as *mut error,
             };
             init
         };
     }
-    let mut cond: *mut *mut ast_expr = malloc(
-        ::core::mem::size_of::<*mut ast_expr>() as libc::c_ulong,
-    ) as *mut *mut ast_expr;
+    let mut cond: *mut *mut AstExpr =
+        malloc(::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong) as *mut *mut AstExpr;
     let ref mut fresh10 = *cond.offset(0 as libc::c_int as isize);
     *fresh10 = e;
     return {
@@ -6718,32 +6141,30 @@ unsafe extern "C" fn stmt_sel_splits(
         init
     };
 }
-unsafe extern "C" fn condexists(mut cond: *mut ast_expr, mut s: *mut state) -> bool {
+unsafe extern "C" fn condexists(mut cond: *mut AstExpr, mut s: *mut State) -> bool {
     let mut res: *mut result = ast_expr_pf_reduce(cond, s);
     if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) as libc::c_int
-        as libc::c_long != 0
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"condexists\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"condexists\0")).as_ptr(),
             b"stmt.c\0" as *const u8 as *const libc::c_char,
             716 as libc::c_int,
-            b"!result_iserror(res) && result_hasvalue(res)\0" as *const u8
-                as *const libc::c_char,
+            b"!result_iserror(res) && result_hasvalue(res)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut reduced: *mut ast_expr = value_to_expr(result_as_value(res));
-    let mut p: *mut props = state_getprops(s);
+    } else {
+    };
+    let mut reduced: *mut AstExpr = value_to_expr(result_as_value(res));
+    let mut p: *mut Props = state_getprops(s);
     return props_get(p, reduced) as libc::c_int != 0
         || props_contradicts(p, reduced) as libc::c_int != 0;
 }
 unsafe extern "C" fn ast_stmt_expr_getfuncs(mut stmt: *mut ast_stmt) -> *mut string_arr {
     return ast_expr_getfuncs((*stmt).u.expr);
 }
-unsafe extern "C" fn ast_stmt_selection_getfuncs(
-    mut stmt: *mut ast_stmt,
-) -> *mut string_arr {
-    let mut cond: *mut ast_expr = (*stmt).u.selection.cond;
+unsafe extern "C" fn ast_stmt_selection_getfuncs(mut stmt: *mut ast_stmt) -> *mut string_arr {
+    let mut cond: *mut AstExpr = (*stmt).u.selection.cond;
     let mut body: *mut ast_stmt = (*stmt).u.selection.body;
     let mut nest: *mut ast_stmt = (*stmt).u.selection.nest;
     let mut cond_arr: *mut string_arr = ast_expr_getfuncs(cond);
@@ -6758,13 +6179,11 @@ unsafe extern "C" fn ast_stmt_selection_getfuncs(
         string_arr_concat(cond_arr, string_arr_concat(body_arr, nest_arr)),
     );
 }
-unsafe extern "C" fn ast_stmt_iteration_getfuncs(
-    mut stmt: *mut ast_stmt,
-) -> *mut string_arr {
+unsafe extern "C" fn ast_stmt_iteration_getfuncs(mut stmt: *mut ast_stmt) -> *mut string_arr {
     let mut init: *mut ast_stmt = (*stmt).u.iteration.init;
     let mut cond: *mut ast_stmt = (*stmt).u.iteration.cond;
     let mut body: *mut ast_stmt = (*stmt).u.iteration.body;
-    let mut iter: *mut ast_expr = (*stmt).u.iteration.iter;
+    let mut iter: *mut AstExpr = (*stmt).u.iteration.iter;
     let mut init_arr: *mut string_arr = ast_stmt_getfuncs(init);
     let mut cond_arr: *mut string_arr = ast_stmt_getfuncs(cond);
     let mut body_arr: *mut string_arr = ast_stmt_getfuncs(body);
@@ -6777,9 +6196,7 @@ unsafe extern "C" fn ast_stmt_iteration_getfuncs(
         ),
     );
 }
-unsafe extern "C" fn ast_stmt_compound_getfuncs(
-    mut stmt: *mut ast_stmt,
-) -> *mut string_arr {
+unsafe extern "C" fn ast_stmt_compound_getfuncs(mut stmt: *mut ast_stmt) -> *mut string_arr {
     let mut res: *mut string_arr = string_arr_create();
     let mut b: *mut ast_block = (*stmt).u.compound;
     let mut stmts: *mut *mut ast_stmt = ast_block_stmts(b);
@@ -6787,14 +6204,11 @@ unsafe extern "C" fn ast_stmt_compound_getfuncs(
     while i < ast_block_nstmts(b) {
         res = string_arr_concat(res, ast_stmt_getfuncs(*stmts.offset(i as isize)));
         i += 1;
-        i;
     }
     return res;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_stmt_preconds_validate(
-    mut stmt: *mut ast_stmt,
-) -> *mut error {
+pub unsafe extern "C" fn ast_stmt_preconds_validate(mut stmt: *mut ast_stmt) -> *mut error {
     match (*stmt).kind as libc::c_uint {
         16 | 512 | 64 => return 0 as *mut error,
         32 => return preconds_selection_verify(stmt),
@@ -6802,27 +6216,26 @@ pub unsafe extern "C" fn ast_stmt_preconds_validate(
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 27],
-                        &[libc::c_char; 27],
-                    >(b"ast_stmt_preconds_validate\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 27], &[libc::c_char; 27]>(
+                        b"ast_stmt_preconds_validate\0",
+                    ))
+                    .as_ptr(),
                     b"stmt.c\0" as *const u8 as *const libc::c_char,
                     806 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 unsafe extern "C" fn preconds_selection_verify(mut stmt: *mut ast_stmt) -> *mut error {
-    let mut b: *mut strbuilder = strbuilder_create();
+    let mut b: *mut StrBuilder = strbuilder_create();
     let mut l: *mut lexememarker = ast_stmt_lexememarker(stmt);
     strbuilder_printf(
         b,
-        b"%s setup preconditions must be decidable\0" as *const u8
-            as *const libc::c_char,
+        b"%s setup preconditions must be decidable\0" as *const u8 as *const libc::c_char,
         lexememarker_str(l),
     );
     return error_create(strbuilder_build(b));
@@ -6838,7 +6251,6 @@ unsafe extern "C" fn preconds_compound_verify(mut stmt: *mut ast_stmt) -> *mut e
             return err;
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
@@ -6855,46 +6267,41 @@ pub unsafe extern "C" fn ast_type_create(
     mut base: ast_type_base,
     mut mod_0: ast_type_modifier,
 ) -> *mut ast_type {
-    let mut t: *mut ast_type = malloc(
-        ::core::mem::size_of::<ast_type>() as libc::c_ulong,
-    ) as *mut ast_type;
+    let mut t: *mut ast_type =
+        malloc(::core::mem::size_of::<ast_type>() as libc::c_ulong) as *mut ast_type;
     if t.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 16],
-                &[libc::c_char; 16],
-            >(b"ast_type_create\0"))
+            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"ast_type_create\0"))
                 .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             45 as libc::c_int,
             b"t\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     (*t).base = base;
-    (*t).mod_0 = mod_0 as libc::c_int;
+    (*t).mod_0 = mod_0.bits() as libc::c_int;
     return t;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_type_create_ptr(mut ref_0: *mut ast_type) -> *mut ast_type {
     if ref_0.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_type_create_ptr\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_type_create_ptr\0"))
                 .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             54 as libc::c_int,
             b"ref\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut t: *mut ast_type = ast_type_create(TYPE_POINTER, 0 as ast_type_modifier);
+    } else {
+    };
+    let mut t: *mut ast_type = ast_type_create(TYPE_POINTER, ast_type_modifier::empty());
     (*t).c2rust_unnamed.ptr_type = ref_0;
     return t;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_type_create_voidptr() -> *mut ast_type {
-    let mut t: *mut ast_type = ast_type_create(TYPE_POINTER, 0 as ast_type_modifier);
+    let mut t: *mut ast_type = ast_type_create(TYPE_POINTER, ast_type_modifier::empty());
     (*t).c2rust_unnamed.ptr_type = 0 as *mut ast_type;
     return t;
 }
@@ -6905,17 +6312,15 @@ pub unsafe extern "C" fn ast_type_create_arr(
 ) -> *mut ast_type {
     if base.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_type_create_arr\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_type_create_arr\0"))
                 .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             71 as libc::c_int,
             b"base\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut t: *mut ast_type = ast_type_create(TYPE_ARRAY, 0 as ast_type_modifier);
+    } else {
+    };
+    let mut t: *mut ast_type = ast_type_create(TYPE_ARRAY, ast_type_modifier::empty());
     (*t).c2rust_unnamed.arr.type_0 = base;
     (*t).c2rust_unnamed.arr.length = length;
     return t;
@@ -6925,26 +6330,24 @@ pub unsafe extern "C" fn ast_type_create_struct(
     mut tag: *mut libc::c_char,
     mut members: *mut ast_variable_arr,
 ) -> *mut ast_type {
-    let mut t: *mut ast_type = ast_type_create(TYPE_STRUCT, 0 as ast_type_modifier);
+    let mut t: *mut ast_type = ast_type_create(TYPE_STRUCT, ast_type_modifier::empty());
     (*t).c2rust_unnamed.structunion.tag = tag;
     (*t).c2rust_unnamed.structunion.members = members;
     return t;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_type_create_userdef(
-    mut name: *mut libc::c_char,
-) -> *mut ast_type {
-    let mut t: *mut ast_type = ast_type_create(TYPE_USERDEF, 0 as ast_type_modifier);
+pub unsafe extern "C" fn ast_type_create_userdef(mut name: *mut libc::c_char) -> *mut ast_type {
+    let mut t: *mut ast_type = ast_type_create(TYPE_USERDEF, ast_type_modifier::empty());
     (*t).c2rust_unnamed.userdef = name;
     return t;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_type_vconst(
     mut t: *mut ast_type,
-    mut s: *mut state,
+    mut s: *mut State,
     mut comment: *mut libc::c_char,
     mut persist: bool,
-) -> *mut value {
+) -> *mut Value {
     match (*t).base as libc::c_uint {
         3 => return value_int_indefinite_create(),
         9 => return value_ptr_indefinite_create(),
@@ -6960,16 +6363,16 @@ pub unsafe extern "C" fn ast_type_vconst(
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 16],
-                        &[libc::c_char; 16],
-                    >(b"ast_type_vconst\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(
+                        b"ast_type_vconst\0",
+                    ))
+                    .as_ptr(),
                     b"type.c\0" as *const u8 as *const libc::c_char,
                     110 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
@@ -6981,7 +6384,7 @@ pub unsafe extern "C" fn ast_type_isstruct(mut t: *mut ast_type) -> bool {
 #[no_mangle]
 pub unsafe extern "C" fn ast_type_struct_complete(
     mut t: *mut ast_type,
-    mut ext: *mut externals,
+    mut ext: *mut Externals,
 ) -> *mut ast_type {
     if !(ast_type_struct_members(t)).is_null() {
         return t;
@@ -6989,54 +6392,52 @@ pub unsafe extern "C" fn ast_type_struct_complete(
     let mut tag: *mut libc::c_char = ast_type_struct_tag(t);
     if tag.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 25],
-                &[libc::c_char; 25],
-            >(b"ast_type_struct_complete\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
+                b"ast_type_struct_complete\0",
+            ))
+            .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             127 as libc::c_int,
             b"tag\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return externals_getstruct(ext, tag);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_type_struct_members(
-    mut t: *mut ast_type,
-) -> *mut ast_variable_arr {
-    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+pub unsafe extern "C" fn ast_type_struct_members(mut t: *mut ast_type) -> *mut ast_variable_arr {
+    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 24],
-                &[libc::c_char; 24],
-            >(b"ast_type_struct_members\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
+                b"ast_type_struct_members\0",
+            ))
+            .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             134 as libc::c_int,
             b"t->base == TYPE_STRUCT\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*t).c2rust_unnamed.structunion.members;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_type_struct_tag(mut t: *mut ast_type) -> *mut libc::c_char {
-    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_type_struct_tag\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_type_struct_tag\0"))
                 .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             142 as libc::c_int,
             b"t->base == TYPE_STRUCT\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*t).c2rust_unnamed.structunion.tag;
 }
 #[no_mangle]
@@ -7053,88 +6454,75 @@ pub unsafe extern "C" fn ast_type_create_struct_partial(
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_type_copy_struct(mut old: *mut ast_type) -> *mut ast_type {
-    if !((*old).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+    if !((*old).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"ast_type_copy_struct\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"ast_type_copy_struct\0"))
                 .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             162 as libc::c_int,
             b"old->base == TYPE_STRUCT\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut new: *mut ast_type = ast_type_create(
         TYPE_STRUCT,
-        (*old).mod_0 as ast_type_modifier,
+        ast_type_modifier::from_bits_truncate((*old).mod_0 as libc::c_uint),
     );
-    (*new)
-        .c2rust_unnamed
-        .structunion
-        .tag = if !((*old).c2rust_unnamed.structunion.tag).is_null() {
+    (*new).c2rust_unnamed.structunion.tag = if !((*old).c2rust_unnamed.structunion.tag).is_null() {
         dynamic_str((*old).c2rust_unnamed.structunion.tag)
     } else {
         0 as *mut libc::c_char
     };
-    (*new)
-        .c2rust_unnamed
-        .structunion
-        .members = if !((*old).c2rust_unnamed.structunion.members).is_null() {
-        ast_variable_arr_copy((*old).c2rust_unnamed.structunion.members)
-    } else {
-        0 as *mut ast_variable_arr
-    };
+    (*new).c2rust_unnamed.structunion.members =
+        if !((*old).c2rust_unnamed.structunion.members).is_null() {
+            ast_variable_arr_copy((*old).c2rust_unnamed.structunion.members)
+        } else {
+            0 as *mut ast_variable_arr
+        };
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_type_mod_or(
-    mut t: *mut ast_type,
-    mut m: ast_type_modifier,
-) {
-    (*t).mod_0 = ((*t).mod_0 as libc::c_uint | m as libc::c_uint) as libc::c_int;
+pub unsafe extern "C" fn ast_type_mod_or(mut t: *mut ast_type, mut m: ast_type_modifier) {
+    (*t).mod_0 = ((*t).mod_0 as libc::c_uint | m.bits()) as libc::c_int;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_type_istypedef(mut t: *mut ast_type) -> bool {
-    return (*t).mod_0 & MOD_TYPEDEF as libc::c_int != 0;
+    ast_type_modifier::from_bits_truncate((*t).mod_0 as libc::c_uint).contains(MOD_TYPEDEF)
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_type_destroy(mut t: *mut ast_type) {
     match (*t).base as libc::c_uint {
         9 => {
-            if ((*t).c2rust_unnamed.ptr_type).is_null() as libc::c_int as libc::c_long
-                != 0
-            {
+            if ((*t).c2rust_unnamed.ptr_type).is_null() as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 17],
-                        &[libc::c_char; 17],
-                    >(b"ast_type_destroy\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(
+                        b"ast_type_destroy\0",
+                    ))
+                    .as_ptr(),
                     b"type.c\0" as *const u8 as *const libc::c_char,
                     191 as libc::c_int,
                     b"t->ptr_type\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
             ast_type_destroy((*t).c2rust_unnamed.ptr_type);
         }
         10 => {
-            if ((*t).c2rust_unnamed.arr.type_0).is_null() as libc::c_int as libc::c_long
-                != 0
-            {
+            if ((*t).c2rust_unnamed.arr.type_0).is_null() as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 17],
-                        &[libc::c_char; 17],
-                    >(b"ast_type_destroy\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(
+                        b"ast_type_destroy\0",
+                    ))
+                    .as_ptr(),
                     b"type.c\0" as *const u8 as *const libc::c_char,
                     195 as libc::c_int,
                     b"t->arr.type\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
             ast_type_destroy((*t).c2rust_unnamed.arr.type_0);
         }
         _ => {}
@@ -7145,16 +6533,14 @@ pub unsafe extern "C" fn ast_type_destroy(mut t: *mut ast_type) {
 pub unsafe extern "C" fn ast_type_copy(mut t: *mut ast_type) -> *mut ast_type {
     if t.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 14],
-                &[libc::c_char; 14],
-            >(b"ast_type_copy\0"))
+            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"ast_type_copy\0"))
                 .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             206 as libc::c_int,
             b"t\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     match (*t).base as libc::c_uint {
         9 => return ast_type_create_ptr(ast_type_copy((*t).c2rust_unnamed.ptr_type)),
         10 => {
@@ -7165,20 +6551,23 @@ pub unsafe extern "C" fn ast_type_copy(mut t: *mut ast_type) -> *mut ast_type {
         }
         11 => return ast_type_copy_struct(t),
         14 => return ast_type_create_userdef(dynamic_str((*t).c2rust_unnamed.userdef)),
-        0 | 3 | 1 => return ast_type_create((*t).base, (*t).mod_0 as ast_type_modifier),
+        0 | 3 | 1 => {
+            return ast_type_create(
+                (*t).base,
+                ast_type_modifier::from_bits_truncate((*t).mod_0 as libc::c_uint),
+            )
+        }
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 14],
-                        &[libc::c_char; 14],
-                    >(b"ast_type_copy\0"))
+                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"ast_type_copy\0"))
                         .as_ptr(),
                     b"type.c\0" as *const u8 as *const libc::c_char,
                     228 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
@@ -7187,16 +6576,13 @@ pub unsafe extern "C" fn ast_type_copy(mut t: *mut ast_type) -> *mut ast_type {
 pub unsafe extern "C" fn ast_type_str(mut t: *mut ast_type) -> *mut libc::c_char {
     if t.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 13],
-                &[libc::c_char; 13],
-            >(b"ast_type_str\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"ast_type_str\0")).as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             247 as libc::c_int,
             b"t\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut basestr: [*const libc::c_char; 9] = [
         b"void\0" as *const u8 as *const libc::c_char,
         b"char\0" as *const u8 as *const libc::c_char,
@@ -7208,7 +6594,7 @@ pub unsafe extern "C" fn ast_type_str(mut t: *mut ast_type) -> *mut libc::c_char
         b"signed\0" as *const u8 as *const libc::c_char,
         b"unsigned\0" as *const u8 as *const libc::c_char,
     ];
-    let mut b: *mut strbuilder = strbuilder_create();
+    let mut b: *mut StrBuilder = strbuilder_create();
     let mut mod_0: *mut libc::c_char = mod_str((*t).mod_0);
     strbuilder_printf(b, b"%s\0" as *const u8 as *const libc::c_char, mod_0);
     free(mod_0 as *mut libc::c_void);
@@ -7304,16 +6690,14 @@ unsafe extern "C" fn mod_str(mut mod_0: libc::c_int) -> *mut libc::c_char {
         b"volatile\0" as *const u8 as *const libc::c_char,
     ];
     let modlen: libc::c_int = 7 as libc::c_int;
-    let mut b: *mut strbuilder = strbuilder_create();
+    let mut b: *mut StrBuilder = strbuilder_create();
     let mut nmods: libc::c_int = 0 as libc::c_int;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < modlen {
         if (1 as libc::c_int) << i & mod_0 != 0 {
             nmods += 1;
-            nmods;
         }
         i += 1;
-        i;
     }
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < modlen {
@@ -7334,14 +6718,10 @@ unsafe extern "C" fn mod_str(mut mod_0: libc::c_int) -> *mut libc::c_char {
             );
         }
         i_0 += 1;
-        i_0;
     }
     return strbuilder_build(b);
 }
-unsafe extern "C" fn ast_type_str_build_ptr(
-    mut b: *mut strbuilder,
-    mut t: *mut ast_type,
-) {
+unsafe extern "C" fn ast_type_str_build_ptr(mut b: *mut StrBuilder, mut t: *mut ast_type) {
     let mut base: *mut libc::c_char = ast_type_str((*t).c2rust_unnamed.ptr_type);
     let mut space: bool = (*(*t).c2rust_unnamed.ptr_type).base as libc::c_uint
         != TYPE_POINTER as libc::c_int as libc::c_uint;
@@ -7357,10 +6737,7 @@ unsafe extern "C" fn ast_type_str_build_ptr(
     );
     free(base as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_type_str_build_arr(
-    mut b: *mut strbuilder,
-    mut t: *mut ast_type,
-) {
+unsafe extern "C" fn ast_type_str_build_arr(mut b: *mut StrBuilder, mut t: *mut ast_type) {
     let mut base: *mut libc::c_char = ast_type_str((*t).c2rust_unnamed.arr.type_0);
     strbuilder_printf(
         b,
@@ -7370,24 +6747,21 @@ unsafe extern "C" fn ast_type_str_build_arr(
     );
     free(base as *mut libc::c_void);
 }
-unsafe extern "C" fn ast_type_str_build_struct(
-    mut b: *mut strbuilder,
-    mut t: *mut ast_type,
-) {
+unsafe extern "C" fn ast_type_str_build_struct(mut b: *mut StrBuilder, mut t: *mut ast_type) {
     let mut tag: *mut libc::c_char = (*t).c2rust_unnamed.structunion.tag;
     let mut members: *mut ast_variable_arr = (*t).c2rust_unnamed.structunion.members;
     if !(!tag.is_null() || !members.is_null()) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 26],
-                &[libc::c_char; 26],
-            >(b"ast_type_str_build_struct\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
+                b"ast_type_str_build_struct\0",
+            ))
+            .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             338 as libc::c_int,
             b"tag || members\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     strbuilder_printf(b, b"struct \0" as *const u8 as *const libc::c_char);
     if !tag.is_null() {
         strbuilder_printf(b, tag);
@@ -7404,7 +6778,6 @@ unsafe extern "C" fn ast_type_str_build_struct(
         strbuilder_printf(b, b"%s; \0" as *const u8 as *const libc::c_char, s);
         free(s as *mut libc::c_void);
         i += 1;
-        i;
     }
     strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
 }
@@ -7414,20 +6787,19 @@ pub unsafe extern "C" fn ast_type_base(mut t: *mut ast_type) -> ast_type_base {
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_type_ptr_type(mut t: *mut ast_type) -> *mut ast_type {
-    if !((*t).base as libc::c_uint == TYPE_POINTER as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+    if !((*t).base as libc::c_uint == TYPE_POINTER as libc::c_int as libc::c_uint) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_type_ptr_type\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_type_ptr_type\0"))
                 .as_ptr(),
             b"type.c\0" as *const u8 as *const libc::c_char,
             370 as libc::c_int,
             b"t->base == TYPE_POINTER\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*t).c2rust_unnamed.ptr_type;
 }
 #[no_mangle]
@@ -7435,9 +6807,8 @@ pub unsafe extern "C" fn ast_variable_create(
     mut name: *mut libc::c_char,
     mut type_0: *mut ast_type,
 ) -> *mut ast_variable {
-    let mut v: *mut ast_variable = malloc(
-        ::core::mem::size_of::<ast_variable>() as libc::c_ulong,
-    ) as *mut ast_variable;
+    let mut v: *mut ast_variable =
+        malloc(::core::mem::size_of::<ast_variable>() as libc::c_ulong) as *mut ast_variable;
     (*v).name = name;
     (*v).type_0 = type_0;
     return v;
@@ -7449,21 +6820,17 @@ pub unsafe extern "C" fn ast_variable_destroy(mut v: *mut ast_variable) {
     free(v as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_variable_copy(
-    mut v: *mut ast_variable,
-) -> *mut ast_variable {
+pub unsafe extern "C" fn ast_variable_copy(mut v: *mut ast_variable) -> *mut ast_variable {
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_variable_copy\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_variable_copy\0"))
                 .as_ptr(),
-            b"variable.c\0" as *const u8 as *const libc::c_char,
+            b"Variable.c\0" as *const u8 as *const libc::c_char,
             33 as libc::c_int,
             b"v\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return ast_variable_create(dynamic_str((*v).name), ast_type_copy((*v).type_0));
 }
 #[no_mangle]
@@ -7473,43 +6840,41 @@ pub unsafe extern "C" fn ast_variables_copy(
 ) -> *mut *mut ast_variable {
     if !(!v.is_null() || n == 0) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"ast_variables_copy\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"ast_variables_copy\0"))
                 .as_ptr(),
-            b"variable.c\0" as *const u8 as *const libc::c_char,
+            b"Variable.c\0" as *const u8 as *const libc::c_char,
             42 as libc::c_int,
             b"v || !n\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut new: *mut *mut ast_variable = calloc(
         n as libc::c_ulong,
-        ::core::mem::size_of::<*mut variable>() as libc::c_ulong,
+        ::core::mem::size_of::<*mut Variable>() as libc::c_ulong,
     ) as *mut *mut ast_variable;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let ref mut fresh12 = *new.offset(i as isize);
         *fresh12 = ast_variable_copy(*v.offset(i as isize));
         i += 1;
-        i;
     }
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_variable_str(
-    mut v: *mut ast_variable,
-) -> *mut libc::c_char {
-    let mut b: *mut strbuilder = strbuilder_create();
+pub unsafe extern "C" fn ast_variable_str(mut v: *mut ast_variable) -> *mut libc::c_char {
+    let mut b: *mut StrBuilder = strbuilder_create();
     let mut t: *mut libc::c_char = ast_type_str((*v).type_0);
-    strbuilder_printf(b, b"%s %s\0" as *const u8 as *const libc::c_char, t, (*v).name);
+    strbuilder_printf(
+        b,
+        b"%s %s\0" as *const u8 as *const libc::c_char,
+        t,
+        (*v).name,
+    );
     free(t as *mut libc::c_void);
     return strbuilder_build(b);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_variable_name(
-    mut v: *mut ast_variable,
-) -> *mut libc::c_char {
+pub unsafe extern "C" fn ast_variable_name(mut v: *mut ast_variable) -> *mut libc::c_char {
     return (*v).name;
 }
 #[no_mangle]
@@ -7529,8 +6894,7 @@ pub unsafe extern "C" fn ast_variable_arr_append(
     mut v: *mut ast_variable,
 ) {
     (*arr).n += 1;
-    (*arr)
-        .v = realloc(
+    (*arr).v = realloc(
         (*arr).v as *mut libc::c_void,
         (::core::mem::size_of::<*mut ast_variable>() as libc::c_ulong)
             .wrapping_mul((*arr).n as libc::c_ulong),
@@ -7544,14 +6908,11 @@ pub unsafe extern "C" fn ast_variable_arr_destroy(mut arr: *mut ast_variable_arr
     while i < (*arr).n {
         ast_variable_destroy(*((*arr).v).offset(i as isize));
         i += 1;
-        i;
     }
     free(arr as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_variable_arr_n(
-    mut arr: *mut ast_variable_arr,
-) -> libc::c_int {
+pub unsafe extern "C" fn ast_variable_arr_n(mut arr: *mut ast_variable_arr) -> libc::c_int {
     return (*arr).n;
 }
 #[no_mangle]
@@ -7569,7 +6930,6 @@ pub unsafe extern "C" fn ast_variable_arr_copy(
     while i < (*old).n {
         ast_variable_arr_append(new, ast_variable_copy(*((*old).v).offset(i as isize)));
         i += 1;
-        i;
     }
     return new;
 }
@@ -7583,9 +6943,8 @@ pub unsafe extern "C" fn ast_function_create(
     mut abstract_0: *mut ast_block,
     mut body: *mut ast_block,
 ) -> *mut ast_function {
-    let mut f: *mut ast_function = malloc(
-        ::core::mem::size_of::<ast_function>() as libc::c_ulong,
-    ) as *mut ast_function;
+    let mut f: *mut ast_function =
+        malloc(::core::mem::size_of::<ast_function>() as libc::c_ulong) as *mut ast_function;
     (*f).isaxiom = isaxiom;
     (*f).ret = ret;
     (*f).name = name;
@@ -7593,16 +6952,14 @@ pub unsafe extern "C" fn ast_function_create(
     (*f).param = param;
     if abstract_0.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"ast_function_create\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_function_create\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             48 as libc::c_int,
             b"abstract\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     (*f).abstract_0 = abstract_0;
     (*f).body = body;
     return f;
@@ -7614,7 +6971,6 @@ pub unsafe extern "C" fn ast_function_destroy(mut f: *mut ast_function) {
     while i < (*f).nparam {
         ast_variable_destroy(*((*f).param).offset(i as isize));
         i += 1;
-        i;
     }
     ast_block_destroy((*f).abstract_0);
     if !((*f).body).is_null() {
@@ -7625,10 +6981,8 @@ pub unsafe extern "C" fn ast_function_destroy(mut f: *mut ast_function) {
     free(f as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_function_str(
-    mut f: *mut ast_function,
-) -> *mut libc::c_char {
-    let mut b: *mut strbuilder = strbuilder_create();
+pub unsafe extern "C" fn ast_function_str(mut f: *mut ast_function) -> *mut libc::c_char {
+    let mut b: *mut StrBuilder = strbuilder_create();
     if (*f).isaxiom {
         strbuilder_printf(b, b"axiom \0" as *const u8 as *const libc::c_char);
     }
@@ -7638,9 +6992,7 @@ pub unsafe extern "C" fn ast_function_str(
     strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, (*f).name);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*f).nparam {
-        let mut v: *mut libc::c_char = ast_variable_str(
-            *((*f).param).offset(i as isize),
-        );
+        let mut v: *mut libc::c_char = ast_variable_str(*((*f).param).offset(i as isize));
         let mut space: *mut libc::c_char = (if (i + 1 as libc::c_int) < (*f).nparam {
             b", \0" as *const u8 as *const libc::c_char
         } else {
@@ -7649,7 +7001,6 @@ pub unsafe extern "C" fn ast_function_str(
         strbuilder_printf(b, b"%s%s\0" as *const u8 as *const libc::c_char, v, space);
         free(v as *mut libc::c_void);
         i += 1;
-        i;
     }
     let mut abs: *mut libc::c_char = ast_block_str(
         (*f).abstract_0,
@@ -7671,27 +7022,21 @@ pub unsafe extern "C" fn ast_function_str(
     return strbuilder_build(b);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_function_name(
-    mut f: *mut ast_function,
-) -> *mut libc::c_char {
+pub unsafe extern "C" fn ast_function_name(mut f: *mut ast_function) -> *mut libc::c_char {
     return (*f).name;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_function_copy(
-    mut f: *mut ast_function,
-) -> *mut ast_function {
+pub unsafe extern "C" fn ast_function_copy(mut f: *mut ast_function) -> *mut ast_function {
     if f.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_function_copy\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_function_copy\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             110 as libc::c_int,
             b"f\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut param: *mut *mut ast_variable = malloc(
         (::core::mem::size_of::<*mut ast_variable>() as libc::c_ulong)
             .wrapping_mul((*f).nparam as libc::c_ulong),
@@ -7701,7 +7046,6 @@ pub unsafe extern "C" fn ast_function_copy(
         let ref mut fresh14 = *param.offset(i as isize);
         *fresh14 = ast_variable_copy(*((*f).param).offset(i as isize));
         i += 1;
-        i;
     }
     return ast_function_create(
         (*f).isaxiom,
@@ -7745,34 +7089,28 @@ pub unsafe extern "C" fn ast_function_body(mut f: *mut ast_function) -> *mut ast
     }
     if ((*f).body).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"ast_function_body\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"ast_function_body\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             156 as libc::c_int,
             b"f->body\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*f).body;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_function_abstract(
-    mut f: *mut ast_function,
-) -> *mut ast_block {
+pub unsafe extern "C" fn ast_function_abstract(mut f: *mut ast_function) -> *mut ast_block {
     if ((*f).abstract_0).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 22],
-                &[libc::c_char; 22],
-            >(b"ast_function_abstract\0"))
+            (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(b"ast_function_abstract\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             163 as libc::c_int,
             b"f->abstract\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*f).abstract_0;
 }
 #[no_mangle]
@@ -7780,21 +7118,17 @@ pub unsafe extern "C" fn ast_function_nparams(mut f: *mut ast_function) -> libc:
     return (*f).nparam;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_function_params(
-    mut f: *mut ast_function,
-) -> *mut *mut ast_variable {
+pub unsafe extern "C" fn ast_function_params(mut f: *mut ast_function) -> *mut *mut ast_variable {
     return (*f).param;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_function_preconditions(
-    mut f: *mut ast_function,
-) -> preconds_result {
+pub unsafe extern "C" fn ast_function_preconditions(mut f: *mut ast_function) -> preconds_result {
     return ast_block_preconds(ast_function_abstract(f));
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_function_protostitch(
     mut f: *mut ast_function,
-    mut ext: *mut externals,
+    mut ext: *mut Externals,
 ) -> *mut ast_function {
     let mut proto: *mut ast_function = externals_getfunc(ext, (*f).name);
     if !proto.is_null() && !((*proto).abstract_0).is_null() {
@@ -7805,43 +7139,39 @@ pub unsafe extern "C" fn ast_function_protostitch(
 #[no_mangle]
 pub unsafe extern "C" fn ast_function_verify(
     mut f: *mut ast_function,
-    mut ext: *mut externals,
+    mut ext: *mut Externals,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
-    let mut state: *mut state = state_create(
-        dynamic_str(ast_function_name(f)),
-        ext,
-        ast_function_type(f),
-    );
-    err = ast_function_initparams(f, state);
+    let mut State: *mut State =
+        state_create(dynamic_str(ast_function_name(f)), ext, ast_function_type(f));
+    err = ast_function_initparams(f, State);
     if !err.is_null() {
         return err;
     }
-    err = path_absverify_withstate(f, state);
+    err = path_absverify_withstate(f, State);
     if !err.is_null() {
         return err;
     }
-    state_destroy(state);
+    state_destroy(State);
     return 0 as *mut error;
 }
 unsafe extern "C" fn path_absverify_withstate(
     mut f: *mut ast_function,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     let mut abs: *mut ast_block = ast_function_abstract(f);
     let mut ndecls: libc::c_int = ast_block_ndecls(abs);
     let mut var: *mut *mut ast_variable = ast_block_decls(abs);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < ndecls {
-        state_declare(state, *var.offset(i as isize), 0 as libc::c_int != 0);
+        state_declare(State, *var.offset(i as isize), 0 as libc::c_int != 0);
         i += 1;
-        i;
     }
-    return path_absverify(f, state, 0 as libc::c_int);
+    return path_absverify(f, State, 0 as libc::c_int);
 }
 unsafe extern "C" fn path_absverify(
     mut f: *mut ast_function,
-    mut state: *mut state,
+    mut State: *mut State,
     mut index: libc::c_int,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
@@ -7850,42 +7180,35 @@ unsafe extern "C" fn path_absverify(
     let mut stmt: *mut *mut ast_stmt = ast_block_stmts(abs);
     let mut i: libc::c_int = index;
     while i < nstmts {
-        let mut splits: ast_stmt_splits = ast_stmt_splits(
-            *stmt.offset(i as isize),
-            state,
-        );
+        let mut splits: ast_stmt_splits = ast_stmt_splits(*stmt.offset(i as isize), State);
         if !(splits.err).is_null() {
             return splits.err;
         }
         if splits.n != 0 {
             if (splits.cond).is_null() as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 15],
-                        &[libc::c_char; 15],
-                    >(b"path_absverify\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(
+                        b"path_absverify\0",
+                    ))
+                    .as_ptr(),
                     b"function.c\0" as *const u8 as *const libc::c_char,
                     263 as libc::c_int,
                     b"splits.cond\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
-            return split_paths_absverify(f, state, i, &mut splits);
+            } else {
+            };
+            return split_paths_absverify(f, State, i, &mut splits);
         }
         if !ast_stmt_ispre(*stmt.offset(i as isize)) {
-            let mut res: *mut result = ast_stmt_absexec(
-                *stmt.offset(i as isize),
-                state,
-                1 as libc::c_int != 0,
-            );
+            let mut res: *mut result =
+                ast_stmt_absexec(*stmt.offset(i as isize), State, 1 as libc::c_int != 0);
             if result_iserror(res) {
                 return result_as_error(res);
             }
         }
         i += 1;
-        i;
     }
-    err = abstract_audit(f, state);
+    err = abstract_audit(f, State);
     if !err.is_null() {
         return err;
     }
@@ -7894,7 +7217,7 @@ unsafe extern "C" fn path_absverify(
 #[no_mangle]
 pub unsafe extern "C" fn ast_function_initparams(
     mut f: *mut ast_function,
-    mut s: *mut state,
+    mut s: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
     let mut nparams: libc::c_int = ast_function_nparams(f);
@@ -7903,7 +7226,6 @@ pub unsafe extern "C" fn ast_function_initparams(
     while i < nparams {
         state_declare(s, *params.offset(i as isize), 1 as libc::c_int != 0);
         i += 1;
-        i;
     }
     err = ast_function_precondsinit(f, s);
     if !err.is_null() {
@@ -7916,13 +7238,12 @@ pub unsafe extern "C" fn ast_function_initparams(
             return err;
         }
         i_0 += 1;
-        i_0;
     }
     return 0 as *mut error;
 }
 unsafe extern "C" fn ast_function_precondsinit(
     mut f: *mut ast_function,
-    mut s: *mut state,
+    mut s: *mut State,
 ) -> *mut error {
     let mut pre: preconds_result = ast_function_preconditions(f);
     if !(pre.err).is_null() {
@@ -7939,40 +7260,33 @@ unsafe extern "C" fn ast_function_precondsinit(
 }
 unsafe extern "C" fn inititalise_param(
     mut param: *mut ast_variable,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     let mut name: *mut libc::c_char = ast_variable_name(param);
     let mut t: *mut ast_type = ast_variable_type(param);
-    let mut obj: *mut object = state_getobject(state, name);
+    let mut obj: *mut Object = state_getobject(State, name);
     if obj.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"inititalise_param\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"inititalise_param\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             336 as libc::c_int,
             b"obj\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     if !object_hasvalue(obj) {
-        let mut val: *mut value = state_vconst(
-            state,
-            t,
-            dynamic_str(name),
-            1 as libc::c_int != 0,
-        );
+        let mut val: *mut Value = state_vconst(State, t, dynamic_str(name), 1 as libc::c_int != 0);
         object_assign(obj, val);
     }
     return 0 as *mut error;
 }
 unsafe extern "C" fn abstract_audit(
     mut f: *mut ast_function,
-    mut abstract_state: *mut state,
+    mut abstract_state: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
-    let mut actual_state: *mut state = state_create_withprops(
+    let mut actual_state: *mut State = state_create_withprops(
         dynamic_str(ast_function_name(f)),
         state_getext(abstract_state),
         ast_function_type(f),
@@ -7982,16 +7296,14 @@ unsafe extern "C" fn abstract_audit(
     if !err.is_null() {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 15],
-                    &[libc::c_char; 15],
-                >(b"abstract_audit\0"))
+                (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"abstract_audit\0"))
                     .as_ptr(),
                 b"function.c\0" as *const u8 as *const libc::c_char,
                 376 as libc::c_int,
                 b"false\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
     }
     err = ast_function_setupabsexec(f, actual_state);
     if !err.is_null() {
@@ -8006,26 +7318,25 @@ unsafe extern "C" fn abstract_audit(
 }
 unsafe extern "C" fn ast_function_setupabsexec(
     mut f: *mut ast_function,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
     let mut nstmts: libc::c_int = ast_block_nstmts((*f).abstract_0);
     let mut stmt: *mut *mut ast_stmt = ast_block_stmts((*f).abstract_0);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmts {
-        err = ast_stmt_setupabsexec(*stmt.offset(i as isize), state);
+        err = ast_stmt_setupabsexec(*stmt.offset(i as isize), State);
         if !err.is_null() {
             return err;
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
 unsafe extern "C" fn abstract_auditwithstate(
     mut f: *mut ast_function,
-    mut actual_state: *mut state,
-    mut abstract_state: *mut state,
+    mut actual_state: *mut State,
+    mut abstract_state: *mut State,
 ) -> *mut error {
     let mut ndecls: libc::c_int = ast_block_ndecls((*f).body);
     let mut var: *mut *mut ast_variable = ast_block_decls((*f).body);
@@ -8033,15 +7344,14 @@ unsafe extern "C" fn abstract_auditwithstate(
     while i < ndecls {
         state_declare(actual_state, *var.offset(i as isize), 0 as libc::c_int != 0);
         i += 1;
-        i;
     }
     return path_verify(f, actual_state, 0 as libc::c_int, abstract_state);
 }
 unsafe extern "C" fn path_verify(
     mut f: *mut ast_function,
-    mut actual_state: *mut state,
+    mut actual_state: *mut State,
     mut index: libc::c_int,
-    mut abstract_state: *mut state,
+    mut abstract_state: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
     let mut fname: *mut libc::c_char = ast_function_name(f);
@@ -8049,10 +7359,7 @@ unsafe extern "C" fn path_verify(
     let mut stmt: *mut *mut ast_stmt = ast_block_stmts((*f).body);
     let mut i: libc::c_int = index;
     while i < nstmts {
-        let mut splits: ast_stmt_splits = ast_stmt_splits(
-            *stmt.offset(i as isize),
-            actual_state,
-        );
+        let mut splits: ast_stmt_splits = ast_stmt_splits(*stmt.offset(i as isize), actual_state);
         if splits.n != 0 {
             return split_paths_verify(f, actual_state, i, &mut splits, abstract_state);
         }
@@ -8064,28 +7371,26 @@ unsafe extern "C" fn path_verify(
             break;
         }
         i += 1;
-        i;
     }
     if state_hasgarbage(actual_state) {
         v_printf(
             b"actual: %s\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
             state_str(actual_state),
         );
-        let mut b: *mut strbuilder = strbuilder_create();
+        let mut b: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b,
-            b"%s: garbage on heap\0" as *const u8 as *const libc::c_char,
+            b"%s: garbage on Heap\0" as *const u8 as *const libc::c_char,
             ast_function_name(f),
         );
         return error_create(strbuilder_build(b));
     }
     let mut equiv: bool = state_equal(actual_state, abstract_state);
     if !equiv {
-        let mut b_0: *mut strbuilder = strbuilder_create();
+        let mut b_0: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b_0,
-            b"%s: actual and abstract states differ\0" as *const u8
-                as *const libc::c_char,
+            b"%s: actual and abstract states differ\0" as *const u8 as *const libc::c_char,
             ast_function_name(f),
         );
         return error_create(strbuilder_build(b_0));
@@ -8095,81 +7400,68 @@ unsafe extern "C" fn path_verify(
 #[no_mangle]
 pub unsafe extern "C" fn ast_function_absexec(
     mut f: *mut ast_function,
-    mut state: *mut state,
+    mut State: *mut State,
 ) -> *mut result {
     let mut ndecls: libc::c_int = ast_block_ndecls((*f).abstract_0);
     if ndecls != 0 {
         let mut var: *mut *mut ast_variable = ast_block_decls((*f).abstract_0);
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < ndecls {
-            state_declare(state, *var.offset(i as isize), 0 as libc::c_int != 0);
+            state_declare(State, *var.offset(i as isize), 0 as libc::c_int != 0);
             i += 1;
-            i;
         }
     }
     let mut nstmts: libc::c_int = ast_block_nstmts((*f).abstract_0);
     let mut stmt: *mut *mut ast_stmt = ast_block_stmts((*f).abstract_0);
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < nstmts {
-        let mut res: *mut result = ast_stmt_absexec(
-            *stmt.offset(i_0 as isize),
-            state,
-            0 as libc::c_int != 0,
-        );
+        let mut res: *mut result =
+            ast_stmt_absexec(*stmt.offset(i_0 as isize), State, 0 as libc::c_int != 0);
         if result_iserror(res) {
             return res;
         }
         i_0 += 1;
-        i_0;
     }
-    let mut obj: *mut object = state_getresult(state);
+    let mut obj: *mut Object = state_getresult(State);
     if obj.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"ast_function_absexec\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"ast_function_absexec\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             605 as libc::c_int,
             b"obj\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return result_value_create(object_as_value(obj));
 }
 unsafe extern "C" fn split_path_verify(
     mut f: *mut ast_function,
-    mut actual_state: *mut state,
+    mut actual_state: *mut State,
     mut index: libc::c_int,
-    mut cond: *mut ast_expr,
-    mut abstract_state: *mut state,
+    mut cond: *mut AstExpr,
+    mut abstract_state: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
     let mut paths: *mut ast_function_arr = body_paths(f, index, cond);
     let mut n: libc::c_int = ast_function_arr_len(paths);
     if !(n == 2 as libc::c_int) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"split_path_verify\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"split_path_verify\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             555 as libc::c_int,
             b"n == 2\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut func: *mut *mut ast_function = ast_function_arr_func(paths);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        let mut actual_copy: *mut state = state_copywithname(
-            actual_state,
-            ast_function_name(*func.offset(i as isize)),
-        );
-        let mut abstract_copy: *mut state = state_copywithname(
-            abstract_state,
-            ast_function_name(*func.offset(i as isize)),
-        );
+        let mut actual_copy: *mut State =
+            state_copywithname(actual_state, ast_function_name(*func.offset(i as isize)));
+        let mut abstract_copy: *mut State =
+            state_copywithname(abstract_state, ast_function_name(*func.offset(i as isize)));
         let mut r: *mut preresult = ast_expr_assume(
             ast_expr_inverted_copy(cond, i == 1 as libc::c_int),
             actual_copy,
@@ -8178,18 +7470,12 @@ unsafe extern "C" fn split_path_verify(
             return preresult_as_error(r);
         }
         if !preresult_iscontradiction(r) {
-            err = path_verify(
-                *func.offset(i as isize),
-                actual_copy,
-                index,
-                abstract_copy,
-            );
+            err = path_verify(*func.offset(i as isize), actual_copy, index, abstract_copy);
             if !err.is_null() {
                 return err;
             }
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
@@ -8197,7 +7483,7 @@ unsafe extern "C" fn recurse_buildgraph(
     mut g: *mut map,
     mut dedup: *mut map,
     mut fname: *mut libc::c_char,
-    mut ext: *mut externals,
+    mut ext: *mut Externals,
 ) {
     let mut local_dedup: *mut map = map_create();
     if !(map_get(dedup, fname)).is_null() {
@@ -8215,46 +7501,40 @@ unsafe extern "C" fn recurse_buildgraph(
     }
     if f.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"recurse_buildgraph\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"recurse_buildgraph\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             637 as libc::c_int,
             b"f\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     if (*f).isaxiom {
         return;
     }
     if ((*f).body).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"recurse_buildgraph\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"recurse_buildgraph\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             645 as libc::c_int,
             b"f->body\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut body: *mut ast_block = (*f).body;
     let mut nstmts: libc::c_int = ast_block_nstmts(body);
     let mut stmt: *mut *mut ast_stmt = ast_block_stmts(body);
     if stmt.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"recurse_buildgraph\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"recurse_buildgraph\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             650 as libc::c_int,
             b"stmt\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut val: *mut string_arr = string_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmts {
@@ -8264,10 +7544,8 @@ unsafe extern "C" fn recurse_buildgraph(
             let mut j: libc::c_int = 0 as libc::c_int;
             while j < string_arr_n(farr) {
                 if (map_get(local_dedup, *func.offset(j as isize))).is_null() {
-                    let mut f_0: *mut ast_function = externals_getfunc(
-                        ext,
-                        *func.offset(j as isize),
-                    );
+                    let mut f_0: *mut ast_function =
+                        externals_getfunc(ext, *func.offset(j as isize));
                     if !(*f_0).isaxiom {
                         string_arr_append(val, *func.offset(j as isize));
                     }
@@ -8279,18 +7557,16 @@ unsafe extern "C" fn recurse_buildgraph(
                     recurse_buildgraph(g, dedup, *func.offset(j as isize), ext);
                 }
                 j += 1;
-                j;
             }
         }
         i += 1;
-        i;
     }
     map_set(g, dynamic_str(fname), val as *const libc::c_void);
 }
 unsafe extern "C" fn abstract_paths(
     mut f: *mut ast_function,
     mut index: libc::c_int,
-    mut cond: *mut ast_expr,
+    mut cond: *mut AstExpr,
 ) -> *mut ast_function_arr {
     let mut res: *mut ast_function_arr = ast_function_arr_create();
     let mut f_true: *mut ast_function = ast_function_create(
@@ -8302,10 +7578,7 @@ unsafe extern "C" fn abstract_paths(
         ast_block_copy((*f).abstract_0),
         ast_block_copy((*f).body),
     );
-    let mut inv_assumption: *mut ast_expr = ast_expr_inverted_copy(
-        cond,
-        1 as libc::c_int != 0,
-    );
+    let mut inv_assumption: *mut AstExpr = ast_expr_inverted_copy(cond, 1 as libc::c_int != 0);
     let mut f_false: *mut ast_function = ast_function_create(
         (*f).isaxiom,
         ast_type_copy((*f).ret),
@@ -8321,36 +7594,30 @@ unsafe extern "C" fn abstract_paths(
 }
 unsafe extern "C" fn split_path_absverify(
     mut f: *mut ast_function,
-    mut state: *mut state,
+    mut State: *mut State,
     mut index: libc::c_int,
-    mut cond: *mut ast_expr,
+    mut cond: *mut AstExpr,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
     let mut paths: *mut ast_function_arr = abstract_paths(f, index, cond);
     let mut n: libc::c_int = ast_function_arr_len(paths);
     if !(n == 2 as libc::c_int) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 21],
-                &[libc::c_char; 21],
-            >(b"split_path_absverify\0"))
+            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"split_path_absverify\0"))
                 .as_ptr(),
             b"function.c\0" as *const u8 as *const libc::c_char,
             446 as libc::c_int,
             b"n == 2\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut func: *mut *mut ast_function = ast_function_arr_func(paths);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        let mut s_copy: *mut state = state_copywithname(
-            state,
-            ast_function_name(*func.offset(i as isize)),
-        );
-        let mut r: *mut preresult = ast_expr_assume(
-            ast_expr_inverted_copy(cond, i == 1 as libc::c_int),
-            s_copy,
-        );
+        let mut s_copy: *mut State =
+            state_copywithname(State, ast_function_name(*func.offset(i as isize)));
+        let mut r: *mut preresult =
+            ast_expr_assume(ast_expr_inverted_copy(cond, i == 1 as libc::c_int), s_copy);
         if preresult_iserror(r) {
             return preresult_as_error(r);
         }
@@ -8361,37 +7628,30 @@ unsafe extern "C" fn split_path_absverify(
             }
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
 unsafe extern "C" fn split_paths_absverify(
     mut f: *mut ast_function,
-    mut state: *mut state,
+    mut State: *mut State,
     mut index: libc::c_int,
     mut splits: *mut ast_stmt_splits,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*splits).n {
-        err = split_path_absverify(
-            f,
-            state,
-            index,
-            *((*splits).cond).offset(i as isize),
-        );
+        err = split_path_absverify(f, State, index, *((*splits).cond).offset(i as isize));
         if !err.is_null() {
             return err;
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_function_buildgraph(
     mut fname: *mut libc::c_char,
-    mut ext: *mut externals,
+    mut ext: *mut Externals,
 ) -> *mut map {
     let mut dedup: *mut map = map_create();
     let mut g: *mut map = map_create();
@@ -8400,9 +7660,9 @@ pub unsafe extern "C" fn ast_function_buildgraph(
 }
 unsafe extern "C" fn split_name(
     mut name: *mut libc::c_char,
-    mut assumption: *mut ast_expr,
+    mut assumption: *mut AstExpr,
 ) -> *mut libc::c_char {
-    let mut b: *mut strbuilder = strbuilder_create();
+    let mut b: *mut StrBuilder = strbuilder_create();
     let mut assumption_str: *mut libc::c_char = ast_expr_str(assumption);
     strbuilder_printf(
         b,
@@ -8415,10 +7675,10 @@ unsafe extern "C" fn split_name(
 }
 unsafe extern "C" fn split_paths_verify(
     mut f: *mut ast_function,
-    mut actual_state: *mut state,
+    mut actual_state: *mut State,
     mut index: libc::c_int,
     mut splits: *mut ast_stmt_splits,
-    mut abstract_state: *mut state,
+    mut abstract_state: *mut State,
 ) -> *mut error {
     let mut err: *mut error = 0 as *mut error;
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -8434,14 +7694,13 @@ unsafe extern "C" fn split_paths_verify(
             return err;
         }
         i += 1;
-        i;
     }
     return 0 as *mut error;
 }
 unsafe extern "C" fn body_paths(
     mut f: *mut ast_function,
     mut index: libc::c_int,
-    mut cond: *mut ast_expr,
+    mut cond: *mut AstExpr,
 ) -> *mut ast_function_arr {
     let mut res: *mut ast_function_arr = ast_function_arr_create();
     let mut f_true: *mut ast_function = ast_function_create(
@@ -8453,10 +7712,7 @@ unsafe extern "C" fn body_paths(
         ast_block_copy((*f).abstract_0),
         (*f).body,
     );
-    let mut inv_assumption: *mut ast_expr = ast_expr_inverted_copy(
-        cond,
-        1 as libc::c_int != 0,
-    );
+    let mut inv_assumption: *mut AstExpr = ast_expr_inverted_copy(cond, 1 as libc::c_int != 0);
     let mut f_false: *mut ast_function = ast_function_create(
         (*f).isaxiom,
         ast_type_copy((*f).ret),
@@ -8486,7 +7742,6 @@ pub unsafe extern "C" fn ast_function_arr_copy(
     while i < (*old).n {
         ast_function_arr_append(new, ast_function_copy(*((*old).f).offset(i as isize)));
         i += 1;
-        i;
     }
     return new;
 }
@@ -8496,7 +7751,6 @@ pub unsafe extern "C" fn ast_function_arr_destroy(mut arr: *mut ast_function_arr
     while i < (*arr).n {
         ast_function_destroy(*((*arr).f).offset(i as isize));
         i += 1;
-        i;
     }
     free(arr as *mut libc::c_void);
 }
@@ -8506,8 +7760,7 @@ pub unsafe extern "C" fn ast_function_arr_append(
     mut f: *mut ast_function,
 ) {
     (*arr).n += 1;
-    (*arr)
-        .f = realloc(
+    (*arr).f = realloc(
         (*arr).f as *mut libc::c_void,
         (::core::mem::size_of::<*mut ast_function>() as libc::c_ulong)
             .wrapping_mul((*arr).n as libc::c_ulong),
@@ -8524,13 +7777,10 @@ pub unsafe extern "C" fn ast_function_arr_appendrange(
     while i < (*range).n {
         ast_function_arr_append(arr, *((*range).f).offset(i as isize));
         i += 1;
-        i;
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_function_arr_len(
-    mut arr: *mut ast_function_arr,
-) -> libc::c_int {
+pub unsafe extern "C" fn ast_function_arr_len(mut arr: *mut ast_function_arr) -> libc::c_int {
     return (*arr).n;
 }
 #[no_mangle]
@@ -8540,41 +7790,36 @@ pub unsafe extern "C" fn ast_function_arr_func(
     return (*arr).f;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_functiondecl_create(
-    mut f: *mut ast_function,
-) -> *mut ast_externdecl {
-    let mut decl: *mut ast_externdecl = malloc(
-        ::core::mem::size_of::<ast_externdecl>() as libc::c_ulong,
-    ) as *mut ast_externdecl;
+pub unsafe extern "C" fn ast_functiondecl_create(mut f: *mut ast_function) -> *mut ast_externdecl {
+    let mut decl: *mut ast_externdecl =
+        malloc(::core::mem::size_of::<ast_externdecl>() as libc::c_ulong) as *mut ast_externdecl;
     (*decl).kind = EXTERN_FUNCTION;
     (*decl).c2rust_unnamed.function = f;
     return decl;
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_externdecl_isfunction(
-    mut decl: *mut ast_externdecl,
-) -> bool {
-    return (*decl).kind as libc::c_uint
-        == EXTERN_FUNCTION as libc::c_int as libc::c_uint;
+pub unsafe extern "C" fn ast_externdecl_isfunction(mut decl: *mut ast_externdecl) -> bool {
+    return (*decl).kind as libc::c_uint == EXTERN_FUNCTION as libc::c_int as libc::c_uint;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_externdecl_as_function(
     mut decl: *mut ast_externdecl,
 ) -> *mut ast_function {
     if !((*decl).kind as libc::c_uint == EXTERN_FUNCTION as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long != 0
+        as libc::c_int as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 27],
-                &[libc::c_char; 27],
-            >(b"ast_externdecl_as_function\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 27], &[libc::c_char; 27]>(
+                b"ast_externdecl_as_function\0",
+            ))
+            .as_ptr(),
             b"externdecl.c\0" as *const u8 as *const libc::c_char,
             45 as libc::c_int,
             b"decl->kind == EXTERN_FUNCTION\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*decl).c2rust_unnamed.function;
 }
 #[no_mangle]
@@ -8582,9 +7827,8 @@ pub unsafe extern "C" fn ast_decl_create(
     mut name: *mut libc::c_char,
     mut t: *mut ast_type,
 ) -> *mut ast_externdecl {
-    let mut decl: *mut ast_externdecl = malloc(
-        ::core::mem::size_of::<ast_externdecl>() as libc::c_ulong,
-    ) as *mut ast_externdecl;
+    let mut decl: *mut ast_externdecl =
+        malloc(::core::mem::size_of::<ast_externdecl>() as libc::c_ulong) as *mut ast_externdecl;
     if ast_type_istypedef(t) {
         (*decl).kind = EXTERN_TYPEDEF;
         (*decl).c2rust_unnamed._typedef.name = name;
@@ -8592,28 +7836,26 @@ pub unsafe extern "C" fn ast_decl_create(
     } else if ast_type_isstruct(t) {
         if (ast_type_struct_tag(t)).is_null() as libc::c_int as libc::c_long != 0 {
             __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 16],
-                    &[libc::c_char; 16],
-                >(b"ast_decl_create\0"))
+                (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"ast_decl_create\0"))
                     .as_ptr(),
                 b"externdecl.c\0" as *const u8 as *const libc::c_char,
                 58 as libc::c_int,
                 b"ast_type_struct_tag(t)\0" as *const u8 as *const libc::c_char,
             );
-        } else {};
+        } else {
+        };
         (*decl).kind = EXTERN_STRUCT;
         (*decl).c2rust_unnamed._struct = t;
     } else {
         (*decl).kind = EXTERN_VARIABLE;
-        (*decl).c2rust_unnamed.variable = ast_variable_create(name, t);
+        (*decl).c2rust_unnamed.Variable = ast_variable_create(name, t);
     }
     return decl;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_externdecl_install(
     mut decl: *mut ast_externdecl,
-    mut ext: *mut externals,
+    mut ext: *mut Externals,
 ) {
     let mut f: *mut ast_function = 0 as *mut ast_function;
     let mut v: *mut ast_variable = 0 as *mut ast_variable;
@@ -8623,7 +7865,7 @@ pub unsafe extern "C" fn ast_externdecl_install(
             externals_declarefunc(ext, ast_function_name(f), f);
         }
         1 => {
-            v = (*decl).c2rust_unnamed.variable;
+            v = (*decl).c2rust_unnamed.Variable;
             externals_declarevar(ext, ast_variable_name(v), v);
         }
         2 => {
@@ -8639,16 +7881,16 @@ pub unsafe extern "C" fn ast_externdecl_install(
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 23],
-                        &[libc::c_char; 23],
-                    >(b"ast_externdecl_install\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                        b"ast_externdecl_install\0",
+                    ))
+                    .as_ptr(),
                     b"externdecl.c\0" as *const u8 as *const libc::c_char,
                     92 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     };
 }
@@ -8659,7 +7901,7 @@ pub unsafe extern "C" fn ast_externdecl_destroy(mut decl: *mut ast_externdecl) {
             ast_function_destroy((*decl).c2rust_unnamed.function);
         }
         1 => {
-            ast_variable_destroy((*decl).c2rust_unnamed.variable);
+            ast_variable_destroy((*decl).c2rust_unnamed.Variable);
         }
         2 => {
             free((*decl).c2rust_unnamed._typedef.name as *mut libc::c_void);
@@ -8671,16 +7913,16 @@ pub unsafe extern "C" fn ast_externdecl_destroy(mut decl: *mut ast_externdecl) {
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 23],
-                        &[libc::c_char; 23],
-                    >(b"ast_externdecl_destroy\0"))
-                        .as_ptr(),
+                    (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                        b"ast_externdecl_destroy\0",
+                    ))
+                    .as_ptr(),
                     b"externdecl.c\0" as *const u8 as *const libc::c_char,
                     114 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     free(decl as *mut libc::c_void);
@@ -8691,57 +7933,55 @@ pub unsafe extern "C" fn parse_int(mut s: *mut libc::c_char) -> libc::c_int {
     while *s != 0 {
         n = 10 as libc::c_int * n + (*s as libc::c_int - '0' as i32);
         s = s.offset(1);
-        s;
     }
     return n;
 }
 #[no_mangle]
 pub unsafe extern "C" fn parse_char(mut s: *mut libc::c_char) -> libc::c_char {
     if !(strlen(s) >= 3 as libc::c_int as libc::c_ulong
-        && *s.offset(0 as libc::c_int as isize) as libc::c_int == '\'' as i32)
-        as libc::c_int as libc::c_long != 0
+        && *s.offset(0 as libc::c_int as isize) as libc::c_int == '\'' as i32) as libc::c_int
+        as libc::c_long
+        != 0
     {
         __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"parse_char\0"))
-                .as_ptr(),
+            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"parse_char\0")).as_ptr(),
             b"literals.c\0" as *const u8 as *const libc::c_char,
             25 as libc::c_int,
             b"strlen(s) >= 3 && s[0] == '\\''\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     match *s.offset(1 as libc::c_int as isize) as libc::c_int {
         92 => {
-            if !(*s.offset(3 as libc::c_int as isize) as libc::c_int == '\'' as i32)
-                as libc::c_int as libc::c_long != 0
+            if !(*s.offset(3 as libc::c_int as isize) as libc::c_int == '\'' as i32) as libc::c_int
+                as libc::c_long
+                != 0
             {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 11],
-                        &[libc::c_char; 11],
-                    >(b"parse_char\0"))
+                    (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"parse_char\0"))
                         .as_ptr(),
                     b"literals.c\0" as *const u8 as *const libc::c_char,
                     29 as libc::c_int,
                     b"s[3] == '\\''\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
             return parse_escape(*s.offset(2 as libc::c_int as isize)) as libc::c_char;
         }
         _ => {
-            if !(*s.offset(2 as libc::c_int as isize) as libc::c_int == '\'' as i32)
-                as libc::c_int as libc::c_long != 0
+            if !(*s.offset(2 as libc::c_int as isize) as libc::c_int == '\'' as i32) as libc::c_int
+                as libc::c_long
+                != 0
             {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 11],
-                        &[libc::c_char; 11],
-                    >(b"parse_char\0"))
+                    (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"parse_char\0"))
                         .as_ptr(),
                     b"literals.c\0" as *const u8 as *const libc::c_char,
                     32 as libc::c_int,
                     b"s[2] == '\\''\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
             return *s.offset(1 as libc::c_int as isize);
         }
     };
@@ -8755,53 +7995,45 @@ pub unsafe extern "C" fn parse_escape(mut c: libc::c_char) -> libc::c_int {
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
-                    (*::core::mem::transmute::<
-                        &[u8; 13],
-                        &[libc::c_char; 13],
-                    >(b"parse_escape\0"))
+                    (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"parse_escape\0"))
                         .as_ptr(),
                     b"literals.c\0" as *const u8 as *const libc::c_char,
                     48 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );
-            } else {};
+            } else {
+            };
         }
     }
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_create(mut decl: *mut ast_externdecl) -> *mut ast {
-    let mut node: *mut ast = calloc(
+pub unsafe extern "C" fn ast_create(mut decl: *mut ast_externdecl) -> *mut Ast {
+    let mut node: *mut Ast = calloc(
         1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<ast>() as libc::c_ulong,
-    ) as *mut ast;
+        ::core::mem::size_of::<Ast>() as libc::c_ulong,
+    ) as *mut Ast;
     return ast_append(node, decl);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_destroy(mut node: *mut ast) {
+pub unsafe extern "C" fn ast_destroy(mut node: *mut Ast) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*node).n {
         ast_externdecl_destroy(*((*node).decl).offset(i as isize));
         i += 1;
-        i;
     }
     free((*node).decl as *mut libc::c_void);
     free(node as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn ast_append(
-    mut node: *mut ast,
-    mut decl: *mut ast_externdecl,
-) -> *mut ast {
+pub unsafe extern "C" fn ast_append(mut node: *mut Ast, mut decl: *mut ast_externdecl) -> *mut Ast {
     (*node).n += 1;
-    (*node)
-        .decl = realloc(
+    (*node).decl = realloc(
         (*node).decl as *mut libc::c_void,
         (::core::mem::size_of::<*mut ast_externdecl>() as libc::c_ulong)
             .wrapping_mul((*node).n as libc::c_ulong),
     ) as *mut *mut ast_externdecl;
-    let ref mut fresh16 = *((*node).decl)
-        .offset(((*node).n - 1 as libc::c_int) as isize);
+    let ref mut fresh16 = *((*node).decl).offset(((*node).n - 1 as libc::c_int) as isize);
     *fresh16 = decl;
     return node;
 }
@@ -8809,26 +8041,24 @@ pub unsafe extern "C" fn ast_append(
 pub unsafe extern "C" fn result_error_create(mut err: *mut error) -> *mut result {
     if err.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 20],
-                &[libc::c_char; 20],
-            >(b"result_error_create\0"))
+            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"result_error_create\0"))
                 .as_ptr(),
-            b"ast.c\0" as *const u8 as *const libc::c_char,
+            b"Ast.c\0" as *const u8 as *const libc::c_char,
             54 as libc::c_int,
             b"err\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
-    let mut r: *mut result = malloc(::core::mem::size_of::<result>() as libc::c_ulong)
-        as *mut result;
-    (*r).val = 0 as *mut value;
+    } else {
+    };
+    let mut r: *mut result =
+        malloc(::core::mem::size_of::<result>() as libc::c_ulong) as *mut result;
+    (*r).val = 0 as *mut Value;
     (*r).err = err;
     return r;
 }
 #[no_mangle]
-pub unsafe extern "C" fn result_value_create(mut val: *mut value) -> *mut result {
-    let mut r: *mut result = malloc(::core::mem::size_of::<result>() as libc::c_ulong)
-        as *mut result;
+pub unsafe extern "C" fn result_value_create(mut val: *mut Value) -> *mut result {
+    let mut r: *mut result =
+        malloc(::core::mem::size_of::<result>() as libc::c_ulong) as *mut result;
     (*r).val = val;
     (*r).err = 0 as *mut error;
     return r;
@@ -8837,16 +8067,14 @@ pub unsafe extern "C" fn result_value_create(mut val: *mut value) -> *mut result
 pub unsafe extern "C" fn result_destroy(mut res: *mut result) {
     if !((*res).err).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 15],
-                &[libc::c_char; 15],
-            >(b"result_destroy\0"))
+            (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"result_destroy\0"))
                 .as_ptr(),
-            b"ast.c\0" as *const u8 as *const libc::c_char,
+            b"Ast.c\0" as *const u8 as *const libc::c_char,
             74 as libc::c_int,
             b"!res->err\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     if !((*res).val).is_null() {
         value_destroy((*res).val);
     }
@@ -8860,57 +8088,48 @@ pub unsafe extern "C" fn result_iserror(mut res: *mut result) -> bool {
 pub unsafe extern "C" fn result_as_error(mut res: *mut result) -> *mut error {
     if ((*res).err).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 16],
-                &[libc::c_char; 16],
-            >(b"result_as_error\0"))
+            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"result_as_error\0"))
                 .as_ptr(),
-            b"ast.c\0" as *const u8 as *const libc::c_char,
+            b"Ast.c\0" as *const u8 as *const libc::c_char,
             90 as libc::c_int,
             b"res->err\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*res).err;
 }
 #[no_mangle]
-pub unsafe extern "C" fn result_as_value(mut res: *mut result) -> *mut value {
+pub unsafe extern "C" fn result_as_value(mut res: *mut result) -> *mut Value {
     if !((*res).err).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 16],
-                &[libc::c_char; 16],
-            >(b"result_as_value\0"))
+            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"result_as_value\0"))
                 .as_ptr(),
-            b"ast.c\0" as *const u8 as *const libc::c_char,
+            b"Ast.c\0" as *const u8 as *const libc::c_char,
             97 as libc::c_int,
             b"!res->err\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*res).val;
 }
 #[no_mangle]
 pub unsafe extern "C" fn result_hasvalue(mut res: *mut result) -> bool {
     if result_iserror(res) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 16],
-                &[libc::c_char; 16],
-            >(b"result_hasvalue\0"))
+            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"result_hasvalue\0"))
                 .as_ptr(),
-            b"ast.c\0" as *const u8 as *const libc::c_char,
+            b"Ast.c\0" as *const u8 as *const libc::c_char,
             104 as libc::c_int,
             b"!result_iserror(res)\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return !((*res).val).is_null();
 }
 #[no_mangle]
-pub unsafe extern "C" fn lvalue_create(
-    mut t: *mut ast_type,
-    mut obj: *mut object,
-) -> *mut lvalue {
-    let mut l: *mut lvalue = malloc(::core::mem::size_of::<lvalue>() as libc::c_ulong)
-        as *mut lvalue;
+pub unsafe extern "C" fn lvalue_create(mut t: *mut ast_type, mut obj: *mut Object) -> *mut lvalue {
+    let mut l: *mut lvalue =
+        malloc(::core::mem::size_of::<lvalue>() as libc::c_ulong) as *mut lvalue;
     (*l).t = t;
     (*l).obj = obj;
     return l;
@@ -8926,7 +8145,7 @@ pub unsafe extern "C" fn lvalue_type(mut l: *mut lvalue) -> *mut ast_type {
     return (*l).t;
 }
 #[no_mangle]
-pub unsafe extern "C" fn lvalue_object(mut l: *mut lvalue) -> *mut object {
+pub unsafe extern "C" fn lvalue_object(mut l: *mut lvalue) -> *mut Object {
     return (*l).obj;
 }
 #[no_mangle]
@@ -8940,16 +8159,16 @@ pub unsafe extern "C" fn preresult_empty_create() -> *mut preresult {
 pub unsafe extern "C" fn preresult_error_create(mut err: *mut error) -> *mut preresult {
     if err.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 23],
-                &[libc::c_char; 23],
-            >(b"preresult_error_create\0"))
-                .as_ptr(),
-            b"ast.c\0" as *const u8 as *const libc::c_char,
+            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
+                b"preresult_error_create\0",
+            ))
+            .as_ptr(),
+            b"Ast.c\0" as *const u8 as *const libc::c_char,
             157 as libc::c_int,
             b"err\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     let mut r: *mut preresult = preresult_empty_create();
     (*r).err = err;
     return r;
@@ -8964,16 +8183,14 @@ pub unsafe extern "C" fn preresult_contradiction_create() -> *mut preresult {
 pub unsafe extern "C" fn preresult_destroy(mut r: *mut preresult) {
     if !((*r).err).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 18],
-                &[libc::c_char; 18],
-            >(b"preresult_destroy\0"))
+            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"preresult_destroy\0"))
                 .as_ptr(),
-            b"ast.c\0" as *const u8 as *const libc::c_char,
+            b"Ast.c\0" as *const u8 as *const libc::c_char,
             175 as libc::c_int,
             b"!r->err\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     free(r as *mut libc::c_void);
 }
 #[no_mangle]
@@ -8988,16 +8205,14 @@ pub unsafe extern "C" fn preresult_iserror(mut r: *mut preresult) -> bool {
 pub unsafe extern "C" fn preresult_as_error(mut r: *mut preresult) -> *mut error {
     if ((*r).err).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
-            (*::core::mem::transmute::<
-                &[u8; 19],
-                &[libc::c_char; 19],
-            >(b"preresult_as_error\0"))
+            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"preresult_as_error\0"))
                 .as_ptr(),
-            b"ast.c\0" as *const u8 as *const libc::c_char,
+            b"Ast.c\0" as *const u8 as *const libc::c_char,
             195 as libc::c_int,
             b"r->err\0" as *const u8 as *const libc::c_char,
         );
-    } else {};
+    } else {
+    };
     return (*r).err;
 }
 #[no_mangle]
@@ -9007,14 +8222,14 @@ pub unsafe extern "C" fn preresult_iscontradiction(mut r: *mut preresult) -> boo
 #[no_mangle]
 pub unsafe extern "C" fn ast_topological_order(
     mut fname: *mut libc::c_char,
-    mut ext: *mut externals,
+    mut ext: *mut Externals,
 ) -> *mut string_arr {
     return topological_order(fname, ext);
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_protostitch(
     mut f: *mut ast_function,
-    mut ext: *mut externals,
+    mut ext: *mut Externals,
 ) -> *mut ast_function {
     return ast_function_protostitch(f, ext);
 }
