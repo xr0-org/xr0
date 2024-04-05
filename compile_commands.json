@@ -1,0 +1,82 @@
+[
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -I src/ast -o build/ast.o -c src/ast/ast.c",
+    "file": "src/ast/ast.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -I src/ast -o build/gram.o -c build/gram.tab.c",
+    "file": "build/gram.tab.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/block.o -c src/state/block.c",
+    "file": "src/state/block.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/clump.o -c src/state/clump.c",
+    "file": "src/state/clump.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/ext.o -c src/ext/ext.c",
+    "file": "src/ext/ext.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/heap.o -c src/state/heap.c",
+    "file": "src/state/heap.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/location.o -c src/state/location.c",
+    "file": "src/state/location.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/math.o -c src/math/math.c",
+    "file": "src/math/math.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/object.o -c src/object/object.c",
+    "file": "src/object/object.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/props.o -c src/props/props.c",
+    "file": "src/props/props.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/stack.o -c src/state/stack.c",
+    "file": "src/state/stack.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/state.o -c src/state/state.c",
+    "file": "src/state/state.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/static.o -c src/state/static.c",
+    "file": "src/state/static.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/util.o -c src/util/util.c",
+    "file": "src/util/util.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/value.o -c src/value/value.c",
+    "file": "src/value/value.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -I build -o build/0v.o -c src/main.c",
+    "file": "src/main.c"
+  },
+]
