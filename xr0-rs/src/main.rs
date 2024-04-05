@@ -1,0 +1,809 @@
+#![allow(
+    dead_code,
+    mutable_transmutes,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    unused_assignments,
+    unused_mut
+)]
+#![feature(extern_types, linkage)]
+
+mod ast;
+mod ext;
+mod math;
+mod object;
+mod props;
+mod state;
+mod util;
+mod value;
+
+extern "C" {
+    pub type __sFILEX;
+    pub type ast_block;
+    pub type ast_function;
+    pub type ast_externdecl;
+    pub type strbuilder;
+    pub type externals;
+    static mut __stderrp: *mut FILE;
+    fn fclose(_: *mut FILE) -> libc::c_int;
+    fn fgetc(_: *mut FILE) -> libc::c_int;
+    fn fgets(_: *mut libc::c_char, _: libc::c_int, _: *mut FILE) -> *mut libc::c_char;
+    fn fopen(_: *const libc::c_char, _: *const libc::c_char) -> *mut FILE;
+    fn fprintf(_: *mut FILE, _: *const libc::c_char, _: ...) -> libc::c_int;
+    fn fputc(_: libc::c_int, _: *mut FILE) -> libc::c_int;
+    fn fputs(_: *const libc::c_char, _: *mut FILE) -> libc::c_int;
+    fn fseek(_: *mut FILE, _: libc::c_long, _: libc::c_int) -> libc::c_int;
+    fn ftell(_: *mut FILE) -> libc::c_long;
+    fn rewind(_: *mut FILE);
+    fn tmpfile() -> *mut FILE;
+    fn pclose(_: *mut FILE) -> libc::c_int;
+    fn popen(_: *const libc::c_char, _: *const libc::c_char) -> *mut FILE;
+    fn snprintf(
+        _: *mut libc::c_char,
+        _: libc::c_ulong,
+        _: *const libc::c_char,
+        _: ...
+    ) -> libc::c_int;
+    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
+    fn free(_: *mut libc::c_void);
+    fn exit(_: libc::c_int) -> !;
+    fn getenv(_: *const libc::c_char) -> *mut libc::c_char;
+    fn __assert_rtn(
+        _: *const libc::c_char,
+        _: *const libc::c_char,
+        _: libc::c_int,
+        _: *const libc::c_char,
+    ) -> !;
+    fn __maskrune(_: __darwin_ct_rune_t, _: libc::c_ulong) -> libc::c_int;
+    static mut _DefaultRuneLocale: _RuneLocale;
+    fn strcmp(_: *const libc::c_char, _: *const libc::c_char) -> libc::c_int;
+    fn strlen(_: *const libc::c_char) -> libc::c_ulong;
+    fn getopt(_: libc::c_int, _: *const *mut libc::c_char, _: *const libc::c_char) -> libc::c_int;
+    static mut optarg: *mut libc::c_char;
+    static mut optind: libc::c_int;
+    fn ast_block_str(_: *mut ast_block, indent: *mut libc::c_char) -> *mut libc::c_char;
+    fn ast_function_name(f: *mut ast_function) -> *mut libc::c_char;
+    fn ast_function_copy(_: *mut ast_function) -> *mut ast_function;
+    fn ast_function_isaxiom(f: *mut ast_function) -> bool;
+    fn ast_function_isproto(f: *mut ast_function) -> bool;
+    fn ast_function_absisempty(f: *mut ast_function) -> bool;
+    fn ast_function_abstract(f: *mut ast_function) -> *mut ast_block;
+    fn ast_function_verify(_: *mut ast_function, _: *mut externals) -> *mut error;
+    fn ast_functiondecl_create(_: *mut ast_function) -> *mut ast_externdecl;
+    fn ast_externdecl_isfunction(_: *mut ast_externdecl) -> bool;
+    fn ast_externdecl_as_function(_: *mut ast_externdecl) -> *mut ast_function;
+    fn ast_externdecl_install(decl: *mut ast_externdecl, ext: *mut externals);
+    fn v_printf(fmt: *mut libc::c_char, _: ...) -> libc::c_int;
+    fn strbuilder_create() -> *mut strbuilder;
+    fn strbuilder_printf(b: *mut strbuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
+    fn strbuilder_build(b: *mut strbuilder) -> *mut libc::c_char;
+    fn string_arr_create() -> *mut string_arr;
+    fn string_arr_s(_: *mut string_arr) -> *mut *mut libc::c_char;
+    fn string_arr_n(_: *mut string_arr) -> libc::c_int;
+    fn string_arr_append(_: *mut string_arr, _: *mut libc::c_char) -> libc::c_int;
+    fn string_arr_str(_: *mut string_arr) -> *mut libc::c_char;
+    fn ast_destroy(_: *mut ast);
+    fn ast_topological_order(fname: *mut libc::c_char, ext: *mut externals) -> *mut string_arr;
+    fn ast_protostitch(_: *mut ast_function, _: *mut externals) -> *mut ast_function;
+    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
+    fn lex_begin();
+    fn lex_finish();
+    fn yylex_destroy() -> libc::c_int;
+    fn externals_create() -> *mut externals;
+    fn externals_destroy(_: *mut externals);
+    fn externals_getfunc(_: *mut externals, id: *mut libc::c_char) -> *mut ast_function;
+    fn yyparse() -> libc::c_int;
+}
+pub type __uint32_t = libc::c_uint;
+pub type __int64_t = libc::c_longlong;
+pub type __darwin_ct_rune_t = libc::c_int;
+pub type __darwin_size_t = libc::c_ulong;
+pub type __darwin_wchar_t = libc::c_int;
+pub type __darwin_rune_t = __darwin_wchar_t;
+pub type __darwin_off_t = __int64_t;
+pub type fpos_t = __darwin_off_t;
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct __sbuf {
+    pub _base: *mut libc::c_uchar,
+    pub _size: libc::c_int,
+}
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct __sFILE {
+    pub _p: *mut libc::c_uchar,
+    pub _r: libc::c_int,
+    pub _w: libc::c_int,
+    pub _flags: libc::c_short,
+    pub _file: libc::c_short,
+    pub _bf: __sbuf,
+    pub _lbfsize: libc::c_int,
+    pub _cookie: *mut libc::c_void,
+    pub _close: Option<unsafe extern "C" fn(*mut libc::c_void) -> libc::c_int>,
+    pub _read: Option<
+        unsafe extern "C" fn(*mut libc::c_void, *mut libc::c_char, libc::c_int) -> libc::c_int,
+    >,
+    pub _seek: Option<unsafe extern "C" fn(*mut libc::c_void, fpos_t, libc::c_int) -> fpos_t>,
+    pub _write: Option<
+        unsafe extern "C" fn(*mut libc::c_void, *const libc::c_char, libc::c_int) -> libc::c_int,
+    >,
+    pub _ub: __sbuf,
+    pub _extra: *mut __sFILEX,
+    pub _ur: libc::c_int,
+    pub _ubuf: [libc::c_uchar; 3],
+    pub _nbuf: [libc::c_uchar; 1],
+    pub _lb: __sbuf,
+    pub _blksize: libc::c_int,
+    pub _offset: fpos_t,
+}
+pub type FILE = __sFILE;
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct _RuneEntry {
+    pub __min: __darwin_rune_t,
+    pub __max: __darwin_rune_t,
+    pub __map: __darwin_rune_t,
+    pub __types: *mut __uint32_t,
+}
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct _RuneRange {
+    pub __nranges: libc::c_int,
+    pub __ranges: *mut _RuneEntry,
+}
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct _RuneCharClass {
+    pub __name: [libc::c_char; 14],
+    pub __mask: __uint32_t,
+}
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct _RuneLocale {
+    pub __magic: [libc::c_char; 8],
+    pub __encoding: [libc::c_char; 32],
+    pub __sgetrune: Option<
+        unsafe extern "C" fn(
+            *const libc::c_char,
+            __darwin_size_t,
+            *mut *const libc::c_char,
+        ) -> __darwin_rune_t,
+    >,
+    pub __sputrune: Option<
+        unsafe extern "C" fn(
+            __darwin_rune_t,
+            *mut libc::c_char,
+            __darwin_size_t,
+            *mut *mut libc::c_char,
+        ) -> libc::c_int,
+    >,
+    pub __invalid_rune: __darwin_rune_t,
+    pub __runetype: [__uint32_t; 256],
+    pub __maplower: [__darwin_rune_t; 256],
+    pub __mapupper: [__darwin_rune_t; 256],
+    pub __runetype_ext: _RuneRange,
+    pub __maplower_ext: _RuneRange,
+    pub __mapupper_ext: _RuneRange,
+    pub __variable: *mut libc::c_void,
+    pub __variable_len: libc::c_int,
+    pub __ncharclasses: libc::c_int,
+    pub __charclasses: *mut _RuneCharClass,
+}
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct ast {
+    pub n: libc::c_int,
+    pub decl: *mut *mut ast_externdecl,
+}
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct error {
+    pub msg: *mut libc::c_char,
+    pub inner: *mut error,
+}
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct string_arr {
+    pub n: libc::c_int,
+    pub s: *mut *mut libc::c_char,
+}
+pub type execmode = libc::c_uint;
+pub const EXECMODE_STRIP: execmode = 1;
+pub const EXECMODE_VERIFY: execmode = 0;
+pub type sortmode = libc::c_uint;
+pub const SORTMODE_VERIFY: sortmode = 2;
+pub const SORTMODE_SORT: sortmode = 1;
+pub const SORTMODE_NONE: sortmode = 0;
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct config {
+    pub infile: *mut libc::c_char,
+    pub outfile: *mut libc::c_char,
+    pub includedirs: *mut string_arr,
+    pub verbose: bool,
+    pub mode: execmode,
+    pub sortfunc: *mut libc::c_char,
+    pub sortmode: sortmode,
+}
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct sortconfig {
+    pub mode: sortmode,
+    pub sortfunc: *mut libc::c_char,
+}
+#[inline]
+unsafe extern "C" fn isascii(mut _c: libc::c_int) -> libc::c_int {
+    return (_c & !(0x7f as libc::c_int) == 0 as libc::c_int) as libc::c_int;
+}
+#[inline]
+unsafe extern "C" fn __istype(mut _c: __darwin_ct_rune_t, mut _f: libc::c_ulong) -> libc::c_int {
+    return if isascii(_c) != 0 {
+        (_DefaultRuneLocale.__runetype[_c as usize] as libc::c_ulong & _f != 0) as libc::c_int
+    } else {
+        (__maskrune(_c, _f) != 0) as libc::c_int
+    };
+}
+#[no_mangle]
+#[inline]
+#[linkage = "external"]
+pub unsafe extern "C" fn isspace(mut _c: libc::c_int) -> libc::c_int {
+    return __istype(_c, 0x4000 as libc::c_long as libc::c_ulong);
+}
+#[no_mangle]
+pub unsafe extern "C" fn parse_config(
+    mut argc: libc::c_int,
+    mut argv: *mut *mut libc::c_char,
+) -> config {
+    let mut mode: execmode = EXECMODE_VERIFY;
+    let mut verbose: bool = 0 as libc::c_int != 0;
+    let mut sortconf: sortconfig = sortconfig_create(
+        SORTMODE_NONE,
+        b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+    );
+    let mut includedirs: *mut string_arr = default_includes();
+    let mut outfile: *mut libc::c_char =
+        b"0.c\0" as *const u8 as *const libc::c_char as *mut libc::c_char;
+    let mut opt: libc::c_int = 0;
+    loop {
+        opt = getopt(
+            argc,
+            argv as *const *mut libc::c_char,
+            b"vso:t:x:I:\0" as *const u8 as *const libc::c_char,
+        );
+        if !(opt != -(1 as libc::c_int)) {
+            break;
+        }
+        match opt {
+            73 => {
+                string_arr_append(includedirs, dynamic_str(optarg));
+            }
+            111 => {
+                outfile = optarg;
+            }
+            118 => {
+                verbose = 1 as libc::c_int != 0;
+            }
+            115 => {
+                mode = EXECMODE_STRIP;
+            }
+            116 => {
+                sortconf = sortconfig_create(SORTMODE_SORT, optarg);
+            }
+            120 => {
+                sortconf = sortconfig_create(SORTMODE_VERIFY, optarg);
+            }
+            _ => {
+                fprintf(
+                    __stderrp,
+                    b"Usage: %s [-I libx] input_file\n\0" as *const u8 as *const libc::c_char,
+                    *argv.offset(0 as libc::c_int as isize),
+                );
+                exit(1 as libc::c_int);
+            }
+        }
+    }
+    if optind >= argc {
+        fprintf(
+            __stderrp,
+            b"%s\n\0" as *const u8 as *const libc::c_char,
+            b"must provide input as string\0" as *const u8 as *const libc::c_char,
+        );
+        exit(1 as libc::c_int);
+    }
+    return {
+        let mut init = config {
+            infile: *argv.offset(optind as isize),
+            outfile: outfile,
+            includedirs: includedirs,
+            verbose: verbose,
+            mode: mode,
+            sortfunc: sortconf.sortfunc,
+            sortmode: sortconf.mode,
+        };
+        init
+    };
+}
+unsafe extern "C" fn sortconfig_create(
+    mut mode: sortmode,
+    mut sortfunc: *mut libc::c_char,
+) -> sortconfig {
+    match mode as libc::c_uint {
+        0 => {
+            return {
+                let mut init = sortconfig {
+                    mode: mode,
+                    sortfunc: sortfunc,
+                };
+                init
+            };
+        }
+        1 | 2 => {
+            if sortfunc.is_null() {
+                fprintf(
+                    __stderrp,
+                    b"%s\n\0" as *const u8 as *const libc::c_char,
+                    b"supply function to `-t' flag to evaluate dependencies for\0" as *const u8
+                        as *const libc::c_char,
+                );
+                exit(1 as libc::c_int);
+            }
+            return {
+                let mut init = sortconfig {
+                    mode: mode,
+                    sortfunc: sortfunc,
+                };
+                init
+            };
+        }
+        _ => {
+            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
+                __assert_rtn(
+                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
+                        b"sortconfig_create\0",
+                    ))
+                    .as_ptr(),
+                    b"main.c\0" as *const u8 as *const libc::c_char,
+                    123 as libc::c_int,
+                    b"false\0" as *const u8 as *const libc::c_char,
+                );
+            } else {
+            };
+        }
+    }
+    panic!("Reached end of non-void function without returning");
+}
+unsafe extern "C" fn default_includes() -> *mut string_arr {
+    let mut dirs: *mut string_arr = string_arr_create();
+    let mut env: *mut libc::c_char = getenv(b"XR0_INCLUDES\0" as *const u8 as *const libc::c_char);
+    if !env.is_null() {
+        string_arr_append(dirs, env);
+    }
+    return dirs;
+}
+#[no_mangle]
+pub unsafe extern "C" fn genincludes(mut includedirs: *mut string_arr) -> *mut libc::c_char {
+    let mut b: *mut strbuilder = strbuilder_create();
+    let mut s: *mut *mut libc::c_char = string_arr_s(includedirs);
+    let mut n: libc::c_int = string_arr_n(includedirs);
+    let mut i: libc::c_int = 0 as libc::c_int;
+    while i < n {
+        strbuilder_printf(
+            b,
+            b" -I %s\0" as *const u8 as *const libc::c_char,
+            *s.offset(i as isize),
+        );
+        i += 1;
+        i;
+    }
+    return strbuilder_build(b);
+}
+#[no_mangle]
+pub unsafe extern "C" fn preprocesscmd_fmt(
+    mut includedirs: *mut string_arr,
+    mut infile: *mut libc::c_char,
+) -> *mut libc::c_char {
+    let mut includes: *mut libc::c_char = genincludes(includedirs);
+    let mut len: libc::c_int =
+        (strlen(b"cc %s -nostdinc -E -xc %s\0" as *const u8 as *const libc::c_char))
+            .wrapping_sub(4 as libc::c_int as libc::c_ulong)
+            .wrapping_add(strlen(includes))
+            .wrapping_add(strlen(infile))
+            .wrapping_add(1 as libc::c_int as libc::c_ulong) as libc::c_int;
+    let mut s: *mut libc::c_char = malloc(
+        (::core::mem::size_of::<libc::c_char>() as libc::c_ulong)
+            .wrapping_mul(len as libc::c_ulong),
+    ) as *mut libc::c_char;
+    snprintf(
+        s,
+        len as libc::c_ulong,
+        b"cc %s -nostdinc -E -xc %s\0" as *const u8 as *const libc::c_char,
+        includes,
+        infile,
+    );
+    return s;
+}
+#[no_mangle]
+pub unsafe extern "C" fn open_preprocessor(
+    mut infile: *mut libc::c_char,
+    mut includedirs: *mut string_arr,
+) -> *mut FILE {
+    let mut cmd: *mut libc::c_char = preprocesscmd_fmt(includedirs, infile);
+    let mut pipe: *mut FILE = popen(cmd, b"r\0" as *const u8 as *const libc::c_char);
+    free(cmd as *mut libc::c_void);
+    return pipe;
+}
+#[no_mangle]
+pub unsafe extern "C" fn preprocess(
+    mut infile: *mut libc::c_char,
+    mut includedirs: *mut string_arr,
+) -> *mut FILE {
+    let mut pipe: *mut FILE = open_preprocessor(infile, includedirs);
+    if pipe.is_null() {
+        fprintf(
+            __stderrp,
+            b"command error\n\0" as *const u8 as *const libc::c_char,
+        );
+        exit(1 as libc::c_int);
+    }
+    let mut tmp: *mut FILE = tmpfile();
+    if tmp.is_null() {
+        fprintf(
+            __stderrp,
+            b"cannot create temp file\n\0" as *const u8 as *const libc::c_char,
+        );
+        exit(1 as libc::c_int);
+    }
+    let mut buf: [libc::c_char; 1024] = [0; 1024];
+    while !(fgets(
+        buf.as_mut_ptr(),
+        ::core::mem::size_of::<[libc::c_char; 1024]>() as libc::c_ulong as libc::c_int,
+        pipe,
+    ))
+    .is_null()
+    {
+        fputs(buf.as_mut_ptr(), tmp);
+    }
+    pclose(pipe);
+    rewind(tmp);
+    return tmp;
+}
+#[no_mangle]
+pub static mut root: *mut ast = 0 as *const ast as *mut ast;
+#[no_mangle]
+pub unsafe extern "C" fn pass0(mut root_0: *mut ast, mut ext: *mut externals) {
+    let mut i: libc::c_int = 0 as libc::c_int;
+    while i < (*root_0).n {
+        let mut decl: *mut ast_externdecl = *((*root_0).decl).offset(i as isize);
+        if !ast_externdecl_isfunction(decl) {
+            ast_externdecl_install(decl, ext);
+        } else {
+            let mut f: *mut ast_function = ast_externdecl_as_function(decl);
+            if ast_function_isaxiom(f) {
+                ast_externdecl_install(decl, ext);
+            } else if ast_function_isproto(f) {
+                if !verifyproto(f, (*root_0).n, (*root_0).decl) {
+                    exit(1 as libc::c_int);
+                }
+                ast_externdecl_install(decl, ext);
+            } else {
+                let mut stitched: *mut ast_function = ast_protostitch(f, ext);
+                ast_externdecl_install(ast_functiondecl_create(ast_function_copy(stitched)), ext);
+            }
+        }
+        i += 1;
+        i;
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn pass1(mut root_0: *mut ast, mut ext: *mut externals) {
+    let mut err: *mut error = 0 as *mut error;
+    let mut i: libc::c_int = 0 as libc::c_int;
+    while i < (*root_0).n {
+        let mut decl: *mut ast_externdecl = *((*root_0).decl).offset(i as isize);
+        if ast_externdecl_isfunction(decl) {
+            let mut f: *mut ast_function = ast_externdecl_as_function(decl);
+            if !(ast_function_isaxiom(f) as libc::c_int != 0
+                || ast_function_isproto(f) as libc::c_int != 0)
+            {
+                if (ast_function_abstract(f)).is_null() as libc::c_int as libc::c_long != 0 {
+                    __assert_rtn(
+                        (*::core::mem::transmute::<&[u8; 6], &[libc::c_char; 6]>(b"pass1\0"))
+                            .as_ptr(),
+                        b"main.c\0" as *const u8 as *const libc::c_char,
+                        243 as libc::c_int,
+                        b"ast_function_abstract(f)\0" as *const u8 as *const libc::c_char,
+                    );
+                } else {
+                };
+                err = ast_function_verify(f, ext);
+                if !err.is_null() {
+                    fprintf(
+                        __stderrp,
+                        b"%s\n\0" as *const u8 as *const libc::c_char,
+                        (*err).msg,
+                    );
+                    exit(1 as libc::c_int);
+                }
+                v_printf(
+                    b"qed %s\n\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+                    ast_function_name(f),
+                );
+            }
+        }
+        i += 1;
+        i;
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn pass_inorder(mut order: *mut string_arr, mut ext: *mut externals) {
+    let mut err: *mut error = 0 as *mut error;
+    let mut n: libc::c_int = string_arr_n(order);
+    let mut name: *mut *mut libc::c_char = string_arr_s(order);
+    let mut i: libc::c_int = 0 as libc::c_int;
+    while i < n {
+        let mut f: *mut ast_function = externals_getfunc(ext, *name.offset(i as isize));
+        if !(ast_function_isaxiom(f) as libc::c_int != 0
+            || ast_function_isproto(f) as libc::c_int != 0)
+        {
+            if (ast_function_abstract(f)).is_null() as libc::c_int as libc::c_long != 0 {
+                __assert_rtn(
+                    (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"pass_inorder\0"))
+                        .as_ptr(),
+                    b"main.c\0" as *const u8 as *const libc::c_char,
+                    265 as libc::c_int,
+                    b"ast_function_abstract(f)\0" as *const u8 as *const libc::c_char,
+                );
+            } else {
+            };
+            err = ast_function_verify(f, ext);
+            if !err.is_null() {
+                fprintf(
+                    __stderrp,
+                    b"%s\n\0" as *const u8 as *const libc::c_char,
+                    (*err).msg,
+                );
+                exit(1 as libc::c_int);
+            }
+            fprintf(
+                __stderrp,
+                b"qed %s\n\0" as *const u8 as *const libc::c_char,
+                ast_function_name(f),
+            );
+        }
+        i += 1;
+        i;
+    }
+}
+unsafe extern "C" fn verifyproto(
+    mut proto: *mut ast_function,
+    mut n: libc::c_int,
+    mut decl: *mut *mut ast_externdecl,
+) -> bool {
+    let mut def: *mut ast_function = 0 as *mut ast_function;
+    let mut count: libc::c_int = 0 as libc::c_int;
+    let mut pname: *mut libc::c_char = ast_function_name(proto);
+    let mut i: libc::c_int = 0 as libc::c_int;
+    while i < n {
+        let mut decl_0: *mut ast_externdecl = *((*root).decl).offset(i as isize);
+        if ast_externdecl_isfunction(decl_0) {
+            let mut d: *mut ast_function = ast_externdecl_as_function(decl_0);
+            if !(ast_function_isaxiom(d) as libc::c_int != 0
+                || ast_function_isproto(d) as libc::c_int != 0)
+            {
+                if strcmp(pname, ast_function_name(d)) == 0 as libc::c_int {
+                    def = d;
+                    count += 1;
+                    count;
+                }
+            }
+        }
+        i += 1;
+        i;
+    }
+    if count == 1 as libc::c_int {
+        if proto_defisvalid(proto, def) {
+            return 1 as libc::c_int != 0;
+        }
+        fprintf(
+            __stderrp,
+            b"function `%s' prototype and definition abstracts mismatch\n\0" as *const u8
+                as *const libc::c_char,
+            pname,
+        );
+    } else if count == 0 as libc::c_int {
+        fprintf(
+            __stderrp,
+            b"function `%s' missing definition\n\0" as *const u8 as *const libc::c_char,
+            pname,
+        );
+    } else if count > 1 as libc::c_int {
+        fprintf(
+            __stderrp,
+            b"function `%s' has multiple definitions\n\0" as *const u8 as *const libc::c_char,
+            pname,
+        );
+    }
+    return 0 as libc::c_int != 0;
+}
+unsafe extern "C" fn proto_defisvalid(
+    mut proto: *mut ast_function,
+    mut def: *mut ast_function,
+) -> bool {
+    let mut proto_abs: *mut ast_block = ast_function_abstract(proto);
+    let mut def_abs: *mut ast_block = ast_function_abstract(def);
+    let mut abs_match: bool = strcmp(
+        ast_block_str(
+            proto_abs,
+            b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+        ),
+        ast_block_str(
+            def_abs,
+            b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+        ),
+    ) == 0 as libc::c_int;
+    let mut protoabs_only: bool =
+        !proto_abs.is_null() && ast_function_absisempty(def) as libc::c_int != 0;
+    if abs_match as libc::c_int != 0 || protoabs_only as libc::c_int != 0 {
+        return 1 as libc::c_int != 0;
+    }
+    return 0 as libc::c_int != 0;
+}
+unsafe fn main_0(mut argc: libc::c_int, mut argv: *mut *mut libc::c_char) -> libc::c_int {
+    extern "C" {
+        static mut VERBOSE_MODE: libc::c_int;
+    }
+    let mut c: config = parse_config(argc, argv);
+    VERBOSE_MODE = c.verbose as libc::c_int;
+    match c.mode as libc::c_uint {
+        0 => return verify(&mut c),
+        1 => return strip(&mut c),
+        _ => {
+            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
+                __assert_rtn(
+                    (*::core::mem::transmute::<&[u8; 5], &[libc::c_char; 5]>(b"main\0")).as_ptr(),
+                    b"main.c\0" as *const u8 as *const libc::c_char,
+                    351 as libc::c_int,
+                    b"false\0" as *const u8 as *const libc::c_char,
+                );
+            } else {
+            };
+        }
+    }
+    return 0;
+}
+unsafe extern "C" fn verify(mut c: *mut config) -> libc::c_int {
+    extern "C" {
+        static mut yyin: *mut FILE;
+    }
+    yyin = preprocess((*c).infile, (*c).includedirs);
+    lex_begin();
+    yyparse();
+    yylex_destroy();
+    lex_finish();
+    let mut ext: *mut externals = externals_create();
+    pass0(root, ext);
+    let mut order: *mut string_arr = 0 as *mut string_arr;
+    match (*c).sortmode as libc::c_uint {
+        0 => {
+            pass1(root, ext);
+        }
+        1 => {
+            order = ast_topological_order((*c).sortfunc, ext);
+            fprintf(
+                __stderrp,
+                b"%s\n\0" as *const u8 as *const libc::c_char,
+                string_arr_str(order),
+            );
+        }
+        2 => {
+            order = ast_topological_order((*c).sortfunc, ext);
+            fprintf(
+                __stderrp,
+                b"%s\n\0" as *const u8 as *const libc::c_char,
+                string_arr_str(order),
+            );
+            pass_inorder(order, ext);
+        }
+        _ => {
+            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
+                __assert_rtn(
+                    (*::core::mem::transmute::<&[u8; 7], &[libc::c_char; 7]>(b"verify\0")).as_ptr(),
+                    b"main.c\0" as *const u8 as *const libc::c_char,
+                    392 as libc::c_int,
+                    b"false\0" as *const u8 as *const libc::c_char,
+                );
+            } else {
+            };
+        }
+    }
+    externals_destroy(ext);
+    ast_destroy(root);
+    return 0 as libc::c_int;
+}
+unsafe extern "C" fn strip(mut config: *mut config) -> libc::c_int {
+    let mut in_0: *mut FILE = fopen(
+        (*config).infile,
+        b"rb\0" as *const u8 as *const libc::c_char,
+    );
+    let mut out: *mut FILE = fopen(
+        (*config).outfile,
+        b"w\0" as *const u8 as *const libc::c_char,
+    );
+    let mut c: libc::c_char = 0;
+    loop {
+        c = fgetc(in_0) as libc::c_char;
+        if !(c as libc::c_int != -(1 as libc::c_int)) {
+            break;
+        }
+        if isvblock(c, in_0) {
+            skipvblock(in_0);
+        } else {
+            fputc(c as libc::c_int, out);
+        }
+    }
+    fclose(in_0);
+    fclose(out);
+    return 0 as libc::c_int;
+}
+#[no_mangle]
+pub unsafe extern "C" fn isvblock(mut c: libc::c_char, mut f: *mut FILE) -> bool {
+    if c as libc::c_int != '~' as i32 {
+        return 0 as libc::c_int != 0;
+    }
+    let mut pos: libc::c_long = ftell(f);
+    c = fgetc(f) as libc::c_char;
+    while isspace(c as libc::c_int) != 0 {
+        c = fgetc(f) as libc::c_char;
+    }
+    match c as libc::c_int {
+        91 => return 1 as libc::c_int != 0,
+        -1 => {
+            fseek(f, -(1 as libc::c_int) as libc::c_long, 1 as libc::c_int);
+            return 0 as libc::c_int != 0;
+        }
+        _ => {
+            fseek(f, pos, 0 as libc::c_int);
+            return 0 as libc::c_int != 0;
+        }
+    };
+}
+#[no_mangle]
+pub unsafe extern "C" fn skipvblock(mut f: *mut FILE) {
+    let mut c: libc::c_char = 0;
+    let mut count: libc::c_int = 0 as libc::c_int;
+    loop {
+        c = fgetc(f) as libc::c_char;
+        if !(c as libc::c_int != ']' as i32 || count != 0) {
+            break;
+        }
+        match c as libc::c_int {
+            91 => {
+                count += 1;
+                count;
+            }
+            93 => {
+                count -= 1;
+                count;
+            }
+            _ => {}
+        }
+    }
+}
+pub fn main() {
+    let mut args: Vec<*mut libc::c_char> = Vec::new();
+    for arg in ::std::env::args() {
+        args.push(
+            (::std::ffi::CString::new(arg))
+                .expect("Failed to convert argument into CString.")
+                .into_raw(),
+        );
+    }
+    args.push(::core::ptr::null_mut());
+    unsafe {
+        ::std::process::exit(main_0(
+            (args.len() - 1) as libc::c_int,
+            args.as_mut_ptr() as *mut *mut libc::c_char,
+        ) as i32)
+    }
+}
