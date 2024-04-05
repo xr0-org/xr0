@@ -10,6 +10,7 @@
 #include "math.h"
 #include "object.h"
 #include "props.h"
+#include "stmt/stmt.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
@@ -467,18 +468,13 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 expr_literal_eval(struct ast_expr *expr, struct state *state)
 {
-	struct result *res = result_value_create(
-		state_static_init(state, expr)
-	);
-	return res;
+	return result_value_create(state_static_init(state, expr));
 }
 
 static struct result *
 expr_constant_eval(struct ast_expr *expr, struct state *state)
 {
-	return result_value_create(
-		value_int_create(ast_expr_as_constant(expr))
-	);
+	return result_value_create(value_int_create(ast_expr_as_constant(expr)));
 }
 
 static struct result *
@@ -532,18 +528,19 @@ static struct result *
 address_eval(struct ast_expr *, struct state *);
 
 static struct result *
+bang_eval(struct ast_expr *, struct state *);
+
+static struct result *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
+	struct ast_expr *operand = ast_expr_unary_operand(expr);
 	switch (ast_expr_unary_op(expr)) {
 	case UNARY_OP_DEREFERENCE:
-		return dereference_eval(expr, state);
+		return dereference_eval(operand, state);
 	case UNARY_OP_ADDRESS:
-		return address_eval(expr, state);
+		return address_eval(operand, state);
 	case UNARY_OP_BANG:
-		/* XXX: hack because we stmt_exec pre as a preproces to verify
-		 * constructors, this breaks any preconditions like: pre: !(p ==
-		 * 0) */
-		return result_value_create(value_literal_create("hack"));
+		return bang_eval(operand, state);
 	default:
 		assert(false);
 	}
@@ -558,7 +555,7 @@ binary_deref_eval(struct ast_expr *expr, struct state *state);
 static struct result *
 dereference_eval(struct ast_expr *expr, struct state *state)
 {
-	struct ast_expr *binary = expr_to_binary(ast_expr_unary_operand(expr));
+	struct ast_expr *binary = expr_to_binary(expr);
 	struct result *res = binary_deref_eval(binary, state);
 	ast_expr_destroy(binary);
 	return res;
@@ -618,11 +615,22 @@ binary_deref_eval(struct ast_expr *expr, struct state *state)
 static struct result *
 address_eval(struct ast_expr *expr, struct state *state)
 {
-	struct ast_expr *operand = ast_expr_unary_operand(expr);
-	char *id = ast_expr_as_identifier(operand);
+	char *id = ast_expr_as_identifier(expr);
 	struct value *v = state_getloc(state, id);
 	return result_value_create(v);
 }
+
+static struct result *
+bang_eval(struct ast_expr *expr, struct state *state)
+{
+	struct decision dec = sel_decide(expr, state);
+	if (dec.err) {
+		return result_error_create(dec.err);
+	}
+	/* XXX */
+	return result_value_create(value_int_create(dec.decision ? 0 : 1));
+}
+
 
 static struct result *
 expr_structmember_eval(struct ast_expr *expr, struct state *s)
@@ -1225,6 +1233,8 @@ reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 	case EXPR_BINARY:
 		return binary_assume(expr, value, s);
 	default:
+		printf("state: %s\n", state_str(s));
+		printf("expr: %s\n", ast_expr_str(expr));
 		assert(false);
 	}
 }

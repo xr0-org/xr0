@@ -32,6 +32,7 @@ struct value {
 		} _struct;
 	};
 }; 
+
 struct value *
 value_ptr_create(struct location *loc)
 {
