@@ -296,6 +296,8 @@ struct error {
 	enum error_type {
 		ERROR_PRINTF,
 		ERROR_UNDECIDEABLE_COND,
+		ERROR_PUSHFRAME,
+		ERROR_POPFRAME,
 	} type;
 	union error_contents {
 		char *printf;
@@ -388,6 +390,34 @@ findnextfmt(char **p)
 }
 
 struct error *
+error_pushframe()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_PUSHFRAME;
+	return err;
+}
+
+bool
+error_ispushframe(struct error *err)
+{
+	return error_to(err, ERROR_PUSHFRAME);
+}
+
+struct error *
+error_popframe()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_POPFRAME;
+	return err;
+}
+
+bool
+error_ispopframe(struct error *err)
+{
+	return error_to(err, ERROR_POPFRAME);
+}
+
+struct error *
 error_undecideable_cond(struct ast_expr *cond)
 {
 	assert(cond);
@@ -415,13 +445,17 @@ char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
-		[ERROR_UNDECIDEABLE_COND] = "undecideable condition"
+		[ERROR_UNDECIDEABLE_COND]	= "undecideable condition",
+		[ERROR_PUSHFRAME]		= "pushed frame",
+		[ERROR_POPFRAME]		= "popped frame",
 	};
 
 	switch (err->type) {
 	case ERROR_PRINTF:
 		return dynamic_str(err->contents.printf);
 	case ERROR_UNDECIDEABLE_COND:
+	case ERROR_PUSHFRAME:
+	case ERROR_POPFRAME:
 		return dynamic_str(error_type_str[err->type]);
 	default:
 		assert(false);

@@ -39,4 +39,7 @@ sel_decide(struct ast_expr *control, struct state *state);
 struct error *
 ast_stmt_precondsinit(struct ast_stmt *, struct state *);
 
+bool
+ast_stmt_jump_hasrv(struct ast_stmt *stmt);
+
 #endif

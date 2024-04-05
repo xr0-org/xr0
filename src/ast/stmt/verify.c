@@ -317,6 +317,7 @@ ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *state,
 	assert(loc);
 	char *m = lexememarker_str(loc);
 	struct error *e = error_printf("%s:%s: %w", m, fname, err);
+	free(m);
 	return e;
 }
 
@@ -436,7 +437,6 @@ sel_decide(struct ast_expr *control, struct state *state)
 
 	if (!values_comparable(zero, v)) {
 		return (struct decision) {
-			.decision = false,
 			.err      = error_undecideable_cond(value_to_expr(v))
 		};
 	}

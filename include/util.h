@@ -112,6 +112,18 @@ error_to_undecideable_cond(struct error *);
 struct ast_expr *
 error_get_undecideable_cond(struct error *);
 
+struct error *
+error_pushframe();
+
+bool
+error_ispushframe(struct error *);
+
+struct error *
+error_popframe();
+
+bool
+error_ispopframe(struct error *);
+
 char *
 error_str(struct error *);
 

@@ -781,8 +781,9 @@ jump_statement
 	/*: GOTO IDENTIFIER ';'*/
 	/*| CONTINUE ';'*/
 	/*| BREAK ';'*/
-	/*| RETURN ';'*/
-	: RETURN expression ';'
+	: RETURN ';'
+		{ $$ = ast_stmt_create_jump(lexloc(), JUMP_RETURN, NULL); }
+	| RETURN expression ';'
 		{ $$ = ast_stmt_create_jump(lexloc(), JUMP_RETURN, $2); }
 	;
 

@@ -189,6 +189,15 @@ ast_stmt_create_jump(struct lexememarker *loc, enum ast_jump_kind kind,
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt)
 {
+	assert(stmt->kind == STMT_JUMP);
+	assert(stmt->u.jump.rv);
+	return stmt->u.jump.rv;
+}
+
+bool
+ast_stmt_jump_hasrv(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_JUMP);
 	return stmt->u.jump.rv;
 }
 
@@ -426,15 +435,13 @@ static void
 ast_stmt_jump_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_JUMP);
-	char *rv = ast_expr_str(stmt->u.jump.rv);
-
-	strbuilder_printf(
-		b,
-		"return %s;\n",
-		rv
-	);
-
-	free(rv);
+	strbuilder_printf(b, "return");
+	if (stmt->u.jump.rv) {
+		char *rv = ast_expr_str(stmt->u.jump.rv);
+		strbuilder_printf(b, "%s", rv);
+		free(rv);
+	}
+	strbuilder_printf(b, ";");
 }
 
 static struct ast_expr *
@@ -651,7 +658,10 @@ ast_stmt_getfuncs(struct ast_stmt *stmt)
 	case STMT_ITERATION_E:
 		return ast_stmt_iteration_getfuncs(stmt);
 	case STMT_JUMP:
-		return ast_expr_getfuncs(stmt->u.jump.rv);
+		if (stmt->u.jump.rv) {
+			return ast_expr_getfuncs(stmt->u.jump.rv);
+		}
+		return string_arr_create();
 	default:
 		assert(false);
 	}
