@@ -10,8 +10,23 @@
 
 use libc::{calloc, free, malloc, realloc, strcmp};
 
+use crate::ast::{
+    ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_equal,
+    ast_expr_identifier_create, ast_expr_literal_create, ast_expr_member_create, ast_expr_str,
+    ast_type_create_voidptr, ast_type_struct_complete, ast_type_struct_members,
+    ast_variable_arr_copy, ast_variable_arr_destroy, ast_variable_arr_n, ast_variable_arr_v,
+    ast_variable_name, ast_variable_type,
+};
 use crate::ext::Externals;
-
+use crate::object::{
+    object_abstractcopy, object_as_value, object_assign, object_copy, object_destroy,
+    object_value_create,
+};
+use crate::state::location::{
+    location_copy, location_destroy, location_references, location_referencesheap, location_str,
+    location_transfigure,
+};
+use crate::state::{state_getext, state_vconst};
 use crate::util::{
     dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
     strbuilder_create, strbuilder_printf, strbuilder_putc,
@@ -27,44 +42,8 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn ast_expr_identifier_create(_: *mut libc::c_char) -> *mut AstExpr;
-    fn ast_expr_constant_create(_: libc::c_int) -> *mut AstExpr;
-    fn ast_expr_literal_create(_: *mut libc::c_char) -> *mut AstExpr;
-    fn ast_expr_member_create(_: *mut AstExpr, _: *mut libc::c_char) -> *mut AstExpr;
-    fn ast_expr_destroy(_: *mut AstExpr);
-    fn ast_expr_str(_: *mut AstExpr) -> *mut libc::c_char;
-    fn ast_expr_copy(_: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_equal(e1: *mut AstExpr, e2: *mut AstExpr) -> bool;
-    fn ast_type_create_voidptr() -> *mut ast_type;
-    fn ast_type_struct_complete(t: *mut ast_type, ext: *mut Externals) -> *mut ast_type;
-    fn ast_type_struct_members(t: *mut ast_type) -> *mut ast_variable_arr;
-    fn ast_variable_arr_destroy(_: *mut ast_variable_arr);
-    fn ast_variable_arr_n(_: *mut ast_variable_arr) -> libc::c_int;
-    fn ast_variable_arr_v(_: *mut ast_variable_arr) -> *mut *mut ast_variable;
-    fn ast_variable_arr_copy(arr: *mut ast_variable_arr) -> *mut ast_variable_arr;
-    fn ast_variable_name(_: *mut ast_variable) -> *mut libc::c_char;
-    fn ast_variable_type(_: *mut ast_variable) -> *mut ast_type;
-
-    fn state_getext(_: *mut State) -> *mut Externals;
-    fn state_vconst(
-        _: *mut State,
-        _: *mut ast_type,
-        comment: *mut libc::c_char,
-        persist: bool,
-    ) -> *mut Value;
-    fn location_copy(_: *mut Location) -> *mut Location;
-    fn location_destroy(_: *mut Location);
-    fn location_str(_: *mut Location) -> *mut libc::c_char;
-    fn location_references(l1: *mut Location, l2: *mut Location, _: *mut State) -> bool;
-    fn location_referencesheap(_: *mut Location, _: *mut State) -> bool;
-    fn location_transfigure(_: *mut Location, compare: *mut State) -> *mut Value;
-    fn object_value_create(offset: *mut AstExpr, _: *mut Value) -> *mut Object;
-    fn object_copy(old: *mut Object) -> *mut Object;
-    fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Object;
-    fn object_destroy(_: *mut Object);
-    fn object_as_value(_: *mut Object) -> *mut Value;
-    fn object_assign(_: *mut Object, _: *mut Value) -> *mut error;
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct error {
