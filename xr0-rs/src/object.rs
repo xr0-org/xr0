@@ -10,7 +10,20 @@
 
 use libc::{calloc, free, malloc, realloc};
 
-use crate::{ast_type, AstExpr, Externals, Location, State, StrBuilder, Value};
+use crate::ast::{
+    ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
+    ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_str,
+    ast_expr_sum_create, ast_type_struct_complete,
+};
+use crate::state::location::{location_copy, location_destroy, location_references, location_str};
+use crate::state::{state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand};
+use crate::util::{dynamic_str, error, strbuilder_build, strbuilder_create, strbuilder_printf};
+use crate::value::{
+    value_abstractcopy, value_as_location, value_copy, value_destroy, value_ptr_create,
+    value_references, value_referencesheap, value_str, value_struct_create, value_struct_member,
+    value_struct_membertype,
+};
+use crate::{ast_type, AstExpr, Location, State, StrBuilder, Value};
 
 extern "C" {
     fn __assert_rtn(
@@ -19,47 +32,6 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn ast_expr_constant_create(_: libc::c_int) -> *mut AstExpr;
-    fn ast_expr_eq_create(_: *mut AstExpr, _: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_lt_create(_: *mut AstExpr, _: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_le_create(_: *mut AstExpr, _: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_ge_create(_: *mut AstExpr, _: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_sum_create(_: *mut AstExpr, _: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_difference_create(_: *mut AstExpr, _: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_destroy(_: *mut AstExpr);
-    fn ast_expr_str(_: *mut AstExpr) -> *mut libc::c_char;
-    fn ast_expr_copy(_: *mut AstExpr) -> *mut AstExpr;
-    fn ast_type_struct_complete(t: *mut ast_type, ext: *mut Externals) -> *mut ast_type;
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn state_getext(_: *mut State) -> *mut Externals;
-    fn state_alloc(_: *mut State) -> *mut Value;
-    fn state_dealloc(_: *mut State, _: *mut Value) -> *mut error;
-    fn location_copy(_: *mut Location) -> *mut Location;
-    fn location_destroy(_: *mut Location);
-    fn location_str(_: *mut Location) -> *mut libc::c_char;
-    fn location_references(l1: *mut Location, l2: *mut Location, _: *mut State) -> bool;
-    fn state_isdeallocand(s: *mut State, loc: *mut Location) -> bool;
-    fn state_eval(_: *mut State, _: *mut AstExpr) -> bool;
-    fn value_ptr_create(loc: *mut Location) -> *mut Value;
-    fn value_struct_create(_: *mut ast_type) -> *mut Value;
-    fn value_struct_membertype(_: *mut Value, member: *mut libc::c_char) -> *mut ast_type;
-    fn value_struct_member(_: *mut Value, member: *mut libc::c_char) -> *mut Object;
-    fn value_copy(_: *mut Value) -> *mut Value;
-    fn value_abstractcopy(_: *mut Value, s: *mut State) -> *mut Value;
-    fn value_destroy(_: *mut Value);
-    fn value_str(_: *mut Value) -> *mut libc::c_char;
-    fn value_as_location(_: *mut Value) -> *mut Location;
-    fn value_referencesheap(_: *mut Value, _: *mut State) -> bool;
-    fn value_references(_: *mut Value, _: *mut Location, _: *mut State) -> bool;
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct error {
-    pub msg: *mut libc::c_char,
-    pub inner: *mut error,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
