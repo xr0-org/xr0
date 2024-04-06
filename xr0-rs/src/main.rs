@@ -24,7 +24,7 @@ use crate::ast::{
     ast_block, ast_externdecl, ast_function, ast_type, ast_variable, ast_variable_arr, Ast, AstExpr,
 };
 use crate::ext::Externals;
-use crate::math::{MathAtom, MathExpr};
+use crate::math::MathExpr;
 use crate::object::{object_arr, Object, Range};
 use crate::props::Props;
 use crate::state::block::{block_arr, Block};

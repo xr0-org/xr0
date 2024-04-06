@@ -17,7 +17,7 @@ pub mod r#static;
 
 use libc::{free, malloc, strcmp, strlen};
 
-use crate::util::v_printf;
+use crate::util::{error, v_printf};
 use crate::{
     ast_type, ast_variable, static_memory, vconst, AstExpr, Block, Clump, Externals, Heap,
     Location, Object, Props, Stack, StrBuilder, Value, Variable,
@@ -153,12 +153,7 @@ extern "C" {
     fn value_as_location(_: *mut Value) -> *mut Location;
     fn value_issync(v: *mut Value) -> bool;
 }
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct error {
-    pub msg: *mut libc::c_char,
-    pub inner: *mut error,
-}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct State {

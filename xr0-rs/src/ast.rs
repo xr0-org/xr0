@@ -11,15 +11,46 @@
 
 use libc::{calloc, exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
 
+use crate::ext::{
+    externals_declarefunc, externals_declarestruct, externals_declaretypedef, externals_declarevar,
+    externals_getfunc, externals_getstruct, externals_gettypedef,
+};
+use crate::math::{
+    math_atom_nat_create, math_atom_variable_create, math_eq, math_expr_atom_create,
+    math_expr_destroy, math_expr_neg_create, math_expr_sum_create, math_ge, math_gt, math_le,
+    math_lt,
+};
+use crate::object::{
+    object_as_value, object_assign, object_destroy, object_getmember, object_getmembertype,
+    object_hasvalue,
+};
+use crate::parser::lexer::{
+    lexememarker, lexememarker_copy, lexememarker_destroy, lexememarker_str,
+};
+use crate::props::{props_contradicts, props_get, props_install};
+use crate::state::{
+    object_res, state_addresses_deallocand, state_alloc, state_clump, state_copy,
+    state_copywithname, state_create, state_create_withprops, state_dealloc, state_declare,
+    state_deref, state_destroy, state_equal, state_get, state_getext, state_getloc,
+    state_getobject, state_getobjecttype, state_getprops, state_getresult, state_getvconst,
+    state_hasgarbage, state_isalloc, state_islval, state_popframe, state_pushframe,
+    state_range_alloc, state_range_aredeallocands, state_range_dealloc, state_static_init,
+    state_str, state_vconst,
+};
 use crate::util::{
-    entry, error, map, map_create, map_get, map_set, string_arr, string_arr_append,
+    dynamic_str, entry, error, error_create, map, map_create, map_get, map_set, strbuilder_build,
+    strbuilder_create, strbuilder_printf, strbuilder_putc, string_arr, string_arr_append,
     string_arr_concat, string_arr_contains, string_arr_create, string_arr_deque, string_arr_n,
     string_arr_s, v_printf,
 };
-
-use crate::{
-    Externals, Location, MathAtom, MathExpr, Object, Props, State, StrBuilder, Value, Variable,
+use crate::value::{
+    value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
+    value_int_create, value_int_indefinite_create, value_isconstant, value_islocation,
+    value_isstruct, value_issync, value_literal_create, value_pf_augment,
+    value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
+    value_sync_create, value_to_expr, values_comparable,
 };
+use crate::{Externals, MathExpr, Object, Props, State, StrBuilder, Value, Variable};
 
 extern "C" {
     static mut __stderrp: *mut libc::FILE;
@@ -29,142 +60,8 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char);
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
-    fn error_create(s: *mut libc::c_char) -> *mut error;
-    fn lexememarker_copy(_: *mut lexememarker) -> *mut lexememarker;
-    fn lexememarker_destroy(_: *mut lexememarker);
-    fn lexememarker_str(_: *mut lexememarker) -> *mut libc::c_char;
-    fn math_le(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
-    fn math_eq(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
-    fn math_lt(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
-    fn math_gt(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
-    fn math_ge(e1: *mut MathExpr, e2: *mut MathExpr) -> bool;
-    fn math_expr_atom_create(_: *mut MathAtom) -> *mut MathExpr;
-    fn math_expr_sum_create(_: *mut MathExpr, _: *mut MathExpr) -> *mut MathExpr;
-    fn math_expr_neg_create(_: *mut MathExpr) -> *mut MathExpr;
-    fn math_expr_destroy(_: *mut MathExpr);
-    fn math_atom_nat_create(_: libc::c_uint) -> *mut MathAtom;
-    fn math_atom_variable_create(_: *mut libc::c_char) -> *mut MathAtom;
-    fn state_str(_: *mut State) -> *mut libc::c_char;
-    fn state_getvconst(_: *mut State, id: *mut libc::c_char) -> *mut Value;
-    fn state_static_init(_: *mut State, _: *mut AstExpr) -> *mut Value;
-    fn state_range_dealloc(
-        _: *mut State,
-        _: *mut Object,
-        lw: *mut AstExpr,
-        up: *mut AstExpr,
-    ) -> *mut error;
-    fn state_range_alloc(
-        _: *mut State,
-        _: *mut Object,
-        lw: *mut AstExpr,
-        up: *mut AstExpr,
-    ) -> *mut error;
-    fn state_addresses_deallocand(_: *mut State, _: *mut Object) -> bool;
-    fn state_range_aredeallocands(
-        _: *mut State,
-        _: *mut Object,
-        lw: *mut AstExpr,
-        up: *mut AstExpr,
-    ) -> bool;
-    fn state_destroy(State: *mut State);
-    fn state_vconst(
-        _: *mut State,
-        _: *mut ast_type,
-        comment: *mut libc::c_char,
-        persist: bool,
-    ) -> *mut Value;
-    fn value_to_expr(_: *mut Value) -> *mut AstExpr;
-    fn value_sync_create(_: *mut AstExpr) -> *mut Value;
-    fn value_copy(_: *mut Value) -> *mut Value;
-    fn object_getmember(
-        obj: *mut Object,
-        t: *mut ast_type,
-        member: *mut libc::c_char,
-        s: *mut State,
-    ) -> *mut Object;
-    fn object_getmembertype(
-        obj: *mut Object,
-        t: *mut ast_type,
-        member: *mut libc::c_char,
-        s: *mut State,
-    ) -> *mut ast_type;
-    fn object_as_value(_: *mut Object) -> *mut Value;
-    fn value_literal_create(_: *mut libc::c_char) -> *mut Value;
-    fn state_deref(_: *mut State, ptr: *mut Value, index: *mut AstExpr) -> object_res;
-    fn state_getobject(_: *mut State, id: *mut libc::c_char) -> *mut Object;
-    fn state_getobjecttype(_: *mut State, id: *mut libc::c_char) -> *mut ast_type;
-    fn object_assign(_: *mut Object, _: *mut Value) -> *mut error;
-    fn value_destroy(_: *mut Value);
-    fn state_getext(_: *mut State) -> *mut Externals;
-    fn externals_getfunc(_: *mut Externals, id: *mut libc::c_char) -> *mut ast_function;
-    fn value_str(_: *mut Value) -> *mut libc::c_char;
-    fn value_islocation(_: *mut Value) -> bool;
-    fn state_getresult(_: *mut State) -> *mut Object;
-    fn state_clump(_: *mut State) -> *mut Value;
-    fn state_dealloc(_: *mut State, _: *mut Value) -> *mut error;
-    fn state_pushframe(_: *mut State, func: *mut libc::c_char, ret_type: *mut ast_type);
-    fn state_alloc(_: *mut State) -> *mut Value;
-    fn externals_getstruct(_: *mut Externals, id: *mut libc::c_char) -> *mut ast_type;
-    fn value_struct_indefinite_create(
-        _: *mut ast_type,
-        _: *mut State,
-        comment: *mut libc::c_char,
-        persist: bool,
-    ) -> *mut Value;
-    fn externals_gettypedef(_: *mut Externals, id: *mut libc::c_char) -> *mut ast_type;
-    fn value_ptr_indefinite_create() -> *mut Value;
-    fn value_int_indefinite_create() -> *mut Value;
-    fn state_getprops(_: *mut State) -> *mut Props;
-    fn props_install(_: *mut Props, _: *mut AstExpr);
-    fn state_create_withprops(
-        func: *mut libc::c_char,
-        _: *mut Externals,
-        result_type: *mut ast_type,
-        Props: *mut Props,
-    ) -> *mut State;
-    fn state_equal(s1: *mut State, s2: *mut State) -> bool;
-    fn state_hasgarbage(_: *mut State) -> bool;
-    fn state_copywithname(_: *mut State, func_name: *mut libc::c_char) -> *mut State;
-    fn externals_declarestruct(_: *mut Externals, type_0: *mut ast_type);
-    fn externals_declaretypedef(_: *mut Externals, id: *mut libc::c_char, type_0: *mut ast_type);
-    fn externals_declarevar(_: *mut Externals, id: *mut libc::c_char, _: *mut ast_variable);
-    fn externals_declarefunc(_: *mut Externals, id: *mut libc::c_char, _: *mut ast_function);
-    fn state_islval(_: *mut State, _: *mut Value) -> bool;
-    fn state_isalloc(_: *mut State, _: *mut Value) -> bool;
-    fn object_hasvalue(_: *mut Object) -> bool;
-    fn state_get(State: *mut State, loc: *mut Location, constructive: bool) -> object_res;
-    fn value_as_location(_: *mut Value) -> *mut Location;
-    fn state_getloc(State: *mut State, id: *mut libc::c_char) -> *mut Value;
-    fn state_create(
-        func: *mut libc::c_char,
-        _: *mut Externals,
-        result_type: *mut ast_type,
-    ) -> *mut State;
-    fn state_copy(_: *mut State) -> *mut State;
-    fn state_popframe(_: *mut State);
-    fn value_pf_augment(_: *mut Value, root: *mut AstExpr) -> *mut Value;
-    fn object_destroy(_: *mut Object);
-    fn state_declare(_: *mut State, var: *mut ast_variable, isparam: bool);
-    fn props_get(_: *mut Props, _: *mut AstExpr) -> bool;
-    fn props_contradicts(k: *mut Props, _: *mut AstExpr) -> bool;
-    fn value_isconstant(v: *mut Value) -> bool;
-    fn value_as_constant(v: *mut Value) -> libc::c_int;
-    fn values_comparable(v1: *mut Value, v2: *mut Value) -> bool;
-    fn value_equal(v1: *mut Value, v2: *mut Value) -> bool;
-    fn value_int_create(val: libc::c_int) -> *mut Value;
-    fn value_isstruct(v: *mut Value) -> bool;
-    fn value_struct_member(_: *mut Value, member: *mut libc::c_char) -> *mut Object;
-    fn value_issync(v: *mut Value) -> bool;
-    fn value_as_sync(v: *mut Value) -> *mut AstExpr;
 }
-pub type __int64_t = libc::c_longlong;
-pub type __darwin_off_t = __int64_t;
-pub type fpos_t = __darwin_off_t;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstExpr {
@@ -399,12 +296,6 @@ pub struct lvalue_res {
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct object_res {
-    pub obj: *mut Object,
-    pub err: *mut error,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
 pub struct ast_function {
     pub isaxiom: bool,
     pub ret: *mut ast_type,
@@ -429,19 +320,6 @@ pub struct ast_stmt {
     pub u: C2RustUnnamed_8,
     pub loc: *mut lexememarker,
 }
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct lexememarker {
-    pub linenum: libc::c_int,
-    pub column: libc::c_int,
-    pub filename: *mut libc::c_char,
-    pub flags: linemarker_flag,
-}
-pub type linemarker_flag = libc::c_uint;
-pub const LM_FLAG_IMPLICIT_EXTERN: linemarker_flag = 8;
-pub const LM_FLAG_SYS_HEADER: linemarker_flag = 4;
-pub const LM_FLAG_RESUME_FILE: linemarker_flag = 2;
-pub const LM_FLAG_NEW_FILE: linemarker_flag = 1;
 
 #[derive(Copy, Clone)]
 #[repr(C)]

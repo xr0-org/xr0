@@ -12,7 +12,7 @@ use std::ptr::addr_of_mut;
 
 use libc::{exit, fflush, fprintf, free, malloc, realloc, strlen, FILE};
 
-use super::lexer::{ictype, IC_TYPE};
+use super::lexer::{ictype, lexememarker, lexememarker_str, lexloc, yylex, yytext, IC_TYPE};
 use crate::ast::*;
 use crate::util::dynamic_str;
 
@@ -33,14 +33,10 @@ extern "C" {
         _: *const libc::c_char,
     ) -> !;
 
-    fn lexloc() -> *mut lexememarker;
-    fn lexememarker_str(_: *mut lexememarker) -> *mut libc::c_char;
     static mut root: *mut Ast;
     static mut installclass: ictype;
     fn parse_int(s: *mut libc::c_char) -> libc::c_int;
     fn parse_char(s: *mut libc::c_char) -> libc::c_char;
-    static mut yytext: *mut libc::c_char;
-    fn yylex() -> libc::c_int;
     static mut marker: lexememarker;
     static mut VERBOSE_MODE: libc::c_int;
 }
