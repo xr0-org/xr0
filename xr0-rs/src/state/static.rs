@@ -10,6 +10,11 @@
 
 use libc::{free, malloc};
 
+use crate::state::block::{
+    block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
+    block_arr_nblocks, block_create, block_str,
+};
+use crate::state::location::location_copy;
 use crate::util::{
     dynamic_str, entry, map, map_create, map_get, map_set, strbuilder_build, strbuilder_create,
     strbuilder_printf,
@@ -23,22 +28,15 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn location_copy(loc: *mut Location) -> *mut Location;
-    fn block_create() -> *mut Block;
-    fn block_str(_: *mut Block) -> *mut libc::c_char;
-    fn block_arr_create() -> *mut block_arr;
-    fn block_arr_destroy(_: *mut block_arr);
-    fn block_arr_copy(_: *mut block_arr) -> *mut block_arr;
-    fn block_arr_blocks(_: *mut block_arr) -> *mut *mut Block;
-    fn block_arr_nblocks(_: *mut block_arr) -> libc::c_int;
-    fn block_arr_append(_: *mut block_arr, _: *mut Block) -> libc::c_int;
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct static_memory {
     pub blocks: *mut block_arr,
     pub pool: *mut map,
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_create() -> *mut static_memory {
     let mut sm: *mut static_memory =
@@ -57,10 +55,12 @@ pub unsafe extern "C" fn static_memory_create() -> *mut static_memory {
     (*sm).pool = map_create();
     return sm;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_destroy(mut sm: *mut static_memory) {
     block_arr_destroy((*sm).blocks);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_str(
     mut sm: *mut static_memory,
@@ -84,6 +84,7 @@ pub unsafe extern "C" fn static_memory_str(
     }
     return strbuilder_build(b);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_copy(mut sm: *mut static_memory) -> *mut static_memory {
     let mut copy: *mut static_memory =
@@ -92,6 +93,7 @@ pub unsafe extern "C" fn static_memory_copy(mut sm: *mut static_memory) -> *mut 
     (*copy).pool = pool_copy((*sm).pool);
     return copy;
 }
+
 unsafe extern "C" fn pool_copy(mut p: *mut map) -> *mut map {
     let mut pcopy: *mut map = map_create();
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -106,6 +108,7 @@ unsafe extern "C" fn pool_copy(mut p: *mut map) -> *mut map {
     }
     return pcopy;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_newblock(mut sm: *mut static_memory) -> libc::c_int {
     let mut address: libc::c_int = block_arr_append((*sm).blocks, block_create());
@@ -124,6 +127,7 @@ pub unsafe extern "C" fn static_memory_newblock(mut sm: *mut static_memory) -> l
     };
     return address;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_getblock(
     mut sm: *mut static_memory,
@@ -134,6 +138,7 @@ pub unsafe extern "C" fn static_memory_getblock(
     }
     return *(block_arr_blocks((*sm).blocks)).offset(address as isize);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_stringpool(
     mut sm: *mut static_memory,
@@ -146,6 +151,7 @@ pub unsafe extern "C" fn static_memory_stringpool(
         location_copy(loc) as *const libc::c_void,
     );
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_checkpool(
     mut sm: *mut static_memory,

@@ -10,15 +10,32 @@
 
 use libc::{calloc, free, malloc, strcmp};
 
-use crate::value::Value;
-
+use crate::ast::{
+    ast_expr_constant_create, ast_type_copy, ast_type_destroy, ast_type_str, ast_variable_name,
+    ast_variable_type,
+};
+use crate::object::{
+    object_as_value, object_assign, object_isvalue, object_str, object_value_create,
+};
+use crate::state::block::{
+    block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
+    block_arr_nblocks, block_create, block_install, block_observe,
+};
+use crate::state::location::block_res;
+use crate::state::location::LOCATION_VCONST;
+use crate::state::location::{
+    location_copy, location_create_automatic, location_destroy, location_getblock,
+    location_getstackblock, location_offset, location_references, location_str, location_type,
+};
+use crate::state::{object_res, state_get};
 use crate::util::{
     dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
     strbuilder_create, strbuilder_printf, strbuilder_putc,
 };
+use crate::value::{value_abstractcopy, Value};
 use crate::{
-    ast_type, ast_variable, block_arr, static_memory, vconst, AstExpr, Block, Clump, Heap,
-    Location, Object, State, StrBuilder,
+    ast_type, ast_variable, block_arr, static_memory, vconst, Block, Clump, Heap, Location, Object,
+    State, StrBuilder,
 };
 
 extern "C" {
@@ -28,68 +45,8 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-
-    fn ast_expr_constant_create(_: libc::c_int) -> *mut AstExpr;
-    fn ast_type_destroy(_: *mut ast_type);
-    fn ast_type_str(_: *mut ast_type) -> *mut libc::c_char;
-    fn ast_type_copy(t: *mut ast_type) -> *mut ast_type;
-    fn ast_variable_name(_: *mut ast_variable) -> *mut libc::c_char;
-    fn ast_variable_type(_: *mut ast_variable) -> *mut ast_type;
-
-    fn location_create_automatic(
-        frame: libc::c_int,
-        Block: libc::c_int,
-        offset: *mut AstExpr,
-    ) -> *mut Location;
-    fn location_copy(loc: *mut Location) -> *mut Location;
-    fn location_destroy(_: *mut Location);
-    fn location_str(_: *mut Location) -> *mut libc::c_char;
-    fn location_type(loc: *mut Location) -> location_type;
-    fn location_offset(loc: *mut Location) -> *mut AstExpr;
-    fn location_references(loc1: *mut Location, loc2: *mut Location, _: *mut State) -> bool;
-    fn location_getblock(
-        _: *mut Location,
-        _: *mut static_memory,
-        _: *mut vconst,
-        _: *mut Stack,
-        _: *mut Heap,
-        _: *mut Clump,
-    ) -> block_res;
-    fn location_getstackblock(loc: *mut Location, s: *mut Stack) -> *mut Block;
-    fn block_create() -> *mut Block;
-    fn block_install(_: *mut Block, _: *mut Object);
-    fn block_observe(
-        _: *mut Block,
-        offset: *mut AstExpr,
-        _: *mut State,
-        constructive: bool,
-    ) -> *mut Object;
-    fn block_arr_create() -> *mut block_arr;
-    fn block_arr_destroy(_: *mut block_arr);
-    fn block_arr_copy(_: *mut block_arr) -> *mut block_arr;
-    fn block_arr_blocks(_: *mut block_arr) -> *mut *mut Block;
-    fn block_arr_nblocks(_: *mut block_arr) -> libc::c_int;
-    fn block_arr_append(_: *mut block_arr, _: *mut Block) -> libc::c_int;
-    fn state_get(State: *mut State, loc: *mut Location, constructive: bool) -> object_res;
-    fn object_value_create(offset: *mut AstExpr, _: *mut Value) -> *mut Object;
-    fn object_str(_: *mut Object) -> *mut libc::c_char;
-    fn object_isvalue(_: *mut Object) -> bool;
-    fn object_as_value(_: *mut Object) -> *mut Value;
-    fn object_assign(_: *mut Object, _: *mut Value) -> *mut error;
-    fn value_abstractcopy(_: *mut Value, s: *mut State) -> *mut Value;
 }
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct error {
-    pub msg: *mut libc::c_char,
-    pub inner: *mut error,
-}
-pub type location_type = libc::c_uint;
-pub const LOCATION_DYNAMIC: location_type = 4;
-pub const LOCATION_AUTOMATIC: location_type = 3;
-pub const LOCATION_DEREFERENCABLE: location_type = 2;
-pub const LOCATION_VCONST: location_type = 1;
-pub const LOCATION_STATIC: location_type = 0;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Stack {
@@ -100,6 +57,7 @@ pub struct Stack {
     pub id: libc::c_int,
     pub prev: *mut Stack,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Variable {
@@ -107,18 +65,7 @@ pub struct Variable {
     pub loc: *mut Location,
     pub isparam: bool,
 }
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct block_res {
-    pub b: *mut Block,
-    pub err: *mut error,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct object_res {
-    pub obj: *mut Object,
-    pub err: *mut error,
-}
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_newblock(mut Stack: *mut Stack) -> *mut Location {
     let mut address: libc::c_int = block_arr_append((*Stack).frame, block_create());
@@ -129,6 +76,7 @@ pub unsafe extern "C" fn stack_newblock(mut Stack: *mut Stack) -> *mut Location 
     );
     return loc;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_create(
     mut name: *mut libc::c_char,
@@ -157,6 +105,7 @@ pub unsafe extern "C" fn stack_create(
     (*Stack).result = variable_create(return_type, Stack, 0 as libc::c_int != 0);
     return Stack;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_getframe(mut s: *mut Stack, mut frame: libc::c_int) -> *mut Stack {
     if s.is_null() as libc::c_int as libc::c_long != 0 {
@@ -187,6 +136,7 @@ pub unsafe extern "C" fn stack_getframe(mut s: *mut Stack, mut frame: libc::c_in
     }
     return stack_getframe((*s).prev, frame);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_destroy(mut Stack: *mut Stack) {
     block_arr_destroy((*Stack).frame);
@@ -200,10 +150,12 @@ pub unsafe extern "C" fn stack_destroy(mut Stack: *mut Stack) {
     variable_destroy((*Stack).result);
     free(Stack as *mut libc::c_void);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_prev(mut s: *mut Stack) -> *mut Stack {
     return (*s).prev;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_copy(mut Stack: *mut Stack) -> *mut Stack {
     let mut copy: *mut Stack = calloc(1, ::core::mem::size_of::<Stack>()) as *mut Stack;
@@ -217,6 +169,7 @@ pub unsafe extern "C" fn stack_copy(mut Stack: *mut Stack) -> *mut Stack {
     }
     return copy;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_copywithname(
     mut Stack: *mut Stack,
@@ -227,6 +180,7 @@ pub unsafe extern "C" fn stack_copywithname(
     (*copy).name = new_name;
     return copy;
 }
+
 unsafe extern "C" fn varmap_copy(mut m: *mut map) -> *mut map {
     let mut m_copy: *mut map = map_create();
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -241,6 +195,7 @@ unsafe extern "C" fn varmap_copy(mut m: *mut map) -> *mut map {
     }
     return m_copy;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_str(
     mut Stack: *mut Stack,
@@ -288,6 +243,7 @@ pub unsafe extern "C" fn stack_str(
     }
     return strbuilder_build(b);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_declare(
     mut Stack: *mut Stack,
@@ -311,6 +267,7 @@ pub unsafe extern "C" fn stack_declare(
         variable_create(ast_variable_type(var), Stack, isparam) as *const libc::c_void,
     );
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_undeclare(mut Stack: *mut Stack, mut State: *mut State) {
     let mut old_result: *mut Variable = (*Stack).result;
@@ -334,14 +291,17 @@ pub unsafe extern "C" fn stack_undeclare(mut Stack: *mut Stack, mut State: *mut 
     }
     map_destroy(m);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_getresult(mut s: *mut Stack) -> *mut Variable {
     return (*s).result;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_getvarmap(mut s: *mut Stack) -> *mut map {
     return (*s).varmap;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_getvariable(
     mut s: *mut Stack,
@@ -362,6 +322,7 @@ pub unsafe extern "C" fn stack_getvariable(
     };
     return map_get((*s).varmap, id) as *mut Variable;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_references(
     mut s: *mut Stack,
@@ -385,6 +346,7 @@ pub unsafe extern "C" fn stack_references(
     }
     return 0 as libc::c_int != 0;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn stack_getblock(mut s: *mut Stack, mut address: libc::c_int) -> *mut Block {
     if !(address < block_arr_nblocks((*s).frame)) as libc::c_int as libc::c_long != 0 {
@@ -399,6 +361,7 @@ pub unsafe extern "C" fn stack_getblock(mut s: *mut Stack, mut address: libc::c_
     };
     return *(block_arr_blocks((*s).frame)).offset(address as isize);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn variable_create(
     mut type_0: *mut ast_type,
@@ -445,12 +408,14 @@ pub unsafe extern "C" fn variable_create(
     );
     return v;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn variable_destroy(mut v: *mut Variable) {
     ast_type_destroy((*v).type_0);
     location_destroy((*v).loc);
     free(v as *mut libc::c_void);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn variable_copy(mut old: *mut Variable) -> *mut Variable {
     let mut new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
@@ -459,6 +424,7 @@ pub unsafe extern "C" fn variable_copy(mut old: *mut Variable) -> *mut Variable 
     (*new).loc = location_copy((*old).loc);
     return new;
 }
+
 unsafe extern "C" fn variable_abstractcopy(
     mut old: *mut Variable,
     mut s: *mut State,
@@ -500,6 +466,7 @@ unsafe extern "C" fn variable_abstractcopy(
     }
     return new;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn variable_str(
     mut var: *mut Variable,
@@ -540,6 +507,7 @@ pub unsafe extern "C" fn variable_str(
     free(type_0 as *mut libc::c_void);
     return strbuilder_build(b);
 }
+
 unsafe extern "C" fn object_or_nothing_str(
     mut loc: *mut Location,
     mut Stack: *mut Stack,
@@ -562,14 +530,17 @@ unsafe extern "C" fn object_or_nothing_str(
     }
     return dynamic_str(b"\0" as *const u8 as *const libc::c_char);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn variable_location(mut v: *mut Variable) -> *mut Location {
     return (*v).loc;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn variable_type(mut v: *mut Variable) -> *mut ast_type {
     return (*v).type_0;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn variable_references(
     mut v: *mut Variable,
@@ -591,6 +562,7 @@ pub unsafe extern "C" fn variable_references(
     };
     return location_references((*v).loc, loc, s);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn variable_isparam(mut v: *mut Variable) -> bool {
     return (*v).isparam;
