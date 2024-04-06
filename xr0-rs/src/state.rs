@@ -15,7 +15,7 @@ pub mod location;
 pub mod stack;
 pub mod r#static;
 
-use libc::{free, malloc};
+use libc::{free, malloc, strcmp, strlen};
 
 use crate::{
     ast_type, ast_variable, static_memory, vconst, AstExpr, Block, Clump, Externals, Heap,
@@ -29,8 +29,7 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn strcmp(_: *const libc::c_char, _: *const libc::c_char) -> libc::c_int;
-    fn strlen(_: *const libc::c_char) -> libc::c_ulong;
+
     fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
     fn strbuilder_create() -> *mut StrBuilder;
     fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
@@ -306,7 +305,7 @@ pub unsafe extern "C" fn state_str(mut State: *mut State) -> *mut libc::c_char {
         (*State).ext,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(ext) > 0 as libc::c_int as libc::c_ulong {
+    if strlen(ext) > 0 {
         strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, ext);
     }
     free(ext as *mut libc::c_void);
@@ -314,7 +313,7 @@ pub unsafe extern "C" fn state_str(mut State: *mut State) -> *mut libc::c_char {
         (*State).static_memory,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(static_mem) > 0 as libc::c_int as libc::c_ulong {
+    if strlen(static_mem) > 0 {
         strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, static_mem);
     }
     free(static_mem as *mut libc::c_void);
@@ -322,7 +321,7 @@ pub unsafe extern "C" fn state_str(mut State: *mut State) -> *mut libc::c_char {
         (*State).vconst,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(vconst) > 0 as libc::c_int as libc::c_ulong {
+    if strlen(vconst) > 0 {
         strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, vconst);
     }
     free(vconst as *mut libc::c_void);
@@ -330,7 +329,7 @@ pub unsafe extern "C" fn state_str(mut State: *mut State) -> *mut libc::c_char {
         (*State).Clump,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(Clump) > 0 as libc::c_int as libc::c_ulong {
+    if strlen(Clump) > 0 {
         strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, Clump);
     }
     free(Clump as *mut libc::c_void);
@@ -341,7 +340,7 @@ pub unsafe extern "C" fn state_str(mut State: *mut State) -> *mut libc::c_char {
         (*State).Props,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(Props) > 0 as libc::c_int as libc::c_ulong {
+    if strlen(Props) > 0 {
         strbuilder_printf(b, b"%s\0" as *const u8 as *const libc::c_char, Props);
     }
     free(Props as *mut libc::c_void);
@@ -349,7 +348,7 @@ pub unsafe extern "C" fn state_str(mut State: *mut State) -> *mut libc::c_char {
         (*State).Heap,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(Heap) > 0 as libc::c_int as libc::c_ulong {
+    if strlen(Heap) > 0 {
         strbuilder_printf(b, b"\n%s\n\0" as *const u8 as *const libc::c_char, Heap);
     }
     free(Heap as *mut libc::c_void);

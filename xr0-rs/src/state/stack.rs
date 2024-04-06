@@ -8,7 +8,7 @@
     unused_mut
 )]
 
-use libc::{calloc, free, malloc};
+use libc::{calloc, free, malloc, strcmp};
 
 use crate::value::Value;
 
@@ -24,7 +24,7 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn strcmp(_: *const libc::c_char, _: *const libc::c_char) -> libc::c_int;
+
     fn ast_expr_constant_create(_: libc::c_int) -> *mut AstExpr;
     fn ast_type_destroy(_: *mut ast_type);
     fn ast_type_str(_: *mut ast_type) -> *mut libc::c_char;

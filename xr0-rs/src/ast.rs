@@ -9,7 +9,7 @@
     unused_variables
 )]
 
-use libc::{calloc, exit, fprintf, free, malloc, realloc};
+use libc::{calloc, exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
 
 use crate::{
     Externals, Location, MathAtom, MathExpr, Object, Props, State, StrBuilder, Value, Variable,
@@ -23,9 +23,6 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn strlen(_: *const libc::c_char) -> libc::c_ulong;
-    fn strncmp(_: *const libc::c_char, _: *const libc::c_char, _: libc::c_ulong) -> libc::c_int;
-    fn strcmp(_: *const libc::c_char, _: *const libc::c_char) -> libc::c_int;
     fn map_create() -> *mut map;
     fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
     fn map_get(_: *mut map, key: *const libc::c_char) -> *mut libc::c_void;
@@ -711,11 +708,7 @@ unsafe extern "C" fn hack_identifier_builtin_eval(
     mut State: *mut State,
 ) -> *mut result {
     if !(state_getvconst(State, id)).is_null()
-        || strncmp(
-            id,
-            b"ptr:\0" as *const u8 as *const libc::c_char,
-            4 as libc::c_int as libc::c_ulong,
-        ) == 0 as libc::c_int
+        || strncmp(id, b"ptr:\0" as *const u8 as *const libc::c_char, 4) == 0 as libc::c_int
     {
         return result_value_create(value_sync_create(ast_expr_identifier_create(dynamic_str(
             id,
@@ -7911,9 +7904,8 @@ pub unsafe extern "C" fn parse_int(mut s: *mut libc::c_char) -> libc::c_int {
 }
 #[no_mangle]
 pub unsafe extern "C" fn parse_char(mut s: *mut libc::c_char) -> libc::c_char {
-    if !(strlen(s) >= 3 as libc::c_int as libc::c_ulong
-        && *s.offset(0 as libc::c_int as isize) as libc::c_int == '\'' as i32) as libc::c_int
-        as libc::c_long
+    if !(strlen(s) >= 3 && *s.offset(0 as libc::c_int as isize) as libc::c_int == '\'' as i32)
+        as libc::c_int as libc::c_long
         != 0
     {
         __assert_rtn(

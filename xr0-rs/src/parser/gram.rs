@@ -10,7 +10,7 @@
 
 use std::ptr::addr_of_mut;
 
-use libc::{exit, fflush, fprintf, free, malloc, FILE};
+use libc::{exit, fflush, fprintf, free, malloc, realloc, strlen, FILE};
 
 use super::lexer::{ictype, IC_TYPE};
 use crate::ast::*;
@@ -25,8 +25,6 @@ extern "C" {
         _: *const libc::c_char,
         _: ...
     ) -> libc::c_int;
-    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
-    fn strlen(_: *const libc::c_char) -> libc::c_ulong;
 
     fn __assert_rtn(
         _: *const libc::c_char,
@@ -182,10 +180,7 @@ pub unsafe extern "C" fn strip_quotes(mut s: *mut libc::c_char) -> *mut libc::c_
         );
     } else {
     };
-    let mut len: libc::c_int = (strlen(s))
-        .wrapping_sub(2 as libc::c_int as libc::c_ulong)
-        .wrapping_add(1 as libc::c_int as libc::c_ulong)
-        as libc::c_int;
+    let mut len: libc::c_int = (strlen(s)).wrapping_sub(2).wrapping_add(1) as libc::c_int;
     let mut t: *mut libc::c_char =
         malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len as usize))
             as *mut libc::c_char;
@@ -218,8 +213,7 @@ pub unsafe extern "C" fn stmt_array_append(
     (*arr).n += 1;
     (*arr).stmt = realloc(
         (*arr).stmt as *mut libc::c_void,
-        (::core::mem::size_of::<*mut ast_stmt>() as libc::c_ulong)
-            .wrapping_mul((*arr).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut ast_stmt>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut ast_stmt;
     let ref mut fresh1 = *((*arr).stmt).offset(((*arr).n - 1 as libc::c_int) as isize);
     *fresh1 = v;
@@ -246,8 +240,7 @@ pub unsafe extern "C" fn expr_array_append(
     (*arr).n += 1;
     (*arr).expr = realloc(
         (*arr).expr as *mut libc::c_void,
-        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
-            .wrapping_mul((*arr).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut AstExpr>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut AstExpr;
     let ref mut fresh3 = *((*arr).expr).offset(((*arr).n - 1 as libc::c_int) as isize);
     *fresh3 = v;

@@ -42,7 +42,7 @@ use libc::isspace;
 
 use libc::{
     exit, fgetc, fgets, fprintf, fputs, free, fseek, getenv, malloc, pclose, popen, rewind,
-    snprintf, tmpfile,
+    snprintf, strcmp, strlen, tmpfile,
 };
 
 extern "C" {
@@ -55,8 +55,6 @@ extern "C" {
         _: *const libc::c_char,
     ) -> !;
 
-    fn strcmp(_: *const libc::c_char, _: *const libc::c_char) -> libc::c_int;
-    fn strlen(_: *const libc::c_char) -> libc::c_ulong;
     fn getopt(_: libc::c_int, _: *const *mut libc::c_char, _: *const libc::c_char) -> libc::c_int;
     static mut optarg: *mut libc::c_char;
     static mut optind: libc::c_int;
@@ -299,10 +297,10 @@ pub unsafe extern "C" fn preprocesscmd_fmt(
     let mut includes: *mut libc::c_char = genincludes(includedirs);
     let mut len: libc::c_int =
         (strlen(b"cc %s -nostdinc -E -xc %s\0" as *const u8 as *const libc::c_char))
-            .wrapping_sub(4 as libc::c_int as libc::c_ulong)
+            .wrapping_sub(4)
             .wrapping_add(strlen(includes))
             .wrapping_add(strlen(infile))
-            .wrapping_add(1 as libc::c_int as libc::c_ulong) as libc::c_int;
+            .wrapping_add(1) as libc::c_int;
     let mut s: *mut libc::c_char =
         malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len as usize))
             as *mut libc::c_char;

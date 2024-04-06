@@ -13,7 +13,7 @@ use std::ptr::addr_of_mut;
 // NOTE: fgetc may be slow.
 use libc::{
     clearerr, exit, ferror, fgetc, fileno, fprintf, fread, free, fwrite, isatty, malloc, putchar,
-    realloc, FILE,
+    realloc, strlen, FILE,
 };
 
 use crate::util::{strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc};
@@ -37,7 +37,6 @@ extern "C" {
     static mut __stdoutp: *mut FILE;
     static mut __stderrp: *mut FILE;
     fn memset(_: *mut libc::c_void, _: libc::c_int, _: libc::c_ulong) -> *mut libc::c_void;
-    fn strlen(_: *const libc::c_char) -> libc::c_ulong;
     fn __error() -> *mut libc::c_int;
 }
 pub type __uint32_t = libc::c_uint;
@@ -3776,7 +3775,7 @@ pub unsafe extern "C" fn yy_scan_buffer(
 }
 #[no_mangle]
 pub unsafe extern "C" fn yy_scan_string(mut yystr: *const libc::c_char) -> YY_BUFFER_STATE {
-    return yy_scan_bytes(yystr, strlen(yystr) as libc::c_int as yy_size_t);
+    return yy_scan_bytes(yystr, strlen(yystr) as yy_size_t);
 }
 #[no_mangle]
 pub unsafe extern "C" fn yy_scan_bytes(

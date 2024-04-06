@@ -8,7 +8,7 @@
     unused_mut
 )]
 
-use libc::{calloc, free, malloc, realloc};
+use libc::{calloc, free, malloc, realloc, strcmp};
 
 use crate::ext::Externals;
 
@@ -23,7 +23,6 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn strcmp(_: *const libc::c_char, _: *const libc::c_char) -> libc::c_int;
     fn ast_expr_identifier_create(_: *mut libc::c_char) -> *mut AstExpr;
     fn ast_expr_constant_create(_: libc::c_int) -> *mut AstExpr;
     fn ast_expr_literal_create(_: *mut libc::c_char) -> *mut AstExpr;
