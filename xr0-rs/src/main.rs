@@ -21,7 +21,7 @@ mod util;
 mod value;
 
 use crate::ast::{
-    ast_block, ast_externdecl, ast_function, ast_type, ast_variable, ast_variable_arr, AstExpr,
+    ast_block, ast_externdecl, ast_function, ast_type, ast_variable, ast_variable_arr, Ast, AstExpr,
 };
 use crate::ext::Externals;
 use crate::math::{MathAtom, MathExpr};
@@ -39,10 +39,23 @@ use crate::value::Value;
 
 // NOTE: libc::isspace may be slower than the inlined definition i deleted
 use libc::isspace;
-
 use libc::{
     exit, fgetc, fgets, fprintf, fputs, free, fseek, getenv, malloc, pclose, popen, rewind,
     snprintf, strcmp, strlen, tmpfile,
+};
+
+use ast::{
+    ast_block_str, ast_destroy, ast_externdecl_as_function, ast_externdecl_install,
+    ast_externdecl_isfunction, ast_function_absisempty, ast_function_abstract, ast_function_copy,
+    ast_function_isaxiom, ast_function_isproto, ast_function_name, ast_function_verify,
+    ast_functiondecl_create, ast_protostitch, ast_topological_order,
+};
+use ext::{externals_create, externals_destroy, externals_getfunc};
+use parser::gram::yyparse;
+use parser::lexer::{lex_begin, lex_finish, yylex_destroy};
+use util::{
+    dynamic_str, error, strbuilder_build, strbuilder_create, strbuilder_printf, string_arr,
+    string_arr_append, string_arr_create, string_arr_n, string_arr_s, string_arr_str, v_printf,
 };
 
 extern "C" {
@@ -60,61 +73,11 @@ extern "C" {
     fn getopt(_: libc::c_int, _: *const *mut libc::c_char, _: *const libc::c_char) -> libc::c_int;
     static mut optarg: *mut libc::c_char;
     static mut optind: libc::c_int;
-    fn ast_block_str(_: *mut ast_block, indent: *mut libc::c_char) -> *mut libc::c_char;
-    fn ast_function_name(f: *mut ast_function) -> *mut libc::c_char;
-    fn ast_function_copy(_: *mut ast_function) -> *mut ast_function;
-    fn ast_function_isaxiom(f: *mut ast_function) -> bool;
-    fn ast_function_isproto(f: *mut ast_function) -> bool;
-    fn ast_function_absisempty(f: *mut ast_function) -> bool;
-    fn ast_function_abstract(f: *mut ast_function) -> *mut ast_block;
-    fn ast_function_verify(_: *mut ast_function, _: *mut Externals) -> *mut error;
-    fn ast_functiondecl_create(_: *mut ast_function) -> *mut ast_externdecl;
-    fn ast_externdecl_isfunction(_: *mut ast_externdecl) -> bool;
-    fn ast_externdecl_as_function(_: *mut ast_externdecl) -> *mut ast_function;
-    fn ast_externdecl_install(decl: *mut ast_externdecl, ext: *mut Externals);
-    fn v_printf(fmt: *mut libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
-    fn string_arr_create() -> *mut string_arr;
-    fn string_arr_s(_: *mut string_arr) -> *mut *mut libc::c_char;
-    fn string_arr_n(_: *mut string_arr) -> libc::c_int;
-    fn string_arr_append(_: *mut string_arr, _: *mut libc::c_char) -> libc::c_int;
-    fn string_arr_str(_: *mut string_arr) -> *mut libc::c_char;
-    fn ast_destroy(_: *mut Ast);
-    fn ast_topological_order(fname: *mut libc::c_char, ext: *mut Externals) -> *mut string_arr;
-    fn ast_protostitch(_: *mut ast_function, _: *mut Externals) -> *mut ast_function;
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
-    fn lex_begin();
-    fn lex_finish();
-    fn yylex_destroy() -> libc::c_int;
-    fn externals_create() -> *mut Externals;
-    fn externals_destroy(_: *mut Externals);
-    fn externals_getfunc(_: *mut Externals, id: *mut libc::c_char) -> *mut ast_function;
-    fn yyparse() -> libc::c_int;
 }
 
 pub type __uint32_t = libc::c_uint;
 pub type __int64_t = libc::c_longlong;
 
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct Ast {
-    pub n: libc::c_int,
-    pub decl: *mut *mut ast_externdecl,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct error {
-    pub msg: *mut libc::c_char,
-    pub inner: *mut error,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct string_arr {
-    pub n: libc::c_int,
-    pub s: *mut *mut libc::c_char,
-}
 pub type execmode = libc::c_uint;
 pub const EXECMODE_STRIP: execmode = 1;
 pub const EXECMODE_VERIFY: execmode = 0;

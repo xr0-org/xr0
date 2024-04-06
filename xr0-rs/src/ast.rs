@@ -11,7 +11,11 @@
 
 use libc::{calloc, exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
 
-use crate::util::{entry, map, map_create, map_get, map_set};
+use crate::util::{
+    entry, error, map, map_create, map_get, map_set, string_arr, string_arr_append,
+    string_arr_concat, string_arr_contains, string_arr_create, string_arr_deque, string_arr_n,
+    string_arr_s, v_printf,
+};
 
 use crate::{
     Externals, Location, MathAtom, MathExpr, Object, Props, State, StrBuilder, Value, Variable,
@@ -31,14 +35,6 @@ extern "C" {
     fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char);
     fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
     fn error_create(s: *mut libc::c_char) -> *mut error;
-    fn string_arr_create() -> *mut string_arr;
-    fn string_arr_s(_: *mut string_arr) -> *mut *mut libc::c_char;
-    fn string_arr_n(_: *mut string_arr) -> libc::c_int;
-    fn string_arr_append(_: *mut string_arr, _: *mut libc::c_char) -> libc::c_int;
-    fn string_arr_deque(_: *mut string_arr) -> *mut libc::c_char;
-    fn string_arr_concat(s1: *mut string_arr, s2: *mut string_arr) -> *mut string_arr;
-    fn string_arr_contains(_: *mut string_arr, s: *mut libc::c_char) -> bool;
-    fn v_printf(fmt: *mut libc::c_char, _: ...) -> libc::c_int;
     fn lexememarker_copy(_: *mut lexememarker) -> *mut lexememarker;
     fn lexememarker_destroy(_: *mut lexememarker);
     fn lexememarker_str(_: *mut lexememarker) -> *mut libc::c_char;
@@ -169,18 +165,6 @@ extern "C" {
 pub type __int64_t = libc::c_longlong;
 pub type __darwin_off_t = __int64_t;
 pub type fpos_t = __darwin_off_t;
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct error {
-    pub msg: *mut libc::c_char,
-    pub inner: *mut error,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct string_arr {
-    pub n: libc::c_int,
-    pub s: *mut *mut libc::c_char,
-}
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstExpr {

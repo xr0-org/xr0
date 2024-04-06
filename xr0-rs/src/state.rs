@@ -17,6 +17,7 @@ pub mod r#static;
 
 use libc::{free, malloc, strcmp, strlen};
 
+use crate::util::v_printf;
 use crate::{
     ast_type, ast_variable, static_memory, vconst, AstExpr, Block, Clump, Externals, Heap,
     Location, Object, Props, Stack, StrBuilder, Value, Variable,
@@ -35,7 +36,6 @@ extern "C" {
     fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
     fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
     fn error_create(s: *mut libc::c_char) -> *mut error;
-    fn v_printf(fmt: *mut libc::c_char, _: ...) -> libc::c_int;
     fn ast_expr_identifier_create(_: *mut libc::c_char) -> *mut AstExpr;
     fn ast_expr_constant_create(_: libc::c_int) -> *mut AstExpr;
     fn ast_expr_as_literal(_: *mut AstExpr) -> *mut libc::c_char;
