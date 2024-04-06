@@ -11,7 +11,7 @@
 use std::ptr::addr_of_mut;
 
 // NOTE: fgetc may be slow.
-use libc::{clearerr, ferror, fgetc, fileno, fprintf, fread, fwrite, putchar, FILE};
+use libc::{clearerr, exit, ferror, fgetc, fileno, fprintf, fread, fwrite, putchar, FILE};
 
 use crate::util::{strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc};
 use crate::StrBuilder;
@@ -36,7 +36,6 @@ extern "C" {
     fn memset(_: *mut libc::c_void, _: libc::c_int, _: libc::c_ulong) -> *mut libc::c_void;
     fn strlen(_: *const libc::c_char) -> libc::c_ulong;
     fn __error() -> *mut libc::c_int;
-    fn exit(_: libc::c_int) -> !;
     fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn free(_: *mut libc::c_void);
     fn malloc(_: libc::c_ulong) -> *mut libc::c_void;

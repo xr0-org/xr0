@@ -10,7 +10,7 @@
 
 use std::ptr::addr_of_mut;
 
-use libc::FILE;
+use libc::{exit, fflush, fprintf, FILE};
 
 use super::lexer::{ictype, IC_TYPE};
 use crate::ast::*;
@@ -19,25 +19,24 @@ use crate::util::dynamic_str;
 extern "C" {
     static mut __stdoutp: *mut FILE;
     static mut __stderrp: *mut FILE;
-    fn fflush(_: *mut FILE) -> libc::c_int;
-    fn fprintf(_: *mut FILE, _: *const libc::c_char, _: ...) -> libc::c_int;
     fn snprintf(
         _: *mut libc::c_char,
         _: libc::c_ulong,
         _: *const libc::c_char,
         _: ...
     ) -> libc::c_int;
-    fn exit(_: libc::c_int) -> !;
     fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
     fn free(_: *mut libc::c_void);
     fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn strlen(_: *const libc::c_char) -> libc::c_ulong;
+
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
+
     fn lexloc() -> *mut lexememarker;
     fn lexememarker_str(_: *mut lexememarker) -> *mut libc::c_char;
     static mut root: *mut Ast;

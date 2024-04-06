@@ -9,9 +9,12 @@
     unused_variables
 )]
 
+use libc::exit;
+
 use crate::{
     Externals, Location, MathAtom, MathExpr, Object, Props, State, StrBuilder, Value, Variable,
 };
+
 extern "C" {
     static mut __stderrp: *mut libc::FILE;
     fn fprintf(_: *mut libc::FILE, _: *const libc::c_char, _: ...) -> libc::c_int;
@@ -19,7 +22,6 @@ extern "C" {
     fn calloc(_: libc::c_ulong, _: libc::c_ulong) -> *mut libc::c_void;
     fn free(_: *mut libc::c_void);
     fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
-    fn exit(_: libc::c_int) -> !;
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
