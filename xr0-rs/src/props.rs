@@ -10,6 +10,10 @@
 
 use libc::{calloc, free, realloc};
 
+use crate::ast::{
+    ast_expr_copy, ast_expr_destroy, ast_expr_equal, ast_expr_inverted_copy, ast_expr_str,
+};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{AstExpr, StrBuilder};
 
 extern "C" {
@@ -19,16 +23,8 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn ast_expr_inverted_copy(expr: *mut AstExpr, invert: bool) -> *mut AstExpr;
-    fn ast_expr_destroy(_: *mut AstExpr);
-    fn ast_expr_str(_: *mut AstExpr) -> *mut libc::c_char;
-    fn ast_expr_copy(_: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_equal(e1: *mut AstExpr, e2: *mut AstExpr) -> bool;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Props {

@@ -12,7 +12,22 @@ use libc::{calloc, free, malloc, realloc};
 
 use crate::value::Value;
 
-use crate::{object_arr, AstExpr, Heap, Location, Object, Range, State, StrBuilder};
+use crate::ast::{
+    ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
+    ast_expr_eq_create, ast_expr_sum_create,
+};
+use crate::object::{
+    object_abstractcopy, object_arr_append, object_arr_copy, object_arr_create, object_arr_destroy,
+    object_arr_index, object_arr_index_upperincl, object_arr_insert, object_arr_nobjects,
+    object_arr_objects, object_arr_remove, object_contig_precedes, object_dealloc, object_from,
+    object_isdeallocand, object_isvalue, object_lower, object_range_create, object_references,
+    object_referencesheap, object_str, object_upper, object_upto, object_value_create,
+    range_create,
+};
+use crate::state::heap::heap_newblock;
+use crate::state::{state_alloc, state_eval};
+use crate::util::{error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf};
+use crate::{object_arr, AstExpr, Heap, Location, Object, State, StrBuilder};
 
 extern "C" {
     fn __assert_rtn(
@@ -21,83 +36,41 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn ast_expr_constant_create(_: libc::c_int) -> *mut AstExpr;
-    fn ast_expr_eq_create(_: *mut AstExpr, _: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_sum_create(_: *mut AstExpr, _: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_difference_create(_: *mut AstExpr, _: *mut AstExpr) -> *mut AstExpr;
-    fn ast_expr_destroy(_: *mut AstExpr);
-    fn ast_expr_copy(_: *mut AstExpr) -> *mut AstExpr;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn error_create(s: *mut libc::c_char) -> *mut error;
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
-    fn heap_newblock(h: *mut Heap) -> *mut Location;
-    fn state_alloc(_: *mut State) -> *mut Value;
-    fn state_eval(_: *mut State, _: *mut AstExpr) -> bool;
-    fn object_value_create(offset: *mut AstExpr, _: *mut Value) -> *mut Object;
-    fn object_range_create(offset: *mut AstExpr, _: *mut Range) -> *mut Object;
-    fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Object;
-    fn object_str(_: *mut Object) -> *mut libc::c_char;
-    fn object_lower(_: *mut Object) -> *mut AstExpr;
-    fn object_upper(_: *mut Object) -> *mut AstExpr;
-    fn object_isdeallocand(_: *mut Object, _: *mut State) -> bool;
-    fn object_references(_: *mut Object, _: *mut Location, _: *mut State) -> bool;
-    fn object_referencesheap(_: *mut Object, _: *mut State) -> bool;
-    fn object_isvalue(_: *mut Object) -> bool;
-    fn object_contig_precedes(before: *mut Object, after: *mut Object, _: *mut State) -> bool;
-    fn object_upto(_: *mut Object, excl_upper: *mut AstExpr, _: *mut State) -> *mut Object;
-    fn object_from(_: *mut Object, incl_lower: *mut AstExpr, _: *mut State) -> *mut Object;
-    fn object_dealloc(_: *mut Object, _: *mut State) -> *mut error;
-    fn range_create(size: *mut AstExpr, loc: *mut Location) -> *mut Range;
-    fn object_arr_create() -> *mut object_arr;
-    fn object_arr_destroy(_: *mut object_arr);
-    fn object_arr_copy(_: *mut object_arr) -> *mut object_arr;
-    fn object_arr_nobjects(_: *mut object_arr) -> libc::c_int;
-    fn object_arr_objects(_: *mut object_arr) -> *mut *mut Object;
-    fn object_arr_index(arr: *mut object_arr, offset: *mut AstExpr, _: *mut State) -> libc::c_int;
-    fn object_arr_index_upperincl(
-        arr: *mut object_arr,
-        offset: *mut AstExpr,
-        _: *mut State,
-    ) -> libc::c_int;
-    fn object_arr_insert(arr: *mut object_arr, index: libc::c_int, _: *mut Object) -> libc::c_int;
-    fn object_arr_append(arr: *mut object_arr, obj: *mut Object) -> libc::c_int;
-    fn object_arr_remove(arr: *mut object_arr, index: libc::c_int);
 }
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct error {
-    pub msg: *mut libc::c_char,
-    pub inner: *mut error,
-}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Block {
     pub arr: *mut object_arr,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct block_arr {
     pub n: libc::c_int,
     pub Block: *mut *mut Block,
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_create() -> *mut Block {
     let mut b: *mut Block = malloc(::core::mem::size_of::<Block>()) as *mut Block;
     (*b).arr = object_arr_create();
     return b;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_destroy(mut b: *mut Block) {
     object_arr_destroy((*b).arr);
     free(b as *mut libc::c_void);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_copy(mut old: *mut Block) -> *mut Block {
     let mut new: *mut Block = malloc(::core::mem::size_of::<Block>()) as *mut Block;
     (*new).arr = object_arr_copy((*old).arr);
     return new;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_str(mut Block: *mut Block) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
@@ -121,6 +94,7 @@ pub unsafe extern "C" fn block_str(mut Block: *mut Block) -> *mut libc::c_char {
     }
     return strbuilder_build(b);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_install(mut b: *mut Block, mut obj: *mut Object) {
     if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
@@ -135,6 +109,7 @@ pub unsafe extern "C" fn block_install(mut b: *mut Block, mut obj: *mut Object) 
     };
     object_arr_append((*b).arr, obj);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_observe(
     mut b: *mut Block,
@@ -190,6 +165,7 @@ pub unsafe extern "C" fn block_observe(
     }
     return observed;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_references(
     mut b: *mut Block,
@@ -207,6 +183,7 @@ pub unsafe extern "C" fn block_references(
     }
     return 0 as libc::c_int != 0;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_range_alloc(
     mut b: *mut Block,
@@ -236,6 +213,7 @@ pub unsafe extern "C" fn block_range_alloc(
     );
     return 0 as *mut error;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_range_aredeallocands(
     mut b: *mut Block,
@@ -283,6 +261,7 @@ pub unsafe extern "C" fn block_range_aredeallocands(
     };
     return 1 as libc::c_int != 0;
 }
+
 unsafe extern "C" fn hack_first_object_is_exactly_bounds(
     mut b: *mut Block,
     mut lw: *mut AstExpr,
@@ -301,6 +280,7 @@ unsafe extern "C" fn hack_first_object_is_exactly_bounds(
     return state_eval(s, same_lw) as libc::c_int != 0
         && state_eval(s, same_up) as libc::c_int != 0;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_range_dealloc(
     mut b: *mut Block,
@@ -363,6 +343,7 @@ pub unsafe extern "C" fn block_range_dealloc(
     (*b).arr = new;
     return 0 as *mut error;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_undeclare(mut b: *mut Block, mut s: *mut State) {
     let mut new: *mut object_arr = object_arr_create();
@@ -379,6 +360,7 @@ pub unsafe extern "C" fn block_undeclare(mut b: *mut Block, mut s: *mut State) {
     object_arr_destroy((*b).arr);
     (*b).arr = new;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_arr_create() -> *mut block_arr {
     let mut arr: *mut block_arr = calloc(1, ::core::mem::size_of::<block_arr>()) as *mut block_arr;
@@ -394,6 +376,7 @@ pub unsafe extern "C" fn block_arr_create() -> *mut block_arr {
     };
     return arr;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_arr_destroy(mut arr: *mut block_arr) {
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -404,6 +387,7 @@ pub unsafe extern "C" fn block_arr_destroy(mut arr: *mut block_arr) {
     free((*arr).Block as *mut libc::c_void);
     free(arr as *mut libc::c_void);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_arr_copy(mut old: *mut block_arr) -> *mut block_arr {
     let mut new: *mut block_arr = block_arr_create();
@@ -414,14 +398,17 @@ pub unsafe extern "C" fn block_arr_copy(mut old: *mut block_arr) -> *mut block_a
     }
     return new;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_arr_blocks(mut arr: *mut block_arr) -> *mut *mut Block {
     return (*arr).Block;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_arr_nblocks(mut arr: *mut block_arr) -> libc::c_int {
     return (*arr).n;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_arr_append(
     mut arr: *mut block_arr,
@@ -447,6 +434,7 @@ pub unsafe extern "C" fn block_arr_append(
     *fresh2 = b;
     return loc;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn block_arr_delete(mut arr: *mut block_arr, mut address: libc::c_int) {
     if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {

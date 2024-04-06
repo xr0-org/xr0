@@ -10,7 +10,7 @@
 
 use std::ptr::addr_of_mut;
 
-use libc::{exit, fflush, fprintf, free, malloc, realloc, strlen, FILE};
+use libc::{exit, fflush, fprintf, free, malloc, realloc, snprintf, strlen, FILE};
 
 use super::lexer::{installclass, lexememarker_str, lexloc, marker, yylex, yytext, IC_TYPE};
 use crate::ast::*;
@@ -20,12 +20,6 @@ use crate::util::{dynamic_str, VERBOSE_MODE};
 extern "C" {
     static mut __stdoutp: *mut FILE;
     static mut __stderrp: *mut FILE;
-    fn snprintf(
-        _: *mut libc::c_char,
-        _: libc::c_ulong,
-        _: *const libc::c_char,
-        _: ...
-    ) -> libc::c_int;
 
     fn __assert_rtn(
         _: *const libc::c_char,
@@ -177,7 +171,7 @@ pub unsafe extern "C" fn strip_quotes(mut s: *mut libc::c_char) -> *mut libc::c_
             as *mut libc::c_char;
     snprintf(
         t,
-        len as libc::c_ulong,
+        len as usize,
         b"%s\0" as *const u8 as *const libc::c_char,
         s.offset(1 as libc::c_int as isize),
     );
