@@ -14,6 +14,7 @@ mod ast;
 mod ext;
 mod math;
 mod object;
+mod parser;
 mod props;
 mod state;
 mod util;

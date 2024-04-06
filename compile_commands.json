@@ -11,6 +11,11 @@
   },
   {
     "directory": "/Users/jorendorff/src/xr0",
+    "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -I build -o build/lex.o -c build/lex.yy.c",
+    "file": "build/lex.yy.c"
+  },
+  {
+    "directory": "/Users/jorendorff/src/xr0",
     "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -o build/block.o -c src/state/block.c",
     "file": "src/state/block.c"
   },
@@ -78,5 +83,5 @@
     "directory": "/Users/jorendorff/src/xr0",
     "command": "gcc -g -Wreturn-type -std=gnu11 -I include -Wall -I build -o build/0v.o -c src/main.c",
     "file": "src/main.c"
-  },
+  }
 ]
