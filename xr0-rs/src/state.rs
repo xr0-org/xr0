@@ -283,11 +283,7 @@ pub unsafe fn state_popframe(mut State: *mut State) {
     stack_destroy(old);
 }
 #[no_mangle]
-pub unsafe fn state_declare(
-    mut State: *mut State,
-    mut var: *mut ast_variable,
-    mut isparam: bool,
-) {
+pub unsafe fn state_declare(mut State: *mut State, mut var: *mut ast_variable, mut isparam: bool) {
     stack_declare((*State).Stack, var, isparam);
 }
 #[no_mangle]
@@ -305,10 +301,7 @@ pub unsafe fn state_vconst(
     return value_sync_create(ast_expr_identifier_create(c));
 }
 #[no_mangle]
-pub unsafe fn state_static_init(
-    mut State: *mut State,
-    mut expr: *mut AstExpr,
-) -> *mut Value {
+pub unsafe fn state_static_init(mut State: *mut State, mut expr: *mut AstExpr) -> *mut Value {
     let mut lit: *mut libc::c_char = ast_expr_as_literal(expr);
     let mut loc: *mut Location = static_memory_checkpool((*State).static_memory, lit);
     if !loc.is_null() {
@@ -417,10 +410,7 @@ pub unsafe fn state_isalloc(mut State: *mut State, mut v: *mut Value) -> bool {
     return location_toheap(loc, (*State).Heap);
 }
 #[no_mangle]
-pub unsafe fn state_getvconst(
-    mut State: *mut State,
-    mut id: *mut libc::c_char,
-) -> *mut Value {
+pub unsafe fn state_getvconst(mut State: *mut State, mut id: *mut libc::c_char) -> *mut Value {
     return vconst_get((*State).vconst, id);
 }
 #[no_mangle]
@@ -488,10 +478,7 @@ pub unsafe fn state_blockinstall(mut b: *mut Block, mut obj: *mut Object) {
     block_install(b, obj);
 }
 #[no_mangle]
-pub unsafe fn state_getblock(
-    mut State: *mut State,
-    mut loc: *mut Location,
-) -> *mut Block {
+pub unsafe fn state_getblock(mut State: *mut State, mut loc: *mut Location) -> *mut Block {
     let mut res: block_res = location_getblock(
         loc,
         (*State).static_memory,
@@ -578,10 +565,7 @@ pub unsafe fn state_getobjecttype(
     return variable_type(v);
 }
 #[no_mangle]
-pub unsafe fn state_getloc(
-    mut State: *mut State,
-    mut id: *mut libc::c_char,
-) -> *mut Value {
+pub unsafe fn state_getloc(mut State: *mut State, mut id: *mut libc::c_char) -> *mut Value {
     let mut v: *mut Variable = stack_getvariable((*State).Stack, id);
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -595,10 +579,7 @@ pub unsafe fn state_getloc(
     return value_ptr_create(variable_location(v));
 }
 #[no_mangle]
-pub unsafe fn state_getobject(
-    mut State: *mut State,
-    mut id: *mut libc::c_char,
-) -> *mut Object {
+pub unsafe fn state_getobject(mut State: *mut State, mut id: *mut libc::c_char) -> *mut Object {
     if strcmp(id, b"return\0" as *const u8 as *const libc::c_char) == 0 as libc::c_int {
         return state_getresult(State);
     }
@@ -756,10 +737,7 @@ pub unsafe fn state_range_dealloc(
     return location_range_dealloc(deref, lw, up, State);
 }
 #[no_mangle]
-pub unsafe fn state_addresses_deallocand(
-    mut State: *mut State,
-    mut obj: *mut Object,
-) -> bool {
+pub unsafe fn state_addresses_deallocand(mut State: *mut State, mut obj: *mut Object) -> bool {
     let mut val: *mut Value = object_as_value(obj);
     let mut loc: *mut Location = value_as_location(val);
     return state_isdeallocand(State, loc);

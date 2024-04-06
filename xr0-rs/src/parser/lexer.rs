@@ -86,10 +86,7 @@ unsafe fn __istype(mut _c: __darwin_ct_rune_t, mut _f: libc::c_ulong) -> libc::c
     };
 }
 #[inline]
-unsafe fn __isctype(
-    mut _c: __darwin_ct_rune_t,
-    mut _f: libc::c_ulong,
-) -> __darwin_ct_rune_t {
+unsafe fn __isctype(mut _c: __darwin_ct_rune_t, mut _f: libc::c_ulong) -> __darwin_ct_rune_t {
     return if _c < 0 as libc::c_int || _c >= (1 as libc::c_int) << 8 as libc::c_int {
         0 as libc::c_int
     } else {
@@ -3467,10 +3464,7 @@ unsafe fn yy_load_buffer_state() {
     yy_hold_char = *yy_c_buf_p;
 }
 #[no_mangle]
-pub unsafe fn yy_create_buffer(
-    mut file: *mut FILE,
-    mut size: libc::c_int,
-) -> YY_BUFFER_STATE {
+pub unsafe fn yy_create_buffer(mut file: *mut FILE, mut size: libc::c_int) -> YY_BUFFER_STATE {
     let mut b: YY_BUFFER_STATE = 0 as *mut yy_buffer_state;
     b = yyalloc(::core::mem::size_of::<yy_buffer_state>() as libc::c_ulong) as YY_BUFFER_STATE;
     if b.is_null() {
@@ -3657,10 +3651,7 @@ unsafe fn yyensure_buffer_stack() {
     }
 }
 #[no_mangle]
-pub unsafe fn yy_scan_buffer(
-    mut base: *mut libc::c_char,
-    mut size: yy_size_t,
-) -> YY_BUFFER_STATE {
+pub unsafe fn yy_scan_buffer(mut base: *mut libc::c_char, mut size: yy_size_t) -> YY_BUFFER_STATE {
     let mut b: YY_BUFFER_STATE = 0 as *mut yy_buffer_state;
     if size < 2 as libc::c_int as yy_size_t
         || *base.offset(size.wrapping_sub(2 as libc::c_int as yy_size_t) as isize) as libc::c_int
@@ -3820,10 +3811,7 @@ pub unsafe fn yyalloc(mut size: yy_size_t) -> *mut libc::c_void {
 }
 
 #[no_mangle]
-pub unsafe fn yyrealloc(
-    mut ptr: *mut libc::c_void,
-    mut size: yy_size_t,
-) -> *mut libc::c_void {
+pub unsafe fn yyrealloc(mut ptr: *mut libc::c_void, mut size: yy_size_t) -> *mut libc::c_void {
     return realloc(ptr, size as usize);
 }
 

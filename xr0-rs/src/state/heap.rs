@@ -82,10 +82,7 @@ pub unsafe fn heap_copy(mut h: *mut Heap) -> *mut Heap {
 }
 
 #[no_mangle]
-pub unsafe fn heap_str(
-    mut h: *mut Heap,
-    mut indent: *mut libc::c_char,
-) -> *mut libc::c_char {
+pub unsafe fn heap_str(mut h: *mut Heap, mut indent: *mut libc::c_char) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     let mut arr: *mut *mut Block = block_arr_blocks((*h).blocks);
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
@@ -172,10 +169,7 @@ pub unsafe fn heap_getblock(mut h: *mut Heap, mut address: libc::c_int) -> *mut 
 }
 
 #[no_mangle]
-pub unsafe fn heap_deallocblock(
-    mut h: *mut Heap,
-    mut address: libc::c_int,
-) -> *mut error {
+pub unsafe fn heap_deallocblock(mut h: *mut Heap, mut address: libc::c_int) -> *mut error {
     if !(address < block_arr_nblocks((*h).blocks)) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"heap_deallocblock\0"))
@@ -386,10 +380,7 @@ pub unsafe fn vconst_undeclare(mut v: *mut vconst) {
 }
 
 #[no_mangle]
-pub unsafe fn vconst_str(
-    mut v: *mut vconst,
-    mut indent: *mut libc::c_char,
-) -> *mut libc::c_char {
+pub unsafe fn vconst_str(mut v: *mut vconst, mut indent: *mut libc::c_char) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     let mut m: *mut map = (*v).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;

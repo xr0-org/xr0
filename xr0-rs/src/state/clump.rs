@@ -46,10 +46,7 @@ pub unsafe fn clump_destroy(mut c: *mut Clump) {
 }
 
 #[no_mangle]
-pub unsafe fn clump_str(
-    mut c: *mut Clump,
-    mut indent: *mut libc::c_char,
-) -> *mut libc::c_char {
+pub unsafe fn clump_str(mut c: *mut Clump, mut indent: *mut libc::c_char) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     let mut n: libc::c_int = block_arr_nblocks((*c).blocks);
     let mut arr: *mut *mut Block = block_arr_blocks((*c).blocks);

@@ -189,10 +189,7 @@ unsafe fn varmap_copy(mut m: *mut map) -> *mut map {
 }
 
 #[no_mangle]
-pub unsafe fn stack_str(
-    mut Stack: *mut Stack,
-    mut State: *mut State,
-) -> *mut libc::c_char {
+pub unsafe fn stack_str(mut Stack: *mut Stack, mut State: *mut State) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     let mut m: *mut map = (*Stack).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -237,11 +234,7 @@ pub unsafe fn stack_str(
 }
 
 #[no_mangle]
-pub unsafe fn stack_declare(
-    mut Stack: *mut Stack,
-    mut var: *mut ast_variable,
-    mut isparam: bool,
-) {
+pub unsafe fn stack_declare(mut Stack: *mut Stack, mut var: *mut ast_variable, mut isparam: bool) {
     let mut id: *mut libc::c_char = ast_variable_name(var);
     if !(map_get((*Stack).varmap, id)).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -295,10 +288,7 @@ pub unsafe fn stack_getvarmap(mut s: *mut Stack) -> *mut map {
 }
 
 #[no_mangle]
-pub unsafe fn stack_getvariable(
-    mut s: *mut Stack,
-    mut id: *mut libc::c_char,
-) -> *mut Variable {
+pub unsafe fn stack_getvariable(mut s: *mut Stack, mut id: *mut libc::c_char) -> *mut Variable {
     if !(strcmp(id, b"return\0" as *const u8 as *const libc::c_char) != 0 as libc::c_int)
         as libc::c_int as libc::c_long
         != 0
@@ -417,10 +407,7 @@ pub unsafe fn variable_copy(mut old: *mut Variable) -> *mut Variable {
     return new;
 }
 
-unsafe fn variable_abstractcopy(
-    mut old: *mut Variable,
-    mut s: *mut State,
-) -> *mut Variable {
+unsafe fn variable_abstractcopy(mut old: *mut Variable, mut s: *mut State) -> *mut Variable {
     let mut new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
     (*new).type_0 = ast_type_copy((*old).type_0);
     (*new).isparam = (*old).isparam;

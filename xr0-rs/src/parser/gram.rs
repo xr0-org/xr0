@@ -180,10 +180,7 @@ pub unsafe fn stmt_array_create(mut v: *mut ast_stmt) -> stmt_array {
     return arr;
 }
 #[no_mangle]
-pub unsafe fn stmt_array_append(
-    mut arr: *mut stmt_array,
-    mut v: *mut ast_stmt,
-) -> stmt_array {
+pub unsafe fn stmt_array_append(mut arr: *mut stmt_array, mut v: *mut ast_stmt) -> stmt_array {
     (*arr).n += 1;
     (*arr).stmt = realloc(
         (*arr).stmt as *mut libc::c_void,
@@ -207,10 +204,7 @@ pub unsafe fn expr_array_create(mut v: *mut AstExpr) -> expr_array {
     return arr;
 }
 #[no_mangle]
-pub unsafe fn expr_array_append(
-    mut arr: *mut expr_array,
-    mut v: *mut AstExpr,
-) -> expr_array {
+pub unsafe fn expr_array_append(mut arr: *mut expr_array, mut v: *mut AstExpr) -> expr_array {
     (*arr).n += 1;
     (*arr).expr = realloc(
         (*arr).expr as *mut libc::c_void,

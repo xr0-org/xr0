@@ -94,10 +94,7 @@ unsafe fn isascii(mut _c: libc::c_int) -> libc::c_int {
 }
 
 #[no_mangle]
-pub unsafe fn parse_config(
-    mut argc: libc::c_int,
-    mut argv: *mut *mut libc::c_char,
-) -> config {
+pub unsafe fn parse_config(mut argc: libc::c_int, mut argv: *mut *mut libc::c_char) -> config {
     let mut mode: execmode = EXECMODE_VERIFY;
     let mut verbose: bool = 0 as libc::c_int != 0;
     let mut sortconf: sortconfig = sortconfig_create(
@@ -167,10 +164,7 @@ pub unsafe fn parse_config(
         init
     };
 }
-unsafe fn sortconfig_create(
-    mut mode: sortmode,
-    mut sortfunc: *mut libc::c_char,
-) -> sortconfig {
+unsafe fn sortconfig_create(mut mode: sortmode, mut sortfunc: *mut libc::c_char) -> sortconfig {
     match mode as libc::c_uint {
         0 => {
             return {
@@ -464,10 +458,7 @@ unsafe fn verifyproto(
     }
     return 0 as libc::c_int != 0;
 }
-unsafe fn proto_defisvalid(
-    mut proto: *mut ast_function,
-    mut def: *mut ast_function,
-) -> bool {
+unsafe fn proto_defisvalid(mut proto: *mut ast_function, mut def: *mut ast_function) -> bool {
     let mut proto_abs: *mut ast_block = ast_function_abstract(proto);
     let mut def_abs: *mut ast_block = ast_function_abstract(def);
     let mut abs_match: bool = strcmp(

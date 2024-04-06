@@ -83,10 +83,7 @@ unsafe fn math_expr_fromint(mut i: libc::c_int) -> *mut MathExpr {
     }
     return math_expr_atom_create(math_atom_nat_create(i as libc::c_uint));
 }
-unsafe fn math_expr_fromvartally(
-    mut id: *mut libc::c_char,
-    mut num: libc::c_int,
-) -> *mut MathExpr {
+unsafe fn math_expr_fromvartally(mut id: *mut libc::c_char, mut num: libc::c_int) -> *mut MathExpr {
     if !(num != 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
@@ -124,10 +121,7 @@ pub unsafe fn math_expr_atom_create(mut a: *mut MathAtom) -> *mut MathExpr {
     return e;
 }
 #[no_mangle]
-pub unsafe fn math_expr_sum_create(
-    mut e1: *mut MathExpr,
-    mut e2: *mut MathExpr,
-) -> *mut MathExpr {
+pub unsafe fn math_expr_sum_create(mut e1: *mut MathExpr, mut e2: *mut MathExpr) -> *mut MathExpr {
     let mut e: *mut MathExpr = malloc(::core::mem::size_of::<MathExpr>()) as *mut MathExpr;
     (*e).type_0 = EXPR_SUM;
     (*e).c2rust_unnamed.sum.e1 = e1;
@@ -246,10 +240,7 @@ unsafe fn math_expr_neg_str(mut e: *mut MathExpr) -> *mut libc::c_char {
     free(orig as *mut libc::c_void);
     return strbuilder_build(b);
 }
-unsafe fn math_expr_nullablesum(
-    mut e1: *mut MathExpr,
-    mut e2: *mut MathExpr,
-) -> *mut MathExpr {
+unsafe fn math_expr_nullablesum(mut e1: *mut MathExpr, mut e2: *mut MathExpr) -> *mut MathExpr {
     if e1.is_null() {
         return if !e2.is_null() {
             e2

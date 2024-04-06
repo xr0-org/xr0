@@ -61,10 +61,7 @@ pub struct object_result {
     pub err: *mut error,
 }
 #[no_mangle]
-pub unsafe fn object_value_create(
-    mut offset: *mut AstExpr,
-    mut v: *mut Value,
-) -> *mut Object {
+pub unsafe fn object_value_create(mut offset: *mut AstExpr, mut v: *mut Value) -> *mut Object {
     let mut obj: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
     if obj.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -82,10 +79,7 @@ pub unsafe fn object_value_create(
     return obj;
 }
 #[no_mangle]
-pub unsafe fn object_range_create(
-    mut offset: *mut AstExpr,
-    mut r: *mut Range,
-) -> *mut Object {
+pub unsafe fn object_range_create(mut offset: *mut AstExpr, mut r: *mut Range) -> *mut Object {
     if r.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"object_range_create\0"))
@@ -173,10 +167,7 @@ pub unsafe fn object_copy(mut old: *mut Object) -> *mut Object {
     return new;
 }
 #[no_mangle]
-pub unsafe fn object_abstractcopy(
-    mut old: *mut Object,
-    mut s: *mut State,
-) -> *mut Object {
+pub unsafe fn object_abstractcopy(mut old: *mut Object, mut s: *mut State) -> *mut Object {
     match (*old).type_0 as libc::c_uint {
         1 => return object_copy(old),
         0 => {
@@ -700,10 +691,7 @@ pub unsafe fn object_result_hasvalue(mut res: *mut object_result) -> bool {
     return !((*res).val).is_null();
 }
 #[no_mangle]
-pub unsafe fn range_create(
-    mut size: *mut AstExpr,
-    mut loc: *mut Location,
-) -> *mut Range {
+pub unsafe fn range_create(mut size: *mut AstExpr, mut loc: *mut Location) -> *mut Range {
     let mut r: *mut Range = malloc(::core::mem::size_of::<Range>()) as *mut Range;
     (*r).size = size;
     (*r).loc = loc;
@@ -860,10 +848,7 @@ pub unsafe fn object_arr_insert(
     return index;
 }
 #[no_mangle]
-pub unsafe fn object_arr_append(
-    mut arr: *mut object_arr,
-    mut obj: *mut Object,
-) -> libc::c_int {
+pub unsafe fn object_arr_append(mut arr: *mut object_arr, mut obj: *mut Object) -> libc::c_int {
     return object_arr_insert(arr, (*arr).n, obj);
 }
 #[no_mangle]

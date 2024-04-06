@@ -241,10 +241,7 @@ pub unsafe fn location_create_automatic(
 }
 
 #[no_mangle]
-pub unsafe fn location_transfigure(
-    mut loc: *mut Location,
-    mut compare: *mut State,
-) -> *mut Value {
+pub unsafe fn location_transfigure(mut loc: *mut Location, mut compare: *mut State) -> *mut Value {
     match (*loc).type_0 as libc::c_uint {
         3 | 2 => return state_clump(compare),
         4 => return state_alloc(compare),
@@ -389,10 +386,7 @@ pub unsafe fn location_with_offset(
 }
 
 #[no_mangle]
-pub unsafe fn location_tostatic(
-    mut loc: *mut Location,
-    mut sm: *mut static_memory,
-) -> bool {
+pub unsafe fn location_tostatic(mut loc: *mut Location, mut sm: *mut static_memory) -> bool {
     let mut type_equal: bool =
         (*loc).type_0 as libc::c_uint == LOCATION_STATIC as libc::c_int as libc::c_uint;
     let mut b: *mut Block = static_memory_getblock(sm, (*loc).Block);
@@ -540,10 +534,7 @@ pub unsafe fn location_getblock(
     panic!("Reached end of non-void function without returning");
 }
 
-unsafe fn location_auto_getblock(
-    mut loc: *mut Location,
-    mut s: *mut Stack,
-) -> block_res {
+unsafe fn location_auto_getblock(mut loc: *mut Location, mut s: *mut Stack) -> block_res {
     let mut f: *mut Stack = stack_getframe(s, (*loc).u.frame);
     if f.is_null() {
         return {
@@ -567,10 +558,7 @@ unsafe fn location_auto_getblock(
 }
 
 #[no_mangle]
-pub unsafe fn location_getstackblock(
-    mut loc: *mut Location,
-    mut s: *mut Stack,
-) -> *mut Block {
+pub unsafe fn location_getstackblock(mut loc: *mut Location, mut s: *mut Stack) -> *mut Block {
     if !((*loc).type_0 as libc::c_uint == LOCATION_AUTOMATIC as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
         != 0
@@ -590,10 +578,7 @@ pub unsafe fn location_getstackblock(
 }
 
 #[no_mangle]
-pub unsafe fn location_dealloc(
-    mut loc: *mut Location,
-    mut Heap: *mut Heap,
-) -> *mut error {
+pub unsafe fn location_dealloc(mut loc: *mut Location, mut Heap: *mut Heap) -> *mut error {
     if (*loc).type_0 as libc::c_uint != LOCATION_DYNAMIC as libc::c_int as libc::c_uint {
         return error_create(
             b"not Heap Location\0" as *const u8 as *const libc::c_char as *mut libc::c_char,

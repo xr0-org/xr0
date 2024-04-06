@@ -402,10 +402,7 @@ pub unsafe fn block_arr_nblocks(mut arr: *mut block_arr) -> libc::c_int {
 }
 
 #[no_mangle]
-pub unsafe fn block_arr_append(
-    mut arr: *mut block_arr,
-    mut b: *mut Block,
-) -> libc::c_int {
+pub unsafe fn block_arr_append(mut arr: *mut block_arr, mut b: *mut Block) -> libc::c_int {
     (*arr).n += 1;
     (*arr).Block = realloc(
         (*arr).Block as *mut libc::c_void,

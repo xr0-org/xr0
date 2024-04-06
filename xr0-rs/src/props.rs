@@ -51,10 +51,7 @@ pub unsafe fn props_destroy(mut p: *mut Props) {
 }
 
 #[no_mangle]
-pub unsafe fn props_str(
-    mut p: *mut Props,
-    mut indent: *mut libc::c_char,
-) -> *mut libc::c_char {
+pub unsafe fn props_str(mut p: *mut Props, mut indent: *mut libc::c_char) -> *mut libc::c_char {
     if (*p).n == 0 as libc::c_int {
         return dynamic_str(b"\0" as *const u8 as *const libc::c_char);
     }
