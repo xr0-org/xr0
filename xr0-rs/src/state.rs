@@ -23,6 +23,43 @@ use crate::{
     Location, Object, Props, Stack, StrBuilder, Value, Variable,
 };
 
+use crate::ast::{
+    ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
+    ast_type_vconst,
+};
+use crate::ext::externals_types_str;
+use crate::object::{object_as_value, object_assign};
+use crate::props::{props_copy, props_create, props_destroy, props_str};
+use crate::util::{
+    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_printf,
+};
+use crate::value::{
+    value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
+    value_ptr_create, value_sync_create,
+};
+use block::{block_install, block_observe, block_range_alloc, block_range_aredeallocands};
+use clump::{clump_copy, clump_create, clump_destroy, clump_newblock, clump_str};
+use heap::{
+    heap_copy, heap_create, heap_destroy, heap_newblock, heap_referenced, heap_str, heap_undeclare,
+    vconst_copy, vconst_create, vconst_declare, vconst_eval, vconst_get, vconst_str,
+    vconst_undeclare,
+};
+use location::{
+    block_res, location_create_dereferencable, location_create_static, location_dealloc,
+    location_destroy, location_getblock, location_offset, location_range_dealloc, location_toclump,
+    location_toheap, location_tostack, location_tostatic, location_type, location_with_offset,
+    LOCATION_DEREFERENCABLE, LOCATION_DYNAMIC,
+};
+use r#static::{
+    static_memory_checkpool, static_memory_copy, static_memory_create, static_memory_destroy,
+    static_memory_newblock, static_memory_str, static_memory_stringpool,
+};
+use stack::{
+    stack_copy, stack_copywithname, stack_create, stack_declare, stack_destroy, stack_getresult,
+    stack_getvariable, stack_prev, stack_references, stack_str, stack_undeclare, variable_location,
+    variable_type,
+};
+
 extern "C" {
     fn __assert_rtn(
         _: *const libc::c_char,
@@ -30,128 +67,6 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
-    fn error_create(s: *mut libc::c_char) -> *mut error;
-    fn ast_expr_identifier_create(_: *mut libc::c_char) -> *mut AstExpr;
-    fn ast_expr_constant_create(_: libc::c_int) -> *mut AstExpr;
-    fn ast_expr_as_literal(_: *mut AstExpr) -> *mut libc::c_char;
-    fn ast_expr_equal(e1: *mut AstExpr, e2: *mut AstExpr) -> bool;
-    fn ast_type_vconst(
-        _: *mut ast_type,
-        s: *mut State,
-        comment: *mut libc::c_char,
-        persist: bool,
-    ) -> *mut Value;
-    fn block_install(_: *mut Block, _: *mut Object);
-    fn block_observe(
-        _: *mut Block,
-        offset: *mut AstExpr,
-        _: *mut State,
-        constructive: bool,
-    ) -> *mut Object;
-    fn block_range_alloc(
-        b: *mut Block,
-        lw: *mut AstExpr,
-        up: *mut AstExpr,
-        Heap: *mut Heap,
-    ) -> *mut error;
-    fn block_range_aredeallocands(
-        _: *mut Block,
-        lw: *mut AstExpr,
-        up: *mut AstExpr,
-        _: *mut State,
-    ) -> bool;
-    fn clump_create() -> *mut Clump;
-    fn clump_destroy(_: *mut Clump);
-    fn clump_str(_: *mut Clump, indent: *mut libc::c_char) -> *mut libc::c_char;
-    fn clump_copy(_: *mut Clump) -> *mut Clump;
-    fn clump_newblock(_: *mut Clump) -> libc::c_int;
-    fn externals_types_str(_: *mut Externals, indent: *mut libc::c_char) -> *mut libc::c_char;
-    fn heap_create() -> *mut Heap;
-    fn heap_destroy(_: *mut Heap);
-    fn heap_copy(_: *mut Heap) -> *mut Heap;
-    fn heap_str(_: *mut Heap, indent: *mut libc::c_char) -> *mut libc::c_char;
-    fn heap_newblock(h: *mut Heap) -> *mut Location;
-    fn heap_referenced(h: *mut Heap, _: *mut State) -> bool;
-    fn heap_undeclare(_: *mut Heap, _: *mut State);
-    fn vconst_create() -> *mut vconst;
-    fn vconst_copy(_: *mut vconst) -> *mut vconst;
-    fn vconst_str(_: *mut vconst, indent: *mut libc::c_char) -> *mut libc::c_char;
-    fn vconst_declare(
-        _: *mut vconst,
-        _: *mut Value,
-        comment: *mut libc::c_char,
-        persist: bool,
-    ) -> *mut libc::c_char;
-    fn vconst_get(_: *mut vconst, id: *mut libc::c_char) -> *mut Value;
-    fn vconst_undeclare(_: *mut vconst);
-    fn vconst_eval(_: *mut vconst, _: *mut AstExpr) -> bool;
-    fn static_memory_create() -> *mut static_memory;
-    fn static_memory_destroy(_: *mut static_memory);
-    fn static_memory_str(_: *mut static_memory, indent: *mut libc::c_char) -> *mut libc::c_char;
-    fn static_memory_copy(_: *mut static_memory) -> *mut static_memory;
-    fn static_memory_newblock(_: *mut static_memory) -> libc::c_int;
-    fn static_memory_stringpool(sm: *mut static_memory, lit: *mut libc::c_char, _: *mut Location);
-    fn static_memory_checkpool(_: *mut static_memory, _: *mut libc::c_char) -> *mut Location;
-    fn location_create_static(Block: libc::c_int, offset: *mut AstExpr) -> *mut Location;
-    fn location_create_dereferencable(Block: libc::c_int, offset: *mut AstExpr) -> *mut Location;
-    fn location_destroy(_: *mut Location);
-    fn location_tostatic(_: *mut Location, _: *mut static_memory) -> bool;
-    fn location_toheap(_: *mut Location, _: *mut Heap) -> bool;
-    fn location_tostack(_: *mut Location, _: *mut Stack) -> bool;
-    fn location_toclump(_: *mut Location, _: *mut Clump) -> bool;
-    fn location_type(loc: *mut Location) -> location_type;
-    fn location_offset(loc: *mut Location) -> *mut AstExpr;
-    fn location_with_offset(loc: *mut Location, offset: *mut AstExpr) -> *mut Location;
-    fn location_getblock(
-        _: *mut Location,
-        _: *mut static_memory,
-        _: *mut vconst,
-        _: *mut Stack,
-        _: *mut Heap,
-        _: *mut Clump,
-    ) -> block_res;
-    fn location_dealloc(_: *mut Location, _: *mut Heap) -> *mut error;
-    fn location_range_dealloc(
-        loc: *mut Location,
-        lw: *mut AstExpr,
-        up: *mut AstExpr,
-        _: *mut State,
-    ) -> *mut error;
-    fn object_as_value(_: *mut Object) -> *mut Value;
-    fn object_assign(_: *mut Object, _: *mut Value) -> *mut error;
-    fn props_create() -> *mut Props;
-    fn props_copy(_: *mut Props) -> *mut Props;
-    fn props_destroy(_: *mut Props);
-    fn props_str(_: *mut Props, indent: *mut libc::c_char) -> *mut libc::c_char;
-    fn stack_create(
-        name: *mut libc::c_char,
-        prev: *mut Stack,
-        ret_type: *mut ast_type,
-    ) -> *mut Stack;
-    fn stack_destroy(_: *mut Stack);
-    fn stack_copy(_: *mut Stack) -> *mut Stack;
-    fn stack_copywithname(_: *mut Stack, new_name: *mut libc::c_char) -> *mut Stack;
-    fn stack_str(_: *mut Stack, _: *mut State) -> *mut libc::c_char;
-    fn stack_prev(_: *mut Stack) -> *mut Stack;
-    fn stack_declare(_: *mut Stack, var: *mut ast_variable, isparam: bool);
-    fn stack_undeclare(Stack: *mut Stack, State: *mut State);
-    fn stack_getresult(_: *mut Stack) -> *mut Variable;
-    fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Variable;
-    fn stack_references(s: *mut Stack, loc: *mut Location, State: *mut State) -> bool;
-    fn variable_location(_: *mut Variable) -> *mut Location;
-    fn variable_type(_: *mut Variable) -> *mut ast_type;
-    fn value_ptr_create(loc: *mut Location) -> *mut Value;
-    fn value_literal_create(_: *mut libc::c_char) -> *mut Value;
-    fn value_sync_create(_: *mut AstExpr) -> *mut Value;
-    fn value_isstruct(v: *mut Value) -> bool;
-    fn value_islocation(_: *mut Value) -> bool;
-    fn value_as_location(_: *mut Value) -> *mut Location;
-    fn value_issync(v: *mut Value) -> bool;
 }
 
 #[derive(Copy, Clone)]
@@ -165,18 +80,7 @@ pub struct State {
     pub Heap: *mut Heap,
     pub Props: *mut Props,
 }
-pub type location_type = libc::c_uint;
-pub const LOCATION_DYNAMIC: location_type = 4;
-pub const LOCATION_AUTOMATIC: location_type = 3;
-pub const LOCATION_DEREFERENCABLE: location_type = 2;
-pub const LOCATION_VCONST: location_type = 1;
-pub const LOCATION_STATIC: location_type = 0;
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct block_res {
-    pub b: *mut Block,
-    pub err: *mut error,
-}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct object_res {
