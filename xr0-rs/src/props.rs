@@ -8,12 +8,11 @@
     unused_mut
 )]
 
+use libc::{calloc, free, realloc};
+
 use crate::{AstExpr, StrBuilder};
 
 extern "C" {
-    fn calloc(_: libc::c_ulong, _: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
-    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -38,10 +37,7 @@ pub struct Props {
 }
 #[no_mangle]
 pub unsafe extern "C" fn props_create() -> *mut Props {
-    return calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<Props>() as libc::c_ulong,
-    ) as *mut Props;
+    return calloc(1, ::core::mem::size_of::<Props>()) as *mut Props;
 }
 #[no_mangle]
 pub unsafe extern "C" fn props_copy(mut old: *mut Props) -> *mut Props {
@@ -118,8 +114,7 @@ pub unsafe extern "C" fn props_install(mut p: *mut Props, mut e: *mut AstExpr) {
     (*p).n += 1;
     (*p).prop = realloc(
         (*p).prop as *mut libc::c_void,
-        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
-            .wrapping_mul((*p).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut AstExpr>()).wrapping_mul((*p).n as usize),
     ) as *mut *mut AstExpr;
     let ref mut fresh0 = *((*p).prop).offset(((*p).n - 1 as libc::c_int) as isize);
     *fresh0 = e;

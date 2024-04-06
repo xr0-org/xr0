@@ -47,6 +47,8 @@ use libc::{
 
 extern "C" {
     static mut __stderrp: *mut libc::FILE;
+    static mut yyin: *mut libc::FILE;
+    static mut VERBOSE_MODE: libc::c_int;
 
     fn __assert_rtn(
         _: *const libc::c_char,
@@ -91,6 +93,7 @@ extern "C" {
     fn externals_getfunc(_: *mut Externals, id: *mut libc::c_char) -> *mut ast_function;
     fn yyparse() -> libc::c_int;
 }
+
 pub type __uint32_t = libc::c_uint;
 pub type __int64_t = libc::c_longlong;
 
@@ -536,9 +539,6 @@ unsafe extern "C" fn proto_defisvalid(
     return 0 as libc::c_int != 0;
 }
 unsafe fn main_0(mut argc: libc::c_int, mut argv: *mut *mut libc::c_char) -> libc::c_int {
-    extern "C" {
-        static mut VERBOSE_MODE: libc::c_int;
-    }
     let mut c: config = parse_config(argc, argv);
     VERBOSE_MODE = c.verbose as libc::c_int;
     match c.mode as libc::c_uint {
@@ -559,9 +559,6 @@ unsafe fn main_0(mut argc: libc::c_int, mut argv: *mut *mut libc::c_char) -> lib
     return 0;
 }
 unsafe extern "C" fn verify(mut c: *mut config) -> libc::c_int {
-    extern "C" {
-        static mut yyin: *mut libc::FILE;
-    }
     yyin = preprocess((*c).infile, (*c).includedirs);
     lex_begin();
     yyparse();

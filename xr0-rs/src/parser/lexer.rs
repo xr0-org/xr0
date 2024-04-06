@@ -12,8 +12,8 @@ use std::ptr::addr_of_mut;
 
 // NOTE: fgetc may be slow.
 use libc::{
-    clearerr, exit, ferror, fgetc, fileno, fprintf, fread, free, fwrite, isatty, malloc, putchar,
-    realloc, strlen, FILE,
+    clearerr, exit, ferror, fgetc, fileno, fprintf, fread, free, fwrite, isatty, malloc, memset,
+    putchar, realloc, strlen, FILE,
 };
 
 use crate::util::{strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc};
@@ -36,7 +36,6 @@ extern "C" {
     static mut __stdinp: *mut FILE;
     static mut __stdoutp: *mut FILE;
     static mut __stderrp: *mut FILE;
-    fn memset(_: *mut libc::c_void, _: libc::c_int, _: libc::c_ulong) -> *mut libc::c_void;
     fn __error() -> *mut libc::c_int;
 }
 pub type __uint32_t = libc::c_uint;
@@ -3711,8 +3710,7 @@ unsafe extern "C" fn yyensure_buffer_stack() {
         memset(
             yy_buffer_stack as *mut libc::c_void,
             0 as libc::c_int,
-            num_to_alloc
-                .wrapping_mul(::core::mem::size_of::<*mut yy_buffer_state>() as libc::c_ulong),
+            (num_to_alloc as usize).wrapping_mul(::core::mem::size_of::<*mut yy_buffer_state>()),
         );
         yy_buffer_stack_max = num_to_alloc;
         yy_buffer_stack_top = 0 as libc::c_int as size_t;
@@ -3735,7 +3733,7 @@ unsafe extern "C" fn yyensure_buffer_stack() {
         memset(
             yy_buffer_stack.offset(yy_buffer_stack_max as isize) as *mut libc::c_void,
             0 as libc::c_int,
-            grow_size.wrapping_mul(::core::mem::size_of::<*mut yy_buffer_state>() as libc::c_ulong),
+            (grow_size as usize).wrapping_mul(::core::mem::size_of::<*mut yy_buffer_state>()),
         );
         yy_buffer_stack_max = num_to_alloc;
     }
