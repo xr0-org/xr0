@@ -8,13 +8,11 @@
     unused_mut
 )]
 
+use libc::{calloc, free, malloc, realloc};
+
 use crate::{ast_type, AstExpr, Externals, Location, State, StrBuilder, Value};
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn calloc(_: libc::c_ulong, _: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
-    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -102,8 +100,7 @@ pub unsafe extern "C" fn object_value_create(
     mut offset: *mut AstExpr,
     mut v: *mut Value,
 ) -> *mut Object {
-    let mut obj: *mut Object =
-        malloc(::core::mem::size_of::<Object>() as libc::c_ulong) as *mut Object;
+    let mut obj: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
     if obj.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"object_value_create\0"))
@@ -134,8 +131,7 @@ pub unsafe extern "C" fn object_range_create(
         );
     } else {
     };
-    let mut obj: *mut Object =
-        malloc(::core::mem::size_of::<Object>() as libc::c_ulong) as *mut Object;
+    let mut obj: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
     if obj.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"object_range_create\0"))
@@ -182,8 +178,7 @@ pub unsafe extern "C" fn object_destroy(mut obj: *mut Object) {
 }
 #[no_mangle]
 pub unsafe extern "C" fn object_copy(mut old: *mut Object) -> *mut Object {
-    let mut new: *mut Object =
-        malloc(::core::mem::size_of::<Object>() as libc::c_ulong) as *mut Object;
+    let mut new: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
     (*new).offset = ast_expr_copy((*old).offset);
     (*new).type_0 = (*old).type_0;
     match (*old).type_0 as libc::c_uint {
@@ -657,7 +652,7 @@ pub unsafe extern "C" fn object_result_error_create(mut err: *mut error) -> *mut
     } else {
     };
     let mut r: *mut object_result =
-        malloc(::core::mem::size_of::<object_result>() as libc::c_ulong) as *mut object_result;
+        malloc(::core::mem::size_of::<object_result>()) as *mut object_result;
     (*r).val = 0 as *mut Object;
     (*r).err = err;
     return r;
@@ -665,7 +660,7 @@ pub unsafe extern "C" fn object_result_error_create(mut err: *mut error) -> *mut
 #[no_mangle]
 pub unsafe extern "C" fn object_result_value_create(mut val: *mut Object) -> *mut object_result {
     let mut r: *mut object_result =
-        malloc(::core::mem::size_of::<object_result>() as libc::c_ulong) as *mut object_result;
+        malloc(::core::mem::size_of::<object_result>()) as *mut object_result;
     (*r).val = val;
     (*r).err = 0 as *mut error;
     return r;
@@ -744,7 +739,7 @@ pub unsafe extern "C" fn range_create(
     mut size: *mut AstExpr,
     mut loc: *mut Location,
 ) -> *mut Range {
-    let mut r: *mut Range = malloc(::core::mem::size_of::<Range>() as libc::c_ulong) as *mut Range;
+    let mut r: *mut Range = malloc(::core::mem::size_of::<Range>()) as *mut Range;
     (*r).size = size;
     (*r).loc = loc;
     return r;
@@ -796,10 +791,8 @@ pub unsafe extern "C" fn range_references(
 }
 #[no_mangle]
 pub unsafe extern "C" fn object_arr_create() -> *mut object_arr {
-    let mut arr: *mut object_arr = calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<object_arr>() as libc::c_ulong,
-    ) as *mut object_arr;
+    let mut arr: *mut object_arr =
+        calloc(1, ::core::mem::size_of::<object_arr>()) as *mut object_arr;
     if arr.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"object_arr_create\0"))
@@ -879,8 +872,7 @@ pub unsafe extern "C" fn object_arr_insert(
     (*arr).n += 1;
     (*arr).Object = realloc(
         (*arr).Object as *mut libc::c_void,
-        (::core::mem::size_of::<*mut Object>() as libc::c_ulong)
-            .wrapping_mul((*arr).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut Object>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut Object;
     if ((*arr).Object).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -920,8 +912,7 @@ pub unsafe extern "C" fn object_arr_remove(mut arr: *mut object_arr, mut index: 
     (*arr).n -= 1;
     (*arr).Object = realloc(
         (*arr).Object as *mut libc::c_void,
-        (::core::mem::size_of::<*mut Object>() as libc::c_ulong)
-            .wrapping_mul((*arr).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut Object>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut Object;
     if !(!((*arr).Object).is_null() || (*arr).n == 0) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(

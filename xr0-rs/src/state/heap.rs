@@ -9,12 +9,11 @@
     unused_variables
 )]
 
+use libc::{free, malloc, realloc};
+
 use crate::{block_arr, AstExpr, Block, Location, State, StrBuilder, Value};
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
-    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -81,7 +80,7 @@ pub struct vconst {
 }
 #[no_mangle]
 pub unsafe extern "C" fn heap_create() -> *mut Heap {
-    let mut h: *mut Heap = malloc(::core::mem::size_of::<Heap>() as libc::c_ulong) as *mut Heap;
+    let mut h: *mut Heap = malloc(::core::mem::size_of::<Heap>()) as *mut Heap;
     if h.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"heap_create\0")).as_ptr(),
@@ -103,12 +102,11 @@ pub unsafe extern "C" fn heap_destroy(mut h: *mut Heap) {
 }
 #[no_mangle]
 pub unsafe extern "C" fn heap_copy(mut h: *mut Heap) -> *mut Heap {
-    let mut copy: *mut Heap = malloc(::core::mem::size_of::<Heap>() as libc::c_ulong) as *mut Heap;
+    let mut copy: *mut Heap = malloc(::core::mem::size_of::<Heap>()) as *mut Heap;
     (*copy).blocks = block_arr_copy((*h).blocks);
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut freed_copy: *mut bool =
-        malloc((::core::mem::size_of::<bool>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong))
-            as *mut bool;
+        malloc((::core::mem::size_of::<bool>()).wrapping_mul(n as usize)) as *mut bool;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         *freed_copy.offset(i as isize) = *((*h).freed).offset(i as isize);
@@ -187,7 +185,7 @@ pub unsafe extern "C" fn heap_newblock(mut h: *mut Heap) -> *mut Location {
     };
     (*h).freed = realloc(
         (*h).freed as *mut libc::c_void,
-        (::core::mem::size_of::<bool>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
+        (::core::mem::size_of::<bool>()).wrapping_mul(n as usize),
     ) as *mut bool;
     *((*h).freed).offset(address as isize) = 0 as libc::c_int != 0;
     return location_create_dynamic(address, ast_expr_constant_create(0 as libc::c_int));
@@ -262,8 +260,7 @@ unsafe extern "C" fn block_referenced(mut s: *mut State, mut addr: libc::c_int) 
 }
 #[no_mangle]
 pub unsafe extern "C" fn vconst_create() -> *mut vconst {
-    let mut v: *mut vconst =
-        malloc(::core::mem::size_of::<vconst>() as libc::c_ulong) as *mut vconst;
+    let mut v: *mut vconst = malloc(::core::mem::size_of::<vconst>()) as *mut vconst;
     (*v).varmap = map_create();
     (*v).comment = map_create();
     (*v).persist = map_create();

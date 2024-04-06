@@ -11,7 +11,10 @@
 use std::ptr::addr_of_mut;
 
 // NOTE: fgetc may be slow.
-use libc::{clearerr, exit, ferror, fgetc, fileno, fprintf, fread, fwrite, putchar, FILE};
+use libc::{
+    clearerr, exit, ferror, fgetc, fileno, fprintf, fread, free, fwrite, isatty, malloc, putchar,
+    realloc, FILE,
+};
 
 use crate::util::{strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc};
 use crate::StrBuilder;
@@ -36,10 +39,6 @@ extern "C" {
     fn memset(_: *mut libc::c_void, _: libc::c_int, _: libc::c_ulong) -> *mut libc::c_void;
     fn strlen(_: *const libc::c_char) -> libc::c_ulong;
     fn __error() -> *mut libc::c_int;
-    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn isatty(_: libc::c_int) -> libc::c_int;
 }
 pub type __uint32_t = libc::c_uint;
 pub type __int64_t = libc::c_longlong;
@@ -420,7 +419,7 @@ pub unsafe extern "C" fn lexememarker_create(
     mut flags: linemarker_flag,
 ) -> *mut lexememarker {
     let mut loc: *mut lexememarker =
-        malloc(::core::mem::size_of::<lexememarker>() as libc::c_ulong) as *mut lexememarker;
+        malloc(::core::mem::size_of::<lexememarker>()) as *mut lexememarker;
     (*loc).linenum = linenum;
     (*loc).column = column;
     (*loc).filename = filename;
@@ -3902,7 +3901,7 @@ pub unsafe extern "C" fn yylex_destroy() -> libc::c_int {
 
 #[no_mangle]
 pub unsafe extern "C" fn yyalloc(mut size: yy_size_t) -> *mut libc::c_void {
-    return malloc(size);
+    return malloc(size as usize);
 }
 
 #[no_mangle]
@@ -3910,7 +3909,7 @@ pub unsafe extern "C" fn yyrealloc(
     mut ptr: *mut libc::c_void,
     mut size: yy_size_t,
 ) -> *mut libc::c_void {
-    return realloc(ptr, size);
+    return realloc(ptr, size as usize);
 }
 
 #[no_mangle]

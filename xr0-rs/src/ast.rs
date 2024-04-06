@@ -9,7 +9,7 @@
     unused_variables
 )]
 
-use libc::exit;
+use libc::{calloc, exit, fprintf, free, malloc, realloc};
 
 use crate::{
     Externals, Location, MathAtom, MathExpr, Object, Props, State, StrBuilder, Value, Variable,
@@ -17,11 +17,6 @@ use crate::{
 
 extern "C" {
     static mut __stderrp: *mut libc::FILE;
-    fn fprintf(_: *mut libc::FILE, _: *const libc::c_char, _: ...) -> libc::c_int;
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn calloc(_: libc::c_ulong, _: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
-    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -1821,10 +1816,9 @@ unsafe extern "C" fn call_to_computed_value(
     let mut root: *mut libc::c_char = ast_function_name(f);
     let mut nparams: libc::c_int = ast_function_nparams(f);
     let mut uncomputed_param: *mut *mut ast_variable = ast_function_params(f);
-    let mut computed_param: *mut *mut AstExpr = malloc(
-        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
-            .wrapping_mul(nparams as libc::c_ulong),
-    ) as *mut *mut AstExpr;
+    let mut computed_param: *mut *mut AstExpr =
+        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(nparams as usize))
+            as *mut *mut AstExpr;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nparams {
         let mut param: *mut AstExpr = ast_expr_identifier_create(dynamic_str(ast_variable_name(
@@ -2014,8 +2008,7 @@ pub unsafe extern "C" fn result_arr_append(mut arr: *mut result_arr, mut res: *m
     (*arr).n += 1;
     (*arr).res = realloc(
         (*arr).res as *mut libc::c_void,
-        (::core::mem::size_of::<*mut result>() as libc::c_ulong)
-            .wrapping_mul((*arr).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut result>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut result;
     let ref mut fresh2 = *((*arr).res).offset(((*arr).n - 1 as libc::c_int) as isize);
     *fresh2 = res;
@@ -2028,13 +2021,12 @@ unsafe extern "C" fn isdereferencable_absexec(
     props_install(p, expr);
     return result_value_create(0 as *mut Value);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn result_arr_create() -> *mut result_arr {
-    return calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<result_arr>() as libc::c_ulong,
-    ) as *mut result_arr;
+    return calloc(1, ::core::mem::size_of::<result_arr>()) as *mut result_arr;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn prepare_arguments(
     mut nargs: libc::c_int,
@@ -2323,7 +2315,7 @@ pub unsafe extern "C" fn ast_expr_as_identifier(mut expr: *mut AstExpr) -> *mut 
     return (*expr).u.string;
 }
 unsafe extern "C" fn ast_expr_create() -> *mut AstExpr {
-    return malloc(::core::mem::size_of::<AstExpr>() as libc::c_ulong) as *mut AstExpr;
+    return malloc(::core::mem::size_of::<AstExpr>()) as *mut AstExpr;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_expr_identifier_create(mut s: *mut libc::c_char) -> *mut AstExpr {
@@ -2396,10 +2388,9 @@ unsafe extern "C" fn call_pf_reduce(mut e: *mut AstExpr, mut s: *mut State) -> *
     let mut root: *mut libc::c_char = ast_expr_as_identifier(ast_expr_call_root(e));
     let mut nargs: libc::c_int = ast_expr_call_nargs(e);
     let mut unreduced_arg: *mut *mut AstExpr = ast_expr_call_args(e);
-    let mut reduced_arg: *mut *mut AstExpr = malloc(
-        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
-            .wrapping_mul(nargs as libc::c_ulong),
-    ) as *mut *mut AstExpr;
+    let mut reduced_arg: *mut *mut AstExpr =
+        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(nargs as usize))
+            as *mut *mut AstExpr;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nargs {
         let mut res: *mut result = ast_expr_pf_reduce(*unreduced_arg.offset(i as isize), s);
@@ -2725,10 +2716,9 @@ pub unsafe extern "C" fn ast_expr_incdec_root(mut expr: *mut AstExpr) -> *mut As
     return (*expr).root;
 }
 unsafe extern "C" fn ast_expr_copy_call(mut expr: *mut AstExpr) -> *mut AstExpr {
-    let mut arg: *mut *mut AstExpr = malloc(
-        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
-            .wrapping_mul((*expr).u.call.n as libc::c_ulong),
-    ) as *mut *mut AstExpr;
+    let mut arg: *mut *mut AstExpr =
+        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul((*expr).u.call.n as usize))
+            as *mut *mut AstExpr;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*expr).u.call.n {
         let ref mut fresh4 = *arg.offset(i as isize);
@@ -3996,8 +3986,7 @@ unsafe extern "C" fn call_splits(mut expr: *mut AstExpr, mut State: *mut State) 
             n += 1;
             cond = realloc(
                 cond as *mut libc::c_void,
-                (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
-                    .wrapping_mul(n as libc::c_ulong),
+                (::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(n as usize),
             ) as *mut *mut AstExpr;
             let ref mut fresh5 = *cond.offset((n - 1 as libc::c_int) as isize);
             *fresh5 = *(splits.cond).offset(j as isize);
@@ -4020,9 +4009,9 @@ unsafe extern "C" fn binary_splits(mut e: *mut AstExpr, mut s: *mut State) -> as
     let mut s1: ast_stmt_splits = ast_expr_splits(ast_expr_binary_e1(e), s);
     let mut s2: ast_stmt_splits = ast_expr_splits(ast_expr_binary_e2(e), s);
     let mut n: libc::c_int = s1.n + s2.n;
-    let mut cond: *mut *mut AstExpr = malloc(
-        (::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong).wrapping_mul(n as libc::c_ulong),
-    ) as *mut *mut AstExpr;
+    let mut cond: *mut *mut AstExpr =
+        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(n as usize))
+            as *mut *mut AstExpr;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < s1.n {
         let ref mut fresh6 = *cond.offset(i as isize);
@@ -4118,7 +4107,7 @@ unsafe extern "C" fn calculate_indegrees(mut g: *mut map) -> *mut map {
 }
 unsafe extern "C" fn dynamic_int(mut i: libc::c_int) -> *mut libc::c_int {
     let mut val: *mut libc::c_int =
-        malloc(::core::mem::size_of::<libc::c_int>() as libc::c_ulong) as *mut libc::c_int;
+        malloc(::core::mem::size_of::<libc::c_int>()) as *mut libc::c_int;
     *val = i;
     return val;
 }
@@ -4187,8 +4176,7 @@ pub unsafe extern "C" fn ast_block_create(
         );
     } else {
     };
-    let mut b: *mut ast_block =
-        malloc(::core::mem::size_of::<ast_block>() as libc::c_ulong) as *mut ast_block;
+    let mut b: *mut ast_block = malloc(::core::mem::size_of::<ast_block>()) as *mut ast_block;
     (*b).decl = decl;
     (*b).ndecl = ndecl;
     (*b).stmt = stmt;
@@ -4246,10 +4234,9 @@ unsafe extern "C" fn copy_var_arr(
     if len == 0 as libc::c_int {
         return 0 as *mut *mut ast_variable;
     }
-    let mut new: *mut *mut ast_variable = malloc(
-        (::core::mem::size_of::<*mut ast_variable>() as libc::c_ulong)
-            .wrapping_mul(len as libc::c_ulong),
-    ) as *mut *mut ast_variable;
+    let mut new: *mut *mut ast_variable =
+        malloc((::core::mem::size_of::<*mut ast_variable>()).wrapping_mul(len as usize))
+            as *mut *mut ast_variable;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < len {
         let ref mut fresh8 = *new.offset(i as isize);
@@ -4275,10 +4262,9 @@ unsafe extern "C" fn copy_stmt_arr(
     if len == 0 as libc::c_int {
         return 0 as *mut *mut ast_stmt;
     }
-    let mut new: *mut *mut ast_stmt = malloc(
-        (::core::mem::size_of::<*mut ast_stmt>() as libc::c_ulong)
-            .wrapping_mul(len as libc::c_ulong),
-    ) as *mut *mut ast_stmt;
+    let mut new: *mut *mut ast_stmt =
+        malloc((::core::mem::size_of::<*mut ast_stmt>()).wrapping_mul(len as usize))
+            as *mut *mut ast_stmt;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < len {
         let ref mut fresh9 = *new.offset(i as isize);
@@ -5546,10 +5532,7 @@ unsafe extern "C" fn ast_stmt_expr_sprint(mut stmt: *mut ast_stmt, mut b: *mut S
     free(s as *mut libc::c_void);
 }
 unsafe extern "C" fn ast_stmt_create(mut loc: *mut lexememarker) -> *mut ast_stmt {
-    let mut stmt: *mut ast_stmt = calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<ast_stmt>() as libc::c_ulong,
-    ) as *mut ast_stmt;
+    let mut stmt: *mut ast_stmt = calloc(1, ::core::mem::size_of::<ast_stmt>()) as *mut ast_stmt;
     (*stmt).loc = loc;
     return stmt;
 }
@@ -6131,7 +6114,7 @@ unsafe extern "C" fn stmt_sel_splits(
         };
     }
     let mut cond: *mut *mut AstExpr =
-        malloc(::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong) as *mut *mut AstExpr;
+        malloc(::core::mem::size_of::<*mut AstExpr>()) as *mut *mut AstExpr;
     let ref mut fresh10 = *cond.offset(0 as libc::c_int as isize);
     *fresh10 = e;
     return {
@@ -6269,8 +6252,7 @@ pub unsafe extern "C" fn ast_type_create(
     mut base: ast_type_base,
     mut mod_0: ast_type_modifier,
 ) -> *mut ast_type {
-    let mut t: *mut ast_type =
-        malloc(::core::mem::size_of::<ast_type>() as libc::c_ulong) as *mut ast_type;
+    let mut t: *mut ast_type = malloc(::core::mem::size_of::<ast_type>()) as *mut ast_type;
     if t.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"ast_type_create\0"))
@@ -6810,7 +6792,7 @@ pub unsafe extern "C" fn ast_variable_create(
     mut type_0: *mut ast_type,
 ) -> *mut ast_variable {
     let mut v: *mut ast_variable =
-        malloc(::core::mem::size_of::<ast_variable>() as libc::c_ulong) as *mut ast_variable;
+        malloc(::core::mem::size_of::<ast_variable>()) as *mut ast_variable;
     (*v).name = name;
     (*v).type_0 = type_0;
     return v;
@@ -6850,10 +6832,8 @@ pub unsafe extern "C" fn ast_variables_copy(
         );
     } else {
     };
-    let mut new: *mut *mut ast_variable = calloc(
-        n as libc::c_ulong,
-        ::core::mem::size_of::<*mut Variable>() as libc::c_ulong,
-    ) as *mut *mut ast_variable;
+    let mut new: *mut *mut ast_variable =
+        calloc(n as usize, ::core::mem::size_of::<*mut Variable>()) as *mut *mut ast_variable;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let ref mut fresh12 = *new.offset(i as isize);
@@ -6885,10 +6865,7 @@ pub unsafe extern "C" fn ast_variable_type(mut v: *mut ast_variable) -> *mut ast
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_variable_arr_create() -> *mut ast_variable_arr {
-    return calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<ast_variable_arr>() as libc::c_ulong,
-    ) as *mut ast_variable_arr;
+    return calloc(1, ::core::mem::size_of::<ast_variable_arr>()) as *mut ast_variable_arr;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_variable_arr_append(
@@ -6898,8 +6875,7 @@ pub unsafe extern "C" fn ast_variable_arr_append(
     (*arr).n += 1;
     (*arr).v = realloc(
         (*arr).v as *mut libc::c_void,
-        (::core::mem::size_of::<*mut ast_variable>() as libc::c_ulong)
-            .wrapping_mul((*arr).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut ast_variable>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut ast_variable;
     let ref mut fresh13 = *((*arr).v).offset(((*arr).n - 1 as libc::c_int) as isize);
     *fresh13 = v;
@@ -6946,7 +6922,7 @@ pub unsafe extern "C" fn ast_function_create(
     mut body: *mut ast_block,
 ) -> *mut ast_function {
     let mut f: *mut ast_function =
-        malloc(::core::mem::size_of::<ast_function>() as libc::c_ulong) as *mut ast_function;
+        malloc(::core::mem::size_of::<ast_function>()) as *mut ast_function;
     (*f).isaxiom = isaxiom;
     (*f).ret = ret;
     (*f).name = name;
@@ -7039,10 +7015,9 @@ pub unsafe extern "C" fn ast_function_copy(mut f: *mut ast_function) -> *mut ast
         );
     } else {
     };
-    let mut param: *mut *mut ast_variable = malloc(
-        (::core::mem::size_of::<*mut ast_variable>() as libc::c_ulong)
-            .wrapping_mul((*f).nparam as libc::c_ulong),
-    ) as *mut *mut ast_variable;
+    let mut param: *mut *mut ast_variable =
+        malloc((::core::mem::size_of::<*mut ast_variable>()).wrapping_mul((*f).nparam as usize))
+            as *mut *mut ast_variable;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*f).nparam {
         let ref mut fresh14 = *param.offset(i as isize);
@@ -7730,10 +7705,7 @@ unsafe extern "C" fn body_paths(
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_function_arr_create() -> *mut ast_function_arr {
-    return calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<ast_function_arr>() as libc::c_ulong,
-    ) as *mut ast_function_arr;
+    return calloc(1, ::core::mem::size_of::<ast_function_arr>()) as *mut ast_function_arr;
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_function_arr_copy(
@@ -7764,8 +7736,7 @@ pub unsafe extern "C" fn ast_function_arr_append(
     (*arr).n += 1;
     (*arr).f = realloc(
         (*arr).f as *mut libc::c_void,
-        (::core::mem::size_of::<*mut ast_function>() as libc::c_ulong)
-            .wrapping_mul((*arr).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut ast_function>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut ast_function;
     let ref mut fresh15 = *((*arr).f).offset(((*arr).n - 1 as libc::c_int) as isize);
     *fresh15 = f;
@@ -7794,7 +7765,7 @@ pub unsafe extern "C" fn ast_function_arr_func(
 #[no_mangle]
 pub unsafe extern "C" fn ast_functiondecl_create(mut f: *mut ast_function) -> *mut ast_externdecl {
     let mut decl: *mut ast_externdecl =
-        malloc(::core::mem::size_of::<ast_externdecl>() as libc::c_ulong) as *mut ast_externdecl;
+        malloc(::core::mem::size_of::<ast_externdecl>()) as *mut ast_externdecl;
     (*decl).kind = EXTERN_FUNCTION;
     (*decl).c2rust_unnamed.function = f;
     return decl;
@@ -7830,7 +7801,7 @@ pub unsafe extern "C" fn ast_decl_create(
     mut t: *mut ast_type,
 ) -> *mut ast_externdecl {
     let mut decl: *mut ast_externdecl =
-        malloc(::core::mem::size_of::<ast_externdecl>() as libc::c_ulong) as *mut ast_externdecl;
+        malloc(::core::mem::size_of::<ast_externdecl>()) as *mut ast_externdecl;
     if ast_type_istypedef(t) {
         (*decl).kind = EXTERN_TYPEDEF;
         (*decl).c2rust_unnamed._typedef.name = name;
@@ -8011,10 +7982,7 @@ pub unsafe extern "C" fn parse_escape(mut c: libc::c_char) -> libc::c_int {
 }
 #[no_mangle]
 pub unsafe extern "C" fn ast_create(mut decl: *mut ast_externdecl) -> *mut Ast {
-    let mut node: *mut Ast = calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<Ast>() as libc::c_ulong,
-    ) as *mut Ast;
+    let mut node: *mut Ast = calloc(1, ::core::mem::size_of::<Ast>()) as *mut Ast;
     return ast_append(node, decl);
 }
 #[no_mangle]
@@ -8032,8 +8000,7 @@ pub unsafe extern "C" fn ast_append(mut node: *mut Ast, mut decl: *mut ast_exter
     (*node).n += 1;
     (*node).decl = realloc(
         (*node).decl as *mut libc::c_void,
-        (::core::mem::size_of::<*mut ast_externdecl>() as libc::c_ulong)
-            .wrapping_mul((*node).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut ast_externdecl>()).wrapping_mul((*node).n as usize),
     ) as *mut *mut ast_externdecl;
     let ref mut fresh16 = *((*node).decl).offset(((*node).n - 1 as libc::c_int) as isize);
     *fresh16 = decl;
@@ -8051,16 +8018,14 @@ pub unsafe extern "C" fn result_error_create(mut err: *mut error) -> *mut result
         );
     } else {
     };
-    let mut r: *mut result =
-        malloc(::core::mem::size_of::<result>() as libc::c_ulong) as *mut result;
+    let mut r: *mut result = malloc(::core::mem::size_of::<result>()) as *mut result;
     (*r).val = 0 as *mut Value;
     (*r).err = err;
     return r;
 }
 #[no_mangle]
 pub unsafe extern "C" fn result_value_create(mut val: *mut Value) -> *mut result {
-    let mut r: *mut result =
-        malloc(::core::mem::size_of::<result>() as libc::c_ulong) as *mut result;
+    let mut r: *mut result = malloc(::core::mem::size_of::<result>()) as *mut result;
     (*r).val = val;
     (*r).err = 0 as *mut error;
     return r;
@@ -8130,8 +8095,7 @@ pub unsafe extern "C" fn result_hasvalue(mut res: *mut result) -> bool {
 }
 #[no_mangle]
 pub unsafe extern "C" fn lvalue_create(mut t: *mut ast_type, mut obj: *mut Object) -> *mut lvalue {
-    let mut l: *mut lvalue =
-        malloc(::core::mem::size_of::<lvalue>() as libc::c_ulong) as *mut lvalue;
+    let mut l: *mut lvalue = malloc(::core::mem::size_of::<lvalue>()) as *mut lvalue;
     (*l).t = t;
     (*l).obj = obj;
     return l;
@@ -8152,10 +8116,7 @@ pub unsafe extern "C" fn lvalue_object(mut l: *mut lvalue) -> *mut Object {
 }
 #[no_mangle]
 pub unsafe extern "C" fn preresult_empty_create() -> *mut preresult {
-    return calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<preresult>() as libc::c_ulong,
-    ) as *mut preresult;
+    return calloc(1, ::core::mem::size_of::<preresult>()) as *mut preresult;
 }
 #[no_mangle]
 pub unsafe extern "C" fn preresult_error_create(mut err: *mut error) -> *mut preresult {

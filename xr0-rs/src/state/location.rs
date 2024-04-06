@@ -9,14 +9,13 @@
     unused_variables
 )]
 
+use libc::{free, malloc, printf};
+
 use crate::{
     static_memory, vconst, AstExpr, Block, Clump, Heap, Object, Stack, State, StrBuilder, Value,
 };
 
 extern "C" {
-    fn printf(_: *const libc::c_char, _: ...) -> libc::c_int;
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -102,8 +101,7 @@ pub unsafe extern "C" fn location_create_vconst(
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
-    let mut loc: *mut Location =
-        malloc(::core::mem::size_of::<Location>() as libc::c_ulong) as *mut Location;
+    let mut loc: *mut Location = malloc(::core::mem::size_of::<Location>()) as *mut Location;
     if loc.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
@@ -138,8 +136,7 @@ pub unsafe extern "C" fn location_create_dereferencable(
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
-    let mut loc: *mut Location =
-        malloc(::core::mem::size_of::<Location>() as libc::c_ulong) as *mut Location;
+    let mut loc: *mut Location = malloc(::core::mem::size_of::<Location>()) as *mut Location;
     if loc.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 31], &[libc::c_char; 31]>(
@@ -174,8 +171,7 @@ pub unsafe extern "C" fn location_create_static(
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
-    let mut loc: *mut Location =
-        malloc(::core::mem::size_of::<Location>() as libc::c_ulong) as *mut Location;
+    let mut loc: *mut Location = malloc(::core::mem::size_of::<Location>()) as *mut Location;
     if loc.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
@@ -210,8 +206,7 @@ pub unsafe extern "C" fn location_create_dynamic(
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
-    let mut loc: *mut Location =
-        malloc(::core::mem::size_of::<Location>() as libc::c_ulong) as *mut Location;
+    let mut loc: *mut Location = malloc(::core::mem::size_of::<Location>()) as *mut Location;
     if loc.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
@@ -247,8 +242,7 @@ pub unsafe extern "C" fn location_create_automatic(
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
-    let mut loc: *mut Location =
-        malloc(::core::mem::size_of::<Location>() as libc::c_ulong) as *mut Location;
+    let mut loc: *mut Location = malloc(::core::mem::size_of::<Location>()) as *mut Location;
     if loc.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(

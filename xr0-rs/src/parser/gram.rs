@@ -10,7 +10,7 @@
 
 use std::ptr::addr_of_mut;
 
-use libc::{exit, fflush, fprintf, FILE};
+use libc::{exit, fflush, fprintf, free, malloc, FILE};
 
 use super::lexer::{ictype, IC_TYPE};
 use crate::ast::*;
@@ -25,8 +25,6 @@ extern "C" {
         _: *const libc::c_char,
         _: ...
     ) -> libc::c_int;
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
     fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn strlen(_: *const libc::c_char) -> libc::c_ulong;
 
@@ -188,10 +186,9 @@ pub unsafe extern "C" fn strip_quotes(mut s: *mut libc::c_char) -> *mut libc::c_
         .wrapping_sub(2 as libc::c_int as libc::c_ulong)
         .wrapping_add(1 as libc::c_int as libc::c_ulong)
         as libc::c_int;
-    let mut t: *mut libc::c_char = malloc(
-        (::core::mem::size_of::<libc::c_char>() as libc::c_ulong)
-            .wrapping_mul(len as libc::c_ulong),
-    ) as *mut libc::c_char;
+    let mut t: *mut libc::c_char =
+        malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len as usize))
+            as *mut libc::c_char;
     snprintf(
         t,
         len as libc::c_ulong,
@@ -205,8 +202,7 @@ pub unsafe extern "C" fn stmt_array_create(mut v: *mut ast_stmt) -> stmt_array {
     let mut arr: stmt_array = {
         let mut init = stmt_array {
             n: 1 as libc::c_int,
-            stmt: malloc(::core::mem::size_of::<*mut ast_stmt>() as libc::c_ulong)
-                as *mut *mut ast_stmt,
+            stmt: malloc(::core::mem::size_of::<*mut ast_stmt>()) as *mut *mut ast_stmt,
         };
         init
     };
@@ -234,8 +230,7 @@ pub unsafe extern "C" fn expr_array_create(mut v: *mut AstExpr) -> expr_array {
     let mut arr: expr_array = {
         let mut init = expr_array {
             n: 1 as libc::c_int,
-            expr: malloc(::core::mem::size_of::<*mut AstExpr>() as libc::c_ulong)
-                as *mut *mut AstExpr,
+            expr: malloc(::core::mem::size_of::<*mut AstExpr>()) as *mut *mut AstExpr,
         };
         init
     };
@@ -3413,15 +3408,12 @@ pub unsafe extern "C" fn yyparse() -> libc::c_int {
             }
             let mut yyss1: *mut yytype_int16 = yyss;
             let mut yyptr: *mut yyalloc = malloc(
-                yystacksize
+                (yystacksize as usize)
                     .wrapping_mul(
-                        (::core::mem::size_of::<yytype_int16>() as libc::c_ulong)
-                            .wrapping_add(::core::mem::size_of::<YYSTYPE>() as libc::c_ulong),
+                        (::core::mem::size_of::<yytype_int16>() as usize)
+                            .wrapping_add(::core::mem::size_of::<YYSTYPE>() as usize),
                     )
-                    .wrapping_add(
-                        (::core::mem::size_of::<yyalloc>() as libc::c_ulong)
-                            .wrapping_sub(1 as libc::c_int as libc::c_ulong),
-                    ),
+                    .wrapping_add((::core::mem::size_of::<yyalloc>()).wrapping_sub(1)),
             ) as *mut yyalloc;
             if yyptr.is_null() {
                 current_block = 17309628368869720559;

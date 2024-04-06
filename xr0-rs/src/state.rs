@@ -15,14 +15,14 @@ pub mod location;
 pub mod stack;
 pub mod r#static;
 
+use libc::{free, malloc};
+
 use crate::{
     ast_type, ast_variable, static_memory, vconst, AstExpr, Block, Clump, Externals, Heap,
     Location, Object, Props, Stack, StrBuilder, Value, Variable,
 };
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -195,8 +195,7 @@ pub unsafe extern "C" fn state_create(
     mut ext: *mut Externals,
     mut result_type: *mut ast_type,
 ) -> *mut State {
-    let mut State: *mut State =
-        malloc(::core::mem::size_of::<State>() as libc::c_ulong) as *mut State;
+    let mut State: *mut State = malloc(::core::mem::size_of::<State>()) as *mut State;
     if State.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"state_create\0")).as_ptr(),
@@ -222,8 +221,7 @@ pub unsafe extern "C" fn state_create_withprops(
     mut result_type: *mut ast_type,
     mut Props: *mut Props,
 ) -> *mut State {
-    let mut State: *mut State =
-        malloc(::core::mem::size_of::<State>() as libc::c_ulong) as *mut State;
+    let mut State: *mut State = malloc(::core::mem::size_of::<State>()) as *mut State;
     if State.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
@@ -256,8 +254,7 @@ pub unsafe extern "C" fn state_destroy(mut State: *mut State) {
 }
 #[no_mangle]
 pub unsafe extern "C" fn state_copy(mut State: *mut State) -> *mut State {
-    let mut copy: *mut State =
-        malloc(::core::mem::size_of::<State>() as libc::c_ulong) as *mut State;
+    let mut copy: *mut State = malloc(::core::mem::size_of::<State>()) as *mut State;
     if copy.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"state_copy\0")).as_ptr(),
@@ -281,8 +278,7 @@ pub unsafe extern "C" fn state_copywithname(
     mut State: *mut State,
     mut func_name: *mut libc::c_char,
 ) -> *mut State {
-    let mut copy: *mut State =
-        malloc(::core::mem::size_of::<State>() as libc::c_ulong) as *mut State;
+    let mut copy: *mut State = malloc(::core::mem::size_of::<State>()) as *mut State;
     if copy.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"state_copywithname\0"))

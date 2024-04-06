@@ -8,15 +8,13 @@
     unused_mut
 )]
 
+use libc::{calloc, free, malloc, realloc};
+
 use crate::value::Value;
 
 use crate::{object_arr, AstExpr, Heap, Location, Object, Range, State, StrBuilder};
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn calloc(_: libc::c_ulong, _: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
-    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -85,7 +83,7 @@ pub struct block_arr {
 }
 #[no_mangle]
 pub unsafe extern "C" fn block_create() -> *mut Block {
-    let mut b: *mut Block = malloc(::core::mem::size_of::<Block>() as libc::c_ulong) as *mut Block;
+    let mut b: *mut Block = malloc(::core::mem::size_of::<Block>()) as *mut Block;
     (*b).arr = object_arr_create();
     return b;
 }
@@ -96,8 +94,7 @@ pub unsafe extern "C" fn block_destroy(mut b: *mut Block) {
 }
 #[no_mangle]
 pub unsafe extern "C" fn block_copy(mut old: *mut Block) -> *mut Block {
-    let mut new: *mut Block =
-        malloc(::core::mem::size_of::<Block>() as libc::c_ulong) as *mut Block;
+    let mut new: *mut Block = malloc(::core::mem::size_of::<Block>()) as *mut Block;
     (*new).arr = object_arr_copy((*old).arr);
     return new;
 }
@@ -384,10 +381,7 @@ pub unsafe extern "C" fn block_undeclare(mut b: *mut Block, mut s: *mut State) {
 }
 #[no_mangle]
 pub unsafe extern "C" fn block_arr_create() -> *mut block_arr {
-    let mut arr: *mut block_arr = calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<block_arr>() as libc::c_ulong,
-    ) as *mut block_arr;
+    let mut arr: *mut block_arr = calloc(1, ::core::mem::size_of::<block_arr>()) as *mut block_arr;
     if arr.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"block_arr_create\0"))
@@ -436,8 +430,7 @@ pub unsafe extern "C" fn block_arr_append(
     (*arr).n += 1;
     (*arr).Block = realloc(
         (*arr).Block as *mut libc::c_void,
-        (::core::mem::size_of::<block_arr>() as libc::c_ulong)
-            .wrapping_mul((*arr).n as libc::c_ulong),
+        (::core::mem::size_of::<block_arr>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut Block;
     if ((*arr).Block).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(

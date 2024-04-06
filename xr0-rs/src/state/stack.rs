@@ -8,6 +8,8 @@
     unused_mut
 )]
 
+use libc::{calloc, free, malloc};
+
 use crate::value::Value;
 
 use crate::{
@@ -16,9 +18,6 @@ use crate::{
 };
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn calloc(_: libc::c_ulong, _: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -152,10 +151,7 @@ pub unsafe extern "C" fn stack_create(
     mut prev: *mut Stack,
     mut return_type: *mut ast_type,
 ) -> *mut Stack {
-    let mut Stack: *mut Stack = calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<Stack>() as libc::c_ulong,
-    ) as *mut Stack;
+    let mut Stack: *mut Stack = calloc(1, ::core::mem::size_of::<Stack>()) as *mut Stack;
     if Stack.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"stack_create\0")).as_ptr(),
@@ -226,10 +222,7 @@ pub unsafe extern "C" fn stack_prev(mut s: *mut Stack) -> *mut Stack {
 }
 #[no_mangle]
 pub unsafe extern "C" fn stack_copy(mut Stack: *mut Stack) -> *mut Stack {
-    let mut copy: *mut Stack = calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<Stack>() as libc::c_ulong,
-    ) as *mut Stack;
+    let mut copy: *mut Stack = calloc(1, ::core::mem::size_of::<Stack>()) as *mut Stack;
     (*copy).name = dynamic_str((*Stack).name);
     (*copy).frame = block_arr_copy((*Stack).frame);
     (*copy).varmap = varmap_copy((*Stack).varmap);
@@ -428,8 +421,7 @@ pub unsafe extern "C" fn variable_create(
     mut Stack: *mut Stack,
     mut isparam: bool,
 ) -> *mut Variable {
-    let mut v: *mut Variable =
-        malloc(::core::mem::size_of::<Variable>() as libc::c_ulong) as *mut Variable;
+    let mut v: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
     (*v).type_0 = ast_type_copy(type_0);
     (*v).isparam = isparam;
     (*v).loc = stack_newblock(Stack);
@@ -477,8 +469,7 @@ pub unsafe extern "C" fn variable_destroy(mut v: *mut Variable) {
 }
 #[no_mangle]
 pub unsafe extern "C" fn variable_copy(mut old: *mut Variable) -> *mut Variable {
-    let mut new: *mut Variable =
-        malloc(::core::mem::size_of::<Variable>() as libc::c_ulong) as *mut Variable;
+    let mut new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
     (*new).type_0 = ast_type_copy((*old).type_0);
     (*new).isparam = (*old).isparam;
     (*new).loc = location_copy((*old).loc);
@@ -488,8 +479,7 @@ unsafe extern "C" fn variable_abstractcopy(
     mut old: *mut Variable,
     mut s: *mut State,
 ) -> *mut Variable {
-    let mut new: *mut Variable =
-        malloc(::core::mem::size_of::<Variable>() as libc::c_ulong) as *mut Variable;
+    let mut new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
     (*new).type_0 = ast_type_copy((*old).type_0);
     (*new).isparam = (*old).isparam;
     (*new).loc = location_copy((*old).loc);

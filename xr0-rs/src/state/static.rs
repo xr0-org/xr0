@@ -8,11 +8,11 @@
     unused_mut
 )]
 
+use libc::{free, malloc};
+
 use crate::{block_arr, Block, Location, StrBuilder};
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -57,7 +57,7 @@ pub struct static_memory {
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_create() -> *mut static_memory {
     let mut sm: *mut static_memory =
-        malloc(::core::mem::size_of::<static_memory>() as libc::c_ulong) as *mut static_memory;
+        malloc(::core::mem::size_of::<static_memory>()) as *mut static_memory;
     if sm.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"static_memory_create\0"))
@@ -102,7 +102,7 @@ pub unsafe extern "C" fn static_memory_str(
 #[no_mangle]
 pub unsafe extern "C" fn static_memory_copy(mut sm: *mut static_memory) -> *mut static_memory {
     let mut copy: *mut static_memory =
-        malloc(::core::mem::size_of::<static_memory>() as libc::c_ulong) as *mut static_memory;
+        malloc(::core::mem::size_of::<static_memory>()) as *mut static_memory;
     (*copy).blocks = block_arr_copy((*sm).blocks);
     (*copy).pool = pool_copy((*sm).pool);
     return copy;

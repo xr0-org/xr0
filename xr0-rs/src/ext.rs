@@ -8,11 +8,11 @@
     unused_mut
 )]
 
+use libc::{free, malloc};
+
 use crate::{ast_function, ast_type, ast_variable, StrBuilder};
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -50,10 +50,10 @@ pub struct Externals {
     pub _typedef: *mut map,
     pub _struct: *mut map,
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn externals_create() -> *mut Externals {
-    let mut ext: *mut Externals =
-        malloc(::core::mem::size_of::<Externals>() as libc::c_ulong) as *mut Externals;
+    let mut ext: *mut Externals = malloc(::core::mem::size_of::<Externals>()) as *mut Externals;
     (*ext).func = map_create();
     (*ext).var = map_create();
     (*ext)._typedef = map_create();

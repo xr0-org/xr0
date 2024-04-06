@@ -8,6 +8,8 @@
     unused_mut
 )]
 
+use libc::{calloc, free, malloc, realloc};
+
 use crate::ext::Externals;
 
 use crate::{
@@ -15,10 +17,6 @@ use crate::{
 };
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn calloc(_: libc::c_ulong, _: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
-    fn realloc(_: *mut libc::c_void, _: libc::c_ulong) -> *mut libc::c_void;
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -172,7 +170,7 @@ pub const VALUE_PTR: value_type = 1;
 pub const VALUE_SYNC: value_type = 0;
 #[no_mangle]
 pub unsafe extern "C" fn value_ptr_create(mut loc: *mut Location) -> *mut Value {
-    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"value_ptr_create\0"))
@@ -190,7 +188,7 @@ pub unsafe extern "C" fn value_ptr_create(mut loc: *mut Location) -> *mut Value 
 }
 #[no_mangle]
 pub unsafe extern "C" fn value_ptr_indefinite_create() -> *mut Value {
-    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 28], &[libc::c_char; 28]>(
@@ -215,8 +213,7 @@ unsafe extern "C" fn ptr_referencesheap(mut v: *mut Value, mut s: *mut State) ->
 }
 #[no_mangle]
 pub unsafe extern "C" fn value_ptr_copy(mut old: *mut Value) -> *mut Value {
-    let mut new: *mut Value =
-        malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if new.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"value_ptr_copy\0"))
@@ -250,7 +247,7 @@ pub unsafe extern "C" fn value_ptr_sprint(mut v: *mut Value, mut b: *mut StrBuil
 }
 #[no_mangle]
 pub unsafe extern "C" fn value_int_create(mut val: libc::c_int) -> *mut Value {
-    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"value_int_create\0"))
@@ -267,7 +264,7 @@ pub unsafe extern "C" fn value_int_create(mut val: libc::c_int) -> *mut Value {
 }
 #[no_mangle]
 pub unsafe extern "C" fn value_literal_create(mut lit: *mut libc::c_char) -> *mut Value {
-    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"value_literal_create\0"))
@@ -344,7 +341,7 @@ pub unsafe extern "C" fn value_transfigure(
 }
 #[no_mangle]
 pub unsafe extern "C" fn value_int_ne_create(mut not_val: libc::c_int) -> *mut Value {
-    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"value_int_ne_create\0"))
@@ -364,7 +361,7 @@ pub unsafe extern "C" fn value_int_range_create(
     mut lw: libc::c_int,
     mut excl_up: libc::c_int,
 ) -> *mut Value {
-    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
@@ -383,7 +380,7 @@ pub unsafe extern "C" fn value_int_range_create(
 }
 #[no_mangle]
 pub unsafe extern "C" fn value_int_indefinite_create() -> *mut Value {
-    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 28], &[libc::c_char; 28]>(
@@ -410,7 +407,7 @@ pub unsafe extern "C" fn value_int_up(mut v: *mut Value) -> libc::c_int {
 }
 #[no_mangle]
 pub unsafe extern "C" fn value_sync_create(mut e: *mut AstExpr) -> *mut Value {
-    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"value_sync_create\0"))
@@ -440,8 +437,7 @@ pub unsafe extern "C" fn value_sync_copy(mut old: *mut Value) -> *mut Value {
         );
     } else {
     };
-    let mut new: *mut Value =
-        malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if new.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"value_sync_copy\0"))
@@ -471,8 +467,7 @@ pub unsafe extern "C" fn value_int_copy(mut old: *mut Value) -> *mut Value {
         );
     } else {
     };
-    let mut new: *mut Value =
-        malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if new.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"value_int_copy\0"))
@@ -500,7 +495,7 @@ pub unsafe extern "C" fn value_struct_create(mut t: *mut ast_type) -> *mut Value
         );
     } else {
     };
-    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"value_struct_create\0"))
@@ -630,8 +625,7 @@ unsafe extern "C" fn destroymembers(mut m: *mut map) {
 }
 #[no_mangle]
 pub unsafe extern "C" fn value_struct_copy(mut old: *mut Value) -> *mut Value {
-    let mut new: *mut Value =
-        malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if new.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"value_struct_copy\0"))
@@ -667,8 +661,7 @@ pub unsafe extern "C" fn value_struct_abstractcopy(
     mut old: *mut Value,
     mut s: *mut State,
 ) -> *mut Value {
-    let mut new: *mut Value =
-        malloc(::core::mem::size_of::<Value>() as libc::c_ulong) as *mut Value;
+    let mut new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if new.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
@@ -1152,10 +1145,7 @@ pub unsafe extern "C" fn value_assume(mut v: *mut Value, mut Value: bool) -> boo
 }
 #[no_mangle]
 pub unsafe extern "C" fn number_ranges_create(mut ranges: *mut number_range_arr) -> *mut number {
-    let mut num: *mut number = calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<number>() as libc::c_ulong,
-    ) as *mut number;
+    let mut num: *mut number = calloc(1, ::core::mem::size_of::<number>()) as *mut number;
     (*num).type_0 = NUMBER_RANGES;
     (*num).c2rust_unnamed.ranges = ranges;
     return num;
@@ -1180,10 +1170,7 @@ pub unsafe extern "C" fn number_range_arr_single_create(
 }
 #[no_mangle]
 pub unsafe extern "C" fn number_computed_create(mut e: *mut AstExpr) -> *mut number {
-    let mut num: *mut number = calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<number>() as libc::c_ulong,
-    ) as *mut number;
+    let mut num: *mut number = calloc(1, ::core::mem::size_of::<number>()) as *mut number;
     (*num).type_0 = NUMBER_COMPUTED;
     (*num).c2rust_unnamed.computation = e;
     return num;
@@ -1560,10 +1547,8 @@ pub unsafe extern "C" fn number_copy(mut num: *mut number) -> *mut number {
 }
 #[no_mangle]
 pub unsafe extern "C" fn number_range_arr_create() -> *mut number_range_arr {
-    let mut arr: *mut number_range_arr = calloc(
-        1 as libc::c_int as libc::c_ulong,
-        ::core::mem::size_of::<number_range_arr>() as libc::c_ulong,
-    ) as *mut number_range_arr;
+    let mut arr: *mut number_range_arr =
+        calloc(1, ::core::mem::size_of::<number_range_arr>()) as *mut number_range_arr;
     if arr.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
@@ -1606,8 +1591,7 @@ pub unsafe extern "C" fn number_range_arr_append(
     (*arr).n += 1;
     (*arr).range = realloc(
         (*arr).range as *mut libc::c_void,
-        (::core::mem::size_of::<*mut number_range>() as libc::c_ulong)
-            .wrapping_mul((*arr).n as libc::c_ulong),
+        (::core::mem::size_of::<*mut number_range>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut number_range;
     if ((*arr).range).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -1673,7 +1657,7 @@ pub unsafe extern "C" fn number_range_create(
     mut up: *mut number_value,
 ) -> *mut number_range {
     let mut r: *mut number_range =
-        malloc(::core::mem::size_of::<number_range>() as libc::c_ulong) as *mut number_range;
+        malloc(::core::mem::size_of::<number_range>()) as *mut number_range;
     (*r).lower = lw;
     (*r).upper = up;
     return r;
@@ -1760,7 +1744,7 @@ pub unsafe extern "C" fn number_value_constant_create(
     mut constant: libc::c_int,
 ) -> *mut number_value {
     let mut v: *mut number_value =
-        malloc(::core::mem::size_of::<number_value>() as libc::c_ulong) as *mut number_value;
+        malloc(::core::mem::size_of::<number_value>()) as *mut number_value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 29], &[libc::c_char; 29]>(
@@ -1780,7 +1764,7 @@ pub unsafe extern "C" fn number_value_constant_create(
 #[no_mangle]
 pub unsafe extern "C" fn number_value_limit_create(mut max: bool) -> *mut number_value {
     let mut v: *mut number_value =
-        malloc(::core::mem::size_of::<number_value>() as libc::c_ulong) as *mut number_value;
+        malloc(::core::mem::size_of::<number_value>()) as *mut number_value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(

@@ -8,11 +8,11 @@
     unused_mut
 )]
 
+use libc::{free, malloc};
+
 use crate::{block_arr, Block, StrBuilder};
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -38,7 +38,7 @@ pub struct Clump {
 }
 #[no_mangle]
 pub unsafe extern "C" fn clump_create() -> *mut Clump {
-    let mut c: *mut Clump = malloc(::core::mem::size_of::<Clump>() as libc::c_ulong) as *mut Clump;
+    let mut c: *mut Clump = malloc(::core::mem::size_of::<Clump>()) as *mut Clump;
     if c.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"clump_create\0")).as_ptr(),
@@ -80,8 +80,7 @@ pub unsafe extern "C" fn clump_str(
 }
 #[no_mangle]
 pub unsafe extern "C" fn clump_copy(mut c: *mut Clump) -> *mut Clump {
-    let mut copy: *mut Clump =
-        malloc(::core::mem::size_of::<Clump>() as libc::c_ulong) as *mut Clump;
+    let mut copy: *mut Clump = malloc(::core::mem::size_of::<Clump>()) as *mut Clump;
     (*copy).blocks = block_arr_copy((*c).blocks);
     return copy;
 }

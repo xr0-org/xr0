@@ -8,11 +8,11 @@
     unused_mut
 )]
 
+use libc::{free, malloc};
+
 use crate::StrBuilder;
 
 extern "C" {
-    fn malloc(_: libc::c_ulong) -> *mut libc::c_void;
-    fn free(_: *mut libc::c_void);
     fn __assert_rtn(
         _: *const libc::c_char,
         _: *const libc::c_char,
@@ -141,8 +141,7 @@ pub unsafe extern "C" fn math_le(mut e1: *mut MathExpr, mut e2: *mut MathExpr) -
 }
 #[no_mangle]
 pub unsafe extern "C" fn math_expr_atom_create(mut a: *mut MathAtom) -> *mut MathExpr {
-    let mut e: *mut MathExpr =
-        malloc(::core::mem::size_of::<MathExpr>() as libc::c_ulong) as *mut MathExpr;
+    let mut e: *mut MathExpr = malloc(::core::mem::size_of::<MathExpr>()) as *mut MathExpr;
     (*e).type_0 = EXPR_ATOM;
     (*e).c2rust_unnamed.a = a;
     return e;
@@ -152,8 +151,7 @@ pub unsafe extern "C" fn math_expr_sum_create(
     mut e1: *mut MathExpr,
     mut e2: *mut MathExpr,
 ) -> *mut MathExpr {
-    let mut e: *mut MathExpr =
-        malloc(::core::mem::size_of::<MathExpr>() as libc::c_ulong) as *mut MathExpr;
+    let mut e: *mut MathExpr = malloc(::core::mem::size_of::<MathExpr>()) as *mut MathExpr;
     (*e).type_0 = EXPR_SUM;
     (*e).c2rust_unnamed.sum.e1 = e1;
     (*e).c2rust_unnamed.sum.e2 = e2;
@@ -161,8 +159,7 @@ pub unsafe extern "C" fn math_expr_sum_create(
 }
 #[no_mangle]
 pub unsafe extern "C" fn math_expr_neg_create(mut orig: *mut MathExpr) -> *mut MathExpr {
-    let mut e: *mut MathExpr =
-        malloc(::core::mem::size_of::<MathExpr>() as libc::c_ulong) as *mut MathExpr;
+    let mut e: *mut MathExpr = malloc(::core::mem::size_of::<MathExpr>()) as *mut MathExpr;
     (*e).type_0 = EXPR_NEG;
     (*e).c2rust_unnamed.negated = orig;
     return e;
@@ -417,16 +414,14 @@ unsafe extern "C" fn variable_tally_eq(mut m1: *mut map, mut m2: *mut map) -> bo
 }
 #[no_mangle]
 pub unsafe extern "C" fn math_atom_nat_create(mut i: libc::c_uint) -> *mut MathAtom {
-    let mut a: *mut MathAtom =
-        malloc(::core::mem::size_of::<MathAtom>() as libc::c_ulong) as *mut MathAtom;
+    let mut a: *mut MathAtom = malloc(::core::mem::size_of::<MathAtom>()) as *mut MathAtom;
     (*a).type_0 = ATOM_NAT;
     (*a).c2rust_unnamed.i = i;
     return a;
 }
 #[no_mangle]
 pub unsafe extern "C" fn math_atom_variable_create(mut s: *mut libc::c_char) -> *mut MathAtom {
-    let mut a: *mut MathAtom =
-        malloc(::core::mem::size_of::<MathAtom>() as libc::c_ulong) as *mut MathAtom;
+    let mut a: *mut MathAtom = malloc(::core::mem::size_of::<MathAtom>()) as *mut MathAtom;
     (*a).type_0 = ATOM_VARIABLE;
     (*a).c2rust_unnamed.v = s;
     return a;
