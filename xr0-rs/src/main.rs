@@ -56,12 +56,12 @@ use parser::lexer::{lex_begin, lex_finish, yylex_destroy};
 use util::{
     dynamic_str, error, strbuilder_build, strbuilder_create, strbuilder_printf, string_arr,
     string_arr_append, string_arr_create, string_arr_n, string_arr_s, string_arr_str, v_printf,
+    VERBOSE_MODE,
 };
 
 extern "C" {
     static mut __stderrp: *mut libc::FILE;
     static mut yyin: *mut libc::FILE;
-    static mut VERBOSE_MODE: libc::c_int;
 
     fn __assert_rtn(
         _: *const libc::c_char,

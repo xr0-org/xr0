@@ -12,9 +12,10 @@ use std::ptr::addr_of_mut;
 
 use libc::{exit, fflush, fprintf, free, malloc, realloc, strlen, FILE};
 
-use super::lexer::{ictype, lexememarker, lexememarker_str, lexloc, yylex, yytext, IC_TYPE};
+use super::lexer::{installclass, lexememarker_str, lexloc, marker, yylex, yytext, IC_TYPE};
 use crate::ast::*;
-use crate::util::dynamic_str;
+use crate::root;
+use crate::util::{dynamic_str, VERBOSE_MODE};
 
 extern "C" {
     static mut __stdoutp: *mut FILE;
@@ -32,14 +33,8 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-
-    static mut root: *mut Ast;
-    static mut installclass: ictype;
-    fn parse_int(s: *mut libc::c_char) -> libc::c_int;
-    fn parse_char(s: *mut libc::c_char) -> libc::c_char;
-    static mut marker: lexememarker;
-    static mut VERBOSE_MODE: libc::c_int;
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union C2RustUnnamed {
