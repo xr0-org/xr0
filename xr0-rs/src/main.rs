@@ -11,6 +11,7 @@
 #![feature(c_variadic, extern_types, linkage)]
 
 mod ast;
+mod c_util;
 mod ext;
 mod math;
 mod object;
@@ -50,6 +51,7 @@ use ast::{
     ast_function_isaxiom, ast_function_isproto, ast_function_name, ast_function_verify,
     ast_functiondecl_create, ast_protostitch, ast_topological_order,
 };
+use c_util::{__assert_rtn, __stderrp, getopt, optarg, optind};
 use ext::{externals_create, externals_destroy, externals_getfunc};
 use parser::gram::yyparse;
 use parser::lexer::{lex_begin, lex_finish, yyin, yylex_destroy};
@@ -58,21 +60,6 @@ use util::{
     string_arr_append, string_arr_create, string_arr_n, string_arr_s, string_arr_str, v_printf,
     VERBOSE_MODE,
 };
-
-extern "C" {
-    static mut __stderrp: *mut libc::FILE;
-
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-
-    fn getopt(_: libc::c_int, _: *const *mut libc::c_char, _: *const libc::c_char) -> libc::c_int;
-    static mut optarg: *mut libc::c_char;
-    static mut optind: libc::c_int;
-}
 
 pub type __uint32_t = libc::c_uint;
 pub type __int64_t = libc::c_longlong;

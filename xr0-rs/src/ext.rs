@@ -17,14 +17,7 @@ use crate::util::{
 };
 use crate::{ast_function, ast_type, ast_variable, StrBuilder};
 
-extern "C" {
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
+use crate::c_util::__assert_rtn;
 
 #[derive(Copy, Clone)]
 #[repr(C)]

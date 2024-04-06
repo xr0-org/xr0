@@ -17,7 +17,6 @@ use crate::ast::{
     ast_variable_arr_copy, ast_variable_arr_destroy, ast_variable_arr_n, ast_variable_arr_v,
     ast_variable_name, ast_variable_type,
 };
-use crate::ext::Externals;
 use crate::object::{
     object_abstractcopy, object_as_value, object_assign, object_copy, object_destroy,
     object_value_create,
@@ -46,16 +45,11 @@ extern "C" {
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct error {
-    pub msg: *mut libc::c_char,
-    pub inner: *mut error,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Value {
     pub type_0: value_type,
     pub c2rust_unnamed: C2RustUnnamed,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union C2RustUnnamed {
@@ -64,72 +58,84 @@ pub union C2RustUnnamed {
     pub s: *mut libc::c_char,
     pub _struct: C2RustUnnamed_0,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct C2RustUnnamed_0 {
     pub members: *mut ast_variable_arr,
     pub m: *mut map,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct number {
     pub type_0: number_type,
     pub c2rust_unnamed: C2RustUnnamed_1,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union C2RustUnnamed_1 {
     pub ranges: *mut number_range_arr,
     pub computation: *mut AstExpr,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct number_range_arr {
     pub n: libc::c_int,
     pub range: *mut *mut number_range,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct number_range {
     pub lower: *mut number_value,
     pub upper: *mut number_value,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct number_value {
     pub type_0: number_value_type,
     pub c2rust_unnamed: C2RustUnnamed_2,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union C2RustUnnamed_2 {
     pub constant: libc::c_int,
     pub max: bool,
 }
+
 pub type number_value_type = libc::c_uint;
 pub const NUMBER_VALUE_LIMIT: number_value_type = 1;
 pub const NUMBER_VALUE_CONSTANT: number_value_type = 0;
 pub type number_type = libc::c_uint;
 pub const NUMBER_COMPUTED: number_type = 1;
 pub const NUMBER_RANGES: number_type = 0;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct C2RustUnnamed_3 {
     pub isindefinite: bool,
     pub c2rust_unnamed: C2RustUnnamed_4,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union C2RustUnnamed_4 {
     pub loc: *mut Location,
     pub n: *mut number,
 }
+
 pub type value_type = libc::c_uint;
 pub const VALUE_STRUCT: value_type = 4;
 pub const VALUE_LITERAL: value_type = 3;
 pub const VALUE_INT: value_type = 2;
 pub const VALUE_PTR: value_type = 1;
 pub const VALUE_SYNC: value_type = 0;
+
 #[no_mangle]
 pub unsafe extern "C" fn value_ptr_create(mut loc: *mut Location) -> *mut Value {
     let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
@@ -148,6 +154,7 @@ pub unsafe extern "C" fn value_ptr_create(mut loc: *mut Location) -> *mut Value 
     (*v).c2rust_unnamed.ptr.c2rust_unnamed.loc = loc;
     return v;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn value_ptr_indefinite_create() -> *mut Value {
     let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
@@ -168,11 +175,13 @@ pub unsafe extern "C" fn value_ptr_indefinite_create() -> *mut Value {
     (*v).c2rust_unnamed.ptr.c2rust_unnamed.n = number_indefinite_create();
     return v;
 }
+
 unsafe extern "C" fn ptr_referencesheap(mut v: *mut Value, mut s: *mut State) -> bool {
     return !(*v).c2rust_unnamed.ptr.isindefinite
         && location_referencesheap((*v).c2rust_unnamed.ptr.c2rust_unnamed.loc, s) as libc::c_int
             != 0;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn value_ptr_copy(mut old: *mut Value) -> *mut Value {
     let mut new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;

@@ -15,6 +15,7 @@ use crate::ast::{
     ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_str,
     ast_expr_sum_create, ast_type_struct_complete,
 };
+use crate::c_util::__assert_rtn;
 use crate::state::location::{location_copy, location_destroy, location_references, location_str};
 use crate::state::{state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand};
 use crate::util::{dynamic_str, error, strbuilder_build, strbuilder_create, strbuilder_printf};
@@ -25,14 +26,6 @@ use crate::value::{
 };
 use crate::{ast_type, AstExpr, Location, State, StrBuilder, Value};
 
-extern "C" {
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Object {

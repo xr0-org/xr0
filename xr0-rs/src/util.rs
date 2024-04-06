@@ -63,27 +63,19 @@ pub unsafe extern "C" fn dynamic_str(mut s: *const libc::c_char) -> *mut libc::c
     strncpy(t, s, len);
     return t;
 }
+
 unsafe extern "C" fn entry_create(
     mut key: *const libc::c_char,
     mut Value: *const libc::c_void,
 ) -> entry {
-    if key.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"entry_create\0")).as_ptr(),
-            b"util.c\0" as *const u8 as *const libc::c_char,
-            22 as libc::c_int,
-            b"key != NULL\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
+    assert!(!key.is_null());
+    let mut init = entry {
+        key: key as *mut libc::c_char,
+        Value: Value,
     };
-    return {
-        let mut init = entry {
-            key: key as *mut libc::c_char,
-            Value: Value,
-        };
-        init
-    };
+    init
 }
+
 unsafe extern "C" fn entry_destroy(mut e: entry) {
     free(e.key as *mut libc::c_void);
 }

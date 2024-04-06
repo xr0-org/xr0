@@ -10,24 +10,13 @@
 
 use std::ptr::addr_of_mut;
 
-use libc::{exit, fflush, fprintf, free, malloc, realloc, snprintf, strlen, FILE};
+use libc::{exit, fflush, fprintf, free, malloc, realloc, snprintf, strlen};
 
 use super::lexer::{installclass, lexememarker_str, lexloc, marker, yylex, yytext, IC_TYPE};
 use crate::ast::*;
+use crate::c_util::{__assert_rtn, __stderrp, __stdoutp};
 use crate::root;
 use crate::util::{dynamic_str, VERBOSE_MODE};
-
-extern "C" {
-    static mut __stdoutp: *mut FILE;
-    static mut __stderrp: *mut FILE;
-
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 
 #[derive(Copy, Clone)]
 #[repr(C)]

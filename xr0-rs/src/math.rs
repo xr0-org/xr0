@@ -10,20 +10,12 @@
 
 use libc::{free, malloc};
 
+use crate::c_util::__assert_rtn;
 use crate::util::{
     dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
     strbuilder_create, strbuilder_printf,
 };
 use crate::StrBuilder;
-
-extern "C" {
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 
 #[derive(Copy, Clone)]
 #[repr(C)]

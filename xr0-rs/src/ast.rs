@@ -11,6 +11,7 @@
 
 use libc::{calloc, exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
 
+use crate::c_util::{__assert_rtn, __stderrp};
 use crate::ext::{
     externals_declarefunc, externals_declarestruct, externals_declaretypedef, externals_declarevar,
     externals_getfunc, externals_getstruct, externals_gettypedef,
@@ -51,16 +52,6 @@ use crate::value::{
     value_sync_create, value_to_expr, values_comparable,
 };
 use crate::{Externals, MathExpr, Object, Props, State, StrBuilder, Value, Variable};
-
-extern "C" {
-    static mut __stderrp: *mut libc::FILE;
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 
 #[derive(Copy, Clone)]
 #[repr(C)]
