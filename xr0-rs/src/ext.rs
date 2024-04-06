@@ -29,7 +29,7 @@ pub struct Externals {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn externals_create() -> *mut Externals {
+pub unsafe fn externals_create() -> *mut Externals {
     let mut ext: *mut Externals = malloc(::core::mem::size_of::<Externals>()) as *mut Externals;
     (*ext).func = map_create();
     (*ext).var = map_create();
@@ -38,7 +38,7 @@ pub unsafe extern "C" fn externals_create() -> *mut Externals {
     return ext;
 }
 #[no_mangle]
-pub unsafe extern "C" fn externals_destroy(mut ext: *mut Externals) {
+pub unsafe fn externals_destroy(mut ext: *mut Externals) {
     map_destroy((*ext).func);
     map_destroy((*ext).var);
     map_destroy((*ext)._typedef);
@@ -46,7 +46,7 @@ pub unsafe extern "C" fn externals_destroy(mut ext: *mut Externals) {
     free(ext as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn externals_types_str(
+pub unsafe fn externals_types_str(
     mut ext: *mut Externals,
     mut indent: *mut libc::c_char,
 ) -> *mut libc::c_char {
@@ -83,7 +83,7 @@ pub unsafe extern "C" fn externals_types_str(
     return strbuilder_build(b);
 }
 #[no_mangle]
-pub unsafe extern "C" fn externals_declarefunc(
+pub unsafe fn externals_declarefunc(
     mut ext: *mut Externals,
     mut id: *mut libc::c_char,
     mut f: *mut ast_function,
@@ -91,7 +91,7 @@ pub unsafe extern "C" fn externals_declarefunc(
     map_set((*ext).func, dynamic_str(id), f as *const libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn externals_declarevar(
+pub unsafe fn externals_declarevar(
     mut ext: *mut Externals,
     mut id: *mut libc::c_char,
     mut v: *mut ast_variable,
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn externals_declarevar(
     map_set((*ext).var, dynamic_str(id), v as *const libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn externals_declaretypedef(
+pub unsafe fn externals_declaretypedef(
     mut ext: *mut Externals,
     mut id: *mut libc::c_char,
     mut t: *mut ast_type,
@@ -107,7 +107,7 @@ pub unsafe extern "C" fn externals_declaretypedef(
     map_set((*ext)._typedef, dynamic_str(id), t as *const libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn externals_declarestruct(mut ext: *mut Externals, mut t: *mut ast_type) {
+pub unsafe fn externals_declarestruct(mut ext: *mut Externals, mut t: *mut ast_type) {
     let mut id: *mut libc::c_char = ast_type_struct_tag(t);
     if id.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -124,21 +124,21 @@ pub unsafe extern "C" fn externals_declarestruct(mut ext: *mut Externals, mut t:
     map_set((*ext)._struct, dynamic_str(id), t as *const libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn externals_getfunc(
+pub unsafe fn externals_getfunc(
     mut ext: *mut Externals,
     mut id: *mut libc::c_char,
 ) -> *mut ast_function {
     return map_get((*ext).func, id) as *mut ast_function;
 }
 #[no_mangle]
-pub unsafe extern "C" fn externals_gettypedef(
+pub unsafe fn externals_gettypedef(
     mut ext: *mut Externals,
     mut id: *mut libc::c_char,
 ) -> *mut ast_type {
     return map_get((*ext)._typedef, id) as *mut ast_type;
 }
 #[no_mangle]
-pub unsafe extern "C" fn externals_getstruct(
+pub unsafe fn externals_getstruct(
     mut ext: *mut Externals,
     mut id: *mut libc::c_char,
 ) -> *mut ast_type {

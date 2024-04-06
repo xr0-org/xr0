@@ -129,7 +129,7 @@ pub const VALUE_PTR: value_type = 1;
 pub const VALUE_SYNC: value_type = 0;
 
 #[no_mangle]
-pub unsafe extern "C" fn value_ptr_create(mut loc: *mut Location) -> *mut Value {
+pub unsafe fn value_ptr_create(mut loc: *mut Location) -> *mut Value {
     let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -148,7 +148,7 @@ pub unsafe extern "C" fn value_ptr_create(mut loc: *mut Location) -> *mut Value 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn value_ptr_indefinite_create() -> *mut Value {
+pub unsafe fn value_ptr_indefinite_create() -> *mut Value {
     let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -168,14 +168,14 @@ pub unsafe extern "C" fn value_ptr_indefinite_create() -> *mut Value {
     return v;
 }
 
-unsafe extern "C" fn ptr_referencesheap(mut v: *mut Value, mut s: *mut State) -> bool {
+unsafe fn ptr_referencesheap(mut v: *mut Value, mut s: *mut State) -> bool {
     return !(*v).c2rust_unnamed.ptr.isindefinite
         && location_referencesheap((*v).c2rust_unnamed.ptr.c2rust_unnamed.loc, s) as libc::c_int
             != 0;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn value_ptr_copy(mut old: *mut Value) -> *mut Value {
+pub unsafe fn value_ptr_copy(mut old: *mut Value) -> *mut Value {
     let mut new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if new.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn value_ptr_copy(mut old: *mut Value) -> *mut Value {
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_ptr_sprint(mut v: *mut Value, mut b: *mut StrBuilder) {
+pub unsafe fn value_ptr_sprint(mut v: *mut Value, mut b: *mut StrBuilder) {
     let mut s: *mut libc::c_char = if (*v).c2rust_unnamed.ptr.isindefinite as libc::c_int != 0 {
         number_str((*v).c2rust_unnamed.ptr.c2rust_unnamed.n)
     } else {
@@ -209,7 +209,7 @@ pub unsafe extern "C" fn value_ptr_sprint(mut v: *mut Value, mut b: *mut StrBuil
     free(s as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_int_create(mut val: libc::c_int) -> *mut Value {
+pub unsafe fn value_int_create(mut val: libc::c_int) -> *mut Value {
     let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -226,7 +226,7 @@ pub unsafe extern "C" fn value_int_create(mut val: libc::c_int) -> *mut Value {
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_literal_create(mut lit: *mut libc::c_char) -> *mut Value {
+pub unsafe fn value_literal_create(mut lit: *mut libc::c_char) -> *mut Value {
     let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -243,7 +243,7 @@ pub unsafe extern "C" fn value_literal_create(mut lit: *mut libc::c_char) -> *mu
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_transfigure(
+pub unsafe fn value_transfigure(
     mut v: *mut Value,
     mut compare: *mut State,
     mut islval: bool,
@@ -303,7 +303,7 @@ pub unsafe extern "C" fn value_transfigure(
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_int_ne_create(mut not_val: libc::c_int) -> *mut Value {
+pub unsafe fn value_int_ne_create(mut not_val: libc::c_int) -> *mut Value {
     let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -320,7 +320,7 @@ pub unsafe extern "C" fn value_int_ne_create(mut not_val: libc::c_int) -> *mut V
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_int_range_create(
+pub unsafe fn value_int_range_create(
     mut lw: libc::c_int,
     mut excl_up: libc::c_int,
 ) -> *mut Value {
@@ -342,7 +342,7 @@ pub unsafe extern "C" fn value_int_range_create(
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_int_indefinite_create() -> *mut Value {
+pub unsafe fn value_int_indefinite_create() -> *mut Value {
     let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -361,15 +361,15 @@ pub unsafe extern "C" fn value_int_indefinite_create() -> *mut Value {
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_int_lw(mut v: *mut Value) -> libc::c_int {
+pub unsafe fn value_int_lw(mut v: *mut Value) -> libc::c_int {
     return number_range_lw((*v).c2rust_unnamed.n);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_int_up(mut v: *mut Value) -> libc::c_int {
+pub unsafe fn value_int_up(mut v: *mut Value) -> libc::c_int {
     return number_range_up((*v).c2rust_unnamed.n);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_sync_create(mut e: *mut AstExpr) -> *mut Value {
+pub unsafe fn value_sync_create(mut e: *mut AstExpr) -> *mut Value {
     let mut v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -386,7 +386,7 @@ pub unsafe extern "C" fn value_sync_create(mut e: *mut AstExpr) -> *mut Value {
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_sync_copy(mut old: *mut Value) -> *mut Value {
+pub unsafe fn value_sync_copy(mut old: *mut Value) -> *mut Value {
     if !((*old).type_0 as libc::c_uint == VALUE_SYNC as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -416,7 +416,7 @@ pub unsafe extern "C" fn value_sync_copy(mut old: *mut Value) -> *mut Value {
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_int_copy(mut old: *mut Value) -> *mut Value {
+pub unsafe fn value_int_copy(mut old: *mut Value) -> *mut Value {
     if !((*old).type_0 as libc::c_uint == VALUE_INT as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -446,7 +446,7 @@ pub unsafe extern "C" fn value_int_copy(mut old: *mut Value) -> *mut Value {
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_struct_create(mut t: *mut ast_type) -> *mut Value {
+pub unsafe fn value_struct_create(mut t: *mut ast_type) -> *mut Value {
     let mut members: *mut ast_variable_arr = ast_variable_arr_copy(ast_type_struct_members(t));
     if members.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -475,7 +475,7 @@ pub unsafe extern "C" fn value_struct_create(mut t: *mut ast_type) -> *mut Value
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_struct_indefinite_create(
+pub unsafe fn value_struct_indefinite_create(
     mut t: *mut ast_type,
     mut s: *mut State,
     mut comment: *mut libc::c_char,
@@ -522,7 +522,7 @@ pub unsafe extern "C" fn value_struct_indefinite_create(
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_pf_augment(
+pub unsafe fn value_pf_augment(
     mut old: *mut Value,
     mut root: *mut AstExpr,
 ) -> *mut Value {
@@ -560,10 +560,10 @@ pub unsafe extern "C" fn value_pf_augment(
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_isstruct(mut v: *mut Value) -> bool {
+pub unsafe fn value_isstruct(mut v: *mut Value) -> bool {
     return (*v).type_0 as libc::c_uint == VALUE_STRUCT as libc::c_int as libc::c_uint;
 }
-unsafe extern "C" fn frommembers(mut members: *mut ast_variable_arr) -> *mut map {
+unsafe fn frommembers(mut members: *mut ast_variable_arr) -> *mut map {
     let mut m: *mut map = map_create();
     let mut n: libc::c_int = ast_variable_arr_n(members);
     let mut v: *mut *mut ast_variable = ast_variable_arr_v(members);
@@ -579,7 +579,7 @@ unsafe extern "C" fn frommembers(mut members: *mut ast_variable_arr) -> *mut map
     }
     return m;
 }
-unsafe extern "C" fn destroymembers(mut m: *mut map) {
+unsafe fn destroymembers(mut m: *mut map) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
         object_destroy((*((*m).entry).offset(i as isize)).Value as *mut Object);
@@ -587,7 +587,7 @@ unsafe extern "C" fn destroymembers(mut m: *mut map) {
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_struct_copy(mut old: *mut Value) -> *mut Value {
+pub unsafe fn value_struct_copy(mut old: *mut Value) -> *mut Value {
     let mut new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if new.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -605,7 +605,7 @@ pub unsafe extern "C" fn value_struct_copy(mut old: *mut Value) -> *mut Value {
     (*new).c2rust_unnamed._struct.m = copymembers((*old).c2rust_unnamed._struct.m);
     return new;
 }
-unsafe extern "C" fn copymembers(mut old: *mut map) -> *mut map {
+unsafe fn copymembers(mut old: *mut map) -> *mut map {
     let mut new: *mut map = map_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*old).n {
@@ -620,7 +620,7 @@ unsafe extern "C" fn copymembers(mut old: *mut map) -> *mut map {
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_struct_abstractcopy(
+pub unsafe fn value_struct_abstractcopy(
     mut old: *mut Value,
     mut s: *mut State,
 ) -> *mut Value {
@@ -643,7 +643,7 @@ pub unsafe extern "C" fn value_struct_abstractcopy(
     (*new).c2rust_unnamed._struct.m = abstractcopymembers((*old).c2rust_unnamed._struct.m, s);
     return new;
 }
-unsafe extern "C" fn abstractcopymembers(mut old: *mut map, mut s: *mut State) -> *mut map {
+unsafe fn abstractcopymembers(mut old: *mut map, mut s: *mut State) -> *mut map {
     let mut new: *mut map = map_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*old).n {
@@ -658,7 +658,7 @@ unsafe extern "C" fn abstractcopymembers(mut old: *mut map, mut s: *mut State) -
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_struct_membertype(
+pub unsafe fn value_struct_membertype(
     mut v: *mut Value,
     mut member: *mut libc::c_char,
 ) -> *mut ast_type {
@@ -675,13 +675,13 @@ pub unsafe extern "C" fn value_struct_membertype(
     return 0 as *mut ast_type;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_struct_member(
+pub unsafe fn value_struct_member(
     mut v: *mut Value,
     mut member: *mut libc::c_char,
 ) -> *mut Object {
     return map_get((*v).c2rust_unnamed._struct.m, member) as *mut Object;
 }
-unsafe extern "C" fn struct_referencesheap(mut v: *mut Value, mut s: *mut State) -> bool {
+unsafe fn struct_referencesheap(mut v: *mut Value, mut s: *mut State) -> bool {
     let mut m: *mut map = (*v).c2rust_unnamed._struct.m;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
@@ -695,7 +695,7 @@ unsafe extern "C" fn struct_referencesheap(mut v: *mut Value, mut s: *mut State)
     return 0 as libc::c_int != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_struct_sprint(mut v: *mut Value, mut b: *mut StrBuilder) {
+pub unsafe fn value_struct_sprint(mut v: *mut Value, mut b: *mut StrBuilder) {
     strbuilder_printf(b, b"struct:{\0" as *const u8 as *const libc::c_char);
     let mut members: *mut ast_variable_arr = (*v).c2rust_unnamed._struct.members;
     let mut n: libc::c_int = ast_variable_arr_n(members);
@@ -727,7 +727,7 @@ pub unsafe extern "C" fn value_struct_sprint(mut v: *mut Value, mut b: *mut StrB
     strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_int_sprint(mut v: *mut Value, mut b: *mut StrBuilder) {
+pub unsafe fn value_int_sprint(mut v: *mut Value, mut b: *mut StrBuilder) {
     strbuilder_printf(
         b,
         b"int:%s\0" as *const u8 as *const libc::c_char,
@@ -735,7 +735,7 @@ pub unsafe extern "C" fn value_int_sprint(mut v: *mut Value, mut b: *mut StrBuil
     );
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_sync_sprint(mut v: *mut Value, mut b: *mut StrBuilder) {
+pub unsafe fn value_sync_sprint(mut v: *mut Value, mut b: *mut StrBuilder) {
     strbuilder_printf(
         b,
         b"comp:%s\0" as *const u8 as *const libc::c_char,
@@ -743,7 +743,7 @@ pub unsafe extern "C" fn value_sync_sprint(mut v: *mut Value, mut b: *mut StrBui
     );
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_copy(mut v: *mut Value) -> *mut Value {
+pub unsafe fn value_copy(mut v: *mut Value) -> *mut Value {
     match (*v).type_0 as libc::c_uint {
         0 => return value_sync_copy(v),
         1 => return value_ptr_copy(v),
@@ -766,7 +766,7 @@ pub unsafe extern "C" fn value_copy(mut v: *mut Value) -> *mut Value {
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_abstractcopy(mut v: *mut Value, mut s: *mut State) -> *mut Value {
+pub unsafe fn value_abstractcopy(mut v: *mut Value, mut s: *mut State) -> *mut Value {
     if !value_referencesheap(v, s) {
         return 0 as *mut Value;
     }
@@ -791,7 +791,7 @@ pub unsafe extern "C" fn value_abstractcopy(mut v: *mut Value, mut s: *mut State
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_destroy(mut v: *mut Value) {
+pub unsafe fn value_destroy(mut v: *mut Value) {
     match (*v).type_0 as libc::c_uint {
         0 => {
             number_destroy((*v).c2rust_unnamed.n);
@@ -830,7 +830,7 @@ pub unsafe extern "C" fn value_destroy(mut v: *mut Value) {
     free(v as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_str(mut v: *mut Value) -> *mut libc::c_char {
+pub unsafe fn value_str(mut v: *mut Value) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     match (*v).type_0 as libc::c_uint {
         0 => {
@@ -868,7 +868,7 @@ pub unsafe extern "C" fn value_str(mut v: *mut Value) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_islocation(mut v: *mut Value) -> bool {
+pub unsafe fn value_islocation(mut v: *mut Value) -> bool {
     if v.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"value_islocation\0"))
@@ -883,7 +883,7 @@ pub unsafe extern "C" fn value_islocation(mut v: *mut Value) -> bool {
         && !(*v).c2rust_unnamed.ptr.isindefinite;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_as_location(mut v: *mut Value) -> *mut Location {
+pub unsafe fn value_as_location(mut v: *mut Value) -> *mut Location {
     if !value_islocation(v) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"value_as_location\0"))
@@ -897,7 +897,7 @@ pub unsafe extern "C" fn value_as_location(mut v: *mut Value) -> *mut Location {
     return (*v).c2rust_unnamed.ptr.c2rust_unnamed.loc;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_referencesheap(mut v: *mut Value, mut s: *mut State) -> bool {
+pub unsafe fn value_referencesheap(mut v: *mut Value, mut s: *mut State) -> bool {
     match (*v).type_0 as libc::c_uint {
         1 => return ptr_referencesheap(v, s),
         4 => return struct_referencesheap(v, s),
@@ -905,7 +905,7 @@ pub unsafe extern "C" fn value_referencesheap(mut v: *mut Value, mut s: *mut Sta
     };
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_as_constant(mut v: *mut Value) -> libc::c_int {
+pub unsafe fn value_as_constant(mut v: *mut Value) -> libc::c_int {
     if !((*v).type_0 as libc::c_uint == VALUE_INT as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -922,21 +922,21 @@ pub unsafe extern "C" fn value_as_constant(mut v: *mut Value) -> libc::c_int {
     return number_as_constant((*v).c2rust_unnamed.n);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_isconstant(mut v: *mut Value) -> bool {
+pub unsafe fn value_isconstant(mut v: *mut Value) -> bool {
     if (*v).type_0 as libc::c_uint != VALUE_INT as libc::c_int as libc::c_uint {
         return 0 as libc::c_int != 0;
     }
     return number_isconstant((*v).c2rust_unnamed.n);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_issync(mut v: *mut Value) -> bool {
+pub unsafe fn value_issync(mut v: *mut Value) -> bool {
     if (*v).type_0 as libc::c_uint != VALUE_SYNC as libc::c_int as libc::c_uint {
         return 0 as libc::c_int != 0;
     }
     return number_issync((*v).c2rust_unnamed.n);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_as_sync(mut v: *mut Value) -> *mut AstExpr {
+pub unsafe fn value_as_sync(mut v: *mut Value) -> *mut AstExpr {
     if !((*v).type_0 as libc::c_uint == VALUE_SYNC as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -953,7 +953,7 @@ pub unsafe extern "C" fn value_as_sync(mut v: *mut Value) -> *mut AstExpr {
     return number_as_sync((*v).c2rust_unnamed.n);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_to_expr(mut v: *mut Value) -> *mut AstExpr {
+pub unsafe fn value_to_expr(mut v: *mut Value) -> *mut AstExpr {
     match (*v).type_0 as libc::c_uint {
         1 => return ast_expr_identifier_create(value_str(v)),
         3 => return ast_expr_copy(value_as_literal(v)),
@@ -975,14 +975,14 @@ pub unsafe extern "C" fn value_to_expr(mut v: *mut Value) -> *mut AstExpr {
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_isliteral(mut v: *mut Value) -> bool {
+pub unsafe fn value_isliteral(mut v: *mut Value) -> bool {
     if (*v).type_0 as libc::c_uint != VALUE_LITERAL as libc::c_int as libc::c_uint {
         return 0 as libc::c_int != 0;
     }
     return 1 as libc::c_int != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_as_literal(mut v: *mut Value) -> *mut AstExpr {
+pub unsafe fn value_as_literal(mut v: *mut Value) -> *mut AstExpr {
     if !((*v).type_0 as libc::c_uint == VALUE_LITERAL as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -999,11 +999,11 @@ pub unsafe extern "C" fn value_as_literal(mut v: *mut Value) -> *mut AstExpr {
     return ast_expr_literal_create((*v).c2rust_unnamed.s);
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_type(mut v: *mut Value) -> value_type {
+pub unsafe fn value_type(mut v: *mut Value) -> value_type {
     return (*v).type_0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_references(
+pub unsafe fn value_references(
     mut v: *mut Value,
     mut loc: *mut Location,
     mut s: *mut State,
@@ -1019,7 +1019,7 @@ pub unsafe extern "C" fn value_references(
         _ => return 0 as libc::c_int != 0,
     };
 }
-unsafe extern "C" fn struct_references(
+unsafe fn struct_references(
     mut v: *mut Value,
     mut loc: *mut Location,
     mut s: *mut State,
@@ -1037,11 +1037,11 @@ unsafe extern "C" fn struct_references(
     return 0 as libc::c_int != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn values_comparable(mut v1: *mut Value, mut v2: *mut Value) -> bool {
+pub unsafe fn values_comparable(mut v1: *mut Value, mut v2: *mut Value) -> bool {
     return (*v1).type_0 as libc::c_uint == (*v2).type_0 as libc::c_uint;
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_equal(mut v1: *mut Value, mut v2: *mut Value) -> bool {
+pub unsafe fn value_equal(mut v1: *mut Value, mut v2: *mut Value) -> bool {
     if !((*v1).type_0 as libc::c_uint == (*v2).type_0 as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -1075,7 +1075,7 @@ pub unsafe extern "C" fn value_equal(mut v1: *mut Value, mut v2: *mut Value) -> 
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn value_assume(mut v: *mut Value, mut Value: bool) -> bool {
+pub unsafe fn value_assume(mut v: *mut Value, mut Value: bool) -> bool {
     match (*v).type_0 as libc::c_uint {
         2 => return number_assume((*v).c2rust_unnamed.n, Value),
         1 => {
@@ -1107,18 +1107,18 @@ pub unsafe extern "C" fn value_assume(mut v: *mut Value, mut Value: bool) -> boo
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_ranges_create(mut ranges: *mut number_range_arr) -> *mut number {
+pub unsafe fn number_ranges_create(mut ranges: *mut number_range_arr) -> *mut number {
     let mut num: *mut number = calloc(1, ::core::mem::size_of::<number>()) as *mut number;
     (*num).type_0 = NUMBER_RANGES;
     (*num).c2rust_unnamed.ranges = ranges;
     return num;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_single_create(mut val: libc::c_int) -> *mut number {
+pub unsafe fn number_single_create(mut val: libc::c_int) -> *mut number {
     return number_ranges_create(number_range_arr_single_create(val));
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_arr_single_create(
+pub unsafe fn number_range_arr_single_create(
     mut val: libc::c_int,
 ) -> *mut number_range_arr {
     let mut arr: *mut number_range_arr = number_range_arr_create();
@@ -1132,14 +1132,14 @@ pub unsafe extern "C" fn number_range_arr_single_create(
     return arr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_computed_create(mut e: *mut AstExpr) -> *mut number {
+pub unsafe fn number_computed_create(mut e: *mut AstExpr) -> *mut number {
     let mut num: *mut number = calloc(1, ::core::mem::size_of::<number>()) as *mut number;
     (*num).type_0 = NUMBER_COMPUTED;
     (*num).c2rust_unnamed.computation = e;
     return num;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_arr_ne_create(mut val: libc::c_int) -> *mut number_range_arr {
+pub unsafe fn number_range_arr_ne_create(mut val: libc::c_int) -> *mut number_range_arr {
     let mut arr: *mut number_range_arr = number_range_arr_create();
     number_range_arr_append(
         arr,
@@ -1155,11 +1155,11 @@ pub unsafe extern "C" fn number_range_arr_ne_create(mut val: libc::c_int) -> *mu
     return arr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_ne_create(mut val: libc::c_int) -> *mut number {
+pub unsafe fn number_ne_create(mut val: libc::c_int) -> *mut number {
     return number_ranges_create(number_range_arr_ne_create(val));
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_with_range_create(
+pub unsafe fn number_with_range_create(
     mut lw: libc::c_int,
     mut excl_up: libc::c_int,
 ) -> *mut number {
@@ -1174,7 +1174,7 @@ pub unsafe extern "C" fn number_with_range_create(
     return number_ranges_create(arr);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_indefinite_create() -> *mut number {
+pub unsafe fn number_indefinite_create() -> *mut number {
     let mut arr: *mut number_range_arr = number_range_arr_create();
     number_range_arr_append(
         arr,
@@ -1183,7 +1183,7 @@ pub unsafe extern "C" fn number_indefinite_create() -> *mut number {
     return number_ranges_create(arr);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_lw(mut n: *mut number) -> libc::c_int {
+pub unsafe fn number_range_lw(mut n: *mut number) -> libc::c_int {
     if !(number_range_arr_n((*n).c2rust_unnamed.ranges) == 1 as libc::c_int) as libc::c_int
         as libc::c_long
         != 0
@@ -1202,7 +1202,7 @@ pub unsafe extern "C" fn number_range_lw(mut n: *mut number) -> libc::c_int {
     return number_value_as_constant(number_range_lower(r));
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_up(mut n: *mut number) -> libc::c_int {
+pub unsafe fn number_range_up(mut n: *mut number) -> libc::c_int {
     if !(number_range_arr_n((*n).c2rust_unnamed.ranges) == 1 as libc::c_int) as libc::c_int
         as libc::c_long
         != 0
@@ -1221,7 +1221,7 @@ pub unsafe extern "C" fn number_range_up(mut n: *mut number) -> libc::c_int {
     return number_value_as_constant(number_range_upper(r));
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_destroy(mut n: *mut number) {
+pub unsafe fn number_destroy(mut n: *mut number) {
     match (*n).type_0 as libc::c_uint {
         0 => {
             number_range_arr_destroy((*n).c2rust_unnamed.ranges);
@@ -1246,7 +1246,7 @@ pub unsafe extern "C" fn number_destroy(mut n: *mut number) {
     };
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_ranges_sprint(mut num: *mut number) -> *mut libc::c_char {
+pub unsafe fn number_ranges_sprint(mut num: *mut number) -> *mut libc::c_char {
     if !((*num).type_0 as libc::c_uint == NUMBER_RANGES as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
         != 0
@@ -1284,7 +1284,7 @@ pub unsafe extern "C" fn number_ranges_sprint(mut num: *mut number) -> *mut libc
     return strbuilder_build(b);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_str(mut num: *mut number) -> *mut libc::c_char {
+pub unsafe fn number_str(mut num: *mut number) -> *mut libc::c_char {
     match (*num).type_0 as libc::c_uint {
         0 => return number_ranges_sprint(num),
         1 => return ast_expr_str((*num).c2rust_unnamed.computation),
@@ -1304,7 +1304,7 @@ pub unsafe extern "C" fn number_str(mut num: *mut number) -> *mut libc::c_char {
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_equal(mut n1: *mut number, mut n2: *mut number) -> bool {
+pub unsafe fn number_equal(mut n1: *mut number, mut n2: *mut number) -> bool {
     if !((*n1).type_0 as libc::c_uint == (*n2).type_0 as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -1341,7 +1341,7 @@ pub unsafe extern "C" fn number_equal(mut n1: *mut number, mut n2: *mut number) 
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_ranges_equal(mut n1: *mut number, mut n2: *mut number) -> bool {
+pub unsafe fn number_ranges_equal(mut n1: *mut number, mut n2: *mut number) -> bool {
     if !((*n1).type_0 as libc::c_uint == (*n2).type_0 as libc::c_uint
         && (*n1).type_0 as libc::c_uint == NUMBER_RANGES as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
@@ -1372,7 +1372,7 @@ pub unsafe extern "C" fn number_ranges_equal(mut n1: *mut number, mut n2: *mut n
     }
     return 1 as libc::c_int != 0;
 }
-unsafe extern "C" fn number_assume(mut n: *mut number, mut Value: bool) -> bool {
+unsafe fn number_assume(mut n: *mut number, mut Value: bool) -> bool {
     if !((*n).type_0 as libc::c_uint == NUMBER_RANGES as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -1392,7 +1392,7 @@ unsafe extern "C" fn number_assume(mut n: *mut number, mut Value: bool) -> bool 
     (*n).c2rust_unnamed.ranges = number_range_assumed_value(Value);
     return 1 as libc::c_int != 0;
 }
-unsafe extern "C" fn number_range_assumed_value(mut Value: bool) -> *mut number_range_arr {
+unsafe fn number_range_assumed_value(mut Value: bool) -> *mut number_range_arr {
     if Value {
         return number_range_arr_ne_create(0 as libc::c_int);
     } else {
@@ -1400,7 +1400,7 @@ unsafe extern "C" fn number_range_assumed_value(mut Value: bool) -> *mut number_
     };
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_isconstant(mut n: *mut number) -> bool {
+pub unsafe fn number_isconstant(mut n: *mut number) -> bool {
     if !((*n).type_0 as libc::c_uint == NUMBER_RANGES as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -1421,7 +1421,7 @@ pub unsafe extern "C" fn number_isconstant(mut n: *mut number) -> bool {
             != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_as_constant(mut n: *mut number) -> libc::c_int {
+pub unsafe fn number_as_constant(mut n: *mut number) -> libc::c_int {
     if !((*n).type_0 as libc::c_uint == NUMBER_RANGES as libc::c_int as libc::c_uint
         && number_range_arr_n((*n).c2rust_unnamed.ranges) == 1 as libc::c_int) as libc::c_int
         as libc::c_long
@@ -1442,11 +1442,11 @@ pub unsafe extern "C" fn number_as_constant(mut n: *mut number) -> libc::c_int {
     );
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_issync(mut n: *mut number) -> bool {
+pub unsafe fn number_issync(mut n: *mut number) -> bool {
     return (*n).type_0 as libc::c_uint == NUMBER_COMPUTED as libc::c_int as libc::c_uint;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_as_sync(mut n: *mut number) -> *mut AstExpr {
+pub unsafe fn number_as_sync(mut n: *mut number) -> *mut AstExpr {
     if !((*n).type_0 as libc::c_uint == NUMBER_COMPUTED as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
         != 0
@@ -1463,7 +1463,7 @@ pub unsafe extern "C" fn number_as_sync(mut n: *mut number) -> *mut AstExpr {
     return (*n).c2rust_unnamed.computation;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_to_expr(mut n: *mut number) -> *mut AstExpr {
+pub unsafe fn number_to_expr(mut n: *mut number) -> *mut AstExpr {
     match (*n).type_0 as libc::c_uint {
         0 => return number_ranges_to_expr((*n).c2rust_unnamed.ranges),
         1 => return ast_expr_copy(number_as_sync(n)),
@@ -1485,7 +1485,7 @@ pub unsafe extern "C" fn number_to_expr(mut n: *mut number) -> *mut AstExpr {
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_copy(mut num: *mut number) -> *mut number {
+pub unsafe fn number_copy(mut num: *mut number) -> *mut number {
     match (*num).type_0 as libc::c_uint {
         0 => {
             return number_ranges_create(number_range_arr_copy((*num).c2rust_unnamed.ranges));
@@ -1509,7 +1509,7 @@ pub unsafe extern "C" fn number_copy(mut num: *mut number) -> *mut number {
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_arr_create() -> *mut number_range_arr {
+pub unsafe fn number_range_arr_create() -> *mut number_range_arr {
     let mut arr: *mut number_range_arr =
         calloc(1, ::core::mem::size_of::<number_range_arr>()) as *mut number_range_arr;
     if arr.is_null() as libc::c_int as libc::c_long != 0 {
@@ -1527,7 +1527,7 @@ pub unsafe extern "C" fn number_range_arr_create() -> *mut number_range_arr {
     return arr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_arr_destroy(mut arr: *mut number_range_arr) {
+pub unsafe fn number_range_arr_destroy(mut arr: *mut number_range_arr) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {
         number_range_destroy(*((*arr).range).offset(i as isize));
@@ -1537,17 +1537,17 @@ pub unsafe extern "C" fn number_range_arr_destroy(mut arr: *mut number_range_arr
     free(arr as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_arr_n(mut arr: *mut number_range_arr) -> libc::c_int {
+pub unsafe fn number_range_arr_n(mut arr: *mut number_range_arr) -> libc::c_int {
     return (*arr).n;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_arr_range(
+pub unsafe fn number_range_arr_range(
     mut arr: *mut number_range_arr,
 ) -> *mut *mut number_range {
     return (*arr).range;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_arr_append(
+pub unsafe fn number_range_arr_append(
     mut arr: *mut number_range_arr,
     mut r: *mut number_range,
 ) -> libc::c_int {
@@ -1574,7 +1574,7 @@ pub unsafe extern "C" fn number_range_arr_append(
     return loc;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_arr_copy(
+pub unsafe fn number_range_arr_copy(
     mut old: *mut number_range_arr,
 ) -> *mut number_range_arr {
     let mut new: *mut number_range_arr = number_range_arr_create();
@@ -1586,7 +1586,7 @@ pub unsafe extern "C" fn number_range_arr_copy(
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_ranges_to_expr(mut arr: *mut number_range_arr) -> *mut AstExpr {
+pub unsafe fn number_ranges_to_expr(mut arr: *mut number_range_arr) -> *mut AstExpr {
     if !(number_range_arr_n(arr) == 1 as libc::c_int) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(b"number_ranges_to_expr\0"))
@@ -1601,7 +1601,7 @@ pub unsafe extern "C" fn number_ranges_to_expr(mut arr: *mut number_range_arr) -
         *((*arr).range).offset(0 as libc::c_int as isize),
     ));
 }
-unsafe extern "C" fn number_range_arr_canbe(
+unsafe fn number_range_arr_canbe(
     mut arr: *mut number_range_arr,
     mut Value: bool,
 ) -> bool {
@@ -1615,7 +1615,7 @@ unsafe extern "C" fn number_range_arr_canbe(
     return 0 as libc::c_int != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_create(
+pub unsafe fn number_range_create(
     mut lw: *mut number_value,
     mut up: *mut number_value,
 ) -> *mut number_range {
@@ -1626,21 +1626,21 @@ pub unsafe extern "C" fn number_range_create(
     return r;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_destroy(mut r: *mut number_range) {
+pub unsafe fn number_range_destroy(mut r: *mut number_range) {
     number_value_destroy((*r).lower);
     number_value_destroy((*r).upper);
     free(r as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_lower(mut r: *mut number_range) -> *mut number_value {
+pub unsafe fn number_range_lower(mut r: *mut number_range) -> *mut number_value {
     return (*r).lower;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_upper(mut r: *mut number_range) -> *mut number_value {
+pub unsafe fn number_range_upper(mut r: *mut number_range) -> *mut number_value {
     return (*r).upper;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_str(mut r: *mut number_range) -> *mut libc::c_char {
+pub unsafe fn number_range_str(mut r: *mut number_range) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     if number_range_issingle(r) {
         strbuilder_printf(
@@ -1659,10 +1659,10 @@ pub unsafe extern "C" fn number_range_str(mut r: *mut number_range) -> *mut libc
     return strbuilder_build(b);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_copy(mut r: *mut number_range) -> *mut number_range {
+pub unsafe fn number_range_copy(mut r: *mut number_range) -> *mut number_range {
     return number_range_create(number_value_copy((*r).lower), number_value_copy((*r).upper));
 }
-unsafe extern "C" fn number_range_canbe(mut r: *mut number_range, mut Value: bool) -> bool {
+unsafe fn number_range_canbe(mut r: *mut number_range, mut Value: bool) -> bool {
     if Value {
         if number_value_equal((*r).lower, (*r).upper) {
             return 0 as libc::c_int != 0;
@@ -1675,11 +1675,11 @@ unsafe extern "C" fn number_range_canbe(mut r: *mut number_range, mut Value: boo
     };
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_issingle(mut r: *mut number_range) -> bool {
+pub unsafe fn number_range_issingle(mut r: *mut number_range) -> bool {
     return number_values_aresingle((*r).lower, (*r).upper);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_equal(
+pub unsafe fn number_range_equal(
     mut r1: *mut number_range,
     mut r2: *mut number_range,
 ) -> bool {
@@ -1687,7 +1687,7 @@ pub unsafe extern "C" fn number_range_equal(
         && number_value_equal((*r1).upper, (*r2).upper) as libc::c_int != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_range_as_constant(mut r: *mut number_range) -> libc::c_int {
+pub unsafe fn number_range_as_constant(mut r: *mut number_range) -> libc::c_int {
     if !number_range_issingle(r) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 25], &[libc::c_char; 25]>(
@@ -1703,7 +1703,7 @@ pub unsafe extern "C" fn number_range_as_constant(mut r: *mut number_range) -> l
     return number_value_as_constant((*r).lower);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_constant_create(
+pub unsafe fn number_value_constant_create(
     mut constant: libc::c_int,
 ) -> *mut number_value {
     let mut v: *mut number_value =
@@ -1725,7 +1725,7 @@ pub unsafe extern "C" fn number_value_constant_create(
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_limit_create(mut max: bool) -> *mut number_value {
+pub unsafe fn number_value_limit_create(mut max: bool) -> *mut number_value {
     let mut v: *mut number_value =
         malloc(::core::mem::size_of::<number_value>()) as *mut number_value;
     if v.is_null() as libc::c_int as libc::c_long != 0 {
@@ -1745,19 +1745,19 @@ pub unsafe extern "C" fn number_value_limit_create(mut max: bool) -> *mut number
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_min_create() -> *mut number_value {
+pub unsafe fn number_value_min_create() -> *mut number_value {
     return number_value_limit_create(0 as libc::c_int != 0);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_max_create() -> *mut number_value {
+pub unsafe fn number_value_max_create() -> *mut number_value {
     return number_value_limit_create(1 as libc::c_int != 0);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_destroy(mut v: *mut number_value) {
+pub unsafe fn number_value_destroy(mut v: *mut number_value) {
     free(v as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_str(mut v: *mut number_value) -> *mut libc::c_char {
+pub unsafe fn number_value_str(mut v: *mut number_value) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     match (*v).type_0 as libc::c_uint {
         0 => {
@@ -1796,7 +1796,7 @@ pub unsafe extern "C" fn number_value_str(mut v: *mut number_value) -> *mut libc
     return strbuilder_build(b);
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_copy(mut v: *mut number_value) -> *mut number_value {
+pub unsafe fn number_value_copy(mut v: *mut number_value) -> *mut number_value {
     match (*v).type_0 as libc::c_uint {
         0 => return number_value_constant_create((*v).c2rust_unnamed.constant),
         1 => return number_value_limit_create((*v).c2rust_unnamed.max),
@@ -1818,7 +1818,7 @@ pub unsafe extern "C" fn number_value_copy(mut v: *mut number_value) -> *mut num
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_values_aresingle(
+pub unsafe fn number_values_aresingle(
     mut v1: *mut number_value,
     mut v2: *mut number_value,
 ) -> bool {
@@ -1852,7 +1852,7 @@ pub unsafe extern "C" fn number_values_aresingle(
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_difference(
+pub unsafe fn number_value_difference(
     mut v1: *mut number_value,
     mut v2: *mut number_value,
 ) -> libc::c_int {
@@ -1891,7 +1891,7 @@ pub unsafe extern "C" fn number_value_difference(
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_equal(
+pub unsafe fn number_value_equal(
     mut v1: *mut number_value,
     mut v2: *mut number_value,
 ) -> bool {
@@ -1922,7 +1922,7 @@ pub unsafe extern "C" fn number_value_equal(
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn number_value_as_constant(mut v: *mut number_value) -> libc::c_int {
+pub unsafe fn number_value_as_constant(mut v: *mut number_value) -> libc::c_int {
     if !((*v).type_0 as libc::c_uint == NUMBER_VALUE_CONSTANT as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
         != 0
@@ -1940,7 +1940,7 @@ pub unsafe extern "C" fn number_value_as_constant(mut v: *mut number_value) -> l
     };
     return (*v).c2rust_unnamed.constant;
 }
-unsafe extern "C" fn number_value_le_constant(
+unsafe fn number_value_le_constant(
     mut v: *mut number_value,
     mut constant: libc::c_int,
 ) -> bool {
@@ -1964,7 +1964,7 @@ unsafe extern "C" fn number_value_le_constant(
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn constant_le_number_value(
+unsafe fn constant_le_number_value(
     mut constant: libc::c_int,
     mut v: *mut number_value,
 ) -> bool {

@@ -25,7 +25,7 @@ pub struct Clump {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn clump_create() -> *mut Clump {
+pub unsafe fn clump_create() -> *mut Clump {
     let mut c: *mut Clump = malloc(::core::mem::size_of::<Clump>()) as *mut Clump;
     if c.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -41,12 +41,12 @@ pub unsafe extern "C" fn clump_create() -> *mut Clump {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn clump_destroy(mut c: *mut Clump) {
+pub unsafe fn clump_destroy(mut c: *mut Clump) {
     block_arr_destroy((*c).blocks);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn clump_str(
+pub unsafe fn clump_str(
     mut c: *mut Clump,
     mut indent: *mut libc::c_char,
 ) -> *mut libc::c_char {
@@ -70,14 +70,14 @@ pub unsafe extern "C" fn clump_str(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn clump_copy(mut c: *mut Clump) -> *mut Clump {
+pub unsafe fn clump_copy(mut c: *mut Clump) -> *mut Clump {
     let mut copy: *mut Clump = malloc(::core::mem::size_of::<Clump>()) as *mut Clump;
     (*copy).blocks = block_arr_copy((*c).blocks);
     return copy;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn clump_newblock(mut c: *mut Clump) -> libc::c_int {
+pub unsafe fn clump_newblock(mut c: *mut Clump) -> libc::c_int {
     let mut address: libc::c_int = block_arr_append((*c).blocks, block_create());
     let mut n: libc::c_int = block_arr_nblocks((*c).blocks);
     if !(n > 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn clump_newblock(mut c: *mut Clump) -> libc::c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn clump_getblock(mut c: *mut Clump, mut address: libc::c_int) -> *mut Block {
+pub unsafe fn clump_getblock(mut c: *mut Clump, mut address: libc::c_int) -> *mut Block {
     if address >= block_arr_nblocks((*c).blocks) {
         return 0 as *mut Block;
     }

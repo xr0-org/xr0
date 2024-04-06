@@ -42,7 +42,7 @@ pub struct vconst {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_create() -> *mut Heap {
+pub unsafe fn heap_create() -> *mut Heap {
     let mut h: *mut Heap = malloc(::core::mem::size_of::<Heap>()) as *mut Heap;
     if h.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -59,14 +59,14 @@ pub unsafe extern "C" fn heap_create() -> *mut Heap {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_destroy(mut h: *mut Heap) {
+pub unsafe fn heap_destroy(mut h: *mut Heap) {
     block_arr_destroy((*h).blocks);
     free((*h).freed as *mut libc::c_void);
     free(h as *mut libc::c_void);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_copy(mut h: *mut Heap) -> *mut Heap {
+pub unsafe fn heap_copy(mut h: *mut Heap) -> *mut Heap {
     let mut copy: *mut Heap = malloc(::core::mem::size_of::<Heap>()) as *mut Heap;
     (*copy).blocks = block_arr_copy((*h).blocks);
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
@@ -82,7 +82,7 @@ pub unsafe extern "C" fn heap_copy(mut h: *mut Heap) -> *mut Heap {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_str(
+pub unsafe fn heap_str(
     mut h: *mut Heap,
     mut indent: *mut libc::c_char,
 ) -> *mut libc::c_char {
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn heap_str(
     return strbuilder_build(b);
 }
 
-unsafe extern "C" fn printdelim(mut h: *mut Heap, mut start: libc::c_int) -> bool {
+unsafe fn printdelim(mut h: *mut Heap, mut start: libc::c_int) -> bool {
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut i: libc::c_int = start + 1 as libc::c_int;
     while i < n {
@@ -125,7 +125,7 @@ unsafe extern "C" fn printdelim(mut h: *mut Heap, mut start: libc::c_int) -> boo
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_blocks(mut h: *mut Heap) -> *mut block_arr {
+pub unsafe fn heap_blocks(mut h: *mut Heap) -> *mut block_arr {
     if h.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"heap_blocks\0")).as_ptr(),
@@ -139,7 +139,7 @@ pub unsafe extern "C" fn heap_blocks(mut h: *mut Heap) -> *mut block_arr {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_newblock(mut h: *mut Heap) -> *mut Location {
+pub unsafe fn heap_newblock(mut h: *mut Heap) -> *mut Location {
     let mut address: libc::c_int = block_arr_append((*h).blocks, block_create());
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     if !(n > 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
@@ -161,7 +161,7 @@ pub unsafe extern "C" fn heap_newblock(mut h: *mut Heap) -> *mut Location {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_getblock(mut h: *mut Heap, mut address: libc::c_int) -> *mut Block {
+pub unsafe fn heap_getblock(mut h: *mut Heap, mut address: libc::c_int) -> *mut Block {
     if address >= block_arr_nblocks((*h).blocks) {
         return 0 as *mut Block;
     }
@@ -172,7 +172,7 @@ pub unsafe extern "C" fn heap_getblock(mut h: *mut Heap, mut address: libc::c_in
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_deallocblock(
+pub unsafe fn heap_deallocblock(
     mut h: *mut Heap,
     mut address: libc::c_int,
 ) -> *mut error {
@@ -196,12 +196,12 @@ pub unsafe extern "C" fn heap_deallocblock(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_blockisfreed(mut h: *mut Heap, mut address: libc::c_int) -> bool {
+pub unsafe fn heap_blockisfreed(mut h: *mut Heap, mut address: libc::c_int) -> bool {
     return *((*h).freed).offset(address as isize);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_undeclare(mut h: *mut Heap, mut s: *mut State) {
+pub unsafe fn heap_undeclare(mut h: *mut Heap, mut s: *mut State) {
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut b: *mut *mut Block = block_arr_blocks((*h).blocks);
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -214,7 +214,7 @@ pub unsafe extern "C" fn heap_undeclare(mut h: *mut Heap, mut s: *mut State) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn heap_referenced(mut h: *mut Heap, mut s: *mut State) -> bool {
+pub unsafe fn heap_referenced(mut h: *mut Heap, mut s: *mut State) -> bool {
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
@@ -226,7 +226,7 @@ pub unsafe extern "C" fn heap_referenced(mut h: *mut Heap, mut s: *mut State) ->
     return 1 as libc::c_int != 0;
 }
 
-unsafe extern "C" fn block_referenced(mut s: *mut State, mut addr: libc::c_int) -> bool {
+unsafe fn block_referenced(mut s: *mut State, mut addr: libc::c_int) -> bool {
     let mut loc: *mut Location =
         location_create_dynamic(addr, ast_expr_constant_create(0 as libc::c_int));
     let mut referenced: bool = state_references(s, loc);
@@ -235,7 +235,7 @@ unsafe extern "C" fn block_referenced(mut s: *mut State, mut addr: libc::c_int) 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vconst_create() -> *mut vconst {
+pub unsafe fn vconst_create() -> *mut vconst {
     let mut v: *mut vconst = malloc(::core::mem::size_of::<vconst>()) as *mut vconst;
     (*v).varmap = map_create();
     (*v).comment = map_create();
@@ -244,7 +244,7 @@ pub unsafe extern "C" fn vconst_create() -> *mut vconst {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vconst_destroy(mut v: *mut vconst) {
+pub unsafe fn vconst_destroy(mut v: *mut vconst) {
     let mut m: *mut map = (*v).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
@@ -258,7 +258,7 @@ pub unsafe extern "C" fn vconst_destroy(mut v: *mut vconst) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vconst_copy(mut old: *mut vconst) -> *mut vconst {
+pub unsafe fn vconst_copy(mut old: *mut vconst) -> *mut vconst {
     let mut new: *mut vconst = vconst_create();
     let mut m: *mut map = (*old).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -293,7 +293,7 @@ pub unsafe extern "C" fn vconst_copy(mut old: *mut vconst) -> *mut vconst {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vconst_declare(
+pub unsafe fn vconst_declare(
     mut v: *mut vconst,
     mut val: *mut Value,
     mut comment: *mut libc::c_char,
@@ -313,7 +313,7 @@ pub unsafe extern "C" fn vconst_declare(
     return s;
 }
 
-unsafe extern "C" fn vconst_id(
+unsafe fn vconst_id(
     mut varmap: *mut map,
     mut persistmap: *mut map,
     mut persist: bool,
@@ -332,7 +332,7 @@ unsafe extern "C" fn vconst_id(
     return strbuilder_build(b);
 }
 
-unsafe extern "C" fn count_true(mut m: *mut map) -> libc::c_int {
+unsafe fn count_true(mut m: *mut map) -> libc::c_int {
     let mut n: libc::c_int = 0 as libc::c_int;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
@@ -345,12 +345,12 @@ unsafe extern "C" fn count_true(mut m: *mut map) -> libc::c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vconst_get(mut v: *mut vconst, mut id: *mut libc::c_char) -> *mut Value {
+pub unsafe fn vconst_get(mut v: *mut vconst, mut id: *mut libc::c_char) -> *mut Value {
     return map_get((*v).varmap, id) as *mut Value;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vconst_undeclare(mut v: *mut vconst) {
+pub unsafe fn vconst_undeclare(mut v: *mut vconst) {
     let mut varmap: *mut map = map_create();
     let mut comment: *mut map = map_create();
     let mut persist: *mut map = map_create();
@@ -386,7 +386,7 @@ pub unsafe extern "C" fn vconst_undeclare(mut v: *mut vconst) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vconst_str(
+pub unsafe fn vconst_str(
     mut v: *mut vconst,
     mut indent: *mut libc::c_char,
 ) -> *mut libc::c_char {
@@ -415,6 +415,6 @@ pub unsafe extern "C" fn vconst_str(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vconst_eval(mut v: *mut vconst, mut e: *mut AstExpr) -> bool {
+pub unsafe fn vconst_eval(mut v: *mut vconst, mut e: *mut AstExpr) -> bool {
     return ast_expr_matheval(e);
 }

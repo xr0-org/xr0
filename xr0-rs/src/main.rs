@@ -89,12 +89,12 @@ pub struct sortconfig {
     pub sortfunc: *mut libc::c_char,
 }
 #[inline]
-unsafe extern "C" fn isascii(mut _c: libc::c_int) -> libc::c_int {
+unsafe fn isascii(mut _c: libc::c_int) -> libc::c_int {
     return (_c & !(0x7f as libc::c_int) == 0 as libc::c_int) as libc::c_int;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn parse_config(
+pub unsafe fn parse_config(
     mut argc: libc::c_int,
     mut argv: *mut *mut libc::c_char,
 ) -> config {
@@ -167,7 +167,7 @@ pub unsafe extern "C" fn parse_config(
         init
     };
 }
-unsafe extern "C" fn sortconfig_create(
+unsafe fn sortconfig_create(
     mut mode: sortmode,
     mut sortfunc: *mut libc::c_char,
 ) -> sortconfig {
@@ -216,7 +216,7 @@ unsafe extern "C" fn sortconfig_create(
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe extern "C" fn default_includes() -> *mut string_arr {
+unsafe fn default_includes() -> *mut string_arr {
     let mut dirs: *mut string_arr = string_arr_create();
     let mut env: *mut libc::c_char = getenv(b"XR0_INCLUDES\0" as *const u8 as *const libc::c_char);
     if !env.is_null() {
@@ -225,7 +225,7 @@ unsafe extern "C" fn default_includes() -> *mut string_arr {
     return dirs;
 }
 #[no_mangle]
-pub unsafe extern "C" fn genincludes(mut includedirs: *mut string_arr) -> *mut libc::c_char {
+pub unsafe fn genincludes(mut includedirs: *mut string_arr) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     let mut s: *mut *mut libc::c_char = string_arr_s(includedirs);
     let mut n: libc::c_int = string_arr_n(includedirs);
@@ -242,7 +242,7 @@ pub unsafe extern "C" fn genincludes(mut includedirs: *mut string_arr) -> *mut l
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn preprocesscmd_fmt(
+pub unsafe fn preprocesscmd_fmt(
     mut includedirs: *mut string_arr,
     mut infile: *mut libc::c_char,
 ) -> *mut libc::c_char {
@@ -267,7 +267,7 @@ pub unsafe extern "C" fn preprocesscmd_fmt(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn open_preprocessor(
+pub unsafe fn open_preprocessor(
     mut infile: *mut libc::c_char,
     mut includedirs: *mut string_arr,
 ) -> *mut libc::FILE {
@@ -277,7 +277,7 @@ pub unsafe extern "C" fn open_preprocessor(
     return pipe;
 }
 #[no_mangle]
-pub unsafe extern "C" fn preprocess(
+pub unsafe fn preprocess(
     mut infile: *mut libc::c_char,
     mut includedirs: *mut string_arr,
 ) -> *mut libc::FILE {
@@ -314,7 +314,7 @@ pub unsafe extern "C" fn preprocess(
 #[no_mangle]
 pub static mut root: *mut Ast = 0 as *const Ast as *mut Ast;
 #[no_mangle]
-pub unsafe extern "C" fn pass0(mut root_0: *mut Ast, mut ext: *mut Externals) {
+pub unsafe fn pass0(mut root_0: *mut Ast, mut ext: *mut Externals) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*root_0).n {
         let mut decl: *mut ast_externdecl = *((*root_0).decl).offset(i as isize);
@@ -338,7 +338,7 @@ pub unsafe extern "C" fn pass0(mut root_0: *mut Ast, mut ext: *mut Externals) {
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn pass1(mut root_0: *mut Ast, mut ext: *mut Externals) {
+pub unsafe fn pass1(mut root_0: *mut Ast, mut ext: *mut Externals) {
     let mut err: *mut error = 0 as *mut error;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*root_0).n {
@@ -377,7 +377,7 @@ pub unsafe extern "C" fn pass1(mut root_0: *mut Ast, mut ext: *mut Externals) {
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn pass_inorder(mut order: *mut string_arr, mut ext: *mut Externals) {
+pub unsafe fn pass_inorder(mut order: *mut string_arr, mut ext: *mut Externals) {
     let mut err: *mut error = 0 as *mut error;
     let mut n: libc::c_int = string_arr_n(order);
     let mut name: *mut *mut libc::c_char = string_arr_s(order);
@@ -415,7 +415,7 @@ pub unsafe extern "C" fn pass_inorder(mut order: *mut string_arr, mut ext: *mut 
         i += 1;
     }
 }
-unsafe extern "C" fn verifyproto(
+unsafe fn verifyproto(
     mut proto: *mut ast_function,
     mut n: libc::c_int,
     mut decl: *mut *mut ast_externdecl,
@@ -464,7 +464,7 @@ unsafe extern "C" fn verifyproto(
     }
     return 0 as libc::c_int != 0;
 }
-unsafe extern "C" fn proto_defisvalid(
+unsafe fn proto_defisvalid(
     mut proto: *mut ast_function,
     mut def: *mut ast_function,
 ) -> bool {
@@ -507,7 +507,7 @@ unsafe fn main_0(mut argc: libc::c_int, mut argv: *mut *mut libc::c_char) -> lib
     }
     return 0;
 }
-unsafe extern "C" fn verify(mut c: *mut config) -> libc::c_int {
+unsafe fn verify(mut c: *mut config) -> libc::c_int {
     yyin = preprocess((*c).infile, (*c).includedirs);
     lex_begin();
     yyparse();
@@ -553,7 +553,7 @@ unsafe extern "C" fn verify(mut c: *mut config) -> libc::c_int {
     ast_destroy(root);
     return 0 as libc::c_int;
 }
-unsafe extern "C" fn strip(mut config: *mut config) -> libc::c_int {
+unsafe fn strip(mut config: *mut config) -> libc::c_int {
     let mut in_0: *mut libc::FILE = libc::fopen(
         (*config).infile,
         b"rb\0" as *const u8 as *const libc::c_char,
@@ -579,7 +579,7 @@ unsafe extern "C" fn strip(mut config: *mut config) -> libc::c_int {
     return 0 as libc::c_int;
 }
 #[no_mangle]
-pub unsafe extern "C" fn isvblock(mut c: libc::c_char, mut f: *mut libc::FILE) -> bool {
+pub unsafe fn isvblock(mut c: libc::c_char, mut f: *mut libc::FILE) -> bool {
     if c as libc::c_int != '~' as i32 {
         return 0 as libc::c_int != 0;
     }
@@ -602,7 +602,7 @@ pub unsafe extern "C" fn isvblock(mut c: libc::c_char, mut f: *mut libc::FILE) -
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn skipvblock(mut f: *mut libc::FILE) {
+pub unsafe fn skipvblock(mut f: *mut libc::FILE) {
     let mut c: libc::c_char = 0;
     let mut count: libc::c_int = 0 as libc::c_int;
     loop {

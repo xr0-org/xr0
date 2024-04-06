@@ -59,7 +59,7 @@ pub struct block_res {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_create_vconst(
+pub unsafe fn location_create_vconst(
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn location_create_vconst(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_create_dereferencable(
+pub unsafe fn location_create_dereferencable(
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
@@ -131,7 +131,7 @@ pub unsafe extern "C" fn location_create_dereferencable(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_create_static(
+pub unsafe fn location_create_static(
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
@@ -167,7 +167,7 @@ pub unsafe extern "C" fn location_create_static(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_create_dynamic(
+pub unsafe fn location_create_dynamic(
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
@@ -203,7 +203,7 @@ pub unsafe extern "C" fn location_create_dynamic(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_create_automatic(
+pub unsafe fn location_create_automatic(
     mut frame: libc::c_int,
     mut Block: libc::c_int,
     mut offset: *mut AstExpr,
@@ -241,7 +241,7 @@ pub unsafe extern "C" fn location_create_automatic(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_transfigure(
+pub unsafe fn location_transfigure(
     mut loc: *mut Location,
     mut compare: *mut State,
 ) -> *mut Value {
@@ -267,13 +267,13 @@ pub unsafe extern "C" fn location_transfigure(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_destroy(mut loc: *mut Location) {
+pub unsafe fn location_destroy(mut loc: *mut Location) {
     ast_expr_destroy((*loc).offset);
     free(loc as *mut libc::c_void);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_str(mut loc: *mut Location) -> *mut libc::c_char {
+pub unsafe fn location_str(mut loc: *mut Location) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     match (*loc).type_0 as libc::c_uint {
         0 => {
@@ -314,7 +314,7 @@ pub unsafe extern "C" fn location_str(mut loc: *mut Location) -> *mut libc::c_ch
     return strbuilder_build(b);
 }
 
-unsafe extern "C" fn offsetzero(mut loc: *mut Location) -> bool {
+unsafe fn offsetzero(mut loc: *mut Location) -> bool {
     let mut zero: *mut AstExpr = ast_expr_constant_create(0 as libc::c_int);
     let mut eq: bool = ast_expr_equal((*loc).offset, zero);
     ast_expr_destroy(zero);
@@ -322,22 +322,22 @@ unsafe extern "C" fn offsetzero(mut loc: *mut Location) -> bool {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_type(mut loc: *mut Location) -> location_type {
+pub unsafe fn location_type(mut loc: *mut Location) -> location_type {
     return (*loc).type_0;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_block(mut loc: *mut Location) -> libc::c_int {
+pub unsafe fn location_block(mut loc: *mut Location) -> libc::c_int {
     return (*loc).Block;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_offset(mut loc: *mut Location) -> *mut AstExpr {
+pub unsafe fn location_offset(mut loc: *mut Location) -> *mut AstExpr {
     return (*loc).offset;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_copy(mut loc: *mut Location) -> *mut Location {
+pub unsafe fn location_copy(mut loc: *mut Location) -> *mut Location {
     match (*loc).type_0 as libc::c_uint {
         0 => return location_create_static((*loc).Block, ast_expr_copy((*loc).offset)),
         1 => return location_create_vconst((*loc).Block, ast_expr_copy((*loc).offset)),
@@ -369,7 +369,7 @@ pub unsafe extern "C" fn location_copy(mut loc: *mut Location) -> *mut Location 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_with_offset(
+pub unsafe fn location_with_offset(
     mut loc: *mut Location,
     mut offset: *mut AstExpr,
 ) -> *mut Location {
@@ -389,7 +389,7 @@ pub unsafe extern "C" fn location_with_offset(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_tostatic(
+pub unsafe fn location_tostatic(
     mut loc: *mut Location,
     mut sm: *mut static_memory,
 ) -> bool {
@@ -400,7 +400,7 @@ pub unsafe extern "C" fn location_tostatic(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_toheap(mut loc: *mut Location, mut h: *mut Heap) -> bool {
+pub unsafe fn location_toheap(mut loc: *mut Location, mut h: *mut Heap) -> bool {
     let mut type_equal: bool =
         (*loc).type_0 as libc::c_uint == LOCATION_DYNAMIC as libc::c_int as libc::c_uint;
     let mut b: *mut Block = heap_getblock(h, (*loc).Block);
@@ -408,7 +408,7 @@ pub unsafe extern "C" fn location_toheap(mut loc: *mut Location, mut h: *mut Hea
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_tostack(mut loc: *mut Location, mut s: *mut Stack) -> bool {
+pub unsafe fn location_tostack(mut loc: *mut Location, mut s: *mut Stack) -> bool {
     let mut type_equal: bool =
         (*loc).type_0 as libc::c_uint == LOCATION_AUTOMATIC as libc::c_int as libc::c_uint;
     let mut b: *mut Block = stack_getblock(s, (*loc).Block);
@@ -416,7 +416,7 @@ pub unsafe extern "C" fn location_tostack(mut loc: *mut Location, mut s: *mut St
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_toclump(mut loc: *mut Location, mut c: *mut Clump) -> bool {
+pub unsafe fn location_toclump(mut loc: *mut Location, mut c: *mut Clump) -> bool {
     let mut type_equal: bool =
         (*loc).type_0 as libc::c_uint == LOCATION_DEREFERENCABLE as libc::c_int as libc::c_uint;
     let mut b: *mut Block = clump_getblock(c, (*loc).Block);
@@ -424,14 +424,14 @@ pub unsafe extern "C" fn location_toclump(mut loc: *mut Location, mut c: *mut Cl
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_equal(mut l1: *mut Location, mut l2: *mut Location) -> bool {
+pub unsafe fn location_equal(mut l1: *mut Location, mut l2: *mut Location) -> bool {
     return (*l1).type_0 as libc::c_uint == (*l2).type_0 as libc::c_uint
         && (*l1).Block == (*l2).Block
         && ast_expr_equal((*l1).offset, (*l2).offset) as libc::c_int != 0;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_references(
+pub unsafe fn location_references(
     mut l1: *mut Location,
     mut l2: *mut Location,
     mut s: *mut State,
@@ -444,12 +444,12 @@ pub unsafe extern "C" fn location_references(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_isauto(mut loc: *mut Location) -> bool {
+pub unsafe fn location_isauto(mut loc: *mut Location) -> bool {
     return (*loc).type_0 as libc::c_uint == LOCATION_AUTOMATIC as libc::c_int as libc::c_uint;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_referencesheap(mut l: *mut Location, mut s: *mut State) -> bool {
+pub unsafe fn location_referencesheap(mut l: *mut Location, mut s: *mut State) -> bool {
     if (*l).type_0 as libc::c_uint == LOCATION_DYNAMIC as libc::c_int as libc::c_uint {
         if heap_blockisfreed(state_getheap(s), (*l).Block) {
             return 0 as libc::c_int != 0;
@@ -475,7 +475,7 @@ pub unsafe extern "C" fn location_referencesheap(mut l: *mut Location, mut s: *m
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_getblock(
+pub unsafe fn location_getblock(
     mut loc: *mut Location,
     mut sm: *mut static_memory,
     mut v: *mut vconst,
@@ -540,7 +540,7 @@ pub unsafe extern "C" fn location_getblock(
     panic!("Reached end of non-void function without returning");
 }
 
-unsafe extern "C" fn location_auto_getblock(
+unsafe fn location_auto_getblock(
     mut loc: *mut Location,
     mut s: *mut Stack,
 ) -> block_res {
@@ -567,7 +567,7 @@ unsafe extern "C" fn location_auto_getblock(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_getstackblock(
+pub unsafe fn location_getstackblock(
     mut loc: *mut Location,
     mut s: *mut Stack,
 ) -> *mut Block {
@@ -590,7 +590,7 @@ pub unsafe extern "C" fn location_getstackblock(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_dealloc(
+pub unsafe fn location_dealloc(
     mut loc: *mut Location,
     mut Heap: *mut Heap,
 ) -> *mut error {
@@ -603,7 +603,7 @@ pub unsafe extern "C" fn location_dealloc(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn location_range_dealloc(
+pub unsafe fn location_range_dealloc(
     mut loc: *mut Location,
     mut lw: *mut AstExpr,
     mut up: *mut AstExpr,

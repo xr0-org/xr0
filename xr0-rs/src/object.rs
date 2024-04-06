@@ -61,7 +61,7 @@ pub struct object_result {
     pub err: *mut error,
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_value_create(
+pub unsafe fn object_value_create(
     mut offset: *mut AstExpr,
     mut v: *mut Value,
 ) -> *mut Object {
@@ -82,7 +82,7 @@ pub unsafe extern "C" fn object_value_create(
     return obj;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_range_create(
+pub unsafe fn object_range_create(
     mut offset: *mut AstExpr,
     mut r: *mut Range,
 ) -> *mut Object {
@@ -113,7 +113,7 @@ pub unsafe extern "C" fn object_range_create(
     return obj;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_destroy(mut obj: *mut Object) {
+pub unsafe fn object_destroy(mut obj: *mut Object) {
     match (*obj).type_0 as libc::c_uint {
         0 => {
             if !((*obj).c2rust_unnamed.Value).is_null() {
@@ -142,7 +142,7 @@ pub unsafe extern "C" fn object_destroy(mut obj: *mut Object) {
     free(obj as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_copy(mut old: *mut Object) -> *mut Object {
+pub unsafe fn object_copy(mut old: *mut Object) -> *mut Object {
     let mut new: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
     (*new).offset = ast_expr_copy((*old).offset);
     (*new).type_0 = (*old).type_0;
@@ -173,7 +173,7 @@ pub unsafe extern "C" fn object_copy(mut old: *mut Object) -> *mut Object {
     return new;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_abstractcopy(
+pub unsafe fn object_abstractcopy(
     mut old: *mut Object,
     mut s: *mut State,
 ) -> *mut Object {
@@ -207,7 +207,7 @@ pub unsafe extern "C" fn object_abstractcopy(
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_str(mut obj: *mut Object) -> *mut libc::c_char {
+pub unsafe fn object_str(mut obj: *mut Object) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     strbuilder_printf(b, b"{\0" as *const u8 as *const libc::c_char);
     let mut offset: *mut libc::c_char = ast_expr_str((*obj).offset);
@@ -219,7 +219,7 @@ pub unsafe extern "C" fn object_str(mut obj: *mut Object) -> *mut libc::c_char {
     strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
     return strbuilder_build(b);
 }
-unsafe extern "C" fn inner_str(mut obj: *mut Object) -> *mut libc::c_char {
+unsafe fn inner_str(mut obj: *mut Object) -> *mut libc::c_char {
     match (*obj).type_0 as libc::c_uint {
         0 => {
             return if !((*obj).c2rust_unnamed.Value).is_null() {
@@ -245,7 +245,7 @@ unsafe extern "C" fn inner_str(mut obj: *mut Object) -> *mut libc::c_char {
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_referencesheap(mut obj: *mut Object, mut s: *mut State) -> bool {
+pub unsafe fn object_referencesheap(mut obj: *mut Object, mut s: *mut State) -> bool {
     if !object_isvalue(obj) {
         return 1 as libc::c_int != 0;
     }
@@ -253,18 +253,18 @@ pub unsafe extern "C" fn object_referencesheap(mut obj: *mut Object, mut s: *mut
         && value_referencesheap((*obj).c2rust_unnamed.Value, s) as libc::c_int != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_hasvalue(mut obj: *mut Object) -> bool {
+pub unsafe fn object_hasvalue(mut obj: *mut Object) -> bool {
     if object_isvalue(obj) {
         return !((*obj).c2rust_unnamed.Value).is_null();
     }
     return 0 as libc::c_int != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_isvalue(mut obj: *mut Object) -> bool {
+pub unsafe fn object_isvalue(mut obj: *mut Object) -> bool {
     return (*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_as_value(mut obj: *mut Object) -> *mut Value {
+pub unsafe fn object_as_value(mut obj: *mut Object) -> *mut Value {
     if !((*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
         != 0
@@ -281,7 +281,7 @@ pub unsafe extern "C" fn object_as_value(mut obj: *mut Object) -> *mut Value {
     return (*obj).c2rust_unnamed.Value;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_isdeallocand(mut obj: *mut Object, mut s: *mut State) -> bool {
+pub unsafe fn object_isdeallocand(mut obj: *mut Object, mut s: *mut State) -> bool {
     match (*obj).type_0 as libc::c_uint {
         0 => {
             return !((*obj).c2rust_unnamed.Value).is_null()
@@ -308,7 +308,7 @@ pub unsafe extern "C" fn object_isdeallocand(mut obj: *mut Object, mut s: *mut S
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_references(
+pub unsafe fn object_references(
     mut obj: *mut Object,
     mut loc: *mut Location,
     mut s: *mut State,
@@ -337,7 +337,7 @@ pub unsafe extern "C" fn object_references(
     } != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_assign(mut obj: *mut Object, mut val: *mut Value) -> *mut error {
+pub unsafe fn object_assign(mut obj: *mut Object, mut val: *mut Value) -> *mut error {
     if !((*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
         != 0
@@ -354,7 +354,7 @@ pub unsafe extern "C" fn object_assign(mut obj: *mut Object, mut val: *mut Value
     (*obj).c2rust_unnamed.Value = val;
     return 0 as *mut error;
 }
-unsafe extern "C" fn object_size(mut obj: *mut Object) -> *mut AstExpr {
+unsafe fn object_size(mut obj: *mut Object) -> *mut AstExpr {
     match (*obj).type_0 as libc::c_uint {
         0 => return ast_expr_constant_create(1 as libc::c_int),
         1 => return ast_expr_copy(range_size((*obj).c2rust_unnamed.range)),
@@ -374,15 +374,15 @@ unsafe extern "C" fn object_size(mut obj: *mut Object) -> *mut AstExpr {
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_lower(mut obj: *mut Object) -> *mut AstExpr {
+pub unsafe fn object_lower(mut obj: *mut Object) -> *mut AstExpr {
     return (*obj).offset;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_upper(mut obj: *mut Object) -> *mut AstExpr {
+pub unsafe fn object_upper(mut obj: *mut Object) -> *mut AstExpr {
     return ast_expr_sum_create(ast_expr_copy((*obj).offset), object_size(obj));
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_contains(
+pub unsafe fn object_contains(
     mut obj: *mut Object,
     mut offset: *mut AstExpr,
     mut s: *mut State,
@@ -400,7 +400,7 @@ pub unsafe extern "C" fn object_contains(
     return contains;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_contains_upperincl(
+pub unsafe fn object_contains_upperincl(
     mut obj: *mut Object,
     mut offset: *mut AstExpr,
     mut s: *mut State,
@@ -412,13 +412,13 @@ pub unsafe extern "C" fn object_contains_upperincl(
         && state_eval(s, ast_expr_le_create(of, up)) as libc::c_int != 0;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_isempty(mut obj: *mut Object, mut s: *mut State) -> bool {
+pub unsafe fn object_isempty(mut obj: *mut Object, mut s: *mut State) -> bool {
     let mut lw: *mut AstExpr = (*obj).offset;
     let mut up: *mut AstExpr = object_upper(obj);
     return state_eval(s, ast_expr_eq_create(lw, up));
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_contig_precedes(
+pub unsafe fn object_contig_precedes(
     mut before: *mut Object,
     mut after: *mut Object,
     mut s: *mut State,
@@ -428,7 +428,7 @@ pub unsafe extern "C" fn object_contig_precedes(
     return state_eval(s, ast_expr_eq_create(lw, up));
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_issingular(mut obj: *mut Object, mut s: *mut State) -> bool {
+pub unsafe fn object_issingular(mut obj: *mut Object, mut s: *mut State) -> bool {
     let mut lw: *mut AstExpr = (*obj).offset;
     let mut up: *mut AstExpr = object_upper(obj);
     let mut lw_succ: *mut AstExpr =
@@ -436,7 +436,7 @@ pub unsafe extern "C" fn object_issingular(mut obj: *mut Object, mut s: *mut Sta
     return state_eval(s, ast_expr_eq_create(lw_succ, up));
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_upto(
+pub unsafe fn object_upto(
     mut obj: *mut Object,
     mut excl_up: *mut AstExpr,
     mut s: *mut State,
@@ -493,7 +493,7 @@ pub unsafe extern "C" fn object_upto(
     );
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_from(
+pub unsafe fn object_from(
     mut obj: *mut Object,
     mut incl_lw: *mut AstExpr,
     mut s: *mut State,
@@ -539,7 +539,7 @@ pub unsafe extern "C" fn object_from(
     );
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_dealloc(mut obj: *mut Object, mut s: *mut State) -> *mut error {
+pub unsafe fn object_dealloc(mut obj: *mut Object, mut s: *mut State) -> *mut error {
     match (*obj).type_0 as libc::c_uint {
         0 => return state_dealloc(s, (*obj).c2rust_unnamed.Value),
         1 => return range_dealloc((*obj).c2rust_unnamed.range, s),
@@ -561,7 +561,7 @@ pub unsafe extern "C" fn object_dealloc(mut obj: *mut Object, mut s: *mut State)
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_getmember(
+pub unsafe fn object_getmember(
     mut obj: *mut Object,
     mut t: *mut ast_type,
     mut member: *mut libc::c_char,
@@ -569,7 +569,7 @@ pub unsafe extern "C" fn object_getmember(
 ) -> *mut Object {
     return value_struct_member(getorcreatestruct(obj, t, s), member);
 }
-unsafe extern "C" fn getorcreatestruct(
+unsafe fn getorcreatestruct(
     mut obj: *mut Object,
     mut t: *mut ast_type,
     mut s: *mut State,
@@ -594,7 +594,7 @@ unsafe extern "C" fn getorcreatestruct(
     return v;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_getmembertype(
+pub unsafe fn object_getmembertype(
     mut obj: *mut Object,
     mut t: *mut ast_type,
     mut member: *mut libc::c_char,
@@ -603,7 +603,7 @@ pub unsafe extern "C" fn object_getmembertype(
     return value_struct_membertype(getorcreatestruct(obj, t, s), member);
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_result_error_create(mut err: *mut error) -> *mut object_result {
+pub unsafe fn object_result_error_create(mut err: *mut error) -> *mut object_result {
     if err.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 27], &[libc::c_char; 27]>(
@@ -623,7 +623,7 @@ pub unsafe extern "C" fn object_result_error_create(mut err: *mut error) -> *mut
     return r;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_result_value_create(mut val: *mut Object) -> *mut object_result {
+pub unsafe fn object_result_value_create(mut val: *mut Object) -> *mut object_result {
     let mut r: *mut object_result =
         malloc(::core::mem::size_of::<object_result>()) as *mut object_result;
     (*r).val = val;
@@ -631,7 +631,7 @@ pub unsafe extern "C" fn object_result_value_create(mut val: *mut Object) -> *mu
     return r;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_result_destroy(mut res: *mut object_result) {
+pub unsafe fn object_result_destroy(mut res: *mut object_result) {
     if !((*res).err).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(b"object_result_destroy\0"))
@@ -648,11 +648,11 @@ pub unsafe extern "C" fn object_result_destroy(mut res: *mut object_result) {
     free(res as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_result_iserror(mut res: *mut object_result) -> bool {
+pub unsafe fn object_result_iserror(mut res: *mut object_result) -> bool {
     return !((*res).err).is_null();
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_result_as_error(mut res: *mut object_result) -> *mut error {
+pub unsafe fn object_result_as_error(mut res: *mut object_result) -> *mut error {
     if ((*res).err).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
@@ -668,7 +668,7 @@ pub unsafe extern "C" fn object_result_as_error(mut res: *mut object_result) -> 
     return (*res).err;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_result_as_value(mut res: *mut object_result) -> *mut Object {
+pub unsafe fn object_result_as_value(mut res: *mut object_result) -> *mut Object {
     if !((*res).err).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
@@ -684,7 +684,7 @@ pub unsafe extern "C" fn object_result_as_value(mut res: *mut object_result) -> 
     return (*res).val;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_result_hasvalue(mut res: *mut object_result) -> bool {
+pub unsafe fn object_result_hasvalue(mut res: *mut object_result) -> bool {
     if object_result_iserror(res) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
@@ -700,7 +700,7 @@ pub unsafe extern "C" fn object_result_hasvalue(mut res: *mut object_result) -> 
     return !((*res).val).is_null();
 }
 #[no_mangle]
-pub unsafe extern "C" fn range_create(
+pub unsafe fn range_create(
     mut size: *mut AstExpr,
     mut loc: *mut Location,
 ) -> *mut Range {
@@ -710,17 +710,17 @@ pub unsafe extern "C" fn range_create(
     return r;
 }
 #[no_mangle]
-pub unsafe extern "C" fn range_copy(mut r: *mut Range) -> *mut Range {
+pub unsafe fn range_copy(mut r: *mut Range) -> *mut Range {
     return range_create(ast_expr_copy((*r).size), location_copy((*r).loc));
 }
 #[no_mangle]
-pub unsafe extern "C" fn range_destroy(mut r: *mut Range) {
+pub unsafe fn range_destroy(mut r: *mut Range) {
     ast_expr_destroy((*r).size);
     location_destroy((*r).loc);
     free(r as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn range_str(mut r: *mut Range) -> *mut libc::c_char {
+pub unsafe fn range_str(mut r: *mut Range) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     let mut size: *mut libc::c_char = ast_expr_str((*r).size);
     let mut loc: *mut libc::c_char = location_str((*r).loc);
@@ -735,19 +735,19 @@ pub unsafe extern "C" fn range_str(mut r: *mut Range) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 #[no_mangle]
-pub unsafe extern "C" fn range_size(mut r: *mut Range) -> *mut AstExpr {
+pub unsafe fn range_size(mut r: *mut Range) -> *mut AstExpr {
     return (*r).size;
 }
 #[no_mangle]
-pub unsafe extern "C" fn range_dealloc(mut r: *mut Range, mut s: *mut State) -> *mut error {
+pub unsafe fn range_dealloc(mut r: *mut Range, mut s: *mut State) -> *mut error {
     return state_dealloc(s, value_ptr_create((*r).loc));
 }
 #[no_mangle]
-pub unsafe extern "C" fn range_isdeallocand(mut r: *mut Range, mut s: *mut State) -> bool {
+pub unsafe fn range_isdeallocand(mut r: *mut Range, mut s: *mut State) -> bool {
     return state_isdeallocand(s, (*r).loc);
 }
 #[no_mangle]
-pub unsafe extern "C" fn range_references(
+pub unsafe fn range_references(
     mut r: *mut Range,
     mut loc: *mut Location,
     mut s: *mut State,
@@ -755,7 +755,7 @@ pub unsafe extern "C" fn range_references(
     return location_references((*r).loc, loc, s);
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_create() -> *mut object_arr {
+pub unsafe fn object_arr_create() -> *mut object_arr {
     let mut arr: *mut object_arr =
         calloc(1, ::core::mem::size_of::<object_arr>()) as *mut object_arr;
     if arr.is_null() as libc::c_int as libc::c_long != 0 {
@@ -771,7 +771,7 @@ pub unsafe extern "C" fn object_arr_create() -> *mut object_arr {
     return arr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_destroy(mut arr: *mut object_arr) {
+pub unsafe fn object_arr_destroy(mut arr: *mut object_arr) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {
         object_destroy(*((*arr).Object).offset(i as isize));
@@ -781,7 +781,7 @@ pub unsafe extern "C" fn object_arr_destroy(mut arr: *mut object_arr) {
     free(arr as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_copy(mut arr: *mut object_arr) -> *mut object_arr {
+pub unsafe fn object_arr_copy(mut arr: *mut object_arr) -> *mut object_arr {
     let mut copy: *mut object_arr = object_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {
@@ -791,15 +791,15 @@ pub unsafe extern "C" fn object_arr_copy(mut arr: *mut object_arr) -> *mut objec
     return copy;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_allocs(mut arr: *mut object_arr) -> *mut *mut Object {
+pub unsafe fn object_arr_allocs(mut arr: *mut object_arr) -> *mut *mut Object {
     return (*arr).Object;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_nallocs(mut arr: *mut object_arr) -> libc::c_int {
+pub unsafe fn object_arr_nallocs(mut arr: *mut object_arr) -> libc::c_int {
     return (*arr).n;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_index(
+pub unsafe fn object_arr_index(
     mut arr: *mut object_arr,
     mut offset: *mut AstExpr,
     mut State: *mut State,
@@ -814,7 +814,7 @@ pub unsafe extern "C" fn object_arr_index(
     return -(1 as libc::c_int);
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_index_upperincl(
+pub unsafe fn object_arr_index_upperincl(
     mut arr: *mut object_arr,
     mut offset: *mut AstExpr,
     mut State: *mut State,
@@ -829,7 +829,7 @@ pub unsafe extern "C" fn object_arr_index_upperincl(
     return -(1 as libc::c_int);
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_insert(
+pub unsafe fn object_arr_insert(
     mut arr: *mut object_arr,
     mut index: libc::c_int,
     mut obj: *mut Object,
@@ -860,14 +860,14 @@ pub unsafe extern "C" fn object_arr_insert(
     return index;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_append(
+pub unsafe fn object_arr_append(
     mut arr: *mut object_arr,
     mut obj: *mut Object,
 ) -> libc::c_int {
     return object_arr_insert(arr, (*arr).n, obj);
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_remove(mut arr: *mut object_arr, mut index: libc::c_int) {
+pub unsafe fn object_arr_remove(mut arr: *mut object_arr, mut index: libc::c_int) {
     let mut i: libc::c_int = index;
     while i < (*arr).n - 1 as libc::c_int {
         let ref mut fresh2 = *((*arr).Object).offset(i as isize);
@@ -891,10 +891,10 @@ pub unsafe extern "C" fn object_arr_remove(mut arr: *mut object_arr, mut index: 
     };
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_nobjects(mut arr: *mut object_arr) -> libc::c_int {
+pub unsafe fn object_arr_nobjects(mut arr: *mut object_arr) -> libc::c_int {
     return (*arr).n;
 }
 #[no_mangle]
-pub unsafe extern "C" fn object_arr_objects(mut arr: *mut object_arr) -> *mut *mut Object {
+pub unsafe fn object_arr_objects(mut arr: *mut object_arr) -> *mut *mut Object {
     return (*arr).Object;
 }

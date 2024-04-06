@@ -73,12 +73,12 @@ pub const IC_TYPE: ictype = 2;
 pub const IC_NONE: ictype = 1;
 
 #[inline]
-unsafe extern "C" fn isascii(mut _c: libc::c_int) -> libc::c_int {
+unsafe fn isascii(mut _c: libc::c_int) -> libc::c_int {
     return (_c & !(0x7f as libc::c_int) == 0 as libc::c_int) as libc::c_int;
 }
 
 #[inline]
-unsafe extern "C" fn __istype(mut _c: __darwin_ct_rune_t, mut _f: libc::c_ulong) -> libc::c_int {
+unsafe fn __istype(mut _c: __darwin_ct_rune_t, mut _f: libc::c_ulong) -> libc::c_int {
     return if isascii(_c) != 0 {
         (_DefaultRuneLocale.__runetype[_c as usize] as libc::c_ulong & _f != 0) as libc::c_int
     } else {
@@ -86,7 +86,7 @@ unsafe extern "C" fn __istype(mut _c: __darwin_ct_rune_t, mut _f: libc::c_ulong)
     };
 }
 #[inline]
-unsafe extern "C" fn __isctype(
+unsafe fn __isctype(
     mut _c: __darwin_ct_rune_t,
     mut _f: libc::c_ulong,
 ) -> __darwin_ct_rune_t {
@@ -99,21 +99,21 @@ unsafe extern "C" fn __isctype(
 #[no_mangle]
 #[inline]
 #[linkage = "external"]
-pub unsafe extern "C" fn isdigit(mut _c: libc::c_int) -> libc::c_int {
+pub unsafe fn isdigit(mut _c: libc::c_int) -> libc::c_int {
     return __isctype(_c, 0x400 as libc::c_long as libc::c_ulong);
 }
 #[no_mangle]
 #[inline]
 #[linkage = "external"]
-pub unsafe extern "C" fn isspace(mut _c: libc::c_int) -> libc::c_int {
+pub unsafe fn isspace(mut _c: libc::c_int) -> libc::c_int {
     return __istype(_c, 0x4000 as libc::c_long as libc::c_ulong);
 }
 #[no_mangle]
-pub unsafe extern "C" fn yywrap() -> libc::c_int {
+pub unsafe fn yywrap() -> libc::c_int {
     return 1 as libc::c_int;
 }
 #[no_mangle]
-pub unsafe extern "C" fn comment() {
+pub unsafe fn comment() {
     let mut c: libc::c_char = 0;
     let mut c1: libc::c_char = 0;
     loop {
@@ -142,7 +142,7 @@ pub static mut marker: lexememarker = lexememarker {
 };
 
 #[no_mangle]
-pub unsafe extern "C" fn lexloc() -> *mut lexememarker {
+pub unsafe fn lexloc() -> *mut lexememarker {
     if (marker.filename).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 7], &[libc::c_char; 7]>(b"lexloc\0")).as_ptr(),
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn lexloc() -> *mut lexememarker {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn process_linemarker() -> lexememarker {
+pub unsafe fn process_linemarker() -> lexememarker {
     let mut c: libc::c_char = input() as libc::c_char;
     if isspace(c as libc::c_int) == 0 {
         fprintf(
@@ -258,14 +258,14 @@ static mut yy_buffer_stack_max: size_t = 0 as libc::c_int as size_t;
 static mut yy_buffer_stack: *mut YY_BUFFER_STATE =
     0 as *const YY_BUFFER_STATE as *mut YY_BUFFER_STATE;
 #[no_mangle]
-pub unsafe extern "C" fn preproc() {
+pub unsafe fn preproc() {
     if !(marker.filename).is_null() {
         free(marker.filename as *mut libc::c_void);
     }
     marker = process_linemarker();
 }
 #[no_mangle]
-pub unsafe extern "C" fn count() {
+pub unsafe fn count() {
     let mut s: *mut libc::c_char = yytext;
     while *s != 0 {
         match *s as libc::c_int {
@@ -294,7 +294,7 @@ static mut yy_init: libc::c_int = 0 as libc::c_int;
 static mut yy_start: libc::c_int = 0 as libc::c_int;
 static mut yy_did_buffer_switch_on_eof: libc::c_int = 0;
 #[no_mangle]
-pub unsafe extern "C" fn check_type() -> libc::c_long {
+pub unsafe fn check_type() -> libc::c_long {
     if !(map_get(table, yytext)).is_null() {
         return 285 as libc::c_int as libc::c_long;
     }
@@ -316,19 +316,19 @@ pub static mut table: *mut map = 0 as *const map as *mut map;
 #[no_mangle]
 pub static mut installclass: ictype = 0 as ictype;
 #[no_mangle]
-pub unsafe extern "C" fn lex_begin() {
+pub unsafe fn lex_begin() {
     table = map_create();
     installclass = IC_NONE;
 }
 #[no_mangle]
-pub unsafe extern "C" fn lex_finish() {
+pub unsafe fn lex_finish() {
     if !(marker.filename).is_null() {
         free(marker.filename as *mut libc::c_void);
     }
     map_destroy(table);
 }
 #[no_mangle]
-pub unsafe extern "C" fn lexememarker_create(
+pub unsafe fn lexememarker_create(
     mut linenum: libc::c_int,
     mut column: libc::c_int,
     mut filename: *mut libc::c_char,
@@ -347,7 +347,7 @@ pub static mut yyin: *mut FILE = 0 as *const FILE as *mut FILE;
 #[no_mangle]
 pub static mut yyout: *mut FILE = 0 as *const FILE as *mut FILE;
 #[no_mangle]
-pub unsafe extern "C" fn lexememarker_copy(mut loc: *mut lexememarker) -> *mut lexememarker {
+pub unsafe fn lexememarker_copy(mut loc: *mut lexememarker) -> *mut lexememarker {
     return lexememarker_create(
         (*loc).linenum,
         (*loc).column,
@@ -358,12 +358,12 @@ pub unsafe extern "C" fn lexememarker_copy(mut loc: *mut lexememarker) -> *mut l
 #[no_mangle]
 pub static mut yylineno: libc::c_int = 1 as libc::c_int;
 #[no_mangle]
-pub unsafe extern "C" fn lexememarker_destroy(mut loc: *mut lexememarker) {
+pub unsafe fn lexememarker_destroy(mut loc: *mut lexememarker) {
     free((*loc).filename as *mut libc::c_void);
     free(loc as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe extern "C" fn lexememarker_str(mut loc: *mut lexememarker) -> *mut libc::c_char {
+pub unsafe fn lexememarker_str(mut loc: *mut lexememarker) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     strbuilder_printf(
         b,
@@ -2496,7 +2496,7 @@ pub static mut yy_flex_debug: libc::c_int = 0 as libc::c_int;
 #[no_mangle]
 pub static mut yytext: *mut libc::c_char = 0 as *const libc::c_char as *mut libc::c_char;
 #[no_mangle]
-pub unsafe extern "C" fn yylex() -> libc::c_int {
+pub unsafe fn yylex() -> libc::c_int {
     let mut yy_amount_of_matched_text: libc::c_int = 0;
     let mut yy_next_state: yy_state_type = 0;
     let mut current_block: u64;
@@ -3082,7 +3082,7 @@ pub unsafe extern "C" fn yylex() -> libc::c_int {
         }
     }
 }
-unsafe extern "C" fn yy_get_next_buffer() -> libc::c_int {
+unsafe fn yy_get_next_buffer() -> libc::c_int {
     let mut dest: *mut libc::c_char =
         (**yy_buffer_stack.offset(yy_buffer_stack_top as isize)).yy_ch_buf;
     let mut source: *mut libc::c_char = yytext;
@@ -3258,7 +3258,7 @@ unsafe extern "C" fn yy_get_next_buffer() -> libc::c_int {
         .offset(0 as libc::c_int as isize) as *mut libc::c_char;
     return ret_val;
 }
-unsafe extern "C" fn yy_get_previous_state() -> yy_state_type {
+unsafe fn yy_get_previous_state() -> yy_state_type {
     let mut yy_current_state: yy_state_type = 0;
     let mut yy_cp: *mut libc::c_char = 0 as *mut libc::c_char;
     yy_current_state = yy_start;
@@ -3290,7 +3290,7 @@ unsafe extern "C" fn yy_get_previous_state() -> yy_state_type {
     }
     return yy_current_state;
 }
-unsafe extern "C" fn yy_try_NUL_trans(mut yy_current_state: yy_state_type) -> yy_state_type {
+unsafe fn yy_try_NUL_trans(mut yy_current_state: yy_state_type) -> yy_state_type {
     let mut yy_is_jam: libc::c_int = 0;
     let mut yy_cp: *mut libc::c_char = yy_c_buf_p;
     let mut yy_c: YY_CHAR = 1 as libc::c_int as YY_CHAR;
@@ -3317,7 +3317,7 @@ unsafe extern "C" fn yy_try_NUL_trans(mut yy_current_state: yy_state_type) -> yy
         yy_current_state
     };
 }
-unsafe extern "C" fn yyunput(mut c: libc::c_int, mut yy_bp: *mut libc::c_char) {
+unsafe fn yyunput(mut c: libc::c_int, mut yy_bp: *mut libc::c_char) {
     let mut yy_cp: *mut libc::c_char = 0 as *mut libc::c_char;
     yy_cp = yy_c_buf_p;
     *yy_cp = yy_hold_char;
@@ -3359,7 +3359,7 @@ unsafe extern "C" fn yyunput(mut c: libc::c_int, mut yy_bp: *mut libc::c_char) {
     yy_hold_char = *yy_cp;
     yy_c_buf_p = yy_cp;
 }
-unsafe extern "C" fn input() -> libc::c_int {
+unsafe fn input() -> libc::c_int {
     let mut c: libc::c_int = 0;
     *yy_c_buf_p = yy_hold_char;
     if *yy_c_buf_p as libc::c_int == 0 as libc::c_int {
@@ -3409,7 +3409,7 @@ unsafe extern "C" fn input() -> libc::c_int {
     return c;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yyrestart(mut input_file: *mut FILE) {
+pub unsafe fn yyrestart(mut input_file: *mut FILE) {
     if if !yy_buffer_stack.is_null() {
         *yy_buffer_stack.offset(yy_buffer_stack_top as isize)
     } else {
@@ -3432,7 +3432,7 @@ pub unsafe extern "C" fn yyrestart(mut input_file: *mut FILE) {
     yy_load_buffer_state();
 }
 #[no_mangle]
-pub unsafe extern "C" fn yy_switch_to_buffer(mut new_buffer: YY_BUFFER_STATE) {
+pub unsafe fn yy_switch_to_buffer(mut new_buffer: YY_BUFFER_STATE) {
     yyensure_buffer_stack();
     if (if !yy_buffer_stack.is_null() {
         *yy_buffer_stack.offset(yy_buffer_stack_top as isize)
@@ -3459,7 +3459,7 @@ pub unsafe extern "C" fn yy_switch_to_buffer(mut new_buffer: YY_BUFFER_STATE) {
     yy_load_buffer_state();
     yy_did_buffer_switch_on_eof = 1 as libc::c_int;
 }
-unsafe extern "C" fn yy_load_buffer_state() {
+unsafe fn yy_load_buffer_state() {
     yy_n_chars = (**yy_buffer_stack.offset(yy_buffer_stack_top as isize)).yy_n_chars;
     yy_c_buf_p = (**yy_buffer_stack.offset(yy_buffer_stack_top as isize)).yy_buf_pos;
     yytext = yy_c_buf_p;
@@ -3467,7 +3467,7 @@ unsafe extern "C" fn yy_load_buffer_state() {
     yy_hold_char = *yy_c_buf_p;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yy_create_buffer(
+pub unsafe fn yy_create_buffer(
     mut file: *mut FILE,
     mut size: libc::c_int,
 ) -> YY_BUFFER_STATE {
@@ -3491,7 +3491,7 @@ pub unsafe extern "C" fn yy_create_buffer(
     return b;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yy_delete_buffer(mut b: YY_BUFFER_STATE) {
+pub unsafe fn yy_delete_buffer(mut b: YY_BUFFER_STATE) {
     if b.is_null() {
         return;
     }
@@ -3508,7 +3508,7 @@ pub unsafe extern "C" fn yy_delete_buffer(mut b: YY_BUFFER_STATE) {
     }
     yyfree(b as *mut libc::c_void);
 }
-unsafe extern "C" fn yy_init_buffer(mut b: YY_BUFFER_STATE, mut file: *mut FILE) {
+unsafe fn yy_init_buffer(mut b: YY_BUFFER_STATE, mut file: *mut FILE) {
     let mut oerrno: libc::c_int = *__error();
     yy_flush_buffer(b);
     (*b).yy_input_file = file;
@@ -3529,7 +3529,7 @@ unsafe extern "C" fn yy_init_buffer(mut b: YY_BUFFER_STATE, mut file: *mut FILE)
     *__error() = oerrno;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yy_flush_buffer(mut b: YY_BUFFER_STATE) {
+pub unsafe fn yy_flush_buffer(mut b: YY_BUFFER_STATE) {
     if b.is_null() {
         return;
     }
@@ -3548,7 +3548,7 @@ pub unsafe extern "C" fn yy_flush_buffer(mut b: YY_BUFFER_STATE) {
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn yypush_buffer_state(mut new_buffer: YY_BUFFER_STATE) {
+pub unsafe fn yypush_buffer_state(mut new_buffer: YY_BUFFER_STATE) {
     if new_buffer.is_null() {
         return;
     }
@@ -3580,7 +3580,7 @@ pub unsafe extern "C" fn yypush_buffer_state(mut new_buffer: YY_BUFFER_STATE) {
     yy_did_buffer_switch_on_eof = 1 as libc::c_int;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yypop_buffer_state() {
+pub unsafe fn yypop_buffer_state() {
     if if !yy_buffer_stack.is_null() {
         *yy_buffer_stack.offset(yy_buffer_stack_top as isize)
     } else {
@@ -3611,7 +3611,7 @@ pub unsafe extern "C" fn yypop_buffer_state() {
         yy_did_buffer_switch_on_eof = 1 as libc::c_int;
     }
 }
-unsafe extern "C" fn yyensure_buffer_stack() {
+unsafe fn yyensure_buffer_stack() {
     let mut num_to_alloc: yy_size_t = 0;
     if yy_buffer_stack.is_null() {
         num_to_alloc = 1 as libc::c_int as yy_size_t;
@@ -3657,7 +3657,7 @@ unsafe extern "C" fn yyensure_buffer_stack() {
     }
 }
 #[no_mangle]
-pub unsafe extern "C" fn yy_scan_buffer(
+pub unsafe fn yy_scan_buffer(
     mut base: *mut libc::c_char,
     mut size: yy_size_t,
 ) -> YY_BUFFER_STATE {
@@ -3690,11 +3690,11 @@ pub unsafe extern "C" fn yy_scan_buffer(
     return b;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yy_scan_string(mut yystr: *const libc::c_char) -> YY_BUFFER_STATE {
+pub unsafe fn yy_scan_string(mut yystr: *const libc::c_char) -> YY_BUFFER_STATE {
     return yy_scan_bytes(yystr, strlen(yystr) as yy_size_t);
 }
 #[no_mangle]
-pub unsafe extern "C" fn yy_scan_bytes(
+pub unsafe fn yy_scan_bytes(
     mut yybytes: *const libc::c_char,
     mut _yybytes_len: yy_size_t,
 ) -> YY_BUFFER_STATE {
@@ -3725,7 +3725,7 @@ pub unsafe extern "C" fn yy_scan_bytes(
     (*b).yy_is_our_buffer = 1 as libc::c_int;
     return b;
 }
-unsafe extern "C" fn yy_fatal_error(mut msg: *const libc::c_char) -> ! {
+unsafe fn yy_fatal_error(mut msg: *const libc::c_char) -> ! {
     fprintf(
         __stderrp,
         b"%s\n\0" as *const u8 as *const libc::c_char,
@@ -3734,51 +3734,51 @@ unsafe extern "C" fn yy_fatal_error(mut msg: *const libc::c_char) -> ! {
     exit(2 as libc::c_int);
 }
 #[no_mangle]
-pub unsafe extern "C" fn yyget_lineno() -> libc::c_int {
+pub unsafe fn yyget_lineno() -> libc::c_int {
     return yylineno;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yyget_in() -> *mut FILE {
+pub unsafe fn yyget_in() -> *mut FILE {
     return yyin;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yyget_out() -> *mut FILE {
+pub unsafe fn yyget_out() -> *mut FILE {
     return yyout;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yyget_leng() -> yy_size_t {
+pub unsafe fn yyget_leng() -> yy_size_t {
     return yyleng;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yyget_text() -> *mut libc::c_char {
+pub unsafe fn yyget_text() -> *mut libc::c_char {
     return yytext;
 }
 #[no_mangle]
-pub unsafe extern "C" fn yyset_lineno(mut _line_number: libc::c_int) {
+pub unsafe fn yyset_lineno(mut _line_number: libc::c_int) {
     yylineno = _line_number;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yyset_in(mut _in_str: *mut FILE) {
+pub unsafe fn yyset_in(mut _in_str: *mut FILE) {
     yyin = _in_str;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yyset_out(mut _out_str: *mut FILE) {
+pub unsafe fn yyset_out(mut _out_str: *mut FILE) {
     yyout = _out_str;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yyget_debug() -> libc::c_int {
+pub unsafe fn yyget_debug() -> libc::c_int {
     return yy_flex_debug;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yyset_debug(mut _bdebug: libc::c_int) {
+pub unsafe fn yyset_debug(mut _bdebug: libc::c_int) {
     yy_flex_debug = _bdebug;
 }
 
-unsafe extern "C" fn yy_init_globals() -> libc::c_int {
+unsafe fn yy_init_globals() -> libc::c_int {
     yy_buffer_stack = 0 as *mut YY_BUFFER_STATE;
     yy_buffer_stack_top = 0 as libc::c_int as size_t;
     yy_buffer_stack_max = 0 as libc::c_int as size_t;
@@ -3791,7 +3791,7 @@ unsafe extern "C" fn yy_init_globals() -> libc::c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yylex_destroy() -> libc::c_int {
+pub unsafe fn yylex_destroy() -> libc::c_int {
     while !if !yy_buffer_stack.is_null() {
         *yy_buffer_stack.offset(yy_buffer_stack_top as isize)
     } else {
@@ -3815,12 +3815,12 @@ pub unsafe extern "C" fn yylex_destroy() -> libc::c_int {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yyalloc(mut size: yy_size_t) -> *mut libc::c_void {
+pub unsafe fn yyalloc(mut size: yy_size_t) -> *mut libc::c_void {
     return malloc(size as usize);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yyrealloc(
+pub unsafe fn yyrealloc(
     mut ptr: *mut libc::c_void,
     mut size: yy_size_t,
 ) -> *mut libc::c_void {
@@ -3828,6 +3828,6 @@ pub unsafe extern "C" fn yyrealloc(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn yyfree(mut ptr: *mut libc::c_void) {
+pub unsafe fn yyfree(mut ptr: *mut libc::c_void) {
     free(ptr as *mut libc::c_char as *mut libc::c_void);
 }

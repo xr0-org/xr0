@@ -141,7 +141,7 @@ pub union yyalloc {
     pub yyvs: YYSTYPE,
 }
 #[no_mangle]
-pub unsafe extern "C" fn strip_quotes(mut s: *mut libc::c_char) -> *mut libc::c_char {
+pub unsafe fn strip_quotes(mut s: *mut libc::c_char) -> *mut libc::c_char {
     if !(*s.offset(0 as libc::c_int as isize) as libc::c_int == '"' as i32) as libc::c_int
         as libc::c_long
         != 0
@@ -167,7 +167,7 @@ pub unsafe extern "C" fn strip_quotes(mut s: *mut libc::c_char) -> *mut libc::c_
     return t;
 }
 #[no_mangle]
-pub unsafe extern "C" fn stmt_array_create(mut v: *mut ast_stmt) -> stmt_array {
+pub unsafe fn stmt_array_create(mut v: *mut ast_stmt) -> stmt_array {
     let mut arr: stmt_array = {
         let mut init = stmt_array {
             n: 1 as libc::c_int,
@@ -180,7 +180,7 @@ pub unsafe extern "C" fn stmt_array_create(mut v: *mut ast_stmt) -> stmt_array {
     return arr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn stmt_array_append(
+pub unsafe fn stmt_array_append(
     mut arr: *mut stmt_array,
     mut v: *mut ast_stmt,
 ) -> stmt_array {
@@ -194,7 +194,7 @@ pub unsafe extern "C" fn stmt_array_append(
     return *arr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn expr_array_create(mut v: *mut AstExpr) -> expr_array {
+pub unsafe fn expr_array_create(mut v: *mut AstExpr) -> expr_array {
     let mut arr: expr_array = {
         let mut init = expr_array {
             n: 1 as libc::c_int,
@@ -207,7 +207,7 @@ pub unsafe extern "C" fn expr_array_create(mut v: *mut AstExpr) -> expr_array {
     return arr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn expr_array_append(
+pub unsafe fn expr_array_append(
     mut arr: *mut expr_array,
     mut v: *mut AstExpr,
 ) -> expr_array {
@@ -221,7 +221,7 @@ pub unsafe extern "C" fn expr_array_append(
     return *arr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn variable_array_append(
+pub unsafe fn variable_array_append(
     mut arr: *mut ast_variable_arr,
     mut v: *mut ast_variable,
 ) -> *mut ast_variable_arr {
@@ -229,7 +229,7 @@ pub unsafe extern "C" fn variable_array_append(
     return arr;
 }
 #[no_mangle]
-pub unsafe extern "C" fn variable_array_create(mut v: *mut ast_variable) -> *mut ast_variable_arr {
+pub unsafe fn variable_array_create(mut v: *mut ast_variable) -> *mut ast_variable_arr {
     return variable_array_append(ast_variable_arr_create(), v);
 }
 static mut yytranslate: [yytype_uint8; 326] = [
@@ -1212,7 +1212,7 @@ static mut yydefact: [yytype_uint8; 281] = [
     168 as libc::c_int as yytype_uint8,
 ];
 #[no_mangle]
-pub unsafe extern "C" fn yyerror(s: *const libc::c_char) -> libc::c_int {
+pub unsafe fn yyerror(s: *const libc::c_char) -> libc::c_int {
     fflush(__stdoutp);
     if (marker.filename).is_null() {
         fprintf(
@@ -3308,7 +3308,7 @@ static mut yystos: [yytype_uint8; 281] = [
     153 as libc::c_int as yytype_uint8,
     142 as libc::c_int as yytype_uint8,
 ];
-unsafe extern "C" fn yydestruct(
+unsafe fn yydestruct(
     mut yymsg: *const libc::c_char,
     mut yytype: libc::c_int,
     mut yyvaluep: *mut YYSTYPE,
@@ -3329,7 +3329,7 @@ pub static mut yylval: YYSTYPE = YYSTYPE {
 #[no_mangle]
 pub static mut yynerrs: libc::c_int = 0;
 #[no_mangle]
-pub unsafe extern "C" fn yyparse() -> libc::c_int {
+pub unsafe fn yyparse() -> libc::c_int {
     let mut current_block: u64;
     let mut yystate: libc::c_int = 0;
     let mut yyn: libc::c_int = 0;

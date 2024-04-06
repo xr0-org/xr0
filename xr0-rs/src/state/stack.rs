@@ -59,7 +59,7 @@ pub struct Variable {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_newblock(mut Stack: *mut Stack) -> *mut Location {
+pub unsafe fn stack_newblock(mut Stack: *mut Stack) -> *mut Location {
     let mut address: libc::c_int = block_arr_append((*Stack).frame, block_create());
     let mut loc: *mut Location = location_create_automatic(
         (*Stack).id,
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn stack_newblock(mut Stack: *mut Stack) -> *mut Location 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_create(
+pub unsafe fn stack_create(
     mut name: *mut libc::c_char,
     mut prev: *mut Stack,
     mut return_type: *mut ast_type,
@@ -99,7 +99,7 @@ pub unsafe extern "C" fn stack_create(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_getframe(mut s: *mut Stack, mut frame: libc::c_int) -> *mut Stack {
+pub unsafe fn stack_getframe(mut s: *mut Stack, mut frame: libc::c_int) -> *mut Stack {
     if s.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"stack_getframe\0"))
@@ -130,7 +130,7 @@ pub unsafe extern "C" fn stack_getframe(mut s: *mut Stack, mut frame: libc::c_in
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_destroy(mut Stack: *mut Stack) {
+pub unsafe fn stack_destroy(mut Stack: *mut Stack) {
     block_arr_destroy((*Stack).frame);
     let mut m: *mut map = (*Stack).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -144,12 +144,12 @@ pub unsafe extern "C" fn stack_destroy(mut Stack: *mut Stack) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_prev(mut s: *mut Stack) -> *mut Stack {
+pub unsafe fn stack_prev(mut s: *mut Stack) -> *mut Stack {
     return (*s).prev;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_copy(mut Stack: *mut Stack) -> *mut Stack {
+pub unsafe fn stack_copy(mut Stack: *mut Stack) -> *mut Stack {
     let mut copy: *mut Stack = calloc(1, ::core::mem::size_of::<Stack>()) as *mut Stack;
     (*copy).name = dynamic_str((*Stack).name);
     (*copy).frame = block_arr_copy((*Stack).frame);
@@ -163,7 +163,7 @@ pub unsafe extern "C" fn stack_copy(mut Stack: *mut Stack) -> *mut Stack {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_copywithname(
+pub unsafe fn stack_copywithname(
     mut Stack: *mut Stack,
     mut new_name: *mut libc::c_char,
 ) -> *mut Stack {
@@ -173,7 +173,7 @@ pub unsafe extern "C" fn stack_copywithname(
     return copy;
 }
 
-unsafe extern "C" fn varmap_copy(mut m: *mut map) -> *mut map {
+unsafe fn varmap_copy(mut m: *mut map) -> *mut map {
     let mut m_copy: *mut map = map_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
@@ -189,7 +189,7 @@ unsafe extern "C" fn varmap_copy(mut m: *mut map) -> *mut map {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_str(
+pub unsafe fn stack_str(
     mut Stack: *mut Stack,
     mut State: *mut State,
 ) -> *mut libc::c_char {
@@ -237,7 +237,7 @@ pub unsafe extern "C" fn stack_str(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_declare(
+pub unsafe fn stack_declare(
     mut Stack: *mut Stack,
     mut var: *mut ast_variable,
     mut isparam: bool,
@@ -261,7 +261,7 @@ pub unsafe extern "C" fn stack_declare(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_undeclare(mut Stack: *mut Stack, mut State: *mut State) {
+pub unsafe fn stack_undeclare(mut Stack: *mut Stack, mut State: *mut State) {
     let mut old_result: *mut Variable = (*Stack).result;
     (*Stack).result = variable_abstractcopy(old_result, State);
     variable_destroy(old_result);
@@ -285,17 +285,17 @@ pub unsafe extern "C" fn stack_undeclare(mut Stack: *mut Stack, mut State: *mut 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_getresult(mut s: *mut Stack) -> *mut Variable {
+pub unsafe fn stack_getresult(mut s: *mut Stack) -> *mut Variable {
     return (*s).result;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_getvarmap(mut s: *mut Stack) -> *mut map {
+pub unsafe fn stack_getvarmap(mut s: *mut Stack) -> *mut map {
     return (*s).varmap;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_getvariable(
+pub unsafe fn stack_getvariable(
     mut s: *mut Stack,
     mut id: *mut libc::c_char,
 ) -> *mut Variable {
@@ -316,7 +316,7 @@ pub unsafe extern "C" fn stack_getvariable(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_references(
+pub unsafe fn stack_references(
     mut s: *mut Stack,
     mut loc: *mut Location,
     mut State: *mut State,
@@ -340,7 +340,7 @@ pub unsafe extern "C" fn stack_references(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn stack_getblock(mut s: *mut Stack, mut address: libc::c_int) -> *mut Block {
+pub unsafe fn stack_getblock(mut s: *mut Stack, mut address: libc::c_int) -> *mut Block {
     if !(address < block_arr_nblocks((*s).frame)) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"stack_getblock\0"))
@@ -355,7 +355,7 @@ pub unsafe extern "C" fn stack_getblock(mut s: *mut Stack, mut address: libc::c_
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn variable_create(
+pub unsafe fn variable_create(
     mut type_0: *mut ast_type,
     mut Stack: *mut Stack,
     mut isparam: bool,
@@ -402,14 +402,14 @@ pub unsafe extern "C" fn variable_create(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn variable_destroy(mut v: *mut Variable) {
+pub unsafe fn variable_destroy(mut v: *mut Variable) {
     ast_type_destroy((*v).type_0);
     location_destroy((*v).loc);
     free(v as *mut libc::c_void);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn variable_copy(mut old: *mut Variable) -> *mut Variable {
+pub unsafe fn variable_copy(mut old: *mut Variable) -> *mut Variable {
     let mut new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
     (*new).type_0 = ast_type_copy((*old).type_0);
     (*new).isparam = (*old).isparam;
@@ -417,7 +417,7 @@ pub unsafe extern "C" fn variable_copy(mut old: *mut Variable) -> *mut Variable 
     return new;
 }
 
-unsafe extern "C" fn variable_abstractcopy(
+unsafe fn variable_abstractcopy(
     mut old: *mut Variable,
     mut s: *mut State,
 ) -> *mut Variable {
@@ -460,7 +460,7 @@ unsafe extern "C" fn variable_abstractcopy(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn variable_str(
+pub unsafe fn variable_str(
     mut var: *mut Variable,
     mut Stack: *mut Stack,
     mut State: *mut State,
@@ -500,7 +500,7 @@ pub unsafe extern "C" fn variable_str(
     return strbuilder_build(b);
 }
 
-unsafe extern "C" fn object_or_nothing_str(
+unsafe fn object_or_nothing_str(
     mut loc: *mut Location,
     mut Stack: *mut Stack,
     mut State: *mut State,
@@ -524,17 +524,17 @@ unsafe extern "C" fn object_or_nothing_str(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn variable_location(mut v: *mut Variable) -> *mut Location {
+pub unsafe fn variable_location(mut v: *mut Variable) -> *mut Location {
     return (*v).loc;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn variable_type(mut v: *mut Variable) -> *mut ast_type {
+pub unsafe fn variable_type(mut v: *mut Variable) -> *mut ast_type {
     return (*v).type_0;
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn variable_references(
+pub unsafe fn variable_references(
     mut v: *mut Variable,
     mut loc: *mut Location,
     mut s: *mut State,
@@ -556,6 +556,6 @@ pub unsafe extern "C" fn variable_references(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn variable_isparam(mut v: *mut Variable) -> bool {
+pub unsafe fn variable_isparam(mut v: *mut Variable) -> bool {
     return (*v).isparam;
 }

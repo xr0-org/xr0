@@ -30,7 +30,7 @@ pub struct static_memory {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn static_memory_create() -> *mut static_memory {
+pub unsafe fn static_memory_create() -> *mut static_memory {
     let mut sm: *mut static_memory =
         malloc(::core::mem::size_of::<static_memory>()) as *mut static_memory;
     if sm.is_null() as libc::c_int as libc::c_long != 0 {
@@ -49,12 +49,12 @@ pub unsafe extern "C" fn static_memory_create() -> *mut static_memory {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn static_memory_destroy(mut sm: *mut static_memory) {
+pub unsafe fn static_memory_destroy(mut sm: *mut static_memory) {
     block_arr_destroy((*sm).blocks);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn static_memory_str(
+pub unsafe fn static_memory_str(
     mut sm: *mut static_memory,
     mut indent: *mut libc::c_char,
 ) -> *mut libc::c_char {
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn static_memory_str(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn static_memory_copy(mut sm: *mut static_memory) -> *mut static_memory {
+pub unsafe fn static_memory_copy(mut sm: *mut static_memory) -> *mut static_memory {
     let mut copy: *mut static_memory =
         malloc(::core::mem::size_of::<static_memory>()) as *mut static_memory;
     (*copy).blocks = block_arr_copy((*sm).blocks);
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn static_memory_copy(mut sm: *mut static_memory) -> *mut 
     return copy;
 }
 
-unsafe extern "C" fn pool_copy(mut p: *mut map) -> *mut map {
+unsafe fn pool_copy(mut p: *mut map) -> *mut map {
     let mut pcopy: *mut map = map_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*p).n {
@@ -102,7 +102,7 @@ unsafe extern "C" fn pool_copy(mut p: *mut map) -> *mut map {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn static_memory_newblock(mut sm: *mut static_memory) -> libc::c_int {
+pub unsafe fn static_memory_newblock(mut sm: *mut static_memory) -> libc::c_int {
     let mut address: libc::c_int = block_arr_append((*sm).blocks, block_create());
     let mut n: libc::c_int = block_arr_nblocks((*sm).blocks);
     if !(n > 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn static_memory_newblock(mut sm: *mut static_memory) -> l
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn static_memory_getblock(
+pub unsafe fn static_memory_getblock(
     mut sm: *mut static_memory,
     mut address: libc::c_int,
 ) -> *mut Block {
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn static_memory_getblock(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn static_memory_stringpool(
+pub unsafe fn static_memory_stringpool(
     mut sm: *mut static_memory,
     mut lit: *mut libc::c_char,
     mut loc: *mut Location,
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn static_memory_stringpool(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn static_memory_checkpool(
+pub unsafe fn static_memory_checkpool(
     mut sm: *mut static_memory,
     mut lit: *mut libc::c_char,
 ) -> *mut Location {
