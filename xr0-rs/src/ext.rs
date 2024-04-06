@@ -10,6 +10,11 @@
 
 use libc::{free, malloc};
 
+use crate::ast::{ast_type_str, ast_type_struct_tag};
+use crate::util::{
+    dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
+    strbuilder_create, strbuilder_printf,
+};
 use crate::{ast_function, ast_type, ast_variable, StrBuilder};
 
 extern "C" {
@@ -19,29 +24,8 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn ast_type_struct_tag(t: *mut ast_type) -> *mut libc::c_char;
-    fn ast_type_str(_: *mut ast_type) -> *mut libc::c_char;
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
-    fn map_create() -> *mut map;
-    fn map_destroy(_: *mut map);
-    fn map_get(_: *mut map, key: *const libc::c_char) -> *mut libc::c_void;
-    fn map_set(_: *mut map, key: *const libc::c_char, Value: *const libc::c_void);
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
 }
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct map {
-    pub entry: *mut entry,
-    pub n: libc::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct entry {
-    pub key: *mut libc::c_char,
-    pub Value: *const libc::c_void,
-}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Externals {

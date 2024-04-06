@@ -10,6 +10,10 @@
 
 use libc::{free, malloc};
 
+use crate::util::{
+    dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
+    strbuilder_create, strbuilder_printf,
+};
 use crate::StrBuilder;
 
 extern "C" {
@@ -19,15 +23,8 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn map_get(_: *mut map, key: *const libc::c_char) -> *mut libc::c_void;
-    fn map_set(_: *mut map, key: *const libc::c_char, Value: *const libc::c_void);
-    fn map_create() -> *mut map;
-    fn map_destroy(_: *mut map);
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct MathExpr {
@@ -71,18 +68,6 @@ pub const EXPR_ATOM: expr_type = 0;
 pub struct tally {
     pub map: *mut map,
     pub num: libc::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct map {
-    pub entry: *mut entry,
-    pub n: libc::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct entry {
-    pub key: *mut libc::c_char,
-    pub Value: *const libc::c_void,
 }
 #[no_mangle]
 pub unsafe extern "C" fn math_eq(mut e1: *mut MathExpr, mut e2: *mut MathExpr) -> bool {

@@ -12,6 +12,10 @@ use libc::{calloc, free, malloc, realloc, strcmp};
 
 use crate::ext::Externals;
 
+use crate::util::{
+    dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
+    strbuilder_create, strbuilder_printf, strbuilder_putc,
+};
 use crate::{
     ast_type, ast_variable, ast_variable_arr, AstExpr, Location, Object, State, StrBuilder,
 };
@@ -40,15 +44,7 @@ extern "C" {
     fn ast_variable_arr_copy(arr: *mut ast_variable_arr) -> *mut ast_variable_arr;
     fn ast_variable_name(_: *mut ast_variable) -> *mut libc::c_char;
     fn ast_variable_type(_: *mut ast_variable) -> *mut ast_type;
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
-    fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char);
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn map_set(_: *mut map, key: *const libc::c_char, Value: *const libc::c_void);
-    fn map_get(_: *mut map, key: *const libc::c_char) -> *mut libc::c_void;
-    fn map_destroy(_: *mut map);
-    fn map_create() -> *mut map;
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
+
     fn state_getext(_: *mut State) -> *mut Externals;
     fn state_vconst(
         _: *mut State,
@@ -68,18 +64,6 @@ extern "C" {
     fn object_destroy(_: *mut Object);
     fn object_as_value(_: *mut Object) -> *mut Value;
     fn object_assign(_: *mut Object, _: *mut Value) -> *mut error;
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct map {
-    pub entry: *mut entry,
-    pub n: libc::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct entry {
-    pub key: *mut libc::c_char,
-    pub Value: *const libc::c_void,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]

@@ -12,6 +12,10 @@ use libc::{calloc, free, malloc, strcmp};
 
 use crate::value::Value;
 
+use crate::util::{
+    dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
+    strbuilder_create, strbuilder_printf, strbuilder_putc,
+};
 use crate::{
     ast_type, ast_variable, block_arr, static_memory, vconst, AstExpr, Block, Clump, Heap,
     Location, Object, State, StrBuilder,
@@ -31,15 +35,7 @@ extern "C" {
     fn ast_type_copy(t: *mut ast_type) -> *mut ast_type;
     fn ast_variable_name(_: *mut ast_variable) -> *mut libc::c_char;
     fn ast_variable_type(_: *mut ast_variable) -> *mut ast_type;
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
-    fn map_create() -> *mut map;
-    fn map_destroy(_: *mut map);
-    fn map_get(_: *mut map, key: *const libc::c_char) -> *mut libc::c_void;
-    fn map_set(_: *mut map, key: *const libc::c_char, Value: *const libc::c_void);
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char);
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
+
     fn location_create_automatic(
         frame: libc::c_int,
         Block: libc::c_int,
@@ -81,18 +77,6 @@ extern "C" {
     fn object_as_value(_: *mut Object) -> *mut Value;
     fn object_assign(_: *mut Object, _: *mut Value) -> *mut error;
     fn value_abstractcopy(_: *mut Value, s: *mut State) -> *mut Value;
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct map {
-    pub entry: *mut entry,
-    pub n: libc::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct entry {
-    pub key: *mut libc::c_char,
-    pub Value: *const libc::c_void,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]

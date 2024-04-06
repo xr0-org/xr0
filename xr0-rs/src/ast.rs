@@ -11,6 +11,8 @@
 
 use libc::{calloc, exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
 
+use crate::util::{entry, map, map_create, map_get, map_set};
+
 use crate::{
     Externals, Location, MathAtom, MathExpr, Object, Props, State, StrBuilder, Value, Variable,
 };
@@ -23,15 +25,12 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn map_create() -> *mut map;
     fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
-    fn map_get(_: *mut map, key: *const libc::c_char) -> *mut libc::c_void;
     fn strbuilder_create() -> *mut StrBuilder;
     fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
     fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char);
     fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
     fn error_create(s: *mut libc::c_char) -> *mut error;
-    fn map_set(_: *mut map, key: *const libc::c_char, Value: *const libc::c_void);
     fn string_arr_create() -> *mut string_arr;
     fn string_arr_s(_: *mut string_arr) -> *mut *mut libc::c_char;
     fn string_arr_n(_: *mut string_arr) -> libc::c_int;
@@ -170,18 +169,6 @@ extern "C" {
 pub type __int64_t = libc::c_longlong;
 pub type __darwin_off_t = __int64_t;
 pub type fpos_t = __darwin_off_t;
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct map {
-    pub entry: *mut entry,
-    pub n: libc::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct entry {
-    pub key: *mut libc::c_char,
-    pub Value: *const libc::c_void,
-}
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct error {

@@ -16,7 +16,10 @@ use libc::{
     putchar, realloc, strlen, FILE,
 };
 
-use crate::util::{strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc};
+use crate::util::{
+    dynamic_str, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
+    strbuilder_create, strbuilder_printf, strbuilder_putc,
+};
 use crate::StrBuilder;
 
 extern "C" {
@@ -28,11 +31,7 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn map_create() -> *mut map;
-    fn map_destroy(_: *mut map);
-    fn map_get(_: *mut map, key: *const libc::c_char) -> *mut libc::c_void;
-    fn map_set(_: *mut map, key: *const libc::c_char, value: *const libc::c_void);
-    fn dynamic_str(_: *const libc::c_char) -> *mut libc::c_char;
+
     static mut __stdinp: *mut FILE;
     static mut __stdoutp: *mut FILE;
     static mut __stderrp: *mut FILE;
@@ -136,18 +135,6 @@ pub const LM_FLAG_IMPLICIT_EXTERN: linemarker_flag = 8;
 pub const LM_FLAG_SYS_HEADER: linemarker_flag = 4;
 pub const LM_FLAG_RESUME_FILE: linemarker_flag = 2;
 pub const LM_FLAG_NEW_FILE: linemarker_flag = 1;
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct map {
-    pub entry: *mut entry,
-    pub n: libc::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct entry {
-    pub key: *mut libc::c_char,
-    pub value: *const libc::c_void,
-}
 
 pub type ictype = libc::c_uint;
 pub const IC_PRED: ictype = 8;
