@@ -10,6 +10,11 @@
 
 use libc::{free, malloc};
 
+use crate::state::block::{
+    block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
+    block_arr_nblocks, block_create, block_str,
+};
+use crate::util::{strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{block_arr, Block, StrBuilder};
 
 extern "C" {
@@ -19,23 +24,14 @@ extern "C" {
         _: libc::c_int,
         _: *const libc::c_char,
     ) -> !;
-    fn strbuilder_create() -> *mut StrBuilder;
-    fn strbuilder_printf(b: *mut StrBuilder, fmt: *const libc::c_char, _: ...) -> libc::c_int;
-    fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char;
-    fn block_create() -> *mut Block;
-    fn block_str(_: *mut Block) -> *mut libc::c_char;
-    fn block_arr_create() -> *mut block_arr;
-    fn block_arr_destroy(_: *mut block_arr);
-    fn block_arr_copy(_: *mut block_arr) -> *mut block_arr;
-    fn block_arr_blocks(_: *mut block_arr) -> *mut *mut Block;
-    fn block_arr_nblocks(_: *mut block_arr) -> libc::c_int;
-    fn block_arr_append(_: *mut block_arr, _: *mut Block) -> libc::c_int;
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Clump {
     pub blocks: *mut block_arr,
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn clump_create() -> *mut Clump {
     let mut c: *mut Clump = malloc(::core::mem::size_of::<Clump>()) as *mut Clump;
@@ -51,10 +47,12 @@ pub unsafe extern "C" fn clump_create() -> *mut Clump {
     (*c).blocks = block_arr_create();
     return c;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn clump_destroy(mut c: *mut Clump) {
     block_arr_destroy((*c).blocks);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn clump_str(
     mut c: *mut Clump,
@@ -78,12 +76,14 @@ pub unsafe extern "C" fn clump_str(
     }
     return strbuilder_build(b);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn clump_copy(mut c: *mut Clump) -> *mut Clump {
     let mut copy: *mut Clump = malloc(::core::mem::size_of::<Clump>()) as *mut Clump;
     (*copy).blocks = block_arr_copy((*c).blocks);
     return copy;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn clump_newblock(mut c: *mut Clump) -> libc::c_int {
     let mut address: libc::c_int = block_arr_append((*c).blocks, block_create());
@@ -100,6 +100,7 @@ pub unsafe extern "C" fn clump_newblock(mut c: *mut Clump) -> libc::c_int {
     };
     return address;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn clump_getblock(mut c: *mut Clump, mut address: libc::c_int) -> *mut Block {
     if address >= block_arr_nblocks((*c).blocks) {

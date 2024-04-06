@@ -25,7 +25,7 @@ use crate::ast::{
 };
 use crate::ext::Externals;
 use crate::math::MathExpr;
-use crate::object::{object_arr, Object, Range};
+use crate::object::{object_arr, Object};
 use crate::props::Props;
 use crate::state::block::{block_arr, Block};
 use crate::state::clump::Clump;
