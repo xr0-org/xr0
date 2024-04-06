@@ -10,21 +10,13 @@
 
 use libc::{free, malloc};
 
+use crate::c_util::__assert_rtn;
 use crate::state::block::{
     block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
     block_arr_nblocks, block_create, block_str,
 };
 use crate::util::{strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{block_arr, Block, StrBuilder};
-
-extern "C" {
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 
 #[derive(Copy, Clone)]
 #[repr(C)]

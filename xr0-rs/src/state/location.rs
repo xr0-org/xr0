@@ -14,6 +14,7 @@ use libc::{free, malloc, printf};
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_equal, ast_expr_str,
 };
+use crate::c_util::__assert_rtn;
 use crate::object::object_referencesheap;
 use crate::state::block::{
     block_range_aredeallocands, block_range_dealloc, block_references, block_str,
@@ -27,15 +28,6 @@ use crate::state::{
 };
 use crate::util::{error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{static_memory, vconst, AstExpr, Block, Clump, Heap, Stack, State, StrBuilder, Value};
-
-extern "C" {
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 
 #[derive(Copy, Clone)]
 #[repr(C)]

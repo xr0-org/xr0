@@ -16,6 +16,7 @@ use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
     ast_expr_eq_create, ast_expr_sum_create,
 };
+use crate::c_util::__assert_rtn;
 use crate::object::{
     object_abstractcopy, object_arr_append, object_arr_copy, object_arr_create, object_arr_destroy,
     object_arr_index, object_arr_index_upperincl, object_arr_insert, object_arr_nobjects,
@@ -28,15 +29,6 @@ use crate::state::heap::heap_newblock;
 use crate::state::{state_alloc, state_eval};
 use crate::util::{error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{object_arr, AstExpr, Heap, Location, Object, State, StrBuilder};
-
-extern "C" {
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 
 #[derive(Copy, Clone)]
 #[repr(C)]

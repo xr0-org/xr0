@@ -14,6 +14,7 @@ use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_destroy, ast_type_str, ast_variable_name,
     ast_variable_type,
 };
+use crate::c_util::__assert_rtn;
 use crate::object::{
     object_as_value, object_assign, object_isvalue, object_str, object_value_create,
 };
@@ -37,15 +38,6 @@ use crate::{
     ast_type, ast_variable, block_arr, static_memory, vconst, Block, Clump, Heap, Location, Object,
     State, StrBuilder,
 };
-
-extern "C" {
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 
 #[derive(Copy, Clone)]
 #[repr(C)]

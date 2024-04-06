@@ -8,22 +8,11 @@
     unused_mut
 )]
 
+use crate::c_util::{__assert_rtn, vfprintf, vprintf};
 use libc::{
     calloc, fclose, free, malloc, open_memstream, realloc, snprintf, strcat, strcmp, strcpy,
     strlen, strncpy, FILE,
 };
-
-extern "C" {
-    fn vfprintf(_: *mut FILE, _: *const libc::c_char, _: ::core::ffi::VaList) -> libc::c_int;
-    fn vprintf(_: *const libc::c_char, _: ::core::ffi::VaList) -> libc::c_int;
-
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 
 #[derive(Copy, Clone)]
 #[repr(C)]

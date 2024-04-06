@@ -27,6 +27,7 @@ use crate::ast::{
     ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
     ast_type_vconst,
 };
+use crate::c_util::__assert_rtn;
 use crate::ext::externals_types_str;
 use crate::object::{object_as_value, object_assign};
 use crate::props::{props_copy, props_create, props_destroy, props_str};
@@ -59,15 +60,6 @@ use stack::{
     stack_getvariable, stack_prev, stack_references, stack_str, stack_undeclare, variable_location,
     variable_type,
 };
-
-extern "C" {
-    fn __assert_rtn(
-        _: *const libc::c_char,
-        _: *const libc::c_char,
-        _: libc::c_int,
-        _: *const libc::c_char,
-    ) -> !;
-}
 
 #[derive(Copy, Clone)]
 #[repr(C)]
