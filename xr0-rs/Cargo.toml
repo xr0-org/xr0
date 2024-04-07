@@ -1,5 +1,5 @@
 [package]
-name = "xr0-rs"
+name = "xr0"
 version = "0.1.0"
 edition = "2021"
 

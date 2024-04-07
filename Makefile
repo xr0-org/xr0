@@ -71,9 +71,12 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 
 OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
-$(XR0V): $(MAIN_0V_OBJ) $(BIN_DIR)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ $(MAIN_0V_OBJ) $(OBJECTS)
+.PHONY: $(XR0V)
+
+$(XR0V):
+	rm -f $@
+	(cd xr0-rs && cargo build)
+	ln xr0-rs/target/debug/xr0 $@
 
 lex: $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx tests/99-program/100-lex/parse.x
