@@ -26,6 +26,36 @@ MATH_DIR = $(SRC_0V_DIR)/math
 # executable
 XR0V = $(BIN_DIR)/0v
 
+# includes
+INCLUDES = \
+include/props.h \
+include/gram_util.h \
+include/value.h \
+include/ast.h \
+include/lex.h \
+include/storage.h \
+include/util.h \
+include/math.h \
+include/object.h \
+include/ext.h \
+include/state.h \
+include/verify.h \
+build/gram.tab.h \
+src/state/clump.h \
+src/state/intern.h \
+src/state/static.h \
+src/state/stack.h \
+src/state/heap.h \
+src/state/block.h \
+src/state/location.h \
+src/ast/stmt/stmt.h \
+src/ast/intern.h \
+src/ast/topological.h \
+src/ast/expr/expr.h \
+src/ast/function/function.h \
+src/ast/literals.h \
+src/ast/type/type.h
+
 # build artifacts
 MAIN_0V_OBJ = $(BUILD_DIR)/0v.o
 
@@ -71,7 +101,7 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 
 OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
-$(XR0V): $(MAIN_0V_OBJ) $(BIN_DIR)
+$(XR0V): $(MAIN_0V_OBJ) $(OBJECTS)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ $(MAIN_0V_OBJ) $(OBJECTS)
 
@@ -106,11 +136,11 @@ matrix-verbose: $(XR0V)
 	$(VALGRIND) --num-callers=30 \
 		$(XR0V) -I libx tests/3-program/000-matrix.x
 
-$(MAIN_0V_OBJ): $(SRC_0V_DIR)/main.c $(OBJECTS)
+$(MAIN_0V_OBJ): $(SRC_0V_DIR)/main.c
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -I $(BUILD_DIR) -o $@ -c $(SRC_0V_DIR)/main.c
 
-$(STATE_OBJ): $(STATE_DIR)/state.c $(STATE_OBJECTS)
+$(STATE_OBJ): $(STATE_DIR)/state.c
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/state.c
 
@@ -122,31 +152,31 @@ $(PROPS_OBJ): $(PROPS_DIR)/props.c
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(PROPS_DIR)/props.c
 
-$(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
+$(STACK_OBJ): $(STATE_DIR)/stack.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/stack.c
 
-$(HEAP_OBJ): $(STATE_DIR)/heap.c $(BLOCK_OBJ)
+$(HEAP_OBJ): $(STATE_DIR)/heap.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/heap.c
 
-$(CLUMP_OBJ): $(STATE_DIR)/clump.c $(BLOCK_OBJ)
+$(CLUMP_OBJ): $(STATE_DIR)/clump.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/clump.c
 
-$(STATIC_OBJ): $(STATE_DIR)/static.c $(BLOCK_OBJ)
+$(STATIC_OBJ): $(STATE_DIR)/static.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/static.c
 
-$(BLOCK_OBJ): $(STATE_DIR)/block.c $(OBJECT_OBJ)
+$(BLOCK_OBJ): $(STATE_DIR)/block.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/block.c
 
-$(OBJECT_OBJ): $(OBJECT_DIR)/object.c $(VALUE_OBJ)
+$(OBJECT_OBJ): $(OBJECT_DIR)/object.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(OBJECT_DIR)/object.c
 
-$(VALUE_OBJ): $(VALUE_DIR)/value.c $(LOCATION_OBJ)
+$(VALUE_OBJ): $(VALUE_DIR)/value.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(VALUE_DIR)/value.c
 
@@ -154,45 +184,36 @@ $(LOCATION_OBJ): $(STATE_DIR)/location.c $(UTIL_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/location.c
 
-$(UTIL_OBJ): $(UTIL_DIR)/util.c $(BUILD_DIR)
+$(UTIL_OBJ): $(UTIL_DIR)/util.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(UTIL_DIR)/util.c
 
-$(AST_OBJ): $(AST_DIR)/ast.c \
-	$(AST_DIR)/topological.h \
-	$(AST_DIR)/expr/expr.h \
-	$(AST_DIR)/type/type.h \
-	$(AST_DIR)/literals.h \
-	$(AST_DIR)/function/function.h \
-	$(MATH_OBJ)
+$(AST_OBJ): $(AST_DIR)/ast.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -I $(AST_DIR) -o $@ -c $(AST_DIR)/ast.c
 
-$(MATH_OBJ): $(MATH_DIR)/math.c $(BUILD_DIR)
+$(MATH_OBJ): $(MATH_DIR)/math.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(MATH_DIR)/math.c
 
-$(LEX_OBJ): $(LEX_YY_C) $(BUILD_DIR)
+$(LEX_OBJ): $(LEX_YY_C) $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(LEX_YY_C)
 
-$(LEX_YY_C): $(INCLUDE_DIR)/lex.h $(AST_DIR)/lex.l $(GRAM_OBJ)
+$(LEX_YY_C): $(INCLUDE_DIR)/lex.h $(AST_DIR)/lex.l
 	@printf 'LEX\t$@\n'
 	@$(LEX) -o $(BUILD_DIR)/lex.yy.c $(AST_DIR)/lex.l
 
-$(GRAM_OBJ): $(GRAM_TAB_C) $(GRAM_TAB_H)
+$(GRAM_OBJ): $(GRAM_TAB_C) $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -I $(AST_DIR) -o $@ -c $(GRAM_TAB_C)
 
-$(GRAM_TAB_C) $(GRAM_TAB_H): $(AST_DIR)/gram.y $(BUILD_DIR)
+$(GRAM_TAB_C) $(GRAM_TAB_H): $(AST_DIR)/gram.y
 	@printf 'YACC\t$@\n'
 	@$(YACC) -o $(BUILD_DIR)/gram.tab.c -d $(AST_DIR)/gram.y
 
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
-
-$(BUILD_DIR):
-	@mkdir -p $(BUILD_DIR)
 
 # tests
 TESTDIR = tests
