@@ -91,6 +91,7 @@ src/ast/topological.c \
 src/ast/variable.c
 
 RUST_SOURCES = \
+$(SRC_0V_DIR)/main.rs \
 $(AST_DIR)/ast.rs \
 $(EXT_DIR)/ext.rs \
 $(MATH_DIR)/math.rs \
@@ -154,9 +155,11 @@ C2RUST = ../c2rust/target/release/c2rust
 
 OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
-$(XR0V): $(MAIN_0V_OBJ) $(OBJECTS)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ $(MAIN_0V_OBJ) $(OBJECTS)
+RUSTCFLAGS = --edition=2021 --extern core --extern libc=$(LIBC_RLIB)
+
+$(XR0V): $(SRC_0V_DIR)/main.rs $(LIBC_RLIB) $(OBJECTS)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_state $(RUSTCFLAGS) -o $@ $< $(foreach obj,$(OBJECTS),-Clink-arg=$(obj))
 
 $(C2RUST):
 	(cd ../c2rust && cargo build --release)
@@ -197,64 +200,58 @@ matrix-verbose: $(XR0V)
 	$(VALGRIND) --num-callers=30 \
 		$(XR0V) -I libx tests/3-program/000-matrix.x
 
-$(MAIN_0V_OBJ): $(SRC_0V_DIR)/main.c
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -I $(BUILD_DIR) -o $@ -c $(SRC_0V_DIR)/main.c
-
 LIBC_RLIB = xr0-deps/target/debug/deps/liblibc-7b7b9cd53da27782.rlib
 
 $(LIBC_RLIB):
 	(cd xr0-deps && cargo +nightly build)
 
-RUSTCFLAGS = --edition=2021 --extern core --extern libc=$(LIBC_RLIB) --crate-type staticlib
-
 $(STATE_OBJ): $(STATE_DIR)/state.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_state $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_state $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(EXT_OBJ): $(EXT_DIR)/ext.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_ext $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_ext $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(PROPS_OBJ): $(PROPS_DIR)/props.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_props $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_props $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(STACK_OBJ): $(STATE_DIR)/stack.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_stack $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_stack $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(HEAP_OBJ): $(STATE_DIR)/heap.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_heap $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_heap $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(CLUMP_OBJ): $(STATE_DIR)/clump.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_clump $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_clump $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(STATIC_OBJ): $(STATE_DIR)/static.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_static $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_static $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(BLOCK_OBJ): $(STATE_DIR)/block.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(OBJECT_OBJ): $(OBJECT_DIR)/object.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(VALUE_OBJ): $(VALUE_DIR)/value.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(LOCATION_OBJ): $(STATE_DIR)/location.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_location $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_location $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(UTIL_OBJ): $(UTIL_DIR)/util.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_util $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_util $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(AST_OBJ): $(AST_DIR)/ast.c $(INCLUDES)
 	@printf 'CC\t$@\n'
@@ -262,11 +259,11 @@ $(AST_OBJ): $(AST_DIR)/ast.c $(INCLUDES)
 
 ## $(AST_OBJ): $(AST_DIR)/ast.rs $(LIBC_RLIB)
 ## 	@printf 'RUSTC\t$@\n'
-## 	@rustc +nightly --crate-name xr0_ast $(RUSTCFLAGS) -o $@ $<
+## 	@rustc +nightly --crate-name xr0_ast $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(MATH_OBJ): $(MATH_DIR)/math.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_math $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_math $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(LEX_OBJ): $(LEX_YY_C) $(INCLUDES)
 	@printf 'CC\t$@\n'
