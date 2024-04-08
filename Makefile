@@ -91,11 +91,19 @@ src/ast/topological.c \
 src/ast/variable.c
 
 RUST_SOURCES = \
-$(STATE_DIR)/location.rs \
-$(UTIL_DIR)/util.rs \
 $(AST_DIR)/ast.rs \
-$(MATH_DIR)/math.rs
-
+$(EXT_DIR)/ext.rs \
+$(MATH_DIR)/math.rs \
+$(PROPS_DIR)/props.rs \
+$(STATE_DIR)/block.rs \
+$(STATE_DIR)/clump.rs \
+$(STATE_DIR)/heap.rs \
+$(STATE_DIR)/location.rs \
+$(STATE_DIR)/stack.rs \
+$(STATE_DIR)/state.rs \
+$(STATE_DIR)/static.rs \
+$(UTIL_DIR)/util.rs \
+$(NULL)
 
 # build artifacts
 MAIN_0V_OBJ = $(BUILD_DIR)/0v.o
@@ -157,7 +165,7 @@ lex: $(XR0V)
 PARSER = $(BUILD_DIR)/lex-gen
 
 $(RUST_SOURCES): $(C2RUST) compile_commands.json $(C_SOURCES) $(INCLUDES)
-	rm $(RUST_SOURCES)
+	rm -f $(RUST_SOURCES)
 	$(C2RUST) transpile --fail-on-error compile_commands.json
 	if ! [ -f compile_commands.json ]; then git checkout compile_commands.json; fi
 
@@ -191,37 +199,44 @@ $(MAIN_0V_OBJ): $(SRC_0V_DIR)/main.c
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -I $(BUILD_DIR) -o $@ -c $(SRC_0V_DIR)/main.c
 
-$(STATE_OBJ): $(STATE_DIR)/state.c
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/state.c
+LIBC_RLIB = xr0-deps/target/debug/deps/liblibc-7b7b9cd53da27782.rlib
 
-$(EXT_OBJ): $(EXT_DIR)/ext.c
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(EXT_DIR)/ext.c
+$(LIBC_RLIB):
+	(cd xr0-deps && cargo +nightly build)
 
-$(PROPS_OBJ): $(PROPS_DIR)/props.c
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(PROPS_DIR)/props.c
+RUSTCFLAGS = --edition=2021 --extern core --extern libc=$(LIBC_RLIB) --crate-type staticlib
 
-$(STACK_OBJ): $(STATE_DIR)/stack.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/stack.c
+$(STATE_OBJ): $(STATE_DIR)/state.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_state $(RUSTCFLAGS) -o $@ $<
 
-$(HEAP_OBJ): $(STATE_DIR)/heap.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/heap.c
+$(EXT_OBJ): $(EXT_DIR)/ext.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_ext $(RUSTCFLAGS) -o $@ $<
 
-$(CLUMP_OBJ): $(STATE_DIR)/clump.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/clump.c
+$(PROPS_OBJ): $(PROPS_DIR)/props.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_props $(RUSTCFLAGS) -o $@ $<
 
-$(STATIC_OBJ): $(STATE_DIR)/static.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/static.c
+$(STACK_OBJ): $(STATE_DIR)/stack.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_stack $(RUSTCFLAGS) -o $@ $<
 
-$(BLOCK_OBJ): $(STATE_DIR)/block.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/block.c
+$(HEAP_OBJ): $(STATE_DIR)/heap.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_heap $(RUSTCFLAGS) -o $@ $<
+
+$(CLUMP_OBJ): $(STATE_DIR)/clump.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_clump $(RUSTCFLAGS) -o $@ $<
+
+$(STATIC_OBJ): $(STATE_DIR)/static.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_static $(RUSTCFLAGS) -o $@ $<
+
+$(BLOCK_OBJ): $(STATE_DIR)/block.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) -o $@ $<
 
 $(OBJECT_OBJ): $(OBJECT_DIR)/object.c $(INCLUDES)
 	@printf 'CC\t$@\n'
@@ -230,13 +245,6 @@ $(OBJECT_OBJ): $(OBJECT_DIR)/object.c $(INCLUDES)
 $(VALUE_OBJ): $(VALUE_DIR)/value.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(VALUE_DIR)/value.c
-
-LIBC_RLIB = xr0-deps/target/debug/deps/liblibc-7b7b9cd53da27782.rlib
-
-$(LIBC_RLIB):
-	(cd xr0-deps && cargo +nightly build)
-
-RUSTCFLAGS = --edition=2021 --extern core --extern libc=$(LIBC_RLIB) --crate-type staticlib
 
 $(LOCATION_OBJ): $(STATE_DIR)/location.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
