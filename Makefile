@@ -94,6 +94,7 @@ RUST_SOURCES = \
 $(AST_DIR)/ast.rs \
 $(EXT_DIR)/ext.rs \
 $(MATH_DIR)/math.rs \
+$(OBJECT_DIR)/object.rs \
 $(PROPS_DIR)/props.rs \
 $(STATE_DIR)/block.rs \
 $(STATE_DIR)/clump.rs \
@@ -103,6 +104,7 @@ $(STATE_DIR)/stack.rs \
 $(STATE_DIR)/state.rs \
 $(STATE_DIR)/static.rs \
 $(UTIL_DIR)/util.rs \
+$(VALUE_DIR)/value.rs \
 $(NULL)
 
 # build artifacts
@@ -238,13 +240,13 @@ $(BLOCK_OBJ): $(STATE_DIR)/block.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
 	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) -o $@ $<
 
-$(OBJECT_OBJ): $(OBJECT_DIR)/object.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(OBJECT_DIR)/object.c
+$(OBJECT_OBJ): $(OBJECT_DIR)/object.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) -o $@ $<
 
-$(VALUE_OBJ): $(VALUE_DIR)/value.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(VALUE_DIR)/value.c
+$(VALUE_OBJ): $(VALUE_DIR)/value.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) -o $@ $<
 
 $(LOCATION_OBJ): $(STATE_DIR)/location.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
