@@ -3,12 +3,6 @@
 
 #include "util.h"
 
-enum ast_alloc_kind {
-	ALLOC		= 1 << 0,
-	DEALLOC		= 1 << 1,
-	CLUMP		= 1 << 2,
-};
-
 struct ast_expr {
 	enum ast_expr_kind {
 		EXPR_IDENTIFIER		= 1 << 0,
@@ -46,27 +40,9 @@ struct ast_expr {
 		struct {
 			int inc, pre;
 		} incdec;
-		enum ast_unary_operator {
-			UNARY_OP_ADDRESS		= 1 << 0,
-			UNARY_OP_DEREFERENCE		= 1 << 1,
-			UNARY_OP_POSITIVE		= 1 << 2,
-			UNARY_OP_NEGATIVE		= 1 << 3,
-			UNARY_OP_ONES_COMPLEMENT	= 1 << 4,
-			UNARY_OP_BANG			= 1 << 5,
-		} unary_op;
+		enum ast_unary_operator unary_op;
 		struct {
-			enum ast_binary_operator {
-				BINARY_OP_EQ	= 1 << 0,
-				BINARY_OP_NE	= 1 << 1,
-
-				BINARY_OP_LT	= 1 << 2,
-				BINARY_OP_GT	= 1 << 3,
-				BINARY_OP_LE	= 1 << 4,
-				BINARY_OP_GE	= 1 << 5,
-
-				BINARY_OP_ADDITION	= 1 << 6,
-				BINARY_OP_SUBTRACTION	= 1 << 7,
-			} op;
+			enum ast_binary_operator op;
 			struct ast_expr *e1, *e2;
 		} binary;
 		struct ast_expr *assignment_value;
