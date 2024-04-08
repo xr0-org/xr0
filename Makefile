@@ -106,6 +106,7 @@ $(STATE_DIR)/state.rs \
 $(STATE_DIR)/static.rs \
 $(UTIL_DIR)/util.rs \
 $(VALUE_DIR)/value.rs \
+$(BUILD_DIR)/lex.yy.rs \
 $(NULL)
 
 # build artifacts
@@ -159,7 +160,7 @@ RUSTCFLAGS = --edition=2021 --extern core --extern libc=$(LIBC_RLIB)
 
 $(XR0V): $(SRC_0V_DIR)/main.rs $(LIBC_RLIB) $(OBJECTS)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_state $(RUSTCFLAGS) -o $@ $< $(foreach obj,$(OBJECTS),-Clink-arg=$(obj))
+	@rustc +nightly --crate-name xr0 $(RUSTCFLAGS) -o $@ $< $(foreach obj,$(OBJECTS),-Clink-arg=$(obj))
 
 $(C2RUST):
 	(cd ../c2rust && cargo build --release)
@@ -239,11 +240,11 @@ $(BLOCK_OBJ): $(STATE_DIR)/block.rs $(LIBC_RLIB)
 
 $(OBJECT_OBJ): $(OBJECT_DIR)/object.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
+	@rustc +nightly --crate-name xr0_object $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(VALUE_OBJ): $(VALUE_DIR)/value.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	@rustc +nightly --crate-name xr0_block $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
+	@rustc +nightly --crate-name xr0_value $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(LOCATION_OBJ): $(STATE_DIR)/location.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
@@ -265,9 +266,9 @@ $(MATH_OBJ): $(MATH_DIR)/math.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
 	@rustc +nightly --crate-name xr0_math $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
-$(LEX_OBJ): $(LEX_YY_C) $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(LEX_YY_C)
+$(LEX_OBJ): $(BUILD_DIR)/lex.yy.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_lex $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(LEX_YY_C): $(INCLUDE_DIR)/lex.h $(AST_DIR)/lex.l
 	@printf 'LEX\t$@\n'
