@@ -9,6 +9,7 @@ YACC = bison -yvd
 # dirs
 BIN_DIR = bin
 BUILD_DIR = build
+RUST_DEPS_DIR = xr0-deps/target/debug
 INCLUDE_DIR = include
 SRC_DIR = src
 UTIL_DIR = $(SRC_DIR)/util
@@ -56,6 +57,42 @@ src/ast/function/function.h \
 src/ast/literals.h \
 src/ast/type/type.h
 
+C_SOURCES = \
+build/gram.tab.c \
+build/lex.yy.c \
+src/util/util.c \
+src/props/props.c \
+src/ext/ext.c \
+src/value/value.c \
+src/state/static.c \
+src/state/block.c \
+src/state/heap.c \
+src/state/stack.c \
+src/state/state.c \
+src/state/location.c \
+src/state/clump.c \
+src/state/test.c \
+src/math/math.c \
+src/math/test.c \
+src/main.c \
+src/object/object.c \
+src/ast/stmt/stmt.c \
+src/ast/stmt/verify.c \
+src/ast/externdecl.c \
+src/ast/ast.c \
+src/ast/block.c \
+src/ast/expr/verify.c \
+src/ast/expr/expr.c \
+src/ast/function/function.c \
+src/ast/function/arr.c \
+src/ast/type/type.c \
+src/ast/literals.c \
+src/ast/topological.c \
+src/ast/variable.c
+
+RUST_SOURCES = \
+src/state/location.rs
+
 # build artifacts
 MAIN_0V_OBJ = $(BUILD_DIR)/0v.o
 
@@ -99,16 +136,24 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 		$(EXT_OBJ) \
 		$(PROPS_OBJ)
 
+C2RUST = ../c2rust/target/release/c2rust
+
 OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
 $(XR0V): $(MAIN_0V_OBJ) $(OBJECTS)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ $(MAIN_0V_OBJ) $(OBJECTS)
 
+$(C2RUST):
+	(cd ../c2rust && cargo +nightly build)
+
 lex: $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx tests/99-program/100-lex/parse.x
 
 PARSER = $(BUILD_DIR)/lex-gen
+
+$(RUST_SOURCES): $(C2RUST) compile_commands.json $(C_SOURCES) $(INCLUDES)
+	$(C2RUST) transpile --fail-on-error compile_commands.json
 
 lex-gen:
 	@$(XR0C) tests/5-program/100-lex/parse.x > build/parse.c
@@ -180,9 +225,16 @@ $(VALUE_OBJ): $(VALUE_DIR)/value.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(VALUE_DIR)/value.c
 
-$(LOCATION_OBJ): $(STATE_DIR)/location.c $(UTIL_OBJ)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/location.c
+LIBC_RLIB = xr0-deps/target/debug/deps/liblibc-7b7b9cd53da27782.rlib
+
+$(LIBC_RLIB):
+	(cd xr0-deps && cargo +nightly build)
+
+RUSTCFLAGS = --edition=2021 --extern core --extern libc=$(LIBC_RLIB) --crate-type staticlib
+
+$(LOCATION_OBJ): $(STATE_DIR)/location.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	rustc +nightly --crate-name xr0_location $(RUSTCFLAGS) -o $@ $<
 
 $(UTIL_OBJ): $(UTIL_DIR)/util.c $(INCLUDES)
 	@printf 'CC\t$@\n'
