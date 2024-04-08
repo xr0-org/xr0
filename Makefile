@@ -254,13 +254,9 @@ $(UTIL_OBJ): $(UTIL_DIR)/util.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
 	@rustc +nightly --crate-name xr0_util $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
-$(AST_OBJ): $(AST_DIR)/ast.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -I $(AST_DIR) -o $@ -c $(AST_DIR)/ast.c
-
-## $(AST_OBJ): $(AST_DIR)/ast.rs $(LIBC_RLIB)
-## 	@printf 'RUSTC\t$@\n'
-## 	@rustc +nightly --crate-name xr0_ast $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
+$(AST_OBJ): $(AST_DIR)/ast.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_ast $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
 $(MATH_OBJ): $(MATH_DIR)/math.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
