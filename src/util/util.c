@@ -332,7 +332,7 @@ error_nest(struct error *outer, struct error *inner)
 struct error *
 error_printf(char *fmt, ...)
 {
-	char *otherfmt;
+	char *otherfmt; char *otherarg;
 	struct error *inner;
 
 	struct error *err = calloc(1, sizeof(struct error));
@@ -355,12 +355,16 @@ error_printf(char *fmt, ...)
 			);
 			err = error_nest(err, inner);
 			break;
-		default:
+		case 's':
 			otherfmt = findnextfmt(&p);
-			strbuilder_vprintf(b, otherfmt, ap);
+			otherarg = va_arg(ap, char *);
+			strbuilder_printf(b, otherfmt, otherarg);
 			free(otherfmt);
 			p--; /* prepare for increment */
 			break;
+		default:
+			/* unrecognised option */
+			assert(false);
 		}
 	}
 	char *s = strbuilder_build(b);
