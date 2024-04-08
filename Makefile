@@ -91,7 +91,11 @@ src/ast/topological.c \
 src/ast/variable.c
 
 RUST_SOURCES = \
-src/state/location.rs
+$(STATE_DIR)/location.rs \
+$(UTIL_DIR)/util.rs \
+$(AST_DIR)/ast.rs \
+$(MATH_DIR)/math.rs
+
 
 # build artifacts
 MAIN_0V_OBJ = $(BUILD_DIR)/0v.o
@@ -145,7 +149,7 @@ $(XR0V): $(MAIN_0V_OBJ) $(OBJECTS)
 	@$(CC) $(CFLAGS) -o $@ $(MAIN_0V_OBJ) $(OBJECTS)
 
 $(C2RUST):
-	(cd ../c2rust && cargo +nightly build)
+	(cd ../c2rust && cargo build --release)
 
 lex: $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx tests/99-program/100-lex/parse.x
@@ -153,7 +157,9 @@ lex: $(XR0V)
 PARSER = $(BUILD_DIR)/lex-gen
 
 $(RUST_SOURCES): $(C2RUST) compile_commands.json $(C_SOURCES) $(INCLUDES)
+	rm $(RUST_SOURCES)
 	$(C2RUST) transpile --fail-on-error compile_commands.json
+	if ! [ -f compile_commands.json ]; then git checkout compile_commands.json; fi
 
 lex-gen:
 	@$(XR0C) tests/5-program/100-lex/parse.x > build/parse.c
@@ -234,19 +240,23 @@ RUSTCFLAGS = --edition=2021 --extern core --extern libc=$(LIBC_RLIB) --crate-typ
 
 $(LOCATION_OBJ): $(STATE_DIR)/location.rs $(LIBC_RLIB)
 	@printf 'RUSTC\t$@\n'
-	rustc +nightly --crate-name xr0_location $(RUSTCFLAGS) -o $@ $<
+	@rustc +nightly --crate-name xr0_location $(RUSTCFLAGS) -o $@ $<
 
-$(UTIL_OBJ): $(UTIL_DIR)/util.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(UTIL_DIR)/util.c
+$(UTIL_OBJ): $(UTIL_DIR)/util.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_util $(RUSTCFLAGS) -o $@ $<
 
 $(AST_OBJ): $(AST_DIR)/ast.c $(INCLUDES)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -I $(AST_DIR) -o $@ -c $(AST_DIR)/ast.c
 
-$(MATH_OBJ): $(MATH_DIR)/math.c $(INCLUDES)
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(MATH_DIR)/math.c
+## $(AST_OBJ): $(AST_DIR)/ast.rs $(LIBC_RLIB)
+## 	@printf 'RUSTC\t$@\n'
+## 	@rustc +nightly --crate-name xr0_ast $(RUSTCFLAGS) -o $@ $<
+
+$(MATH_OBJ): $(MATH_DIR)/math.rs $(LIBC_RLIB)
+	@printf 'RUSTC\t$@\n'
+	@rustc +nightly --crate-name xr0_math $(RUSTCFLAGS) -o $@ $<
 
 $(LEX_OBJ): $(LEX_YY_C) $(INCLUDES)
 	@printf 'CC\t$@\n'
