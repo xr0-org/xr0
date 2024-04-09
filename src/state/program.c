@@ -23,12 +23,12 @@ program_state_init(struct ast_block *);
 struct program *
 program_create(struct ast_block *b, char *name)
 {
-	struct program *pc = malloc(sizeof(struct program));
-	pc->b = b;
-	pc->s = program_state_init(b);
-	pc->index = 0;
-	pc->name = dynamic_str(name);
-	return pc;
+	struct program *p = malloc(sizeof(struct program));
+	p->b = b;
+	p->s = program_state_init(b);
+	p->index = 0;
+	p->name = dynamic_str(name);
+	return p;
 }
 
 static enum program_state
@@ -42,11 +42,11 @@ program_state_init(struct ast_block *b)
 }
 
 void
-program_destroy(struct program *pc)
+program_destroy(struct program *p)
 {
 	/* no ownership of block */
-	free(pc->name);
-	free(pc);
+	free(p->name);
+	free(p);
 }
 
 struct program *
@@ -59,34 +59,34 @@ program_copy(struct program *old)
 }
 
 char *
-program_name(struct program *pc)
+program_name(struct program *p)
 {
-	return pc->name;
+	return p->name;
 }
 
 void
-program_changename(struct program *pc, char *new_name)
+program_changename(struct program *p, char *new_name)
 {
-	free(pc->name);
-	pc->name = dynamic_str(new_name);
+	free(p->name);
+	p->name = dynamic_str(new_name);
 }
 
 bool
-program_atend(struct program *pc)
+program_atend(struct program *p)
 {
-	return pc->s == PROGRAM_COUNTER_ATEND;
+	return p->s == PROGRAM_COUNTER_ATEND;
 }
 
 static void
-program_nextdecl(struct program *pc)
+program_nextdecl(struct program *p)
 {
-	assert(pc->s == PROGRAM_COUNTER_DECLS);
+	assert(p->s == PROGRAM_COUNTER_DECLS);
 
-	if (++pc->index >= ast_block_ndecls(pc->b)) {
-		pc->s = ast_block_nstmts(pc->b)
+	if (++p->index >= ast_block_ndecls(p->b)) {
+		p->s = ast_block_nstmts(p->b)
 			? PROGRAM_COUNTER_STMTS
 			: PROGRAM_COUNTER_ATEND;
-		pc->index = 0;
+		p->index = 0;
 	}
 }
 
@@ -94,37 +94,37 @@ static bool
 program_stmt_atend(struct program *, struct state *);
 
 static void
-program_nextstmt(struct program *pc, struct state *s)
+program_nextstmt(struct program *p, struct state *s)
 {
-	assert(pc->s == PROGRAM_COUNTER_STMTS);
+	assert(p->s == PROGRAM_COUNTER_STMTS);
 
-	if (program_stmt_atend(pc, s)) {
-		pc->s = PROGRAM_COUNTER_ATEND;
+	if (program_stmt_atend(p, s)) {
+		p->s = PROGRAM_COUNTER_ATEND;
 	}
 }
 
 static bool
-program_stmt_atend(struct program *pc, struct state *s)
+program_stmt_atend(struct program *p, struct state *s)
 {
-	return ast_stmt_isterminal(ast_block_stmts(pc->b)[pc->index], s)
-		|| ++pc->index >= ast_block_nstmts(pc->b);
+	return ast_stmt_isterminal(ast_block_stmts(p->b)[p->index], s)
+		|| ++p->index >= ast_block_nstmts(p->b);
 }
 
 
 static struct error *
-program_stmt_step(struct program *pc, bool abstract, 
+program_stmt_step(struct program *p, bool abstract, 
 		struct state *s);
 
 struct error *
-program_exec(struct program *pc, bool abstract, struct state *s)
+program_exec(struct program *p, bool abstract, struct state *s)
 {
-	switch (pc->s) {
+	switch (p->s) {
 	case PROGRAM_COUNTER_DECLS:
-		state_declare(s, ast_block_decls(pc->b)[pc->index], false);
-		program_nextdecl(pc);
+		state_declare(s, ast_block_decls(p->b)[p->index], false);
+		program_nextdecl(p);
 		return NULL;
 	case PROGRAM_COUNTER_STMTS:
-		return program_stmt_step(pc, abstract, s);
+		return program_stmt_step(p, abstract, s);
 	case PROGRAM_COUNTER_ATEND:
 	default:
 		assert(false);
@@ -132,31 +132,28 @@ program_exec(struct program *pc, bool abstract, struct state *s)
 }
 
 static struct error *
-program_stmt_process(struct program *pc, bool abstract, 
-		struct state *s);
+program_stmt_process(struct program *p, bool abstract, struct state *s);
 
 static struct error *
-program_stmt_step(struct program *pc, bool abstract, 
-		struct state *s)
+program_stmt_step(struct program *p, bool abstract, struct state *s)
 {
-	struct error *err = program_stmt_process(pc, abstract, s);
+	struct error *err = program_stmt_process(p, abstract, s);
 	if (err) {
 		return err;
 	}
-	program_nextstmt(pc, s);
+	program_nextstmt(p, s);
 	return NULL;
 }
 
 static struct error *
-program_stmt_process(struct program *pc, bool abstract, 
-		struct state *s)
+program_stmt_process(struct program *p, bool abstract, struct state *s)
 {
-	struct ast_stmt *stmt = ast_block_stmts(pc->b)[pc->index];
+	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	if (abstract) {
 		if (ast_stmt_ispre(stmt)) {
 			return NULL;
 		}
-		return ast_stmt_absprocess(stmt, pc->name, s, true);
+		return ast_stmt_absprocess(stmt, p->name, s, true);
 	}
-	return ast_stmt_process(stmt, pc->name, s);
+	return ast_stmt_process(stmt, p->name, s);
 }
