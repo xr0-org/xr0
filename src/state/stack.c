@@ -16,7 +16,7 @@
 struct frame;
 
 struct stack {
-	struct program *pc;
+	struct program *p;
 	bool abstract;
 
 	struct block_arr *memory;
@@ -47,7 +47,7 @@ stack_create(char *name, struct ast_block *b, struct ast_type *ret_type,
 	assert(stack);
 
 	assert(b);
-	stack->pc = program_create(b, name);
+	stack->p = program_create(b, name);
 	stack->abstract = abstract;
 	stack->memory = block_arr_create();
 
@@ -89,7 +89,7 @@ stack_destroy(struct stack *stack)
 
 	variable_destroy(stack->result);
 
-	program_destroy(stack->pc);
+	program_destroy(stack->p);
 	free(stack);
 }
 
@@ -107,7 +107,7 @@ stack_copy(struct stack *stack)
 {
 	struct stack *copy = calloc(1, sizeof(struct stack));
 	copy->abstract = stack->abstract;
-	copy->pc = program_copy(stack->pc);
+	copy->p = program_copy(stack->p);
 	copy->memory = block_arr_copy(stack->memory);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->id = stack->id;
@@ -122,7 +122,7 @@ struct stack *
 stack_copywithname(struct stack *stack, char *new_name)
 {
 	struct stack *copy = stack_copy(stack);
-	program_changename(copy->pc, new_name);
+	program_changename(copy->p, new_name);
 	return copy;
 }
 
@@ -161,7 +161,7 @@ stack_str(struct stack *stack, struct state *state)
 	for (int i = 0, len = 30; i < len-2; i++ ) {
 		strbuilder_putc(b, '-');
 	}
-	strbuilder_printf(b, " %s\n", program_name(stack->pc));
+	strbuilder_printf(b, " %s\n", program_name(stack->p));
 	if (stack->prev) {
 		char *prev = stack_str(stack->prev, state);
 		strbuilder_printf(b, prev);
@@ -173,13 +173,13 @@ stack_str(struct stack *stack, struct state *state)
 bool
 stack_atend(struct stack *s)
 {
-	return !s->prev && program_atend(s->pc);
+	return !s->prev && program_atend(s->p);
 }
 
 struct error *
 stack_step(struct stack *s, struct state *state)
 {
-	return program_exec(s->pc, s->abstract, state);
+	return program_exec(s->p, s->abstract, state);
 }
 
 void
