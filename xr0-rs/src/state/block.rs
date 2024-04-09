@@ -24,7 +24,7 @@ use crate::object::{
     range_create,
 };
 use crate::state::heap::heap_newblock;
-use crate::state::{state_alloc, state_eval};
+use crate::state::state::{state_alloc, state_eval};
 use crate::util::{error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{
     object_arr, AstExpr as ast_expr, Heap as heap, Location as location, Object as object,

@@ -18,7 +18,7 @@ use crate::state::block::{
     block_arr_nblocks, block_create, block_str, block_undeclare,
 };
 use crate::state::location::{location_create_dynamic, location_destroy};
-use crate::state::state_references;
+use crate::state::state::state_references;
 use crate::util::{
     dynamic_str, entry, error, error_create, map, map_create, map_destroy, map_get, map_set,
     strbuilder_build, strbuilder_create, strbuilder_printf,

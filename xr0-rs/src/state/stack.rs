@@ -28,7 +28,7 @@ use crate::state::location::{
     location_copy, location_create_automatic, location_destroy, location_getblock,
     location_getstackblock, location_offset, location_references, location_str, location_type,
 };
-use crate::state::{object_res, state_get};
+use crate::state::state::{object_res, state_get};
 use crate::util::{
     dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
     strbuilder_create, strbuilder_printf, strbuilder_putc,

@@ -29,7 +29,7 @@ use crate::parser::lexer::{
     lexememarker, lexememarker_copy, lexememarker_destroy, lexememarker_str,
 };
 use crate::props::{props_contradicts, props_get, props_install};
-use crate::state::{
+use crate::state::state::{
     object_res, state_addresses_deallocand, state_alloc, state_clump, state_copy,
     state_copywithname, state_create, state_create_withprops, state_dealloc, state_declare,
     state_deref, state_destroy, state_equal, state_get, state_getext, state_getloc,

@@ -23,7 +23,7 @@ use crate::state::clump::clump_getblock;
 use crate::state::heap::{heap_blockisfreed, heap_deallocblock, heap_getblock};
 use crate::state::r#static::static_memory_getblock;
 use crate::state::stack::{stack_getblock, stack_getframe};
-use crate::state::{
+use crate::state::state::{
     object_res, state_alloc, state_clump, state_get, state_getblock, state_getheap,
 };
 use crate::util::{error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf};

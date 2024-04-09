@@ -15,22 +15,21 @@ use crate::util::{
     dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
     strbuilder_create, strbuilder_printf,
 };
-use crate::{ast_function, ast_type, ast_variable, StrBuilder};
+use crate::{ast_function, ast_type, ast_variable, StrBuilder as strbuilder};
 
 use crate::c_util::__assert_rtn;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct Externals {
+pub struct externals {
     pub func: *mut map,
     pub var: *mut map,
     pub _typedef: *mut map,
     pub _struct: *mut map,
 }
-
 #[no_mangle]
-pub unsafe fn externals_create() -> *mut Externals {
-    let mut ext: *mut Externals = malloc(::core::mem::size_of::<Externals>()) as *mut Externals;
+pub unsafe fn externals_create() -> *mut externals {
+    let mut ext: *mut externals = malloc(::core::mem::size_of::<externals>()) as *mut externals;
     (*ext).func = map_create();
     (*ext).var = map_create();
     (*ext)._typedef = map_create();
@@ -38,7 +37,7 @@ pub unsafe fn externals_create() -> *mut Externals {
     return ext;
 }
 #[no_mangle]
-pub unsafe fn externals_destroy(mut ext: *mut Externals) {
+pub unsafe fn externals_destroy(mut ext: *mut externals) {
     map_destroy((*ext).func);
     map_destroy((*ext).var);
     map_destroy((*ext)._typedef);
@@ -47,10 +46,10 @@ pub unsafe fn externals_destroy(mut ext: *mut Externals) {
 }
 #[no_mangle]
 pub unsafe fn externals_types_str(
-    mut ext: *mut Externals,
+    mut ext: *mut externals,
     mut indent: *mut libc::c_char,
 ) -> *mut libc::c_char {
-    let mut b: *mut StrBuilder = strbuilder_create();
+    let mut b: *mut strbuilder = strbuilder_create();
     let mut m: *mut map = (*ext)._typedef;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
@@ -84,7 +83,7 @@ pub unsafe fn externals_types_str(
 }
 #[no_mangle]
 pub unsafe fn externals_declarefunc(
-    mut ext: *mut Externals,
+    mut ext: *mut externals,
     mut id: *mut libc::c_char,
     mut f: *mut ast_function,
 ) {
@@ -92,7 +91,7 @@ pub unsafe fn externals_declarefunc(
 }
 #[no_mangle]
 pub unsafe fn externals_declarevar(
-    mut ext: *mut Externals,
+    mut ext: *mut externals,
     mut id: *mut libc::c_char,
     mut v: *mut ast_variable,
 ) {
@@ -100,14 +99,14 @@ pub unsafe fn externals_declarevar(
 }
 #[no_mangle]
 pub unsafe fn externals_declaretypedef(
-    mut ext: *mut Externals,
+    mut ext: *mut externals,
     mut id: *mut libc::c_char,
     mut t: *mut ast_type,
 ) {
     map_set((*ext)._typedef, dynamic_str(id), t as *const libc::c_void);
 }
 #[no_mangle]
-pub unsafe fn externals_declarestruct(mut ext: *mut Externals, mut t: *mut ast_type) {
+pub unsafe fn externals_declarestruct(mut ext: *mut externals, mut t: *mut ast_type) {
     let mut id: *mut libc::c_char = ast_type_struct_tag(t);
     if id.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -125,21 +124,21 @@ pub unsafe fn externals_declarestruct(mut ext: *mut Externals, mut t: *mut ast_t
 }
 #[no_mangle]
 pub unsafe fn externals_getfunc(
-    mut ext: *mut Externals,
+    mut ext: *mut externals,
     mut id: *mut libc::c_char,
 ) -> *mut ast_function {
     return map_get((*ext).func, id) as *mut ast_function;
 }
 #[no_mangle]
 pub unsafe fn externals_gettypedef(
-    mut ext: *mut Externals,
+    mut ext: *mut externals,
     mut id: *mut libc::c_char,
 ) -> *mut ast_type {
     return map_get((*ext)._typedef, id) as *mut ast_type;
 }
 #[no_mangle]
 pub unsafe fn externals_getstruct(
-    mut ext: *mut Externals,
+    mut ext: *mut externals,
     mut id: *mut libc::c_char,
 ) -> *mut ast_type {
     return map_get((*ext)._struct, id) as *mut ast_type;

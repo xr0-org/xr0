@@ -24,19 +24,19 @@ mod value;
 use crate::ast::{
     ast_block, ast_externdecl, ast_function, ast_type, ast_variable, ast_variable_arr, Ast, AstExpr,
 };
-use crate::ext::Externals;
+use crate::ext::externals as Externals;
 use crate::math::math_expr;
-use crate::object::{object_arr, Object};
-use crate::props::Props;
+use crate::object::{object as Object, object_arr};
+use crate::props::props as Props;
 use crate::state::block::{block as Block, block_arr};
 use crate::state::clump::clump as Clump;
 use crate::state::heap::{heap as Heap, vconst};
 use crate::state::location::location as Location;
 use crate::state::r#static::static_memory;
 use crate::state::stack::{stack as Stack, variable as Variable};
-use crate::state::State;
-use crate::util::StrBuilder;
-use crate::value::Value;
+use crate::state::state::state as State;
+use crate::util::strbuilder as StrBuilder;
+use crate::value::value as Value;
 
 // NOTE: libc::isspace may be slower than the inlined definition i deleted
 use libc::isspace;
