@@ -11,11 +11,11 @@
 use libc::{free, malloc};
 
 use crate::c_util::__assert_rtn;
-use crate::strbuilder;
 use crate::util::{
     dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
     strbuilder_create, strbuilder_printf,
 };
+use crate::StrBuilder as strbuilder;
 
 #[derive(Copy, Clone)]
 #[repr(C)]

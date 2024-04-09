@@ -28,15 +28,14 @@ use crate::ext::Externals;
 use crate::math::math_expr;
 use crate::object::{object_arr, Object};
 use crate::props::Props;
-use crate::state::block::{block_arr, Block};
-use crate::state::clump::Clump;
-use crate::state::heap::{vconst, Heap};
-use crate::state::location::Location;
+use crate::state::block::{block as Block, block_arr};
+use crate::state::clump::clump as Clump;
+use crate::state::heap::{heap as Heap, vconst};
+use crate::state::location::location as Location;
 use crate::state::r#static::static_memory;
-use crate::state::stack::{Stack, Variable};
+use crate::state::stack::{stack as Stack, variable as Variable};
 use crate::state::State;
 use crate::util::StrBuilder;
-type strbuilder = StrBuilder;
 use crate::value::Value;
 
 // NOTE: libc::isspace may be slower than the inlined definition i deleted
