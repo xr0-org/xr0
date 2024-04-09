@@ -53,8 +53,7 @@ use ast::{
 };
 use c_util::{__assert_rtn, __stderrp, getopt, optarg, optind};
 use ext::{externals_create, externals_destroy, externals_getfunc};
-use parser::gram::yyparse;
-use parser::lexer::{lex_begin, lex_finish, yyin, yylex_destroy};
+use parser::{lex_begin, lex_finish, yyin, yylex_destroy, yyparse};
 use util::{
     dynamic_str, error, strbuilder_build, strbuilder_create, strbuilder_printf, string_arr,
     string_arr_append, string_arr_create, string_arr_n, string_arr_s, string_arr_str, v_printf,

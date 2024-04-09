@@ -25,9 +25,7 @@ use crate::object::{
     object_as_value, object_assign, object_destroy, object_getmember, object_getmembertype,
     object_hasvalue,
 };
-use crate::parser::lexer::{
-    lexememarker, lexememarker_copy, lexememarker_destroy, lexememarker_str,
-};
+use crate::parser::{lexememarker, lexememarker_copy, lexememarker_destroy, lexememarker_str};
 use crate::props::{props_contradicts, props_get, props_install};
 use crate::state::state::{
     object_res, state_addresses_deallocand, state_alloc, state_clump, state_copy,
