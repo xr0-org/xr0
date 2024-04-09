@@ -288,14 +288,27 @@ string_arr_str(struct string_arr *string_arr)
 	return strbuilder_build(b);
 }
 
-int VERBOSE_MODE;
+enum loglevel LOG_LEVEL;
 
+/* d_printf: Print if Xr0 is in debug mode. */
+int
+d_printf(char *fmt, ...)
+{
+	if (LOG_LEVEL != LOG_DEBUG) {
+		return 0;
+	}
+	va_list ap;
+	va_start(ap, fmt);
+	int r = vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	return r;
+}
 
 /* v_printf: Print if Xr0 is in verbose mode. */
 int
 v_printf(char *fmt, ...)
 {
-	if (!VERBOSE_MODE) {
+	if (LOG_LEVEL != LOG_INFO) {
 		return 0;
 	}
 	va_list ap;
@@ -309,6 +322,7 @@ struct error {
 	enum error_type {
 		ERROR_PRINTF,
 		ERROR_UNDECIDEABLE_COND,
+		ERROR_RETURN,
 	} type;
 	union error_contents {
 		char *printf;
@@ -320,6 +334,7 @@ struct error {
 static struct error *
 error_to(struct error *err, enum error_type t)
 {
+	assert(err);
 	if (err->type == t) {
 		return err;
 	}
@@ -425,17 +440,33 @@ error_get_undecideable_cond(struct error *err)
 	return err->contents.undecidable_cond;
 }
 
+struct error *
+error_return()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_RETURN;
+	return err;
+}
+
+struct error *
+error_to_return(struct error *err)
+{
+	return error_to(err, ERROR_RETURN);
+}
+
 char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
-		[ERROR_UNDECIDEABLE_COND] = "undecideable condition"
+		[ERROR_UNDECIDEABLE_COND] = "undecideable condition",
+		[ERROR_RETURN] = "returned",
 	};
 
 	switch (err->type) {
 	case ERROR_PRINTF:
 		return dynamic_str(err->contents.printf);
 	case ERROR_UNDECIDEABLE_COND:
+	case ERROR_RETURN:
 		return dynamic_str(error_type_str[err->type]);
 	default:
 		assert(false);

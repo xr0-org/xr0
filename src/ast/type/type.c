@@ -38,6 +38,12 @@ ast_type_ispointer(struct ast_type *t)
 	return t->base == TYPE_POINTER;
 }
 
+bool
+ast_type_isvoid(struct ast_type *t)
+{
+	return t->base == TYPE_VOID;
+}
+
 struct ast_type *
 ast_type_create(enum ast_type_base base, enum ast_type_modifier mod)
 {
@@ -55,6 +61,12 @@ ast_type_create_ptr(struct ast_type *ref)
 	struct ast_type *t = ast_type_create(TYPE_POINTER, 0);
 	t->ptr_type = ref;
 	return t;
+}
+
+struct ast_type *
+ast_type_create_void()
+{
+	return ast_type_create(TYPE_VOID, 0);
 }
 
 struct ast_type *

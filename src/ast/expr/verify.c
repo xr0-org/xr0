@@ -459,7 +459,6 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 	case EXPR_ARBARG:
 		return arbarg_eval(expr, state);
 	default:
-		/*printf("expr: %s\n", ast_expr_str(expr));*/
 		assert(false);
 	}
 }
@@ -682,13 +681,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		struct result_arr *args, char *fname, struct state *state);
 
 static struct error *
-call_setupverify(struct ast_function *, struct state *state);
-
-static struct result *
-call_absexec(struct ast_expr *call, struct state *);
-
-static struct result *
-pf_augment(struct value *v, struct ast_expr *root, struct state *);
+call_setupverify(struct ast_function *, struct ast_expr *, struct state *state);
 
 static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
@@ -723,73 +716,28 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		state
 	);
 
-	state_pushframe(
-		state,
+	struct frame *call_frame = frame_call_create(
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		true
+		state_next_execmode(state),
+		ast_expr_copy(expr),
+		f
 	);
+	state_pushframe(state, call_frame);
+
 	if ((err = prepare_parameters(nparams, params, args, name, state))) {
 		return result_error_create(err);
 	}
 
 	/* XXX: pass copy so we don't observe */
-	if ((err = call_setupverify(f, state_copy(state)))) {
+	if ((err = call_setupverify(f, ast_expr_copy(expr), state_copy(state)))) {
 		return result_error_create(
-			error_printf(
-				"`%s' precondition failure\n"
-				"\t%w",
-				name, err
-			)
+			error_printf("precondition failure: %w", err)
 		);
 	}
 
-	struct result *res = call_absexec(expr, state);
-	if (result_iserror(res)) {
-		return result_error_create(
-			error_printf("\n\t%w", result_as_error(res))
-		);
-	}
-
-	/* XXX: pass copy so we don't observe */
-	/* copy to preserve value through popping of frame */
-	struct value *v = NULL;
-	if (result_hasvalue(res)) {
-		v = value_copy(result_as_value(res));
-	}
-
-	state_popframe(state);
-	/*result_arr_destroy(args);*/
-
-	if (v) {
-		return pf_augment(v, expr, state);
-	}
-
-	return res;
-}
-
-static struct result *
-call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state *);
-
-static struct result *
-call_absexec(struct ast_expr *expr, struct state *s)
-{
-	struct ast_expr *root = ast_expr_call_root(expr);
-	/* TODO: function-valued-expressions */
-	char *name = ast_expr_as_identifier(root);
-
-	struct ast_function *f = externals_getfunc(state_getext(s), name);
-	if (!f) {
-		return result_error_create(
-			error_printf("function `%s' not found", name)
-		);
-	}
-	struct result *res = ast_function_absexec(f, s);
-	if (result_iserror(res) || result_hasvalue(res)) {
-		return res;
-	}
-	return call_arbitraryresult(expr, f, s);
+	return result_value_create(NULL);
 }
 
 static struct error *
@@ -797,21 +745,30 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 		struct state *arg_state);
 
 static struct error *
-call_setupverify(struct ast_function *f, struct state *arg_state)
+call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *arg_state)
 {
 	struct error *err;
 
 	char *fname = ast_function_name(f);
-	struct state *param_state = state_create(
+	struct frame *setupframe = frame_call_create(
 		fname,
 		ast_function_abstract(f),
 		ast_function_type(f),
-		true,
+		EXEC_ABSTRACT_NO_SETUP,
+		ast_expr_copy(call),
+		f
+	);
+	struct state *param_state = state_create(
+		setupframe,
 		state_getext(arg_state)
 	);
 	if ((err = ast_function_initparams(f, param_state))) {
 		return err;
 	}
+	if ((err = ast_function_initsetup(f, param_state))) {
+		assert(false);
+	}
+
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **param = ast_function_params(f);
 
@@ -867,8 +824,8 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 	);
 }
 
-static struct result *
-pf_augment(struct value *v, struct ast_expr *call, struct state *state)
+struct result *
+ast_expr_pf_augment(struct value *v, struct ast_expr *call, struct state *state)
 {
 	if (!value_isstruct(v)) {
 		return result_value_create(value_copy(v));
@@ -886,16 +843,16 @@ pf_augment(struct value *v, struct ast_expr *call, struct state *state)
 static struct result *
 call_to_computed_value(struct ast_function *, struct state *s);
 
-static struct result *
-call_arbitraryresult(struct ast_expr *expr, struct ast_function *f,
+struct value *
+ast_expr_call_arbitrary(struct ast_expr *expr, struct ast_function *f,
 		struct state *state)
 {
 	struct result *res = call_to_computed_value(f, state);
 	if (result_iserror(res)) {
-		return res;
+		assert(false);
 	}
 	assert(result_hasvalue(res));
-	return res;
+	return result_as_value(res);
 }
 
 static struct result *
@@ -1084,6 +1041,9 @@ static struct result *
 isdereferencable_absexec(struct ast_expr *, struct state *);
 
 static struct result *
+call_absexec(struct ast_expr *, struct state *);
+
+static struct result *
 alloc_absexec(struct ast_expr *, struct state *);
 
 struct result *
@@ -1096,16 +1056,74 @@ ast_expr_abseval(struct ast_expr *expr, struct state *state)
 		return isdereferencable_absexec(expr, state);
 	case EXPR_ALLOCATION:
 		return alloc_absexec(expr, state);
+	case EXPR_CALL:
+		return call_absexec(expr, state);
 	case EXPR_IDENTIFIER:
 	case EXPR_CONSTANT:
 	case EXPR_UNARY:
-	case EXPR_CALL:
 	case EXPR_STRUCTMEMBER:
 	case EXPR_ARBARG:
 		return ast_expr_eval(expr, state);	
 	default:
 		assert(false);
 	}
+}
+
+static struct result *
+call_absexec(struct ast_expr *expr, struct state *state)
+{
+	struct error *err;
+
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(root);
+
+	struct ast_function *f = externals_getfunc(state_getext(state), name);
+	if (!f) {
+		return result_error_create(error_printf("`%s' not found\n", name));
+	}
+
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **params = ast_function_params(f);
+
+	int nargs = ast_expr_call_nargs(expr);
+	if (nargs != nparams) {
+		return result_error_create(
+			error_printf(
+				"`%s' given %d arguments instead of %d\n",
+				name, nargs, nparams
+			)
+		);
+	}
+
+	struct result_arr *args = prepare_arguments(
+		nargs, ast_expr_call_args(expr),
+		nparams, params,
+		state
+	);
+
+	struct frame *call_frame = frame_call_create(
+		ast_function_name(f),
+		ast_function_abstract(f),
+		ast_function_type(f),
+		state_next_execmode(state),
+		ast_expr_copy(expr),
+		f
+	);
+	state_pushframe(state, call_frame);
+
+	if ((err = prepare_parameters(nparams, params, args, name, state))) {
+		return result_error_create(err);
+	}
+
+	/* XXX: pass copy so we don't observe */
+	if ((err = call_setupverify(f, ast_expr_copy(expr), state_copy(state)))) {
+		return result_error_create(
+			error_printf("precondition failure: %w", err)
+		);
+	}
+
+	return result_value_create(NULL);
 }
 
 static struct result *
@@ -1118,17 +1136,28 @@ dealloc_process(struct ast_expr *, struct state *);
 static struct result *
 alloc_absexec(struct ast_expr *expr, struct state *state)
 {
+	struct result *res;
 	switch (ast_expr_alloc_kind(expr)) {
 	case ALLOC:
 		/* TODO: size needs to be passed in here when added to .alloc */
-		return result_value_create(state_alloc(state));
+		res = result_value_create(state_alloc(state));
+		break;
 	case DEALLOC:
-		return dealloc_process(expr, state);
+		res = dealloc_process(expr, state);
+		break;
 	case CLUMP:
-		return result_value_create(state_clump(state));
+		res = result_value_create(state_clump(state));
+		break;
 	default:
 		assert(false);
 	}
+	if (result_iserror(res)) {
+		return res;
+	}
+	if (result_hasvalue(res)) {
+		state_writeregister(state, result_as_value(res));
+	}
+	return res;
 }
 
 static struct result *
@@ -1436,4 +1465,202 @@ binary_assume(struct ast_expr *expr, bool value, struct state *s)
 		value,
 		s
 	);
+}
+
+/*
+given f(x)
+
+want:
+	<rtype> t0 = f(x);
+
+
+given f(g(x), y);
+
+want:
+	<rtype g> t0 = g(x);
+	<rtype f> t1 = f(t0, y);
+ */
+
+static struct ast_expr *
+unary_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
+binary_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
+incdec_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
+alloc_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
+assign_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
+call_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
+structmember_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
+bracketed_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+struct ast_expr *
+ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
+		struct ast_block *b, struct state *s) 
+{
+	switch (ast_expr_kind(expr)) {
+	case EXPR_CONSTANT:
+	case EXPR_ISDEALLOCAND:
+	case EXPR_IDENTIFIER:
+	case EXPR_STRING_LITERAL:
+	case EXPR_ARBARG:
+		return expr;
+	case EXPR_UNARY:
+		return unary_geninstr(expr, loc, b, s);	
+	case EXPR_BINARY:
+		return binary_geninstr(expr, loc, b, s);
+	case EXPR_INCDEC:
+		return incdec_geninstr(expr, loc, b, s);
+	case EXPR_ALLOCATION:
+		return alloc_geninstr(expr, loc, b, s);	
+	case EXPR_ASSIGNMENT:
+		return assign_geninstr(expr, loc, b, s);
+	case EXPR_CALL:
+		return call_geninstr(expr, loc, b, s);
+	case EXPR_STRUCTMEMBER:
+		return structmember_geninstr(expr, loc, b, s);
+	case EXPR_BRACKETED:
+		return bracketed_geninstr(expr, loc, b, s);
+	default:
+		printf("expr: %s\n", ast_expr_str(expr));
+		assert(false);
+	}
+}
+
+static struct ast_expr *
+unary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *gen_operand = ast_expr_geninstr(
+		ast_expr_unary_operand(expr), loc, b, s
+	);
+	return ast_expr_unary_create(gen_operand, ast_expr_unary_op(expr));
+}
+
+static struct ast_expr *
+binary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *gen_e1 = ast_expr_geninstr(ast_expr_binary_e1(expr), loc, b, s),
+			*gen_e2 = ast_expr_geninstr(ast_expr_binary_e2(expr), loc, b, s);
+	return ast_expr_binary_create(gen_e1, ast_expr_binary_op(expr), gen_e2);
+}
+
+static struct ast_expr *
+incdec_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *gen_root = ast_expr_geninstr(
+		ast_expr_incdec_root(expr), loc, b, s
+	);
+	return ast_expr_incdec_create(
+		gen_root, ast_expr_incdec_inc(expr), ast_expr_incdec_pre(expr)
+	);
+}
+
+static struct ast_expr *
+alloc_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr	*gen_arg = ast_expr_geninstr(ast_expr_alloc_arg(expr), loc, b, s);
+	enum ast_alloc_kind kind = ast_expr_alloc_kind(expr);
+
+	struct ast_expr *alloc = ast_expr_alloc_kind_create(gen_arg, kind);
+	struct ast_type *rtype = kind == DEALLOC
+		? ast_type_create_void()
+		: ast_type_create_voidptr();
+	return ast_block_call_create(b, loc, rtype, alloc);
+}
+
+static struct ast_expr *
+assign_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *lval = ast_expr_assignment_lval(expr),
+			*rval = ast_expr_assignment_rval(expr);
+	assert(
+		ast_expr_kind(lval) == EXPR_IDENTIFIER ||
+		ast_expr_kind(lval) == EXPR_UNARY ||
+		ast_expr_kind(lval) == EXPR_STRUCTMEMBER
+	);
+	struct ast_expr *gen_rval = ast_expr_geninstr(rval, loc, b, s);
+	if (!gen_rval) {
+		assert(false); /* XXX: user error void func */
+	}
+	struct ast_expr *assign = ast_expr_assignment_create(
+		ast_expr_copy(lval), gen_rval
+	);
+	ast_block_append_stmt(b, ast_stmt_create_expr(loc, assign));
+	return lval;
+}
+
+static struct ast_expr *
+call_geninstr(struct ast_expr *expr, struct lexememarker *loc,
+		struct ast_block *b, struct state *s)
+{
+	int nargs = ast_expr_call_nargs(expr);
+	struct ast_expr **args = ast_expr_call_args(expr);
+
+	struct ast_expr **gen_args = malloc(sizeof(struct ast_expr *) * nargs);
+
+	for (int i = 0; i < nargs; i++) {
+		struct ast_expr *gen_arg = ast_expr_geninstr(args[i], loc, b, s);
+		if (!gen_arg) {
+			assert(false); /* XXX: user error void func */
+		}
+		gen_args[i] = gen_arg;
+	}
+
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* XXX: handle root thats a call */
+	char *name = ast_expr_as_identifier(root);
+	struct ast_function *f = externals_getfunc(state_getext(s), name);
+	assert(f);
+	struct ast_type *rtype = ast_function_type(f);
+	struct ast_expr *call = ast_expr_call_create(
+		ast_expr_copy(root), nargs, gen_args
+	);
+	return ast_block_call_create(b, loc, rtype, call);
+}
+
+static struct ast_expr *
+structmember_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *root_gen = ast_expr_geninstr(
+		ast_expr_member_root(expr), loc, b, s
+	);
+	if (!root_gen) {
+		assert(false); /* XXX: user error void root */
+	}
+	return ast_expr_member_create(root_gen, dynamic_str(ast_expr_member_field(expr)));
+}
+
+static struct ast_expr *
+bracketed_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *gen_root = ast_expr_geninstr(
+		ast_expr_bracketed_root(expr), loc, b, s
+	);
+	return ast_expr_bracketed_create(gen_root);
 }

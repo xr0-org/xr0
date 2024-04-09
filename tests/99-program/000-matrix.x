@@ -7,7 +7,7 @@ struct matrix {
 };
 
 struct matrix *
-matrix_create(int rows, int cold) ~ [
+matrix_create(int rows, int cols) ~ [
 	struct matrix *m;
 	int i;
 
@@ -19,11 +19,7 @@ matrix_create(int rows, int cold) ~ [
 		m->data[i] = .malloc(sizeof(int));	
 	}
 	return m;
-];
-
-struct matrix *
-matrix_create(int rows, int cols)
-{
+]{
 	int i;
 	struct matrix *m;
 

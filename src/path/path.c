@@ -7,6 +7,7 @@
 #include "object.h"
 #include "state.h"
 #include "path.h"
+#include "value.h"
 
 struct path {
 	enum path_state {
@@ -19,11 +20,69 @@ struct path {
 		PATH_STATE_ATEND,
 	} path_state;
 	struct state *abstract, *actual;
-	struct path *p_true, *p_false;
+	
+	int branch_index;
+	struct path_arr *paths;
 
 	struct ast_function *f;
 	struct externals *ext;
 };
+
+struct path_arr {
+	int n;
+	struct path **paths;
+};
+
+static struct path_arr *
+path_arr_create()
+{
+	struct path_arr *arr = calloc(1, sizeof(struct path_arr));
+	assert(arr);
+	return arr;
+}
+
+static void
+path_arr_destroy(struct path_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		path_destroy(arr->paths[i]);
+	}
+	free(arr->paths);
+	free(arr);
+}
+
+static struct path **
+path_arr_s(struct path_arr *arr)
+{
+	return arr->paths;
+}
+
+static int
+path_arr_n(struct path_arr *arr)
+{
+	return arr->n;
+}
+
+static int
+path_arr_append(struct path_arr *arr, struct path *p)
+{
+	arr->paths = realloc(arr->paths, sizeof(struct path_arr) * ++arr->n);
+	assert(arr->paths);
+	int loc = arr->n-1;
+	arr->paths[loc] = p;
+	return loc;
+}
+
+static bool
+path_arr_atend(struct path_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		if (!path_atend(arr->paths[i])) {
+			return false;	
+		}
+	}
+	return true;
+}
 
 struct path *
 path_create(struct ast_function *f, struct externals *ext)
@@ -31,6 +90,7 @@ path_create(struct ast_function *f, struct externals *ext)
 	struct path *p = calloc(1, sizeof(struct path));
 	p->f = ast_function_copy(f);
 	p->ext = ext;
+	p->paths = path_arr_create();
 	p->path_state = PATH_STATE_UNINIT;
 	return p;
 }
@@ -52,12 +112,22 @@ path_copywithcond(struct path *old, struct ast_expr *cond);
 static void
 path_split(struct path *p, struct ast_expr *cond)
 {
-	p->p_true = path_copywithcond(p, cond);
-	p->p_false = path_copywithcond(p, ast_expr_inverted_copy(cond, true));
+	path_arr_append(p->paths, path_copywithcond(p, cond));
+	path_arr_append(p->paths, path_copywithcond(p, ast_expr_inverted_copy(cond, true)));
 	/* TODO: destroy abstract and actual */
 	p->abstract = NULL;
 	p->actual = NULL;
 	p->path_state = PATH_STATE_SPLIT;
+}
+
+static void
+path_nextbranch(struct path *p)
+{
+	assert(p->paths->n >= 2);
+	int index = p->branch_index;
+	if (index < p->paths->n - 1) {
+		p->branch_index++;	
+	}
 }
 
 static struct ast_function *
@@ -133,7 +203,7 @@ path_atend(struct path *p)
 {
 	switch (p->path_state) {
 	case PATH_STATE_SPLIT:
-		return path_atend(p->p_true) && path_atend(p->p_false);
+		return path_arr_atend(p->paths);
 	case PATH_STATE_ATEND:
 		return true;
 	default:
@@ -145,13 +215,13 @@ static struct error *
 path_init_abstract(struct path *p);
 
 static struct error *
-path_step_abstract(struct path *p);
+path_step_abstract(struct path *p, bool print);
 
 static struct error *
 path_init_actual(struct path *p);
 
 static struct error *
-path_step_actual(struct path *p);
+path_step_actual(struct path *p, bool print);
 
 static struct error *
 path_step_split(struct path *p);
@@ -166,11 +236,11 @@ path_step(struct path *p)
 	case PATH_STATE_UNINIT:
 		return path_init_abstract(p);
 	case PATH_STATE_ABSTRACT:
-		return path_step_abstract(p);
+		return path_step_abstract(p, true);
 	case PATH_STATE_HALFWAY:
 		return path_init_actual(p);
 	case PATH_STATE_ACTUAL:
-		return path_step_actual(p);
+		return path_step_actual(p, true);
 	case PATH_STATE_AUDIT:
 		return path_audit(p);
 	case PATH_STATE_SPLIT:
@@ -182,19 +252,177 @@ path_step(struct path *p)
 }
 
 static struct error *
-path_init_abstract(struct path *p)
+path_next_abstract(struct path *);
+
+static struct error *
+path_next_actual(struct path *);
+
+static struct error *
+path_next_split(struct path *);
+
+struct error *
+path_next(struct path *p)
 {
-	p->abstract = state_create(
-		ast_function_name(p->f),
-		ast_function_abstract(p->f),
-		ast_function_type(p->f),
-		true,
-		p->ext
-	);
-	struct error *err = ast_function_initparams(p->f, p->abstract);
+	switch (p->path_state) {
+	case PATH_STATE_UNINIT:
+		return path_step(p);
+	case PATH_STATE_ABSTRACT:
+		return path_next_abstract(p);
+	case PATH_STATE_HALFWAY:
+		return path_step(p);
+	case PATH_STATE_ACTUAL:
+		return path_next_actual(p);
+	case PATH_STATE_AUDIT:
+		return path_audit(p);
+	case PATH_STATE_SPLIT:
+		return path_next_split(p);
+	case PATH_STATE_ATEND:
+	default:
+		assert(false);
+	}
+}
+
+static bool
+path_continue(struct path *, enum path_state og_state, int og_frame,
+		int og_index);
+
+static struct error *
+path_next_abstract(struct path *p)
+{
+	struct error *err;
+
+	int og_frame = state_frameid(p->abstract);
+	int og_index = state_programindex(p->abstract);
+	if ((err = path_step(p))) {
+		return err;
+	}
+	while (path_continue(p, PATH_STATE_ABSTRACT, og_frame, og_index)) {
+		if ((err = path_step_abstract(p, false))) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
+static struct error *
+branch_next(struct path *parent, struct path *branch);
+
+static struct error *
+path_next_split(struct path *p)
+{
+	assert(!path_arr_atend(p->paths));
+	struct path_arr *p_arr = p->paths;
+	struct error *err = branch_next(p, p_arr->paths[p->branch_index]);
 	if (err) {
 		return err;
 	}
+	return NULL;
+}
+
+static struct error *
+branch_next(struct path *parent, struct path *branch)
+{
+	d_printf("branch: %d\n", parent->branch_index);
+	if (path_atend(branch)) {
+		path_nextbranch(parent);
+		return NULL;
+	}
+	return path_next(branch);
+}
+
+static bool
+path_insamestate(struct path *, enum path_state og_state);
+
+static bool
+path_inlowerframe(struct path *p, enum path_state og_state, int og_frameid);
+
+static bool
+path_insamestmt(struct path *p, enum path_state og_state, int og_frameid,
+		int og_program_index);
+
+static bool
+path_continue(struct path *p, enum path_state og_state, int og_frame,
+		int og_index)
+{
+	return path_insamestate(p, og_state) &&
+		(path_inlowerframe(p, og_state, og_frame) ||
+		path_insamestmt(p, og_state, og_frame, og_index));
+}
+
+static bool
+path_insamestate(struct path *p, enum path_state og_state)
+{
+	return p->path_state == og_state;
+}
+
+static bool
+path_inlowerframe(struct path *p, enum path_state og_state, int og_frame)
+{
+	switch (og_state) {
+	case PATH_STATE_ABSTRACT:
+		return og_frame < state_frameid(p->abstract);
+	case PATH_STATE_ACTUAL:
+		return og_frame < state_frameid(p->actual);
+	default:
+		assert(false);
+	}
+}
+
+static bool
+path_insamestmt(struct path *p, enum path_state og_state, int og_frame, int og_index)
+{
+	struct state *s;
+	switch (og_state) {
+	case PATH_STATE_ABSTRACT:
+		s = p->abstract;
+		break;
+	case PATH_STATE_ACTUAL:
+		s = p->actual;
+		break;
+	default:
+		assert(false);
+	}
+	return og_frame == state_frameid(s) &&
+		og_index == state_programindex(s);
+}
+
+static struct error *
+path_next_actual(struct path *p)
+{
+	struct error *err;
+
+	int og_frame = state_frameid(p->actual);
+	int og_index = state_programindex(p->actual);
+	if ((err = path_step(p))) {
+		return err;
+	}
+	while (path_continue(p, PATH_STATE_ACTUAL, og_frame, og_index)) {
+		if ((err = path_step_actual(p, false))) {
+			return err;
+		}
+	}
+	return NULL;
+}
+
+static struct error *
+path_init_abstract(struct path *p)
+{
+	struct error *err;
+
+	d_printf("init abstract state\n");
+	struct frame *f = frame_call_create(
+		ast_function_name(p->f),
+		ast_function_abstract(p->f),
+		ast_function_type(p->f),
+		EXEC_ABSTRACT,
+		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
+		p->f
+	);
+	p->abstract = state_create(f, p->ext);
+	if ((err = ast_function_initparams(p->f, p->abstract))) {
+		return err;
+	}
+	state_clearregister(p->abstract);
 	p->path_state = PATH_STATE_ABSTRACT;
 	return NULL;
 }
@@ -202,30 +430,42 @@ path_init_abstract(struct path *p)
 static struct error *
 path_init_actual(struct path *p)
 {
-	p->actual = state_create_withprops(
+	struct error *err;
+	d_printf("init actual state\n");
+	/* if body empty just apply setup */
+	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_body(p->f),
 		ast_function_type(p->f),
-		false,
+		EXEC_ACTUAL,
+		ast_expr_identifier_create(dynamic_str("base act")), /* xxx */
+		p->f
+	);
+	p->actual = state_create_withprops(
+		f,
 		p->ext,
 		state_getprops(p->abstract)
 	);
-	struct error *err = ast_function_initparams(p->f, p->actual);
-	if (err) {
+	if ((err = ast_function_initparams(p->f, p->actual))) {
 		return err;
 	}
-	err = ast_function_setupabsexec(p->f, p->actual);
-	if (err) {
+	if ((err = ast_function_initsetup(p->f, p->actual))) {
 		return err;
 	}
+	state_clearregister(p->actual);
 	p->path_state = PATH_STATE_ACTUAL;
 	return NULL;
 }
 
 static struct error *
-path_step_abstract(struct path *p)
+path_step_abstract(struct path *p, bool print)
 {
-	if (state_atend(p->abstract)) {
+	if (print) {
+		d_printf("mode:%d\n", state_execmode(p->abstract));
+		d_printf("text:\n%s\n", state_programtext(p->abstract));
+		d_printf("abstract: %s\n", state_str(p->abstract));
+	}
+	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
 		return path_step(p);
 	}
@@ -235,17 +475,22 @@ path_step_abstract(struct path *p)
 		return NULL;
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
-	if (!uc_err) {
-		return err;
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
 	}
-	path_split(p, error_get_undecideable_cond(uc_err));
-	return NULL;
+	return state_stacktrace(p->abstract, err);
 }
 
 static struct error *
-path_step_actual(struct path *p)
+path_step_actual(struct path *p, bool print)
 {
-	if (state_atend(p->actual)) {
+	if (print) {
+		d_printf("mode:%d\n", state_execmode(p->actual));
+		d_printf("text:\n%s\n", state_programtext(p->actual));
+		d_printf("actual: %s\n", state_str(p->actual));
+	}
+	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
 		return path_step(p);
 	}
@@ -255,18 +500,19 @@ path_step_actual(struct path *p)
 		return NULL;
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
-	if (!uc_err) {
-		return err;
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
 	}
-	path_split(p, error_get_undecideable_cond(uc_err));
-	return NULL;
+	return state_stacktrace(p->actual, err);
 }
 
 static struct error *
 path_audit(struct path *p)
 {
+	d_printf("audit\n");
 	if (state_hasgarbage(p->actual)) {
-		v_printf("actual: %s", state_str(p->actual));
+		d_printf("actual: %s", state_str(p->actual));
 		return error_printf(
 			"%s: garbage on heap", ast_function_name(p->f)
 		);
@@ -284,23 +530,29 @@ path_audit(struct path *p)
 }
 
 static struct error *
-path_trystep(struct path *p);
+branch_step(struct path *parent, struct path *branch);
 
 static struct error *
 path_step_split(struct path *p)
 {
 	/* path_atend holds this invariant whenever this function is called */ 
-	assert(!path_atend(p->p_true) || !path_atend(p->p_false));
+	assert(!path_arr_atend(p->paths));
 
-	struct error *err = path_trystep(p->p_true);
+	struct path_arr *p_arr = p->paths;
+	struct error *err = branch_step(p, p_arr->paths[p->branch_index]);
 	if (err) {
 		return err;
 	}
-	return path_trystep(p->p_false);
+	return NULL;	
 }
 
 static struct error *
-path_trystep(struct path *p)
+branch_step(struct path *parent, struct path *branch)
 {
-	return path_atend(p) ? NULL : path_step(p);
+	d_printf("branch: %d\n", parent->branch_index);
+	if (path_atend(branch)) {
+		path_nextbranch(parent);
+		return NULL;
+	}
+	return path_step(branch);
 }

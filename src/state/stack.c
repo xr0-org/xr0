@@ -11,48 +11,39 @@
 #include "object.h"
 #include "value.h"
 #include "util.h"
+#include "program.h"
 
-struct program_counter;
-
-static struct program_counter *
-program_counter_create(struct ast_block *, char *name);
-
-static struct program_counter *
-program_counter_copy(struct program_counter *);
-
-static void
-program_counter_destroy(struct program_counter *);
-
-static char *
-program_counter_name(struct program_counter *);
-
-static void
-program_counter_changename(struct program_counter *, char *);
-
-static bool
-program_counter_atend(struct program_counter *);
-
-static struct error *
-program_counter_exec(struct program_counter *, bool abstract, struct state *);
+struct frame;
 
 struct stack {
-	struct program_counter *pc;
-	bool abstract;
-
-	struct block_arr *frame;
-
-	/* lvalues of blocks in frame */
-	struct map *varmap;
-	struct variable *result;
-
 	int id;
+	struct program *p;
+	struct block_arr *memory;
+	struct map *varmap;		/* lvalues of blocks in frame */
 	struct stack *prev;
+
+	char *name;
+	enum execution_mode mode;
+	enum frame_kind kind;
+	struct ast_expr *call;
+	struct ast_function *f;
+};
+
+struct frame {
+	char *name;
+	struct ast_block *b;
+	struct ast_type *ret_type;
+	enum execution_mode mode;
+	enum frame_kind kind;
+	struct ast_expr *call;
+	struct ast_function *f;
+	bool advance;
 };
 
 struct location *
 stack_newblock(struct stack *stack)
 {
-	int address = block_arr_append(stack->frame, block_create());
+	int address = block_arr_append(stack->memory, block_create());
 	struct location *loc = location_create_automatic(
 		stack->id, address, ast_expr_constant_create(0)
 	);
@@ -60,25 +51,34 @@ stack_newblock(struct stack *stack)
 }
 
 struct stack *
-stack_create(char *name, struct ast_block *b, struct ast_type *ret_type,
-		bool abstract, struct stack *prev)
+stack_create(struct frame *f, struct stack *prev)
 {
 	struct stack *stack = calloc(1, sizeof(struct stack));
 	assert(stack);
 
-	assert(b);
-	stack->pc = program_counter_create(b, name);
-	stack->abstract = abstract;
-	stack->frame = block_arr_create();
-
+	assert(f->b);
+	stack->p = program_create(f->b);
+	stack->memory = block_arr_create();
 	stack->varmap = map_create();
-
 	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
 
-	stack->result = variable_create(ret_type, stack, false);
+	stack->name = f->name;
+	stack->mode = f->mode;
+	stack->kind = f->kind;
+	if (stack->kind == FRAME_CALL) {
+		stack->call = f->call;
+		stack->f = f->f;
+	}
 
 	return stack;
+}
+
+int
+stack_id(struct stack *s)
+{
+	assert(s);
+	return s->id;
 }
 
 struct stack *
@@ -96,10 +96,46 @@ stack_getframe(struct stack *s, int frame)
 	return stack_getframe(s->prev, frame);
 }
 
+char *
+stack_programtext(struct stack *s)
+{
+	return program_render(s->p);
+}
+
+int
+stack_programindex(struct stack *s)
+{
+	return program_index(s->p);
+}
+
+void
+stack_return(struct stack *s)
+{
+	program_setatend(s->p);
+	if (s->prev && s->kind != FRAME_CALL) {
+		stack_return(s->prev);
+	}
+}
+
+struct ast_expr *
+stack_framecall(struct stack *s)
+{
+	switch (s->kind) {
+	case FRAME_CALL:
+		assert(s->call);
+		return s->call;
+	case FRAME_INTERMEDIATE:
+		return program_prevcall(s->p);
+	default:
+		assert(false);
+	}
+	return NULL;
+}
+
 void
 stack_destroy(struct stack *stack)
 {
-	block_arr_destroy(stack->frame);
+	block_arr_destroy(stack->memory);
 
 	struct map *m = stack->varmap;
 	for (int i = 0; i < m->n; i++) {
@@ -107,9 +143,9 @@ stack_destroy(struct stack *stack)
 	}
 	map_destroy(m);
 
-	variable_destroy(stack->result);
+	/* XXX: call expr leak */
 
-	program_counter_destroy(stack->pc);
+	program_destroy(stack->p);
 	free(stack);
 }
 
@@ -126,24 +162,42 @@ struct stack *
 stack_copy(struct stack *stack)
 {
 	struct stack *copy = calloc(1, sizeof(struct stack));
-	copy->abstract = stack->abstract;
-	copy->pc = program_counter_copy(stack->pc);
-	copy->frame = block_arr_copy(stack->frame);
+	copy->mode = stack->mode;
+	copy->p = program_copy(stack->p);
+	copy->memory = block_arr_copy(stack->memory);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->id = stack->id;
-	copy->result = variable_copy(stack->result);
 	if (stack->prev) {
 		copy->prev = stack_copy(stack->prev);
 	}
+	copy->name = dynamic_str(stack->name);
+	copy->kind = stack->kind;
+	if (stack->kind == FRAME_CALL) {
+		copy->call = ast_expr_copy(stack->call);
+		copy->f = ast_function_copy(stack->f);
+	}
 	return copy;
 }
+
+static void
+rename_lowestframe(struct stack *, char *new_name);
 
 struct stack *
 stack_copywithname(struct stack *stack, char *new_name)
 {
 	struct stack *copy = stack_copy(stack);
-	program_counter_changename(copy->pc, new_name);
+	rename_lowestframe(copy, new_name);
 	return copy;
+}
+
+static void
+rename_lowestframe(struct stack *s, char *new_name)
+{
+	if (s->prev) {
+		rename_lowestframe(s->prev, new_name);
+	} else {
+		s->name = new_name;
+	}
 }
 
 static struct map *
@@ -173,15 +227,12 @@ stack_str(struct stack *stack, struct state *state)
 		free(var);
 		strbuilder_putc(b, '\n');
 	}
-	char *result = variable_str(stack->result, stack, state);
-	strbuilder_printf(b, "\treturn: %s\n", result);
-	free(result);
 	strbuilder_printf(b, "\t");
 	/* TODO: fix length of line */
 	for (int i = 0, len = 30; i < len-2; i++ ) {
 		strbuilder_putc(b, '-');
 	}
-	strbuilder_printf(b, " %s\n", program_counter_name(stack->pc));
+	strbuilder_printf(b, " %s\n", stack->name);
 	if (stack->prev) {
 		char *prev = stack_str(stack->prev, state);
 		strbuilder_printf(b, prev);
@@ -191,15 +242,33 @@ stack_str(struct stack *stack, struct state *state)
 }
 
 bool
+stack_islinear(struct stack *s)
+{
+	return s->kind == FRAME_INTERMEDIATE;
+}
+
+enum execution_mode
+stack_execmode(struct stack *s)
+{
+	return s->mode;
+}
+
+bool
 stack_atend(struct stack *s)
 {
-	return !s->prev && program_counter_atend(s->pc);
+	return program_atend(s->p);
 }
 
 struct error *
 stack_step(struct stack *s, struct state *state)
 {
-	return program_counter_exec(s->pc, s->abstract, state);
+	return program_exec(s->p, s->mode, state);
+}
+
+void
+stack_storeloc(struct stack *s)
+{
+	program_storeloc(s->p);
 }
 
 void
@@ -220,10 +289,6 @@ variable_abstractcopy(struct variable *v, struct state *s);
 void
 stack_undeclare(struct stack *stack, struct state *state)
 {
-	struct variable *old_result = stack->result;
-	stack->result = variable_abstractcopy(old_result, state);
-	variable_destroy(old_result);
-
 	struct map *m = stack->varmap;
 	stack->varmap = map_create();
 	for (int i = 0; i < m->n; i++) {
@@ -240,10 +305,79 @@ stack_undeclare(struct stack *stack, struct state *state)
 	map_destroy(m);
 }
 
-struct variable *
-stack_getresult(struct stack *s)
+static bool
+stack_iscall(struct stack *s)
 {
-	return s->result;
+	return s->kind == FRAME_CALL;
+}
+
+bool
+stack_isnested(struct stack *s)
+{
+	return s->kind == FRAME_NESTED;
+}
+
+static char *
+stack_propername(struct stack *);
+
+static char *
+stack_context(struct stack *);
+
+struct error *
+stack_trace(struct stack *s, struct error *err)
+{
+	if (s->kind != FRAME_CALL) {
+		assert(s->prev);
+		return stack_trace(s->prev, err);
+	}
+
+	struct strbuilder *b = strbuilder_create();
+
+	char *loc = program_loc(s->p);
+	char *err_str = error_str(err);
+	strbuilder_printf(b, "%s: %s (%s)", loc, err_str, stack_propername(s));
+	free(err_str);
+	free(loc);
+	if (s->prev) {
+		char *context = stack_context(s->prev);
+		if (strlen(context)) {
+			strbuilder_printf(b, "%s", context);
+		}
+		free(context);
+
+		char *msg = strbuilder_build(b);
+		struct error *trace_err = error_printf("%s", msg);
+		free(msg);
+		return trace_err;
+	}
+	char *msg = strbuilder_build(b);
+	struct error *e = error_printf("%s", msg);
+	free(msg);
+	return e;
+}
+
+static char *
+stack_propername(struct stack *s)
+{
+	return s->kind == FRAME_CALL ? s->name : stack_propername(s->prev);
+}
+
+static char *
+stack_context(struct stack *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	if (s->kind == FRAME_CALL) {
+		char *loc = program_loc(s->p);
+		strbuilder_printf(b, "\t%s (%s)", loc, stack_propername(s));
+		free(loc);
+	}
+	if (s->prev) {
+		char *prev = stack_context(s->prev);
+		if (strlen(prev)) {
+			strbuilder_printf(b, "\n%s", prev);
+		}
+	}
+	return strbuilder_build(b);
 }
 
 struct map *
@@ -257,15 +391,35 @@ stack_getvariable(struct stack *s, char *id)
 {
 	assert(strcmp(id, KEYWORD_RETURN) != 0);
 
-	return map_get(s->varmap, id);
+	struct variable *v = map_get(s->varmap, id);
+	if (!v && !stack_iscall(s)) {
+		/* ⊢ block */
+		return stack_getvariable(s->prev, id);
+	}
+	return v;
+}
+
+void
+stack_popprep(struct stack *s, struct state *state)
+{
+	if (s->kind == FRAME_CALL && !ast_function_isvoid(s->f)) {
+		struct value *v = state_readregister(state);
+		if (!v) {
+			state_writeregister(
+				state,
+				ast_expr_call_arbitrary(s->call, s->f, state)
+			);
+		}
+	}
 }
 
 bool
 stack_references(struct stack *s, struct location *loc, struct state *state)
 {
 	/* TODO: check globals */
-	struct variable *result = stack_getresult(s);
-	if (result && variable_references(result, loc, state)) {
+	struct value *result = state_popregister(state);
+	struct circuitbreaker *c = circuitbreaker_create();
+	if (result && value_references(result, loc, state, c)) {
 		return true;
 	}
 
@@ -283,9 +437,90 @@ stack_references(struct stack *s, struct location *loc, struct state *state)
 struct block *
 stack_getblock(struct stack *s, int address)
 {
-	assert(address < block_arr_nblocks(s->frame));
+	assert(address < block_arr_nblocks(s->memory));
 
-	return block_arr_blocks(s->frame)[address];
+	return block_arr_blocks(s->memory)[address];
+}
+
+static struct frame *
+frame_create(char *n, struct ast_block *b, struct ast_type *r, enum execution_mode mode,
+		enum frame_kind kind)
+{
+	struct frame *f = malloc(sizeof(struct frame));
+	f->name = dynamic_str(n);
+	f->b = ast_block_copy(b);
+	if (kind == FRAME_CALL) {
+		assert(r);
+		f->ret_type = ast_type_copy(r);
+	}
+	f->mode = mode;
+	f->kind = kind;
+	f->call = NULL;
+	f->f = NULL;
+	f->advance = true;
+	return f;
+}
+
+struct frame *
+frame_call_create(char *n, struct ast_block *b, struct ast_type *r, enum execution_mode mode, struct ast_expr *call, struct ast_function *func)
+{
+	struct frame *f = frame_create(n, b, r, mode, FRAME_CALL);
+	f->call = call;
+	f->f = func;
+	return f;
+}
+
+struct frame *
+frame_block_create(char *n, struct ast_block *b, enum execution_mode mode)
+{
+	return frame_create(n, b, NULL, mode, FRAME_NESTED);
+}
+
+struct frame *
+frame_setup_create(char *n, struct ast_block *b, enum execution_mode mode)
+{
+	struct frame* f = frame_create(n, b, NULL, mode, FRAME_NESTED);
+	f->advance = false;
+	return f;
+}
+
+struct frame *
+frame_intermediate_create(char *n, struct ast_block *b, enum execution_mode mode)
+{
+	return frame_create(n, b, NULL, mode, FRAME_INTERMEDIATE);
+}
+
+bool
+frame_advance(struct frame *f)
+{
+	return f->advance;
+}
+
+static struct frame *
+frame_copy(struct frame *f)
+{
+	if (f->kind == FRAME_CALL) {
+		assert(f->ret_type);
+	}
+	struct frame *copy = frame_create(
+		dynamic_str(f->name),
+		ast_block_copy(f->b),
+		f->ret_type ? ast_type_copy(f->ret_type) : NULL,
+		f->mode,
+		f->kind
+	); 
+	if (f->kind == FRAME_CALL) {
+		copy->f = ast_function_copy(f->f);
+		copy->call = ast_expr_copy(f->call);
+	}
+	copy->advance = f->advance;
+	return copy;
+}
+
+static void
+frame_destroy(struct frame *f)
+{
+	assert(false);
 }
 
 
@@ -413,160 +648,4 @@ bool
 variable_isparam(struct variable *v)
 {
 	return v->isparam;
-}
-
-
-struct program_counter {
-	struct ast_block *b;
-	enum program_counter_state {
-		PROGRAM_COUNTER_DECLS,
-		PROGRAM_COUNTER_STMTS,
-		PROGRAM_COUNTER_ATEND,
-	} s;
-	char *name;
-	int index;
-};
-
-static enum program_counter_state
-program_counter_state_init(struct ast_block *);
-
-struct program_counter *
-program_counter_create(struct ast_block *b, char *name)
-{
-	struct program_counter *pc = malloc(sizeof(struct program_counter));
-	pc->b = b;
-	pc->s = program_counter_state_init(b);
-	pc->index = 0;
-	pc->name = dynamic_str(name);
-	return pc;
-}
-
-static enum program_counter_state
-program_counter_state_init(struct ast_block *b)
-{
-	return ast_block_ndecls(b)
-		? PROGRAM_COUNTER_DECLS
-		: ast_block_nstmts(b)
-		? PROGRAM_COUNTER_STMTS
-		: PROGRAM_COUNTER_ATEND;
-}
-
-static void
-program_counter_destroy(struct program_counter *pc)
-{
-	/* no ownership of block */
-	free(pc->name);
-	free(pc);
-}
-
-static struct program_counter *
-program_counter_copy(struct program_counter *old)
-{
-	struct program_counter *new = program_counter_create(old->b, old->name);
-	new->s = old->s;
-	new->index = old->index;
-	return new;
-}
-
-static char *
-program_counter_name(struct program_counter *pc)
-{
-	return pc->name;
-}
-
-static void
-program_counter_changename(struct program_counter *pc, char *new_name)
-{
-	free(pc->name);
-	pc->name = dynamic_str(new_name);
-}
-
-static bool
-program_counter_atend(struct program_counter *pc)
-{
-	return pc->s == PROGRAM_COUNTER_ATEND;
-}
-
-static void
-program_counter_nextdecl(struct program_counter *pc)
-{
-	assert(pc->s == PROGRAM_COUNTER_DECLS);
-
-	if (++pc->index >= ast_block_ndecls(pc->b)) {
-		pc->s = ast_block_nstmts(pc->b)
-			? PROGRAM_COUNTER_STMTS
-			: PROGRAM_COUNTER_ATEND;
-		pc->index = 0;
-	}
-}
-
-static bool
-program_counter_stmt_atend(struct program_counter *, struct state *);
-
-static void
-program_counter_nextstmt(struct program_counter *pc, struct state *s)
-{
-	assert(pc->s == PROGRAM_COUNTER_STMTS);
-
-	if (program_counter_stmt_atend(pc, s)) {
-		pc->s = PROGRAM_COUNTER_ATEND;
-	}
-}
-
-static bool
-program_counter_stmt_atend(struct program_counter *pc, struct state *s)
-{
-	return ast_stmt_isterminal(ast_block_stmts(pc->b)[pc->index], s)
-		|| ++pc->index >= ast_block_nstmts(pc->b);
-}
-
-
-static struct error *
-program_counter_stmt_step(struct program_counter *pc, bool abstract, 
-		struct state *s);
-
-static struct error *
-program_counter_exec(struct program_counter *pc, bool abstract, struct state *s)
-{
-	switch (pc->s) {
-	case PROGRAM_COUNTER_DECLS:
-		state_declare(s, ast_block_decls(pc->b)[pc->index], false);
-		program_counter_nextdecl(pc);
-		return NULL;
-	case PROGRAM_COUNTER_STMTS:
-		return program_counter_stmt_step(pc, abstract, s);
-	case PROGRAM_COUNTER_ATEND:
-	default:
-		assert(false);
-	}
-}
-
-static struct error *
-program_counter_stmt_process(struct program_counter *pc, bool abstract, 
-		struct state *s);
-
-static struct error *
-program_counter_stmt_step(struct program_counter *pc, bool abstract, 
-		struct state *s)
-{
-	struct error *err = program_counter_stmt_process(pc, abstract, s);
-	if (err) {
-		return err;
-	}
-	program_counter_nextstmt(pc, s);
-	return NULL;
-}
-
-static struct error *
-program_counter_stmt_process(struct program_counter *pc, bool abstract, 
-		struct state *s)
-{
-	struct ast_stmt *stmt = ast_block_stmts(pc->b)[pc->index];
-	if (abstract) {
-		if (ast_stmt_ispre(stmt)) {
-			return NULL;
-		}
-		return ast_stmt_absprocess(stmt, pc->name, s, true);
-	}
-	return ast_stmt_process(stmt, pc->name, s);
 }

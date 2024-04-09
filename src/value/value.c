@@ -474,6 +474,7 @@ value_sync_sprint(struct value *v, struct strbuilder *b)
 struct value *
 value_copy(struct value *v)
 {
+	assert(v);
 	switch (v->type) {
 	case VALUE_SYNC:
 		return value_sync_copy(v);
@@ -744,6 +745,7 @@ values_comparable(struct value *v1, struct value *v2)
 bool
 value_equal(struct value *v1, struct value *v2)
 {
+	assert(v1 && v2);
 	assert(v1->type == v2->type);
 
 	switch (v1->type) {

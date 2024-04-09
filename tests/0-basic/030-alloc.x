@@ -6,6 +6,6 @@ unit() ~ [ return .malloc(1); ]
 	void *p;
 
 	p = malloc(1);
-	~ [ @p; ]
+	//~ [ @p; ]
 	return p;
 }

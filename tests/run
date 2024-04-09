@@ -19,7 +19,6 @@ cd tests
 length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
 	tail -1 | wc -c)
 
-
 for f in */*.x
 do
 	ntests=$((ntests+1))

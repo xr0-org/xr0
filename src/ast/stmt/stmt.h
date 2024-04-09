@@ -14,6 +14,7 @@ enum ast_stmt_kind {
 	STMT_ITERATION_E	= 1 << 7,
 	STMT_JUMP		= 1 << 8,
 	STMT_ALLOCATION		= 1 << 9,
+	STMT_REGISTER		= 1 << 10,
 };
 
 enum ast_stmt_kind

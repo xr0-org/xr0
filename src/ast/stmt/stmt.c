@@ -41,6 +41,13 @@ struct ast_stmt {
 			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
 		} alloc;
+		struct {
+			bool iscall;
+			union {
+				struct ast_expr *call;
+				struct ast_variable *temp;
+			} op;
+		} _register;
 	} u;
 
 	struct lexememarker *loc;
@@ -86,6 +93,34 @@ ast_stmt_labelled_stmt(struct ast_stmt *stmt)
 
 	return stmt->u.labelled.stmt;
 }
+
+static struct ast_block *
+ast_stmt_to_block(struct ast_stmt *);
+
+struct ast_block *
+ast_stmt_labelled_as_block(struct ast_stmt *stmt)
+{
+	assert(ast_stmt_ispre(stmt));
+	struct ast_stmt *setup = ast_stmt_labelled_stmt(stmt);
+	switch (setup->kind) {
+	case STMT_EXPR:
+		return ast_stmt_to_block(ast_stmt_copy(setup));
+	case STMT_COMPOUND:
+		return ast_block_copy(ast_stmt_as_block(setup));
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_block *
+ast_stmt_to_block(struct ast_stmt *stmt)
+{
+	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	ast_block_append_stmt(b, stmt);
+	return b;
+}
+
+
 
 bool
 ast_stmt_ispre(struct ast_stmt *stmt)
@@ -377,9 +412,15 @@ struct ast_expr *
 ast_stmt_iter_lower_bound(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ITERATION);
-	struct ast_stmt *init = stmt->u.iteration.init;
-	assert(init->kind == STMT_EXPR);
-	return ast_expr_assignment_rval(init->u.expr);
+	struct ast_expr *init = ast_stmt_as_expr(stmt->u.iteration.init);
+	switch (ast_expr_kind(init)) {
+	case EXPR_IDENTIFIER:
+		return init;
+	case EXPR_ASSIGNMENT:
+		return ast_expr_assignment_rval(init);
+	default:
+		assert(false);
+	}
 }
 
 struct ast_expr *
@@ -389,6 +430,45 @@ ast_stmt_iter_upper_bound(struct ast_stmt *stmt)
 	struct ast_stmt *cond = stmt->u.iteration.cond;
 	assert(cond->kind == STMT_EXPR);
 	return ast_expr_binary_e2(cond->u.expr);
+}
+
+struct ast_stmt *
+ast_stmt_register_call_create(struct lexememarker *loc, struct ast_expr *call) {
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_REGISTER;
+	stmt->u._register.iscall = true;
+	stmt->u._register.op.call = call;
+	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp) {
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_REGISTER;
+	stmt->u._register.iscall = false;
+	stmt->u._register.op.temp = temp;
+	return stmt;
+}
+
+bool
+ast_stmt_register_iscall(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_REGISTER);
+	return stmt->u._register.iscall;
+}
+
+struct ast_expr *
+ast_stmt_register_call(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_REGISTER);
+	return stmt->u._register.op.call;
+}
+
+struct ast_variable *
+ast_stmt_register_mov(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_REGISTER);
+	return stmt->u._register.op.temp;
 }
 
 static struct ast_stmt *
@@ -454,6 +534,19 @@ ast_stmt_jump_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	);
 
 	free(rv);
+}
+
+static void
+ast_stmt_register_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+{
+	assert(stmt->kind == STMT_REGISTER);
+	if (stmt->u._register.iscall) {
+		char *call = ast_expr_str(stmt->u._register.op.call);
+		strbuilder_printf(b, "call %s;", call);
+	} else {
+		char *tempvar = ast_variable_name(stmt->u._register.op.temp);
+		strbuilder_printf(b, "movret %s;", tempvar);
+	}
 }
 
 static struct ast_expr *
@@ -558,6 +651,10 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			loc, stmt->u.jump.kind,
 			ast_expr_copy_ifnotnull(stmt->u.jump.rv)
 		);
+	case STMT_REGISTER:
+		return stmt->u._register.iscall
+			? ast_stmt_register_call_create(loc, stmt->u._register.op.call)
+			: ast_stmt_register_mov_create(loc, stmt->u._register.op.temp);
 	default:
 		assert(false);
 	}
@@ -596,6 +693,9 @@ ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 	case STMT_JUMP:
 		ast_stmt_jump_sprint(stmt, b);
 		break;
+	case STMT_REGISTER:
+		ast_stmt_register_sprint(stmt, b);
+		break;
 	default:
 		assert(false);
 	}
@@ -616,6 +716,22 @@ ast_stmt_equal(struct ast_stmt *s1, struct ast_stmt *s2)
 		return ast_expr_equal(ast_stmt_as_expr(s1), ast_stmt_as_expr(s2));
 	default:
 		assert(false);
+	}
+}
+
+bool
+ast_stmt_linearisable(struct ast_stmt *stmt)
+{
+	switch (stmt->kind) {
+	case STMT_NOP:
+	case STMT_LABELLED:
+	case STMT_COMPOUND:
+	case STMT_COMPOUND_V:
+	case STMT_ITERATION_E:
+	case STMT_ITERATION:
+		return false;
+	default:
+		return true;
 	}
 }
 

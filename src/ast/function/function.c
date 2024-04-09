@@ -145,6 +145,12 @@ ast_function_isproto(struct ast_function *f)
 }
 
 bool
+ast_function_isvoid(struct ast_function *f)
+{
+	return ast_type_isvoid(f->ret);
+}
+
+bool
 ast_function_absisempty(struct ast_function *f)
 {
 	return ast_block_ndecls(f->abstract) == 0 && ast_block_nstmts(f->abstract) == 0;
@@ -185,13 +191,6 @@ ast_function_params(struct ast_function *f)
 	return f->param;
 }
 
-struct preconds_result
-ast_function_preconditions(struct ast_function *f)
-{
-	/* XXX: should we allow multiple pre tags */
-	return ast_block_preconds(ast_function_abstract(f));	
-}
-
 struct ast_function *
 ast_function_protostitch(struct ast_function *f, struct externals *ext)
 {
@@ -219,7 +218,77 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 }
 
 static struct error *
-ast_function_precondsinit(struct ast_function *, struct state *);
+next(struct path *);
+
+struct error *
+ast_function_debug(struct ast_function *f, struct externals *ext)
+{
+	struct path *path = path_create(f, ext);
+	while (!path_atend(path)) {
+		struct error *err = next(path);
+		if (err) {
+			return err;
+		}
+	}
+	path_destroy(path);
+	return NULL;
+}
+
+enum command {
+	COMMAND_STEP,
+	COMMAND_NEXT,
+	COMMAND_QUIT,
+};
+
+static enum command
+getcmd();
+
+static struct error *
+next(struct path *p)
+{
+	printf("(0db) ");
+	switch (getcmd()) {
+	case COMMAND_STEP:
+		return path_step(p);
+	case COMMAND_NEXT:
+		return path_next(p);
+	case COMMAND_QUIT:
+		exit(0);
+	default:
+		assert(false);
+	}
+}
+
+#define LINELEN 1000
+
+static enum command
+getcmd()
+{
+	char line[LINELEN];
+	if (!fgets(line, LINELEN, stdin)) {
+		fprintf(stderr, "error: cannot read\n");
+		return getcmd();
+	}
+	if (strlen(line) != 2) {
+		fprintf(stderr, "input must be single char\n");
+		return getcmd();
+	}
+	if (line[1] != '\n') {
+		fprintf(stderr, "input must be end with newline\n");
+		return getcmd();
+	}
+	switch (*line) {
+	case 's':
+		return COMMAND_STEP;
+	case 'n':
+		return COMMAND_NEXT;
+	case 'q':
+		return COMMAND_QUIT;
+	default:
+		fprintf(stderr, "unknown command `%c'", *line);
+		return getcmd();
+	}
+}
 
 static struct error *
 inititalise_param(struct ast_variable *v, struct state *);
@@ -235,10 +304,6 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 		state_declare(s, params[i], true);
 	}
 
-	if ((err = ast_function_precondsinit(f, s))) {
-		return err;
-	}
-	
 	for (int i = 0; i < nparams; i++) {
 		if ((err = inititalise_param(params[i], s))) {
 			return err;
@@ -247,30 +312,23 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 	return NULL;
 }
 
-static struct error *
-ast_function_precondsinit(struct ast_function *f, struct state *s)
+struct error *
+ast_function_initsetup(struct ast_function *f, struct state *s)
 {
-	struct preconds_result pre = ast_function_preconditions(f);
+	struct preconds_result pre = ast_block_setups(ast_function_abstract(f), s);
 	if (pre.err) {
 		return pre.err;
 	}
-	if (!pre.stmt) {
+	if (!pre.b) {
 		return NULL;
 	}
-	struct error *err = ast_stmt_absprocess(
-		pre.stmt, ast_function_name(f), s, true
+	struct frame *setupframe = frame_setup_create(
+		"setup",
+		pre.b,
+		EXEC_SETUP
 	);
-	if (err) {
-		struct lexememarker *loc = ast_stmt_lexememarker(pre.stmt); 
-		assert(loc);
-		char *m = lexememarker_str(loc);
-		struct error *e = error_printf(
-			"%s:%s: %w", 
-			m, ast_function_name(f), err
-		);
-		free(m);
-		return e;
-	}
+	state_pushframe(s, setupframe);
+	state_initsetup(s, state_frameid(s));
 	return NULL;
 }
 
@@ -296,50 +354,6 @@ inititalise_param(struct ast_variable *param, struct state *state)
 		object_assign(res.obj, val);
 	}
 	return NULL;
-}
-
-
-struct error *
-ast_function_setupabsexec(struct ast_function *f, struct state *state)
-{
-	struct error *err;
-	int nstmts = ast_block_nstmts(f->abstract);
-	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
-	for (int i = 0; i < nstmts; i++) {
-		if ((err = ast_stmt_setupabsexec(stmt[i], state))) {
-			return err;
-		}
-	}
-	return NULL;
-}
-
-struct result *
-ast_function_absexec(struct ast_function *f, struct state *state)
-{
-	int ndecls = ast_block_ndecls(f->abstract);
-	if (ndecls) {
-		struct ast_variable **var = ast_block_decls(f->abstract);
-		for (int i = 0; i < ndecls; i++) {
-			state_declare(state, var[i], false);
-		}
-	}
-
-	char *fname = ast_function_name(f);
-	int nstmts = ast_block_nstmts(f->abstract);
-	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
-	for (int i = 0; i < nstmts; i++) {
-		struct error *err = ast_stmt_absprocess(
-			stmt[i], fname, state, false
-		);
-		if (err) {
-			return result_error_create(err);
-		}
-	}
-
-	/* wrap result and return */ 
-	struct object_res res = state_getresult(state);
-	assert(!res.err);
-	return result_value_create(object_as_value(res.obj));
 }
 
 static void

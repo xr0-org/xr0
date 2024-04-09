@@ -7,6 +7,7 @@
 
 /* ast */
 struct ast_function;
+struct ast_block;
 struct ast_type;
 struct ast_variable;
 struct ast_expr;
@@ -25,14 +26,27 @@ struct value;
 
 struct state;
 
-struct state *
-state_create(char *name, struct ast_block *, struct ast_type *result_type,
-		bool abstract, struct externals *);
+enum execution_mode {
+	EXEC_ABSTRACT,
+	EXEC_ABSTRACT_NO_SETUP,
+	EXEC_ACTUAL,
+	EXEC_SETUP,
+	EXEC_VERIFY
+};
+
+enum frame_kind {
+	FRAME_NESTED,
+	FRAME_INTERMEDIATE,
+	FRAME_CALL
+};
+
+struct frame;
 
 struct state *
-state_create_withprops(char *name, struct ast_block *,
-		struct ast_type *result_type, bool abstract, struct externals *,
-		struct props *props);
+state_create(struct frame *, struct externals *);
+
+struct state *
+state_create_withprops(struct frame *, struct externals *, struct props *props);
 
 struct state *
 state_copy(struct state *);
@@ -58,16 +72,26 @@ state_getext(struct state *);
 struct props *
 state_getprops(struct state *);
 
+char *
+state_programtext(struct state *);
+
+int
+state_programindex(struct state *);
+
+int
+state_frameid(struct state *);
+
 struct heap *
 state_getheap(struct state *);
 
 void
-state_pushframe(struct state *, char *name, struct ast_block *b,
-		struct ast_type *, bool abstract);
+state_pushframe(struct state *, struct frame *);
 
 void
 state_popframe(struct state *);
 
+void
+state_unnest(struct state *);
 
 void
 state_declare(struct state *, struct ast_variable *var, bool isparam);
@@ -102,6 +126,12 @@ state_range_dealloc(struct state *, struct object *,
 		struct ast_expr *lw, struct ast_expr *up);
 
 bool
+state_islinear(struct state *);
+
+enum execution_mode
+state_execmode(struct state *);
+
+bool
 state_addresses_deallocand(struct state *, struct object *);
 
 bool
@@ -132,6 +162,48 @@ state_hasgarbage(struct state *);
 bool
 state_equal(struct state *s1, struct state *s2);
 
+struct value *
+state_popregister(struct state *);
+
+struct value *
+state_readregister(struct state *);
+
+void
+state_writeregister(struct state *, struct value *);
+
+void
+state_clearregister(struct state *);
+
+void
+state_initsetup(struct state *s, int frameid);
+
+enum execution_mode
+state_next_execmode(struct state *s);
+
+struct error *
+state_stacktrace(struct state *, struct error *);
+
+void
+state_return(struct state *);
+
+struct ast_expr *
+state_framecall(struct state *);
+
+
+/* FRAME DTO */
+
+struct frame *
+frame_call_create(char *name, struct ast_block *, struct ast_type *,
+		enum execution_mode, struct ast_expr *, struct ast_function *);
+
+struct frame *
+frame_block_create(char *name, struct ast_block *, enum execution_mode);
+
+struct frame *
+frame_setup_create(char *name, struct ast_block *, enum execution_mode);
+
+struct frame *
+frame_intermediate_create(char *name, struct ast_block *, enum execution_mode);
 
 /* USED BY VALUE */
 

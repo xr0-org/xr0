@@ -14,6 +14,7 @@
 #include "state.h"
 #include "util.h"
 #include "verify.h"
+#include "signal.h"
 
 /* XXX */
 #define INCLUDE_ENVVAR		"XR0_INCLUDES"
@@ -40,6 +41,7 @@ struct config {
 
 	char *sortfunc;
 	enum sortmode sortmode;
+	bool debug;
 };
 
 static struct string_arr *
@@ -58,11 +60,12 @@ parse_config(int argc, char *argv[])
 {
 	enum execmode mode = EXECMODE_VERIFY;
 	bool verbose = false;
+	bool debug = false;
 	struct sortconfig sortconf = sortconfig_create(SORTMODE_NONE, "");
 	struct string_arr *includedirs = default_includes();
 	char *outfile = OUTPUT_PATH;
 	int opt;
-	while ((opt = getopt(argc, argv, "vso:t:x:I:")) != -1) {
+	while ((opt = getopt(argc, argv, "vso:t:x:I:d")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
@@ -82,6 +85,9 @@ parse_config(int argc, char *argv[])
 		case 'x':
 			sortconf = sortconfig_create(SORTMODE_VERIFY, optarg);
 			break;
+		case 'd':
+			debug = true;
+			break;
 		default:
 			fprintf(stderr, "Usage: %s [-I libx] input_file\n", argv[0]);
 			exit(EXIT_FAILURE);
@@ -99,6 +105,7 @@ parse_config(int argc, char *argv[])
 		.verbose	= verbose,
 		.sortmode	= sortconf.mode,
 		.sortfunc	= sortconf.sortfunc,
+		.debug		= debug
 	};
 }
 
@@ -110,7 +117,6 @@ sortconfig_create(enum sortmode mode, char *sortfunc)
 		return (struct sortconfig) {
 			.mode = mode, .sortfunc = sortfunc,
 		};
-
 	case SORTMODE_SORT:
 	case SORTMODE_VERIFY:
 		if (!sortfunc) {
@@ -227,8 +233,11 @@ pass0(struct ast *root, struct externals *ext)
 	}
 }
 
+static struct error *
+handle_debug(struct ast_function *, struct externals *, bool debug);
+
 void
-pass1(struct ast *root, struct externals *ext)
+pass1(struct ast *root, struct externals *ext, bool debug)
 {
 	struct error *err;
 	for (int i = 0; i < root->n; i++) {
@@ -242,13 +251,28 @@ pass1(struct ast *root, struct externals *ext)
 		}
 		/* XXX: ensure that verified functions always have an abstract */
 		assert(ast_function_abstract(f));
-
-		if ((err = ast_function_verify(f, ext))) {
+		if ((err = handle_debug(f, ext, debug))) {
 			fprintf(stderr, "%s\n", error_str(err));
 			exit(EXIT_FAILURE);
 		}
 		v_printf("qed %s\n", ast_function_name(f));
 	}
+}
+
+static struct error *
+handle_debug(struct ast_function *f, struct externals *ext, bool debug)
+{
+	struct error *err;
+	if (debug) {
+		if ((err = ast_function_debug(f, ext))) {
+			return err;	
+		}
+	} else {
+		if ((err = ast_function_verify(f, ext))) {
+			return err;
+		}
+	}
+	return NULL;
 }
 
 void
@@ -340,10 +364,15 @@ strip(struct config *c);
 int
 main(int argc, char *argv[])
 {
-	extern int VERBOSE_MODE;
+	extern int LOG_LEVEL;
 
 	struct config c = parse_config(argc, argv);
-	VERBOSE_MODE = c.verbose;
+	if (c.verbose) {
+		LOG_LEVEL = LOG_INFO;
+	}
+	if (c.debug) {
+		LOG_LEVEL = LOG_DEBUG;
+	}
 
 	switch (c.mode) {
 	case EXECMODE_VERIFY:
@@ -378,7 +407,7 @@ verify(struct config *c)
 	struct string_arr *order;
 	switch (c->sortmode) {
 	case SORTMODE_NONE:
-		pass1(root, ext);
+		pass1(root, ext, c->debug);
 		break;
 	case SORTMODE_SORT:
 		order = ast_topological_order(c->sortfunc, ext);

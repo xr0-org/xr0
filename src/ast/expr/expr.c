@@ -272,6 +272,14 @@ ast_expr_incdec_pre(struct ast_expr *expr)
 	return expr->u.incdec.pre;
 }
 
+bool
+ast_expr_incdec_inc(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_INCDEC);
+
+	return expr->u.incdec.inc;
+}
+
 struct ast_expr *
 ast_expr_incdec_root(struct ast_expr *expr)
 {
@@ -692,6 +700,21 @@ ast_expr_clump_create(struct ast_expr *arg)
 	return expr;
 }
 
+struct ast_expr *
+ast_expr_alloc_kind_create(struct ast_expr *arg, enum ast_alloc_kind kind)
+{
+	switch (kind) {
+	case ALLOC:
+		return ast_expr_alloc_create(arg);
+	case DEALLOC:
+		return ast_expr_dealloc_create(arg);
+	case CLUMP:
+		return ast_expr_clump_create(arg);
+	default:
+		assert(false);
+	}
+}
+
 static struct ast_expr *
 ast_expr_alloc_copy(struct ast_expr *expr)
 {
@@ -958,6 +981,9 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 		) && (strcmp(
 			ast_expr_member_field(e1), ast_expr_member_field(e2)
 		) == 0);
+	case EXPR_ALLOCATION:
+		return ast_expr_alloc_kind(e1) == ast_expr_alloc_kind(e2) && 
+			ast_expr_equal(ast_expr_alloc_arg(e1), ast_expr_alloc_arg(e2));
 	default:
 		assert(false);
 	}

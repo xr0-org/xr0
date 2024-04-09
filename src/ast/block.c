@@ -9,6 +9,7 @@ struct ast_block {
 	int ndecl, nstmt;
 	struct ast_variable **decl;
 	struct ast_stmt **stmt;
+	int tempcount;
 };
 
 struct ast_block *
@@ -24,6 +25,7 @@ ast_block_create(struct ast_variable **decl, int ndecl,
 	b->ndecl = ndecl;
 	b->stmt = stmt;
 	b->nstmt = nstmt;
+	b->tempcount = 0;
 	return b;
 }
 
@@ -127,6 +129,31 @@ ast_block_absstr(struct ast_block *b, int indent)
 	return ast_block_str_div(b, indent, '[', ']');
 }
 
+char *
+ast_block_render(struct ast_block *b, int index, bool indecls)
+{
+	struct strbuilder *sb = strbuilder_create();
+	for (int i = 0; i < b->ndecl; i++) {
+		char *s = ast_variable_str(b->decl[i]);
+		if (i == index && indecls) {
+			strbuilder_printf(sb, "-->\t%s;\n", s);
+		} else {
+			strbuilder_printf(sb, "\t%s;\n", s);
+		}
+		free(s);
+	}
+	for (int i = 0; i < b->nstmt; i++) {
+		char *s = ast_stmt_str(b->stmt[i], 1);
+		if (i == index && !indecls) {
+			strbuilder_printf(sb, "-->\t%s\n", s);
+		} else {
+			strbuilder_printf(sb, "\t%s\n", s);
+		}
+		free(s);
+	}
+	return strbuilder_build(sb);
+}
+
 int
 ast_block_ndecls(struct ast_block *b)
 {
@@ -165,21 +192,71 @@ ast_block_isterminal(struct ast_block *b, struct state *s)
 	return false;
 }
 
-struct preconds_result
-ast_block_preconds(struct ast_block *b)
+bool
+ast_block_empty(struct ast_block *b)
 {
-	int n = ast_block_nstmts(b);
-	struct ast_stmt **stmt = ast_block_stmts(b);
-	for (int i = 0; i < n; i++) {
-		/* XXX: either enforce one pre block or concat */
-		if (ast_stmt_ispre(stmt[i])) {
-			struct ast_stmt *preconds = ast_stmt_labelled_stmt(stmt[i]);
-			struct error *err = ast_stmt_preconds_validate(preconds);
-			if (err) {
-				return (struct preconds_result) { .stmt = NULL, .err = err };
-			}
-			return (struct preconds_result) { .stmt = preconds, .err = NULL };
+	return b->ndecl == 0 && b->nstmt == 0;
+}
+
+void
+block_append_decl(struct ast_block *b, struct ast_variable *v)
+{
+	b->decl = realloc(b->decl, sizeof(struct ast_variable *) * ++b->ndecl);
+	b->decl[b->ndecl-1] = v;
+}
+
+void
+ast_block_append_stmt(struct ast_block *b, struct ast_stmt *v)
+{
+	b->stmt = realloc(b->stmt, sizeof(struct ast_stmt *) * ++b->nstmt);
+	b->stmt[b->nstmt-1] = v;
+}
+
+struct preconds_result
+ast_block_setups(struct ast_block *abs, struct state *state)
+{
+	struct ast_block *setups = ast_block_create(NULL, 0, NULL, 0);
+	int nstmts = ast_block_nstmts(abs);
+	struct ast_stmt **stmts = ast_block_stmts(abs);
+	for (int i = 0; i < nstmts; i++) {
+		struct error *err = ast_stmt_buildsetup(stmts[i], state, setups);		
+		if (err) {
+			return (struct preconds_result) { .b = NULL, .err = err };
 		}
 	}
-	return (struct preconds_result) { .stmt = NULL, .err = NULL };
+	return (struct preconds_result) { .b = setups, .err = NULL };
+}
+
+static char *
+generate_tempvar(int tempid);
+
+struct ast_expr *
+ast_block_call_create(struct ast_block *b, struct lexememarker *loc,
+		struct ast_type *rtype, struct ast_expr *expr)
+{
+	struct ast_stmt *call = ast_stmt_register_call_create(
+		loc, ast_expr_copy(expr)
+	);
+	ast_block_append_stmt(b, call);
+
+	if (!ast_type_isvoid(rtype)) {
+		char *tvar = generate_tempvar(b->tempcount++);
+		struct ast_stmt *read = ast_stmt_register_mov_create(
+			loc,
+			ast_variable_create(
+				dynamic_str(tvar), ast_type_copy(rtype)
+			)
+		);
+		ast_block_append_stmt(b, read);
+		return ast_expr_identifier_create(dynamic_str(tvar));
+	}
+	return NULL;
+}
+
+static char *
+generate_tempvar(int tempid)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "<t%d>", tempid);
+	return strbuilder_build(b);
 }

@@ -6,15 +6,31 @@
 
 struct stack;
 
-struct stack *
-stack_create(char *name, struct ast_block *, struct ast_type *ret_type,
-		bool abstract, struct stack *prev);
+struct frame;
 
 struct stack *
-stack_getframe(struct stack *s, int frame);
+stack_create(struct frame *, struct stack *prev);
+
+struct stack *
+stack_getframe(struct stack *, int frame);
+
+char *
+stack_programtext(struct stack *);
+
+int
+stack_programindex(struct stack *);
+
+void
+stack_return(struct stack *);
+
+struct ast_expr *
+stack_framecall(struct stack *);
+
+int
+stack_id(struct stack *);
 
 struct location *
-stack_newblock(struct stack *stack);
+stack_newblock(struct stack *);
 
 void
 stack_destroy(struct stack *);
@@ -29,13 +45,28 @@ char *
 stack_str(struct stack *, struct state *);
 
 bool
+stack_islinear(struct stack *);
+
+enum execution_mode
+stack_execmode(struct stack *);
+
+bool
 stack_atend(struct stack *);
 
 struct error *
 stack_step(struct stack *, struct state *);
 
+void
+stack_nextstmt(struct stack *s, struct state *state);
+
 struct stack *
 stack_prev(struct stack *);
+
+void
+stack_popprep(struct stack *, struct state *);
+
+void
+stack_storeloc(struct stack *);
 
 void
 stack_declare(struct stack *, struct ast_variable *var, bool isparam);
@@ -43,8 +74,11 @@ stack_declare(struct stack *, struct ast_variable *var, bool isparam);
 void
 stack_undeclare(struct stack *stack, struct state *state);
 
-struct variable *
-stack_getresult(struct stack *);
+bool
+stack_isnested(struct stack *);
+
+struct error *
+stack_trace(struct stack *, struct error *);
 
 struct map *
 stack_getvarmap(struct stack *);
@@ -59,6 +93,9 @@ struct ast_expr;
 
 struct block *
 stack_getblock(struct stack *, int address);
+
+
+/* variable */
 
 struct ast_type;
 

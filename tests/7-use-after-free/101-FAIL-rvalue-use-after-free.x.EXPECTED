@@ -1,1 +1,1 @@
-7-use-after-free/101-FAIL-rvalue-use-after-free.x:12:8:func: undefined indirection: *(p+0) has no value
+7-use-after-free/101-FAIL-rvalue-use-after-free.x:12:8: undefined indirection: *(p+0) has no value (func)

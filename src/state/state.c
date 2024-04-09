@@ -26,11 +26,11 @@ struct state {
 	struct stack *stack;
 	struct heap *heap;
 	struct props *props;
+	struct value *reg;
 };
 
 struct state *
-state_create(char *name, struct ast_block *block, struct ast_type *ret_type,
-		bool abstract, struct externals *ext)
+state_create(struct frame *f, struct externals *ext)
 {
 	struct state *state = malloc(sizeof(struct state));
 	assert(state);
@@ -38,18 +38,18 @@ state_create(char *name, struct ast_block *block, struct ast_type *ret_type,
 	state->static_memory = static_memory_create();
 	state->vconst = vconst_create();
 	state->clump = clump_create();
-	state->stack = stack_create(name, block, ret_type, abstract, NULL);
+	state->stack = stack_create(f, NULL);
 	state->heap = heap_create();
 	state->props = props_create();
+	state->reg = NULL;
 	return state;
 }
 
 struct state *
-state_create_withprops(char *name, struct ast_block *block,
-		struct ast_type *ret_type, bool abstract, struct externals *ext,
+state_create_withprops(struct frame *f, struct externals *ext,
 		struct props *props)
 {
-	struct state *state = state_create(name, block, ret_type, abstract, ext);
+	struct state *state = state_create(f, ext);
 	state->props = props_copy(props);
 	return state;
 }
@@ -78,6 +78,7 @@ state_copy(struct state *state)
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
+	copy->reg = state->reg ? value_copy(state->reg) : NULL;
 	return copy;
 }
 
@@ -99,6 +100,11 @@ state_str(struct state *state)
 		strbuilder_printf(b, "%s\n", ext);
 	}
 	free(ext);
+	strbuilder_printf(
+		b,
+		"\treturn: {<type> := {%s}}\n\n",
+		state->reg ? value_str(state->reg) : "empty"
+	);
 	char *static_mem = static_memory_str(state->static_memory, "\t");
 	if (strlen(static_mem) > 0) {
 		strbuilder_printf(b, "%s\n", static_mem);
@@ -134,6 +140,18 @@ state_str(struct state *state)
 }
 
 bool
+state_islinear(struct state *s)
+{
+	return stack_islinear(s->stack);
+}
+
+enum execution_mode
+state_execmode(struct state *s)
+{
+	return stack_execmode(s->stack);
+}
+
+bool
 state_atend(struct state *s)
 {
 	return stack_atend(s->stack);
@@ -144,7 +162,6 @@ state_step(struct state *s)
 {
 	return stack_step(s->stack, s);
 }
-
 
 struct externals *
 state_getext(struct state *s)
@@ -164,16 +181,36 @@ state_getprops(struct state *s)
 	return s->props;
 }
 
-void
-state_pushframe(struct state *state, char *name, struct ast_block *b,
-		struct ast_type *t, bool abstract)
+char *
+state_programtext(struct state *s)
 {
-	state->stack = stack_create(name, b, t, abstract, state->stack);
+	return stack_programtext(s->stack);
+}
+
+int
+state_programindex(struct state *s)
+{
+	return stack_programindex(s->stack);
+}
+
+int
+state_frameid(struct state *s)
+{
+	return stack_id(s->stack);
+}
+
+void
+state_pushframe(struct state *state, struct frame *f)
+{
+	stack_storeloc(state->stack);
+	state->stack = stack_create(f, state->stack);
 }
 
 void
 state_popframe(struct state *state)
 {
+	stack_popprep(state->stack, state);
+
 	struct stack *old = state->stack;
 	state->stack = stack_prev(old); /* pop */
 	assert(state->stack);
@@ -199,6 +236,82 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 		comment, persist
 	);
 	return value_sync_create(ast_expr_identifier_create(c));
+}
+
+struct value *
+state_popregister(struct state *state)
+{
+	//v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
+	if (!state->reg) {
+		return NULL;
+	}
+	struct value *v = value_copy(state->reg);
+	if (state_frameid(state) != 0) {
+		state->reg = NULL;
+	}
+	return v;
+}
+
+struct value *
+state_readregister(struct state *state)
+{
+	//v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
+	return state->reg;
+}
+
+void
+state_writeregister(struct state *state, struct value *v)
+{
+	assert(!state->reg);
+	//v_printf("writing to register: %s\n", v ? value_str(v) : "NULL");
+	state->reg = v;
+}
+
+void
+state_clearregister(struct state *state)
+{
+	/* XXX: used after initing the actual state */
+	state->reg = NULL;
+}
+
+void
+state_initsetup(struct state *s, int frameid)
+{
+	struct error *err;
+	
+	assert(state_execmode(s) == EXEC_SETUP);
+	while (!(state_atend(s) && state_frameid(s) == frameid)) {
+		if ((err = state_step(s))) {
+			assert(false);
+		}
+	}
+}
+
+enum execution_mode
+state_next_execmode(struct state *s)
+{
+	if (stack_execmode(s->stack) == EXEC_ABSTRACT) {
+		return EXEC_ABSTRACT;
+	}
+	return EXEC_ABSTRACT_NO_SETUP;
+}
+
+struct error *
+state_stacktrace(struct state *s, struct error *err)
+{
+	return stack_trace(s->stack, err);
+}
+
+void
+state_return(struct state *s)
+{
+	stack_return(s->stack);	
+}
+
+struct ast_expr *
+state_framecall(struct state *s)
+{
+	return stack_framecall(s->stack);
 }
 
 struct value *
@@ -321,33 +434,12 @@ state_getblock(struct state *state, struct location *loc)
 	return res.b;
 }
 
-struct object_res
-state_getresult(struct state *state)
-{
-	struct variable *v = stack_getresult(state->stack);
-	assert(v);
-
-	struct object_res res = state_get(state, variable_location(v), true);
-	if (res.err) {
-		assert(false);
-	}
-	return res;
-}
-
-static struct ast_type *
-state_getresulttype(struct state *state)
-{
-	struct variable *v = stack_getresult(state->stack);
-	assert(v);
-
-	return variable_type(v);
-}
-
 struct ast_type *
 state_getobjecttype(struct state *state, char *id)
 {
 	if (strcmp(id, KEYWORD_RETURN) == 0) {
-		return state_getresulttype(state);
+		assert(false);
+		//return state_getresulttype(state);
 	}
 
 	struct variable *v = stack_getvariable(state->stack, id);
@@ -369,7 +461,8 @@ struct object_res
 state_getobject(struct state *state, char *id)
 {
 	if (strcmp(id, KEYWORD_RETURN) == 0) {
-		return state_getresult(state);
+		assert(false);
+		/*return state_getresult(state);*/
 	}
 
 	struct variable *v = stack_getvariable(state->stack, id);
@@ -538,11 +631,16 @@ state_undeclarevars(struct state *s);
 static void
 state_popprops(struct state *s);
 
+void
+state_unnest(struct state *s);
+
 bool
 state_equal(struct state *s1, struct state *s2)
 {
 	struct state *s1_c = state_copy(s1),
 		     *s2_c = state_copy(s2);
+	state_unnest(s1_c);
+	state_unnest(s2_c);
 	state_undeclareliterals(s1_c);
 	state_undeclareliterals(s2_c);
 	state_undeclarevars(s1_c);
@@ -576,9 +674,14 @@ state_undeclareliterals(struct state *s)
 
 static void
 state_undeclarevars(struct state *s)
-{
+{	
 	heap_undeclare(s->heap, s);
 	vconst_undeclare(s->vconst);
+	struct value *v = state_readregister(s);
+	if (v) {
+		/* XXX: avoid state_writeregister assert */
+		s->reg = value_abstractcopy(v, s);
+	}
 	stack_undeclare(s->stack, s);
 }
 
@@ -587,4 +690,12 @@ state_popprops(struct state *s)
 {
 	props_destroy(s->props);
 	s->props = props_create();
+}
+
+void
+state_unnest(struct state *s)
+{
+	while (stack_isnested(s->stack)) {
+		state_popframe(s);
+	}
 }

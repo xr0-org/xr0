@@ -64,6 +64,9 @@ ast_expr_incdec_root(struct ast_expr *);
 bool
 ast_expr_incdec_pre(struct ast_expr *);
 
+bool
+ast_expr_incdec_inc(struct ast_expr *);
+
 struct ast_expr *
 ast_expr_member_create(struct ast_expr *, char *);
 
@@ -165,6 +168,9 @@ ast_expr_alloc_arg(struct ast_expr *);
 enum ast_alloc_kind
 ast_expr_alloc_kind(struct ast_expr *);
 
+struct ast_expr *
+ast_expr_alloc_kind_create(struct ast_expr *arg, enum ast_alloc_kind);
+
 struct state;
 
 struct error *
@@ -227,6 +233,24 @@ ast_expr_abseval(struct ast_expr *, struct state *);
 struct result *
 ast_expr_pf_reduce(struct ast_expr *, struct state *);
 
+struct value;
+
+struct result *
+ast_expr_pf_augment(struct value *, struct ast_expr *, struct state *);
+
+struct ast_function;
+
+struct value *
+ast_expr_call_arbitrary(struct ast_expr *, struct ast_function *,
+	struct state *);
+
+struct ast_block;
+struct lexememarker;
+
+struct ast_expr *
+ast_expr_geninstr(struct ast_expr *, struct lexememarker *,
+	struct ast_block *, struct state *);
+
 struct ast_stmt;
 
 struct ast_block;
@@ -247,6 +271,9 @@ ast_block_str(struct ast_block *, int indent_level);
 char *
 ast_block_absstr(struct ast_block *b, int indent_level);
 
+char *
+ast_block_render(struct ast_block *, int index, bool indecls);
+
 struct ast_block *
 ast_block_copy(struct ast_block *b);
 
@@ -263,15 +290,30 @@ struct ast_stmt **
 ast_block_stmts(struct ast_block *b);
 
 bool
+ast_block_empty(struct ast_block *b);
+
+bool
 ast_block_isterminal(struct ast_block *, struct state *);
 
+struct ast_type;
+
+struct ast_expr *
+ast_block_call_create(struct ast_block *, struct lexememarker *,
+	struct ast_type *, struct ast_expr *);
+
+void
+ast_block_append_decl(struct ast_block *, struct ast_variable *);
+
+void
+ast_block_append_stmt(struct ast_block *, struct ast_stmt *);
+
 struct preconds_result {
-	struct ast_stmt *stmt;
+	struct ast_block *b;
 	struct error *err;
 };
 
 struct preconds_result
-ast_block_preconds(struct ast_block *b);
+ast_block_setups(struct ast_block *b, struct state *);
 
 struct ast_stmt;
 
@@ -294,6 +336,9 @@ ast_stmt_labelled_label(struct ast_stmt *);
 
 struct ast_stmt *
 ast_stmt_labelled_stmt(struct ast_stmt *);
+
+struct ast_block *
+ast_stmt_labelled_as_block(struct ast_stmt *);
 
 struct ast_stmt *
 ast_stmt_create_nop(struct lexememarker *);
@@ -373,6 +418,21 @@ ast_stmt_create_dealloc(struct lexememarker *, struct ast_expr *arg);
 struct ast_stmt *
 ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
 
+struct ast_stmt *
+ast_stmt_register_call_create(struct lexememarker *, struct ast_expr *call);
+
+struct ast_stmt *
+ast_stmt_register_mov_create(struct lexememarker *, struct ast_variable *v);
+
+struct ast_expr *
+ast_stmt_register_call(struct ast_stmt *);
+
+struct ast_variable *
+ast_stmt_register_mov(struct ast_stmt *);
+
+bool
+ast_stmt_register_iscall(struct ast_stmt *);
+
 void
 ast_stmt_destroy(struct ast_stmt *);
 
@@ -395,13 +455,15 @@ ast_stmt_as_v_block(struct ast_stmt *);
 struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
 
+enum execution_mode;
+
 struct error *
-ast_stmt_process(struct ast_stmt *, char *fname, struct state *);
+ast_stmt_linearise(struct ast_stmt *, struct state *, enum execution_mode);
+
+bool
+ast_stmt_linearisable(struct ast_stmt *);
 
 struct preresult;
-
-struct preresult *
-ast_stmt_preprocess(struct ast_stmt *, struct state *);
 
 bool
 ast_stmt_isterminal(struct ast_stmt *, struct state *);
@@ -416,10 +478,16 @@ struct error *
 ast_stmt_exec(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *, bool iscall);
+ast_stmt_process(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *);
+ast_stmt_absprocess(struct ast_stmt *stmt, struct state *);
+
+struct error *
+ast_stmt_absprocess_nosetup(struct ast_stmt *stmt, struct state *);
+
+struct error *
+ast_stmt_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
 
 struct ast_type;
 
@@ -432,6 +500,9 @@ ast_type_ispointer(struct ast_type *type);
 
 struct ast_type *
 ast_type_create_ptr(struct ast_type *type);
+
+struct ast_type *
+ast_type_create_void();
 
 struct ast_type *
 ast_type_create_voidptr();
@@ -470,7 +541,9 @@ ast_type_isstruct(struct ast_type *);
 bool
 ast_type_istypedef(struct ast_type *);
 
-struct value;
+bool
+ast_type_isvoid(struct ast_type *);
+
 struct externals;
 
 struct value *
@@ -534,7 +607,6 @@ ast_variable_name(struct ast_variable *);
 struct ast_type *
 ast_variable_type(struct ast_variable *);
 
-struct ast_function;
 
 /* ast_function_create: name must be allocated on the heap */
 struct ast_function *
@@ -572,6 +644,9 @@ ast_function_isproto(struct ast_function *f);
 bool
 ast_function_absisempty(struct ast_function *f);
 
+bool
+ast_function_isvoid(struct ast_function *f);
+
 struct ast_type *
 ast_function_type(struct ast_function *f);
 
@@ -587,11 +662,11 @@ ast_function_nparams(struct ast_function *f);
 struct ast_variable **
 ast_function_params(struct ast_function *f);
 
-struct preconds_result
-ast_function_preconditions(struct ast_function *f);
-
 struct error *
 ast_function_initparams(struct ast_function *, struct state *);
+
+struct error *
+ast_function_initsetup(struct ast_function *, struct state *);
 
 struct externals;
 struct error;
@@ -599,13 +674,10 @@ struct error;
 struct error *
 ast_function_verify(struct ast_function *, struct externals *);
 
-struct result;
-
 struct error *
-ast_function_setupabsexec(struct ast_function *f, struct state *state);
+ast_function_debug(struct ast_function *, struct externals *);
 
-struct result *
-ast_function_absexec(struct ast_function *, struct state *state);
+struct result;
 
 struct ast_externdecl;
 
