@@ -55,7 +55,7 @@ pub unsafe fn externals_types_str(
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
         let mut e: entry = *((*m).entry).offset(i as isize);
-        let mut type_0: *mut libc::c_char = ast_type_str(e.Value as *mut ast_type);
+        let mut type_0: *mut libc::c_char = ast_type_str(e.value as *mut ast_type);
         strbuilder_printf(
             b,
             b"%s%s %s\n\0" as *const u8 as *const libc::c_char,
@@ -70,7 +70,7 @@ pub unsafe fn externals_types_str(
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < (*m).n {
         let mut type_1: *mut libc::c_char =
-            ast_type_str((*((*m).entry).offset(i_0 as isize)).Value as *mut ast_type);
+            ast_type_str((*((*m).entry).offset(i_0 as isize)).value as *mut ast_type);
         strbuilder_printf(
             b,
             b"%s%s\n\0" as *const u8 as *const libc::c_char,

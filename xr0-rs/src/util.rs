@@ -25,7 +25,7 @@ pub struct map {
 #[repr(C)]
 pub struct entry {
     pub key: *mut libc::c_char,
-    pub Value: *const libc::c_void,
+    pub value: *const libc::c_void,
 }
 
 #[derive(Copy, Clone)]
@@ -58,11 +58,11 @@ pub unsafe fn dynamic_str(mut s: *const libc::c_char) -> *mut libc::c_char {
     return t;
 }
 
-unsafe fn entry_create(mut key: *const libc::c_char, mut Value: *const libc::c_void) -> entry {
+unsafe fn entry_create(mut key: *const libc::c_char, mut value: *const libc::c_void) -> entry {
     assert!(!key.is_null());
     let mut init = entry {
         key: key as *mut libc::c_char,
-        Value: Value,
+        value: value,
     };
     init
 }
@@ -111,7 +111,7 @@ unsafe fn map_getindex(mut map: *mut map, mut key: *const libc::c_char) -> libc:
 pub unsafe fn map_get(mut map: *mut map, mut key: *const libc::c_char) -> *mut libc::c_void {
     let mut index: libc::c_int = map_getindex(map, key);
     if index != -(1 as libc::c_int) {
-        return (*((*map).entry).offset(index as isize)).Value as *mut libc::c_void;
+        return (*((*map).entry).offset(index as isize)).value as *mut libc::c_void;
     }
     return 0 as *mut libc::c_void;
 }
@@ -120,12 +120,12 @@ pub unsafe fn map_get(mut map: *mut map, mut key: *const libc::c_char) -> *mut l
 pub unsafe fn map_set(
     mut map: *mut map,
     mut key: *const libc::c_char,
-    mut Value: *const libc::c_void,
+    mut value: *const libc::c_void,
 ) {
     let mut index: libc::c_int = map_getindex(map, key);
     if index >= 0 as libc::c_int {
-        let ref mut fresh0 = (*((*map).entry).offset(index as isize)).Value;
-        *fresh0 = Value;
+        let ref mut fresh0 = (*((*map).entry).offset(index as isize)).value;
+        *fresh0 = value;
         return;
     }
     (*map).n += 1;
@@ -134,7 +134,7 @@ pub unsafe fn map_set(
         (::core::mem::size_of::<entry>() as libc::c_ulong).wrapping_mul((*map).n as libc::c_ulong)
             as usize,
     ) as *mut entry;
-    *((*map).entry).offset(((*map).n - 1 as libc::c_int) as isize) = entry_create(key, Value);
+    *((*map).entry).offset(((*map).n - 1 as libc::c_int) as isize) = entry_create(key, value);
 }
 
 #[no_mangle]

@@ -94,7 +94,7 @@ unsafe fn pool_copy(mut p: *mut map) -> *mut map {
         map_set(
             pcopy,
             dynamic_str(e.key),
-            location_copy(e.Value as *mut Location) as *const libc::c_void,
+            location_copy(e.value as *mut Location) as *const libc::c_void,
         );
         i += 1;
     }

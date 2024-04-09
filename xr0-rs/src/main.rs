@@ -25,7 +25,7 @@ use crate::ast::{
     ast_block, ast_externdecl, ast_function, ast_type, ast_variable, ast_variable_arr, Ast, AstExpr,
 };
 use crate::ext::Externals;
-use crate::math::MathExpr;
+use crate::math::math_expr;
 use crate::object::{object_arr, Object};
 use crate::props::Props;
 use crate::state::block::{block_arr, Block};
@@ -36,6 +36,7 @@ use crate::state::r#static::static_memory;
 use crate::state::stack::{Stack, Variable};
 use crate::state::State;
 use crate::util::StrBuilder;
+type strbuilder = StrBuilder;
 use crate::value::Value;
 
 // NOTE: libc::isspace may be slower than the inlined definition i deleted

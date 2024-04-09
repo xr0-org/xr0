@@ -51,7 +51,7 @@ use crate::value::{
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr, values_comparable,
 };
-use crate::{Externals, MathExpr, Object, Props, State, StrBuilder, Value, Variable};
+use crate::{math_expr, Externals, Object, Props, State, StrBuilder, Value, Variable};
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -953,11 +953,11 @@ pub unsafe fn ast_expr_assume(mut expr: *mut AstExpr, mut State: *mut State) -> 
 
 unsafe fn reduce_assume(
     mut expr: *mut AstExpr,
-    mut Value: bool,
+    mut value: bool,
     mut s: *mut State,
 ) -> *mut preresult {
     match (*expr).kind {
-        1 => return identifier_assume(expr, Value, s),
+        1 => return identifier_assume(expr, value, s),
         256 => {
             if !(ast_expr_unary_op(expr) == UNARY_OP_BANG) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
@@ -970,11 +970,11 @@ unsafe fn reduce_assume(
                 );
             } else {
             };
-            return reduce_assume(ast_expr_unary_operand(expr), !Value, s);
+            return reduce_assume(ast_expr_unary_operand(expr), !value, s);
         }
-        8 => return reduce_assume((*expr).root, Value, s),
-        32 | 128 => return ast_expr_pf_reduce_assume(expr, Value, s),
-        512 => return binary_assume(expr, Value, s),
+        8 => return reduce_assume((*expr).root, value, s),
+        32 | 128 => return ast_expr_pf_reduce_assume(expr, value, s),
+        512 => return binary_assume(expr, value, s),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
@@ -993,7 +993,7 @@ unsafe fn reduce_assume(
 
 unsafe fn binary_assume(
     mut expr: *mut AstExpr,
-    mut Value: bool,
+    mut value: bool,
     mut s: *mut State,
 ) -> *mut preresult {
     let mut r1: *mut result = ast_expr_pf_reduce((*expr).u.binary.e1, s);
@@ -1002,17 +1002,17 @@ unsafe fn binary_assume(
     let mut v2: *mut Value = result_as_value(r2);
     return irreducible_assume(
         ast_expr_binary_create(value_to_expr(v1), (*expr).u.binary.op, value_to_expr(v2)),
-        Value,
+        value,
         s,
     );
 }
 
 unsafe fn irreducible_assume(
     mut e: *mut AstExpr,
-    mut Value: bool,
+    mut value: bool,
     mut s: *mut State,
 ) -> *mut preresult {
-    let mut prop: *mut AstExpr = ast_expr_inverted_copy(e, !Value);
+    let mut prop: *mut AstExpr = ast_expr_inverted_copy(e, !value);
     let mut r: *mut preresult = irreducible_assume_actual(prop, s);
     ast_expr_destroy(prop);
     return r;
@@ -1029,7 +1029,7 @@ unsafe fn irreducible_assume_actual(mut e: *mut AstExpr, mut s: *mut State) -> *
 
 unsafe fn ast_expr_pf_reduce_assume(
     mut expr: *mut AstExpr,
-    mut Value: bool,
+    mut value: bool,
     mut s: *mut State,
 ) -> *mut preresult {
     let mut res: *mut result = ast_expr_pf_reduce(expr, s);
@@ -1048,12 +1048,12 @@ unsafe fn ast_expr_pf_reduce_assume(
         );
     } else {
     };
-    return irreducible_assume(value_as_sync(result_as_value(res)), Value, s);
+    return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
 }
 
 unsafe fn identifier_assume(
     mut expr: *mut AstExpr,
-    mut Value: bool,
+    mut value: bool,
     mut s: *mut State,
 ) -> *mut preresult {
     let mut s_copy: *mut State = state_copy(s);
@@ -1072,7 +1072,7 @@ unsafe fn identifier_assume(
     } else {
     };
     state_destroy(s_copy);
-    return irreducible_assume(value_as_sync(result_as_value(res)), Value, s);
+    return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
 }
 
 unsafe fn expr_structmember_eval(mut expr: *mut AstExpr, mut s: *mut State) -> *mut result {
@@ -3076,14 +3076,14 @@ unsafe fn ast_expr_isdeallocand_str_build(mut expr: *mut AstExpr, mut b: *mut St
 
 unsafe fn ast_expr_assignment_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
     let mut root: *mut libc::c_char = ast_expr_str((*expr).root);
-    let mut Value: *mut libc::c_char = ast_expr_str((*expr).u.assignment_value);
+    let mut value: *mut libc::c_char = ast_expr_str((*expr).u.assignment_value);
     strbuilder_printf(
         b,
         b"%s = %s\0" as *const u8 as *const libc::c_char,
         root,
-        Value,
+        value,
     );
-    free(Value as *mut libc::c_void);
+    free(value as *mut libc::c_void);
     free(root as *mut libc::c_void);
 }
 
@@ -3439,12 +3439,12 @@ pub unsafe fn ast_expr_gt_create(mut e1: *mut AstExpr, mut e2: *mut AstExpr) -> 
 #[no_mangle]
 pub unsafe fn ast_expr_assignment_create(
     mut root: *mut AstExpr,
-    mut Value: *mut AstExpr,
+    mut value: *mut AstExpr,
 ) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ASSIGNMENT;
     (*expr).root = root;
-    (*expr).u.assignment_value = Value;
+    (*expr).u.assignment_value = value;
     return expr;
 }
 
@@ -3583,8 +3583,8 @@ pub unsafe fn ast_expr_matheval(mut e: *mut AstExpr) -> bool {
         );
     } else {
     };
-    let mut e1: *mut MathExpr = math_expr((*e).u.binary.e1);
-    let mut e2: *mut MathExpr = math_expr((*e).u.binary.e2);
+    let mut e1: *mut math_expr = math_expr((*e).u.binary.e1);
+    let mut e2: *mut math_expr = math_expr((*e).u.binary.e2);
     let mut val: bool = eval_prop(e1, (*e).u.binary.op, e2);
     math_expr_destroy(e2);
     math_expr_destroy(e1);
@@ -3592,9 +3592,9 @@ pub unsafe fn ast_expr_matheval(mut e: *mut AstExpr) -> bool {
 }
 
 unsafe fn eval_prop(
-    mut e1: *mut MathExpr,
+    mut e1: *mut math_expr,
     mut op: ast_binary_operator,
-    mut e2: *mut MathExpr,
+    mut e2: *mut math_expr,
 ) -> bool {
     match op.bits() {
         1 => return math_eq(e1, e2),
@@ -3619,7 +3619,7 @@ unsafe fn eval_prop(
     panic!("Reached end of non-void function without returning");
 }
 
-unsafe fn math_expr(mut e: *mut AstExpr) -> *mut MathExpr {
+unsafe fn math_expr(mut e: *mut AstExpr) -> *mut math_expr {
     match (*e).kind as libc::c_uint {
         1 => {
             return math_expr_atom_create(math_atom_variable_create(dynamic_str((*e).u.string)));
@@ -3656,7 +3656,7 @@ unsafe fn math_expr(mut e: *mut AstExpr) -> *mut MathExpr {
     panic!("Reached end of non-void function without returning");
 }
 
-unsafe fn binary_e2(mut e2: *mut AstExpr, mut op: ast_binary_operator) -> *mut MathExpr {
+unsafe fn binary_e2(mut e2: *mut AstExpr, mut op: ast_binary_operator) -> *mut math_expr {
     match op.bits() {
         64 => return math_expr(e2),
         128 => return math_expr_neg_create(math_expr(e2)),

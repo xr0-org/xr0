@@ -37,7 +37,7 @@ pub struct Object {
 #[repr(C)]
 pub union C2RustUnnamed {
     pub range: *mut Range,
-    pub Value: *mut Value,
+    pub value: *mut Value,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -74,7 +74,7 @@ pub unsafe fn object_value_create(mut offset: *mut AstExpr, mut v: *mut Value) -
     } else {
     };
     (*obj).offset = offset;
-    (*obj).c2rust_unnamed.Value = v;
+    (*obj).c2rust_unnamed.value = v;
     (*obj).type_0 = OBJECT_VALUE;
     return obj;
 }
@@ -110,8 +110,8 @@ pub unsafe fn object_range_create(mut offset: *mut AstExpr, mut r: *mut Range) -
 pub unsafe fn object_destroy(mut obj: *mut Object) {
     match (*obj).type_0 as libc::c_uint {
         0 => {
-            if !((*obj).c2rust_unnamed.Value).is_null() {
-                value_destroy((*obj).c2rust_unnamed.Value);
+            if !((*obj).c2rust_unnamed.value).is_null() {
+                value_destroy((*obj).c2rust_unnamed.value);
             }
         }
         1 => {
@@ -142,8 +142,8 @@ pub unsafe fn object_copy(mut old: *mut Object) -> *mut Object {
     (*new).type_0 = (*old).type_0;
     match (*old).type_0 as libc::c_uint {
         0 => {
-            (*new).c2rust_unnamed.Value = if !((*old).c2rust_unnamed.Value).is_null() {
-                value_copy((*old).c2rust_unnamed.Value)
+            (*new).c2rust_unnamed.value = if !((*old).c2rust_unnamed.value).is_null() {
+                value_copy((*old).c2rust_unnamed.value)
             } else {
                 0 as *mut Value
             };
@@ -173,8 +173,8 @@ pub unsafe fn object_abstractcopy(mut old: *mut Object, mut s: *mut State) -> *m
         0 => {
             return object_value_create(
                 ast_expr_copy((*old).offset),
-                if !((*old).c2rust_unnamed.Value).is_null() {
-                    value_abstractcopy((*old).c2rust_unnamed.Value, s)
+                if !((*old).c2rust_unnamed.value).is_null() {
+                    value_abstractcopy((*old).c2rust_unnamed.value, s)
                 } else {
                     0 as *mut Value
                 },
@@ -213,8 +213,8 @@ pub unsafe fn object_str(mut obj: *mut Object) -> *mut libc::c_char {
 unsafe fn inner_str(mut obj: *mut Object) -> *mut libc::c_char {
     match (*obj).type_0 as libc::c_uint {
         0 => {
-            return if !((*obj).c2rust_unnamed.Value).is_null() {
-                value_str((*obj).c2rust_unnamed.Value)
+            return if !((*obj).c2rust_unnamed.value).is_null() {
+                value_str((*obj).c2rust_unnamed.value)
             } else {
                 dynamic_str(b"\0" as *const u8 as *const libc::c_char)
             };
@@ -240,13 +240,13 @@ pub unsafe fn object_referencesheap(mut obj: *mut Object, mut s: *mut State) -> 
     if !object_isvalue(obj) {
         return 1 as libc::c_int != 0;
     }
-    return !((*obj).c2rust_unnamed.Value).is_null()
-        && value_referencesheap((*obj).c2rust_unnamed.Value, s) as libc::c_int != 0;
+    return !((*obj).c2rust_unnamed.value).is_null()
+        && value_referencesheap((*obj).c2rust_unnamed.value, s) as libc::c_int != 0;
 }
 #[no_mangle]
 pub unsafe fn object_hasvalue(mut obj: *mut Object) -> bool {
     if object_isvalue(obj) {
-        return !((*obj).c2rust_unnamed.Value).is_null();
+        return !((*obj).c2rust_unnamed.value).is_null();
     }
     return 0 as libc::c_int != 0;
 }
@@ -269,14 +269,14 @@ pub unsafe fn object_as_value(mut obj: *mut Object) -> *mut Value {
         );
     } else {
     };
-    return (*obj).c2rust_unnamed.Value;
+    return (*obj).c2rust_unnamed.value;
 }
 #[no_mangle]
 pub unsafe fn object_isdeallocand(mut obj: *mut Object, mut s: *mut State) -> bool {
     match (*obj).type_0 as libc::c_uint {
         0 => {
-            return !((*obj).c2rust_unnamed.Value).is_null()
-                && state_isdeallocand(s, value_as_location((*obj).c2rust_unnamed.Value))
+            return !((*obj).c2rust_unnamed.value).is_null()
+                && state_isdeallocand(s, value_as_location((*obj).c2rust_unnamed.value))
                     as libc::c_int
                     != 0;
         }
@@ -342,7 +342,7 @@ pub unsafe fn object_assign(mut obj: *mut Object, mut val: *mut Value) -> *mut e
         );
     } else {
     };
-    (*obj).c2rust_unnamed.Value = val;
+    (*obj).c2rust_unnamed.value = val;
     return 0 as *mut error;
 }
 unsafe fn object_size(mut obj: *mut Object) -> *mut AstExpr {
@@ -472,7 +472,7 @@ pub unsafe fn object_upto(
         };
         return object_value_create(
             ast_expr_copy((*obj).offset),
-            value_copy((*obj).c2rust_unnamed.Value),
+            value_copy((*obj).c2rust_unnamed.value),
         );
     }
     return object_range_create(
@@ -518,7 +518,7 @@ pub unsafe fn object_from(
         ast_expr_destroy(up);
         return object_value_create(
             ast_expr_copy(incl_lw),
-            value_copy((*obj).c2rust_unnamed.Value),
+            value_copy((*obj).c2rust_unnamed.value),
         );
     }
     return object_range_create(
@@ -532,7 +532,7 @@ pub unsafe fn object_from(
 #[no_mangle]
 pub unsafe fn object_dealloc(mut obj: *mut Object, mut s: *mut State) -> *mut error {
     match (*obj).type_0 as libc::c_uint {
-        0 => return state_dealloc(s, (*obj).c2rust_unnamed.Value),
+        0 => return state_dealloc(s, (*obj).c2rust_unnamed.value),
         1 => return range_dealloc((*obj).c2rust_unnamed.range, s),
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {

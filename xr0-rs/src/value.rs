@@ -576,7 +576,7 @@ unsafe fn frommembers(mut members: *mut ast_variable_arr) -> *mut map {
 unsafe fn destroymembers(mut m: *mut map) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
-        object_destroy((*((*m).entry).offset(i as isize)).Value as *mut Object);
+        object_destroy((*((*m).entry).offset(i as isize)).value as *mut Object);
         i += 1;
     }
 }
@@ -607,7 +607,7 @@ unsafe fn copymembers(mut old: *mut map) -> *mut map {
         map_set(
             new,
             dynamic_str(e.key),
-            object_copy(e.Value as *mut Object) as *const libc::c_void,
+            object_copy(e.value as *mut Object) as *const libc::c_void,
         );
         i += 1;
     }
@@ -642,7 +642,7 @@ unsafe fn abstractcopymembers(mut old: *mut map, mut s: *mut State) -> *mut map 
         map_set(
             new,
             dynamic_str(e.key),
-            object_abstractcopy(e.Value as *mut Object, s) as *const libc::c_void,
+            object_abstractcopy(e.value as *mut Object, s) as *const libc::c_void,
         );
         i += 1;
     }
@@ -674,7 +674,7 @@ unsafe fn struct_referencesheap(mut v: *mut Value, mut s: *mut State) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
         let mut val: *mut Value =
-            object_as_value((*((*m).entry).offset(i as isize)).Value as *mut Object);
+            object_as_value((*((*m).entry).offset(i as isize)).value as *mut Object);
         if !val.is_null() && value_referencesheap(val, s) as libc::c_int != 0 {
             return 1 as libc::c_int != 0;
         }
@@ -1012,7 +1012,7 @@ unsafe fn struct_references(mut v: *mut Value, mut loc: *mut Location, mut s: *m
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
         let mut val: *mut Value =
-            object_as_value((*((*m).entry).offset(i as isize)).Value as *mut Object);
+            object_as_value((*((*m).entry).offset(i as isize)).value as *mut Object);
         if !val.is_null() && value_references(val, loc, s) as libc::c_int != 0 {
             return 1 as libc::c_int != 0;
         }
@@ -1059,9 +1059,9 @@ pub unsafe fn value_equal(mut v1: *mut Value, mut v2: *mut Value) -> bool {
     panic!("Reached end of non-void function without returning");
 }
 #[no_mangle]
-pub unsafe fn value_assume(mut v: *mut Value, mut Value: bool) -> bool {
+pub unsafe fn value_assume(mut v: *mut Value, mut value: bool) -> bool {
     match (*v).type_0 as libc::c_uint {
-        2 => return number_assume((*v).c2rust_unnamed.n, Value),
+        2 => return number_assume((*v).c2rust_unnamed.n, value),
         1 => {
             if !(*v).c2rust_unnamed.ptr.isindefinite as libc::c_int as libc::c_long != 0 {
                 __assert_rtn(
@@ -1073,7 +1073,7 @@ pub unsafe fn value_assume(mut v: *mut Value, mut Value: bool) -> bool {
                 );
             } else {
             };
-            return number_assume((*v).c2rust_unnamed.ptr.c2rust_unnamed.n, Value);
+            return number_assume((*v).c2rust_unnamed.ptr.c2rust_unnamed.n, value);
         }
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
@@ -1354,7 +1354,7 @@ pub unsafe fn number_ranges_equal(mut n1: *mut number, mut n2: *mut number) -> b
     }
     return 1 as libc::c_int != 0;
 }
-unsafe fn number_assume(mut n: *mut number, mut Value: bool) -> bool {
+unsafe fn number_assume(mut n: *mut number, mut value: bool) -> bool {
     if !((*n).type_0 as libc::c_uint == NUMBER_RANGES as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -1368,14 +1368,14 @@ unsafe fn number_assume(mut n: *mut number, mut Value: bool) -> bool {
         );
     } else {
     };
-    if !number_range_arr_canbe((*n).c2rust_unnamed.ranges, Value) {
+    if !number_range_arr_canbe((*n).c2rust_unnamed.ranges, value) {
         return 0 as libc::c_int != 0;
     }
-    (*n).c2rust_unnamed.ranges = number_range_assumed_value(Value);
+    (*n).c2rust_unnamed.ranges = number_range_assumed_value(value);
     return 1 as libc::c_int != 0;
 }
-unsafe fn number_range_assumed_value(mut Value: bool) -> *mut number_range_arr {
-    if Value {
+unsafe fn number_range_assumed_value(mut value: bool) -> *mut number_range_arr {
+    if value {
         return number_range_arr_ne_create(0 as libc::c_int);
     } else {
         return number_range_arr_single_create(0 as libc::c_int);
@@ -1579,10 +1579,10 @@ pub unsafe fn number_ranges_to_expr(mut arr: *mut number_range_arr) -> *mut AstE
         *((*arr).range).offset(0 as libc::c_int as isize),
     ));
 }
-unsafe fn number_range_arr_canbe(mut arr: *mut number_range_arr, mut Value: bool) -> bool {
+unsafe fn number_range_arr_canbe(mut arr: *mut number_range_arr, mut value: bool) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {
-        if number_range_canbe(*((*arr).range).offset(i as isize), Value) {
+        if number_range_canbe(*((*arr).range).offset(i as isize), value) {
             return 1 as libc::c_int != 0;
         }
         i += 1;
@@ -1637,8 +1637,8 @@ pub unsafe fn number_range_str(mut r: *mut number_range) -> *mut libc::c_char {
 pub unsafe fn number_range_copy(mut r: *mut number_range) -> *mut number_range {
     return number_range_create(number_value_copy((*r).lower), number_value_copy((*r).upper));
 }
-unsafe fn number_range_canbe(mut r: *mut number_range, mut Value: bool) -> bool {
-    if Value {
+unsafe fn number_range_canbe(mut r: *mut number_range, mut value: bool) -> bool {
+    if value {
         if number_value_equal((*r).lower, (*r).upper) {
             return 0 as libc::c_int != 0;
         }
@@ -1939,7 +1939,7 @@ unsafe fn constant_le_number_value(mut constant: libc::c_int, mut v: *mut number
                         b"constant_le_number_value\0",
                     ))
                     .as_ptr(),
-                    b"Value.c\0" as *const u8 as *const libc::c_char,
+                    b"value.c\0" as *const u8 as *const libc::c_char,
                     1447 as libc::c_int,
                     b"false\0" as *const u8 as *const libc::c_char,
                 );

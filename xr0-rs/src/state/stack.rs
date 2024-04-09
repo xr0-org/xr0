@@ -135,7 +135,7 @@ pub unsafe fn stack_destroy(mut Stack: *mut Stack) {
     let mut m: *mut map = (*Stack).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
-        variable_destroy((*((*m).entry).offset(i as isize)).Value as *mut Variable);
+        variable_destroy((*((*m).entry).offset(i as isize)).value as *mut Variable);
         i += 1;
     }
     map_destroy(m);
@@ -181,7 +181,7 @@ unsafe fn varmap_copy(mut m: *mut map) -> *mut map {
         map_set(
             m_copy,
             dynamic_str(e.key),
-            variable_copy(e.Value as *mut Variable) as *const libc::c_void,
+            variable_copy(e.value as *mut Variable) as *const libc::c_void,
         );
         i += 1;
     }
@@ -195,7 +195,7 @@ pub unsafe fn stack_str(mut Stack: *mut Stack, mut State: *mut State) -> *mut li
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
         let mut e: entry = *((*m).entry).offset(i as isize);
-        let mut var: *mut libc::c_char = variable_str(e.Value as *mut Variable, Stack, State);
+        let mut var: *mut libc::c_char = variable_str(e.value as *mut Variable, Stack, State);
         strbuilder_printf(
             b,
             b"\t%s: %s\0" as *const u8 as *const libc::c_char,
@@ -263,7 +263,7 @@ pub unsafe fn stack_undeclare(mut Stack: *mut Stack, mut State: *mut State) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
         let mut e: entry = *((*m).entry).offset(i as isize);
-        let mut v: *mut Variable = e.Value as *mut Variable;
+        let mut v: *mut Variable = e.value as *mut Variable;
         if variable_isparam(v) {
             map_set(
                 (*Stack).varmap,
@@ -318,7 +318,7 @@ pub unsafe fn stack_references(
     let mut m: *mut map = (*s).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
-        let mut var: *mut Variable = (*((*m).entry).offset(i as isize)).Value as *mut Variable;
+        let mut var: *mut Variable = (*((*m).entry).offset(i as isize)).value as *mut Variable;
         if variable_isparam(var) as libc::c_int != 0
             && variable_references(var, loc, State) as libc::c_int != 0
         {

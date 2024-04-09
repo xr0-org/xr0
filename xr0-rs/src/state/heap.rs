@@ -242,7 +242,7 @@ pub unsafe fn vconst_destroy(mut v: *mut vconst) {
     let mut m: *mut map = (*v).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
-        value_destroy((*((*m).entry).offset(i as isize)).Value as *mut Value);
+        value_destroy((*((*m).entry).offset(i as isize)).value as *mut Value);
         i += 1;
     }
     map_destroy(m);
@@ -261,7 +261,7 @@ pub unsafe fn vconst_copy(mut old: *mut vconst) -> *mut vconst {
         map_set(
             (*new).varmap,
             dynamic_str(e.key),
-            value_copy(e.Value as *mut Value) as *const libc::c_void,
+            value_copy(e.value as *mut Value) as *const libc::c_void,
         );
         i += 1;
     }
@@ -272,7 +272,7 @@ pub unsafe fn vconst_copy(mut old: *mut vconst) -> *mut vconst {
         map_set(
             (*new).comment,
             dynamic_str(e_0.key),
-            dynamic_str(e_0.Value as *const libc::c_char) as *const libc::c_void,
+            dynamic_str(e_0.value as *const libc::c_char) as *const libc::c_void,
         );
         i_0 += 1;
     }
@@ -280,7 +280,7 @@ pub unsafe fn vconst_copy(mut old: *mut vconst) -> *mut vconst {
     let mut i_1: libc::c_int = 0 as libc::c_int;
     while i_1 < (*m).n {
         let mut e_1: entry = *((*m).entry).offset(i_1 as isize);
-        map_set((*new).persist, dynamic_str(e_1.key), e_1.Value);
+        map_set((*new).persist, dynamic_str(e_1.key), e_1.value);
         i_1 += 1;
     }
     return new;
@@ -330,7 +330,7 @@ unsafe fn count_true(mut m: *mut map) -> libc::c_int {
     let mut n: libc::c_int = 0 as libc::c_int;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
-        if !((*((*m).entry).offset(i as isize)).Value).is_null() {
+        if !((*((*m).entry).offset(i as isize)).value).is_null() {
             n += 1;
         }
         i += 1;
@@ -386,20 +386,20 @@ pub unsafe fn vconst_str(mut v: *mut vconst, mut indent: *mut libc::c_char) -> *
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*m).n {
         let mut e: entry = *((*m).entry).offset(i as isize);
-        let mut Value: *mut libc::c_char = value_str(e.Value as *mut Value);
+        let mut value: *mut libc::c_char = value_str(e.value as *mut Value);
         strbuilder_printf(
             b,
             b"%s%s: %s\0" as *const u8 as *const libc::c_char,
             indent,
             e.key,
-            Value,
+            value,
         );
         let mut comment: *mut libc::c_char = map_get((*v).comment, e.key) as *mut libc::c_char;
         if !comment.is_null() {
             strbuilder_printf(b, b"\t(%s)\0" as *const u8 as *const libc::c_char, comment);
         }
         strbuilder_printf(b, b"\n\0" as *const u8 as *const libc::c_char);
-        free(Value as *mut libc::c_void);
+        free(value as *mut libc::c_void);
         i += 1;
     }
     return strbuilder_build(b);
