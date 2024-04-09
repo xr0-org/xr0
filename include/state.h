@@ -7,6 +7,7 @@
 
 /* ast */
 struct ast_function;
+struct ast_block;
 struct ast_type;
 struct ast_variable;
 struct ast_expr;
