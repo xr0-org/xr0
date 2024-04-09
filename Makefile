@@ -291,16 +291,23 @@ TESTFILES = $(shell find $(TESTDIR) -name '*.0')
 test: $(RUNTEST) $(TESTFILES) $(XR0V) 
 	XR0=$(XR0V) ./tests/run
 
-test-rust: $(RUNTEST) $(TESTFILES)
+.PHONY: $(XR0V_RUST)
+$(XR0V_RUST):
 	(cd xr0-rs && cargo build)
+
+.PHONY: test-rust
+test-rust: $(XR0V_RUST)
 	XR0=$(XR0V_RUST) ./tests/run
 
-check: $(RUNTEST) $(TESTFILES) $(XR0V)
+.PHONY: check
+check: $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
-check-verbose: $(RUNTEST) $(TESTFILES) $(XR0V)
+.PHONY: check-verbose
+check-verbose: $(XR0V)
 	$(VALGRIND) --num-callers=30 \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
+.PHONY: clean
 clean:
 	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(OBJECTS) $(XR0_OBJECTS)
