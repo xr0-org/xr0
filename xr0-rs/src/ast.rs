@@ -3677,39 +3677,21 @@ unsafe fn binary_e2(mut e2: *mut AstExpr, mut op: ast_binary_operator) -> *mut m
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_getfuncs(mut expr: *mut AstExpr) -> *mut string_arr {
+pub unsafe fn ast_expr_getfuncs(mut expr: *mut AstExpr) -> Box<string_arr> {
     match (*expr).kind as libc::c_uint {
         1 | 2 | 4 | 128 | 2048 | 4096 | 8192 => return string_arr_create(),
-        32 => return ast_expr_call_getfuncs(expr),
-        8 | 256 | 64 => return ast_expr_getfuncs((*expr).root),
-        1024 => {
-            return string_arr_concat(
-                ast_expr_getfuncs((*expr).root),
-                ast_expr_getfuncs((*expr).u.assignment_value),
-            );
-        }
-        512 => {
-            return string_arr_concat(
-                ast_expr_getfuncs((*expr).u.binary.e1),
-                ast_expr_getfuncs((*expr).u.binary.e2),
-            );
-        }
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
-                        b"ast_expr_getfuncs\0",
-                    ))
-                    .as_ptr(),
-                    b"expr.c\0" as *const u8 as *const libc::c_char,
-                    1079 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        32 => ast_expr_call_getfuncs(expr),
+        8 | 256 | 64 => ast_expr_getfuncs((*expr).root),
+        1024 => string_arr_concat(
+            &ast_expr_getfuncs((*expr).root),
+            &ast_expr_getfuncs((*expr).u.assignment_value),
+        ),
+        512 => string_arr_concat(
+            &ast_expr_getfuncs((*expr).u.binary.e1),
+            &ast_expr_getfuncs((*expr).u.binary.e2),
+        ),
+        _ => panic!("invalid expr kind"),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 #[no_mangle]
@@ -3861,8 +3843,8 @@ unsafe fn binary_splits(mut e: *mut AstExpr, mut s: *mut State) -> ast_stmt_spli
     };
 }
 
-unsafe fn ast_expr_call_getfuncs(mut expr: *mut AstExpr) -> *mut string_arr {
-    let mut res: *mut string_arr = string_arr_create();
+unsafe fn ast_expr_call_getfuncs(mut expr: *mut AstExpr) -> Box<string_arr> {
+    let mut res = string_arr_create();
     let mut root: *mut AstExpr = (*expr).root;
     if !((*root).kind as libc::c_uint == EXPR_IDENTIFIER as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
@@ -3879,16 +3861,16 @@ unsafe fn ast_expr_call_getfuncs(mut expr: *mut AstExpr) -> *mut string_arr {
         );
     } else {
     };
-    string_arr_append(res, dynamic_str((*root).u.string));
+    string_arr_append(&mut res, dynamic_str((*root).u.string));
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*expr).u.call.n {
         res = string_arr_concat(
-            res,
-            ast_expr_getfuncs(*((*expr).u.call.arg).offset(i as isize)),
+            &res,
+            &ast_expr_getfuncs(*((*expr).u.call.arg).offset(i as isize)),
         );
         i += 1;
     }
-    return res;
+    res
 }
 
 unsafe fn calculate_indegrees(mut g: &map) -> Box<map> {
@@ -3942,54 +3924,54 @@ unsafe fn dynamic_int(mut i: libc::c_int) -> *mut libc::c_int {
     return val;
 }
 
-unsafe fn build_indegree_zero(mut indegrees: &map) -> *mut string_arr {
-    let mut indegree_zero: *mut string_arr = string_arr_create();
+unsafe fn build_indegree_zero(mut indegrees: &map) -> Box<string_arr> {
+    let mut indegree_zero = string_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < indegrees.n {
         let mut e: entry = *indegrees.entry.offset(i as isize);
         let mut val: *mut libc::c_int = map_get(indegrees, e.key) as *mut libc::c_int;
         if *val == 0 as libc::c_int {
-            string_arr_append(indegree_zero, dynamic_str(e.key));
+            string_arr_append(&mut indegree_zero, dynamic_str(e.key));
         }
         i += 1;
     }
-    return indegree_zero;
+    indegree_zero
 }
 
 #[no_mangle]
 pub unsafe fn topological_order(
     mut fname: *mut libc::c_char,
     mut ext: *mut Externals,
-) -> *mut string_arr {
-    let mut order: *mut string_arr = string_arr_create();
+) -> Box<string_arr> {
+    let mut order = string_arr_create();
     let mut g = ast_function_buildgraph(fname, ext);
     let mut indegrees = calculate_indegrees(&g);
-    let mut indegree_zero: *mut string_arr = build_indegree_zero(&indegrees);
+    let mut indegree_zero = build_indegree_zero(&indegrees);
     while (*indegree_zero).n > 0 as libc::c_int {
-        let mut curr: *mut libc::c_char = string_arr_deque(indegree_zero);
-        string_arr_append(order, curr);
+        let mut curr: *mut libc::c_char = string_arr_deque(&mut indegree_zero);
+        string_arr_append(&mut order, curr);
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < (*g).n {
             let mut e: entry = *((*g).entry).offset(i as isize);
             let mut v: *mut string_arr = map_get(&g, e.key) as *mut string_arr;
-            if string_arr_contains(v, curr) {
+            if string_arr_contains(&*v, curr) {
                 let mut count: *mut libc::c_int = map_get(&indegrees, e.key) as *mut libc::c_int;
                 *count = *count - 1 as libc::c_int;
                 if *count == 0 as libc::c_int {
-                    string_arr_append(indegree_zero, dynamic_str(e.key));
+                    string_arr_append(&mut indegree_zero, dynamic_str(e.key));
                 }
             }
             i += 1;
         }
     }
-    if (*order).n != indegrees.n {
+    if order.n != indegrees.n {
         fprintf(
             __stderrp,
             b"cycle detected in graph\0" as *const u8 as *const libc::c_char,
         );
         exit(1 as libc::c_int);
     }
-    return order;
+    order
 }
 
 #[no_mangle]
@@ -5895,31 +5877,17 @@ pub unsafe fn ast_stmt_kind(mut stmt: *mut ast_stmt) -> ast_stmt_kind {
 }
 
 #[no_mangle]
-pub unsafe fn ast_stmt_getfuncs(mut stmt: *mut ast_stmt) -> *mut string_arr {
+pub unsafe fn ast_stmt_getfuncs(mut stmt: *mut ast_stmt) -> Box<string_arr> {
     match (*stmt).kind as libc::c_uint {
-        1 => return string_arr_create(),
-        2 => return ast_stmt_getfuncs((*stmt).u.labelled.stmt),
-        4 | 8 => return ast_stmt_compound_getfuncs(stmt),
-        16 => return ast_stmt_expr_getfuncs(stmt),
-        32 => return ast_stmt_selection_getfuncs(stmt),
-        64 | 128 => return ast_stmt_iteration_getfuncs(stmt),
-        256 => return ast_expr_getfuncs((*stmt).u.jump.rv),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
-                        b"ast_stmt_getfuncs\0",
-                    ))
-                    .as_ptr(),
-                    b"stmt.c\0" as *const u8 as *const libc::c_char,
-                    656 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        1 => string_arr_create(),
+        2 => ast_stmt_getfuncs((*stmt).u.labelled.stmt),
+        4 | 8 => ast_stmt_compound_getfuncs(stmt),
+        16 => ast_stmt_expr_getfuncs(stmt),
+        32 => ast_stmt_selection_getfuncs(stmt),
+        64 | 128 => ast_stmt_iteration_getfuncs(stmt),
+        256 => ast_expr_getfuncs((*stmt).u.jump.rv),
+        _ => panic!("invalid stmt kind"),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 #[no_mangle]
@@ -6027,55 +5995,55 @@ unsafe fn condexists(mut cond: *mut AstExpr, mut s: *mut State) -> bool {
         || props_contradicts(p, reduced) as libc::c_int != 0;
 }
 
-unsafe fn ast_stmt_expr_getfuncs(mut stmt: *mut ast_stmt) -> *mut string_arr {
-    return ast_expr_getfuncs((*stmt).u.expr);
+unsafe fn ast_stmt_expr_getfuncs(mut stmt: *mut ast_stmt) -> Box<string_arr> {
+    ast_expr_getfuncs((*stmt).u.expr)
 }
 
-unsafe fn ast_stmt_selection_getfuncs(mut stmt: *mut ast_stmt) -> *mut string_arr {
+unsafe fn ast_stmt_selection_getfuncs(mut stmt: *mut ast_stmt) -> Box<string_arr> {
     let mut cond: *mut AstExpr = (*stmt).u.selection.cond;
     let mut body: *mut ast_stmt = (*stmt).u.selection.body;
     let mut nest: *mut ast_stmt = (*stmt).u.selection.nest;
-    let mut cond_arr: *mut string_arr = ast_expr_getfuncs(cond);
-    let mut body_arr: *mut string_arr = ast_stmt_getfuncs(body);
-    let mut nest_arr: *mut string_arr = if !nest.is_null() {
+    let mut cond_arr = ast_expr_getfuncs(cond);
+    let mut body_arr = ast_stmt_getfuncs(body);
+    let mut nest_arr = if !nest.is_null() {
         ast_stmt_getfuncs(nest)
     } else {
         string_arr_create()
     };
-    return string_arr_concat(
-        string_arr_create(),
-        string_arr_concat(cond_arr, string_arr_concat(body_arr, nest_arr)),
-    );
+    string_arr_concat(
+        &string_arr_create(),
+        &string_arr_concat(&cond_arr, &string_arr_concat(&body_arr, &nest_arr)),
+    )
 }
 
-unsafe fn ast_stmt_iteration_getfuncs(mut stmt: *mut ast_stmt) -> *mut string_arr {
+unsafe fn ast_stmt_iteration_getfuncs(mut stmt: *mut ast_stmt) -> Box<string_arr> {
     let mut init: *mut ast_stmt = (*stmt).u.iteration.init;
     let mut cond: *mut ast_stmt = (*stmt).u.iteration.cond;
     let mut body: *mut ast_stmt = (*stmt).u.iteration.body;
     let mut iter: *mut AstExpr = (*stmt).u.iteration.iter;
-    let mut init_arr: *mut string_arr = ast_stmt_getfuncs(init);
-    let mut cond_arr: *mut string_arr = ast_stmt_getfuncs(cond);
-    let mut body_arr: *mut string_arr = ast_stmt_getfuncs(body);
-    let mut iter_arr: *mut string_arr = ast_expr_getfuncs(iter);
-    return string_arr_concat(
-        string_arr_create(),
-        string_arr_concat(
-            string_arr_concat(init_arr, cond_arr),
-            string_arr_concat(body_arr, iter_arr),
+    let mut init_arr = ast_stmt_getfuncs(init);
+    let mut cond_arr = ast_stmt_getfuncs(cond);
+    let mut body_arr = ast_stmt_getfuncs(body);
+    let mut iter_arr = ast_expr_getfuncs(iter);
+    string_arr_concat(
+        &string_arr_create(),
+        &string_arr_concat(
+            &string_arr_concat(&init_arr, &cond_arr),
+            &string_arr_concat(&body_arr, &iter_arr),
         ),
-    );
+    )
 }
 
-unsafe fn ast_stmt_compound_getfuncs(mut stmt: *mut ast_stmt) -> *mut string_arr {
-    let mut res: *mut string_arr = string_arr_create();
+unsafe fn ast_stmt_compound_getfuncs(mut stmt: *mut ast_stmt) -> Box<string_arr> {
+    let mut res = string_arr_create();
     let mut b: *mut ast_block = (*stmt).u.compound;
     let mut stmts: *mut *mut ast_stmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < ast_block_nstmts(b) {
-        res = string_arr_concat(res, ast_stmt_getfuncs(*stmts.offset(i as isize)));
+        res = string_arr_concat(&res, &ast_stmt_getfuncs(*stmts.offset(i as isize)));
         i += 1;
     }
-    return res;
+    res
 }
 
 #[no_mangle]
@@ -7439,33 +7407,34 @@ unsafe fn recurse_buildgraph(
         );
     } else {
     };
-    let mut val: *mut string_arr = string_arr_create();
+    let mut val = string_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmts {
-        let mut farr: *mut string_arr = ast_stmt_getfuncs(*stmt.offset(i as isize));
-        if !farr.is_null() {
-            let mut func: *mut *mut libc::c_char = string_arr_s(farr);
-            let mut j: libc::c_int = 0 as libc::c_int;
-            while j < string_arr_n(farr) {
-                if (map_get(&local_dedup, *func.offset(j as isize))).is_null() {
-                    let mut f_0: *mut ast_function =
-                        externals_getfunc(ext, *func.offset(j as isize));
-                    if !(*f_0).isaxiom {
-                        string_arr_append(val, *func.offset(j as isize));
-                    }
-                    map_set(
-                        &mut local_dedup,
-                        *func.offset(j as isize),
-                        1 as libc::c_int as *mut libc::c_void,
-                    );
-                    recurse_buildgraph(g, dedup, *func.offset(j as isize), ext);
+        let mut farr = ast_stmt_getfuncs(*stmt.offset(i as isize));
+        let mut func: *mut *mut libc::c_char = string_arr_s(&mut farr);
+        let mut j: libc::c_int = 0 as libc::c_int;
+        while j < string_arr_n(&farr) {
+            if (map_get(&local_dedup, *func.offset(j as isize))).is_null() {
+                let mut f_0: *mut ast_function = externals_getfunc(ext, *func.offset(j as isize));
+                if !(*f_0).isaxiom {
+                    string_arr_append(&mut val, *func.offset(j as isize));
                 }
-                j += 1;
+                map_set(
+                    &mut local_dedup,
+                    *func.offset(j as isize),
+                    1 as libc::c_int as *mut libc::c_void,
+                );
+                recurse_buildgraph(g, dedup, *func.offset(j as isize), ext);
             }
+            j += 1;
         }
         i += 1;
     }
-    map_set(g, dynamic_str(fname), val as *const libc::c_void);
+    map_set(
+        g,
+        dynamic_str(fname),
+        Box::into_raw(val) as *const libc::c_void,
+    );
 }
 
 unsafe fn abstract_paths(
@@ -8146,8 +8115,8 @@ pub unsafe fn preresult_iscontradiction(mut r: *mut preresult) -> bool {
 pub unsafe fn ast_topological_order(
     mut fname: *mut libc::c_char,
     mut ext: *mut Externals,
-) -> *mut string_arr {
-    return topological_order(fname, ext);
+) -> Box<string_arr> {
+    topological_order(fname, ext)
 }
 
 #[no_mangle]

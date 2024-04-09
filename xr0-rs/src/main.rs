@@ -70,12 +70,12 @@ pub type sortmode = libc::c_uint;
 pub const SORTMODE_VERIFY: sortmode = 2;
 pub const SORTMODE_SORT: sortmode = 1;
 pub const SORTMODE_NONE: sortmode = 0;
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct config {
     pub infile: *mut libc::c_char,
     pub outfile: *mut libc::c_char,
-    pub includedirs: *mut string_arr,
+    pub includedirs: Box<string_arr>,
     pub verbose: bool,
     pub mode: execmode,
     pub sortfunc: *mut libc::c_char,
@@ -100,7 +100,7 @@ pub unsafe fn parse_config(mut argc: libc::c_int, mut argv: *mut *mut libc::c_ch
         SORTMODE_NONE,
         b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    let mut includedirs: *mut string_arr = default_includes();
+    let mut includedirs = default_includes();
     let mut outfile: *mut libc::c_char =
         b"0.c\0" as *const u8 as *const libc::c_char as *mut libc::c_char;
     let mut opt: libc::c_int = 0;
@@ -115,7 +115,7 @@ pub unsafe fn parse_config(mut argc: libc::c_int, mut argv: *mut *mut libc::c_ch
         }
         match opt {
             73 => {
-                string_arr_append(includedirs, dynamic_str(optarg));
+                string_arr_append(&mut includedirs, dynamic_str(optarg));
             }
             111 => {
                 outfile = optarg;
@@ -153,10 +153,10 @@ pub unsafe fn parse_config(mut argc: libc::c_int, mut argv: *mut *mut libc::c_ch
     return {
         let mut init = config {
             infile: *argv.offset(optind as isize),
-            outfile: outfile,
-            includedirs: includedirs,
-            verbose: verbose,
-            mode: mode,
+            outfile,
+            includedirs,
+            verbose,
+            mode,
             sortfunc: sortconf.sortfunc,
             sortmode: sortconf.mode,
         };
@@ -209,16 +209,16 @@ unsafe fn sortconfig_create(mut mode: sortmode, mut sortfunc: *mut libc::c_char)
     }
     panic!("Reached end of non-void function without returning");
 }
-unsafe fn default_includes() -> *mut string_arr {
-    let mut dirs: *mut string_arr = string_arr_create();
+unsafe fn default_includes() -> Box<string_arr> {
+    let mut dirs = string_arr_create();
     let mut env: *mut libc::c_char = getenv(b"XR0_INCLUDES\0" as *const u8 as *const libc::c_char);
     if !env.is_null() {
-        string_arr_append(dirs, env);
+        string_arr_append(&mut dirs, env);
     }
-    return dirs;
+    dirs
 }
 #[no_mangle]
-pub unsafe fn genincludes(mut includedirs: *mut string_arr) -> *mut libc::c_char {
+pub unsafe fn genincludes(includedirs: &mut string_arr) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
     let mut s: *mut *mut libc::c_char = string_arr_s(includedirs);
     let mut n: libc::c_int = string_arr_n(includedirs);
@@ -236,7 +236,7 @@ pub unsafe fn genincludes(mut includedirs: *mut string_arr) -> *mut libc::c_char
 
 #[no_mangle]
 pub unsafe fn preprocesscmd_fmt(
-    mut includedirs: *mut string_arr,
+    includedirs: &mut string_arr,
     mut infile: *mut libc::c_char,
 ) -> *mut libc::c_char {
     let mut includes: *mut libc::c_char = genincludes(includedirs);
@@ -262,7 +262,7 @@ pub unsafe fn preprocesscmd_fmt(
 #[no_mangle]
 pub unsafe fn open_preprocessor(
     mut infile: *mut libc::c_char,
-    mut includedirs: *mut string_arr,
+    includedirs: &mut string_arr,
 ) -> *mut libc::FILE {
     let mut cmd: *mut libc::c_char = preprocesscmd_fmt(includedirs, infile);
     let mut pipe: *mut libc::FILE = popen(cmd, b"r\0" as *const u8 as *const libc::c_char);
@@ -272,7 +272,7 @@ pub unsafe fn open_preprocessor(
 #[no_mangle]
 pub unsafe fn preprocess(
     mut infile: *mut libc::c_char,
-    mut includedirs: *mut string_arr,
+    includedirs: &mut string_arr,
 ) -> *mut libc::FILE {
     let mut pipe: *mut libc::FILE = open_preprocessor(infile, includedirs);
     if pipe.is_null() {
@@ -370,7 +370,7 @@ pub unsafe fn pass1(mut root_0: *mut Ast, mut ext: *mut Externals) {
     }
 }
 #[no_mangle]
-pub unsafe fn pass_inorder(mut order: *mut string_arr, mut ext: *mut Externals) {
+pub unsafe fn pass_inorder(order: &mut string_arr, mut ext: *mut Externals) {
     let mut err: *mut error = 0 as *mut error;
     let mut n: libc::c_int = string_arr_n(order);
     let mut name: *mut *mut libc::c_char = string_arr_s(order);
@@ -487,34 +487,34 @@ unsafe fn main_0(mut argc: libc::c_int, mut argv: *mut *mut libc::c_char) -> lib
     }
 }
 unsafe fn verify(mut c: *mut config) -> libc::c_int {
-    yyin = preprocess((*c).infile, (*c).includedirs);
+    yyin = preprocess((*c).infile, &mut *(*c).includedirs);
     lex_begin();
     yyparse();
     yylex_destroy();
     lex_finish();
     let mut ext: *mut Externals = externals_create();
     pass0(root, ext);
-    let mut order: *mut string_arr = 0 as *mut string_arr;
+    let mut order: Option<Box<string_arr>> = None;
     match (*c).sortmode as libc::c_uint {
         0 => {
             pass1(root, ext);
         }
         1 => {
-            order = ast_topological_order((*c).sortfunc, ext);
+            order = Some(ast_topological_order((*c).sortfunc, ext));
             fprintf(
                 __stderrp,
                 b"%s\n\0" as *const u8 as *const libc::c_char,
-                string_arr_str(order),
+                string_arr_str(order.as_ref().unwrap()),
             );
         }
         2 => {
-            order = ast_topological_order((*c).sortfunc, ext);
+            order = Some(ast_topological_order((*c).sortfunc, ext));
             fprintf(
                 __stderrp,
                 b"%s\n\0" as *const u8 as *const libc::c_char,
-                string_arr_str(order),
+                string_arr_str(order.as_ref().unwrap()),
             );
-            pass_inorder(order, ext);
+            pass_inorder(order.as_mut().unwrap(), ext);
         }
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {

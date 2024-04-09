@@ -263,47 +263,37 @@ pub unsafe fn error_prepend(mut e: *mut error, mut prefix: *mut libc::c_char) ->
     return error_create(new_msg);
 }
 #[no_mangle]
-pub unsafe fn string_arr_create() -> *mut string_arr {
-    let mut arr: *mut string_arr =
-        calloc(1, ::core::mem::size_of::<string_arr>()) as *mut string_arr;
-    if arr.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"string_arr_create\0"))
-                .as_ptr(),
-            b"util.c\0" as *const u8 as *const libc::c_char,
-            211 as libc::c_int,
-            b"arr\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
-    return arr;
+pub unsafe fn string_arr_create() -> Box<string_arr> {
+    Box::new(string_arr {
+        s: std::ptr::null_mut(),
+        n: 0,
+    })
 }
 #[no_mangle]
-pub unsafe fn string_arr_destroy(mut arr: *mut string_arr) {
+pub unsafe fn string_arr_destroy(arr: Box<string_arr>) {
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        free(*((*arr).s).offset(i as isize) as *mut libc::c_void);
+    while i < arr.n {
+        free(*arr.s.offset(i as isize) as *mut libc::c_void);
         i += 1;
     }
-    free((*arr).s as *mut libc::c_void);
-    free(arr as *mut libc::c_void);
+    free(arr.s as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe fn string_arr_s(mut arr: *mut string_arr) -> *mut *mut libc::c_char {
-    return (*arr).s;
+pub unsafe fn string_arr_s(mut arr: &mut string_arr) -> *mut *mut libc::c_char {
+    arr.s
 }
 #[no_mangle]
-pub unsafe fn string_arr_n(mut arr: *mut string_arr) -> libc::c_int {
-    return (*arr).n;
+pub unsafe fn string_arr_n(mut arr: &string_arr) -> libc::c_int {
+    arr.n
 }
 #[no_mangle]
-pub unsafe fn string_arr_append(mut arr: *mut string_arr, mut s: *mut libc::c_char) -> libc::c_int {
-    (*arr).n += 1;
-    (*arr).s = realloc(
+pub unsafe fn string_arr_append(arr: &mut string_arr, mut s: *mut libc::c_char) -> libc::c_int {
+    arr.n += 1;
+    arr.s = realloc(
         (*arr).s as *mut libc::c_void,
         (::core::mem::size_of::<string_arr>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut libc::c_char;
-    if ((*arr).s).is_null() as libc::c_int as libc::c_long != 0 {
+    if arr.s.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"string_arr_append\0"))
                 .as_ptr(),
@@ -313,65 +303,52 @@ pub unsafe fn string_arr_append(mut arr: *mut string_arr, mut s: *mut libc::c_ch
         );
     } else {
     };
-    let mut loc: libc::c_int = (*arr).n - 1 as libc::c_int;
-    let ref mut fresh1 = *((*arr).s).offset(loc as isize);
+    let mut loc: libc::c_int = arr.n - 1 as libc::c_int;
+    let ref mut fresh1 = *arr.s.offset(loc as isize);
     *fresh1 = s;
     return loc;
 }
 #[no_mangle]
-pub unsafe fn string_arr_copy(mut old: *mut string_arr) -> *mut string_arr {
-    let mut new: *mut string_arr = string_arr_create();
+pub unsafe fn string_arr_copy(old: &string_arr) -> Box<string_arr> {
+    let mut new = string_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*old).n {
-        string_arr_append(new, dynamic_str(*((*old).s).offset(i as isize)));
+    while i < old.n {
+        string_arr_append(&mut new, dynamic_str(*old.s.offset(i as isize)));
         i += 1;
     }
     return new;
 }
 #[no_mangle]
-pub unsafe fn string_arr_concat(
-    mut s1: *mut string_arr,
-    mut s2: *mut string_arr,
-) -> *mut string_arr {
-    if !(!s1.is_null() && !s2.is_null()) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"string_arr_concat\0"))
-                .as_ptr(),
-            b"util.c\0" as *const u8 as *const libc::c_char,
-            261 as libc::c_int,
-            b"s1 && s2\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
-    let mut new: *mut string_arr = string_arr_copy(s1);
+pub unsafe fn string_arr_concat(s1: &string_arr, s2: &string_arr) -> Box<string_arr> {
+    let mut new = string_arr_copy(s1);
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*s2).n {
-        string_arr_append(new, *((*s2).s).offset(i as isize));
+    while i < s2.n {
+        string_arr_append(&mut new, *s2.s.offset(i as isize));
         i += 1;
     }
     return new;
 }
 #[no_mangle]
-pub unsafe fn string_arr_deque(mut arr: *mut string_arr) -> *mut libc::c_char {
-    let mut ret: *mut libc::c_char = dynamic_str(*((*arr).s).offset(0 as libc::c_int as isize));
+pub unsafe fn string_arr_deque(arr: &mut string_arr) -> *mut libc::c_char {
+    let mut ret: *mut libc::c_char = dynamic_str(*arr.s.offset(0 as libc::c_int as isize));
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n - 1 as libc::c_int {
-        let ref mut fresh2 = *((*arr).s).offset(i as isize);
-        *fresh2 = *((*arr).s).offset((i + 1 as libc::c_int) as isize);
+    while i < arr.n - 1 as libc::c_int {
+        let ref mut fresh2 = *(arr.s).offset(i as isize);
+        *fresh2 = *arr.s.offset((i + 1 as libc::c_int) as isize);
         i += 1;
     }
-    (*arr).n -= 1;
-    (*arr).s = realloc(
-        (*arr).s as *mut libc::c_void,
-        (::core::mem::size_of::<*mut libc::c_char>()).wrapping_mul((*arr).n as usize),
+    arr.n -= 1;
+    arr.s = realloc(
+        arr.s as *mut libc::c_void,
+        (::core::mem::size_of::<*mut libc::c_char>()).wrapping_mul(arr.n as usize),
     ) as *mut *mut libc::c_char;
     return ret;
 }
 #[no_mangle]
-pub unsafe fn string_arr_contains(mut arr: *mut string_arr, mut s: *mut libc::c_char) -> bool {
+pub unsafe fn string_arr_contains(arr: &string_arr, mut s: *mut libc::c_char) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        if strcmp(s, *((*arr).s).offset(i as isize)) == 0 as libc::c_int {
+    while i < arr.n {
+        if strcmp(s, *arr.s.offset(i as isize)) == 0 as libc::c_int {
             return 1 as libc::c_int != 0;
         }
         i += 1;
@@ -379,10 +356,10 @@ pub unsafe fn string_arr_contains(mut arr: *mut string_arr, mut s: *mut libc::c_
     return 0 as libc::c_int != 0;
 }
 #[no_mangle]
-pub unsafe fn string_arr_str(mut string_arr: *mut string_arr) -> *mut libc::c_char {
+pub unsafe fn string_arr_str(mut string_arr: &string_arr) -> *mut libc::c_char {
     let mut b: *mut strbuilder = strbuilder_create();
-    let mut s: *mut *mut libc::c_char = (*string_arr).s;
-    let mut n: libc::c_int = (*string_arr).n;
+    let mut s: *mut *mut libc::c_char = string_arr.s;
+    let mut n: libc::c_int = string_arr.n;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let mut str: *mut libc::c_char = *s.offset(i as isize);
