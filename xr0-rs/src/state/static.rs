@@ -22,29 +22,25 @@ use crate::util::{
 };
 use crate::{block_arr, Block as block, Location as location, StrBuilder as strbuilder};
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct static_memory {
     pub blocks: *mut block_arr,
-    pub pool: *mut map,
+    pub pool: Box<map>,
 }
 #[no_mangle]
 pub unsafe fn static_memory_create() -> *mut static_memory {
     let mut sm: *mut static_memory =
         malloc(::core::mem::size_of::<static_memory>()) as *mut static_memory;
-    if sm.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"static_memory_create\0"))
-                .as_ptr(),
-            b"static.c\0" as *const u8 as *const libc::c_char,
-            20 as libc::c_int,
-            b"sm\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
-    (*sm).blocks = block_arr_create();
-    (*sm).pool = map_create();
-    return sm;
+    assert!(!sm.is_null());
+    std::ptr::write(
+        sm,
+        static_memory {
+            blocks: block_arr_create(),
+            pool: map_create(),
+        },
+    );
+    sm
 }
 #[no_mangle]
 pub unsafe fn static_memory_destroy(mut sm: *mut static_memory) {
@@ -78,16 +74,16 @@ pub unsafe fn static_memory_copy(mut sm: *mut static_memory) -> *mut static_memo
     let mut copy: *mut static_memory =
         malloc(::core::mem::size_of::<static_memory>()) as *mut static_memory;
     (*copy).blocks = block_arr_copy((*sm).blocks);
-    (*copy).pool = pool_copy((*sm).pool);
+    (*copy).pool = pool_copy(&(*sm).pool);
     return copy;
 }
-unsafe fn pool_copy(mut p: *mut map) -> *mut map {
-    let mut pcopy: *mut map = map_create();
+unsafe fn pool_copy(mut p: &map) -> Box<map> {
+    let mut pcopy = map_create();
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*p).n {
-        let mut e: entry = *((*p).entry).offset(i as isize);
+    while i < p.n {
+        let mut e: entry = *p.entry.offset(i as isize);
         map_set(
-            pcopy,
+            &mut pcopy,
             dynamic_str(e.key),
             location_copy(e.value as *mut location) as *const libc::c_void,
         );
@@ -130,7 +126,7 @@ pub unsafe fn static_memory_stringpool(
     mut loc: *mut location,
 ) {
     map_set(
-        (*sm).pool,
+        &mut (*sm).pool,
         dynamic_str(lit),
         location_copy(loc) as *const libc::c_void,
     );
@@ -140,5 +136,5 @@ pub unsafe fn static_memory_checkpool(
     mut sm: *mut static_memory,
     mut lit: *mut libc::c_char,
 ) -> *mut location {
-    return map_get((*sm).pool, lit) as *mut location;
+    return map_get(&(*sm).pool, lit) as *mut location;
 }

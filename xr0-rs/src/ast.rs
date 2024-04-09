@@ -3891,24 +3891,24 @@ unsafe fn ast_expr_call_getfuncs(mut expr: *mut AstExpr) -> *mut string_arr {
     return res;
 }
 
-unsafe fn calculate_indegrees(mut g: *mut map) -> *mut map {
-    let mut indegrees: *mut map = map_create();
+unsafe fn calculate_indegrees(mut g: &map) -> Box<map> {
+    let mut indegrees = map_create();
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*g).n {
-        let mut e: entry = *((*g).entry).offset(i as isize);
+    while i < g.n {
+        let mut e: entry = *g.entry.offset(i as isize);
         let mut deps: *mut string_arr = map_get(g, e.key) as *mut string_arr;
-        if (map_get(indegrees, e.key)).is_null() {
+        if (map_get(&indegrees, e.key)).is_null() {
             map_set(
-                indegrees,
+                &mut indegrees,
                 dynamic_str(e.key),
                 dynamic_int(0 as libc::c_int) as *const libc::c_void,
             );
             let mut j: libc::c_int = 0 as libc::c_int;
             while j < (*deps).n {
                 let mut dep_key: *mut libc::c_char = *((*deps).s).offset(j as isize);
-                if (map_get(indegrees, dep_key)).is_null() {
+                if (map_get(&indegrees, dep_key)).is_null() {
                     map_set(
-                        indegrees,
+                        &mut indegrees,
                         dynamic_str(dep_key),
                         dynamic_int(0 as libc::c_int) as *const libc::c_void,
                     );
@@ -3919,13 +3919,13 @@ unsafe fn calculate_indegrees(mut g: *mut map) -> *mut map {
         i += 1;
     }
     let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < (*indegrees).n {
-        let mut e_0: entry = *((*indegrees).entry).offset(i_0 as isize);
+    while i_0 < indegrees.n {
+        let mut e_0: entry = *indegrees.entry.offset(i_0 as isize);
         let mut n_arr: *mut string_arr = map_get(g, e_0.key) as *mut string_arr;
         if !n_arr.is_null() {
             let mut j_0: libc::c_int = 0 as libc::c_int;
             while j_0 < (*n_arr).n {
-                let mut count: *mut libc::c_int = map_get(indegrees, e_0.key) as *mut libc::c_int;
+                let mut count: *mut libc::c_int = map_get(&indegrees, e_0.key) as *mut libc::c_int;
                 *count = *count + 1 as libc::c_int;
                 j_0 += 1;
             }
@@ -3942,11 +3942,11 @@ unsafe fn dynamic_int(mut i: libc::c_int) -> *mut libc::c_int {
     return val;
 }
 
-unsafe fn build_indegree_zero(mut indegrees: *mut map) -> *mut string_arr {
+unsafe fn build_indegree_zero(mut indegrees: &map) -> *mut string_arr {
     let mut indegree_zero: *mut string_arr = string_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*indegrees).n {
-        let mut e: entry = *((*indegrees).entry).offset(i as isize);
+    while i < indegrees.n {
+        let mut e: entry = *indegrees.entry.offset(i as isize);
         let mut val: *mut libc::c_int = map_get(indegrees, e.key) as *mut libc::c_int;
         if *val == 0 as libc::c_int {
             string_arr_append(indegree_zero, dynamic_str(e.key));
@@ -3962,18 +3962,18 @@ pub unsafe fn topological_order(
     mut ext: *mut Externals,
 ) -> *mut string_arr {
     let mut order: *mut string_arr = string_arr_create();
-    let mut g: *mut map = ast_function_buildgraph(fname, ext);
-    let mut indegrees: *mut map = calculate_indegrees(g);
-    let mut indegree_zero: *mut string_arr = build_indegree_zero(indegrees);
+    let mut g = ast_function_buildgraph(fname, ext);
+    let mut indegrees = calculate_indegrees(&g);
+    let mut indegree_zero: *mut string_arr = build_indegree_zero(&indegrees);
     while (*indegree_zero).n > 0 as libc::c_int {
         let mut curr: *mut libc::c_char = string_arr_deque(indegree_zero);
         string_arr_append(order, curr);
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < (*g).n {
             let mut e: entry = *((*g).entry).offset(i as isize);
-            let mut v: *mut string_arr = map_get(g, e.key) as *mut string_arr;
+            let mut v: *mut string_arr = map_get(&g, e.key) as *mut string_arr;
             if string_arr_contains(v, curr) {
-                let mut count: *mut libc::c_int = map_get(indegrees, e.key) as *mut libc::c_int;
+                let mut count: *mut libc::c_int = map_get(&indegrees, e.key) as *mut libc::c_int;
                 *count = *count - 1 as libc::c_int;
                 if *count == 0 as libc::c_int {
                     string_arr_append(indegree_zero, dynamic_str(e.key));
@@ -3982,7 +3982,7 @@ pub unsafe fn topological_order(
             i += 1;
         }
     }
-    if (*order).n != (*indegrees).n {
+    if (*order).n != indegrees.n {
         fprintf(
             __stderrp,
             b"cycle detected in graph\0" as *const u8 as *const libc::c_char,
@@ -7384,12 +7384,12 @@ unsafe fn split_path_verify(
 }
 
 unsafe fn recurse_buildgraph(
-    mut g: *mut map,
-    mut dedup: *mut map,
+    mut g: &mut map,
+    mut dedup: &mut map,
     mut fname: *mut libc::c_char,
     mut ext: *mut Externals,
 ) {
-    let mut local_dedup: *mut map = map_create();
+    let mut local_dedup = map_create();
     if !(map_get(dedup, fname)).is_null() {
         return;
     }
@@ -7447,14 +7447,14 @@ unsafe fn recurse_buildgraph(
             let mut func: *mut *mut libc::c_char = string_arr_s(farr);
             let mut j: libc::c_int = 0 as libc::c_int;
             while j < string_arr_n(farr) {
-                if (map_get(local_dedup, *func.offset(j as isize))).is_null() {
+                if (map_get(&local_dedup, *func.offset(j as isize))).is_null() {
                     let mut f_0: *mut ast_function =
                         externals_getfunc(ext, *func.offset(j as isize));
                     if !(*f_0).isaxiom {
                         string_arr_append(val, *func.offset(j as isize));
                     }
                     map_set(
-                        local_dedup,
+                        &mut local_dedup,
                         *func.offset(j as isize),
                         1 as libc::c_int as *mut libc::c_void,
                     );
@@ -7560,10 +7560,10 @@ unsafe fn split_paths_absverify(
 pub unsafe fn ast_function_buildgraph(
     mut fname: *mut libc::c_char,
     mut ext: *mut Externals,
-) -> *mut map {
-    let mut dedup: *mut map = map_create();
-    let mut g: *mut map = map_create();
-    recurse_buildgraph(g, dedup, fname, ext);
+) -> Box<map> {
+    let mut dedup = map_create();
+    let mut g = map_create();
+    recurse_buildgraph(&mut g, &mut dedup, fname, ext);
     return g;
 }
 

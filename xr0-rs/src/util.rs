@@ -52,32 +52,33 @@ pub unsafe extern "C" fn dynamic_str(mut s: *const libc::c_char) -> *mut libc::c
     strncpy(t, s, len);
     return t;
 }
-unsafe fn entry_create(mut key: *const libc::c_char, mut value: *const libc::c_void) -> entry {
+unsafe fn entry_create(key: *const libc::c_char, value: *const libc::c_void) -> entry {
     assert!(!key.is_null());
-    let mut init = entry {
+    entry {
         key: key as *mut libc::c_char,
-        value: value,
-    };
-    init
+        value,
+    }
 }
 unsafe fn entry_destroy(mut e: entry) {
     free(e.key as *mut libc::c_void);
 }
 #[no_mangle]
-pub unsafe fn map_create() -> *mut map {
-    return calloc(1, ::core::mem::size_of::<map>()) as *mut map;
+pub unsafe fn map_create() -> Box<map> {
+    Box::new(map {
+        entry: std::ptr::null_mut(),
+        n: 0,
+    })
 }
 #[no_mangle]
-pub unsafe fn map_destroy(mut map: *mut map) {
+pub unsafe fn map_destroy(mut map: Box<map>) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*map).n {
         entry_destroy(*((*map).entry).offset(i as isize));
         i += 1;
     }
     free((*map).entry as *mut libc::c_void);
-    free(map as *mut libc::c_void);
 }
-unsafe fn map_getindex(mut map: *mut map, mut key: *const libc::c_char) -> libc::c_int {
+unsafe fn map_getindex(map: &map, mut key: *const libc::c_char) -> libc::c_int {
     if key.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"map_getindex\0")).as_ptr(),
@@ -88,8 +89,8 @@ unsafe fn map_getindex(mut map: *mut map, mut key: *const libc::c_char) -> libc:
     } else {
     };
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*map).n {
-        if strcmp((*((*map).entry).offset(i as isize)).key, key) == 0 as libc::c_int {
+    while i < map.n {
+        if strcmp((*(map.entry).offset(i as isize)).key, key) == 0 as libc::c_int {
             return i;
         }
         i += 1;
@@ -97,32 +98,32 @@ unsafe fn map_getindex(mut map: *mut map, mut key: *const libc::c_char) -> libc:
     return -(1 as libc::c_int);
 }
 #[no_mangle]
-pub unsafe fn map_get(mut map: *mut map, mut key: *const libc::c_char) -> *mut libc::c_void {
+pub unsafe fn map_get(mut map: &map, mut key: *const libc::c_char) -> *mut libc::c_void {
     let mut index: libc::c_int = map_getindex(map, key);
     if index != -(1 as libc::c_int) {
-        return (*((*map).entry).offset(index as isize)).value as *mut libc::c_void;
+        return (*(map.entry).offset(index as isize)).value as *mut libc::c_void;
     }
     return 0 as *mut libc::c_void;
 }
 #[no_mangle]
 pub unsafe fn map_set(
-    mut map: *mut map,
+    mut map: &mut map,
     mut key: *const libc::c_char,
     mut value: *const libc::c_void,
 ) {
     let mut index: libc::c_int = map_getindex(map, key);
     if index >= 0 as libc::c_int {
-        let ref mut fresh0 = (*((*map).entry).offset(index as isize)).value;
+        let ref mut fresh0 = (*(map.entry).offset(index as isize)).value;
         *fresh0 = value;
         return;
     }
-    (*map).n += 1;
-    (*map).entry = realloc(
-        (*map).entry as *mut libc::c_void,
-        (::core::mem::size_of::<entry>() as libc::c_ulong).wrapping_mul((*map).n as libc::c_ulong)
+    map.n += 1;
+    map.entry = realloc(
+        map.entry as *mut libc::c_void,
+        (::core::mem::size_of::<entry>() as libc::c_ulong).wrapping_mul(map.n as libc::c_ulong)
             as usize,
     ) as *mut entry;
-    *((*map).entry).offset(((*map).n - 1 as libc::c_int) as isize) = entry_create(key, value);
+    *(map.entry).offset((map.n - 1 as libc::c_int) as isize) = entry_create(key, value);
 }
 #[no_mangle]
 pub unsafe fn strbuilder_create() -> *mut strbuilder {

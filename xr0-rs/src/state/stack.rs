@@ -40,12 +40,12 @@ use crate::{
     Value as value,
 };
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct stack {
     pub name: *mut libc::c_char,
     pub frame: *mut block_arr,
-    pub varmap: *mut map,
+    pub varmap: Box<map>,
     pub result: *mut variable,
     pub id: libc::c_int,
     pub prev: *mut stack,
@@ -74,26 +74,24 @@ pub unsafe fn stack_create(
     mut return_type: *mut ast_type,
 ) -> *mut stack {
     let mut stack: *mut stack = calloc(1, ::core::mem::size_of::<stack>()) as *mut stack;
-    if stack.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"stack_create\0")).as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            41 as libc::c_int,
-            b"stack\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
-    (*stack).name = name;
-    (*stack).frame = block_arr_create();
-    (*stack).varmap = map_create();
-    (*stack).prev = prev;
-    (*stack).id = if !prev.is_null() {
-        (*prev).id + 1 as libc::c_int
-    } else {
-        0 as libc::c_int
-    };
+    assert!(!stack.is_null());
+    std::ptr::write(
+        stack,
+        stack {
+            name,
+            frame: block_arr_create(),
+            varmap: map_create(),
+            prev,
+            id: if !prev.is_null() {
+                (*prev).id + 1 as libc::c_int
+            } else {
+                0 as libc::c_int
+            },
+            result: std::ptr::null_mut(),
+        },
+    );
     (*stack).result = variable_create(return_type, stack, 0 as libc::c_int != 0);
-    return stack;
+    stack
 }
 #[no_mangle]
 pub unsafe fn stack_getframe(mut s: *mut stack, mut frame: libc::c_int) -> *mut stack {
@@ -127,15 +125,16 @@ pub unsafe fn stack_getframe(mut s: *mut stack, mut frame: libc::c_int) -> *mut 
 }
 #[no_mangle]
 pub unsafe fn stack_destroy(mut stack: *mut stack) {
-    block_arr_destroy((*stack).frame);
-    let mut m: *mut map = (*stack).varmap;
+    let stack_val = std::ptr::read(stack);
+    block_arr_destroy(stack_val.frame);
+    let mut m = stack_val.varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*m).n {
-        variable_destroy((*((*m).entry).offset(i as isize)).value as *mut variable);
+    while i < m.n {
+        variable_destroy((*m.entry.offset(i as isize)).value as *mut variable);
         i += 1;
     }
     map_destroy(m);
-    variable_destroy((*stack).result);
+    variable_destroy(stack_val.result);
     free(stack as *mut libc::c_void);
 }
 #[no_mangle]
@@ -145,11 +144,17 @@ pub unsafe fn stack_prev(mut s: *mut stack) -> *mut stack {
 #[no_mangle]
 pub unsafe fn stack_copy(mut stack: *mut stack) -> *mut stack {
     let mut copy: *mut stack = calloc(1, ::core::mem::size_of::<stack>()) as *mut stack;
-    (*copy).name = dynamic_str((*stack).name);
-    (*copy).frame = block_arr_copy((*stack).frame);
-    (*copy).varmap = varmap_copy((*stack).varmap);
-    (*copy).id = (*stack).id;
-    (*copy).result = variable_copy((*stack).result);
+    std::ptr::write(
+        copy,
+        stack {
+            name: dynamic_str((*stack).name),
+            frame: block_arr_copy((*stack).frame),
+            varmap: varmap_copy(&(*stack).varmap),
+            id: (*stack).id,
+            result: variable_copy((*stack).result),
+            prev: std::ptr::null_mut(),
+        },
+    );
     if !((*stack).prev).is_null() {
         (*copy).prev = stack_copy((*stack).prev);
     }
@@ -165,13 +170,13 @@ pub unsafe fn stack_copywithname(
     (*copy).name = new_name;
     return copy;
 }
-unsafe fn varmap_copy(mut m: *mut map) -> *mut map {
-    let mut m_copy: *mut map = map_create();
+unsafe fn varmap_copy(mut m: &map) -> Box<map> {
+    let mut m_copy = map_create();
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*m).n {
-        let mut e: entry = *((*m).entry).offset(i as isize);
+    while i < m.n {
+        let mut e: entry = *m.entry.offset(i as isize);
         map_set(
-            m_copy,
+            &mut m_copy,
             dynamic_str(e.key),
             variable_copy(e.value as *mut variable) as *const libc::c_void,
         );
@@ -182,10 +187,10 @@ unsafe fn varmap_copy(mut m: *mut map) -> *mut map {
 #[no_mangle]
 pub unsafe fn stack_str(mut stack: *mut stack, mut state: *mut state) -> *mut libc::c_char {
     let mut b: *mut strbuilder = strbuilder_create();
-    let mut m: *mut map = (*stack).varmap;
+    let mut m: &map = &(*stack).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*m).n {
-        let mut e: entry = *((*m).entry).offset(i as isize);
+    while i < m.n {
+        let mut e: entry = *m.entry.offset(i as isize);
         let mut var: *mut libc::c_char = variable_str(e.value as *mut variable, stack, state);
         strbuilder_printf(
             b,
@@ -226,7 +231,7 @@ pub unsafe fn stack_str(mut stack: *mut stack, mut state: *mut state) -> *mut li
 #[no_mangle]
 pub unsafe fn stack_declare(mut stack: *mut stack, mut var: *mut ast_variable, mut isparam: bool) {
     let mut id: *mut libc::c_char = ast_variable_name(var);
-    if !(map_get((*stack).varmap, id)).is_null() as libc::c_int as libc::c_long != 0 {
+    if !(map_get(&(*stack).varmap, id)).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"stack_declare\0"))
                 .as_ptr(),
@@ -237,7 +242,7 @@ pub unsafe fn stack_declare(mut stack: *mut stack, mut var: *mut ast_variable, m
     } else {
     };
     map_set(
-        (*stack).varmap,
+        &mut (*stack).varmap,
         dynamic_str(id),
         variable_create(ast_variable_type(var), stack, isparam) as *const libc::c_void,
     );
@@ -247,15 +252,17 @@ pub unsafe fn stack_undeclare(mut stack: *mut stack, mut state: *mut state) {
     let mut old_result: *mut variable = (*stack).result;
     (*stack).result = variable_abstractcopy(old_result, state);
     variable_destroy(old_result);
-    let mut m: *mut map = (*stack).varmap;
-    (*stack).varmap = map_create();
+    let mut m = {
+        let stack_ref = &mut *stack;
+        std::mem::replace(&mut stack_ref.varmap, map_create())
+    };
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*m).n {
-        let mut e: entry = *((*m).entry).offset(i as isize);
+    while i < m.n {
+        let mut e: entry = *m.entry.offset(i as isize);
         let mut v: *mut variable = e.value as *mut variable;
         if variable_isparam(v) {
             map_set(
-                (*stack).varmap,
+                &mut (*stack).varmap,
                 dynamic_str(e.key),
                 variable_abstractcopy(v, state) as *const libc::c_void,
             );
@@ -270,8 +277,8 @@ pub unsafe fn stack_getresult(mut s: *mut stack) -> *mut variable {
     return (*s).result;
 }
 #[no_mangle]
-pub unsafe fn stack_getvarmap(mut s: *mut stack) -> *mut map {
-    return (*s).varmap;
+pub unsafe fn stack_getvarmap(mut s: &mut stack) -> &mut map {
+    return &mut (*s).varmap;
 }
 #[no_mangle]
 pub unsafe fn stack_getvariable(mut s: *mut stack, mut id: *mut libc::c_char) -> *mut variable {
@@ -288,7 +295,7 @@ pub unsafe fn stack_getvariable(mut s: *mut stack, mut id: *mut libc::c_char) ->
         );
     } else {
     };
-    return map_get((*s).varmap, id) as *mut variable;
+    return map_get(&(*s).varmap, id) as *mut variable;
 }
 #[no_mangle]
 pub unsafe fn stack_references(
@@ -300,10 +307,10 @@ pub unsafe fn stack_references(
     if !result.is_null() && variable_references(result, loc, state) as libc::c_int != 0 {
         return 1 as libc::c_int != 0;
     }
-    let mut m: *mut map = (*s).varmap;
+    let mut m = &(*s).varmap;
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*m).n {
-        let mut var: *mut variable = (*((*m).entry).offset(i as isize)).value as *mut variable;
+    while i < m.n {
+        let mut var: *mut variable = (*m.entry.offset(i as isize)).value as *mut variable;
         if variable_isparam(var) as libc::c_int != 0
             && variable_references(var, loc, state) as libc::c_int != 0
         {
