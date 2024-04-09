@@ -2001,7 +2001,7 @@ pub unsafe fn ast_expr_bracketed_root(mut expr: *mut AstExpr) -> *mut AstExpr {
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_bracketed_create(mut root: *mut AstExpr) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_bracketed_create(mut root: *mut AstExpr) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_BRACKETED;
     (*expr).root = root;
@@ -2009,7 +2009,7 @@ pub unsafe fn ast_expr_bracketed_create(mut root: *mut AstExpr) -> *mut AstExpr 
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_literal_create(mut s: *mut libc::c_char) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_literal_create(mut s: *mut libc::c_char) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_STRING_LITERAL;
     (*expr).u.string = s;
@@ -2071,7 +2071,7 @@ unsafe fn pf_augment(
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_constant_create_char(mut c: libc::c_char) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_constant_create_char(mut c: libc::c_char) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_CONSTANT;
     (*expr).u.constant.ischar = 1 as libc::c_int != 0;
@@ -2080,7 +2080,7 @@ pub unsafe fn ast_expr_constant_create_char(mut c: libc::c_char) -> *mut AstExpr
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_constant_create(mut k: libc::c_int) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_constant_create(mut k: libc::c_int) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_CONSTANT;
     (*expr).u.constant.ischar = 0 as libc::c_int != 0;
@@ -2110,7 +2110,7 @@ unsafe fn ast_expr_create() -> *mut AstExpr {
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_identifier_create(mut s: *mut libc::c_char) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_identifier_create(mut s: *mut libc::c_char) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_IDENTIFIER;
     (*expr).u.string = s;
@@ -2533,7 +2533,7 @@ unsafe fn ast_expr_copy_call(mut expr: *mut AstExpr) -> *mut AstExpr {
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_member_create(
+pub unsafe extern "C" fn ast_expr_member_create(
     mut _struct: *mut AstExpr,
     mut field: *mut libc::c_char,
 ) -> *mut AstExpr {
@@ -2545,7 +2545,7 @@ pub unsafe fn ast_expr_member_create(
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_unary_create(
+pub unsafe extern "C" fn ast_expr_unary_create(
     mut root: *mut AstExpr,
     mut op: ast_unary_operator,
 ) -> *mut AstExpr {
@@ -2585,7 +2585,7 @@ pub unsafe fn ast_expr_incdec_to_assignment(mut expr: *mut AstExpr) -> *mut AstE
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_incdec_create(
+pub unsafe extern "C" fn ast_expr_incdec_create(
     mut root: *mut AstExpr,
     mut inc: bool,
     mut pre: bool,
@@ -2614,7 +2614,7 @@ pub unsafe fn ast_expr_call_root(mut expr: *mut AstExpr) -> *mut AstExpr {
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_call_create(
+pub unsafe extern "C" fn ast_expr_call_create(
     mut root: *mut AstExpr,
     mut narg: libc::c_int,
     mut arg: *mut *mut AstExpr,
@@ -2670,7 +2670,7 @@ pub unsafe fn ast_expr_isisdereferencable(mut expr: *mut AstExpr) -> bool {
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_dealloc_create(mut arg: *mut AstExpr) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_dealloc_create(mut arg: *mut AstExpr) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ALLOCATION;
     (*expr).u.alloc.kind = DEALLOC;
@@ -2779,7 +2779,7 @@ unsafe fn ast_expr_alloc_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilde
             strbuilder_printf(
                 b,
                 b".%s %s;\0" as *const u8 as *const libc::c_char,
-                b"Clump\0" as *const u8 as *const libc::c_char,
+                b"clump\0" as *const u8 as *const libc::c_char,
                 arg,
             );
         }
@@ -2802,7 +2802,7 @@ unsafe fn ast_expr_alloc_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilde
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_alloc_create(mut arg: *mut AstExpr) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_alloc_create(mut arg: *mut AstExpr) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ALLOCATION;
     (*expr).u.alloc.kind = ALLOC;
@@ -2956,7 +2956,7 @@ pub unsafe fn ast_expr_assignment_rval(mut expr: *mut AstExpr) -> *mut AstExpr {
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_copy(mut expr: *mut AstExpr) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_copy(mut expr: *mut AstExpr) -> *mut AstExpr {
     if expr.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"ast_expr_copy\0"))
@@ -3398,7 +3398,7 @@ pub unsafe fn ast_expr_le_create(mut e1: *mut AstExpr, mut e2: *mut AstExpr) -> 
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_clump_create(mut arg: *mut AstExpr) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_clump_create(mut arg: *mut AstExpr) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ALLOCATION;
     (*expr).u.alloc.kind = CLUMP;
@@ -3407,14 +3407,16 @@ pub unsafe fn ast_expr_clump_create(mut arg: *mut AstExpr) -> *mut AstExpr {
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_arbarg_create() -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_arbarg_create() -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = EXPR_ARBARG;
     return expr;
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_isdereferencable_create(mut assertand: *mut AstExpr) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_isdereferencable_create(
+    mut assertand: *mut AstExpr,
+) -> *mut AstExpr {
     let mut new: *mut AstExpr = ast_expr_create();
     (*new).kind = EXPR_ISDEREFERENCABLE;
     (*new).root = assertand;
@@ -3422,7 +3424,7 @@ pub unsafe fn ast_expr_isdereferencable_create(mut assertand: *mut AstExpr) -> *
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_isdeallocand_create(mut assertand: *mut AstExpr) -> *mut AstExpr {
+pub unsafe extern "C" fn ast_expr_isdeallocand_create(mut assertand: *mut AstExpr) -> *mut AstExpr {
     let mut new: *mut AstExpr = ast_expr_create();
     (*new).kind = EXPR_ISDEALLOCAND;
     (*new).root = assertand;
@@ -3435,7 +3437,7 @@ pub unsafe fn ast_expr_gt_create(mut e1: *mut AstExpr, mut e2: *mut AstExpr) -> 
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_assignment_create(
+pub unsafe extern "C" fn ast_expr_assignment_create(
     mut root: *mut AstExpr,
     mut value: *mut AstExpr,
 ) -> *mut AstExpr {
@@ -3447,7 +3449,7 @@ pub unsafe fn ast_expr_assignment_create(
 }
 
 #[no_mangle]
-pub unsafe fn ast_expr_binary_create(
+pub unsafe extern "C" fn ast_expr_binary_create(
     mut e1: *mut AstExpr,
     mut op: ast_binary_operator,
     mut e2: *mut AstExpr,
@@ -3991,7 +3993,7 @@ pub unsafe fn topological_order(
 }
 
 #[no_mangle]
-pub unsafe fn ast_block_create(
+pub unsafe extern "C" fn ast_block_create(
     mut decl: *mut *mut ast_variable,
     mut ndecl: libc::c_int,
     mut stmt: *mut *mut ast_stmt,
@@ -5237,7 +5239,7 @@ pub unsafe fn ast_stmt_isterminal(mut stmt: *mut ast_stmt, mut s: *mut State) ->
 }
 
 #[no_mangle]
-pub unsafe fn ast_stmt_create_jump(
+pub unsafe extern "C" fn ast_stmt_create_jump(
     mut loc: *mut lexememarker,
     mut kind: ast_jump_kind,
     mut rv: *mut AstExpr,
@@ -5401,7 +5403,7 @@ unsafe fn ast_stmt_copy_iter(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
 }
 
 #[no_mangle]
-pub unsafe fn ast_stmt_create_iter_e(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
+pub unsafe extern "C" fn ast_stmt_create_iter_e(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
     if !((*stmt).kind as libc::c_uint == STMT_ITERATION as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
         != 0
@@ -5479,7 +5481,7 @@ pub unsafe fn ast_stmt_iter_body(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
 }
 
 #[no_mangle]
-pub unsafe fn ast_stmt_create_sel(
+pub unsafe extern "C" fn ast_stmt_create_sel(
     mut loc: *mut lexememarker,
     mut isswitch: bool,
     mut cond: *mut AstExpr,
@@ -5516,7 +5518,7 @@ pub unsafe fn ast_stmt_create_sel(
 }
 
 #[no_mangle]
-pub unsafe fn ast_stmt_create_compound_v(
+pub unsafe extern "C" fn ast_stmt_create_compound_v(
     mut loc: *mut lexememarker,
     mut b: *mut ast_block,
 ) -> *mut ast_stmt {
@@ -5653,7 +5655,7 @@ pub unsafe fn ast_stmt_sel_nest(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
 }
 
 #[no_mangle]
-pub unsafe fn ast_stmt_create_labelled(
+pub unsafe extern "C" fn ast_stmt_create_labelled(
     mut loc: *mut lexememarker,
     mut label: *mut libc::c_char,
     mut substmt: *mut ast_stmt,
@@ -5666,7 +5668,7 @@ pub unsafe fn ast_stmt_create_labelled(
 }
 
 #[no_mangle]
-pub unsafe fn ast_stmt_create_nop(mut loc: *mut lexememarker) -> *mut ast_stmt {
+pub unsafe extern "C" fn ast_stmt_create_nop(mut loc: *mut lexememarker) -> *mut ast_stmt {
     let mut stmt: *mut ast_stmt = ast_stmt_create(loc);
     (*stmt).kind = STMT_NOP;
     return stmt;
@@ -5684,7 +5686,7 @@ pub unsafe fn ast_stmt_create_expr(
 }
 
 #[no_mangle]
-pub unsafe fn ast_stmt_create_compound(
+pub unsafe extern "C" fn ast_stmt_create_compound(
     mut loc: *mut lexememarker,
     mut b: *mut ast_block,
 ) -> *mut ast_stmt {
@@ -6137,7 +6139,7 @@ pub unsafe fn ast_type_ispointer(mut t: *mut ast_type) -> bool {
 }
 
 #[no_mangle]
-pub unsafe fn ast_type_create(
+pub unsafe extern "C" fn ast_type_create(
     mut base: ast_type_base,
     mut mod_0: ast_type_modifier,
 ) -> *mut ast_type {
@@ -6158,7 +6160,7 @@ pub unsafe fn ast_type_create(
 }
 
 #[no_mangle]
-pub unsafe fn ast_type_create_ptr(mut ref_0: *mut ast_type) -> *mut ast_type {
+pub unsafe extern "C" fn ast_type_create_ptr(mut ref_0: *mut ast_type) -> *mut ast_type {
     if ref_0.is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
             (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"ast_type_create_ptr\0"))
@@ -6203,7 +6205,7 @@ pub unsafe fn ast_type_create_arr(
 }
 
 #[no_mangle]
-pub unsafe fn ast_type_create_struct(
+pub unsafe extern "C" fn ast_type_create_struct(
     mut tag: *mut libc::c_char,
     mut members: *mut ast_variable_arr,
 ) -> *mut ast_type {
@@ -6214,7 +6216,7 @@ pub unsafe fn ast_type_create_struct(
 }
 
 #[no_mangle]
-pub unsafe fn ast_type_create_userdef(mut name: *mut libc::c_char) -> *mut ast_type {
+pub unsafe extern "C" fn ast_type_create_userdef(mut name: *mut libc::c_char) -> *mut ast_type {
     let mut t: *mut ast_type = ast_type_create(TYPE_USERDEF, ast_type_modifier::empty());
     (*t).c2rust_unnamed.userdef = name;
     return t;
@@ -6307,7 +6309,7 @@ pub unsafe fn ast_type_struct_members(mut t: *mut ast_type) -> *mut ast_variable
 }
 
 #[no_mangle]
-pub unsafe fn ast_type_struct_tag(mut t: *mut ast_type) -> *mut libc::c_char {
+pub unsafe extern "C" fn ast_type_struct_tag(mut t: *mut ast_type) -> *mut libc::c_char {
     if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
@@ -6325,12 +6327,16 @@ pub unsafe fn ast_type_struct_tag(mut t: *mut ast_type) -> *mut libc::c_char {
 }
 
 #[no_mangle]
-pub unsafe fn ast_type_create_struct_anonym(mut members: *mut ast_variable_arr) -> *mut ast_type {
+pub unsafe extern "C" fn ast_type_create_struct_anonym(
+    mut members: *mut ast_variable_arr,
+) -> *mut ast_type {
     return ast_type_create_struct(0 as *mut libc::c_char, members);
 }
 
 #[no_mangle]
-pub unsafe fn ast_type_create_struct_partial(mut tag: *mut libc::c_char) -> *mut ast_type {
+pub unsafe extern "C" fn ast_type_create_struct_partial(
+    mut tag: *mut libc::c_char,
+) -> *mut ast_type {
     return ast_type_create_struct(tag, 0 as *mut ast_variable_arr);
 }
 
@@ -6368,7 +6374,7 @@ pub unsafe fn ast_type_copy_struct(mut old: *mut ast_type) -> *mut ast_type {
 }
 
 #[no_mangle]
-pub unsafe fn ast_type_mod_or(mut t: *mut ast_type, mut m: ast_type_modifier) {
+pub unsafe extern "C" fn ast_type_mod_or(mut t: *mut ast_type, mut m: ast_type_modifier) {
     (*t).mod_0 = ((*t).mod_0 as libc::c_uint | m.bits()) as libc::c_int;
 }
 
@@ -6697,7 +6703,7 @@ pub unsafe fn ast_type_ptr_type(mut t: *mut ast_type) -> *mut ast_type {
 }
 
 #[no_mangle]
-pub unsafe fn ast_variable_create(
+pub unsafe extern "C" fn ast_variable_create(
     mut name: *mut libc::c_char,
     mut type_0: *mut ast_type,
 ) -> *mut ast_variable {
@@ -6807,12 +6813,14 @@ pub unsafe fn ast_variable_arr_destroy(mut arr: *mut ast_variable_arr) {
 }
 
 #[no_mangle]
-pub unsafe fn ast_variable_arr_n(mut arr: *mut ast_variable_arr) -> libc::c_int {
+pub unsafe extern "C" fn ast_variable_arr_n(mut arr: *mut ast_variable_arr) -> libc::c_int {
     return (*arr).n;
 }
 
 #[no_mangle]
-pub unsafe fn ast_variable_arr_v(mut arr: *mut ast_variable_arr) -> *mut *mut ast_variable {
+pub unsafe extern "C" fn ast_variable_arr_v(
+    mut arr: *mut ast_variable_arr,
+) -> *mut *mut ast_variable {
     return (*arr).v;
 }
 
@@ -6828,7 +6836,7 @@ pub unsafe fn ast_variable_arr_copy(mut old: *mut ast_variable_arr) -> *mut ast_
 }
 
 #[no_mangle]
-pub unsafe fn ast_function_create(
+pub unsafe extern "C" fn ast_function_create(
     mut isaxiom: bool,
     mut ret: *mut ast_type,
     mut name: *mut libc::c_char,
@@ -7690,7 +7698,7 @@ pub unsafe fn ast_function_arr_func(mut arr: *mut ast_function_arr) -> *mut *mut
 }
 
 #[no_mangle]
-pub unsafe fn ast_functiondecl_create(mut f: *mut ast_function) -> *mut ast_externdecl {
+pub unsafe extern "C" fn ast_functiondecl_create(mut f: *mut ast_function) -> *mut ast_externdecl {
     let mut decl: *mut ast_externdecl =
         malloc(::core::mem::size_of::<ast_externdecl>()) as *mut ast_externdecl;
     (*decl).kind = EXTERN_FUNCTION;
@@ -7724,7 +7732,7 @@ pub unsafe fn ast_externdecl_as_function(mut decl: *mut ast_externdecl) -> *mut 
 }
 
 #[no_mangle]
-pub unsafe fn ast_decl_create(
+pub unsafe extern "C" fn ast_decl_create(
     mut name: *mut libc::c_char,
     mut t: *mut ast_type,
 ) -> *mut ast_externdecl {
@@ -7911,7 +7919,7 @@ pub unsafe fn parse_escape(mut c: libc::c_char) -> libc::c_int {
 }
 
 #[no_mangle]
-pub unsafe fn ast_create(mut decl: *mut ast_externdecl) -> *mut Ast {
+pub unsafe extern "C" fn ast_create(mut decl: *mut ast_externdecl) -> *mut Ast {
     let mut node: *mut Ast = calloc(1, ::core::mem::size_of::<Ast>()) as *mut Ast;
     return ast_append(node, decl);
 }
@@ -7928,7 +7936,7 @@ pub unsafe fn ast_destroy(mut node: *mut Ast) {
 }
 
 #[no_mangle]
-pub unsafe fn ast_append(mut node: *mut Ast, mut decl: *mut ast_externdecl) -> *mut Ast {
+pub unsafe extern "C" fn ast_append(mut node: *mut Ast, mut decl: *mut ast_externdecl) -> *mut Ast {
     (*node).n += 1;
     (*node).decl = realloc(
         (*node).decl as *mut libc::c_void,

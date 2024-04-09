@@ -45,7 +45,7 @@ pub struct string_arr {
     pub s: *mut *mut libc::c_char,
 }
 #[no_mangle]
-pub unsafe fn dynamic_str(mut s: *const libc::c_char) -> *mut libc::c_char {
+pub unsafe extern "C" fn dynamic_str(mut s: *const libc::c_char) -> *mut libc::c_char {
     let mut len = strlen(s).wrapping_add(1);
     let mut t: *mut libc::c_char =
         malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len)) as *mut libc::c_char;
