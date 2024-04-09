@@ -481,21 +481,10 @@ unsafe fn main_0(mut argc: libc::c_int, mut argv: *mut *mut libc::c_char) -> lib
     let mut c: config = parse_config(argc, argv);
     VERBOSE_MODE = c.verbose as libc::c_int;
     match c.mode as libc::c_uint {
-        0 => return verify(&mut c),
-        1 => return strip(&mut c),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 5], &[libc::c_char; 5]>(b"main\0")).as_ptr(),
-                    b"main.c\0" as *const u8 as *const libc::c_char,
-                    351 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        0 => verify(&mut c),
+        1 => strip(&mut c),
+        _ => panic!(),
     }
-    return 0;
 }
 unsafe fn verify(mut c: *mut config) -> libc::c_int {
     yyin = preprocess((*c).infile, (*c).includedirs);
