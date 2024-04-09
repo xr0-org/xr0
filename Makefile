@@ -278,6 +278,7 @@ $(GRAM_OBJ): $(GRAM_TAB_C) $(INCLUDES)
 
 $(GRAM_TAB_C) $(GRAM_TAB_H): $(AST_DIR)/gram.y
 	@printf 'YACC\t$@\n'
+	@mkdir -p $(BUILD_DIR)
 	@$(YACC) -o $(BUILD_DIR)/gram.tab.c -d $(AST_DIR)/gram.y
 
 $(BIN_DIR):
