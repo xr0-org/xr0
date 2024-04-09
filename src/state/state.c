@@ -29,8 +29,7 @@ struct state {
 };
 
 struct state *
-state_create(char *name, struct ast_block *block, struct ast_type *ret_type,
-		bool abstract, struct externals *ext)
+state_create(struct frame *f, struct externals *ext)
 {
 	struct state *state = malloc(sizeof(struct state));
 	assert(state);
@@ -38,18 +37,17 @@ state_create(char *name, struct ast_block *block, struct ast_type *ret_type,
 	state->static_memory = static_memory_create();
 	state->vconst = vconst_create();
 	state->clump = clump_create();
-	state->stack = stack_create(name, block, ret_type, abstract, NULL);
+	state->stack = stack_create(f, NULL);
 	state->heap = heap_create();
 	state->props = props_create();
 	return state;
 }
 
 struct state *
-state_create_withprops(char *name, struct ast_block *block,
-		struct ast_type *ret_type, bool abstract, struct externals *ext,
+state_create_withprops(struct frame *f, struct externals *ext,
 		struct props *props)
 {
-	struct state *state = state_create(name, block, ret_type, abstract, ext);
+	struct state *state = state_create(f, ext);
 	state->props = props_copy(props);
 	return state;
 }
@@ -165,10 +163,9 @@ state_getprops(struct state *s)
 }
 
 void
-state_pushframe(struct state *state, char *name, struct ast_block *b,
-		struct ast_type *t, bool abstract)
+state_pushframe(struct state *state, struct frame *f)
 {
-	state->stack = stack_create(name, b, t, abstract, state->stack);
+	state->stack = stack_create(f, state->stack);
 }
 
 void

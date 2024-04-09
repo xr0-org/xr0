@@ -184,13 +184,13 @@ path_step(struct path *p)
 static struct error *
 path_init_abstract(struct path *p)
 {
-	p->abstract = state_create(
+	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
 		ast_function_type(p->f),
-		true,
-		p->ext
+		true
 	);
+	p->abstract = state_create(f, p->ext);
 	struct error *err = ast_function_initparams(p->f, p->abstract);
 	if (err) {
 		return err;
@@ -202,11 +202,14 @@ path_init_abstract(struct path *p)
 static struct error *
 path_init_actual(struct path *p)
 {
-	p->actual = state_create_withprops(
+	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_body(p->f),
 		ast_function_type(p->f),
-		false,
+		false
+	);
+	p->actual = state_create_withprops(
+		f,
 		p->ext,
 		state_getprops(p->abstract)
 	);

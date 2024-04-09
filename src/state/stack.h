@@ -9,8 +9,7 @@ struct stack;
 struct frame;
 
 struct stack *
-stack_create(char *name, struct ast_block *, struct ast_type *ret_type,
-		bool abstract, struct stack *prev);
+stack_create(struct frame *, struct stack *prev);
 
 struct stack *
 stack_getframe(struct stack *s, int frame);
@@ -61,6 +60,9 @@ struct ast_expr;
 
 struct block *
 stack_getblock(struct stack *, int address);
+
+
+/* variable */
 
 struct ast_type;
 
