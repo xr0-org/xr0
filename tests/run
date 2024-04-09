@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -eu
+
 printf 'running test suite at %s\n\n' "$(date)"
 start=$(date +"%s")
 
@@ -13,8 +16,8 @@ main_func="main"
 pass="\e[32mPASS\e[0m\n"
 fail="\e[31mFAIL\e[0m\n"
 
-XR0=$(pwd)/bin/0v
 libx=$(pwd)/libx
+XR0=$(realpath "$XR0")
 cd tests
 length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
 	tail -1 | wc -c)
@@ -26,6 +29,7 @@ do
 	folder=$(dirname "$f")
 
 	printf "%-${length}s ..." "$f"
+        set +e
 	if [ "$folder" == *"$topological_folder"* ]
 	then
 		if [[ "$f" == *"verification"* ]]
@@ -37,13 +41,14 @@ do
 	else 
 		output=$($XR0 -I $libx $f 2>&1 >/dev/null)
 	fi
+        set -e
 
 	# cases where we have an expected output to compare with
 	if [[ "$f" == *"${fail_prefix}"* || "$folder" == *"$topological_folder"* ]]
 	then
 		expected_file="${f}.${expected_suffix}"
 		expected_output=$(cat $expected_file)
-		
+
 		# check if output matches expected_output
 		if [[ "${output}" == "$expected_output" ]]
 		then
@@ -54,10 +59,12 @@ do
 		fi
 	else
 		# silence is golden
-		if [[ $output -eq 0 ]] 
+		if [[ "$output" -eq 0 ]] 
 		then
 			npass=$((npass+1))
 			printf "$pass"
+		else
+			printf "$fail"
 		fi
 	fi
 done

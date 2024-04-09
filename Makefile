@@ -27,6 +27,8 @@ MATH_DIR = $(SRC_0V_DIR)/math
 # executable
 XR0V = $(BIN_DIR)/0v
 
+XR0V_RUST = xr0-rs/target/debug/xr0
+
 # includes
 INCLUDES = \
 include/props.h \
@@ -287,7 +289,11 @@ RUNTEST = $(TESTDIR)/run
 TESTFILES = $(shell find $(TESTDIR) -name '*.0')
 
 test: $(RUNTEST) $(TESTFILES) $(XR0V) 
-	@./tests/run
+	XR0=$(XR0V) ./tests/run
+
+test-rust: $(RUNTEST) $(TESTFILES)
+	(cd xr0-rs && cargo build)
+	XR0=$(XR0V_RUST) ./tests/run
 
 check: $(RUNTEST) $(TESTFILES) $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
