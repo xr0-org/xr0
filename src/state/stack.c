@@ -13,11 +13,13 @@
 #include "util.h"
 #include "program.h"
 
+struct frame;
+
 struct stack {
 	struct program *pc;
 	bool abstract;
 
-	struct block_arr *frame;
+	struct block_arr *memory;
 
 	/* lvalues of blocks in frame */
 	struct map *varmap;
@@ -30,7 +32,7 @@ struct stack {
 struct location *
 stack_newblock(struct stack *stack)
 {
-	int address = block_arr_append(stack->frame, block_create());
+	int address = block_arr_append(stack->memory, block_create());
 	struct location *loc = location_create_automatic(
 		stack->id, address, ast_expr_constant_create(0)
 	);
@@ -47,7 +49,7 @@ stack_create(char *name, struct ast_block *b, struct ast_type *ret_type,
 	assert(b);
 	stack->pc = program_create(b, name);
 	stack->abstract = abstract;
-	stack->frame = block_arr_create();
+	stack->memory = block_arr_create();
 
 	stack->varmap = map_create();
 
@@ -77,7 +79,7 @@ stack_getframe(struct stack *s, int frame)
 void
 stack_destroy(struct stack *stack)
 {
-	block_arr_destroy(stack->frame);
+	block_arr_destroy(stack->memory);
 
 	struct map *m = stack->varmap;
 	for (int i = 0; i < m->n; i++) {
@@ -106,7 +108,7 @@ stack_copy(struct stack *stack)
 	struct stack *copy = calloc(1, sizeof(struct stack));
 	copy->abstract = stack->abstract;
 	copy->pc = program_copy(stack->pc);
-	copy->frame = block_arr_copy(stack->frame);
+	copy->memory = block_arr_copy(stack->memory);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->id = stack->id;
 	copy->result = variable_copy(stack->result);
@@ -261,9 +263,56 @@ stack_references(struct stack *s, struct location *loc, struct state *state)
 struct block *
 stack_getblock(struct stack *s, int address)
 {
-	assert(address < block_arr_nblocks(s->frame));
+	assert(address < block_arr_nblocks(s->memory));
 
-	return block_arr_blocks(s->frame)[address];
+	return block_arr_blocks(s->memory)[address];
+}
+
+struct frame {
+	char *name;
+	struct ast_block *b;
+	struct ast_type *ret_type;
+	bool abstract;
+};
+
+static struct frame *
+frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs)
+{
+	struct frame *f = malloc(sizeof(struct frame));
+	f->name = n;
+	f->b = b;
+	f->ret_type = r;
+	f->abstract = abs;
+	return f;
+}
+
+struct frame *
+frame_call_create(char *n, struct ast_block *b, struct ast_type *r, bool abs)
+{
+	return frame_create(n, b, r, abs);
+}
+
+struct frame *
+frame_block_create(char *n, struct ast_block *b)
+{
+	return frame_create(n, b, NULL, false);
+}
+
+struct frame *
+frame_copy(struct frame *f)
+{
+	return frame_create(
+		dynamic_str(f->name),
+		ast_block_copy(f->b),
+		ast_type_copy(f->ret_type),
+		f->abstract
+	); 
+}
+
+static void
+frame_destroy(struct frame *f)
+{
+	assert(false);
 }
 
 
@@ -392,5 +441,3 @@ variable_isparam(struct variable *v)
 {
 	return v->isparam;
 }
-
-

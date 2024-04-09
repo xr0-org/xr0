@@ -6,6 +6,8 @@
 
 struct stack;
 
+struct frame;
+
 struct stack *
 stack_create(char *name, struct ast_block *, struct ast_type *ret_type,
 		bool abstract, struct stack *prev);
