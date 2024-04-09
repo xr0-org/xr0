@@ -498,7 +498,7 @@ unsafe fn binary_deref_eval(mut expr: *mut AstExpr, mut State: *mut State) -> *m
         let mut s: *mut libc::c_char = ast_expr_str(expr);
         strbuilder_printf(
             b,
-            b"undefined indirection: *(%s) has no Value\0" as *const u8 as *const libc::c_char,
+            b"undefined indirection: *(%s) has no value\0" as *const u8 as *const libc::c_char,
             s,
         );
         free(s as *mut libc::c_void);
@@ -511,7 +511,7 @@ unsafe fn binary_deref_eval(mut expr: *mut AstExpr, mut State: *mut State) -> *m
         let mut s_0: *mut libc::c_char = ast_expr_str(expr);
         strbuilder_printf(
             b_0,
-            b"undefined indirection: *(%s) has no Value\0" as *const u8 as *const libc::c_char,
+            b"undefined indirection: *(%s) has no value\0" as *const u8 as *const libc::c_char,
             s_0,
         );
         free(s_0 as *mut libc::c_void);
@@ -548,7 +548,7 @@ unsafe fn expr_identifier_eval(mut expr: *mut AstExpr, mut State: *mut State) ->
         let mut b_0: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b_0,
-            b"undefined memory access: %s has no Value\0" as *const u8 as *const libc::c_char,
+            b"undefined memory access: %s has no value\0" as *const u8 as *const libc::c_char,
             id,
         );
         return result_error_create(error_create(strbuilder_build(b_0)));
@@ -1801,7 +1801,7 @@ pub unsafe fn prepare_parameters(
             let mut b: *mut StrBuilder = strbuilder_create();
             strbuilder_printf(
                 b,
-                b"parameter `%s' of function `%s' has no Value\0" as *const u8
+                b"parameter `%s' of function `%s' has no value\0" as *const u8
                     as *const libc::c_char,
                 ast_variable_name(*param.offset(i as isize)),
                 fname,
@@ -1900,7 +1900,7 @@ unsafe fn verify_paramspec(
     }
     if state_isalloc(param_state, param) as libc::c_int != 0 && !state_isalloc(arg_state, arg) {
         return error_create(
-            b"must be Heap allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+            b"must be heap allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
     }
     let mut param_res: object_res =
@@ -7278,7 +7278,7 @@ unsafe fn path_verify(
         let mut b: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b,
-            b"%s: garbage on Heap\0" as *const u8 as *const libc::c_char,
+            b"%s: garbage on heap\0" as *const u8 as *const libc::c_char,
             ast_function_name(f),
         );
         return error_create(strbuilder_build(b));
