@@ -16,8 +16,8 @@
 struct frame;
 
 struct stack {
-	struct program *p;
 	bool abstract;
+	struct program *p;
 
 	struct block_arr *memory;
 
@@ -27,6 +27,15 @@ struct stack {
 
 	int id;
 	struct stack *prev;
+	bool cansee;
+};
+
+struct frame {
+	char *name;
+	struct ast_block *b;
+	struct ast_type *ret_type;
+	bool abstract;
+	bool cansee;
 };
 
 struct location *
@@ -40,15 +49,14 @@ stack_newblock(struct stack *stack)
 }
 
 struct stack *
-stack_create(char *name, struct ast_block *b, struct ast_type *ret_type,
-		bool abstract, struct stack *prev)
+stack_create(struct frame *f, struct stack *prev)
 {
 	struct stack *stack = calloc(1, sizeof(struct stack));
 	assert(stack);
 
-	assert(b);
-	stack->p = program_create(b, name);
-	stack->abstract = abstract;
+	assert(f->b);
+	stack->p = program_create(f->b, f->name);
+	stack->abstract = f->abstract;
 	stack->memory = block_arr_create();
 
 	stack->varmap = map_create();
@@ -56,7 +64,9 @@ stack_create(char *name, struct ast_block *b, struct ast_type *ret_type,
 	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
 
-	stack->result = variable_create(ret_type, stack, false);
+	stack->cansee = f->cansee;
+	stack->result = stack->cansee
+		? NULL : variable_create(f->ret_type, stack, false);
 
 	return stack;
 }
@@ -111,7 +121,8 @@ stack_copy(struct stack *stack)
 	copy->memory = block_arr_copy(stack->memory);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->id = stack->id;
-	copy->result = variable_copy(stack->result);
+	copy->result = stack->cansee
+		? NULL : variable_copy(stack->result);
 	if (stack->prev) {
 		copy->prev = stack_copy(stack->prev);
 	}
@@ -153,9 +164,11 @@ stack_str(struct stack *stack, struct state *state)
 		free(var);
 		strbuilder_putc(b, '\n');
 	}
-	char *result = variable_str(stack->result, stack, state);
-	strbuilder_printf(b, "\treturn: %s\n", result);
-	free(result);
+	if (!stack->cansee) {
+		char *result = variable_str(stack->result, stack, state);
+		strbuilder_printf(b, "\treturn: %s\n", result);
+		free(result);
+	}
 	strbuilder_printf(b, "\t");
 	/* TODO: fix length of line */
 	for (int i = 0, len = 30; i < len-2; i++ ) {
@@ -268,44 +281,45 @@ stack_getblock(struct stack *s, int address)
 	return block_arr_blocks(s->memory)[address];
 }
 
-struct frame {
-	char *name;
-	struct ast_block *b;
-	struct ast_type *ret_type;
-	bool abstract;
-};
-
 static struct frame *
-frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs)
+frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs, bool cansee)
 {
 	struct frame *f = malloc(sizeof(struct frame));
-	f->name = n;
-	f->b = b;
-	f->ret_type = r;
+	f->name = dynamic_str(n);
+	f->b = ast_block_copy(b);
+	if (!cansee) {
+		assert(r);
+		f->ret_type = ast_type_copy(r);
+	}
 	f->abstract = abs;
+	f->cansee = cansee;
 	return f;
 }
 
 struct frame *
 frame_call_create(char *n, struct ast_block *b, struct ast_type *r, bool abs)
 {
-	return frame_create(n, b, r, abs);
+	return frame_create(n, b, r, abs, false);
 }
 
 struct frame *
 frame_block_create(char *n, struct ast_block *b)
 {
-	return frame_create(n, b, NULL, false);
+	return frame_create(n, b, NULL, false, true);
 }
 
-struct frame *
+static struct frame *
 frame_copy(struct frame *f)
 {
+	if (!f->cansee) {
+		assert(f->ret_type);
+	}
 	return frame_create(
 		dynamic_str(f->name),
 		ast_block_copy(f->b),
-		ast_type_copy(f->ret_type),
-		f->abstract
+		f->ret_type ? ast_type_copy(f->ret_type) : NULL,
+		f->abstract,
+		f->cansee
 	); 
 }
 

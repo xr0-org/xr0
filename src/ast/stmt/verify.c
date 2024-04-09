@@ -289,8 +289,6 @@ iter_neteffect(struct ast_stmt *iter)
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
-	/* TODO: install propositions corresponding to dereferencability */
-
 	struct result *res = ast_expr_eval(ast_stmt_jump_rv(stmt), state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
@@ -364,13 +362,11 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 static struct error *
 labelled_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 {
-	if (!ast_stmt_ispre(stmt)) {
-		assert(false);
-	}
+	assert(ast_stmt_ispre(stmt));
+
 	struct ast_stmt *setup = ast_stmt_labelled_stmt(stmt);
-	if (!setup) {
-		assert(false);
-	}
+	assert(setup);
+
 	if (!should_setup) {
 		/* if abstract is called we don't execute setup */
 		return NULL;

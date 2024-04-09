@@ -723,12 +723,15 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		state
 	);
 
-	state_pushframe(
-		state,
+	struct frame *call_frame = frame_call_create(
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
 		true
+	);
+	state_pushframe(
+		state,
+		call_frame
 	);
 	if ((err = prepare_parameters(nparams, params, args, name, state))) {
 		return result_error_create(err);
@@ -802,11 +805,11 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 	struct error *err;
 
 	char *fname = ast_function_name(f);
+	struct frame *setupframe = frame_call_create(
+		fname, ast_function_abstract(f), ast_function_type(f), true
+	);
 	struct state *param_state = state_create(
-		fname,
-		ast_function_abstract(f),
-		ast_function_type(f),
-		true,
+		setupframe,
 		state_getext(arg_state)
 	);
 	if ((err = ast_function_initparams(f, param_state))) {

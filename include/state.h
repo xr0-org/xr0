@@ -26,14 +26,13 @@ struct value;
 
 struct state;
 
-struct state *
-state_create(char *name, struct ast_block *, struct ast_type *result_type,
-		bool abstract, struct externals *);
+struct frame;
 
 struct state *
-state_create_withprops(char *name, struct ast_block *,
-		struct ast_type *result_type, bool abstract, struct externals *,
-		struct props *props);
+state_create(struct frame *, struct externals *);
+
+struct state *
+state_create_withprops(struct frame *, struct externals *, struct props *props);
 
 struct state *
 state_copy(struct state *);
@@ -63,12 +62,10 @@ struct heap *
 state_getheap(struct state *);
 
 void
-state_pushframe(struct state *, char *name, struct ast_block *b,
-		struct ast_type *, bool abstract);
+state_pushframe(struct state *, struct frame *);
 
 void
 state_popframe(struct state *);
-
 
 void
 state_declare(struct state *, struct ast_variable *var, bool isparam);
@@ -132,6 +129,15 @@ state_hasgarbage(struct state *);
 
 bool
 state_equal(struct state *s1, struct state *s2);
+
+
+/* FRAME DTO */
+
+struct frame *
+frame_call_create(char *name, struct ast_block *, struct ast_type *, bool abs);
+
+struct frame *
+frame_block_create(char *name, struct ast_block *);
 
 
 /* USED BY VALUE */
