@@ -208,7 +208,7 @@ LIBC_RLIB = xr0-deps/target/debug/deps/liblibc-7b7b9cd53da27782.rlib
 $(LIBC_RLIB):
 	(cd xr0-deps && cargo +nightly build)
 
-$(STATE_OBJ): $(STATE_DIR)/state.rs $(LIBC_RLIB)
+$(STATE_OBJ): $(STATE_DIR)/state.rs $(LIBC_RLIB) $(BIN_DIR)
 	@printf 'RUSTC\t$@\n'
 	@rustc +nightly --crate-name xr0_state $(RUSTCFLAGS) --crate-type staticlib -o $@ $<
 
