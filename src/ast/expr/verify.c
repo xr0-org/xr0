@@ -522,8 +522,6 @@ hack_identifier_builtin_eval(char *id, struct state *state)
 			value_sync_create(ast_expr_identifier_create(dynamic_str(id)))
 		);
 	}
-	printf("id: %s\n", id);
-	assert(false);
 	return result_error_create(error_printf("not built-in"));
 }
 
