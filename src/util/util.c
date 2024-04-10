@@ -314,6 +314,7 @@ struct error {
 	union error_contents {
 		char *printf;
 		struct ast_expr *undecidable_cond;
+		char *from;
 	} contents;
 	struct error *inner;
 };
