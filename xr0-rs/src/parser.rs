@@ -1,3 +1,5 @@
+mod inner;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct lexememarker {

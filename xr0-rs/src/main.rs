@@ -22,7 +22,8 @@ mod util;
 mod value;
 
 use crate::ast::{
-    ast_block, ast_externdecl, ast_function, ast_type, ast_variable, ast_variable_arr, Ast, AstExpr,
+    ast as Ast, ast_block, ast_expr as AstExpr, ast_externdecl, ast_function, ast_type,
+    ast_variable, ast_variable_arr,
 };
 use crate::ext::externals as Externals;
 use crate::math::math_expr;
