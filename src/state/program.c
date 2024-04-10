@@ -138,10 +138,14 @@ static struct error *
 program_stmt_step(struct program *p, bool abstract, struct state *s)
 {
 	struct error *err = program_stmt_process(p, abstract, s);
-	if (err) {
+	if (!err) {
+		program_nextstmt(p, s);
+		return NULL;
+	}
+	struct error *ct_err = error_to_control_transfer(err);
+	if (!ct_err) {
 		return err;
 	}
-	program_nextstmt(p, s);
 	return NULL;
 }
 
@@ -153,7 +157,7 @@ program_stmt_process(struct program *p, bool abstract, struct state *s)
 		if (ast_stmt_ispre(stmt)) {
 			return NULL;
 		}
-		return ast_stmt_absprocess(stmt, p->name, s, true);
+		return ast_stmt_absprocess(stmt, p->name, s);
 	}
 	return ast_stmt_process(stmt, p->name, s);
 }

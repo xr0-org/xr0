@@ -97,7 +97,9 @@ stack_destroy(struct stack *stack)
 	}
 	map_destroy(m);
 
-	variable_destroy(stack->result);
+	if (!stack->prev || !stack->cansee) {
+		variable_destroy(stack->result);
+	}
 
 	program_destroy(stack->p);
 	free(stack);
@@ -236,7 +238,12 @@ stack_undeclare(struct stack *stack, struct state *state)
 struct variable *
 stack_getresult(struct stack *s)
 {
-	return s->result;
+	/* ⊢ lowest frame || call */
+	if (!s->prev || !s->cansee) {
+		return s->result;
+	}
+	/* ⊢ block */
+	return stack_getresult(s->prev);
 }
 
 struct map *
@@ -303,9 +310,9 @@ frame_call_create(char *n, struct ast_block *b, struct ast_type *r, bool abs)
 }
 
 struct frame *
-frame_block_create(char *n, struct ast_block *b)
+frame_block_create(char *n, struct ast_block *b, bool abs)
 {
-	return frame_create(n, b, NULL, false, true);
+	return frame_create(n, b, NULL, abs, true);
 }
 
 static struct frame *

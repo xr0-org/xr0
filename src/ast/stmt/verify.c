@@ -168,6 +168,7 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("stmt: %s\n", ast_stmt_str(stmt));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
@@ -195,20 +196,14 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_block *b = ast_stmt_as_block(stmt);
-	assert(ast_block_ndecls(b) == 0);
-	int nstmt = ast_block_nstmts(b);
-	struct ast_stmt **stmts = ast_block_stmts(b);
-	for (int i = 0; i < nstmt; i++) {
-		struct error *err = ast_stmt_exec(stmts[i], state);
-		if (err) {
-			return err;
-		}
-		if (ast_stmt_isterminal(stmts[i], state)) {
-			break;
-		}
-	}
-	return NULL;
+	struct frame *block_frame = frame_block_create(
+		dynamic_str("real block"),
+		ast_stmt_as_block(stmt),
+		false
+	);
+	state_pushframe(state, block_frame);
+
+	return error_control_transfer();
 }
 
 /* stmt_sel_exec */
@@ -237,7 +232,7 @@ static struct ast_stmt *
 iter_neteffect(struct ast_stmt *);
 
 static struct error *
-ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup);
+ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
@@ -249,7 +244,7 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 		return NULL;
 	}
 
-	struct error *err = ast_stmt_absexec(neteffect, state, true);
+	struct error *err = ast_stmt_absexec(neteffect, state);
 	if (err) {
 		return err;
 	}
@@ -298,16 +293,15 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		assert(!obj_res.err);
 		object_assign(obj_res.obj, value_copy(result_as_value(res)));
 		/* destroy result if exists */
-		
 	}
-	return NULL;
+	state_popframe(state);
+	return error_control_transfer();
 }
 
 struct error *
-ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *state,
-		bool should_setup)
+ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *state)
 {
-	struct error *err = ast_stmt_absexec(stmt, state, should_setup);
+	struct error *err = ast_stmt_absexec(stmt, state);
 	if (!err) {
 		return NULL;
 	}
@@ -322,36 +316,36 @@ static struct error *
 expr_absexec(struct ast_expr *expr, struct state *state);
 
 static struct error *
-labelled_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup);
+labelled_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
-sel_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup);
+sel_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
 iter_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
-comp_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup);
+comp_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
 jump_absexec(struct ast_stmt *, struct state *);
 
 static struct error *
-ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
+ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
-		return labelled_absexec(stmt, state, should_setup);
+		return labelled_absexec(stmt, state);
 	case STMT_EXPR:
 		return expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
-		return sel_absexec(stmt, state, should_setup);
+		return sel_absexec(stmt, state);
 	case STMT_ITERATION:
 		return iter_absexec(stmt, state);
 	case STMT_COMPOUND:
-		return comp_absexec(stmt, state, should_setup);
+		return comp_absexec(stmt, state);
 	case STMT_JUMP:
 		return jump_absexec(stmt, state);
 	default:
@@ -360,18 +354,19 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 }
 
 static struct error *
-labelled_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
+labelled_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	assert(ast_stmt_ispre(stmt));
 
 	struct ast_stmt *setup = ast_stmt_labelled_stmt(stmt);
 	assert(setup);
 
-	if (!should_setup) {
-		/* if abstract is called we don't execute setup */
-		return NULL;
-	}
-	return ast_stmt_absexec(setup, state, should_setup);
+	/* XXX: get this from frame */	
+	//if (!should_setup) {
+	//	/* if abstract is called we don't execute setup */
+	//	return NULL;
+	//}
+	return ast_stmt_absexec(setup, state);
 }
 
 static struct error *
@@ -385,7 +380,7 @@ expr_absexec(struct ast_expr *expr, struct state *state)
 }
 
 static struct error *
-sel_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
+sel_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
@@ -395,9 +390,9 @@ sel_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 		return dec.err;
 	}
 	if (dec.decision) {
-		return ast_stmt_absexec(body, state, should_setup);
+		return ast_stmt_absexec(body, state);
 	} else if (nest) {
-		return ast_stmt_absexec(nest, state, should_setup);
+		return ast_stmt_absexec(nest, state);
 	}
 	return NULL;
 }
@@ -471,22 +466,22 @@ hack_alloc_from_neteffect(struct ast_stmt *stmt)
 }
 
 static struct error *
-comp_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
+comp_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_block *b = ast_stmt_as_block(stmt);
-	struct ast_stmt **stmts = ast_block_stmts(b);
-	for (int i = 0; i < ast_block_nstmts(b); i++) {
-		struct error *err = ast_stmt_absexec(stmts[i], state, should_setup);
-		if (err) {
-			return err;
-		}
-	}
-	return NULL;
+	struct frame *block_frame = frame_block_create(
+		dynamic_str("real block"),
+		ast_stmt_as_block(stmt),
+		false
+	);
+	state_pushframe(state, block_frame);
+
+	return error_control_transfer();
 }
 
 static struct error *
 jump_absexec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("state: %s\n", state_str(state));
 	return expr_absexec(
 		ast_expr_assignment_create(
 			ast_expr_identifier_create(KEYWORD_RETURN),
@@ -540,7 +535,7 @@ static struct error *
 labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
 	/* XXX: dedupe the execution of setups */
-	struct error *err = ast_stmt_absexec(stmt, state, true);
+	struct error *err = ast_stmt_absexec(stmt, state);
 	if (err) {
 		return err;
 	}
