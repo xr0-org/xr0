@@ -238,8 +238,8 @@ stack_undeclare(struct stack *stack, struct state *state)
 struct variable *
 stack_getresult(struct stack *s)
 {
-	/* ⊢ lowest frame || call */
 	if (!s->prev || !s->cansee) {
+		/* ⊢ lowest frame || call */
 		return s->result;
 	}
 	/* ⊢ block */
@@ -257,7 +257,12 @@ stack_getvariable(struct stack *s, char *id)
 {
 	assert(strcmp(id, KEYWORD_RETURN) != 0);
 
-	return map_get(s->varmap, id);
+	struct variable *v = map_get(s->varmap, id);
+	if (!v && s->cansee) {
+		/* ⊢ block */
+		return stack_getvariable(s->prev, id);
+	}
+	return v;
 }
 
 bool

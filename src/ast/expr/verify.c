@@ -522,6 +522,8 @@ hack_identifier_builtin_eval(char *id, struct state *state)
 			value_sync_create(ast_expr_identifier_create(dynamic_str(id)))
 		);
 	}
+	printf("id: %s\n", id);
+	assert(false);
 	return result_error_create(error_printf("not built-in"));
 }
 
@@ -748,9 +750,16 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 
 	struct result *res = call_absexec(expr, state);
 	if (result_iserror(res)) {
-		return result_error_create(
-			error_printf("\n\t%w", result_as_error(res))
-		);
+		struct error *ct_err = error_to_control_transfer(result_as_error(res));
+		if (!ct_err) {
+			return result_error_create(
+				error_printf("\n\t%w", result_as_error(res))
+			);
+		}
+
+		struct object_res obj_res = state_getresult(state);
+		assert(!obj_res.err);
+		res = result_value_create(object_as_value(obj_res.obj));
 	}
 
 	/* XXX: pass copy so we don't observe */

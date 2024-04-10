@@ -168,7 +168,6 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("stmt: %s\n", ast_stmt_str(stmt));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
@@ -203,7 +202,7 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 	);
 	state_pushframe(state, block_frame);
 
-	return error_control_transfer();
+	return error_control_transfer(ast_stmt_str(stmt));
 }
 
 /* stmt_sel_exec */
@@ -294,7 +293,6 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		object_assign(obj_res.obj, value_copy(result_as_value(res)));
 		/* destroy result if exists */
 	}
-	state_popframe(state);
 	return error_control_transfer();
 }
 
@@ -469,9 +467,9 @@ static struct error *
 comp_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	struct frame *block_frame = frame_block_create(
-		dynamic_str("real block"),
+		dynamic_str("abs block"),
 		ast_stmt_as_block(stmt),
-		false
+		true
 	);
 	state_pushframe(state, block_frame);
 
@@ -481,14 +479,17 @@ comp_absexec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 jump_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("state: %s\n", state_str(state));
-	return expr_absexec(
+	struct error *err = expr_absexec(
 		ast_expr_assignment_create(
 			ast_expr_identifier_create(KEYWORD_RETURN),
 			ast_stmt_jump_rv(stmt)
 		), 
 		state
 	);
+	if (err) {
+		return err;
+	}
+	return error_control_transfer();
 }
 
 static struct error *
