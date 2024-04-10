@@ -309,6 +309,7 @@ struct error {
 	enum error_type {
 		ERROR_PRINTF,
 		ERROR_UNDECIDEABLE_COND,
+		ERROR_CONTROL_TRANSFER
 	} type;
 	union error_contents {
 		char *printf;
@@ -425,17 +426,33 @@ error_get_undecideable_cond(struct error *err)
 	return err->contents.undecidable_cond;
 }
 
+struct error *
+error_control_transfer()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_CONTROL_TRANSFER;
+	return err;
+}
+
+struct error *
+error_to_control_transfer(struct error *err)
+{
+	return error_to(err, ERROR_CONTROL_TRANSFER);
+}
+
 char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
-		[ERROR_UNDECIDEABLE_COND] = "undecideable condition"
+		[ERROR_UNDECIDEABLE_COND] = "undecideable condition",
+		[ERROR_CONTROL_TRANSFER] = "control transfer",
 	};
 
 	switch (err->type) {
 	case ERROR_PRINTF:
 		return dynamic_str(err->contents.printf);
 	case ERROR_UNDECIDEABLE_COND:
+	case ERROR_CONTROL_TRANSFER:
 		return dynamic_str(error_type_str[err->type]);
 	default:
 		assert(false);

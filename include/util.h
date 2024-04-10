@@ -117,6 +117,12 @@ error_to_undecideable_cond(struct error *);
 struct ast_expr *
 error_get_undecideable_cond(struct error *);
 
+struct error *
+error_control_transfer();
+
+struct error *
+error_to_control_transfer(struct error *);
+
 char *
 error_str(struct error *);
 

@@ -729,10 +729,8 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		ast_function_type(f),
 		true
 	);
-	state_pushframe(
-		state,
-		call_frame
-	);
+	state_pushframe(state, call_frame);
+
 	if ((err = prepare_parameters(nparams, params, args, name, state))) {
 		return result_error_create(err);
 	}
