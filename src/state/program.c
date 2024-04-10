@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 
 #include "ast.h"
@@ -146,6 +147,7 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 	if (!ct_err) {
 		return err;
 	}
+	p->s = PROGRAM_COUNTER_ATEND;
 	return NULL;
 }
 
