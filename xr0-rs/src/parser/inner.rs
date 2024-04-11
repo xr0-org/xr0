@@ -180,7 +180,8 @@ pub grammar c_parser(env: &Env) for str {
         numeric_constant() / character_constant()
 
     rule numeric_constant() -> BoxedExpr =
-        n:integer_number() { unsafe { ast_expr_constant_create(n) } }
+        n:quiet! { integer_number() } { unsafe { ast_expr_constant_create(n) } } /
+        expected!("number")
 
     rule integer_number() -> libc::c_int =
         n:$(['1'..='9'] dec()* / "0") end_of_token() {
@@ -191,12 +192,13 @@ pub grammar c_parser(env: &Env) for str {
         }
 
     rule character_constant() -> BoxedExpr =
-        c:$("'" character()+ "'") {
+        c:quiet! { $("'" character()+ "'") } {
             unsafe {
                 let cstr = CString::new(c.to_string()).unwrap();
                 ast_expr_constant_create_char(parse_char(cstr.as_ptr() as *mut libc::c_char))
             }
-        }
+        } /
+        expected!("character")
 
     rule character() = [^ '\\' | '\n'] / escape_sequence()
 
