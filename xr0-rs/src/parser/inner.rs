@@ -1,26 +1,11 @@
 #![allow(non_camel_case_types)]
 
-use std::collections::HashSet;
 use std::ffi::CString;
 use std::ptr;
 
-use super::lexememarker;
 use crate::ast::*;
+use crate::parser::env::Env;
 use crate::util::dynamic_str;
-
-pub struct Env {
-    pub reserved: HashSet<&'static str>,
-}
-
-impl Env {
-    unsafe fn lexloc(&self, _p: usize) -> *mut lexememarker {
-        todo!();
-    }
-
-    unsafe fn is_typename(&self, _name: *const libc::c_char) -> bool {
-        todo!();
-    }
-}
 
 /* XXX */
 unsafe fn strip_quotes(s: *const libc::c_char) -> BoxedCStr {
@@ -157,8 +142,18 @@ pub grammar c_parser(env: &Env) for str {
     rule cs1<T>(ex: rule<T>) -> Vec<T> = e:ex() ++ (_ "," _) { e }
 
     // Whitespace
-    rule _() = quiet!{("\r"? "\n" directive()? / [ ' ' | '\t'])*}
+    rule _() = quiet!{(newline() / [ ' ' | '\t'])*}
+    rule newline() =
+        "\r"? "\n" d:$(directive()?) {
+            unsafe {
+                env.newline();
+                if !d.is_empty() {
+                    env.directive(d)
+                }
+            }
+        }
     rule directive() = "#" [^ '\n']*
+    rule start_directive() = d:$(directive()) { unsafe { env.directive(d); } }
 
     // Keywords
     rule end_of_token() = !['_' | 'a'..='z' | 'A'..='Z' | '0'..='9']
@@ -586,7 +581,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule for_iteration_statement() -> BoxedStmt =
         p:position!()
-        "for" _ "(" _ init:expression_statement() _ cond:expression_statement() _ iter:expression() _ ")" _
+        K(<"for">) _ "(" _ init:expression_statement() _ cond:expression_statement() _ iter:expression() _ ")" _
         verif:optional_compound_verification() _ body:statement() {
             unsafe { ast_stmt_create_iter(env.lexloc(p), init, cond, iter, verif, body) }
         }
@@ -597,13 +592,6 @@ pub grammar c_parser(env: &Env) for str {
         p:position!() K(<"return">) _ expr:expression() _ ";" {
             unsafe { ast_stmt_create_jump(env.lexloc(p), JUMP_RETURN, expr) }
         }
-
-    pub rule translation_unit() -> BoxedAst =
-        directive()? _ decl:list1(<external_declaration()>) _ { unsafe { ast_from_vec(decl) } }
-
-    rule external_declaration() -> BoxedExternDecl =
-        f:function_definition() { unsafe { ast_functiondecl_create(f) } } /
-        d:declaration() { unsafe { ast_decl_create(d.name, d.t) } }
 
     rule block_statement() -> block_statement =
         ";" {
@@ -681,5 +669,12 @@ pub grammar c_parser(env: &Env) for str {
                 )
             }
         }
+
+    rule external_declaration() -> BoxedExternDecl =
+        f:function_definition() { unsafe { ast_functiondecl_create(f) } } /
+        d:declaration() { unsafe { ast_decl_create(d.name, d.t) } }
+
+    pub rule translation_unit() -> BoxedAst =
+        start_directive()? _ decl:list1(<external_declaration()>) _ { unsafe { ast_from_vec(decl) } }
 }
 }
