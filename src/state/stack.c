@@ -27,7 +27,7 @@ struct stack {
 
 	int id;
 	struct stack *prev;
-	bool cansee;
+	bool nested;
 };
 
 struct frame {
@@ -35,7 +35,7 @@ struct frame {
 	struct ast_block *b;
 	struct ast_type *ret_type;
 	bool abstract;
-	bool cansee;
+	bool nested;
 };
 
 struct location *
@@ -64,8 +64,8 @@ stack_create(struct frame *f, struct stack *prev)
 	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
 
-	stack->cansee = f->cansee;
-	stack->result = stack->cansee
+	stack->nested = f->nested;
+	stack->result = stack->nested
 		? NULL : variable_create(f->ret_type, stack, false);
 
 	return stack;
@@ -97,7 +97,7 @@ stack_destroy(struct stack *stack)
 	}
 	map_destroy(m);
 
-	if (!stack->prev || !stack->cansee) {
+	if (stack->result) {
 		variable_destroy(stack->result);
 	}
 
@@ -123,11 +123,12 @@ stack_copy(struct stack *stack)
 	copy->memory = block_arr_copy(stack->memory);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->id = stack->id;
-	copy->result = stack->cansee
-		? NULL : variable_copy(stack->result);
+	copy->result = stack->result
+		? variable_copy(stack->result) : NULL;
 	if (stack->prev) {
 		copy->prev = stack_copy(stack->prev);
 	}
+	copy->nested = stack->nested;
 	return copy;
 }
 
@@ -166,7 +167,7 @@ stack_str(struct stack *stack, struct state *state)
 		free(var);
 		strbuilder_putc(b, '\n');
 	}
-	if (!stack->cansee) {
+	if (stack->result) {
 		char *result = variable_str(stack->result, stack, state);
 		strbuilder_printf(b, "\treturn: %s\n", result);
 		free(result);
@@ -188,7 +189,7 @@ stack_str(struct stack *stack, struct state *state)
 bool
 stack_atend(struct stack *s)
 {
-	return !s->prev && program_atend(s->p);
+	return program_atend(s->p);
 }
 
 struct error *
@@ -215,9 +216,12 @@ variable_abstractcopy(struct variable *v, struct state *s);
 void
 stack_undeclare(struct stack *stack, struct state *state)
 {
-	struct variable *old_result = stack->result;
-	stack->result = variable_abstractcopy(old_result, state);
-	variable_destroy(old_result);
+	if (stack->result) {
+		struct variable *old_result = stack->result;
+		assert(old_result);
+		stack->result = variable_abstractcopy(old_result, state);
+		variable_destroy(old_result);
+	}
 
 	struct map *m = stack->varmap;
 	stack->varmap = map_create();
@@ -235,10 +239,16 @@ stack_undeclare(struct stack *stack, struct state *state)
 	map_destroy(m);
 }
 
+bool
+stack_nested(struct stack *s)
+{
+	return s->nested;
+}
+
 struct variable *
 stack_getresult(struct stack *s)
 {
-	if (!s->prev || !s->cansee) {
+	if (!s->prev || !s->nested) {
 		/* ⊢ lowest frame || call */
 		return s->result;
 	}
@@ -258,7 +268,7 @@ stack_getvariable(struct stack *s, char *id)
 	assert(strcmp(id, KEYWORD_RETURN) != 0);
 
 	struct variable *v = map_get(s->varmap, id);
-	if (!v && s->cansee) {
+	if (!v && s->nested) {
 		/* ⊢ block */
 		return stack_getvariable(s->prev, id);
 	}
@@ -294,17 +304,17 @@ stack_getblock(struct stack *s, int address)
 }
 
 static struct frame *
-frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs, bool cansee)
+frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs, bool nested)
 {
 	struct frame *f = malloc(sizeof(struct frame));
 	f->name = dynamic_str(n);
 	f->b = ast_block_copy(b);
-	if (!cansee) {
+	if (!nested) {
 		assert(r);
 		f->ret_type = ast_type_copy(r);
 	}
 	f->abstract = abs;
-	f->cansee = cansee;
+	f->nested = nested;
 	return f;
 }
 
@@ -323,7 +333,7 @@ frame_block_create(char *n, struct ast_block *b, bool abs)
 static struct frame *
 frame_copy(struct frame *f)
 {
-	if (!f->cansee) {
+	if (!f->nested) {
 		assert(f->ret_type);
 	}
 	return frame_create(
@@ -331,7 +341,7 @@ frame_copy(struct frame *f)
 		ast_block_copy(f->b),
 		f->ret_type ? ast_type_copy(f->ret_type) : NULL,
 		f->abstract,
-		f->cansee
+		f->nested
 	); 
 }
 

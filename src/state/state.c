@@ -535,11 +535,16 @@ state_undeclarevars(struct state *s);
 static void
 state_popprops(struct state *s);
 
+void
+state_unnest(struct state *s);
+
 bool
 state_equal(struct state *s1, struct state *s2)
 {
 	struct state *s1_c = state_copy(s1),
 		     *s2_c = state_copy(s2);
+	state_unnest(s1_c);
+	state_unnest(s2_c);
 	state_undeclareliterals(s1_c);
 	state_undeclareliterals(s2_c);
 	state_undeclarevars(s1_c);
@@ -584,4 +589,12 @@ state_popprops(struct state *s)
 {
 	props_destroy(s->props);
 	s->props = props_create();
+}
+
+void
+state_unnest(struct state *s)
+{
+	while (stack_nested(s->stack)) {
+		state_popframe(s);
+	}
 }
