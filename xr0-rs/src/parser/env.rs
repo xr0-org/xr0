@@ -71,14 +71,14 @@ pub const LM_FLAG_SYS_HEADER: linemarker_flag = 4;
 pub const LM_FLAG_RESUME_FILE: linemarker_flag = 2;
 pub const LM_FLAG_NEW_FILE: linemarker_flag = 1;
 
-#[no_mangle]
+
 pub static mut marker: lexememarker = lexememarker {
     linenum: 0,
     column: 0,
     filename: 0 as *const libc::c_char as *mut libc::c_char,
     flags: 0 as linemarker_flag,
 };
-#[no_mangle]
+
 pub unsafe fn lexloc() -> *mut lexememarker {
     if (marker.filename).is_null() as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -91,7 +91,7 @@ pub unsafe fn lexloc() -> *mut lexememarker {
     };
     return lexememarker_copy(std::ptr::addr_of_mut!(marker));
 }
-#[no_mangle]
+
 pub unsafe fn lexememarker_create(
     linenum: libc::c_int,
     column: libc::c_int,
@@ -105,7 +105,7 @@ pub unsafe fn lexememarker_create(
     (*loc).flags = flags;
     return loc;
 }
-#[no_mangle]
+
 pub unsafe fn lexememarker_copy(loc: *mut lexememarker) -> *mut lexememarker {
     return lexememarker_create(
         (*loc).linenum,
@@ -114,12 +114,12 @@ pub unsafe fn lexememarker_copy(loc: *mut lexememarker) -> *mut lexememarker {
         (*loc).flags,
     );
 }
-#[no_mangle]
+
 pub unsafe fn lexememarker_destroy(loc: *mut lexememarker) {
     free((*loc).filename as *mut libc::c_void);
     free(loc as *mut libc::c_void);
 }
-#[no_mangle]
+
 pub unsafe fn lexememarker_str(loc: *mut lexememarker) -> *mut libc::c_char {
     let b: *mut strbuilder = strbuilder_create();
     strbuilder_printf(

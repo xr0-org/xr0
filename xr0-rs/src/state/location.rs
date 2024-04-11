@@ -57,7 +57,7 @@ pub struct block_res {
     pub b: *mut block,
     pub err: *mut error,
 }
-#[no_mangle]
+
 pub unsafe fn location_create_vconst(
     mut block: libc::c_int,
     mut offset: *mut ast_expr,
@@ -92,7 +92,7 @@ pub unsafe fn location_create_vconst(
     (*loc).offset = offset;
     return loc;
 }
-#[no_mangle]
+
 pub unsafe fn location_create_dereferencable(
     mut block: libc::c_int,
     mut offset: *mut ast_expr,
@@ -127,7 +127,7 @@ pub unsafe fn location_create_dereferencable(
     (*loc).offset = offset;
     return loc;
 }
-#[no_mangle]
+
 pub unsafe fn location_create_static(
     mut block: libc::c_int,
     mut offset: *mut ast_expr,
@@ -162,7 +162,7 @@ pub unsafe fn location_create_static(
     (*loc).offset = offset;
     return loc;
 }
-#[no_mangle]
+
 pub unsafe fn location_create_dynamic(
     mut block: libc::c_int,
     mut offset: *mut ast_expr,
@@ -197,7 +197,7 @@ pub unsafe fn location_create_dynamic(
     (*loc).offset = offset;
     return loc;
 }
-#[no_mangle]
+
 pub unsafe fn location_create_automatic(
     mut frame: libc::c_int,
     mut block: libc::c_int,
@@ -234,7 +234,7 @@ pub unsafe fn location_create_automatic(
     (*loc).offset = offset;
     return loc;
 }
-#[no_mangle]
+
 pub unsafe fn location_transfigure(mut loc: *mut location, mut compare: *mut state) -> *mut value {
     match (*loc).type_0 as libc::c_uint {
         3 | 2 => return state_clump(compare),
@@ -256,12 +256,12 @@ pub unsafe fn location_transfigure(mut loc: *mut location, mut compare: *mut sta
     }
     panic!("Reached end of non-void function without returning");
 }
-#[no_mangle]
+
 pub unsafe fn location_destroy(mut loc: *mut location) {
     ast_expr_destroy((*loc).offset);
     free(loc as *mut libc::c_void);
 }
-#[no_mangle]
+
 pub unsafe fn location_str(mut loc: *mut location) -> *mut libc::c_char {
     let mut b: *mut strbuilder = strbuilder_create();
     match (*loc).type_0 as libc::c_uint {
@@ -308,19 +308,19 @@ unsafe fn offsetzero(mut loc: *mut location) -> bool {
     ast_expr_destroy(zero);
     return eq;
 }
-#[no_mangle]
+
 pub unsafe fn location_type(mut loc: *mut location) -> location_type {
     return (*loc).type_0;
 }
-#[no_mangle]
+
 pub unsafe fn location_block(mut loc: *mut location) -> libc::c_int {
     return (*loc).block;
 }
-#[no_mangle]
+
 pub unsafe fn location_offset(mut loc: *mut location) -> *mut ast_expr {
     return (*loc).offset;
 }
-#[no_mangle]
+
 pub unsafe fn location_copy(mut loc: *mut location) -> *mut location {
     match (*loc).type_0 as libc::c_uint {
         0 => return location_create_static((*loc).block, ast_expr_copy((*loc).offset)),
@@ -351,7 +351,7 @@ pub unsafe fn location_copy(mut loc: *mut location) -> *mut location {
     }
     panic!("Reached end of non-void function without returning");
 }
-#[no_mangle]
+
 pub unsafe fn location_with_offset(
     mut loc: *mut location,
     mut offset: *mut ast_expr,
@@ -370,41 +370,41 @@ pub unsafe fn location_with_offset(
     (*copy).offset = ast_expr_copy(offset);
     return copy;
 }
-#[no_mangle]
+
 pub unsafe fn location_tostatic(mut loc: *mut location, mut sm: *mut static_memory) -> bool {
     let mut type_equal: bool =
         (*loc).type_0 as libc::c_uint == LOCATION_STATIC as libc::c_int as libc::c_uint;
     let mut b: *mut block = static_memory_getblock(sm, (*loc).block);
     return type_equal as libc::c_int != 0 && !b.is_null();
 }
-#[no_mangle]
+
 pub unsafe fn location_toheap(mut loc: *mut location, mut h: *mut heap) -> bool {
     let mut type_equal: bool =
         (*loc).type_0 as libc::c_uint == LOCATION_DYNAMIC as libc::c_int as libc::c_uint;
     let mut b: *mut block = heap_getblock(h, (*loc).block);
     return type_equal as libc::c_int != 0 && !b.is_null();
 }
-#[no_mangle]
+
 pub unsafe fn location_tostack(mut loc: *mut location, mut s: *mut stack) -> bool {
     let mut type_equal: bool =
         (*loc).type_0 as libc::c_uint == LOCATION_AUTOMATIC as libc::c_int as libc::c_uint;
     let mut b: *mut block = stack_getblock(s, (*loc).block);
     return type_equal as libc::c_int != 0 && !b.is_null();
 }
-#[no_mangle]
+
 pub unsafe fn location_toclump(mut loc: *mut location, mut c: *mut clump) -> bool {
     let mut type_equal: bool =
         (*loc).type_0 as libc::c_uint == LOCATION_DEREFERENCABLE as libc::c_int as libc::c_uint;
     let mut b: *mut block = clump_getblock(c, (*loc).block);
     return type_equal as libc::c_int != 0 && !b.is_null();
 }
-#[no_mangle]
+
 pub unsafe fn location_equal(mut l1: *mut location, mut l2: *mut location) -> bool {
     return (*l1).type_0 as libc::c_uint == (*l2).type_0 as libc::c_uint
         && (*l1).block == (*l2).block
         && ast_expr_equal((*l1).offset, (*l2).offset) as libc::c_int != 0;
 }
-#[no_mangle]
+
 pub unsafe fn location_references(
     mut l1: *mut location,
     mut l2: *mut location,
@@ -416,11 +416,11 @@ pub unsafe fn location_references(
     let mut b: *mut block = state_getblock(s, l1);
     return !b.is_null() && block_references(b, l2, s) as libc::c_int != 0;
 }
-#[no_mangle]
+
 pub unsafe fn location_isauto(mut loc: *mut location) -> bool {
     return (*loc).type_0 as libc::c_uint == LOCATION_AUTOMATIC as libc::c_int as libc::c_uint;
 }
-#[no_mangle]
+
 pub unsafe fn location_referencesheap(mut l: *mut location, mut s: *mut state) -> bool {
     if (*l).type_0 as libc::c_uint == LOCATION_DYNAMIC as libc::c_int as libc::c_uint {
         if heap_blockisfreed(state_getheap(s), (*l).block) {
@@ -445,7 +445,7 @@ pub unsafe fn location_referencesheap(mut l: *mut location, mut s: *mut state) -
     }
     return !(res.obj).is_null() && object_referencesheap(res.obj, s) as libc::c_int != 0;
 }
-#[no_mangle]
+
 pub unsafe fn location_getblock(
     mut loc: *mut location,
     mut sm: *mut static_memory,
@@ -532,7 +532,7 @@ unsafe fn location_auto_getblock(mut loc: *mut location, mut s: *mut stack) -> b
         init
     };
 }
-#[no_mangle]
+
 pub unsafe fn location_getstackblock(mut loc: *mut location, mut s: *mut stack) -> *mut block {
     if !((*loc).type_0 as libc::c_uint == LOCATION_AUTOMATIC as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
@@ -551,7 +551,7 @@ pub unsafe fn location_getstackblock(mut loc: *mut location, mut s: *mut stack) 
     };
     return stack_getblock(s, (*loc).block);
 }
-#[no_mangle]
+
 pub unsafe fn location_dealloc(mut loc: *mut location, mut heap: *mut heap) -> *mut error {
     if (*loc).type_0 as libc::c_uint != LOCATION_DYNAMIC as libc::c_int as libc::c_uint {
         return error_create(
@@ -560,7 +560,7 @@ pub unsafe fn location_dealloc(mut loc: *mut location, mut heap: *mut heap) -> *
     }
     return heap_deallocblock(heap, (*loc).block);
 }
-#[no_mangle]
+
 pub unsafe fn location_range_dealloc(
     mut loc: *mut location,
     mut lw: *mut ast_expr,

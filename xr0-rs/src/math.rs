@@ -61,19 +61,19 @@ pub struct tally {
     pub map: Box<map>,
     pub num: libc::c_int,
 }
-#[no_mangle]
+
 pub unsafe fn math_eq(mut e1: *mut math_expr, mut e2: *mut math_expr) -> bool {
     return math_le(e1, e2) as libc::c_int != 0 && math_le(e2, e1) as libc::c_int != 0;
 }
-#[no_mangle]
+
 pub unsafe fn math_lt(mut e1: *mut math_expr, mut e2: *mut math_expr) -> bool {
     return math_le(e1, e2) as libc::c_int != 0 && !math_eq(e1, e2);
 }
-#[no_mangle]
+
 pub unsafe fn math_gt(mut e1: *mut math_expr, mut e2: *mut math_expr) -> bool {
     return math_lt(e2, e1);
 }
-#[no_mangle]
+
 pub unsafe fn math_ge(mut e1: *mut math_expr, mut e2: *mut math_expr) -> bool {
     return math_le(e2, e1);
 }
@@ -110,20 +110,20 @@ unsafe fn math_expr_fromvartally(
     }
     return e;
 }
-#[no_mangle]
+
 pub unsafe fn math_le(mut e1: *mut math_expr, mut e2: *mut math_expr) -> bool {
     let mut d1: tally = tally(e1);
     let mut d2: tally = tally(e2);
     return variable_tally_eq(d1.map, d2.map) as libc::c_int != 0 && d1.num <= d2.num;
 }
-#[no_mangle]
+
 pub unsafe fn math_expr_atom_create(mut a: *mut math_atom) -> *mut math_expr {
     let mut e: *mut math_expr = malloc(::core::mem::size_of::<math_expr>()) as *mut math_expr;
     (*e).type_0 = EXPR_ATOM;
     (*e).c2rust_unnamed.a = a;
     return e;
 }
-#[no_mangle]
+
 pub unsafe fn math_expr_sum_create(
     mut e1: *mut math_expr,
     mut e2: *mut math_expr,
@@ -134,14 +134,14 @@ pub unsafe fn math_expr_sum_create(
     (*e).c2rust_unnamed.sum.e2 = e2;
     return e;
 }
-#[no_mangle]
+
 pub unsafe fn math_expr_neg_create(mut orig: *mut math_expr) -> *mut math_expr {
     let mut e: *mut math_expr = malloc(::core::mem::size_of::<math_expr>()) as *mut math_expr;
     (*e).type_0 = EXPR_NEG;
     (*e).c2rust_unnamed.negated = orig;
     return e;
 }
-#[no_mangle]
+
 pub unsafe fn math_expr_copy(mut e: *mut math_expr) -> *mut math_expr {
     match (*e).type_0 as libc::c_uint {
         0 => return math_expr_atom_create(math_atom_copy((*e).c2rust_unnamed.a)),
@@ -168,7 +168,7 @@ pub unsafe fn math_expr_copy(mut e: *mut math_expr) -> *mut math_expr {
     }
     panic!("Reached end of non-void function without returning");
 }
-#[no_mangle]
+
 pub unsafe fn math_expr_destroy(mut e: *mut math_expr) {
     match (*e).type_0 as libc::c_uint {
         0 => {
@@ -198,7 +198,7 @@ pub unsafe fn math_expr_destroy(mut e: *mut math_expr) {
     }
     free(e as *mut libc::c_void);
 }
-#[no_mangle]
+
 pub unsafe fn math_expr_str(mut e: *mut math_expr) -> *mut libc::c_char {
     match (*e).type_0 as libc::c_uint {
         0 => return math_atom_str((*e).c2rust_unnamed.a),
@@ -260,7 +260,7 @@ unsafe fn math_expr_nullablesum(mut e1: *mut math_expr, mut e2: *mut math_expr) 
         e1
     };
 }
-#[no_mangle]
+
 pub unsafe fn math_expr_simplify(mut raw: *mut math_expr) -> *mut math_expr {
     let mut t: tally = tally(raw);
     let mut m = &t.map;
@@ -383,21 +383,21 @@ unsafe fn variable_tally_eq(mut m1: Box<map>, mut m2: Box<map>) -> bool {
     map_destroy(m1);
     return res;
 }
-#[no_mangle]
+
 pub unsafe fn math_atom_nat_create(mut i: libc::c_uint) -> *mut math_atom {
     let mut a: *mut math_atom = malloc(::core::mem::size_of::<math_atom>()) as *mut math_atom;
     (*a).type_0 = ATOM_NAT;
     (*a).c2rust_unnamed.i = i;
     return a;
 }
-#[no_mangle]
+
 pub unsafe fn math_atom_variable_create(mut s: *mut libc::c_char) -> *mut math_atom {
     let mut a: *mut math_atom = malloc(::core::mem::size_of::<math_atom>()) as *mut math_atom;
     (*a).type_0 = ATOM_VARIABLE;
     (*a).c2rust_unnamed.v = s;
     return a;
 }
-#[no_mangle]
+
 pub unsafe fn math_atom_copy(mut a: *mut math_atom) -> *mut math_atom {
     match (*a).type_0 as libc::c_uint {
         0 => return math_atom_nat_create((*a).c2rust_unnamed.i),
@@ -419,7 +419,7 @@ pub unsafe fn math_atom_copy(mut a: *mut math_atom) -> *mut math_atom {
     }
     panic!("Reached end of non-void function without returning");
 }
-#[no_mangle]
+
 pub unsafe fn math_atom_destroy(mut a: *mut math_atom) {
     match (*a).type_0 as libc::c_uint {
         0 => {}
@@ -443,7 +443,7 @@ pub unsafe fn math_atom_destroy(mut a: *mut math_atom) {
     }
     free(a as *mut libc::c_void);
 }
-#[no_mangle]
+
 pub unsafe fn math_atom_str(mut a: *mut math_atom) -> *mut libc::c_char {
     if (*a).type_0 as libc::c_uint == ATOM_VARIABLE as libc::c_int as libc::c_uint {
         return dynamic_str((*a).c2rust_unnamed.v);

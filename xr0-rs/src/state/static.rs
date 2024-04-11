@@ -28,7 +28,7 @@ pub struct static_memory {
     pub blocks: *mut block_arr,
     pub pool: Box<map>,
 }
-#[no_mangle]
+
 pub unsafe fn static_memory_create() -> *mut static_memory {
     let mut sm: *mut static_memory =
         malloc(::core::mem::size_of::<static_memory>()) as *mut static_memory;
@@ -42,11 +42,11 @@ pub unsafe fn static_memory_create() -> *mut static_memory {
     );
     sm
 }
-#[no_mangle]
+
 pub unsafe fn static_memory_destroy(mut sm: *mut static_memory) {
     block_arr_destroy((*sm).blocks);
 }
-#[no_mangle]
+
 pub unsafe fn static_memory_str(
     mut sm: *mut static_memory,
     mut indent: *mut libc::c_char,
@@ -69,7 +69,7 @@ pub unsafe fn static_memory_str(
     }
     return strbuilder_build(b);
 }
-#[no_mangle]
+
 pub unsafe fn static_memory_copy(mut sm: *mut static_memory) -> *mut static_memory {
     let mut copy: *mut static_memory =
         malloc(::core::mem::size_of::<static_memory>()) as *mut static_memory;
@@ -91,7 +91,7 @@ unsafe fn pool_copy(mut p: &map) -> Box<map> {
     }
     return pcopy;
 }
-#[no_mangle]
+
 pub unsafe fn static_memory_newblock(mut sm: *mut static_memory) -> libc::c_int {
     let mut address: libc::c_int = block_arr_append((*sm).blocks, block_create());
     let mut n: libc::c_int = block_arr_nblocks((*sm).blocks);
@@ -109,7 +109,7 @@ pub unsafe fn static_memory_newblock(mut sm: *mut static_memory) -> libc::c_int 
     };
     return address;
 }
-#[no_mangle]
+
 pub unsafe fn static_memory_getblock(
     mut sm: *mut static_memory,
     mut address: libc::c_int,
@@ -119,7 +119,7 @@ pub unsafe fn static_memory_getblock(
     }
     return *(block_arr_blocks((*sm).blocks)).offset(address as isize);
 }
-#[no_mangle]
+
 pub unsafe fn static_memory_stringpool(
     mut sm: *mut static_memory,
     mut lit: *mut libc::c_char,
@@ -131,7 +131,7 @@ pub unsafe fn static_memory_stringpool(
         location_copy(loc) as *const libc::c_void,
     );
 }
-#[no_mangle]
+
 pub unsafe fn static_memory_checkpool(
     mut sm: *mut static_memory,
     mut lit: *mut libc::c_char,

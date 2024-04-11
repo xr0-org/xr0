@@ -23,11 +23,11 @@ pub struct props {
     pub n: libc::c_int,
     pub prop: *mut *mut ast_expr,
 }
-#[no_mangle]
+
 pub unsafe fn props_create() -> *mut props {
     return calloc(1, ::core::mem::size_of::<props>()) as *mut props;
 }
-#[no_mangle]
+
 pub unsafe fn props_copy(mut old: *mut props) -> *mut props {
     let mut new: *mut props = props_create();
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -37,7 +37,7 @@ pub unsafe fn props_copy(mut old: *mut props) -> *mut props {
     }
     return new;
 }
-#[no_mangle]
+
 pub unsafe fn props_destroy(mut p: *mut props) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*p).n {
@@ -46,7 +46,7 @@ pub unsafe fn props_destroy(mut p: *mut props) {
     }
     free(p as *mut libc::c_void);
 }
-#[no_mangle]
+
 pub unsafe fn props_str(mut p: *mut props, mut indent: *mut libc::c_char) -> *mut libc::c_char {
     if (*p).n == 0 as libc::c_int {
         return dynamic_str(b"\0" as *const u8 as *const libc::c_char);
@@ -76,15 +76,15 @@ pub unsafe fn props_str(mut p: *mut props, mut indent: *mut libc::c_char) -> *mu
     strbuilder_printf(b, b"\n\0" as *const u8 as *const libc::c_char);
     return strbuilder_build(b);
 }
-#[no_mangle]
+
 pub unsafe fn props_n(mut p: *mut props) -> libc::c_int {
     return (*p).n;
 }
-#[no_mangle]
+
 pub unsafe fn props_props(mut p: *mut props) -> *mut *mut ast_expr {
     return (*p).prop;
 }
-#[no_mangle]
+
 pub unsafe fn props_install(mut p: *mut props, mut e: *mut ast_expr) {
     if props_contradicts(p, e) as libc::c_int as libc::c_long != 0 {
         __assert_rtn(
@@ -104,7 +104,7 @@ pub unsafe fn props_install(mut p: *mut props, mut e: *mut ast_expr) {
     let ref mut fresh0 = *((*p).prop).offset(((*p).n - 1 as libc::c_int) as isize);
     *fresh0 = e;
 }
-#[no_mangle]
+
 pub unsafe fn props_get(mut p: *mut props, mut e: *mut ast_expr) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*p).n {
@@ -115,7 +115,7 @@ pub unsafe fn props_get(mut p: *mut props, mut e: *mut ast_expr) -> bool {
     }
     return 0 as libc::c_int != 0;
 }
-#[no_mangle]
+
 pub unsafe fn props_contradicts(mut p: *mut props, mut p1: *mut ast_expr) -> bool {
     let mut not_p1: *mut ast_expr = ast_expr_inverted_copy(p1, 1 as libc::c_int != 0);
     let mut iscontradiction: bool = props_contradicts_actual(p, p1, not_p1);

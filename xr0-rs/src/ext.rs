@@ -27,7 +27,7 @@ pub struct externals {
     pub _typedef: Box<map>,
     pub _struct: Box<map>,
 }
-#[no_mangle]
+
 pub unsafe fn externals_create() -> *mut externals {
     let mut ext: *mut externals = malloc(::core::mem::size_of::<externals>()) as *mut externals;
     std::ptr::write(
@@ -41,7 +41,7 @@ pub unsafe fn externals_create() -> *mut externals {
     );
     return ext;
 }
-#[no_mangle]
+
 pub unsafe fn externals_destroy(mut ext: *mut externals) {
     let externals {
         func,
@@ -55,7 +55,7 @@ pub unsafe fn externals_destroy(mut ext: *mut externals) {
     map_destroy(_struct);
     free(ext as *mut libc::c_void);
 }
-#[no_mangle]
+
 pub unsafe fn externals_types_str(
     mut ext: *mut externals,
     mut indent: *mut libc::c_char,
@@ -92,7 +92,7 @@ pub unsafe fn externals_types_str(
     }
     return strbuilder_build(b);
 }
-#[no_mangle]
+
 pub unsafe fn externals_declarefunc(
     mut ext: *mut externals,
     mut id: *mut libc::c_char,
@@ -100,7 +100,7 @@ pub unsafe fn externals_declarefunc(
 ) {
     map_set(&mut (*ext).func, dynamic_str(id), f as *const libc::c_void);
 }
-#[no_mangle]
+
 pub unsafe fn externals_declarevar(
     mut ext: *mut externals,
     mut id: *mut libc::c_char,
@@ -108,7 +108,7 @@ pub unsafe fn externals_declarevar(
 ) {
     map_set(&mut (*ext).var, dynamic_str(id), v as *const libc::c_void);
 }
-#[no_mangle]
+
 pub unsafe fn externals_declaretypedef(
     mut ext: *mut externals,
     mut id: *mut libc::c_char,
@@ -120,7 +120,7 @@ pub unsafe fn externals_declaretypedef(
         t as *const libc::c_void,
     );
 }
-#[no_mangle]
+
 pub unsafe fn externals_declarestruct(mut ext: *mut externals, mut t: *mut ast_type) {
     let mut id: *mut libc::c_char = ast_type_struct_tag(t);
     if id.is_null() as libc::c_int as libc::c_long != 0 {
@@ -141,21 +141,21 @@ pub unsafe fn externals_declarestruct(mut ext: *mut externals, mut t: *mut ast_t
         t as *const libc::c_void,
     );
 }
-#[no_mangle]
+
 pub unsafe fn externals_getfunc(
     mut ext: *mut externals,
     mut id: *mut libc::c_char,
 ) -> *mut ast_function {
     return map_get(&(*ext).func, id) as *mut ast_function;
 }
-#[no_mangle]
+
 pub unsafe fn externals_gettypedef(
     mut ext: *mut externals,
     mut id: *mut libc::c_char,
 ) -> *mut ast_type {
     return map_get(&(*ext)._typedef, id) as *mut ast_type;
 }
-#[no_mangle]
+
 pub unsafe fn externals_getstruct(
     mut ext: *mut externals,
     mut id: *mut libc::c_char,

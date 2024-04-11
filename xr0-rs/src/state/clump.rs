@@ -23,7 +23,7 @@ use crate::{block_arr, Block as block, StrBuilder as strbuilder};
 pub struct clump {
     pub blocks: *mut block_arr,
 }
-#[no_mangle]
+
 pub unsafe fn clump_create() -> *mut clump {
     let mut c: *mut clump = malloc(::core::mem::size_of::<clump>()) as *mut clump;
     if c.is_null() as libc::c_int as libc::c_long != 0 {
@@ -38,11 +38,11 @@ pub unsafe fn clump_create() -> *mut clump {
     (*c).blocks = block_arr_create();
     return c;
 }
-#[no_mangle]
+
 pub unsafe fn clump_destroy(mut c: *mut clump) {
     block_arr_destroy((*c).blocks);
 }
-#[no_mangle]
+
 pub unsafe fn clump_str(mut c: *mut clump, mut indent: *mut libc::c_char) -> *mut libc::c_char {
     let mut b: *mut strbuilder = strbuilder_create();
     let mut n: libc::c_int = block_arr_nblocks((*c).blocks);
@@ -62,13 +62,13 @@ pub unsafe fn clump_str(mut c: *mut clump, mut indent: *mut libc::c_char) -> *mu
     }
     return strbuilder_build(b);
 }
-#[no_mangle]
+
 pub unsafe fn clump_copy(mut c: *mut clump) -> *mut clump {
     let mut copy: *mut clump = malloc(::core::mem::size_of::<clump>()) as *mut clump;
     (*copy).blocks = block_arr_copy((*c).blocks);
     return copy;
 }
-#[no_mangle]
+
 pub unsafe fn clump_newblock(mut c: *mut clump) -> libc::c_int {
     let mut address: libc::c_int = block_arr_append((*c).blocks, block_create());
     let mut n: libc::c_int = block_arr_nblocks((*c).blocks);
@@ -84,7 +84,7 @@ pub unsafe fn clump_newblock(mut c: *mut clump) -> libc::c_int {
     };
     return address;
 }
-#[no_mangle]
+
 pub unsafe fn clump_getblock(mut c: *mut clump, mut address: libc::c_int) -> *mut block {
     if address >= block_arr_nblocks((*c).blocks) {
         return 0 as *mut block;

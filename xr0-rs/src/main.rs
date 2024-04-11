@@ -137,10 +137,10 @@ pub fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String>
     Ok(buf)
 }
 
-#[no_mangle]
+
 pub static mut root: *mut Ast = 0 as *const Ast as *mut Ast;
 
-#[no_mangle]
+
 pub unsafe fn pass0(root_0: *mut Ast, ext: *mut Externals) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*root_0).n {
@@ -165,7 +165,7 @@ pub unsafe fn pass0(root_0: *mut Ast, ext: *mut Externals) {
     }
 }
 
-#[no_mangle]
+
 pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*root_0).n {
@@ -204,7 +204,7 @@ pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
     }
 }
 
-#[no_mangle]
+
 pub unsafe fn pass_inorder(order: &mut string_arr, ext: *mut Externals) {
     let n: libc::c_int = string_arr_n(order);
     let name: *mut *mut libc::c_char = string_arr_s(order);
