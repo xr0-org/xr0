@@ -257,7 +257,7 @@ ast_function_precondsinit(struct ast_function *f, struct state *s)
 	if (!pre.stmt) {
 		return NULL;
 	}
-	struct error *err = ast_stmt_absprocess(pre.stmt, ast_function_name(f), s, false, true);
+	struct error *err = ast_stmt_absprocess(pre.stmt, ast_function_name(f), s, true, true);
 	if (err) {
 		struct lexememarker *loc = ast_stmt_lexememarker(pre.stmt); 
 		assert(loc);

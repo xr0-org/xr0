@@ -1002,6 +1002,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 static struct result *
 expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("state: %s\n", state_str(state));
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
