@@ -122,7 +122,7 @@ pub struct ConstantExpr {
     ischar: bool,
 }
 
-pub type ast_expr_kind = libc::c_uint;
+type ast_expr_kind = libc::c_uint;
 const EXPR_ALLOCATION: ast_expr_kind = 16384;
 const EXPR_ARBARG: ast_expr_kind = 8192;
 const EXPR_ISDEREFERENCABLE: ast_expr_kind = 4096;
@@ -2655,7 +2655,7 @@ pub unsafe fn ast_expr_unary_operand(mut expr: *mut ast_expr) -> *mut ast_expr {
     return (*expr).root;
 }
 
-pub unsafe fn ast_expr_kind(mut expr: *mut ast_expr) -> ast_expr_kind {
+unsafe fn ast_expr_kind(mut expr: *mut ast_expr) -> ast_expr_kind {
     return (*expr).kind;
 }
 
