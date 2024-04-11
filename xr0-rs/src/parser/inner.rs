@@ -1,3 +1,5 @@
+#![allow(non_camel_case_types)]
+
 use std::collections::HashSet;
 use std::ffi::CString;
 use std::ptr;
@@ -6,16 +8,16 @@ use super::lexememarker;
 use crate::ast::*;
 use crate::util::dynamic_str;
 
-struct Env {
-    reserved: HashSet<&'static str>,
+pub struct Env {
+    pub reserved: HashSet<&'static str>,
 }
 
 impl Env {
-    unsafe fn lexloc(&self, p: usize) -> *mut lexememarker {
+    unsafe fn lexloc(&self, _p: usize) -> *mut lexememarker {
         todo!();
     }
 
-    unsafe fn is_typename(&self, name: *const libc::c_char) -> bool {
+    unsafe fn is_typename(&self, _name: *const libc::c_char) -> bool {
         todo!();
     }
 }
@@ -121,7 +123,7 @@ unsafe fn stmt_array_from_vec(v: Vec<*mut ast_stmt>) -> stmt_array {
 }
 
 unsafe fn variable_array_from_vec(vars: Vec<*mut ast_variable>) -> *mut ast_variable_arr {
-    let mut list = ast_variable_arr_create();
+    let list = ast_variable_arr_create();
     for v in vars {
         ast_variable_arr_append(list, v);
     }
@@ -129,14 +131,14 @@ unsafe fn variable_array_from_vec(vars: Vec<*mut ast_variable>) -> *mut ast_vari
 }
 
 unsafe fn variable_array_from_decl_vec(decls: Vec<declaration>) -> *mut ast_variable_arr {
-    let mut list = ast_variable_arr_create();
+    let list = ast_variable_arr_create();
     for decl in decls {
         ast_variable_arr_append(list, ast_variable_create(decl.name, decl.t));
     }
     list
 }
 
-unsafe fn ast_from_vec(mut v: Vec<*mut ast_externdecl>) -> *mut ast {
+unsafe fn ast_from_vec(v: Vec<*mut ast_externdecl>) -> *mut ast {
     let mut root = ast_create(v[0]);
     for &decl in &v[1..] {
         root = ast_append(root, decl);
@@ -144,7 +146,8 @@ unsafe fn ast_from_vec(mut v: Vec<*mut ast_externdecl>) -> *mut ast {
     root
 }
 
-peg::parser! { grammar c_parser(env: &Env) for str {
+peg::parser! {
+pub grammar c_parser(env: &Env) for str {
     // A few bits cribbed from <https://github.com/vickenty/lang-c/blob/master/grammar.rustpeg>
 
     // Lists of elements.
@@ -594,8 +597,8 @@ peg::parser! { grammar c_parser(env: &Env) for str {
             unsafe { ast_stmt_create_jump(env.lexloc(p), JUMP_RETURN, expr) }
         }
 
-    rule translation_unit() -> BoxedAst =
-        decl:list1(<external_declaration()>) { unsafe { ast_from_vec(decl) } }
+    pub rule translation_unit() -> BoxedAst =
+        directive()? _ decl:list1(<external_declaration()>) _ { unsafe { ast_from_vec(decl) } }
 
     rule external_declaration() -> BoxedExternDecl =
         f:function_definition() { unsafe { ast_functiondecl_create(f) } } /
@@ -677,4 +680,5 @@ peg::parser! { grammar c_parser(env: &Env) for str {
                 )
             }
         }
-}}
+}
+}

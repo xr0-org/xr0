@@ -1,3 +1,5 @@
+#![allow(non_camel_case_types)]
+
 use libc::FILE;
 
 extern "C" {
@@ -9,14 +11,6 @@ extern "C" {
 
     pub fn vfprintf(_: *mut FILE, _: *const libc::c_char, _: ::core::ffi::VaList) -> libc::c_int;
     pub fn vprintf(_: *const libc::c_char, _: ::core::ffi::VaList) -> libc::c_int;
-
-    pub fn getopt(
-        _: libc::c_int,
-        _: *const *mut libc::c_char,
-        _: *const libc::c_char,
-    ) -> libc::c_int;
-    pub static mut optarg: *mut libc::c_char;
-    pub static mut optind: libc::c_int;
 
     pub fn __assert_rtn(
         _: *const libc::c_char,
@@ -36,10 +30,6 @@ pub type __darwin_size_t = libc::c_ulong;
 pub type __darwin_wchar_t = libc::c_int;
 pub type __darwin_rune_t = __darwin_wchar_t;
 pub type __darwin_off_t = __int64_t;
-pub type int16_t = libc::c_short;
-pub type size_t = __darwin_size_t;
-pub type fpos_t = __darwin_off_t;
-pub type uint8_t = libc::c_uchar;
 
 #[derive(Copy, Clone)]
 #[repr(C)]

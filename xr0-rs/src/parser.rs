@@ -1,3 +1,7 @@
+#![allow(non_camel_case_types, dead_code)]
+
+use crate::ast::ast;
+
 mod inner;
 
 #[derive(Copy, Clone)]
@@ -28,4 +32,20 @@ extern "C" {
     // pub static mut yylval: YYSTYPE;
     // pub static mut yynerrs: libc::c_int;
     pub fn yyparse() -> libc::c_int;
+}
+
+static RESERVED: &[&str] = &[
+    "auto", "axiom", "break", "case", "char", "const", "continue", "default", "do", "double",
+    "else", "enum", "extern", "float", "for", "goto", "if", "int", "lemma", "long", "register",
+    "return", "short", "signed", "sizeof", "some", "static", "sfunc", "struct", "switch",
+    "typedef", "union", "unsigned", "void", "volatile", "while",
+];
+
+pub fn parse_translation_unit(
+    source: &str,
+) -> Result<*mut ast, peg::error::ParseError<peg::str::LineCol>> {
+    let env = inner::Env {
+        reserved: RESERVED.iter().copied().collect(),
+    };
+    inner::c_parser::translation_unit(source, &env)
 }
