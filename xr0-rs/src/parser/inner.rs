@@ -166,14 +166,15 @@ pub grammar c_parser(env: &Env) for str {
 
     // Identifiers
     rule identifier() -> BoxedCStr =
-        n:$(['_' | 'a'..='z' | 'A'..='Z'] ['_' | 'a'..='z' | 'A'..='Z' | '0'..='9']*) {?
+        n:quiet! { $(['_' | 'a'..='z' | 'A'..='Z'] ['_' | 'a'..='z' | 'A'..='Z' | '0'..='9']*) } {?
             if !env.reserved.contains(n) {
                 let cstr = CString::new(n.to_string()).unwrap();
                 Ok(unsafe { dynamic_str(cstr.as_ptr()) })
             } else {
                 Err("identifier")
             }
-        }
+        } /
+        expected!("identifier")
 
     // Constants
     rule dec() = ['0'..='9']
