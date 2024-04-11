@@ -319,6 +319,10 @@ pub grammar c_parser(env: &Env) for str {
         x:(@) _ "+" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_ADDITION, y) } }
         x:(@) _ "-" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_SUBTRACTION, y) } }
         --
+        x:(@) _ "*" _ y:@ { x }
+        x:(@) _ "/" _ y:@ { x }
+        x:(@) _ "%" _ y:@ { x }
+        --
         e:cast_expression() { e }
     }
 
