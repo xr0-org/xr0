@@ -19,8 +19,6 @@ use crate::state::location::location_copy;
 use crate::util::{dynamic_str, map, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{block_arr, Block as block, Location as location, StrBuilder as strbuilder};
 
-#[derive(Clone)]
-#[repr(C)]
 pub struct static_memory {
     pub blocks: *mut block_arr,
     pub pool: Box<map>,

@@ -52,8 +52,7 @@ pub type expr_type = libc::c_uint;
 pub const EXPR_NEG: expr_type = 2;
 pub const EXPR_SUM: expr_type = 1;
 pub const EXPR_ATOM: expr_type = 0;
-#[derive(Clone)]
-#[repr(C)]
+
 pub struct tally {
     pub map: Box<map>,
     pub num: libc::c_int,

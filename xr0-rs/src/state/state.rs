@@ -44,8 +44,7 @@ use crate::{
     Props as props, Stack as stack, StrBuilder as strbuilder, Value as value, Variable as variable,
 };
 
-#[derive(Copy, Clone)]
-#[repr(C)]
+#[allow(non_camel_case_types)]
 pub struct state {
     pub ext: *mut externals,
     pub vconst: *mut vconst,

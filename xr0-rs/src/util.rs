@@ -14,8 +14,6 @@ use libc::{
     strlen, strncpy, FILE,
 };
 
-#[derive(Copy, Clone)]
-#[repr(C)]
 pub struct map {
     entry: *mut entry,
     n: libc::c_int,

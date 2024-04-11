@@ -34,8 +34,6 @@ pub struct heap {
     pub blocks: *mut block_arr,
     pub freed: *mut bool,
 }
-#[derive(Clone)]
-#[repr(C)]
 pub struct vconst {
     pub varmap: Box<map>,
     pub comment: Box<map>,

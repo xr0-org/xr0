@@ -39,8 +39,6 @@ use crate::{
     Value as value,
 };
 
-#[derive(Clone)]
-#[repr(C)]
 pub struct stack {
     pub name: *mut libc::c_char,
     pub frame: *mut block_arr,

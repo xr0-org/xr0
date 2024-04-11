@@ -16,8 +16,6 @@ use crate::{ast_function, ast_type, ast_variable, StrBuilder as strbuilder};
 
 use crate::c_util::__assert_rtn;
 
-#[derive(Clone)]
-#[repr(C)]
 pub struct externals {
     pub func: Box<map>,
     pub var: Box<map>,
