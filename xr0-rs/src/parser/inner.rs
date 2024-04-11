@@ -7,20 +7,6 @@ use crate::ast::*;
 use crate::parser::env::Env;
 use crate::util::dynamic_str;
 
-/* XXX */
-unsafe fn strip_quotes(s: *const libc::c_char) -> BoxedCStr {
-    assert_eq!(*s, b'"' as libc::c_char);
-    let len = libc::strlen(s) - 2 + 1;
-    let t = libc::malloc(len) as *mut libc::c_char;
-    libc::memcpy(
-        t as *mut libc::c_void,
-        s.offset(1) as *const libc::c_void,
-        len - 1,
-    );
-    *t.add(len - 1) = 0;
-    t
-}
-
 type BoxedAst = *mut ast;
 type BoxedBlock = *mut ast_block;
 type BoxedExpr = *mut ast_expr;
@@ -75,6 +61,20 @@ enum PostfixOp {
     Arrow(*mut libc::c_char),
     Inc,
     Dec,
+}
+
+/* XXX */
+unsafe fn strip_quotes(s: *const libc::c_char) -> BoxedCStr {
+    assert_eq!(*s, b'"' as libc::c_char);
+    let len = libc::strlen(s) - 2 + 1;
+    let t = libc::malloc(len) as *mut libc::c_char;
+    libc::memcpy(
+        t as *mut libc::c_void,
+        s.offset(1) as *const libc::c_void,
+        len - 1,
+    );
+    *t.add(len - 1) = 0;
+    t
 }
 
 unsafe fn expr_array_from_vec(v: Vec<*mut ast_expr>) -> expr_array {
