@@ -73,56 +73,55 @@ pub const BINARY_OP_GT: ast_binary_operator = 8;
 pub const BINARY_OP_LT: ast_binary_operator = 4;
 pub const BINARY_OP_NE: ast_binary_operator = 2;
 pub const BINARY_OP_EQ: ast_binary_operator = 1;
-#[derive(Copy, Clone)]
-#[repr(C)]
+
 pub struct ast_expr {
-    pub kind: ast_expr_kind,
-    pub root: *mut ast_expr,
-    pub u: C2RustUnnamed,
+    kind: ast_expr_kind,
+    root: *mut ast_expr,
+    u: C2RustUnnamed,
 }
-#[derive(Copy, Clone)]
-#[repr(C)]
+
 pub union C2RustUnnamed {
-    pub string: *mut libc::c_char,
-    pub constant: C2RustUnnamed_4,
-    pub call: C2RustUnnamed_3,
-    pub incdec: C2RustUnnamed_2,
-    pub unary_op: ast_unary_operator,
-    pub binary: C2RustUnnamed_1,
-    pub assignment_value: *mut ast_expr,
-    pub alloc: C2RustUnnamed_0,
+    string: *mut libc::c_char,
+    constant: ConstantExpr,
+    call: CallExpr,
+    incdec: IncDecExpr,
+    unary_op: ast_unary_operator,
+    binary: BinaryExpr,
+    assignment_value: *mut ast_expr,
+    alloc: AllocExpr,
 }
+
 #[derive(Copy, Clone)]
-#[repr(C)]
-pub struct C2RustUnnamed_0 {
-    pub kind: ast_alloc_kind,
-    pub arg: *mut ast_expr,
+pub struct AllocExpr {
+    kind: ast_alloc_kind,
+    arg: *mut ast_expr,
 }
+
 #[derive(Copy, Clone)]
-#[repr(C)]
-pub struct C2RustUnnamed_1 {
-    pub op: ast_binary_operator,
-    pub e1: *mut ast_expr,
-    pub e2: *mut ast_expr,
+pub struct BinaryExpr {
+    op: ast_binary_operator,
+    e1: *mut ast_expr,
+    e2: *mut ast_expr,
 }
+
 #[derive(Copy, Clone)]
-#[repr(C)]
-pub struct C2RustUnnamed_2 {
-    pub inc: libc::c_int,
-    pub pre: libc::c_int,
+pub struct IncDecExpr {
+    inc: libc::c_int,
+    pre: libc::c_int,
 }
+
 #[derive(Copy, Clone)]
-#[repr(C)]
-pub struct C2RustUnnamed_3 {
-    pub n: libc::c_int,
-    pub arg: *mut *mut ast_expr,
+pub struct CallExpr {
+    n: libc::c_int,
+    arg: *mut *mut ast_expr,
 }
+
 #[derive(Copy, Clone)]
-#[repr(C)]
-pub struct C2RustUnnamed_4 {
-    pub constant: libc::c_int,
-    pub ischar: bool,
+pub struct ConstantExpr {
+    constant: libc::c_int,
+    ischar: bool,
 }
+
 pub type ast_expr_kind = libc::c_uint;
 pub const EXPR_ALLOCATION: ast_expr_kind = 16384;
 pub const EXPR_ARBARG: ast_expr_kind = 8192;
