@@ -735,6 +735,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(err);
 	}
 
+	printf("state (postpush): %s\n", state_str(state));
 	/* XXX: pass copy so we don't observe */
 	if ((err = call_setupverify(f, state_copy(state)))) {
 		return result_error_create(
@@ -765,6 +766,8 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	if (result_hasvalue(res)) {
 		v = value_copy(result_as_value(res));
 	}
+
+	printf("state (post): %s\n", state_str(state));
 
 	state_unnest(state);
 	state_popframe(state);

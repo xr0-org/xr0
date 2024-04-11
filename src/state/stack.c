@@ -298,6 +298,8 @@ stack_references(struct stack *s, struct location *loc, struct state *state)
 struct block *
 stack_getblock(struct stack *s, int address)
 {
+	printf("addy: %d, block: %d\n", address, block_arr_nblocks(s->memory));
+
 	assert(address < block_arr_nblocks(s->memory));
 
 	return block_arr_blocks(s->memory)[address];

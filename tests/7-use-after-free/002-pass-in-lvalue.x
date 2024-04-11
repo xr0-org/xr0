@@ -1,8 +1,6 @@
 void
 modify(int *q) ~ [
-	setup: {
-		q = .clump(sizeof(int));
-	}
+	setup: q = .clump(sizeof(int));
 	*q = 2;
 ] {
 	*q = 2;
