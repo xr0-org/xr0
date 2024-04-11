@@ -11,10 +11,7 @@
 use libc::{free, malloc};
 
 use crate::c_util::__assert_rtn;
-use crate::util::{
-    dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
-    strbuilder_create, strbuilder_printf,
-};
+use crate::util::{dynamic_str, map, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::StrBuilder as strbuilder;
 
 #[derive(Copy, Clone)]
@@ -265,16 +262,14 @@ pub unsafe fn math_expr_simplify(mut raw: *mut math_expr) -> *mut math_expr {
     let mut t: tally = tally(raw);
     let mut m = &t.map;
     let mut expr: *mut math_expr = 0 as *mut math_expr;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m.n {
-        let mut e: entry = *(m.entry).offset(i as isize);
-        if !(e.value).is_null() {
+    for (k, v) in m.pairs() {
+        if !v.is_null() {
+            // XXX this cast to mut is suspicious; is the original making a mistake here?
             expr = math_expr_nullablesum(
                 expr,
-                math_expr_fromvartally(e.key, e.value as libc::c_long as libc::c_int),
+                math_expr_fromvartally(k as *mut libc::c_char, v as libc::c_long as libc::c_int),
             );
         }
-        i += 1;
     }
     let mut num: *mut math_expr = if t.num != 0 {
         math_expr_fromint(t.num)
@@ -313,6 +308,7 @@ unsafe fn tally(mut e: *mut math_expr) -> tally {
     }
     panic!("Reached end of non-void function without returning");
 }
+
 unsafe fn sum_tally(mut e: *mut math_expr) -> tally {
     if !((*e).type_0 as libc::c_uint == EXPR_SUM as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
@@ -336,51 +332,43 @@ unsafe fn sum_tally(mut e: *mut math_expr) -> tally {
         init
     };
 }
+
 unsafe fn map_sum(mut m1: Box<map>, mut m2: Box<map>) -> Box<map> {
-    let mut m = map_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m1.n {
-        let mut e: entry = *m1.entry.offset(i as isize);
-        map_set(&mut m, dynamic_str(e.key), e.value);
-        i += 1;
+    let mut m = map::new();
+    for (k, v) in m1.pairs() {
+        m.set(dynamic_str(k), v);
     }
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < m2.n {
-        let mut e_0: entry = *m2.entry.offset(i_0 as isize);
-        let val = (e_0.value).offset(map_get(&m, e_0.key) as libc::c_long as isize);
-        map_set(&mut m, dynamic_str(e_0.key), val);
-        i_0 += 1;
+    for (k, v) in m2.pairs() {
+        // XXX THIS IS NOT GREAT
+        let val = v.offset(m.get(k) as libc::c_long as isize);
+        m.set(dynamic_str(k), val);
     }
-    map_destroy(m2);
-    map_destroy(m1);
+    m2.destroy();
+    m1.destroy();
     return m;
 }
+
 unsafe fn neg_tally(mut e: *mut math_expr) -> tally {
     let mut r: tally = tally((*e).c2rust_unnamed.negated);
     let mut m = &mut r.map;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m.n {
-        let mut e_0: entry = *m.entry.offset(i as isize);
-        let mut val: libc::c_long = -(map_get(m, e_0.key) as libc::c_long);
-        map_set(m, e_0.key, val as *mut libc::c_void);
-        i += 1;
+    for (_, v) in m.pairs_mut() {
+        let mut val: libc::c_long = -(*v as libc::c_long);
+        *v = val as *mut libc::c_void;
     }
     r.num = -r.num;
     return r;
 }
+
 unsafe fn variable_tally_eq(mut m1: Box<map>, mut m2: Box<map>) -> bool {
     let mut res: bool = 0 as libc::c_int != 0;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m1.n {
-        let mut key: *mut libc::c_char = (*m1.entry.offset(i as isize)).key;
-        if map_get(&m1, key) != map_get(&m2, key) {
+    for key in m1.keys() {
+        if m1.get(key) != m2.get(key) {
             res = 0 as libc::c_int != 0;
         }
-        i += 1;
     }
-    res = (*m1).n == (*m2).n;
-    map_destroy(m2);
-    map_destroy(m1);
+    res = m1.len() == m2.len();
+    m2.destroy();
+    m1.destroy();
     return res;
 }
 
@@ -472,7 +460,7 @@ pub unsafe fn math_atom_str(mut a: *mut math_atom) -> *mut libc::c_char {
 unsafe fn atom_tally(mut a: *mut math_atom) -> tally {
     match (*a).type_0 as libc::c_uint {
         0 => tally {
-            map: map_create(),
+            map: map::new(),
             num: (*a).c2rust_unnamed.i as libc::c_int,
         },
         1 => tally {
@@ -483,7 +471,7 @@ unsafe fn atom_tally(mut a: *mut math_atom) -> tally {
     }
 }
 unsafe fn map_fromvar(mut id: *mut libc::c_char) -> Box<map> {
-    let mut m = map_create();
-    map_set(&mut m, id, 1 as libc::c_int as *mut libc::c_void);
+    let mut m = map::new();
+    m.set(id, 1 as libc::c_int as *mut libc::c_void);
     return m;
 }

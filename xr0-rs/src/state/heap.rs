@@ -20,8 +20,7 @@ use crate::state::block::{
 use crate::state::location::{location_create_dynamic, location_destroy};
 use crate::state::state::state_references;
 use crate::util::{
-    dynamic_str, entry, error, error_create, map, map_create, map_destroy, map_get, map_set,
-    strbuilder_build, strbuilder_create, strbuilder_printf,
+    dynamic_str, error, error_create, map, strbuilder_build, strbuilder_create, strbuilder_printf,
 };
 use crate::value::{value_copy, value_destroy, value_str};
 use crate::{
@@ -222,9 +221,9 @@ pub unsafe fn vconst_create() -> *mut vconst {
     std::ptr::write(
         v,
         vconst {
-            varmap: map_create(),
-            comment: map_create(),
-            persist: map_create(),
+            varmap: map::new(),
+            comment: map::new(),
+            persist: map::new(),
         },
     );
     return v;
@@ -236,47 +235,34 @@ pub unsafe fn vconst_destroy(mut v: *mut vconst) {
         comment,
         persist,
     } = std::ptr::read(v);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m.n {
-        value_destroy((*m.entry.offset(i as isize)).value as *mut value);
-        i += 1;
+    for v in m.values() {
+        value_destroy(v as *mut value);
     }
-    map_destroy(m);
-    map_destroy(comment);
-    map_destroy(persist);
+    m.destroy();
+    comment.destroy();
+    persist.destroy();
     free(v as *mut libc::c_void);
 }
 
 pub unsafe fn vconst_copy(mut old: *mut vconst) -> *mut vconst {
     let mut new: *mut vconst = vconst_create();
     let mut m = &(*old).varmap;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m.n {
-        let mut e: entry = *m.entry.offset(i as isize);
-        map_set(
-            &mut (*new).varmap,
-            dynamic_str(e.key),
-            value_copy(e.value as *mut value) as *const libc::c_void,
+    for (k, v) in m.pairs() {
+        (*new).varmap.set(
+            dynamic_str(k),
+            value_copy(v as *mut value) as *const libc::c_void,
         );
-        i += 1;
     }
     m = &(*old).comment;
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < m.n {
-        let mut e_0: entry = *m.entry.offset(i_0 as isize);
-        map_set(
-            &mut (*new).comment,
-            dynamic_str(e_0.key),
-            dynamic_str(e_0.value as *const libc::c_char) as *const libc::c_void,
+    for (k, v) in m.pairs() {
+        (*new).comment.set(
+            dynamic_str(k),
+            dynamic_str(v as *const libc::c_char) as *const libc::c_void,
         );
-        i_0 += 1;
     }
     m = &(*old).persist;
-    let mut i_1: libc::c_int = 0 as libc::c_int;
-    while i_1 < m.n {
-        let mut e_1: entry = *m.entry.offset(i_1 as isize);
-        map_set(&mut (*new).persist, dynamic_str(e_1.key), e_1.value);
-        i_1 += 1;
+    for (k, v) in m.pairs() {
+        (*new).persist.set(dynamic_str(k), v);
     }
     return new;
 }
@@ -289,19 +275,13 @@ pub unsafe fn vconst_declare(
 ) -> *mut libc::c_char {
     let mut m = &mut (*v).varmap;
     let mut s: *mut libc::c_char = vconst_id(m, &(*v).persist, persist);
-    map_set(m, dynamic_str(s), val as *const libc::c_void);
+    m.set(dynamic_str(s), val as *const libc::c_void);
     if !comment.is_null() {
-        map_set(
-            &mut (*v).comment,
-            dynamic_str(s),
-            comment as *const libc::c_void,
-        );
+        (*v).comment
+            .set(dynamic_str(s), comment as *const libc::c_void);
     }
-    map_set(
-        &mut (*v).persist,
-        dynamic_str(s),
-        persist as usize as *mut libc::c_void,
-    );
+    (*v).persist
+        .set(dynamic_str(s), persist as usize as *mut libc::c_void);
     return s;
 }
 unsafe fn vconst_id(
@@ -317,56 +297,42 @@ unsafe fn vconst_id(
         strbuilder_printf(
             b,
             b"#%d\0" as *const u8 as *const libc::c_char,
-            varmap.n - npersist,
+            varmap.len() - npersist,
         );
     }
     return strbuilder_build(b);
 }
 unsafe fn count_true(mut m: &map) -> libc::c_int {
     let mut n: libc::c_int = 0 as libc::c_int;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m.n {
-        if !((*m.entry.offset(i as isize)).value).is_null() {
+    for v in m.values() {
+        if !v.is_null() {
             n += 1;
         }
-        i += 1;
     }
     return n;
 }
 
 pub unsafe fn vconst_get(mut v: *mut vconst, mut id: *mut libc::c_char) -> *mut value {
-    return map_get(&(*v).varmap, id) as *mut value;
+    return (*v).varmap.get(id) as *mut value;
 }
 
 pub unsafe fn vconst_undeclare(mut v: *mut vconst) {
-    let mut varmap = map_create();
-    let mut comment = map_create();
-    let mut persist = map_create();
+    let mut varmap = map::new();
+    let mut comment = map::new();
+    let mut persist = map::new();
     let mut m = &(*v).varmap;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m.n {
-        let mut key: *mut libc::c_char = (*m.entry.offset(i as isize)).key;
-        if !(map_get(&(*v).persist, key)).is_null() {
-            map_set(
-                &mut varmap,
+    for key in m.keys() {
+        if !((*v).persist.get(key)).is_null() {
+            varmap.set(
                 dynamic_str(key),
-                value_copy(map_get(&(*v).varmap, key) as *mut value) as *const libc::c_void,
+                value_copy((*v).varmap.get(key) as *mut value) as *const libc::c_void,
             );
-            let mut c: *mut libc::c_char = map_get(&(*v).comment, key) as *mut libc::c_char;
+            let mut c: *mut libc::c_char = (*v).comment.get(key) as *mut libc::c_char;
             if !c.is_null() {
-                map_set(
-                    &mut comment,
-                    dynamic_str(key),
-                    dynamic_str(c) as *const libc::c_void,
-                );
+                comment.set(dynamic_str(key), dynamic_str(c) as *const libc::c_void);
             }
-            map_set(
-                &mut persist,
-                dynamic_str(key),
-                1 as libc::c_int as *mut libc::c_void,
-            );
+            persist.set(dynamic_str(key), 1 as libc::c_int as *mut libc::c_void);
         }
-        i += 1;
     }
     std::ptr::write(
         v,
@@ -381,24 +347,21 @@ pub unsafe fn vconst_undeclare(mut v: *mut vconst) {
 pub unsafe fn vconst_str(mut v: *mut vconst, mut indent: *mut libc::c_char) -> *mut libc::c_char {
     let mut b: *mut strbuilder = strbuilder_create();
     let mut m = &(*v).varmap;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m.n {
-        let mut e: entry = *m.entry.offset(i as isize);
-        let mut value: *mut libc::c_char = value_str(e.value as *mut value);
+    for (k, val) in m.pairs() {
+        let mut value: *mut libc::c_char = value_str(val as *mut value);
         strbuilder_printf(
             b,
             b"%s%s: %s\0" as *const u8 as *const libc::c_char,
             indent,
-            e.key,
+            k,
             value,
         );
-        let mut comment: *mut libc::c_char = map_get(&(*v).comment, e.key) as *mut libc::c_char;
+        let mut comment: *mut libc::c_char = (*v).comment.get(k) as *mut libc::c_char;
         if !comment.is_null() {
             strbuilder_printf(b, b"\t(%s)\0" as *const u8 as *const libc::c_char, comment);
         }
         strbuilder_printf(b, b"\n\0" as *const u8 as *const libc::c_char);
         free(value as *mut libc::c_void);
-        i += 1;
     }
     return strbuilder_build(b);
 }

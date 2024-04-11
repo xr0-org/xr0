@@ -17,8 +17,8 @@ use libc::{
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct map {
-    pub entry: *mut entry,
-    pub n: libc::c_int,
+    entry: *mut entry,
+    n: libc::c_int,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -52,6 +52,7 @@ pub unsafe extern "C" fn dynamic_str(mut s: *const libc::c_char) -> *mut libc::c
     strncpy(t, s, len);
     return t;
 }
+
 unsafe fn entry_create(key: *const libc::c_char, value: *const libc::c_void) -> entry {
     assert!(!key.is_null());
     entry {
@@ -59,71 +60,104 @@ unsafe fn entry_create(key: *const libc::c_char, value: *const libc::c_void) -> 
         value,
     }
 }
+
 unsafe fn entry_destroy(mut e: entry) {
     free(e.key as *mut libc::c_void);
 }
 
-pub unsafe fn map_create() -> Box<map> {
-    Box::new(map {
-        entry: std::ptr::null_mut(),
-        n: 0,
-    })
-}
-
-pub unsafe fn map_destroy(mut map: Box<map>) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*map).n {
-        entry_destroy(*((*map).entry).offset(i as isize));
-        i += 1;
+impl map {
+    pub fn new() -> Box<map> {
+        Box::new(map {
+            entry: std::ptr::null_mut(),
+            n: 0,
+        })
     }
-    free((*map).entry as *mut libc::c_void);
-}
-unsafe fn map_getindex(map: &map, mut key: *const libc::c_char) -> libc::c_int {
-    if key.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"map_getindex\0")).as_ptr(),
-            b"util.c\0" as *const u8 as *const libc::c_char,
-            51 as libc::c_int,
-            b"key != NULL\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < map.n {
-        if strcmp((*(map.entry).offset(i as isize)).key, key) == 0 as libc::c_int {
-            return i;
+
+    pub unsafe fn destroy(self: Box<map>) {
+        let mut i: libc::c_int = 0 as libc::c_int;
+        while i < self.n {
+            entry_destroy(*(self.entry).offset(i as isize));
+            i += 1;
         }
-        i += 1;
+        free(self.entry as *mut libc::c_void);
     }
-    return -(1 as libc::c_int);
-}
 
-pub unsafe fn map_get(mut map: &map, mut key: *const libc::c_char) -> *mut libc::c_void {
-    let mut index: libc::c_int = map_getindex(map, key);
-    if index != -(1 as libc::c_int) {
-        return (*(map.entry).offset(index as isize)).value as *mut libc::c_void;
+    unsafe fn getindex(&self, mut key: *const libc::c_char) -> libc::c_int {
+        if key.is_null() {
+            panic!("key is null");
+        }
+        let mut i: libc::c_int = 0 as libc::c_int;
+        while i < self.n {
+            if strcmp((*self.entry.offset(i as isize)).key, key) == 0 as libc::c_int {
+                return i;
+            }
+            i += 1;
+        }
+        return -(1 as libc::c_int);
     }
-    return 0 as *mut libc::c_void;
-}
 
-pub unsafe fn map_set(
-    mut map: &mut map,
-    mut key: *const libc::c_char,
-    mut value: *const libc::c_void,
-) {
-    let mut index: libc::c_int = map_getindex(map, key);
-    if index >= 0 as libc::c_int {
-        let ref mut fresh0 = (*(map.entry).offset(index as isize)).value;
-        *fresh0 = value;
-        return;
+    pub unsafe fn get(&self, mut key: *const libc::c_char) -> *mut libc::c_void {
+        let mut index: libc::c_int = self.getindex(key);
+        if index != -(1 as libc::c_int) {
+            return (*self.entry.offset(index as isize)).value as *mut libc::c_void;
+        }
+        return 0 as *mut libc::c_void;
     }
-    map.n += 1;
-    map.entry = realloc(
-        map.entry as *mut libc::c_void,
-        (::core::mem::size_of::<entry>() as libc::c_ulong).wrapping_mul(map.n as libc::c_ulong)
-            as usize,
-    ) as *mut entry;
-    *(map.entry).offset((map.n - 1 as libc::c_int) as isize) = entry_create(key, value);
+
+    pub unsafe fn set(&mut self, mut key: *const libc::c_char, mut value: *const libc::c_void) {
+        let mut index: libc::c_int = self.getindex(key);
+        if index >= 0 as libc::c_int {
+            let ref mut fresh0 = (*self.entry.offset(index as isize)).value;
+            *fresh0 = value;
+            return;
+        }
+        self.n += 1;
+        self.entry = realloc(
+            self.entry as *mut libc::c_void,
+            (::core::mem::size_of::<entry>() as libc::c_ulong).wrapping_mul(self.n as libc::c_ulong)
+                as usize,
+        ) as *mut entry;
+        *self.entry.offset((self.n - 1 as libc::c_int) as isize) = entry_create(key, value);
+    }
+
+    pub fn len(&self) -> libc::c_int {
+        self.n
+    }
+
+    fn table(&self) -> &[entry] {
+        if self.n == 0 {
+            &[]
+        } else {
+            unsafe { std::slice::from_raw_parts(self.entry, self.n as usize) }
+        }
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = *const libc::c_char> + '_ {
+        self.table().iter().map(|e| e.key as *const libc::c_char)
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = *const libc::c_void> + '_ {
+        self.table().iter().map(|e| e.value)
+    }
+
+    pub fn pairs(&self) -> impl Iterator<Item = (*const libc::c_char, *const libc::c_void)> + '_ {
+        self.table()
+            .iter()
+            .map(|e| (e.key as *const libc::c_char, e.value as *const libc::c_void))
+    }
+
+    pub fn pairs_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (*const libc::c_char, &'_ mut *const libc::c_void)> + '_ {
+        let table = if self.n == 0 {
+            &mut []
+        } else {
+            unsafe { std::slice::from_raw_parts_mut(self.entry, self.n as usize) }
+        };
+        table
+            .iter_mut()
+            .map(|e| (e.key as *const libc::c_char, &mut e.value))
+    }
 }
 
 pub unsafe fn strbuilder_create() -> *mut strbuilder {

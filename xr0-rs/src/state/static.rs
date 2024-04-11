@@ -16,10 +16,7 @@ use crate::state::block::{
     block_arr_nblocks, block_create, block_str,
 };
 use crate::state::location::location_copy;
-use crate::util::{
-    dynamic_str, entry, map, map_create, map_get, map_set, strbuilder_build, strbuilder_create,
-    strbuilder_printf,
-};
+use crate::util::{dynamic_str, map, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{block_arr, Block as block, Location as location, StrBuilder as strbuilder};
 
 #[derive(Clone)]
@@ -37,7 +34,7 @@ pub unsafe fn static_memory_create() -> *mut static_memory {
         sm,
         static_memory {
             blocks: block_arr_create(),
-            pool: map_create(),
+            pool: map::new(),
         },
     );
     sm
@@ -78,16 +75,12 @@ pub unsafe fn static_memory_copy(mut sm: *mut static_memory) -> *mut static_memo
     return copy;
 }
 unsafe fn pool_copy(mut p: &map) -> Box<map> {
-    let mut pcopy = map_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < p.n {
-        let mut e: entry = *p.entry.offset(i as isize);
-        map_set(
-            &mut pcopy,
-            dynamic_str(e.key),
-            location_copy(e.value as *mut location) as *const libc::c_void,
+    let mut pcopy = map::new();
+    for (k, v) in p.pairs() {
+        pcopy.set(
+            dynamic_str(k),
+            location_copy(v as *mut location) as *const libc::c_void,
         );
-        i += 1;
     }
     return pcopy;
 }
@@ -125,16 +118,14 @@ pub unsafe fn static_memory_stringpool(
     mut lit: *mut libc::c_char,
     mut loc: *mut location,
 ) {
-    map_set(
-        &mut (*sm).pool,
-        dynamic_str(lit),
-        location_copy(loc) as *const libc::c_void,
-    );
+    (*sm)
+        .pool
+        .set(dynamic_str(lit), location_copy(loc) as *const libc::c_void);
 }
 
 pub unsafe fn static_memory_checkpool(
     mut sm: *mut static_memory,
     mut lit: *mut libc::c_char,
 ) -> *mut location {
-    return map_get(&(*sm).pool, lit) as *mut location;
+    return (*sm).pool.get(lit) as *mut location;
 }

@@ -28,8 +28,7 @@ use crate::state::location::{
 };
 use crate::state::state::{state_getext, state_vconst};
 use crate::util::{
-    dynamic_str, entry, map, map_create, map_destroy, map_get, map_set, strbuilder_build,
-    strbuilder_create, strbuilder_printf, strbuilder_putc,
+    dynamic_str, map, strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc,
 };
 use crate::{
     ast_type, ast_variable, ast_variable_arr, AstExpr as ast_expr, Location as location,
@@ -482,7 +481,7 @@ pub unsafe fn value_struct_indefinite_create(
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let mut field: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
-        let mut obj: *mut object = map_get(&*(*v).c2rust_unnamed._struct.m, field) as *mut object;
+        let mut obj: *mut object = (*(*v).c2rust_unnamed._struct.m).get(field) as *mut object;
         let mut b: *mut strbuilder = strbuilder_create();
         strbuilder_printf(
             b,
@@ -521,7 +520,7 @@ pub unsafe fn value_pf_augment(mut old: *mut value, mut root: *mut ast_expr) -> 
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let mut field: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
-        let mut obj: *mut object = map_get(&*(*v).c2rust_unnamed._struct.m, field) as *mut object;
+        let mut obj: *mut object = (*(*v).c2rust_unnamed._struct.m).get(field) as *mut object;
         let mut obj_value: *mut value = object_as_value(obj);
         if !obj_value.is_null() {
             if value_issync(obj_value) {
@@ -543,13 +542,12 @@ pub unsafe fn value_isstruct(mut v: *mut value) -> bool {
     return (*v).type_0 as libc::c_uint == VALUE_STRUCT as libc::c_int as libc::c_uint;
 }
 unsafe fn frommembers(mut members: *mut ast_variable_arr) -> Box<map> {
-    let mut m = map_create();
+    let mut m = map::new();
     let mut n: libc::c_int = ast_variable_arr_n(members);
     let mut v: *mut *mut ast_variable = ast_variable_arr_v(members);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        map_set(
-            &mut m,
+        m.set(
             dynamic_str(ast_variable_name(*v.offset(i as isize))),
             object_value_create(ast_expr_constant_create(0 as libc::c_int), 0 as *mut value)
                 as *const libc::c_void,
@@ -559,10 +557,8 @@ unsafe fn frommembers(mut members: *mut ast_variable_arr) -> Box<map> {
     return m;
 }
 unsafe fn destroymembers(m: &map) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m.n {
-        object_destroy((*m.entry.offset(i as isize)).value as *mut object);
-        i += 1;
+    for p in m.values() {
+        object_destroy(p as *mut object);
     }
 }
 
@@ -585,16 +581,12 @@ pub unsafe fn value_struct_copy(mut old: *mut value) -> *mut value {
     return new;
 }
 unsafe fn copymembers(mut old: &map) -> Box<map> {
-    let mut new = map_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < old.n {
-        let mut e: entry = *old.entry.offset(i as isize);
-        map_set(
-            &mut new,
-            dynamic_str(e.key),
-            object_copy(e.value as *mut object) as *const libc::c_void,
+    let mut new = map::new();
+    for (k, v) in old.pairs() {
+        new.set(
+            dynamic_str(k),
+            object_copy(v as *mut object) as *const libc::c_void,
         );
-        i += 1;
     }
     return new;
 }
@@ -621,16 +613,12 @@ pub unsafe fn value_struct_abstractcopy(mut old: *mut value, mut s: *mut state) 
     return new;
 }
 unsafe fn abstractcopymembers(old: &map, mut s: *mut state) -> Box<map> {
-    let mut new = map_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < old.n {
-        let mut e: entry = *old.entry.offset(i as isize);
-        map_set(
-            &mut new,
-            dynamic_str(e.key),
-            object_abstractcopy(e.value as *mut object, s) as *const libc::c_void,
+    let mut new = map::new();
+    for (k, v) in old.pairs() {
+        new.set(
+            dynamic_str(k),
+            object_abstractcopy(v as *mut object, s) as *const libc::c_void,
         );
-        i += 1;
     }
     return new;
 }
@@ -653,18 +641,15 @@ pub unsafe fn value_struct_membertype(
 }
 
 pub unsafe fn value_struct_member(mut v: *mut value, mut member: *mut libc::c_char) -> *mut object {
-    return map_get(&*(*v).c2rust_unnamed._struct.m, member) as *mut object;
+    return (*(*v).c2rust_unnamed._struct.m).get(member) as *mut object;
 }
 unsafe fn struct_referencesheap(mut v: *mut value, mut s: *mut state) -> bool {
     let mut m: &map = &*(*v).c2rust_unnamed._struct.m;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < m.n {
-        let mut val: *mut value =
-            object_as_value((*m.entry.offset(i as isize)).value as *mut object);
+    for p in m.values() {
+        let mut val: *mut value = object_as_value(p as *mut object);
         if !val.is_null() && value_referencesheap(val, s) as libc::c_int != 0 {
             return 1 as libc::c_int != 0;
         }
-        i += 1;
     }
     return 0 as libc::c_int != 0;
 }
@@ -678,7 +663,7 @@ pub unsafe fn value_struct_sprint(mut v: *mut value, mut b: *mut strbuilder) {
     while i < n {
         let mut f: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
         let mut val: *mut value =
-            object_as_value(map_get(&*(*v).c2rust_unnamed._struct.m, f) as *mut object);
+            object_as_value((*(*v).c2rust_unnamed._struct.m).get(f) as *mut object);
         let mut val_str: *mut libc::c_char = if !val.is_null() {
             value_str(val)
         } else {
@@ -786,7 +771,7 @@ pub unsafe fn value_destroy(mut v: *mut value) {
         4 => {
             ast_variable_arr_destroy((*v).c2rust_unnamed._struct.members);
             destroymembers(&*(*v).c2rust_unnamed._struct.m);
-            map_destroy(Box::from_raw((*v).c2rust_unnamed._struct.m));
+            Box::from_raw((*v).c2rust_unnamed._struct.m).destroy();
         }
         _ => {
             if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
@@ -995,16 +980,13 @@ pub unsafe fn value_references(
 }
 unsafe fn struct_references(mut v: *mut value, mut loc: *mut location, mut s: *mut state) -> bool {
     let mut m: &map = &*(*v).c2rust_unnamed._struct.m;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*m).n {
-        let mut val: *mut value =
-            object_as_value((*m.entry.offset(i as isize)).value as *mut object);
+    for p in m.values() {
+        let mut val: *mut value = object_as_value(p as *mut object);
         if !val.is_null() && value_references(val, loc, s) as libc::c_int != 0 {
-            return 1 as libc::c_int != 0;
+            return true;
         }
-        i += 1;
     }
-    return 0 as libc::c_int != 0;
+    false
 }
 
 pub unsafe fn values_comparable(mut v1: *mut value, mut v2: *mut value) -> bool {
