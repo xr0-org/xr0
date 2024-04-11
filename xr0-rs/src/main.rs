@@ -1,4 +1,4 @@
-#![feature(c_variadic, extern_types, linkage)]
+#![feature(c_variadic)]
 
 use std::ffi::CString;
 use std::fs::File;
