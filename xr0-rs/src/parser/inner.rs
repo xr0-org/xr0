@@ -200,12 +200,7 @@ pub grammar c_parser(env: &Env) for str {
         } /
         expected!("character")
 
-    rule character() = [^ '\\' | '\n'] / escape_sequence()
-
-    rule escape_sequence() =
-        "\\" (['\'' | '"' | '?' | '\\' | 'a' | 'b' | 'c' | 'f' | 'n' | 'r' | 't' | 'v'] /
-              oct() * <1,3> /
-              "x" hex()+)
+    rule character() = [^ '\'' | '\\' | '\n'] / "\\" [^ '\n']
 
     // String literals
     rule string_literal() -> BoxedExpr =
@@ -216,7 +211,7 @@ pub grammar c_parser(env: &Env) for str {
             }
         }
 
-    rule string_char() = [^ '"' | '\\' | '\n'] / escape_sequence()
+    rule string_char() = [^ '"' | '\\' | '\n'] / "\\" [^ '\n']
 
     // 6.5.1 Primary expression
     rule primary_expression() -> BoxedExpr =
