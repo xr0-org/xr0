@@ -754,7 +754,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 				error_printf("\n\t%w", result_as_error(res))
 			);
 		}
-
 		struct object_res obj_res = state_getresult(state);
 		assert(!obj_res.err);
 		res = result_value_create(object_as_value(obj_res.obj));
@@ -767,6 +766,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		v = value_copy(result_as_value(res));
 	}
 
+	state_unnest(state);
 	state_popframe(state);
 	/*result_arr_destroy(args);*/
 
@@ -1007,6 +1007,8 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	if (!result_hasvalue(res)) {
+		printf("s: %s\n", state_str(state));
+		printf("expr: %s\n", ast_expr_str(expr));
 		assert(false);
 		return result_error_create(error_printf("undefined indirection (rvalue)"));
 	}

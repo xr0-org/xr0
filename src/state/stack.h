@@ -44,6 +44,9 @@ stack_declare(struct stack *, struct ast_variable *var, bool isparam);
 void
 stack_undeclare(struct stack *stack, struct state *state);
 
+bool
+stack_nested(struct stack *);
+
 struct variable *
 stack_getresult(struct stack *);
 

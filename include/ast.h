@@ -416,7 +416,7 @@ struct error *
 ast_stmt_exec(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *);
+ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *, bool hack_old);
 
 struct error *
 ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *);

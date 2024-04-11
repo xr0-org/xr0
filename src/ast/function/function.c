@@ -257,7 +257,7 @@ ast_function_precondsinit(struct ast_function *f, struct state *s)
 	if (!pre.stmt) {
 		return NULL;
 	}
-	struct error *err = ast_stmt_absprocess(pre.stmt, ast_function_name(f), s);
+	struct error *err = ast_stmt_absprocess(pre.stmt, ast_function_name(f), s, false);
 	if (err) {
 		struct lexememarker *loc = ast_stmt_lexememarker(pre.stmt); 
 		assert(loc);
@@ -326,7 +326,7 @@ ast_function_absexec(struct ast_function *f, struct state *state)
 	int nstmts = ast_block_nstmts(f->abstract);
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
 	for (int i = 0; i < nstmts; i++) {
-		struct error *err = ast_stmt_absprocess(stmt[i], fname, state);
+		struct error *err = ast_stmt_absprocess(stmt[i], fname, state, true);
 		if (err) {
 			return result_error_create(err);
 		}

@@ -68,6 +68,9 @@ void
 state_popframe(struct state *);
 
 void
+state_unnest(struct state *);
+
+void
 state_declare(struct state *, struct ast_variable *var, bool isparam);
 
 struct object_res

@@ -107,8 +107,7 @@ program_nextstmt(struct program *p, struct state *s)
 static bool
 program_stmt_atend(struct program *p, struct state *s)
 {
-	return ast_stmt_isterminal(ast_block_stmts(p->b)[p->index], s)
-		|| ++p->index >= ast_block_nstmts(p->b);
+	return ++p->index >= ast_block_nstmts(p->b);
 }
 
 
@@ -159,7 +158,7 @@ program_stmt_process(struct program *p, bool abstract, struct state *s)
 		if (ast_stmt_ispre(stmt)) {
 			return NULL;
 		}
-		return ast_stmt_absprocess(stmt, p->name, s);
+		return ast_stmt_absprocess(stmt, p->name, s, false);
 	}
 	return ast_stmt_process(stmt, p->name, s);
 }
