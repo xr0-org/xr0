@@ -280,8 +280,8 @@ pub grammar c_parser(env: &Env) for str {
         _ "--" { PostfixOp::Dec }
 
     rule allocation_expression() -> BoxedExpr =
-        ".alloc" _ "(" a:expression() ")" { unsafe { ast_expr_alloc_create(a) } } /
-        ".dealloc" _ "(" a:expression() ")" { unsafe { ast_expr_dealloc_create(a) } } /
+        ".malloc" _ "(" a:expression() ")" { unsafe { ast_expr_alloc_create(a) } } /
+        ".free" _ "(" a:expression() ")" { unsafe { ast_expr_dealloc_create(a) } } /
         ".clump" _ "(" a:expression() ")" { unsafe { ast_expr_clump_create(a) } }
 
     rule argument_expression_list() -> expr_array =
@@ -365,7 +365,7 @@ pub grammar c_parser(env: &Env) for str {
     rule declaration_specifiers() -> BoxedType =
         type_specifier() /
         type_specifier() _ t:declaration_specifiers() { t } /
-        m:declaration_modifier() s:declaration_specifiers() {
+        m:declaration_modifier() _ s:declaration_specifiers() {
             unsafe {
                 ast_type_mod_or(s, m);
             }
