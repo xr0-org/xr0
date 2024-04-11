@@ -234,8 +234,8 @@ pub grammar c_parser(env: &Env) for str {
                     a = match op {
                         PostfixOp::ArrayAccess(i) =>
                             ast_expr_unary_create(
-                                ast_expr_binary_create(a, BINARY_OP_ADDITION, i),
-                                UNARY_OP_DEREFERENCE,
+                                ast_expr_binary_create(a, AstBinaryOp::Addition, i),
+                                AstUnaryOp::Dereference,
                             ),
                         PostfixOp::Call(argc, argv) =>
                             ast_expr_call_create(a, argc, argv),
@@ -246,10 +246,10 @@ pub grammar c_parser(env: &Env) for str {
                                 ast_expr_unary_create(
                                     ast_expr_binary_create(
                                         a,
-                                        BINARY_OP_ADDITION,
+                                        AstBinaryOp::Addition,
                                         ast_expr_constant_create(0)
                                     ),
-                                    UNARY_OP_DEREFERENCE
+                                    AstUnaryOp::Dereference
                                 ),
                                 name,
                             ),
@@ -292,13 +292,13 @@ pub grammar c_parser(env: &Env) for str {
         op:unary_operator() _ e:cast_expression() { unsafe { ast_expr_unary_create(e, op) } } /
         "sizeof" _ "(" _ ty:type_name() _ ")" { unsafe { ast_expr_constant_create(1) /* XXX */ } }
 
-    rule unary_operator() -> ast_unary_operator =
-        "&" !"&" { UNARY_OP_ADDRESS } /
-        "*" { UNARY_OP_DEREFERENCE } /
-        "+" { UNARY_OP_POSITIVE } /
-        "-" { UNARY_OP_NEGATIVE } /
-        "~" { UNARY_OP_ONES_COMPLEMENT } /
-        "!" { UNARY_OP_BANG }
+    rule unary_operator() -> AstUnaryOp =
+        "&" !"&" { AstUnaryOp::Address } /
+        "*" { AstUnaryOp::Dereference } /
+        "+" { AstUnaryOp::Positive } /
+        "-" { AstUnaryOp::Negative } /
+        "~" { AstUnaryOp::OnesComplement } /
+        "!" { AstUnaryOp::Bang }
 
     // 6.5.4 Cast expressions
     rule cast_expression() -> BoxedExpr = unary_expression()
@@ -309,16 +309,16 @@ pub grammar c_parser(env: &Env) for str {
         --
         x:(@) _ "&&" _ y:@ { x }
         --
-        x:(@) _ "==" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_EQ, y) } }
-        x:(@) _ "!=" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_NE, y) } }
+        x:(@) _ "==" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Eq, y) } }
+        x:(@) _ "!=" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Ne, y) } }
         --
-        x:(@) _ "<" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_LT, y) } }
-        x:(@) _ ">" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_GT, y) } }
-        x:(@) _ "<=" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_LE, y) } }
-        x:(@) _ ">=" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_GE, y) } }
+        x:(@) _ "<" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Lt, y) } }
+        x:(@) _ ">" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Gt, y) } }
+        x:(@) _ "<=" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Le, y) } }
+        x:(@) _ ">=" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Ge, y) } }
         --
-        x:(@) _ "+" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_ADDITION, y) } }
-        x:(@) _ "-" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_SUBTRACTION, y) } }
+        x:(@) _ "+" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Addition, y) } }
+        x:(@) _ "-" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Subtraction, y) } }
         --
         x:(@) _ "*" _ y:@ { x }
         x:(@) _ "/" _ y:@ { x }
@@ -573,7 +573,7 @@ pub grammar c_parser(env: &Env) for str {
     rule selection_statement() -> BoxedStmt =
         p:position!() K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() {
             unsafe {
-                let neg_cond = ast_expr_unary_create(ast_expr_copy(cond), UNARY_OP_BANG);
+                let neg_cond = ast_expr_unary_create(ast_expr_copy(cond), AstUnaryOp::Bang);
                 let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, neg_cond, alt, ptr::null_mut());
                 ast_stmt_create_sel(env.lexloc(p), false, cond, then, else_stmt)
             }

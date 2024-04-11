@@ -57,22 +57,28 @@ pub type ast_alloc_kind = libc::c_uint;
 pub const CLUMP: ast_alloc_kind = 4;
 pub const DEALLOC: ast_alloc_kind = 2;
 pub const ALLOC: ast_alloc_kind = 1;
-pub type ast_unary_operator = libc::c_uint;
-pub const UNARY_OP_BANG: ast_unary_operator = 32;
-pub const UNARY_OP_ONES_COMPLEMENT: ast_unary_operator = 16;
-pub const UNARY_OP_NEGATIVE: ast_unary_operator = 8;
-pub const UNARY_OP_POSITIVE: ast_unary_operator = 4;
-pub const UNARY_OP_DEREFERENCE: ast_unary_operator = 2;
-pub const UNARY_OP_ADDRESS: ast_unary_operator = 1;
-pub type ast_binary_operator = libc::c_uint;
-pub const BINARY_OP_SUBTRACTION: ast_binary_operator = 128;
-pub const BINARY_OP_ADDITION: ast_binary_operator = 64;
-pub const BINARY_OP_GE: ast_binary_operator = 32;
-pub const BINARY_OP_LE: ast_binary_operator = 16;
-pub const BINARY_OP_GT: ast_binary_operator = 8;
-pub const BINARY_OP_LT: ast_binary_operator = 4;
-pub const BINARY_OP_NE: ast_binary_operator = 2;
-pub const BINARY_OP_EQ: ast_binary_operator = 1;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum AstUnaryOp {
+    Address,
+    Dereference,
+    Positive,
+    Negative,
+    OnesComplement,
+    Bang,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum AstBinaryOp {
+    Eq = 1,
+    Ne = 2,
+    Lt = 4,
+    Gt = 8,
+    Le = 16,
+    Ge = 32,
+    Addition = 64,
+    Subtraction = 128,
+}
 
 pub struct ast_expr {
     kind: AstExprKind,
@@ -85,7 +91,7 @@ pub union C2RustUnnamed {
     constant: ConstantExpr,
     call: CallExpr,
     incdec: IncDecExpr,
-    unary_op: ast_unary_operator,
+    unary_op: AstUnaryOp,
     binary: BinaryExpr,
     assignment_value: *mut ast_expr,
     alloc: AllocExpr,
@@ -99,7 +105,7 @@ pub struct AllocExpr {
 
 #[derive(Copy, Clone)]
 pub struct BinaryExpr {
-    op: ast_binary_operator,
+    op: AstBinaryOp,
     e1: *mut ast_expr,
     e2: *mut ast_expr,
 }
@@ -435,8 +441,7 @@ pub unsafe fn ast_expr_equal(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> bo
                 && ast_expr_equal((*e1).root, (*e2).root) as libc::c_int != 0;
         }
         AstExprKind::Binary => {
-            return ast_expr_binary_op(e1) as libc::c_uint
-                == ast_expr_binary_op(e2) as libc::c_uint
+            return ast_expr_binary_op(e1) == ast_expr_binary_op(e2)
                 && ast_expr_equal(ast_expr_binary_e1(e1), ast_expr_binary_e1(e2)) as libc::c_int
                     != 0
                 && ast_expr_equal(ast_expr_binary_e2(e1), ast_expr_binary_e2(e2)) as libc::c_int
@@ -495,6 +500,7 @@ pub unsafe fn ast_expr_matheval(mut e: *mut ast_expr) -> bool {
     math_expr_destroy(e1);
     return val;
 }
+
 unsafe fn math_expr(mut e: *mut ast_expr) -> *mut math_expr {
     match (*e).kind {
         AstExprKind::Identifier => {
@@ -521,30 +527,24 @@ unsafe fn math_expr(mut e: *mut ast_expr) -> *mut math_expr {
         }
     }
 }
-unsafe fn binary_e2(mut e2: *mut ast_expr, mut op: ast_binary_operator) -> *mut math_expr {
-    match op as libc::c_uint {
-        64 => return math_expr(e2),
-        128 => return math_expr_neg_create(math_expr(e2)),
-        _ => {
-            panic!();
-        }
+
+unsafe fn binary_e2(mut e2: *mut ast_expr, mut op: AstBinaryOp) -> *mut math_expr {
+    match op {
+        AstBinaryOp::Addition => math_expr(e2),
+        AstBinaryOp::Subtraction => math_expr_neg_create(math_expr(e2)),
+        _ => panic!(),
     }
 }
-unsafe fn eval_prop(
-    mut e1: *mut math_expr,
-    mut op: ast_binary_operator,
-    mut e2: *mut math_expr,
-) -> bool {
-    match op as libc::c_uint {
-        1 => return math_eq(e1, e2),
-        2 => return !math_eq(e1, e2),
-        4 => return math_lt(e1, e2),
-        8 => return math_gt(e1, e2),
-        16 => return math_le(e1, e2),
-        32 => return math_ge(e1, e2),
-        _ => {
-            panic!();
-        }
+
+unsafe fn eval_prop(mut e1: *mut math_expr, mut op: AstBinaryOp, mut e2: *mut math_expr) -> bool {
+    match op {
+        AstBinaryOp::Eq => math_eq(e1, e2),
+        AstBinaryOp::Ne => !math_eq(e1, e2),
+        AstBinaryOp::Lt => math_lt(e1, e2),
+        AstBinaryOp::Gt => math_gt(e1, e2),
+        AstBinaryOp::Le => math_le(e1, e2),
+        AstBinaryOp::Ge => math_ge(e1, e2),
+        _ => panic!(),
     }
 }
 
@@ -571,17 +571,11 @@ unsafe fn expr_binary_decide(mut expr: *mut ast_expr, mut state: *mut state) -> 
     );
 }
 
-unsafe fn value_compare(
-    mut v1: *mut value,
-    mut op: ast_binary_operator,
-    mut v2: *mut value,
-) -> bool {
-    match op as libc::c_uint {
-        1 => return value_equal(v1, v2),
-        2 => return !value_compare(v1, BINARY_OP_EQ, v2),
-        _ => {
-            panic!();
-        }
+unsafe fn value_compare(mut v1: *mut value, mut op: AstBinaryOp, mut v2: *mut value) -> bool {
+    match op {
+        AstBinaryOp::Eq => value_equal(v1, v2),
+        AstBinaryOp::Ne => !value_compare(v1, AstBinaryOp::Eq, v2),
+        _ => panic!(),
     }
 }
 
@@ -609,11 +603,9 @@ unsafe fn hack_object_from_assertion(
 
 unsafe fn expr_unary_decide(mut expr: *mut ast_expr, mut state: *mut state) -> bool {
     let mut operand: *mut ast_expr = ast_expr_unary_operand(expr);
-    match ast_expr_unary_op(expr) as libc::c_uint {
-        32 => return !ast_expr_decide(operand, state),
-        _ => {
-            panic!();
-        }
+    match ast_expr_unary_op(expr) {
+        AstUnaryOp::Bang => !ast_expr_decide(operand, state),
+        _ => panic!(),
     }
 }
 
@@ -626,11 +618,10 @@ pub unsafe fn ast_expr_rangedecide(
     match ast_expr_kind(expr) {
         AstExprKind::Unary => return unary_rangedecide(expr, lw, up, state),
         AstExprKind::IsDeallocand => return expr_isdeallocand_rangedecide(expr, lw, up, state),
-        _ => {
-            panic!();
-        }
+        _ => panic!(),
     }
 }
+
 unsafe fn expr_isdeallocand_rangedecide(
     mut expr: *mut ast_expr,
     mut lw: *mut ast_expr,
@@ -638,22 +629,14 @@ unsafe fn expr_isdeallocand_rangedecide(
     mut state: *mut state,
 ) -> bool {
     let mut acc: *mut ast_expr = ast_expr_isdeallocand_assertand(expr);
-    if !(ast_expr_unary_op(acc) as libc::c_uint
-        == UNARY_OP_DEREFERENCE as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
-        panic!();
-    }
+    assert_eq!(ast_expr_unary_op(acc), AstUnaryOp::Dereference);
     let mut inner: *mut ast_expr = ast_expr_unary_operand(acc);
     let mut i: *mut ast_expr =
         ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
     let mut j: *mut ast_expr =
         ast_expr_identifier_create(dynamic_str(b"j\0" as *const u8 as *const libc::c_char));
     if !(ast_expr_equal(ast_expr_binary_e2(inner), i) as libc::c_int != 0
-        || ast_expr_equal(ast_expr_binary_e2(inner), j) as libc::c_int != 0) as libc::c_int
-        as libc::c_long
-        != 0
+        || ast_expr_equal(ast_expr_binary_e2(inner), j) as libc::c_int != 0)
     {
         panic!();
     }
@@ -669,6 +652,7 @@ unsafe fn expr_isdeallocand_rangedecide(
     }
     return state_range_aredeallocands(state, obj, lw, up);
 }
+
 unsafe fn unary_rangedecide(
     mut expr: *mut ast_expr,
     mut lw: *mut ast_expr,
@@ -676,11 +660,9 @@ unsafe fn unary_rangedecide(
     mut state: *mut state,
 ) -> bool {
     let mut operand: *mut ast_expr = ast_expr_unary_operand(expr);
-    match ast_expr_unary_op(expr) as libc::c_uint {
-        32 => return !ast_expr_rangedecide(operand, lw, up, state),
-        _ => {
-            panic!();
-        }
+    match ast_expr_unary_op(expr) {
+        AstUnaryOp::Bang => return !ast_expr_rangedecide(operand, lw, up, state),
+        _ => panic!(),
     }
 }
 
@@ -710,11 +692,7 @@ unsafe fn reduce_assume(
     match (*expr).kind {
         AstExprKind::Identifier => return identifier_assume(expr, value, s),
         AstExprKind::Unary => {
-            if !(ast_expr_unary_op(expr) as libc::c_uint
-                == UNARY_OP_BANG as libc::c_int as libc::c_uint)
-            {
-                panic!();
-            }
+            assert_eq!(ast_expr_unary_op(expr), AstUnaryOp::Bang);
             return reduce_assume(ast_expr_unary_operand(expr), !value, s);
         }
         AstExprKind::Bracketed => return reduce_assume((*expr).root, value, s),
@@ -777,10 +755,7 @@ unsafe fn ast_expr_pf_reduce_assume(
     mut s: *mut state,
 ) -> *mut preresult {
     let mut res: *mut result = ast_expr_pf_reduce(expr, s);
-    if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) {
         panic!();
     }
     return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
@@ -792,10 +767,7 @@ unsafe fn identifier_assume(
 ) -> *mut preresult {
     let mut s_copy: *mut state = state_copy(s);
     let mut res: *mut result = ast_expr_eval(expr, s_copy);
-    if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) {
         panic!();
     }
     state_destroy(s_copy);
@@ -873,23 +845,26 @@ pub unsafe fn ast_expr_assignment_create(
     (*expr).u.assignment_value = value;
     return expr;
 }
+
 unsafe fn ast_expr_bracketed_str_build(mut expr: *mut ast_expr, mut b: *mut strbuilder) {
     let mut root: *mut libc::c_char = ast_expr_str((*expr).root);
     strbuilder_printf(b, b"(%s)\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
+
 unsafe fn expr_to_binary(mut expr: *mut ast_expr) -> *mut ast_expr {
     match ast_expr_kind(expr) {
         AstExprKind::Binary => return ast_expr_copy(expr),
         _ => {
             return ast_expr_binary_create(
                 ast_expr_copy(expr),
-                BINARY_OP_ADDITION,
+                AstBinaryOp::Addition,
                 ast_expr_constant_create(0 as libc::c_int),
             );
         }
     };
 }
+
 unsafe fn expr_identifier_eval(mut expr: *mut ast_expr, mut state: *mut state) -> *mut result {
     let mut res: *mut result = hack_identifier_builtin_eval(ast_expr_as_identifier(expr), state);
     if !result_iserror(res) && result_hasvalue(res) as libc::c_int != 0 {
@@ -1148,7 +1123,7 @@ pub unsafe fn expr_structmember_lvalue(
 }
 
 pub unsafe fn expr_unary_lvalue(mut expr: *mut ast_expr, mut state: *mut state) -> lvalue_res {
-    if !(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE) {
+    if !(ast_expr_unary_op(expr) == AstUnaryOp::Dereference) {
         panic!();
     }
     let mut inner: *mut ast_expr = ast_expr_unary_operand(expr);
@@ -1264,6 +1239,7 @@ unsafe fn ast_expr_constant_str_build(mut expr: *mut ast_expr, mut b: *mut strbu
         }
     };
 }
+
 unsafe fn escape_str(mut c: libc::c_char) -> *mut libc::c_char {
     match c as libc::c_int {
         10 => return b"\\n\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
@@ -1282,6 +1258,7 @@ unsafe fn escape_str(mut c: libc::c_char) -> *mut libc::c_char {
         }
     }
 }
+
 unsafe fn expr_call_eval(mut expr: *mut ast_expr, mut state: *mut state) -> *mut result {
     let mut err: *mut error = 0 as *mut error;
     let mut root: *mut ast_expr = ast_expr_call_root(expr);
@@ -1416,16 +1393,13 @@ pub unsafe fn ast_expr_absexec(mut expr: *mut ast_expr, mut state: *mut state) -
 
 unsafe fn expr_unary_eval(mut expr: *mut ast_expr, mut state: *mut state) -> *mut result {
     match ast_expr_unary_op(expr) {
-        2 => return dereference_eval(expr, state),
-        1 => return address_eval(expr, state),
-        32 => {
-            return result_value_create(value_literal_create(
-                b"hack\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-            ));
-        }
-        _ => {
-            panic!();
-        }
+        AstUnaryOp::Dereference => dereference_eval(expr, state),
+        AstUnaryOp::Address => address_eval(expr, state),
+        AstUnaryOp::Bang => result_value_create(value_literal_create(
+            b"hack\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+        )),
+
+        _ => panic!(),
     }
 }
 
@@ -1702,9 +1676,7 @@ pub unsafe fn ast_expr_constant_create(mut k: libc::c_int) -> *mut ast_expr {
 }
 
 pub unsafe fn ast_expr_as_identifier(mut expr: *mut ast_expr) -> *mut libc::c_char {
-    if !((*expr).kind == AstExprKind::Identifier) {
-        panic!();
-    }
+    assert_eq!((*expr).kind, AstExprKind::Identifier);
     return (*expr).u.string;
 }
 unsafe fn ast_expr_create() -> *mut ast_expr {
@@ -1732,7 +1704,7 @@ unsafe fn unary_pf_reduce(mut e: *mut ast_expr, mut s: *mut state) -> *mut resul
 }
 unsafe fn binary_pf_reduce(
     mut e1: *mut ast_expr,
-    mut op: ast_binary_operator,
+    mut op: AstBinaryOp,
     mut e2: *mut ast_expr,
     mut s: *mut state,
 ) -> *mut result {
@@ -1812,23 +1784,19 @@ unsafe fn structmember_pf_reduce(mut expr: *mut ast_expr, mut s: *mut state) -> 
 pub unsafe fn ast_expr_pf_reduce(mut e: *mut ast_expr, mut s: *mut state) -> *mut result {
     match ast_expr_kind(e) {
         AstExprKind::Constant | AstExprKind::StringLiteral | AstExprKind::Identifier => {
-            return ast_expr_eval(e, s)
+            ast_expr_eval(e, s)
         }
-        AstExprKind::Unary => return unary_pf_reduce(e, s),
-        AstExprKind::Binary => {
-            return binary_pf_reduce(
-                ast_expr_binary_e1(e),
-                ast_expr_binary_op(e),
-                ast_expr_binary_e2(e),
-                s,
-            );
-        }
-        AstExprKind::Call => return call_pf_reduce(e, s),
-        AstExprKind::StructMember => return structmember_pf_reduce(e, s),
-        AstExprKind::Bracketed => return ast_expr_pf_reduce(ast_expr_bracketed_root(e), s),
-        _ => {
-            panic!();
-        }
+        AstExprKind::Unary => unary_pf_reduce(e, s),
+        AstExprKind::Binary => binary_pf_reduce(
+            ast_expr_binary_e1(e),
+            ast_expr_binary_op(e),
+            ast_expr_binary_e2(e),
+            s,
+        ),
+        AstExprKind::Call => call_pf_reduce(e, s),
+        AstExprKind::StructMember => structmember_pf_reduce(e, s),
+        AstExprKind::Bracketed => ast_expr_pf_reduce(ast_expr_bracketed_root(e), s),
+        _ => panic!(),
     }
 }
 
@@ -1859,7 +1827,7 @@ unsafe fn ast_expr_member_deref_str_build(
     mut member: *mut libc::c_char,
     mut b: *mut strbuilder,
 ) {
-    if !(ast_expr_unary_op(root) == UNARY_OP_DEREFERENCE) {
+    if !(ast_expr_unary_op(root) == AstUnaryOp::Dereference) {
         panic!();
     }
     let mut inner: *mut ast_expr = ast_expr_unary_operand(root);
@@ -1948,7 +1916,7 @@ unsafe fn ast_expr_destroy_incdec(mut expr: *mut ast_expr) {
 pub unsafe fn ast_expr_inverted_copy(mut expr: *mut ast_expr, mut invert: bool) -> *mut ast_expr {
     let mut copy: *mut ast_expr = ast_expr_copy(expr);
     return if invert as libc::c_int != 0 {
-        ast_expr_unary_create(copy, UNARY_OP_BANG)
+        ast_expr_unary_create(copy, AstUnaryOp::Bang)
     } else {
         copy
     };
@@ -2007,7 +1975,7 @@ pub unsafe fn ast_expr_member_create(
 
 pub unsafe fn ast_expr_binary_create(
     mut e1: *mut ast_expr,
-    mut op: ast_binary_operator,
+    mut op: AstBinaryOp,
     mut e2: *mut ast_expr,
 ) -> *mut ast_expr {
     let mut expr: *mut ast_expr = ast_expr_create();
@@ -2018,10 +1986,7 @@ pub unsafe fn ast_expr_binary_create(
     return expr;
 }
 
-pub unsafe fn ast_expr_unary_create(
-    mut root: *mut ast_expr,
-    mut op: ast_unary_operator,
-) -> *mut ast_expr {
+pub unsafe fn ast_expr_unary_create(mut root: *mut ast_expr, mut op: AstUnaryOp) -> *mut ast_expr {
     let mut expr: *mut ast_expr = ast_expr_create();
     (*expr).kind = AstExprKind::Unary;
     (*expr).root = root;
@@ -2038,9 +2003,9 @@ pub unsafe fn ast_expr_incdec_to_assignment(mut expr: *mut ast_expr) -> *mut ast
         ast_expr_binary_create(
             ast_expr_copy((*expr).root),
             if (*expr).u.incdec.inc != 0 {
-                BINARY_OP_ADDITION
+                AstBinaryOp::Addition
             } else {
-                BINARY_OP_SUBTRACTION
+                AstBinaryOp::Subtraction
             },
             ast_expr_constant_create(1 as libc::c_int),
         ),
@@ -2343,144 +2308,23 @@ unsafe fn ast_expr_assignment_str_build(mut expr: *mut ast_expr, mut b: *mut str
 }
 
 unsafe fn ast_expr_binary_str_build(mut expr: *mut ast_expr, mut b: *mut strbuilder) {
-    let mut opstr: [*const libc::c_char; 129] = [
-        0 as *const libc::c_char,
-        b"==\0" as *const u8 as *const libc::c_char,
-        b"!=\0" as *const u8 as *const libc::c_char,
-        0 as *const libc::c_char,
-        b"<\0" as *const u8 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        b">\0" as *const u8 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        b"<=\0" as *const u8 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        b">=\0" as *const u8 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        b"+\0" as *const u8 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        0 as *const libc::c_char,
-        b"-\0" as *const u8 as *const libc::c_char,
-    ];
+    let opstr = match (*expr).u.binary.op {
+        AstBinaryOp::Eq => c"==",
+        AstBinaryOp::Ne => c"!=",
+        AstBinaryOp::Lt => c"<",
+        AstBinaryOp::Gt => c">",
+        AstBinaryOp::Le => c"<=",
+        AstBinaryOp::Ge => c">=",
+        AstBinaryOp::Addition => c"+",
+        AstBinaryOp::Subtraction => c"-",
+    };
     let mut e1: *mut libc::c_char = ast_expr_str((*expr).u.binary.e1);
     let mut e2: *mut libc::c_char = ast_expr_str((*expr).u.binary.e2);
     strbuilder_printf(
         b,
         b"%s%s%s\0" as *const u8 as *const libc::c_char,
         e1,
-        opstr[(*expr).u.binary.op as usize],
+        opstr.as_ptr(),
         e2,
     );
     free(e1 as *mut libc::c_void);
@@ -2496,66 +2340,38 @@ pub unsafe fn ast_expr_difference_create(
     mut e1: *mut ast_expr,
     mut e2: *mut ast_expr,
 ) -> *mut ast_expr {
-    return ast_expr_binary_create(e1, BINARY_OP_SUBTRACTION, e2);
+    return ast_expr_binary_create(e1, AstBinaryOp::Subtraction, e2);
 }
 
 pub unsafe fn ast_expr_sum_create(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> *mut ast_expr {
-    return ast_expr_binary_create(e1, BINARY_OP_ADDITION, e2);
+    return ast_expr_binary_create(e1, AstBinaryOp::Addition, e2);
 }
 
 unsafe fn ast_expr_unary_str_build(mut expr: *mut ast_expr, mut b: *mut strbuilder) {
-    let mut op: ast_unary_operator = (*expr).u.unary_op;
-    assert!(UNARY_OP_ADDRESS <= op && op <= UNARY_OP_BANG);
-    let opchar: [libc::c_char; 33] = [
-        0,
-        '&' as i32 as libc::c_char,
-        '*' as i32 as libc::c_char,
-        0,
-        '+' as i32 as libc::c_char,
-        0,
-        0,
-        0,
-        '-' as i32 as libc::c_char,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        '~' as i32 as libc::c_char,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        '!' as i32 as libc::c_char,
-    ];
+    let mut op: AstUnaryOp = (*expr).u.unary_op;
+    let c = match op {
+        AstUnaryOp::Address => b'&',
+        AstUnaryOp::Dereference => b'*',
+        AstUnaryOp::Positive => b'+',
+        AstUnaryOp::Negative => b'-',
+        AstUnaryOp::OnesComplement => b'~',
+        AstUnaryOp::Bang => b'!',
+    } as libc::c_char;
     let mut root: *mut libc::c_char = ast_expr_str((*expr).root);
     strbuilder_printf(
         b,
         b"%c(%s)\0" as *const u8 as *const libc::c_char,
-        opchar[op as usize] as libc::c_int,
+        c as libc::c_int,
         root,
     );
     free(root as *mut libc::c_void);
 }
 
 pub unsafe fn ast_expr_ge_create(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> *mut ast_expr {
-    return ast_expr_binary_create(e1, BINARY_OP_GE, e2);
+    return ast_expr_binary_create(e1, AstBinaryOp::Ge, e2);
 }
 
-pub unsafe fn ast_expr_binary_op(mut expr: *mut ast_expr) -> ast_binary_operator {
+pub unsafe fn ast_expr_binary_op(mut expr: *mut ast_expr) -> AstBinaryOp {
     assert_eq!((*expr).kind, AstExprKind::Binary);
     return (*expr).u.binary.op;
 }
@@ -2608,7 +2424,7 @@ pub unsafe fn ast_expr_destroy(mut expr: *mut ast_expr) {
 }
 
 pub unsafe fn ast_expr_le_create(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> *mut ast_expr {
-    return ast_expr_binary_create(e1, BINARY_OP_LE, e2);
+    return ast_expr_binary_create(e1, AstBinaryOp::Le, e2);
 }
 
 pub unsafe fn ast_expr_clump_create(mut arg: *mut ast_expr) -> *mut ast_expr {
@@ -2620,15 +2436,15 @@ pub unsafe fn ast_expr_clump_create(mut arg: *mut ast_expr) -> *mut ast_expr {
 }
 
 pub unsafe fn ast_expr_gt_create(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> *mut ast_expr {
-    return ast_expr_binary_create(e1, BINARY_OP_GT, e2);
+    return ast_expr_binary_create(e1, AstBinaryOp::Gt, e2);
 }
 
 pub unsafe fn ast_expr_lt_create(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> *mut ast_expr {
-    return ast_expr_binary_create(e1, BINARY_OP_LT, e2);
+    return ast_expr_binary_create(e1, AstBinaryOp::Lt, e2);
 }
 
 pub unsafe fn ast_expr_ne_create(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> *mut ast_expr {
-    return ast_expr_binary_create(e1, BINARY_OP_NE, e2);
+    return ast_expr_binary_create(e1, AstBinaryOp::Ne, e2);
 }
 unsafe fn ast_expr_destroy_binary(mut expr: *mut ast_expr) {
     assert_eq!((*expr).kind, AstExprKind::Binary);
@@ -2637,7 +2453,7 @@ unsafe fn ast_expr_destroy_binary(mut expr: *mut ast_expr) {
 }
 
 pub unsafe fn ast_expr_eq_create(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> *mut ast_expr {
-    return ast_expr_binary_create(e1, BINARY_OP_EQ, e2);
+    return ast_expr_binary_create(e1, AstBinaryOp::Eq, e2);
 }
 unsafe fn ast_expr_destroy_assignment(mut expr: *mut ast_expr) {
     assert_eq!((*expr).kind, AstExprKind::Assignment);
@@ -2656,10 +2472,10 @@ unsafe fn ast_expr_kind(mut expr: *mut ast_expr) -> AstExprKind {
 
 pub unsafe fn ast_expr_unary_isdereference(mut expr: *mut ast_expr) -> bool {
     assert_eq!(ast_expr_kind(expr), AstExprKind::Unary);
-    return ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE;
+    return ast_expr_unary_op(expr) == AstUnaryOp::Dereference;
 }
 
-pub unsafe fn ast_expr_unary_op(mut expr: *mut ast_expr) -> ast_unary_operator {
+pub unsafe fn ast_expr_unary_op(mut expr: *mut ast_expr) -> AstUnaryOp {
     assert_eq!(ast_expr_kind(expr), AstExprKind::Unary);
     return (*expr).u.unary_op;
 }
@@ -3456,10 +3272,7 @@ unsafe fn iter_neteffect(mut iter: *mut ast_stmt) -> *mut ast_stmt {
     if nstmts == 0 {
         return 0 as *mut ast_stmt;
     }
-    if !(ast_block_ndecls(abs) == 0 as libc::c_int && nstmts == 1 as libc::c_int) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !(ast_block_ndecls(abs) == 0 as libc::c_int && nstmts == 1 as libc::c_int) {
         panic!();
     }
     return ast_stmt_create_iter(
@@ -3522,10 +3335,7 @@ pub unsafe fn ast_stmt_exec(mut stmt: *mut ast_stmt, mut state: *mut state) -> *
     }
 }
 unsafe fn ast_stmt_jump_sprint(mut stmt: *mut ast_stmt, mut b: *mut strbuilder) {
-    if !((*stmt).kind as libc::c_uint == STMT_JUMP as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !((*stmt).kind as libc::c_uint == STMT_JUMP as libc::c_int as libc::c_uint) {
         panic!();
     }
     let mut rv: *mut libc::c_char = ast_expr_str((*stmt).u.jump.rv);
@@ -3871,10 +3681,7 @@ unsafe fn ast_stmt_compound_sprint(mut stmt: *mut ast_stmt, mut b: *mut strbuild
     free(s as *mut libc::c_void);
 }
 unsafe fn ast_stmt_expr_sprint(mut stmt: *mut ast_stmt, mut b: *mut strbuilder) {
-    if !((*stmt).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !((*stmt).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) {
         panic!();
     }
     let mut s: *mut libc::c_char = ast_expr_str((*stmt).u.expr);
@@ -3987,10 +3794,7 @@ pub unsafe fn ast_stmt_iter_lower_bound(mut stmt: *mut ast_stmt) -> *mut ast_exp
         panic!();
     }
     let mut init: *mut ast_stmt = (*stmt).u.iteration.init;
-    if !((*init).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !((*init).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) {
         panic!();
     }
     return ast_expr_assignment_rval((*init).u.expr);
@@ -4087,10 +3891,7 @@ pub unsafe fn ast_stmt_iter_upper_bound(mut stmt: *mut ast_stmt) -> *mut ast_exp
         panic!();
     }
     let mut cond: *mut ast_stmt = (*stmt).u.iteration.cond;
-    if !((*cond).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !((*cond).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) {
         panic!();
     }
     return ast_expr_binary_e2((*cond).u.expr);
@@ -4158,10 +3959,7 @@ unsafe fn ast_stmt_destroy_jump(mut stmt: *mut ast_stmt) {
 }
 
 pub unsafe fn ast_stmt_as_expr(mut stmt: *mut ast_stmt) -> *mut ast_expr {
-    if !((*stmt).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !((*stmt).kind as libc::c_uint == STMT_EXPR as libc::c_int as libc::c_uint) {
         panic!();
     }
     return (*stmt).u.expr;
@@ -4263,10 +4061,7 @@ unsafe fn stmt_sel_splits(mut stmt: *mut ast_stmt, mut s: *mut state) -> ast_stm
 }
 unsafe fn condexists(mut cond: *mut ast_expr, mut s: *mut state) -> bool {
     let mut res: *mut result = ast_expr_pf_reduce(cond, s);
-    if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) {
         panic!();
     }
     let mut reduced: *mut ast_expr = value_to_expr(result_as_value(res));
@@ -4465,20 +4260,14 @@ pub unsafe fn ast_type_struct_complete(
 }
 
 pub unsafe fn ast_type_struct_members(mut t: *mut ast_type) -> *mut ast_variable_arr {
-    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) {
         panic!();
     }
     return (*t).c2rust_unnamed.structunion.members;
 }
 
 pub unsafe fn ast_type_struct_tag(mut t: *mut ast_type) -> *mut libc::c_char {
-    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) {
         panic!();
     }
     return (*t).c2rust_unnamed.structunion.tag;
@@ -4493,10 +4282,7 @@ pub unsafe fn ast_type_create_struct_partial(mut tag: *mut libc::c_char) -> *mut
 }
 
 pub unsafe fn ast_type_copy_struct(mut old: *mut ast_type) -> *mut ast_type {
-    if !((*old).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !((*old).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) {
         panic!();
     }
     let mut new: *mut ast_type = ast_type_create(
@@ -4766,10 +4552,7 @@ pub unsafe fn ast_type_base(mut t: *mut ast_type) -> ast_type_base {
 }
 
 pub unsafe fn ast_type_ptr_type(mut t: *mut ast_type) -> *mut ast_type {
-    if !((*t).base as libc::c_uint == TYPE_POINTER as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    if !((*t).base as libc::c_uint == TYPE_POINTER as libc::c_int as libc::c_uint) {
         panic!();
     }
     return (*t).c2rust_unnamed.ptr_type;
