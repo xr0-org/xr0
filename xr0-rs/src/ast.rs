@@ -7480,7 +7480,6 @@ pub unsafe fn parse_escape(mut c: libc::c_char) -> libc::c_int {
     panic!("Reached end of non-void function without returning");
 }
 
-
 pub unsafe fn ast_create(mut decl: *mut ast_externdecl) -> *mut ast {
     let mut node: *mut ast = calloc(1, ::core::mem::size_of::<ast>()) as *mut ast;
     return ast_append(node, decl);

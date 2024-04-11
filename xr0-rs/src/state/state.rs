@@ -1,6 +1,6 @@
 use libc::{free, malloc, strcmp, strlen};
 
-use super::block::{block_install, block_observe, block_range_alloc, block_range_aredeallocands};
+use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
 use super::clump::{clump_copy, clump_create, clump_destroy, clump_newblock, clump_str};
 use super::heap::{
     heap_copy, heap_create, heap_destroy, heap_newblock, heap_referenced, heap_str, heap_undeclare,
@@ -9,8 +9,8 @@ use super::heap::{
 };
 use super::location::{
     block_res, location_create_dereferencable, location_create_static, location_dealloc,
-    location_destroy, location_getblock, location_offset, location_range_dealloc, location_toclump,
-    location_toheap, location_tostack, location_tostatic, location_type, location_with_offset,
+    location_getblock, location_offset, location_range_dealloc, location_toclump, location_toheap,
+    location_tostack, location_tostatic, location_type, location_with_offset,
     LOCATION_DEREFERENCABLE, LOCATION_DYNAMIC,
 };
 use super::r#static::{
@@ -457,10 +457,6 @@ pub unsafe fn state_get(
     };
 }
 
-pub unsafe fn state_blockinstall(mut b: *mut block, mut obj: *mut object) {
-    block_install(b, obj);
-}
-
 pub unsafe fn state_getblock(mut state: *mut state, mut loc: *mut location) -> *mut block {
     let mut res: block_res = location_getblock(
         loc,
@@ -775,10 +771,6 @@ pub unsafe fn state_range_aredeallocands(
 
 pub unsafe fn state_hasgarbage(mut state: *mut state) -> bool {
     return !heap_referenced((*state).heap, state);
-}
-
-pub unsafe fn state_location_destroy(mut loc: *mut location) {
-    location_destroy(loc);
 }
 
 pub unsafe fn state_references(mut s: *mut state, mut loc: *mut location) -> bool {

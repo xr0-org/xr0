@@ -1,3 +1,5 @@
+#![allow(non_camel_case_types)]
+
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ffi::CStr;
@@ -71,7 +73,7 @@ pub const LM_FLAG_SYS_HEADER: linemarker_flag = 4;
 pub const LM_FLAG_RESUME_FILE: linemarker_flag = 2;
 pub const LM_FLAG_NEW_FILE: linemarker_flag = 1;
 
-
+#[allow(non_upper_case_globals)]
 pub static mut marker: lexememarker = lexememarker {
     linenum: 0,
     column: 0,

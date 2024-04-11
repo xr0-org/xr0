@@ -137,9 +137,8 @@ pub fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String>
     Ok(buf)
 }
 
-
+#[allow(non_upper_case_globals)]
 pub static mut root: *mut Ast = 0 as *const Ast as *mut Ast;
-
 
 pub unsafe fn pass0(root_0: *mut Ast, ext: *mut Externals) {
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -164,7 +163,6 @@ pub unsafe fn pass0(root_0: *mut Ast, ext: *mut Externals) {
         i += 1;
     }
 }
-
 
 pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -203,7 +201,6 @@ pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
         i += 1;
     }
 }
-
 
 pub unsafe fn pass_inorder(order: &mut string_arr, ext: *mut Externals) {
     let n: libc::c_int = string_arr_n(order);
