@@ -123,21 +123,22 @@ pub struct ConstantExpr {
 }
 
 pub type ast_expr_kind = libc::c_uint;
-pub const EXPR_ALLOCATION: ast_expr_kind = 16384;
-pub const EXPR_ARBARG: ast_expr_kind = 8192;
-pub const EXPR_ISDEREFERENCABLE: ast_expr_kind = 4096;
-pub const EXPR_ISDEALLOCAND: ast_expr_kind = 2048;
-pub const EXPR_ASSIGNMENT: ast_expr_kind = 1024;
-pub const EXPR_BINARY: ast_expr_kind = 512;
-pub const EXPR_UNARY: ast_expr_kind = 256;
-pub const EXPR_STRUCTMEMBER: ast_expr_kind = 128;
-pub const EXPR_INCDEC: ast_expr_kind = 64;
-pub const EXPR_CALL: ast_expr_kind = 32;
-pub const EXPR_ITERATION: ast_expr_kind = 16;
-pub const EXPR_BRACKETED: ast_expr_kind = 8;
-pub const EXPR_STRING_LITERAL: ast_expr_kind = 4;
-pub const EXPR_CONSTANT: ast_expr_kind = 2;
-pub const EXPR_IDENTIFIER: ast_expr_kind = 1;
+const EXPR_ALLOCATION: ast_expr_kind = 16384;
+const EXPR_ARBARG: ast_expr_kind = 8192;
+const EXPR_ISDEREFERENCABLE: ast_expr_kind = 4096;
+const EXPR_ISDEALLOCAND: ast_expr_kind = 2048;
+const EXPR_ASSIGNMENT: ast_expr_kind = 1024;
+const EXPR_BINARY: ast_expr_kind = 512;
+const EXPR_UNARY: ast_expr_kind = 256;
+const EXPR_STRUCTMEMBER: ast_expr_kind = 128;
+const EXPR_INCDEC: ast_expr_kind = 64;
+const EXPR_CALL: ast_expr_kind = 32;
+const EXPR_ITERATION: ast_expr_kind = 16;
+const EXPR_BRACKETED: ast_expr_kind = 8;
+const EXPR_STRING_LITERAL: ast_expr_kind = 4;
+const EXPR_CONSTANT: ast_expr_kind = 2;
+const EXPR_IDENTIFIER: ast_expr_kind = 1;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct result {
