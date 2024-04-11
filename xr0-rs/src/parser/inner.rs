@@ -613,7 +613,7 @@ pub grammar c_parser(env: &Env) for str {
             block_statement { r#abstract: v, body: ptr::null_mut() }
         } /
         v:compound_verification_statement() _ c:compound_statement() {
-            block_statement { r#abstract: v, body: ptr::null_mut() }
+            block_statement { r#abstract: v, body: c }
         }
 
     rule function_definition() -> BoxedFunction =
