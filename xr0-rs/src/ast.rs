@@ -408,10 +408,10 @@ unsafe fn hack_base_object_from_alloc(
 
 pub unsafe fn ast_expr_equal(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> bool {
     if e1.is_null() || e2.is_null() {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     if (*e1).kind as libc::c_uint != (*e2).kind as libc::c_uint {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     match (*e1).kind as libc::c_uint {
         2 => return (*e1).u.constant.constant == (*e2).u.constant.constant,
@@ -442,7 +442,7 @@ pub unsafe fn ast_expr_equal(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> bo
         }
         32 => {
             if (*e1).u.call.n != (*e2).u.call.n {
-                return 0 as libc::c_int != 0;
+                return false;
             }
             let mut i: libc::c_int = 0 as libc::c_int;
             while i < (*e1).u.call.n {
@@ -450,7 +450,7 @@ pub unsafe fn ast_expr_equal(mut e1: *mut ast_expr, mut e2: *mut ast_expr) -> bo
                     *((*e1).u.call.arg).offset(i as isize),
                     *((*e2).u.call.arg).offset(i as isize),
                 ) {
-                    return 0 as libc::c_int != 0;
+                    return false;
                 }
                 i += 1;
             }
@@ -706,7 +706,7 @@ pub unsafe fn ast_expr_arbarg_create() -> *mut ast_expr {
 }
 
 pub unsafe fn ast_expr_assume(mut expr: *mut ast_expr, mut state: *mut state) -> *mut preresult {
-    return reduce_assume(expr, 1 as libc::c_int != 0, state);
+    return reduce_assume(expr, true, state);
 }
 unsafe fn reduce_assume(
     mut expr: *mut ast_expr,
@@ -1021,7 +1021,7 @@ unsafe fn arbarg_eval(mut expr: *mut ast_expr, mut state: *mut state) -> *mut re
         state,
         ast_type_create_ptr(ast_type_create(TYPE_VOID, 0)),
         0 as *mut libc::c_char,
-        0 as libc::c_int != 0,
+        false,
     ));
 }
 unsafe fn expr_binary_eval(mut expr: *mut ast_expr, mut state: *mut state) -> *mut result {
@@ -1463,7 +1463,7 @@ pub unsafe fn prepare_parameters(
     assert_eq!(nparams as usize, args.len());
     let mut i: libc::c_int = 0 as libc::c_int;
     while (i as usize) < args.len() {
-        state_declare(state, *param.offset(i as isize), 1 as libc::c_int != 0);
+        state_declare(state, *param.offset(i as isize), true);
         let mut res: *mut result = args[i as usize];
         if result_iserror(res) {
             return result_as_error(res);
@@ -1563,13 +1563,11 @@ unsafe fn verify_paramspec(
             b"must be heap allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
     }
-    let mut param_res: object_res =
-        state_get(param_state, value_as_location(param), 0 as libc::c_int != 0);
+    let mut param_res: object_res = state_get(param_state, value_as_location(param), false);
     if !(param_res.err).is_null() {
         return param_res.err;
     }
-    let mut arg_res: object_res =
-        state_get(arg_state, value_as_location(arg), 0 as libc::c_int != 0);
+    let mut arg_res: object_res = state_get(arg_state, value_as_location(arg), false);
     if !(arg_res.err).is_null() {
         return arg_res.err;
     }
@@ -1685,7 +1683,7 @@ unsafe fn pf_augment(
 pub unsafe fn ast_expr_constant_create_char(mut c: libc::c_char) -> *mut ast_expr {
     let mut expr: *mut ast_expr = ast_expr_create();
     (*expr).kind = EXPR_CONSTANT;
-    (*expr).u.constant.ischar = 1 as libc::c_int != 0;
+    (*expr).u.constant.ischar = true;
     (*expr).u.constant.constant = c as libc::c_int;
     return expr;
 }
@@ -1693,7 +1691,7 @@ pub unsafe fn ast_expr_constant_create_char(mut c: libc::c_char) -> *mut ast_exp
 pub unsafe fn ast_expr_constant_create(mut k: libc::c_int) -> *mut ast_expr {
     let mut expr: *mut ast_expr = ast_expr_create();
     (*expr).kind = EXPR_CONSTANT;
-    (*expr).u.constant.ischar = 0 as libc::c_int != 0;
+    (*expr).u.constant.ischar = false;
     (*expr).u.constant.constant = k;
     return expr;
 }
@@ -2663,7 +2661,7 @@ pub unsafe fn ast_expr_kind(mut expr: *mut ast_expr) -> ast_expr_kind {
 
 pub unsafe fn ast_expr_unary_isdereference(mut expr: *mut ast_expr) -> bool {
     if ast_expr_kind(expr) as libc::c_uint != EXPR_UNARY as libc::c_int as libc::c_uint {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     return ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE;
 }
@@ -2771,7 +2769,7 @@ unsafe fn call_splits(mut expr: *mut ast_expr, mut state: *mut state) -> ast_stm
         let mut var: *mut *mut ast_variable = ast_block_decls(abs);
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < ndecls {
-            state_declare(s_copy, *var.offset(i as isize), 0 as libc::c_int != 0);
+            state_declare(s_copy, *var.offset(i as isize), false);
             i += 1;
         }
     }
@@ -3073,11 +3071,11 @@ pub unsafe fn ast_block_isterminal(mut b: *mut ast_block, mut s: *mut state) -> 
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*b).nstmt {
         if ast_stmt_isterminal(*((*b).stmt).offset(i as isize), s) {
-            return 1 as libc::c_int != 0;
+            return true;
         }
         i += 1;
     }
-    return 0 as libc::c_int != 0;
+    return false;
 }
 
 pub unsafe fn ast_block_preconds(mut b: *mut ast_block) -> preconds_result {
@@ -3174,10 +3172,10 @@ pub unsafe fn ast_stmt_preprocess(
 
 pub unsafe fn ast_stmt_equal(mut s1: *mut ast_stmt, mut s2: *mut ast_stmt) -> bool {
     if s1.is_null() || s2.is_null() {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     if ast_stmt_kind(s1) as libc::c_uint != ast_stmt_kind(s2) as libc::c_uint {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     match ast_stmt_kind(s1) as libc::c_uint {
         16 => return ast_expr_equal(ast_stmt_as_expr(s1), ast_stmt_as_expr(s2)),
@@ -3268,7 +3266,7 @@ pub unsafe fn ast_stmt_copy(mut stmt: *mut ast_stmt) -> *mut ast_stmt {
     }
 }
 unsafe fn labelled_setupabsexec(mut stmt: *mut ast_stmt, mut state: *mut state) -> *mut error {
-    let mut res: *mut result = ast_stmt_absexec(stmt, state, 1 as libc::c_int != 0);
+    let mut res: *mut result = ast_stmt_absexec(stmt, state, true);
     if result_iserror(res) {
         return result_as_error(res);
     }
@@ -3493,7 +3491,7 @@ unsafe fn stmt_iter_exec(mut stmt: *mut ast_stmt, mut state: *mut state) -> *mut
     if neteffect.is_null() {
         return 0 as *mut error;
     }
-    let mut res: *mut result = ast_stmt_absexec(neteffect, state, 1 as libc::c_int != 0);
+    let mut res: *mut result = ast_stmt_absexec(neteffect, state, true);
     if result_iserror(res) {
         return result_as_error(res);
     }
@@ -3675,7 +3673,7 @@ unsafe fn sel_isterminal(mut stmt: *mut ast_stmt, mut s: *mut state) -> bool {
     if dec.decision {
         return ast_stmt_isterminal(ast_stmt_sel_body(stmt), s);
     }
-    return 0 as libc::c_int != 0;
+    return false;
 }
 unsafe fn comp_absexec(
     mut stmt: *mut ast_stmt,
@@ -3765,7 +3763,7 @@ pub unsafe fn ast_stmt_isterminal(mut stmt: *mut ast_stmt, mut s: *mut state) ->
         }
         4 => return ast_block_isterminal((*stmt).u.compound, s),
         32 => return sel_isterminal(stmt, s),
-        _ => return 0 as libc::c_int != 0,
+        _ => return false,
     };
 }
 
@@ -3802,7 +3800,7 @@ pub unsafe fn sel_decide(mut control: *mut ast_expr, mut state: *mut state) -> d
         if props_get(p, sync) {
             return {
                 let mut init = decision {
-                    decision: 1 as libc::c_int != 0,
+                    decision: true,
                     err: 0 as *mut error,
                 };
                 init
@@ -3810,7 +3808,7 @@ pub unsafe fn sel_decide(mut control: *mut ast_expr, mut state: *mut state) -> d
         } else if props_contradicts(p, sync) {
             return {
                 let mut init = decision {
-                    decision: 0 as libc::c_int != 0,
+                    decision: false,
                     err: 0 as *mut error,
                 };
                 init
@@ -3821,7 +3819,7 @@ pub unsafe fn sel_decide(mut control: *mut ast_expr, mut state: *mut state) -> d
         if value_as_constant(v) != 0 {
             return {
                 let mut init = decision {
-                    decision: 1 as libc::c_int != 0,
+                    decision: true,
                     err: 0 as *mut error,
                 };
                 init
@@ -3829,7 +3827,7 @@ pub unsafe fn sel_decide(mut control: *mut ast_expr, mut state: *mut state) -> d
         }
         return {
             let mut init = decision {
-                decision: 0 as libc::c_int != 0,
+                decision: false,
                 err: 0 as *mut error,
             };
             init
@@ -3850,7 +3848,7 @@ pub unsafe fn sel_decide(mut control: *mut ast_expr, mut state: *mut state) -> d
         free(c_str as *mut libc::c_void);
         return {
             let mut init = decision {
-                decision: 0 as libc::c_int != 0,
+                decision: false,
                 err: error_create(strbuilder_build(b)),
             };
             init
@@ -5083,7 +5081,7 @@ unsafe fn path_absverify_withstate(mut f: *mut ast_function, mut state: *mut sta
     let mut var: *mut *mut ast_variable = ast_block_decls(abs);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < ndecls {
-        state_declare(state, *var.offset(i as isize), 0 as libc::c_int != 0);
+        state_declare(state, *var.offset(i as isize), false);
         i += 1;
     }
     return path_absverify(f, state, 0 as libc::c_int);
@@ -5110,8 +5108,7 @@ unsafe fn path_absverify(
             return split_paths_absverify(f, state, i, &mut splits);
         }
         if !ast_stmt_ispre(*stmt.offset(i as isize)) {
-            let mut res: *mut result =
-                ast_stmt_absexec(*stmt.offset(i as isize), state, 1 as libc::c_int != 0);
+            let mut res: *mut result = ast_stmt_absexec(*stmt.offset(i as isize), state, true);
             if result_iserror(res) {
                 return result_as_error(res);
             }
@@ -5131,7 +5128,7 @@ pub unsafe fn ast_function_initparams(mut f: *mut ast_function, mut s: *mut stat
     let mut params: *mut *mut ast_variable = ast_function_params(f);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nparams {
-        state_declare(s, *params.offset(i as isize), 1 as libc::c_int != 0);
+        state_declare(s, *params.offset(i as isize), true);
         i += 1;
     }
     err = ast_function_precondsinit(f, s);
@@ -5156,7 +5153,7 @@ unsafe fn ast_function_precondsinit(mut f: *mut ast_function, mut s: *mut state)
     if (pre.stmt).is_null() {
         return 0 as *mut error;
     }
-    let mut res: *mut result = ast_stmt_absexec(pre.stmt, s, 1 as libc::c_int != 0);
+    let mut res: *mut result = ast_stmt_absexec(pre.stmt, s, true);
     if result_iserror(res) {
         return result_as_error(res);
     }
@@ -5170,7 +5167,7 @@ unsafe fn inititalise_param(mut param: *mut ast_variable, mut state: *mut state)
         panic!();
     }
     if !object_hasvalue(obj) {
-        let mut val: *mut value = state_vconst(state, t, dynamic_str(name), 1 as libc::c_int != 0);
+        let mut val: *mut value = state_vconst(state, t, dynamic_str(name), true);
         object_assign(obj, val);
     }
     return 0 as *mut error;
@@ -5221,7 +5218,7 @@ unsafe fn abstract_auditwithstate(
     let mut var: *mut *mut ast_variable = ast_block_decls((*f).body);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < ndecls {
-        state_declare(actual_state, *var.offset(i as isize), 0 as libc::c_int != 0);
+        state_declare(actual_state, *var.offset(i as isize), false);
         i += 1;
     }
     return path_verify(f, actual_state, 0 as libc::c_int, abstract_state);
@@ -5283,7 +5280,7 @@ pub unsafe fn ast_function_absexec(mut f: *mut ast_function, mut state: *mut sta
         let mut var: *mut *mut ast_variable = ast_block_decls((*f).abstract_0);
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < ndecls {
-            state_declare(state, *var.offset(i as isize), 0 as libc::c_int != 0);
+            state_declare(state, *var.offset(i as isize), false);
             i += 1;
         }
     }
@@ -5291,8 +5288,7 @@ pub unsafe fn ast_function_absexec(mut f: *mut ast_function, mut state: *mut sta
     let mut stmt: *mut *mut ast_stmt = ast_block_stmts((*f).abstract_0);
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < nstmts {
-        let mut res: *mut result =
-            ast_stmt_absexec(*stmt.offset(i_0 as isize), state, 0 as libc::c_int != 0);
+        let mut res: *mut result = ast_stmt_absexec(*stmt.offset(i_0 as isize), state, false);
         if result_iserror(res) {
             return res;
         }
@@ -5418,7 +5414,7 @@ unsafe fn abstract_paths(
         ast_block_copy((*f).abstract_0),
         ast_block_copy((*f).body),
     );
-    let mut inv_assumption: *mut ast_expr = ast_expr_inverted_copy(cond, 1 as libc::c_int != 0);
+    let mut inv_assumption: *mut ast_expr = ast_expr_inverted_copy(cond, true);
     let mut f_false: *mut ast_function = ast_function_create(
         (*f).isaxiom,
         ast_type_copy((*f).ret),
@@ -5545,7 +5541,7 @@ unsafe fn body_paths(
         ast_block_copy((*f).abstract_0),
         (*f).body,
     );
-    let mut inv_assumption: *mut ast_expr = ast_expr_inverted_copy(cond, 1 as libc::c_int != 0);
+    let mut inv_assumption: *mut ast_expr = ast_expr_inverted_copy(cond, true);
     let mut f_false: *mut ast_function = ast_function_create(
         (*f).isaxiom,
         ast_type_copy((*f).ret),
@@ -5858,7 +5854,7 @@ pub unsafe fn preresult_error_create(mut err: *mut error) -> *mut preresult {
 
 pub unsafe fn preresult_contradiction_create() -> *mut preresult {
     let mut r: *mut preresult = preresult_empty_create();
-    (*r).iscontradiction = 1 as libc::c_int != 0;
+    (*r).iscontradiction = true;
     return r;
 }
 
