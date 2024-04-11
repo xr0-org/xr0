@@ -22,9 +22,9 @@ pub struct map {
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct entry {
-    pub key: *mut libc::c_char,
-    pub value: *const libc::c_void,
+struct entry {
+    key: *mut libc::c_char,
+    value: *const libc::c_void,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
