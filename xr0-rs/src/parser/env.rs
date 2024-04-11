@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
+use std::ffi::CStr;
 
 use libc::{exit, fprintf, free, isdigit, isspace, malloc};
 
@@ -10,6 +12,7 @@ use crate::util::{
 
 pub struct Env {
     pub reserved: HashSet<&'static str>,
+    pub typenames: RefCell<HashSet<Vec<u8>>>,
 }
 
 static RESERVED: &[&str] = &[
@@ -23,6 +26,7 @@ impl Env {
     pub fn new() -> Self {
         Env {
             reserved: RESERVED.iter().copied().collect(),
+            typenames: RefCell::new(HashSet::new()),
         }
     }
 
@@ -30,8 +34,16 @@ impl Env {
         lexloc()
     }
 
-    pub unsafe fn is_typename(&self, _name: *const libc::c_char) -> bool {
-        todo!();
+    pub unsafe fn add_typename(&self, name: *const libc::c_char) {
+        let name = CStr::from_ptr(name);
+        let mut typenames = self.typenames.borrow_mut();
+        typenames.insert(name.to_bytes().to_vec());
+    }
+
+    pub unsafe fn is_typename(&self, name: *const libc::c_char) -> bool {
+        let name = CStr::from_ptr(name);
+        let typenames = self.typenames.borrow();
+        typenames.contains(name.to_bytes())
     }
 
     pub unsafe fn newline(&self) {
