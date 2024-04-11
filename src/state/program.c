@@ -158,7 +158,7 @@ program_stmt_process(struct program *p, bool abstract, struct state *s)
 		if (ast_stmt_ispre(stmt)) {
 			return NULL;
 		}
-		return ast_stmt_absprocess(stmt, p->name, s, false);
+		return ast_stmt_absprocess(stmt, p->name, s, false, true);
 	}
 	return ast_stmt_process(stmt, p->name, s);
 }

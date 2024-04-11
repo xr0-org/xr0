@@ -365,7 +365,9 @@ labelled_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool
 		/* if abstract is called we don't execute setup */
 		return NULL;
 	}
-	return ast_stmt_absexec(setup, state, hack_old, should_setup);
+
+	/* hack_old flag irrelevant here */
+	return ast_stmt_absexec(setup, state, true, should_setup);	
 }
 
 static struct error *
@@ -477,6 +479,7 @@ comp_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool sho
 				return err;
 			}
 		}
+		return NULL;
 	}
 
 	struct frame *block_frame = frame_block_create(
@@ -547,8 +550,9 @@ stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("state: %s\n", state_str(state));
 	/* XXX: dedupe the execution of setups */
-	struct error *err = ast_stmt_absexec(stmt, state, true, true);
+	struct error *err = ast_stmt_absexec(ast_stmt_labelled_stmt(stmt), state, true, true);
 	if (err) {
 		return err;
 	}

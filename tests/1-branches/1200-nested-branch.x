@@ -1,4 +1,4 @@
-include <stdlib.h>
+#include <stdlib.h>
 
 void
 foo(int a, int b)
