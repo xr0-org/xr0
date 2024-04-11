@@ -305,6 +305,10 @@ pub grammar c_parser(env: &Env) for str {
 
     // 6.5.5 -- 6.5.14 Binary operators
     rule binary_expression() -> BoxedExpr = precedence! {
+        x:(@) _ "||" _ y:@ { x }
+        --
+        x:(@) _ "&&" _ y:@ { x }
+        --
         x:(@) _ "==" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_EQ, y) } }
         x:(@) _ "!=" _ y:@ { unsafe { ast_expr_binary_create(x, BINARY_OP_NE, y) } }
         --
@@ -327,10 +331,13 @@ pub grammar c_parser(env: &Env) for str {
 
     // 6.5.16 Assignment operators
     rule assignment_expression() -> BoxedExpr =
-        a:unary_expression() _ "=" _ b:assignment_expression() {
+        a:unary_expression() _ assignment_operator() _ b:assignment_expression() {
             unsafe { ast_expr_assignment_create(a, b) }
         } /
         conditional_expression()
+
+    rule assignment_operator() =
+        "=" / ">>=" / "<<=" / "+=" / "-=" / "*=" / "/=" / "%=" / "&=" / "^=" / "|="
 
     pub rule expression() -> BoxedExpr = assignment_expression();
 
@@ -484,8 +491,8 @@ pub grammar c_parser(env: &Env) for str {
         }
 
     rule type_name() -> BoxedType =
-        specifier_qualifier_list() /
-        t:specifier_qualifier_list() _ abstract_declarator() { t }
+        t:specifier_qualifier_list() _ abstract_declarator() { t } /
+        specifier_qualifier_list()
 
     rule abstract_declarator() -> libc::c_int = pointer()
 
