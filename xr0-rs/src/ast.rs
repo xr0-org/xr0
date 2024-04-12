@@ -2975,7 +2975,7 @@ pub unsafe fn ast_stmt_equal(mut s1: *mut AstStmt, mut s2: *mut AstStmt) -> bool
     if ast_stmt_kind(s1) as libc::c_uint != ast_stmt_kind(s2) as libc::c_uint {
         return false;
     }
-    match ast_stmt_kind(s1) as libc::c_uint {
+    match ast_stmt_kind(s1) {
         16 => return ast_expr_equal(ast_stmt_as_expr(s1), ast_stmt_as_expr(s2)),
         _ => {
             panic!();
@@ -3015,7 +3015,7 @@ pub unsafe fn ast_stmt_copy(mut stmt: *mut AstStmt) -> *mut AstStmt {
     } else {
         0 as *mut LexemeMarker
     };
-    match (*stmt).kind as libc::c_uint {
+    match (*stmt).kind {
         2 => {
             return ast_stmt_create_labelled(
                 loc,
@@ -3107,7 +3107,7 @@ unsafe fn comp_setupabsexec(mut stmt: *mut AstStmt, mut state: *mut State) -> *m
     return 0 as *mut error;
 }
 unsafe fn stmt_setupabsexec(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut error {
-    match ast_stmt_kind(stmt) as libc::c_uint {
+    match ast_stmt_kind(stmt) {
         16 | 512 | 256 => return 0 as *mut error,
         2 => return labelled_setupabsexec(stmt, state),
         32 => return sel_setupabsexec(stmt, state),
@@ -3206,7 +3206,7 @@ unsafe fn stmt_iter_verify(mut stmt: *mut AstStmt, mut state: *mut State) -> *mu
 }
 
 pub unsafe fn ast_stmt_verify(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut error {
-    match ast_stmt_kind(stmt) as libc::c_uint {
+    match ast_stmt_kind(stmt) {
         1 => return 0 as *mut error,
         8 => return stmt_v_block_verify(stmt, state),
         16 => return stmt_expr_verify(stmt, state),
@@ -3306,7 +3306,7 @@ unsafe fn stmt_jump_exec(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut 
 }
 
 pub unsafe fn ast_stmt_exec(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut error {
-    match ast_stmt_kind(stmt) as libc::c_uint {
+    match ast_stmt_kind(stmt) {
         1 => return 0 as *mut error,
         2 => return ast_stmt_exec(ast_stmt_labelled_stmt(stmt), state),
         4 => return stmt_compound_exec(stmt, state),
@@ -3392,7 +3392,7 @@ pub unsafe fn ast_stmt_str(mut stmt: *mut AstStmt) -> *mut libc::c_char {
         panic!();
     }
     let mut b: *mut StrBuilder = strbuilder_create();
-    match (*stmt).kind as libc::c_uint {
+    match (*stmt).kind {
         2 => {
             ast_stmt_labelled_sprint(stmt, b);
         }
@@ -3509,7 +3509,7 @@ pub unsafe fn ast_stmt_absexec(
     mut state: *mut State,
     mut should_setup: bool,
 ) -> *mut result {
-    match ast_stmt_kind(stmt) as libc::c_uint {
+    match ast_stmt_kind(stmt) {
         1 => return result_value_create(0 as *mut Value),
         2 => return labelled_absexec(stmt, state, should_setup),
         16 => return ast_expr_absexec(ast_stmt_as_expr(stmt), state),
@@ -3545,7 +3545,7 @@ unsafe fn ast_stmt_sel_sprint(mut stmt: *mut AstStmt, mut b: *mut StrBuilder) {
 }
 
 pub unsafe fn ast_stmt_isterminal(mut stmt: *mut AstStmt, mut s: *mut State) -> bool {
-    match (*stmt).kind as libc::c_uint {
+    match (*stmt).kind {
         256 => {
             return (*stmt).u.jump.kind as libc::c_uint
                 == JUMP_RETURN as libc::c_int as libc::c_uint;
@@ -3895,7 +3895,7 @@ unsafe fn iter_absexec(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut re
 }
 
 pub unsafe fn ast_stmt_destroy(mut stmt: *mut AstStmt) {
-    match (*stmt).kind as libc::c_uint {
+    match (*stmt).kind {
         2 => {
             free((*stmt).u.labelled.label as *mut libc::c_void);
             ast_stmt_destroy((*stmt).u.labelled.stmt);
@@ -3963,7 +3963,7 @@ pub unsafe fn ast_stmt_kind(mut stmt: *mut AstStmt) -> AstStmtKind {
 }
 
 pub unsafe fn ast_stmt_getfuncs(mut stmt: *mut AstStmt) -> Box<string_arr> {
-    match (*stmt).kind as libc::c_uint {
+    match (*stmt).kind {
         1 => string_arr_create(),
         2 => ast_stmt_getfuncs((*stmt).u.labelled.stmt),
         4 | 8 => ast_stmt_compound_getfuncs(stmt),
@@ -3976,7 +3976,7 @@ pub unsafe fn ast_stmt_getfuncs(mut stmt: *mut AstStmt) -> Box<string_arr> {
 }
 
 pub unsafe fn ast_stmt_splits(mut stmt: *mut AstStmt, mut s: *mut State) -> AstStmtSplits {
-    match (*stmt).kind as libc::c_uint {
+    match (*stmt).kind {
         1 => {
             return {
                 let mut init = AstStmtSplits {
@@ -4104,7 +4104,7 @@ unsafe fn ast_stmt_compound_getfuncs(mut stmt: *mut AstStmt) -> Box<string_arr> 
 }
 
 pub unsafe fn ast_stmt_preconds_validate(mut stmt: *mut AstStmt) -> *mut error {
-    match (*stmt).kind as libc::c_uint {
+    match (*stmt).kind {
         16 | 512 | 64 => return 0 as *mut error,
         32 => return preconds_selection_verify(stmt),
         4 => return preconds_compound_verify(stmt),
@@ -4203,7 +4203,7 @@ pub unsafe fn ast_type_vconst(
     mut comment: *mut libc::c_char,
     mut persist: bool,
 ) -> *mut Value {
-    match (*t).base as libc::c_uint {
+    match (*t).base {
         3 => return value_int_indefinite_create(),
         9 => return value_ptr_indefinite_create(),
         14 => {
@@ -4290,7 +4290,7 @@ pub unsafe fn ast_type_istypedef(mut t: *mut AstType) -> bool {
 }
 
 pub unsafe fn ast_type_destroy(mut t: *mut AstType) {
-    match (*t).base as libc::c_uint {
+    match (*t).base {
         9 => {
             if ((*t).c2rust_unnamed.ptr_type).is_null() {
                 panic!();
@@ -4312,7 +4312,7 @@ pub unsafe fn ast_type_copy(mut t: *mut AstType) -> *mut AstType {
     if t.is_null() {
         panic!();
     }
-    match (*t).base as libc::c_uint {
+    match (*t).base {
         9 => return ast_type_create_ptr(ast_type_copy((*t).c2rust_unnamed.ptr_type)),
         10 => {
             return ast_type_create_arr(
@@ -4350,7 +4350,7 @@ pub unsafe fn ast_type_str(mut t: *mut AstType) -> *mut libc::c_char {
     let mut mod_0: *mut libc::c_char = mod_str((*t).mod_0);
     strbuilder_printf(b, b"%s\0" as *const u8 as *const libc::c_char, mod_0);
     free(mod_0 as *mut libc::c_void);
-    match (*t).base as libc::c_uint {
+    match (*t).base {
         9 => {
             ast_type_str_build_ptr(b, t);
         }
@@ -5405,7 +5405,7 @@ pub unsafe fn ast_decl_create(
 pub unsafe fn ast_externdecl_install(mut decl: *mut AstExternDecl, mut ext: *mut Externals) {
     let mut f: *mut AstFunction = 0 as *mut AstFunction;
     let mut v: *mut AstVariable = 0 as *mut AstVariable;
-    match (*decl).kind as libc::c_uint {
+    match (*decl).kind {
         0 => {
             f = (*decl).c2rust_unnamed.function;
             externals_declarefunc(ext, ast_function_name(f), f);
@@ -5431,7 +5431,7 @@ pub unsafe fn ast_externdecl_install(mut decl: *mut AstExternDecl, mut ext: *mut
 }
 
 pub unsafe fn ast_externdecl_destroy(mut decl: *mut AstExternDecl) {
-    match (*decl).kind as libc::c_uint {
+    match (*decl).kind {
         0 => {
             ast_function_destroy((*decl).c2rust_unnamed.function);
         }

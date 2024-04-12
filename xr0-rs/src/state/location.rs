@@ -141,7 +141,7 @@ pub unsafe fn location_create_automatic(
 }
 
 pub unsafe fn location_transfigure(mut loc: *mut Location, mut compare: *mut State) -> *mut Value {
-    match (*loc).type_0 as libc::c_uint {
+    match (*loc).type_0 {
         3 | 2 => state_clump(compare),
         4 => state_alloc(compare),
         _ => panic!(),
@@ -155,7 +155,7 @@ pub unsafe fn location_destroy(mut loc: *mut Location) {
 
 pub unsafe fn location_str(mut loc: *mut Location) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
-    match (*loc).type_0 as libc::c_uint {
+    match (*loc).type_0 {
         0 => {
             strbuilder_printf(b, b"static:\0" as *const u8 as *const libc::c_char);
         }
@@ -202,7 +202,7 @@ pub unsafe fn location_offset(mut loc: *mut Location) -> *mut AstExpr {
 }
 
 pub unsafe fn location_copy(mut loc: *mut Location) -> *mut Location {
-    match (*loc).type_0 as libc::c_uint {
+    match (*loc).type_0 {
         0 => location_create_static((*loc).block, ast_expr_copy((*loc).offset)),
         1 => location_create_vconst((*loc).block, ast_expr_copy((*loc).offset)),
         2 => location_create_dereferencable((*loc).block, ast_expr_copy((*loc).offset)),
@@ -299,7 +299,7 @@ pub unsafe fn location_getblock(
     if s.is_null() {
         panic!();
     }
-    match (*loc).type_0 as libc::c_uint {
+    match (*loc).type_0 {
         0 => BlockRes {
             b: static_memory_getblock(sm, (*loc).block),
             err: 0 as *mut error,

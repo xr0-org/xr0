@@ -87,7 +87,7 @@ pub unsafe fn object_range_create(mut offset: *mut AstExpr, mut r: *mut Range) -
 }
 
 pub unsafe fn object_destroy(mut obj: *mut Object) {
-    match (*obj).type_0 as libc::c_uint {
+    match (*obj).type_0 {
         0 => {
             if !((*obj).c2rust_unnamed.value).is_null() {
                 value_destroy((*obj).c2rust_unnamed.value);
@@ -106,7 +106,7 @@ pub unsafe fn object_copy(mut old: *mut Object) -> *mut Object {
     let mut new: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
     (*new).offset = ast_expr_copy((*old).offset);
     (*new).type_0 = (*old).type_0;
-    match (*old).type_0 as libc::c_uint {
+    match (*old).type_0 {
         0 => {
             (*new).c2rust_unnamed.value = if !((*old).c2rust_unnamed.value).is_null() {
                 value_copy((*old).c2rust_unnamed.value)
@@ -123,7 +123,7 @@ pub unsafe fn object_copy(mut old: *mut Object) -> *mut Object {
 }
 
 pub unsafe fn object_abstractcopy(mut old: *mut Object, mut s: *mut State) -> *mut Object {
-    match (*old).type_0 as libc::c_uint {
+    match (*old).type_0 {
         1 => object_copy(old),
         0 => object_value_create(
             ast_expr_copy((*old).offset),
@@ -151,7 +151,7 @@ pub unsafe fn object_str(mut obj: *mut Object) -> *mut libc::c_char {
 }
 
 unsafe fn inner_str(mut obj: *mut Object) -> *mut libc::c_char {
-    match (*obj).type_0 as libc::c_uint {
+    match (*obj).type_0 {
         0 => {
             if !((*obj).c2rust_unnamed.value).is_null() {
                 value_str((*obj).c2rust_unnamed.value)
@@ -191,7 +191,7 @@ pub unsafe fn object_as_value(mut obj: *mut Object) -> *mut Value {
 }
 
 pub unsafe fn object_isdeallocand(mut obj: *mut Object, mut s: *mut State) -> bool {
-    match (*obj).type_0 as libc::c_uint {
+    match (*obj).type_0 {
         0 => {
             !((*obj).c2rust_unnamed.value).is_null()
                 && state_isdeallocand(s, value_as_location((*obj).c2rust_unnamed.value))
@@ -236,7 +236,7 @@ pub unsafe fn object_assign(mut obj: *mut Object, mut val: *mut Value) -> *mut e
     return 0 as *mut error;
 }
 unsafe fn object_size(mut obj: *mut Object) -> *mut AstExpr {
-    match (*obj).type_0 as libc::c_uint {
+    match (*obj).type_0 {
         0 => ast_expr_constant_create(1 as libc::c_int),
         1 => ast_expr_copy(range_size((*obj).c2rust_unnamed.range)),
         _ => panic!(),
@@ -387,7 +387,7 @@ pub unsafe fn object_from(
 }
 
 pub unsafe fn object_dealloc(mut obj: *mut Object, mut s: *mut State) -> *mut error {
-    match (*obj).type_0 as libc::c_uint {
+    match (*obj).type_0 {
         0 => state_dealloc(s, (*obj).c2rust_unnamed.value),
         1 => range_dealloc((*obj).c2rust_unnamed.range, s),
         _ => panic!(),

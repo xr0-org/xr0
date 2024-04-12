@@ -122,7 +122,7 @@ pub unsafe fn math_expr_neg_create(mut orig: *mut MathExpr) -> *mut MathExpr {
 }
 
 pub unsafe fn math_expr_copy(mut e: *mut MathExpr) -> *mut MathExpr {
-    match (*e).type_0 as libc::c_uint {
+    match (*e).type_0 {
         0 => return math_expr_atom_create(math_atom_copy((*e).c2rust_unnamed.a)),
         1 => {
             return math_expr_sum_create(
@@ -135,7 +135,7 @@ pub unsafe fn math_expr_copy(mut e: *mut MathExpr) -> *mut MathExpr {
 }
 
 pub unsafe fn math_expr_destroy(mut e: *mut MathExpr) {
-    match (*e).type_0 as libc::c_uint {
+    match (*e).type_0 {
         0 => {
             math_atom_destroy((*e).c2rust_unnamed.a);
         }
@@ -152,7 +152,7 @@ pub unsafe fn math_expr_destroy(mut e: *mut MathExpr) {
 }
 
 pub unsafe fn math_expr_str(mut e: *mut MathExpr) -> *mut libc::c_char {
-    match (*e).type_0 as libc::c_uint {
+    match (*e).type_0 {
         0 => math_atom_str((*e).c2rust_unnamed.a),
         1 => math_expr_sum_str(e),
         2 => math_expr_neg_str(e),
@@ -228,7 +228,7 @@ pub unsafe fn math_expr_simplify(mut raw: *mut MathExpr) -> *mut MathExpr {
 }
 
 unsafe fn tally(mut e: *mut MathExpr) -> Tally {
-    match (*e).type_0 as libc::c_uint {
+    match (*e).type_0 {
         0 => atom_tally((*e).c2rust_unnamed.a),
         1 => sum_tally(e),
         2 => neg_tally(e),
@@ -305,7 +305,7 @@ pub unsafe fn math_atom_variable_create(mut s: *mut libc::c_char) -> *mut MathAt
 }
 
 pub unsafe fn math_atom_copy(mut a: *mut MathAtom) -> *mut MathAtom {
-    match (*a).type_0 as libc::c_uint {
+    match (*a).type_0 {
         0 => return math_atom_nat_create((*a).c2rust_unnamed.i),
         1 => return math_atom_variable_create(dynamic_str((*a).c2rust_unnamed.v)),
         _ => panic!(),
@@ -313,7 +313,7 @@ pub unsafe fn math_atom_copy(mut a: *mut MathAtom) -> *mut MathAtom {
 }
 
 pub unsafe fn math_atom_destroy(mut a: *mut MathAtom) {
-    match (*a).type_0 as libc::c_uint {
+    match (*a).type_0 {
         0 => {}
         1 => {
             free((*a).c2rust_unnamed.v as *mut libc::c_void);
@@ -343,7 +343,7 @@ pub unsafe fn math_atom_str(mut a: *mut MathAtom) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 unsafe fn atom_tally(mut a: *mut MathAtom) -> Tally {
-    match (*a).type_0 as libc::c_uint {
+    match (*a).type_0 {
         0 => Tally {
             map: Map::new(),
             num: (*a).c2rust_unnamed.i as libc::c_int,

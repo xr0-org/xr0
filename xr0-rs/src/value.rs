@@ -190,7 +190,7 @@ pub unsafe fn value_transfigure(
     mut compare: *mut State,
     mut islval: bool,
 ) -> *mut Value {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         0 | 3 => {
             return if islval as libc::c_int != 0 {
                 0 as *mut Value
@@ -529,7 +529,7 @@ pub unsafe fn value_sync_sprint(mut v: *mut Value, mut b: *mut StrBuilder) {
 }
 
 pub unsafe fn value_copy(mut v: *mut Value) -> *mut Value {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         0 => value_sync_copy(v),
         1 => value_ptr_copy(v),
         2 => value_int_copy(v),
@@ -543,7 +543,7 @@ pub unsafe fn value_abstractcopy(mut v: *mut Value, mut s: *mut State) -> *mut V
     if !value_referencesheap(v, s) {
         return 0 as *mut Value;
     }
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         1 => value_copy(v),
         4 => value_struct_abstractcopy(v, s),
         _ => panic!(),
@@ -551,7 +551,7 @@ pub unsafe fn value_abstractcopy(mut v: *mut Value, mut s: *mut State) -> *mut V
 }
 
 pub unsafe fn value_destroy(mut v: *mut Value) {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         0 => {
             number_destroy((*v).c2rust_unnamed.n);
         }
@@ -580,7 +580,7 @@ pub unsafe fn value_destroy(mut v: *mut Value) {
 
 pub unsafe fn value_str(mut v: *mut Value) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         0 => {
             value_sync_sprint(v, b);
         }
@@ -621,7 +621,7 @@ pub unsafe fn value_as_location(mut v: *mut Value) -> *mut Location {
 }
 
 pub unsafe fn value_referencesheap(mut v: *mut Value, mut s: *mut State) -> bool {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         1 => return ptr_referencesheap(v, s),
         4 => return struct_referencesheap(v, s),
         _ => return false,
@@ -663,7 +663,7 @@ pub unsafe fn value_as_sync(mut v: *mut Value) -> *mut AstExpr {
 }
 
 pub unsafe fn value_to_expr(mut v: *mut Value) -> *mut AstExpr {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         1 => ast_expr_identifier_create(value_str(v)),
         3 => ast_expr_copy(value_as_literal(v)),
         0 => ast_expr_copy(value_as_sync(v)),
@@ -698,7 +698,7 @@ pub unsafe fn value_references(
     mut loc: *mut Location,
     mut s: *mut State,
 ) -> bool {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         1 => {
             return !(*v).c2rust_unnamed.ptr.isindefinite
                 && location_references((*v).c2rust_unnamed.ptr.c2rust_unnamed.loc, loc, s)
@@ -729,7 +729,7 @@ pub unsafe fn value_equal(mut v1: *mut Value, mut v2: *mut Value) -> bool {
     if !((*v1).type_0 as libc::c_uint == (*v2).type_0 as libc::c_uint) {
         panic!();
     }
-    match (*v1).type_0 as libc::c_uint {
+    match (*v1).type_0 {
         3 => strcmp((*v1).c2rust_unnamed.s, (*v2).c2rust_unnamed.s) == 0,
         2 | 0 => number_equal((*v1).c2rust_unnamed.n, (*v2).c2rust_unnamed.n),
         _ => panic!(),
@@ -737,7 +737,7 @@ pub unsafe fn value_equal(mut v1: *mut Value, mut v2: *mut Value) -> bool {
 }
 
 pub unsafe fn value_assume(mut v: *mut Value, mut value: bool) -> bool {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         2 => number_assume((*v).c2rust_unnamed.n, value),
         1 => {
             if !(*v).c2rust_unnamed.ptr.isindefinite {
@@ -848,7 +848,7 @@ pub unsafe fn number_range_up(mut n: *mut Number) -> libc::c_int {
 }
 
 pub unsafe fn number_destroy(mut n: *mut Number) {
-    match (*n).type_0 as libc::c_uint {
+    match (*n).type_0 {
         0 => {
             number_range_arr_destroy((*n).c2rust_unnamed.ranges);
         }
@@ -891,7 +891,7 @@ pub unsafe fn number_ranges_sprint(mut num: *mut Number) -> *mut libc::c_char {
 }
 
 pub unsafe fn number_str(mut num: *mut Number) -> *mut libc::c_char {
-    match (*num).type_0 as libc::c_uint {
+    match (*num).type_0 {
         0 => number_ranges_sprint(num),
         1 => ast_expr_str((*num).c2rust_unnamed.computation),
         _ => panic!(),
@@ -902,7 +902,7 @@ pub unsafe fn number_equal(mut n1: *mut Number, mut n2: *mut Number) -> bool {
     if !((*n1).type_0 as libc::c_uint == (*n2).type_0 as libc::c_uint) {
         panic!();
     }
-    match (*n1).type_0 as libc::c_uint {
+    match (*n1).type_0 {
         0 => number_ranges_equal(n1, n2),
         1 => ast_expr_equal(
             (*n1).c2rust_unnamed.computation,
@@ -999,7 +999,7 @@ pub unsafe fn number_as_sync(mut n: *mut Number) -> *mut AstExpr {
 }
 
 pub unsafe fn number_to_expr(mut n: *mut Number) -> *mut AstExpr {
-    match (*n).type_0 as libc::c_uint {
+    match (*n).type_0 {
         0 => number_ranges_to_expr((*n).c2rust_unnamed.ranges),
         1 => ast_expr_copy(number_as_sync(n)),
         _ => panic!(),
@@ -1007,7 +1007,7 @@ pub unsafe fn number_to_expr(mut n: *mut Number) -> *mut AstExpr {
 }
 
 pub unsafe fn number_copy(mut num: *mut Number) -> *mut Number {
-    match (*num).type_0 as libc::c_uint {
+    match (*num).type_0 {
         0 => number_ranges_create(number_range_arr_copy((*num).c2rust_unnamed.ranges)),
         1 => number_computed_create(ast_expr_copy((*num).c2rust_unnamed.computation)),
         _ => panic!(),
@@ -1197,7 +1197,7 @@ pub unsafe fn number_value_destroy(mut v: *mut NumberValue) {
 
 pub unsafe fn number_value_str(mut v: *mut NumberValue) -> *mut libc::c_char {
     let mut b: *mut StrBuilder = strbuilder_create();
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         0 => {
             strbuilder_printf(
                 b,
@@ -1222,7 +1222,7 @@ pub unsafe fn number_value_str(mut v: *mut NumberValue) -> *mut libc::c_char {
 }
 
 pub unsafe fn number_value_copy(mut v: *mut NumberValue) -> *mut NumberValue {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         0 => number_value_constant_create((*v).c2rust_unnamed.constant),
         1 => number_value_limit_create((*v).c2rust_unnamed.max),
         _ => panic!(),
@@ -1230,10 +1230,10 @@ pub unsafe fn number_value_copy(mut v: *mut NumberValue) -> *mut NumberValue {
 }
 
 pub unsafe fn number_values_aresingle(mut v1: *mut NumberValue, mut v2: *mut NumberValue) -> bool {
-    if (*v1).type_0 as libc::c_uint != (*v2).type_0 as libc::c_uint {
+    if (*v1).type_0 != (*v2).type_0 {
         return false;
     }
-    match (*v1).type_0 as libc::c_uint {
+    match (*v1).type_0 {
         0 => (*v1).c2rust_unnamed.constant == (*v2).c2rust_unnamed.constant - 1 as libc::c_int,
         1 => (*v1).c2rust_unnamed.max as libc::c_int == (*v2).c2rust_unnamed.max as libc::c_int,
         _ => panic!(),
@@ -1247,7 +1247,7 @@ pub unsafe fn number_value_difference(
     if !((*v1).type_0 as libc::c_uint == (*v2).type_0 as libc::c_uint) {
         panic!();
     }
-    match (*v1).type_0 as libc::c_uint {
+    match (*v1).type_0 {
         0 => (*v1).c2rust_unnamed.constant - (*v2).c2rust_unnamed.constant,
         _ => panic!(),
     }
@@ -1257,7 +1257,7 @@ pub unsafe fn number_value_equal(mut v1: *mut NumberValue, mut v2: *mut NumberVa
     if (*v1).type_0 as libc::c_uint != (*v2).type_0 as libc::c_uint {
         return false;
     }
-    match (*v1).type_0 as libc::c_uint {
+    match (*v1).type_0 {
         0 => number_value_difference(v1, v2) == 0 as libc::c_int,
         1 => (*v1).c2rust_unnamed.max as libc::c_int == (*v2).c2rust_unnamed.max as libc::c_int,
         _ => panic!(),
@@ -1271,14 +1271,14 @@ pub unsafe fn number_value_as_constant(mut v: *mut NumberValue) -> libc::c_int {
     return (*v).c2rust_unnamed.constant;
 }
 unsafe fn number_value_le_constant(mut v: *mut NumberValue, mut constant: libc::c_int) -> bool {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         0 => (*v).c2rust_unnamed.constant <= constant,
         1 => !(*v).c2rust_unnamed.max,
         _ => panic!(),
     }
 }
 unsafe fn constant_le_number_value(mut constant: libc::c_int, mut v: *mut NumberValue) -> bool {
-    match (*v).type_0 as libc::c_uint {
+    match (*v).type_0 {
         0 => constant <= (*v).c2rust_unnamed.constant,
         1 => (*v).c2rust_unnamed.max,
         _ => panic!(),
