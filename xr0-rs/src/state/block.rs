@@ -23,7 +23,7 @@ use crate::object::{
 };
 use crate::state::heap::heap_newblock;
 use crate::state::state::{state_alloc, state_eval};
-use crate::util::{error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf};
+use crate::util::{error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Error};
 use crate::{AstExpr, Heap, Location, Object, ObjectArr, State, StrBuilder, Value};
 
 #[derive(Copy, Clone)]
@@ -115,7 +115,7 @@ pub unsafe fn block_observe(
     let mut from: *mut Object = object_from(obj_0, up, s);
     ast_expr_destroy(up);
     ast_expr_destroy(lw);
-    let mut err: *mut error = object_dealloc(obj_0, s);
+    let mut err: *mut Error = object_dealloc(obj_0, s);
     if !err.is_null() {
         panic!();
     } else {
@@ -157,7 +157,7 @@ pub unsafe fn block_range_alloc(
     mut lw: *mut AstExpr,
     mut up: *mut AstExpr,
     mut heap: *mut Heap,
-) -> *mut error {
+) -> *mut Error {
     if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) {
         panic!();
     } else {
@@ -172,7 +172,7 @@ pub unsafe fn block_range_alloc(
             ),
         ),
     );
-    return 0 as *mut error;
+    return 0 as *mut Error;
 }
 
 pub unsafe fn block_range_aredeallocands(
@@ -237,9 +237,9 @@ pub unsafe fn block_range_dealloc(
     mut lw: *mut AstExpr,
     mut up: *mut AstExpr,
     mut s: *mut State,
-) -> *mut error {
+) -> *mut Error {
     if hack_first_object_is_exactly_bounds(b, lw, up, s) {
-        let mut err: *mut error = object_dealloc(
+        let mut err: *mut Error = object_dealloc(
             *(object_arr_objects((*b).arr)).offset(0 as libc::c_int as isize),
             s,
         );
@@ -247,7 +247,7 @@ pub unsafe fn block_range_dealloc(
             return err;
         }
         object_arr_remove((*b).arr, 0 as libc::c_int);
-        return 0 as *mut error;
+        return 0 as *mut Error;
     }
     let mut lw_index: libc::c_int = object_arr_index((*b).arr, lw, s);
     if lw_index == -(1 as libc::c_int) {
@@ -284,14 +284,14 @@ pub unsafe fn block_range_dealloc(
     }
     let mut i_1: libc::c_int = lw_index;
     while i_1 <= up_index {
-        let mut err_0: *mut error = object_dealloc(*obj.offset(i_1 as isize), s);
+        let mut err_0: *mut Error = object_dealloc(*obj.offset(i_1 as isize), s);
         if !err_0.is_null() {
             return err_0;
         }
         i_1 += 1;
     }
     (*b).arr = new;
-    return 0 as *mut error;
+    return 0 as *mut Error;
 }
 
 pub unsafe fn block_undeclare(mut b: *mut Block, mut s: *mut State) {

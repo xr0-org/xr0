@@ -41,7 +41,7 @@ use state::location::Location;
 use state::r#static::StaticMemory;
 use state::stack::{Stack, Variable};
 use state::state::State;
-use util::{string_arr, string_arr_n, string_arr_s, string_arr_str, StrBuilder, VERBOSE_MODE};
+use util::{string_arr_n, string_arr_s, string_arr_str, StrBuilder, StringArr, VERBOSE_MODE};
 use value::Value;
 
 #[derive(Parser)]
@@ -155,7 +155,7 @@ pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
     }
 }
 
-pub unsafe fn pass_inorder(order: &mut string_arr, ext: *mut Externals) {
+pub unsafe fn pass_inorder(order: &mut StringArr, ext: *mut Externals) {
     let n: libc::c_int = string_arr_n(order);
     let name: *mut *mut libc::c_char = string_arr_s(order);
     let mut i: libc::c_int = 0 as libc::c_int;

@@ -24,7 +24,7 @@ use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{
     state_alloc, state_clump, state_get, state_getblock, state_getheap, ObjectRes,
 };
-use crate::util::{error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf};
+use crate::util::{error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Error};
 use crate::{AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, StrBuilder, VConst, Value};
 
 #[derive(Copy, Clone)]
@@ -50,7 +50,7 @@ pub const LOCATION_STATIC: LocationType = 0;
 #[repr(C)]
 pub struct BlockRes {
     pub b: *mut Block,
-    pub err: *mut error,
+    pub err: *mut Error,
 }
 
 pub unsafe fn location_create_vconst(
@@ -302,16 +302,16 @@ pub unsafe fn location_getblock(
     match (*loc).type_0 {
         0 => BlockRes {
             b: static_memory_getblock(sm, (*loc).block),
-            err: 0 as *mut error,
+            err: 0 as *mut Error,
         },
         3 => location_auto_getblock(loc, s),
         4 => BlockRes {
             b: heap_getblock(h, (*loc).block),
-            err: 0 as *mut error,
+            err: 0 as *mut Error,
         },
         2 => BlockRes {
             b: clump_getblock(c, (*loc).block),
-            err: 0 as *mut error,
+            err: 0 as *mut Error,
         },
         _ => panic!(),
     }
@@ -334,7 +334,7 @@ unsafe fn location_auto_getblock(mut loc: *mut Location, mut s: *mut Stack) -> B
     return {
         let mut init = BlockRes {
             b: stack_getblock(f, (*loc).block),
-            err: 0 as *mut error,
+            err: 0 as *mut Error,
         };
         init
     };
@@ -350,7 +350,7 @@ pub unsafe fn location_getstackblock(mut loc: *mut Location, mut s: *mut Stack) 
     return stack_getblock(s, (*loc).block);
 }
 
-pub unsafe fn location_dealloc(mut loc: *mut Location, mut heap: *mut Heap) -> *mut error {
+pub unsafe fn location_dealloc(mut loc: *mut Location, mut heap: *mut Heap) -> *mut Error {
     if (*loc).type_0 as libc::c_uint != LOCATION_DYNAMIC as libc::c_int as libc::c_uint {
         return error_create(
             b"not heap location\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
@@ -364,7 +364,7 @@ pub unsafe fn location_range_dealloc(
     mut lw: *mut AstExpr,
     mut up: *mut AstExpr,
     mut state: *mut State,
-) -> *mut error {
+) -> *mut Error {
     if !offsetzero(loc) {
         panic!();
     }

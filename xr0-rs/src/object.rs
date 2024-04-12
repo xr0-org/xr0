@@ -18,7 +18,7 @@ use crate::state::location::{location_copy, location_destroy, location_reference
 use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
 };
-use crate::util::{dynamic_str, error, strbuilder_build, strbuilder_create, strbuilder_printf};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, Error};
 use crate::value::{
     value_abstractcopy, value_as_location, value_copy, value_destroy, value_ptr_create,
     value_references, value_referencesheap, value_str, value_struct_create, value_struct_member,
@@ -58,7 +58,7 @@ pub struct ObjectArr {
 #[repr(C)]
 pub struct ObjectResult {
     pub val: *mut Object,
-    pub err: *mut error,
+    pub err: *mut Error,
 }
 
 pub unsafe fn object_value_create(mut offset: *mut AstExpr, mut v: *mut Value) -> *mut Object {
@@ -225,7 +225,7 @@ pub unsafe fn object_references(
     } != 0;
 }
 
-pub unsafe fn object_assign(mut obj: *mut Object, mut val: *mut Value) -> *mut error {
+pub unsafe fn object_assign(mut obj: *mut Object, mut val: *mut Value) -> *mut Error {
     if !((*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
         != 0
@@ -233,7 +233,7 @@ pub unsafe fn object_assign(mut obj: *mut Object, mut val: *mut Value) -> *mut e
         panic!();
     }
     (*obj).c2rust_unnamed.value = val;
-    return 0 as *mut error;
+    return 0 as *mut Error;
 }
 unsafe fn object_size(mut obj: *mut Object) -> *mut AstExpr {
     match (*obj).type_0 {
@@ -386,7 +386,7 @@ pub unsafe fn object_from(
     );
 }
 
-pub unsafe fn object_dealloc(mut obj: *mut Object, mut s: *mut State) -> *mut error {
+pub unsafe fn object_dealloc(mut obj: *mut Object, mut s: *mut State) -> *mut Error {
     match (*obj).type_0 {
         0 => state_dealloc(s, (*obj).c2rust_unnamed.value),
         1 => range_dealloc((*obj).c2rust_unnamed.range, s),
@@ -429,7 +429,7 @@ pub unsafe fn object_getmembertype(
     return value_struct_membertype(getorcreatestruct(obj, t, s), member);
 }
 
-pub unsafe fn object_result_error_create(mut err: *mut error) -> *mut ObjectResult {
+pub unsafe fn object_result_error_create(mut err: *mut Error) -> *mut ObjectResult {
     if err.is_null() {
         panic!();
     }
@@ -444,7 +444,7 @@ pub unsafe fn object_result_value_create(mut val: *mut Object) -> *mut ObjectRes
     let mut r: *mut ObjectResult =
         malloc(::core::mem::size_of::<ObjectResult>()) as *mut ObjectResult;
     (*r).val = val;
-    (*r).err = 0 as *mut error;
+    (*r).err = 0 as *mut Error;
     return r;
 }
 
@@ -462,7 +462,7 @@ pub unsafe fn object_result_iserror(mut res: *mut ObjectResult) -> bool {
     return !((*res).err).is_null();
 }
 
-pub unsafe fn object_result_as_error(mut res: *mut ObjectResult) -> *mut error {
+pub unsafe fn object_result_as_error(mut res: *mut ObjectResult) -> *mut Error {
     if ((*res).err).is_null() {
         panic!();
     }
@@ -519,7 +519,7 @@ pub unsafe fn range_size(mut r: *mut Range) -> *mut AstExpr {
     return (*r).size;
 }
 
-pub unsafe fn range_dealloc(mut r: *mut Range, mut s: *mut State) -> *mut error {
+pub unsafe fn range_dealloc(mut r: *mut Range, mut s: *mut State) -> *mut Error {
     return state_dealloc(s, value_ptr_create((*r).loc));
 }
 

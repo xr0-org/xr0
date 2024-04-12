@@ -32,7 +32,7 @@ use crate::ext::externals_types_str;
 use crate::object::{object_as_value, object_assign};
 use crate::props::{props_copy, props_create, props_destroy, props_str};
 use crate::util::{
-    dynamic_str, error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf,
+    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Error,
 };
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
@@ -57,7 +57,7 @@ pub struct State {
 #[repr(C)]
 pub struct ObjectRes {
     pub obj: *mut Object,
-    pub err: *mut error,
+    pub err: *mut Error,
 }
 
 pub unsafe fn state_create(
@@ -344,7 +344,7 @@ pub unsafe fn state_get(
         return {
             let mut init = ObjectRes {
                 obj: 0 as *mut Object,
-                err: 0 as *mut error,
+                err: 0 as *mut Error,
             };
             init
         };
@@ -353,7 +353,7 @@ pub unsafe fn state_get(
     return {
         let mut init = ObjectRes {
             obj,
-            err: 0 as *mut error,
+            err: 0 as *mut Error,
         };
         init
     };
@@ -443,7 +443,7 @@ pub unsafe fn state_deref(
         return {
             let mut init = ObjectRes {
                 obj: 0 as *mut Object,
-                err: 0 as *mut error,
+                err: 0 as *mut Error,
             };
             init
         };
@@ -477,7 +477,7 @@ pub unsafe fn state_range_alloc(
     mut obj: *mut Object,
     mut lw: *mut AstExpr,
     mut up: *mut AstExpr,
-) -> *mut error {
+) -> *mut Error {
     let mut arr_val: *mut Value = object_as_value(obj);
     if arr_val.is_null() {
         return error_create(
@@ -513,7 +513,7 @@ pub unsafe fn state_alloc(mut state: *mut State) -> *mut Value {
     return value_ptr_create(heap_newblock((*state).heap));
 }
 
-pub unsafe fn state_dealloc(mut state: *mut State, mut val: *mut Value) -> *mut error {
+pub unsafe fn state_dealloc(mut state: *mut State, mut val: *mut Value) -> *mut Error {
     if !value_islocation(val) {
         return error_create(
             b"undefined free of value not pointing at heap\0" as *const u8 as *const libc::c_char
@@ -528,7 +528,7 @@ pub unsafe fn state_range_dealloc(
     mut obj: *mut Object,
     mut lw: *mut AstExpr,
     mut up: *mut AstExpr,
-) -> *mut error {
+) -> *mut Error {
     let mut arr_val: *mut Value = object_as_value(obj);
     if arr_val.is_null() {
         return error_create(
