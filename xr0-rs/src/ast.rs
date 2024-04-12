@@ -799,8 +799,8 @@ pub unsafe fn ast_expr_assignment_create(root: *mut AstExpr, value: *mut AstExpr
     return expr;
 }
 
-unsafe fn ast_expr_bracketed_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
-    let root: *mut libc::c_char = ast_expr_str((*expr).root);
+unsafe fn ast_expr_bracketed_str_build(inner: *mut AstExpr, b: *mut StrBuilder) {
+    let root: *mut libc::c_char = ast_expr_str(inner);
     strbuilder_printf(b, b"(%s)\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
@@ -2045,18 +2045,18 @@ pub unsafe fn ast_expr_dealloc_create(arg: *mut AstExpr) -> *mut AstExpr {
 
 pub unsafe fn ast_expr_str(expr: *mut AstExpr) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    match (*expr).kind {
+    match &(*expr).kind {
         AstExprKind::Identifier(id) => {
-            strbuilder_printf(b, id);
+            strbuilder_printf(b, *id);
         }
         AstExprKind::Constant(_) => {
             ast_expr_constant_str_build(expr, b);
         }
         AstExprKind::StringLiteral(s) => {
-            strbuilder_printf(b, b"\"%s\"\0" as *const u8 as *const libc::c_char, s);
+            strbuilder_printf(b, b"\"%s\"\0" as *const u8 as *const libc::c_char, *s);
         }
-        AstExprKind::Bracketed(_) => {
-            ast_expr_bracketed_str_build(expr, b);
+        AstExprKind::Bracketed(inner) => {
+            ast_expr_bracketed_str_build(*inner, b);
         }
         AstExprKind::Call(_) => {
             ast_expr_call_str_build(expr, b);
