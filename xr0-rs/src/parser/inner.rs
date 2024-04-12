@@ -351,7 +351,7 @@ pub grammar c_parser(env: &Env) for str {
         } /
         t:declaration_specifiers() _ v:declarator() _ ";" {
             unsafe {
-                let is_typedef = (*t).mod_0 & MOD_TYPEDEF as libc::c_int != 0;
+                let is_typedef = (*t).modifiers & MOD_TYPEDEF as libc::c_int != 0;
 
                 let mut t = t;
                 for _ in 0..v.ptr_valence {
