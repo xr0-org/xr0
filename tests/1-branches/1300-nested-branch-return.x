@@ -8,7 +8,7 @@ foo(int a, int b)
        if (a) {
                free(p);
                if (b) {
-                       return;
+                       return NULL;
                }
        }
        if (b) {
