@@ -111,6 +111,7 @@ pub struct IncDecExpr {
 
 #[derive(Copy, Clone)]
 pub struct CallExpr {
+    fun: *mut AstExpr,
     n: libc::c_int,
     arg: *mut *mut AstExpr,
 }
@@ -444,7 +445,7 @@ pub unsafe fn ast_expr_equal(e1: *mut AstExpr, e2: *mut AstExpr) -> bool {
                 }
                 i += 1;
             }
-            ast_expr_equal((*e1).root, (*e2).root)
+            ast_expr_equal(c1.fun, c2.fun)
         }
         (AstExprKind::StructMember(m1), AstExprKind::StructMember(m2)) => {
             ast_expr_equal(m1.root, m2.root) && strcmp(m1.field, m2.field) == 0
@@ -1825,8 +1826,8 @@ unsafe fn ast_expr_call_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
     let AstExprKind::Call(call) = &(*expr).kind else {
         panic!()
     };
-    let root: *mut libc::c_char = ast_expr_str((*expr).root);
-    strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, root);
+    let fun: *mut libc::c_char = ast_expr_str(call.fun);
+    strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, fun);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
         let arg: *mut libc::c_char = ast_expr_str(*call.arg.offset(i as isize));
@@ -1844,14 +1845,14 @@ unsafe fn ast_expr_call_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
         i += 1;
     }
     strbuilder_printf(b, b")\0" as *const u8 as *const libc::c_char);
-    free(root as *mut libc::c_void);
+    free(fun as *mut libc::c_void);
 }
 
 unsafe fn ast_expr_destroy_call(expr: *mut AstExpr) {
     let AstExprKind::Call(call) = &(*expr).kind else {
         panic!()
     };
-    ast_expr_destroy((*expr).root);
+    ast_expr_destroy(call.fun);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
         ast_expr_destroy(*call.arg.offset(i as isize));
@@ -1913,7 +1914,7 @@ unsafe fn ast_expr_copy_call(expr: *mut AstExpr) -> *mut AstExpr {
         *fresh4 = ast_expr_copy(*(call.arg).offset(i as isize));
         i += 1;
     }
-    return ast_expr_call_create(ast_expr_copy((*expr).root), call.n, arg);
+    return ast_expr_call_create(ast_expr_copy(call.fun), call.n, arg);
 }
 
 pub unsafe fn ast_expr_member_create(
@@ -1988,7 +1989,10 @@ pub unsafe fn ast_expr_call_nargs(expr: *mut AstExpr) -> libc::c_int {
 }
 
 pub unsafe fn ast_expr_call_root(expr: *mut AstExpr) -> *mut AstExpr {
-    return (*expr).root;
+    let AstExprKind::Call(call) = &(*expr).kind else {
+        panic!()
+    };
+    call.fun
 }
 
 pub unsafe fn ast_expr_call_create(
@@ -1997,8 +2001,11 @@ pub unsafe fn ast_expr_call_create(
     arg: *mut *mut AstExpr,
 ) -> *mut AstExpr {
     let expr: *mut AstExpr = ast_expr_create();
-    (*expr).kind = AstExprKind::Call(CallExpr { n: narg, arg });
-    (*expr).root = root;
+    (*expr).kind = AstExprKind::Call(CallExpr {
+        fun: root,
+        n: narg,
+        arg,
+    });
     return expr;
 }
 
@@ -2591,8 +2598,8 @@ unsafe fn ast_expr_call_getfuncs(expr: *mut AstExpr) -> Box<StringArr> {
         panic!()
     };
     let mut res = string_arr_create();
-    let root: *mut AstExpr = (*expr).root;
-    let AstExprKind::Identifier(id) = (*root).kind else {
+    let fun: *mut AstExpr = call.fun;
+    let AstExprKind::Identifier(id) = (*fun).kind else {
         panic!()
     };
     string_arr_append(&mut res, dynamic_str(id));
