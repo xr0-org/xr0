@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments,
-    unused_variables
-)]
+#![allow(dead_code, unused_assignments, unused_variables)]
 
 use std::ffi::CStr;
 
@@ -253,20 +247,7 @@ pub struct AstBlock {
 #[repr(C)]
 pub struct AstStmt {
     pub kind: AstStmtKind,
-    pub u: C2RustUnnamed_8,
     pub loc: *mut LexemeMarker,
-}
-
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub union C2RustUnnamed_8 {
-    pub labelled: AstLabelledStmt,
-    pub compound: *mut AstBlock,
-    pub selection: AstSelectionStmt,
-    pub iteration: AstIterationStmt,
-    pub expr: *mut AstExpr,
-    pub jump: AstJumpStmt,
-    pub alloc: AstAllocStmt,
 }
 
 #[derive(Copy, Clone)]
@@ -314,18 +295,18 @@ pub struct AstLabelledStmt {
     pub stmt: *mut AstStmt,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone)]
 pub enum AstStmtKind {
     Nop,
-    Labelled,
-    Compound,
-    CompoundV,
-    Expr,
-    Selection,
-    Iteration,
-    IterationE,
-    Jump,
-    Allocation,
+    Labelled(AstLabelledStmt),
+    Compound(*mut AstBlock),
+    CompoundV(*mut AstBlock),
+    Expr(*mut AstExpr),
+    Selection(AstSelectionStmt),
+    Iteration(AstIterationStmt),
+    IterationE(AstIterationStmt),
+    Jump(AstJumpStmt),
+    Allocation(AstAllocStmt),
 }
 
 #[derive(Copy, Clone)]
@@ -2862,8 +2843,7 @@ pub unsafe fn ast_stmt_process(
     state: *mut State,
 ) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    if ast_stmt_kind(stmt) as libc::c_uint == AstStmtKind::CompoundV as libc::c_int as libc::c_uint
-    {
+    if matches!(ast_stmt_kind(stmt), AstStmtKind::CompoundV(_)) {
         err = ast_stmt_verify(stmt, state);
         if !err.is_null() {
             let b: *mut StrBuilder = strbuilder_create();
@@ -2914,21 +2894,19 @@ pub unsafe fn ast_stmt_equal(s1: *mut AstStmt, s2: *mut AstStmt) -> bool {
     if s1.is_null() || s2.is_null() {
         return false;
     }
-    if ast_stmt_kind(s1) as libc::c_uint != ast_stmt_kind(s2) as libc::c_uint {
-        return false;
-    }
-    match ast_stmt_kind(s1) {
-        AstStmtKind::Expr => return ast_expr_equal(ast_stmt_as_expr(s1), ast_stmt_as_expr(s2)),
+    match (ast_stmt_kind(s1), ast_stmt_kind(s2)) {
+        (AstStmtKind::Expr(e1), AstStmtKind::Expr(e2)) => ast_expr_equal(e1, e2),
         _ => panic!(),
     }
 }
 
 pub unsafe fn ast_stmt_labelled_stmt(stmt: *mut AstStmt) -> *mut AstStmt {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Labelled as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    return (*stmt).u.labelled.stmt;
+    let AstStmtKind::Labelled(labelled) = (*stmt).kind else {
+        panic!()
+    };
+    labelled.stmt
 }
+
 unsafe fn labelled_absexec(
     stmt: *mut AstStmt,
     state: *mut State,
@@ -2955,49 +2933,40 @@ pub unsafe fn ast_stmt_copy(stmt: *mut AstStmt) -> *mut AstStmt {
     } else {
         0 as *mut LexemeMarker
     };
-    match (*stmt).kind {
-        AstStmtKind::Labelled => ast_stmt_create_labelled(
+    match &(*stmt).kind {
+        AstStmtKind::Labelled(labelled) => ast_stmt_create_labelled(
             loc,
-            dynamic_str((*stmt).u.labelled.label),
-            ast_stmt_copy((*stmt).u.labelled.stmt),
+            dynamic_str(labelled.label),
+            ast_stmt_copy(labelled.stmt),
         ),
 
         AstStmtKind::Nop => ast_stmt_create_nop(loc),
-        AstStmtKind::Expr => ast_stmt_create_expr(loc, ast_expr_copy((*stmt).u.expr)),
-        AstStmtKind::Compound => ast_stmt_create_compound(loc, ast_block_copy((*stmt).u.compound)),
-        AstStmtKind::CompoundV => {
-            ast_stmt_create_compound_v(loc, ast_block_copy((*stmt).u.compound))
+        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, ast_expr_copy(*expr)),
+        AstStmtKind::Compound(compound) => ast_stmt_create_compound(loc, ast_block_copy(*compound)),
+        AstStmtKind::CompoundV(compound) => {
+            ast_stmt_create_compound_v(loc, ast_block_copy(*compound))
         }
-        AstStmtKind::Selection => ast_stmt_create_sel(
+        AstStmtKind::Selection(selection) => ast_stmt_create_sel(
             loc,
-            (*stmt).u.selection.isswitch,
-            ast_expr_copy((*stmt).u.selection.cond),
-            ast_stmt_copy((*stmt).u.selection.body),
-            if !((*stmt).u.selection.nest).is_null() {
-                ast_stmt_copy((*stmt).u.selection.nest)
+            selection.isswitch,
+            ast_expr_copy(selection.cond),
+            ast_stmt_copy(selection.body),
+            if !(selection.nest).is_null() {
+                ast_stmt_copy(selection.nest)
             } else {
                 0 as *mut AstStmt
             },
         ),
 
-        AstStmtKind::Iteration => ast_stmt_create_iter(
-            loc,
-            ast_stmt_copy((*stmt).u.iteration.init),
-            ast_stmt_copy((*stmt).u.iteration.cond),
-            ast_expr_copy((*stmt).u.iteration.iter),
-            ast_block_copy((*stmt).u.iteration.abstract_0),
-            ast_stmt_copy((*stmt).u.iteration.body),
-        ),
-
-        AstStmtKind::IterationE => return ast_stmt_copy_iter(stmt),
-        AstStmtKind::Jump => ast_stmt_create_jump(
-            loc,
-            (*stmt).u.jump.kind,
-            ast_expr_copy_ifnotnull((*stmt).u.jump.rv),
-        ),
+        AstStmtKind::Iteration(iteration) => ast_stmt_copy_iter(loc, iteration, false),
+        AstStmtKind::IterationE(iteration) => ast_stmt_copy_iter(loc, iteration, true),
+        AstStmtKind::Jump(jump) => {
+            ast_stmt_create_jump(loc, jump.kind, ast_expr_copy_ifnotnull(jump.rv))
+        }
         _ => panic!(),
     }
 }
+
 unsafe fn labelled_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     let res: *mut Result = ast_stmt_absexec(stmt, state, true);
     if result_iserror(res) {
@@ -3005,6 +2974,7 @@ unsafe fn labelled_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut E
     }
     return 0 as *mut Error;
 }
+
 unsafe fn sel_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
     if !(dec.err).is_null() {
@@ -3018,6 +2988,7 @@ unsafe fn sel_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error 
     }
     return 0 as *mut Error;
 }
+
 unsafe fn comp_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
     let b: *mut AstBlock = ast_stmt_as_block(stmt);
@@ -3041,33 +3012,36 @@ unsafe fn comp_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error
     }
     return 0 as *mut Error;
 }
+
 unsafe fn stmt_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     match ast_stmt_kind(stmt) {
-        AstStmtKind::Expr | AstStmtKind::Allocation | AstStmtKind::Jump => 0 as *mut Error,
-        AstStmtKind::Labelled => labelled_setupabsexec(stmt, state),
-        AstStmtKind::Selection => sel_setupabsexec(stmt, state),
-        AstStmtKind::Compound => comp_setupabsexec(stmt, state),
+        AstStmtKind::Expr(_) | AstStmtKind::Allocation(_) | AstStmtKind::Jump(_) => 0 as *mut Error,
+        AstStmtKind::Labelled(_) => labelled_setupabsexec(stmt, state),
+        AstStmtKind::Selection(_) => sel_setupabsexec(stmt, state),
+        AstStmtKind::Compound(_) => comp_setupabsexec(stmt, state),
         _ => panic!(),
     }
 }
 
 pub unsafe fn ast_stmt_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
-    if ast_stmt_kind(stmt) != AstStmtKind::Selection {
+    if !matches!(ast_stmt_kind(stmt), AstStmtKind::Selection(_)) {
         return 0 as *mut Error;
     }
     return stmt_setupabsexec(stmt, state);
 }
 
 pub unsafe fn ast_stmt_isselection(stmt: *mut AstStmt) -> bool {
-    (*stmt).kind == AstStmtKind::Selection
+    matches!((*stmt).kind, AstStmtKind::Selection(_))
 }
 
 pub unsafe fn ast_stmt_isassume(stmt: *mut AstStmt) -> bool {
-    return (*stmt).kind == AstStmtKind::Labelled
-        && strcmp(
-            (*stmt).u.labelled.label,
-            b"assume\0" as *const u8 as *const libc::c_char,
-        ) == 0 as libc::c_int;
+    let AstStmtKind::Labelled(labelled) = (*stmt).kind else {
+        return false;
+    };
+    strcmp(
+        labelled.label,
+        b"assume\0" as *const u8 as *const libc::c_char,
+    ) == 0
 }
 
 unsafe fn stmt_installprop(stmt: *mut AstStmt, state: *mut State) -> *mut Preresult {
@@ -3075,11 +3049,13 @@ unsafe fn stmt_installprop(stmt: *mut AstStmt, state: *mut State) -> *mut Preres
 }
 
 pub unsafe fn ast_stmt_ispre(stmt: *mut AstStmt) -> bool {
-    return (*stmt).kind == AstStmtKind::Labelled
-        && strcmp(
-            (*stmt).u.labelled.label,
-            b"setup\0" as *const u8 as *const libc::c_char,
-        ) == 0 as libc::c_int;
+    let AstStmtKind::Labelled(labelled) = (*stmt).kind else {
+        return false;
+    };
+    strcmp(
+        labelled.label,
+        b"setup\0" as *const u8 as *const libc::c_char,
+    ) == 0
 }
 
 unsafe fn stmt_v_block_verify(v_block_stmt: *mut AstStmt, state: *mut State) -> *mut Error {
@@ -3120,7 +3096,7 @@ unsafe fn stmt_iter_verify(stmt: *mut AstStmt, state: *mut State) -> *mut Error 
         return 0 as *mut Error;
     }
     let body: *mut AstStmt = ast_stmt_iter_body(stmt);
-    assert_eq!(ast_stmt_kind(body), AstStmtKind::Compound);
+    assert!(matches!(ast_stmt_kind(body), AstStmtKind::Compound(_)));
     let block: *mut AstBlock = ast_stmt_as_block(body);
     assert_eq!(ast_block_ndecls(block), 0);
     assert_eq!(ast_block_nstmts(block), 1);
@@ -3139,9 +3115,9 @@ unsafe fn stmt_iter_verify(stmt: *mut AstStmt, state: *mut State) -> *mut Error 
 pub unsafe fn ast_stmt_verify(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     match ast_stmt_kind(stmt) {
         AstStmtKind::Nop => 0 as *mut Error,
-        AstStmtKind::CompoundV => stmt_v_block_verify(stmt, state),
-        AstStmtKind::Expr => stmt_expr_verify(stmt, state),
-        AstStmtKind::Iteration => stmt_iter_verify(stmt, state),
+        AstStmtKind::CompoundV(_) => stmt_v_block_verify(stmt, state),
+        AstStmtKind::Expr(_) => stmt_expr_verify(stmt, state),
+        AstStmtKind::Iteration(_) => stmt_iter_verify(stmt, state),
         _ => panic!(),
     }
 }
@@ -3179,6 +3155,7 @@ unsafe fn stmt_sel_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     }
     return 0 as *mut Error;
 }
+
 unsafe fn iter_neteffect(iter: *mut AstStmt) -> *mut AstStmt {
     let abs: *mut AstBlock = ast_stmt_iter_abstract(iter);
     if abs.is_null() {
@@ -3208,6 +3185,7 @@ unsafe fn iter_neteffect(iter: *mut AstStmt) -> *mut AstStmt {
         ),
     );
 }
+
 unsafe fn stmt_iter_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     let neteffect: *mut AstStmt = iter_neteffect(stmt);
     if neteffect.is_null() {
@@ -3220,6 +3198,7 @@ unsafe fn stmt_iter_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     ast_stmt_destroy(neteffect);
     return 0 as *mut Error;
 }
+
 unsafe fn stmt_jump_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     let res: *mut Result = ast_expr_eval(ast_stmt_jump_rv(stmt), state);
     if result_iserror(res) {
@@ -3238,65 +3217,51 @@ unsafe fn stmt_jump_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
 pub unsafe fn ast_stmt_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     match ast_stmt_kind(stmt) {
         AstStmtKind::Nop => return 0 as *mut Error,
-        AstStmtKind::Labelled => return ast_stmt_exec(ast_stmt_labelled_stmt(stmt), state),
-        AstStmtKind::Compound => return stmt_compound_exec(stmt, state),
-        AstStmtKind::CompoundV => return 0 as *mut Error,
-        AstStmtKind::Expr => return ast_expr_exec(ast_stmt_as_expr(stmt), state),
-        AstStmtKind::Selection => return stmt_sel_exec(stmt, state),
-        AstStmtKind::Iteration => return stmt_iter_exec(stmt, state),
-        AstStmtKind::Jump => return stmt_jump_exec(stmt, state),
+        AstStmtKind::Labelled(labelled) => return ast_stmt_exec(labelled.stmt, state),
+        AstStmtKind::Compound(_) => return stmt_compound_exec(stmt, state),
+        AstStmtKind::CompoundV(_) => return 0 as *mut Error,
+        AstStmtKind::Expr(expr) => return ast_expr_exec(expr, state),
+        AstStmtKind::Selection(_) => return stmt_sel_exec(stmt, state),
+        AstStmtKind::Iteration(_) => return stmt_iter_exec(stmt, state),
+        AstStmtKind::Jump(_) => return stmt_jump_exec(stmt, state),
         _ => {
             panic!();
         }
     }
 }
-unsafe fn ast_stmt_jump_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Jump as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    let rv: *mut libc::c_char = ast_expr_str((*stmt).u.jump.rv);
+
+unsafe fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: *mut StrBuilder) {
+    let rv: *mut libc::c_char = ast_expr_str(jump.rv);
     strbuilder_printf(b, b"return %s;\n\0" as *const u8 as *const libc::c_char, rv);
     free(rv as *mut libc::c_void);
 }
 
 pub unsafe fn ast_stmt_iter_abstract(stmt: *mut AstStmt) -> *mut AstBlock {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Iteration as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    return (*stmt).u.iteration.abstract_0;
+    let AstStmtKind::Iteration(iteration) = (*stmt).kind else {
+        panic!()
+    };
+    iteration.abstract_0
 }
 
 pub unsafe fn ast_stmt_iter_iter(stmt: *mut AstStmt) -> *mut AstExpr {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Iteration as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    return (*stmt).u.iteration.iter;
+    let AstStmtKind::Iteration(iteration) = (*stmt).kind else {
+        panic!()
+    };
+    iteration.iter
 }
 
 pub unsafe fn ast_stmt_lexememarker(stmt: *mut AstStmt) -> *mut LexemeMarker {
     return (*stmt).loc;
 }
-unsafe fn ast_stmt_iter_e_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::IterationE as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    (*stmt).kind = AstStmtKind::Iteration;
-    let s: *mut libc::c_char = ast_stmt_str(stmt);
-    (*stmt).kind = AstStmtKind::IterationE;
-    strbuilder_printf(b, b".%s\0" as *const u8 as *const libc::c_char, s);
-    free(s as *mut libc::c_void);
-}
-unsafe fn ast_stmt_iter_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Iteration as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    let init: *mut libc::c_char = ast_stmt_str((*stmt).u.iteration.init);
-    let cond: *mut libc::c_char = ast_stmt_str((*stmt).u.iteration.cond);
-    let body: *mut libc::c_char = ast_stmt_str((*stmt).u.iteration.body);
-    let iter: *mut libc::c_char = ast_expr_str((*stmt).u.iteration.iter);
-    let abs: *mut libc::c_char = (if !((*stmt).u.iteration.abstract_0).is_null() {
+
+unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder) {
+    let init: *mut libc::c_char = ast_stmt_str(iteration.init);
+    let cond: *mut libc::c_char = ast_stmt_str(iteration.cond);
+    let body: *mut libc::c_char = ast_stmt_str(iteration.body);
+    let iter: *mut libc::c_char = ast_expr_str(iteration.iter);
+    let abs: *mut libc::c_char = (if !(iteration.abstract_0).is_null() {
         ast_block_str(
-            (*stmt).u.iteration.abstract_0,
+            iteration.abstract_0,
             b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ) as *const libc::c_char
     } else {
@@ -3322,33 +3287,33 @@ pub unsafe fn ast_stmt_str(stmt: *mut AstStmt) -> *mut libc::c_char {
         panic!();
     }
     let b: *mut StrBuilder = strbuilder_create();
-    match (*stmt).kind {
-        AstStmtKind::Labelled => {
+    match &(*stmt).kind {
+        AstStmtKind::Labelled(_) => {
             ast_stmt_labelled_sprint(stmt, b);
         }
         AstStmtKind::Nop => {
             ast_stmt_nop_sprint(stmt, b);
         }
-        AstStmtKind::Expr => {
-            ast_stmt_expr_sprint(stmt, b);
+        AstStmtKind::Expr(expr) => {
+            ast_stmt_expr_sprint(*expr, b);
         }
-        AstStmtKind::Compound => {
-            ast_stmt_compound_sprint(stmt, b);
+        AstStmtKind::Compound(compound) => {
+            ast_stmt_compound_sprint(*compound, b);
         }
-        AstStmtKind::CompoundV => {
-            ast_stmt_compound_sprint(stmt, b);
+        AstStmtKind::CompoundV(compound) => {
+            ast_stmt_compound_sprint(*compound, b);
         }
-        AstStmtKind::Selection => {
+        AstStmtKind::Selection(_) => {
             ast_stmt_sel_sprint(stmt, b);
         }
-        AstStmtKind::Iteration => {
-            ast_stmt_iter_sprint(stmt, b);
+        AstStmtKind::Iteration(iteration) => {
+            ast_stmt_iter_sprint(iteration, b);
         }
-        AstStmtKind::IterationE => {
-            ast_stmt_iter_e_sprint(stmt, b);
+        AstStmtKind::IterationE(iteration) => {
+            ast_stmt_iter_sprint(iteration, b);
         }
-        AstStmtKind::Jump => {
-            ast_stmt_jump_sprint(stmt, b);
+        AstStmtKind::Jump(jump) => {
+            ast_stmt_jump_sprint(jump, b);
         }
         _ => {
             panic!();
@@ -3356,6 +3321,7 @@ pub unsafe fn ast_stmt_str(stmt: *mut AstStmt) -> *mut libc::c_char {
     }
     return strbuilder_build(b);
 }
+
 unsafe fn ast_expr_copy_ifnotnull(expr: *mut AstExpr) -> *mut AstExpr {
     return if !expr.is_null() {
         ast_expr_copy(expr)
@@ -3365,25 +3331,26 @@ unsafe fn ast_expr_copy_ifnotnull(expr: *mut AstExpr) -> *mut AstExpr {
 }
 
 pub unsafe fn ast_stmt_iter_cond(stmt: *mut AstStmt) -> *mut AstStmt {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Iteration as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    return (*stmt).u.iteration.cond;
+    let AstStmtKind::Iteration(iteration) = (*stmt).kind else {
+        panic!()
+    };
+    iteration.cond
 }
 
 pub unsafe fn ast_stmt_iter_init(stmt: *mut AstStmt) -> *mut AstStmt {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Iteration as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    return (*stmt).u.iteration.init;
+    let AstStmtKind::Iteration(iteration) = (*stmt).kind else {
+        panic!()
+    };
+    iteration.init
 }
 
 pub unsafe fn ast_stmt_labelled_label(stmt: *mut AstStmt) -> *mut libc::c_char {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Labelled as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    return (*stmt).u.labelled.label;
+    let AstStmtKind::Labelled(labelled) = (*stmt).kind else {
+        panic!()
+    };
+    labelled.label
 }
+
 unsafe fn sel_isterminal(stmt: *mut AstStmt, s: *mut State) -> bool {
     let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), s);
     if !(dec.err).is_null() {
@@ -3392,7 +3359,7 @@ unsafe fn sel_isterminal(stmt: *mut AstStmt, s: *mut State) -> bool {
     if dec.decision {
         return ast_stmt_isterminal(ast_stmt_sel_body(stmt), s);
     }
-    return false;
+    false
 }
 unsafe fn comp_absexec(stmt: *mut AstStmt, state: *mut State, should_setup: bool) -> *mut Result {
     let b: *mut AstBlock = ast_stmt_as_block(stmt);
@@ -3409,15 +3376,19 @@ unsafe fn comp_absexec(stmt: *mut AstStmt, state: *mut State, should_setup: bool
 }
 
 pub unsafe fn ast_stmt_as_block(stmt: *mut AstStmt) -> *mut AstBlock {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Compound as libc::c_int as libc::c_uint) {
+    let AstStmtKind::Compound(compound) = (*stmt).kind else {
         panic!();
-    }
-    return (*stmt).u.compound;
+    };
+    compound
 }
 
 pub unsafe fn ast_stmt_jump_rv(stmt: *mut AstStmt) -> *mut AstExpr {
-    return (*stmt).u.jump.rv;
+    let AstStmtKind::Jump(jump) = (*stmt).kind else {
+        panic!()
+    };
+    jump.rv
 }
+
 unsafe fn jump_absexec(stmt: *mut AstStmt, state: *mut State) -> *mut Result {
     return ast_expr_absexec(
         ast_expr_assignment_create(
@@ -3437,28 +3408,29 @@ pub unsafe fn ast_stmt_absexec(
 ) -> *mut Result {
     match ast_stmt_kind(stmt) {
         AstStmtKind::Nop => result_value_create(0 as *mut Value),
-        AstStmtKind::Labelled => labelled_absexec(stmt, state, should_setup),
-        AstStmtKind::Expr => ast_expr_absexec(ast_stmt_as_expr(stmt), state),
-        AstStmtKind::Selection => sel_absexec(stmt, state, should_setup),
-        AstStmtKind::Iteration => iter_absexec(stmt, state),
-        AstStmtKind::Compound => comp_absexec(stmt, state, should_setup),
-        AstStmtKind::Jump => jump_absexec(stmt, state),
+        AstStmtKind::Labelled(_) => labelled_absexec(stmt, state, should_setup),
+        AstStmtKind::Expr(_) => ast_expr_absexec(ast_stmt_as_expr(stmt), state),
+        AstStmtKind::Selection(_) => sel_absexec(stmt, state, should_setup),
+        AstStmtKind::Iteration(_) => iter_absexec(stmt, state),
+        AstStmtKind::Compound(_) => comp_absexec(stmt, state, should_setup),
+        AstStmtKind::Jump(_) => jump_absexec(stmt, state),
         _ => panic!(),
     }
 }
+
 unsafe fn ast_stmt_sel_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Selection as libc::c_int as libc::c_uint) {
+    let AstStmtKind::Selection(selection) = (*stmt).kind else {
         panic!();
-    }
-    let cond: *mut libc::c_char = ast_expr_str((*stmt).u.selection.cond);
-    let body: *mut libc::c_char = ast_stmt_str((*stmt).u.selection.body);
+    };
+    let cond: *mut libc::c_char = ast_expr_str(selection.cond);
+    let body: *mut libc::c_char = ast_stmt_str(selection.body);
     strbuilder_printf(
         b,
         b"if (%s) { %s }\0" as *const u8 as *const libc::c_char,
         cond,
         body,
     );
-    let nest_stmt: *mut AstStmt = (*stmt).u.selection.nest;
+    let nest_stmt: *mut AstStmt = selection.nest;
     if !nest_stmt.is_null() {
         let nest: *mut libc::c_char = ast_stmt_str(nest_stmt);
         strbuilder_printf(b, b" else %s\0" as *const u8 as *const libc::c_char, nest);
@@ -3470,9 +3442,9 @@ unsafe fn ast_stmt_sel_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
 
 pub unsafe fn ast_stmt_isterminal(stmt: *mut AstStmt, s: *mut State) -> bool {
     match (*stmt).kind {
-        AstStmtKind::Jump => (*stmt).u.jump.kind == AstJumpKind::Return,
-        AstStmtKind::Compound => ast_block_isterminal((*stmt).u.compound, s),
-        AstStmtKind::Selection => sel_isterminal(stmt, s),
+        AstStmtKind::Jump(jump) => jump.kind == AstJumpKind::Return,
+        AstStmtKind::Compound(block) => ast_block_isterminal(block, s),
+        AstStmtKind::Selection(_) => sel_isterminal(stmt, s),
         _ => false,
     }
 }
@@ -3483,9 +3455,10 @@ pub unsafe fn ast_stmt_create_jump(
     rv: *mut AstExpr,
 ) -> *mut AstStmt {
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::Jump;
-    (*stmt).u.jump.kind = AstJumpKind::Return;
-    (*stmt).u.jump.rv = rv;
+    (*stmt).kind = AstStmtKind::Jump(AstJumpStmt {
+        kind: AstJumpKind::Return,
+        rv,
+    });
     return stmt;
 }
 
@@ -3574,45 +3547,44 @@ pub unsafe fn sel_decide(control: *mut AstExpr, state: *mut State) -> Decision {
         init
     };
 }
-unsafe fn ast_stmt_compound_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Compound as libc::c_int as libc::c_uint
-        || (*stmt).kind as libc::c_uint == AstStmtKind::CompoundV as libc::c_int as libc::c_uint)
-    {
-        panic!();
-    }
+unsafe fn ast_stmt_compound_sprint(compound: *mut AstBlock, b: *mut StrBuilder) {
     let s: *mut libc::c_char = ast_block_str(
-        (*stmt).u.compound,
+        compound,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     strbuilder_printf(b, s);
     free(s as *mut libc::c_void);
 }
-unsafe fn ast_stmt_expr_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Expr as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    let s: *mut libc::c_char = ast_expr_str((*stmt).u.expr);
+
+unsafe fn ast_stmt_expr_sprint(expr: *mut AstExpr, b: *mut StrBuilder) {
+    let s: *mut libc::c_char = ast_expr_str(expr);
     strbuilder_printf(b, b"%s;\0" as *const u8 as *const libc::c_char, s);
     free(s as *mut libc::c_void);
 }
+
 unsafe fn ast_stmt_create(loc: *mut LexemeMarker) -> *mut AstStmt {
     let stmt: *mut AstStmt = calloc(1, ::core::mem::size_of::<AstStmt>()) as *mut AstStmt;
     (*stmt).loc = loc;
     return stmt;
 }
-unsafe fn ast_stmt_copy_iter(stmt: *mut AstStmt) -> *mut AstStmt {
-    (*stmt).kind = AstStmtKind::Iteration;
-    let copy: *mut AstStmt = ast_stmt_copy(stmt);
-    (*stmt).kind = AstStmtKind::IterationE;
-    return ast_stmt_create_iter_e(copy);
-}
 
-pub unsafe fn ast_stmt_create_iter_e(stmt: *mut AstStmt) -> *mut AstStmt {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Iteration as libc::c_int as libc::c_uint) {
-        panic!();
+unsafe fn ast_stmt_copy_iter(
+    loc: *mut LexemeMarker,
+    iteration: &AstIterationStmt,
+    as_iteration_e: bool,
+) -> *mut AstStmt {
+    let init = ast_stmt_copy(iteration.init);
+    let cond = ast_stmt_copy(iteration.cond);
+    let iter = ast_expr_copy(iteration.iter);
+    let abstract_0 = ast_block_copy(iteration.abstract_0);
+    let body = ast_stmt_copy(iteration.body);
+
+    let stmt = ast_stmt_create_iter(loc, init, cond, iter, abstract_0, body);
+    if as_iteration_e {
+        ast_stmt_create_iter_e(stmt)
+    } else {
+        stmt
     }
-    (*stmt).kind = AstStmtKind::IterationE;
-    return stmt;
 }
 
 pub unsafe fn ast_stmt_create_iter(
@@ -3623,33 +3595,41 @@ pub unsafe fn ast_stmt_create_iter(
     abstract_0: *mut AstBlock,
     body: *mut AstStmt,
 ) -> *mut AstStmt {
-    if !(!init.is_null()
-        && !cond.is_null()
-        && !iter.is_null()
-        && !abstract_0.is_null()
-        && !body.is_null()) as libc::c_int as libc::c_long
-        != 0
-    {
-        panic!();
-    }
+    assert!(
+        !init.is_null()
+            && !cond.is_null()
+            && !iter.is_null()
+            && !abstract_0.is_null()
+            && !body.is_null()
+    );
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::Iteration;
-    (*stmt).u.iteration.init = init;
-    (*stmt).u.iteration.cond = cond;
-    (*stmt).u.iteration.iter = iter;
-    (*stmt).u.iteration.body = body;
-    (*stmt).u.iteration.abstract_0 = abstract_0;
+    (*stmt).kind = AstStmtKind::Iteration(AstIterationStmt {
+        init,
+        cond,
+        iter,
+        body,
+        abstract_0,
+    });
     return stmt;
 }
+
+pub unsafe fn ast_stmt_create_iter_e(stmt: *mut AstStmt) -> *mut AstStmt {
+    let AstStmtKind::Iteration(iteration) = (*stmt).kind else {
+        panic!();
+    };
+    (*stmt).kind = AstStmtKind::IterationE(iteration);
+    stmt
+}
+
 unsafe fn ast_stmt_nop_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
     strbuilder_printf(b, b";\0" as *const u8 as *const libc::c_char);
 }
 
 pub unsafe fn ast_stmt_iter_body(stmt: *mut AstStmt) -> *mut AstStmt {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Iteration as libc::c_int as libc::c_uint) {
+    let AstStmtKind::Iteration(iteration) = (*stmt).kind else {
         panic!();
-    }
-    return (*stmt).u.iteration.body;
+    };
+    iteration.body
 }
 
 pub unsafe fn ast_stmt_create_sel(
@@ -3666,23 +3646,23 @@ pub unsafe fn ast_stmt_create_sel(
         panic!();
     }
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::Selection;
-    (*stmt).u.selection.isswitch = isswitch;
-    (*stmt).u.selection.cond = cond;
-    (*stmt).u.selection.body = body;
-    (*stmt).u.selection.nest = nest;
+    (*stmt).kind = AstStmtKind::Selection(AstSelectionStmt {
+        isswitch,
+        cond,
+        body,
+        nest,
+    });
     return stmt;
 }
 
 pub unsafe fn ast_stmt_create_compound_v(loc: *mut LexemeMarker, b: *mut AstBlock) -> *mut AstStmt {
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::CompoundV;
-    (*stmt).u.compound = b;
+    (*stmt).kind = AstStmtKind::CompoundV(b);
     return stmt;
 }
 unsafe fn hack_alloc_from_neteffect(stmt: *mut AstStmt) -> *mut AstExpr {
     let body: *mut AstStmt = ast_stmt_iter_body(stmt);
-    assert_eq!(ast_stmt_kind(body), AstStmtKind::Compound);
+    assert!(matches!(ast_stmt_kind(body), AstStmtKind::Compound(_)));
     let block: *mut AstBlock = ast_stmt_as_block(body);
     assert_eq!(ast_block_ndecls(block), 0);
     assert_eq!(ast_block_nstmts(block), 1);
@@ -3690,25 +3670,30 @@ unsafe fn hack_alloc_from_neteffect(stmt: *mut AstStmt) -> *mut AstExpr {
 }
 
 pub unsafe fn ast_stmt_iter_lower_bound(stmt: *mut AstStmt) -> *mut AstExpr {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Iteration as libc::c_int as libc::c_uint) {
+    let AstStmtKind::Iteration(iteration) = (*stmt).kind else {
         panic!();
-    }
-    let init: *mut AstStmt = (*stmt).u.iteration.init;
-    if !((*init).kind as libc::c_uint == AstStmtKind::Expr as libc::c_int as libc::c_uint) {
+    };
+    let init: *mut AstStmt = iteration.init;
+    let AstStmtKind::Expr(expr) = (*init).kind else {
         panic!();
-    }
-    return ast_expr_assignment_rval((*init).u.expr);
+    };
+    return ast_expr_assignment_rval(expr);
 }
+
 unsafe fn ast_stmt_labelled_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
-    let s: *mut libc::c_char = ast_stmt_str((*stmt).u.labelled.stmt);
+    let AstStmtKind::Labelled(labelled) = (*stmt).kind else {
+        panic!();
+    };
+    let s: *mut libc::c_char = ast_stmt_str(labelled.stmt);
     strbuilder_printf(
         b,
         b"%s: %s\0" as *const u8 as *const libc::c_char,
-        (*stmt).u.labelled.label,
+        labelled.label,
         s,
     );
     free(s as *mut libc::c_void);
 }
+
 unsafe fn sel_absexec(stmt: *mut AstStmt, state: *mut State, should_setup: bool) -> *mut Result {
     let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
     if !(dec.err).is_null() {
@@ -3724,10 +3709,10 @@ unsafe fn sel_absexec(stmt: *mut AstStmt, state: *mut State, should_setup: bool)
 }
 
 pub unsafe fn ast_stmt_sel_nest(stmt: *mut AstStmt) -> *mut AstStmt {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Selection as libc::c_int as libc::c_uint) {
+    let AstStmtKind::Selection(selection) = (*stmt).kind else {
         panic!();
-    }
-    return (*stmt).u.selection.nest;
+    };
+    selection.nest
 }
 
 pub unsafe fn ast_stmt_create_labelled(
@@ -3736,9 +3721,10 @@ pub unsafe fn ast_stmt_create_labelled(
     substmt: *mut AstStmt,
 ) -> *mut AstStmt {
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::Labelled;
-    (*stmt).u.labelled.label = label;
-    (*stmt).u.labelled.stmt = substmt;
+    (*stmt).kind = AstStmtKind::Labelled(AstLabelledStmt {
+        label,
+        stmt: substmt,
+    });
     return stmt;
 }
 
@@ -3750,42 +3736,41 @@ pub unsafe fn ast_stmt_create_nop(loc: *mut LexemeMarker) -> *mut AstStmt {
 
 pub unsafe fn ast_stmt_create_expr(loc: *mut LexemeMarker, expr: *mut AstExpr) -> *mut AstStmt {
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::Expr;
-    (*stmt).u.expr = expr;
+    (*stmt).kind = AstStmtKind::Expr(expr);
     return stmt;
 }
 
 pub unsafe fn ast_stmt_create_compound(loc: *mut LexemeMarker, b: *mut AstBlock) -> *mut AstStmt {
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::Compound;
-    (*stmt).u.compound = b;
+    (*stmt).kind = AstStmtKind::Compound(b);
     return stmt;
 }
 
 pub unsafe fn ast_stmt_sel_cond(stmt: *mut AstStmt) -> *mut AstExpr {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Selection as libc::c_int as libc::c_uint) {
+    let AstStmtKind::Selection(selection) = (*stmt).kind else {
         panic!();
-    }
-    return (*stmt).u.selection.cond;
+    };
+    selection.cond
 }
 
 pub unsafe fn ast_stmt_sel_body(stmt: *mut AstStmt) -> *mut AstStmt {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Selection as libc::c_int as libc::c_uint) {
+    let AstStmtKind::Selection(selection) = (*stmt).kind else {
         panic!();
-    }
-    return (*stmt).u.selection.body;
+    };
+    selection.body
 }
 
 pub unsafe fn ast_stmt_iter_upper_bound(stmt: *mut AstStmt) -> *mut AstExpr {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Iteration as libc::c_int as libc::c_uint) {
+    let AstStmtKind::Iteration(iteration) = (*stmt).kind else {
         panic!();
-    }
-    let cond: *mut AstStmt = (*stmt).u.iteration.cond;
-    if !((*cond).kind as libc::c_uint == AstStmtKind::Expr as libc::c_int as libc::c_uint) {
+    };
+    let cond: *mut AstStmt = iteration.cond;
+    let AstStmtKind::Expr(expr) = (*cond).kind else {
         panic!();
-    }
-    return ast_expr_binary_e2((*cond).u.expr);
+    };
+    ast_expr_binary_e2(expr)
 }
+
 unsafe fn iter_absexec(stmt: *mut AstStmt, state: *mut State) -> *mut Result {
     let mut err: *mut Error = 0 as *mut Error;
     let alloc: *mut AstExpr = hack_alloc_from_neteffect(stmt);
@@ -3799,34 +3784,34 @@ unsafe fn iter_absexec(stmt: *mut AstStmt, state: *mut State) -> *mut Result {
 }
 
 pub unsafe fn ast_stmt_destroy(stmt: *mut AstStmt) {
-    match (*stmt).kind {
-        AstStmtKind::Labelled => {
-            free((*stmt).u.labelled.label as *mut libc::c_void);
-            ast_stmt_destroy((*stmt).u.labelled.stmt);
+    match &(*stmt).kind {
+        AstStmtKind::Labelled(labelled) => {
+            free(labelled.label as *mut libc::c_void);
+            ast_stmt_destroy(labelled.stmt);
         }
         AstStmtKind::Nop => {}
-        AstStmtKind::Compound | AstStmtKind::CompoundV => {
-            ast_block_destroy((*stmt).u.compound);
+        AstStmtKind::Compound(block) | AstStmtKind::CompoundV(block) => {
+            ast_block_destroy(*block);
         }
-        AstStmtKind::Selection => {
-            ast_expr_destroy((*stmt).u.selection.cond);
-            ast_stmt_destroy((*stmt).u.selection.body);
-            if !((*stmt).u.selection.nest).is_null() {
-                ast_stmt_destroy((*stmt).u.selection.nest);
+        AstStmtKind::Selection(selection) => {
+            ast_expr_destroy(selection.cond);
+            ast_stmt_destroy(selection.body);
+            if !(selection.nest).is_null() {
+                ast_stmt_destroy(selection.nest);
             }
         }
-        AstStmtKind::Iteration | AstStmtKind::IterationE => {
-            ast_stmt_destroy((*stmt).u.iteration.init);
-            ast_stmt_destroy((*stmt).u.iteration.cond);
-            ast_stmt_destroy((*stmt).u.iteration.body);
-            ast_expr_destroy((*stmt).u.iteration.iter);
-            ast_block_destroy((*stmt).u.iteration.abstract_0);
+        AstStmtKind::Iteration(iteration) | AstStmtKind::IterationE(iteration) => {
+            ast_stmt_destroy(iteration.init);
+            ast_stmt_destroy(iteration.cond);
+            ast_stmt_destroy(iteration.body);
+            ast_expr_destroy(iteration.iter);
+            ast_block_destroy(iteration.abstract_0);
         }
-        AstStmtKind::Expr => {
-            ast_expr_destroy((*stmt).u.expr);
+        AstStmtKind::Expr(expr) => {
+            ast_expr_destroy(*expr);
         }
-        AstStmtKind::Jump => {
-            ast_stmt_destroy_jump(stmt);
+        AstStmtKind::Jump(jump) => {
+            ast_stmt_destroy_jump(jump);
         }
         _ => {
             panic!();
@@ -3837,48 +3822,53 @@ pub unsafe fn ast_stmt_destroy(stmt: *mut AstStmt) {
     }
     free(stmt as *mut libc::c_void);
 }
-unsafe fn ast_stmt_destroy_jump(stmt: *mut AstStmt) {
-    let rv: *mut AstExpr = (*stmt).u.jump.rv;
+
+unsafe fn ast_stmt_destroy_jump(jump: &AstJumpStmt) {
+    let rv: *mut AstExpr = jump.rv;
     if rv.is_null() {
         return;
     }
-    assert_eq!((*stmt).u.jump.kind, AstJumpKind::Return);
+    assert_eq!(jump.kind, AstJumpKind::Return);
     ast_expr_destroy(rv);
 }
 
 pub unsafe fn ast_stmt_as_expr(stmt: *mut AstStmt) -> *mut AstExpr {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::Expr as libc::c_int as libc::c_uint) {
+    let AstStmtKind::Expr(expr) = (*stmt).kind else {
         panic!();
-    }
-    return (*stmt).u.expr;
+    };
+    expr
 }
 
 pub unsafe fn ast_stmt_as_v_block(stmt: *mut AstStmt) -> *mut AstBlock {
-    if !((*stmt).kind as libc::c_uint == AstStmtKind::CompoundV as libc::c_int as libc::c_uint) {
+    let AstStmtKind::CompoundV(block) = (*stmt).kind else {
         panic!();
-    }
-    return (*stmt).u.compound;
+    };
+    block
 }
 
-pub unsafe fn ast_stmt_kind(stmt: *mut AstStmt) -> AstStmtKind {
-    return (*stmt).kind;
+unsafe fn ast_stmt_kind(stmt: *mut AstStmt) -> AstStmtKind {
+    (*stmt).kind
 }
 
 pub unsafe fn ast_stmt_getfuncs(stmt: *mut AstStmt) -> Box<StringArr> {
-    match (*stmt).kind {
+    match &(*stmt).kind {
         AstStmtKind::Nop => string_arr_create(),
-        AstStmtKind::Labelled => ast_stmt_getfuncs((*stmt).u.labelled.stmt),
-        AstStmtKind::Compound | AstStmtKind::CompoundV => ast_stmt_compound_getfuncs(stmt),
-        AstStmtKind::Expr => ast_stmt_expr_getfuncs(stmt),
-        AstStmtKind::Selection => ast_stmt_selection_getfuncs(stmt),
-        AstStmtKind::Iteration | AstStmtKind::IterationE => ast_stmt_iteration_getfuncs(stmt),
-        AstStmtKind::Jump => ast_expr_getfuncs((*stmt).u.jump.rv),
+        AstStmtKind::Labelled(labelled) => ast_stmt_getfuncs(labelled.stmt),
+        AstStmtKind::Compound(block) | AstStmtKind::CompoundV(block) => {
+            ast_stmt_compound_getfuncs(*block)
+        }
+        AstStmtKind::Expr(expr) => ast_expr_getfuncs(*expr),
+        AstStmtKind::Selection(selection) => ast_stmt_selection_getfuncs(selection),
+        AstStmtKind::Iteration(iteration) | AstStmtKind::IterationE(iteration) => {
+            ast_stmt_iteration_getfuncs(iteration)
+        }
+        AstStmtKind::Jump(jump) => ast_expr_getfuncs(jump.rv),
         _ => panic!("invalid stmt kind"),
     }
 }
 
 pub unsafe fn ast_stmt_splits(stmt: *mut AstStmt, s: *mut State) -> AstStmtSplits {
-    match (*stmt).kind {
+    match &(*stmt).kind {
         AstStmtKind::Nop => {
             return {
                 let init = AstStmtSplits {
@@ -3889,11 +3879,11 @@ pub unsafe fn ast_stmt_splits(stmt: *mut AstStmt, s: *mut State) -> AstStmtSplit
                 init
             };
         }
-        AstStmtKind::Expr => return ast_expr_splits((*stmt).u.expr, s),
-        AstStmtKind::Selection => return stmt_sel_splits(stmt, s),
-        AstStmtKind::Jump => {
-            if !((*stmt).u.jump.rv).is_null() {
-                return ast_expr_splits((*stmt).u.jump.rv, s);
+        AstStmtKind::Expr(expr) => return ast_expr_splits(*expr, s),
+        AstStmtKind::Selection(selection) => return stmt_sel_splits(selection, s),
+        AstStmtKind::Jump(jump) => {
+            if !jump.rv.is_null() {
+                return ast_expr_splits(jump.rv, s);
             }
             AstStmtSplits {
                 n: 0 as libc::c_int,
@@ -3901,17 +3891,20 @@ pub unsafe fn ast_stmt_splits(stmt: *mut AstStmt, s: *mut State) -> AstStmtSplit
                 err: 0 as *mut Error,
             }
         }
-        AstStmtKind::Labelled => return ast_stmt_splits((*stmt).u.labelled.stmt, s),
-        AstStmtKind::Iteration | AstStmtKind::Compound | AstStmtKind::CompoundV => AstStmtSplits {
-            n: 0 as libc::c_int,
-            cond: 0 as *mut *mut AstExpr,
-            err: 0 as *mut Error,
-        },
+        AstStmtKind::Labelled(labelled) => return ast_stmt_splits(labelled.stmt, s),
+        AstStmtKind::Iteration(_) | AstStmtKind::Compound(_) | AstStmtKind::CompoundV(_) => {
+            AstStmtSplits {
+                n: 0 as libc::c_int,
+                cond: 0 as *mut *mut AstExpr,
+                err: 0 as *mut Error,
+            }
+        }
         _ => panic!(),
     }
 }
-unsafe fn stmt_sel_splits(stmt: *mut AstStmt, s: *mut State) -> AstStmtSplits {
-    let res: *mut Result = ast_expr_pf_reduce((*stmt).u.selection.cond, s);
+
+unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> AstStmtSplits {
+    let res: *mut Result = ast_expr_pf_reduce(selection.cond, s);
     let v: *mut Value = result_as_value(res);
     let e: *mut AstExpr = value_to_expr(v);
     if condexists(e, s) as libc::c_int != 0 || value_isconstant(v) as libc::c_int != 0 {
@@ -3946,14 +3939,10 @@ unsafe fn condexists(cond: *mut AstExpr, s: *mut State) -> bool {
         || props_contradicts(p, reduced) as libc::c_int != 0;
 }
 
-unsafe fn ast_stmt_expr_getfuncs(stmt: *mut AstStmt) -> Box<StringArr> {
-    ast_expr_getfuncs((*stmt).u.expr)
-}
-
-unsafe fn ast_stmt_selection_getfuncs(stmt: *mut AstStmt) -> Box<StringArr> {
-    let cond: *mut AstExpr = (*stmt).u.selection.cond;
-    let body: *mut AstStmt = (*stmt).u.selection.body;
-    let nest: *mut AstStmt = (*stmt).u.selection.nest;
+unsafe fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Box<StringArr> {
+    let cond: *mut AstExpr = selection.cond;
+    let body: *mut AstStmt = selection.body;
+    let nest: *mut AstStmt = selection.nest;
     let cond_arr = ast_expr_getfuncs(cond);
     let body_arr = ast_stmt_getfuncs(body);
     let nest_arr = if !nest.is_null() {
@@ -3967,11 +3956,11 @@ unsafe fn ast_stmt_selection_getfuncs(stmt: *mut AstStmt) -> Box<StringArr> {
     )
 }
 
-unsafe fn ast_stmt_iteration_getfuncs(stmt: *mut AstStmt) -> Box<StringArr> {
-    let init: *mut AstStmt = (*stmt).u.iteration.init;
-    let cond: *mut AstStmt = (*stmt).u.iteration.cond;
-    let body: *mut AstStmt = (*stmt).u.iteration.body;
-    let iter: *mut AstExpr = (*stmt).u.iteration.iter;
+unsafe fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Box<StringArr> {
+    let init: *mut AstStmt = iteration.init;
+    let cond: *mut AstStmt = iteration.cond;
+    let body: *mut AstStmt = iteration.body;
+    let iter: *mut AstExpr = iteration.iter;
     let init_arr = ast_stmt_getfuncs(init);
     let cond_arr = ast_stmt_getfuncs(cond);
     let body_arr = ast_stmt_getfuncs(body);
@@ -3985,12 +3974,11 @@ unsafe fn ast_stmt_iteration_getfuncs(stmt: *mut AstStmt) -> Box<StringArr> {
     )
 }
 
-unsafe fn ast_stmt_compound_getfuncs(stmt: *mut AstStmt) -> Box<StringArr> {
+unsafe fn ast_stmt_compound_getfuncs(block: *mut AstBlock) -> Box<StringArr> {
     let mut res = string_arr_create();
-    let b: *mut AstBlock = (*stmt).u.compound;
-    let stmts: *mut *mut AstStmt = ast_block_stmts(b);
+    let stmts: *mut *mut AstStmt = ast_block_stmts(block);
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < ast_block_nstmts(b) {
+    while i < ast_block_nstmts(block) {
         res = string_arr_concat(&res, &ast_stmt_getfuncs(*stmts.offset(i as isize)));
         i += 1;
     }
@@ -3998,10 +3986,12 @@ unsafe fn ast_stmt_compound_getfuncs(stmt: *mut AstStmt) -> Box<StringArr> {
 }
 
 pub unsafe fn ast_stmt_preconds_validate(stmt: *mut AstStmt) -> *mut Error {
-    match (*stmt).kind {
-        AstStmtKind::Expr | AstStmtKind::Allocation | AstStmtKind::Iteration => 0 as *mut Error,
-        AstStmtKind::Selection => preconds_selection_verify(stmt),
-        AstStmtKind::Compound => preconds_compound_verify(stmt),
+    match &(*stmt).kind {
+        AstStmtKind::Expr(_) | AstStmtKind::Allocation(_) | AstStmtKind::Iteration(_) => {
+            0 as *mut Error
+        }
+        AstStmtKind::Selection(_) => preconds_selection_verify(stmt),
+        AstStmtKind::Compound(block) => preconds_compound_verify(*block),
         _ => panic!(),
     }
 }
@@ -4015,12 +4005,12 @@ unsafe fn preconds_selection_verify(stmt: *mut AstStmt) -> *mut Error {
     );
     return error_create(strbuilder_build(b));
 }
-unsafe fn preconds_compound_verify(stmt: *mut AstStmt) -> *mut Error {
+
+unsafe fn preconds_compound_verify(block: *mut AstBlock) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let b: *mut AstBlock = (*stmt).u.compound;
-    let stmts: *mut *mut AstStmt = ast_block_stmts(b);
+    let stmts: *mut *mut AstStmt = ast_block_stmts(block);
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < ast_block_nstmts(b) {
+    while i < ast_block_nstmts(block) {
         err = ast_stmt_preconds_validate(*stmts.offset(i as isize));
         if !err.is_null() {
             return err;
