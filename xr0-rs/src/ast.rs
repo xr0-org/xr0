@@ -283,8 +283,12 @@ pub struct C2RustUnnamed_10 {
     pub kind: AstJumpKind,
     pub rv: *mut AstExpr,
 }
-pub type AstJumpKind = libc::c_uint;
-pub const JUMP_RETURN: AstJumpKind = 1;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum AstJumpKind {
+    Return,
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct C2RustUnnamed_11 {
@@ -3539,7 +3543,7 @@ unsafe fn ast_stmt_sel_sprint(mut stmt: *mut AstStmt, mut b: *mut StrBuilder) {
 
 pub unsafe fn ast_stmt_isterminal(mut stmt: *mut AstStmt, mut s: *mut State) -> bool {
     match (*stmt).kind {
-        AstStmtKind::Jump => (*stmt).u.jump.kind == JUMP_RETURN,
+        AstStmtKind::Jump => (*stmt).u.jump.kind == AstJumpKind::Return,
         AstStmtKind::Compound => ast_block_isterminal((*stmt).u.compound, s),
         AstStmtKind::Selection => sel_isterminal(stmt, s),
         _ => false,
@@ -3553,7 +3557,7 @@ pub unsafe fn ast_stmt_create_jump(
 ) -> *mut AstStmt {
     let mut stmt: *mut AstStmt = ast_stmt_create(loc);
     (*stmt).kind = AstStmtKind::Jump;
-    (*stmt).u.jump.kind = JUMP_RETURN;
+    (*stmt).u.jump.kind = AstJumpKind::Return;
     (*stmt).u.jump.rv = rv;
     return stmt;
 }
@@ -3924,9 +3928,7 @@ unsafe fn ast_stmt_destroy_jump(mut stmt: *mut AstStmt) {
     if rv.is_null() {
         return;
     }
-    if !((*stmt).u.jump.kind as libc::c_uint == JUMP_RETURN as libc::c_int as libc::c_uint) {
-        panic!();
-    }
+    assert_eq!((*stmt).u.jump.kind, AstJumpKind::Return);
     ast_expr_destroy(rv);
 }
 

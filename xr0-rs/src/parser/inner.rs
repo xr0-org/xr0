@@ -601,7 +601,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule jump_statement() -> BoxedStmt =
         p:position!() K(<"return">) _ expr:expression() _ ";" {
-            unsafe { ast_stmt_create_jump(env.lexloc(p), JUMP_RETURN, expr) }
+            unsafe { ast_stmt_create_jump(env.lexloc(p), AstJumpKind::Return, expr) }
         }
 
     rule block_statement() -> BlockStatement =
