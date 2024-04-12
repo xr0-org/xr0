@@ -3,8 +3,7 @@
     mutable_transmutes,
     non_snake_case,
     non_upper_case_globals,
-    unused_assignments,
-    unused_mut
+    unused_assignments
 )]
 
 use libc::{free, malloc};
@@ -23,7 +22,7 @@ pub struct StaticMemory {
 }
 
 pub unsafe fn static_memory_create() -> *mut StaticMemory {
-    let mut sm: *mut StaticMemory =
+    let sm: *mut StaticMemory =
         malloc(::core::mem::size_of::<StaticMemory>()) as *mut StaticMemory;
     assert!(!sm.is_null());
     std::ptr::write(
@@ -36,20 +35,20 @@ pub unsafe fn static_memory_create() -> *mut StaticMemory {
     sm
 }
 
-pub unsafe fn static_memory_destroy(mut sm: *mut StaticMemory) {
+pub unsafe fn static_memory_destroy(sm: *mut StaticMemory) {
     block_arr_destroy((*sm).blocks);
 }
 
 pub unsafe fn static_memory_str(
-    mut sm: *mut StaticMemory,
-    mut indent: *mut libc::c_char,
+    sm: *mut StaticMemory,
+    indent: *mut libc::c_char,
 ) -> *mut libc::c_char {
-    let mut b: *mut StrBuilder = strbuilder_create();
-    let mut n: libc::c_int = block_arr_nblocks((*sm).blocks);
-    let mut arr: *mut *mut Block = block_arr_blocks((*sm).blocks);
+    let b: *mut StrBuilder = strbuilder_create();
+    let n: libc::c_int = block_arr_nblocks((*sm).blocks);
+    let arr: *mut *mut Block = block_arr_blocks((*sm).blocks);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        let mut block: *mut libc::c_char = block_str(*arr.offset(i as isize));
+        let block: *mut libc::c_char = block_str(*arr.offset(i as isize));
         strbuilder_printf(
             b,
             b"%s%d: %s\n\0" as *const u8 as *const libc::c_char,
@@ -63,14 +62,14 @@ pub unsafe fn static_memory_str(
     return strbuilder_build(b);
 }
 
-pub unsafe fn static_memory_copy(mut sm: *mut StaticMemory) -> *mut StaticMemory {
-    let mut copy: *mut StaticMemory =
+pub unsafe fn static_memory_copy(sm: *mut StaticMemory) -> *mut StaticMemory {
+    let copy: *mut StaticMemory =
         malloc(::core::mem::size_of::<StaticMemory>()) as *mut StaticMemory;
     (*copy).blocks = block_arr_copy((*sm).blocks);
     (*copy).pool = pool_copy(&(*sm).pool);
     return copy;
 }
-unsafe fn pool_copy(mut p: &Map) -> Box<Map> {
+unsafe fn pool_copy(p: &Map) -> Box<Map> {
     let mut pcopy = Map::new();
     for (k, v) in p.pairs() {
         pcopy.set(
@@ -81,16 +80,16 @@ unsafe fn pool_copy(mut p: &Map) -> Box<Map> {
     return pcopy;
 }
 
-pub unsafe fn static_memory_newblock(mut sm: *mut StaticMemory) -> libc::c_int {
-    let mut address: libc::c_int = block_arr_append((*sm).blocks, block_create());
-    let mut n: libc::c_int = block_arr_nblocks((*sm).blocks);
+pub unsafe fn static_memory_newblock(sm: *mut StaticMemory) -> libc::c_int {
+    let address: libc::c_int = block_arr_append((*sm).blocks, block_create());
+    let n: libc::c_int = block_arr_nblocks((*sm).blocks);
     assert!(n > 0);
     return address;
 }
 
 pub unsafe fn static_memory_getblock(
-    mut sm: *mut StaticMemory,
-    mut address: libc::c_int,
+    sm: *mut StaticMemory,
+    address: libc::c_int,
 ) -> *mut Block {
     if address >= block_arr_nblocks((*sm).blocks) {
         return 0 as *mut Block;
@@ -99,9 +98,9 @@ pub unsafe fn static_memory_getblock(
 }
 
 pub unsafe fn static_memory_stringpool(
-    mut sm: *mut StaticMemory,
-    mut lit: *mut libc::c_char,
-    mut loc: *mut Location,
+    sm: *mut StaticMemory,
+    lit: *mut libc::c_char,
+    loc: *mut Location,
 ) {
     (*sm)
         .pool
@@ -109,8 +108,8 @@ pub unsafe fn static_memory_stringpool(
 }
 
 pub unsafe fn static_memory_checkpool(
-    mut sm: *mut StaticMemory,
-    mut lit: *mut libc::c_char,
+    sm: *mut StaticMemory,
+    lit: *mut libc::c_char,
 ) -> *mut Location {
     return (*sm).pool.get(lit) as *mut Location;
 }

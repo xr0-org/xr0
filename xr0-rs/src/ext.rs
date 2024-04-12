@@ -3,8 +3,7 @@
     mutable_transmutes,
     non_snake_case,
     non_upper_case_globals,
-    unused_assignments,
-    unused_mut
+    unused_assignments
 )]
 
 use libc::{free, malloc};
@@ -21,7 +20,7 @@ pub struct Externals {
 }
 
 pub unsafe fn externals_create() -> *mut Externals {
-    let mut ext: *mut Externals = malloc(::core::mem::size_of::<Externals>()) as *mut Externals;
+    let ext: *mut Externals = malloc(::core::mem::size_of::<Externals>()) as *mut Externals;
     std::ptr::write(
         ext,
         Externals {
@@ -34,7 +33,7 @@ pub unsafe fn externals_create() -> *mut Externals {
     return ext;
 }
 
-pub unsafe fn externals_destroy(mut ext: *mut Externals) {
+pub unsafe fn externals_destroy(ext: *mut Externals) {
     let Externals {
         func,
         var,
@@ -49,13 +48,13 @@ pub unsafe fn externals_destroy(mut ext: *mut Externals) {
 }
 
 pub unsafe fn externals_types_str(
-    mut ext: *mut Externals,
-    mut indent: *mut libc::c_char,
+    ext: *mut Externals,
+    indent: *mut libc::c_char,
 ) -> *mut libc::c_char {
-    let mut b: *mut StrBuilder = strbuilder_create();
+    let b: *mut StrBuilder = strbuilder_create();
     let mut m = &(*ext)._typedef;
     for (k, v) in m.pairs() {
-        let mut type_0: *mut libc::c_char = ast_type_str(v as *mut AstType);
+        let type_0: *mut libc::c_char = ast_type_str(v as *mut AstType);
         strbuilder_printf(
             b,
             b"%s%s %s\n\0" as *const u8 as *const libc::c_char,
@@ -67,7 +66,7 @@ pub unsafe fn externals_types_str(
     }
     m = &(*ext)._struct;
     for v in m.values() {
-        let mut type_1: *mut libc::c_char = ast_type_str(v as *mut AstType);
+        let type_1: *mut libc::c_char = ast_type_str(v as *mut AstType);
         strbuilder_printf(
             b,
             b"%s%s\n\0" as *const u8 as *const libc::c_char,
@@ -80,33 +79,33 @@ pub unsafe fn externals_types_str(
 }
 
 pub unsafe fn externals_declarefunc(
-    mut ext: *mut Externals,
-    mut id: *mut libc::c_char,
-    mut f: *mut AstFunction,
+    ext: *mut Externals,
+    id: *mut libc::c_char,
+    f: *mut AstFunction,
 ) {
     (*ext).func.set(dynamic_str(id), f as *const libc::c_void);
 }
 
 pub unsafe fn externals_declarevar(
-    mut ext: *mut Externals,
-    mut id: *mut libc::c_char,
-    mut v: *mut AstVariable,
+    ext: *mut Externals,
+    id: *mut libc::c_char,
+    v: *mut AstVariable,
 ) {
     (*ext).var.set(dynamic_str(id), v as *const libc::c_void);
 }
 
 pub unsafe fn externals_declaretypedef(
-    mut ext: *mut Externals,
-    mut id: *mut libc::c_char,
-    mut t: *mut AstType,
+    ext: *mut Externals,
+    id: *mut libc::c_char,
+    t: *mut AstType,
 ) {
     (*ext)
         ._typedef
         .set(dynamic_str(id), t as *const libc::c_void);
 }
 
-pub unsafe fn externals_declarestruct(mut ext: *mut Externals, mut t: *mut AstType) {
-    let mut id: *mut libc::c_char = ast_type_struct_tag(t);
+pub unsafe fn externals_declarestruct(ext: *mut Externals, t: *mut AstType) {
+    let id: *mut libc::c_char = ast_type_struct_tag(t);
     if id.is_null() {
         panic!();
     }
@@ -116,22 +115,22 @@ pub unsafe fn externals_declarestruct(mut ext: *mut Externals, mut t: *mut AstTy
 }
 
 pub unsafe fn externals_getfunc(
-    mut ext: *mut Externals,
-    mut id: *mut libc::c_char,
+    ext: *mut Externals,
+    id: *mut libc::c_char,
 ) -> *mut AstFunction {
     return (*ext).func.get(id) as *mut AstFunction;
 }
 
 pub unsafe fn externals_gettypedef(
-    mut ext: *mut Externals,
-    mut id: *mut libc::c_char,
+    ext: *mut Externals,
+    id: *mut libc::c_char,
 ) -> *mut AstType {
     return (*ext)._typedef.get(id) as *mut AstType;
 }
 
 pub unsafe fn externals_getstruct(
-    mut ext: *mut Externals,
-    mut id: *mut libc::c_char,
+    ext: *mut Externals,
+    id: *mut libc::c_char,
 ) -> *mut AstType {
     return (*ext)._struct.get(id) as *mut AstType;
 }

@@ -3,8 +3,7 @@
     mutable_transmutes,
     non_snake_case,
     non_upper_case_globals,
-    unused_assignments,
-    unused_mut
+    unused_assignments
 )]
 
 use libc::{calloc, free, malloc, realloc};
@@ -61,8 +60,8 @@ pub struct ObjectResult {
     pub err: *mut Error,
 }
 
-pub unsafe fn object_value_create(mut offset: *mut AstExpr, mut v: *mut Value) -> *mut Object {
-    let mut obj: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
+pub unsafe fn object_value_create(offset: *mut AstExpr, v: *mut Value) -> *mut Object {
+    let obj: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
     if obj.is_null() {
         panic!();
     }
@@ -72,11 +71,11 @@ pub unsafe fn object_value_create(mut offset: *mut AstExpr, mut v: *mut Value) -
     return obj;
 }
 
-pub unsafe fn object_range_create(mut offset: *mut AstExpr, mut r: *mut Range) -> *mut Object {
+pub unsafe fn object_range_create(offset: *mut AstExpr, r: *mut Range) -> *mut Object {
     if r.is_null() {
         panic!();
     }
-    let mut obj: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
+    let obj: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
     if obj.is_null() {
         panic!();
     }
@@ -86,7 +85,7 @@ pub unsafe fn object_range_create(mut offset: *mut AstExpr, mut r: *mut Range) -
     return obj;
 }
 
-pub unsafe fn object_destroy(mut obj: *mut Object) {
+pub unsafe fn object_destroy(obj: *mut Object) {
     match (*obj).type_0 {
         0 => {
             if !((*obj).c2rust_unnamed.value).is_null() {
@@ -102,8 +101,8 @@ pub unsafe fn object_destroy(mut obj: *mut Object) {
     free(obj as *mut libc::c_void);
 }
 
-pub unsafe fn object_copy(mut old: *mut Object) -> *mut Object {
-    let mut new: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
+pub unsafe fn object_copy(old: *mut Object) -> *mut Object {
+    let new: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
     (*new).offset = ast_expr_copy((*old).offset);
     (*new).type_0 = (*old).type_0;
     match (*old).type_0 {
@@ -122,7 +121,7 @@ pub unsafe fn object_copy(mut old: *mut Object) -> *mut Object {
     return new;
 }
 
-pub unsafe fn object_abstractcopy(mut old: *mut Object, mut s: *mut State) -> *mut Object {
+pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Object {
     match (*old).type_0 {
         1 => object_copy(old),
         0 => object_value_create(
@@ -137,20 +136,20 @@ pub unsafe fn object_abstractcopy(mut old: *mut Object, mut s: *mut State) -> *m
     }
 }
 
-pub unsafe fn object_str(mut obj: *mut Object) -> *mut libc::c_char {
-    let mut b: *mut StrBuilder = strbuilder_create();
+pub unsafe fn object_str(obj: *mut Object) -> *mut libc::c_char {
+    let b: *mut StrBuilder = strbuilder_create();
     strbuilder_printf(b, b"{\0" as *const u8 as *const libc::c_char);
-    let mut offset: *mut libc::c_char = ast_expr_str((*obj).offset);
+    let offset: *mut libc::c_char = ast_expr_str((*obj).offset);
     strbuilder_printf(b, b"%s:\0" as *const u8 as *const libc::c_char, offset);
     free(offset as *mut libc::c_void);
-    let mut inner: *mut libc::c_char = inner_str(obj);
+    let inner: *mut libc::c_char = inner_str(obj);
     strbuilder_printf(b, b"<%s>\0" as *const u8 as *const libc::c_char, inner);
     free(inner as *mut libc::c_void);
     strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
     return strbuilder_build(b);
 }
 
-unsafe fn inner_str(mut obj: *mut Object) -> *mut libc::c_char {
+unsafe fn inner_str(obj: *mut Object) -> *mut libc::c_char {
     match (*obj).type_0 {
         0 => {
             if !((*obj).c2rust_unnamed.value).is_null() {
@@ -164,7 +163,7 @@ unsafe fn inner_str(mut obj: *mut Object) -> *mut libc::c_char {
     }
 }
 
-pub unsafe fn object_referencesheap(mut obj: *mut Object, mut s: *mut State) -> bool {
+pub unsafe fn object_referencesheap(obj: *mut Object, s: *mut State) -> bool {
     if !object_isvalue(obj) {
         return true;
     }
@@ -172,25 +171,25 @@ pub unsafe fn object_referencesheap(mut obj: *mut Object, mut s: *mut State) -> 
         && value_referencesheap((*obj).c2rust_unnamed.value, s);
 }
 
-pub unsafe fn object_hasvalue(mut obj: *mut Object) -> bool {
+pub unsafe fn object_hasvalue(obj: *mut Object) -> bool {
     if object_isvalue(obj) {
         return !((*obj).c2rust_unnamed.value).is_null();
     }
     false
 }
 
-pub unsafe fn object_isvalue(mut obj: *mut Object) -> bool {
+pub unsafe fn object_isvalue(obj: *mut Object) -> bool {
     return (*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint;
 }
 
-pub unsafe fn object_as_value(mut obj: *mut Object) -> *mut Value {
+pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
     if !((*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
         panic!();
     }
     return (*obj).c2rust_unnamed.value;
 }
 
-pub unsafe fn object_isdeallocand(mut obj: *mut Object, mut s: *mut State) -> bool {
+pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
     match (*obj).type_0 {
         0 => {
             !((*obj).c2rust_unnamed.value).is_null()
@@ -204,9 +203,9 @@ pub unsafe fn object_isdeallocand(mut obj: *mut Object, mut s: *mut State) -> bo
 }
 
 pub unsafe fn object_references(
-    mut obj: *mut Object,
-    mut loc: *mut Location,
-    mut s: *mut State,
+    obj: *mut Object,
+    loc: *mut Location,
+    s: *mut State,
 ) -> bool {
     if (*obj).type_0 as libc::c_uint == OBJECT_DEALLOCAND_RANGE as libc::c_int as libc::c_uint {
         return range_references((*obj).c2rust_unnamed.range, loc, s);
@@ -217,7 +216,7 @@ pub unsafe fn object_references(
     {
         panic!();
     }
-    let mut v: *mut Value = object_as_value(obj);
+    let v: *mut Value = object_as_value(obj);
     return if !v.is_null() {
         value_references(v, loc, s) as libc::c_int
     } else {
@@ -225,7 +224,7 @@ pub unsafe fn object_references(
     } != 0;
 }
 
-pub unsafe fn object_assign(mut obj: *mut Object, mut val: *mut Value) -> *mut Error {
+pub unsafe fn object_assign(obj: *mut Object, val: *mut Value) -> *mut Error {
     if !((*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
         as libc::c_int as libc::c_long
         != 0
@@ -235,7 +234,7 @@ pub unsafe fn object_assign(mut obj: *mut Object, mut val: *mut Value) -> *mut E
     (*obj).c2rust_unnamed.value = val;
     return 0 as *mut Error;
 }
-unsafe fn object_size(mut obj: *mut Object) -> *mut AstExpr {
+unsafe fn object_size(obj: *mut Object) -> *mut AstExpr {
     match (*obj).type_0 {
         0 => ast_expr_constant_create(1 as libc::c_int),
         1 => ast_expr_copy(range_size((*obj).c2rust_unnamed.range)),
@@ -243,26 +242,26 @@ unsafe fn object_size(mut obj: *mut Object) -> *mut AstExpr {
     }
 }
 
-pub unsafe fn object_lower(mut obj: *mut Object) -> *mut AstExpr {
+pub unsafe fn object_lower(obj: *mut Object) -> *mut AstExpr {
     return (*obj).offset;
 }
 
-pub unsafe fn object_upper(mut obj: *mut Object) -> *mut AstExpr {
+pub unsafe fn object_upper(obj: *mut Object) -> *mut AstExpr {
     return ast_expr_sum_create(ast_expr_copy((*obj).offset), object_size(obj));
 }
 
 pub unsafe fn object_contains(
-    mut obj: *mut Object,
-    mut offset: *mut AstExpr,
-    mut s: *mut State,
+    obj: *mut Object,
+    offset: *mut AstExpr,
+    s: *mut State,
 ) -> bool {
-    let mut lw: *mut AstExpr = (*obj).offset;
-    let mut up: *mut AstExpr = object_upper(obj);
-    let mut of: *mut AstExpr = offset;
-    let mut e1: *mut AstExpr = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(of));
-    let mut e2: *mut AstExpr = ast_expr_lt_create(ast_expr_copy(of), ast_expr_copy(up));
+    let lw: *mut AstExpr = (*obj).offset;
+    let up: *mut AstExpr = object_upper(obj);
+    let of: *mut AstExpr = offset;
+    let e1: *mut AstExpr = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(of));
+    let e2: *mut AstExpr = ast_expr_lt_create(ast_expr_copy(of), ast_expr_copy(up));
     ast_expr_destroy(up);
-    let mut contains: bool =
+    let contains: bool =
         state_eval(s, e1) as libc::c_int != 0 && state_eval(s, e2) as libc::c_int != 0;
     ast_expr_destroy(e2);
     ast_expr_destroy(e1);
@@ -270,54 +269,54 @@ pub unsafe fn object_contains(
 }
 
 pub unsafe fn object_contains_upperincl(
-    mut obj: *mut Object,
-    mut offset: *mut AstExpr,
-    mut s: *mut State,
+    obj: *mut Object,
+    offset: *mut AstExpr,
+    s: *mut State,
 ) -> bool {
-    let mut lw: *mut AstExpr = (*obj).offset;
-    let mut up: *mut AstExpr = object_upper(obj);
-    let mut of: *mut AstExpr = offset;
+    let lw: *mut AstExpr = (*obj).offset;
+    let up: *mut AstExpr = object_upper(obj);
+    let of: *mut AstExpr = offset;
     return state_eval(s, ast_expr_le_create(lw, of)) as libc::c_int != 0
         && state_eval(s, ast_expr_le_create(of, up)) as libc::c_int != 0;
 }
 
-pub unsafe fn object_isempty(mut obj: *mut Object, mut s: *mut State) -> bool {
-    let mut lw: *mut AstExpr = (*obj).offset;
-    let mut up: *mut AstExpr = object_upper(obj);
+pub unsafe fn object_isempty(obj: *mut Object, s: *mut State) -> bool {
+    let lw: *mut AstExpr = (*obj).offset;
+    let up: *mut AstExpr = object_upper(obj);
     return state_eval(s, ast_expr_eq_create(lw, up));
 }
 
 pub unsafe fn object_contig_precedes(
-    mut before: *mut Object,
-    mut after: *mut Object,
-    mut s: *mut State,
+    before: *mut Object,
+    after: *mut Object,
+    s: *mut State,
 ) -> bool {
-    let mut lw: *mut AstExpr = object_upper(before);
-    let mut up: *mut AstExpr = (*after).offset;
+    let lw: *mut AstExpr = object_upper(before);
+    let up: *mut AstExpr = (*after).offset;
     return state_eval(s, ast_expr_eq_create(lw, up));
 }
 
-pub unsafe fn object_issingular(mut obj: *mut Object, mut s: *mut State) -> bool {
-    let mut lw: *mut AstExpr = (*obj).offset;
-    let mut up: *mut AstExpr = object_upper(obj);
-    let mut lw_succ: *mut AstExpr =
+pub unsafe fn object_issingular(obj: *mut Object, s: *mut State) -> bool {
+    let lw: *mut AstExpr = (*obj).offset;
+    let up: *mut AstExpr = object_upper(obj);
+    let lw_succ: *mut AstExpr =
         ast_expr_sum_create(lw, ast_expr_constant_create(1 as libc::c_int));
     return state_eval(s, ast_expr_eq_create(lw_succ, up));
 }
 
 pub unsafe fn object_upto(
-    mut obj: *mut Object,
-    mut excl_up: *mut AstExpr,
-    mut s: *mut State,
+    obj: *mut Object,
+    excl_up: *mut AstExpr,
+    s: *mut State,
 ) -> *mut Object {
-    let mut lw: *mut AstExpr = (*obj).offset;
-    let mut up: *mut AstExpr = object_upper(obj);
-    let mut prop0: *mut AstExpr = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
-    let mut prop1: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
-    let mut prop2: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(up), ast_expr_copy(excl_up));
-    let mut e0: bool = state_eval(s, prop0);
-    let mut e1: bool = state_eval(s, prop1);
-    let mut e2: bool = state_eval(s, prop2);
+    let lw: *mut AstExpr = (*obj).offset;
+    let up: *mut AstExpr = object_upper(obj);
+    let prop0: *mut AstExpr = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
+    let prop1: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
+    let prop2: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(up), ast_expr_copy(excl_up));
+    let e0: bool = state_eval(s, prop0);
+    let e1: bool = state_eval(s, prop1);
+    let e2: bool = state_eval(s, prop2);
     ast_expr_destroy(prop2);
     ast_expr_destroy(prop1);
     ast_expr_destroy(prop0);
@@ -351,16 +350,16 @@ pub unsafe fn object_upto(
 }
 
 pub unsafe fn object_from(
-    mut obj: *mut Object,
-    mut incl_lw: *mut AstExpr,
-    mut s: *mut State,
+    obj: *mut Object,
+    incl_lw: *mut AstExpr,
+    s: *mut State,
 ) -> *mut Object {
-    let mut lw: *mut AstExpr = (*obj).offset;
-    let mut up: *mut AstExpr = object_upper(obj);
-    let mut prop0: *mut AstExpr = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(up));
-    let mut prop1: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(incl_lw), ast_expr_copy(lw));
-    let mut e0: bool = state_eval(s, prop0);
-    let mut e1: bool = state_eval(s, prop1);
+    let lw: *mut AstExpr = (*obj).offset;
+    let up: *mut AstExpr = object_upper(obj);
+    let prop0: *mut AstExpr = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(up));
+    let prop1: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(incl_lw), ast_expr_copy(lw));
+    let e0: bool = state_eval(s, prop0);
+    let e1: bool = state_eval(s, prop1);
     ast_expr_destroy(prop1);
     ast_expr_destroy(prop0);
     if e0 {
@@ -386,7 +385,7 @@ pub unsafe fn object_from(
     );
 }
 
-pub unsafe fn object_dealloc(mut obj: *mut Object, mut s: *mut State) -> *mut Error {
+pub unsafe fn object_dealloc(obj: *mut Object, s: *mut State) -> *mut Error {
     match (*obj).type_0 {
         0 => state_dealloc(s, (*obj).c2rust_unnamed.value),
         1 => range_dealloc((*obj).c2rust_unnamed.range, s),
@@ -395,23 +394,23 @@ pub unsafe fn object_dealloc(mut obj: *mut Object, mut s: *mut State) -> *mut Er
 }
 
 pub unsafe fn object_getmember(
-    mut obj: *mut Object,
-    mut t: *mut AstType,
-    mut member: *mut libc::c_char,
-    mut s: *mut State,
+    obj: *mut Object,
+    t: *mut AstType,
+    member: *mut libc::c_char,
+    s: *mut State,
 ) -> *mut Object {
     return value_struct_member(getorcreatestruct(obj, t, s), member);
 }
 unsafe fn getorcreatestruct(
-    mut obj: *mut Object,
-    mut t: *mut AstType,
-    mut s: *mut State,
+    obj: *mut Object,
+    t: *mut AstType,
+    s: *mut State,
 ) -> *mut Value {
     let mut v: *mut Value = object_as_value(obj);
     if !v.is_null() {
         return v;
     }
-    let mut complete: *mut AstType = ast_type_struct_complete(t, state_getext(s));
+    let complete: *mut AstType = ast_type_struct_complete(t, state_getext(s));
     if complete.is_null() {
         panic!();
     }
@@ -421,34 +420,34 @@ unsafe fn getorcreatestruct(
 }
 
 pub unsafe fn object_getmembertype(
-    mut obj: *mut Object,
-    mut t: *mut AstType,
-    mut member: *mut libc::c_char,
-    mut s: *mut State,
+    obj: *mut Object,
+    t: *mut AstType,
+    member: *mut libc::c_char,
+    s: *mut State,
 ) -> *mut AstType {
     return value_struct_membertype(getorcreatestruct(obj, t, s), member);
 }
 
-pub unsafe fn object_result_error_create(mut err: *mut Error) -> *mut ObjectResult {
+pub unsafe fn object_result_error_create(err: *mut Error) -> *mut ObjectResult {
     if err.is_null() {
         panic!();
     }
-    let mut r: *mut ObjectResult =
+    let r: *mut ObjectResult =
         malloc(::core::mem::size_of::<ObjectResult>()) as *mut ObjectResult;
     (*r).val = 0 as *mut Object;
     (*r).err = err;
     return r;
 }
 
-pub unsafe fn object_result_value_create(mut val: *mut Object) -> *mut ObjectResult {
-    let mut r: *mut ObjectResult =
+pub unsafe fn object_result_value_create(val: *mut Object) -> *mut ObjectResult {
+    let r: *mut ObjectResult =
         malloc(::core::mem::size_of::<ObjectResult>()) as *mut ObjectResult;
     (*r).val = val;
     (*r).err = 0 as *mut Error;
     return r;
 }
 
-pub unsafe fn object_result_destroy(mut res: *mut ObjectResult) {
+pub unsafe fn object_result_destroy(res: *mut ObjectResult) {
     if !((*res).err).is_null() {
         panic!();
     }
@@ -458,52 +457,52 @@ pub unsafe fn object_result_destroy(mut res: *mut ObjectResult) {
     free(res as *mut libc::c_void);
 }
 
-pub unsafe fn object_result_iserror(mut res: *mut ObjectResult) -> bool {
+pub unsafe fn object_result_iserror(res: *mut ObjectResult) -> bool {
     return !((*res).err).is_null();
 }
 
-pub unsafe fn object_result_as_error(mut res: *mut ObjectResult) -> *mut Error {
+pub unsafe fn object_result_as_error(res: *mut ObjectResult) -> *mut Error {
     if ((*res).err).is_null() {
         panic!();
     }
     return (*res).err;
 }
 
-pub unsafe fn object_result_as_value(mut res: *mut ObjectResult) -> *mut Object {
+pub unsafe fn object_result_as_value(res: *mut ObjectResult) -> *mut Object {
     if !((*res).err).is_null() {
         panic!();
     }
     return (*res).val;
 }
 
-pub unsafe fn object_result_hasvalue(mut res: *mut ObjectResult) -> bool {
+pub unsafe fn object_result_hasvalue(res: *mut ObjectResult) -> bool {
     if object_result_iserror(res) {
         panic!();
     }
     return !((*res).val).is_null();
 }
 
-pub unsafe fn range_create(mut size: *mut AstExpr, mut loc: *mut Location) -> *mut Range {
-    let mut r: *mut Range = malloc(::core::mem::size_of::<Range>()) as *mut Range;
+pub unsafe fn range_create(size: *mut AstExpr, loc: *mut Location) -> *mut Range {
+    let r: *mut Range = malloc(::core::mem::size_of::<Range>()) as *mut Range;
     (*r).size = size;
     (*r).loc = loc;
     return r;
 }
 
-pub unsafe fn range_copy(mut r: *mut Range) -> *mut Range {
+pub unsafe fn range_copy(r: *mut Range) -> *mut Range {
     return range_create(ast_expr_copy((*r).size), location_copy((*r).loc));
 }
 
-pub unsafe fn range_destroy(mut r: *mut Range) {
+pub unsafe fn range_destroy(r: *mut Range) {
     ast_expr_destroy((*r).size);
     location_destroy((*r).loc);
     free(r as *mut libc::c_void);
 }
 
-pub unsafe fn range_str(mut r: *mut Range) -> *mut libc::c_char {
-    let mut b: *mut StrBuilder = strbuilder_create();
-    let mut size: *mut libc::c_char = ast_expr_str((*r).size);
-    let mut loc: *mut libc::c_char = location_str((*r).loc);
+pub unsafe fn range_str(r: *mut Range) -> *mut libc::c_char {
+    let b: *mut StrBuilder = strbuilder_create();
+    let size: *mut libc::c_char = ast_expr_str((*r).size);
+    let loc: *mut libc::c_char = location_str((*r).loc);
     strbuilder_printf(
         b,
         b"virt:%s@%s\0" as *const u8 as *const libc::c_char,
@@ -515,35 +514,35 @@ pub unsafe fn range_str(mut r: *mut Range) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 
-pub unsafe fn range_size(mut r: *mut Range) -> *mut AstExpr {
+pub unsafe fn range_size(r: *mut Range) -> *mut AstExpr {
     return (*r).size;
 }
 
-pub unsafe fn range_dealloc(mut r: *mut Range, mut s: *mut State) -> *mut Error {
+pub unsafe fn range_dealloc(r: *mut Range, s: *mut State) -> *mut Error {
     return state_dealloc(s, value_ptr_create((*r).loc));
 }
 
-pub unsafe fn range_isdeallocand(mut r: *mut Range, mut s: *mut State) -> bool {
+pub unsafe fn range_isdeallocand(r: *mut Range, s: *mut State) -> bool {
     return state_isdeallocand(s, (*r).loc);
 }
 
 pub unsafe fn range_references(
-    mut r: *mut Range,
-    mut loc: *mut Location,
-    mut s: *mut State,
+    r: *mut Range,
+    loc: *mut Location,
+    s: *mut State,
 ) -> bool {
     return location_references((*r).loc, loc, s);
 }
 
 pub unsafe fn object_arr_create() -> *mut ObjectArr {
-    let mut arr: *mut ObjectArr = calloc(1, ::core::mem::size_of::<ObjectArr>()) as *mut ObjectArr;
+    let arr: *mut ObjectArr = calloc(1, ::core::mem::size_of::<ObjectArr>()) as *mut ObjectArr;
     if arr.is_null() {
         panic!();
     }
     return arr;
 }
 
-pub unsafe fn object_arr_destroy(mut arr: *mut ObjectArr) {
+pub unsafe fn object_arr_destroy(arr: *mut ObjectArr) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {
         object_destroy(*((*arr).object).offset(i as isize));
@@ -553,8 +552,8 @@ pub unsafe fn object_arr_destroy(mut arr: *mut ObjectArr) {
     free(arr as *mut libc::c_void);
 }
 
-pub unsafe fn object_arr_copy(mut arr: *mut ObjectArr) -> *mut ObjectArr {
-    let mut copy: *mut ObjectArr = object_arr_create();
+pub unsafe fn object_arr_copy(arr: *mut ObjectArr) -> *mut ObjectArr {
+    let copy: *mut ObjectArr = object_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {
         object_arr_append(copy, object_copy(*((*arr).object).offset(i as isize)));
@@ -563,18 +562,18 @@ pub unsafe fn object_arr_copy(mut arr: *mut ObjectArr) -> *mut ObjectArr {
     return copy;
 }
 
-pub unsafe fn object_arr_allocs(mut arr: *mut ObjectArr) -> *mut *mut Object {
+pub unsafe fn object_arr_allocs(arr: *mut ObjectArr) -> *mut *mut Object {
     return (*arr).object;
 }
 
-pub unsafe fn object_arr_nallocs(mut arr: *mut ObjectArr) -> libc::c_int {
+pub unsafe fn object_arr_nallocs(arr: *mut ObjectArr) -> libc::c_int {
     return (*arr).n;
 }
 
 pub unsafe fn object_arr_index(
-    mut arr: *mut ObjectArr,
-    mut offset: *mut AstExpr,
-    mut state: *mut State,
+    arr: *mut ObjectArr,
+    offset: *mut AstExpr,
+    state: *mut State,
 ) -> libc::c_int {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {
@@ -587,9 +586,9 @@ pub unsafe fn object_arr_index(
 }
 
 pub unsafe fn object_arr_index_upperincl(
-    mut arr: *mut ObjectArr,
-    mut offset: *mut AstExpr,
-    mut state: *mut State,
+    arr: *mut ObjectArr,
+    offset: *mut AstExpr,
+    state: *mut State,
 ) -> libc::c_int {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {
@@ -602,9 +601,9 @@ pub unsafe fn object_arr_index_upperincl(
 }
 
 pub unsafe fn object_arr_insert(
-    mut arr: *mut ObjectArr,
-    mut index: libc::c_int,
-    mut obj: *mut Object,
+    arr: *mut ObjectArr,
+    index: libc::c_int,
+    obj: *mut Object,
 ) -> libc::c_int {
     (*arr).n += 1;
     (*arr).object = realloc(
@@ -625,11 +624,11 @@ pub unsafe fn object_arr_insert(
     return index;
 }
 
-pub unsafe fn object_arr_append(mut arr: *mut ObjectArr, mut obj: *mut Object) -> libc::c_int {
+pub unsafe fn object_arr_append(arr: *mut ObjectArr, obj: *mut Object) -> libc::c_int {
     return object_arr_insert(arr, (*arr).n, obj);
 }
 
-pub unsafe fn object_arr_remove(mut arr: *mut ObjectArr, mut index: libc::c_int) {
+pub unsafe fn object_arr_remove(arr: *mut ObjectArr, index: libc::c_int) {
     let mut i: libc::c_int = index;
     while i < (*arr).n - 1 as libc::c_int {
         let ref mut fresh2 = *((*arr).object).offset(i as isize);
@@ -646,10 +645,10 @@ pub unsafe fn object_arr_remove(mut arr: *mut ObjectArr, mut index: libc::c_int)
     }
 }
 
-pub unsafe fn object_arr_nobjects(mut arr: *mut ObjectArr) -> libc::c_int {
+pub unsafe fn object_arr_nobjects(arr: *mut ObjectArr) -> libc::c_int {
     return (*arr).n;
 }
 
-pub unsafe fn object_arr_objects(mut arr: *mut ObjectArr) -> *mut *mut Object {
+pub unsafe fn object_arr_objects(arr: *mut ObjectArr) -> *mut *mut Object {
     return (*arr).object;
 }

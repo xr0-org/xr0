@@ -1,4 +1,4 @@
-#![allow(unused_variables, unused_mut)]
+#![allow(unused_variables)]
 
 pub mod block;
 pub mod clump;
