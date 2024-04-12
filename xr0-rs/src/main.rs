@@ -1,6 +1,6 @@
 #![feature(c_variadic)]
 
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
@@ -10,6 +10,8 @@ use std::{env, ptr};
 use clap::Parser;
 use libc::{exit, fprintf, strcmp};
 
+mod util;
+
 mod ast;
 mod c_util;
 mod ext;
@@ -18,7 +20,6 @@ mod object;
 mod parser;
 mod props;
 mod state;
-mod util;
 mod value;
 
 use ast::{
@@ -41,8 +42,7 @@ use state::r#static::static_memory;
 use state::stack::{stack as Stack, variable as Variable};
 use state::state::state as State;
 use util::{
-    strbuilder as StrBuilder, string_arr, string_arr_n, string_arr_s, string_arr_str, v_printf,
-    VERBOSE_MODE,
+    strbuilder as StrBuilder, string_arr, string_arr_n, string_arr_s, string_arr_str, VERBOSE_MODE,
 };
 use value::value as Value;
 
@@ -185,9 +185,9 @@ pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
                     );
                     exit(1 as libc::c_int);
                 }
-                v_printf(
-                    b"qed %s\n\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-                    ast_function_name(f),
+                vprintln!(
+                    "qed {}",
+                    CStr::from_ptr(ast_function_name(f)).to_string_lossy()
                 );
             }
         }

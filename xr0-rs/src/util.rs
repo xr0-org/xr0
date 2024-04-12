@@ -8,7 +8,7 @@
     unused_mut
 )]
 
-use crate::c_util::{vfprintf, vprintf};
+use crate::c_util::vfprintf;
 use libc::{
     calloc, fclose, free, malloc, open_memstream, realloc, snprintf, strcat, strcmp, strcpy,
     strlen, strncpy, FILE,
@@ -391,12 +391,11 @@ pub unsafe fn string_arr_str(mut string_arr: &string_arr) -> *mut libc::c_char {
 
 pub static mut VERBOSE_MODE: libc::c_int = 0;
 
-pub unsafe extern "C" fn v_printf(mut fmt: *mut libc::c_char, mut args: ...) -> libc::c_int {
-    if VERBOSE_MODE == 0 {
-        return 0 as libc::c_int;
+#[macro_export]
+macro_rules! vprintln {
+    ( $( $args:tt )* ) => {
+        if $crate::util::VERBOSE_MODE != 0 {
+            println!($($args)*);
+        }
     }
-    let mut ap: ::core::ffi::VaListImpl;
-    ap = args.clone();
-    let mut r: libc::c_int = vprintf(fmt, ap.as_va_list());
-    return r;
 }

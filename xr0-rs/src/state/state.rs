@@ -1,3 +1,5 @@
+use std::ffi::CStr;
+
 use libc::{free, malloc, strcmp, strlen};
 
 use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
@@ -31,14 +33,13 @@ use crate::object::{object_as_value, object_assign};
 use crate::props::{props_copy, props_create, props_destroy, props_str};
 use crate::util::{
     dynamic_str, error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf,
-    v_printf,
 };
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
     value_ptr_create, value_sync_create,
 };
 use crate::{
-    ast_type, ast_variable, static_memory, vconst, AstExpr as ast_expr, Block as block,
+    ast_type, ast_variable, static_memory, vconst, vprintln, AstExpr as ast_expr, Block as block,
     Clump as clump, Externals as externals, Heap as heap, Location as location, Object as object,
     Props as props, Stack as stack, StrBuilder as strbuilder, Value as value, Variable as variable,
 };
@@ -56,6 +57,7 @@ pub struct state {
 
 #[derive(Copy, Clone)]
 #[repr(C)]
+#[allow(non_camel_case_types)]
 pub struct object_res {
     pub obj: *mut object,
     pub err: *mut error,
@@ -609,14 +611,8 @@ pub unsafe fn state_equal(mut s1: *mut state, mut s2: *mut state) -> bool {
     let mut str2: *mut libc::c_char = state_str(s2_c);
     let mut equal: bool = strcmp(str1, str2) == 0 as libc::c_int;
     if !equal {
-        v_printf(
-            b"actual: %s\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-            str1,
-        );
-        v_printf(
-            b"abstract: %s\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-            str2,
-        );
+        vprintln!("actual: {}", CStr::from_ptr(str1).to_string_lossy());
+        vprintln!("abstract: {}", CStr::from_ptr(str2).to_string_lossy());
     }
     free(str2 as *mut libc::c_void);
     free(str1 as *mut libc::c_void);

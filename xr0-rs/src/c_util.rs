@@ -10,5 +10,4 @@ extern "C" {
     pub fn __error() -> *mut libc::c_int;
 
     pub fn vfprintf(_: *mut FILE, _: *const libc::c_char, _: ::core::ffi::VaList) -> libc::c_int;
-    pub fn vprintf(_: *const libc::c_char, _: ::core::ffi::VaList) -> libc::c_int;
 }

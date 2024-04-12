@@ -9,6 +9,8 @@
     unused_variables
 )]
 
+use std::ffi::CStr;
+
 use libc::{calloc, exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
 
 use crate::c_util::__stderrp;
@@ -39,7 +41,7 @@ use crate::state::state::{
 use crate::util::{
     dynamic_str, error, error_create, map, strbuilder_build, strbuilder_create, strbuilder_printf,
     strbuilder_putc, string_arr, string_arr_append, string_arr_concat, string_arr_contains,
-    string_arr_create, string_arr_deque, string_arr_n, string_arr_s, v_printf,
+    string_arr_create, string_arr_deque, string_arr_n, string_arr_s,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -49,7 +51,7 @@ use crate::value::{
     value_sync_create, value_to_expr, values_comparable,
 };
 use crate::{
-    math_expr, Externals as externals, Object as object, Props as props, State as state,
+    math_expr, vprintln, Externals as externals, Object as object, Props as props, State as state,
     StrBuilder as strbuilder, Value as value, Variable as variable,
 };
 
@@ -886,9 +888,9 @@ unsafe fn expr_identifier_eval(mut expr: *mut ast_expr, mut state: *mut state) -
     }
     let mut val: *mut value = object_as_value(obj);
     if val.is_null() {
-        v_printf(
-            b"state: %s\n\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-            state_str(state),
+        vprintln!(
+            "state: {}",
+            CStr::from_ptr(state_str(state)).to_string_lossy()
         );
         let mut b_0: *mut strbuilder = strbuilder_create();
         strbuilder_printf(
@@ -5024,9 +5026,9 @@ unsafe fn path_verify(
         i += 1;
     }
     if state_hasgarbage(actual_state) {
-        v_printf(
-            b"actual: %s\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-            state_str(actual_state),
+        vprintln!(
+            "actual: {}",
+            CStr::from_ptr(state_str(actual_state)).to_string_lossy()
         );
         let mut b: *mut strbuilder = strbuilder_create();
         strbuilder_printf(
