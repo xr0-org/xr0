@@ -75,7 +75,6 @@ pub enum AstBinaryOp {
 
 pub struct AstExpr {
     kind: AstExprKind,
-    root: *mut AstExpr,
 }
 
 #[derive(Copy, Clone)]
@@ -105,6 +104,7 @@ pub struct AssignmentExpr {
 
 #[derive(Copy, Clone)]
 pub struct IncDecExpr {
+    operand: *mut AstExpr,
     inc: libc::c_int,
     pre: libc::c_int,
 }
@@ -1809,7 +1809,7 @@ unsafe fn ast_expr_incdec_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
     let AstExprKind::IncDec(incdec) = &(*expr).kind else {
         panic!()
     };
-    let root: *mut libc::c_char = ast_expr_str((*expr).root);
+    let root: *mut libc::c_char = ast_expr_str(incdec.operand);
     let op: *mut libc::c_char = (if incdec.inc != 0 {
         b"++\0" as *const u8 as *const libc::c_char
     } else {
@@ -1863,8 +1863,10 @@ unsafe fn ast_expr_destroy_call(expr: *mut AstExpr) {
 }
 
 unsafe fn ast_expr_destroy_incdec(expr: *mut AstExpr) {
-    assert!(matches!((*expr).kind, AstExprKind::IncDec(_)));
-    ast_expr_destroy((*expr).root);
+    let AstExprKind::IncDec(incdec) = &(*expr).kind else {
+        panic!()
+    };
+    ast_expr_destroy(incdec.operand);
 }
 
 pub unsafe fn ast_expr_inverted_copy(expr: *mut AstExpr, invert: bool) -> *mut AstExpr {
@@ -1898,8 +1900,10 @@ pub unsafe fn ast_expr_incdec_pre(expr: *mut AstExpr) -> bool {
 }
 
 pub unsafe fn ast_expr_incdec_root(expr: *mut AstExpr) -> *mut AstExpr {
-    assert!(matches!((*expr).kind, AstExprKind::IncDec(_)));
-    return (*expr).root;
+    let AstExprKind::IncDec(incdec) = &(*expr).kind else {
+        panic!()
+    };
+    incdec.operand
 }
 
 unsafe fn ast_expr_copy_call(expr: *mut AstExpr) -> *mut AstExpr {
@@ -1952,9 +1956,9 @@ pub unsafe fn ast_expr_incdec_to_assignment(expr: *mut AstExpr) -> *mut AstExpr 
     };
 
     ast_expr_assignment_create(
-        ast_expr_copy((*expr).root),
+        ast_expr_copy(incdec.operand),
         ast_expr_binary_create(
-            ast_expr_copy((*expr).root),
+            ast_expr_copy(incdec.operand),
             if incdec.inc != 0 {
                 AstBinaryOp::Addition
             } else {
@@ -1968,10 +1972,10 @@ pub unsafe fn ast_expr_incdec_to_assignment(expr: *mut AstExpr) -> *mut AstExpr 
 pub unsafe fn ast_expr_incdec_create(root: *mut AstExpr, inc: bool, pre: bool) -> *mut AstExpr {
     let expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = AstExprKind::IncDec(IncDecExpr {
+        operand: root,
         inc: inc as libc::c_int,
         pre: pre as libc::c_int,
     });
-    (*expr).root = root;
     expr
 }
 
@@ -2076,11 +2080,11 @@ pub unsafe fn ast_expr_str(expr: *mut AstExpr) -> *mut libc::c_char {
         AstExprKind::Assignment(_) => {
             ast_expr_assignment_str_build(expr, b);
         }
-        AstExprKind::IsDeallocand(_) => {
-            ast_expr_isdeallocand_str_build(expr, b);
+        AstExprKind::IsDeallocand(assertand) => {
+            ast_expr_isdeallocand_str_build(*assertand, b);
         }
-        AstExprKind::IsDereferencable(_) => {
-            ast_expr_isdereferencable_str_build(expr, b);
+        AstExprKind::IsDereferencable(assertand) => {
+            ast_expr_isdereferencable_str_build(*assertand, b);
         }
         AstExprKind::ArbArg => {
             strbuilder_putc(b, '$' as i32 as libc::c_char);
@@ -2094,6 +2098,7 @@ pub unsafe fn ast_expr_str(expr: *mut AstExpr) -> *mut libc::c_char {
     }
     return strbuilder_build(b);
 }
+
 unsafe fn ast_expr_alloc_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
     let AstExprKind::Allocation(alloc) = &(*expr).kind else {
         panic!()
@@ -2163,8 +2168,8 @@ unsafe fn ast_expr_alloc_copy(expr: *mut AstExpr) -> *mut AstExpr {
     }
 }
 
-unsafe fn ast_expr_isdereferencable_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
-    let root: *mut libc::c_char = ast_expr_str((*expr).root);
+unsafe fn ast_expr_isdereferencable_str_build(assertand: *mut AstExpr, b: *mut StrBuilder) {
+    let root: *mut libc::c_char = ast_expr_str(assertand);
     strbuilder_printf(b, b"$%s\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
@@ -2193,7 +2198,7 @@ pub unsafe fn ast_expr_copy(expr: *mut AstExpr) -> *mut AstExpr {
         AstExprKind::Bracketed(inner) => ast_expr_bracketed_create(ast_expr_copy(*inner)),
         AstExprKind::Call(_) => ast_expr_copy_call(expr),
         AstExprKind::IncDec(incdec) => ast_expr_incdec_create(
-            ast_expr_copy((*expr).root),
+            ast_expr_copy(incdec.operand),
             incdec.inc != 0,
             incdec.pre != 0,
         ),
@@ -2236,8 +2241,8 @@ pub unsafe fn ast_expr_binary_e2(expr: *mut AstExpr) -> *mut AstExpr {
     binary.e2
 }
 
-unsafe fn ast_expr_isdeallocand_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
-    let root: *mut libc::c_char = ast_expr_str((*expr).root);
+unsafe fn ast_expr_isdeallocand_str_build(assertand: *mut AstExpr, b: *mut StrBuilder) {
+    let root: *mut libc::c_char = ast_expr_str(assertand);
     strbuilder_printf(b, b"@%s\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
@@ -2452,7 +2457,7 @@ pub unsafe fn ast_expr_getfuncs(expr: *mut AstExpr) -> Box<StringArr> {
         | AstExprKind::ArbArg => return string_arr_create(),
         AstExprKind::Call(_) => ast_expr_call_getfuncs(expr),
         AstExprKind::Bracketed(inner) => ast_expr_getfuncs(*inner),
-        AstExprKind::IncDec(_) => ast_expr_getfuncs((*expr).root),
+        AstExprKind::IncDec(incdec) => ast_expr_getfuncs(incdec.operand),
         AstExprKind::Unary(unary) => ast_expr_getfuncs(unary.arg),
         AstExprKind::Assignment(assignment) => string_arr_concat(
             &ast_expr_getfuncs(assignment.lval),
