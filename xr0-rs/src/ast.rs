@@ -71,14 +71,14 @@ pub enum AstUnaryOp {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstBinaryOp {
-    Eq = 1,
-    Ne = 2,
-    Lt = 4,
-    Gt = 8,
-    Le = 16,
-    Ge = 32,
-    Addition = 64,
-    Subtraction = 128,
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    Addition,
+    Subtraction,
 }
 
 pub struct AstExpr {
@@ -154,6 +154,7 @@ pub struct result {
     pub val: *mut Value,
     pub err: *mut Error,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstType {
@@ -161,6 +162,7 @@ pub struct AstType {
     pub base: AstTypeBase,
     pub c2rust_unnamed: C2RustUnnamed_5,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union C2RustUnnamed_5 {
@@ -169,24 +171,28 @@ pub union C2RustUnnamed_5 {
     pub structunion: AstStructType,
     pub userdef: *mut libc::c_char,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstStructType {
     pub tag: *mut libc::c_char,
     pub members: *mut AstVariableArr,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstVariableArr {
     pub n: libc::c_int,
     pub v: *mut *mut AstVariable,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstVariable {
     pub name: *mut libc::c_char,
     pub type_0: *mut AstType,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstArrayType {
