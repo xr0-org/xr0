@@ -194,29 +194,29 @@ pub struct AstArrayType {
     pub length: libc::c_int,
 }
 pub type AstTypeBase = libc::c_uint;
-pub const TYPE_USERDEF: AstTypeBase = 14;
-pub const TYPE_ENUM: AstTypeBase = 13;
-pub const TYPE_UNION: AstTypeBase = 12;
-pub const TYPE_STRUCT: AstTypeBase = 11;
-pub const TYPE_ARRAY: AstTypeBase = 10;
-pub const TYPE_POINTER: AstTypeBase = 9;
-pub const TYPE_UNSIGNED: AstTypeBase = 8;
-pub const TYPE_SIGNED: AstTypeBase = 7;
-pub const TYPE_DOUBLE: AstTypeBase = 6;
-pub const TYPE_FLOAT: AstTypeBase = 5;
-pub const TYPE_LONG: AstTypeBase = 4;
-pub const TYPE_INT: AstTypeBase = 3;
-pub const TYPE_SHORT: AstTypeBase = 2;
-pub const TYPE_CHAR: AstTypeBase = 1;
 pub const TYPE_VOID: AstTypeBase = 0;
+pub const TYPE_CHAR: AstTypeBase = 1;
+pub const TYPE_SHORT: AstTypeBase = 2;
+pub const TYPE_INT: AstTypeBase = 3;
+pub const TYPE_LONG: AstTypeBase = 4;
+pub const TYPE_FLOAT: AstTypeBase = 5;
+pub const TYPE_DOUBLE: AstTypeBase = 6;
+pub const TYPE_SIGNED: AstTypeBase = 7;
+pub const TYPE_UNSIGNED: AstTypeBase = 8;
+pub const TYPE_POINTER: AstTypeBase = 9;
+pub const TYPE_ARRAY: AstTypeBase = 10;
+pub const TYPE_STRUCT: AstTypeBase = 11;
+pub const TYPE_UNION: AstTypeBase = 12;
+pub const TYPE_ENUM: AstTypeBase = 13;
+pub const TYPE_USERDEF: AstTypeBase = 14;
 pub type AstTypeModifier = libc::c_uint;
-pub const MOD_VOLATILE: AstTypeModifier = 64;
-pub const MOD_CONST: AstTypeModifier = 32;
-pub const MOD_REGISTER: AstTypeModifier = 16;
-pub const MOD_AUTO: AstTypeModifier = 8;
-pub const MOD_STATIC: AstTypeModifier = 4;
-pub const MOD_EXTERN: AstTypeModifier = 2;
 pub const MOD_TYPEDEF: AstTypeModifier = 1;
+pub const MOD_EXTERN: AstTypeModifier = 2;
+pub const MOD_STATIC: AstTypeModifier = 4;
+pub const MOD_AUTO: AstTypeModifier = 8;
+pub const MOD_REGISTER: AstTypeModifier = 16;
+pub const MOD_CONST: AstTypeModifier = 32;
+pub const MOD_VOLATILE: AstTypeModifier = 64;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct LValue {
@@ -304,31 +304,31 @@ pub struct C2RustUnnamed_13 {
     pub stmt: *mut AstStmt,
 }
 pub type AstStmtKind = libc::c_uint;
-pub const STMT_ALLOCATION: AstStmtKind = 512;
-pub const STMT_JUMP: AstStmtKind = 256;
-pub const STMT_ITERATION_E: AstStmtKind = 128;
-pub const STMT_ITERATION: AstStmtKind = 64;
-pub const STMT_SELECTION: AstStmtKind = 32;
-pub const STMT_EXPR: AstStmtKind = 16;
-pub const STMT_COMPOUND_V: AstStmtKind = 8;
-pub const STMT_COMPOUND: AstStmtKind = 4;
-pub const STMT_LABELLED: AstStmtKind = 2;
 pub const STMT_NOP: AstStmtKind = 1;
+pub const STMT_LABELLED: AstStmtKind = 2;
+pub const STMT_COMPOUND: AstStmtKind = 4;
+pub const STMT_COMPOUND_V: AstStmtKind = 8;
+pub const STMT_EXPR: AstStmtKind = 16;
+pub const STMT_SELECTION: AstStmtKind = 32;
+pub const STMT_ITERATION: AstStmtKind = 64;
+pub const STMT_ITERATION_E: AstStmtKind = 128;
+pub const STMT_JUMP: AstStmtKind = 256;
+pub const STMT_ALLOCATION: AstStmtKind = 512;
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct decision {
+pub struct Decision {
     pub decision: bool,
     pub err: *mut error,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct preconds_result {
+pub struct PrecondsResult {
     pub stmt: *mut AstStmt,
     pub err: *mut error,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct preresult {
+pub struct Preresult {
     pub iscontradiction: bool,
     pub err: *mut error,
 }
@@ -365,11 +365,15 @@ pub struct C2RustUnnamed_15 {
     pub name: *mut libc::c_char,
     pub type_0: *mut AstType,
 }
-pub type AstExternDeclKind = libc::c_uint;
-pub const EXTERN_STRUCT: AstExternDeclKind = 3;
-pub const EXTERN_TYPEDEF: AstExternDeclKind = 2;
-pub const EXTERN_VARIABLE: AstExternDeclKind = 1;
-pub const EXTERN_FUNCTION: AstExternDeclKind = 0;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum AstExternDeclKind {
+    Function,
+    Variable,
+    Typedef,
+    Struct,
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Ast {
@@ -676,7 +680,7 @@ pub unsafe fn ast_expr_arbarg_create() -> *mut AstExpr {
     return expr;
 }
 
-pub unsafe fn ast_expr_assume(mut expr: *mut AstExpr, mut state: *mut State) -> *mut preresult {
+pub unsafe fn ast_expr_assume(mut expr: *mut AstExpr, mut state: *mut State) -> *mut Preresult {
     return reduce_assume(expr, true, state);
 }
 
@@ -684,7 +688,7 @@ unsafe fn reduce_assume(
     mut expr: *mut AstExpr,
     mut value: bool,
     mut s: *mut State,
-) -> *mut preresult {
+) -> *mut Preresult {
     match (*expr).kind {
         AstExprKind::Identifier => return identifier_assume(expr, value, s),
         AstExprKind::Unary => {
@@ -706,7 +710,7 @@ unsafe fn binary_assume(
     mut expr: *mut AstExpr,
     mut value: bool,
     mut s: *mut State,
-) -> *mut preresult {
+) -> *mut Preresult {
     let mut r1: *mut result = ast_expr_pf_reduce((*expr).u.binary.e1, s);
     let mut r2: *mut result = ast_expr_pf_reduce((*expr).u.binary.e2, s);
     let mut v1: *mut Value = result_as_value(r1);
@@ -722,14 +726,14 @@ unsafe fn irreducible_assume(
     mut e: *mut AstExpr,
     mut value: bool,
     mut s: *mut State,
-) -> *mut preresult {
+) -> *mut Preresult {
     let mut prop: *mut AstExpr = ast_expr_inverted_copy(e, !value);
-    let mut r: *mut preresult = irreducible_assume_actual(prop, s);
+    let mut r: *mut Preresult = irreducible_assume_actual(prop, s);
     ast_expr_destroy(prop);
     return r;
 }
 
-unsafe fn irreducible_assume_actual(mut e: *mut AstExpr, mut s: *mut State) -> *mut preresult {
+unsafe fn irreducible_assume_actual(mut e: *mut AstExpr, mut s: *mut State) -> *mut Preresult {
     let mut p: *mut Props = state_getprops(s);
     if props_contradicts(p, e) {
         return preresult_contradiction_create();
@@ -749,7 +753,7 @@ unsafe fn ast_expr_pf_reduce_assume(
     mut expr: *mut AstExpr,
     mut value: bool,
     mut s: *mut State,
-) -> *mut preresult {
+) -> *mut Preresult {
     let mut res: *mut result = ast_expr_pf_reduce(expr, s);
     if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) {
         panic!();
@@ -760,7 +764,7 @@ unsafe fn identifier_assume(
     mut expr: *mut AstExpr,
     mut value: bool,
     mut s: *mut State,
-) -> *mut preresult {
+) -> *mut Preresult {
     let mut s_copy: *mut State = state_copy(s);
     let mut res: *mut result = ast_expr_eval(expr, s_copy);
     if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) {
@@ -2872,7 +2876,7 @@ pub unsafe fn ast_block_isterminal(mut b: *mut AstBlock, mut s: *mut State) -> b
     return false;
 }
 
-pub unsafe fn ast_block_preconds(mut b: *mut AstBlock) -> preconds_result {
+pub unsafe fn ast_block_preconds(mut b: *mut AstBlock) -> PrecondsResult {
     let mut n: libc::c_int = ast_block_nstmts(b);
     let mut stmt: *mut *mut AstStmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -2882,7 +2886,7 @@ pub unsafe fn ast_block_preconds(mut b: *mut AstBlock) -> preconds_result {
             let mut err: *mut error = ast_stmt_preconds_validate(preconds);
             if !err.is_null() {
                 return {
-                    let mut init = preconds_result {
+                    let mut init = PrecondsResult {
                         stmt: 0 as *mut AstStmt,
                         err: err,
                     };
@@ -2890,7 +2894,7 @@ pub unsafe fn ast_block_preconds(mut b: *mut AstBlock) -> preconds_result {
                 };
             }
             return {
-                let mut init = preconds_result {
+                let mut init = PrecondsResult {
                     stmt: preconds,
                     err: 0 as *mut error,
                 };
@@ -2900,7 +2904,7 @@ pub unsafe fn ast_block_preconds(mut b: *mut AstBlock) -> preconds_result {
         i += 1;
     }
     return {
-        let mut init = preconds_result {
+        let mut init = PrecondsResult {
             stmt: 0 as *mut AstStmt,
             err: 0 as *mut error,
         };
@@ -2954,7 +2958,7 @@ pub unsafe fn ast_stmt_process(
     return 0 as *mut error;
 }
 
-pub unsafe fn ast_stmt_preprocess(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut preresult {
+pub unsafe fn ast_stmt_preprocess(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut Preresult {
     if ast_stmt_isassume(stmt) {
         return stmt_installprop(stmt, state);
     }
@@ -3064,7 +3068,7 @@ unsafe fn labelled_setupabsexec(mut stmt: *mut AstStmt, mut state: *mut State) -
     return 0 as *mut error;
 }
 unsafe fn sel_setupabsexec(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut error {
-    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), state);
+    let mut dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
     if !(dec.err).is_null() {
         return dec.err;
     }
@@ -3129,7 +3133,7 @@ pub unsafe fn ast_stmt_isassume(mut stmt: *mut AstStmt) -> bool {
             b"assume\0" as *const u8 as *const libc::c_char,
         ) == 0 as libc::c_int;
 }
-unsafe fn stmt_installprop(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut preresult {
+unsafe fn stmt_installprop(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut Preresult {
     return ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), state);
 }
 
@@ -3230,7 +3234,7 @@ unsafe fn stmt_compound_exec(mut stmt: *mut AstStmt, mut state: *mut State) -> *
     return 0 as *mut error;
 }
 unsafe fn stmt_sel_exec(mut stmt: *mut AstStmt, mut state: *mut State) -> *mut error {
-    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), state);
+    let mut dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
     if !(dec.err).is_null() {
         return dec.err;
     }
@@ -3448,7 +3452,7 @@ pub unsafe fn ast_stmt_labelled_label(mut stmt: *mut AstStmt) -> *mut libc::c_ch
     return (*stmt).u.labelled.label;
 }
 unsafe fn sel_isterminal(mut stmt: *mut AstStmt, mut s: *mut State) -> bool {
-    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), s);
+    let mut dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), s);
     if !(dec.err).is_null() {
         panic!();
     }
@@ -3561,11 +3565,11 @@ pub unsafe fn ast_stmt_create_jump(
     return stmt;
 }
 
-pub unsafe fn sel_decide(mut control: *mut AstExpr, mut state: *mut State) -> decision {
+pub unsafe fn sel_decide(mut control: *mut AstExpr, mut state: *mut State) -> Decision {
     let mut res: *mut result = ast_expr_pf_reduce(control, state);
     if result_iserror(res) {
         return {
-            let mut init = decision {
+            let mut init = Decision {
                 decision: false,
                 err: result_as_error(res),
             };
@@ -3581,7 +3585,7 @@ pub unsafe fn sel_decide(mut control: *mut AstExpr, mut state: *mut State) -> de
         let mut p: *mut Props = state_getprops(state);
         if props_get(p, sync) {
             return {
-                let mut init = decision {
+                let mut init = Decision {
                     decision: true,
                     err: 0 as *mut error,
                 };
@@ -3589,7 +3593,7 @@ pub unsafe fn sel_decide(mut control: *mut AstExpr, mut state: *mut State) -> de
             };
         } else if props_contradicts(p, sync) {
             return {
-                let mut init = decision {
+                let mut init = Decision {
                     decision: false,
                     err: 0 as *mut error,
                 };
@@ -3600,7 +3604,7 @@ pub unsafe fn sel_decide(mut control: *mut AstExpr, mut state: *mut State) -> de
     if value_isconstant(v) {
         if value_as_constant(v) != 0 {
             return {
-                let mut init = decision {
+                let mut init = Decision {
                     decision: true,
                     err: 0 as *mut error,
                 };
@@ -3608,7 +3612,7 @@ pub unsafe fn sel_decide(mut control: *mut AstExpr, mut state: *mut State) -> de
             };
         }
         return {
-            let mut init = decision {
+            let mut init = Decision {
                 decision: false,
                 err: 0 as *mut error,
             };
@@ -3629,7 +3633,7 @@ pub unsafe fn sel_decide(mut control: *mut AstExpr, mut state: *mut State) -> de
         free(v_str as *mut libc::c_void);
         free(c_str as *mut libc::c_void);
         return {
-            let mut init = decision {
+            let mut init = Decision {
                 decision: false,
                 err: error_create(strbuilder_build(b)),
             };
@@ -3639,7 +3643,7 @@ pub unsafe fn sel_decide(mut control: *mut AstExpr, mut state: *mut State) -> de
     let mut nonzero: bool = !value_equal(zero, v);
     value_destroy(zero);
     return {
-        let mut init = decision {
+        let mut init = Decision {
             decision: nonzero,
             err: 0 as *mut error,
         };
@@ -3793,7 +3797,7 @@ unsafe fn sel_absexec(
     mut state: *mut State,
     mut should_setup: bool,
 ) -> *mut result {
-    let mut dec: decision = sel_decide(ast_stmt_sel_cond(stmt), state);
+    let mut dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
     if !(dec.err).is_null() {
         return result_error_create(dec.err);
     }
@@ -4790,7 +4794,7 @@ pub unsafe fn ast_function_params(mut f: *mut AstFunction) -> *mut *mut AstVaria
     return (*f).param;
 }
 
-pub unsafe fn ast_function_preconditions(mut f: *mut AstFunction) -> preconds_result {
+pub unsafe fn ast_function_preconditions(mut f: *mut AstFunction) -> PrecondsResult {
     return ast_block_preconds(ast_function_abstract(f));
 }
 
@@ -4891,7 +4895,7 @@ pub unsafe fn ast_function_initparams(mut f: *mut AstFunction, mut s: *mut State
     return 0 as *mut error;
 }
 unsafe fn ast_function_precondsinit(mut f: *mut AstFunction, mut s: *mut State) -> *mut error {
-    let mut pre: preconds_result = ast_function_preconditions(f);
+    let mut pre: PrecondsResult = ast_function_preconditions(f);
     if !(pre.err).is_null() {
         return pre.err;
     }
@@ -5065,7 +5069,7 @@ unsafe fn split_path_verify(
             state_copywithname(actual_state, ast_function_name(*func.offset(i as isize)));
         let mut abstract_copy: *mut State =
             state_copywithname(abstract_state, ast_function_name(*func.offset(i as isize)));
-        let mut r: *mut preresult = ast_expr_assume(
+        let mut r: *mut Preresult = ast_expr_assume(
             ast_expr_inverted_copy(cond, i == 1 as libc::c_int),
             actual_copy,
         );
@@ -5190,7 +5194,7 @@ unsafe fn split_path_absverify(
     while i < n {
         let mut s_copy: *mut State =
             state_copywithname(state, ast_function_name(*func.offset(i as isize)));
-        let mut r: *mut preresult =
+        let mut r: *mut Preresult =
             ast_expr_assume(ast_expr_inverted_copy(cond, i == 1 as libc::c_int), s_copy);
         if preresult_iserror(r) {
             return preresult_as_error(r);
@@ -5356,19 +5360,17 @@ pub unsafe fn ast_function_arr_func(mut arr: *mut AstFunctionArr) -> *mut *mut A
 pub unsafe fn ast_functiondecl_create(mut f: *mut AstFunction) -> *mut AstExternDecl {
     let mut decl: *mut AstExternDecl =
         malloc(::core::mem::size_of::<AstExternDecl>()) as *mut AstExternDecl;
-    (*decl).kind = EXTERN_FUNCTION;
+    (*decl).kind = AstExternDeclKind::Function;
     (*decl).c2rust_unnamed.function = f;
     return decl;
 }
 
 pub unsafe fn ast_externdecl_isfunction(mut decl: *mut AstExternDecl) -> bool {
-    return (*decl).kind as libc::c_uint == EXTERN_FUNCTION as libc::c_int as libc::c_uint;
+    (*decl).kind == AstExternDeclKind::Function
 }
 
 pub unsafe fn ast_externdecl_as_function(mut decl: *mut AstExternDecl) -> *mut AstFunction {
-    if !((*decl).kind as libc::c_uint == EXTERN_FUNCTION as libc::c_int as libc::c_uint) {
-        panic!();
-    }
+    assert_eq!((*decl).kind, AstExternDeclKind::Function);
     return (*decl).c2rust_unnamed.function;
 }
 
@@ -5379,17 +5381,17 @@ pub unsafe fn ast_decl_create(
     let mut decl: *mut AstExternDecl =
         malloc(::core::mem::size_of::<AstExternDecl>()) as *mut AstExternDecl;
     if ast_type_istypedef(t) {
-        (*decl).kind = EXTERN_TYPEDEF;
+        (*decl).kind = AstExternDeclKind::Typedef;
         (*decl).c2rust_unnamed._typedef.name = name;
         (*decl).c2rust_unnamed._typedef.type_0 = t;
     } else if ast_type_isstruct(t) {
         if (ast_type_struct_tag(t)).is_null() {
             panic!();
         }
-        (*decl).kind = EXTERN_STRUCT;
+        (*decl).kind = AstExternDeclKind::Struct;
         (*decl).c2rust_unnamed._struct = t;
     } else {
-        (*decl).kind = EXTERN_VARIABLE;
+        (*decl).kind = AstExternDeclKind::Variable;
         (*decl).c2rust_unnamed.variable = ast_variable_create(name, t);
     }
     return decl;
@@ -5399,47 +5401,41 @@ pub unsafe fn ast_externdecl_install(mut decl: *mut AstExternDecl, mut ext: *mut
     let mut f: *mut AstFunction = 0 as *mut AstFunction;
     let mut v: *mut AstVariable = 0 as *mut AstVariable;
     match (*decl).kind {
-        0 => {
+        AstExternDeclKind::Function => {
             f = (*decl).c2rust_unnamed.function;
             externals_declarefunc(ext, ast_function_name(f), f);
         }
-        1 => {
+        AstExternDeclKind::Variable => {
             v = (*decl).c2rust_unnamed.variable;
             externals_declarevar(ext, ast_variable_name(v), v);
         }
-        2 => {
+        AstExternDeclKind::Typedef => {
             externals_declaretypedef(
                 ext,
                 (*decl).c2rust_unnamed._typedef.name,
                 (*decl).c2rust_unnamed._typedef.type_0,
             );
         }
-        3 => {
+        AstExternDeclKind::Struct => {
             externals_declarestruct(ext, (*decl).c2rust_unnamed._struct);
         }
-        _ => {
-            panic!();
-        }
-    };
+    }
 }
 
 pub unsafe fn ast_externdecl_destroy(mut decl: *mut AstExternDecl) {
     match (*decl).kind {
-        0 => {
+        AstExternDeclKind::Function => {
             ast_function_destroy((*decl).c2rust_unnamed.function);
         }
-        1 => {
+        AstExternDeclKind::Variable => {
             ast_variable_destroy((*decl).c2rust_unnamed.variable);
         }
-        2 => {
+        AstExternDeclKind::Typedef => {
             free((*decl).c2rust_unnamed._typedef.name as *mut libc::c_void);
             ast_type_destroy((*decl).c2rust_unnamed._typedef.type_0);
         }
-        3 => {
+        AstExternDeclKind::Struct => {
             ast_type_destroy((*decl).c2rust_unnamed._struct);
-        }
-        _ => {
-            panic!();
         }
     }
     free(decl as *mut libc::c_void);
@@ -5584,48 +5580,48 @@ pub unsafe fn lvalue_object(mut l: *mut LValue) -> *mut Object {
     return (*l).obj;
 }
 
-pub unsafe fn preresult_empty_create() -> *mut preresult {
-    return calloc(1, ::core::mem::size_of::<preresult>()) as *mut preresult;
+pub unsafe fn preresult_empty_create() -> *mut Preresult {
+    return calloc(1, ::core::mem::size_of::<Preresult>()) as *mut Preresult;
 }
 
-pub unsafe fn preresult_error_create(mut err: *mut error) -> *mut preresult {
+pub unsafe fn preresult_error_create(mut err: *mut error) -> *mut Preresult {
     if err.is_null() {
         panic!();
     }
-    let mut r: *mut preresult = preresult_empty_create();
+    let mut r: *mut Preresult = preresult_empty_create();
     (*r).err = err;
     return r;
 }
 
-pub unsafe fn preresult_contradiction_create() -> *mut preresult {
-    let mut r: *mut preresult = preresult_empty_create();
+pub unsafe fn preresult_contradiction_create() -> *mut Preresult {
+    let mut r: *mut Preresult = preresult_empty_create();
     (*r).iscontradiction = true;
     return r;
 }
 
-pub unsafe fn preresult_destroy(mut r: *mut preresult) {
+pub unsafe fn preresult_destroy(mut r: *mut Preresult) {
     if !((*r).err).is_null() {
         panic!();
     }
     free(r as *mut libc::c_void);
 }
 
-pub unsafe fn preresult_isempty(mut r: *mut preresult) -> bool {
+pub unsafe fn preresult_isempty(mut r: *mut Preresult) -> bool {
     return !((*r).iscontradiction as libc::c_int != 0 || !((*r).err).is_null());
 }
 
-pub unsafe fn preresult_iserror(mut r: *mut preresult) -> bool {
+pub unsafe fn preresult_iserror(mut r: *mut Preresult) -> bool {
     return !((*r).err).is_null();
 }
 
-pub unsafe fn preresult_as_error(mut r: *mut preresult) -> *mut error {
+pub unsafe fn preresult_as_error(mut r: *mut Preresult) -> *mut error {
     if ((*r).err).is_null() {
         panic!();
     }
     return (*r).err;
 }
 
-pub unsafe fn preresult_iscontradiction(mut r: *mut preresult) -> bool {
+pub unsafe fn preresult_iscontradiction(mut r: *mut Preresult) -> bool {
     return (*r).iscontradiction;
 }
 
