@@ -594,6 +594,9 @@ ast_function_preconditions(struct ast_function *f);
 struct error *
 ast_function_initparams(struct ast_function *, struct state *);
 
+struct error *
+ast_function_precondsinit(struct ast_function *, struct state *);
+
 struct externals;
 struct error;
 

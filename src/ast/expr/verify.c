@@ -812,6 +812,8 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 {
 	struct error *err;
 
+	printf("arg_state: %s\n", state_str(arg_state));
+
 	char *fname = ast_function_name(f);
 	struct frame *setupframe = frame_call_create(
 		fname, ast_function_abstract(f), ast_function_type(f), true
@@ -823,6 +825,11 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 	if ((err = ast_function_initparams(f, param_state))) {
 		return err;
 	}
+	if ((err = ast_function_precondsinit(f, param_state))) {
+		return err;
+	}
+
+	printf("param_state: %s\n", state_str(param_state));
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **param = ast_function_params(f);
 

@@ -7,6 +7,17 @@
 #include "state.h"
 #include "util.h"
 
+struct instruction {
+};
+
+struct instruction_block {
+	struct instruction_arr *arr;
+	int index;
+};
+
+struct instruction_block *
+instruction_block_create(struct ast_expr *);
+
 struct program {
 	struct ast_block *b;
 	enum program_state {
