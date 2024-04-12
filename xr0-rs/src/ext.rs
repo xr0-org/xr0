@@ -14,8 +14,6 @@ use crate::ast::{ast_type_str, ast_type_struct_tag};
 use crate::util::{dynamic_str, map, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{ast_function, ast_type, ast_variable, StrBuilder as strbuilder};
 
-use crate::c_util::__assert_rtn;
-
 pub struct externals {
     pub func: Box<map>,
     pub var: Box<map>,
@@ -110,18 +108,9 @@ pub unsafe fn externals_declaretypedef(
 
 pub unsafe fn externals_declarestruct(mut ext: *mut externals, mut t: *mut ast_type) {
     let mut id: *mut libc::c_char = ast_type_struct_tag(t);
-    if id.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
-                b"externals_declarestruct\0",
-            ))
-            .as_ptr(),
-            b"ext.c\0" as *const u8 as *const libc::c_char,
-            77 as libc::c_int,
-            b"id\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if id.is_null() {
+        panic!();
+    }
     (*ext)
         ._struct
         .set(dynamic_str(id), t as *const libc::c_void);

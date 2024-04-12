@@ -8,7 +8,7 @@
     unused_mut
 )]
 
-use crate::c_util::{__assert_rtn, vfprintf, vprintf};
+use crate::c_util::{vfprintf, vprintf};
 use libc::{
     calloc, fclose, free, malloc, open_memstream, realloc, snprintf, strcat, strcmp, strcpy,
     strlen, strncpy, FILE,
@@ -168,16 +168,9 @@ pub unsafe fn strbuilder_create() -> *mut strbuilder {
 }
 
 pub unsafe fn strbuilder_build(mut b: *mut strbuilder) -> *mut libc::c_char {
-    if b.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"strbuilder_build\0"))
-                .as_ptr(),
-            b"util.c\0" as *const u8 as *const libc::c_char,
-            105 as libc::c_int,
-            b"b != NULL\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if b.is_null() {
+        panic!();
+    }
     let mut len = strlen((*b).buf).wrapping_add(1);
     let mut s: *mut libc::c_char =
         malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len)) as *mut libc::c_char;
@@ -193,16 +186,9 @@ pub unsafe fn strbuilder_build(mut b: *mut strbuilder) -> *mut libc::c_char {
 }
 
 pub unsafe fn strbuilder_preview(mut b: *mut strbuilder) -> *mut libc::c_char {
-    if b.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"strbuilder_preview\0"))
-                .as_ptr(),
-            b"util.c\0" as *const u8 as *const libc::c_char,
-            117 as libc::c_int,
-            b"b != NULL\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if b.is_null() {
+        panic!();
+    }
     let mut len = (strlen((*b).buf)).wrapping_add(1);
     let mut s: *mut libc::c_char =
         malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len)) as *mut libc::c_char;
@@ -325,16 +311,9 @@ pub unsafe fn string_arr_append(arr: &mut string_arr, mut s: *mut libc::c_char) 
         (*arr).s as *mut libc::c_void,
         (::core::mem::size_of::<string_arr>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut libc::c_char;
-    if arr.s.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"string_arr_append\0"))
-                .as_ptr(),
-            b"util.c\0" as *const u8 as *const libc::c_char,
-            242 as libc::c_int,
-            b"arr->s\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if arr.s.is_null() {
+        panic!();
+    }
     let mut loc: libc::c_int = arr.n - 1 as libc::c_int;
     let ref mut fresh1 = *arr.s.offset(loc as isize);
     *fresh1 = s;

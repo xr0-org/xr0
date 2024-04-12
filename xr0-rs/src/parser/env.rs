@@ -6,7 +6,7 @@ use std::ffi::CStr;
 
 use libc::{exit, fprintf, free, isdigit, isspace, malloc};
 
-use crate::c_util::{__assert_rtn, __stderrp};
+use crate::c_util::__stderrp;
 use crate::util::{
     dynamic_str, strbuilder, strbuilder_build, strbuilder_create, strbuilder_printf,
     strbuilder_putc,
@@ -83,14 +83,8 @@ pub static mut marker: lexememarker = lexememarker {
 
 pub unsafe fn lexloc() -> *mut lexememarker {
     if (marker.filename).is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 7], &[libc::c_char; 7]>(b"lexloc\0")).as_ptr(),
-            b"lex.l\0" as *const u8 as *const libc::c_char,
-            171 as libc::c_int,
-            b"marker.filename\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     return lexememarker_copy(std::ptr::addr_of_mut!(marker));
 }
 

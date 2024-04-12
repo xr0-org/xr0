@@ -28,7 +28,7 @@ use ast::{
     ast_function_isproto, ast_function_name, ast_function_verify, ast_functiondecl_create,
     ast_protostitch, ast_topological_order, ast_type, ast_variable, ast_variable_arr,
 };
-use c_util::{__assert_rtn, __stderrp};
+use c_util::__stderrp;
 use ext::{externals as Externals, externals_create, externals_destroy, externals_getfunc};
 use math::math_expr;
 use object::{object as Object, object_arr};
@@ -173,16 +173,9 @@ pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
             if !(ast_function_isaxiom(f) as libc::c_int != 0
                 || ast_function_isproto(f) as libc::c_int != 0)
             {
-                if (ast_function_abstract(f)).is_null() as libc::c_int as libc::c_long != 0 {
-                    __assert_rtn(
-                        (*::core::mem::transmute::<&[u8; 6], &[libc::c_char; 6]>(b"pass1\0"))
-                            .as_ptr(),
-                        b"main.c\0" as *const u8 as *const libc::c_char,
-                        243 as libc::c_int,
-                        b"ast_function_abstract(f)\0" as *const u8 as *const libc::c_char,
-                    );
-                } else {
-                };
+                if (ast_function_abstract(f)).is_null() {
+                    panic!();
+                }
                 let err = ast_function_verify(f, ext);
                 if !err.is_null() {
                     fprintf(
@@ -211,16 +204,9 @@ pub unsafe fn pass_inorder(order: &mut string_arr, ext: *mut Externals) {
         if !(ast_function_isaxiom(f) as libc::c_int != 0
             || ast_function_isproto(f) as libc::c_int != 0)
         {
-            if (ast_function_abstract(f)).is_null() as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"pass_inorder\0"))
-                        .as_ptr(),
-                    b"main.c\0" as *const u8 as *const libc::c_char,
-                    265 as libc::c_int,
-                    b"ast_function_abstract(f)\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
+            if (ast_function_abstract(f)).is_null() {
+                panic!();
+            }
             let err = ast_function_verify(f, ext);
             if !err.is_null() {
                 fprintf(

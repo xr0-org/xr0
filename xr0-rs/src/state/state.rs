@@ -26,7 +26,6 @@ use crate::ast::{
     ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
     ast_type_vconst,
 };
-use crate::c_util::__assert_rtn;
 use crate::ext::externals_types_str;
 use crate::object::{object_as_value, object_assign};
 use crate::props::{props_copy, props_create, props_destroy, props_str};
@@ -68,15 +67,9 @@ pub unsafe fn state_create(
     mut result_type: *mut ast_type,
 ) -> *mut state {
     let mut state: *mut state = malloc(::core::mem::size_of::<state>()) as *mut state;
-    if state.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"state_create\0")).as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            35 as libc::c_int,
-            b"state\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if state.is_null() {
+        panic!();
+    }
     (*state).ext = ext;
     (*state).static_memory = static_memory_create();
     (*state).vconst = vconst_create();
@@ -94,18 +87,9 @@ pub unsafe fn state_create_withprops(
     mut props: *mut props,
 ) -> *mut state {
     let mut state: *mut state = malloc(::core::mem::size_of::<state>()) as *mut state;
-    if state.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"state_create_withprops\0",
-            ))
-            .as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            51 as libc::c_int,
-            b"state\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if state.is_null() {
+        panic!();
+    }
     (*state).ext = ext;
     (*state).static_memory = static_memory_create();
     (*state).vconst = vconst_create();
@@ -127,15 +111,9 @@ pub unsafe fn state_destroy(mut state: *mut state) {
 
 pub unsafe fn state_copy(mut state: *mut state) -> *mut state {
     let mut copy: *mut state = malloc(::core::mem::size_of::<state>()) as *mut state;
-    if copy.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 11], &[libc::c_char; 11]>(b"state_copy\0")).as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            78 as libc::c_int,
-            b"copy\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if copy.is_null() {
+        panic!();
+    }
     (*copy).ext = (*state).ext;
     (*copy).static_memory = static_memory_copy((*state).static_memory);
     (*copy).vconst = vconst_copy((*state).vconst);
@@ -151,16 +129,9 @@ pub unsafe fn state_copywithname(
     mut func_name: *mut libc::c_char,
 ) -> *mut state {
     let mut copy: *mut state = malloc(::core::mem::size_of::<state>()) as *mut state;
-    if copy.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"state_copywithname\0"))
-                .as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            93 as libc::c_int,
-            b"copy\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if copy.is_null() {
+        panic!();
+    }
     (*copy).ext = (*state).ext;
     (*copy).static_memory = static_memory_copy((*state).static_memory);
     (*copy).vconst = vconst_copy((*state).vconst);
@@ -252,16 +223,9 @@ pub unsafe fn state_pushframe(
 pub unsafe fn state_popframe(mut state: *mut state) {
     let mut old: *mut stack = (*state).stack;
     (*state).stack = stack_prev(old);
-    if ((*state).stack).is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"state_popframe\0"))
-                .as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            175 as libc::c_int,
-            b"state->stack\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if ((*state).stack).is_null() {
+        panic!();
+    }
     stack_destroy(old);
 }
 
@@ -293,28 +257,10 @@ pub unsafe fn state_static_init(mut state: *mut state, mut expr: *mut ast_expr) 
     loc = location_create_static(address, ast_expr_constant_create(0 as libc::c_int));
     let mut res: object_res = state_get(state, loc, 1 as libc::c_int != 0);
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"state_static_init\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                215 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        panic!();
     }
     if (res.obj).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"state_static_init\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                218 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        panic!();
     }
     object_assign(res.obj, value_literal_create(dynamic_str(lit)));
     static_memory_stringpool((*state).static_memory, lit, loc);
@@ -329,31 +275,16 @@ pub unsafe fn state_clump(mut state: *mut state) -> *mut value {
 }
 
 pub unsafe fn state_islval(mut state: *mut state, mut v: *mut value) -> bool {
-    if v.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"state_islval\0")).as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            243 as libc::c_int,
-            b"v\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if v.is_null() {
+        panic!();
+    }
     if !value_islocation(v) {
         return 0 as libc::c_int != 0;
     }
     let mut loc: *mut location = value_as_location(v);
     let mut res: object_res = state_get(state, loc, 1 as libc::c_int != 0);
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"state_islval\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                250 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        panic!();
     }
     return location_tostatic(loc, (*state).static_memory) as libc::c_int != 0
         || location_toheap(loc, (*state).heap) as libc::c_int != 0
@@ -362,32 +293,18 @@ pub unsafe fn state_islval(mut state: *mut state, mut v: *mut value) -> bool {
 }
 
 pub unsafe fn state_isalloc(mut state: *mut state, mut v: *mut value) -> bool {
-    if v.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"state_isalloc\0"))
-                .as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            261 as libc::c_int,
-            b"v\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if v.is_null() {
+        panic!();
+    }
     if !value_islocation(v) {
         return 0 as libc::c_int != 0;
     }
     let mut loc: *mut location = value_as_location(v);
     let mut res: object_res = state_get(state, loc, 1 as libc::c_int != 0);
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"state_isalloc\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                268 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        if true {
+            panic!();
+        }
     }
     return location_toheap(loc, (*state).heap);
 }
@@ -421,23 +338,10 @@ pub unsafe fn state_get(
     if (res.b).is_null() {
         if !(location_type(loc) as libc::c_uint == LOCATION_DYNAMIC as libc::c_int as libc::c_uint
             || location_type(loc) as libc::c_uint
-                == LOCATION_DEREFERENCABLE as libc::c_int as libc::c_uint) as libc::c_int
-            as libc::c_long
-            != 0
+                == LOCATION_DEREFERENCABLE as libc::c_int as libc::c_uint)
         {
-            __assert_rtn(
-                (*::core::mem::transmute::<
-                    &[u8; 10],
-                    &[libc::c_char; 10],
-                >(b"state_get\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                290 as libc::c_int,
-                b"location_type(loc) == LOCATION_DYNAMIC || location_type(loc) == LOCATION_DEREFERENCABLE\0"
-                    as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+            panic!();
+        }
         return {
             let mut init = object_res {
                 obj: 0 as *mut object,
@@ -449,7 +353,7 @@ pub unsafe fn state_get(
     let mut obj: *mut object = block_observe(res.b, location_offset(loc), state, constructive);
     return {
         let mut init = object_res {
-            obj: obj,
+            obj,
             err: 0 as *mut error,
         };
         init
@@ -465,60 +369,28 @@ pub unsafe fn state_getblock(mut state: *mut state, mut loc: *mut location) -> *
         (*state).heap,
         (*state).clump,
     );
-    if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"state_getblock\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                310 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+    if !res.err.is_null() {
+        panic!();
     }
     return res.b;
 }
 
 pub unsafe fn state_getresult(mut state: *mut state) -> *mut object {
     let mut v: *mut variable = stack_getresult((*state).stack);
-    if v.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"state_getresult\0"))
-                .as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            319 as libc::c_int,
-            b"v\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if v.is_null() {
+        panic!();
+    }
     let mut res: object_res = state_get(state, variable_location(v), 1 as libc::c_int != 0);
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"state_getresult\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                323 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        panic!();
     }
     return res.obj;
 }
 unsafe fn state_getresulttype(mut state: *mut state) -> *mut ast_type {
     let mut v: *mut variable = stack_getresult((*state).stack);
-    if v.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"state_getresulttype\0"))
-                .as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            332 as libc::c_int,
-            b"v\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if v.is_null() {
+        panic!();
+    }
     return variable_type(v);
 }
 
@@ -530,30 +402,17 @@ pub unsafe fn state_getobjecttype(
         return state_getresulttype(state);
     }
     let mut v: *mut variable = stack_getvariable((*state).stack, id);
-    if v.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"state_getobjecttype\0"))
-                .as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            345 as libc::c_int,
-            b"v\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if v.is_null() {
+        panic!();
+    }
     return variable_type(v);
 }
 
 pub unsafe fn state_getloc(mut state: *mut state, mut id: *mut libc::c_char) -> *mut value {
     let mut v: *mut variable = stack_getvariable((*state).stack, id);
-    if v.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"state_getloc\0")).as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            354 as libc::c_int,
-            b"v\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if v.is_null() {
+        panic!();
+    }
     return value_ptr_create(variable_location(v));
 }
 
@@ -563,29 +422,15 @@ pub unsafe fn state_getobject(mut state: *mut state, mut id: *mut libc::c_char) 
     }
     let mut v: *mut variable = stack_getvariable((*state).stack, id);
     if v.is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"state_getobject\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                368 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        if true {
+            panic!();
+        }
     }
     let mut res: object_res = state_get(state, variable_location(v), 1 as libc::c_int != 0);
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"state_getobject\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                373 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        if true {
+            panic!();
+        }
     }
     return res.obj;
 }
@@ -605,15 +450,9 @@ pub unsafe fn state_deref(
         };
     }
     let mut deref_base: *mut location = value_as_location(ptr_val);
-    if deref_base.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"state_deref\0")).as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            385 as libc::c_int,
-            b"deref_base\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if deref_base.is_null() {
+        panic!();
+    }
     let mut deref: *mut location = location_with_offset(deref_base, index);
     let mut res: object_res = state_get(state, deref, 1 as libc::c_int != 0);
     if !(res.err).is_null() {
@@ -656,32 +495,18 @@ pub unsafe fn state_range_alloc(
         (*state).clump,
     );
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"state_range_alloc\0"))
-                    .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                416 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        if true {
+            panic!();
+        }
     }
     if (res.b).is_null() {
         return error_create(
             b"no block\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
     }
-    if ast_expr_equal(lw, up) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"state_range_alloc\0"))
-                .as_ptr(),
-            b"state.c\0" as *const u8 as *const libc::c_char,
-            423 as libc::c_int,
-            b"!ast_expr_equal(lw, up)\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if ast_expr_equal(lw, up) {
+        panic!();
+    }
     return block_range_alloc(res.b, lw, up, (*state).heap);
 }
 
@@ -751,18 +576,9 @@ pub unsafe fn state_range_aredeallocands(
         (*state).clump,
     );
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 27], &[libc::c_char; 27]>(
-                    b"state_range_aredeallocands\0",
-                ))
-                .as_ptr(),
-                b"state.c\0" as *const u8 as *const libc::c_char,
-                493 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        if true {
+            panic!();
+        }
     }
     return !(res.b).is_null() as libc::c_int != 0
         && block_range_aredeallocands(res.b, lw, up, state) as libc::c_int != 0;

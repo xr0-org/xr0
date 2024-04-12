@@ -10,7 +10,6 @@
 
 use libc::{free, malloc};
 
-use crate::c_util::__assert_rtn;
 use crate::util::{dynamic_str, map, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::StrBuilder as strbuilder;
 
@@ -83,18 +82,9 @@ unsafe fn math_expr_fromvartally(
     mut id: *mut libc::c_char,
     mut num: libc::c_int,
 ) -> *mut math_expr {
-    if !(num != 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"math_expr_fromvartally\0",
-            ))
-            .as_ptr(),
-            b"math.c\0" as *const u8 as *const libc::c_char,
-            52 as libc::c_int,
-            b"num != 0\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !(num != 0 as libc::c_int) {
+        panic!();
+    }
     if num < 0 as libc::c_int {
         return math_expr_neg_create(math_expr_fromvartally(id, -num));
     }
@@ -147,22 +137,8 @@ pub unsafe fn math_expr_copy(mut e: *mut math_expr) -> *mut math_expr {
                 math_expr_copy((*e).c2rust_unnamed.sum.e2),
             );
         }
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(
-                        b"math_expr_copy\0",
-                    ))
-                    .as_ptr(),
-                    b"math.c\0" as *const u8 as *const libc::c_char,
-                    136 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 pub unsafe fn math_expr_destroy(mut e: *mut math_expr) {
@@ -177,44 +153,20 @@ pub unsafe fn math_expr_destroy(mut e: *mut math_expr) {
         2 => {
             math_expr_destroy((*e).c2rust_unnamed.negated);
         }
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
-                        b"math_expr_destroy\0",
-                    ))
-                    .as_ptr(),
-                    b"math.c\0" as *const u8 as *const libc::c_char,
-                    155 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        _ => panic!(),
     }
     free(e as *mut libc::c_void);
 }
 
 pub unsafe fn math_expr_str(mut e: *mut math_expr) -> *mut libc::c_char {
     match (*e).type_0 as libc::c_uint {
-        0 => return math_atom_str((*e).c2rust_unnamed.a),
-        1 => return math_expr_sum_str(e),
-        2 => return math_expr_neg_str(e),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"math_expr_str\0"))
-                        .as_ptr(),
-                    b"math.c\0" as *const u8 as *const libc::c_char,
-                    177 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        0 => math_atom_str((*e).c2rust_unnamed.a),
+        1 => math_expr_sum_str(e),
+        2 => math_expr_neg_str(e),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
+
 unsafe fn math_expr_sum_str(mut e: *mut math_expr) -> *mut libc::c_char {
     let mut b: *mut strbuilder = strbuilder_create();
     let mut e1: *mut libc::c_char = math_expr_str((*e).c2rust_unnamed.sum.e1);
@@ -276,51 +228,25 @@ pub unsafe fn math_expr_simplify(mut raw: *mut math_expr) -> *mut math_expr {
         0 as *mut math_expr
     };
     expr = math_expr_nullablesum(expr, num);
-    if expr.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 19], &[libc::c_char; 19]>(b"math_expr_simplify\0"))
-                .as_ptr(),
-            b"math.c\0" as *const u8 as *const libc::c_char,
-            244 as libc::c_int,
-            b"expr\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if expr.is_null() {
+        panic!();
+    }
     return expr;
 }
+
 unsafe fn tally(mut e: *mut math_expr) -> tally {
     match (*e).type_0 as libc::c_uint {
-        0 => return atom_tally((*e).c2rust_unnamed.a),
-        1 => return sum_tally(e),
-        2 => return neg_tally(e),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 6], &[libc::c_char; 6]>(b"tally\0")).as_ptr(),
-                    b"math.c\0" as *const u8 as *const libc::c_char,
-                    269 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        0 => atom_tally((*e).c2rust_unnamed.a),
+        1 => sum_tally(e),
+        2 => neg_tally(e),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 unsafe fn sum_tally(mut e: *mut math_expr) -> tally {
-    if !((*e).type_0 as libc::c_uint == EXPR_SUM as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 10], &[libc::c_char; 10]>(b"sum_tally\0")).as_ptr(),
-            b"math.c\0" as *const u8 as *const libc::c_char,
-            279 as libc::c_int,
-            b"e->type == EXPR_SUM\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !((*e).type_0 as libc::c_uint == EXPR_SUM as libc::c_int as libc::c_uint) {
+        panic!();
+    }
     let mut r1: tally = tally((*e).c2rust_unnamed.sum.e1);
     let mut r2: tally = tally((*e).c2rust_unnamed.sum.e2);
     return {
@@ -389,22 +315,8 @@ pub unsafe fn math_atom_copy(mut a: *mut math_atom) -> *mut math_atom {
     match (*a).type_0 as libc::c_uint {
         0 => return math_atom_nat_create((*a).c2rust_unnamed.i),
         1 => return math_atom_variable_create(dynamic_str((*a).c2rust_unnamed.v)),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(
-                        b"math_atom_copy\0",
-                    ))
-                    .as_ptr(),
-                    b"math.c\0" as *const u8 as *const libc::c_char,
-                    381 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 pub unsafe fn math_atom_destroy(mut a: *mut math_atom) {
@@ -413,20 +325,7 @@ pub unsafe fn math_atom_destroy(mut a: *mut math_atom) {
         1 => {
             free((*a).c2rust_unnamed.v as *mut libc::c_void);
         }
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
-                        b"math_atom_destroy\0",
-                    ))
-                    .as_ptr(),
-                    b"math.c\0" as *const u8 as *const libc::c_char,
-                    395 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        _ => panic!(),
     }
     free(a as *mut libc::c_void);
 }
@@ -439,13 +338,7 @@ pub unsafe fn math_atom_str(mut a: *mut math_atom) -> *mut libc::c_char {
         as libc::c_long
         != 0
     {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"math_atom_str\0"))
-                .as_ptr(),
-            b"math.c\0" as *const u8 as *const libc::c_char,
-            407 as libc::c_int,
-            b"a->type == ATOM_NAT\0" as *const u8 as *const libc::c_char,
-        );
+        panic!();
     } else {
     };
     let mut b: *mut strbuilder = strbuilder_create();

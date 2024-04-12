@@ -14,7 +14,6 @@ use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
     ast_expr_eq_create, ast_expr_sum_create,
 };
-use crate::c_util::__assert_rtn;
 use crate::object::{
     object_abstractcopy, object_arr_append, object_arr_copy, object_arr_create, object_arr_destroy,
     object_arr_index, object_arr_index_upperincl, object_arr_insert, object_arr_nobjects,
@@ -84,14 +83,8 @@ pub unsafe fn block_str(mut block: *mut block) -> *mut libc::c_char {
 }
 
 pub unsafe fn block_install(mut b: *mut block, mut obj: *mut object) {
-    if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"block_install\0"))
-                .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
-            59 as libc::c_int,
-            b"object_arr_nobjects(b->arr) == 0\0" as *const u8 as *const libc::c_char,
-        );
+    if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) {
+        panic!();
     } else {
     };
     object_arr_append((*b).arr, obj);
@@ -127,14 +120,8 @@ pub unsafe fn block_observe(
     ast_expr_destroy(up);
     ast_expr_destroy(lw);
     let mut err: *mut error = object_dealloc(obj_0, s);
-    if !err.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"block_observe\0"))
-                .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
-            104 as libc::c_int,
-            b"!err\0" as *const u8 as *const libc::c_char,
-        );
+    if !err.is_null() {
+        panic!();
     } else {
     };
     object_arr_remove((*b).arr, index);
@@ -175,14 +162,8 @@ pub unsafe fn block_range_alloc(
     mut up: *mut ast_expr,
     mut heap: *mut heap,
 ) -> *mut error {
-    if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"block_range_alloc\0"))
-                .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
-            136 as libc::c_int,
-            b"object_arr_nobjects(b->arr) == 0\0" as *const u8 as *const libc::c_char,
-        );
+    if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) {
+        panic!();
     } else {
     };
     object_arr_append(
@@ -230,16 +211,8 @@ pub unsafe fn block_range_aredeallocands(
         }
         i += 1;
     }
-    if !object_isdeallocand(*obj.offset(up_index as isize), s) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 27], &[libc::c_char; 27]>(
-                b"block_range_aredeallocands\0",
-            ))
-            .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
-            187 as libc::c_int,
-            b"object_isdeallocand(obj[up_index], s)\0" as *const u8 as *const libc::c_char,
-        );
+    if !object_isdeallocand(*obj.offset(up_index as isize), s) {
+        panic!();
     } else {
     };
     return 1 as libc::c_int != 0;
@@ -343,14 +316,8 @@ pub unsafe fn block_undeclare(mut b: *mut block, mut s: *mut state) {
 
 pub unsafe fn block_arr_create() -> *mut block_arr {
     let mut arr: *mut block_arr = calloc(1, ::core::mem::size_of::<block_arr>()) as *mut block_arr;
-    if arr.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"block_arr_create\0"))
-                .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
-            295 as libc::c_int,
-            b"arr\0" as *const u8 as *const libc::c_char,
-        );
+    if arr.is_null() {
+        panic!();
     } else {
     };
     return arr;
@@ -390,16 +357,9 @@ pub unsafe fn block_arr_append(mut arr: *mut block_arr, mut b: *mut block) -> li
         (*arr).block as *mut libc::c_void,
         (::core::mem::size_of::<block_arr>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut block;
-    if ((*arr).block).is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"block_arr_append\0"))
-                .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
-            336 as libc::c_int,
-            b"arr->block\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if ((*arr).block).is_null() {
+        panic!();
+    }
     let mut loc: libc::c_int = (*arr).n - 1 as libc::c_int;
     let ref mut fresh2 = *((*arr).block).offset(loc as isize);
     *fresh2 = b;
@@ -407,14 +367,5 @@ pub unsafe fn block_arr_append(mut arr: *mut block_arr, mut b: *mut block) -> li
 }
 
 pub unsafe fn block_arr_delete(mut arr: *mut block_arr, mut address: libc::c_int) {
-    if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 17], &[libc::c_char; 17]>(b"block_arr_delete\0"))
-                .as_ptr(),
-            b"block.c\0" as *const u8 as *const libc::c_char,
-            345 as libc::c_int,
-            b"false\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    panic!();
 }

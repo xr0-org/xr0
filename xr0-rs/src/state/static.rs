@@ -10,7 +10,6 @@
 
 use libc::{free, malloc};
 
-use crate::c_util::__assert_rtn;
 use crate::state::block::{
     block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
     block_arr_nblocks, block_create, block_str,
@@ -86,18 +85,7 @@ unsafe fn pool_copy(mut p: &map) -> Box<map> {
 pub unsafe fn static_memory_newblock(mut sm: *mut static_memory) -> libc::c_int {
     let mut address: libc::c_int = block_arr_append((*sm).blocks, block_create());
     let mut n: libc::c_int = block_arr_nblocks((*sm).blocks);
-    if !(n > 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"static_memory_newblock\0",
-            ))
-            .as_ptr(),
-            b"static.c\0" as *const u8 as *const libc::c_char,
-            80 as libc::c_int,
-            b"n > 0\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    assert!(n > 0);
     return address;
 }
 

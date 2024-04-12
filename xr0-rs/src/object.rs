@@ -15,7 +15,6 @@ use crate::ast::{
     ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_str,
     ast_expr_sum_create, ast_type_struct_complete,
 };
-use crate::c_util::__assert_rtn;
 use crate::state::location::{location_copy, location_destroy, location_references, location_str};
 use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
@@ -68,16 +67,9 @@ pub struct object_result {
 
 pub unsafe fn object_value_create(mut offset: *mut ast_expr, mut v: *mut value) -> *mut object {
     let mut obj: *mut object = malloc(::core::mem::size_of::<object>()) as *mut object;
-    if obj.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"object_value_create\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            49 as libc::c_int,
-            b"obj\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if obj.is_null() {
+        panic!();
+    }
     (*obj).offset = offset;
     (*obj).c2rust_unnamed.value = v;
     (*obj).type_0 = OBJECT_VALUE;
@@ -85,27 +77,13 @@ pub unsafe fn object_value_create(mut offset: *mut ast_expr, mut v: *mut value) 
 }
 
 pub unsafe fn object_range_create(mut offset: *mut ast_expr, mut r: *mut range) -> *mut object {
-    if r.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"object_range_create\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            59 as libc::c_int,
-            b"r\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if r.is_null() {
+        panic!();
+    }
     let mut obj: *mut object = malloc(::core::mem::size_of::<object>()) as *mut object;
-    if obj.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"object_range_create\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            61 as libc::c_int,
-            b"obj\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if obj.is_null() {
+        panic!();
+    }
     (*obj).offset = offset;
     (*obj).c2rust_unnamed.range = r;
     (*obj).type_0 = OBJECT_DEALLOCAND_RANGE;
@@ -122,20 +100,7 @@ pub unsafe fn object_destroy(mut obj: *mut object) {
         1 => {
             range_destroy((*obj).c2rust_unnamed.range);
         }
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(
-                        b"object_destroy\0",
-                    ))
-                    .as_ptr(),
-                    b"object.c\0" as *const u8 as *const libc::c_char,
-                    81 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        _ => panic!(),
     }
     ast_expr_destroy((*obj).offset);
     free(obj as *mut libc::c_void);
@@ -156,51 +121,24 @@ pub unsafe fn object_copy(mut old: *mut object) -> *mut object {
         1 => {
             (*new).c2rust_unnamed.range = range_copy((*old).c2rust_unnamed.range);
         }
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"object_copy\0"))
-                        .as_ptr(),
-                    b"object.c\0" as *const u8 as *const libc::c_char,
-                    101 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        _ => panic!(),
     }
     return new;
 }
 
 pub unsafe fn object_abstractcopy(mut old: *mut object, mut s: *mut state) -> *mut object {
     match (*old).type_0 as libc::c_uint {
-        1 => return object_copy(old),
-        0 => {
-            return object_value_create(
-                ast_expr_copy((*old).offset),
-                if !((*old).c2rust_unnamed.value).is_null() {
-                    value_abstractcopy((*old).c2rust_unnamed.value, s)
-                } else {
-                    0 as *mut value
-                },
-            );
-        }
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(
-                        b"object_abstractcopy\0",
-                    ))
-                    .as_ptr(),
-                    b"object.c\0" as *const u8 as *const libc::c_char,
-                    119 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
+        1 => object_copy(old),
+        0 => object_value_create(
+            ast_expr_copy((*old).offset),
+            if !((*old).c2rust_unnamed.value).is_null() {
+                value_abstractcopy((*old).c2rust_unnamed.value, s)
             } else {
-            };
-        }
+                0 as *mut value
+            },
+        ),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 pub unsafe fn object_str(mut obj: *mut object) -> *mut libc::c_char {
@@ -215,45 +153,34 @@ pub unsafe fn object_str(mut obj: *mut object) -> *mut libc::c_char {
     strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
     return strbuilder_build(b);
 }
+
 unsafe fn inner_str(mut obj: *mut object) -> *mut libc::c_char {
     match (*obj).type_0 as libc::c_uint {
         0 => {
-            return if !((*obj).c2rust_unnamed.value).is_null() {
+            if !((*obj).c2rust_unnamed.value).is_null() {
                 value_str((*obj).c2rust_unnamed.value)
             } else {
                 dynamic_str(b"\0" as *const u8 as *const libc::c_char)
-            };
+            }
         }
-        1 => return range_str((*obj).c2rust_unnamed.range),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 10], &[libc::c_char; 10]>(b"inner_str\0"))
-                        .as_ptr(),
-                    b"object.c\0" as *const u8 as *const libc::c_char,
-                    150 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        1 => range_str((*obj).c2rust_unnamed.range),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 pub unsafe fn object_referencesheap(mut obj: *mut object, mut s: *mut state) -> bool {
     if !object_isvalue(obj) {
-        return 1 as libc::c_int != 0;
+        return true;
     }
     return !((*obj).c2rust_unnamed.value).is_null()
-        && value_referencesheap((*obj).c2rust_unnamed.value, s) as libc::c_int != 0;
+        && value_referencesheap((*obj).c2rust_unnamed.value, s);
 }
 
 pub unsafe fn object_hasvalue(mut obj: *mut object) -> bool {
     if object_isvalue(obj) {
         return !((*obj).c2rust_unnamed.value).is_null();
     }
-    return 0 as libc::c_int != 0;
+    false
 }
 
 pub unsafe fn object_isvalue(mut obj: *mut object) -> bool {
@@ -261,47 +188,23 @@ pub unsafe fn object_isvalue(mut obj: *mut object) -> bool {
 }
 
 pub unsafe fn object_as_value(mut obj: *mut object) -> *mut value {
-    if !((*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long
-        != 0
-    {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"object_as_value\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            182 as libc::c_int,
-            b"obj->type == OBJECT_VALUE\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !((*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
+        panic!();
+    }
     return (*obj).c2rust_unnamed.value;
 }
 
 pub unsafe fn object_isdeallocand(mut obj: *mut object, mut s: *mut state) -> bool {
     match (*obj).type_0 as libc::c_uint {
         0 => {
-            return !((*obj).c2rust_unnamed.value).is_null()
+            !((*obj).c2rust_unnamed.value).is_null()
                 && state_isdeallocand(s, value_as_location((*obj).c2rust_unnamed.value))
                     as libc::c_int
-                    != 0;
+                    != 0
         }
-        1 => return range_isdeallocand((*obj).c2rust_unnamed.range, s),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(
-                        b"object_isdeallocand\0",
-                    ))
-                    .as_ptr(),
-                    b"object.c\0" as *const u8 as *const libc::c_char,
-                    196 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        1 => range_isdeallocand((*obj).c2rust_unnamed.range, s),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 pub unsafe fn object_references(
@@ -316,15 +219,8 @@ pub unsafe fn object_references(
         as libc::c_int as libc::c_long
         != 0
     {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"object_references\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            207 as libc::c_int,
-            b"obj->type == OBJECT_VALUE\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     let mut v: *mut value = object_as_value(obj);
     return if !v.is_null() {
         value_references(v, loc, s) as libc::c_int
@@ -338,36 +234,17 @@ pub unsafe fn object_assign(mut obj: *mut object, mut val: *mut value) -> *mut e
         as libc::c_int as libc::c_long
         != 0
     {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"object_assign\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            216 as libc::c_int,
-            b"obj->type == OBJECT_VALUE\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     (*obj).c2rust_unnamed.value = val;
     return 0 as *mut error;
 }
 unsafe fn object_size(mut obj: *mut object) -> *mut ast_expr {
     match (*obj).type_0 as libc::c_uint {
-        0 => return ast_expr_constant_create(1 as libc::c_int),
-        1 => return ast_expr_copy(range_size((*obj).c2rust_unnamed.range)),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"object_size\0"))
-                        .as_ptr(),
-                    b"object.c\0" as *const u8 as *const libc::c_char,
-                    235 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        0 => ast_expr_constant_create(1 as libc::c_int),
+        1 => ast_expr_copy(range_size((*obj).c2rust_unnamed.range)),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 pub unsafe fn object_lower(mut obj: *mut object) -> *mut ast_expr {
@@ -449,15 +326,9 @@ pub unsafe fn object_upto(
     ast_expr_destroy(prop1);
     ast_expr_destroy(prop0);
     ast_expr_destroy(up);
-    if !e0 as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"object_upto\0")).as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            357 as libc::c_int,
-            b"e0\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !e0 {
+        panic!();
+    }
     if e1 {
         return 0 as *mut object;
     }
@@ -466,13 +337,7 @@ pub unsafe fn object_upto(
             as libc::c_int as libc::c_long
             != 0
         {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"object_upto\0"))
-                    .as_ptr(),
-                b"object.c\0" as *const u8 as *const libc::c_char,
-                364 as libc::c_int,
-                b"obj->type == OBJECT_VALUE\0" as *const u8 as *const libc::c_char,
-            );
+            panic!();
         } else {
         };
         return object_value_create(
@@ -507,19 +372,9 @@ pub unsafe fn object_from(
         return 0 as *mut object;
     }
     if e1 {
-        if !((*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
-            as libc::c_int as libc::c_long
-            != 0
-        {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"object_from\0"))
-                    .as_ptr(),
-                b"object.c\0" as *const u8 as *const libc::c_char,
-                403 as libc::c_int,
-                b"obj->type == OBJECT_VALUE\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        if !((*obj).type_0 as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
+            panic!();
+        }
         ast_expr_destroy(up);
         return object_value_create(
             ast_expr_copy(incl_lw),
@@ -537,24 +392,10 @@ pub unsafe fn object_from(
 
 pub unsafe fn object_dealloc(mut obj: *mut object, mut s: *mut state) -> *mut error {
     match (*obj).type_0 as libc::c_uint {
-        0 => return state_dealloc(s, (*obj).c2rust_unnamed.value),
-        1 => return range_dealloc((*obj).c2rust_unnamed.range, s),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(
-                        b"object_dealloc\0",
-                    ))
-                    .as_ptr(),
-                    b"object.c\0" as *const u8 as *const libc::c_char,
-                    432 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        0 => state_dealloc(s, (*obj).c2rust_unnamed.value),
+        1 => range_dealloc((*obj).c2rust_unnamed.range, s),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 pub unsafe fn object_getmember(
@@ -575,16 +416,9 @@ unsafe fn getorcreatestruct(
         return v;
     }
     let mut complete: *mut ast_type = ast_type_struct_complete(t, state_getext(s));
-    if complete.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"getorcreatestruct\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            454 as libc::c_int,
-            b"complete\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if complete.is_null() {
+        panic!();
+    }
     v = value_struct_create(complete);
     object_assign(obj, v);
     return v;
@@ -600,18 +434,9 @@ pub unsafe fn object_getmembertype(
 }
 
 pub unsafe fn object_result_error_create(mut err: *mut error) -> *mut object_result {
-    if err.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 27], &[libc::c_char; 27]>(
-                b"object_result_error_create\0",
-            ))
-            .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            478 as libc::c_int,
-            b"err\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if err.is_null() {
+        panic!();
+    }
     let mut r: *mut object_result =
         malloc(::core::mem::size_of::<object_result>()) as *mut object_result;
     (*r).val = 0 as *mut object;
@@ -628,16 +453,9 @@ pub unsafe fn object_result_value_create(mut val: *mut object) -> *mut object_re
 }
 
 pub unsafe fn object_result_destroy(mut res: *mut object_result) {
-    if !((*res).err).is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(b"object_result_destroy\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            498 as libc::c_int,
-            b"!res->err\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !((*res).err).is_null() {
+        panic!();
+    }
     if !((*res).val).is_null() {
         object_destroy((*res).val);
     }
@@ -649,50 +467,23 @@ pub unsafe fn object_result_iserror(mut res: *mut object_result) -> bool {
 }
 
 pub unsafe fn object_result_as_error(mut res: *mut object_result) -> *mut error {
-    if ((*res).err).is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"object_result_as_error\0",
-            ))
-            .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            514 as libc::c_int,
-            b"res->err\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if ((*res).err).is_null() {
+        panic!();
+    }
     return (*res).err;
 }
 
 pub unsafe fn object_result_as_value(mut res: *mut object_result) -> *mut object {
-    if !((*res).err).is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"object_result_as_value\0",
-            ))
-            .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            521 as libc::c_int,
-            b"!res->err\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !((*res).err).is_null() {
+        panic!();
+    }
     return (*res).val;
 }
 
 pub unsafe fn object_result_hasvalue(mut res: *mut object_result) -> bool {
-    if object_result_iserror(res) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"object_result_hasvalue\0",
-            ))
-            .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            528 as libc::c_int,
-            b"!object_result_iserror(res)\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if object_result_iserror(res) {
+        panic!();
+    }
     return !((*res).val).is_null();
 }
 
@@ -751,16 +542,9 @@ pub unsafe fn range_references(
 pub unsafe fn object_arr_create() -> *mut object_arr {
     let mut arr: *mut object_arr =
         calloc(1, ::core::mem::size_of::<object_arr>()) as *mut object_arr;
-    if arr.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"object_arr_create\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            606 as libc::c_int,
-            b"arr\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if arr.is_null() {
+        panic!();
+    }
     return arr;
 }
 
@@ -832,16 +616,9 @@ pub unsafe fn object_arr_insert(
         (*arr).object as *mut libc::c_void,
         (::core::mem::size_of::<*mut object>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut object;
-    if ((*arr).object).is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"object_arr_insert\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            675 as libc::c_int,
-            b"arr->object\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if ((*arr).object).is_null() {
+        panic!();
+    }
     let mut i: libc::c_int = (*arr).n - 1 as libc::c_int;
     while i > index {
         let ref mut fresh0 = *((*arr).object).offset(i as isize);
@@ -869,16 +646,9 @@ pub unsafe fn object_arr_remove(mut arr: *mut object_arr, mut index: libc::c_int
         (*arr).object as *mut libc::c_void,
         (::core::mem::size_of::<*mut object>()).wrapping_mul((*arr).n as usize),
     ) as *mut *mut object;
-    if !(!((*arr).object).is_null() || (*arr).n == 0) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"object_arr_remove\0"))
-                .as_ptr(),
-            b"object.c\0" as *const u8 as *const libc::c_char,
-            696 as libc::c_int,
-            b"arr->object || !arr->n\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !(!((*arr).object).is_null() || (*arr).n == 0) {
+        panic!();
+    }
 }
 
 pub unsafe fn object_arr_nobjects(mut arr: *mut object_arr) -> libc::c_int {

@@ -14,7 +14,6 @@ use libc::{free, malloc, printf};
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_equal, ast_expr_str,
 };
-use crate::c_util::__assert_rtn;
 use crate::object::object_referencesheap;
 use crate::state::block::{
     block_range_aredeallocands, block_range_dealloc, block_references, block_str,
@@ -63,32 +62,14 @@ pub unsafe fn location_create_vconst(
     mut offset: *mut ast_expr,
 ) -> *mut location {
     let mut loc: *mut location = malloc(::core::mem::size_of::<location>()) as *mut location;
-    if loc.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"location_create_vconst\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            31 as libc::c_int,
-            b"loc\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if loc.is_null() {
+        panic!();
+    }
     (*loc).type_0 = LOCATION_VCONST;
     (*loc).block = block;
-    if offset.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"location_create_vconst\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            34 as libc::c_int,
-            b"offset\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if offset.is_null() {
+        panic!();
+    }
     (*loc).offset = offset;
     return loc;
 }
@@ -98,32 +79,14 @@ pub unsafe fn location_create_dereferencable(
     mut offset: *mut ast_expr,
 ) -> *mut location {
     let mut loc: *mut location = malloc(::core::mem::size_of::<location>()) as *mut location;
-    if loc.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 31], &[libc::c_char; 31]>(
-                b"location_create_dereferencable\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            43 as libc::c_int,
-            b"loc\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if loc.is_null() {
+        panic!();
+    }
     (*loc).type_0 = LOCATION_DEREFERENCABLE;
     (*loc).block = block;
-    if offset.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 31], &[libc::c_char; 31]>(
-                b"location_create_dereferencable\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            46 as libc::c_int,
-            b"offset\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if offset.is_null() {
+        panic!();
+    }
     (*loc).offset = offset;
     return loc;
 }
@@ -133,32 +96,14 @@ pub unsafe fn location_create_static(
     mut offset: *mut ast_expr,
 ) -> *mut location {
     let mut loc: *mut location = malloc(::core::mem::size_of::<location>()) as *mut location;
-    if loc.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"location_create_static\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            55 as libc::c_int,
-            b"loc\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if loc.is_null() {
+        panic!();
+    }
     (*loc).type_0 = LOCATION_STATIC;
     (*loc).block = block;
-    if offset.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"location_create_static\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            58 as libc::c_int,
-            b"offset\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if offset.is_null() {
+        panic!();
+    }
     (*loc).offset = offset;
     return loc;
 }
@@ -168,32 +113,14 @@ pub unsafe fn location_create_dynamic(
     mut offset: *mut ast_expr,
 ) -> *mut location {
     let mut loc: *mut location = malloc(::core::mem::size_of::<location>()) as *mut location;
-    if loc.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
-                b"location_create_dynamic\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            67 as libc::c_int,
-            b"loc\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if loc.is_null() {
+        panic!();
+    }
     (*loc).type_0 = LOCATION_DYNAMIC;
     (*loc).block = block;
-    if offset.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
-                b"location_create_dynamic\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            70 as libc::c_int,
-            b"offset\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if offset.is_null() {
+        panic!();
+    }
     (*loc).offset = offset;
     return loc;
 }
@@ -204,57 +131,25 @@ pub unsafe fn location_create_automatic(
     mut offset: *mut ast_expr,
 ) -> *mut location {
     let mut loc: *mut location = malloc(::core::mem::size_of::<location>()) as *mut location;
-    if loc.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
-                b"location_create_automatic\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            79 as libc::c_int,
-            b"loc\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if loc.is_null() {
+        panic!();
+    }
     (*loc).type_0 = LOCATION_AUTOMATIC;
     (*loc).u.frame = frame;
     (*loc).block = block;
-    if offset.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 26], &[libc::c_char; 26]>(
-                b"location_create_automatic\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            83 as libc::c_int,
-            b"offset\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if offset.is_null() {
+        panic!();
+    }
     (*loc).offset = offset;
     return loc;
 }
 
 pub unsafe fn location_transfigure(mut loc: *mut location, mut compare: *mut state) -> *mut value {
     match (*loc).type_0 as libc::c_uint {
-        3 | 2 => return state_clump(compare),
-        4 => return state_alloc(compare),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(
-                        b"location_transfigure\0",
-                    ))
-                    .as_ptr(),
-                    b"location.c\0" as *const u8 as *const libc::c_char,
-                    98 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        3 | 2 => state_clump(compare),
+        4 => state_alloc(compare),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 pub unsafe fn location_destroy(mut loc: *mut location) {
@@ -281,18 +176,7 @@ pub unsafe fn location_str(mut loc: *mut location) -> *mut libc::c_char {
         2 => {
             strbuilder_printf(b, b"clump:\0" as *const u8 as *const libc::c_char);
         }
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"location_str\0"))
-                        .as_ptr(),
-                    b"location.c\0" as *const u8 as *const libc::c_char,
-                    130 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        _ => panic!(),
     }
     strbuilder_printf(b, b"%d\0" as *const u8 as *const libc::c_char, (*loc).block);
     if !offsetzero(loc) {
@@ -323,49 +207,22 @@ pub unsafe fn location_offset(mut loc: *mut location) -> *mut ast_expr {
 
 pub unsafe fn location_copy(mut loc: *mut location) -> *mut location {
     match (*loc).type_0 as libc::c_uint {
-        0 => return location_create_static((*loc).block, ast_expr_copy((*loc).offset)),
-        1 => return location_create_vconst((*loc).block, ast_expr_copy((*loc).offset)),
-        2 => {
-            return location_create_dereferencable((*loc).block, ast_expr_copy((*loc).offset));
-        }
-        3 => {
-            return location_create_automatic(
-                (*loc).u.frame,
-                (*loc).block,
-                ast_expr_copy((*loc).offset),
-            );
-        }
-        4 => return location_create_dynamic((*loc).block, ast_expr_copy((*loc).offset)),
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"location_copy\0"))
-                        .as_ptr(),
-                    b"location.c\0" as *const u8 as *const libc::c_char,
-                    193 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+        0 => location_create_static((*loc).block, ast_expr_copy((*loc).offset)),
+        1 => location_create_vconst((*loc).block, ast_expr_copy((*loc).offset)),
+        2 => location_create_dereferencable((*loc).block, ast_expr_copy((*loc).offset)),
+        3 => location_create_automatic((*loc).u.frame, (*loc).block, ast_expr_copy((*loc).offset)),
+        4 => location_create_dynamic((*loc).block, ast_expr_copy((*loc).offset)),
+        _ => panic!(),
     }
-    panic!("Reached end of non-void function without returning");
 }
 
 pub unsafe fn location_with_offset(
     mut loc: *mut location,
     mut offset: *mut ast_expr,
 ) -> *mut location {
-    if !offsetzero(loc) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 21], &[libc::c_char; 21]>(b"location_with_offset\0"))
-                .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            201 as libc::c_int,
-            b"offsetzero(loc)\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !offsetzero(loc) {
+        panic!();
+    }
     let mut copy: *mut location = location_copy(loc);
     (*copy).offset = ast_expr_copy(offset);
     return copy;
@@ -430,18 +287,7 @@ pub unsafe fn location_referencesheap(mut l: *mut location, mut s: *mut state) -
     }
     let mut res: object_res = state_get(s, l, 0 as libc::c_int != 0);
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 24], &[libc::c_char; 24]>(
-                    b"location_referencesheap\0",
-                ))
-                .as_ptr(),
-                b"location.c\0" as *const u8 as *const libc::c_char,
-                279 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        panic!();
     }
     return !(res.obj).is_null() && object_referencesheap(res.obj, s) as libc::c_int != 0;
 }
@@ -454,62 +300,27 @@ pub unsafe fn location_getblock(
     mut h: *mut heap,
     mut c: *mut clump,
 ) -> block_res {
-    if s.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"location_getblock\0"))
-                .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            291 as libc::c_int,
-            b"s\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
-    match (*loc).type_0 as libc::c_uint {
-        0 => {
-            return {
-                let mut init = block_res {
-                    b: static_memory_getblock(sm, (*loc).block),
-                    err: 0 as *mut error,
-                };
-                init
-            };
-        }
-        3 => return location_auto_getblock(loc, s),
-        4 => {
-            return {
-                let mut init = block_res {
-                    b: heap_getblock(h, (*loc).block),
-                    err: 0 as *mut error,
-                };
-                init
-            };
-        }
-        2 => {
-            return {
-                let mut init = block_res {
-                    b: clump_getblock(c, (*loc).block),
-                    err: 0 as *mut error,
-                };
-                init
-            };
-        }
-        _ => {
-            if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-                __assert_rtn(
-                    (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(
-                        b"location_getblock\0",
-                    ))
-                    .as_ptr(),
-                    b"location.c\0" as *const u8 as *const libc::c_char,
-                    311 as libc::c_int,
-                    b"false\0" as *const u8 as *const libc::c_char,
-                );
-            } else {
-            };
-        }
+    if s.is_null() {
+        panic!();
     }
-    panic!("Reached end of non-void function without returning");
+    match (*loc).type_0 as libc::c_uint {
+        0 => block_res {
+            b: static_memory_getblock(sm, (*loc).block),
+            err: 0 as *mut error,
+        },
+        3 => location_auto_getblock(loc, s),
+        4 => block_res {
+            b: heap_getblock(h, (*loc).block),
+            err: 0 as *mut error,
+        },
+        2 => block_res {
+            b: clump_getblock(c, (*loc).block),
+            err: 0 as *mut error,
+        },
+        _ => panic!(),
+    }
 }
+
 unsafe fn location_auto_getblock(mut loc: *mut location, mut s: *mut stack) -> block_res {
     let mut f: *mut stack = stack_getframe(s, (*loc).u.frame);
     if f.is_null() {
@@ -538,17 +349,8 @@ pub unsafe fn location_getstackblock(mut loc: *mut location, mut s: *mut stack) 
         as libc::c_int as libc::c_long
         != 0
     {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"location_getstackblock\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            334 as libc::c_int,
-            b"loc->type == LOCATION_AUTOMATIC\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     return stack_getblock(s, (*loc).block);
 }
 
@@ -567,18 +369,9 @@ pub unsafe fn location_range_dealloc(
     mut up: *mut ast_expr,
     mut state: *mut state,
 ) -> *mut error {
-    if !offsetzero(loc) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                b"location_range_dealloc\0",
-            ))
-            .as_ptr(),
-            b"location.c\0" as *const u8 as *const libc::c_char,
-            352 as libc::c_int,
-            b"offsetzero(loc)\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !offsetzero(loc) {
+        panic!();
+    }
     let mut b: *mut block = state_getblock(state, loc);
     if b.is_null() {
         return error_create(
@@ -595,18 +388,7 @@ pub unsafe fn location_range_dealloc(
             ast_expr_str(lw),
             ast_expr_str(up),
         );
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 23], &[libc::c_char; 23]>(
-                    b"location_range_dealloc\0",
-                ))
-                .as_ptr(),
-                b"location.c\0" as *const u8 as *const libc::c_char,
-                362 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+        debug_assert!(false);
         return error_create(
             b"some values not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );

@@ -14,7 +14,6 @@ use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_destroy, ast_type_str, ast_variable_name,
     ast_variable_type,
 };
-use crate::c_util::__assert_rtn;
 use crate::object::{
     object_as_value, object_assign, object_isvalue, object_str, object_value_create,
 };
@@ -93,25 +92,11 @@ pub unsafe fn stack_create(
 
 pub unsafe fn stack_getframe(mut s: *mut stack, mut frame: libc::c_int) -> *mut stack {
     if s.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"stack_getframe\0"))
-                .as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            58 as libc::c_int,
-            b"s\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     if !(frame >= 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"stack_getframe\0"))
-                .as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            59 as libc::c_int,
-            b"frame >= 0\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     if (*s).id == frame {
         return s;
     }
@@ -254,19 +239,9 @@ pub unsafe fn stack_getvarmap(mut s: &mut stack) -> &mut map {
 }
 
 pub unsafe fn stack_getvariable(mut s: *mut stack, mut id: *mut libc::c_char) -> *mut variable {
-    if !(strcmp(id, b"return\0" as *const u8 as *const libc::c_char) != 0 as libc::c_int)
-        as libc::c_int as libc::c_long
-        != 0
-    {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"stack_getvariable\0"))
-                .as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            216 as libc::c_int,
-            b"strcmp(id, KEYWORD_RETURN) != 0\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !(strcmp(id, b"return\0" as *const u8 as *const libc::c_char) != 0 as libc::c_int) {
+        panic!();
+    }
     return (*s).varmap.get(id) as *mut variable;
 }
 
@@ -293,15 +268,8 @@ pub unsafe fn stack_references(
 
 pub unsafe fn stack_getblock(mut s: *mut stack, mut address: libc::c_int) -> *mut block {
     if !(address < block_arr_nblocks((*s).frame)) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 15], &[libc::c_char; 15]>(b"stack_getblock\0"))
-                .as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            244 as libc::c_int,
-            b"address < block_arr_nblocks(s->frame)\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     return *(block_arr_blocks((*s).frame)).offset(address as isize);
 }
 
@@ -324,26 +292,12 @@ pub unsafe fn variable_create(
     );
     if !(res.err).is_null() {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"variable_create\0"))
-                    .as_ptr(),
-                b"stack.c\0" as *const u8 as *const libc::c_char,
-                268 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+            panic!();
+        }
     }
     if (res.b).is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 16], &[libc::c_char; 16]>(b"variable_create\0"))
-                .as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            270 as libc::c_int,
-            b"res.b\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     block_install(
         res.b,
         object_value_create(ast_expr_constant_create(0 as libc::c_int), 0 as *mut value),
@@ -372,28 +326,12 @@ unsafe fn variable_abstractcopy(mut old: *mut variable, mut s: *mut state) -> *m
     let mut res: object_res = state_get(s, (*new).loc, 0 as libc::c_int != 0);
     if !(res.err).is_null() {
         if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            __assert_rtn(
-                (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(
-                    b"variable_abstractcopy\0",
-                ))
-                .as_ptr(),
-                b"stack.c\0" as *const u8 as *const libc::c_char,
-                303 as libc::c_int,
-                b"false\0" as *const u8 as *const libc::c_char,
-            );
-        } else {
-        };
+            panic!();
+        }
     }
     if (res.obj).is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(b"variable_abstractcopy\0"))
-                .as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            305 as libc::c_int,
-            b"res.obj\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     if object_isvalue(res.obj) {
         let mut v: *mut value = object_as_value(res.obj);
         if !v.is_null() {
@@ -412,14 +350,8 @@ pub unsafe fn variable_str(
         != LOCATION_VCONST as libc::c_int as libc::c_uint) as libc::c_int as libc::c_long
         != 0
     {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 13], &[libc::c_char; 13]>(b"variable_str\0")).as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            321 as libc::c_int,
-            b"location_type(var->loc) != LOCATION_VCONST\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     let mut b: *mut strbuilder = strbuilder_create();
     let mut type_0: *mut libc::c_char = ast_type_str((*var).type_0);
     let mut loc: *mut libc::c_char = location_str((*var).loc);
@@ -449,15 +381,8 @@ unsafe fn object_or_nothing_str(
 ) -> *mut libc::c_char {
     let mut b: *mut block = location_getstackblock(loc, stack);
     if b.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 22], &[libc::c_char; 22]>(b"object_or_nothing_str\0"))
-                .as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            339 as libc::c_int,
-            b"b\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+        panic!();
+    }
     let mut obj: *mut object = block_observe(b, location_offset(loc), state, 0 as libc::c_int != 0);
     if !obj.is_null() {
         return object_str(obj);
@@ -478,19 +403,9 @@ pub unsafe fn variable_references(
     mut loc: *mut location,
     mut s: *mut state,
 ) -> bool {
-    if !(location_type(loc) as libc::c_uint != LOCATION_VCONST as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long
-        != 0
-    {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 20], &[libc::c_char; 20]>(b"variable_references\0"))
-                .as_ptr(),
-            b"stack.c\0" as *const u8 as *const libc::c_char,
-            362 as libc::c_int,
-            b"location_type(loc) != LOCATION_VCONST\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !(location_type(loc) as libc::c_uint != LOCATION_VCONST as libc::c_int as libc::c_uint) {
+        panic!();
+    }
     return location_references((*v).loc, loc, s);
 }
 

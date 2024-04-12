@@ -13,7 +13,6 @@ use libc::{calloc, free, realloc};
 use crate::ast::{
     ast_expr_copy, ast_expr_destroy, ast_expr_equal, ast_expr_inverted_copy, ast_expr_str,
 };
-use crate::c_util::__assert_rtn;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{AstExpr as ast_expr, StrBuilder as strbuilder};
 
@@ -86,16 +85,9 @@ pub unsafe fn props_props(mut p: *mut props) -> *mut *mut ast_expr {
 }
 
 pub unsafe fn props_install(mut p: *mut props, mut e: *mut ast_expr) {
-    if props_contradicts(p, e) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"props_install\0"))
-                .as_ptr(),
-            b"props.c\0" as *const u8 as *const libc::c_char,
-            71 as libc::c_int,
-            b"!props_contradicts(p, e)\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if props_contradicts(p, e) {
+        panic!();
+    }
     (*p).n += 1;
     (*p).prop = realloc(
         (*p).prop as *mut libc::c_void,

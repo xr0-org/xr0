@@ -2869,8 +2869,7 @@ pub unsafe fn ast_block_nstmts(mut b: *mut ast_block) -> libc::c_int {
 }
 
 pub unsafe fn ast_block_stmts(mut b: *mut ast_block) -> *mut *mut ast_stmt {
-    if !((*b).nstmt > 0 as libc::c_int || ((*b).stmt).is_null()) as libc::c_int as libc::c_long != 0
-    {
+    if !((*b).nstmt > 0 as libc::c_int || ((*b).stmt).is_null()) {
         panic!();
     }
     return (*b).stmt;
