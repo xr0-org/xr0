@@ -140,8 +140,8 @@ enum AstExprKind {
     Unary(UnaryExpr),
     Binary(BinaryExpr),
     Assignment(AssignmentExpr),
-    IsDeallocand,
-    IsDereferencable,
+    IsDeallocand(*mut AstExpr),
+    IsDereferencable(*mut AstExpr),
     ArbArg,
     Allocation(AllocExpr),
 }
@@ -530,7 +530,7 @@ pub unsafe fn ast_expr_decide(expr: *mut AstExpr, state: *mut State) -> bool {
     match &(*expr).kind {
         AstExprKind::Constant(_) => ast_expr_as_constant(expr) != 0,
         AstExprKind::Unary(_) => expr_unary_decide(expr, state),
-        AstExprKind::IsDeallocand => expr_isdeallocand_decide(expr, state),
+        AstExprKind::IsDeallocand(_) => expr_isdeallocand_decide(expr, state),
         AstExprKind::Binary(_) => expr_binary_decide(expr, state),
         _ => panic!(),
     }
@@ -592,7 +592,7 @@ pub unsafe fn ast_expr_rangedecide(
 ) -> bool {
     match &(*expr).kind {
         AstExprKind::Unary(_) => return unary_rangedecide(expr, lw, up, state),
-        AstExprKind::IsDeallocand => return expr_isdeallocand_rangedecide(expr, lw, up, state),
+        AstExprKind::IsDeallocand(_) => return expr_isdeallocand_rangedecide(expr, lw, up, state),
         _ => panic!(),
     }
 }
@@ -707,8 +707,7 @@ unsafe fn irreducible_assume_actual(e: *mut AstExpr, s: *mut State) -> *mut Prer
 
 pub unsafe fn ast_expr_isdereferencable_create(assertand: *mut AstExpr) -> *mut AstExpr {
     let new: *mut AstExpr = ast_expr_create();
-    (*new).kind = AstExprKind::IsDereferencable;
-    (*new).root = assertand;
+    (*new).kind = AstExprKind::IsDereferencable(assertand);
     return new;
 }
 
@@ -786,8 +785,7 @@ unsafe fn hack_identifier_builtin_eval(id: *mut libc::c_char, state: *mut State)
 
 pub unsafe fn ast_expr_isdeallocand_create(assertand: *mut AstExpr) -> *mut AstExpr {
     let new: *mut AstExpr = ast_expr_create();
-    (*new).kind = AstExprKind::IsDeallocand;
-    (*new).root = assertand;
+    (*new).kind = AstExprKind::IsDeallocand(assertand);
     return new;
 }
 
@@ -1334,7 +1332,7 @@ unsafe fn call_to_computed_value(f: *mut AstFunction, s: *mut State) -> *mut Res
 pub unsafe fn ast_expr_absexec(expr: *mut AstExpr, state: *mut State) -> *mut Result {
     match &(*expr).kind {
         AstExprKind::Assignment(_) => assign_absexec(expr, state),
-        AstExprKind::IsDereferencable => isdereferencable_absexec(expr, state),
+        AstExprKind::IsDereferencable(_) => isdereferencable_absexec(expr, state),
         AstExprKind::Allocation(_) => alloc_absexec(expr, state),
         AstExprKind::Identifier(_)
         | AstExprKind::Constant(_)
@@ -2025,7 +2023,7 @@ pub unsafe fn ast_expr_alloc_arg(expr: *mut AstExpr) -> *mut AstExpr {
 }
 
 pub unsafe fn ast_expr_isisdereferencable(expr: *mut AstExpr) -> bool {
-    return matches!((*expr).kind, AstExprKind::IsDereferencable);
+    return matches!((*expr).kind, AstExprKind::IsDereferencable(_));
 }
 
 pub unsafe fn ast_expr_dealloc_create(arg: *mut AstExpr) -> *mut AstExpr {
@@ -2070,10 +2068,10 @@ pub unsafe fn ast_expr_str(expr: *mut AstExpr) -> *mut libc::c_char {
         AstExprKind::Assignment(_) => {
             ast_expr_assignment_str_build(expr, b);
         }
-        AstExprKind::IsDeallocand => {
+        AstExprKind::IsDeallocand(_) => {
             ast_expr_isdeallocand_str_build(expr, b);
         }
-        AstExprKind::IsDereferencable => {
+        AstExprKind::IsDereferencable(_) => {
             ast_expr_isdereferencable_str_build(expr, b);
         }
         AstExprKind::ArbArg => {
@@ -2132,13 +2130,17 @@ pub unsafe fn ast_expr_alloc_create(arg: *mut AstExpr) -> *mut AstExpr {
 }
 
 pub unsafe fn ast_expr_isdereferencable_assertand(expr: *mut AstExpr) -> *mut AstExpr {
-    assert!(matches!((*expr).kind, AstExprKind::IsDereferencable));
-    return (*expr).root;
+    let AstExprKind::IsDereferencable(assertand) = &(*expr).kind else {
+        panic!()
+    };
+    *assertand
 }
 
 pub unsafe fn ast_expr_isdeallocand_assertand(expr: *mut AstExpr) -> *mut AstExpr {
-    assert!(matches!((*expr).kind, AstExprKind::IsDeallocand));
-    return (*expr).root;
+    let AstExprKind::IsDeallocand(assertand) = &(*expr).kind else {
+        panic!()
+    };
+    *assertand
 }
 
 unsafe fn ast_expr_alloc_copy(expr: *mut AstExpr) -> *mut AstExpr {
@@ -2200,9 +2202,11 @@ pub unsafe fn ast_expr_copy(expr: *mut AstExpr) -> *mut AstExpr {
             ast_expr_copy(assignment.lval),
             ast_expr_copy(assignment.rval),
         ),
-        AstExprKind::IsDeallocand => ast_expr_isdeallocand_create(ast_expr_copy((*expr).root)),
-        AstExprKind::IsDereferencable => {
-            ast_expr_isdereferencable_create(ast_expr_copy((*expr).root))
+        AstExprKind::IsDeallocand(assertand) => {
+            ast_expr_isdeallocand_create(ast_expr_copy(*assertand))
+        }
+        AstExprKind::IsDereferencable(assertand) => {
+            ast_expr_isdereferencable_create(ast_expr_copy(*assertand))
         }
         AstExprKind::ArbArg => ast_expr_arbarg_create(),
         AstExprKind::Allocation(_) => ast_expr_alloc_copy(expr),
@@ -2351,11 +2355,11 @@ pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
         AstExprKind::Assignment(assignment) => {
             ast_expr_destroy_assignment(assignment);
         }
-        AstExprKind::IsDeallocand => {
-            ast_expr_destroy((*expr).root);
+        AstExprKind::IsDeallocand(assertand) => {
+            ast_expr_destroy(*assertand);
         }
-        AstExprKind::IsDereferencable => {
-            ast_expr_destroy((*expr).root);
+        AstExprKind::IsDereferencable(assertand) => {
+            ast_expr_destroy(*assertand);
         }
         AstExprKind::Constant(_) | AstExprKind::ArbArg => {}
         AstExprKind::Allocation(alloc) => {
@@ -2435,8 +2439,8 @@ pub unsafe fn ast_expr_getfuncs(expr: *mut AstExpr) -> Box<StringArr> {
         | AstExprKind::Constant(_)
         | AstExprKind::StringLiteral(_)
         | AstExprKind::StructMember(_)
-        | AstExprKind::IsDeallocand
-        | AstExprKind::IsDereferencable
+        | AstExprKind::IsDeallocand(_)
+        | AstExprKind::IsDereferencable(_)
         | AstExprKind::ArbArg => return string_arr_create(),
         AstExprKind::Call(_) => ast_expr_call_getfuncs(expr),
         AstExprKind::Bracketed | AstExprKind::IncDec(_) => ast_expr_getfuncs((*expr).root),
@@ -2464,7 +2468,7 @@ pub unsafe fn ast_expr_splits(e: *mut AstExpr, s: *mut State) -> AstStmtSplits {
         | AstExprKind::Identifier(_)
         | AstExprKind::StringLiteral(_)
         | AstExprKind::ArbArg
-        | AstExprKind::IsDereferencable
+        | AstExprKind::IsDereferencable(_)
         | AstExprKind::Allocation(_) => AstStmtSplits {
             n: 0 as libc::c_int,
             cond: 0 as *mut *mut AstExpr,
