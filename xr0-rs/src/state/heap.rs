@@ -12,7 +12,6 @@
 use libc::{free, malloc, realloc};
 
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
-use crate::c_util::__assert_rtn;
 use crate::state::block::{
     block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
     block_arr_nblocks, block_create, block_str, block_undeclare,
@@ -42,15 +41,9 @@ pub struct vconst {
 
 pub unsafe fn heap_create() -> *mut heap {
     let mut h: *mut heap = malloc(::core::mem::size_of::<heap>()) as *mut heap;
-    if h.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"heap_create\0")).as_ptr(),
-            b"heap.c\0" as *const u8 as *const libc::c_char,
-            25 as libc::c_int,
-            b"h\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if h.is_null() {
+        panic!();
+    }
     (*h).blocks = block_arr_create();
     (*h).freed = 0 as *mut bool;
     return h;
@@ -116,31 +109,16 @@ unsafe fn printdelim(mut h: *mut heap, mut start: libc::c_int) -> bool {
 }
 
 pub unsafe fn heap_blocks(mut h: *mut heap) -> *mut block_arr {
-    if h.is_null() as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 12], &[libc::c_char; 12]>(b"heap_blocks\0")).as_ptr(),
-            b"heap.c\0" as *const u8 as *const libc::c_char,
-            91 as libc::c_int,
-            b"h\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if h.is_null() {
+        panic!();
+    }
     return (*h).blocks;
 }
 
 pub unsafe fn heap_newblock(mut h: *mut heap) -> *mut location {
     let mut address: libc::c_int = block_arr_append((*h).blocks, block_create());
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
-    if !(n > 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 14], &[libc::c_char; 14]>(b"heap_newblock\0"))
-                .as_ptr(),
-            b"heap.c\0" as *const u8 as *const libc::c_char,
-            101 as libc::c_int,
-            b"n > 0\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    assert!(n > 0);
     (*h).freed = realloc(
         (*h).freed as *mut libc::c_void,
         (::core::mem::size_of::<bool>()).wrapping_mul(n as usize),
@@ -160,16 +138,9 @@ pub unsafe fn heap_getblock(mut h: *mut heap, mut address: libc::c_int) -> *mut 
 }
 
 pub unsafe fn heap_deallocblock(mut h: *mut heap, mut address: libc::c_int) -> *mut error {
-    if !(address < block_arr_nblocks((*h).blocks)) as libc::c_int as libc::c_long != 0 {
-        __assert_rtn(
-            (*::core::mem::transmute::<&[u8; 18], &[libc::c_char; 18]>(b"heap_deallocblock\0"))
-                .as_ptr(),
-            b"heap.c\0" as *const u8 as *const libc::c_char,
-            125 as libc::c_int,
-            b"address < block_arr_nblocks(h->blocks)\0" as *const u8 as *const libc::c_char,
-        );
-    } else {
-    };
+    if !(address < block_arr_nblocks((*h).blocks)) {
+        panic!();
+    }
     if *((*h).freed).offset(address as isize) {
         return error_create(
             b"double free\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
