@@ -1,7 +1,6 @@
 #![allow(
     dead_code,
     mutable_transmutes,
-    non_camel_case_types,
     non_snake_case,
     non_upper_case_globals,
     unused_assignments,
@@ -19,28 +18,25 @@ use crate::state::block::{
 use crate::state::location::{location_create_dynamic, location_destroy};
 use crate::state::state::state_references;
 use crate::util::{
-    dynamic_str, error, error_create, map, strbuilder_build, strbuilder_create, strbuilder_printf,
+    dynamic_str, error, error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Map,
 };
 use crate::value::{value_copy, value_destroy, value_str};
-use crate::{
-    block_arr, AstExpr as ast_expr, Block as block, Location as location, State as state,
-    StrBuilder as strbuilder, Value as value,
-};
+use crate::{AstExpr, Block, BlockArr, Location, State, StrBuilder, Value};
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct heap {
-    pub blocks: *mut block_arr,
+pub struct Heap {
+    pub blocks: *mut BlockArr,
     pub freed: *mut bool,
 }
-pub struct vconst {
-    pub varmap: Box<map>,
-    pub comment: Box<map>,
-    pub persist: Box<map>,
+pub struct VConst {
+    pub varmap: Box<Map>,
+    pub comment: Box<Map>,
+    pub persist: Box<Map>,
 }
 
-pub unsafe fn heap_create() -> *mut heap {
-    let mut h: *mut heap = malloc(::core::mem::size_of::<heap>()) as *mut heap;
+pub unsafe fn heap_create() -> *mut Heap {
+    let mut h: *mut Heap = malloc(::core::mem::size_of::<Heap>()) as *mut Heap;
     if h.is_null() {
         panic!();
     }
@@ -49,14 +45,14 @@ pub unsafe fn heap_create() -> *mut heap {
     return h;
 }
 
-pub unsafe fn heap_destroy(mut h: *mut heap) {
+pub unsafe fn heap_destroy(mut h: *mut Heap) {
     block_arr_destroy((*h).blocks);
     free((*h).freed as *mut libc::c_void);
     free(h as *mut libc::c_void);
 }
 
-pub unsafe fn heap_copy(mut h: *mut heap) -> *mut heap {
-    let mut copy: *mut heap = malloc(::core::mem::size_of::<heap>()) as *mut heap;
+pub unsafe fn heap_copy(mut h: *mut Heap) -> *mut Heap {
+    let mut copy: *mut Heap = malloc(::core::mem::size_of::<Heap>()) as *mut Heap;
     (*copy).blocks = block_arr_copy((*h).blocks);
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut freed_copy: *mut bool =
@@ -70,9 +66,9 @@ pub unsafe fn heap_copy(mut h: *mut heap) -> *mut heap {
     return copy;
 }
 
-pub unsafe fn heap_str(mut h: *mut heap, mut indent: *mut libc::c_char) -> *mut libc::c_char {
-    let mut b: *mut strbuilder = strbuilder_create();
-    let mut arr: *mut *mut block = block_arr_blocks((*h).blocks);
+pub unsafe fn heap_str(mut h: *mut Heap, mut indent: *mut libc::c_char) -> *mut libc::c_char {
+    let mut b: *mut StrBuilder = strbuilder_create();
+    let mut arr: *mut *mut Block = block_arr_blocks((*h).blocks);
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
@@ -96,7 +92,7 @@ pub unsafe fn heap_str(mut h: *mut heap, mut indent: *mut libc::c_char) -> *mut 
     }
     return strbuilder_build(b);
 }
-unsafe fn printdelim(mut h: *mut heap, mut start: libc::c_int) -> bool {
+unsafe fn printdelim(mut h: *mut Heap, mut start: libc::c_int) -> bool {
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut i: libc::c_int = start + 1 as libc::c_int;
     while i < n {
@@ -108,14 +104,14 @@ unsafe fn printdelim(mut h: *mut heap, mut start: libc::c_int) -> bool {
     return 0 as libc::c_int != 0;
 }
 
-pub unsafe fn heap_blocks(mut h: *mut heap) -> *mut block_arr {
+pub unsafe fn heap_blocks(mut h: *mut Heap) -> *mut BlockArr {
     if h.is_null() {
         panic!();
     }
     return (*h).blocks;
 }
 
-pub unsafe fn heap_newblock(mut h: *mut heap) -> *mut location {
+pub unsafe fn heap_newblock(mut h: *mut Heap) -> *mut Location {
     let mut address: libc::c_int = block_arr_append((*h).blocks, block_create());
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     assert!(n > 0);
@@ -127,17 +123,17 @@ pub unsafe fn heap_newblock(mut h: *mut heap) -> *mut location {
     return location_create_dynamic(address, ast_expr_constant_create(0 as libc::c_int));
 }
 
-pub unsafe fn heap_getblock(mut h: *mut heap, mut address: libc::c_int) -> *mut block {
+pub unsafe fn heap_getblock(mut h: *mut Heap, mut address: libc::c_int) -> *mut Block {
     if address >= block_arr_nblocks((*h).blocks) {
-        return 0 as *mut block;
+        return 0 as *mut Block;
     }
     if *((*h).freed).offset(address as isize) {
-        return 0 as *mut block;
+        return 0 as *mut Block;
     }
     return *(block_arr_blocks((*h).blocks)).offset(address as isize);
 }
 
-pub unsafe fn heap_deallocblock(mut h: *mut heap, mut address: libc::c_int) -> *mut error {
+pub unsafe fn heap_deallocblock(mut h: *mut Heap, mut address: libc::c_int) -> *mut error {
     if !(address < block_arr_nblocks((*h).blocks)) {
         panic!();
     }
@@ -150,13 +146,13 @@ pub unsafe fn heap_deallocblock(mut h: *mut heap, mut address: libc::c_int) -> *
     return 0 as *mut error;
 }
 
-pub unsafe fn heap_blockisfreed(mut h: *mut heap, mut address: libc::c_int) -> bool {
+pub unsafe fn heap_blockisfreed(mut h: *mut Heap, mut address: libc::c_int) -> bool {
     return *((*h).freed).offset(address as isize);
 }
 
-pub unsafe fn heap_undeclare(mut h: *mut heap, mut s: *mut state) {
+pub unsafe fn heap_undeclare(mut h: *mut Heap, mut s: *mut State) {
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
-    let mut b: *mut *mut block = block_arr_blocks((*h).blocks);
+    let mut b: *mut *mut Block = block_arr_blocks((*h).blocks);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         if !*((*h).freed).offset(i as isize) {
@@ -166,7 +162,7 @@ pub unsafe fn heap_undeclare(mut h: *mut heap, mut s: *mut state) {
     }
 }
 
-pub unsafe fn heap_referenced(mut h: *mut heap, mut s: *mut state) -> bool {
+pub unsafe fn heap_referenced(mut h: *mut Heap, mut s: *mut State) -> bool {
     let mut n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
@@ -177,35 +173,35 @@ pub unsafe fn heap_referenced(mut h: *mut heap, mut s: *mut state) -> bool {
     }
     return 1 as libc::c_int != 0;
 }
-unsafe fn block_referenced(mut s: *mut state, mut addr: libc::c_int) -> bool {
-    let mut loc: *mut location =
+unsafe fn block_referenced(mut s: *mut State, mut addr: libc::c_int) -> bool {
+    let mut loc: *mut Location =
         location_create_dynamic(addr, ast_expr_constant_create(0 as libc::c_int));
     let mut referenced: bool = state_references(s, loc);
     location_destroy(loc);
     return referenced;
 }
 
-pub unsafe fn vconst_create() -> *mut vconst {
-    let mut v: *mut vconst = malloc(::core::mem::size_of::<vconst>()) as *mut vconst;
+pub unsafe fn vconst_create() -> *mut VConst {
+    let mut v: *mut VConst = malloc(::core::mem::size_of::<VConst>()) as *mut VConst;
     std::ptr::write(
         v,
-        vconst {
-            varmap: map::new(),
-            comment: map::new(),
-            persist: map::new(),
+        VConst {
+            varmap: Map::new(),
+            comment: Map::new(),
+            persist: Map::new(),
         },
     );
     return v;
 }
 
-pub unsafe fn vconst_destroy(mut v: *mut vconst) {
-    let vconst {
+pub unsafe fn vconst_destroy(mut v: *mut VConst) {
+    let VConst {
         varmap: m,
         comment,
         persist,
     } = std::ptr::read(v);
     for v in m.values() {
-        value_destroy(v as *mut value);
+        value_destroy(v as *mut Value);
     }
     m.destroy();
     comment.destroy();
@@ -213,13 +209,13 @@ pub unsafe fn vconst_destroy(mut v: *mut vconst) {
     free(v as *mut libc::c_void);
 }
 
-pub unsafe fn vconst_copy(mut old: *mut vconst) -> *mut vconst {
-    let mut new: *mut vconst = vconst_create();
+pub unsafe fn vconst_copy(mut old: *mut VConst) -> *mut VConst {
+    let mut new: *mut VConst = vconst_create();
     let mut m = &(*old).varmap;
     for (k, v) in m.pairs() {
         (*new).varmap.set(
             dynamic_str(k),
-            value_copy(v as *mut value) as *const libc::c_void,
+            value_copy(v as *mut Value) as *const libc::c_void,
         );
     }
     m = &(*old).comment;
@@ -237,8 +233,8 @@ pub unsafe fn vconst_copy(mut old: *mut vconst) -> *mut vconst {
 }
 
 pub unsafe fn vconst_declare(
-    mut v: *mut vconst,
-    mut val: *mut value,
+    mut v: *mut VConst,
+    mut val: *mut Value,
     mut comment: *mut libc::c_char,
     mut persist: bool,
 ) -> *mut libc::c_char {
@@ -254,12 +250,12 @@ pub unsafe fn vconst_declare(
     return s;
 }
 unsafe fn vconst_id(
-    mut varmap: &map,
-    mut persistmap: &map,
+    mut varmap: &Map,
+    mut persistmap: &Map,
     mut persist: bool,
 ) -> *mut libc::c_char {
     let mut npersist: libc::c_int = count_true(persistmap);
-    let mut b: *mut strbuilder = strbuilder_create();
+    let mut b: *mut StrBuilder = strbuilder_create();
     if persist {
         strbuilder_printf(b, b"$%d\0" as *const u8 as *const libc::c_char, npersist);
     } else {
@@ -271,7 +267,7 @@ unsafe fn vconst_id(
     }
     return strbuilder_build(b);
 }
-unsafe fn count_true(mut m: &map) -> libc::c_int {
+unsafe fn count_true(mut m: &Map) -> libc::c_int {
     let mut n: libc::c_int = 0 as libc::c_int;
     for v in m.values() {
         if !v.is_null() {
@@ -281,20 +277,20 @@ unsafe fn count_true(mut m: &map) -> libc::c_int {
     return n;
 }
 
-pub unsafe fn vconst_get(mut v: *mut vconst, mut id: *mut libc::c_char) -> *mut value {
-    return (*v).varmap.get(id) as *mut value;
+pub unsafe fn vconst_get(mut v: *mut VConst, mut id: *mut libc::c_char) -> *mut Value {
+    return (*v).varmap.get(id) as *mut Value;
 }
 
-pub unsafe fn vconst_undeclare(mut v: *mut vconst) {
-    let mut varmap = map::new();
-    let mut comment = map::new();
-    let mut persist = map::new();
+pub unsafe fn vconst_undeclare(mut v: *mut VConst) {
+    let mut varmap = Map::new();
+    let mut comment = Map::new();
+    let mut persist = Map::new();
     let mut m = &(*v).varmap;
     for key in m.keys() {
         if !((*v).persist.get(key)).is_null() {
             varmap.set(
                 dynamic_str(key),
-                value_copy((*v).varmap.get(key) as *mut value) as *const libc::c_void,
+                value_copy((*v).varmap.get(key) as *mut Value) as *const libc::c_void,
             );
             let mut c: *mut libc::c_char = (*v).comment.get(key) as *mut libc::c_char;
             if !c.is_null() {
@@ -305,7 +301,7 @@ pub unsafe fn vconst_undeclare(mut v: *mut vconst) {
     }
     std::ptr::write(
         v,
-        vconst {
+        VConst {
             varmap,
             comment,
             persist,
@@ -313,11 +309,11 @@ pub unsafe fn vconst_undeclare(mut v: *mut vconst) {
     );
 }
 
-pub unsafe fn vconst_str(mut v: *mut vconst, mut indent: *mut libc::c_char) -> *mut libc::c_char {
-    let mut b: *mut strbuilder = strbuilder_create();
+pub unsafe fn vconst_str(mut v: *mut VConst, mut indent: *mut libc::c_char) -> *mut libc::c_char {
+    let mut b: *mut StrBuilder = strbuilder_create();
     let mut m = &(*v).varmap;
     for (k, val) in m.pairs() {
-        let mut value: *mut libc::c_char = value_str(val as *mut value);
+        let mut value: *mut libc::c_char = value_str(val as *mut Value);
         strbuilder_printf(
             b,
             b"%s%s: %s\0" as *const u8 as *const libc::c_char,
@@ -335,6 +331,6 @@ pub unsafe fn vconst_str(mut v: *mut vconst, mut indent: *mut libc::c_char) -> *
     return strbuilder_build(b);
 }
 
-pub unsafe fn vconst_eval(mut v: *mut vconst, mut e: *mut ast_expr) -> bool {
+pub unsafe fn vconst_eval(mut v: *mut VConst, mut e: *mut AstExpr) -> bool {
     return ast_expr_matheval(e);
 }

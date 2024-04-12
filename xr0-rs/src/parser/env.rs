@@ -1,5 +1,3 @@
-#![allow(non_camel_case_types)]
-
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ffi::CStr;
@@ -8,8 +6,8 @@ use libc::{exit, fprintf, free, isdigit, isspace, malloc};
 
 use crate::c_util::__stderrp;
 use crate::util::{
-    dynamic_str, strbuilder, strbuilder_build, strbuilder_create, strbuilder_printf,
-    strbuilder_putc,
+    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc,
+    StrBuilder,
 };
 
 pub struct Env {
@@ -32,7 +30,7 @@ impl Env {
         }
     }
 
-    pub unsafe fn lexloc(&self, _p: usize) -> *mut lexememarker {
+    pub unsafe fn lexloc(&self, _p: usize) -> *mut LexemeMarker {
         lexloc()
     }
 
@@ -61,27 +59,27 @@ impl Env {
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct lexememarker {
+pub struct LexemeMarker {
     pub linenum: libc::c_int,
     pub column: libc::c_int,
     pub filename: *mut libc::c_char,
-    pub flags: linemarker_flag,
+    pub flags: LineMarkerFlag,
 }
-pub type linemarker_flag = libc::c_uint;
-pub const LM_FLAG_IMPLICIT_EXTERN: linemarker_flag = 8;
-pub const LM_FLAG_SYS_HEADER: linemarker_flag = 4;
-pub const LM_FLAG_RESUME_FILE: linemarker_flag = 2;
-pub const LM_FLAG_NEW_FILE: linemarker_flag = 1;
+pub type LineMarkerFlag = libc::c_uint;
+pub const LM_FLAG_IMPLICIT_EXTERN: LineMarkerFlag = 8;
+pub const LM_FLAG_SYS_HEADER: LineMarkerFlag = 4;
+pub const LM_FLAG_RESUME_FILE: LineMarkerFlag = 2;
+pub const LM_FLAG_NEW_FILE: LineMarkerFlag = 1;
 
 #[allow(non_upper_case_globals)]
-pub static mut marker: lexememarker = lexememarker {
+pub static mut marker: LexemeMarker = LexemeMarker {
     linenum: 0,
     column: 0,
     filename: 0 as *const libc::c_char as *mut libc::c_char,
-    flags: 0 as linemarker_flag,
+    flags: 0 as LineMarkerFlag,
 };
 
-pub unsafe fn lexloc() -> *mut lexememarker {
+pub unsafe fn lexloc() -> *mut LexemeMarker {
     if (marker.filename).is_null() as libc::c_int as libc::c_long != 0 {
         panic!();
     }
@@ -92,9 +90,9 @@ pub unsafe fn lexememarker_create(
     linenum: libc::c_int,
     column: libc::c_int,
     filename: *mut libc::c_char,
-    flags: linemarker_flag,
-) -> *mut lexememarker {
-    let loc = malloc(::core::mem::size_of::<lexememarker>()) as *mut lexememarker;
+    flags: LineMarkerFlag,
+) -> *mut LexemeMarker {
+    let loc = malloc(::core::mem::size_of::<LexemeMarker>()) as *mut LexemeMarker;
     (*loc).linenum = linenum;
     (*loc).column = column;
     (*loc).filename = filename;
@@ -102,7 +100,7 @@ pub unsafe fn lexememarker_create(
     return loc;
 }
 
-pub unsafe fn lexememarker_copy(loc: *mut lexememarker) -> *mut lexememarker {
+pub unsafe fn lexememarker_copy(loc: *mut LexemeMarker) -> *mut LexemeMarker {
     return lexememarker_create(
         (*loc).linenum,
         (*loc).column,
@@ -111,13 +109,13 @@ pub unsafe fn lexememarker_copy(loc: *mut lexememarker) -> *mut lexememarker {
     );
 }
 
-pub unsafe fn lexememarker_destroy(loc: *mut lexememarker) {
+pub unsafe fn lexememarker_destroy(loc: *mut LexemeMarker) {
     free((*loc).filename as *mut libc::c_void);
     free(loc as *mut libc::c_void);
 }
 
-pub unsafe fn lexememarker_str(loc: *mut lexememarker) -> *mut libc::c_char {
-    let b: *mut strbuilder = strbuilder_create();
+pub unsafe fn lexememarker_str(loc: *mut LexemeMarker) -> *mut libc::c_char {
+    let b: *mut StrBuilder = strbuilder_create();
     strbuilder_printf(
         b,
         b"%s:%d:%d\0" as *const u8 as *const libc::c_char,
@@ -128,7 +126,7 @@ pub unsafe fn lexememarker_str(loc: *mut lexememarker) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 
-pub unsafe fn process_linemarker(mut bytes: impl Iterator<Item = libc::c_char>) -> lexememarker {
+pub unsafe fn process_linemarker(mut bytes: impl Iterator<Item = libc::c_char>) -> LexemeMarker {
     let mut c: libc::c_char = bytes.next().unwrap_or(0);
     if isspace(c as libc::c_int) == 0 {
         fprintf(
@@ -170,7 +168,7 @@ pub unsafe fn process_linemarker(mut bytes: impl Iterator<Item = libc::c_char>) 
         );
         exit(1 as libc::c_int);
     }
-    let b: *mut strbuilder = strbuilder_create();
+    let b: *mut StrBuilder = strbuilder_create();
     loop {
         c = bytes.next().unwrap_or(0);
         if !(c as libc::c_int != '"' as i32) {
@@ -210,10 +208,10 @@ pub unsafe fn process_linemarker(mut bytes: impl Iterator<Item = libc::c_char>) 
             c = bytes.next().unwrap_or(0);
         }
     }
-    lexememarker {
+    LexemeMarker {
         linenum,
         column: 0 as libc::c_int,
         filename: name,
-        flags: flags as linemarker_flag,
+        flags: flags as LineMarkerFlag,
     }
 }

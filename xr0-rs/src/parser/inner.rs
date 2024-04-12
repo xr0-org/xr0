@@ -1,5 +1,3 @@
-#![allow(non_camel_case_types)]
-
 use std::ffi::CString;
 use std::ptr;
 
@@ -7,56 +5,56 @@ use crate::ast::*;
 use crate::parser::env::Env;
 use crate::util::dynamic_str;
 
-type BoxedAst = *mut ast;
-type BoxedBlock = *mut ast_block;
-type BoxedExpr = *mut ast_expr;
-type BoxedFunction = *mut ast_function;
-type BoxedStmt = *mut ast_stmt;
-type BoxedType = *mut ast_type;
-type BoxedVariable = *mut ast_variable;
-type BoxedVariableArray = *mut ast_variable_arr;
-type BoxedExternDecl = *mut ast_externdecl;
+type BoxedAst = *mut Ast;
+type BoxedBlock = *mut AstBlock;
+type BoxedExpr = *mut AstExpr;
+type BoxedFunction = *mut AstFunction;
+type BoxedStmt = *mut AstStmt;
+type BoxedType = *mut AstType;
+type BoxedVariable = *mut AstVariable;
+type BoxedVariableArray = *mut AstVariableArr;
+type BoxedExternDecl = *mut AstExternDecl;
 type BoxedCStr = *mut libc::c_char;
 
-pub struct declaration {
+pub struct Declaration {
     pub name: *mut libc::c_char,
-    pub t: *mut ast_type,
+    pub t: *mut AstType,
 }
 
-pub struct direct_function_declarator {
+pub struct DirectFunctionDeclarator {
     pub name: *mut libc::c_char,
     pub n: libc::c_int,
-    pub param: *mut *mut ast_variable,
+    pub param: *mut *mut AstVariable,
 }
 
-pub struct function_declarator {
+pub struct FunctionDeclarator {
     pub ptr_valence: libc::c_int,
-    pub decl: direct_function_declarator,
+    pub decl: DirectFunctionDeclarator,
 }
 
-pub struct declarator {
+pub struct Declarator {
     pub ptr_valence: libc::c_int,
     pub name: *mut libc::c_char,
 }
 
-pub struct expr_array {
+pub struct ExprArray {
     pub n: libc::c_int,
-    pub expr: *mut *mut ast_expr,
+    pub expr: *mut *mut AstExpr,
 }
 
-pub struct stmt_array {
+pub struct StmtArray {
     pub n: libc::c_int,
-    pub stmt: *mut *mut ast_stmt,
+    pub stmt: *mut *mut AstStmt,
 }
 
-struct block_statement {
-    r#abstract: *mut ast_block,
-    body: *mut ast_block,
+struct BlockStatement {
+    r#abstract: *mut AstBlock,
+    body: *mut AstBlock,
 }
 
 enum PostfixOp {
-    ArrayAccess(*mut ast_expr),
-    Call(libc::c_int, *mut *mut ast_expr),
+    ArrayAccess(*mut AstExpr),
+    Call(libc::c_int, *mut *mut AstExpr),
     Dot(*mut libc::c_char),
     Arrow(*mut libc::c_char),
     Inc,
@@ -77,37 +75,37 @@ unsafe fn strip_quotes(s: *const libc::c_char) -> BoxedCStr {
     t
 }
 
-unsafe fn expr_array_from_vec(v: Vec<*mut ast_expr>) -> expr_array {
-    let size_bytes = std::mem::size_of::<*mut ast_expr>() * v.len();
-    let expr = libc::malloc(size_bytes) as *mut *mut ast_expr;
+unsafe fn expr_array_from_vec(v: Vec<*mut AstExpr>) -> ExprArray {
+    let size_bytes = std::mem::size_of::<*mut AstExpr>() * v.len();
+    let expr = libc::malloc(size_bytes) as *mut *mut AstExpr;
     assert!(!expr.is_null());
     libc::memmove(
         expr as *mut libc::c_void,
         v.as_ptr() as *const libc::c_void,
         size_bytes,
     );
-    expr_array {
+    ExprArray {
         n: v.len() as libc::c_int,
         expr,
     }
 }
 
-unsafe fn stmt_array_from_vec(v: Vec<*mut ast_stmt>) -> stmt_array {
-    let size_bytes = std::mem::size_of::<*mut ast_stmt>() * v.len();
-    let stmt = libc::malloc(size_bytes) as *mut *mut ast_stmt;
+unsafe fn stmt_array_from_vec(v: Vec<*mut AstStmt>) -> StmtArray {
+    let size_bytes = std::mem::size_of::<*mut AstStmt>() * v.len();
+    let stmt = libc::malloc(size_bytes) as *mut *mut AstStmt;
     assert!(!stmt.is_null());
     libc::memmove(
         stmt as *mut libc::c_void,
         v.as_ptr() as *const libc::c_void,
         size_bytes,
     );
-    stmt_array {
+    StmtArray {
         n: v.len() as libc::c_int,
         stmt,
     }
 }
 
-unsafe fn variable_array_from_vec(vars: Vec<*mut ast_variable>) -> *mut ast_variable_arr {
+unsafe fn variable_array_from_vec(vars: Vec<*mut AstVariable>) -> *mut AstVariableArr {
     let list = ast_variable_arr_create();
     for v in vars {
         ast_variable_arr_append(list, v);
@@ -115,7 +113,7 @@ unsafe fn variable_array_from_vec(vars: Vec<*mut ast_variable>) -> *mut ast_vari
     list
 }
 
-unsafe fn variable_array_from_decl_vec(decls: Vec<declaration>) -> *mut ast_variable_arr {
+unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> *mut AstVariableArr {
     let list = ast_variable_arr_create();
     for decl in decls {
         ast_variable_arr_append(list, ast_variable_create(decl.name, decl.t));
@@ -123,7 +121,7 @@ unsafe fn variable_array_from_decl_vec(decls: Vec<declaration>) -> *mut ast_vari
     list
 }
 
-unsafe fn ast_from_vec(v: Vec<*mut ast_externdecl>) -> *mut ast {
+unsafe fn ast_from_vec(v: Vec<*mut AstExternDecl>) -> *mut Ast {
     let mut root = ast_create(v[0]);
     for &decl in &v[1..] {
         root = ast_append(root, decl);
@@ -276,7 +274,7 @@ pub grammar c_parser(env: &Env) for str {
         ".free" _ "(" a:expression() ")" { unsafe { ast_expr_dealloc_create(a) } } /
         ".clump" _ "(" a:expression() ")" { unsafe { ast_expr_clump_create(a) } }
 
-    rule argument_expression_list() -> expr_array =
+    rule argument_expression_list() -> ExprArray =
         args:cs1(<assignment_expression()>) { unsafe { expr_array_from_vec(args) } }
 
     rule isdeallocand_expression() -> BoxedExpr =
@@ -345,10 +343,10 @@ pub grammar c_parser(env: &Env) for str {
     rule constant_expression() -> BoxedExpr = conditional_expression()
 
     // 6.7 Declarations
-    rule declaration() -> declaration =
+    rule declaration() -> Declaration =
         t:declaration_specifiers() _ ";" {
             unsafe {
-                declaration { name: ast_type_struct_tag(t), t }
+                Declaration { name: ast_type_struct_tag(t), t }
             }
         } /
         t:declaration_specifiers() _ v:declarator() _ ";" {
@@ -362,11 +360,11 @@ pub grammar c_parser(env: &Env) for str {
                 if is_typedef {
                     env.add_typename(v.name);
                 }
-                declaration { name: v.name, t }
+                Declaration { name: v.name, t }
             }
         }
 
-    rule declaration_modifier() -> ast_type_modifier =
+    rule declaration_modifier() -> AstTypeModifier =
         storage_class_specifier() /
         type_qualifier()
 
@@ -380,7 +378,7 @@ pub grammar c_parser(env: &Env) for str {
             s
         }
 
-    rule storage_class_specifier() -> ast_type_modifier =
+    rule storage_class_specifier() -> AstTypeModifier =
         K(<"typedef">) {
             // XXX TODO
         /* XXX: typedef is not modelled as a modifier, so our only
@@ -433,32 +431,32 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_variable_create(d.name, d.t) }
         }
 
-    rule type_qualifier() -> ast_type_modifier =
+    rule type_qualifier() -> AstTypeModifier =
         K(<"const">) { MOD_CONST } /
         K(<"volatile">) { MOD_VOLATILE }
 
-    rule function_declarator() -> function_declarator =
+    rule function_declarator() -> FunctionDeclarator =
         p:pointer() _ d:direct_function_declarator() {
-            function_declarator { ptr_valence: p, decl: d }
+            FunctionDeclarator { ptr_valence: p, decl: d }
         } /
         d:direct_function_declarator() {
-            function_declarator { ptr_valence: 0, decl: d }
+            FunctionDeclarator { ptr_valence: 0, decl: d }
         }
 
-    rule direct_function_declarator() -> direct_function_declarator =
+    rule direct_function_declarator() -> DirectFunctionDeclarator =
         name:identifier() _ "(" _ params:parameter_type_list() _ ")" {
             unsafe {
-                direct_function_declarator { name, n: ast_variable_arr_n(params), param: ast_variable_arr_v(params) }
+                DirectFunctionDeclarator { name, n: ast_variable_arr_n(params), param: ast_variable_arr_v(params) }
             }
         } /
         name:identifier() _ "(" _ ")" {
-            direct_function_declarator { name, n: 0, param: ptr::null_mut() }
+            DirectFunctionDeclarator { name, n: 0, param: ptr::null_mut() }
         }
 
-    rule declarator() -> declarator =
-        p:pointer() _ name:direct_declarator() { declarator { ptr_valence: p, name } } /
-        name:direct_declarator() { declarator { ptr_valence: 0, name } } /
-        p:pointer() { declarator { ptr_valence: p, name: ptr::null_mut() } }
+    rule declarator() -> Declarator =
+        p:pointer() _ name:direct_declarator() { Declarator { ptr_valence: p, name } } /
+        name:direct_declarator() { Declarator { ptr_valence: 0, name } } /
+        p:pointer() { Declarator { ptr_valence: p, name: ptr::null_mut() } }
 
     rule direct_declarator() -> BoxedCStr =
         // Note: declarator postfix syntax is ignored in the original
@@ -563,7 +561,7 @@ pub grammar c_parser(env: &Env) for str {
     rule declaration_list() -> BoxedVariableArray =
         decls:list1(<declaration()>) { unsafe { variable_array_from_decl_vec(decls) } }
 
-    rule statement_list() -> stmt_array =
+    rule statement_list() -> StmtArray =
         stmts:list1(<statement()>) { unsafe { stmt_array_from_vec(stmts) } }
 
     rule expression_statement() -> BoxedStmt =
@@ -606,18 +604,18 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_stmt_create_jump(env.lexloc(p), JUMP_RETURN, expr) }
         }
 
-    rule block_statement() -> block_statement =
+    rule block_statement() -> BlockStatement =
         ";" {
-            block_statement { r#abstract: ptr::null_mut(), body: ptr::null_mut() }
+            BlockStatement { r#abstract: ptr::null_mut(), body: ptr::null_mut() }
         } /
         c:compound_statement() {
-            block_statement { r#abstract: ptr::null_mut(), body: c }
+            BlockStatement { r#abstract: ptr::null_mut(), body: c }
         } /
         v:compound_verification_statement() _ ";" {
-            block_statement { r#abstract: v, body: ptr::null_mut() }
+            BlockStatement { r#abstract: v, body: ptr::null_mut() }
         } /
         v:compound_verification_statement() _ c:compound_statement() {
-            block_statement { r#abstract: v, body: c }
+            BlockStatement { r#abstract: v, body: c }
         }
 
     rule function_definition() -> BoxedFunction =

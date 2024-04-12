@@ -1,7 +1,6 @@
 #![allow(
     dead_code,
     mutable_transmutes,
-    non_camel_case_types,
     non_snake_case,
     non_upper_case_globals,
     unused_assignments,
@@ -14,19 +13,19 @@ use libc::{
     strlen, strncpy, FILE,
 };
 
-pub struct map {
-    entry: *mut entry,
+pub struct Map {
+    entry: *mut Entry,
     n: libc::c_int,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-struct entry {
+struct Entry {
     key: *mut libc::c_char,
     value: *const libc::c_void,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct strbuilder {
+pub struct StrBuilder {
     pub cap: usize,
     pub buf: *mut libc::c_char,
 }
@@ -51,27 +50,27 @@ pub unsafe extern "C" fn dynamic_str(mut s: *const libc::c_char) -> *mut libc::c
     return t;
 }
 
-unsafe fn entry_create(key: *const libc::c_char, value: *const libc::c_void) -> entry {
+unsafe fn entry_create(key: *const libc::c_char, value: *const libc::c_void) -> Entry {
     assert!(!key.is_null());
-    entry {
+    Entry {
         key: key as *mut libc::c_char,
         value,
     }
 }
 
-unsafe fn entry_destroy(mut e: entry) {
+unsafe fn entry_destroy(mut e: Entry) {
     free(e.key as *mut libc::c_void);
 }
 
-impl map {
-    pub fn new() -> Box<map> {
-        Box::new(map {
+impl Map {
+    pub fn new() -> Box<Map> {
+        Box::new(Map {
             entry: std::ptr::null_mut(),
             n: 0,
         })
     }
 
-    pub unsafe fn destroy(self: Box<map>) {
+    pub unsafe fn destroy(self: Box<Map>) {
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < self.n {
             entry_destroy(*(self.entry).offset(i as isize));
@@ -112,9 +111,9 @@ impl map {
         self.n += 1;
         self.entry = realloc(
             self.entry as *mut libc::c_void,
-            (::core::mem::size_of::<entry>() as libc::c_ulong).wrapping_mul(self.n as libc::c_ulong)
+            (::core::mem::size_of::<Entry>() as libc::c_ulong).wrapping_mul(self.n as libc::c_ulong)
                 as usize,
-        ) as *mut entry;
+        ) as *mut Entry;
         *self.entry.offset((self.n - 1 as libc::c_int) as isize) = entry_create(key, value);
     }
 
@@ -122,7 +121,7 @@ impl map {
         self.n
     }
 
-    fn table(&self) -> &[entry] {
+    fn table(&self) -> &[Entry] {
         if self.n == 0 {
             &[]
         } else {
@@ -158,8 +157,8 @@ impl map {
     }
 }
 
-pub unsafe fn strbuilder_create() -> *mut strbuilder {
-    let mut b: *mut strbuilder = malloc(::core::mem::size_of::<strbuilder>()) as *mut strbuilder;
+pub unsafe fn strbuilder_create() -> *mut StrBuilder {
+    let mut b: *mut StrBuilder = malloc(::core::mem::size_of::<StrBuilder>()) as *mut StrBuilder;
     (*b).cap = 100 as libc::c_int as usize;
     (*b).buf = malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul((*b).cap))
         as *mut libc::c_char;
@@ -167,7 +166,7 @@ pub unsafe fn strbuilder_create() -> *mut strbuilder {
     return b;
 }
 
-pub unsafe fn strbuilder_build(mut b: *mut strbuilder) -> *mut libc::c_char {
+pub unsafe fn strbuilder_build(mut b: *mut StrBuilder) -> *mut libc::c_char {
     if b.is_null() {
         panic!();
     }
@@ -185,7 +184,7 @@ pub unsafe fn strbuilder_build(mut b: *mut strbuilder) -> *mut libc::c_char {
     return s;
 }
 
-pub unsafe fn strbuilder_preview(mut b: *mut strbuilder) -> *mut libc::c_char {
+pub unsafe fn strbuilder_preview(mut b: *mut StrBuilder) -> *mut libc::c_char {
     if b.is_null() {
         panic!();
     }
@@ -200,7 +199,7 @@ pub unsafe fn strbuilder_preview(mut b: *mut strbuilder) -> *mut libc::c_char {
     );
     return s;
 }
-unsafe fn strbuilder_realloc(mut b: *mut strbuilder, mut len: usize) {
+unsafe fn strbuilder_realloc(mut b: *mut StrBuilder, mut len: usize) {
     while (*b).cap <= len {
         (*b).cap = (*b).cap * 2 as libc::c_int as usize;
         (*b).buf = realloc(
@@ -209,7 +208,7 @@ unsafe fn strbuilder_realloc(mut b: *mut strbuilder, mut len: usize) {
         ) as *mut libc::c_char;
     }
 }
-unsafe fn strbuilder_append(mut b: *mut strbuilder, mut s: *mut libc::c_char, mut len: usize) {
+unsafe fn strbuilder_append(mut b: *mut StrBuilder, mut s: *mut libc::c_char, mut len: usize) {
     let mut buflen: libc::c_int = strlen((*b).buf) as libc::c_int;
     strbuilder_realloc(b, (buflen as usize).wrapping_add(len));
     let mut newlen: usize = (buflen as usize)
@@ -223,7 +222,7 @@ unsafe fn strbuilder_append(mut b: *mut strbuilder, mut s: *mut libc::c_char, mu
 }
 
 pub unsafe fn strbuilder_vprintf(
-    mut b: *mut strbuilder,
+    mut b: *mut StrBuilder,
     mut fmt: *const libc::c_char,
     mut ap: ::core::ffi::VaList,
 ) -> libc::c_int {
@@ -238,7 +237,7 @@ pub unsafe fn strbuilder_vprintf(
 }
 
 pub unsafe extern "C" fn strbuilder_printf(
-    mut b: *mut strbuilder,
+    mut b: *mut StrBuilder,
     mut fmt: *const libc::c_char,
     mut args: ...
 ) -> libc::c_int {
@@ -248,13 +247,13 @@ pub unsafe extern "C" fn strbuilder_printf(
     return r;
 }
 
-pub unsafe fn strbuilder_puts(mut b: *mut strbuilder, mut s: *mut libc::c_char) -> libc::c_int {
+pub unsafe fn strbuilder_puts(mut b: *mut StrBuilder, mut s: *mut libc::c_char) -> libc::c_int {
     let mut len: usize = strlen(s);
     strbuilder_append(b, s, len);
     return len as libc::c_int;
 }
 
-pub unsafe fn strbuilder_putc(mut b: *mut strbuilder, mut c: libc::c_char) {
+pub unsafe fn strbuilder_putc(mut b: *mut StrBuilder, mut c: libc::c_char) {
     strbuilder_printf(
         b,
         b"%c\0" as *const u8 as *const libc::c_char,
@@ -368,7 +367,7 @@ pub unsafe fn string_arr_contains(arr: &string_arr, mut s: *mut libc::c_char) ->
 }
 
 pub unsafe fn string_arr_str(mut string_arr: &string_arr) -> *mut libc::c_char {
-    let mut b: *mut strbuilder = strbuilder_create();
+    let mut b: *mut StrBuilder = strbuilder_create();
     let mut s: *mut *mut libc::c_char = string_arr.s;
     let mut n: libc::c_int = string_arr.n;
     let mut i: libc::c_int = 0 as libc::c_int;

@@ -23,34 +23,26 @@ mod state;
 mod value;
 
 use ast::{
-    ast as Ast, ast_block, ast_block_str, ast_destroy, ast_expr as AstExpr, ast_externdecl,
-    ast_externdecl_as_function, ast_externdecl_install, ast_externdecl_isfunction, ast_function,
-    ast_function_absisempty, ast_function_abstract, ast_function_copy, ast_function_isaxiom,
-    ast_function_isproto, ast_function_name, ast_function_verify, ast_functiondecl_create,
-    ast_protostitch, ast_topological_order, ast_type, ast_variable, ast_variable_arr,
+    ast_block_str, ast_destroy, ast_externdecl_as_function, ast_externdecl_install,
+    ast_externdecl_isfunction, ast_function_absisempty, ast_function_abstract, ast_function_copy,
+    ast_function_isaxiom, ast_function_isproto, ast_function_name, ast_function_verify,
+    ast_functiondecl_create, ast_protostitch, ast_topological_order, Ast, AstBlock, AstExpr,
+    AstExternDecl, AstFunction, AstType, AstVariable, AstVariableArr,
 };
 use c_util::__stderrp;
-use ext::{externals as Externals, externals_create, externals_destroy, externals_getfunc};
-use math::math_expr;
-use object::{object as Object, object_arr};
+use ext::{externals_create, externals_destroy, externals_getfunc, Externals};
+use math::MathExpr;
+use object::{Object, ObjectArr};
 use props::props as Props;
-use state::block::{block as Block, block_arr};
-use state::clump::clump as Clump;
-use state::heap::{heap as Heap, vconst};
-use state::location::location as Location;
-use state::r#static::static_memory;
-use state::stack::{stack as Stack, variable as Variable};
-use state::state::state as State;
-use util::{
-    strbuilder as StrBuilder, string_arr, string_arr_n, string_arr_s, string_arr_str, VERBOSE_MODE,
-};
-use value::value as Value;
-
-#[allow(non_camel_case_types)]
-pub type sortmode = libc::c_uint;
-pub const SORTMODE_VERIFY: sortmode = 2;
-pub const SORTMODE_SORT: sortmode = 1;
-pub const SORTMODE_NONE: sortmode = 0;
+use state::block::{Block, BlockArr};
+use state::clump::Clump;
+use state::heap::{Heap, VConst};
+use state::location::Location;
+use state::r#static::StaticMemory;
+use state::stack::{Stack, Variable};
+use state::state::State;
+use util::{string_arr, string_arr_n, string_arr_s, string_arr_str, StrBuilder, VERBOSE_MODE};
+use value::Value;
 
 #[derive(Parser)]
 pub struct Config {
@@ -76,38 +68,6 @@ pub struct Config {
     #[arg(short = 's', long = "strip")]
     pub strip_mode: bool,
 }
-
-/*
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct sortconfig {
-    pub mode: sortmode,
-    pub sortfunc: *mut libc::c_char,
-}
-
-impl Config {
-    fn sortmode(&self) -> sortconfig {
-        if let Some(sortfunc) = &self.sort {
-            let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-            sortconfig {
-                mode: SORTMODE_SORT,
-                sortfunc: sortfunc_cstr.into_raw(),
-            }
-        } else if let Some(sortfunc) = &self.verify {
-            let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-            sortconfig {
-                mode: SORTMODE_VERIFY,
-                sortfunc: sortfunc_cstr.into_raw(),
-            }
-        } else {
-            sortconfig {
-                mode: SORTMODE_NONE,
-                sortfunc: &(0 as libc::c_char),
-            }
-        }
-    }
-}
- */
 
 pub fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String> {
     let mut cmd = Command::new("cc");
@@ -143,11 +103,11 @@ pub static mut root: *mut Ast = 0 as *const Ast as *mut Ast;
 pub unsafe fn pass0(root_0: *mut Ast, ext: *mut Externals) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*root_0).n {
-        let decl: *mut ast_externdecl = *((*root_0).decl).offset(i as isize);
+        let decl: *mut AstExternDecl = *((*root_0).decl).offset(i as isize);
         if !ast_externdecl_isfunction(decl) {
             ast_externdecl_install(decl, ext);
         } else {
-            let f: *mut ast_function = ast_externdecl_as_function(decl);
+            let f: *mut AstFunction = ast_externdecl_as_function(decl);
             if ast_function_isaxiom(f) {
                 ast_externdecl_install(decl, ext);
             } else if ast_function_isproto(f) {
@@ -156,7 +116,7 @@ pub unsafe fn pass0(root_0: *mut Ast, ext: *mut Externals) {
                 }
                 ast_externdecl_install(decl, ext);
             } else {
-                let stitched: *mut ast_function = ast_protostitch(f, ext);
+                let stitched: *mut AstFunction = ast_protostitch(f, ext);
                 ast_externdecl_install(ast_functiondecl_create(ast_function_copy(stitched)), ext);
             }
         }
@@ -167,9 +127,9 @@ pub unsafe fn pass0(root_0: *mut Ast, ext: *mut Externals) {
 pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*root_0).n {
-        let decl: *mut ast_externdecl = *((*root_0).decl).offset(i as isize);
+        let decl: *mut AstExternDecl = *((*root_0).decl).offset(i as isize);
         if ast_externdecl_isfunction(decl) {
-            let f: *mut ast_function = ast_externdecl_as_function(decl);
+            let f: *mut AstFunction = ast_externdecl_as_function(decl);
             if !(ast_function_isaxiom(f) as libc::c_int != 0
                 || ast_function_isproto(f) as libc::c_int != 0)
             {
@@ -200,7 +160,7 @@ pub unsafe fn pass_inorder(order: &mut string_arr, ext: *mut Externals) {
     let name: *mut *mut libc::c_char = string_arr_s(order);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        let f: *mut ast_function = externals_getfunc(ext, *name.offset(i as isize));
+        let f: *mut AstFunction = externals_getfunc(ext, *name.offset(i as isize));
         if !(ast_function_isaxiom(f) as libc::c_int != 0
             || ast_function_isproto(f) as libc::c_int != 0)
         {
@@ -227,19 +187,19 @@ pub unsafe fn pass_inorder(order: &mut string_arr, ext: *mut Externals) {
 }
 
 unsafe fn verifyproto(
-    proto: *mut ast_function,
+    proto: *mut AstFunction,
     n: libc::c_int,
     // Note: unused parameter in original. Should use this instead of `root->decl`.
-    _decl: *mut *mut ast_externdecl,
+    _decl: *mut *mut AstExternDecl,
 ) -> bool {
-    let mut def: *mut ast_function = ptr::null_mut();
+    let mut def: *mut AstFunction = ptr::null_mut();
     let mut count: libc::c_int = 0 as libc::c_int;
     let pname: *mut libc::c_char = ast_function_name(proto);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        let decl_0: *mut ast_externdecl = *((*root).decl).offset(i as isize);
+        let decl_0: *mut AstExternDecl = *((*root).decl).offset(i as isize);
         if ast_externdecl_isfunction(decl_0) {
-            let d: *mut ast_function = ast_externdecl_as_function(decl_0);
+            let d: *mut AstFunction = ast_externdecl_as_function(decl_0);
             if !(ast_function_isaxiom(d) as libc::c_int != 0
                 || ast_function_isproto(d) as libc::c_int != 0)
             {
@@ -277,9 +237,9 @@ unsafe fn verifyproto(
     return 0 as libc::c_int != 0;
 }
 
-unsafe fn proto_defisvalid(proto: *mut ast_function, def: *mut ast_function) -> bool {
-    let proto_abs: *mut ast_block = ast_function_abstract(proto);
-    let def_abs: *mut ast_block = ast_function_abstract(def);
+unsafe fn proto_defisvalid(proto: *mut AstFunction, def: *mut AstFunction) -> bool {
+    let proto_abs: *mut AstBlock = ast_function_abstract(proto);
+    let def_abs: *mut AstBlock = ast_function_abstract(def);
     let abs_match: bool = strcmp(
         ast_block_str(
             proto_abs,
