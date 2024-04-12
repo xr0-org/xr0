@@ -52,10 +52,12 @@ use crate::{
     vprintln, Externals, MathExpr, Object, Props, State, StrBuilder, Value, Variable as variable,
 };
 
-pub type AstAllocKind = libc::c_uint;
-pub const CLUMP: AstAllocKind = 4;
-pub const DEALLOC: AstAllocKind = 2;
-pub const ALLOC: AstAllocKind = 1;
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum AstAllocKind {
+    Clump,
+    Dealloc,
+    Alloc,
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstUnaryOp {
@@ -163,13 +165,13 @@ pub struct AstType {
 #[repr(C)]
 pub union C2RustUnnamed_5 {
     pub ptr_type: *mut AstType,
-    pub arr: C2RustUnnamed_7,
-    pub structunion: C2RustUnnamed_6,
+    pub arr: AstArrayType,
+    pub structunion: AstStructType,
     pub userdef: *mut libc::c_char,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_6 {
+pub struct AstStructType {
     pub tag: *mut libc::c_char,
     pub members: *mut AstVariableArr,
 }
@@ -187,7 +189,7 @@ pub struct AstVariable {
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_7 {
+pub struct AstArrayType {
     pub type_0: *mut AstType,
     pub length: libc::c_int,
 }
@@ -483,9 +485,7 @@ unsafe fn rangeprocess_alloc(
     let mut lval: *mut AstExpr = ast_expr_assignment_lval(expr);
     let mut rval: *mut AstExpr = ast_expr_assignment_rval(expr);
     assert_eq!(ast_expr_kind(rval), AstExprKind::Allocation);
-    if !(ast_expr_alloc_kind(rval) as libc::c_uint != DEALLOC as libc::c_int as libc::c_uint) {
-        panic!();
-    }
+    assert_ne!(ast_expr_alloc_kind(rval), AstAllocKind::Dealloc);
     let mut obj: *mut Object = hack_base_object_from_alloc(lval, state);
     return state_range_alloc(state, obj, lw, up);
 }
@@ -1398,12 +1398,9 @@ unsafe fn expr_unary_eval(mut expr: *mut AstExpr, mut state: *mut State) -> *mut
 
 unsafe fn alloc_absexec(mut expr: *mut AstExpr, mut state: *mut State) -> *mut result {
     match ast_expr_alloc_kind(expr) {
-        1 => return result_value_create(state_alloc(state)),
-        2 => return dealloc_process(expr, state),
-        4 => return result_value_create(state_clump(state)),
-        _ => {
-            panic!();
-        }
+        AstAllocKind::Alloc => return result_value_create(state_alloc(state)),
+        AstAllocKind::Dealloc => return dealloc_process(expr, state),
+        AstAllocKind::Clump => return result_value_create(state_clump(state)),
     }
 }
 
@@ -2070,7 +2067,7 @@ pub unsafe fn ast_expr_isisdereferencable(mut expr: *mut AstExpr) -> bool {
 pub unsafe fn ast_expr_dealloc_create(mut arg: *mut AstExpr) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = AstExprKind::Allocation;
-    (*expr).u.alloc.kind = DEALLOC;
+    (*expr).u.alloc.kind = AstAllocKind::Dealloc;
     (*expr).u.alloc.arg = arg;
     return expr;
 }
@@ -2136,7 +2133,7 @@ unsafe fn ast_expr_alloc_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilde
     }
     let mut arg: *mut libc::c_char = ast_expr_str((*expr).u.alloc.arg);
     match (*expr).u.alloc.kind {
-        1 => {
+        AstAllocKind::Alloc => {
             strbuilder_printf(
                 b,
                 b".%s %s;\0" as *const u8 as *const libc::c_char,
@@ -2144,7 +2141,7 @@ unsafe fn ast_expr_alloc_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilde
                 arg,
             );
         }
-        2 => {
+        AstAllocKind::Dealloc => {
             strbuilder_printf(
                 b,
                 b".%s %s;\0" as *const u8 as *const libc::c_char,
@@ -2152,16 +2149,13 @@ unsafe fn ast_expr_alloc_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilde
                 arg,
             );
         }
-        4 => {
+        AstAllocKind::Clump => {
             strbuilder_printf(
                 b,
                 b".%s %s;\0" as *const u8 as *const libc::c_char,
                 b"clump\0" as *const u8 as *const libc::c_char,
                 arg,
             );
-        }
-        _ => {
-            panic!();
         }
     }
     free(arg as *mut libc::c_void);
@@ -2170,7 +2164,7 @@ unsafe fn ast_expr_alloc_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilde
 pub unsafe fn ast_expr_alloc_create(mut arg: *mut AstExpr) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = AstExprKind::Allocation;
-    (*expr).u.alloc.kind = ALLOC;
+    (*expr).u.alloc.kind = AstAllocKind::Alloc;
     (*expr).u.alloc.arg = arg;
     return expr;
 }
@@ -2191,10 +2185,9 @@ pub unsafe fn ast_expr_isdeallocand_assertand(mut expr: *mut AstExpr) -> *mut As
 unsafe fn ast_expr_alloc_copy(mut expr: *mut AstExpr) -> *mut AstExpr {
     let mut arg: *mut AstExpr = ast_expr_copy((*expr).u.alloc.arg);
     match (*expr).u.alloc.kind {
-        ALLOC => return ast_expr_alloc_create(arg),
-        DEALLOC => return ast_expr_dealloc_create(arg),
-        CLUMP => return ast_expr_clump_create(arg),
-        _ => panic!(),
+        AstAllocKind::Alloc => return ast_expr_alloc_create(arg),
+        AstAllocKind::Dealloc => return ast_expr_dealloc_create(arg),
+        AstAllocKind::Clump => return ast_expr_clump_create(arg),
     }
 }
 unsafe fn ast_expr_isdereferencable_str_build(mut expr: *mut AstExpr, mut b: *mut StrBuilder) {
@@ -2423,7 +2416,7 @@ pub unsafe fn ast_expr_le_create(mut e1: *mut AstExpr, mut e2: *mut AstExpr) -> 
 pub unsafe fn ast_expr_clump_create(mut arg: *mut AstExpr) -> *mut AstExpr {
     let mut expr: *mut AstExpr = ast_expr_create();
     (*expr).kind = AstExprKind::Allocation;
-    (*expr).u.alloc.kind = CLUMP;
+    (*expr).u.alloc.kind = AstAllocKind::Clump;
     (*expr).u.alloc.arg = arg;
     return expr;
 }
