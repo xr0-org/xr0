@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    mutable_transmutes,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments
-)]
+#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
 use libc::{calloc, free, malloc, realloc};
 
@@ -134,11 +128,7 @@ pub unsafe fn block_observe(
     return observed;
 }
 
-pub unsafe fn block_references(
-    b: *mut Block,
-    loc: *mut Location,
-    s: *mut State,
-) -> bool {
+pub unsafe fn block_references(b: *mut Block, loc: *mut Location, s: *mut State) -> bool {
     let n: libc::c_int = object_arr_nobjects((*b).arr);
     let obj: *mut *mut Object = object_arr_objects((*b).arr);
     let mut i: libc::c_int = 0 as libc::c_int;

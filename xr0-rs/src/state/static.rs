@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    mutable_transmutes,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments
-)]
+#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
 use libc::{free, malloc};
 
@@ -22,8 +16,7 @@ pub struct StaticMemory {
 }
 
 pub unsafe fn static_memory_create() -> *mut StaticMemory {
-    let sm: *mut StaticMemory =
-        malloc(::core::mem::size_of::<StaticMemory>()) as *mut StaticMemory;
+    let sm: *mut StaticMemory = malloc(::core::mem::size_of::<StaticMemory>()) as *mut StaticMemory;
     assert!(!sm.is_null());
     std::ptr::write(
         sm,
@@ -87,10 +80,7 @@ pub unsafe fn static_memory_newblock(sm: *mut StaticMemory) -> libc::c_int {
     return address;
 }
 
-pub unsafe fn static_memory_getblock(
-    sm: *mut StaticMemory,
-    address: libc::c_int,
-) -> *mut Block {
+pub unsafe fn static_memory_getblock(sm: *mut StaticMemory, address: libc::c_int) -> *mut Block {
     if address >= block_arr_nblocks((*sm).blocks) {
         return 0 as *mut Block;
     }

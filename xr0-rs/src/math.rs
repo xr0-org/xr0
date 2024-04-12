@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    mutable_transmutes,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments
-)]
+#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
 use libc::{free, malloc};
 

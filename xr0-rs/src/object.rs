@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    mutable_transmutes,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments
-)]
+#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
 use libc::{calloc, free, malloc, realloc};
 
@@ -202,11 +196,7 @@ pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
     }
 }
 
-pub unsafe fn object_references(
-    obj: *mut Object,
-    loc: *mut Location,
-    s: *mut State,
-) -> bool {
+pub unsafe fn object_references(obj: *mut Object, loc: *mut Location, s: *mut State) -> bool {
     if (*obj).type_0 as libc::c_uint == OBJECT_DEALLOCAND_RANGE as libc::c_int as libc::c_uint {
         return range_references((*obj).c2rust_unnamed.range, loc, s);
     }
@@ -250,11 +240,7 @@ pub unsafe fn object_upper(obj: *mut Object) -> *mut AstExpr {
     return ast_expr_sum_create(ast_expr_copy((*obj).offset), object_size(obj));
 }
 
-pub unsafe fn object_contains(
-    obj: *mut Object,
-    offset: *mut AstExpr,
-    s: *mut State,
-) -> bool {
+pub unsafe fn object_contains(obj: *mut Object, offset: *mut AstExpr, s: *mut State) -> bool {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
     let of: *mut AstExpr = offset;
@@ -299,16 +285,11 @@ pub unsafe fn object_contig_precedes(
 pub unsafe fn object_issingular(obj: *mut Object, s: *mut State) -> bool {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
-    let lw_succ: *mut AstExpr =
-        ast_expr_sum_create(lw, ast_expr_constant_create(1 as libc::c_int));
+    let lw_succ: *mut AstExpr = ast_expr_sum_create(lw, ast_expr_constant_create(1 as libc::c_int));
     return state_eval(s, ast_expr_eq_create(lw_succ, up));
 }
 
-pub unsafe fn object_upto(
-    obj: *mut Object,
-    excl_up: *mut AstExpr,
-    s: *mut State,
-) -> *mut Object {
+pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State) -> *mut Object {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
     let prop0: *mut AstExpr = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
@@ -349,11 +330,7 @@ pub unsafe fn object_upto(
     );
 }
 
-pub unsafe fn object_from(
-    obj: *mut Object,
-    incl_lw: *mut AstExpr,
-    s: *mut State,
-) -> *mut Object {
+pub unsafe fn object_from(obj: *mut Object, incl_lw: *mut AstExpr, s: *mut State) -> *mut Object {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
     let prop0: *mut AstExpr = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(up));
@@ -401,11 +378,7 @@ pub unsafe fn object_getmember(
 ) -> *mut Object {
     return value_struct_member(getorcreatestruct(obj, t, s), member);
 }
-unsafe fn getorcreatestruct(
-    obj: *mut Object,
-    t: *mut AstType,
-    s: *mut State,
-) -> *mut Value {
+unsafe fn getorcreatestruct(obj: *mut Object, t: *mut AstType, s: *mut State) -> *mut Value {
     let mut v: *mut Value = object_as_value(obj);
     if !v.is_null() {
         return v;
@@ -432,16 +405,14 @@ pub unsafe fn object_result_error_create(err: *mut Error) -> *mut ObjectResult {
     if err.is_null() {
         panic!();
     }
-    let r: *mut ObjectResult =
-        malloc(::core::mem::size_of::<ObjectResult>()) as *mut ObjectResult;
+    let r: *mut ObjectResult = malloc(::core::mem::size_of::<ObjectResult>()) as *mut ObjectResult;
     (*r).val = 0 as *mut Object;
     (*r).err = err;
     return r;
 }
 
 pub unsafe fn object_result_value_create(val: *mut Object) -> *mut ObjectResult {
-    let r: *mut ObjectResult =
-        malloc(::core::mem::size_of::<ObjectResult>()) as *mut ObjectResult;
+    let r: *mut ObjectResult = malloc(::core::mem::size_of::<ObjectResult>()) as *mut ObjectResult;
     (*r).val = val;
     (*r).err = 0 as *mut Error;
     return r;
@@ -526,11 +497,7 @@ pub unsafe fn range_isdeallocand(r: *mut Range, s: *mut State) -> bool {
     return state_isdeallocand(s, (*r).loc);
 }
 
-pub unsafe fn range_references(
-    r: *mut Range,
-    loc: *mut Location,
-    s: *mut State,
-) -> bool {
+pub unsafe fn range_references(r: *mut Range, loc: *mut Location, s: *mut State) -> bool {
     return location_references((*r).loc, loc, s);
 }
 

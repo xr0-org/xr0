@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    mutable_transmutes,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments
-)]
+#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
 use libc::{free, malloc};
 
@@ -114,23 +108,14 @@ pub unsafe fn externals_declarestruct(ext: *mut Externals, t: *mut AstType) {
         .set(dynamic_str(id), t as *const libc::c_void);
 }
 
-pub unsafe fn externals_getfunc(
-    ext: *mut Externals,
-    id: *mut libc::c_char,
-) -> *mut AstFunction {
+pub unsafe fn externals_getfunc(ext: *mut Externals, id: *mut libc::c_char) -> *mut AstFunction {
     return (*ext).func.get(id) as *mut AstFunction;
 }
 
-pub unsafe fn externals_gettypedef(
-    ext: *mut Externals,
-    id: *mut libc::c_char,
-) -> *mut AstType {
+pub unsafe fn externals_gettypedef(ext: *mut Externals, id: *mut libc::c_char) -> *mut AstType {
     return (*ext)._typedef.get(id) as *mut AstType;
 }
 
-pub unsafe fn externals_getstruct(
-    ext: *mut Externals,
-    id: *mut libc::c_char,
-) -> *mut AstType {
+pub unsafe fn externals_getstruct(ext: *mut Externals, id: *mut libc::c_char) -> *mut AstType {
     return (*ext)._struct.get(id) as *mut AstType;
 }

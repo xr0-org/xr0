@@ -1,6 +1,5 @@
 #![allow(
     dead_code,
-    mutable_transmutes,
     non_snake_case,
     non_upper_case_globals,
     unused_assignments,
@@ -52,10 +51,7 @@ pub struct BlockRes {
     pub err: *mut Error,
 }
 
-pub unsafe fn location_create_vconst(
-    block: libc::c_int,
-    offset: *mut AstExpr,
-) -> *mut Location {
+pub unsafe fn location_create_vconst(block: libc::c_int, offset: *mut AstExpr) -> *mut Location {
     let loc: *mut Location = malloc(::core::mem::size_of::<Location>()) as *mut Location;
     if loc.is_null() {
         panic!();
@@ -86,10 +82,7 @@ pub unsafe fn location_create_dereferencable(
     return loc;
 }
 
-pub unsafe fn location_create_static(
-    block: libc::c_int,
-    offset: *mut AstExpr,
-) -> *mut Location {
+pub unsafe fn location_create_static(block: libc::c_int, offset: *mut AstExpr) -> *mut Location {
     let loc: *mut Location = malloc(::core::mem::size_of::<Location>()) as *mut Location;
     if loc.is_null() {
         panic!();
@@ -103,10 +96,7 @@ pub unsafe fn location_create_static(
     return loc;
 }
 
-pub unsafe fn location_create_dynamic(
-    block: libc::c_int,
-    offset: *mut AstExpr,
-) -> *mut Location {
+pub unsafe fn location_create_dynamic(block: libc::c_int, offset: *mut AstExpr) -> *mut Location {
     let loc: *mut Location = malloc(::core::mem::size_of::<Location>()) as *mut Location;
     if loc.is_null() {
         panic!();
@@ -211,10 +201,7 @@ pub unsafe fn location_copy(loc: *mut Location) -> *mut Location {
     }
 }
 
-pub unsafe fn location_with_offset(
-    loc: *mut Location,
-    offset: *mut AstExpr,
-) -> *mut Location {
+pub unsafe fn location_with_offset(loc: *mut Location, offset: *mut AstExpr) -> *mut Location {
     if !offsetzero(loc) {
         panic!();
     }
@@ -257,11 +244,7 @@ pub unsafe fn location_equal(l1: *mut Location, l2: *mut Location) -> bool {
         && ast_expr_equal((*l1).offset, (*l2).offset) as libc::c_int != 0;
 }
 
-pub unsafe fn location_references(
-    l1: *mut Location,
-    l2: *mut Location,
-    s: *mut State,
-) -> bool {
+pub unsafe fn location_references(l1: *mut Location, l2: *mut Location, s: *mut State) -> bool {
     if location_equal(l1, l2) {
         return 1 as libc::c_int != 0;
     }

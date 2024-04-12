@@ -1,6 +1,5 @@
 #![allow(
     dead_code,
-    mutable_transmutes,
     non_snake_case,
     non_upper_case_globals,
     unused_assignments,
@@ -248,11 +247,7 @@ pub unsafe fn vconst_declare(
         .set(dynamic_str(s), persist as usize as *mut libc::c_void);
     return s;
 }
-unsafe fn vconst_id(
-    varmap: &Map,
-    persistmap: &Map,
-    persist: bool,
-) -> *mut libc::c_char {
+unsafe fn vconst_id(varmap: &Map, persistmap: &Map, persist: bool) -> *mut libc::c_char {
     let npersist: libc::c_int = count_true(persistmap);
     let b: *mut StrBuilder = strbuilder_create();
     if persist {

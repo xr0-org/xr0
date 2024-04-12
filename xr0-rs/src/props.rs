@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    mutable_transmutes,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments
-)]
+#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
 use libc::{calloc, free, realloc};
 
@@ -112,11 +106,7 @@ pub unsafe fn props_contradicts(p: *mut props, p1: *mut AstExpr) -> bool {
     ast_expr_destroy(not_p1);
     return iscontradiction;
 }
-unsafe fn props_contradicts_actual(
-    p: *mut props,
-    p1: *mut AstExpr,
-    not_p1: *mut AstExpr,
-) -> bool {
+unsafe fn props_contradicts_actual(p: *mut props, p1: *mut AstExpr, not_p1: *mut AstExpr) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*p).n {
         let p2: *mut AstExpr = *((*p).prop).offset(i as isize);

@@ -1,10 +1,4 @@
-#![allow(
-    dead_code,
-    mutable_transmutes,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments
-)]
+#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
 use libc::{calloc, free, malloc, strcmp};
 
@@ -138,10 +132,7 @@ pub unsafe fn stack_copy(stack: *mut Stack) -> *mut Stack {
     return copy;
 }
 
-pub unsafe fn stack_copywithname(
-    stack: *mut Stack,
-    new_name: *mut libc::c_char,
-) -> *mut Stack {
+pub unsafe fn stack_copywithname(stack: *mut Stack, new_name: *mut libc::c_char) -> *mut Stack {
     let copy: *mut Stack = stack_copy(stack);
     free((*copy).name as *mut libc::c_void);
     (*copy).name = new_name;
@@ -242,11 +233,7 @@ pub unsafe fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Va
     return (*s).varmap.get(id) as *mut Variable;
 }
 
-pub unsafe fn stack_references(
-    s: *mut Stack,
-    loc: *mut Location,
-    state: *mut State,
-) -> bool {
+pub unsafe fn stack_references(s: *mut Stack, loc: *mut Location, state: *mut State) -> bool {
     let result: *mut Variable = stack_getresult(s);
     if !result.is_null() && variable_references(result, loc, state) as libc::c_int != 0 {
         return true;
@@ -395,11 +382,7 @@ pub unsafe fn variable_type(v: *mut Variable) -> *mut AstType {
     return (*v).type_0;
 }
 
-pub unsafe fn variable_references(
-    v: *mut Variable,
-    loc: *mut Location,
-    s: *mut State,
-) -> bool {
+pub unsafe fn variable_references(v: *mut Variable, loc: *mut Location, s: *mut State) -> bool {
     if !(location_type(loc) as libc::c_uint != LOCATION_VCONST as libc::c_int as libc::c_uint) {
         panic!();
     }
