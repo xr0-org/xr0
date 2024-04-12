@@ -219,9 +219,6 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 }
 
 static struct error *
-ast_function_precondsinit(struct ast_function *, struct state *);
-
-static struct error *
 inititalise_param(struct ast_variable *v, struct state *);
 
 struct error *
@@ -235,10 +232,6 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 		state_declare(s, params[i], true);
 	}
 
-	/*if ((err = ast_function_precondsinit(f, s))) {*/
-		/*return err;*/
-	/*}*/
-	
 	for (int i = 0; i < nparams; i++) {
 		if ((err = inititalise_param(params[i], s))) {
 			return err;
@@ -247,7 +240,7 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 	return NULL;
 }
 
-static struct error *
+struct error *
 ast_function_precondsinit(struct ast_function *f, struct state *s)
 {
 	struct preconds_result pre = ast_function_preconditions(f);
