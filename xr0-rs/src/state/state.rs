@@ -123,10 +123,7 @@ pub unsafe fn state_copy(state: *mut State) -> *mut State {
     return copy;
 }
 
-pub unsafe fn state_copywithname(
-    state: *mut State,
-    func_name: *mut libc::c_char,
-) -> *mut State {
+pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char) -> *mut State {
     let copy: *mut State = malloc(::core::mem::size_of::<State>()) as *mut State;
     if copy.is_null() {
         panic!();
@@ -211,11 +208,7 @@ pub unsafe fn state_getprops(s: *mut State) -> *mut Props {
     return (*s).props;
 }
 
-pub unsafe fn state_pushframe(
-    state: *mut State,
-    func: *mut libc::c_char,
-    ret_type: *mut AstType,
-) {
+pub unsafe fn state_pushframe(state: *mut State, func: *mut libc::c_char, ret_type: *mut AstType) {
     (*state).stack = stack_create(func, (*state).stack, ret_type);
 }
 
@@ -312,11 +305,7 @@ pub unsafe fn state_getvconst(state: *mut State, id: *mut libc::c_char) -> *mut 
     return vconst_get((*state).vconst, id);
 }
 
-pub unsafe fn state_get(
-    state: *mut State,
-    loc: *mut Location,
-    constructive: bool,
-) -> ObjectRes {
+pub unsafe fn state_get(state: *mut State, loc: *mut Location, constructive: bool) -> ObjectRes {
     let res: BlockRes = location_getblock(
         loc,
         (*state).static_memory,
@@ -393,10 +382,7 @@ unsafe fn state_getresulttype(state: *mut State) -> *mut AstType {
     return variable_type(v);
 }
 
-pub unsafe fn state_getobjecttype(
-    state: *mut State,
-    id: *mut libc::c_char,
-) -> *mut AstType {
+pub unsafe fn state_getobjecttype(state: *mut State, id: *mut libc::c_char) -> *mut AstType {
     if strcmp(id, b"return\0" as *const u8 as *const libc::c_char) == 0 as libc::c_int {
         return state_getresulttype(state);
     }
