@@ -436,7 +436,7 @@ pub unsafe fn ast_expr_equal(e1: *mut AstExpr, e2: *mut AstExpr) -> bool {
         (AstExprKind::Identifier(id1), AstExprKind::Identifier(id2)) => strcmp(id1, id2) == 0,
         (AstExprKind::StringLiteral(s1), AstExprKind::StringLiteral(s2)) => strcmp(s1, s2) == 0,
         (AstExprKind::Assignment(a1), AstExprKind::Assignment(a2)) => {
-            ast_expr_equal((*e1).root, (*e2).root) && ast_expr_equal(a1, a1)
+            ast_expr_equal((*e1).root, (*e2).root) && ast_expr_equal(a1, a2)
         }
         (AstExprKind::Unary(op1), AstExprKind::Unary(op2)) => {
             op1 == op2 && ast_expr_equal((*e1).root, (*e2).root)
