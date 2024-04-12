@@ -395,9 +395,9 @@ pub grammar c_parser(env: &Env) for str {
         K(<"register">) { MOD_REGISTER }
 
     rule type_specifier() -> BoxedType =
-        K(<"void">) { unsafe { ast_type_create(TYPE_VOID, 0) } } /
-        K(<"char">) { unsafe { ast_type_create(TYPE_CHAR, 0) } } /
-        K(<"int">) { unsafe { ast_type_create(TYPE_INT, 0) } } /
+        K(<"void">) { unsafe { ast_type_create(AstTypeBase::Void, 0) } } /
+        K(<"char">) { unsafe { ast_type_create(AstTypeBase::Char, 0) } } /
+        K(<"int">) { unsafe { ast_type_create(AstTypeBase::Int, 0) } } /
         struct_or_union_specifier() /
         t:typedef_name() { unsafe { ast_type_create_userdef(dynamic_str(t)) } }
 
@@ -516,7 +516,7 @@ pub grammar c_parser(env: &Env) for str {
         // Note: original is I guess UB? type confusion
         type_qualifier() _ t:specifier_qualifier_list() { t } /
         type_qualifier() {
-            unsafe { ast_type_create(TYPE_INT, 0) }
+            unsafe { ast_type_create(AstTypeBase::Int, 0) }
         }
 
     rule labelled_statement() -> BoxedStmt =
@@ -667,7 +667,7 @@ pub grammar c_parser(env: &Env) for str {
             unsafe {
                 ast_function_create(
                     false,
-                    ast_type_create(TYPE_VOID, 0),
+                    ast_type_create(AstTypeBase::Void, 0),
                     decl.decl.name,
                     decl.decl.n,
                     decl.decl.param,

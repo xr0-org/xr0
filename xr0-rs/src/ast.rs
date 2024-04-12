@@ -193,22 +193,26 @@ pub struct AstArrayType {
     pub type_0: *mut AstType,
     pub length: libc::c_int,
 }
-pub type AstTypeBase = libc::c_uint;
-pub const TYPE_VOID: AstTypeBase = 0;
-pub const TYPE_CHAR: AstTypeBase = 1;
-pub const TYPE_SHORT: AstTypeBase = 2;
-pub const TYPE_INT: AstTypeBase = 3;
-pub const TYPE_LONG: AstTypeBase = 4;
-pub const TYPE_FLOAT: AstTypeBase = 5;
-pub const TYPE_DOUBLE: AstTypeBase = 6;
-pub const TYPE_SIGNED: AstTypeBase = 7;
-pub const TYPE_UNSIGNED: AstTypeBase = 8;
-pub const TYPE_POINTER: AstTypeBase = 9;
-pub const TYPE_ARRAY: AstTypeBase = 10;
-pub const TYPE_STRUCT: AstTypeBase = 11;
-pub const TYPE_UNION: AstTypeBase = 12;
-pub const TYPE_ENUM: AstTypeBase = 13;
-pub const TYPE_USERDEF: AstTypeBase = 14;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum AstTypeBase {
+    Void,
+    Char,
+    Short,
+    Int,
+    Long,
+    Float,
+    Double,
+    Signed,
+    Unsigned,
+    Pointer,
+    Array,
+    Struct,
+    Union,
+    Enum,
+    UserDefined,
+}
+
 pub type AstTypeModifier = libc::c_uint;
 pub const MOD_TYPEDEF: AstTypeModifier = 1;
 pub const MOD_EXTERN: AstTypeModifier = 2;
@@ -217,6 +221,7 @@ pub const MOD_AUTO: AstTypeModifier = 8;
 pub const MOD_REGISTER: AstTypeModifier = 16;
 pub const MOD_CONST: AstTypeModifier = 32;
 pub const MOD_VOLATILE: AstTypeModifier = 64;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct LValue {
@@ -997,7 +1002,7 @@ pub unsafe fn ast_expr_eval(mut expr: *mut AstExpr, mut state: *mut State) -> *m
 unsafe fn arbarg_eval(mut expr: *mut AstExpr, mut state: *mut State) -> *mut result {
     return result_value_create(state_vconst(
         state,
-        ast_type_create_ptr(ast_type_create(TYPE_VOID, 0)),
+        ast_type_create_ptr(ast_type_create(AstTypeBase::Void, 0)),
         0 as *mut libc::c_char,
         false,
     ));
@@ -4110,11 +4115,11 @@ unsafe fn preconds_compound_verify(mut stmt: *mut AstStmt) -> *mut error {
 }
 
 pub unsafe fn ast_type_isint(mut t: *mut AstType) -> bool {
-    return (*t).base as libc::c_uint == TYPE_INT as libc::c_int as libc::c_uint;
+    (*t).base == AstTypeBase::Int
 }
 
 pub unsafe fn ast_type_ispointer(mut t: *mut AstType) -> bool {
-    return (*t).base as libc::c_uint == TYPE_POINTER as libc::c_int as libc::c_uint;
+    (*t).base == AstTypeBase::Pointer
 }
 
 pub unsafe fn ast_type_create(mut base: AstTypeBase, mut mod_0: AstTypeModifier) -> *mut AstType {
@@ -4131,13 +4136,13 @@ pub unsafe fn ast_type_create_ptr(mut ref_0: *mut AstType) -> *mut AstType {
     if ref_0.is_null() {
         panic!();
     }
-    let mut t: *mut AstType = ast_type_create(TYPE_POINTER, 0 as AstTypeModifier);
+    let mut t: *mut AstType = ast_type_create(AstTypeBase::Pointer, 0 as AstTypeModifier);
     (*t).c2rust_unnamed.ptr_type = ref_0;
     return t;
 }
 
 pub unsafe fn ast_type_create_voidptr() -> *mut AstType {
-    let mut t: *mut AstType = ast_type_create(TYPE_POINTER, 0 as AstTypeModifier);
+    let mut t: *mut AstType = ast_type_create(AstTypeBase::Pointer, 0 as AstTypeModifier);
     (*t).c2rust_unnamed.ptr_type = 0 as *mut AstType;
     return t;
 }
@@ -4146,7 +4151,7 @@ pub unsafe fn ast_type_create_arr(mut base: *mut AstType, mut length: libc::c_in
     if base.is_null() {
         panic!();
     }
-    let mut t: *mut AstType = ast_type_create(TYPE_ARRAY, 0 as AstTypeModifier);
+    let mut t: *mut AstType = ast_type_create(AstTypeBase::Array, 0 as AstTypeModifier);
     (*t).c2rust_unnamed.arr.type_0 = base;
     (*t).c2rust_unnamed.arr.length = length;
     return t;
@@ -4156,14 +4161,14 @@ pub unsafe fn ast_type_create_struct(
     mut tag: *mut libc::c_char,
     mut members: *mut AstVariableArr,
 ) -> *mut AstType {
-    let mut t: *mut AstType = ast_type_create(TYPE_STRUCT, 0 as AstTypeModifier);
+    let mut t: *mut AstType = ast_type_create(AstTypeBase::Struct, 0 as AstTypeModifier);
     (*t).c2rust_unnamed.structunion.tag = tag;
     (*t).c2rust_unnamed.structunion.members = members;
     return t;
 }
 
 pub unsafe fn ast_type_create_userdef(mut name: *mut libc::c_char) -> *mut AstType {
-    let mut t: *mut AstType = ast_type_create(TYPE_USERDEF, 0 as AstTypeModifier);
+    let mut t: *mut AstType = ast_type_create(AstTypeBase::UserDefined, 0 as AstTypeModifier);
     (*t).c2rust_unnamed.userdef = name;
     return t;
 }
@@ -4175,9 +4180,9 @@ pub unsafe fn ast_type_vconst(
     mut persist: bool,
 ) -> *mut Value {
     match (*t).base {
-        3 => return value_int_indefinite_create(),
-        9 => return value_ptr_indefinite_create(),
-        14 => {
+        AstTypeBase::Int => return value_int_indefinite_create(),
+        AstTypeBase::Pointer => return value_ptr_indefinite_create(),
+        AstTypeBase::UserDefined => {
             return ast_type_vconst(
                 externals_gettypedef(state_getext(s), (*t).c2rust_unnamed.userdef),
                 s,
@@ -4185,7 +4190,7 @@ pub unsafe fn ast_type_vconst(
                 persist,
             );
         }
-        11 => return value_struct_indefinite_create(t, s, comment, persist),
+        AstTypeBase::Struct => return value_struct_indefinite_create(t, s, comment, persist),
         _ => {
             panic!();
         }
@@ -4193,7 +4198,7 @@ pub unsafe fn ast_type_vconst(
 }
 
 pub unsafe fn ast_type_isstruct(mut t: *mut AstType) -> bool {
-    return (*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint;
+    (*t).base == AstTypeBase::Struct
 }
 
 pub unsafe fn ast_type_struct_complete(
@@ -4211,33 +4216,29 @@ pub unsafe fn ast_type_struct_complete(
 }
 
 pub unsafe fn ast_type_struct_members(mut t: *mut AstType) -> *mut AstVariableArr {
-    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    return (*t).c2rust_unnamed.structunion.members;
+    assert_eq!((*t).base, AstTypeBase::Struct);
+    (*t).c2rust_unnamed.structunion.members
 }
 
 pub unsafe fn ast_type_struct_tag(mut t: *mut AstType) -> *mut libc::c_char {
-    if !((*t).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    return (*t).c2rust_unnamed.structunion.tag;
+    assert_eq!((*t).base, AstTypeBase::Struct);
+    (*t).c2rust_unnamed.structunion.tag
 }
 
 pub unsafe fn ast_type_create_struct_anonym(mut members: *mut AstVariableArr) -> *mut AstType {
-    return ast_type_create_struct(0 as *mut libc::c_char, members);
+    ast_type_create_struct(0 as *mut libc::c_char, members)
 }
 
 pub unsafe fn ast_type_create_struct_partial(mut tag: *mut libc::c_char) -> *mut AstType {
-    return ast_type_create_struct(tag, 0 as *mut AstVariableArr);
+    ast_type_create_struct(tag, 0 as *mut AstVariableArr)
 }
 
 pub unsafe fn ast_type_copy_struct(mut old: *mut AstType) -> *mut AstType {
-    if !((*old).base as libc::c_uint == TYPE_STRUCT as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    let mut new: *mut AstType =
-        ast_type_create(TYPE_STRUCT, (*old).mod_0 as libc::c_uint as AstTypeModifier);
+    assert_eq!((*old).base, AstTypeBase::Struct);
+    let mut new: *mut AstType = ast_type_create(
+        AstTypeBase::Struct,
+        (*old).mod_0 as libc::c_uint as AstTypeModifier,
+    );
     (*new).c2rust_unnamed.structunion.tag = if !((*old).c2rust_unnamed.structunion.tag).is_null() {
         dynamic_str((*old).c2rust_unnamed.structunion.tag)
     } else {
@@ -4262,13 +4263,13 @@ pub unsafe fn ast_type_istypedef(mut t: *mut AstType) -> bool {
 
 pub unsafe fn ast_type_destroy(mut t: *mut AstType) {
     match (*t).base {
-        9 => {
+        AstTypeBase::Pointer => {
             if ((*t).c2rust_unnamed.ptr_type).is_null() {
                 panic!();
             }
             ast_type_destroy((*t).c2rust_unnamed.ptr_type);
         }
-        10 => {
+        AstTypeBase::Array => {
             if ((*t).c2rust_unnamed.arr.type_0).is_null() {
                 panic!();
             }
@@ -4284,16 +4285,20 @@ pub unsafe fn ast_type_copy(mut t: *mut AstType) -> *mut AstType {
         panic!();
     }
     match (*t).base {
-        9 => return ast_type_create_ptr(ast_type_copy((*t).c2rust_unnamed.ptr_type)),
-        10 => {
+        AstTypeBase::Pointer => {
+            return ast_type_create_ptr(ast_type_copy((*t).c2rust_unnamed.ptr_type))
+        }
+        AstTypeBase::Array => {
             return ast_type_create_arr(
                 ast_type_copy((*t).c2rust_unnamed.arr.type_0),
                 (*t).c2rust_unnamed.arr.length,
             );
         }
-        11 => return ast_type_copy_struct(t),
-        14 => return ast_type_create_userdef(dynamic_str((*t).c2rust_unnamed.userdef)),
-        0 | 3 | 1 => {
+        AstTypeBase::Struct => return ast_type_copy_struct(t),
+        AstTypeBase::UserDefined => {
+            return ast_type_create_userdef(dynamic_str((*t).c2rust_unnamed.userdef))
+        }
+        AstTypeBase::Void | AstTypeBase::Int | AstTypeBase::Char => {
             return ast_type_create((*t).base, (*t).mod_0 as libc::c_uint as AstTypeModifier)
         }
         _ => {
@@ -4322,16 +4327,16 @@ pub unsafe fn ast_type_str(mut t: *mut AstType) -> *mut libc::c_char {
     strbuilder_printf(b, b"%s\0" as *const u8 as *const libc::c_char, mod_0);
     free(mod_0 as *mut libc::c_void);
     match (*t).base {
-        9 => {
+        AstTypeBase::Pointer => {
             ast_type_str_build_ptr(b, t);
         }
-        10 => {
+        AstTypeBase::Array => {
             ast_type_str_build_arr(b, t);
         }
-        11 => {
+        AstTypeBase::Struct => {
             ast_type_str_build_struct(b, t);
         }
-        14 => {
+        AstTypeBase::UserDefined => {
             strbuilder_printf(
                 b,
                 b"%s\0" as *const u8 as *const libc::c_char,
@@ -4447,7 +4452,7 @@ unsafe fn mod_str(mut mod_0: libc::c_int) -> *mut libc::c_char {
 unsafe fn ast_type_str_build_ptr(mut b: *mut StrBuilder, mut t: *mut AstType) {
     let mut base: *mut libc::c_char = ast_type_str((*t).c2rust_unnamed.ptr_type);
     let mut space: bool = (*(*t).c2rust_unnamed.ptr_type).base as libc::c_uint
-        != TYPE_POINTER as libc::c_int as libc::c_uint;
+        != AstTypeBase::Pointer as libc::c_int as libc::c_uint;
     strbuilder_printf(
         b,
         b"%s%s*\0" as *const u8 as *const libc::c_char,
@@ -4501,9 +4506,7 @@ pub unsafe fn ast_type_base(mut t: *mut AstType) -> AstTypeBase {
 }
 
 pub unsafe fn ast_type_ptr_type(mut t: *mut AstType) -> *mut AstType {
-    if !((*t).base as libc::c_uint == TYPE_POINTER as libc::c_int as libc::c_uint) {
-        panic!();
-    }
+    assert_eq!((*t).base, AstTypeBase::Pointer);
     return (*t).c2rust_unnamed.ptr_type;
 }
 
