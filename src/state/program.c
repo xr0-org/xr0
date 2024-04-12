@@ -155,9 +155,6 @@ program_stmt_process(struct program *p, bool abstract, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	if (abstract) {
-		if (ast_stmt_ispre(stmt)) {
-			return NULL;
-		}
 		return ast_stmt_absprocess(stmt, p->name, s, false, true);
 	}
 	return ast_stmt_process(stmt, p->name, s);

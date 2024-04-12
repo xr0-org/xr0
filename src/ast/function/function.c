@@ -235,9 +235,9 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 		state_declare(s, params[i], true);
 	}
 
-	if ((err = ast_function_precondsinit(f, s))) {
-		return err;
-	}
+	/*if ((err = ast_function_precondsinit(f, s))) {*/
+		/*return err;*/
+	/*}*/
 	
 	for (int i = 0; i < nparams; i++) {
 		if ((err = inititalise_param(params[i], s))) {
@@ -257,7 +257,9 @@ ast_function_precondsinit(struct ast_function *f, struct state *s)
 	if (!pre.stmt) {
 		return NULL;
 	}
-	struct error *err = ast_stmt_absprocess(pre.stmt, ast_function_name(f), s, true, true);
+	struct error *err = ast_stmt_absprocess(
+		pre.stmt, ast_function_name(f), s, true, true
+	);
 	if (err) {
 		struct lexememarker *loc = ast_stmt_lexememarker(pre.stmt); 
 		assert(loc);
