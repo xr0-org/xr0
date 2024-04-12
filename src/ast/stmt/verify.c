@@ -529,6 +529,7 @@ static struct error *
 stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {	
+	case STMT_NOP:
 	case STMT_EXPR:
 	case STMT_ALLOCATION:
 	case STMT_JUMP:
@@ -540,6 +541,7 @@ stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 	case STMT_COMPOUND:
 		return comp_setupabsexec(stmt, state);
 	default:
+		printf("stmt: %s\n", ast_stmt_str(stmt));
 		assert(false);
 	}
 }
