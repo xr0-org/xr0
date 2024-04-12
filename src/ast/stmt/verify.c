@@ -522,9 +522,6 @@ comp_setupabsexec(struct ast_stmt *, struct state *);
 struct error *
 ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
-	if (ast_stmt_kind(stmt) != STMT_SELECTION) {
-		return NULL;
-	}
 	return stmt_setupabsexec(stmt, state);
 }
 
