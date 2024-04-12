@@ -508,9 +508,6 @@ jump_absexec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
-stmt_setupabsexec(struct ast_stmt *, struct state *);
-
-static struct error *
 labelled_setupabsexec(struct ast_stmt *, struct state *);
 
 static struct error *
@@ -522,16 +519,11 @@ comp_setupabsexec(struct ast_stmt *, struct state *);
 struct error *
 ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
-	return stmt_setupabsexec(stmt, state);
-}
-
-static struct error *
-stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
-{
 	switch (ast_stmt_kind(stmt)) {	
 	case STMT_NOP:
 	case STMT_EXPR:
 	case STMT_ALLOCATION:
+	case STMT_ITERATION: /* XXX */
 	case STMT_JUMP:
 		return NULL;
 	case STMT_LABELLED:
@@ -541,7 +533,6 @@ stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 	case STMT_COMPOUND:
 		return comp_setupabsexec(stmt, state);
 	default:
-		printf("stmt: %s\n", ast_stmt_str(stmt));
 		assert(false);
 	}
 }
@@ -549,9 +540,12 @@ stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("state: %s\n", state_str(state));
 	/* XXX: dedupe the execution of setups */
-	struct error *err = ast_stmt_absexec(ast_stmt_labelled_stmt(stmt), state, true, true);
+	struct ast_stmt *lstmt = ast_stmt_labelled_stmt(stmt);
+	if (ast_stmt_kind(lstmt) == STMT_SELECTION) {
+		return error_printf("setup preconditions must be decidable");
+	}
+	struct error *err = ast_stmt_absexec(lstmt, state, true, true);
 	if (err) {
 		return err;
 	}
@@ -569,9 +563,9 @@ sel_setupabsexec(struct ast_stmt *stmt, struct state *state)
 		return dec.err;
 	}
 	if (dec.decision) {
-		return stmt_setupabsexec(body, state);
+		return ast_stmt_setupabsexec(body, state);
 	} else if (nest) {
-		return stmt_setupabsexec(nest, state);
+		return ast_stmt_setupabsexec(nest, state);
 	}
 	return NULL;
 }
@@ -586,7 +580,7 @@ comp_setupabsexec(struct ast_stmt *stmt, struct state *state)
 	struct ast_stmt **stmts = ast_block_stmts(b);
 	for (int i = 0; i < nstmt; i++) {
 		if (ast_stmt_ispre(stmts[i])) {
-			if ((err = stmt_setupabsexec(stmts[i], state))) {
+			if ((err = ast_stmt_setupabsexec(stmts[i], state))) {
 				return err;
 			}
 			if (ast_stmt_isterminal(stmts[i], state)) {

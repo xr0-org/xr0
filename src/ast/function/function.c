@@ -300,7 +300,12 @@ ast_function_setupabsexec(struct ast_function *f, struct state *state)
 	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
 	for (int i = 0; i < nstmts; i++) {
 		if ((err = ast_stmt_setupabsexec(stmt[i], state))) {
-			return err;
+			struct lexememarker *loc = ast_stmt_lexememarker(stmt[i]); 
+			assert(loc);
+			char *m = lexememarker_str(loc);
+			struct error *e = error_printf("%s %w", m, err);
+			free(m);
+			return e;
 		}
 	}
 	return NULL;
