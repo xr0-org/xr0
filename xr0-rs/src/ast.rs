@@ -228,12 +228,14 @@ pub struct LValue {
     pub t: *mut AstType,
     pub obj: *mut Object,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct LValueRes {
     pub lval: *mut LValue,
     pub err: *mut Error,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstFunction {
@@ -245,6 +247,7 @@ pub struct AstFunction {
     pub abstract_0: *mut AstBlock,
     pub body: *mut AstBlock,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstBlock {
@@ -253,6 +256,7 @@ pub struct AstBlock {
     pub decl: *mut *mut AstVariable,
     pub stmt: *mut *mut AstStmt,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstStmt {
@@ -260,26 +264,29 @@ pub struct AstStmt {
     pub u: C2RustUnnamed_8,
     pub loc: *mut LexemeMarker,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub union C2RustUnnamed_8 {
-    pub labelled: C2RustUnnamed_13,
+    pub labelled: AstLabelledStmt,
     pub compound: *mut AstBlock,
-    pub selection: C2RustUnnamed_12,
-    pub iteration: C2RustUnnamed_11,
+    pub selection: AstSelectionStmt,
+    pub iteration: AstIterationStmt,
     pub expr: *mut AstExpr,
-    pub jump: C2RustUnnamed_10,
-    pub alloc: C2RustUnnamed_9,
+    pub jump: AstJumpStmt,
+    pub alloc: AstAllocStmt,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_9 {
+pub struct AstAllocStmt {
     pub kind: AstAllocKind,
     pub arg: *mut AstExpr,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_10 {
+pub struct AstJumpStmt {
     pub kind: AstJumpKind,
     pub rv: *mut AstExpr,
 }
@@ -291,24 +298,26 @@ pub enum AstJumpKind {
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_11 {
+pub struct AstIterationStmt {
     pub init: *mut AstStmt,
     pub cond: *mut AstStmt,
     pub body: *mut AstStmt,
     pub iter: *mut AstExpr,
     pub abstract_0: *mut AstBlock,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_12 {
+pub struct AstSelectionStmt {
     pub isswitch: bool,
     pub cond: *mut AstExpr,
     pub body: *mut AstStmt,
     pub nest: *mut AstStmt,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_13 {
+pub struct AstLabelledStmt {
     pub label: *mut libc::c_char,
     pub stmt: *mut AstStmt,
 }
@@ -333,18 +342,21 @@ pub struct Decision {
     pub decision: bool,
     pub err: *mut Error,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct PrecondsResult {
     pub stmt: *mut AstStmt,
     pub err: *mut Error,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Preresult {
     pub iscontradiction: bool,
     pub err: *mut Error,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstStmtSplits {
@@ -352,39 +364,33 @@ pub struct AstStmtSplits {
     pub cond: *mut *mut AstExpr,
     pub err: *mut Error,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstFunctionArr {
     pub n: libc::c_int,
     pub f: *mut *mut AstFunction,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct AstExternDecl {
     pub kind: AstExternDeclKind,
-    pub c2rust_unnamed: C2RustUnnamed_14,
 }
+
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union C2RustUnnamed_14 {
-    pub function: *mut AstFunction,
-    pub variable: *mut AstVariable,
-    pub _typedef: C2RustUnnamed_15,
-    pub _struct: *mut AstType,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct C2RustUnnamed_15 {
+pub struct AstTypedefDecl {
     pub name: *mut libc::c_char,
     pub type_0: *mut AstType,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone)]
 pub enum AstExternDeclKind {
-    Function,
-    Variable,
-    Typedef,
-    Struct,
+    Function(*mut AstFunction),
+    Variable(*mut AstVariable),
+    Typedef(AstTypedefDecl),
+    Struct(*mut AstType),
 }
 
 #[derive(Copy, Clone)]
@@ -5339,18 +5345,19 @@ pub unsafe fn ast_function_arr_func(mut arr: *mut AstFunctionArr) -> *mut *mut A
 pub unsafe fn ast_functiondecl_create(mut f: *mut AstFunction) -> *mut AstExternDecl {
     let mut decl: *mut AstExternDecl =
         malloc(::core::mem::size_of::<AstExternDecl>()) as *mut AstExternDecl;
-    (*decl).kind = AstExternDeclKind::Function;
-    (*decl).c2rust_unnamed.function = f;
+    (*decl).kind = AstExternDeclKind::Function(f);
     return decl;
 }
 
 pub unsafe fn ast_externdecl_isfunction(mut decl: *mut AstExternDecl) -> bool {
-    (*decl).kind == AstExternDeclKind::Function
+    matches!((*decl).kind, AstExternDeclKind::Function(_))
 }
 
 pub unsafe fn ast_externdecl_as_function(mut decl: *mut AstExternDecl) -> *mut AstFunction {
-    assert_eq!((*decl).kind, AstExternDeclKind::Function);
-    return (*decl).c2rust_unnamed.function;
+    match &(*decl).kind {
+        AstExternDeclKind::Function(f) => *f,
+        _ => panic!(),
+    }
 }
 
 pub unsafe fn ast_decl_create(
@@ -5360,61 +5367,49 @@ pub unsafe fn ast_decl_create(
     let mut decl: *mut AstExternDecl =
         malloc(::core::mem::size_of::<AstExternDecl>()) as *mut AstExternDecl;
     if ast_type_istypedef(t) {
-        (*decl).kind = AstExternDeclKind::Typedef;
-        (*decl).c2rust_unnamed._typedef.name = name;
-        (*decl).c2rust_unnamed._typedef.type_0 = t;
+        (*decl).kind = AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t });
     } else if ast_type_isstruct(t) {
         if (ast_type_struct_tag(t)).is_null() {
             panic!();
         }
-        (*decl).kind = AstExternDeclKind::Struct;
-        (*decl).c2rust_unnamed._struct = t;
+        (*decl).kind = AstExternDeclKind::Struct(t);
     } else {
-        (*decl).kind = AstExternDeclKind::Variable;
-        (*decl).c2rust_unnamed.variable = ast_variable_create(name, t);
+        (*decl).kind = AstExternDeclKind::Variable(ast_variable_create(name, t));
     }
     return decl;
 }
 
 pub unsafe fn ast_externdecl_install(mut decl: *mut AstExternDecl, mut ext: *mut Externals) {
-    let mut f: *mut AstFunction = 0 as *mut AstFunction;
-    let mut v: *mut AstVariable = 0 as *mut AstVariable;
     match (*decl).kind {
-        AstExternDeclKind::Function => {
-            f = (*decl).c2rust_unnamed.function;
+        AstExternDeclKind::Function(f) => {
             externals_declarefunc(ext, ast_function_name(f), f);
         }
-        AstExternDeclKind::Variable => {
-            v = (*decl).c2rust_unnamed.variable;
+        AstExternDeclKind::Variable(v) => {
             externals_declarevar(ext, ast_variable_name(v), v);
         }
-        AstExternDeclKind::Typedef => {
-            externals_declaretypedef(
-                ext,
-                (*decl).c2rust_unnamed._typedef.name,
-                (*decl).c2rust_unnamed._typedef.type_0,
-            );
+        AstExternDeclKind::Typedef(typedef) => {
+            externals_declaretypedef(ext, typedef.name, typedef.type_0);
         }
-        AstExternDeclKind::Struct => {
-            externals_declarestruct(ext, (*decl).c2rust_unnamed._struct);
+        AstExternDeclKind::Struct(s) => {
+            externals_declarestruct(ext, s);
         }
     }
 }
 
 pub unsafe fn ast_externdecl_destroy(mut decl: *mut AstExternDecl) {
     match (*decl).kind {
-        AstExternDeclKind::Function => {
-            ast_function_destroy((*decl).c2rust_unnamed.function);
+        AstExternDeclKind::Function(f) => {
+            ast_function_destroy(f);
         }
-        AstExternDeclKind::Variable => {
-            ast_variable_destroy((*decl).c2rust_unnamed.variable);
+        AstExternDeclKind::Variable(v) => {
+            ast_variable_destroy(v);
         }
-        AstExternDeclKind::Typedef => {
-            free((*decl).c2rust_unnamed._typedef.name as *mut libc::c_void);
-            ast_type_destroy((*decl).c2rust_unnamed._typedef.type_0);
+        AstExternDeclKind::Typedef(td) => {
+            free(td.name as *mut libc::c_void);
+            ast_type_destroy(td.type_0);
         }
-        AstExternDeclKind::Struct => {
-            ast_type_destroy((*decl).c2rust_unnamed._struct);
+        AstExternDeclKind::Struct(s) => {
+            ast_type_destroy(s);
         }
     }
     free(decl as *mut libc::c_void);
