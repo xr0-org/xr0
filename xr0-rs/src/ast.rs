@@ -77,58 +77,49 @@ pub struct AstExpr {
     kind: AstExprKind,
 }
 
-#[derive(Copy, Clone)]
 pub struct AllocExpr {
     kind: AstAllocKind,
     arg: *mut AstExpr,
 }
 
-#[derive(Clone)]
 pub struct UnaryExpr {
     op: AstUnaryOp,
     arg: *mut AstExpr,
 }
 
-#[derive(Copy, Clone)]
 pub struct BinaryExpr {
     op: AstBinaryOp,
     e1: *mut AstExpr,
     e2: *mut AstExpr,
 }
 
-#[derive(Clone)]
 pub struct AssignmentExpr {
     lval: *mut AstExpr,
     rval: *mut AstExpr,
 }
 
-#[derive(Copy, Clone)]
 pub struct IncDecExpr {
     operand: *mut AstExpr,
     inc: libc::c_int,
     pre: libc::c_int,
 }
 
-#[derive(Copy, Clone)]
 pub struct CallExpr {
     fun: *mut AstExpr,
     n: libc::c_int,
     arg: *mut *mut AstExpr,
 }
 
-#[derive(Copy, Clone)]
 pub struct ConstantExpr {
     constant: libc::c_int,
     ischar: bool,
 }
 
-#[derive(Clone)]
 pub struct StructMemberExpr {
     root: *mut AstExpr,
     field: *mut libc::c_char,
 }
 
-#[derive(Clone)]
 enum AstExprKind {
     Identifier(*mut libc::c_char),
     Constant(ConstantExpr),
@@ -148,48 +139,36 @@ enum AstExprKind {
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Result {
     pub val: *mut Value,
     pub err: *mut Error,
 }
 
-#[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstType {
     pub modifiers: libc::c_int,
     pub base: AstTypeBase,
 }
 
-#[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstStructType {
     pub tag: *mut libc::c_char,
     pub members: *mut AstVariableArr,
 }
 
-#[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstVariableArr {
     pub n: libc::c_int,
     pub v: *mut *mut AstVariable,
 }
 
-#[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstVariable {
     pub name: *mut libc::c_char,
     pub type_0: *mut AstType,
 }
 
-#[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstArrayType {
     pub type_0: *mut AstType,
     pub length: libc::c_int,
 }
 
-#[derive(Copy, Clone)]
 pub enum AstTypeBase {
     Void,
     Char,
@@ -454,7 +433,7 @@ unsafe fn rangeprocess_alloc(
 ) -> *mut Error {
     let lval: *mut AstExpr = ast_expr_assignment_lval(expr);
     let rval: *mut AstExpr = ast_expr_assignment_rval(expr);
-    let AstExprKind::Allocation(alloc) = (*rval).kind else {
+    let AstExprKind::Allocation(alloc) = &(*rval).kind else {
         panic!()
     };
     assert_ne!(alloc.kind, AstAllocKind::Dealloc);
@@ -477,17 +456,17 @@ pub unsafe fn ast_expr_matheval(e: *mut AstExpr) -> bool {
 }
 
 unsafe fn math_expr(e: *mut AstExpr) -> *mut MathExpr {
-    match (*e).kind {
+    match &(*e).kind {
         AstExprKind::Identifier(id) => {
-            math_expr_atom_create(math_atom_variable_create(dynamic_str(id)))
+            math_expr_atom_create(math_atom_variable_create(dynamic_str(*id)))
         }
-        AstExprKind::Constant(ConstantExpr { constant: c, .. }) => {
-            if c < 0 {
+        AstExprKind::Constant(c) => {
+            if c.constant < 0 {
                 math_expr_neg_create(math_expr_atom_create(math_atom_nat_create(
-                    -c as libc::c_uint,
+                    -c.constant as libc::c_uint,
                 )))
             } else {
-                math_expr_atom_create(math_atom_nat_create(c as libc::c_uint))
+                math_expr_atom_create(math_atom_nat_create(c.constant as libc::c_uint))
             }
         }
         AstExprKind::Binary(binary) => {
@@ -901,7 +880,7 @@ pub unsafe fn ast_expr_alloc_rangeprocess(
     let res_up: *mut AstExpr = value_to_expr(result_as_value(result_up));
     result_destroy(result_up);
     result_destroy(result_lw);
-    match (*alloc).kind {
+    match &(*alloc).kind {
         AstExprKind::Assignment(_) => {
             err = rangeprocess_alloc(alloc, res_lw, res_up, state);
         }
@@ -1163,7 +1142,7 @@ unsafe fn dereference_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result
     return res;
 }
 unsafe fn ast_expr_constant_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
-    let c = match (*expr).kind {
+    let c = match &(*expr).kind {
         AstExprKind::Constant(c) => c,
         _ => panic!(),
     };
@@ -1577,7 +1556,7 @@ pub unsafe fn ast_expr_as_literal(expr: *mut AstExpr) -> *mut libc::c_char {
 }
 
 pub unsafe fn ast_expr_as_constant(expr: *mut AstExpr) -> libc::c_int {
-    match (*expr).kind {
+    match &(*expr).kind {
         AstExprKind::Constant(c) => c.constant,
         _ => panic!(),
     }
@@ -1885,7 +1864,7 @@ pub unsafe fn ast_expr_member_root(expr: *mut AstExpr) -> *mut AstExpr {
 }
 
 pub unsafe fn ast_expr_incdec_pre(expr: *mut AstExpr) -> bool {
-    match (*expr).kind {
+    match &(*expr).kind {
         AstExprKind::IncDec(incdec) => incdec.pre != 0,
         _ => panic!(),
     }
@@ -2598,10 +2577,10 @@ unsafe fn ast_expr_call_getfuncs(expr: *mut AstExpr) -> Box<StringArr> {
     };
     let mut res = string_arr_create();
     let fun: *mut AstExpr = call.fun;
-    let AstExprKind::Identifier(id) = (*fun).kind else {
+    let AstExprKind::Identifier(id) = &(*fun).kind else {
         panic!()
     };
-    string_arr_append(&mut res, dynamic_str(id));
+    string_arr_append(&mut res, dynamic_str(*id));
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
         res = string_arr_concat(&res, &ast_expr_getfuncs(*(call.arg).offset(i as isize)));
@@ -3797,10 +3776,10 @@ pub unsafe fn ast_stmt_iter_upper_bound(stmt: *mut AstStmt) -> *mut AstExpr {
         panic!();
     };
     let cond: *mut AstStmt = iteration.cond;
-    let AstStmtKind::Expr(expr) = (*cond).kind else {
+    let AstStmtKind::Expr(expr) = &(*cond).kind else {
         panic!();
     };
-    ast_expr_binary_e2(expr)
+    ast_expr_binary_e2(*expr)
 }
 
 unsafe fn iter_absexec(stmt: *mut AstStmt, state: *mut State) -> *mut Result {
@@ -4111,11 +4090,11 @@ pub unsafe fn ast_type_vconst(
     comment: *mut libc::c_char,
     persist: bool,
 ) -> *mut Value {
-    match (*t).base {
+    match &(*t).base {
         AstTypeBase::Int => value_int_indefinite_create(),
         AstTypeBase::Pointer(_) => value_ptr_indefinite_create(),
         AstTypeBase::UserDefined(name) => ast_type_vconst(
-            externals_gettypedef(state_getext(s), name),
+            externals_gettypedef(state_getext(s), *name),
             s,
             comment,
             persist,
@@ -4141,14 +4120,14 @@ pub unsafe fn ast_type_struct_complete(t: *mut AstType, ext: *mut Externals) -> 
 }
 
 pub unsafe fn ast_type_struct_members(t: *mut AstType) -> *mut AstVariableArr {
-    let AstTypeBase::Struct(s) = (*t).base else {
+    let AstTypeBase::Struct(s) = &(*t).base else {
         panic!()
     };
     s.members
 }
 
 pub unsafe fn ast_type_struct_tag(t: *mut AstType) -> *mut libc::c_char {
-    let AstTypeBase::Struct(s) = (*t).base else {
+    let AstTypeBase::Struct(s) = &(*t).base else {
         panic!()
     };
     s.tag
@@ -4163,7 +4142,7 @@ pub unsafe fn ast_type_create_struct_partial(tag: *mut libc::c_char) -> *mut Ast
 }
 
 pub unsafe fn ast_type_copy_struct(old: *mut AstType) -> *mut AstType {
-    let AstTypeBase::Struct(s) = (*old).base else {
+    let AstTypeBase::Struct(s) = &(*old).base else {
         panic!();
     };
     ast_type_create(
@@ -4192,10 +4171,10 @@ pub unsafe fn ast_type_istypedef(t: *mut AstType) -> bool {
 }
 
 pub unsafe fn ast_type_destroy(t: *mut AstType) {
-    match (*t).base {
+    match &(*t).base {
         AstTypeBase::Pointer(ptr_type) => {
             assert!(!ptr_type.is_null());
-            ast_type_destroy(ptr_type);
+            ast_type_destroy(*ptr_type);
         }
         AstTypeBase::Array(arr) => {
             assert!(!arr.type_0.is_null());
@@ -4210,15 +4189,21 @@ pub unsafe fn ast_type_copy(t: *mut AstType) -> *mut AstType {
     if t.is_null() {
         panic!();
     }
-    match (*t).base {
-        AstTypeBase::Pointer(ptr_type) => return ast_type_create_ptr(ast_type_copy(ptr_type)),
+    match &(*t).base {
+        AstTypeBase::Pointer(ptr_type) => return ast_type_create_ptr(ast_type_copy(*ptr_type)),
         AstTypeBase::Array(arr) => {
             return ast_type_create_arr(ast_type_copy(arr.type_0), arr.length);
         }
         AstTypeBase::Struct(_) => return ast_type_copy_struct(t),
-        AstTypeBase::UserDefined(name) => return ast_type_create_userdef(dynamic_str(name)),
-        AstTypeBase::Void | AstTypeBase::Int | AstTypeBase::Char => {
-            return ast_type_create((*t).base, (*t).modifiers as libc::c_uint as AstTypeModifier)
+        AstTypeBase::UserDefined(name) => return ast_type_create_userdef(dynamic_str(*name)),
+        AstTypeBase::Void => {
+            return ast_type_create(AstTypeBase::Void, (*t).modifiers as AstTypeModifier)
+        }
+        AstTypeBase::Int => {
+            return ast_type_create(AstTypeBase::Int, (*t).modifiers as AstTypeModifier)
+        }
+        AstTypeBase::Char => {
+            return ast_type_create(AstTypeBase::Char, (*t).modifiers as AstTypeModifier)
         }
         _ => {
             panic!();
@@ -4375,15 +4360,11 @@ unsafe fn ast_type_str_build_struct(b: *mut StrBuilder, s: &AstStructType) {
     strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
 }
 
-pub unsafe fn ast_type_base(t: *mut AstType) -> AstTypeBase {
-    (*t).base
-}
-
 pub unsafe fn ast_type_ptr_type(t: *mut AstType) -> *mut AstType {
-    let AstTypeBase::Pointer(ptr_type) = (*t).base else {
+    let AstTypeBase::Pointer(ptr_type) = &(*t).base else {
         panic!()
     };
-    ptr_type
+    *ptr_type
 }
 
 pub unsafe fn ast_variable_create(
@@ -5232,36 +5213,36 @@ pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> *mut 
 }
 
 pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: *mut Externals) {
-    match (*decl).kind {
+    match &(*decl).kind {
         AstExternDeclKind::Function(f) => {
-            externals_declarefunc(ext, ast_function_name(f), f);
+            externals_declarefunc(ext, ast_function_name(*f), *f);
         }
         AstExternDeclKind::Variable(v) => {
-            externals_declarevar(ext, ast_variable_name(v), v);
+            externals_declarevar(ext, ast_variable_name(*v), *v);
         }
         AstExternDeclKind::Typedef(typedef) => {
             externals_declaretypedef(ext, typedef.name, typedef.type_0);
         }
         AstExternDeclKind::Struct(s) => {
-            externals_declarestruct(ext, s);
+            externals_declarestruct(ext, *s);
         }
     }
 }
 
 pub unsafe fn ast_externdecl_destroy(decl: *mut AstExternDecl) {
-    match (*decl).kind {
+    match &(*decl).kind {
         AstExternDeclKind::Function(f) => {
-            ast_function_destroy(f);
+            ast_function_destroy(*f);
         }
         AstExternDeclKind::Variable(v) => {
-            ast_variable_destroy(v);
+            ast_variable_destroy(*v);
         }
         AstExternDeclKind::Typedef(td) => {
             free(td.name as *mut libc::c_void);
             ast_type_destroy(td.type_0);
         }
         AstExternDeclKind::Struct(s) => {
-            ast_type_destroy(s);
+            ast_type_destroy(*s);
         }
     }
     free(decl as *mut libc::c_void);
