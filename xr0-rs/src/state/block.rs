@@ -74,8 +74,7 @@ pub unsafe fn block_str(block: *mut Block) -> *mut libc::c_char {
 pub unsafe fn block_install(b: *mut Block, obj: *mut Object) {
     if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) {
         panic!();
-    } else {
-    };
+    }
     object_arr_append((*b).arr, obj);
 }
 
@@ -90,7 +89,7 @@ pub unsafe fn block_observe(
         if !constructive {
             return 0 as *mut Object;
         }
-        let obj: *mut Object = object_value_create(ast_expr_copy(offset), 0 as *mut Value);
+        let obj: *mut Object = object_value_create(ast_expr_copy(&*offset), 0 as *mut Value);
         object_arr_append((*b).arr, obj);
         return obj;
     }
@@ -98,21 +97,20 @@ pub unsafe fn block_observe(
     if object_isvalue(obj_0) {
         return obj_0;
     }
-    let lw: *mut AstExpr = ast_expr_copy(offset);
+    let lw: *mut AstExpr = ast_expr_copy(&*offset);
     let up: *mut AstExpr = ast_expr_sum_create(
-        ast_expr_copy(offset),
+        ast_expr_copy(&*offset),
         ast_expr_constant_create(1 as libc::c_int),
     );
     let upto: *mut Object = object_upto(obj_0, lw, s);
-    let observed: *mut Object = object_value_create(ast_expr_copy(lw), state_alloc(s));
+    let observed: *mut Object = object_value_create(ast_expr_copy(&*lw), state_alloc(s));
     let from: *mut Object = object_from(obj_0, up, s);
     ast_expr_destroy(up);
     ast_expr_destroy(lw);
     let err: *mut Error = object_dealloc(obj_0, s);
     if !err.is_null() {
         panic!();
-    } else {
-    };
+    }
     object_arr_remove((*b).arr, index);
     if !upto.is_null() {
         let fresh0 = index;
@@ -149,14 +147,13 @@ pub unsafe fn block_range_alloc(
 ) -> *mut Error {
     if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) {
         panic!();
-    } else {
-    };
+    }
     object_arr_append(
         (*b).arr,
         object_range_create(
-            ast_expr_copy(lw),
+            ast_expr_copy(&*lw),
             range_create(
-                ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
+                ast_expr_difference_create(ast_expr_copy(&*up), ast_expr_copy(&*lw)),
                 heap_newblock(heap),
             ),
         ),
@@ -165,7 +162,7 @@ pub unsafe fn block_range_alloc(
 }
 
 pub unsafe fn block_range_aredeallocands(
-    b: *mut Block,
+    b: &Block,
     lw: *mut AstExpr,
     up: *mut AstExpr,
     s: *mut State,
@@ -173,15 +170,15 @@ pub unsafe fn block_range_aredeallocands(
     if hack_first_object_is_exactly_bounds(b, lw, up, s) {
         return 1 as libc::c_int != 0;
     }
-    let lw_index: libc::c_int = object_arr_index((*b).arr, lw, s);
+    let lw_index: libc::c_int = object_arr_index(b.arr, lw, s);
     if lw_index == -(1 as libc::c_int) {
         return 0 as libc::c_int != 0;
     }
-    let up_index: libc::c_int = object_arr_index_upperincl((*b).arr, up, s);
+    let up_index: libc::c_int = object_arr_index_upperincl(b.arr, up, s);
     if up_index == -(1 as libc::c_int) {
         return 0 as libc::c_int != 0;
     }
-    let obj: *mut *mut Object = object_arr_objects((*b).arr);
+    let obj: *mut *mut Object = object_arr_objects(b.arr);
     let mut i: libc::c_int = lw_index;
     while i < up_index {
         if !object_isdeallocand(*obj.offset(i as isize), s) {
@@ -198,20 +195,20 @@ pub unsafe fn block_range_aredeallocands(
     }
     if !object_isdeallocand(*obj.offset(up_index as isize), s) {
         panic!();
-    } else {
-    };
+    }
     return 1 as libc::c_int != 0;
 }
+
 unsafe fn hack_first_object_is_exactly_bounds(
-    b: *mut Block,
+    b: &Block,
     lw: *mut AstExpr,
     up: *mut AstExpr,
     s: *mut State,
 ) -> bool {
-    if object_arr_nobjects((*b).arr) == 0 as libc::c_int {
+    if object_arr_nobjects(b.arr) == 0 as libc::c_int {
         return 0 as libc::c_int != 0;
     }
-    let obj: *mut Object = *(object_arr_objects((*b).arr)).offset(0 as libc::c_int as isize);
+    let obj: *mut Object = *(object_arr_objects(b.arr)).offset(0 as libc::c_int as isize);
     if !object_isdeallocand(obj, s) {
         return 0 as libc::c_int != 0;
     }
@@ -227,7 +224,7 @@ pub unsafe fn block_range_dealloc(
     up: *mut AstExpr,
     s: *mut State,
 ) -> *mut Error {
-    if hack_first_object_is_exactly_bounds(b, lw, up, s) {
+    if hack_first_object_is_exactly_bounds(&*b, lw, up, s) {
         let err: *mut Error = object_dealloc(
             *(object_arr_objects((*b).arr)).offset(0 as libc::c_int as isize),
             s,
@@ -303,8 +300,7 @@ pub unsafe fn block_arr_create() -> *mut BlockArr {
     let arr: *mut BlockArr = calloc(1, ::core::mem::size_of::<BlockArr>()) as *mut BlockArr;
     if arr.is_null() {
         panic!();
-    } else {
-    };
+    }
     return arr;
 }
 

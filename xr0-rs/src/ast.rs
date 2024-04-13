@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_assignments, unused_variables)]
 
 use std::ffi::CStr;
+use std::ptr;
 
 use libc::{calloc, exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
 
@@ -219,7 +220,7 @@ pub struct AstFunction {
     pub nparam: libc::c_int,
     pub param: *mut *mut AstVariable,
     pub abstract_0: *mut AstBlock,
-    pub body: *mut AstBlock,
+    pub body: *mut AstBlock, // can be null
 }
 
 #[repr(C)]
@@ -353,15 +354,15 @@ pub struct Ast {
     pub decl: *mut *mut AstExternDecl,
 }
 
-unsafe fn expr_literal_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn expr_literal_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     let res: *mut Result = result_value_create(state_static_init(state, expr));
     return res;
 }
-unsafe fn expr_constant_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn expr_constant_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     return result_value_create(value_int_create(ast_expr_as_constant(expr)));
 }
 unsafe fn rangeprocess_dealloc(
-    dealloc: *mut AstExpr,
+    dealloc: &AstExpr,
     lw: *mut AstExpr,
     up: *mut AstExpr,
     state: *mut State,
@@ -369,11 +370,10 @@ unsafe fn rangeprocess_dealloc(
     let obj: *mut Object = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), state);
     return state_range_dealloc(state, obj, lw, up);
 }
-unsafe fn hack_base_object_from_alloc(expr: *mut AstExpr, state: *mut State) -> *mut Object {
-    let inner: *mut AstExpr = ast_expr_unary_operand(expr);
-    let i: *mut AstExpr =
-        ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
-    if !ast_expr_equal(ast_expr_binary_e2(inner), i) {
+unsafe fn hack_base_object_from_alloc(expr: &AstExpr, state: *mut State) -> *mut Object {
+    let inner = ast_expr_unary_operand(expr);
+    let i = ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
+    if !ast_expr_equal(ast_expr_binary_e2(inner), &*i) {
         panic!();
     }
     ast_expr_destroy(i);
@@ -388,22 +388,19 @@ unsafe fn hack_base_object_from_alloc(expr: *mut AstExpr, state: *mut State) -> 
     return obj;
 }
 
-pub unsafe fn ast_expr_equal(e1: *mut AstExpr, e2: *mut AstExpr) -> bool {
-    if e1.is_null() || e2.is_null() {
-        return false;
-    }
-    match (&(*e1).kind, &(*e2).kind) {
+pub unsafe fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
+    match (&e1.kind, &e2.kind) {
         (AstExprKind::Constant(c1), AstExprKind::Constant(c2)) => c1.constant == c2.constant,
         (AstExprKind::Identifier(id1), AstExprKind::Identifier(id2)) => strcmp(*id1, *id2) == 0,
         (AstExprKind::StringLiteral(s1), AstExprKind::StringLiteral(s2)) => strcmp(*s1, *s2) == 0,
         (AstExprKind::Assignment(a1), AstExprKind::Assignment(a2)) => {
-            ast_expr_equal(a1.lval, a2.lval) && ast_expr_equal(a1.rval, a2.rval)
+            ast_expr_equal(&*a1.lval, &*a2.lval) && ast_expr_equal(&*a1.rval, &*a2.rval)
         }
         (AstExprKind::Unary(u1), AstExprKind::Unary(u2)) => {
-            u1.op == u2.op && ast_expr_equal(u1.arg, u2.arg)
+            u1.op == u2.op && ast_expr_equal(&*u1.arg, &*u2.arg)
         }
         (AstExprKind::Binary(b1), AstExprKind::Binary(b2)) => {
-            b1.op == b2.op && ast_expr_equal(b1.e1, b2.e1) && ast_expr_equal(b1.e2, b2.e2)
+            b1.op == b2.op && ast_expr_equal(&*b1.e1, &*b2.e1) && ast_expr_equal(&*b1.e2, &*b2.e2)
         }
         (AstExprKind::Call(c1), AstExprKind::Call(c2)) => {
             if c1.n != c2.n {
@@ -411,28 +408,28 @@ pub unsafe fn ast_expr_equal(e1: *mut AstExpr, e2: *mut AstExpr) -> bool {
             }
             let mut i: libc::c_int = 0 as libc::c_int;
             while i < c1.n {
-                if !ast_expr_equal(*(c1.arg).offset(i as isize), *(c2.arg).offset(i as isize)) {
+                if !ast_expr_equal(&**c1.arg.offset(i as isize), &**c2.arg.offset(i as isize)) {
                     return false;
                 }
                 i += 1;
             }
-            ast_expr_equal(c1.fun, c2.fun)
+            ast_expr_equal(&*c1.fun, &*c2.fun)
         }
         (AstExprKind::StructMember(m1), AstExprKind::StructMember(m2)) => {
-            ast_expr_equal(m1.root, m2.root) && strcmp(m1.field, m2.field) == 0
+            ast_expr_equal(&*m1.root, &*m2.root) && strcmp(m1.field, m2.field) == 0
         }
         _ => false,
     }
 }
 
 unsafe fn rangeprocess_alloc(
-    expr: *mut AstExpr,
+    expr: &AstExpr,
     lw: *mut AstExpr,
     up: *mut AstExpr,
     state: *mut State,
 ) -> *mut Error {
-    let lval: *mut AstExpr = ast_expr_assignment_lval(expr);
-    let rval: *mut AstExpr = ast_expr_assignment_rval(expr);
+    let lval = ast_expr_assignment_lval(expr);
+    let rval = ast_expr_assignment_rval(expr);
     let AstExprKind::Allocation(alloc) = &(*rval).kind else {
         panic!()
     };
@@ -498,9 +495,9 @@ unsafe fn eval_prop(e1: *mut MathExpr, op: AstBinaryOp, e2: *mut MathExpr) -> bo
     }
 }
 
-pub unsafe fn ast_expr_decide(expr: *mut AstExpr, state: *mut State) -> bool {
+pub unsafe fn ast_expr_decide(expr: &AstExpr, state: *mut State) -> bool {
     match &(*expr).kind {
-        AstExprKind::Constant(_) => ast_expr_as_constant(expr) != 0,
+        AstExprKind::Constant(c) => c.constant != 0,
         AstExprKind::Unary(_) => expr_unary_decide(expr, state),
         AstExprKind::IsDeallocand(_) => expr_isdeallocand_decide(expr, state),
         AstExprKind::Binary(_) => expr_binary_decide(expr, state),
@@ -508,7 +505,7 @@ pub unsafe fn ast_expr_decide(expr: *mut AstExpr, state: *mut State) -> bool {
     }
 }
 
-unsafe fn expr_binary_decide(expr: *mut AstExpr, state: *mut State) -> bool {
+unsafe fn expr_binary_decide(expr: &AstExpr, state: *mut State) -> bool {
     let root: *mut Result = ast_expr_eval(ast_expr_binary_e1(expr), state);
     let last: *mut Result = ast_expr_eval(ast_expr_binary_e2(expr), state);
     if !(!result_iserror(root) && !result_iserror(last)) {
@@ -529,14 +526,14 @@ unsafe fn value_compare(v1: *mut Value, op: AstBinaryOp, v2: *mut Value) -> bool
     }
 }
 
-unsafe fn expr_isdeallocand_decide(expr: *mut AstExpr, state: *mut State) -> bool {
+unsafe fn expr_isdeallocand_decide(expr: &AstExpr, state: *mut State) -> bool {
     let obj: *mut Object = hack_object_from_assertion(expr, state);
     let isdeallocand: bool = state_addresses_deallocand(state, obj);
     return isdeallocand;
 }
 
-unsafe fn hack_object_from_assertion(expr: *mut AstExpr, state: *mut State) -> *mut Object {
-    let assertand: *mut AstExpr = ast_expr_isdeallocand_assertand(expr);
+unsafe fn hack_object_from_assertion(expr: &AstExpr, state: *mut State) -> *mut Object {
+    let assertand = ast_expr_isdeallocand_assertand(expr);
     let res: LValueRes = ast_expr_lvalue(assertand, state);
     if !(res.err).is_null() {
         panic!();
@@ -548,8 +545,8 @@ unsafe fn hack_object_from_assertion(expr: *mut AstExpr, state: *mut State) -> *
     return obj;
 }
 
-unsafe fn expr_unary_decide(expr: *mut AstExpr, state: *mut State) -> bool {
-    let operand: *mut AstExpr = ast_expr_unary_operand(expr);
+unsafe fn expr_unary_decide(expr: &AstExpr, state: *mut State) -> bool {
+    let operand = ast_expr_unary_operand(expr);
     match ast_expr_unary_op(expr) {
         AstUnaryOp::Bang => !ast_expr_decide(operand, state),
         _ => panic!(),
@@ -557,7 +554,7 @@ unsafe fn expr_unary_decide(expr: *mut AstExpr, state: *mut State) -> bool {
 }
 
 pub unsafe fn ast_expr_rangedecide(
-    expr: *mut AstExpr,
+    expr: &AstExpr,
     lw: *mut AstExpr,
     up: *mut AstExpr,
     state: *mut State,
@@ -570,20 +567,18 @@ pub unsafe fn ast_expr_rangedecide(
 }
 
 unsafe fn expr_isdeallocand_rangedecide(
-    expr: *mut AstExpr,
+    expr: &AstExpr,
     lw: *mut AstExpr,
     up: *mut AstExpr,
     state: *mut State,
 ) -> bool {
-    let acc: *mut AstExpr = ast_expr_isdeallocand_assertand(expr);
+    let acc = ast_expr_isdeallocand_assertand(expr);
     assert_eq!(ast_expr_unary_op(acc), AstUnaryOp::Dereference);
-    let inner: *mut AstExpr = ast_expr_unary_operand(acc);
-    let i: *mut AstExpr =
-        ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
-    let j: *mut AstExpr =
-        ast_expr_identifier_create(dynamic_str(b"j\0" as *const u8 as *const libc::c_char));
-    if !(ast_expr_equal(ast_expr_binary_e2(inner), i) as libc::c_int != 0
-        || ast_expr_equal(ast_expr_binary_e2(inner), j) as libc::c_int != 0)
+    let inner = ast_expr_unary_operand(acc);
+    let i = ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
+    let j = ast_expr_identifier_create(dynamic_str(b"j\0" as *const u8 as *const libc::c_char));
+    if !(ast_expr_equal(ast_expr_binary_e2(inner), &*i) as libc::c_int != 0
+        || ast_expr_equal(ast_expr_binary_e2(inner), &*j) as libc::c_int != 0)
     {
         panic!();
     }
@@ -601,19 +596,19 @@ unsafe fn expr_isdeallocand_rangedecide(
 }
 
 unsafe fn unary_rangedecide(
-    expr: *mut AstExpr,
+    expr: &AstExpr,
     lw: *mut AstExpr,
     up: *mut AstExpr,
     state: *mut State,
 ) -> bool {
-    let operand: *mut AstExpr = ast_expr_unary_operand(expr);
+    let operand = ast_expr_unary_operand(expr);
     match ast_expr_unary_op(expr) {
-        AstUnaryOp::Bang => return !ast_expr_rangedecide(operand, lw, up, state),
+        AstUnaryOp::Bang => !ast_expr_rangedecide(operand, lw, up, state),
         _ => panic!(),
     }
 }
 
-pub unsafe fn ast_expr_exec(expr: *mut AstExpr, state: *mut State) -> *mut Error {
+pub unsafe fn ast_expr_exec(expr: &AstExpr, state: *mut State) -> *mut Error {
     let res: *mut Result = ast_expr_eval(expr, state);
     if result_iserror(res) {
         return result_as_error(res);
@@ -627,18 +622,18 @@ pub unsafe fn ast_expr_arbarg_create() -> *mut AstExpr {
     return expr;
 }
 
-pub unsafe fn ast_expr_assume(expr: *mut AstExpr, state: *mut State) -> *mut Preresult {
+pub unsafe fn ast_expr_assume(expr: &AstExpr, state: *mut State) -> *mut Preresult {
     return reduce_assume(expr, true, state);
 }
 
-unsafe fn reduce_assume(expr: *mut AstExpr, value: bool, s: *mut State) -> *mut Preresult {
+unsafe fn reduce_assume(expr: &AstExpr, value: bool, s: *mut State) -> *mut Preresult {
     match &(*expr).kind {
         AstExprKind::Identifier(_) => return identifier_assume(expr, value, s),
         AstExprKind::Unary(unary) => {
             assert_eq!(unary.op, AstUnaryOp::Bang);
-            return reduce_assume(unary.arg, !value, s);
+            return reduce_assume(&*unary.arg, !value, s);
         }
-        AstExprKind::Bracketed(inner) => return reduce_assume(*inner, value, s),
+        AstExprKind::Bracketed(inner) => return reduce_assume(&**inner, value, s),
         AstExprKind::Call(_) | AstExprKind::StructMember(_) => {
             return ast_expr_pf_reduce_assume(expr, value, s)
         }
@@ -650,25 +645,25 @@ unsafe fn reduce_assume(expr: *mut AstExpr, value: bool, s: *mut State) -> *mut 
 }
 
 unsafe fn binary_assume(b: &BinaryExpr, value: bool, s: *mut State) -> *mut Preresult {
-    let r1: *mut Result = ast_expr_pf_reduce(b.e1, s);
-    let r2: *mut Result = ast_expr_pf_reduce(b.e2, s);
+    let r1: *mut Result = ast_expr_pf_reduce(&*b.e1, s);
+    let r2: *mut Result = ast_expr_pf_reduce(&*b.e2, s);
     let v1: *mut Value = result_as_value(r1);
     let v2: *mut Value = result_as_value(r2);
     return irreducible_assume(
-        ast_expr_binary_create(value_to_expr(v1), b.op, value_to_expr(v2)),
+        &*ast_expr_binary_create(value_to_expr(v1), b.op, value_to_expr(v2)),
         value,
         s,
     );
 }
 
-unsafe fn irreducible_assume(e: *mut AstExpr, value: bool, s: *mut State) -> *mut Preresult {
+unsafe fn irreducible_assume(e: &AstExpr, value: bool, s: *mut State) -> *mut Preresult {
     let prop: *mut AstExpr = ast_expr_inverted_copy(e, !value);
-    let r: *mut Preresult = irreducible_assume_actual(prop, s);
+    let r: *mut Preresult = irreducible_assume_actual(&*prop, s);
     ast_expr_destroy(prop);
     return r;
 }
 
-unsafe fn irreducible_assume_actual(e: *mut AstExpr, s: *mut State) -> *mut Preresult {
+unsafe fn irreducible_assume_actual(e: &AstExpr, s: *mut State) -> *mut Preresult {
     let p: *mut Props = state_getprops(s);
     if props_contradicts(p, e) {
         return preresult_contradiction_create();
@@ -683,27 +678,25 @@ pub unsafe fn ast_expr_isdereferencable_create(assertand: *mut AstExpr) -> *mut 
     return new;
 }
 
-unsafe fn ast_expr_pf_reduce_assume(
-    expr: *mut AstExpr,
-    value: bool,
-    s: *mut State,
-) -> *mut Preresult {
+unsafe fn ast_expr_pf_reduce_assume(expr: &AstExpr, value: bool, s: *mut State) -> *mut Preresult {
     let res: *mut Result = ast_expr_pf_reduce(expr, s);
     if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) {
         panic!();
     }
-    return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
+    return irreducible_assume(&*value_as_sync(result_as_value(res)), value, s);
 }
-unsafe fn identifier_assume(expr: *mut AstExpr, value: bool, s: *mut State) -> *mut Preresult {
+
+unsafe fn identifier_assume(expr: &AstExpr, value: bool, s: *mut State) -> *mut Preresult {
     let s_copy: *mut State = state_copy(s);
     let res: *mut Result = ast_expr_eval(expr, s_copy);
     if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) {
         panic!();
     }
     state_destroy(s_copy);
-    return irreducible_assume(value_as_sync(result_as_value(res)), value, s);
+    return irreducible_assume(&*value_as_sync(result_as_value(res)), value, s);
 }
-unsafe fn binary_deref_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+
+unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     let res: *mut Result = ast_expr_eval(ast_expr_binary_e1(expr), state);
     if result_iserror(res) {
         return res;
@@ -742,6 +735,7 @@ unsafe fn binary_deref_eval(expr: *mut AstExpr, state: *mut State) -> *mut Resul
     }
     return result_value_create(value_copy(v));
 }
+
 unsafe fn hack_identifier_builtin_eval(id: *mut libc::c_char, state: *mut State) -> *mut Result {
     if !(state_getvconst(state, id)).is_null()
         || strncmp(id, b"ptr:\0" as *const u8 as *const libc::c_char, 4) == 0 as libc::c_int
@@ -770,13 +764,13 @@ pub unsafe fn ast_expr_assignment_create(root: *mut AstExpr, value: *mut AstExpr
     return expr;
 }
 
-unsafe fn ast_expr_bracketed_str_build(inner: *mut AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_bracketed_str_build(inner: &AstExpr, b: *mut StrBuilder) {
     let root: *mut libc::c_char = ast_expr_str(inner);
     strbuilder_printf(b, b"(%s)\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
 
-unsafe fn expr_to_binary(expr: *mut AstExpr) -> *mut AstExpr {
+unsafe fn expr_to_binary(expr: &AstExpr) -> *mut AstExpr {
     match &(*expr).kind {
         AstExprKind::Binary(_) => return ast_expr_copy(expr),
         _ => {
@@ -789,7 +783,7 @@ unsafe fn expr_to_binary(expr: *mut AstExpr) -> *mut AstExpr {
     };
 }
 
-unsafe fn expr_identifier_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     let res: *mut Result = hack_identifier_builtin_eval(ast_expr_as_identifier(expr), state);
     if !result_iserror(res) && result_hasvalue(res) as libc::c_int != 0 {
         return res;
@@ -824,8 +818,8 @@ unsafe fn expr_identifier_eval(expr: *mut AstExpr, state: *mut State) -> *mut Re
     }
     return result_value_create(value_copy(val));
 }
-unsafe fn expr_structmember_eval(expr: *mut AstExpr, s: *mut State) -> *mut Result {
-    let root: *mut AstExpr = ast_expr_member_root(expr);
+unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> *mut Result {
+    let root = ast_expr_member_root(expr);
     let res: *mut Result = ast_expr_eval(root, s);
     if result_iserror(res) {
         return res;
@@ -854,22 +848,22 @@ unsafe fn expr_structmember_eval(expr: *mut AstExpr, s: *mut State) -> *mut Resu
     return result_value_create(v);
 }
 
-unsafe fn address_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
-    let operand: *mut AstExpr = ast_expr_unary_operand(expr);
-    let id: *mut libc::c_char = ast_expr_as_identifier(operand);
+unsafe fn address_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
+    let operand = ast_expr_unary_operand(expr);
+    let id = ast_expr_as_identifier(operand);
     let v: *mut Value = state_getloc(state, id);
     return result_value_create(v);
 }
 
 pub unsafe fn ast_expr_alloc_rangeprocess(
-    alloc: *mut AstExpr,
+    alloc: &AstExpr,
     lw: *mut AstExpr,
     up: *mut AstExpr,
     state: *mut State,
 ) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let result_lw: *mut Result = ast_expr_eval(lw, state);
-    let result_up: *mut Result = ast_expr_eval(up, state);
+    let result_lw: *mut Result = ast_expr_eval(&*lw, state);
+    let result_up: *mut Result = ast_expr_eval(&*up, state);
     if result_iserror(result_lw) {
         return result_as_error(result_lw);
     }
@@ -893,13 +887,10 @@ pub unsafe fn ast_expr_alloc_rangeprocess(
     }
     ast_expr_destroy(res_up);
     ast_expr_destroy(res_lw);
-    if !err.is_null() {
-        return err;
-    }
-    return 0 as *mut Error;
+    err
 }
 
-pub unsafe fn ast_expr_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+pub unsafe fn ast_expr_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     match &(*expr).kind {
         AstExprKind::Constant(_) => expr_constant_eval(expr, state),
         AstExprKind::StringLiteral(_) => expr_literal_eval(expr, state),
@@ -915,7 +906,7 @@ pub unsafe fn ast_expr_eval(expr: *mut AstExpr, state: *mut State) -> *mut Resul
     }
 }
 
-unsafe fn arbarg_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn arbarg_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     return result_value_create(state_vconst(
         state,
         ast_type_create_ptr(ast_type_create(AstTypeBase::Void, 0)),
@@ -923,9 +914,10 @@ unsafe fn arbarg_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
         false,
     ));
 }
-unsafe fn expr_binary_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
-    let e1: *mut AstExpr = ast_expr_binary_e1(expr);
-    let e2: *mut AstExpr = ast_expr_binary_e2(expr);
+
+unsafe fn expr_binary_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
+    let e1 = ast_expr_binary_e1(expr);
+    let e2 = ast_expr_binary_e2(expr);
     let res1: *mut Result = ast_expr_eval(e1, state);
     let res2: *mut Result = ast_expr_eval(e2, state);
     if result_iserror(res1) {
@@ -940,14 +932,15 @@ unsafe fn expr_binary_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result
         value_to_expr(result_as_value(res2)),
     )));
 }
-unsafe fn expr_incdec_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+
+unsafe fn expr_incdec_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     let assign: *mut AstExpr = ast_expr_incdec_to_assignment(expr);
     let mut res: *mut Result = 0 as *mut Result;
     if ast_expr_incdec_pre(expr) {
-        res = expr_assign_eval(assign, state);
+        res = expr_assign_eval(&*assign, state);
     } else {
         res = ast_expr_eval(ast_expr_incdec_root(expr), state);
-        result_destroy(expr_assign_eval(assign, state));
+        result_destroy(expr_assign_eval(&*assign, state));
     }
     ast_expr_destroy(assign);
     return res;
@@ -967,9 +960,9 @@ unsafe fn ast_expr_destroy_identifier(expr: *mut AstExpr) {
     free(*id as *mut libc::c_void);
 }
 
-unsafe fn expr_assign_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
-    let lval: *mut AstExpr = ast_expr_assignment_lval(expr);
-    let rval: *mut AstExpr = ast_expr_assignment_rval(expr);
+unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
+    let lval = ast_expr_assignment_lval(expr);
+    let rval = ast_expr_assignment_rval(expr);
     let res: *mut Result = ast_expr_eval(rval, state);
     if result_iserror(res) {
         return res;
@@ -1001,7 +994,7 @@ unsafe fn expr_assign_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result
     return res;
 }
 
-pub unsafe fn ast_expr_lvalue(expr: *mut AstExpr, state: *mut State) -> LValueRes {
+pub unsafe fn ast_expr_lvalue(expr: &AstExpr, state: *mut State) -> LValueRes {
     match &(*expr).kind {
         AstExprKind::Identifier(_) => expr_identifier_lvalue(expr, state),
         AstExprKind::Unary(_) => expr_unary_lvalue(expr, state),
@@ -1010,8 +1003,8 @@ pub unsafe fn ast_expr_lvalue(expr: *mut AstExpr, state: *mut State) -> LValueRe
     }
 }
 
-pub unsafe fn expr_structmember_lvalue(expr: *mut AstExpr, state: *mut State) -> LValueRes {
-    let root: *mut AstExpr = ast_expr_member_root(expr);
+pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> LValueRes {
+    let root = ast_expr_member_root(&*expr);
     let root_res: LValueRes = ast_expr_lvalue(root, state);
     let root_obj: *mut Object = lvalue_object(root_res.lval);
     if root_obj.is_null() {
@@ -1043,12 +1036,12 @@ pub unsafe fn expr_structmember_lvalue(expr: *mut AstExpr, state: *mut State) ->
     };
 }
 
-pub unsafe fn expr_unary_lvalue(expr: *mut AstExpr, state: *mut State) -> LValueRes {
+pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> LValueRes {
     if !(ast_expr_unary_op(expr) == AstUnaryOp::Dereference) {
         panic!();
     }
-    let inner: *mut AstExpr = ast_expr_unary_operand(expr);
-    if matches!((*inner).kind, AstExprKind::Identifier(_)) {
+    let inner = ast_expr_unary_operand(expr);
+    if matches!(inner.kind, AstExprKind::Identifier(_)) {
         let root_res: LValueRes = ast_expr_lvalue(inner, state);
         if !(root_res.err).is_null() {
             return root_res;
@@ -1068,8 +1061,11 @@ pub unsafe fn expr_unary_lvalue(expr: *mut AstExpr, state: *mut State) -> LValue
         if root_val.is_null() {
             panic!();
         }
-        let res: ObjectRes =
-            state_deref(state, root_val, ast_expr_constant_create(0 as libc::c_int));
+        let res: ObjectRes = state_deref(
+            state,
+            root_val,
+            &*ast_expr_constant_create(0 as libc::c_int),
+        );
         if !(res.err).is_null() {
             return {
                 let init = LValueRes {
@@ -1125,7 +1121,7 @@ pub unsafe fn expr_unary_lvalue(expr: *mut AstExpr, state: *mut State) -> LValue
     };
 }
 
-pub unsafe fn expr_identifier_lvalue(expr: *mut AstExpr, state: *mut State) -> LValueRes {
+pub unsafe fn expr_identifier_lvalue(expr: &AstExpr, state: *mut State) -> LValueRes {
     let id: *mut libc::c_char = ast_expr_as_identifier(expr);
     return {
         let init = LValueRes {
@@ -1135,16 +1131,15 @@ pub unsafe fn expr_identifier_lvalue(expr: *mut AstExpr, state: *mut State) -> L
         init
     };
 }
-unsafe fn dereference_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn dereference_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     let binary: *mut AstExpr = expr_to_binary(ast_expr_unary_operand(expr));
-    let res: *mut Result = binary_deref_eval(binary, state);
+    let res: *mut Result = binary_deref_eval(&*binary, state);
     ast_expr_destroy(binary);
     return res;
 }
-unsafe fn ast_expr_constant_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
-    let c = match &(*expr).kind {
-        AstExprKind::Constant(c) => c,
-        _ => panic!(),
+unsafe fn ast_expr_constant_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+    let AstExprKind::Constant(c) = &expr.kind else {
+        panic!()
     };
     let constant: libc::c_int = c.constant;
     if !c.ischar {
@@ -1184,10 +1179,10 @@ unsafe fn escape_str(c: libc::c_char) -> *mut libc::c_char {
     }
 }
 
-unsafe fn expr_call_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     let mut err: *mut Error = 0 as *mut Error;
-    let root: *mut AstExpr = ast_expr_call_root(expr);
-    let name: *mut libc::c_char = ast_expr_as_identifier(root);
+    let root = ast_expr_call_root(expr);
+    let name: *mut libc::c_char = ast_expr_as_identifier(&*root);
     let f: *mut AstFunction = externals_getfunc(state_getext(state), name);
     if f.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
@@ -1198,9 +1193,9 @@ unsafe fn expr_call_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
         );
         return result_error_create(error_create(strbuilder_build(b)));
     }
-    let nparams: libc::c_int = ast_function_nparams(f);
-    let params: *mut *mut AstVariable = ast_function_params(f);
-    let rtype: *mut AstType = ast_function_type(f);
+    let nparams: libc::c_int = ast_function_nparams(&*f);
+    let params: *mut *mut AstVariable = ast_function_params(&*f);
+    let rtype = ast_function_type(&*f);
     let args = prepare_arguments(
         ast_expr_call_nargs(expr),
         ast_expr_call_args(expr),
@@ -1231,9 +1226,10 @@ unsafe fn expr_call_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
     }
     return res;
 }
-unsafe fn call_absexec(expr: *mut AstExpr, s: *mut State) -> *mut Result {
-    let root: *mut AstExpr = ast_expr_call_root(expr);
-    let name: *mut libc::c_char = ast_expr_as_identifier(root);
+
+unsafe fn call_absexec(expr: &AstExpr, s: *mut State) -> *mut Result {
+    let root = ast_expr_call_root(expr);
+    let name: *mut libc::c_char = ast_expr_as_identifier(&*root);
     let f: *mut AstFunction = externals_getfunc(state_getext(s), name);
     if f.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
@@ -1244,18 +1240,19 @@ unsafe fn call_absexec(expr: *mut AstExpr, s: *mut State) -> *mut Result {
         );
         return result_error_create(error_create(strbuilder_build(b)));
     }
-    let res: *mut Result = ast_function_absexec(f, s);
+    let res: *mut Result = ast_function_absexec(&*f, s);
     if result_iserror(res) as libc::c_int != 0 || result_hasvalue(res) as libc::c_int != 0 {
         return res;
     }
     return call_arbitraryresult(expr, f, s);
 }
+
 unsafe fn call_arbitraryresult(
-    expr: *mut AstExpr,
+    expr: &AstExpr,
     f: *mut AstFunction,
     state: *mut State,
 ) -> *mut Result {
-    let res: *mut Result = call_to_computed_value(f, state);
+    let res: *mut Result = call_to_computed_value(&*f, state);
     if result_iserror(res) {
         return res;
     }
@@ -1264,7 +1261,8 @@ unsafe fn call_arbitraryresult(
     }
     return res;
 }
-unsafe fn call_to_computed_value(f: *mut AstFunction, s: *mut State) -> *mut Result {
+
+unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> *mut Result {
     let root: *mut libc::c_char = ast_function_name(f);
     let nparams: libc::c_int = ast_function_nparams(f);
     let uncomputed_param: *mut *mut AstVariable = ast_function_params(f);
@@ -1276,7 +1274,7 @@ unsafe fn call_to_computed_value(f: *mut AstFunction, s: *mut State) -> *mut Res
         let param: *mut AstExpr = ast_expr_identifier_create(dynamic_str(ast_variable_name(
             *uncomputed_param.offset(i as isize),
         )));
-        let res: *mut Result = ast_expr_eval(param, s);
+        let res: *mut Result = ast_expr_eval(&*param, s);
         ast_expr_destroy(param);
         if result_iserror(res) {
             return res;
@@ -1301,7 +1299,7 @@ unsafe fn call_to_computed_value(f: *mut AstFunction, s: *mut State) -> *mut Res
     )));
 }
 
-pub unsafe fn ast_expr_absexec(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+pub unsafe fn ast_expr_absexec(expr: &AstExpr, state: *mut State) -> *mut Result {
     match &(*expr).kind {
         AstExprKind::Assignment(_) => assign_absexec(expr, state),
         AstExprKind::IsDereferencable(_) => isdereferencable_absexec(expr, state),
@@ -1316,7 +1314,7 @@ pub unsafe fn ast_expr_absexec(expr: *mut AstExpr, state: *mut State) -> *mut Re
     }
 }
 
-unsafe fn expr_unary_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn expr_unary_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     match ast_expr_unary_op(expr) {
         AstUnaryOp::Dereference => dereference_eval(expr, state),
         AstUnaryOp::Address => address_eval(expr, state),
@@ -1328,7 +1326,7 @@ unsafe fn expr_unary_eval(expr: *mut AstExpr, state: *mut State) -> *mut Result 
     }
 }
 
-unsafe fn alloc_absexec(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn alloc_absexec(expr: &AstExpr, state: *mut State) -> *mut Result {
     match ast_expr_alloc_kind(expr) {
         AstAllocKind::Alloc => return result_value_create(state_alloc(state)),
         AstAllocKind::Dealloc => return dealloc_process(expr, state),
@@ -1336,8 +1334,8 @@ unsafe fn alloc_absexec(expr: *mut AstExpr, state: *mut State) -> *mut Result {
     }
 }
 
-unsafe fn dealloc_process(expr: *mut AstExpr, state: *mut State) -> *mut Result {
-    let arg: *mut AstExpr = ast_expr_alloc_arg(expr);
+unsafe fn dealloc_process(expr: &AstExpr, state: *mut State) -> *mut Result {
+    let arg = ast_expr_alloc_arg(expr);
     let res: *mut Result = ast_expr_eval(arg, state);
     if result_iserror(res) {
         return res;
@@ -1382,7 +1380,7 @@ pub unsafe fn prepare_parameters(
         }
         let name: *mut AstExpr =
             ast_expr_identifier_create(dynamic_str(ast_variable_name(*param.offset(i as isize))));
-        let lval_res: LValueRes = ast_expr_lvalue(name, state);
+        let lval_res: LValueRes = ast_expr_lvalue(&*name, state);
         if !(lval_res.err).is_null() {
             return lval_res.err;
         }
@@ -1393,9 +1391,9 @@ pub unsafe fn prepare_parameters(
     }
     return 0 as *mut Error;
 }
-unsafe fn isdereferencable_absexec(expr: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn isdereferencable_absexec(expr: &AstExpr, state: *mut State) -> *mut Result {
     let p: *mut Props = state_getprops(state);
-    props_install(p, expr);
+    props_install(p, expr as *const AstExpr as *mut AstExpr);
     return result_value_create(0 as *mut Value);
 }
 
@@ -1410,15 +1408,15 @@ pub unsafe fn prepare_arguments(
     let mut args = vec![];
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nargs {
-        args.push(ast_expr_eval(*arg.offset(i as isize), state));
+        args.push(ast_expr_eval(&**arg.offset(i as isize), state));
         i += 1;
     }
     args
 }
 
-unsafe fn assign_absexec(expr: *mut AstExpr, state: *mut State) -> *mut Result {
-    let lval: *mut AstExpr = ast_expr_assignment_lval(expr);
-    let rval: *mut AstExpr = ast_expr_assignment_rval(expr);
+unsafe fn assign_absexec(expr: &AstExpr, state: *mut State) -> *mut Result {
+    let lval = ast_expr_assignment_lval(expr);
+    let rval = ast_expr_assignment_rval(expr);
     let res: *mut Result = ast_expr_absexec(rval, state);
     if result_iserror(res) {
         return res;
@@ -1495,18 +1493,18 @@ unsafe fn verify_paramspec(
 }
 unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let fname: *mut libc::c_char = ast_function_name(f);
+    let fname: *mut libc::c_char = ast_function_name(&*f);
     let param_state: *mut State = state_create(
         dynamic_str(fname),
         state_getext(arg_state),
-        ast_function_type(f),
+        ast_function_type(&*f),
     );
-    err = ast_function_initparams(f, param_state);
+    err = ast_function_initparams(&*f, param_state);
     if !err.is_null() {
         return err;
     }
-    let nparams: libc::c_int = ast_function_nparams(f);
-    let param: *mut *mut AstVariable = ast_function_params(f);
+    let nparams: libc::c_int = ast_function_nparams(&*f);
+    let param: *mut *mut AstVariable = ast_function_params(&*f);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nparams {
         let id: *mut libc::c_char = ast_variable_name(*param.offset(i as isize));
@@ -1548,21 +1546,21 @@ pub unsafe fn ast_expr_literal_create(s: *mut libc::c_char) -> *mut AstExpr {
     expr
 }
 
-pub unsafe fn ast_expr_as_literal(expr: *mut AstExpr) -> *mut libc::c_char {
-    let AstExprKind::StringLiteral(s) = &(*expr).kind else {
+pub unsafe fn ast_expr_as_literal(expr: &AstExpr) -> *mut libc::c_char {
+    let AstExprKind::StringLiteral(s) = &expr.kind else {
         panic!()
     };
     *s
 }
 
-pub unsafe fn ast_expr_as_constant(expr: *mut AstExpr) -> libc::c_int {
-    match &(*expr).kind {
+pub unsafe fn ast_expr_as_constant(expr: &AstExpr) -> libc::c_int {
+    match &expr.kind {
         AstExprKind::Constant(c) => c.constant,
         _ => panic!(),
     }
 }
 
-unsafe fn pf_augment(v: *mut Value, call: *mut AstExpr, state: *mut State) -> *mut Result {
+unsafe fn pf_augment(v: *mut Value, call: &AstExpr, state: *mut State) -> *mut Result {
     if !value_isstruct(v) {
         return result_value_create(value_copy(v));
     }
@@ -1594,7 +1592,7 @@ pub unsafe fn ast_expr_constant_create(k: libc::c_int) -> *mut AstExpr {
     return expr;
 }
 
-pub unsafe fn ast_expr_as_identifier(expr: *mut AstExpr) -> *mut libc::c_char {
+pub unsafe fn ast_expr_as_identifier(expr: &AstExpr) -> *mut libc::c_char {
     let AstExprKind::Identifier(id) = &(*expr).kind else {
         panic!()
     };
@@ -1610,7 +1608,7 @@ pub unsafe fn ast_expr_identifier_create(s: *mut libc::c_char) -> *mut AstExpr {
     (*expr).kind = AstExprKind::Identifier(s);
     return expr;
 }
-unsafe fn unary_pf_reduce(e: *mut AstExpr, s: *mut State) -> *mut Result {
+unsafe fn unary_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
     let res: *mut Result = ast_expr_pf_reduce(ast_expr_unary_operand(e), s);
     if result_iserror(res) {
         return res;
@@ -1624,9 +1622,9 @@ unsafe fn unary_pf_reduce(e: *mut AstExpr, s: *mut State) -> *mut Result {
     )));
 }
 unsafe fn binary_pf_reduce(
-    e1: *mut AstExpr,
+    e1: &AstExpr,
     op: AstBinaryOp,
-    e2: *mut AstExpr,
+    e2: &AstExpr,
     s: *mut State,
 ) -> *mut Result {
     let res1: *mut Result = ast_expr_pf_reduce(e1, s);
@@ -1649,8 +1647,9 @@ unsafe fn binary_pf_reduce(
         value_to_expr(result_as_value(res2)),
     )));
 }
-unsafe fn call_pf_reduce(e: *mut AstExpr, s: *mut State) -> *mut Result {
-    let root: *mut libc::c_char = ast_expr_as_identifier(ast_expr_call_root(e));
+
+unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
+    let root: *mut libc::c_char = ast_expr_as_identifier(ast_expr_call_root(&*e));
     let nargs: libc::c_int = ast_expr_call_nargs(e);
     let unreduced_arg: *mut *mut AstExpr = ast_expr_call_args(e);
     let reduced_arg: *mut *mut AstExpr =
@@ -1658,7 +1657,7 @@ unsafe fn call_pf_reduce(e: *mut AstExpr, s: *mut State) -> *mut Result {
             as *mut *mut AstExpr;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nargs {
-        let res: *mut Result = ast_expr_pf_reduce(*unreduced_arg.offset(i as isize), s);
+        let res: *mut Result = ast_expr_pf_reduce(&**unreduced_arg.offset(i as isize), s);
         if result_iserror(res) {
             return res;
         }
@@ -1666,7 +1665,7 @@ unsafe fn call_pf_reduce(e: *mut AstExpr, s: *mut State) -> *mut Result {
             panic!();
         }
         let ref mut fresh3 = *reduced_arg.offset(i as isize);
-        *fresh3 = ast_expr_copy(value_to_expr(result_as_value(res)));
+        *fresh3 = value_to_expr(result_as_value(res));
         i += 1;
     }
     return result_value_create(value_sync_create(ast_expr_call_create(
@@ -1675,7 +1674,7 @@ unsafe fn call_pf_reduce(e: *mut AstExpr, s: *mut State) -> *mut Result {
         reduced_arg,
     )));
 }
-unsafe fn structmember_pf_reduce(expr: *mut AstExpr, s: *mut State) -> *mut Result {
+unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> *mut Result {
     let res: *mut Result = ast_expr_pf_reduce(ast_expr_member_root(expr), s);
     if result_iserror(res) {
         return res;
@@ -1702,16 +1701,16 @@ unsafe fn structmember_pf_reduce(expr: *mut AstExpr, s: *mut State) -> *mut Resu
     )));
 }
 
-pub unsafe fn ast_expr_pf_reduce(e: *mut AstExpr, s: *mut State) -> *mut Result {
+pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
     match &(*e).kind {
         AstExprKind::Constant(_) | AstExprKind::StringLiteral(_) | AstExprKind::Identifier(_) => {
             ast_expr_eval(e, s)
         }
         AstExprKind::Unary(_) => unary_pf_reduce(e, s),
-        AstExprKind::Binary(binary) => binary_pf_reduce(binary.e1, binary.op, binary.e2, s),
+        AstExprKind::Binary(binary) => binary_pf_reduce(&*binary.e1, binary.op, &*binary.e2, s),
         AstExprKind::Call(_) => call_pf_reduce(e, s),
         AstExprKind::StructMember(_) => structmember_pf_reduce(e, s),
-        AstExprKind::Bracketed(inner) => ast_expr_pf_reduce(*inner, s),
+        AstExprKind::Bracketed(inner) => ast_expr_pf_reduce(&**inner, s),
         _ => panic!(),
     }
 }
@@ -1723,12 +1722,12 @@ unsafe fn ast_expr_destroy_unary(expr: *mut AstExpr) {
     ast_expr_destroy(unary.arg);
 }
 
-unsafe fn ast_expr_member_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
-    let AstExprKind::StructMember(member) = &(*expr).kind else {
+unsafe fn ast_expr_member_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+    let AstExprKind::StructMember(member) = &expr.kind else {
         panic!()
     };
-    let root = member.root;
-    if matches!((*root).kind, AstExprKind::Unary(_)) {
+    let root = &*member.root;
+    if matches!(root.kind, AstExprKind::Unary(_)) {
         return ast_expr_member_deref_str_build(root, member.field, b);
     }
     let r: *mut libc::c_char = ast_expr_str(root);
@@ -1742,19 +1741,19 @@ unsafe fn ast_expr_member_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
 }
 
 unsafe fn ast_expr_member_deref_str_build(
-    root: *mut AstExpr,
+    root: &AstExpr,
     member: *mut libc::c_char,
     b: *mut StrBuilder,
 ) {
     if !(ast_expr_unary_op(root) == AstUnaryOp::Dereference) {
         panic!();
     }
-    let inner: *mut AstExpr = ast_expr_unary_operand(root);
-    let e1: *mut AstExpr = ast_expr_binary_e1(inner);
-    let e2: *mut AstExpr = ast_expr_binary_e2(inner);
+    let inner = ast_expr_unary_operand(root);
+    let e1 = ast_expr_binary_e1(inner);
+    let e2 = ast_expr_binary_e2(inner);
     let left: *mut libc::c_char = ast_expr_str(e1);
     if matches!((*e2).kind, AstExprKind::Constant(_))
-        && ast_expr_as_constant(e2) == 0 as libc::c_int
+        && ast_expr_as_constant(&*e2) == 0 as libc::c_int
     {
         strbuilder_printf(
             b,
@@ -1776,11 +1775,11 @@ unsafe fn ast_expr_member_deref_str_build(
     free(left as *mut libc::c_void);
 }
 
-unsafe fn ast_expr_incdec_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
-    let AstExprKind::IncDec(incdec) = &(*expr).kind else {
+unsafe fn ast_expr_incdec_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+    let AstExprKind::IncDec(incdec) = &expr.kind else {
         panic!()
     };
-    let root: *mut libc::c_char = ast_expr_str(incdec.operand);
+    let root: *mut libc::c_char = ast_expr_str(&*incdec.operand);
     let op: *mut libc::c_char = (if incdec.inc != 0 {
         b"++\0" as *const u8 as *const libc::c_char
     } else {
@@ -1794,15 +1793,15 @@ unsafe fn ast_expr_incdec_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
     free(root as *mut libc::c_void);
 }
 
-unsafe fn ast_expr_call_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_call_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     let AstExprKind::Call(call) = &(*expr).kind else {
         panic!()
     };
-    let fun: *mut libc::c_char = ast_expr_str(call.fun);
+    let fun: *mut libc::c_char = ast_expr_str(&*call.fun);
     strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, fun);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
-        let arg: *mut libc::c_char = ast_expr_str(*call.arg.offset(i as isize));
+        let arg: *mut libc::c_char = ast_expr_str(&**call.arg.offset(i as isize));
         strbuilder_printf(
             b,
             b"%s%s\0" as *const u8 as *const libc::c_char,
@@ -1840,7 +1839,7 @@ unsafe fn ast_expr_destroy_incdec(expr: *mut AstExpr) {
     ast_expr_destroy(incdec.operand);
 }
 
-pub unsafe fn ast_expr_inverted_copy(expr: *mut AstExpr, invert: bool) -> *mut AstExpr {
+pub unsafe fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> *mut AstExpr {
     let copy: *mut AstExpr = ast_expr_copy(expr);
     if invert {
         ast_expr_unary_create(copy, AstUnaryOp::Bang)
@@ -1849,36 +1848,36 @@ pub unsafe fn ast_expr_inverted_copy(expr: *mut AstExpr, invert: bool) -> *mut A
     }
 }
 
-pub unsafe fn ast_expr_member_field(expr: *mut AstExpr) -> *mut libc::c_char {
+pub unsafe fn ast_expr_member_field(expr: &AstExpr) -> *mut libc::c_char {
     let AstExprKind::StructMember(member) = &(*expr).kind else {
         panic!()
     };
     member.field
 }
 
-pub unsafe fn ast_expr_member_root(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::StructMember(member) = &(*expr).kind else {
+pub unsafe fn ast_expr_member_root(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::StructMember(member) = &expr.kind else {
         panic!()
     };
-    member.root
+    &*member.root
 }
 
-pub unsafe fn ast_expr_incdec_pre(expr: *mut AstExpr) -> bool {
+pub unsafe fn ast_expr_incdec_pre(expr: &AstExpr) -> bool {
     match &(*expr).kind {
         AstExprKind::IncDec(incdec) => incdec.pre != 0,
         _ => panic!(),
     }
 }
 
-pub unsafe fn ast_expr_incdec_root(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::IncDec(incdec) = &(*expr).kind else {
+pub unsafe fn ast_expr_incdec_root(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::IncDec(incdec) = &expr.kind else {
         panic!()
     };
-    incdec.operand
+    &*incdec.operand
 }
 
-unsafe fn ast_expr_copy_call(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::Call(call) = &(*expr).kind else {
+unsafe fn ast_expr_copy_call(expr: &AstExpr) -> *mut AstExpr {
+    let AstExprKind::Call(call) = &expr.kind else {
         panic!()
     };
     let arg: *mut *mut AstExpr =
@@ -1887,10 +1886,10 @@ unsafe fn ast_expr_copy_call(expr: *mut AstExpr) -> *mut AstExpr {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
         let ref mut fresh4 = *arg.offset(i as isize);
-        *fresh4 = ast_expr_copy(*(call.arg).offset(i as isize));
+        *fresh4 = ast_expr_copy(&**(call.arg).offset(i as isize));
         i += 1;
     }
-    return ast_expr_call_create(ast_expr_copy(call.fun), call.n, arg);
+    return ast_expr_call_create(ast_expr_copy(&*call.fun), call.n, arg);
 }
 
 pub unsafe fn ast_expr_member_create(
@@ -1921,15 +1920,15 @@ pub unsafe fn ast_expr_unary_create(root: *mut AstExpr, op: AstUnaryOp) -> *mut 
     return expr;
 }
 
-pub unsafe fn ast_expr_incdec_to_assignment(expr: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> *mut AstExpr {
     let AstExprKind::IncDec(incdec) = &(*expr).kind else {
         panic!()
     };
 
     ast_expr_assignment_create(
-        ast_expr_copy(incdec.operand),
+        ast_expr_copy(&*incdec.operand),
         ast_expr_binary_create(
-            ast_expr_copy(incdec.operand),
+            ast_expr_copy(&*incdec.operand),
             if incdec.inc != 0 {
                 AstBinaryOp::Addition
             } else {
@@ -1950,25 +1949,25 @@ pub unsafe fn ast_expr_incdec_create(root: *mut AstExpr, inc: bool, pre: bool) -
     expr
 }
 
-pub unsafe fn ast_expr_call_args(expr: *mut AstExpr) -> *mut *mut AstExpr {
-    let AstExprKind::Call(call) = &(*expr).kind else {
+pub unsafe fn ast_expr_call_args(expr: &AstExpr) -> *mut *mut AstExpr {
+    let AstExprKind::Call(call) = &expr.kind else {
         panic!()
     };
     call.arg
 }
 
-pub unsafe fn ast_expr_call_nargs(expr: *mut AstExpr) -> libc::c_int {
+pub unsafe fn ast_expr_call_nargs(expr: &AstExpr) -> libc::c_int {
     let AstExprKind::Call(call) = &(*expr).kind else {
         panic!()
     };
     call.n
 }
 
-pub unsafe fn ast_expr_call_root(expr: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_call_root(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Call(call) = &(*expr).kind else {
         panic!()
     };
-    call.fun
+    &*call.fun
 }
 
 pub unsafe fn ast_expr_call_create(
@@ -1991,22 +1990,22 @@ pub unsafe fn ast_expr_iteration_create() -> *mut AstExpr {
     return expr;
 }
 
-pub unsafe fn ast_expr_alloc_kind(expr: *mut AstExpr) -> AstAllocKind {
+pub unsafe fn ast_expr_alloc_kind(expr: &AstExpr) -> AstAllocKind {
     let AstExprKind::Allocation(alloc) = &(*expr).kind else {
         panic!()
     };
     alloc.kind
 }
 
-pub unsafe fn ast_expr_alloc_arg(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::Allocation(alloc) = &(*expr).kind else {
+pub unsafe fn ast_expr_alloc_arg(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::Allocation(alloc) = &expr.kind else {
         panic!()
     };
-    alloc.arg
+    &*alloc.arg
 }
 
-pub unsafe fn ast_expr_isisdereferencable(expr: *mut AstExpr) -> bool {
-    return matches!((*expr).kind, AstExprKind::IsDereferencable(_));
+pub unsafe fn ast_expr_isisdereferencable(expr: &AstExpr) -> bool {
+    return matches!(expr.kind, AstExprKind::IsDereferencable(_));
 }
 
 pub unsafe fn ast_expr_dealloc_create(arg: *mut AstExpr) -> *mut AstExpr {
@@ -2018,7 +2017,7 @@ pub unsafe fn ast_expr_dealloc_create(arg: *mut AstExpr) -> *mut AstExpr {
     expr
 }
 
-pub unsafe fn ast_expr_str(expr: *mut AstExpr) -> *mut libc::c_char {
+pub unsafe fn ast_expr_str(expr: &AstExpr) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     match &(*expr).kind {
         AstExprKind::Identifier(id) => {
@@ -2031,7 +2030,7 @@ pub unsafe fn ast_expr_str(expr: *mut AstExpr) -> *mut libc::c_char {
             strbuilder_printf(b, b"\"%s\"\0" as *const u8 as *const libc::c_char, *s);
         }
         AstExprKind::Bracketed(inner) => {
-            ast_expr_bracketed_str_build(*inner, b);
+            ast_expr_bracketed_str_build(&**inner, b);
         }
         AstExprKind::Call(_) => {
             ast_expr_call_str_build(expr, b);
@@ -2052,10 +2051,10 @@ pub unsafe fn ast_expr_str(expr: *mut AstExpr) -> *mut libc::c_char {
             ast_expr_assignment_str_build(expr, b);
         }
         AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_isdeallocand_str_build(*assertand, b);
+            ast_expr_isdeallocand_str_build(&**assertand, b);
         }
         AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_isdereferencable_str_build(*assertand, b);
+            ast_expr_isdereferencable_str_build(&**assertand, b);
         }
         AstExprKind::ArbArg => {
             strbuilder_putc(b, '$' as i32 as libc::c_char);
@@ -2070,11 +2069,11 @@ pub unsafe fn ast_expr_str(expr: *mut AstExpr) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 
-unsafe fn ast_expr_alloc_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_alloc_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     let AstExprKind::Allocation(alloc) = &(*expr).kind else {
         panic!()
     };
-    let arg: *mut libc::c_char = ast_expr_str(alloc.arg);
+    let arg: *mut libc::c_char = ast_expr_str(&*alloc.arg);
     match alloc.kind {
         AstAllocKind::Alloc => {
             strbuilder_printf(
@@ -2113,50 +2112,47 @@ pub unsafe fn ast_expr_alloc_create(arg: *mut AstExpr) -> *mut AstExpr {
     expr
 }
 
-pub unsafe fn ast_expr_isdereferencable_assertand(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::IsDereferencable(assertand) = &(*expr).kind else {
+pub unsafe fn ast_expr_isdereferencable_assertand(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::IsDereferencable(assertand) = &expr.kind else {
         panic!()
     };
-    *assertand
+    &**assertand
 }
 
-pub unsafe fn ast_expr_isdeallocand_assertand(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::IsDeallocand(assertand) = &(*expr).kind else {
+pub unsafe fn ast_expr_isdeallocand_assertand(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::IsDeallocand(assertand) = &expr.kind else {
         panic!()
     };
-    *assertand
+    &**assertand
 }
 
-unsafe fn ast_expr_alloc_copy(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::Allocation(alloc) = &(*expr).kind else {
+unsafe fn ast_expr_alloc_copy(expr: &AstExpr) -> *mut AstExpr {
+    let AstExprKind::Allocation(alloc) = &expr.kind else {
         panic!()
     };
-    let arg: *mut AstExpr = ast_expr_copy(alloc.arg);
+    let arg: *mut AstExpr = ast_expr_copy(&*alloc.arg);
     match alloc.kind {
-        AstAllocKind::Alloc => return ast_expr_alloc_create(arg),
-        AstAllocKind::Dealloc => return ast_expr_dealloc_create(arg),
-        AstAllocKind::Clump => return ast_expr_clump_create(arg),
+        AstAllocKind::Alloc => ast_expr_alloc_create(arg),
+        AstAllocKind::Dealloc => ast_expr_dealloc_create(arg),
+        AstAllocKind::Clump => ast_expr_clump_create(arg),
     }
 }
 
-unsafe fn ast_expr_isdereferencable_str_build(assertand: *mut AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_isdereferencable_str_build(assertand: &AstExpr, b: *mut StrBuilder) {
     let root: *mut libc::c_char = ast_expr_str(assertand);
     strbuilder_printf(b, b"$%s\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
 
-pub unsafe fn ast_expr_assignment_rval(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::Assignment(assignment) = &(*expr).kind else {
+pub unsafe fn ast_expr_assignment_rval(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::Assignment(assignment) = &expr.kind else {
         panic!()
     };
-    assignment.rval
+    &*assignment.rval
 }
 
-pub unsafe fn ast_expr_copy(expr: *mut AstExpr) -> *mut AstExpr {
-    if expr.is_null() {
-        panic!();
-    }
-    match &(*expr).kind {
+pub unsafe fn ast_expr_copy(expr: &AstExpr) -> *mut AstExpr {
+    match &expr.kind {
         AstExprKind::Identifier(id) => ast_expr_identifier_create(dynamic_str(*id)),
         AstExprKind::Constant(c) => {
             if c.ischar {
@@ -2166,31 +2162,31 @@ pub unsafe fn ast_expr_copy(expr: *mut AstExpr) -> *mut AstExpr {
             }
         }
         AstExprKind::StringLiteral(s) => ast_expr_literal_create(dynamic_str(*s)),
-        AstExprKind::Bracketed(inner) => ast_expr_bracketed_create(ast_expr_copy(*inner)),
+        AstExprKind::Bracketed(inner) => ast_expr_bracketed_create(ast_expr_copy(&**inner)),
         AstExprKind::Call(_) => ast_expr_copy_call(expr),
         AstExprKind::IncDec(incdec) => ast_expr_incdec_create(
-            ast_expr_copy(incdec.operand),
+            ast_expr_copy(&*incdec.operand),
             incdec.inc != 0,
             incdec.pre != 0,
         ),
         AstExprKind::StructMember(member) => {
-            ast_expr_member_create(ast_expr_copy(member.root), dynamic_str(member.field))
+            ast_expr_member_create(ast_expr_copy(&*member.root), dynamic_str(member.field))
         }
-        AstExprKind::Unary(unary) => ast_expr_unary_create(ast_expr_copy(unary.arg), unary.op),
+        AstExprKind::Unary(unary) => ast_expr_unary_create(ast_expr_copy(&*unary.arg), unary.op),
         AstExprKind::Binary(binary) => ast_expr_binary_create(
-            ast_expr_copy(binary.e1),
+            ast_expr_copy(&*binary.e1),
             binary.op,
-            ast_expr_copy(binary.e2),
+            ast_expr_copy(&*binary.e2),
         ),
         AstExprKind::Assignment(assignment) => ast_expr_assignment_create(
-            ast_expr_copy(assignment.lval),
-            ast_expr_copy(assignment.rval),
+            ast_expr_copy(&*assignment.lval),
+            ast_expr_copy(&*assignment.rval),
         ),
         AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_isdeallocand_create(ast_expr_copy(*assertand))
+            ast_expr_isdeallocand_create(ast_expr_copy(&**assertand))
         }
         AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_isdereferencable_create(ast_expr_copy(*assertand))
+            ast_expr_isdereferencable_create(ast_expr_copy(&**assertand))
         }
         AstExprKind::ArbArg => ast_expr_arbarg_create(),
         AstExprKind::Allocation(_) => ast_expr_alloc_copy(expr),
@@ -2198,32 +2194,32 @@ pub unsafe fn ast_expr_copy(expr: *mut AstExpr) -> *mut AstExpr {
     }
 }
 
-pub unsafe fn ast_expr_assignment_lval(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::Assignment(assignment) = &(*expr).kind else {
+pub unsafe fn ast_expr_assignment_lval(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::Assignment(assignment) = &expr.kind else {
         panic!()
     };
-    assignment.lval
+    &*assignment.lval
 }
 
-pub unsafe fn ast_expr_binary_e2(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::Binary(binary) = &(*expr).kind else {
+pub unsafe fn ast_expr_binary_e2(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::Binary(binary) = &expr.kind else {
         panic!()
     };
-    binary.e2
+    &*binary.e2
 }
 
-unsafe fn ast_expr_isdeallocand_str_build(assertand: *mut AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_isdeallocand_str_build(assertand: &AstExpr, b: *mut StrBuilder) {
     let root: *mut libc::c_char = ast_expr_str(assertand);
     strbuilder_printf(b, b"@%s\0" as *const u8 as *const libc::c_char, root);
     free(root as *mut libc::c_void);
 }
 
-unsafe fn ast_expr_assignment_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
-    let AstExprKind::Assignment(assignment) = &(*expr).kind else {
+unsafe fn ast_expr_assignment_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+    let AstExprKind::Assignment(assignment) = &expr.kind else {
         panic!()
     };
-    let root: *mut libc::c_char = ast_expr_str(assignment.lval);
-    let rval: *mut libc::c_char = ast_expr_str(assignment.rval);
+    let root: *mut libc::c_char = ast_expr_str(&*assignment.lval);
+    let rval: *mut libc::c_char = ast_expr_str(&*assignment.rval);
     strbuilder_printf(
         b,
         b"%s = %s\0" as *const u8 as *const libc::c_char,
@@ -2234,7 +2230,7 @@ unsafe fn ast_expr_assignment_str_build(expr: *mut AstExpr, b: *mut StrBuilder) 
     free(root as *mut libc::c_void);
 }
 
-unsafe fn ast_expr_binary_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_binary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     let AstExprKind::Binary(binary) = &(*expr).kind else {
         panic!()
     };
@@ -2248,8 +2244,8 @@ unsafe fn ast_expr_binary_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
         AstBinaryOp::Addition => b"+\0",
         AstBinaryOp::Subtraction => b"-\0",
     };
-    let e1: *mut libc::c_char = ast_expr_str(binary.e1);
-    let e2: *mut libc::c_char = ast_expr_str(binary.e2);
+    let e1: *mut libc::c_char = ast_expr_str(&*binary.e1);
+    let e2: *mut libc::c_char = ast_expr_str(&*binary.e2);
     strbuilder_printf(
         b,
         b"%s%s%s\0" as *const u8 as *const libc::c_char,
@@ -2261,11 +2257,11 @@ unsafe fn ast_expr_binary_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
     free(e2 as *mut libc::c_void);
 }
 
-pub unsafe fn ast_expr_binary_e1(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::Binary(binary) = &(*expr).kind else {
+pub unsafe fn ast_expr_binary_e1(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::Binary(binary) = &expr.kind else {
         panic!()
     };
-    binary.e1
+    &*binary.e1
 }
 
 pub unsafe fn ast_expr_difference_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
@@ -2276,8 +2272,8 @@ pub unsafe fn ast_expr_sum_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut As
     return ast_expr_binary_create(e1, AstBinaryOp::Addition, e2);
 }
 
-unsafe fn ast_expr_unary_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
-    let AstExprKind::Unary(unary) = &(*expr).kind else {
+unsafe fn ast_expr_unary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+    let AstExprKind::Unary(unary) = &expr.kind else {
         panic!()
     };
     let c = match unary.op {
@@ -2288,7 +2284,7 @@ unsafe fn ast_expr_unary_str_build(expr: *mut AstExpr, b: *mut StrBuilder) {
         AstUnaryOp::OnesComplement => b'~',
         AstUnaryOp::Bang => b'!',
     } as libc::c_char;
-    let root: *mut libc::c_char = ast_expr_str(unary.arg);
+    let root: *mut libc::c_char = ast_expr_str(&*unary.arg);
     strbuilder_printf(
         b,
         b"%c(%s)\0" as *const u8 as *const libc::c_char,
@@ -2302,8 +2298,8 @@ pub unsafe fn ast_expr_ge_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut Ast
     return ast_expr_binary_create(e1, AstBinaryOp::Ge, e2);
 }
 
-pub unsafe fn ast_expr_binary_op(expr: *mut AstExpr) -> AstBinaryOp {
-    let AstExprKind::Binary(binary) = &(*expr).kind else {
+pub unsafe fn ast_expr_binary_op(expr: &AstExpr) -> AstBinaryOp {
+    let AstExprKind::Binary(binary) = &expr.kind else {
         panic!()
     };
     binary.op
@@ -2398,27 +2394,27 @@ unsafe fn ast_expr_destroy_assignment(assignment: &AssignmentExpr) {
     ast_expr_destroy(assignment.rval);
 }
 
-pub unsafe fn ast_expr_unary_operand(expr: *mut AstExpr) -> *mut AstExpr {
-    let AstExprKind::Unary(unary) = &(*expr).kind else {
+pub unsafe fn ast_expr_unary_operand(expr: &AstExpr) -> &AstExpr {
+    let AstExprKind::Unary(unary) = &expr.kind else {
         panic!()
     };
-    unary.arg
+    &*unary.arg
 }
 
-pub unsafe fn ast_expr_unary_isdereference(expr: *mut AstExpr) -> bool {
-    assert!(matches!(&(*expr).kind, AstExprKind::Unary(_)));
+pub unsafe fn ast_expr_unary_isdereference(expr: &AstExpr) -> bool {
+    assert!(matches!(&expr.kind, AstExprKind::Unary(_)));
     return ast_expr_unary_op(expr) == AstUnaryOp::Dereference;
 }
 
-pub unsafe fn ast_expr_unary_op(expr: *mut AstExpr) -> AstUnaryOp {
-    let AstExprKind::Unary(unary) = &(*expr).kind else {
+pub unsafe fn ast_expr_unary_op(expr: &AstExpr) -> AstUnaryOp {
+    let AstExprKind::Unary(unary) = &expr.kind else {
         panic!()
     };
     unary.op
 }
 
-pub unsafe fn ast_expr_getfuncs(expr: *mut AstExpr) -> Box<StringArr> {
-    match &(*expr).kind {
+pub unsafe fn ast_expr_getfuncs(expr: &AstExpr) -> Box<StringArr> {
+    match &expr.kind {
         AstExprKind::Identifier(_)
         | AstExprKind::Constant(_)
         | AstExprKind::StringLiteral(_)
@@ -2427,24 +2423,25 @@ pub unsafe fn ast_expr_getfuncs(expr: *mut AstExpr) -> Box<StringArr> {
         | AstExprKind::IsDereferencable(_)
         | AstExprKind::ArbArg => return string_arr_create(),
         AstExprKind::Call(_) => ast_expr_call_getfuncs(expr),
-        AstExprKind::Bracketed(inner) => ast_expr_getfuncs(*inner),
-        AstExprKind::IncDec(incdec) => ast_expr_getfuncs(incdec.operand),
-        AstExprKind::Unary(unary) => ast_expr_getfuncs(unary.arg),
+        AstExprKind::Bracketed(inner) => ast_expr_getfuncs(&**inner),
+        AstExprKind::IncDec(incdec) => ast_expr_getfuncs(&*incdec.operand),
+        AstExprKind::Unary(unary) => ast_expr_getfuncs(&*unary.arg),
         AstExprKind::Assignment(assignment) => string_arr_concat(
-            &ast_expr_getfuncs(assignment.lval),
-            &ast_expr_getfuncs(assignment.rval),
+            &ast_expr_getfuncs(&*assignment.lval),
+            &ast_expr_getfuncs(&*assignment.rval),
         ),
-        AstExprKind::Binary(binary) => {
-            string_arr_concat(&ast_expr_getfuncs(binary.e1), &ast_expr_getfuncs(binary.e2))
-        }
+        AstExprKind::Binary(binary) => string_arr_concat(
+            &ast_expr_getfuncs(&*binary.e1),
+            &ast_expr_getfuncs(&*binary.e2),
+        ),
         _ => panic!("invalid expr kind"),
     }
 }
 
-pub unsafe fn ast_expr_splits(e: *mut AstExpr, s: *mut State) -> AstStmtSplits {
+pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> AstStmtSplits {
     match &(*e).kind {
         AstExprKind::Call(_) => call_splits(e, s),
-        AstExprKind::Assignment(assignment) => ast_expr_splits(assignment.rval, s),
+        AstExprKind::Assignment(assignment) => ast_expr_splits(&*assignment.rval, s),
         AstExprKind::Unary(_) => ast_expr_splits(ast_expr_unary_operand(e), s),
         AstExprKind::Binary(_) => binary_splits(e, s),
         AstExprKind::IncDec(_) => ast_expr_splits(ast_expr_incdec_root(e), s),
@@ -2463,9 +2460,9 @@ pub unsafe fn ast_expr_splits(e: *mut AstExpr, s: *mut State) -> AstStmtSplits {
     }
 }
 
-unsafe fn call_splits(expr: *mut AstExpr, state: *mut State) -> AstStmtSplits {
+unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     let mut err: *mut Error = 0 as *mut Error;
-    let root: *mut AstExpr = ast_expr_call_root(expr);
+    let root = ast_expr_call_root(expr);
     let name: *mut libc::c_char = ast_expr_as_identifier(root);
     let f: *mut AstFunction = externals_getfunc(state_getext(state), name);
     if f.is_null() {
@@ -2485,8 +2482,8 @@ unsafe fn call_splits(expr: *mut AstExpr, state: *mut State) -> AstStmtSplits {
             init
         };
     }
-    let nparams: libc::c_int = ast_function_nparams(f);
-    let params: *mut *mut AstVariable = ast_function_params(f);
+    let nparams: libc::c_int = ast_function_nparams(&*f);
+    let params: *mut *mut AstVariable = ast_function_params(&*f);
     let s_copy: *mut State = state_copy(state);
     let args = prepare_arguments(
         ast_expr_call_nargs(expr),
@@ -2495,7 +2492,7 @@ unsafe fn call_splits(expr: *mut AstExpr, state: *mut State) -> AstStmtSplits {
         params,
         s_copy,
     );
-    let ret_type: *mut AstType = ast_function_type(f);
+    let ret_type: *mut AstType = ast_function_type(&*f);
     state_pushframe(s_copy, dynamic_str(name), ret_type);
     err = prepare_parameters(nparams, params, &args, name, s_copy);
     if !err.is_null() {
@@ -2510,7 +2507,7 @@ unsafe fn call_splits(expr: *mut AstExpr, state: *mut State) -> AstStmtSplits {
     }
     let mut n: libc::c_int = 0 as libc::c_int;
     let mut cond: *mut *mut AstExpr = 0 as *mut *mut AstExpr;
-    let abs: *mut AstBlock = ast_function_abstract(f);
+    let abs = ast_function_abstract(&*f);
     let ndecls: libc::c_int = ast_block_ndecls(abs);
     if ndecls != 0 {
         let var: *mut *mut AstVariable = ast_block_decls(abs);
@@ -2524,7 +2521,7 @@ unsafe fn call_splits(expr: *mut AstExpr, state: *mut State) -> AstStmtSplits {
     let stmt: *mut *mut AstStmt = ast_block_stmts(abs);
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < nstmts {
-        let splits: AstStmtSplits = ast_stmt_splits(*stmt.offset(i_0 as isize), s_copy);
+        let splits: AstStmtSplits = ast_stmt_splits(&**stmt.offset(i_0 as isize), s_copy);
         let mut j: libc::c_int = 0 as libc::c_int;
         while j < splits.n {
             n += 1;
@@ -2545,7 +2542,7 @@ unsafe fn call_splits(expr: *mut AstExpr, state: *mut State) -> AstStmtSplits {
         err: 0 as *mut Error,
     }
 }
-unsafe fn binary_splits(e: *mut AstExpr, s: *mut State) -> AstStmtSplits {
+unsafe fn binary_splits(e: &AstExpr, s: *mut State) -> AstStmtSplits {
     let s1: AstStmtSplits = ast_expr_splits(ast_expr_binary_e1(e), s);
     let s2: AstStmtSplits = ast_expr_splits(ast_expr_binary_e2(e), s);
     let n: libc::c_int = s1.n + s2.n;
@@ -2571,19 +2568,18 @@ unsafe fn binary_splits(e: *mut AstExpr, s: *mut State) -> AstStmtSplits {
     }
 }
 
-unsafe fn ast_expr_call_getfuncs(expr: *mut AstExpr) -> Box<StringArr> {
+unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Box<StringArr> {
     let AstExprKind::Call(call) = &(*expr).kind else {
         panic!()
     };
     let mut res = string_arr_create();
-    let fun: *mut AstExpr = call.fun;
-    let AstExprKind::Identifier(id) = &(*fun).kind else {
+    let AstExprKind::Identifier(id) = &(*call.fun).kind else {
         panic!()
     };
     string_arr_append(&mut res, dynamic_str(*id));
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
-        res = string_arr_concat(&res, &ast_expr_getfuncs(*(call.arg).offset(i as isize)));
+        res = string_arr_concat(&res, &ast_expr_getfuncs(&**(call.arg).offset(i as isize)));
         i += 1;
     }
     res
@@ -2704,17 +2700,15 @@ pub unsafe fn ast_block_destroy(b: *mut AstBlock) {
     free(b as *mut libc::c_void);
 }
 
-pub unsafe fn ast_block_copy(b: *mut AstBlock) -> *mut AstBlock {
-    if b.is_null() {
-        panic!();
-    }
+pub unsafe fn ast_block_copy(b: &AstBlock) -> *mut AstBlock {
     return ast_block_create(
-        copy_var_arr((*b).ndecl, (*b).decl),
-        (*b).ndecl,
-        copy_stmt_arr((*b).nstmt, (*b).stmt),
-        (*b).nstmt,
+        copy_var_arr(b.ndecl, b.decl),
+        b.ndecl,
+        copy_stmt_arr(b.nstmt, b.stmt),
+        b.nstmt,
     );
 }
+
 unsafe fn copy_var_arr(len: libc::c_int, var: *mut *mut AstVariable) -> *mut *mut AstVariable {
     if !(len == 0 as libc::c_int || !var.is_null()) {
         panic!();
@@ -2746,13 +2740,13 @@ unsafe fn copy_stmt_arr(len: libc::c_int, stmt: *mut *mut AstStmt) -> *mut *mut 
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < len {
         let ref mut fresh9 = *new.offset(i as isize);
-        *fresh9 = ast_stmt_copy(*stmt.offset(i as isize));
+        *fresh9 = ast_stmt_copy(&**stmt.offset(i as isize));
         i += 1;
     }
     return new;
 }
 
-pub unsafe fn ast_block_str(b: *mut AstBlock, indent: *mut libc::c_char) -> *mut libc::c_char {
+pub unsafe fn ast_block_str(b: &AstBlock, indent: *mut libc::c_char) -> *mut libc::c_char {
     let sb: *mut StrBuilder = strbuilder_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*b).ndecl {
@@ -2768,7 +2762,7 @@ pub unsafe fn ast_block_str(b: *mut AstBlock, indent: *mut libc::c_char) -> *mut
     }
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < (*b).nstmt {
-        let s_0: *mut libc::c_char = ast_stmt_str(*((*b).stmt).offset(i_0 as isize));
+        let s_0: *mut libc::c_char = ast_stmt_str(&**b.stmt.offset(i_0 as isize));
         strbuilder_printf(
             sb,
             b"%s%s\n\0" as *const u8 as *const libc::c_char,
@@ -2781,29 +2775,29 @@ pub unsafe fn ast_block_str(b: *mut AstBlock, indent: *mut libc::c_char) -> *mut
     return strbuilder_build(sb);
 }
 
-pub unsafe fn ast_block_ndecls(b: *mut AstBlock) -> libc::c_int {
-    return (*b).ndecl;
+pub unsafe fn ast_block_ndecls(b: &AstBlock) -> libc::c_int {
+    b.ndecl
 }
 
-pub unsafe fn ast_block_decls(b: *mut AstBlock) -> *mut *mut AstVariable {
-    return (*b).decl;
+pub unsafe fn ast_block_decls(b: &AstBlock) -> *mut *mut AstVariable {
+    b.decl
 }
 
-pub unsafe fn ast_block_nstmts(b: *mut AstBlock) -> libc::c_int {
-    return (*b).nstmt;
+pub unsafe fn ast_block_nstmts(b: &AstBlock) -> libc::c_int {
+    b.nstmt
 }
 
-pub unsafe fn ast_block_stmts(b: *mut AstBlock) -> *mut *mut AstStmt {
-    if !((*b).nstmt > 0 as libc::c_int || ((*b).stmt).is_null()) {
+pub unsafe fn ast_block_stmts(b: &AstBlock) -> *mut *mut AstStmt {
+    if !(b.nstmt > 0 || b.stmt.is_null()) {
         panic!();
     }
     return (*b).stmt;
 }
 
-pub unsafe fn ast_block_isterminal(b: *mut AstBlock, s: *mut State) -> bool {
+pub unsafe fn ast_block_isterminal(b: &AstBlock, s: *mut State) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*b).nstmt {
-        if ast_stmt_isterminal(*((*b).stmt).offset(i as isize), s) {
+        if ast_stmt_isterminal(&**((*b).stmt).offset(i as isize), s) {
             return true;
         }
         i += 1;
@@ -2811,44 +2805,35 @@ pub unsafe fn ast_block_isterminal(b: *mut AstBlock, s: *mut State) -> bool {
     return false;
 }
 
-pub unsafe fn ast_block_preconds(b: *mut AstBlock) -> PrecondsResult {
+pub unsafe fn ast_block_preconds(b: &AstBlock) -> PrecondsResult {
     let n: libc::c_int = ast_block_nstmts(b);
     let stmt: *mut *mut AstStmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        if ast_stmt_ispre(*stmt.offset(i as isize)) {
-            let preconds: *mut AstStmt = ast_stmt_labelled_stmt(*stmt.offset(i as isize));
+        if ast_stmt_ispre(&**stmt.offset(i as isize)) {
+            let preconds = ast_stmt_labelled_stmt(&**stmt.offset(i as isize));
             let err: *mut Error = ast_stmt_preconds_validate(preconds);
             if !err.is_null() {
-                return {
-                    let init = PrecondsResult {
-                        stmt: 0 as *mut AstStmt,
-                        err,
-                    };
-                    init
+                return PrecondsResult {
+                    stmt: 0 as *mut AstStmt,
+                    err,
                 };
             }
-            return {
-                let init = PrecondsResult {
-                    stmt: preconds,
-                    err: 0 as *mut Error,
-                };
-                init
+            return PrecondsResult {
+                stmt: preconds as *const AstStmt as *mut AstStmt, // TODO - figure out if this is safe
+                err: 0 as *mut Error,
             };
         }
         i += 1;
     }
-    return {
-        let init = PrecondsResult {
-            stmt: 0 as *mut AstStmt,
-            err: 0 as *mut Error,
-        };
-        init
-    };
+    PrecondsResult {
+        stmt: 0 as *mut AstStmt,
+        err: 0 as *mut Error,
+    }
 }
 
 pub unsafe fn ast_stmt_process(
-    stmt: *mut AstStmt,
+    stmt: &AstStmt,
     fname: *mut libc::c_char,
     state: *mut State,
 ) -> *mut Error {
@@ -2857,10 +2842,7 @@ pub unsafe fn ast_stmt_process(
         err = ast_stmt_verify(stmt, state);
         if !err.is_null() {
             let b: *mut StrBuilder = strbuilder_create();
-            let loc: *mut LexemeMarker = ast_stmt_lexememarker(stmt);
-            if loc.is_null() {
-                panic!();
-            }
+            let loc = ast_stmt_lexememarker(stmt);
             let m: *mut libc::c_char = lexememarker_str(loc);
             strbuilder_printf(
                 b,
@@ -2875,10 +2857,7 @@ pub unsafe fn ast_stmt_process(
     err = ast_stmt_exec(stmt, state);
     if !err.is_null() {
         let b_0: *mut StrBuilder = strbuilder_create();
-        let loc_0: *mut LexemeMarker = ast_stmt_lexememarker(stmt);
-        if loc_0.is_null() {
-            panic!();
-        }
+        let loc_0 = ast_stmt_lexememarker(stmt);
         let m_0: *mut libc::c_char = lexememarker_str(loc_0);
         strbuilder_printf(
             b_0,
@@ -2893,51 +2872,41 @@ pub unsafe fn ast_stmt_process(
     return 0 as *mut Error;
 }
 
-pub unsafe fn ast_stmt_preprocess(stmt: *mut AstStmt, state: *mut State) -> *mut Preresult {
+pub unsafe fn ast_stmt_preprocess(stmt: &AstStmt, state: *mut State) -> *mut Preresult {
     if ast_stmt_isassume(stmt) {
         return stmt_installprop(stmt, state);
     }
     return preresult_empty_create();
 }
 
-pub unsafe fn ast_stmt_equal(s1: *mut AstStmt, s2: *mut AstStmt) -> bool {
-    if s1.is_null() || s2.is_null() {
-        return false;
-    }
-    match (&(*s1).kind, &(*s2).kind) {
-        (AstStmtKind::Expr(e1), AstStmtKind::Expr(e2)) => ast_expr_equal(*e1, *e2),
+pub unsafe fn ast_stmt_equal(s1: &AstStmt, s2: &AstStmt) -> bool {
+    match (&s1.kind, &s2.kind) {
+        (AstStmtKind::Expr(e1), AstStmtKind::Expr(e2)) => ast_expr_equal(&**e1, &**e2),
         _ => panic!(),
     }
 }
 
-pub unsafe fn ast_stmt_labelled_stmt(stmt: *mut AstStmt) -> *mut AstStmt {
-    let AstStmtKind::Labelled(labelled) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_labelled_stmt(stmt: &AstStmt) -> &AstStmt {
+    let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         panic!()
     };
-    labelled.stmt
+    &*labelled.stmt
 }
 
-unsafe fn labelled_absexec(
-    stmt: *mut AstStmt,
-    state: *mut State,
-    should_setup: bool,
-) -> *mut Result {
+unsafe fn labelled_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> *mut Result {
     if !ast_stmt_ispre(stmt) {
         let s: *mut libc::c_char = ast_stmt_str(stmt);
         let cstr = std::ffi::CStr::from_ptr(s);
         panic!("expected precondition, got: {cstr:?}");
     }
-    let setup: *mut AstStmt = ast_stmt_labelled_stmt(stmt);
-    if setup.is_null() {
-        panic!();
-    }
+    let setup = ast_stmt_labelled_stmt(stmt);
     if !should_setup {
         return result_value_create(0 as *mut Value);
     }
     return ast_stmt_absexec(setup, state, should_setup);
 }
 
-pub unsafe fn ast_stmt_copy(stmt: *mut AstStmt) -> *mut AstStmt {
+pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> *mut AstStmt {
     let loc: *mut LexemeMarker = if !((*stmt).loc).is_null() {
         lexememarker_copy((*stmt).loc)
     } else {
@@ -2947,22 +2916,24 @@ pub unsafe fn ast_stmt_copy(stmt: *mut AstStmt) -> *mut AstStmt {
         AstStmtKind::Labelled(labelled) => ast_stmt_create_labelled(
             loc,
             dynamic_str(labelled.label),
-            ast_stmt_copy(labelled.stmt),
+            ast_stmt_copy(&*labelled.stmt),
         ),
 
         AstStmtKind::Nop => ast_stmt_create_nop(loc),
-        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, ast_expr_copy(*expr)),
-        AstStmtKind::Compound(compound) => ast_stmt_create_compound(loc, ast_block_copy(*compound)),
+        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, ast_expr_copy(&**expr)),
+        AstStmtKind::Compound(compound) => {
+            ast_stmt_create_compound(loc, ast_block_copy(&**compound))
+        }
         AstStmtKind::CompoundV(compound) => {
-            ast_stmt_create_compound_v(loc, ast_block_copy(*compound))
+            ast_stmt_create_compound_v(loc, ast_block_copy(&**compound))
         }
         AstStmtKind::Selection(selection) => ast_stmt_create_sel(
             loc,
             selection.isswitch,
-            ast_expr_copy(selection.cond),
-            ast_stmt_copy(selection.body),
+            ast_expr_copy(&*selection.cond),
+            ast_stmt_copy(&*selection.body),
             if !(selection.nest).is_null() {
-                ast_stmt_copy(selection.nest)
+                ast_stmt_copy(&*selection.nest)
             } else {
                 0 as *mut AstStmt
             },
@@ -2977,7 +2948,7 @@ pub unsafe fn ast_stmt_copy(stmt: *mut AstStmt) -> *mut AstStmt {
     }
 }
 
-unsafe fn labelled_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
+unsafe fn labelled_setupabsexec(stmt: &AstStmt, state: *mut State) -> *mut Error {
     let res: *mut Result = ast_stmt_absexec(stmt, state, true);
     if result_iserror(res) {
         return result_as_error(res);
@@ -2985,7 +2956,7 @@ unsafe fn labelled_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut E
     return 0 as *mut Error;
 }
 
-unsafe fn sel_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
+unsafe fn sel_setupabsexec(stmt: &AstStmt, state: *mut State) -> *mut Error {
     let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
     if !(dec.err).is_null() {
         return dec.err;
@@ -2993,15 +2964,13 @@ unsafe fn sel_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error 
     if dec.decision {
         return stmt_setupabsexec(ast_stmt_sel_body(stmt), state);
     }
-    if !(ast_stmt_sel_nest(stmt)).is_null() {
-        panic!();
-    }
+    assert!(ast_stmt_sel_nest(stmt).is_none());
     return 0 as *mut Error;
 }
 
-unsafe fn comp_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
+unsafe fn comp_setupabsexec(stmt: &AstStmt, state: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let b: *mut AstBlock = ast_stmt_as_block(stmt);
+    let b = ast_stmt_as_block(stmt);
     if !(ast_block_ndecls(b) == 0 as libc::c_int) {
         panic!();
     }
@@ -3009,12 +2978,12 @@ unsafe fn comp_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error
     let stmts: *mut *mut AstStmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmt {
-        if ast_stmt_ispre(*stmts.offset(i as isize)) {
-            err = stmt_setupabsexec(*stmts.offset(i as isize), state);
+        if ast_stmt_ispre(&**stmts.offset(i as isize)) {
+            err = stmt_setupabsexec(&**stmts.offset(i as isize), state);
             if !err.is_null() {
                 return err;
             }
-            if ast_stmt_isterminal(*stmts.offset(i as isize), state) {
+            if ast_stmt_isterminal(&**stmts.offset(i as isize), state) {
                 break;
             }
         }
@@ -3023,7 +2992,7 @@ unsafe fn comp_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error
     return 0 as *mut Error;
 }
 
-unsafe fn stmt_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
+unsafe fn stmt_setupabsexec(stmt: &AstStmt, state: *mut State) -> *mut Error {
     match &(*stmt).kind {
         AstStmtKind::Expr(_) | AstStmtKind::Allocation(_) | AstStmtKind::Jump(_) => 0 as *mut Error,
         AstStmtKind::Labelled(_) => labelled_setupabsexec(stmt, state),
@@ -3033,19 +3002,19 @@ unsafe fn stmt_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error
     }
 }
 
-pub unsafe fn ast_stmt_setupabsexec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
-    if !matches!((*stmt).kind, AstStmtKind::Selection(_)) {
+pub unsafe fn ast_stmt_setupabsexec(stmt: &AstStmt, state: *mut State) -> *mut Error {
+    if !matches!(stmt.kind, AstStmtKind::Selection(_)) {
         return 0 as *mut Error;
     }
     return stmt_setupabsexec(stmt, state);
 }
 
-pub unsafe fn ast_stmt_isselection(stmt: *mut AstStmt) -> bool {
-    matches!((*stmt).kind, AstStmtKind::Selection(_))
+pub unsafe fn ast_stmt_isselection(stmt: &AstStmt) -> bool {
+    matches!(stmt.kind, AstStmtKind::Selection(_))
 }
 
-pub unsafe fn ast_stmt_isassume(stmt: *mut AstStmt) -> bool {
-    let AstStmtKind::Labelled(labelled) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_isassume(stmt: &AstStmt) -> bool {
+    let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         return false;
     };
     strcmp(
@@ -3054,12 +3023,12 @@ pub unsafe fn ast_stmt_isassume(stmt: *mut AstStmt) -> bool {
     ) == 0
 }
 
-unsafe fn stmt_installprop(stmt: *mut AstStmt, state: *mut State) -> *mut Preresult {
+unsafe fn stmt_installprop(stmt: &AstStmt, state: *mut State) -> *mut Preresult {
     return ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), state);
 }
 
-pub unsafe fn ast_stmt_ispre(stmt: *mut AstStmt) -> bool {
-    let AstStmtKind::Labelled(labelled) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_ispre(stmt: &AstStmt) -> bool {
+    let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         return false;
     };
     strcmp(
@@ -3068,8 +3037,8 @@ pub unsafe fn ast_stmt_ispre(stmt: *mut AstStmt) -> bool {
     ) == 0
 }
 
-unsafe fn stmt_v_block_verify(v_block_stmt: *mut AstStmt, state: *mut State) -> *mut Error {
-    let b: *mut AstBlock = ast_stmt_as_v_block(v_block_stmt);
+unsafe fn stmt_v_block_verify(v_block_stmt: &AstStmt, state: *mut State) -> *mut Error {
+    let b = ast_stmt_as_v_block(v_block_stmt);
     if !(ast_block_ndecls(b) == 0 as libc::c_int) {
         panic!();
     }
@@ -3077,7 +3046,7 @@ unsafe fn stmt_v_block_verify(v_block_stmt: *mut AstStmt, state: *mut State) -> 
     let stmt: *mut *mut AstStmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmts {
-        let err: *mut Error = ast_stmt_verify(*stmt.offset(i as isize), state);
+        let err: *mut Error = ast_stmt_verify(&**stmt.offset(i as isize), state);
         if !err.is_null() {
             return err;
         }
@@ -3085,8 +3054,8 @@ unsafe fn stmt_v_block_verify(v_block_stmt: *mut AstStmt, state: *mut State) -> 
     }
     return 0 as *mut Error;
 }
-unsafe fn stmt_expr_verify(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
-    let expr: *mut AstExpr = ast_stmt_as_expr(stmt);
+unsafe fn stmt_expr_verify(stmt: &AstStmt, state: *mut State) -> *mut Error {
+    let expr = ast_stmt_as_expr(stmt);
     if ast_expr_decide(expr, state) {
         return 0 as *mut Error;
     }
@@ -3094,27 +3063,31 @@ unsafe fn stmt_expr_verify(stmt: *mut AstStmt, state: *mut State) -> *mut Error 
         b"cannot verify statement\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
 }
-unsafe fn iter_empty(stmt: *mut AstStmt, state: *mut State) -> bool {
+unsafe fn iter_empty(stmt: &AstStmt, state: *mut State) -> bool {
     let err: *mut Error = ast_stmt_exec(ast_stmt_iter_init(stmt), state);
     if !err.is_null() {
         panic!();
     }
     return !ast_expr_decide(ast_stmt_as_expr(ast_stmt_iter_cond(stmt)), state);
 }
-unsafe fn stmt_iter_verify(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
+unsafe fn stmt_iter_verify(stmt: &AstStmt, state: *mut State) -> *mut Error {
     if iter_empty(stmt, state) {
         return 0 as *mut Error;
     }
-    let body: *mut AstStmt = ast_stmt_iter_body(stmt);
+    let body = ast_stmt_iter_body(stmt);
     assert!(matches!((*body).kind, AstStmtKind::Compound(_)));
-    let block: *mut AstBlock = ast_stmt_as_block(body);
+    let block = ast_stmt_as_block(body);
     assert_eq!(ast_block_ndecls(block), 0);
     assert_eq!(ast_block_nstmts(block), 1);
-    let assertion: *mut AstExpr =
-        ast_stmt_as_expr(*(ast_block_stmts(block)).offset(0 as libc::c_int as isize));
-    let lw: *mut AstExpr = ast_stmt_iter_lower_bound(stmt);
-    let up: *mut AstExpr = ast_stmt_iter_upper_bound(stmt);
-    if !ast_expr_rangedecide(assertion, lw, up, state) {
+    let assertion = ast_stmt_as_expr(&**(ast_block_stmts(block)).offset(0 as libc::c_int as isize));
+    let lw = ast_stmt_iter_lower_bound(stmt);
+    let up = ast_stmt_iter_upper_bound(stmt);
+    if !ast_expr_rangedecide(
+        assertion,
+        lw as *const AstExpr as *mut AstExpr,
+        up as *const AstExpr as *mut AstExpr,
+        state,
+    ) {
         return error_create(
             b"could not verify\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
@@ -3122,8 +3095,8 @@ unsafe fn stmt_iter_verify(stmt: *mut AstStmt, state: *mut State) -> *mut Error 
     return 0 as *mut Error;
 }
 
-pub unsafe fn ast_stmt_verify(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
-    match &(*stmt).kind {
+pub unsafe fn ast_stmt_verify(stmt: &AstStmt, state: *mut State) -> *mut Error {
+    match &stmt.kind {
         AstStmtKind::Nop => 0 as *mut Error,
         AstStmtKind::CompoundV(_) => stmt_v_block_verify(stmt, state),
         AstStmtKind::Expr(_) => stmt_expr_verify(stmt, state),
@@ -3132,8 +3105,8 @@ pub unsafe fn ast_stmt_verify(stmt: *mut AstStmt, state: *mut State) -> *mut Err
     }
 }
 
-unsafe fn stmt_compound_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
-    let b: *mut AstBlock = ast_stmt_as_block(stmt);
+unsafe fn stmt_compound_exec(stmt: &AstStmt, state: *mut State) -> *mut Error {
+    let b = ast_stmt_as_block(stmt);
     if !(ast_block_ndecls(b) == 0 as libc::c_int) {
         panic!();
     }
@@ -3141,18 +3114,18 @@ unsafe fn stmt_compound_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Erro
     let stmts: *mut *mut AstStmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmt {
-        let err: *mut Error = ast_stmt_exec(*stmts.offset(i as isize), state);
+        let err: *mut Error = ast_stmt_exec(&**stmts.offset(i as isize), state);
         if !err.is_null() {
             return err;
         }
-        if ast_stmt_isterminal(*stmts.offset(i as isize), state) {
+        if ast_stmt_isterminal(&**stmts.offset(i as isize), state) {
             break;
         }
         i += 1;
     }
     return 0 as *mut Error;
 }
-unsafe fn stmt_sel_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
+unsafe fn stmt_sel_exec(stmt: &AstStmt, state: *mut State) -> *mut Error {
     let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
     if !(dec.err).is_null() {
         return dec.err;
@@ -3160,17 +3133,14 @@ unsafe fn stmt_sel_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     if dec.decision {
         return ast_stmt_exec(ast_stmt_sel_body(stmt), state);
     }
-    if !(ast_stmt_sel_nest(stmt)).is_null() {
+    if !(ast_stmt_sel_nest(stmt)).is_none() {
         panic!();
     }
     return 0 as *mut Error;
 }
 
-unsafe fn iter_neteffect(iter: *mut AstStmt) -> *mut AstStmt {
-    let abs: *mut AstBlock = ast_stmt_iter_abstract(iter);
-    if abs.is_null() {
-        panic!();
-    }
+unsafe fn iter_neteffect(iter: &AstStmt) -> *mut AstStmt {
+    let abs = ast_stmt_iter_abstract(iter);
     let nstmts: libc::c_int = ast_block_nstmts(abs);
     if nstmts == 0 {
         return 0 as *mut AstStmt;
@@ -3196,12 +3166,12 @@ unsafe fn iter_neteffect(iter: *mut AstStmt) -> *mut AstStmt {
     );
 }
 
-unsafe fn stmt_iter_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
+unsafe fn stmt_iter_exec(stmt: &AstStmt, state: *mut State) -> *mut Error {
     let neteffect: *mut AstStmt = iter_neteffect(stmt);
     if neteffect.is_null() {
         return 0 as *mut Error;
     }
-    let res: *mut Result = ast_stmt_absexec(neteffect, state, true);
+    let res: *mut Result = ast_stmt_absexec(&*neteffect, state, true);
     if result_iserror(res) {
         return result_as_error(res);
     }
@@ -3209,8 +3179,12 @@ unsafe fn stmt_iter_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     return 0 as *mut Error;
 }
 
-unsafe fn stmt_jump_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
-    let res: *mut Result = ast_expr_eval(ast_stmt_jump_rv(stmt), state);
+unsafe fn stmt_jump_exec(stmt: &AstStmt, state: *mut State) -> *mut Error {
+    // Note: jump_rv may be null. Error in original.
+    let res: *mut Result = ast_expr_eval(
+        ast_stmt_jump_rv(stmt).expect("unsupported: return without value"),
+        state,
+    );
     if result_iserror(res) {
         return result_as_error(res);
     }
@@ -3224,13 +3198,13 @@ unsafe fn stmt_jump_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
     return 0 as *mut Error;
 }
 
-pub unsafe fn ast_stmt_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error {
-    match &(*stmt).kind {
+pub unsafe fn ast_stmt_exec(stmt: &AstStmt, state: *mut State) -> *mut Error {
+    match &stmt.kind {
         AstStmtKind::Nop => return 0 as *mut Error,
-        AstStmtKind::Labelled(labelled) => return ast_stmt_exec(labelled.stmt, state),
+        AstStmtKind::Labelled(labelled) => return ast_stmt_exec(&*labelled.stmt, state),
         AstStmtKind::Compound(_) => return stmt_compound_exec(stmt, state),
         AstStmtKind::CompoundV(_) => return 0 as *mut Error,
-        AstStmtKind::Expr(expr) => return ast_expr_exec(*expr, state),
+        AstStmtKind::Expr(expr) => return ast_expr_exec(&**expr, state),
         AstStmtKind::Selection(_) => return stmt_sel_exec(stmt, state),
         AstStmtKind::Iteration(_) => return stmt_iter_exec(stmt, state),
         AstStmtKind::Jump(_) => return stmt_jump_exec(stmt, state),
@@ -3241,37 +3215,38 @@ pub unsafe fn ast_stmt_exec(stmt: *mut AstStmt, state: *mut State) -> *mut Error
 }
 
 unsafe fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: *mut StrBuilder) {
-    let rv: *mut libc::c_char = ast_expr_str(jump.rv);
+    // Note: jump.rv can be null. Error in the original.
+    let rv: *mut libc::c_char = ast_expr_str(&*jump.rv);
     strbuilder_printf(b, b"return %s;\n\0" as *const u8 as *const libc::c_char, rv);
     free(rv as *mut libc::c_void);
 }
 
-pub unsafe fn ast_stmt_iter_abstract(stmt: *mut AstStmt) -> *mut AstBlock {
-    let AstStmtKind::Iteration(iteration) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!()
     };
-    iteration.abstract_0
+    &*iteration.abstract_0
 }
 
-pub unsafe fn ast_stmt_iter_iter(stmt: *mut AstStmt) -> *mut AstExpr {
-    let AstStmtKind::Iteration(iteration) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!()
     };
-    iteration.iter
+    &*iteration.iter
 }
 
-pub unsafe fn ast_stmt_lexememarker(stmt: *mut AstStmt) -> *mut LexemeMarker {
-    return (*stmt).loc;
+pub unsafe fn ast_stmt_lexememarker(stmt: &AstStmt) -> &LexemeMarker {
+    &*stmt.loc
 }
 
 unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder) {
-    let init: *mut libc::c_char = ast_stmt_str(iteration.init);
-    let cond: *mut libc::c_char = ast_stmt_str(iteration.cond);
-    let body: *mut libc::c_char = ast_stmt_str(iteration.body);
-    let iter: *mut libc::c_char = ast_expr_str(iteration.iter);
+    let init: *mut libc::c_char = ast_stmt_str(&*iteration.init);
+    let cond: *mut libc::c_char = ast_stmt_str(&*iteration.cond);
+    let body: *mut libc::c_char = ast_stmt_str(&*iteration.body);
+    let iter: *mut libc::c_char = ast_expr_str(&*iteration.iter);
     let abs: *mut libc::c_char = (if !(iteration.abstract_0).is_null() {
         ast_block_str(
-            iteration.abstract_0,
+            &*iteration.abstract_0,
             b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ) as *const libc::c_char
     } else {
@@ -3292,12 +3267,9 @@ unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder)
     free(iter as *mut libc::c_void);
 }
 
-pub unsafe fn ast_stmt_str(stmt: *mut AstStmt) -> *mut libc::c_char {
-    if stmt.is_null() {
-        panic!();
-    }
+pub unsafe fn ast_stmt_str(stmt: &AstStmt) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    match &(*stmt).kind {
+    match &stmt.kind {
         AstStmtKind::Labelled(_) => {
             ast_stmt_labelled_sprint(stmt, b);
         }
@@ -3305,13 +3277,13 @@ pub unsafe fn ast_stmt_str(stmt: *mut AstStmt) -> *mut libc::c_char {
             ast_stmt_nop_sprint(stmt, b);
         }
         AstStmtKind::Expr(expr) => {
-            ast_stmt_expr_sprint(*expr, b);
+            ast_stmt_expr_sprint(&**expr, b);
         }
         AstStmtKind::Compound(compound) => {
-            ast_stmt_compound_sprint(*compound, b);
+            ast_stmt_compound_sprint(&**compound, b);
         }
         AstStmtKind::CompoundV(compound) => {
-            ast_stmt_compound_sprint(*compound, b);
+            ast_stmt_compound_sprint(&**compound, b);
         }
         AstStmtKind::Selection(_) => {
             ast_stmt_sel_sprint(stmt, b);
@@ -3334,34 +3306,34 @@ pub unsafe fn ast_stmt_str(stmt: *mut AstStmt) -> *mut libc::c_char {
 
 unsafe fn ast_expr_copy_ifnotnull(expr: *mut AstExpr) -> *mut AstExpr {
     return if !expr.is_null() {
-        ast_expr_copy(expr)
+        ast_expr_copy(&*expr)
     } else {
         0 as *mut AstExpr
     };
 }
 
-pub unsafe fn ast_stmt_iter_cond(stmt: *mut AstStmt) -> *mut AstStmt {
+pub unsafe fn ast_stmt_iter_cond(stmt: &AstStmt) -> &AstStmt {
     let AstStmtKind::Iteration(iteration) = &(*stmt).kind else {
         panic!()
     };
-    iteration.cond
+    &*iteration.cond
 }
 
-pub unsafe fn ast_stmt_iter_init(stmt: *mut AstStmt) -> *mut AstStmt {
-    let AstStmtKind::Iteration(iteration) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_iter_init(stmt: &AstStmt) -> &AstStmt {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!()
     };
-    iteration.init
+    &*iteration.init
 }
 
-pub unsafe fn ast_stmt_labelled_label(stmt: *mut AstStmt) -> *mut libc::c_char {
-    let AstStmtKind::Labelled(labelled) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_labelled_label(stmt: &AstStmt) -> *mut libc::c_char {
+    let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         panic!()
     };
     labelled.label
 }
 
-unsafe fn sel_isterminal(stmt: *mut AstStmt, s: *mut State) -> bool {
+unsafe fn sel_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
     let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), s);
     if !(dec.err).is_null() {
         panic!();
@@ -3371,12 +3343,13 @@ unsafe fn sel_isterminal(stmt: *mut AstStmt, s: *mut State) -> bool {
     }
     false
 }
-unsafe fn comp_absexec(stmt: *mut AstStmt, state: *mut State, should_setup: bool) -> *mut Result {
-    let b: *mut AstBlock = ast_stmt_as_block(stmt);
+
+unsafe fn comp_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> *mut Result {
+    let b = ast_stmt_as_block(stmt);
     let stmts: *mut *mut AstStmt = ast_block_stmts(b);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < ast_block_nstmts(b) {
-        let res: *mut Result = ast_stmt_absexec(*stmts.offset(i as isize), state, should_setup);
+        let res: *mut Result = ast_stmt_absexec(&**stmts.offset(i as isize), state, should_setup);
         if result_iserror(res) {
             return res;
         }
@@ -3385,38 +3358,46 @@ unsafe fn comp_absexec(stmt: *mut AstStmt, state: *mut State, should_setup: bool
     return result_value_create(0 as *mut Value);
 }
 
-pub unsafe fn ast_stmt_as_block(stmt: *mut AstStmt) -> *mut AstBlock {
+pub unsafe fn ast_stmt_as_block(stmt: &AstStmt) -> &AstBlock {
     let AstStmtKind::Compound(block) = &(*stmt).kind else {
         panic!();
     };
-    *block
+    &**block
 }
 
-pub unsafe fn ast_stmt_jump_rv(stmt: *mut AstStmt) -> *mut AstExpr {
-    let AstStmtKind::Jump(jump) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
+    let AstStmtKind::Jump(jump) = &stmt.kind else {
         panic!()
     };
-    jump.rv
+    if jump.rv.is_null() {
+        None
+    } else {
+        Some(&*jump.rv)
+    }
 }
 
-unsafe fn jump_absexec(stmt: *mut AstStmt, state: *mut State) -> *mut Result {
+unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
     return ast_expr_absexec(
-        ast_expr_assignment_create(
+        &*ast_expr_assignment_create(
             ast_expr_identifier_create(
                 b"return\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
             ),
-            ast_stmt_jump_rv(stmt),
+            // Note: jump_rv can be null. Error in original.
+            match ast_stmt_jump_rv(stmt) {
+                Some(rv) => ast_expr_copy(rv),
+                None => ptr::null_mut(),
+            },
         ),
         state,
     );
 }
 
 pub unsafe fn ast_stmt_absexec(
-    stmt: *mut AstStmt,
+    stmt: &AstStmt,
     state: *mut State,
     should_setup: bool,
 ) -> *mut Result {
-    match &(*stmt).kind {
+    match &stmt.kind {
         AstStmtKind::Nop => result_value_create(0 as *mut Value),
         AstStmtKind::Labelled(_) => labelled_absexec(stmt, state, should_setup),
         AstStmtKind::Expr(_) => ast_expr_absexec(ast_stmt_as_expr(stmt), state),
@@ -3428,12 +3409,12 @@ pub unsafe fn ast_stmt_absexec(
     }
 }
 
-unsafe fn ast_stmt_sel_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
+unsafe fn ast_stmt_sel_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
     let AstStmtKind::Selection(selection) = &(*stmt).kind else {
         panic!();
     };
-    let cond: *mut libc::c_char = ast_expr_str(selection.cond);
-    let body: *mut libc::c_char = ast_stmt_str(selection.body);
+    let cond: *mut libc::c_char = ast_expr_str(&*selection.cond);
+    let body: *mut libc::c_char = ast_stmt_str(&*selection.body);
     strbuilder_printf(
         b,
         b"if (%s) { %s }\0" as *const u8 as *const libc::c_char,
@@ -3442,7 +3423,7 @@ unsafe fn ast_stmt_sel_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
     );
     let nest_stmt: *mut AstStmt = selection.nest;
     if !nest_stmt.is_null() {
-        let nest: *mut libc::c_char = ast_stmt_str(nest_stmt);
+        let nest: *mut libc::c_char = ast_stmt_str(&*nest_stmt);
         strbuilder_printf(b, b" else %s\0" as *const u8 as *const libc::c_char, nest);
         free(nest as *mut libc::c_void);
     }
@@ -3450,10 +3431,10 @@ unsafe fn ast_stmt_sel_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
     free(body as *mut libc::c_void);
 }
 
-pub unsafe fn ast_stmt_isterminal(stmt: *mut AstStmt, s: *mut State) -> bool {
+pub unsafe fn ast_stmt_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
     match &(*stmt).kind {
         AstStmtKind::Jump(jump) => jump.kind == AstJumpKind::Return,
-        AstStmtKind::Compound(block) => ast_block_isterminal(*block, s),
+        AstStmtKind::Compound(block) => ast_block_isterminal(&**block, s),
         AstStmtKind::Selection(_) => sel_isterminal(stmt, s),
         _ => false,
     }
@@ -3472,7 +3453,7 @@ pub unsafe fn ast_stmt_create_jump(
     return stmt;
 }
 
-pub unsafe fn sel_decide(control: *mut AstExpr, state: *mut State) -> Decision {
+pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
     let res: *mut Result = ast_expr_pf_reduce(control, state);
     if result_iserror(res) {
         return {
@@ -3498,7 +3479,7 @@ pub unsafe fn sel_decide(control: *mut AstExpr, state: *mut State) -> Decision {
                 };
                 init
             };
-        } else if props_contradicts(p, sync) {
+        } else if props_contradicts(p, &*sync) {
             return {
                 let init = Decision {
                     decision: false,
@@ -3557,7 +3538,7 @@ pub unsafe fn sel_decide(control: *mut AstExpr, state: *mut State) -> Decision {
         init
     };
 }
-unsafe fn ast_stmt_compound_sprint(compound: *mut AstBlock, b: *mut StrBuilder) {
+unsafe fn ast_stmt_compound_sprint(compound: &AstBlock, b: *mut StrBuilder) {
     let s: *mut libc::c_char = ast_block_str(
         compound,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
@@ -3566,7 +3547,7 @@ unsafe fn ast_stmt_compound_sprint(compound: *mut AstBlock, b: *mut StrBuilder) 
     free(s as *mut libc::c_void);
 }
 
-unsafe fn ast_stmt_expr_sprint(expr: *mut AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_stmt_expr_sprint(expr: &AstExpr, b: *mut StrBuilder) {
     let s: *mut libc::c_char = ast_expr_str(expr);
     strbuilder_printf(b, b"%s;\0" as *const u8 as *const libc::c_char, s);
     free(s as *mut libc::c_void);
@@ -3583,11 +3564,11 @@ unsafe fn ast_stmt_copy_iter(
     iteration: &AstIterationStmt,
     as_iteration_e: bool,
 ) -> *mut AstStmt {
-    let init = ast_stmt_copy(iteration.init);
-    let cond = ast_stmt_copy(iteration.cond);
-    let iter = ast_expr_copy(iteration.iter);
-    let abstract_0 = ast_block_copy(iteration.abstract_0);
-    let body = ast_stmt_copy(iteration.body);
+    let init = ast_stmt_copy(&*iteration.init);
+    let cond = ast_stmt_copy(&*iteration.cond);
+    let iter = ast_expr_copy(&*iteration.iter);
+    let abstract_0 = ast_block_copy(&*iteration.abstract_0);
+    let body = ast_stmt_copy(&*iteration.body);
 
     let stmt = ast_stmt_create_iter(loc, init, cond, iter, abstract_0, body);
     if as_iteration_e {
@@ -3632,15 +3613,15 @@ pub unsafe fn ast_stmt_create_iter_e(stmt: *mut AstStmt) -> *mut AstStmt {
     stmt
 }
 
-unsafe fn ast_stmt_nop_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
+unsafe fn ast_stmt_nop_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
     strbuilder_printf(b, b";\0" as *const u8 as *const libc::c_char);
 }
 
-pub unsafe fn ast_stmt_iter_body(stmt: *mut AstStmt) -> *mut AstStmt {
-    let AstStmtKind::Iteration(iteration) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_iter_body(stmt: &AstStmt) -> &AstStmt {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!();
     };
-    iteration.body
+    &*iteration.body
 }
 
 pub unsafe fn ast_stmt_create_sel(
@@ -3671,31 +3652,30 @@ pub unsafe fn ast_stmt_create_compound_v(loc: *mut LexemeMarker, b: *mut AstBloc
     (*stmt).kind = AstStmtKind::CompoundV(b);
     return stmt;
 }
-unsafe fn hack_alloc_from_neteffect(stmt: *mut AstStmt) -> *mut AstExpr {
-    let body: *mut AstStmt = ast_stmt_iter_body(stmt);
+unsafe fn hack_alloc_from_neteffect(stmt: &AstStmt) -> &AstExpr {
+    let body = ast_stmt_iter_body(stmt);
     assert!(matches!((*body).kind, AstStmtKind::Compound(_)));
-    let block: *mut AstBlock = ast_stmt_as_block(body);
+    let block = ast_stmt_as_block(body);
     assert_eq!(ast_block_ndecls(block), 0);
     assert_eq!(ast_block_nstmts(block), 1);
-    return ast_stmt_as_expr(*(ast_block_stmts(block)).offset(0 as libc::c_int as isize));
+    return ast_stmt_as_expr(&**(ast_block_stmts(block)).offset(0 as libc::c_int as isize));
 }
 
-pub unsafe fn ast_stmt_iter_lower_bound(stmt: *mut AstStmt) -> *mut AstExpr {
-    let AstStmtKind::Iteration(iteration) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_iter_lower_bound(stmt: &AstStmt) -> &AstExpr {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!();
     };
-    let init: *mut AstStmt = iteration.init;
-    let AstStmtKind::Expr(expr) = &(*init).kind else {
+    let AstStmtKind::Expr(expr) = &(*iteration.init).kind else {
         panic!();
     };
-    return ast_expr_assignment_rval(*expr);
+    return ast_expr_assignment_rval(&**expr);
 }
 
-unsafe fn ast_stmt_labelled_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
+unsafe fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
     let AstStmtKind::Labelled(labelled) = &(*stmt).kind else {
         panic!();
     };
-    let s: *mut libc::c_char = ast_stmt_str(labelled.stmt);
+    let s: *mut libc::c_char = ast_stmt_str(&*labelled.stmt);
     strbuilder_printf(
         b,
         b"%s: %s\0" as *const u8 as *const libc::c_char,
@@ -3705,7 +3685,7 @@ unsafe fn ast_stmt_labelled_sprint(stmt: *mut AstStmt, b: *mut StrBuilder) {
     free(s as *mut libc::c_void);
 }
 
-unsafe fn sel_absexec(stmt: *mut AstStmt, state: *mut State, should_setup: bool) -> *mut Result {
+unsafe fn sel_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> *mut Result {
     let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
     if !(dec.err).is_null() {
         return result_error_create(dec.err);
@@ -3713,17 +3693,19 @@ unsafe fn sel_absexec(stmt: *mut AstStmt, state: *mut State, should_setup: bool)
     if dec.decision {
         return ast_stmt_absexec(ast_stmt_sel_body(stmt), state, should_setup);
     }
-    if !(ast_stmt_sel_nest(stmt)).is_null() {
-        panic!();
-    }
+    assert!(ast_stmt_sel_nest(stmt).is_none());
     return result_value_create(0 as *mut Value);
 }
 
-pub unsafe fn ast_stmt_sel_nest(stmt: *mut AstStmt) -> *mut AstStmt {
-    let AstStmtKind::Selection(selection) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_sel_nest(stmt: &AstStmt) -> Option<&AstStmt> {
+    let AstStmtKind::Selection(selection) = &stmt.kind else {
         panic!();
     };
-    selection.nest
+    if selection.nest.is_null() {
+        None
+    } else {
+        Some(&*selection.nest)
+    }
 }
 
 pub unsafe fn ast_stmt_create_labelled(
@@ -3757,36 +3739,35 @@ pub unsafe fn ast_stmt_create_compound(loc: *mut LexemeMarker, b: *mut AstBlock)
     return stmt;
 }
 
-pub unsafe fn ast_stmt_sel_cond(stmt: *mut AstStmt) -> *mut AstExpr {
-    let AstStmtKind::Selection(selection) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_sel_cond(stmt: &AstStmt) -> &AstExpr {
+    let AstStmtKind::Selection(selection) = &stmt.kind else {
         panic!();
     };
-    selection.cond
+    &*selection.cond
 }
 
-pub unsafe fn ast_stmt_sel_body(stmt: *mut AstStmt) -> *mut AstStmt {
-    let AstStmtKind::Selection(selection) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_sel_body(stmt: &AstStmt) -> &AstStmt {
+    let AstStmtKind::Selection(selection) = &stmt.kind else {
         panic!();
     };
-    selection.body
+    &*selection.body
 }
 
-pub unsafe fn ast_stmt_iter_upper_bound(stmt: *mut AstStmt) -> *mut AstExpr {
-    let AstStmtKind::Iteration(iteration) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_iter_upper_bound(stmt: &AstStmt) -> &AstExpr {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!();
     };
-    let cond: *mut AstStmt = iteration.cond;
-    let AstStmtKind::Expr(expr) = &(*cond).kind else {
+    let AstStmtKind::Expr(expr) = &(*iteration.cond).kind else {
         panic!();
     };
-    ast_expr_binary_e2(*expr)
+    ast_expr_binary_e2(&**expr)
 }
 
-unsafe fn iter_absexec(stmt: *mut AstStmt, state: *mut State) -> *mut Result {
+unsafe fn iter_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
     let mut err: *mut Error = 0 as *mut Error;
-    let alloc: *mut AstExpr = hack_alloc_from_neteffect(stmt);
-    let lw: *mut AstExpr = ast_stmt_iter_lower_bound(stmt);
-    let up: *mut AstExpr = ast_stmt_iter_upper_bound(stmt);
+    let alloc = hack_alloc_from_neteffect(stmt);
+    let lw = ast_stmt_iter_lower_bound(stmt) as *const AstExpr as *mut AstExpr;
+    let up = ast_stmt_iter_upper_bound(stmt) as *const AstExpr as *mut AstExpr;
     err = ast_expr_alloc_rangeprocess(alloc, lw, up, state);
     if !err.is_null() {
         return result_error_create(err);
@@ -3843,39 +3824,40 @@ unsafe fn ast_stmt_destroy_jump(jump: &AstJumpStmt) {
     ast_expr_destroy(rv);
 }
 
-pub unsafe fn ast_stmt_as_expr(stmt: *mut AstStmt) -> *mut AstExpr {
-    let AstStmtKind::Expr(expr) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_as_expr(stmt: &AstStmt) -> &AstExpr {
+    let AstStmtKind::Expr(expr) = &stmt.kind else {
         panic!();
     };
-    *expr
+    &**expr
 }
 
-pub unsafe fn ast_stmt_as_v_block(stmt: *mut AstStmt) -> *mut AstBlock {
-    let AstStmtKind::CompoundV(block) = &(*stmt).kind else {
+pub unsafe fn ast_stmt_as_v_block(stmt: &AstStmt) -> &AstBlock {
+    let AstStmtKind::CompoundV(block) = &stmt.kind else {
         panic!();
     };
-    *block
+    &**block
 }
 
-pub unsafe fn ast_stmt_getfuncs(stmt: *mut AstStmt) -> Box<StringArr> {
-    match &(*stmt).kind {
+pub unsafe fn ast_stmt_getfuncs(stmt: &AstStmt) -> Box<StringArr> {
+    match &stmt.kind {
         AstStmtKind::Nop => string_arr_create(),
-        AstStmtKind::Labelled(labelled) => ast_stmt_getfuncs(labelled.stmt),
+        AstStmtKind::Labelled(labelled) => ast_stmt_getfuncs(&*labelled.stmt),
         AstStmtKind::Compound(block) | AstStmtKind::CompoundV(block) => {
-            ast_stmt_compound_getfuncs(*block)
+            ast_stmt_compound_getfuncs(&**block)
         }
-        AstStmtKind::Expr(expr) => ast_expr_getfuncs(*expr),
+        AstStmtKind::Expr(expr) => ast_expr_getfuncs(&**expr),
         AstStmtKind::Selection(selection) => ast_stmt_selection_getfuncs(selection),
         AstStmtKind::Iteration(iteration) | AstStmtKind::IterationE(iteration) => {
             ast_stmt_iteration_getfuncs(iteration)
         }
-        AstStmtKind::Jump(jump) => ast_expr_getfuncs(jump.rv),
+        // Note: jump.rv can be null. Error in original.
+        AstStmtKind::Jump(jump) => ast_expr_getfuncs(&*jump.rv),
         _ => panic!("invalid stmt kind"),
     }
 }
 
-pub unsafe fn ast_stmt_splits(stmt: *mut AstStmt, s: *mut State) -> AstStmtSplits {
-    match &(*stmt).kind {
+pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
+    match &stmt.kind {
         AstStmtKind::Nop => {
             return {
                 let init = AstStmtSplits {
@@ -3886,11 +3868,11 @@ pub unsafe fn ast_stmt_splits(stmt: *mut AstStmt, s: *mut State) -> AstStmtSplit
                 init
             };
         }
-        AstStmtKind::Expr(expr) => return ast_expr_splits(*expr, s),
+        AstStmtKind::Expr(expr) => return ast_expr_splits(&**expr, s),
         AstStmtKind::Selection(selection) => return stmt_sel_splits(selection, s),
         AstStmtKind::Jump(jump) => {
             if !jump.rv.is_null() {
-                return ast_expr_splits(jump.rv, s);
+                return ast_expr_splits(&*jump.rv, s);
             }
             AstStmtSplits {
                 n: 0 as libc::c_int,
@@ -3898,7 +3880,7 @@ pub unsafe fn ast_stmt_splits(stmt: *mut AstStmt, s: *mut State) -> AstStmtSplit
                 err: 0 as *mut Error,
             }
         }
-        AstStmtKind::Labelled(labelled) => return ast_stmt_splits(labelled.stmt, s),
+        AstStmtKind::Labelled(labelled) => return ast_stmt_splits(&*labelled.stmt, s),
         AstStmtKind::Iteration(_) | AstStmtKind::Compound(_) | AstStmtKind::CompoundV(_) => {
             AstStmtSplits {
                 n: 0 as libc::c_int,
@@ -3911,10 +3893,10 @@ pub unsafe fn ast_stmt_splits(stmt: *mut AstStmt, s: *mut State) -> AstStmtSplit
 }
 
 unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> AstStmtSplits {
-    let res: *mut Result = ast_expr_pf_reduce(selection.cond, s);
+    let res: *mut Result = ast_expr_pf_reduce(&*selection.cond, s);
     let v: *mut Value = result_as_value(res);
     let e: *mut AstExpr = value_to_expr(v);
-    if condexists(e, s) as libc::c_int != 0 || value_isconstant(v) as libc::c_int != 0 {
+    if condexists(&*e, s) as libc::c_int != 0 || value_isconstant(v) as libc::c_int != 0 {
         return {
             let init = AstStmtSplits {
                 n: 0 as libc::c_int,
@@ -3935,25 +3917,24 @@ unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> AstStm
     }
 }
 
-unsafe fn condexists(cond: *mut AstExpr, s: *mut State) -> bool {
+unsafe fn condexists(cond: &AstExpr, s: *mut State) -> bool {
     let res: *mut Result = ast_expr_pf_reduce(cond, s);
     if !(!result_iserror(res) && result_hasvalue(res) as libc::c_int != 0) {
         panic!();
     }
+    // Note: original doesn't free this.
     let reduced: *mut AstExpr = value_to_expr(result_as_value(res));
     let p: *mut Props = state_getprops(s);
     return props_get(p, reduced) as libc::c_int != 0
-        || props_contradicts(p, reduced) as libc::c_int != 0;
+        || props_contradicts(p, &*reduced) as libc::c_int != 0;
 }
 
 unsafe fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Box<StringArr> {
-    let cond: *mut AstExpr = selection.cond;
-    let body: *mut AstStmt = selection.body;
     let nest: *mut AstStmt = selection.nest;
-    let cond_arr = ast_expr_getfuncs(cond);
-    let body_arr = ast_stmt_getfuncs(body);
+    let cond_arr = ast_expr_getfuncs(&*selection.cond);
+    let body_arr = ast_stmt_getfuncs(&*selection.body);
     let nest_arr = if !nest.is_null() {
-        ast_stmt_getfuncs(nest)
+        ast_stmt_getfuncs(&*nest)
     } else {
         string_arr_create()
     };
@@ -3964,14 +3945,10 @@ unsafe fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Box<Strin
 }
 
 unsafe fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Box<StringArr> {
-    let init: *mut AstStmt = iteration.init;
-    let cond: *mut AstStmt = iteration.cond;
-    let body: *mut AstStmt = iteration.body;
-    let iter: *mut AstExpr = iteration.iter;
-    let init_arr = ast_stmt_getfuncs(init);
-    let cond_arr = ast_stmt_getfuncs(cond);
-    let body_arr = ast_stmt_getfuncs(body);
-    let iter_arr = ast_expr_getfuncs(iter);
+    let init_arr = ast_stmt_getfuncs(&*iteration.init);
+    let cond_arr = ast_stmt_getfuncs(&*iteration.cond);
+    let body_arr = ast_stmt_getfuncs(&*iteration.body);
+    let iter_arr = ast_expr_getfuncs(&*iteration.iter);
     string_arr_concat(
         &string_arr_create(),
         &string_arr_concat(
@@ -3981,30 +3958,30 @@ unsafe fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Box<Strin
     )
 }
 
-unsafe fn ast_stmt_compound_getfuncs(block: *mut AstBlock) -> Box<StringArr> {
+unsafe fn ast_stmt_compound_getfuncs(block: &AstBlock) -> Box<StringArr> {
     let mut res = string_arr_create();
     let stmts: *mut *mut AstStmt = ast_block_stmts(block);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < ast_block_nstmts(block) {
-        res = string_arr_concat(&res, &ast_stmt_getfuncs(*stmts.offset(i as isize)));
+        res = string_arr_concat(&res, &ast_stmt_getfuncs(&**stmts.offset(i as isize)));
         i += 1;
     }
     res
 }
 
-pub unsafe fn ast_stmt_preconds_validate(stmt: *mut AstStmt) -> *mut Error {
-    match &(*stmt).kind {
+pub unsafe fn ast_stmt_preconds_validate(stmt: &AstStmt) -> *mut Error {
+    match &stmt.kind {
         AstStmtKind::Expr(_) | AstStmtKind::Allocation(_) | AstStmtKind::Iteration(_) => {
             0 as *mut Error
         }
         AstStmtKind::Selection(_) => preconds_selection_verify(stmt),
-        AstStmtKind::Compound(block) => preconds_compound_verify(*block),
+        AstStmtKind::Compound(block) => preconds_compound_verify(&**block),
         _ => panic!(),
     }
 }
-unsafe fn preconds_selection_verify(stmt: *mut AstStmt) -> *mut Error {
+unsafe fn preconds_selection_verify(stmt: &AstStmt) -> *mut Error {
     let b: *mut StrBuilder = strbuilder_create();
-    let l: *mut LexemeMarker = ast_stmt_lexememarker(stmt);
+    let l = ast_stmt_lexememarker(stmt);
     strbuilder_printf(
         b,
         b"%s setup preconditions must be decidable\0" as *const u8 as *const libc::c_char,
@@ -4013,12 +3990,12 @@ unsafe fn preconds_selection_verify(stmt: *mut AstStmt) -> *mut Error {
     return error_create(strbuilder_build(b));
 }
 
-unsafe fn preconds_compound_verify(block: *mut AstBlock) -> *mut Error {
+unsafe fn preconds_compound_verify(block: &AstBlock) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
     let stmts: *mut *mut AstStmt = ast_block_stmts(block);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < ast_block_nstmts(block) {
-        err = ast_stmt_preconds_validate(*stmts.offset(i as isize));
+        err = ast_stmt_preconds_validate(&**stmts.offset(i as isize));
         if !err.is_null() {
             return err;
         }
@@ -4509,19 +4486,19 @@ pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
     free(f as *mut libc::c_void);
 }
 
-pub unsafe fn ast_function_str(f: *mut AstFunction) -> *mut libc::c_char {
+pub unsafe fn ast_function_str(f: &AstFunction) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    if (*f).isaxiom {
+    if f.isaxiom {
         strbuilder_printf(b, b"axiom \0" as *const u8 as *const libc::c_char);
     }
-    let ret: *mut libc::c_char = ast_type_str((*f).ret);
+    let ret: *mut libc::c_char = ast_type_str(f.ret);
     strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, ret);
     free(ret as *mut libc::c_void);
-    strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, (*f).name);
+    strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, f.name);
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*f).nparam {
-        let v: *mut libc::c_char = ast_variable_str(*((*f).param).offset(i as isize));
-        let space: *mut libc::c_char = (if (i + 1 as libc::c_int) < (*f).nparam {
+    while i < f.nparam {
+        let v: *mut libc::c_char = ast_variable_str(*(f.param).offset(i as isize));
+        let space: *mut libc::c_char = (if (i + 1 as libc::c_int) < f.nparam {
             b", \0" as *const u8 as *const libc::c_char
         } else {
             b"\0" as *const u8 as *const libc::c_char
@@ -4531,14 +4508,14 @@ pub unsafe fn ast_function_str(f: *mut AstFunction) -> *mut libc::c_char {
         i += 1;
     }
     let abs: *mut libc::c_char = ast_block_str(
-        (*f).abstract_0,
+        &*f.abstract_0,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     strbuilder_printf(b, b") ~ [\n%s]\0" as *const u8 as *const libc::c_char, abs);
     free(abs as *mut libc::c_void);
-    if !((*f).body).is_null() {
+    if !(f.body).is_null() {
         let body: *mut libc::c_char = ast_block_str(
-            (*f).body,
+            &*f.body,
             b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
         strbuilder_printf(b, b"{\n%s}\0" as *const u8 as *const libc::c_char, body);
@@ -4550,86 +4527,76 @@ pub unsafe fn ast_function_str(f: *mut AstFunction) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 
-pub unsafe fn ast_function_name(f: *mut AstFunction) -> *mut libc::c_char {
-    return (*f).name;
+pub unsafe fn ast_function_name(f: &AstFunction) -> *mut libc::c_char {
+    return f.name;
 }
 
-pub unsafe fn ast_function_copy(f: *mut AstFunction) -> *mut AstFunction {
-    if f.is_null() {
-        panic!();
-    }
+pub unsafe fn ast_function_copy(f: &AstFunction) -> *mut AstFunction {
     let param: *mut *mut AstVariable =
-        malloc((::core::mem::size_of::<*mut AstVariable>()).wrapping_mul((*f).nparam as usize))
+        malloc((::core::mem::size_of::<*mut AstVariable>()).wrapping_mul(f.nparam as usize))
             as *mut *mut AstVariable;
     let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*f).nparam {
+    while i < f.nparam {
         let ref mut fresh14 = *param.offset(i as isize);
-        *fresh14 = ast_variable_copy(*((*f).param).offset(i as isize));
+        *fresh14 = ast_variable_copy(*(f.param).offset(i as isize));
         i += 1;
     }
     return ast_function_create(
-        (*f).isaxiom,
-        ast_type_copy((*f).ret),
-        dynamic_str((*f).name),
-        (*f).nparam,
+        f.isaxiom,
+        ast_type_copy(f.ret),
+        dynamic_str(f.name),
+        f.nparam,
         param,
-        ast_block_copy((*f).abstract_0),
-        if !((*f).body).is_null() {
-            ast_block_copy((*f).body)
+        ast_block_copy(&*f.abstract_0),
+        if !f.body.is_null() {
+            ast_block_copy(&*f.body)
         } else {
             0 as *mut AstBlock
         },
     );
 }
 
-pub unsafe fn ast_function_isaxiom(f: *mut AstFunction) -> bool {
-    return (*f).isaxiom;
+pub unsafe fn ast_function_isaxiom(f: &AstFunction) -> bool {
+    return f.isaxiom;
 }
 
-pub unsafe fn ast_function_isproto(f: *mut AstFunction) -> bool {
-    return !((*f).abstract_0).is_null() && ((*f).body).is_null();
+pub unsafe fn ast_function_isproto(f: &AstFunction) -> bool {
+    return !(f.abstract_0).is_null() && (f.body).is_null();
 }
 
-pub unsafe fn ast_function_absisempty(f: *mut AstFunction) -> bool {
-    return ast_block_ndecls((*f).abstract_0) == 0 as libc::c_int
-        && ast_block_nstmts((*f).abstract_0) == 0 as libc::c_int;
+pub unsafe fn ast_function_absisempty(f: &AstFunction) -> bool {
+    return ast_block_ndecls(&*f.abstract_0) == 0 as libc::c_int
+        && ast_block_nstmts(&*f.abstract_0) == 0 as libc::c_int;
 }
 
-pub unsafe fn ast_function_type(f: *mut AstFunction) -> *mut AstType {
-    return (*f).ret;
+pub unsafe fn ast_function_type(f: &AstFunction) -> *mut AstType {
+    f.ret
 }
 
-pub unsafe fn ast_function_body(f: *mut AstFunction) -> *mut AstBlock {
-    if ((*f).body).is_null() {
-        fprintf(
-            __stderrp,
-            b"cannot find body for `%s'\n\0" as *const u8 as *const libc::c_char,
-            (*f).name,
-        );
-    }
-    if ((*f).body).is_null() {
-        panic!();
-    }
-    return (*f).body;
+pub unsafe fn ast_function_body(f: &AstFunction) -> &AstBlock {
+    assert!(
+        !f.body.is_null(),
+        "cannot find body for {:?}",
+        CStr::from_ptr(f.name)
+    );
+    &*f.body
 }
 
-pub unsafe fn ast_function_abstract(f: *mut AstFunction) -> *mut AstBlock {
-    if ((*f).abstract_0).is_null() {
-        panic!();
-    }
-    return (*f).abstract_0;
+pub unsafe fn ast_function_abstract(f: &AstFunction) -> &AstBlock {
+    assert!(!f.abstract_0.is_null());
+    &*f.abstract_0
 }
 
-pub unsafe fn ast_function_nparams(f: *mut AstFunction) -> libc::c_int {
-    return (*f).nparam;
+pub unsafe fn ast_function_nparams(f: &AstFunction) -> libc::c_int {
+    f.nparam
 }
 
-pub unsafe fn ast_function_params(f: *mut AstFunction) -> *mut *mut AstVariable {
-    return (*f).param;
+pub unsafe fn ast_function_params(f: &AstFunction) -> *mut *mut AstVariable {
+    f.param
 }
 
-pub unsafe fn ast_function_preconditions(f: *mut AstFunction) -> PrecondsResult {
-    return ast_block_preconds(ast_function_abstract(f));
+pub unsafe fn ast_function_preconditions(f: &AstFunction) -> PrecondsResult {
+    ast_block_preconds(ast_function_abstract(f))
 }
 
 pub unsafe fn ast_function_protostitch(
@@ -4638,16 +4605,19 @@ pub unsafe fn ast_function_protostitch(
 ) -> *mut AstFunction {
     let proto: *mut AstFunction = externals_getfunc(ext, (*f).name);
     if !proto.is_null() && !((*proto).abstract_0).is_null() {
-        (*f).abstract_0 = ast_block_copy((*proto).abstract_0);
+        (*f).abstract_0 = ast_block_copy(&*(*proto).abstract_0);
     }
     return f;
 }
 
 pub unsafe fn ast_function_verify(f: *mut AstFunction, ext: *mut Externals) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let state: *mut State =
-        state_create(dynamic_str(ast_function_name(f)), ext, ast_function_type(f));
-    err = ast_function_initparams(f, state);
+    let state: *mut State = state_create(
+        dynamic_str(ast_function_name(&*f)),
+        ext,
+        ast_function_type(&*f),
+    );
+    err = ast_function_initparams(&*f, state);
     if !err.is_null() {
         return err;
     }
@@ -4660,7 +4630,7 @@ pub unsafe fn ast_function_verify(f: *mut AstFunction, ext: *mut Externals) -> *
 }
 
 unsafe fn path_absverify_withstate(f: *mut AstFunction, state: *mut State) -> *mut Error {
-    let abs: *mut AstBlock = ast_function_abstract(f);
+    let abs = ast_function_abstract(&*f);
     let ndecls: libc::c_int = ast_block_ndecls(abs);
     let var: *mut *mut AstVariable = ast_block_decls(abs);
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -4673,12 +4643,12 @@ unsafe fn path_absverify_withstate(f: *mut AstFunction, state: *mut State) -> *m
 
 unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_int) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let abs: *mut AstBlock = ast_function_abstract(f);
+    let abs = ast_function_abstract(&*f);
     let nstmts: libc::c_int = ast_block_nstmts(abs);
     let stmt: *mut *mut AstStmt = ast_block_stmts(abs);
     let mut i: libc::c_int = index;
     while i < nstmts {
-        let mut splits: AstStmtSplits = ast_stmt_splits(*stmt.offset(i as isize), state);
+        let mut splits: AstStmtSplits = ast_stmt_splits(&**stmt.offset(i as isize), state);
         if !(splits.err).is_null() {
             return splits.err;
         }
@@ -4688,8 +4658,8 @@ unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_
             }
             return split_paths_absverify(f, state, i, &mut splits);
         }
-        if !ast_stmt_ispre(*stmt.offset(i as isize)) {
-            let res: *mut Result = ast_stmt_absexec(*stmt.offset(i as isize), state, true);
+        if !ast_stmt_ispre(&**stmt.offset(i as isize)) {
+            let res: *mut Result = ast_stmt_absexec(&**stmt.offset(i as isize), state, true);
             if result_iserror(res) {
                 return result_as_error(res);
             }
@@ -4703,7 +4673,7 @@ unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_
     return 0 as *mut Error;
 }
 
-pub unsafe fn ast_function_initparams(f: *mut AstFunction, s: *mut State) -> *mut Error {
+pub unsafe fn ast_function_initparams(f: &AstFunction, s: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
     let nparams: libc::c_int = ast_function_nparams(f);
     let params: *mut *mut AstVariable = ast_function_params(f);
@@ -4727,7 +4697,7 @@ pub unsafe fn ast_function_initparams(f: *mut AstFunction, s: *mut State) -> *mu
     return 0 as *mut Error;
 }
 
-unsafe fn ast_function_precondsinit(f: *mut AstFunction, s: *mut State) -> *mut Error {
+unsafe fn ast_function_precondsinit(f: &AstFunction, s: *mut State) -> *mut Error {
     let pre: PrecondsResult = ast_function_preconditions(f);
     if !(pre.err).is_null() {
         return pre.err;
@@ -4735,7 +4705,7 @@ unsafe fn ast_function_precondsinit(f: *mut AstFunction, s: *mut State) -> *mut 
     if (pre.stmt).is_null() {
         return 0 as *mut Error;
     }
-    let res: *mut Result = ast_stmt_absexec(pre.stmt, s, true);
+    let res: *mut Result = ast_stmt_absexec(&*pre.stmt, s, true);
     if result_iserror(res) {
         return result_as_error(res);
     }
@@ -4759,16 +4729,16 @@ unsafe fn inititalise_param(param: *mut AstVariable, state: *mut State) -> *mut 
 unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
     let actual_state: *mut State = state_create_withprops(
-        dynamic_str(ast_function_name(f)),
+        dynamic_str(ast_function_name(&*f)),
         state_getext(abstract_state),
-        ast_function_type(f),
+        ast_function_type(&*f),
         state_getprops(abstract_state),
     );
-    err = ast_function_initparams(f, actual_state);
+    err = ast_function_initparams(&*f, actual_state);
     if !err.is_null() {
         panic!();
     }
-    err = ast_function_setupabsexec(f, actual_state);
+    err = ast_function_setupabsexec(&*f, actual_state);
     if !err.is_null() {
         return err;
     }
@@ -4780,13 +4750,13 @@ unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> *mu
     return 0 as *mut Error;
 }
 
-unsafe fn ast_function_setupabsexec(f: *mut AstFunction, state: *mut State) -> *mut Error {
+unsafe fn ast_function_setupabsexec(f: &AstFunction, state: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let nstmts: libc::c_int = ast_block_nstmts((*f).abstract_0);
-    let stmt: *mut *mut AstStmt = ast_block_stmts((*f).abstract_0);
+    let nstmts: libc::c_int = ast_block_nstmts(&*f.abstract_0);
+    let stmt: *mut *mut AstStmt = ast_block_stmts(&*f.abstract_0);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmts {
-        err = ast_stmt_setupabsexec(*stmt.offset(i as isize), state);
+        err = ast_stmt_setupabsexec(&**stmt.offset(i as isize), state);
         if !err.is_null() {
             return err;
         }
@@ -4800,8 +4770,8 @@ unsafe fn abstract_auditwithstate(
     actual_state: *mut State,
     abstract_state: *mut State,
 ) -> *mut Error {
-    let ndecls: libc::c_int = ast_block_ndecls((*f).body);
-    let var: *mut *mut AstVariable = ast_block_decls((*f).body);
+    let ndecls: libc::c_int = ast_block_ndecls(&*(*f).body);
+    let var: *mut *mut AstVariable = ast_block_decls(&*(*f).body);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < ndecls {
         state_declare(actual_state, *var.offset(i as isize), false);
@@ -4817,20 +4787,20 @@ unsafe fn path_verify(
     abstract_state: *mut State,
 ) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let fname: *mut libc::c_char = ast_function_name(f);
-    let nstmts: libc::c_int = ast_block_nstmts((*f).body);
-    let stmt: *mut *mut AstStmt = ast_block_stmts((*f).body);
+    let fname: *mut libc::c_char = ast_function_name(&*f);
+    let nstmts: libc::c_int = ast_block_nstmts(&*(*f).body);
+    let stmt: *mut *mut AstStmt = ast_block_stmts(&*(*f).body);
     let mut i: libc::c_int = index;
     while i < nstmts {
-        let mut splits: AstStmtSplits = ast_stmt_splits(*stmt.offset(i as isize), actual_state);
+        let mut splits: AstStmtSplits = ast_stmt_splits(&**stmt.offset(i as isize), actual_state);
         if splits.n != 0 {
             return split_paths_verify(f, actual_state, i, &mut splits, abstract_state);
         }
-        err = ast_stmt_process(*stmt.offset(i as isize), fname, actual_state);
+        err = ast_stmt_process(&**stmt.offset(i as isize), fname, actual_state);
         if !err.is_null() {
             return err;
         }
-        if ast_stmt_isterminal(*stmt.offset(i as isize), actual_state) {
+        if ast_stmt_isterminal(&**stmt.offset(i as isize), actual_state) {
             break;
         }
         i += 1;
@@ -4844,7 +4814,7 @@ unsafe fn path_verify(
         strbuilder_printf(
             b,
             b"%s: garbage on heap\0" as *const u8 as *const libc::c_char,
-            ast_function_name(f),
+            ast_function_name(&*f),
         );
         return error_create(strbuilder_build(b));
     }
@@ -4854,28 +4824,28 @@ unsafe fn path_verify(
         strbuilder_printf(
             b_0,
             b"%s: actual and abstract states differ\0" as *const u8 as *const libc::c_char,
-            ast_function_name(f),
+            ast_function_name(&*f),
         );
         return error_create(strbuilder_build(b_0));
     }
     return 0 as *mut Error;
 }
 
-pub unsafe fn ast_function_absexec(f: *mut AstFunction, state: *mut State) -> *mut Result {
-    let ndecls: libc::c_int = ast_block_ndecls((*f).abstract_0);
+pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> *mut Result {
+    let ndecls: libc::c_int = ast_block_ndecls(&*f.abstract_0);
     if ndecls != 0 {
-        let var: *mut *mut AstVariable = ast_block_decls((*f).abstract_0);
+        let var: *mut *mut AstVariable = ast_block_decls(&*f.abstract_0);
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < ndecls {
             state_declare(state, *var.offset(i as isize), false);
             i += 1;
         }
     }
-    let nstmts: libc::c_int = ast_block_nstmts((*f).abstract_0);
-    let stmt: *mut *mut AstStmt = ast_block_stmts((*f).abstract_0);
+    let nstmts: libc::c_int = ast_block_nstmts(&*f.abstract_0);
+    let stmt: *mut *mut AstStmt = ast_block_stmts(&*f.abstract_0);
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < nstmts {
-        let res: *mut Result = ast_stmt_absexec(*stmt.offset(i_0 as isize), state, false);
+        let res: *mut Result = ast_stmt_absexec(&**stmt.offset(i_0 as isize), state, false);
         if result_iserror(res) {
             return res;
         }
@@ -4892,7 +4862,7 @@ unsafe fn split_path_verify(
     f: *mut AstFunction,
     actual_state: *mut State,
     index: libc::c_int,
-    cond: *mut AstExpr,
+    cond: &AstExpr,
     abstract_state: *mut State,
 ) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
@@ -4905,11 +4875,13 @@ unsafe fn split_path_verify(
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let actual_copy: *mut State =
-            state_copywithname(actual_state, ast_function_name(*func.offset(i as isize)));
-        let abstract_copy: *mut State =
-            state_copywithname(abstract_state, ast_function_name(*func.offset(i as isize)));
+            state_copywithname(actual_state, ast_function_name(&**func.offset(i as isize)));
+        let abstract_copy: *mut State = state_copywithname(
+            abstract_state,
+            ast_function_name(&**func.offset(i as isize)),
+        );
         let r: *mut Preresult = ast_expr_assume(
-            ast_expr_inverted_copy(cond, i == 1 as libc::c_int),
+            &*ast_expr_inverted_copy(cond, i == 1 as libc::c_int),
             actual_copy,
         );
         if preresult_iserror(r) {
@@ -4956,15 +4928,15 @@ unsafe fn recurse_buildgraph(
         panic!();
     }
     let body: *mut AstBlock = (*f).body;
-    let nstmts: libc::c_int = ast_block_nstmts(body);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(body);
+    let nstmts: libc::c_int = ast_block_nstmts(&*body);
+    let stmt: *mut *mut AstStmt = ast_block_stmts(&*body);
     if stmt.is_null() {
         panic!();
     }
     let mut val = string_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmts {
-        let mut farr = ast_stmt_getfuncs(*stmt.offset(i as isize));
+        let mut farr = ast_stmt_getfuncs(&**stmt.offset(i as isize));
         let func: *mut *mut libc::c_char = string_arr_s(&mut farr);
         let mut j: libc::c_int = 0 as libc::c_int;
         while j < string_arr_n(&farr) {
@@ -4992,7 +4964,7 @@ unsafe fn recurse_buildgraph(
 unsafe fn abstract_paths(
     f: *mut AstFunction,
     index: libc::c_int,
-    cond: *mut AstExpr,
+    cond: &AstExpr,
 ) -> *mut AstFunctionArr {
     let res: *mut AstFunctionArr = ast_function_arr_create();
     let f_true: *mut AstFunction = ast_function_create(
@@ -5001,18 +4973,18 @@ unsafe fn abstract_paths(
         split_name((*f).name, cond),
         (*f).nparam,
         ast_variables_copy((*f).nparam, (*f).param),
-        ast_block_copy((*f).abstract_0),
-        ast_block_copy((*f).body),
+        ast_block_copy(&*(*f).abstract_0),
+        ast_block_copy(&*(*f).body),
     );
     let inv_assumption: *mut AstExpr = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
         (*f).isaxiom,
         ast_type_copy((*f).ret),
-        split_name((*f).name, inv_assumption),
+        split_name((*f).name, &*inv_assumption),
         (*f).nparam,
         ast_variables_copy((*f).nparam, (*f).param),
-        ast_block_copy((*f).abstract_0),
-        ast_block_copy((*f).body),
+        ast_block_copy(&*(*f).abstract_0),
+        ast_block_copy(&*(*f).body),
     );
     ast_function_arr_append(res, f_true);
     ast_function_arr_append(res, f_false);
@@ -5023,7 +4995,7 @@ unsafe fn split_path_absverify(
     f: *mut AstFunction,
     state: *mut State,
     index: libc::c_int,
-    cond: *mut AstExpr,
+    cond: &AstExpr,
 ) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
     let paths: *mut AstFunctionArr = abstract_paths(f, index, cond);
@@ -5035,9 +5007,11 @@ unsafe fn split_path_absverify(
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let s_copy: *mut State =
-            state_copywithname(state, ast_function_name(*func.offset(i as isize)));
-        let r: *mut Preresult =
-            ast_expr_assume(ast_expr_inverted_copy(cond, i == 1 as libc::c_int), s_copy);
+            state_copywithname(state, ast_function_name(&**func.offset(i as isize)));
+        let r: *mut Preresult = ast_expr_assume(
+            &*ast_expr_inverted_copy(cond, i == 1 as libc::c_int),
+            s_copy,
+        );
         if preresult_iserror(r) {
             return preresult_as_error(r);
         }
@@ -5061,7 +5035,7 @@ unsafe fn split_paths_absverify(
     let mut err: *mut Error = 0 as *mut Error;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*splits).n {
-        err = split_path_absverify(f, state, index, *((*splits).cond).offset(i as isize));
+        err = split_path_absverify(f, state, index, &**(*splits).cond.offset(i as isize));
         if !err.is_null() {
             return err;
         }
@@ -5077,7 +5051,7 @@ pub unsafe fn ast_function_buildgraph(fname: *mut libc::c_char, ext: *mut Extern
     return g;
 }
 
-unsafe fn split_name(name: *mut libc::c_char, assumption: *mut AstExpr) -> *mut libc::c_char {
+unsafe fn split_name(name: *mut libc::c_char, assumption: &AstExpr) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     let assumption_str: *mut libc::c_char = ast_expr_str(assumption);
     strbuilder_printf(
@@ -5104,7 +5078,7 @@ unsafe fn split_paths_verify(
             f,
             actual_state,
             index,
-            *((*splits).cond).offset(i as isize),
+            &**((*splits).cond).offset(i as isize),
             abstract_state,
         );
         if !err.is_null() {
@@ -5118,7 +5092,7 @@ unsafe fn split_paths_verify(
 unsafe fn body_paths(
     f: *mut AstFunction,
     index: libc::c_int,
-    cond: *mut AstExpr,
+    cond: &AstExpr,
 ) -> *mut AstFunctionArr {
     let res: *mut AstFunctionArr = ast_function_arr_create();
     let f_true: *mut AstFunction = ast_function_create(
@@ -5127,17 +5101,17 @@ unsafe fn body_paths(
         split_name((*f).name, cond),
         (*f).nparam,
         ast_variables_copy((*f).nparam, (*f).param),
-        ast_block_copy((*f).abstract_0),
+        ast_block_copy(&*(*f).abstract_0),
         (*f).body,
     );
     let inv_assumption: *mut AstExpr = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
         (*f).isaxiom,
         ast_type_copy((*f).ret),
-        split_name((*f).name, inv_assumption),
+        split_name((*f).name, &*inv_assumption),
         (*f).nparam,
         ast_variables_copy((*f).nparam, (*f).param),
-        ast_block_copy((*f).abstract_0),
+        ast_block_copy(&*(*f).abstract_0),
         (*f).body,
     );
     ast_function_arr_append(res, f_true);
@@ -5153,7 +5127,7 @@ pub unsafe fn ast_function_arr_copy(old: *mut AstFunctionArr) -> *mut AstFunctio
     let new: *mut AstFunctionArr = ast_function_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*old).n {
-        ast_function_arr_append(new, ast_function_copy(*((*old).f).offset(i as isize)));
+        ast_function_arr_append(new, ast_function_copy(&**((*old).f).offset(i as isize)));
         i += 1;
     }
     return new;
@@ -5231,7 +5205,7 @@ pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> *mut 
 pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: *mut Externals) {
     match &(*decl).kind {
         AstExternDeclKind::Function(f) => {
-            externals_declarefunc(ext, ast_function_name(*f), *f);
+            externals_declarefunc(ext, ast_function_name(&**f), *f);
         }
         AstExternDeclKind::Variable(v) => {
             externals_declarevar(ext, ast_variable_name(*v), *v);

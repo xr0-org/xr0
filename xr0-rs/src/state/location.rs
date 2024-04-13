@@ -165,7 +165,7 @@ pub unsafe fn location_str(loc: *mut Location) -> *mut libc::c_char {
     }
     strbuilder_printf(b, b"%d\0" as *const u8 as *const libc::c_char, (*loc).block);
     if !offsetzero(loc) {
-        let offset: *mut libc::c_char = ast_expr_str((*loc).offset);
+        let offset: *mut libc::c_char = ast_expr_str(&*(*loc).offset);
         strbuilder_printf(b, b"+%s\0" as *const u8 as *const libc::c_char, offset);
         free(offset as *mut libc::c_void);
     }
@@ -173,7 +173,7 @@ pub unsafe fn location_str(loc: *mut Location) -> *mut libc::c_char {
 }
 unsafe fn offsetzero(loc: *mut Location) -> bool {
     let zero: *mut AstExpr = ast_expr_constant_create(0 as libc::c_int);
-    let eq: bool = ast_expr_equal((*loc).offset, zero);
+    let eq: bool = ast_expr_equal(&*(*loc).offset, &*zero);
     ast_expr_destroy(zero);
     return eq;
 }
@@ -192,16 +192,18 @@ pub unsafe fn location_offset(loc: *mut Location) -> *mut AstExpr {
 
 pub unsafe fn location_copy(loc: *mut Location) -> *mut Location {
     match (*loc).type_0 {
-        0 => location_create_static((*loc).block, ast_expr_copy((*loc).offset)),
-        1 => location_create_vconst((*loc).block, ast_expr_copy((*loc).offset)),
-        2 => location_create_dereferencable((*loc).block, ast_expr_copy((*loc).offset)),
-        3 => location_create_automatic((*loc).u.frame, (*loc).block, ast_expr_copy((*loc).offset)),
-        4 => location_create_dynamic((*loc).block, ast_expr_copy((*loc).offset)),
+        0 => location_create_static((*loc).block, ast_expr_copy(&*(*loc).offset)),
+        1 => location_create_vconst((*loc).block, ast_expr_copy(&*(*loc).offset)),
+        2 => location_create_dereferencable((*loc).block, ast_expr_copy(&*(*loc).offset)),
+        3 => {
+            location_create_automatic((*loc).u.frame, (*loc).block, ast_expr_copy(&*(*loc).offset))
+        }
+        4 => location_create_dynamic((*loc).block, ast_expr_copy(&*(*loc).offset)),
         _ => panic!(),
     }
 }
 
-pub unsafe fn location_with_offset(loc: *mut Location, offset: *mut AstExpr) -> *mut Location {
+pub unsafe fn location_with_offset(loc: *mut Location, offset: &AstExpr) -> *mut Location {
     if !offsetzero(loc) {
         panic!();
     }
@@ -241,7 +243,7 @@ pub unsafe fn location_toclump(loc: *mut Location, c: *mut Clump) -> bool {
 pub unsafe fn location_equal(l1: *mut Location, l2: *mut Location) -> bool {
     return (*l1).type_0 as libc::c_uint == (*l2).type_0 as libc::c_uint
         && (*l1).block == (*l2).block
-        && ast_expr_equal((*l1).offset, (*l2).offset) as libc::c_int != 0;
+        && ast_expr_equal(&*(*l1).offset, &*(*l2).offset) as libc::c_int != 0;
 }
 
 pub unsafe fn location_references(l1: *mut Location, l2: *mut Location, s: *mut State) -> bool {
@@ -356,15 +358,15 @@ pub unsafe fn location_range_dealloc(
             b"cannot get block\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
     }
-    if !block_range_aredeallocands(b, lw, up, state) {
+    if !block_range_aredeallocands(&*b, lw, up, state) {
         printf(
             b"block: %s\n\0" as *const u8 as *const libc::c_char,
             block_str(b),
         );
         printf(
             b"lw: %s, up: %s\n\0" as *const u8 as *const libc::c_char,
-            ast_expr_str(lw),
-            ast_expr_str(up),
+            ast_expr_str(&*lw),
+            ast_expr_str(&*up),
         );
         debug_assert!(false);
         return error_create(

@@ -571,7 +571,7 @@ pub grammar c_parser(env: &Env) for str {
     rule selection_statement() -> BoxedStmt =
         p:position!() K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() {
             unsafe {
-                let neg_cond = ast_expr_unary_create(ast_expr_copy(cond), AstUnaryOp::Bang);
+                let neg_cond = ast_expr_unary_create(ast_expr_copy(&*cond), AstUnaryOp::Bang);
                 let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, neg_cond, alt, ptr::null_mut());
                 ast_stmt_create_sel(env.lexloc(p), false, cond, then, else_stmt)
             }

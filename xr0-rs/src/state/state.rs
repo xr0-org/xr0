@@ -239,7 +239,7 @@ pub unsafe fn state_vconst(
     return value_sync_create(ast_expr_identifier_create(c));
 }
 
-pub unsafe fn state_static_init(state: *mut State, expr: *mut AstExpr) -> *mut Value {
+pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value {
     let lit: *mut libc::c_char = ast_expr_as_literal(expr);
     let mut loc: *mut Location = static_memory_checkpool((*state).static_memory, lit);
     if !loc.is_null() {
@@ -294,9 +294,7 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
     let loc: *mut Location = value_as_location(v);
     let res: ObjectRes = state_get(state, loc, 1 as libc::c_int != 0);
     if !(res.err).is_null() {
-        if true {
-            panic!();
-        }
+        panic!();
     }
     return location_toheap(loc, (*state).heap);
 }
@@ -407,24 +405,16 @@ pub unsafe fn state_getobject(state: *mut State, id: *mut libc::c_char) -> *mut 
     }
     let v: *mut Variable = stack_getvariable((*state).stack, id);
     if v.is_null() {
-        if true {
-            panic!();
-        }
+        panic!();
     }
     let res: ObjectRes = state_get(state, variable_location(v), 1 as libc::c_int != 0);
     if !(res.err).is_null() {
-        if true {
-            panic!();
-        }
+        panic!();
     }
     return res.obj;
 }
 
-pub unsafe fn state_deref(
-    state: *mut State,
-    ptr_val: *mut Value,
-    index: *mut AstExpr,
-) -> ObjectRes {
+pub unsafe fn state_deref(state: *mut State, ptr_val: *mut Value, index: &AstExpr) -> ObjectRes {
     if value_issync(ptr_val) {
         return {
             let init = ObjectRes {
@@ -489,7 +479,7 @@ pub unsafe fn state_range_alloc(
             b"no block\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
     }
-    if ast_expr_equal(lw, up) {
+    if ast_expr_equal(&*lw, &*up) {
         panic!();
     }
     return block_range_alloc(res.b, lw, up, (*state).heap);
@@ -544,7 +534,7 @@ pub unsafe fn state_range_aredeallocands(
     lw: *mut AstExpr,
     up: *mut AstExpr,
 ) -> bool {
-    if ast_expr_equal(lw, up) {
+    if ast_expr_equal(&*lw, &*up) {
         return 1 as libc::c_int != 0;
     }
     let arr_val: *mut Value = object_as_value(obj);
@@ -560,13 +550,11 @@ pub unsafe fn state_range_aredeallocands(
         (*state).heap,
         (*state).clump,
     );
-    if !(res.err).is_null() {
-        if true {
-            panic!();
-        }
+    if !res.err.is_null() {
+        panic!();
     }
     return !(res.b).is_null() as libc::c_int != 0
-        && block_range_aredeallocands(res.b, lw, up, state) as libc::c_int != 0;
+        && block_range_aredeallocands(&*res.b, lw, up, state) as libc::c_int != 0;
 }
 
 pub unsafe fn state_hasgarbage(state: *mut State) -> bool {

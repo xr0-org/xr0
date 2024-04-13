@@ -114,14 +114,14 @@ pub unsafe fn lexememarker_destroy(loc: *mut LexemeMarker) {
     free(loc as *mut libc::c_void);
 }
 
-pub unsafe fn lexememarker_str(loc: *mut LexemeMarker) -> *mut libc::c_char {
+pub unsafe fn lexememarker_str(loc: &LexemeMarker) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_printf(
         b,
         b"%s:%d:%d\0" as *const u8 as *const libc::c_char,
-        (*loc).filename,
-        (*loc).linenum,
-        (*loc).column,
+        loc.filename,
+        loc.linenum,
+        loc.column,
     );
     return strbuilder_build(b);
 }

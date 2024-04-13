@@ -358,7 +358,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
                 object_assign(
                     obj,
                     value_sync_create(ast_expr_member_create(
-                        ast_expr_copy(root),
+                        ast_expr_copy(&*root),
                         dynamic_str(field),
                     )),
                 );
@@ -651,8 +651,8 @@ pub unsafe fn value_as_sync(v: *mut Value) -> *mut AstExpr {
 pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
     match (*v).type_0 {
         1 => ast_expr_identifier_create(value_str(v)),
-        3 => ast_expr_copy(value_as_literal(v)),
-        0 => ast_expr_copy(value_as_sync(v)),
+        3 => ast_expr_copy(&*value_as_literal(v)),
+        0 => ast_expr_copy(&*value_as_sync(v)),
         2 => number_to_expr((*v).c2rust_unnamed.n),
         _ => panic!(),
     }
@@ -872,7 +872,7 @@ pub unsafe fn number_ranges_sprint(num: *mut Number) -> *mut libc::c_char {
 pub unsafe fn number_str(num: *mut Number) -> *mut libc::c_char {
     match (*num).type_0 {
         0 => number_ranges_sprint(num),
-        1 => ast_expr_str((*num).c2rust_unnamed.computation),
+        1 => ast_expr_str(&*(*num).c2rust_unnamed.computation),
         _ => panic!(),
     }
 }
@@ -884,8 +884,8 @@ pub unsafe fn number_equal(n1: *mut Number, n2: *mut Number) -> bool {
     match (*n1).type_0 {
         0 => number_ranges_equal(n1, n2),
         1 => ast_expr_equal(
-            (*n1).c2rust_unnamed.computation,
-            (*n2).c2rust_unnamed.computation,
+            &*(*n1).c2rust_unnamed.computation,
+            &*(*n2).c2rust_unnamed.computation,
         ),
 
         _ => panic!(),
@@ -980,7 +980,7 @@ pub unsafe fn number_as_sync(n: *mut Number) -> *mut AstExpr {
 pub unsafe fn number_to_expr(n: *mut Number) -> *mut AstExpr {
     match (*n).type_0 {
         0 => number_ranges_to_expr((*n).c2rust_unnamed.ranges),
-        1 => ast_expr_copy(number_as_sync(n)),
+        1 => ast_expr_copy(&*number_as_sync(n)),
         _ => panic!(),
     }
 }
@@ -988,7 +988,7 @@ pub unsafe fn number_to_expr(n: *mut Number) -> *mut AstExpr {
 pub unsafe fn number_copy(num: *mut Number) -> *mut Number {
     match (*num).type_0 {
         0 => number_ranges_create(number_range_arr_copy((*num).c2rust_unnamed.ranges)),
-        1 => number_computed_create(ast_expr_copy((*num).c2rust_unnamed.computation)),
+        1 => number_computed_create(ast_expr_copy(&*(*num).c2rust_unnamed.computation)),
         _ => panic!(),
     }
 }
