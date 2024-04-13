@@ -4658,6 +4658,7 @@ pub unsafe fn ast_function_verify(f: *mut AstFunction, ext: *mut Externals) -> *
     state_destroy(state);
     return 0 as *mut Error;
 }
+
 unsafe fn path_absverify_withstate(f: *mut AstFunction, state: *mut State) -> *mut Error {
     let abs: *mut AstBlock = ast_function_abstract(f);
     let ndecls: libc::c_int = ast_block_ndecls(abs);
@@ -4669,6 +4670,7 @@ unsafe fn path_absverify_withstate(f: *mut AstFunction, state: *mut State) -> *m
     }
     return path_absverify(f, state, 0 as libc::c_int);
 }
+
 unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_int) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
     let abs: *mut AstBlock = ast_function_abstract(f);
@@ -4724,6 +4726,7 @@ pub unsafe fn ast_function_initparams(f: *mut AstFunction, s: *mut State) -> *mu
     }
     return 0 as *mut Error;
 }
+
 unsafe fn ast_function_precondsinit(f: *mut AstFunction, s: *mut State) -> *mut Error {
     let pre: PrecondsResult = ast_function_preconditions(f);
     if !(pre.err).is_null() {
@@ -4738,6 +4741,7 @@ unsafe fn ast_function_precondsinit(f: *mut AstFunction, s: *mut State) -> *mut 
     }
     return 0 as *mut Error;
 }
+
 unsafe fn inititalise_param(param: *mut AstVariable, state: *mut State) -> *mut Error {
     let name: *mut libc::c_char = ast_variable_name(param);
     let t: *mut AstType = ast_variable_type(param);
@@ -4751,6 +4755,7 @@ unsafe fn inititalise_param(param: *mut AstVariable, state: *mut State) -> *mut 
     }
     return 0 as *mut Error;
 }
+
 unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
     let actual_state: *mut State = state_create_withprops(
@@ -4774,6 +4779,7 @@ unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> *mu
     state_destroy(actual_state);
     return 0 as *mut Error;
 }
+
 unsafe fn ast_function_setupabsexec(f: *mut AstFunction, state: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
     let nstmts: libc::c_int = ast_block_nstmts((*f).abstract_0);
@@ -4788,6 +4794,7 @@ unsafe fn ast_function_setupabsexec(f: *mut AstFunction, state: *mut State) -> *
     }
     return 0 as *mut Error;
 }
+
 unsafe fn abstract_auditwithstate(
     f: *mut AstFunction,
     actual_state: *mut State,
@@ -4802,6 +4809,7 @@ unsafe fn abstract_auditwithstate(
     }
     return path_verify(f, actual_state, 0 as libc::c_int, abstract_state);
 }
+
 unsafe fn path_verify(
     f: *mut AstFunction,
     actual_state: *mut State,
@@ -4879,6 +4887,7 @@ pub unsafe fn ast_function_absexec(f: *mut AstFunction, state: *mut State) -> *m
     }
     return result_value_create(object_as_value(obj));
 }
+
 unsafe fn split_path_verify(
     f: *mut AstFunction,
     actual_state: *mut State,
@@ -4916,6 +4925,7 @@ unsafe fn split_path_verify(
     }
     return 0 as *mut Error;
 }
+
 unsafe fn recurse_buildgraph(
     g: &mut Map,
     dedup: &mut Map,
@@ -4978,6 +4988,7 @@ unsafe fn recurse_buildgraph(
         Box::into_raw(val) as *const libc::c_void,
     );
 }
+
 unsafe fn abstract_paths(
     f: *mut AstFunction,
     index: libc::c_int,
@@ -5007,6 +5018,7 @@ unsafe fn abstract_paths(
     ast_function_arr_append(res, f_false);
     return res;
 }
+
 unsafe fn split_path_absverify(
     f: *mut AstFunction,
     state: *mut State,
@@ -5039,6 +5051,7 @@ unsafe fn split_path_absverify(
     }
     return 0 as *mut Error;
 }
+
 unsafe fn split_paths_absverify(
     f: *mut AstFunction,
     state: *mut State,
@@ -5063,6 +5076,7 @@ pub unsafe fn ast_function_buildgraph(fname: *mut libc::c_char, ext: *mut Extern
     recurse_buildgraph(&mut g, &mut dedup, fname, ext);
     return g;
 }
+
 unsafe fn split_name(name: *mut libc::c_char, assumption: *mut AstExpr) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     let assumption_str: *mut libc::c_char = ast_expr_str(assumption);
@@ -5075,6 +5089,7 @@ unsafe fn split_name(name: *mut libc::c_char, assumption: *mut AstExpr) -> *mut 
     free(assumption_str as *mut libc::c_void);
     return strbuilder_build(b);
 }
+
 unsafe fn split_paths_verify(
     f: *mut AstFunction,
     actual_state: *mut State,
@@ -5099,6 +5114,7 @@ unsafe fn split_paths_verify(
     }
     return 0 as *mut Error;
 }
+
 unsafe fn body_paths(
     f: *mut AstFunction,
     index: libc::c_int,
