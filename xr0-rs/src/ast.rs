@@ -324,7 +324,6 @@ pub enum AstExternDeclKind {
     Struct(*mut AstType),
 }
 
-#[derive(Copy, Clone)]
 pub struct Ast {
     pub n: libc::c_int,
     pub decl: *mut *mut AstExternDecl,
@@ -5147,13 +5146,20 @@ pub unsafe fn ast_create(decl: *mut AstExternDecl) -> *mut Ast {
     Box::into_raw(node)
 }
 
-pub unsafe fn ast_destroy(node: *mut Ast) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*node).n {
-        ast_externdecl_destroy(*((*node).decl).offset(i as isize));
-        i += 1;
+impl Drop for Ast {
+    fn drop(&mut self) {
+        unsafe {
+            let mut i: libc::c_int = 0 as libc::c_int;
+            while i < (*self).n {
+                ast_externdecl_destroy(*self.decl.offset(i as isize));
+                i += 1;
+            }
+            free(self.decl as *mut libc::c_void);
+        }
     }
-    free((*node).decl as *mut libc::c_void);
+}
+
+pub unsafe fn ast_destroy(node: *mut Ast) {
     drop(Box::from_raw(node));
 }
 
