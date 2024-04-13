@@ -305,7 +305,6 @@ pub struct AstFunctionArr {
     pub f: *mut *mut AstFunction,
 }
 
-#[derive(Copy, Clone)]
 pub struct AstExternDecl {
     pub kind: AstExternDeclKind,
 }
@@ -316,7 +315,6 @@ pub struct AstTypedefDecl {
     pub type_0: *mut AstType,
 }
 
-#[derive(Copy, Clone)]
 pub enum AstExternDeclKind {
     Function(*mut AstFunction),
     Variable(*mut AstVariable),
@@ -919,20 +917,6 @@ unsafe fn expr_incdec_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     }
     ast_expr_destroy(assign);
     return res;
-}
-
-unsafe fn ast_expr_destroy_literal(expr: *mut AstExpr) {
-    let AstExprKind::StringLiteral(s) = &(*expr).kind else {
-        panic!()
-    };
-    free(*s as *mut libc::c_void);
-}
-
-unsafe fn ast_expr_destroy_identifier(expr: *mut AstExpr) {
-    let AstExprKind::Identifier(id) = &(*expr).kind else {
-        panic!()
-    };
-    free(*id as *mut libc::c_void);
 }
 
 unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
@@ -2268,50 +2252,57 @@ pub unsafe fn ast_expr_binary_op(expr: &AstExpr) -> AstBinaryOp {
     binary.op
 }
 
-pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
-    match &(*expr).kind {
-        AstExprKind::Identifier(_) => {
-            ast_expr_destroy_identifier(expr);
-        }
-        AstExprKind::StringLiteral(_) => {
-            ast_expr_destroy_literal(expr);
-        }
-        AstExprKind::Bracketed(inner) => {
-            ast_expr_destroy(*inner);
-        }
-        AstExprKind::Call(_) => {
-            ast_expr_destroy_call(expr);
-        }
-        AstExprKind::IncDec(_) => {
-            ast_expr_destroy_incdec(expr);
-        }
-        AstExprKind::StructMember(member) => {
-            ast_expr_destroy(member.root);
-            free(member.field as *mut libc::c_void);
-        }
-        AstExprKind::Unary(_) => {
-            ast_expr_destroy_unary(expr);
-        }
-        AstExprKind::Binary(_) => {
-            ast_expr_destroy_binary(expr);
-        }
-        AstExprKind::Assignment(assignment) => {
-            ast_expr_destroy_assignment(assignment);
-        }
-        AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_destroy(*assertand);
-        }
-        AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_destroy(*assertand);
-        }
-        AstExprKind::Constant(_) | AstExprKind::ArbArg => {}
-        AstExprKind::Allocation(alloc) => {
-            ast_expr_destroy(alloc.arg);
-        }
-        _ => {
-            panic!();
+impl Drop for AstExpr {
+    fn drop(&mut self) {
+        unsafe {
+            match &self.kind {
+                AstExprKind::Identifier(id) => {
+                    free(*id as *mut libc::c_void);
+                }
+                AstExprKind::StringLiteral(s) => {
+                    free(*s as *mut libc::c_void);
+                }
+                AstExprKind::Bracketed(inner) => {
+                    ast_expr_destroy(*inner);
+                }
+                AstExprKind::Call(_) => {
+                    ast_expr_destroy_call(self);
+                }
+                AstExprKind::IncDec(_) => {
+                    ast_expr_destroy_incdec(self);
+                }
+                AstExprKind::StructMember(member) => {
+                    ast_expr_destroy(member.root);
+                    free(member.field as *mut libc::c_void);
+                }
+                AstExprKind::Unary(_) => {
+                    ast_expr_destroy_unary(self);
+                }
+                AstExprKind::Binary(_) => {
+                    ast_expr_destroy_binary(self);
+                }
+                AstExprKind::Assignment(assignment) => {
+                    ast_expr_destroy_assignment(assignment);
+                }
+                AstExprKind::IsDeallocand(assertand) => {
+                    ast_expr_destroy(*assertand);
+                }
+                AstExprKind::IsDereferencable(assertand) => {
+                    ast_expr_destroy(*assertand);
+                }
+                AstExprKind::Constant(_) | AstExprKind::ArbArg => {}
+                AstExprKind::Allocation(alloc) => {
+                    ast_expr_destroy(alloc.arg);
+                }
+                _ => {
+                    panic!();
+                }
+            }
         }
     }
+}
+
+pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
     drop(Box::from_raw(expr));
 }
 
@@ -5078,22 +5069,29 @@ pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: *mut Externa
     }
 }
 
-pub unsafe fn ast_externdecl_destroy(decl: *mut AstExternDecl) {
-    match &(*decl).kind {
-        AstExternDeclKind::Function(f) => {
-            ast_function_destroy(*f);
-        }
-        AstExternDeclKind::Variable(v) => {
-            ast_variable_destroy(*v);
-        }
-        AstExternDeclKind::Typedef(td) => {
-            free(td.name as *mut libc::c_void);
-            ast_type_destroy(td.type_0);
-        }
-        AstExternDeclKind::Struct(s) => {
-            ast_type_destroy(*s);
+impl Drop for AstExternDeclKind {
+    fn drop(&mut self) {
+        unsafe {
+            match self {
+                AstExternDeclKind::Function(f) => {
+                    ast_function_destroy(*f);
+                }
+                AstExternDeclKind::Variable(v) => {
+                    ast_variable_destroy(*v);
+                }
+                AstExternDeclKind::Typedef(td) => {
+                    free(td.name as *mut libc::c_void);
+                    ast_type_destroy(td.type_0);
+                }
+                AstExternDeclKind::Struct(s) => {
+                    ast_type_destroy(*s);
+                }
+            }
         }
     }
+}
+
+pub unsafe fn ast_externdecl_destroy(decl: *mut AstExternDecl) {
     drop(Box::from_raw(decl));
 }
 
