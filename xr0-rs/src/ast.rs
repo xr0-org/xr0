@@ -3,7 +3,7 @@
 use std::ffi::CStr;
 use std::ptr;
 
-use libc::{calloc, exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
+use libc::{exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
 
 use crate::c_util::__stderrp;
 use crate::ext::{
@@ -1562,7 +1562,9 @@ pub unsafe fn ast_expr_as_identifier(expr: &AstExpr) -> *mut libc::c_char {
 }
 
 unsafe fn ast_expr_create() -> *mut AstExpr {
-    return malloc(::core::mem::size_of::<AstExpr>()) as *mut AstExpr;
+    Box::into_raw(Box::new(AstExpr {
+        kind: AstExprKind::ArbArg,
+    }))
 }
 
 pub unsafe fn ast_expr_identifier_create(s: *mut libc::c_char) -> *mut AstExpr {
@@ -2311,7 +2313,7 @@ pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
             panic!();
         }
     }
-    free(expr as *mut libc::c_void);
+    drop(Box::from_raw(expr));
 }
 
 pub unsafe fn ast_expr_le_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
@@ -2631,9 +2633,7 @@ pub unsafe fn ast_block_create(
     decls: Vec<*mut AstVariable>,
     stmts: Vec<*mut AstStmt>,
 ) -> *mut AstBlock {
-    let b: *mut AstBlock = malloc(::core::mem::size_of::<AstBlock>()) as *mut AstBlock;
-    std::ptr::write(b, AstBlock { decls, stmts });
-    return b;
+    Box::into_raw(Box::new(AstBlock { decls, stmts }))
 }
 
 pub unsafe fn ast_block_destroy(b: *mut AstBlock) {
@@ -2644,7 +2644,7 @@ pub unsafe fn ast_block_destroy(b: *mut AstBlock) {
     for stmt in block.stmts {
         ast_stmt_destroy(stmt);
     }
-    free(b as *mut libc::c_void);
+    drop(Box::from_raw(b));
 }
 
 pub unsafe fn ast_block_copy(b: &AstBlock) -> *mut AstBlock {
@@ -3451,9 +3451,10 @@ unsafe fn ast_stmt_expr_sprint(expr: &AstExpr, b: *mut StrBuilder) {
 }
 
 unsafe fn ast_stmt_create(loc: *mut LexemeMarker) -> *mut AstStmt {
-    let stmt: *mut AstStmt = calloc(1, ::core::mem::size_of::<AstStmt>()) as *mut AstStmt;
-    (*stmt).loc = loc;
-    return stmt;
+    Box::into_raw(Box::new(AstStmt {
+        kind: AstStmtKind::Nop,
+        loc,
+    }))
 }
 
 unsafe fn ast_stmt_copy_iter(
@@ -3709,7 +3710,7 @@ pub unsafe fn ast_stmt_destroy(stmt: *mut AstStmt) {
     if !((*stmt).loc).is_null() {
         lexememarker_destroy((*stmt).loc);
     }
-    free(stmt as *mut libc::c_void);
+    drop(Box::from_raw(stmt));
 }
 
 unsafe fn ast_stmt_destroy_jump(jump: &AstJumpStmt) {
@@ -3909,14 +3910,11 @@ pub unsafe fn ast_type_ispointer(t: *mut AstType) -> bool {
     matches!((*t).base, AstTypeBase::Pointer(_))
 }
 
-pub unsafe fn ast_type_create(base: AstTypeBase, mod_0: AstTypeModifier) -> *mut AstType {
-    let t: *mut AstType = malloc(::core::mem::size_of::<AstType>()) as *mut AstType;
-    if t.is_null() {
-        panic!();
-    }
-    (*t).base = base;
-    (*t).modifiers = mod_0 as libc::c_int;
-    return t;
+pub unsafe fn ast_type_create(base: AstTypeBase, modifiers: AstTypeModifier) -> *mut AstType {
+    Box::into_raw(Box::new(AstType {
+        base,
+        modifiers: modifiers as libc::c_int,
+    }))
 }
 
 pub unsafe fn ast_type_create_ptr(referent: *mut AstType) -> *mut AstType {
@@ -4059,7 +4057,7 @@ pub unsafe fn ast_type_destroy(t: *mut AstType) {
         }
         _ => {}
     }
-    free(t as *mut libc::c_void);
+    drop(Box::from_raw(t));
 }
 
 pub unsafe fn ast_type_copy(t: *mut AstType) -> *mut AstType {
@@ -4241,16 +4239,13 @@ pub unsafe fn ast_variable_create(
     name: *mut libc::c_char,
     type_0: *mut AstType,
 ) -> *mut AstVariable {
-    let v: *mut AstVariable = malloc(::core::mem::size_of::<AstVariable>()) as *mut AstVariable;
-    (*v).name = name;
-    (*v).type_0 = type_0;
-    return v;
+    Box::into_raw(Box::new(AstVariable { name, type_0 }))
 }
 
 pub unsafe fn ast_variable_destroy(v: *mut AstVariable) {
     ast_type_destroy((*v).type_0);
     free((*v).name as *mut libc::c_void);
-    free(v as *mut libc::c_void);
+    drop(Box::from_raw(v));
 }
 
 pub unsafe fn ast_variable_copy(v: *mut AstVariable) -> *mut AstVariable {
@@ -4288,7 +4283,10 @@ pub unsafe fn ast_variable_type(v: *mut AstVariable) -> *mut AstType {
 }
 
 pub unsafe fn ast_variable_arr_create() -> *mut AstVariableArr {
-    return calloc(1, ::core::mem::size_of::<AstVariableArr>()) as *mut AstVariableArr;
+    Box::into_raw(Box::new(AstVariableArr {
+        n: 0,
+        v: ptr::null_mut(),
+    }))
 }
 
 pub unsafe fn ast_variable_arr_append(arr: *mut AstVariableArr, v: *mut AstVariable) {
@@ -4307,7 +4305,7 @@ pub unsafe fn ast_variable_arr_destroy(arr: *mut AstVariableArr) {
         ast_variable_destroy(*((*arr).v).offset(i as isize));
         i += 1;
     }
-    free(arr as *mut libc::c_void);
+    drop(Box::from_raw(arr));
 }
 
 pub unsafe fn ast_variable_arr_n(arr: *mut AstVariableArr) -> libc::c_int {
@@ -4347,19 +4345,14 @@ pub unsafe fn ast_function_create(
     if abstract_0.is_null() {
         panic!();
     }
-    let f: *mut AstFunction = malloc(::core::mem::size_of::<AstFunction>()) as *mut AstFunction;
-    ptr::write(
-        f,
-        AstFunction {
-            isaxiom,
-            ret,
-            name,
-            params,
-            abstract_0,
-            body,
-        },
-    );
-    return f;
+    Box::into_raw(Box::new(AstFunction {
+        isaxiom,
+        ret,
+        name,
+        params,
+        abstract_0,
+        body,
+    }))
 }
 
 pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
@@ -4373,7 +4366,7 @@ pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
         ast_block_destroy(fun.body);
     }
     free(fun.name as *mut libc::c_void);
-    free(f as *mut libc::c_void);
+    drop(Box::from_raw(f));
 }
 
 pub unsafe fn ast_function_str(f: &AstFunction) -> *mut libc::c_char {
@@ -4986,7 +4979,10 @@ unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> *mu
 }
 
 pub unsafe fn ast_function_arr_create() -> *mut AstFunctionArr {
-    return calloc(1, ::core::mem::size_of::<AstFunctionArr>()) as *mut AstFunctionArr;
+    Box::into_raw(Box::new(AstFunctionArr {
+        n: 0,
+        f: ptr::null_mut(),
+    }))
 }
 
 pub unsafe fn ast_function_arr_copy(old: *mut AstFunctionArr) -> *mut AstFunctionArr {
@@ -5005,7 +5001,7 @@ pub unsafe fn ast_function_arr_destroy(arr: *mut AstFunctionArr) {
         ast_function_destroy(*((*arr).f).offset(i as isize));
         i += 1;
     }
-    free(arr as *mut libc::c_void);
+    drop(Box::from_raw(arr));
 }
 
 pub unsafe fn ast_function_arr_append(arr: *mut AstFunctionArr, f: *mut AstFunction) {
@@ -5035,10 +5031,9 @@ pub unsafe fn ast_function_arr_func(arr: *mut AstFunctionArr) -> *mut *mut AstFu
 }
 
 pub unsafe fn ast_functiondecl_create(f: *mut AstFunction) -> *mut AstExternDecl {
-    let decl: *mut AstExternDecl =
-        malloc(::core::mem::size_of::<AstExternDecl>()) as *mut AstExternDecl;
-    (*decl).kind = AstExternDeclKind::Function(f);
-    return decl;
+    Box::into_raw(Box::new(AstExternDecl {
+        kind: AstExternDeclKind::Function(f),
+    }))
 }
 
 pub unsafe fn ast_externdecl_isfunction(decl: *mut AstExternDecl) -> bool {
@@ -5053,19 +5048,18 @@ pub unsafe fn ast_externdecl_as_function(decl: *mut AstExternDecl) -> *mut AstFu
 }
 
 pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> *mut AstExternDecl {
-    let decl: *mut AstExternDecl =
-        malloc(::core::mem::size_of::<AstExternDecl>()) as *mut AstExternDecl;
-    if ast_type_istypedef(t) {
-        (*decl).kind = AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t });
-    } else if ast_type_isstruct(&*t) {
-        if (ast_type_struct_tag(&*t)).is_null() {
-            panic!();
-        }
-        (*decl).kind = AstExternDeclKind::Struct(t);
-    } else {
-        (*decl).kind = AstExternDeclKind::Variable(ast_variable_create(name, t));
-    }
-    return decl;
+    Box::into_raw(Box::new(AstExternDecl {
+        kind: if ast_type_istypedef(t) {
+            AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t })
+        } else if ast_type_isstruct(&*t) {
+            if (ast_type_struct_tag(&*t)).is_null() {
+                panic!();
+            }
+            AstExternDeclKind::Struct(t)
+        } else {
+            AstExternDeclKind::Variable(ast_variable_create(name, t))
+        },
+    }))
 }
 
 pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: *mut Externals) {
@@ -5101,7 +5095,7 @@ pub unsafe fn ast_externdecl_destroy(decl: *mut AstExternDecl) {
             ast_type_destroy(*s);
         }
     }
-    free(decl as *mut libc::c_void);
+    drop(Box::from_raw(decl));
 }
 
 pub unsafe fn parse_int(mut s: *mut libc::c_char) -> libc::c_int {
@@ -5145,8 +5139,12 @@ pub unsafe fn parse_escape(c: libc::c_char) -> libc::c_int {
 }
 
 pub unsafe fn ast_create(decl: *mut AstExternDecl) -> *mut Ast {
-    let node: *mut Ast = calloc(1, ::core::mem::size_of::<Ast>()) as *mut Ast;
-    return ast_append(node, decl);
+    let mut node = Box::new(Ast {
+        n: 0,
+        decl: ptr::null_mut(),
+    });
+    ast_append(&mut *node, decl);
+    Box::into_raw(node)
 }
 
 pub unsafe fn ast_destroy(node: *mut Ast) {
@@ -5156,7 +5154,7 @@ pub unsafe fn ast_destroy(node: *mut Ast) {
         i += 1;
     }
     free((*node).decl as *mut libc::c_void);
-    free(node as *mut libc::c_void);
+    drop(Box::from_raw(node));
 }
 
 pub unsafe fn ast_append(node: *mut Ast, decl: *mut AstExternDecl) -> *mut Ast {
@@ -5223,16 +5221,13 @@ pub unsafe fn result_hasvalue(res: *mut Result) -> bool {
 }
 
 pub unsafe fn lvalue_create(t: *mut AstType, obj: *mut Object) -> *mut LValue {
-    let l: *mut LValue = malloc(::core::mem::size_of::<LValue>()) as *mut LValue;
-    (*l).t = t;
-    (*l).obj = obj;
-    return l;
+    Box::into_raw(Box::new(LValue { t, obj }))
 }
 
 pub unsafe fn lvalue_destroy(l: *mut LValue) {
     ast_type_destroy((*l).t);
     object_destroy((*l).obj);
-    free(l as *mut libc::c_void);
+    drop(Box::from_raw(l));
 }
 
 pub unsafe fn lvalue_type(l: *mut LValue) -> *mut AstType {
@@ -5244,7 +5239,10 @@ pub unsafe fn lvalue_object(l: *mut LValue) -> *mut Object {
 }
 
 pub unsafe fn preresult_empty_create() -> *mut Preresult {
-    return calloc(1, ::core::mem::size_of::<Preresult>()) as *mut Preresult;
+    Box::into_raw(Box::new(Preresult {
+        iscontradiction: false,
+        err: ptr::null_mut(),
+    }))
 }
 
 pub unsafe fn preresult_error_create(err: *mut Error) -> *mut Preresult {
@@ -5259,14 +5257,14 @@ pub unsafe fn preresult_error_create(err: *mut Error) -> *mut Preresult {
 pub unsafe fn preresult_contradiction_create() -> *mut Preresult {
     let r: *mut Preresult = preresult_empty_create();
     (*r).iscontradiction = true;
-    return r;
+    r
 }
 
 pub unsafe fn preresult_destroy(r: *mut Preresult) {
     if !((*r).err).is_null() {
         panic!();
     }
-    free(r as *mut libc::c_void);
+    drop(Box::from_raw(r));
 }
 
 pub unsafe fn preresult_isempty(r: *mut Preresult) -> bool {
