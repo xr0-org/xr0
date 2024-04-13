@@ -41,9 +41,7 @@ use crate::value::{
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr, values_comparable,
 };
-use crate::{
-    vprintln, Externals, MathExpr, Object, Props, State, StrBuilder, Value, Variable as variable,
-};
+use crate::{vprintln, Externals, MathExpr, Object, Props, State, StrBuilder, Value};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
@@ -152,7 +150,7 @@ pub struct AstType {
 
 pub struct AstStructType {
     pub tag: *mut libc::c_char,
-    pub members: *mut AstVariableArr,
+    pub members: Option<Box<Vec<*mut AstVariable>>>,
 }
 
 pub struct AstVariableArr {
@@ -198,52 +196,41 @@ pub const MOD_CONST: AstTypeModifier = 32;
 pub const MOD_VOLATILE: AstTypeModifier = 64;
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct LValue {
     pub t: *mut AstType,
     pub obj: *mut Object,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct LValueRes {
     pub lval: *mut LValue,
     pub err: *mut Error,
 }
 
-#[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstFunction {
     pub isaxiom: bool,
     pub ret: *mut AstType,
     pub name: *mut libc::c_char,
-    pub nparam: libc::c_int,
-    pub param: *mut *mut AstVariable,
+    pub params: Vec<*mut AstVariable>,
     pub abstract_0: *mut AstBlock,
     pub body: *mut AstBlock, // can be null
 }
 
-#[repr(C)]
 pub struct AstBlock {
-    pub ndecl: libc::c_int,
-    pub nstmt: libc::c_int,
-    pub decl: *mut *mut AstVariable,
-    pub stmt: *mut *mut AstStmt,
+    pub decls: Vec<*mut AstVariable>,
+    pub stmts: Vec<*mut AstStmt>,
 }
 
-#[repr(C)]
 pub struct AstStmt {
     pub kind: AstStmtKind,
     pub loc: *mut LexemeMarker,
 }
 
-#[repr(C)]
 pub struct AstAllocStmt {
     pub kind: AstAllocKind,
     pub arg: *mut AstExpr,
 }
 
-#[repr(C)]
 pub struct AstJumpStmt {
     pub kind: AstJumpKind,
     pub rv: *mut AstExpr,
@@ -254,7 +241,6 @@ pub enum AstJumpKind {
     Return,
 }
 
-#[repr(C)]
 pub struct AstIterationStmt {
     pub init: *mut AstStmt,
     pub cond: *mut AstStmt,
@@ -263,7 +249,6 @@ pub struct AstIterationStmt {
     pub abstract_0: *mut AstBlock,
 }
 
-#[repr(C)]
 pub struct AstSelectionStmt {
     pub isswitch: bool,
     pub cond: *mut AstExpr,
@@ -271,7 +256,6 @@ pub struct AstSelectionStmt {
     pub nest: *mut AstStmt,
 }
 
-#[repr(C)]
 pub struct AstLabelledStmt {
     pub label: *mut libc::c_char,
     pub stmt: *mut AstStmt,
@@ -291,28 +275,24 @@ pub enum AstStmtKind {
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Decision {
     pub decision: bool,
     pub err: *mut Error,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct PrecondsResult {
     pub stmt: *mut AstStmt,
     pub err: *mut Error,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Preresult {
     pub iscontradiction: bool,
     pub err: *mut Error,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstStmtSplits {
     pub n: libc::c_int,
     pub cond: *mut *mut AstExpr,
@@ -320,20 +300,17 @@ pub struct AstStmtSplits {
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstFunctionArr {
     pub n: libc::c_int,
     pub f: *mut *mut AstFunction,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstExternDecl {
     pub kind: AstExternDeclKind,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct AstTypedefDecl {
     pub name: *mut libc::c_char,
     pub type_0: *mut AstType,
@@ -348,7 +325,6 @@ pub enum AstExternDeclKind {
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Ast {
     pub n: libc::c_int,
     pub decl: *mut *mut AstExternDecl,
@@ -1193,18 +1169,16 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
         );
         return result_error_create(error_create(strbuilder_build(b)));
     }
-    let nparams: libc::c_int = ast_function_nparams(&*f);
-    let params: *mut *mut AstVariable = ast_function_params(&*f);
+    let params = ast_function_params(&*f);
     let rtype = ast_function_type(&*f);
     let args = prepare_arguments(
         ast_expr_call_nargs(expr),
         ast_expr_call_args(expr),
-        nparams,
         params,
         state,
     );
     state_pushframe(state, dynamic_str(name), rtype);
-    err = prepare_parameters(nparams, params, &args, name, state);
+    err = prepare_parameters(params, &args, name, state);
     if !err.is_null() {
         return result_error_create(err);
     }
@@ -1264,16 +1238,12 @@ unsafe fn call_arbitraryresult(
 
 unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> *mut Result {
     let root: *mut libc::c_char = ast_function_name(f);
-    let nparams: libc::c_int = ast_function_nparams(f);
-    let uncomputed_param: *mut *mut AstVariable = ast_function_params(f);
+    let uncomputed_params = ast_function_params(f);
+    let nparams = uncomputed_params.len();
     let computed_param: *mut *mut AstExpr =
-        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(nparams as usize))
-            as *mut *mut AstExpr;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nparams {
-        let param: *mut AstExpr = ast_expr_identifier_create(dynamic_str(ast_variable_name(
-            *uncomputed_param.offset(i as isize),
-        )));
+        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(nparams)) as *mut *mut AstExpr;
+    for (i, &p) in uncomputed_params.iter().enumerate() {
+        let param: *mut AstExpr = ast_expr_identifier_create(dynamic_str(ast_variable_name(p)));
         let res: *mut Result = ast_expr_eval(&*param, s);
         ast_expr_destroy(param);
         if result_iserror(res) {
@@ -1290,11 +1260,10 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> *mut Result 
             let ref mut fresh1 = *computed_param.offset(i as isize);
             *fresh1 = value_to_expr(v);
         }
-        i += 1;
     }
     return result_value_create(value_sync_create(ast_expr_call_create(
         ast_expr_identifier_create(dynamic_str(root)),
-        nparams,
+        uncomputed_params.len() as libc::c_int,
         computed_param,
     )));
 }
@@ -1353,17 +1322,14 @@ unsafe fn dealloc_process(expr: &AstExpr, state: *mut State) -> *mut Result {
 }
 
 pub unsafe fn prepare_parameters(
-    nparams: libc::c_int,
-    param: *mut *mut AstVariable,
+    params: &[*mut AstVariable],
     args: &[*mut Result],
     fname: *mut libc::c_char,
     state: *mut State,
 ) -> *mut Error {
-    assert_eq!(nparams as usize, args.len());
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while (i as usize) < args.len() {
-        state_declare(state, *param.offset(i as isize), true);
-        let res: *mut Result = args[i as usize];
+    assert_eq!(params.len(), args.len());
+    for (&param, &res) in params.iter().zip(args) {
+        state_declare(state, param, true);
         if result_iserror(res) {
             return result_as_error(res);
         }
@@ -1373,13 +1339,12 @@ pub unsafe fn prepare_parameters(
                 b,
                 b"parameter `%s' of function `%s' has no value\0" as *const u8
                     as *const libc::c_char,
-                ast_variable_name(*param.offset(i as isize)),
+                ast_variable_name(param),
                 fname,
             );
             return error_create(strbuilder_build(b));
         }
-        let name: *mut AstExpr =
-            ast_expr_identifier_create(dynamic_str(ast_variable_name(*param.offset(i as isize))));
+        let name: *mut AstExpr = ast_expr_identifier_create(dynamic_str(ast_variable_name(param)));
         let lval_res: LValueRes = ast_expr_lvalue(&*name, state);
         if !(lval_res.err).is_null() {
             return lval_res.err;
@@ -1387,10 +1352,10 @@ pub unsafe fn prepare_parameters(
         let obj: *mut Object = lvalue_object(lval_res.lval);
         ast_expr_destroy(name);
         object_assign(obj, value_copy(result_as_value(res)));
-        i += 1;
     }
     return 0 as *mut Error;
 }
+
 unsafe fn isdereferencable_absexec(expr: &AstExpr, state: *mut State) -> *mut Result {
     let p: *mut Props = state_getprops(state);
     props_install(p, expr as *const AstExpr as *mut AstExpr);
@@ -1400,11 +1365,10 @@ unsafe fn isdereferencable_absexec(expr: &AstExpr, state: *mut State) -> *mut Re
 pub unsafe fn prepare_arguments(
     nargs: libc::c_int,
     arg: *mut *mut AstExpr,
-    nparams: libc::c_int,
-    param: *mut *mut AstVariable,
+    params: &[*mut AstVariable],
     state: *mut State,
 ) -> Vec<*mut Result> {
-    assert_eq!(nargs, nparams);
+    assert_eq!(nargs as isize, params.len() as isize);
     let mut args = vec![];
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nargs {
@@ -1491,6 +1455,7 @@ unsafe fn verify_paramspec(
         arg_state,
     );
 }
+
 unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
     let fname: *mut libc::c_char = ast_function_name(&*f);
@@ -1503,11 +1468,9 @@ unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> *mut E
     if !err.is_null() {
         return err;
     }
-    let nparams: libc::c_int = ast_function_nparams(&*f);
-    let param: *mut *mut AstVariable = ast_function_params(&*f);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nparams {
-        let id: *mut libc::c_char = ast_variable_name(*param.offset(i as isize));
+    let params = ast_function_params(&*f);
+    for &p in params {
+        let id: *mut libc::c_char = ast_variable_name(p);
         let param_0: *mut Value = state_getloc(param_state, id);
         let arg: *mut Value = state_getloc(arg_state, id);
         err = verify_paramspec(param_0, arg, param_state, arg_state);
@@ -1522,7 +1485,6 @@ unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> *mut E
             );
             return error_create(strbuilder_build(b));
         }
-        i += 1;
     }
     return 0 as *mut Error;
 }
@@ -2482,19 +2444,17 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
             init
         };
     }
-    let nparams: libc::c_int = ast_function_nparams(&*f);
-    let params: *mut *mut AstVariable = ast_function_params(&*f);
+    let params = ast_function_params(&*f);
     let s_copy: *mut State = state_copy(state);
     let args = prepare_arguments(
         ast_expr_call_nargs(expr),
         ast_expr_call_args(expr),
-        nparams,
         params,
         s_copy,
     );
     let ret_type: *mut AstType = ast_function_type(&*f);
     state_pushframe(s_copy, dynamic_str(name), ret_type);
-    err = prepare_parameters(nparams, params, &args, name, s_copy);
+    err = prepare_parameters(params, &args, name, s_copy);
     if !err.is_null() {
         return {
             let init = AstStmtSplits {
@@ -2668,89 +2628,44 @@ pub unsafe fn topological_order(fname: *mut libc::c_char, ext: *mut Externals) -
 }
 
 pub unsafe fn ast_block_create(
-    decl: *mut *mut AstVariable,
-    ndecl: libc::c_int,
-    stmt: *mut *mut AstStmt,
-    nstmt: libc::c_int,
+    decls: Vec<*mut AstVariable>,
+    stmts: Vec<*mut AstStmt>,
 ) -> *mut AstBlock {
-    if !(nstmt > 0 as libc::c_int || stmt.is_null()) {
-        panic!();
-    }
     let b: *mut AstBlock = malloc(::core::mem::size_of::<AstBlock>()) as *mut AstBlock;
-    (*b).decl = decl;
-    (*b).ndecl = ndecl;
-    (*b).stmt = stmt;
-    (*b).nstmt = nstmt;
+    std::ptr::write(b, AstBlock { decls, stmts });
     return b;
 }
 
 pub unsafe fn ast_block_destroy(b: *mut AstBlock) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*b).ndecl {
-        ast_variable_destroy(*((*b).decl).offset(i as isize));
-        i += 1;
+    let block = std::ptr::read(b);
+    for decl in block.decls {
+        ast_variable_destroy(decl);
     }
-    free((*b).decl as *mut libc::c_void);
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < (*b).nstmt {
-        ast_stmt_destroy(*((*b).stmt).offset(i_0 as isize));
-        i_0 += 1;
+    for stmt in block.stmts {
+        ast_stmt_destroy(stmt);
     }
-    free((*b).stmt as *mut libc::c_void);
     free(b as *mut libc::c_void);
 }
 
 pub unsafe fn ast_block_copy(b: &AstBlock) -> *mut AstBlock {
     return ast_block_create(
-        copy_var_arr(b.ndecl, b.decl),
-        b.ndecl,
-        copy_stmt_arr(b.nstmt, b.stmt),
-        b.nstmt,
+        b.decls
+            .iter()
+            .copied()
+            .map(|var_ptr| unsafe { ast_variable_copy(var_ptr) })
+            .collect(),
+        b.stmts
+            .iter()
+            .copied()
+            .map(|stmt| ast_stmt_copy(&*stmt))
+            .collect(),
     );
-}
-
-unsafe fn copy_var_arr(len: libc::c_int, var: *mut *mut AstVariable) -> *mut *mut AstVariable {
-    if !(len == 0 as libc::c_int || !var.is_null()) {
-        panic!();
-    }
-    if len == 0 as libc::c_int {
-        return 0 as *mut *mut AstVariable;
-    }
-    let new: *mut *mut AstVariable =
-        malloc((::core::mem::size_of::<*mut AstVariable>()).wrapping_mul(len as usize))
-            as *mut *mut AstVariable;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < len {
-        let ref mut fresh8 = *new.offset(i as isize);
-        *fresh8 = ast_variable_copy(*var.offset(i as isize));
-        i += 1;
-    }
-    return new;
-}
-unsafe fn copy_stmt_arr(len: libc::c_int, stmt: *mut *mut AstStmt) -> *mut *mut AstStmt {
-    if !(len == 0 as libc::c_int || !stmt.is_null()) {
-        panic!();
-    }
-    if len == 0 as libc::c_int {
-        return 0 as *mut *mut AstStmt;
-    }
-    let new: *mut *mut AstStmt =
-        malloc((::core::mem::size_of::<*mut AstStmt>()).wrapping_mul(len as usize))
-            as *mut *mut AstStmt;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < len {
-        let ref mut fresh9 = *new.offset(i as isize);
-        *fresh9 = ast_stmt_copy(&**stmt.offset(i as isize));
-        i += 1;
-    }
-    return new;
 }
 
 pub unsafe fn ast_block_str(b: &AstBlock, indent: *mut libc::c_char) -> *mut libc::c_char {
     let sb: *mut StrBuilder = strbuilder_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*b).ndecl {
-        let s: *mut libc::c_char = ast_variable_str(*((*b).decl).offset(i as isize));
+    for &decl in &b.decls {
+        let s: *mut libc::c_char = ast_variable_str(decl);
         strbuilder_printf(
             sb,
             b"%s%s;\n\0" as *const u8 as *const libc::c_char,
@@ -2758,51 +2673,38 @@ pub unsafe fn ast_block_str(b: &AstBlock, indent: *mut libc::c_char) -> *mut lib
             s,
         );
         free(s as *mut libc::c_void);
-        i += 1;
     }
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < (*b).nstmt {
-        let s_0: *mut libc::c_char = ast_stmt_str(&**b.stmt.offset(i_0 as isize));
+    for &stmt in &b.stmts {
+        let s: *mut libc::c_char = ast_stmt_str(&*stmt);
         strbuilder_printf(
             sb,
             b"%s%s\n\0" as *const u8 as *const libc::c_char,
             indent,
-            s_0,
+            s,
         );
-        free(s_0 as *mut libc::c_void);
-        i_0 += 1;
+        free(s as *mut libc::c_void);
     }
     return strbuilder_build(sb);
 }
 
 pub unsafe fn ast_block_ndecls(b: &AstBlock) -> libc::c_int {
-    b.ndecl
+    b.decls.len() as libc::c_int
 }
 
 pub unsafe fn ast_block_decls(b: &AstBlock) -> *mut *mut AstVariable {
-    b.decl
+    b.decls.as_slice().as_ptr() as *mut *mut AstVariable
 }
 
 pub unsafe fn ast_block_nstmts(b: &AstBlock) -> libc::c_int {
-    b.nstmt
+    b.stmts.len() as libc::c_int
 }
 
 pub unsafe fn ast_block_stmts(b: &AstBlock) -> *mut *mut AstStmt {
-    if !(b.nstmt > 0 || b.stmt.is_null()) {
-        panic!();
-    }
-    return (*b).stmt;
+    b.stmts.as_slice().as_ptr() as *mut *mut AstStmt
 }
 
 pub unsafe fn ast_block_isterminal(b: &AstBlock, s: *mut State) -> bool {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*b).nstmt {
-        if ast_stmt_isterminal(&**((*b).stmt).offset(i as isize), s) {
-            return true;
-        }
-        i += 1;
-    }
-    return false;
+    b.stmts.iter().any(|stmt| ast_stmt_isterminal(&**stmt, s))
 }
 
 pub unsafe fn ast_block_preconds(b: &AstBlock) -> PrecondsResult {
@@ -3153,12 +3055,7 @@ unsafe fn iter_neteffect(iter: &AstStmt) -> *mut AstStmt {
         ast_stmt_copy(ast_stmt_iter_init(iter)),
         ast_stmt_copy(ast_stmt_iter_cond(iter)),
         ast_expr_copy(ast_stmt_iter_iter(iter)),
-        ast_block_create(
-            0 as *mut *mut AstVariable,
-            0 as libc::c_int,
-            0 as *mut *mut AstStmt,
-            0 as libc::c_int,
-        ),
+        ast_block_create(vec![], vec![]),
         ast_stmt_create_compound(
             0 as *mut LexemeMarker,
             ast_block_copy(ast_stmt_iter_abstract(iter)),
@@ -4049,7 +3946,7 @@ pub unsafe fn ast_type_create_arr(base: *mut AstType, length: libc::c_int) -> *m
 
 pub unsafe fn ast_type_create_struct(
     tag: *mut libc::c_char,
-    members: *mut AstVariableArr,
+    members: Option<Box<Vec<*mut AstVariable>>>,
 ) -> *mut AstType {
     ast_type_create(
         AstTypeBase::Struct(AstStructType { tag, members }),
@@ -4081,41 +3978,41 @@ pub unsafe fn ast_type_vconst(
     }
 }
 
-pub unsafe fn ast_type_isstruct(t: *mut AstType) -> bool {
+pub unsafe fn ast_type_isstruct(t: &AstType) -> bool {
     matches!((*t).base, AstTypeBase::Struct(_))
 }
 
 pub unsafe fn ast_type_struct_complete(t: *mut AstType, ext: *mut Externals) -> *mut AstType {
-    if !(ast_type_struct_members(t)).is_null() {
+    if !(ast_type_struct_members(&*t)).is_none() {
         return t;
     }
-    let tag: *mut libc::c_char = ast_type_struct_tag(t);
+    let tag: *mut libc::c_char = ast_type_struct_tag(&*t);
     if tag.is_null() {
         panic!();
     }
     return externals_getstruct(ext, tag);
 }
 
-pub unsafe fn ast_type_struct_members(t: *mut AstType) -> *mut AstVariableArr {
-    let AstTypeBase::Struct(s) = &(*t).base else {
+pub unsafe fn ast_type_struct_members(t: &AstType) -> Option<&[*mut AstVariable]> {
+    let AstTypeBase::Struct(s) = &t.base else {
         panic!()
     };
-    s.members
+    s.members.as_ref().map(|v| v.as_slice())
 }
 
-pub unsafe fn ast_type_struct_tag(t: *mut AstType) -> *mut libc::c_char {
-    let AstTypeBase::Struct(s) = &(*t).base else {
+pub unsafe fn ast_type_struct_tag(t: &AstType) -> *mut libc::c_char {
+    let AstTypeBase::Struct(s) = &t.base else {
         panic!()
     };
     s.tag
 }
 
-pub unsafe fn ast_type_create_struct_anonym(members: *mut AstVariableArr) -> *mut AstType {
-    ast_type_create_struct(0 as *mut libc::c_char, members)
+pub unsafe fn ast_type_create_struct_anonym(members: Vec<*mut AstVariable>) -> *mut AstType {
+    ast_type_create_struct(0 as *mut libc::c_char, Some(Box::new(members)))
 }
 
 pub unsafe fn ast_type_create_struct_partial(tag: *mut libc::c_char) -> *mut AstType {
-    ast_type_create_struct(tag, 0 as *mut AstVariableArr)
+    ast_type_create_struct(tag, None)
 }
 
 pub unsafe fn ast_type_copy_struct(old: *mut AstType) -> *mut AstType {
@@ -4129,11 +4026,14 @@ pub unsafe fn ast_type_copy_struct(old: *mut AstType) -> *mut AstType {
             } else {
                 0 as *mut libc::c_char
             },
-            members: if !s.members.is_null() {
-                ast_variable_arr_copy(s.members)
-            } else {
-                0 as *mut AstVariableArr
-            },
+            members: s.members.as_ref().map(|v| {
+                Box::new(
+                    v.iter()
+                        .copied()
+                        .map(|var_ptr| ast_variable_copy(var_ptr))
+                        .collect(),
+                )
+            }),
         }),
         (*old).modifiers as libc::c_uint as AstTypeModifier,
     )
@@ -4313,26 +4213,19 @@ unsafe fn ast_type_str_build_arr(b: *mut StrBuilder, arr: &AstArrayType) {
 
 unsafe fn ast_type_str_build_struct(b: *mut StrBuilder, s: &AstStructType) {
     let tag: *mut libc::c_char = s.tag;
-    let members: *mut AstVariableArr = s.members;
-    if !(!tag.is_null() || !members.is_null()) {
-        panic!();
-    }
+    assert!(!tag.is_null() || !s.members.is_none());
     strbuilder_printf(b, b"struct \0" as *const u8 as *const libc::c_char);
     if !tag.is_null() {
         strbuilder_printf(b, tag);
     }
-    if members.is_null() {
+    let Some(members) = s.members.as_ref() else {
         return;
-    }
+    };
     strbuilder_printf(b, b" { \0" as *const u8 as *const libc::c_char);
-    let n: libc::c_int = ast_variable_arr_n(members);
-    let v: *mut *mut AstVariable = ast_variable_arr_v(members);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let s: *mut libc::c_char = ast_variable_str(*v.offset(i as isize));
+    for &field in members.iter() {
+        let s: *mut libc::c_char = ast_variable_str(field);
         strbuilder_printf(b, b"%s; \0" as *const u8 as *const libc::c_char, s);
         free(s as *mut libc::c_void);
-        i += 1;
     }
     strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
 }
@@ -4367,22 +4260,10 @@ pub unsafe fn ast_variable_copy(v: *mut AstVariable) -> *mut AstVariable {
     return ast_variable_create(dynamic_str((*v).name), ast_type_copy((*v).type_0));
 }
 
-pub unsafe fn ast_variables_copy(
-    n: libc::c_int,
-    v: *mut *mut AstVariable,
-) -> *mut *mut AstVariable {
-    if !(!v.is_null() || n == 0) {
-        panic!();
-    }
-    let new: *mut *mut AstVariable =
-        calloc(n as usize, ::core::mem::size_of::<*mut variable>()) as *mut *mut AstVariable;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let ref mut fresh12 = *new.offset(i as isize);
-        *fresh12 = ast_variable_copy(*v.offset(i as isize));
-        i += 1;
-    }
-    return new;
+pub unsafe fn ast_variables_copy(v: &[*mut AstVariable]) -> Vec<*mut AstVariable> {
+    v.iter()
+        .map(|&var_ptr| ast_variable_copy(var_ptr))
+        .collect()
 }
 
 pub unsafe fn ast_variable_str(v: *mut AstVariable) -> *mut libc::c_char {
@@ -4447,42 +4328,51 @@ pub unsafe fn ast_variable_arr_copy(old: *mut AstVariableArr) -> *mut AstVariabl
     return new;
 }
 
+pub unsafe fn ast_variable_arr_from_slice(old: &[*mut AstVariable]) -> *mut AstVariableArr {
+    let new: *mut AstVariableArr = ast_variable_arr_create();
+    for &var_ptr in old {
+        ast_variable_arr_append(new, ast_variable_copy(var_ptr));
+    }
+    new
+}
+
 pub unsafe fn ast_function_create(
     isaxiom: bool,
     ret: *mut AstType,
     name: *mut libc::c_char,
-    nparam: libc::c_int,
-    param: *mut *mut AstVariable,
+    params: Vec<*mut AstVariable>,
     abstract_0: *mut AstBlock,
     body: *mut AstBlock,
 ) -> *mut AstFunction {
-    let f: *mut AstFunction = malloc(::core::mem::size_of::<AstFunction>()) as *mut AstFunction;
-    (*f).isaxiom = isaxiom;
-    (*f).ret = ret;
-    (*f).name = name;
-    (*f).nparam = nparam;
-    (*f).param = param;
     if abstract_0.is_null() {
         panic!();
     }
-    (*f).abstract_0 = abstract_0;
-    (*f).body = body;
+    let f: *mut AstFunction = malloc(::core::mem::size_of::<AstFunction>()) as *mut AstFunction;
+    ptr::write(
+        f,
+        AstFunction {
+            isaxiom,
+            ret,
+            name,
+            params,
+            abstract_0,
+            body,
+        },
+    );
     return f;
 }
 
 pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
-    ast_type_destroy((*f).ret);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*f).nparam {
-        ast_variable_destroy(*((*f).param).offset(i as isize));
-        i += 1;
+    let fun = ptr::read(f);
+    ast_type_destroy(fun.ret);
+    for param in fun.params {
+        ast_variable_destroy(param);
     }
-    ast_block_destroy((*f).abstract_0);
-    if !((*f).body).is_null() {
-        ast_block_destroy((*f).body);
+    ast_block_destroy(fun.abstract_0);
+    if !fun.body.is_null() {
+        ast_block_destroy(fun.body);
     }
-    free((*f).param as *mut libc::c_void);
-    free((*f).name as *mut libc::c_void);
+    free(fun.name as *mut libc::c_void);
     free(f as *mut libc::c_void);
 }
 
@@ -4495,17 +4385,15 @@ pub unsafe fn ast_function_str(f: &AstFunction) -> *mut libc::c_char {
     strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, ret);
     free(ret as *mut libc::c_void);
     strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, f.name);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < f.nparam {
-        let v: *mut libc::c_char = ast_variable_str(*(f.param).offset(i as isize));
-        let space: *mut libc::c_char = (if (i + 1 as libc::c_int) < f.nparam {
+    for (i, &param) in f.params.iter().enumerate() {
+        let v: *mut libc::c_char = ast_variable_str(param);
+        let space: *mut libc::c_char = (if i + 1 < f.params.len() {
             b", \0" as *const u8 as *const libc::c_char
         } else {
             b"\0" as *const u8 as *const libc::c_char
         }) as *mut libc::c_char;
         strbuilder_printf(b, b"%s%s\0" as *const u8 as *const libc::c_char, v, space);
         free(v as *mut libc::c_void);
-        i += 1;
     }
     let abs: *mut libc::c_char = ast_block_str(
         &*f.abstract_0,
@@ -4532,21 +4420,16 @@ pub unsafe fn ast_function_name(f: &AstFunction) -> *mut libc::c_char {
 }
 
 pub unsafe fn ast_function_copy(f: &AstFunction) -> *mut AstFunction {
-    let param: *mut *mut AstVariable =
-        malloc((::core::mem::size_of::<*mut AstVariable>()).wrapping_mul(f.nparam as usize))
-            as *mut *mut AstVariable;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < f.nparam {
-        let ref mut fresh14 = *param.offset(i as isize);
-        *fresh14 = ast_variable_copy(*(f.param).offset(i as isize));
-        i += 1;
-    }
+    let params = f
+        .params
+        .iter()
+        .map(|&param| ast_variable_copy(param))
+        .collect();
     return ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),
         dynamic_str(f.name),
-        f.nparam,
-        param,
+        params,
         ast_block_copy(&*f.abstract_0),
         if !f.body.is_null() {
             ast_block_copy(&*f.body)
@@ -4587,12 +4470,8 @@ pub unsafe fn ast_function_abstract(f: &AstFunction) -> &AstBlock {
     &*f.abstract_0
 }
 
-pub unsafe fn ast_function_nparams(f: &AstFunction) -> libc::c_int {
-    f.nparam
-}
-
-pub unsafe fn ast_function_params(f: &AstFunction) -> *mut *mut AstVariable {
-    f.param
+pub unsafe fn ast_function_params(f: &AstFunction) -> &[*mut AstVariable] {
+    f.params.as_slice()
 }
 
 pub unsafe fn ast_function_preconditions(f: &AstFunction) -> PrecondsResult {
@@ -4675,24 +4554,19 @@ unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_
 
 pub unsafe fn ast_function_initparams(f: &AstFunction, s: *mut State) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let nparams: libc::c_int = ast_function_nparams(f);
-    let params: *mut *mut AstVariable = ast_function_params(f);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nparams {
-        state_declare(s, *params.offset(i as isize), true);
-        i += 1;
+    let params = ast_function_params(f);
+    for &param in params {
+        state_declare(s, param, true);
     }
     err = ast_function_precondsinit(f, s);
     if !err.is_null() {
         return err;
     }
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < nparams {
-        err = inititalise_param(*params.offset(i_0 as isize), s);
+    for &param in params {
+        err = inititalise_param(param, s);
         if !err.is_null() {
             return err;
         }
-        i_0 += 1;
     }
     return 0 as *mut Error;
 }
@@ -4866,7 +4740,7 @@ unsafe fn split_path_verify(
     abstract_state: *mut State,
 ) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let paths: *mut AstFunctionArr = body_paths(f, index, cond);
+    let paths: *mut AstFunctionArr = body_paths(&*f, index, cond);
     let n: libc::c_int = ast_function_arr_len(paths);
     if !(n == 2 as libc::c_int) {
         panic!();
@@ -4962,29 +4836,27 @@ unsafe fn recurse_buildgraph(
 }
 
 unsafe fn abstract_paths(
-    f: *mut AstFunction,
+    f: &AstFunction,
     index: libc::c_int,
     cond: &AstExpr,
 ) -> *mut AstFunctionArr {
     let res: *mut AstFunctionArr = ast_function_arr_create();
     let f_true: *mut AstFunction = ast_function_create(
-        (*f).isaxiom,
-        ast_type_copy((*f).ret),
-        split_name((*f).name, cond),
-        (*f).nparam,
-        ast_variables_copy((*f).nparam, (*f).param),
-        ast_block_copy(&*(*f).abstract_0),
-        ast_block_copy(&*(*f).body),
+        f.isaxiom,
+        ast_type_copy(f.ret),
+        split_name(f.name, cond),
+        ast_variables_copy(&f.params),
+        ast_block_copy(&*f.abstract_0),
+        ast_block_copy(&*f.body),
     );
     let inv_assumption: *mut AstExpr = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
-        (*f).isaxiom,
-        ast_type_copy((*f).ret),
-        split_name((*f).name, &*inv_assumption),
-        (*f).nparam,
-        ast_variables_copy((*f).nparam, (*f).param),
-        ast_block_copy(&*(*f).abstract_0),
-        ast_block_copy(&*(*f).body),
+        f.isaxiom,
+        ast_type_copy(f.ret),
+        split_name(f.name, &*inv_assumption),
+        ast_variables_copy(&f.params),
+        ast_block_copy(&*f.abstract_0),
+        ast_block_copy(&*f.body),
     );
     ast_function_arr_append(res, f_true);
     ast_function_arr_append(res, f_false);
@@ -4998,7 +4870,7 @@ unsafe fn split_path_absverify(
     cond: &AstExpr,
 ) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let paths: *mut AstFunctionArr = abstract_paths(f, index, cond);
+    let paths: *mut AstFunctionArr = abstract_paths(&*f, index, cond);
     let n: libc::c_int = ast_function_arr_len(paths);
     if !(n == 2 as libc::c_int) {
         panic!();
@@ -5089,30 +4961,24 @@ unsafe fn split_paths_verify(
     return 0 as *mut Error;
 }
 
-unsafe fn body_paths(
-    f: *mut AstFunction,
-    index: libc::c_int,
-    cond: &AstExpr,
-) -> *mut AstFunctionArr {
+unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> *mut AstFunctionArr {
     let res: *mut AstFunctionArr = ast_function_arr_create();
     let f_true: *mut AstFunction = ast_function_create(
-        (*f).isaxiom,
-        ast_type_copy((*f).ret),
-        split_name((*f).name, cond),
-        (*f).nparam,
-        ast_variables_copy((*f).nparam, (*f).param),
-        ast_block_copy(&*(*f).abstract_0),
-        (*f).body,
+        f.isaxiom,
+        ast_type_copy(f.ret),
+        split_name(f.name, cond),
+        ast_variables_copy(&f.params),
+        ast_block_copy(&*f.abstract_0),
+        f.body,
     );
     let inv_assumption: *mut AstExpr = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
-        (*f).isaxiom,
-        ast_type_copy((*f).ret),
-        split_name((*f).name, &*inv_assumption),
-        (*f).nparam,
-        ast_variables_copy((*f).nparam, (*f).param),
-        ast_block_copy(&*(*f).abstract_0),
-        (*f).body,
+        f.isaxiom,
+        ast_type_copy(f.ret),
+        split_name(f.name, &*inv_assumption),
+        ast_variables_copy(&f.params),
+        ast_block_copy(&*f.abstract_0),
+        f.body,
     );
     ast_function_arr_append(res, f_true);
     ast_function_arr_append(res, f_false);
@@ -5191,8 +5057,8 @@ pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> *mut 
         malloc(::core::mem::size_of::<AstExternDecl>()) as *mut AstExternDecl;
     if ast_type_istypedef(t) {
         (*decl).kind = AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t });
-    } else if ast_type_isstruct(t) {
-        if (ast_type_struct_tag(t)).is_null() {
+    } else if ast_type_isstruct(&*t) {
+        if (ast_type_struct_tag(&*t)).is_null() {
             panic!();
         }
         (*decl).kind = AstExternDeclKind::Struct(t);

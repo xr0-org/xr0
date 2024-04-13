@@ -99,7 +99,7 @@ pub unsafe fn externals_declaretypedef(
 }
 
 pub unsafe fn externals_declarestruct(ext: *mut Externals, t: *mut AstType) {
-    let id: *mut libc::c_char = ast_type_struct_tag(t);
+    let id: *mut libc::c_char = ast_type_struct_tag(&*t);
     if id.is_null() {
         panic!();
     }

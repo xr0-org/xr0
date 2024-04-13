@@ -12,7 +12,6 @@ type BoxedFunction = *mut AstFunction;
 type BoxedStmt = *mut AstStmt;
 type BoxedType = *mut AstType;
 type BoxedVariable = *mut AstVariable;
-type BoxedVariableArray = *mut AstVariableArr;
 type BoxedExternDecl = *mut AstExternDecl;
 type BoxedCStr = *mut libc::c_char;
 
@@ -23,8 +22,7 @@ pub struct Declaration {
 
 pub struct DirectFunctionDeclarator {
     pub name: *mut libc::c_char,
-    pub n: libc::c_int,
-    pub param: *mut *mut AstVariable,
+    pub params: Vec<*mut AstVariable>,
 }
 
 pub struct FunctionDeclarator {
@@ -40,11 +38,6 @@ pub struct Declarator {
 pub struct ExprArray {
     pub n: libc::c_int,
     pub expr: *mut *mut AstExpr,
-}
-
-pub struct StmtArray {
-    pub n: libc::c_int,
-    pub stmt: *mut *mut AstStmt,
 }
 
 struct BlockStatement {
@@ -90,35 +83,11 @@ unsafe fn expr_array_from_vec(v: Vec<*mut AstExpr>) -> ExprArray {
     }
 }
 
-unsafe fn stmt_array_from_vec(v: Vec<*mut AstStmt>) -> StmtArray {
-    let size_bytes = std::mem::size_of::<*mut AstStmt>() * v.len();
-    let stmt = libc::malloc(size_bytes) as *mut *mut AstStmt;
-    assert!(!stmt.is_null());
-    libc::memmove(
-        stmt as *mut libc::c_void,
-        v.as_ptr() as *const libc::c_void,
-        size_bytes,
-    );
-    StmtArray {
-        n: v.len() as libc::c_int,
-        stmt,
-    }
-}
-
-unsafe fn variable_array_from_vec(vars: Vec<*mut AstVariable>) -> *mut AstVariableArr {
-    let list = ast_variable_arr_create();
-    for v in vars {
-        ast_variable_arr_append(list, v);
-    }
-    list
-}
-
-unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> *mut AstVariableArr {
-    let list = ast_variable_arr_create();
-    for decl in decls {
-        ast_variable_arr_append(list, ast_variable_create(decl.name, decl.t));
-    }
-    list
+unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<*mut AstVariable> {
+    decls
+        .into_iter()
+        .map(|decl| ast_variable_create(decl.name, decl.t))
+        .collect()
 }
 
 unsafe fn ast_from_vec(v: Vec<*mut AstExternDecl>) -> *mut Ast {
@@ -346,7 +315,7 @@ pub grammar c_parser(env: &Env) for str {
     rule declaration() -> Declaration =
         t:declaration_specifiers() _ ";" {
             unsafe {
-                Declaration { name: ast_type_struct_tag(t), t }
+                Declaration { name: ast_type_struct_tag(&*t), t }
             }
         } /
         t:declaration_specifiers() _ v:declarator() _ ";" {
@@ -414,7 +383,7 @@ pub grammar c_parser(env: &Env) for str {
     // note: unions are unsupported in the original
     rule struct_or_union_specifier() -> BoxedType =
         "struct" _ tag:identifier() _ "{" _ fields:struct_declaration_list() _ "}" {
-            unsafe { ast_type_create_struct(tag, fields) }
+            unsafe { ast_type_create_struct(tag, Some(Box::new(fields))) }
         } /
         "struct" _ "{" _ fields:struct_declaration_list() _ "}" {
             unsafe { ast_type_create_struct_anonym(fields) }
@@ -423,8 +392,8 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_type_create_struct_partial(tag) }
         }
 
-    rule struct_declaration_list() -> BoxedVariableArray =
-        decls:list1(<struct_declaration()>) { unsafe { variable_array_from_vec(decls) } }
+    rule struct_declaration_list() -> Vec<BoxedVariable> =
+        decls:list1(<struct_declaration()>) { decls }
 
     rule struct_declaration() -> BoxedVariable =
         d:declaration() {
@@ -446,11 +415,11 @@ pub grammar c_parser(env: &Env) for str {
     rule direct_function_declarator() -> DirectFunctionDeclarator =
         name:identifier() _ "(" _ params:parameter_type_list() _ ")" {
             unsafe {
-                DirectFunctionDeclarator { name, n: ast_variable_arr_n(params), param: ast_variable_arr_v(params) }
+                DirectFunctionDeclarator { name, params }
             }
         } /
         name:identifier() _ "(" _ ")" {
-            DirectFunctionDeclarator { name, n: 0, param: ptr::null_mut() }
+            DirectFunctionDeclarator { name, params: vec![] }
         }
 
     rule declarator() -> Declarator =
@@ -469,10 +438,10 @@ pub grammar c_parser(env: &Env) for str {
     rule pointer() -> libc::c_int =
         s:$("*"+) { s.len() as libc::c_int }
 
-    rule parameter_type_list() -> BoxedVariableArray = parameter_list()
+    rule parameter_type_list() -> Vec<BoxedVariable> = parameter_list()
 
-    rule parameter_list() -> BoxedVariableArray =
-        decls:cs1(<parameter_declaration()>) { unsafe { variable_array_from_vec(decls) } }
+    rule parameter_list() -> Vec<BoxedVariable> =
+        decls:cs1(<parameter_declaration()>) { decls }
 
     rule parameter_declaration() -> BoxedVariable =
         t:declaration_specifiers() _ decl:declarator() {
@@ -535,16 +504,16 @@ pub grammar c_parser(env: &Env) for str {
 
     rule block() -> BoxedBlock =
         d:declaration_list() _ s:statement_list() {
-            unsafe { ast_block_create(ast_variable_arr_v(d), ast_variable_arr_n(d), s.stmt, s.n) }
+            unsafe { ast_block_create(d, s) }
         } /
         d:declaration_list() {
-            unsafe { ast_block_create(ast_variable_arr_v(d), ast_variable_arr_n(d), ptr::null_mut(), 0) }
+            unsafe { ast_block_create(d, vec![]) }
         } /
         s:statement_list() {
-            unsafe { ast_block_create(ptr::null_mut(), 0, s.stmt, s.n) }
+            unsafe { ast_block_create(vec![], s) }
         } /
         /* empty */ {
-            unsafe { ast_block_create(ptr::null_mut(), 0, ptr::null_mut(), 0) }
+            unsafe { ast_block_create(vec![], vec![]) }
         }
 
     rule iteration_effect_statement() -> BoxedStmt =
@@ -552,17 +521,17 @@ pub grammar c_parser(env: &Env) for str {
 
     rule compound_verification_statement() -> BoxedBlock =
         "~" _ "[" _ "]" {
-            unsafe { ast_block_create(ptr::null_mut(), 0, ptr::null_mut(), 0) }
+            unsafe { ast_block_create(vec![], vec![]) }
         } /
         "~" _ "[" _ b:block() _ "]" {
             b
         }
 
-    rule declaration_list() -> BoxedVariableArray =
+    rule declaration_list() -> Vec<BoxedVariable> =
         decls:list1(<declaration()>) { unsafe { variable_array_from_decl_vec(decls) } }
 
-    rule statement_list() -> StmtArray =
-        stmts:list1(<statement()>) { unsafe { stmt_array_from_vec(stmts) } }
+    rule statement_list() -> Vec<BoxedStmt> =
+        stmts:list1(<statement()>) { stmts }
 
     rule expression_statement() -> BoxedStmt =
         p:position!() ";" { unsafe { ast_stmt_create_nop(env.lexloc(p)) } } /
@@ -586,7 +555,7 @@ pub grammar c_parser(env: &Env) for str {
     rule optional_compound_verification() -> BoxedBlock =
         vs:compound_verification_statement()? {
             vs.unwrap_or_else(|| {
-                unsafe { ast_block_create(ptr::null_mut(), 0, ptr::null_mut(), 0) }
+                unsafe { ast_block_create(vec![], vec![]) }
             })
         }
 
@@ -629,10 +598,9 @@ pub grammar c_parser(env: &Env) for str {
                     true,
                     t,
                     decl.decl.name,
-                    decl.decl.n,
-                    decl.decl.param,
+                    decl.decl.params,
                     if body.r#abstract.is_null() {
-                        ast_block_create(ptr::null_mut(), 0, ptr::null_mut(), 0)
+                        ast_block_create(vec![], vec![])
                     } else {
                         body.r#abstract
                     },
@@ -650,10 +618,9 @@ pub grammar c_parser(env: &Env) for str {
                     false,
                     t,
                     decl.decl.name,
-                    decl.decl.n,
-                    decl.decl.param,
+                    decl.decl.params,
                     if body.r#abstract.is_null() {
-                        ast_block_create(ptr::null_mut(), 0, ptr::null_mut(), 0)
+                        ast_block_create(vec![], vec![])
                     } else {
                         body.r#abstract
                     },
@@ -669,10 +636,9 @@ pub grammar c_parser(env: &Env) for str {
                     false,
                     ast_type_create(AstTypeBase::Void, 0),
                     decl.decl.name,
-                    decl.decl.n,
-                    decl.decl.param,
+                    decl.decl.params,
                     if body.r#abstract.is_null() {
-                        ast_block_create(ptr::null_mut(), 0, ptr::null_mut(), 0)
+                        ast_block_create(vec![], vec![])
                     } else {
                         body.r#abstract
                     },

@@ -6,8 +6,8 @@ use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_equal,
     ast_expr_identifier_create, ast_expr_literal_create, ast_expr_member_create, ast_expr_str,
     ast_type_create_voidptr, ast_type_struct_complete, ast_type_struct_members,
-    ast_variable_arr_copy, ast_variable_arr_destroy, ast_variable_arr_n, ast_variable_arr_v,
-    ast_variable_name, ast_variable_type,
+    ast_variable_arr_copy, ast_variable_arr_destroy, ast_variable_arr_from_slice,
+    ast_variable_arr_n, ast_variable_arr_v, ast_variable_name, ast_variable_type,
 };
 use crate::object::{
     object_abstractcopy, object_as_value, object_assign, object_copy, object_destroy,
@@ -289,10 +289,9 @@ pub unsafe fn value_int_copy(old: *mut Value) -> *mut Value {
 }
 
 pub unsafe fn value_struct_create(t: *mut AstType) -> *mut Value {
-    let members: *mut AstVariableArr = ast_variable_arr_copy(ast_type_struct_members(t));
-    if members.is_null() {
-        panic!();
-    }
+    let members = ast_variable_arr_from_slice(
+        ast_type_struct_members(&*t).expect("can't create value of incomplete type"),
+    );
     let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
     if v.is_null() {
         panic!();
@@ -310,7 +309,7 @@ pub unsafe fn value_struct_indefinite_create(
     persist: bool,
 ) -> *mut Value {
     t = ast_type_struct_complete(t, state_getext(s));
-    if (ast_type_struct_members(t)).is_null() {
+    if (ast_type_struct_members(&*t)).is_none() {
         panic!();
     }
     let v: *mut Value = value_struct_create(t);
@@ -372,6 +371,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
 pub unsafe fn value_isstruct(v: *mut Value) -> bool {
     return (*v).type_0 as libc::c_uint == VALUE_STRUCT as libc::c_int as libc::c_uint;
 }
+
 unsafe fn frommembers(members: *mut AstVariableArr) -> Box<Map> {
     let mut m = Map::new();
     let n: libc::c_int = ast_variable_arr_n(members);
@@ -387,6 +387,7 @@ unsafe fn frommembers(members: *mut AstVariableArr) -> Box<Map> {
     }
     return m;
 }
+
 unsafe fn destroymembers(m: &Map) {
     for p in m.values() {
         object_destroy(p as *mut Object);
