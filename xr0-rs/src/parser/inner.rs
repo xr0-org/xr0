@@ -472,9 +472,7 @@ pub grammar c_parser(env: &Env) for str {
         selection_statement() /
         iteration_statement() /
         jump_statement() /
-        stmt:iteration_effect_statement() {
-            unsafe { ast_stmt_create_iter_e(stmt) }
-        } /
+        iteration_effect_statement() /
         p:position!() v:compound_verification_statement() {
             unsafe { ast_stmt_create_compound_v(env.lexloc(p), v) }
         }
@@ -517,7 +515,7 @@ pub grammar c_parser(env: &Env) for str {
         }
 
     rule iteration_effect_statement() -> BoxedStmt =
-        "." _ s:for_iteration_statement() { s }
+        "." _ s:for_iteration_statement(true) { s }
 
     rule compound_verification_statement() -> BoxedBlock =
         "~" _ "[" _ "]" {
@@ -559,14 +557,14 @@ pub grammar c_parser(env: &Env) for str {
             })
         }
 
-    rule for_iteration_statement() -> BoxedStmt =
+    rule for_iteration_statement(as_iteration_e: bool) -> BoxedStmt =
         p:position!()
         K(<"for">) _ "(" _ init:expression_statement() _ cond:expression_statement() _ iter:expression() _ ")" _
         verif:optional_compound_verification() _ body:statement() {
-            unsafe { ast_stmt_create_iter(env.lexloc(p), init, cond, iter, verif, body) }
+            unsafe { ast_stmt_create_iter(env.lexloc(p), init, cond, iter, verif, body, as_iteration_e) }
         }
 
-    rule iteration_statement() -> BoxedStmt = for_iteration_statement()
+    rule iteration_statement() -> BoxedStmt = for_iteration_statement(false)
 
     rule jump_statement() -> BoxedStmt =
         p:position!() K(<"return">) _ expr:expression() _ ";" {

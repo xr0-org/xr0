@@ -1662,11 +1662,12 @@ pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
     }
 }
 
-unsafe fn ast_expr_destroy_unary(expr: *mut AstExpr) {
-    let AstExprKind::Unary(unary) = &(*expr).kind else {
-        panic!()
-    };
-    ast_expr_destroy(unary.arg);
+impl Drop for UnaryExpr {
+    fn drop(&mut self) {
+        unsafe {
+            ast_expr_destroy(self.arg);
+        }
+    }
 }
 
 unsafe fn ast_expr_member_str_build(expr: &AstExpr, b: *mut StrBuilder) {
@@ -1766,24 +1767,26 @@ unsafe fn ast_expr_call_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     free(fun as *mut libc::c_void);
 }
 
-unsafe fn ast_expr_destroy_call(expr: *mut AstExpr) {
-    let AstExprKind::Call(call) = &(*expr).kind else {
-        panic!()
-    };
-    ast_expr_destroy(call.fun);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < call.n {
-        ast_expr_destroy(*call.arg.offset(i as isize));
-        i += 1;
+impl Drop for CallExpr {
+    fn drop(&mut self) {
+        unsafe {
+            ast_expr_destroy(self.fun);
+            let mut i: libc::c_int = 0 as libc::c_int;
+            while i < self.n {
+                ast_expr_destroy(*self.arg.offset(i as isize));
+                i += 1;
+            }
+            free(self.arg as *mut libc::c_void);
+        }
     }
-    free(call.arg as *mut libc::c_void);
 }
 
-unsafe fn ast_expr_destroy_incdec(expr: *mut AstExpr) {
-    let AstExprKind::IncDec(incdec) = &(*expr).kind else {
-        panic!()
-    };
-    ast_expr_destroy(incdec.operand);
+impl Drop for IncDecExpr {
+    fn drop(&mut self) {
+        unsafe {
+            ast_expr_destroy(self.operand);
+        }
+    }
 }
 
 pub unsafe fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> *mut AstExpr {
@@ -2252,10 +2255,10 @@ pub unsafe fn ast_expr_binary_op(expr: &AstExpr) -> AstBinaryOp {
     binary.op
 }
 
-impl Drop for AstExpr {
+impl Drop for AstExprKind {
     fn drop(&mut self) {
         unsafe {
-            match &self.kind {
+            match self {
                 AstExprKind::Identifier(id) => {
                     free(*id as *mut libc::c_void);
                 }
@@ -2265,39 +2268,60 @@ impl Drop for AstExpr {
                 AstExprKind::Bracketed(inner) => {
                     ast_expr_destroy(*inner);
                 }
-                AstExprKind::Call(_) => {
-                    ast_expr_destroy_call(self);
-                }
-                AstExprKind::IncDec(_) => {
-                    ast_expr_destroy_incdec(self);
-                }
-                AstExprKind::StructMember(member) => {
-                    ast_expr_destroy(member.root);
-                    free(member.field as *mut libc::c_void);
-                }
-                AstExprKind::Unary(_) => {
-                    ast_expr_destroy_unary(self);
-                }
-                AstExprKind::Binary(_) => {
-                    ast_expr_destroy_binary(self);
-                }
-                AstExprKind::Assignment(assignment) => {
-                    ast_expr_destroy_assignment(assignment);
-                }
+                AstExprKind::Call(_) => {}
+                AstExprKind::IncDec(_) => {}
+                AstExprKind::StructMember(_) => {}
+                AstExprKind::Unary(_) => {}
+                AstExprKind::Binary(_) => {}
+                AstExprKind::Assignment(_) => {}
                 AstExprKind::IsDeallocand(assertand) => {
                     ast_expr_destroy(*assertand);
                 }
                 AstExprKind::IsDereferencable(assertand) => {
                     ast_expr_destroy(*assertand);
                 }
-                AstExprKind::Constant(_) | AstExprKind::ArbArg => {}
-                AstExprKind::Allocation(alloc) => {
-                    ast_expr_destroy(alloc.arg);
-                }
+                AstExprKind::Constant(_) => {}
+                AstExprKind::ArbArg => {}
+                AstExprKind::Allocation(_) => {}
                 _ => {
                     panic!();
                 }
             }
+        }
+    }
+}
+
+impl Drop for StructMemberExpr {
+    fn drop(&mut self) {
+        unsafe {
+            ast_expr_destroy(self.root);
+            free(self.field as *mut libc::c_void);
+        }
+    }
+}
+
+impl Drop for AllocExpr {
+    fn drop(&mut self) {
+        unsafe {
+            ast_expr_destroy(self.arg);
+        }
+    }
+}
+
+impl Drop for BinaryExpr {
+    fn drop(&mut self) {
+        unsafe {
+            ast_expr_destroy(self.e1);
+            ast_expr_destroy(self.e2);
+        }
+    }
+}
+
+impl Drop for AssignmentExpr {
+    fn drop(&mut self) {
+        unsafe {
+            ast_expr_destroy(self.lval);
+            ast_expr_destroy(self.rval);
         }
     }
 }
@@ -2331,21 +2355,8 @@ pub unsafe fn ast_expr_ne_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut Ast
     return ast_expr_binary_create(e1, AstBinaryOp::Ne, e2);
 }
 
-unsafe fn ast_expr_destroy_binary(expr: *mut AstExpr) {
-    let AstExprKind::Binary(binary) = &(*expr).kind else {
-        panic!()
-    };
-    ast_expr_destroy(binary.e1);
-    ast_expr_destroy(binary.e2);
-}
-
 pub unsafe fn ast_expr_eq_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
     return ast_expr_binary_create(e1, AstBinaryOp::Eq, e2);
-}
-
-unsafe fn ast_expr_destroy_assignment(assignment: &AssignmentExpr) {
-    ast_expr_destroy(assignment.lval);
-    ast_expr_destroy(assignment.rval);
 }
 
 pub unsafe fn ast_expr_unary_operand(expr: &AstExpr) -> &AstExpr {
@@ -2626,14 +2637,20 @@ pub unsafe fn ast_block_create(
     Box::into_raw(Box::new(AstBlock { decls, stmts }))
 }
 
+impl Drop for AstBlock {
+    fn drop(&mut self) {
+        unsafe {
+            for &decl in &self.decls {
+                ast_variable_destroy(decl);
+            }
+            for &stmt in &self.stmts {
+                ast_stmt_destroy(stmt);
+            }
+        }
+    }
+}
+
 pub unsafe fn ast_block_destroy(b: *mut AstBlock) {
-    let block = std::ptr::read(b);
-    for decl in block.decls {
-        ast_variable_destroy(decl);
-    }
-    for stmt in block.stmts {
-        ast_stmt_destroy(stmt);
-    }
     drop(Box::from_raw(b));
 }
 
@@ -3050,6 +3067,7 @@ unsafe fn iter_neteffect(iter: &AstStmt) -> *mut AstStmt {
             0 as *mut LexemeMarker,
             ast_block_copy(ast_stmt_iter_abstract(iter)),
         ),
+        false,
     );
 }
 
@@ -3458,12 +3476,7 @@ unsafe fn ast_stmt_copy_iter(
     let abstract_0 = ast_block_copy(&*iteration.abstract_0);
     let body = ast_stmt_copy(&*iteration.body);
 
-    let stmt = ast_stmt_create_iter(loc, init, cond, iter, abstract_0, body);
-    if as_iteration_e {
-        ast_stmt_create_iter_e(stmt)
-    } else {
-        stmt
-    }
+    ast_stmt_create_iter(loc, init, cond, iter, abstract_0, body, as_iteration_e)
 }
 
 pub unsafe fn ast_stmt_create_iter(
@@ -3473,6 +3486,7 @@ pub unsafe fn ast_stmt_create_iter(
     iter: *mut AstExpr,
     abstract_0: *mut AstBlock,
     body: *mut AstStmt,
+    as_iteration_e: bool,
 ) -> *mut AstStmt {
     assert!(
         !init.is_null()
@@ -3482,23 +3496,19 @@ pub unsafe fn ast_stmt_create_iter(
             && !body.is_null()
     );
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::Iteration(AstIterationStmt {
+    let iter = AstIterationStmt {
         init,
         cond,
         iter,
         body,
         abstract_0,
-    });
-    return stmt;
-}
-
-pub unsafe fn ast_stmt_create_iter_e(stmt: *mut AstStmt) -> *mut AstStmt {
-    let kind = std::mem::replace(&mut (*stmt).kind, AstStmtKind::Nop);
-    let AstStmtKind::Iteration(iteration) = kind else {
-        panic!();
     };
-    (*stmt).kind = AstStmtKind::IterationE(iteration);
-    stmt
+    (*stmt).kind = if as_iteration_e {
+        AstStmtKind::IterationE(iter)
+    } else {
+        AstStmtKind::Iteration(iter)
+    };
+    return stmt;
 }
 
 unsafe fn ast_stmt_nop_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
@@ -3664,43 +3674,57 @@ unsafe fn iter_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
 }
 
 pub unsafe fn ast_stmt_destroy(stmt: *mut AstStmt) {
-    match &(*stmt).kind {
-        AstStmtKind::Labelled(labelled) => {
-            free(labelled.label as *mut libc::c_void);
-            ast_stmt_destroy(labelled.stmt);
-        }
-        AstStmtKind::Nop => {}
-        AstStmtKind::Compound(block) | AstStmtKind::CompoundV(block) => {
-            ast_block_destroy(*block);
-        }
-        AstStmtKind::Selection(selection) => {
-            ast_expr_destroy(selection.cond);
-            ast_stmt_destroy(selection.body);
-            if !(selection.nest).is_null() {
-                ast_stmt_destroy(selection.nest);
+    drop(Box::from_raw(stmt));
+}
+
+impl Drop for AstStmt {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.loc.is_null() {
+                lexememarker_destroy(self.loc);
             }
         }
-        AstStmtKind::Iteration(iteration) | AstStmtKind::IterationE(iteration) => {
-            ast_stmt_destroy(iteration.init);
-            ast_stmt_destroy(iteration.cond);
-            ast_stmt_destroy(iteration.body);
-            ast_expr_destroy(iteration.iter);
-            ast_block_destroy(iteration.abstract_0);
-        }
-        AstStmtKind::Expr(expr) => {
-            ast_expr_destroy(*expr);
-        }
-        AstStmtKind::Jump(jump) => {
-            ast_stmt_destroy_jump(jump);
-        }
-        _ => {
-            panic!();
+    }
+}
+
+impl Drop for AstStmtKind {
+    fn drop(&mut self) {
+        unsafe {
+            match self {
+                AstStmtKind::Labelled(labelled) => {
+                    free(labelled.label as *mut libc::c_void);
+                    ast_stmt_destroy(labelled.stmt);
+                }
+                AstStmtKind::Nop => {}
+                AstStmtKind::Compound(block) | AstStmtKind::CompoundV(block) => {
+                    ast_block_destroy(*block);
+                }
+                AstStmtKind::Selection(selection) => {
+                    ast_expr_destroy(selection.cond);
+                    ast_stmt_destroy(selection.body);
+                    if !(selection.nest).is_null() {
+                        ast_stmt_destroy(selection.nest);
+                    }
+                }
+                AstStmtKind::Iteration(iteration) | AstStmtKind::IterationE(iteration) => {
+                    ast_stmt_destroy(iteration.init);
+                    ast_stmt_destroy(iteration.cond);
+                    ast_stmt_destroy(iteration.body);
+                    ast_expr_destroy(iteration.iter);
+                    ast_block_destroy(iteration.abstract_0);
+                }
+                AstStmtKind::Expr(expr) => {
+                    ast_expr_destroy(*expr);
+                }
+                AstStmtKind::Jump(jump) => {
+                    ast_stmt_destroy_jump(jump);
+                }
+                _ => {
+                    panic!();
+                }
+            }
         }
     }
-    if !((*stmt).loc).is_null() {
-        lexememarker_destroy((*stmt).loc);
-    }
-    drop(Box::from_raw(stmt));
 }
 
 unsafe fn ast_stmt_destroy_jump(jump: &AstJumpStmt) {
