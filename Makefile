@@ -311,4 +311,4 @@ check-verbose: $(XR0V)
 
 .PHONY: clean
 clean:
-	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(RUST_SOURCES) $(OBJECTS) $(XR0_OBJECTS)
+	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(LIBC_RLIB) $(RUST_SOURCES) $(OBJECTS) $(XR0_OBJECTS)
