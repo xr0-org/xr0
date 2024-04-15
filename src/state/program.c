@@ -7,17 +7,6 @@
 #include "state.h"
 #include "util.h"
 
-struct instruction {
-};
-
-struct instruction_block {
-	struct instruction_arr *arr;
-	int index;
-};
-
-struct instruction_block *
-instruction_block_create(struct ast_expr *);
-
 struct program {
 	struct ast_block *b;
 	enum program_state {
@@ -110,6 +99,7 @@ program_nextstmt(struct program *p, struct state *s)
 {
 	assert(p->s == PROGRAM_COUNTER_STMTS);
 
+	++p->index;
 	if (program_stmt_atend(p, s)) {
 		p->s = PROGRAM_COUNTER_ATEND;
 	}
@@ -118,7 +108,7 @@ program_nextstmt(struct program *p, struct state *s)
 static bool
 program_stmt_atend(struct program *p, struct state *s)
 {
-	return ++p->index >= ast_block_nstmts(p->b);
+	return p->index >= ast_block_nstmts(p->b);
 }
 
 

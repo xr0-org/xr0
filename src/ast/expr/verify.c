@@ -1458,3 +1458,64 @@ binary_assume(struct ast_expr *expr, bool value, struct state *s)
 		s
 	);
 }
+
+static struct ast_expr *
+call_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+/*
+given f(x)
+
+want:
+	<rtype> t0 = f(x);
+
+
+given f(g(x), y);
+
+want:
+	<rtype g> t0 = g(x);
+	<rtype f> t1 = f(t0, y);
+ */
+
+struct ast_expr *
+ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
+		struct ast_block *b, struct state *s) 
+{
+	switch (ast_expr_kind(expr)) {
+	case EXPR_IDENTIFIER:
+		return expr;
+	case EXPR_CALL:
+		return call_geninstr(expr, loc, b, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_expr *
+call_geninstr(struct ast_expr *expr, struct lexememarker *loc,
+		struct ast_block *b, struct state *s)
+{
+	int nargs = ast_expr_call_nargs(expr);
+	struct ast_expr **args = ast_expr_call_args(expr);
+
+	struct ast_expr **gen_args = malloc(sizeof(struct ast_expr *) * nargs);
+
+	for (int i = 0; i < nargs; i++) {
+		gen_args[i] = ast_expr_geninstr(args[i], loc, b, s);
+	}
+
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* XXX: handle root thats a call */
+	char *name = ast_expr_as_identifier(root);
+	struct ast_function *f = externals_getfunc(state_getext(s), name);
+	if (!f) {
+		/* error */
+		assert(false);
+	}
+	struct ast_type *rtype = ast_function_type(f);
+	struct ast_expr *call = ast_expr_call_create(
+		ast_expr_copy(ast_expr_call_root(expr)), nargs, gen_args
+	);
+	return ast_block_call_create(b, loc, rtype, call);
+}
+

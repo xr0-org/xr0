@@ -203,6 +203,68 @@ preresult_iscontradiction(struct preresult *r)
 	return r->iscontradiction;
 }
 
+struct iresult {
+	struct ast_expr *val;
+	struct error *err;
+};
+
+struct iresult *
+iresult_error_create(struct error *err)
+{
+	assert(err);
+
+	struct iresult *r = malloc(sizeof(struct iresult));
+	r->val = NULL;
+	r->err = err;
+	return r;
+}
+
+struct iresult *
+iresult_expr_create(struct ast_expr *val)
+{
+	struct iresult *r = malloc(sizeof(struct iresult));
+	r->val = val;
+	r->err = NULL;
+	return r;
+}
+
+void
+iresult_destroy(struct iresult *res)
+{
+	assert(!res->err);
+	if (res->val) {
+		ast_expr_destroy(res->val);
+	}
+	free(res);
+}
+
+bool
+iresult_iserror(struct iresult *res)
+{
+	return res->err;
+}
+
+struct error *
+iresult_as_error(struct iresult *res)
+{
+	assert(res->err);
+	return res->err;
+}
+
+struct ast_expr *
+iresult_as_expr(struct iresult *res)
+{
+	assert(!res->err);
+	return res->val;
+}
+
+bool
+iresult_hasexpr(struct iresult *res)
+{
+	assert(!iresult_iserror(res));
+	return res->val; /* implicit cast */
+}
+
 struct string_arr *
 ast_topological_order(char *fname, struct externals *ext)
 {

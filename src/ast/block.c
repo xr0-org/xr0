@@ -5,10 +5,13 @@
 #include "ast.h"
 #include "util.h"
 
+#define TEMP_PREFIX "\u22A4" /* `⊤': unreachable from user space */
+
 struct ast_block {
 	int ndecl, nstmt;
 	struct ast_variable **decl;
 	struct ast_stmt **stmt;
+	int tempcount;
 };
 
 struct ast_block *
@@ -24,6 +27,7 @@ ast_block_create(struct ast_variable **decl, int ndecl,
 	b->ndecl = ndecl;
 	b->stmt = stmt;
 	b->nstmt = nstmt;
+	b->tempcount = 0;
 	return b;
 }
 
@@ -182,4 +186,48 @@ ast_block_preconds(struct ast_block *b)
 		}
 	}
 	return (struct preconds_result) { .stmt = NULL, .err = NULL };
+}
+
+void
+block_append_decl(struct ast_block *b, struct ast_variable *v)
+{
+	b->decl = realloc(b->decl, sizeof(struct ast_variable *) * ++b->ndecl);
+	b->decl[b->ndecl-1] = v;
+}
+
+void
+ast_block_append_stmt(struct ast_block *b, struct ast_stmt *v)
+{
+	b->stmt = realloc(b->stmt, sizeof(struct ast_stmt *) * ++b->nstmt);
+	b->stmt[b->nstmt-1] = v;
+}
+
+static char *
+generate_tempvar(int tempid);
+
+struct ast_expr *
+ast_block_call_create(struct ast_block *b, struct lexememarker *loc,
+		struct ast_type *rtype, struct ast_expr *expr)
+{
+	char *tvar = generate_tempvar(b->tempcount++);
+	struct ast_variable *decl = ast_variable_create(dynamic_str(tvar), rtype);
+	struct ast_stmt *stmt = ast_stmt_create_expr(
+		loc,
+		ast_expr_assignment_create(
+			ast_expr_identifier_create(dynamic_str(tvar)),
+			ast_expr_copy(expr)
+		)
+	);
+
+	block_append_decl(b, decl);
+	ast_block_append_stmt(b, stmt);
+	return ast_expr_identifier_create(dynamic_str(tvar));
+}
+
+static char *
+generate_tempvar(int tempid)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s%d", dynamic_str(TEMP_PREFIX), tempid);
+	return strbuilder_build(b);
 }

@@ -10,8 +10,7 @@ struct ast_expr;
 struct ast_expr *
 ast_expr_identifier_create(char *);
 
-char *
-ast_expr_as_identifier(struct ast_expr *);
+char * ast_expr_as_identifier(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_constant_create(int);
@@ -227,6 +226,13 @@ ast_expr_abseval(struct ast_expr *, struct state *);
 struct result *
 ast_expr_pf_reduce(struct ast_expr *, struct state *);
 
+struct ast_block;
+struct lexememarker;
+
+struct ast_expr *
+ast_expr_geninstr(struct ast_expr *, struct lexememarker *,
+	struct ast_block *, struct state *);
+
 struct ast_stmt;
 
 struct ast_block;
@@ -264,6 +270,18 @@ ast_block_stmts(struct ast_block *b);
 
 bool
 ast_block_isterminal(struct ast_block *, struct state *);
+
+struct ast_type;
+
+struct ast_expr *
+ast_block_call_create(struct ast_block *, struct lexememarker *,
+	struct ast_type *, struct ast_expr *);
+
+void
+ast_block_append_decl(struct ast_block *, struct ast_variable *);
+
+void
+ast_block_append_stmt(struct ast_block *, struct ast_stmt *);
 
 struct preconds_result {
 	struct ast_stmt *stmt;

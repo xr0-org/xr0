@@ -69,4 +69,27 @@ preresult_as_error(struct preresult *);
 bool
 preresult_iscontradiction(struct preresult *);
 
+struct iresult;
+
+struct iresult *
+iresult_error_create(struct error *err);
+
+struct iresult *
+iresult_expr_create(struct ast_expr *val);
+
+void
+iresult_destroy(struct iresult *);
+
+bool
+iresult_iserror(struct iresult *);
+
+struct error *
+iresult_as_error(struct iresult *);
+
+struct ast_expr *
+iresult_as_expr(struct iresult *);
+
+bool
+iresult_hasexpr(struct iresult *);
+
 #endif

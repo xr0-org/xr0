@@ -209,18 +209,21 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
-	struct ast_stmt *body = ast_stmt_sel_body(stmt),
-			*nest = ast_stmt_sel_nest(stmt);
-	struct decision dec = sel_decide(cond, state);
-	if (dec.err) {
-		return dec.err;
-	}
-	if (dec.decision) {
-		return ast_stmt_exec(body, state);
-	} else if (nest) {
-		return ast_stmt_exec(nest, state);
-	}
+	struct ast_stmt *nest = ast_stmt_sel_nest(stmt);
+	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	struct ast_expr *newcond = ast_expr_geninstr(ast_stmt_sel_cond(stmt), ast_stmt_lexememarker(stmt), b, state);
+	ast_block_append_stmt(
+		b, ast_stmt_create_sel(
+			lexememarker_copy(ast_stmt_lexememarker(stmt)),
+			false,
+			newcond,
+			ast_stmt_copy(ast_stmt_sel_body(stmt)),
+			nest ? ast_stmt_copy(nest) : NULL
+		)
+	);
+	
+	printf("sel: %s\n", ast_block_str(b, "\t"));
+	assert(false);
 	return NULL;
 }
 
