@@ -41,6 +41,13 @@ struct ast_stmt {
 			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
 		} alloc;
+		struct {
+			bool iscall;
+			union {
+				struct ast_expr *call;
+				struct ast_variable *temp;
+			} op;
+		} _register;
 	} u;
 
 	struct lexememarker *loc;
@@ -391,6 +398,24 @@ ast_stmt_iter_upper_bound(struct ast_stmt *stmt)
 	return ast_expr_binary_e2(cond->u.expr);
 }
 
+struct ast_stmt *
+ast_stmt_register_call_create(struct ast_expr *call) {
+	struct ast_stmt *stmt = ast_stmt_create(NULL);
+	stmt->kind = STMT_REGISTER;
+	stmt->u._register.iscall = true;
+	stmt->u._register.op.call = call;
+	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_register_read_create(struct ast_variable *temp) {
+	struct ast_stmt *stmt = ast_stmt_create(NULL);
+	stmt->kind = STMT_REGISTER;
+	stmt->u._register.iscall = false;
+	stmt->u._register.op.temp = temp;
+	return stmt;
+}
+
 static struct ast_stmt *
 ast_stmt_copy_iter(struct ast_stmt *stmt)
 {
@@ -454,6 +479,19 @@ ast_stmt_jump_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	);
 
 	free(rv);
+}
+
+static void
+ast_stmt_register_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+{
+	assert(stmt->kind == STMT_REGISTER);
+	if (stmt->u._register.iscall) {
+		char *call = ast_expr_str(stmt->u._register.op.call);
+		strbuilder_printf(b, "call %s;", call);
+	} else {
+		char *tempvar = ast_variable_str(stmt->u._register.op.temp);
+		strbuilder_printf(b, "mov %s;", tempvar);
+	}
 }
 
 static struct ast_expr *
@@ -558,6 +596,10 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			loc, stmt->u.jump.kind,
 			ast_expr_copy_ifnotnull(stmt->u.jump.rv)
 		);
+	case STMT_REGISTER:
+		return stmt->u._register.iscall
+			? ast_stmt_register_call_create(stmt->u._register.op.call)
+			: ast_stmt_register_read_create(stmt->u._register.op.temp);
 	default:
 		assert(false);
 	}
@@ -595,6 +637,9 @@ ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 		break;
 	case STMT_JUMP:
 		ast_stmt_jump_sprint(stmt, b);
+		break;
+	case STMT_REGISTER:
+		ast_stmt_register_sprint(stmt, b);
 		break;
 	default:
 		assert(false);

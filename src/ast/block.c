@@ -210,17 +210,13 @@ ast_block_call_create(struct ast_block *b, struct lexememarker *loc,
 		struct ast_type *rtype, struct ast_expr *expr)
 {
 	char *tvar = generate_tempvar(b->tempcount++);
-	struct ast_variable *decl = ast_variable_create(dynamic_str(tvar), rtype);
-	struct ast_stmt *stmt = ast_stmt_create_expr(
-		loc,
-		ast_expr_assignment_create(
-			ast_expr_identifier_create(dynamic_str(tvar)),
-			ast_expr_copy(expr)
-		)
+	struct ast_stmt *call = ast_stmt_register_call_create(ast_expr_copy(expr));
+	struct ast_stmt *read = ast_stmt_register_read_create(
+		ast_variable_create(dynamic_str(tvar), ast_type_copy(rtype))
 	);
 
-	block_append_decl(b, decl);
-	ast_block_append_stmt(b, stmt);
+	ast_block_append_stmt(b, call);
+	ast_block_append_stmt(b, read);
 	return ast_expr_identifier_create(dynamic_str(tvar));
 }
 

@@ -5,7 +5,6 @@
 
 #include "ast.h"
 #include "block.h"
-#include "registers.h"
 #include "clump.h"
 #include "ext.h"
 #include "heap.h"
@@ -27,7 +26,7 @@ struct state {
 	struct stack *stack;
 	struct heap *heap;
 	struct props *props;
-	struct registers *registers;
+	struct value *reg;
 };
 
 struct state *
@@ -42,7 +41,7 @@ state_create(struct frame *f, struct externals *ext)
 	state->stack = stack_create(f, NULL);
 	state->heap = heap_create();
 	state->props = props_create();
-	state->registers = registers_create();
+	state->reg = NULL;
 	return state;
 }
 
@@ -79,7 +78,7 @@ state_copy(struct state *state)
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
-	copy->registers = registers_copy(state->registers);
+	copy->reg = state->reg ? value_copy(state->reg) : NULL;
 	return copy;
 }
 
@@ -202,22 +201,18 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 	return value_sync_create(ast_expr_identifier_create(c));
 }
 
-struct ast_expr *
-state_getregister(struct state *state)
-{
-	return registers_reserve(state->registers);
-}
-
 struct value *
-state_readregister(struct state *state, struct ast_expr *reg)
+state_readregister(struct state *state)
 {
-	return registers_readfrom(state->registers, reg);
+	struct value *v = value_copy(state->reg);
+	state->reg = NULL;
+	return v;
 }
 
 void
-state_writeregister(struct state *state, struct ast_expr *reg, struct value *v)
+state_writeregister(struct state *state, struct value *v)
 {
-	return registers_writeto(state->registers, reg, v);
+	state->reg = v;
 }
 
 struct value *
