@@ -5,6 +5,7 @@
 
 #include "ast.h"
 #include "block.h"
+#include "registers.h"
 #include "clump.h"
 #include "ext.h"
 #include "heap.h"
@@ -26,6 +27,7 @@ struct state {
 	struct stack *stack;
 	struct heap *heap;
 	struct props *props;
+	struct registers *registers;
 };
 
 struct state *
@@ -40,6 +42,7 @@ state_create(struct frame *f, struct externals *ext)
 	state->stack = stack_create(f, NULL);
 	state->heap = heap_create();
 	state->props = props_create();
+	state->registers = registers_create();
 	return state;
 }
 
@@ -76,6 +79,7 @@ state_copy(struct state *state)
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
 	copy->props = props_copy(state->props);
+	copy->registers = registers_copy(state->registers);
 	return copy;
 }
 
@@ -196,6 +200,24 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 		comment, persist
 	);
 	return value_sync_create(ast_expr_identifier_create(c));
+}
+
+struct ast_expr *
+state_getregister(struct state *state)
+{
+	return registers_reserve(state->registers);
+}
+
+struct value *
+state_readregister(struct state *state, struct ast_expr *reg)
+{
+	return registers_readfrom(state->registers, reg);
+}
+
+void
+state_writeregister(struct state *state, struct ast_expr *reg, struct value *v)
+{
+	return registers_writeto(state->registers, reg, v);
 }
 
 struct value *

@@ -123,6 +123,12 @@ error_return();
 struct error *
 error_to_return(struct error *);
 
+struct error *
+error_call();
+
+struct error *
+error_to_call(struct error *);
+
 char *
 error_str(struct error *);
 

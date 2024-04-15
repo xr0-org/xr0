@@ -745,6 +745,23 @@ ast_expr_alloc_kind(struct ast_expr *expr)
 	return expr->u.alloc.kind;
 }
 
+struct ast_expr *
+ast_expr_register_create(int slot, struct ast_expr *original)
+{
+	struct ast_expr *reg = ast_expr_create();
+	reg->kind = EXPR_REGISTER;
+	reg->u.reg.slot = slot;
+	reg->u.reg.original = original;
+	return reg;
+}
+
+int
+ast_expr_register_slot(struct ast_expr *reg)
+{
+	assert(ast_expr_kind(reg) == EXPR_REGISTER);
+	return reg->u.reg.slot;
+}
+
 void
 ast_expr_destroy(struct ast_expr *expr)
 {
@@ -788,6 +805,9 @@ ast_expr_destroy(struct ast_expr *expr)
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_destroy(expr->u.alloc.arg);
+		break;
+	case EXPR_REGISTER:
+		ast_expr_destroy(expr->u.reg.original);
 		break;
 	default:
 		assert(false);
@@ -841,6 +861,9 @@ ast_expr_str(struct ast_expr *expr)
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_alloc_str_build(expr, b);
+		break;
+	case EXPR_REGISTER:
+		ast_expr_str(expr->u.reg.original);
 		break;
 	default:
 		assert(false);
@@ -903,6 +926,10 @@ ast_expr_copy(struct ast_expr *expr)
 		return ast_expr_arbarg_create();
 	case EXPR_ALLOCATION:
 		return ast_expr_alloc_copy(expr);
+	case EXPR_REGISTER:
+		return ast_expr_register_create(
+			expr->u.reg.slot, expr->u.reg.original
+		);
 	default:
 		assert(false);
 	}

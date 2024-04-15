@@ -143,7 +143,11 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 		program_nextstmt(p, s);
 		return NULL;
 	}
-	struct error *return_err = error_return(err);
+	struct error *call_err = error_to_call(err);
+	if (call_err) {
+		return NULL;
+	}
+	struct error *return_err = error_to_return(err);
 	if (!return_err) {
 		return err;
 	}
