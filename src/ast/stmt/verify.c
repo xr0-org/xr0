@@ -211,7 +211,9 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 {
 	struct ast_stmt *nest = ast_stmt_sel_nest(stmt);
 	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
-	struct ast_expr *newcond = ast_expr_geninstr(ast_stmt_sel_cond(stmt), ast_stmt_lexememarker(stmt), b, state);
+	struct ast_expr *newcond = ast_expr_geninstr(
+		ast_stmt_sel_cond(stmt), ast_stmt_lexememarker(stmt), b, state
+	);
 	ast_block_append_stmt(
 		b, ast_stmt_create_sel(
 			lexememarker_copy(ast_stmt_lexememarker(stmt)),
@@ -222,15 +224,12 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 		)
 	);
 	
-	printf("sel: %s\n", ast_block_str(b, "\t"));
 	struct frame *inter_frame = frame_intermediate_create(
 		dynamic_str("inter"),
 		b,
 		false
 	);
 	state_pushframe(state, inter_frame);
-	printf("state: %s\n", state_str(state));
-	assert(false);
 	return NULL;
 }
 

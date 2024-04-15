@@ -1,6 +1,8 @@
 #ifndef VALUE_H
 #define VALUE_H
 
+#include <stdbool.h>
+
 enum value_type {
 	VALUE_SYNC,
 	VALUE_PTR,

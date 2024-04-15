@@ -31,6 +31,7 @@ struct ast_expr {
 		EXPR_ISDEREFERENCABLE	= 1 << 12,
 		EXPR_ARBARG		= 1 << 13,
 		EXPR_ALLOCATION		= 1 << 14,
+		EXPR_REGISTER		= 1 << 15,
 	} kind;
 	struct ast_expr *root;
 	union {
@@ -74,6 +75,10 @@ struct ast_expr {
 			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
 		} alloc;
+		struct {
+			int slot;
+			struct ast_expr *original;
+		} reg;
 	} u;
 };
 
