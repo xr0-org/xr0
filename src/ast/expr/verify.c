@@ -735,7 +735,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return result_error_create(err);
 	}
 
-	printf("state (postpush): %s\n", state_str(state));
 	/* XXX: pass copy so we don't observe */
 	if ((err = call_setupverify(f, state_copy(state)))) {
 		return result_error_create(
@@ -747,9 +746,10 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		);
 	}
 
+	/*
 	struct result *res = call_absexec(expr, state);
 	if (result_iserror(res)) {
-		struct error *ct_err = error_to_control_transfer(result_as_error(res));
+		struct error *ct_err = error_to_return(result_as_error(res));
 		if (!ct_err) {
 			return result_error_create(
 				error_printf("\n\t%w", result_as_error(res))
@@ -760,8 +760,8 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		res = result_value_create(object_as_value(obj_res.obj));
 	}
 
-	/* XXX: pass copy so we don't observe */
-	/* copy to preserve value through popping of frame */
+	/* XXX: pass copy so we don't observe
+	/* copy to preserve value through popping of frame
 	struct value *v = NULL;
 	if (result_hasvalue(res)) {
 		v = value_copy(result_as_value(res));
@@ -771,13 +771,14 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 
 	state_unnest(state);
 	state_popframe(state);
-	/*result_arr_destroy(args);*/
+	/*result_arr_destroy(args);
 
 	if (v) {
 		return pf_augment(v, expr, state);
 	}
 
 	return res;
+	*/
 }
 
 static struct result *
@@ -1009,7 +1010,6 @@ prepare_parameters(int nparams, struct ast_variable **param,
 static struct result *
 expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("state: %s\n", state_str(state));
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
@@ -1018,8 +1018,6 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	if (!result_hasvalue(res)) {
-		printf("s: %s\n", state_str(state));
-		printf("expr: %s\n", ast_expr_str(expr));
 		assert(false);
 		return result_error_create(error_printf("undefined indirection (rvalue)"));
 	}

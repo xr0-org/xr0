@@ -223,6 +223,13 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 	);
 	
 	printf("sel: %s\n", ast_block_str(b, "\t"));
+	struct frame *inter_frame = frame_intermediate_create(
+		dynamic_str("inter"),
+		b,
+		false
+	);
+	state_pushframe(state, inter_frame);
+	printf("state: %s\n", state_str(state));
 	assert(false);
 	return NULL;
 }
@@ -295,7 +302,7 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		object_assign(obj_res.obj, value_copy(result_as_value(res)));
 		/* destroy result if exists */
 	}
-	return error_control_transfer();
+	return error_return();
 }
 
 struct error *
@@ -507,7 +514,7 @@ jump_absexec(struct ast_stmt *stmt, struct state *state)
 	if (err) {
 		return err;
 	}
-	return error_control_transfer();
+	return error_return();
 }
 
 static struct error *
