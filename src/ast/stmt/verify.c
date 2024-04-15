@@ -229,7 +229,10 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 		b,
 		false
 	);
+
+	printf("block: %s\n", ast_block_str(b, "\t"));
 	state_pushframe(state, inter_frame);
+	assert(false);
 	return NULL;
 }
 

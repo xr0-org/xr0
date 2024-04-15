@@ -139,14 +139,11 @@ state_hasgarbage(struct state *);
 bool
 state_equal(struct state *s1, struct state *s2);
 
-struct ast_expr *
-state_getregister(struct state *);
-
 struct value *
-state_readregister(struct state *, struct ast_expr *reg);
+state_readregister(struct state *);
 
 void
-state_writeregister(struct state *, struct ast_expr *reg, struct value *);
+state_writeregister(struct state *, struct value *);
 
 
 /* FRAME DTO */

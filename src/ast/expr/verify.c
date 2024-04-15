@@ -420,7 +420,7 @@ static struct result *
 expr_structmember_eval(struct ast_expr *expr, struct state *state);
 
 static struct result *
-expr_call_eval(struct ast_expr **expr, struct state *state);
+expr_call_eval(struct ast_expr *expr, struct state *state);
 
 static struct result *
 expr_assign_eval(struct ast_expr *expr, struct state *state);
@@ -433,9 +433,6 @@ expr_binary_eval(struct ast_expr *expr, struct state *state);
 
 static struct result *
 arbarg_eval(struct ast_expr *expr, struct state *state);
-
-static struct result *
-register_eval(struct ast_expr *expr, struct state *state);
 
 struct result *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
@@ -452,7 +449,7 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 	case EXPR_STRUCTMEMBER:
 		return expr_structmember_eval(expr, state);
 	case EXPR_CALL:
-		return expr_call_eval(&expr, state);
+		return expr_call_eval(expr, state);
 	case EXPR_ASSIGNMENT:
 		return expr_assign_eval(expr, state);
 	case EXPR_INCDEC:
@@ -461,8 +458,6 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 		return expr_binary_eval(expr, state);
 	case EXPR_ARBARG:
 		return arbarg_eval(expr, state);
-	case EXPR_REGISTER:
-		return register_eval(expr, state);
 	default:
 		/*printf("expr: %s\n", ast_expr_str(expr));*/
 		assert(false);
@@ -696,11 +691,11 @@ static struct result *
 pf_augment(struct value *v, struct ast_expr *root, struct state *);
 
 static struct result *
-expr_call_eval(struct ast_expr **expr, struct state *state)
+expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	struct error *err;
 
-	struct ast_expr *root = ast_expr_call_root(*expr);
+	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
 
@@ -712,7 +707,7 @@ expr_call_eval(struct ast_expr **expr, struct state *state)
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
 
-	int nargs = ast_expr_call_nargs(*expr);
+	int nargs = ast_expr_call_nargs(expr);
 	if (nargs != nparams) {
 		return result_error_create(
 			error_printf(
@@ -723,7 +718,7 @@ expr_call_eval(struct ast_expr **expr, struct state *state)
 	}
 
 	struct result_arr *args = prepare_arguments(
-		nargs, ast_expr_call_args(*expr),
+		nargs, ast_expr_call_args(expr),
 		nparams, params,
 		state
 	);
@@ -751,10 +746,6 @@ expr_call_eval(struct ast_expr **expr, struct state *state)
 		);
 	}
 
-	struct ast_expr *reg = state_getregister(state);
-	*expr = reg; /* XXX */
-
-	printf("expr: %s\n", ast_expr_str(*expr));
 	return result_error_create(error_call());
 	/*
 	struct result *res = call_absexec(expr, state);
@@ -1025,7 +1016,6 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 
 	struct result *res = ast_expr_eval(rval, state);
 	if (result_iserror(res)) {
-		
 		return res;
 	}
 	if (!result_hasvalue(res)) {
@@ -1105,14 +1095,6 @@ arbarg_eval(struct ast_expr *expr, struct state *state)
 		NULL,
 		false
 	));
-}
-
-static struct result *
-register_eval(struct ast_expr *expr, struct state *state)
-{
-	return result_value_create(
-		state_readregister(state, expr)
-	);
 }
 
 static struct result *

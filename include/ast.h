@@ -10,7 +10,8 @@ struct ast_expr;
 struct ast_expr *
 ast_expr_identifier_create(char *);
 
-char * ast_expr_as_identifier(struct ast_expr *);
+char *
+ast_expr_as_identifier(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_constant_create(int);
@@ -169,12 +170,6 @@ struct state;
 struct error *
 ast_expr_alloc_rangeprocess(struct ast_expr *expr, struct ast_expr *lw,
 	struct ast_expr *up, struct state *);
-
-struct ast_expr *
-ast_expr_register_create(int slot, struct ast_expr *original);
-
-int
-ast_expr_register_slot(struct ast_expr *reg);
 
 void
 ast_expr_destroy(struct ast_expr *);
@@ -396,6 +391,12 @@ ast_stmt_create_dealloc(struct lexememarker *, struct ast_expr *arg);
 
 struct ast_stmt *
 ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
+
+struct ast_stmt *
+ast_stmt_register_call_create(struct ast_expr *call);
+
+struct ast_stmt *
+ast_stmt_register_read_create(struct ast_variable *v);
 
 void
 ast_stmt_destroy(struct ast_stmt *);
