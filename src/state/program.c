@@ -143,8 +143,8 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 		program_nextstmt(p, s);
 		return NULL;
 	}
-	struct error *ct_err = error_to_control_transfer(err);
-	if (!ct_err) {
+	struct error *return_err = error_return(err);
+	if (!return_err) {
 		return err;
 	}
 	p->s = PROGRAM_COUNTER_ATEND;

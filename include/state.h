@@ -26,6 +26,12 @@ struct value;
 
 struct state;
 
+enum frame_kind {
+	FRAME_NESTED,
+	FRAME_INTERMEDIATE,
+	FRAME_CALL
+};
+
 struct frame;
 
 struct state *
@@ -142,6 +148,8 @@ frame_call_create(char *name, struct ast_block *, struct ast_type *, bool abs);
 struct frame *
 frame_block_create(char *name, struct ast_block *, bool abs);
 
+struct frame *
+frame_intermediate_create(char *name, struct ast_block *, bool abs);
 
 /* USED BY VALUE */
 

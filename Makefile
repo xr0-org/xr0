@@ -34,7 +34,6 @@ STATE_OBJ = $(BUILD_DIR)/state.o
 STATIC_OBJ = $(BUILD_DIR)/static.o
 STACK_OBJ = $(BUILD_DIR)/stack.o
 PROGRAM_OBJ = $(BUILD_DIR)/program.o
-INSTRUCTION_OBJ = $(BUILD_DIR)/instruction.o
 HEAP_OBJ = $(BUILD_DIR)/heap.o
 CLUMP_OBJ = $(BUILD_DIR)/clump.o
 LOCATION_OBJ = $(BUILD_DIR)/location.o
@@ -70,7 +69,6 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 		$(HEAP_OBJ) \
 		$(STACK_OBJ) \
 		$(PROGRAM_OBJ) \
-		$(INSTRUCTION_OBJ) \
 		$(PROPS_OBJ) \
 		$(STATIC_OBJ) \
 		$(EXT_OBJ) \
@@ -140,10 +138,6 @@ $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 $(PROGRAM_OBJ): $(STATE_DIR)/program.c
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/program.c
-
-$(INSTRUCTION_OBJ): $(STATE_DIR)/instruction.c
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/instruction.c
 
 $(HEAP_OBJ): $(STATE_DIR)/heap.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'

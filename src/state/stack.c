@@ -27,7 +27,7 @@ struct stack {
 
 	int id;
 	struct stack *prev;
-	bool nested;
+	enum frame_kind kind;
 };
 
 struct frame {
@@ -35,7 +35,7 @@ struct frame {
 	struct ast_block *b;
 	struct ast_type *ret_type;
 	bool abstract;
-	bool nested;
+	enum frame_kind kind;
 };
 
 struct location *
@@ -64,8 +64,8 @@ stack_create(struct frame *f, struct stack *prev)
 	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
 
-	stack->nested = f->nested;
-	stack->result = stack->nested
+	stack->kind = f->kind;
+	stack->result = stack->kind != FRAME_CALL
 		? NULL : variable_create(f->ret_type, stack, false);
 
 	return stack;
@@ -128,7 +128,7 @@ stack_copy(struct stack *stack)
 	if (stack->prev) {
 		copy->prev = stack_copy(stack->prev);
 	}
-	copy->nested = stack->nested;
+	copy->kind = stack->kind;
 	return copy;
 }
 
@@ -242,13 +242,13 @@ stack_undeclare(struct stack *stack, struct state *state)
 bool
 stack_nested(struct stack *s)
 {
-	return s->nested;
+	return s->kind == FRAME_NESTED;
 }
 
 struct variable *
 stack_getresult(struct stack *s)
 {
-	if (!s->prev || !s->nested) {
+	if (!s->prev || s->kind == FRAME_CALL) {
 		/* ⊢ lowest frame || call */
 		return s->result;
 	}
@@ -268,7 +268,7 @@ stack_getvariable(struct stack *s, char *id)
 	assert(strcmp(id, KEYWORD_RETURN) != 0);
 
 	struct variable *v = map_get(s->varmap, id);
-	if (!v && s->nested) {
+	if (!v && stack_nested(s)) {
 		/* ⊢ block */
 		return stack_getvariable(s->prev, id);
 	}
@@ -304,36 +304,43 @@ stack_getblock(struct stack *s, int address)
 }
 
 static struct frame *
-frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs, bool nested)
+frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs,
+		enum frame_kind kind)
 {
 	struct frame *f = malloc(sizeof(struct frame));
 	f->name = dynamic_str(n);
 	f->b = ast_block_copy(b);
-	if (!nested) {
+	if (kind == FRAME_CALL) {
 		assert(r);
 		f->ret_type = ast_type_copy(r);
 	}
 	f->abstract = abs;
-	f->nested = nested;
+	f->kind = kind;
 	return f;
 }
 
 struct frame *
 frame_call_create(char *n, struct ast_block *b, struct ast_type *r, bool abs)
 {
-	return frame_create(n, b, r, abs, false);
+	return frame_create(n, b, r, abs, FRAME_CALL);
 }
 
 struct frame *
 frame_block_create(char *n, struct ast_block *b, bool abs)
 {
-	return frame_create(n, b, NULL, abs, true);
+	return frame_create(n, b, NULL, abs, FRAME_NESTED);
+}
+
+struct frame *
+frame_intermediate_create(char *n, struct ast_block *b, bool abs)
+{
+	return frame_create(n, b, NULL, abs, FRAME_INTERMEDIATE);
 }
 
 static struct frame *
 frame_copy(struct frame *f)
 {
-	if (!f->nested) {
+	if (f->kind == FRAME_CALL) {
 		assert(f->ret_type);
 	}
 	return frame_create(
@@ -341,7 +348,7 @@ frame_copy(struct frame *f)
 		ast_block_copy(f->b),
 		f->ret_type ? ast_type_copy(f->ret_type) : NULL,
 		f->abstract,
-		f->nested
+		f->kind
 	); 
 }
 

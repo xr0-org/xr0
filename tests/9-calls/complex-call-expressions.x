@@ -1,21 +1,21 @@
 #include <stdlib.h>
 
 int
-f(int x, int y)
+f(int x, int y) ~ [ return 0; ]
 {
 	return 0;
 }
 
 int
-g(int x)
+g(int x) ~ [ return 1; ]
 {
-	return 0;
+	return 1;
 }
 
 int
-h(int x, int y)
+h(int x, int y) ~ [ return 2; ]
 {
-	return 0;
+	return 2;
 }
 
 void *
