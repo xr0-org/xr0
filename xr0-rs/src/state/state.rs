@@ -336,7 +336,7 @@ pub unsafe fn state_get(state: *mut State, loc: *mut Location, constructive: boo
             init
         };
     }
-    let obj: *mut Object = block_observe(res.b, location_offset(loc), state, constructive);
+    let obj: *mut Object = block_observe(res.b, &*location_offset(loc), state, constructive);
     return {
         let init = ObjectRes {
             obj,
@@ -451,8 +451,8 @@ pub unsafe fn state_deref(state: *mut State, ptr_val: *mut Value, index: &AstExp
 pub unsafe fn state_range_alloc(
     state: *mut State,
     obj: *mut Object,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
 ) -> *mut Error {
     let arr_val: *mut Value = object_as_value(obj);
     if arr_val.is_null() {
@@ -470,19 +470,17 @@ pub unsafe fn state_range_alloc(
         (*state).clump,
     );
     if !(res.err).is_null() {
-        if true {
-            panic!();
-        }
+        panic!();
     }
     if (res.b).is_null() {
         return error_create(
             b"no block\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
     }
-    if ast_expr_equal(&*lw, &*up) {
+    if ast_expr_equal(lw, up) {
         panic!();
     }
-    return block_range_alloc(res.b, lw, up, (*state).heap);
+    return block_range_alloc(&*res.b, lw, up, (*state).heap);
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> *mut Value {
@@ -502,8 +500,8 @@ pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> *mut Error {
 pub unsafe fn state_range_dealloc(
     state: *mut State,
     obj: *mut Object,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
 ) -> *mut Error {
     let arr_val: *mut Value = object_as_value(obj);
     if arr_val.is_null() {
@@ -531,8 +529,8 @@ pub unsafe fn state_isdeallocand(s: *mut State, loc: *mut Location) -> bool {
 pub unsafe fn state_range_aredeallocands(
     state: *mut State,
     obj: *mut Object,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
 ) -> bool {
     if ast_expr_equal(&*lw, &*up) {
         return 1 as libc::c_int != 0;
@@ -565,7 +563,7 @@ pub unsafe fn state_references(s: *mut State, loc: *mut Location) -> bool {
     return stack_references((*s).stack, loc, s);
 }
 
-pub unsafe fn state_eval(s: *mut State, e: *mut AstExpr) -> bool {
+pub unsafe fn state_eval(s: *mut State, e: &AstExpr) -> bool {
     return vconst_eval((*s).vconst, e);
 }
 

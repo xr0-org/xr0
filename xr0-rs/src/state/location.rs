@@ -345,8 +345,8 @@ pub unsafe fn location_dealloc(loc: *mut Location, heap: *mut Heap) -> *mut Erro
 
 pub unsafe fn location_range_dealloc(
     loc: *mut Location,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
     state: *mut State,
 ) -> *mut Error {
     if !offsetzero(loc) {

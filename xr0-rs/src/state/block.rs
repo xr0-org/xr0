@@ -80,7 +80,7 @@ pub unsafe fn block_install(b: *mut Block, obj: *mut Object) {
 
 pub unsafe fn block_observe(
     b: *mut Block,
-    offset: *mut AstExpr,
+    offset: &AstExpr,
     s: *mut State,
     constructive: bool,
 ) -> *mut Object {
@@ -89,7 +89,7 @@ pub unsafe fn block_observe(
         if !constructive {
             return 0 as *mut Object;
         }
-        let obj: *mut Object = object_value_create(ast_expr_copy(&*offset), 0 as *mut Value);
+        let obj: *mut Object = object_value_create(ast_expr_copy(offset), 0 as *mut Value);
         object_arr_append((*b).arr, obj);
         return obj;
     }
@@ -97,16 +97,19 @@ pub unsafe fn block_observe(
     if object_isvalue(obj_0) {
         return obj_0;
     }
-    let lw: *mut AstExpr = ast_expr_copy(&*offset);
-    let up: *mut AstExpr = ast_expr_sum_create(
-        ast_expr_copy(&*offset),
+    let lw = ast_expr_copy(offset);
+    let up = ast_expr_sum_create(
+        ast_expr_copy(offset),
         ast_expr_constant_create(1 as libc::c_int),
     );
+    // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down. I don't
+    // know why it isn't a double free.
     let upto: *mut Object = object_upto(obj_0, lw, s);
     let observed: *mut Object = object_value_create(ast_expr_copy(&*lw), state_alloc(s));
-    let from: *mut Object = object_from(obj_0, up, s);
+    let from: *mut Object = object_from(obj_0, &*up, s);
     ast_expr_destroy(up);
     ast_expr_destroy(lw);
+
     let err: *mut Error = object_dealloc(obj_0, s);
     if !err.is_null() {
         panic!();
@@ -140,20 +143,20 @@ pub unsafe fn block_references(b: *mut Block, loc: *mut Location, s: *mut State)
 }
 
 pub unsafe fn block_range_alloc(
-    b: *mut Block,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    b: &Block,
+    lw: &AstExpr,
+    up: &AstExpr,
     heap: *mut Heap,
 ) -> *mut Error {
-    if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) {
+    if !(object_arr_nobjects(b.arr) == 0 as libc::c_int) {
         panic!();
     }
     object_arr_append(
-        (*b).arr,
+        b.arr,
         object_range_create(
-            ast_expr_copy(&*lw),
+            ast_expr_copy(lw),
             range_create(
-                ast_expr_difference_create(ast_expr_copy(&*up), ast_expr_copy(&*lw)),
+                ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
                 heap_newblock(heap),
             ),
         ),
@@ -163,8 +166,8 @@ pub unsafe fn block_range_alloc(
 
 pub unsafe fn block_range_aredeallocands(
     b: &Block,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
     s: *mut State,
 ) -> bool {
     if hack_first_object_is_exactly_bounds(b, lw, up, s) {
@@ -201,8 +204,8 @@ pub unsafe fn block_range_aredeallocands(
 
 unsafe fn hack_first_object_is_exactly_bounds(
     b: &Block,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
     s: *mut State,
 ) -> bool {
     if object_arr_nobjects(b.arr) == 0 as libc::c_int {
@@ -212,16 +215,16 @@ unsafe fn hack_first_object_is_exactly_bounds(
     if !object_isdeallocand(obj, s) {
         return 0 as libc::c_int != 0;
     }
-    let same_lw: *mut AstExpr = ast_expr_eq_create(lw, object_lower(obj));
-    let same_up: *mut AstExpr = ast_expr_eq_create(up, object_upper(obj));
-    return state_eval(s, same_lw) as libc::c_int != 0
-        && state_eval(s, same_up) as libc::c_int != 0;
+    // Note: Original leaks these outer expressions to avoid double-freeing the inner ones.
+    let same_lw = ast_expr_eq_create(lw as *const AstExpr as *mut AstExpr, object_lower(obj));
+    let same_up = ast_expr_eq_create(up as *const AstExpr as *mut AstExpr, object_upper(obj));
+    return state_eval(s, &*same_lw) && state_eval(s, &*same_up);
 }
 
 pub unsafe fn block_range_dealloc(
     b: *mut Block,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
     s: *mut State,
 ) -> *mut Error {
     if hack_first_object_is_exactly_bounds(&*b, lw, up, s) {
@@ -249,7 +252,13 @@ pub unsafe fn block_range_dealloc(
     }
     let n: libc::c_int = object_arr_nobjects((*b).arr);
     let obj: *mut *mut Object = object_arr_objects((*b).arr);
-    let upto: *mut Object = object_upto(*obj.offset(lw_index as isize), lw, s);
+    // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`. I
+    // don't know why it isn't a double free.
+    let upto: *mut Object = object_upto(
+        *obj.offset(lw_index as isize),
+        lw as *const AstExpr as *mut AstExpr,
+        s,
+    );
     let from: *mut Object = object_from(*obj.offset(up_index as isize), up, s);
     let new: *mut ObjectArr = object_arr_create();
     let mut i: libc::c_int = 0 as libc::c_int;

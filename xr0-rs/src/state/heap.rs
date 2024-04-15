@@ -325,6 +325,6 @@ pub unsafe fn vconst_str(v: *mut VConst, indent: *mut libc::c_char) -> *mut libc
     return strbuilder_build(b);
 }
 
-pub unsafe fn vconst_eval(v: *mut VConst, e: *mut AstExpr) -> bool {
+pub unsafe fn vconst_eval(v: *mut VConst, e: &AstExpr) -> bool {
     return ast_expr_matheval(e);
 }

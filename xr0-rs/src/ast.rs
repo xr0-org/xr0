@@ -336,8 +336,8 @@ unsafe fn expr_constant_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
 }
 unsafe fn rangeprocess_dealloc(
     dealloc: &AstExpr,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
     state: *mut State,
 ) -> *mut Error {
     let obj: *mut Object = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), state);
@@ -397,8 +397,8 @@ pub unsafe fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
 
 unsafe fn rangeprocess_alloc(
     expr: &AstExpr,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
     state: *mut State,
 ) -> *mut Error {
     let lval = ast_expr_assignment_lval(expr);
@@ -411,8 +411,8 @@ unsafe fn rangeprocess_alloc(
     return state_range_alloc(state, obj, lw, up);
 }
 
-pub unsafe fn ast_expr_matheval(e: *mut AstExpr) -> bool {
-    match &(*e).kind {
+pub unsafe fn ast_expr_matheval(e: &AstExpr) -> bool {
+    match &e.kind {
         AstExprKind::Binary(binary) => {
             let e1: *mut MathExpr = math_expr(binary.e1);
             let e2: *mut MathExpr = math_expr(binary.e2);
@@ -528,8 +528,8 @@ unsafe fn expr_unary_decide(expr: &AstExpr, state: *mut State) -> bool {
 
 pub unsafe fn ast_expr_rangedecide(
     expr: &AstExpr,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
     state: *mut State,
 ) -> bool {
     match &(*expr).kind {
@@ -541,8 +541,8 @@ pub unsafe fn ast_expr_rangedecide(
 
 unsafe fn expr_isdeallocand_rangedecide(
     expr: &AstExpr,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
     state: *mut State,
 ) -> bool {
     let acc = ast_expr_isdeallocand_assertand(expr);
@@ -568,12 +568,7 @@ unsafe fn expr_isdeallocand_rangedecide(
     return state_range_aredeallocands(state, obj, lw, up);
 }
 
-unsafe fn unary_rangedecide(
-    expr: &AstExpr,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
-    state: *mut State,
-) -> bool {
+unsafe fn unary_rangedecide(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: *mut State) -> bool {
     let operand = ast_expr_unary_operand(expr);
     match ast_expr_unary_op(expr) {
         AstUnaryOp::Bang => !ast_expr_rangedecide(operand, lw, up, state),
@@ -830,13 +825,13 @@ unsafe fn address_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
 
 pub unsafe fn ast_expr_alloc_rangeprocess(
     alloc: &AstExpr,
-    lw: *mut AstExpr,
-    up: *mut AstExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
     state: *mut State,
 ) -> *mut Error {
     let mut err: *mut Error = 0 as *mut Error;
-    let result_lw: *mut Result = ast_expr_eval(&*lw, state);
-    let result_up: *mut Result = ast_expr_eval(&*up, state);
+    let result_lw: *mut Result = ast_expr_eval(lw, state);
+    let result_up: *mut Result = ast_expr_eval(up, state);
     if result_iserror(result_lw) {
         return result_as_error(result_lw);
     }
@@ -847,12 +842,12 @@ pub unsafe fn ast_expr_alloc_rangeprocess(
     let res_up: *mut AstExpr = value_to_expr(result_as_value(result_up));
     result_destroy(result_up);
     result_destroy(result_lw);
-    match &(*alloc).kind {
+    match &alloc.kind {
         AstExprKind::Assignment(_) => {
-            err = rangeprocess_alloc(alloc, res_lw, res_up, state);
+            err = rangeprocess_alloc(alloc, &*res_lw, &*res_up, state);
         }
         AstExprKind::Allocation(_) => {
-            err = rangeprocess_dealloc(alloc, res_lw, res_up, state);
+            err = rangeprocess_dealloc(alloc, &*res_lw, &*res_up, state);
         }
         _ => {
             panic!();
@@ -2991,12 +2986,7 @@ unsafe fn stmt_iter_verify(stmt: &AstStmt, state: *mut State) -> *mut Error {
     let assertion = ast_stmt_as_expr(&**(ast_block_stmts(block)).offset(0 as libc::c_int as isize));
     let lw = ast_stmt_iter_lower_bound(stmt);
     let up = ast_stmt_iter_upper_bound(stmt);
-    if !ast_expr_rangedecide(
-        assertion,
-        lw as *const AstExpr as *mut AstExpr,
-        up as *const AstExpr as *mut AstExpr,
-        state,
-    ) {
+    if !ast_expr_rangedecide(assertion, lw, up, state) {
         return error_create(
             b"could not verify\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
@@ -3666,7 +3656,7 @@ unsafe fn iter_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
     let alloc = hack_alloc_from_neteffect(stmt);
     let lw = ast_stmt_iter_lower_bound(stmt) as *const AstExpr as *mut AstExpr;
     let up = ast_stmt_iter_upper_bound(stmt) as *const AstExpr as *mut AstExpr;
-    err = ast_expr_alloc_rangeprocess(alloc, lw, up, state);
+    err = ast_expr_alloc_rangeprocess(alloc, &*lw, &*up, state);
     if !err.is_null() {
         return result_error_create(err);
     }

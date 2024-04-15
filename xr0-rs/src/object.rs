@@ -240,36 +240,33 @@ pub unsafe fn object_upper(obj: *mut Object) -> *mut AstExpr {
     return ast_expr_sum_create(ast_expr_copy(&*(*obj).offset), object_size(obj));
 }
 
-pub unsafe fn object_contains(obj: *mut Object, offset: *mut AstExpr, s: *mut State) -> bool {
+pub unsafe fn object_contains(obj: *mut Object, offset: &AstExpr, s: *mut State) -> bool {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
-    let of: *mut AstExpr = offset;
-    let e1: *mut AstExpr = ast_expr_le_create(ast_expr_copy(&*lw), ast_expr_copy(&*of));
-    let e2: *mut AstExpr = ast_expr_lt_create(ast_expr_copy(&*of), ast_expr_copy(&*up));
+    let of = offset;
+    let e1: *mut AstExpr = ast_expr_le_create(ast_expr_copy(&*lw), ast_expr_copy(of));
+    let e2: *mut AstExpr = ast_expr_lt_create(ast_expr_copy(of), ast_expr_copy(&*up));
     ast_expr_destroy(up);
-    let contains: bool =
-        state_eval(s, e1) as libc::c_int != 0 && state_eval(s, e2) as libc::c_int != 0;
+    let contains = state_eval(s, &*e1) && state_eval(s, &*e2);
     ast_expr_destroy(e2);
     ast_expr_destroy(e1);
     return contains;
 }
 
-pub unsafe fn object_contains_upperincl(
-    obj: *mut Object,
-    offset: *mut AstExpr,
-    s: *mut State,
-) -> bool {
+pub unsafe fn object_contains_upperincl(obj: *mut Object, offset: &AstExpr, s: *mut State) -> bool {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
-    let of: *mut AstExpr = offset;
-    return state_eval(s, ast_expr_le_create(lw, of)) as libc::c_int != 0
-        && state_eval(s, ast_expr_le_create(of, up)) as libc::c_int != 0;
+    let of: *mut AstExpr = offset as *const AstExpr as *mut AstExpr;
+    // Note: Original leaks the expressions to avoid double-freeing subexpressions.
+    return state_eval(s, &*ast_expr_le_create(lw, of))
+        && state_eval(s, &*ast_expr_le_create(of, up));
 }
 
 pub unsafe fn object_isempty(obj: *mut Object, s: *mut State) -> bool {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
-    return state_eval(s, ast_expr_eq_create(lw, up));
+    // Note: Original leaks the expression to avoid double-freeing subexpressions.
+    return state_eval(s, &*ast_expr_eq_create(lw, up));
 }
 
 pub unsafe fn object_contig_precedes(
@@ -279,14 +276,16 @@ pub unsafe fn object_contig_precedes(
 ) -> bool {
     let lw: *mut AstExpr = object_upper(before);
     let up: *mut AstExpr = (*after).offset;
-    return state_eval(s, ast_expr_eq_create(lw, up));
+    // Note: Original leaks the expression to avoid double-freeing subexpressions.
+    return state_eval(s, &*ast_expr_eq_create(lw, up));
 }
 
 pub unsafe fn object_issingular(obj: *mut Object, s: *mut State) -> bool {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
     let lw_succ: *mut AstExpr = ast_expr_sum_create(lw, ast_expr_constant_create(1 as libc::c_int));
-    return state_eval(s, ast_expr_eq_create(lw_succ, up));
+    // Note: Original leaks the expression to avoid double-freeing subexpressions.
+    return state_eval(s, &*ast_expr_eq_create(lw_succ, up));
 }
 
 pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State) -> *mut Object {
@@ -295,9 +294,9 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
     let prop0: *mut AstExpr = ast_expr_le_create(ast_expr_copy(&*lw), ast_expr_copy(&*excl_up));
     let prop1: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(&*lw), ast_expr_copy(&*excl_up));
     let prop2: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(&*up), ast_expr_copy(&*excl_up));
-    let e0: bool = state_eval(s, prop0);
-    let e1: bool = state_eval(s, prop1);
-    let e2: bool = state_eval(s, prop2);
+    let e0: bool = state_eval(s, &*prop0);
+    let e1: bool = state_eval(s, &*prop1);
+    let e2: bool = state_eval(s, &*prop2);
     ast_expr_destroy(prop2);
     ast_expr_destroy(prop1);
     ast_expr_destroy(prop0);
@@ -329,13 +328,13 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
     );
 }
 
-pub unsafe fn object_from(obj: *mut Object, incl_lw: *mut AstExpr, s: *mut State) -> *mut Object {
+pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) -> *mut Object {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
-    let prop0: *mut AstExpr = ast_expr_ge_create(ast_expr_copy(&*incl_lw), ast_expr_copy(&*up));
-    let prop1: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(&*incl_lw), ast_expr_copy(&*lw));
-    let e0: bool = state_eval(s, prop0);
-    let e1: bool = state_eval(s, prop1);
+    let prop0: *mut AstExpr = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(&*up));
+    let prop1: *mut AstExpr = ast_expr_eq_create(ast_expr_copy(incl_lw), ast_expr_copy(&*lw));
+    let e0: bool = state_eval(s, &*prop0);
+    let e1: bool = state_eval(s, &*prop1);
     ast_expr_destroy(prop1);
     ast_expr_destroy(prop0);
     if e0 {
@@ -348,14 +347,14 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: *mut AstExpr, s: *mut State
         }
         ast_expr_destroy(up);
         return object_value_create(
-            ast_expr_copy(&*incl_lw),
+            ast_expr_copy(incl_lw),
             value_copy((*obj).c2rust_unnamed.value),
         );
     }
     return object_range_create(
-        ast_expr_copy(&*incl_lw),
+        ast_expr_copy(incl_lw),
         range_create(
-            ast_expr_difference_create(up, ast_expr_copy(&*incl_lw)),
+            ast_expr_difference_create(up, ast_expr_copy(incl_lw)),
             value_as_location(state_alloc(s)),
         ),
     );
@@ -539,7 +538,7 @@ pub unsafe fn object_arr_nallocs(arr: *mut ObjectArr) -> libc::c_int {
 
 pub unsafe fn object_arr_index(
     arr: *mut ObjectArr,
-    offset: *mut AstExpr,
+    offset: &AstExpr,
     state: *mut State,
 ) -> libc::c_int {
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -554,7 +553,7 @@ pub unsafe fn object_arr_index(
 
 pub unsafe fn object_arr_index_upperincl(
     arr: *mut ObjectArr,
-    offset: *mut AstExpr,
+    offset: &AstExpr,
     state: *mut State,
 ) -> libc::c_int {
     let mut i: libc::c_int = 0 as libc::c_int;

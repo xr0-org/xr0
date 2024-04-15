@@ -367,7 +367,7 @@ unsafe fn object_or_nothing_str(
     if b.is_null() as libc::c_int as libc::c_long != 0 {
         panic!();
     }
-    let obj: *mut Object = block_observe(b, location_offset(loc), state, 0 as libc::c_int != 0);
+    let obj: *mut Object = block_observe(b, &*location_offset(loc), state, 0 as libc::c_int != 0);
     if !obj.is_null() {
         return object_str(obj);
     }
