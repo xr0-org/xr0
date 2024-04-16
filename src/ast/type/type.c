@@ -58,6 +58,12 @@ ast_type_create_ptr(struct ast_type *ref)
 }
 
 struct ast_type *
+ast_type_create_void()
+{
+	return ast_type_create(TYPE_VOID, 0);
+}
+
+struct ast_type *
 ast_type_create_voidptr()
 {
 	struct ast_type *t = ast_type_create(TYPE_POINTER, 0);

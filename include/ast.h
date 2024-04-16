@@ -165,6 +165,9 @@ ast_expr_alloc_arg(struct ast_expr *);
 enum ast_alloc_kind
 ast_expr_alloc_kind(struct ast_expr *);
 
+struct ast_expr *
+ast_expr_alloc_kind_create(struct ast_expr *arg, enum ast_alloc_kind);
+
 struct state;
 
 struct error *
@@ -393,10 +396,19 @@ struct ast_stmt *
 ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
 
 struct ast_stmt *
-ast_stmt_register_call_create(struct ast_expr *call);
+ast_stmt_register_call_create(struct lexememarker *, struct ast_expr *call);
 
 struct ast_stmt *
-ast_stmt_register_read_create(struct ast_variable *v);
+ast_stmt_register_mov_create(struct lexememarker *, struct ast_variable *v);
+
+struct ast_expr *
+ast_stmt_register_call(struct ast_stmt *);
+
+struct ast_variable *
+ast_stmt_register_mov(struct ast_stmt *);
+
+bool
+ast_stmt_register_iscall(struct ast_stmt *);
 
 void
 ast_stmt_destroy(struct ast_stmt *);
@@ -458,6 +470,9 @@ ast_type_ispointer(struct ast_type *type);
 
 struct ast_type *
 ast_type_create_ptr(struct ast_type *type);
+
+struct ast_type *
+ast_type_create_void();
 
 struct ast_type *
 ast_type_create_voidptr();

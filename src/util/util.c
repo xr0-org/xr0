@@ -310,12 +310,11 @@ struct error {
 		ERROR_PRINTF,
 		ERROR_UNDECIDEABLE_COND,
 		ERROR_RETURN,
-		ERROR_CALL
+		ERROR_CALL,
 	} type;
 	union error_contents {
 		char *printf;
 		struct ast_expr *undecidable_cond;
-		struct ast_expr *return_register;
 	} contents;
 	struct error *inner;
 };
@@ -443,7 +442,7 @@ error_to_return(struct error *err)
 }
 
 struct error *
-error_call()
+error_call(struct ast_expr *return_register)
 {
 	struct error *err = calloc(1, sizeof(struct error));
 	err->type = ERROR_CALL;

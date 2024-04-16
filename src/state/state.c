@@ -100,6 +100,11 @@ state_str(struct state *state)
 		strbuilder_printf(b, "%s\n", ext);
 	}
 	free(ext);
+	strbuilder_printf(
+		b,
+		"\tR0: %s\n\n",
+		state->reg ? value_str(state->reg) : "empty"
+	);
 	char *static_mem = static_memory_str(state->static_memory, "\t");
 	if (strlen(static_mem) > 0) {
 		strbuilder_printf(b, "%s\n", static_mem);
@@ -175,10 +180,12 @@ void
 state_popframe(struct state *state)
 {
 	struct stack *old = state->stack;
-	state->stack = stack_prev(old); /* pop */
-	assert(state->stack);
-	/* destroy old frame */
-	stack_destroy(old);
+	if (stack_prev(old)) {
+		state->stack = stack_prev(old); /* pop */
+		assert(state->stack);
+		/* destroy old frame */
+		stack_destroy(old);
+	}
 }
 
 void

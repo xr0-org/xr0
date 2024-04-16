@@ -145,14 +145,16 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 	}
 	struct error *call_err = error_to_call(err);
 	if (call_err) {
+		program_nextstmt(p, s);
 		return NULL;
 	}
 	struct error *return_err = error_to_return(err);
-	if (!return_err) {
-		return err;
+	if (return_err) {
+		p->s = PROGRAM_COUNTER_ATEND;
+		state_popframe(s);
+		return NULL;
 	}
-	p->s = PROGRAM_COUNTER_ATEND;
-	return NULL;
+	return err;
 }
 
 static struct error *
