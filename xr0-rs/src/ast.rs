@@ -88,8 +88,8 @@ pub struct UnaryExpr {
 
 pub struct BinaryExpr {
     op: AstBinaryOp,
-    e1: *mut AstExpr,
-    e2: *mut AstExpr,
+    e1: Box<AstExpr>,
+    e2: Box<AstExpr>,
 }
 
 pub struct AssignmentExpr {
@@ -373,7 +373,7 @@ pub unsafe fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
             u1.op == u2.op && ast_expr_equal(&*u1.arg, &*u2.arg)
         }
         (AstExprKind::Binary(b1), AstExprKind::Binary(b2)) => {
-            b1.op == b2.op && ast_expr_equal(&*b1.e1, &*b2.e1) && ast_expr_equal(&*b1.e2, &*b2.e2)
+            b1.op == b2.op && ast_expr_equal(&b1.e1, &b2.e1) && ast_expr_equal(&b1.e2, &b2.e2)
         }
         (AstExprKind::Call(c1), AstExprKind::Call(c2)) => {
             if c1.n != c2.n {
@@ -414,8 +414,10 @@ unsafe fn rangeprocess_alloc(
 pub unsafe fn ast_expr_matheval(e: &AstExpr) -> bool {
     match &e.kind {
         AstExprKind::Binary(binary) => {
-            let e1: *mut MathExpr = math_expr(binary.e1);
-            let e2: *mut MathExpr = math_expr(binary.e2);
+            let e1: *mut MathExpr =
+                math_expr(&binary.e1 as &AstExpr as *const AstExpr as *mut AstExpr);
+            let e2: *mut MathExpr =
+                math_expr(&binary.e2 as &AstExpr as *const AstExpr as *mut AstExpr);
             let val: bool = eval_prop(e1, binary.op, e2);
             math_expr_destroy(e2);
             math_expr_destroy(e1);
@@ -439,9 +441,13 @@ unsafe fn math_expr(e: *mut AstExpr) -> *mut MathExpr {
                 math_expr_atom_create(math_atom_nat_create(c.constant as libc::c_uint))
             }
         }
-        AstExprKind::Binary(binary) => {
-            math_expr_sum_create(math_expr(binary.e1), binary_e2(binary.e2, binary.op))
-        }
+        AstExprKind::Binary(binary) => math_expr_sum_create(
+            math_expr(&binary.e1 as &AstExpr as *const AstExpr as *mut AstExpr),
+            binary_e2(
+                &binary.e2 as &AstExpr as *const AstExpr as *mut AstExpr,
+                binary.op,
+            ),
+        ),
         _ => {
             panic!();
         }
@@ -1629,7 +1635,7 @@ pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
             ast_expr_eval(e, s)
         }
         AstExprKind::Unary(_) => unary_pf_reduce(e, s),
-        AstExprKind::Binary(binary) => binary_pf_reduce(&*binary.e1, binary.op, &*binary.e2, s),
+        AstExprKind::Binary(binary) => binary_pf_reduce(&binary.e1, binary.op, &binary.e2, s),
         AstExprKind::Call(_) => call_pf_reduce(e, s),
         AstExprKind::StructMember(_) => structmember_pf_reduce(e, s),
         AstExprKind::Bracketed(inner) => ast_expr_pf_reduce(inner, s),
@@ -1831,7 +1837,11 @@ pub unsafe fn ast_expr_binary_create(
     op: AstBinaryOp,
     e2: *mut AstExpr,
 ) -> *mut AstExpr {
-    ast_expr_create(AstExprKind::Binary(BinaryExpr { e1, op, e2 }))
+    ast_expr_create(AstExprKind::Binary(BinaryExpr {
+        e1: Box::from_raw(e1),
+        op,
+        e2: Box::from_raw(e2),
+    }))
 }
 
 pub unsafe fn ast_expr_unary_create(root: *mut AstExpr, op: AstUnaryOp) -> *mut AstExpr {
@@ -2082,9 +2092,9 @@ pub unsafe fn ast_expr_copy(expr: &AstExpr) -> *mut AstExpr {
         }
         AstExprKind::Unary(unary) => ast_expr_unary_create(ast_expr_copy(&*unary.arg), unary.op),
         AstExprKind::Binary(binary) => ast_expr_binary_create(
-            ast_expr_copy(&*binary.e1),
+            ast_expr_copy(&binary.e1),
             binary.op,
-            ast_expr_copy(&*binary.e2),
+            ast_expr_copy(&binary.e2),
         ),
         AstExprKind::Assignment(assignment) => ast_expr_assignment_create(
             ast_expr_copy(&*assignment.lval),
@@ -2113,7 +2123,7 @@ pub unsafe fn ast_expr_binary_e2(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Binary(binary) = &expr.kind else {
         panic!()
     };
-    &*binary.e2
+    &binary.e2
 }
 
 unsafe fn ast_expr_isdeallocand_str_build(assertand: &AstExpr, b: *mut StrBuilder) {
@@ -2152,8 +2162,8 @@ unsafe fn ast_expr_binary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
         AstBinaryOp::Addition => b"+\0",
         AstBinaryOp::Subtraction => b"-\0",
     };
-    let e1: *mut libc::c_char = ast_expr_str(&*binary.e1);
-    let e2: *mut libc::c_char = ast_expr_str(&*binary.e2);
+    let e1: *mut libc::c_char = ast_expr_str(&binary.e1);
+    let e2: *mut libc::c_char = ast_expr_str(&binary.e2);
     strbuilder_printf(
         b,
         b"%s%s%s\0" as *const u8 as *const libc::c_char,
@@ -2169,7 +2179,7 @@ pub unsafe fn ast_expr_binary_e1(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Binary(binary) = &expr.kind else {
         panic!()
     };
-    &*binary.e1
+    &binary.e1
 }
 
 pub unsafe fn ast_expr_difference_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
@@ -2260,15 +2270,6 @@ impl Drop for AllocExpr {
     }
 }
 
-impl Drop for BinaryExpr {
-    fn drop(&mut self) {
-        unsafe {
-            ast_expr_destroy(self.e1);
-            ast_expr_destroy(self.e2);
-        }
-    }
-}
-
 impl Drop for AssignmentExpr {
     fn drop(&mut self) {
         unsafe {
@@ -2346,8 +2347,8 @@ pub unsafe fn ast_expr_getfuncs(expr: &AstExpr) -> Box<StringArr> {
             &ast_expr_getfuncs(&*assignment.rval),
         ),
         AstExprKind::Binary(binary) => string_arr_concat(
-            &ast_expr_getfuncs(&*binary.e1),
-            &ast_expr_getfuncs(&*binary.e2),
+            &ast_expr_getfuncs(&binary.e1),
+            &ast_expr_getfuncs(&binary.e2),
         ),
         _ => panic!("invalid expr kind"),
     }
