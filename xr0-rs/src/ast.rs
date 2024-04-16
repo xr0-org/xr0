@@ -78,7 +78,7 @@ pub struct AstExpr {
 
 pub struct AllocExpr {
     kind: AstAllocKind,
-    arg: *mut AstExpr,
+    arg: Box<AstExpr>,
 }
 
 pub struct UnaryExpr {
@@ -403,7 +403,7 @@ unsafe fn rangeprocess_alloc(
 ) -> *mut Error {
     let lval = ast_expr_assignment_lval(expr);
     let rval = ast_expr_assignment_rval(expr);
-    let AstExprKind::Allocation(alloc) = &(*rval).kind else {
+    let AstExprKind::Allocation(alloc) = &rval.kind else {
         panic!()
     };
     assert_ne!(alloc.kind, AstAllocKind::Dealloc);
@@ -1272,9 +1272,9 @@ unsafe fn expr_unary_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
 
 unsafe fn alloc_absexec(expr: &AstExpr, state: *mut State) -> *mut Result {
     match ast_expr_alloc_kind(expr) {
-        AstAllocKind::Alloc => return result_value_create(state_alloc(state)),
-        AstAllocKind::Dealloc => return dealloc_process(expr, state),
-        AstAllocKind::Clump => return result_value_create(state_clump(state)),
+        AstAllocKind::Alloc => result_value_create(state_alloc(state)),
+        AstAllocKind::Dealloc => dealloc_process(expr, state),
+        AstAllocKind::Clump => result_value_create(state_clump(state)),
     }
 }
 
@@ -1910,7 +1910,7 @@ pub unsafe fn ast_expr_alloc_arg(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Allocation(alloc) = &expr.kind else {
         panic!()
     };
-    &*alloc.arg
+    &alloc.arg
 }
 
 pub unsafe fn ast_expr_isisdereferencable(expr: &AstExpr) -> bool {
@@ -1920,7 +1920,7 @@ pub unsafe fn ast_expr_isisdereferencable(expr: &AstExpr) -> bool {
 pub unsafe fn ast_expr_dealloc_create(arg: *mut AstExpr) -> *mut AstExpr {
     ast_expr_create(AstExprKind::Allocation(AllocExpr {
         kind: AstAllocKind::Dealloc,
-        arg,
+        arg: Box::from_raw(arg),
     }))
 }
 
@@ -2013,7 +2013,7 @@ unsafe fn ast_expr_alloc_str_build(expr: &AstExpr, b: *mut StrBuilder) {
 pub unsafe fn ast_expr_alloc_create(arg: *mut AstExpr) -> *mut AstExpr {
     ast_expr_create(AstExprKind::Allocation(AllocExpr {
         kind: AstAllocKind::Alloc,
-        arg,
+        arg: Box::from_raw(arg),
     }))
 }
 
@@ -2249,14 +2249,6 @@ impl Drop for StructMemberExpr {
     }
 }
 
-impl Drop for AllocExpr {
-    fn drop(&mut self) {
-        unsafe {
-            ast_expr_destroy(self.arg);
-        }
-    }
-}
-
 pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
     drop(Box::from_raw(expr));
 }
@@ -2268,7 +2260,7 @@ pub unsafe fn ast_expr_le_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut Ast
 pub unsafe fn ast_expr_clump_create(arg: *mut AstExpr) -> *mut AstExpr {
     ast_expr_create(AstExprKind::Allocation(AllocExpr {
         kind: AstAllocKind::Clump,
-        arg,
+        arg: Box::from_raw(arg),
     }))
 }
 
