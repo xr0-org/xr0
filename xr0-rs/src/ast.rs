@@ -266,7 +266,7 @@ pub enum AstStmtKind {
     Labelled(AstLabelledStmt),
     Compound(*mut AstBlock),
     CompoundV(*mut AstBlock),
-    Expr(*mut AstExpr),
+    Expr(Box<AstExpr>),
     Selection(AstSelectionStmt),
     Iteration(AstIterationStmt),
     IterationE(AstIterationStmt),
@@ -2700,13 +2700,6 @@ pub unsafe fn ast_stmt_preprocess(stmt: &AstStmt, state: *mut State) -> *mut Pre
     return preresult_empty_create();
 }
 
-pub unsafe fn ast_stmt_equal(s1: &AstStmt, s2: &AstStmt) -> bool {
-    match (&s1.kind, &s2.kind) {
-        (AstStmtKind::Expr(e1), AstStmtKind::Expr(e2)) => ast_expr_equal(&**e1, &**e2),
-        _ => panic!(),
-    }
-}
-
 pub unsafe fn ast_stmt_labelled_stmt(stmt: &AstStmt) -> &AstStmt {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         panic!()
@@ -2741,7 +2734,7 @@ pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> *mut AstStmt {
         ),
 
         AstStmtKind::Nop => ast_stmt_create_nop(loc),
-        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, ast_expr_copy(&**expr)),
+        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, ast_expr_copy(expr)),
         AstStmtKind::Compound(compound) => {
             ast_stmt_create_compound(loc, ast_block_copy(&**compound))
         }
@@ -3016,7 +3009,7 @@ pub unsafe fn ast_stmt_exec(stmt: &AstStmt, state: *mut State) -> *mut Error {
         AstStmtKind::Labelled(labelled) => return ast_stmt_exec(&*labelled.stmt, state),
         AstStmtKind::Compound(_) => return stmt_compound_exec(stmt, state),
         AstStmtKind::CompoundV(_) => return 0 as *mut Error,
-        AstStmtKind::Expr(expr) => return ast_expr_exec(&**expr, state),
+        AstStmtKind::Expr(expr) => return ast_expr_exec(expr, state),
         AstStmtKind::Selection(_) => return stmt_sel_exec(stmt, state),
         AstStmtKind::Iteration(_) => return stmt_iter_exec(stmt, state),
         AstStmtKind::Jump(_) => return stmt_jump_exec(stmt, state),
@@ -3089,7 +3082,7 @@ pub unsafe fn ast_stmt_str(stmt: &AstStmt) -> *mut libc::c_char {
             ast_stmt_nop_sprint(stmt, b);
         }
         AstStmtKind::Expr(expr) => {
-            ast_stmt_expr_sprint(&**expr, b);
+            ast_stmt_expr_sprint(expr, b);
         }
         AstStmtKind::Compound(compound) => {
             ast_stmt_compound_sprint(&**compound, b);
@@ -3530,7 +3523,7 @@ pub unsafe fn ast_stmt_create_nop(loc: *mut LexemeMarker) -> *mut AstStmt {
 
 pub unsafe fn ast_stmt_create_expr(loc: *mut LexemeMarker, expr: *mut AstExpr) -> *mut AstStmt {
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::Expr(expr);
+    (*stmt).kind = AstStmtKind::Expr(Box::from_raw(expr));
     return stmt;
 }
 
@@ -3561,7 +3554,7 @@ pub unsafe fn ast_stmt_iter_upper_bound(stmt: &AstStmt) -> &AstExpr {
     let AstStmtKind::Expr(expr) = &(*iteration.cond).kind else {
         panic!();
     };
-    ast_expr_binary_e2(&**expr)
+    ast_expr_binary_e2(expr)
 }
 
 unsafe fn iter_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
@@ -3614,9 +3607,7 @@ impl Drop for AstStmtKind {
                     ast_stmt_destroy(iteration.body);
                     ast_block_destroy(iteration.abstract_0);
                 }
-                AstStmtKind::Expr(expr) => {
-                    ast_expr_destroy(*expr);
-                }
+                AstStmtKind::Expr(_) => {}
                 AstStmtKind::Jump(_) => {}
                 _ => {
                     panic!();
@@ -3630,7 +3621,7 @@ pub unsafe fn ast_stmt_as_expr(stmt: &AstStmt) -> &AstExpr {
     let AstStmtKind::Expr(expr) = &stmt.kind else {
         panic!();
     };
-    &**expr
+    expr
 }
 
 pub unsafe fn ast_stmt_as_v_block(stmt: &AstStmt) -> &AstBlock {
@@ -3647,7 +3638,7 @@ pub unsafe fn ast_stmt_getfuncs(stmt: &AstStmt) -> Box<StringArr> {
         AstStmtKind::Compound(block) | AstStmtKind::CompoundV(block) => {
             ast_stmt_compound_getfuncs(&**block)
         }
-        AstStmtKind::Expr(expr) => ast_expr_getfuncs(&**expr),
+        AstStmtKind::Expr(expr) => ast_expr_getfuncs(expr),
         AstStmtKind::Selection(selection) => ast_stmt_selection_getfuncs(selection),
         AstStmtKind::Iteration(iteration) | AstStmtKind::IterationE(iteration) => {
             ast_stmt_iteration_getfuncs(iteration)
@@ -3670,7 +3661,7 @@ pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
                 init
             };
         }
-        AstStmtKind::Expr(expr) => return ast_expr_splits(&**expr, s),
+        AstStmtKind::Expr(expr) => return ast_expr_splits(expr, s),
         AstStmtKind::Selection(selection) => return stmt_sel_splits(selection, s),
         AstStmtKind::Jump(jump) => {
             if let Some(rv) = &jump.rv {
