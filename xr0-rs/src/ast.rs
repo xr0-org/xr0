@@ -251,7 +251,7 @@ pub struct AstIterationStmt {
 
 pub struct AstSelectionStmt {
     pub isswitch: bool,
-    pub cond: *mut AstExpr,
+    pub cond: Box<AstExpr>,
     pub body: *mut AstStmt,
     pub nest: *mut AstStmt,
 }
@@ -2751,7 +2751,7 @@ pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> *mut AstStmt {
         AstStmtKind::Selection(selection) => ast_stmt_create_sel(
             loc,
             selection.isswitch,
-            ast_expr_copy(&*selection.cond),
+            ast_expr_copy(&selection.cond),
             ast_stmt_copy(&*selection.body),
             if !(selection.nest).is_null() {
                 ast_stmt_copy(&*selection.nest)
@@ -3214,10 +3214,10 @@ pub unsafe fn ast_stmt_absexec(
 }
 
 unsafe fn ast_stmt_sel_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
-    let AstStmtKind::Selection(selection) = &(*stmt).kind else {
+    let AstStmtKind::Selection(selection) = &stmt.kind else {
         panic!();
     };
-    let cond: *mut libc::c_char = ast_expr_str(&*selection.cond);
+    let cond: *mut libc::c_char = ast_expr_str(&selection.cond);
     let body: *mut libc::c_char = ast_stmt_str(&*selection.body);
     strbuilder_printf(
         b,
@@ -3441,7 +3441,7 @@ pub unsafe fn ast_stmt_create_sel(
     let stmt: *mut AstStmt = ast_stmt_create(loc);
     (*stmt).kind = AstStmtKind::Selection(AstSelectionStmt {
         isswitch,
-        cond,
+        cond: Box::from_raw(cond),
         body,
         nest,
     });
@@ -3544,7 +3544,7 @@ pub unsafe fn ast_stmt_sel_cond(stmt: &AstStmt) -> &AstExpr {
     let AstStmtKind::Selection(selection) = &stmt.kind else {
         panic!();
     };
-    &*selection.cond
+    &selection.cond
 }
 
 pub unsafe fn ast_stmt_sel_body(stmt: &AstStmt) -> &AstStmt {
@@ -3603,7 +3603,6 @@ impl Drop for AstStmtKind {
                     ast_block_destroy(*block);
                 }
                 AstStmtKind::Selection(selection) => {
-                    ast_expr_destroy(selection.cond);
                     ast_stmt_destroy(selection.body);
                     if !(selection.nest).is_null() {
                         ast_stmt_destroy(selection.nest);
@@ -3696,7 +3695,7 @@ pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
 }
 
 unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> AstStmtSplits {
-    let res: *mut Result = ast_expr_pf_reduce(&*selection.cond, s);
+    let res: *mut Result = ast_expr_pf_reduce(&selection.cond, s);
     let v: *mut Value = result_as_value(res);
     let e: *mut AstExpr = value_to_expr(v);
     if condexists(&*e, s) as libc::c_int != 0 || value_isconstant(v) as libc::c_int != 0 {
@@ -3734,7 +3733,7 @@ unsafe fn condexists(cond: &AstExpr, s: *mut State) -> bool {
 
 unsafe fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Box<StringArr> {
     let nest: *mut AstStmt = selection.nest;
-    let cond_arr = ast_expr_getfuncs(&*selection.cond);
+    let cond_arr = ast_expr_getfuncs(&selection.cond);
     let body_arr = ast_stmt_getfuncs(&*selection.body);
     let nest_arr = if !nest.is_null() {
         ast_stmt_getfuncs(&*nest)
