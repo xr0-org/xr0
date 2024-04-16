@@ -132,7 +132,7 @@ enum AstExprKind {
     Binary(BinaryExpr),
     Assignment(AssignmentExpr),
     IsDeallocand(Box<AstExpr>),
-    IsDereferencable(*mut AstExpr),
+    IsDereferencable(Box<AstExpr>),
     ArbArg,
     Allocation(AllocExpr),
 }
@@ -638,7 +638,7 @@ unsafe fn irreducible_assume_actual(e: &AstExpr, s: *mut State) -> *mut Preresul
 }
 
 pub unsafe fn ast_expr_isdereferencable_create(assertand: *mut AstExpr) -> *mut AstExpr {
-    ast_expr_create(AstExprKind::IsDereferencable(assertand))
+    ast_expr_create(AstExprKind::IsDereferencable(Box::from_raw(assertand)))
 }
 
 unsafe fn ast_expr_pf_reduce_assume(expr: &AstExpr, value: bool, s: *mut State) -> *mut Preresult {
@@ -1964,7 +1964,7 @@ pub unsafe fn ast_expr_str(expr: &AstExpr) -> *mut libc::c_char {
             ast_expr_isdeallocand_str_build(assertand, b);
         }
         AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_isdereferencable_str_build(&**assertand, b);
+            ast_expr_isdereferencable_str_build(assertand, b);
         }
         AstExprKind::ArbArg => {
             strbuilder_putc(b, '$' as i32 as libc::c_char);
@@ -2024,7 +2024,7 @@ pub unsafe fn ast_expr_isdereferencable_assertand(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::IsDereferencable(assertand) = &expr.kind else {
         panic!()
     };
-    &**assertand
+    assertand
 }
 
 pub unsafe fn ast_expr_isdeallocand_assertand(expr: &AstExpr) -> &AstExpr {
@@ -2094,7 +2094,7 @@ pub unsafe fn ast_expr_copy(expr: &AstExpr) -> *mut AstExpr {
             ast_expr_isdeallocand_create(ast_expr_copy(assertand))
         }
         AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_isdereferencable_create(ast_expr_copy(&**assertand))
+            ast_expr_isdereferencable_create(ast_expr_copy(assertand))
         }
         AstExprKind::ArbArg => ast_expr_arbarg_create(),
         AstExprKind::Allocation(_) => ast_expr_alloc_copy(expr),
@@ -2231,9 +2231,7 @@ impl Drop for AstExprKind {
                 AstExprKind::Binary(_) => {}
                 AstExprKind::Assignment(_) => {}
                 AstExprKind::IsDeallocand(_) => {}
-                AstExprKind::IsDereferencable(assertand) => {
-                    ast_expr_destroy(*assertand);
-                }
+                AstExprKind::IsDereferencable(assertand) => {}
                 AstExprKind::Constant(_) => {}
                 AstExprKind::ArbArg => {}
                 AstExprKind::Allocation(_) => {}
