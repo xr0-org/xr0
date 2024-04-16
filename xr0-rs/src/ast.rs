@@ -123,7 +123,7 @@ enum AstExprKind {
     Identifier(*mut libc::c_char),
     Constant(ConstantExpr),
     StringLiteral(*mut libc::c_char),
-    Bracketed(*mut AstExpr),
+    Bracketed(Box<AstExpr>),
     Iteration,
     Call(CallExpr),
     IncDec(IncDecExpr),
@@ -599,7 +599,7 @@ unsafe fn reduce_assume(expr: &AstExpr, value: bool, s: *mut State) -> *mut Prer
             assert_eq!(unary.op, AstUnaryOp::Bang);
             return reduce_assume(&*unary.arg, !value, s);
         }
-        AstExprKind::Bracketed(inner) => return reduce_assume(&**inner, value, s),
+        AstExprKind::Bracketed(inner) => return reduce_assume(inner, value, s),
         AstExprKind::Call(_) | AstExprKind::StructMember(_) => {
             return ast_expr_pf_reduce_assume(expr, value, s)
         }
@@ -1459,15 +1459,15 @@ unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> *mut E
     return 0 as *mut Error;
 }
 
-pub unsafe fn ast_expr_bracketed_root(expr: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_bracketed_root(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Bracketed(inner) = &expr.kind else {
         panic!()
     };
-    *inner
+    inner
 }
 
 pub unsafe fn ast_expr_bracketed_create(root: *mut AstExpr) -> *mut AstExpr {
-    ast_expr_create(AstExprKind::Bracketed(root))
+    ast_expr_create(AstExprKind::Bracketed(Box::from_raw(root)))
 }
 
 pub unsafe fn ast_expr_literal_create(s: *mut libc::c_char) -> *mut AstExpr {
@@ -1625,7 +1625,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> *mut Result {
 }
 
 pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
-    match &(*e).kind {
+    match &e.kind {
         AstExprKind::Constant(_) | AstExprKind::StringLiteral(_) | AstExprKind::Identifier(_) => {
             ast_expr_eval(e, s)
         }
@@ -1633,7 +1633,7 @@ pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
         AstExprKind::Binary(binary) => binary_pf_reduce(&*binary.e1, binary.op, &*binary.e2, s),
         AstExprKind::Call(_) => call_pf_reduce(e, s),
         AstExprKind::StructMember(_) => structmember_pf_reduce(e, s),
-        AstExprKind::Bracketed(inner) => ast_expr_pf_reduce(&**inner, s),
+        AstExprKind::Bracketed(inner) => ast_expr_pf_reduce(inner, s),
         _ => panic!(),
     }
 }
@@ -1941,7 +1941,7 @@ pub unsafe fn ast_expr_str(expr: &AstExpr) -> *mut libc::c_char {
             strbuilder_printf(b, b"\"%s\"\0" as *const u8 as *const libc::c_char, *s);
         }
         AstExprKind::Bracketed(inner) => {
-            ast_expr_bracketed_str_build(&**inner, b);
+            ast_expr_bracketed_str_build(inner, b);
         }
         AstExprKind::Call(_) => {
             ast_expr_call_str_build(expr, b);
@@ -2071,7 +2071,7 @@ pub unsafe fn ast_expr_copy(expr: &AstExpr) -> *mut AstExpr {
             }
         }
         AstExprKind::StringLiteral(s) => ast_expr_literal_create(dynamic_str(*s)),
-        AstExprKind::Bracketed(inner) => ast_expr_bracketed_create(ast_expr_copy(&**inner)),
+        AstExprKind::Bracketed(inner) => ast_expr_bracketed_create(ast_expr_copy(inner)),
         AstExprKind::Call(_) => ast_expr_copy_call(expr),
         AstExprKind::IncDec(incdec) => ast_expr_incdec_create(
             ast_expr_copy(&*incdec.operand),
@@ -2224,9 +2224,7 @@ impl Drop for AstExprKind {
                 AstExprKind::StringLiteral(s) => {
                     free(*s as *mut libc::c_void);
                 }
-                AstExprKind::Bracketed(inner) => {
-                    ast_expr_destroy(*inner);
-                }
+                AstExprKind::Bracketed(_) => {}
                 AstExprKind::Call(_) => {}
                 AstExprKind::IncDec(_) => {}
                 AstExprKind::StructMember(_) => {}
@@ -2345,7 +2343,7 @@ pub unsafe fn ast_expr_getfuncs(expr: &AstExpr) -> Box<StringArr> {
         | AstExprKind::IsDereferencable(_)
         | AstExprKind::ArbArg => return string_arr_create(),
         AstExprKind::Call(_) => ast_expr_call_getfuncs(expr),
-        AstExprKind::Bracketed(inner) => ast_expr_getfuncs(&**inner),
+        AstExprKind::Bracketed(inner) => ast_expr_getfuncs(inner),
         AstExprKind::IncDec(incdec) => ast_expr_getfuncs(&*incdec.operand),
         AstExprKind::Unary(unary) => ast_expr_getfuncs(&*unary.arg),
         AstExprKind::Assignment(assignment) => string_arr_concat(
