@@ -33,7 +33,7 @@ use c_util::__stderrp;
 use ext::{externals_create, externals_destroy, externals_getfunc, Externals};
 use math::MathExpr;
 use object::{Object, ObjectArr};
-use props::props as Props;
+use props::Props;
 use state::block::{Block, BlockArr};
 use state::clump::Clump;
 use state::heap::{Heap, VConst};
