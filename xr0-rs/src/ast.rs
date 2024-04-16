@@ -131,7 +131,7 @@ enum AstExprKind {
     Unary(UnaryExpr),
     Binary(BinaryExpr),
     Assignment(AssignmentExpr),
-    IsDeallocand(*mut AstExpr),
+    IsDeallocand(Box<AstExpr>),
     IsDereferencable(*mut AstExpr),
     ArbArg,
     Allocation(AllocExpr),
@@ -501,8 +501,7 @@ unsafe fn value_compare(v1: *mut Value, op: AstBinaryOp, v2: *mut Value) -> bool
 
 unsafe fn expr_isdeallocand_decide(expr: &AstExpr, state: *mut State) -> bool {
     let obj: *mut Object = hack_object_from_assertion(expr, state);
-    let isdeallocand: bool = state_addresses_deallocand(state, obj);
-    return isdeallocand;
+    state_addresses_deallocand(state, obj)
 }
 
 unsafe fn hack_object_from_assertion(expr: &AstExpr, state: *mut State) -> *mut Object {
@@ -714,7 +713,7 @@ unsafe fn hack_identifier_builtin_eval(id: *mut libc::c_char, state: *mut State)
 }
 
 pub unsafe fn ast_expr_isdeallocand_create(assertand: *mut AstExpr) -> *mut AstExpr {
-    ast_expr_create(AstExprKind::IsDeallocand(assertand))
+    ast_expr_create(AstExprKind::IsDeallocand(Box::from_raw(assertand)))
 }
 
 pub unsafe fn ast_expr_assignment_create(root: *mut AstExpr, value: *mut AstExpr) -> *mut AstExpr {
@@ -1962,7 +1961,7 @@ pub unsafe fn ast_expr_str(expr: &AstExpr) -> *mut libc::c_char {
             ast_expr_assignment_str_build(expr, b);
         }
         AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_isdeallocand_str_build(&**assertand, b);
+            ast_expr_isdeallocand_str_build(assertand, b);
         }
         AstExprKind::IsDereferencable(assertand) => {
             ast_expr_isdereferencable_str_build(&**assertand, b);
@@ -2032,7 +2031,7 @@ pub unsafe fn ast_expr_isdeallocand_assertand(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::IsDeallocand(assertand) = &expr.kind else {
         panic!()
     };
-    &**assertand
+    assertand
 }
 
 unsafe fn ast_expr_alloc_copy(expr: &AstExpr) -> *mut AstExpr {
@@ -2092,7 +2091,7 @@ pub unsafe fn ast_expr_copy(expr: &AstExpr) -> *mut AstExpr {
             ast_expr_copy(&*assignment.rval),
         ),
         AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_isdeallocand_create(ast_expr_copy(&**assertand))
+            ast_expr_isdeallocand_create(ast_expr_copy(assertand))
         }
         AstExprKind::IsDereferencable(assertand) => {
             ast_expr_isdereferencable_create(ast_expr_copy(&**assertand))
@@ -2231,9 +2230,7 @@ impl Drop for AstExprKind {
                 AstExprKind::Unary(_) => {}
                 AstExprKind::Binary(_) => {}
                 AstExprKind::Assignment(_) => {}
-                AstExprKind::IsDeallocand(assertand) => {
-                    ast_expr_destroy(*assertand);
-                }
+                AstExprKind::IsDeallocand(_) => {}
                 AstExprKind::IsDereferencable(assertand) => {
                     ast_expr_destroy(*assertand);
                 }
