@@ -209,9 +209,13 @@ struct ast_expr *
 ast_block_call_create(struct ast_block *b, struct lexememarker *loc,
 		struct ast_type *rtype, struct ast_expr *expr)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	char *tvar = generate_tempvar(b->tempcount++);
-	struct ast_stmt *call = ast_stmt_register_call_create(ast_expr_copy(expr));
-	struct ast_stmt *read = ast_stmt_register_read_create(
+	struct ast_stmt *call = ast_stmt_register_call_create(
+		loc, ast_expr_copy(expr)
+	);
+	struct ast_stmt *read = ast_stmt_register_mov_create(
+		loc,
 		ast_variable_create(dynamic_str(tvar), ast_type_copy(rtype))
 	);
 

@@ -399,8 +399,8 @@ ast_stmt_iter_upper_bound(struct ast_stmt *stmt)
 }
 
 struct ast_stmt *
-ast_stmt_register_call_create(struct ast_expr *call) {
-	struct ast_stmt *stmt = ast_stmt_create(NULL);
+ast_stmt_register_call_create(struct lexememarker *loc, struct ast_expr *call) {
+	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_REGISTER;
 	stmt->u._register.iscall = true;
 	stmt->u._register.op.call = call;
@@ -408,12 +408,33 @@ ast_stmt_register_call_create(struct ast_expr *call) {
 }
 
 struct ast_stmt *
-ast_stmt_register_read_create(struct ast_variable *temp) {
-	struct ast_stmt *stmt = ast_stmt_create(NULL);
+ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp) {
+	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_REGISTER;
 	stmt->u._register.iscall = false;
 	stmt->u._register.op.temp = temp;
 	return stmt;
+}
+
+bool
+ast_stmt_register_iscall(struct ast_stmt *stmt)
+{
+	assert(stmt->kind = STMT_REGISTER);
+	return stmt->u._register.iscall;
+}
+
+struct ast_expr *
+ast_stmt_register_call(struct ast_stmt *stmt)
+{
+	assert(stmt->kind = STMT_REGISTER);
+	return stmt->u._register.op.call;
+}
+
+struct ast_variable *
+ast_stmt_register_mov(struct ast_stmt *stmt)
+{
+	assert(stmt->kind = STMT_REGISTER);
+	return stmt->u._register.op.temp;
 }
 
 static struct ast_stmt *
@@ -598,8 +619,8 @@ ast_stmt_copy(struct ast_stmt *stmt)
 		);
 	case STMT_REGISTER:
 		return stmt->u._register.iscall
-			? ast_stmt_register_call_create(stmt->u._register.op.call)
-			: ast_stmt_register_read_create(stmt->u._register.op.temp);
+			? ast_stmt_register_call_create(loc, stmt->u._register.op.call)
+			: ast_stmt_register_mov_create(loc, stmt->u._register.op.temp);
 	default:
 		assert(false);
 	}

@@ -242,7 +242,7 @@ stack_undeclare(struct stack *stack, struct state *state)
 bool
 stack_nested(struct stack *s)
 {
-	return s->kind == FRAME_NESTED;
+	return s->kind == FRAME_NESTED || s->kind == FRAME_INTERMEDIATE;
 }
 
 struct variable *
@@ -252,7 +252,7 @@ stack_getresult(struct stack *s)
 		/* ⊢ lowest frame || call */
 		return s->result;
 	}
-	/* ⊢ block */
+	/* ⊢ block || intermediate  */
 	return stack_getresult(s->prev);
 }
 

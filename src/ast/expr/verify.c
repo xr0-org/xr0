@@ -459,7 +459,6 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 	case EXPR_ARBARG:
 		return arbarg_eval(expr, state);
 	default:
-		/*printf("expr: %s\n", ast_expr_str(expr));*/
 		assert(false);
 	}
 }
@@ -788,6 +787,7 @@ call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state 
 static struct result *
 call_absexec(struct ast_expr *expr, struct state *s)
 {
+	assert(false);
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
 	char *name = ast_expr_as_identifier(root);
@@ -1138,17 +1138,26 @@ dealloc_process(struct ast_expr *, struct state *);
 static struct result *
 alloc_absexec(struct ast_expr *expr, struct state *state)
 {
+	struct result *res;
 	switch (ast_expr_alloc_kind(expr)) {
 	case ALLOC:
 		/* TODO: size needs to be passed in here when added to .alloc */
-		return result_value_create(state_alloc(state));
+		res = result_value_create(state_alloc(state));
+		break;
 	case DEALLOC:
-		return dealloc_process(expr, state);
+		res = dealloc_process(expr, state);
+		break;
 	case CLUMP:
-		return result_value_create(state_clump(state));
+		res = result_value_create(state_clump(state));
+		break;
 	default:
 		assert(false);
 	}
+	if (result_iserror(res)) {
+		return res;
+	}
+	state_writeregister(state, result_as_value(res));
+	return result_error_create(error_call());
 }
 
 static struct result *
@@ -1473,6 +1482,10 @@ want:
  */
 
 static struct ast_expr *
+alloc_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
 assign_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
 		struct state *);
 
@@ -1485,8 +1498,11 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 		struct ast_block *b, struct state *s) 
 {
 	switch (ast_expr_kind(expr)) {
+	case EXPR_CONSTANT:
 	case EXPR_IDENTIFIER:
 		return expr;
+	case EXPR_ALLOCATION:
+		return alloc_geninstr(expr, loc, b, s);	
 	case EXPR_ASSIGNMENT:
 		return assign_geninstr(expr, loc, b, s);
 	case EXPR_CALL:
@@ -1494,6 +1510,20 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	default:
 		assert(false);
 	}
+}
+
+static struct ast_expr *
+alloc_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr	*arg = ast_expr_geninstr(ast_expr_alloc_arg(expr), loc, b, s);
+	enum ast_alloc_kind kind = ast_expr_alloc_kind(expr);
+
+	struct ast_expr *alloc = ast_expr_alloc_kind_create(arg, kind);
+	struct ast_type *rtype = kind == DEALLOC
+		? ast_type_create_void()
+		: ast_type_create_voidptr();
+	return ast_block_call_create(b, loc, rtype, alloc);
 }
 
 static struct ast_expr *
@@ -1506,7 +1536,6 @@ assign_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_bloc
 		ast_expr_copy(lval), ast_expr_geninstr(lval, loc, b, s)
 	);
 	ast_block_append_stmt(b, ast_stmt_create_expr(loc, assign));
-	printf("b: %s\n", ast_block_str(b, "\t"));
 	return lval;
 }
 
@@ -1533,7 +1562,7 @@ call_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	}
 	struct ast_type *rtype = ast_function_type(f);
 	struct ast_expr *call = ast_expr_call_create(
-		ast_expr_copy(ast_expr_call_root(expr)), nargs, gen_args
+		ast_expr_copy(root), nargs, gen_args
 	);
 	return ast_block_call_create(b, loc, rtype, call);
 }
