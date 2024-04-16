@@ -245,7 +245,7 @@ pub struct AstIterationStmt {
     pub init: *mut AstStmt,
     pub cond: *mut AstStmt,
     pub body: *mut AstStmt,
-    pub iter: *mut AstExpr,
+    pub iter: Box<AstExpr>,
     pub abstract_0: *mut AstBlock,
 }
 
@@ -3044,7 +3044,7 @@ pub unsafe fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
     let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!()
     };
-    &*iteration.iter
+    &iteration.iter
 }
 
 pub unsafe fn ast_stmt_lexememarker(stmt: &AstStmt) -> &LexemeMarker {
@@ -3055,7 +3055,7 @@ unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder)
     let init: *mut libc::c_char = ast_stmt_str(&*iteration.init);
     let cond: *mut libc::c_char = ast_stmt_str(&*iteration.cond);
     let body: *mut libc::c_char = ast_stmt_str(&*iteration.body);
-    let iter: *mut libc::c_char = ast_expr_str(&*iteration.iter);
+    let iter: *mut libc::c_char = ast_expr_str(&iteration.iter);
     let abs: *mut libc::c_char = (if !(iteration.abstract_0).is_null() {
         ast_block_str(
             &*iteration.abstract_0,
@@ -3375,7 +3375,7 @@ unsafe fn ast_stmt_copy_iter(
 ) -> *mut AstStmt {
     let init = ast_stmt_copy(&*iteration.init);
     let cond = ast_stmt_copy(&*iteration.cond);
-    let iter = ast_expr_copy(&*iteration.iter);
+    let iter = ast_expr_copy(&iteration.iter);
     let abstract_0 = ast_block_copy(&*iteration.abstract_0);
     let body = ast_stmt_copy(&*iteration.body);
 
@@ -3402,7 +3402,7 @@ pub unsafe fn ast_stmt_create_iter(
     let iter = AstIterationStmt {
         init,
         cond,
-        iter,
+        iter: Box::from_raw(iter),
         body,
         abstract_0,
     };
@@ -3613,7 +3613,6 @@ impl Drop for AstStmtKind {
                     ast_stmt_destroy(iteration.init);
                     ast_stmt_destroy(iteration.cond);
                     ast_stmt_destroy(iteration.body);
-                    ast_expr_destroy(iteration.iter);
                     ast_block_destroy(iteration.abstract_0);
                 }
                 AstStmtKind::Expr(expr) => {
@@ -3752,7 +3751,7 @@ unsafe fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Box<Strin
     let init_arr = ast_stmt_getfuncs(&*iteration.init);
     let cond_arr = ast_stmt_getfuncs(&*iteration.cond);
     let body_arr = ast_stmt_getfuncs(&*iteration.body);
-    let iter_arr = ast_expr_getfuncs(&*iteration.iter);
+    let iter_arr = ast_expr_getfuncs(&iteration.iter);
     string_arr_concat(
         &string_arr_create(),
         &string_arr_concat(
