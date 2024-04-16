@@ -104,7 +104,7 @@ pub struct IncDecExpr {
 }
 
 pub struct CallExpr {
-    fun: *mut AstExpr,
+    fun: Box<AstExpr>,
     n: libc::c_int,
     arg: *mut *mut AstExpr,
 }
@@ -386,7 +386,7 @@ pub unsafe fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
                 }
                 i += 1;
             }
-            ast_expr_equal(&*c1.fun, &*c2.fun)
+            ast_expr_equal(&c1.fun, &c2.fun)
         }
         (AstExprKind::StructMember(m1), AstExprKind::StructMember(m2)) => {
             ast_expr_equal(&*m1.root, &*m2.root) && strcmp(m1.field, m2.field) == 0
@@ -1721,7 +1721,7 @@ unsafe fn ast_expr_call_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     let AstExprKind::Call(call) = &(*expr).kind else {
         panic!()
     };
-    let fun: *mut libc::c_char = ast_expr_str(&*call.fun);
+    let fun: *mut libc::c_char = ast_expr_str(&call.fun);
     strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, fun);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
@@ -1746,7 +1746,6 @@ unsafe fn ast_expr_call_str_build(expr: &AstExpr, b: *mut StrBuilder) {
 impl Drop for CallExpr {
     fn drop(&mut self) {
         unsafe {
-            ast_expr_destroy(self.fun);
             let mut i: libc::c_int = 0 as libc::c_int;
             while i < self.n {
                 ast_expr_destroy(*self.arg.offset(i as isize));
@@ -1815,7 +1814,7 @@ unsafe fn ast_expr_copy_call(expr: &AstExpr) -> *mut AstExpr {
         *fresh4 = ast_expr_copy(&**(call.arg).offset(i as isize));
         i += 1;
     }
-    return ast_expr_call_create(ast_expr_copy(&*call.fun), call.n, arg);
+    return ast_expr_call_create(ast_expr_copy(&call.fun), call.n, arg);
 }
 
 pub unsafe fn ast_expr_member_create(
@@ -1885,7 +1884,7 @@ pub unsafe fn ast_expr_call_root(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Call(call) = &(*expr).kind else {
         panic!()
     };
-    &*call.fun
+    &call.fun
 }
 
 pub unsafe fn ast_expr_call_create(
@@ -1894,7 +1893,7 @@ pub unsafe fn ast_expr_call_create(
     arg: *mut *mut AstExpr,
 ) -> *mut AstExpr {
     ast_expr_create(AstExprKind::Call(CallExpr {
-        fun: root,
+        fun: Box::from_raw(root),
         n: narg,
         arg,
     }))
@@ -2494,7 +2493,7 @@ unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Box<StringArr> {
         panic!()
     };
     let mut res = string_arr_create();
-    let AstExprKind::Identifier(id) = &(*call.fun).kind else {
+    let AstExprKind::Identifier(id) = &call.fun.kind else {
         panic!()
     };
     string_arr_append(&mut res, dynamic_str(*id));
