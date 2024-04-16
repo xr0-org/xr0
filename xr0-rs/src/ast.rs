@@ -115,7 +115,7 @@ pub struct ConstantExpr {
 }
 
 pub struct StructMemberExpr {
-    root: *mut AstExpr,
+    root: Box<AstExpr>,
     field: *mut libc::c_char,
 }
 
@@ -389,7 +389,7 @@ pub unsafe fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
             ast_expr_equal(&c1.fun, &c2.fun)
         }
         (AstExprKind::StructMember(m1), AstExprKind::StructMember(m2)) => {
-            ast_expr_equal(&*m1.root, &*m2.root) && strcmp(m1.field, m2.field) == 0
+            ast_expr_equal(&m1.root, &m2.root) && strcmp(m1.field, m2.field) == 0
         }
         _ => false,
     }
@@ -1647,7 +1647,7 @@ unsafe fn ast_expr_member_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     let AstExprKind::StructMember(member) = &expr.kind else {
         panic!()
     };
-    let root = &*member.root;
+    let root = &member.root;
     if matches!(root.kind, AstExprKind::Unary(_)) {
         return ast_expr_member_deref_str_build(root, member.field, b);
     }
@@ -1773,7 +1773,7 @@ pub unsafe fn ast_expr_member_root(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::StructMember(member) = &expr.kind else {
         panic!()
     };
-    &*member.root
+    &member.root
 }
 
 pub unsafe fn ast_expr_incdec_pre(expr: &AstExpr) -> bool {
@@ -1811,7 +1811,7 @@ pub unsafe fn ast_expr_member_create(
     field: *mut libc::c_char,
 ) -> *mut AstExpr {
     ast_expr_create(AstExprKind::StructMember(StructMemberExpr {
-        root: struct_,
+        root: Box::from_raw(struct_),
         field,
     }))
 }
@@ -2236,15 +2236,6 @@ impl Drop for AstExprKind {
                     panic!();
                 }
             }
-        }
-    }
-}
-
-impl Drop for StructMemberExpr {
-    fn drop(&mut self) {
-        unsafe {
-            ast_expr_destroy(self.root);
-            free(self.field as *mut libc::c_void);
         }
     }
 }
