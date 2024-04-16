@@ -228,12 +228,12 @@ pub struct AstStmt {
 
 pub struct AstAllocStmt {
     pub kind: AstAllocKind,
-    pub arg: *mut AstExpr,
+    pub arg: Box<AstExpr>,
 }
 
 pub struct AstJumpStmt {
     pub kind: AstJumpKind,
-    pub rv: *mut AstExpr,
+    pub rv: Option<Box<AstExpr>>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -2763,7 +2763,7 @@ pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> *mut AstStmt {
         AstStmtKind::Iteration(iteration) => ast_stmt_copy_iter(loc, iteration, false),
         AstStmtKind::IterationE(iteration) => ast_stmt_copy_iter(loc, iteration, true),
         AstStmtKind::Jump(jump) => {
-            ast_stmt_create_jump(loc, jump.kind, ast_expr_copy_ifnotnull(jump.rv))
+            ast_stmt_create_jump(loc, jump.kind, ast_expr_copy_ifnotnull(&jump.rv))
         }
         _ => panic!(),
     }
@@ -3028,7 +3028,7 @@ pub unsafe fn ast_stmt_exec(stmt: &AstStmt, state: *mut State) -> *mut Error {
 
 unsafe fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: *mut StrBuilder) {
     // Note: jump.rv can be null. Error in the original.
-    let rv: *mut libc::c_char = ast_expr_str(&*jump.rv);
+    let rv: *mut libc::c_char = ast_expr_str(jump.rv.as_ref().unwrap());
     strbuilder_printf(b, b"return %s;\n\0" as *const u8 as *const libc::c_char, rv);
     free(rv as *mut libc::c_void);
 }
@@ -3116,12 +3116,11 @@ pub unsafe fn ast_stmt_str(stmt: &AstStmt) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 
-unsafe fn ast_expr_copy_ifnotnull(expr: *mut AstExpr) -> *mut AstExpr {
-    return if !expr.is_null() {
-        ast_expr_copy(&*expr)
-    } else {
-        0 as *mut AstExpr
-    };
+unsafe fn ast_expr_copy_ifnotnull(expr: &Option<Box<AstExpr>>) -> *mut AstExpr {
+    match expr {
+        Some(expr) => ast_expr_copy(expr),
+        None => ptr::null_mut(),
+    }
 }
 
 pub unsafe fn ast_stmt_iter_cond(stmt: &AstStmt) -> &AstStmt {
@@ -3181,11 +3180,7 @@ pub unsafe fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
     let AstStmtKind::Jump(jump) = &stmt.kind else {
         panic!()
     };
-    if jump.rv.is_null() {
-        None
-    } else {
-        Some(&*jump.rv)
-    }
+    jump.rv.as_ref().map(|rv| &**rv)
 }
 
 unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
@@ -3195,10 +3190,7 @@ unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
                 b"return\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
             ),
             // Note: jump_rv can be null. Error in original.
-            match ast_stmt_jump_rv(stmt) {
-                Some(rv) => ast_expr_copy(rv),
-                None => ptr::null_mut(),
-            },
+            ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap()),
         ),
         state,
     );
@@ -3260,7 +3252,11 @@ pub unsafe fn ast_stmt_create_jump(
     let stmt: *mut AstStmt = ast_stmt_create(loc);
     (*stmt).kind = AstStmtKind::Jump(AstJumpStmt {
         kind: AstJumpKind::Return,
-        rv,
+        rv: if rv.is_null() {
+            None
+        } else {
+            Some(Box::from_raw(rv))
+        },
     });
     return stmt;
 }
@@ -3623,24 +3619,13 @@ impl Drop for AstStmtKind {
                 AstStmtKind::Expr(expr) => {
                     ast_expr_destroy(*expr);
                 }
-                AstStmtKind::Jump(jump) => {
-                    ast_stmt_destroy_jump(jump);
-                }
+                AstStmtKind::Jump(_) => {}
                 _ => {
                     panic!();
                 }
             }
         }
     }
-}
-
-unsafe fn ast_stmt_destroy_jump(jump: &AstJumpStmt) {
-    let rv: *mut AstExpr = jump.rv;
-    if rv.is_null() {
-        return;
-    }
-    assert_eq!(jump.kind, AstJumpKind::Return);
-    ast_expr_destroy(rv);
 }
 
 pub unsafe fn ast_stmt_as_expr(stmt: &AstStmt) -> &AstExpr {
@@ -3670,7 +3655,7 @@ pub unsafe fn ast_stmt_getfuncs(stmt: &AstStmt) -> Box<StringArr> {
             ast_stmt_iteration_getfuncs(iteration)
         }
         // Note: jump.rv can be null. Error in original.
-        AstStmtKind::Jump(jump) => ast_expr_getfuncs(&*jump.rv),
+        AstStmtKind::Jump(jump) => ast_expr_getfuncs(jump.rv.as_ref().unwrap()),
         _ => panic!("invalid stmt kind"),
     }
 }
@@ -3690,8 +3675,8 @@ pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
         AstStmtKind::Expr(expr) => return ast_expr_splits(&**expr, s),
         AstStmtKind::Selection(selection) => return stmt_sel_splits(selection, s),
         AstStmtKind::Jump(jump) => {
-            if !jump.rv.is_null() {
-                return ast_expr_splits(&*jump.rv, s);
+            if let Some(rv) = &jump.rv {
+                return ast_expr_splits(rv, s);
             }
             AstStmtSplits {
                 n: 0 as libc::c_int,
