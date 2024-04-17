@@ -321,6 +321,7 @@ struct error {
 static struct error *
 error_to(struct error *err, enum error_type t)
 {
+	assert(err);
 	if (err->type == t) {
 		return err;
 	}

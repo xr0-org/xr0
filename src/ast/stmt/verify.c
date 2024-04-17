@@ -43,7 +43,10 @@ expr_linearise(struct ast_stmt *stmt, struct state *state)
 
 	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
 	struct ast_expr *expr = ast_expr_geninstr(
-		ast_stmt_as_expr(stmt), lexememarker_copy(loc), b, state
+		ast_expr_copy(ast_stmt_as_expr(stmt)),
+		lexememarker_copy(loc),
+		b,
+		state
 	);
 	struct frame *inter_frame = frame_intermediate_create(
 		dynamic_str("inter"), b, false
@@ -373,7 +376,6 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 			assert(!obj_res.err);
 			object_assign(obj_res.obj, value_copy(result_as_value(res)));
 			/* destroy result if exists */
-			printf("postjump: %s\n", state_str(state));
 		}
 	}
 	return error_return();
