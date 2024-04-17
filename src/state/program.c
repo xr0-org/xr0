@@ -60,6 +60,14 @@ program_copy(struct program *old)
 }
 
 char *
+program_str(struct program *p)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s\n", ast_block_str(p->b, "\t"));
+	return strbuilder_build(b);
+}
+
+char *
 program_name(struct program *p)
 {
 	return p->name;
@@ -111,7 +119,6 @@ program_stmt_atend(struct program *p, struct state *s)
 	return p->index >= ast_block_nstmts(p->b);
 }
 
-
 static struct error *
 program_stmt_step(struct program *p, bool abstract, 
 		struct state *s);
@@ -154,8 +161,8 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 static struct error *
 program_stmt_process(struct program *p, bool abstract, struct state *s)
 {
+	printf("program: %s\n", program_str(p));
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	printf("stmt: %s\n", ast_stmt_str(stmt));
 	if (state_linear(s)) {
 		if (abstract) {
 			return ast_stmt_absprocess(stmt, p->name, s, false, true);

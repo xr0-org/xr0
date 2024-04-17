@@ -285,8 +285,8 @@ bool
 stack_references(struct stack *s, struct location *loc, struct state *state)
 {
 	/* TODO: check globals */
-	struct variable *result = stack_getresult(s);
-	if (result && variable_references(result, loc, state)) {
+	struct value *result = state_readregister(state);
+	if (result && value_references(result, loc, state)) {
 		return true;
 	}
 
