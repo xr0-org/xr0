@@ -228,7 +228,8 @@ path_init_actual(struct path *p)
 static struct error *
 path_step_abstract(struct path *p)
 {
-	if (state_atend(p->abstract)) {
+	v_printf("stepping through abstract\n");
+	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
 		return path_step(p);
 	}
@@ -248,6 +249,7 @@ path_step_abstract(struct path *p)
 static struct error *
 path_step_actual(struct path *p)
 {
+	v_printf("stepping through actual\n");
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
 		return path_step(p);

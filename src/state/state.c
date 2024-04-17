@@ -223,18 +223,22 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 struct value *
 state_readregister(struct state *state)
 {
+	v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "");
 	if (!state->reg) {
 		return NULL;
 	}
 	struct value *v = value_copy(state->reg);
-	value_destroy(state->reg);
-	state->reg = NULL;
+	if (state_frameid(state) != 0) {
+		state->reg = NULL;
+	}
 	return v;
 }
 
 void
 state_writeregister(struct state *state, struct value *v)
 {
+	assert(!state->reg);
+	printf("writing to register: %s\n", value_str(v));
 	state->reg = v;
 }
 
