@@ -109,6 +109,9 @@ state_range_dealloc(struct state *, struct object *,
 		struct ast_expr *lw, struct ast_expr *up);
 
 bool
+state_linear(struct state *);
+
+bool
 state_addresses_deallocand(struct state *, struct object *);
 
 bool

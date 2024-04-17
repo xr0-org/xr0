@@ -30,6 +30,9 @@ char *
 stack_str(struct stack *, struct state *);
 
 bool
+stack_linear(struct stack *);
+
+bool
 stack_atend(struct stack *);
 
 struct error *
