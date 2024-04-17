@@ -419,21 +419,21 @@ ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp
 bool
 ast_stmt_register_iscall(struct ast_stmt *stmt)
 {
-	assert(stmt->kind = STMT_REGISTER);
+	assert(stmt->kind == STMT_REGISTER);
 	return stmt->u._register.iscall;
 }
 
 struct ast_expr *
 ast_stmt_register_call(struct ast_stmt *stmt)
 {
-	assert(stmt->kind = STMT_REGISTER);
+	assert(stmt->kind == STMT_REGISTER);
 	return stmt->u._register.op.call;
 }
 
 struct ast_variable *
 ast_stmt_register_mov(struct ast_stmt *stmt)
 {
-	assert(stmt->kind = STMT_REGISTER);
+	assert(stmt->kind == STMT_REGISTER);
 	return stmt->u._register.op.temp;
 }
 

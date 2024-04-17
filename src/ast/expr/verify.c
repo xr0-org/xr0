@@ -745,7 +745,8 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		);
 	}
 
-	return result_error_create(error_call());
+	printf("call state: %s\n", state_str(state));
+	return result_value_create(NULL);
 	/*
 	struct result *res = call_absexec(expr, state);
 	if (result_iserror(res)) {
@@ -814,8 +815,6 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 {
 	struct error *err;
 
-	printf("arg_state: %s\n", state_str(arg_state));
-
 	char *fname = ast_function_name(f);
 	struct frame *setupframe = frame_call_create(
 		fname, ast_function_abstract(f), ast_function_type(f), true
@@ -831,7 +830,6 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 		return err;
 	}
 
-	printf("param_state: %s\n", state_str(param_state));
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **param = ast_function_params(f);
 
@@ -1109,6 +1107,7 @@ alloc_absexec(struct ast_expr *, struct state *);
 struct result *
 ast_expr_abseval(struct ast_expr *expr, struct state *state)
 {
+	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
@@ -1157,7 +1156,7 @@ alloc_absexec(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	state_writeregister(state, result_as_value(res));
-	return result_error_create(error_call());
+	return res;
 }
 
 static struct result *
@@ -1530,6 +1529,7 @@ static struct ast_expr *
 assign_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
 		struct state *s)
 {
+	assert(false);
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 	struct ast_expr *assign = ast_expr_assignment_create(

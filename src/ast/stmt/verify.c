@@ -38,24 +38,6 @@ ast_stmt_process(struct ast_stmt *stmt, char *fname, struct state *state)
 	return NULL;
 }
 
-static struct preresult *
-stmt_installprop(struct ast_stmt *stmt, struct state *state);
-
-struct preresult *
-ast_stmt_preprocess(struct ast_stmt *stmt, struct state *state)
-{
-	if (ast_stmt_isassume(stmt)) {
-		return stmt_installprop(stmt, state);
-	}
-	return preresult_empty_create();
-}
-
-static struct preresult *
-stmt_installprop(struct ast_stmt *stmt, struct state *state)
-{
-	return ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), state);
-}
-
 /* stmt_verify */
 
 static struct error *
@@ -171,6 +153,8 @@ stmt_register_exec(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("stmt: %s\n", ast_stmt_str(stmt));
+	printf("state: %s\n", state_str(state));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
@@ -214,30 +198,33 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 {
+	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
 
 	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
 	struct ast_expr *newcond = ast_expr_geninstr(
-		ast_stmt_sel_cond(stmt), ast_stmt_lexememarker(stmt), b, state
+		cond, lexememarker_copy(loc), b, state
 	);
+	
+	printf("cond: %s\n, newcond: %s\n", ast_expr_str(cond), ast_expr_str(newcond));
 	if (!ast_expr_equal(cond, newcond)) {
-		ast_block_append_stmt(
-			b, ast_stmt_create_sel(
-				lexememarker_copy(ast_stmt_lexememarker(stmt)),
-				false,
-				newcond,
-				ast_stmt_copy(body),
-				nest ? ast_stmt_copy(nest) : NULL
-			)
+		/* we had to generate code */
+		struct ast_stmt *newsel = ast_stmt_create_sel(
+			lexememarker_copy(loc),
+			false,
+			newcond,
+			ast_stmt_copy(body),
+			nest ? ast_stmt_copy(nest) : NULL
 		);
+		ast_block_append_stmt(b, newsel);
+		printf("block: %s\n", ast_block_str(b, "\t"));
 		struct frame *inter_frame = frame_intermediate_create(
-			dynamic_str("inter"),
-			b,
-			false
+			dynamic_str("inter"), b, false
 		);
 		state_pushframe(state, inter_frame);
+		return NULL;
 	}
 
 	struct decision dec = sel_decide(cond, state);
@@ -307,19 +294,42 @@ iter_neteffect(struct ast_stmt *iter)
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct result *res = ast_expr_eval(ast_stmt_jump_rv(stmt), state);
-	if (result_iserror(res)) {
-		return result_as_error(res);
-	}
-	if (result_hasvalue(res)) {
-		state_writeregister(state, result_as_value(res));
+	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 
-		/* relevant for garbage check  */
-		struct object_res obj_res = state_getresult(state); 
-		assert(!obj_res.err);
-		object_assign(obj_res.obj, value_copy(result_as_value(res)));
-		/* destroy result if exists */
+	if (rv) {
+		struct lexememarker *loc = ast_stmt_lexememarker(stmt);
+		struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+		struct ast_expr *gen = ast_expr_geninstr(
+			rv, lexememarker_copy(loc), b, state
+		);
+		struct ast_stmt *newjump = ast_stmt_create_jump(
+			lexememarker_copy(loc), JUMP_RETURN, gen
+		);
+		ast_block_append_stmt(b, newjump);
+
+		if (ast_block_nstmts(b) > 1) {
+			struct frame *inter_frame = frame_intermediate_create(
+				dynamic_str("inter"), b, false
+			);
+			state_pushframe(state, inter_frame);
+			return error_call();
+		} else {
+			struct result *res = ast_expr_eval(rv, state);
+			if (result_iserror(res)) {
+				return result_as_error(res);
+			}
+			if (result_hasvalue(res)) {
+				state_writeregister(state, result_as_value(res));
+
+				struct object_res obj_res = state_getresult(state); 
+				assert(!obj_res.err);
+				object_assign(obj_res.obj, value_copy(result_as_value(res)));
+				/* destroy result if exists */
+printf("postassign: %s\n", state_str(state));
+			}
+		}
 	}
+
 	return error_return();
 }
 
@@ -332,8 +342,6 @@ register_mov_exec(struct ast_variable *temp, struct state *);
 static struct error *
 stmt_register_exec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("stmt: %s\n", ast_stmt_str(stmt));
-	printf("state: %s\n", state_str(state));
 	/* XXX: assert we are in intermediate frame */
 	if (ast_stmt_register_iscall(stmt)) {
 		return register_call_exec(ast_stmt_register_call(stmt), state);
@@ -345,6 +353,7 @@ stmt_register_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 register_call_exec(struct ast_expr *call, struct state *state)
 {
+	printf("register_call_exec...\n");
 	struct result *res = ast_expr_abseval(call, state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
@@ -355,6 +364,7 @@ register_call_exec(struct ast_expr *call, struct state *state)
 static struct error *
 register_mov_exec(struct ast_variable *temp, struct state *state)
 {
+	printf("register_mov_exec...\n");
 	state_declare(state, temp, false);
 	struct value *v = state_readregister(state);
 	struct ast_expr *name = ast_expr_identifier_create(
@@ -404,6 +414,8 @@ jump_absexec(struct ast_stmt *, struct state *);
 static struct error *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool should_setup)
 {
+	printf("absstmt: %s\n", ast_stmt_str(stmt));
+	printf("state: %s\n", state_str(state));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
@@ -567,46 +579,7 @@ comp_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool sho
 static struct error *
 jump_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
-	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
-
-	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
-
-	if (rv) {
-		struct ast_expr *gen = ast_expr_geninstr(
-			rv, lexememarker_copy(loc), b, state
-		);
-		struct ast_stmt *jump = ast_stmt_create_jump(
-			lexememarker_copy(loc),
-			JUMP_RETURN,
-			gen
-		);
-		ast_block_append_stmt(b, jump);
-
-		printf("b: %s\n", ast_block_str(b, "\t"));
-		struct frame *inter_frame = frame_intermediate_create(
-			dynamic_str("inter"),
-			b,
-			false
-		);
-		state_pushframe(state, inter_frame);
-		return error_call();
-	}
-
-	struct result *res = ast_expr_abseval(rv, state);
-	if (result_iserror(res)) {
-		return result_as_error(res);
-	}
-	if (result_hasvalue(res)) {
-		state_writeregister(state, result_as_value(res));
-
-		/* relevant for garbage check */
-		struct object_res obj_res = state_getresult(state); 
-		assert(!obj_res.err);
-		object_assign(obj_res.obj, value_copy(result_as_value(res)));
-	}
-	printf("state: %s\n", state_str(state));
-	return error_return();
+	return stmt_jump_exec(stmt, state);
 }
 
 static struct error *
