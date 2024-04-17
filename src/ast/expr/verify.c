@@ -1529,11 +1529,10 @@ static struct ast_expr *
 assign_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
 		struct state *s)
 {
-	assert(false);
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 	struct ast_expr *assign = ast_expr_assignment_create(
-		ast_expr_copy(lval), ast_expr_geninstr(lval, loc, b, s)
+		ast_expr_copy(lval), ast_expr_geninstr(rval, loc, b, s)
 	);
 	ast_block_append_stmt(b, ast_stmt_create_expr(loc, assign));
 	return lval;

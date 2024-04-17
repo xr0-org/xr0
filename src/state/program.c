@@ -155,8 +155,13 @@ static struct error *
 program_stmt_process(struct program *p, bool abstract, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	if (abstract) {
-		return ast_stmt_absprocess(stmt, p->name, s, false, true);
+	printf("stmt: %s\n", ast_stmt_str(stmt));
+	if (state_linear(s)) {
+		if (abstract) {
+			return ast_stmt_absprocess(stmt, p->name, s, false, true);
+		}
+		return ast_stmt_process(stmt, p->name, s);
+	} else {
+		return ast_stmt_linearise(stmt, s);
 	}
-	return ast_stmt_process(stmt, p->name, s);
 }

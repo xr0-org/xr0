@@ -140,6 +140,12 @@ state_str(struct state *state)
 }
 
 bool
+state_linear(struct state *s)
+{
+	return stack_linear(s->stack);
+}
+
+bool
 state_atend(struct state *s)
 {
 	return stack_atend(s->stack);

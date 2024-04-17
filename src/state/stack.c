@@ -187,6 +187,12 @@ stack_str(struct stack *stack, struct state *state)
 }
 
 bool
+stack_linear(struct stack *s)
+{
+	return s->kind == FRAME_INTERMEDIATE;
+}
+
+bool
 stack_atend(struct stack *s)
 {
 	return program_atend(s->p);

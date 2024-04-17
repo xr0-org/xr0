@@ -433,12 +433,12 @@ struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
 
 struct error *
+ast_stmt_linearise(struct ast_stmt *, struct state *);
+
+struct error *
 ast_stmt_process(struct ast_stmt *, char *fname, struct state *);
 
 struct preresult;
-
-struct preresult *
-ast_stmt_preprocess(struct ast_stmt *, struct state *);
 
 bool
 ast_stmt_isterminal(struct ast_stmt *, struct state *);
