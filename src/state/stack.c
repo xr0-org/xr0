@@ -71,6 +71,13 @@ stack_create(struct frame *f, struct stack *prev)
 	return stack;
 }
 
+int
+stack_id(struct stack *s)
+{
+	assert(s);
+	return s->id;
+}
+
 struct stack *
 stack_getframe(struct stack *s, int frame)
 {
@@ -245,10 +252,16 @@ stack_undeclare(struct stack *stack, struct state *state)
 	map_destroy(m);
 }
 
+static bool
+stack_call(struct stack *s)
+{
+	return s->kind = FRAME_CALL;
+}
+
 bool
 stack_nested(struct stack *s)
 {
-	return s->kind == FRAME_NESTED || s->kind == FRAME_INTERMEDIATE;
+	return s->kind == FRAME_NESTED;
 }
 
 struct variable *
@@ -274,7 +287,7 @@ stack_getvariable(struct stack *s, char *id)
 	assert(strcmp(id, KEYWORD_RETURN) != 0);
 
 	struct variable *v = map_get(s->varmap, id);
-	if (!v && stack_nested(s)) {
+	if (!v && !stack_call(s)) {
 		/* ⊢ block */
 		return stack_getvariable(s->prev, id);
 	}

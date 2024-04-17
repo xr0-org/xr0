@@ -5,7 +5,7 @@
 #include "ast.h"
 #include "util.h"
 
-#define TEMP_PREFIX "#T" /* `⊤': unreachable from user space */
+#define TEMP_PREFIX "`T" /* unreachable from user space */
 
 struct ast_block {
 	int ndecl, nstmt;

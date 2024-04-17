@@ -248,7 +248,7 @@ path_step_abstract(struct path *p)
 static struct error *
 path_step_actual(struct path *p)
 {
-	if (state_atend(p->actual)) {
+	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
 		return path_step(p);
 	}

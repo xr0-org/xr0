@@ -64,6 +64,9 @@ state_getext(struct state *);
 struct props *
 state_getprops(struct state *);
 
+int
+state_frameid(struct state *);
+
 struct heap *
 state_getheap(struct state *);
 

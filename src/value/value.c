@@ -474,6 +474,7 @@ value_sync_sprint(struct value *v, struct strbuilder *b)
 struct value *
 value_copy(struct value *v)
 {
+	assert(v);
 	switch (v->type) {
 	case VALUE_SYNC:
 		return value_sync_copy(v);
