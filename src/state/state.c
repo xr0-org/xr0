@@ -634,7 +634,7 @@ state_popprops(struct state *s)
 void
 state_unnest(struct state *s)
 {
-	while (stack_nested(s->stack)) {
+	while (stack_isnested(s->stack)) {
 		state_popframe(s);
 	}
 }

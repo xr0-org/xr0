@@ -362,8 +362,6 @@ iter_neteffect(struct ast_stmt *iter)
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("frameid %d\n", state_frameid(state));
-	printf("return: %s\n", ast_stmt_str(stmt));
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 
 	if (rv) {
@@ -372,7 +370,6 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 			return result_as_error(res);
 		}
 		if (result_hasvalue(res)) {
-			printf("writing\n");
 			state_writeregister(state, result_as_value(res));
 		}
 	}
@@ -388,7 +385,6 @@ register_mov_exec(struct ast_variable *temp, struct state *);
 static struct error *
 stmt_register_exec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("register stmt: %s\n", ast_stmt_str(stmt));
 	/* XXX: assert we are in intermediate frame */
 	if (ast_stmt_register_iscall(stmt)) {
 		return register_call_exec(ast_stmt_register_call(stmt), state);
@@ -400,7 +396,6 @@ stmt_register_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 register_call_exec(struct ast_expr *call, struct state *state)
 {
-	printf("register_call_exec...\n");
 	struct result *res = ast_expr_abseval(call, state);
 	if (result_iserror(res)) {
 		return result_as_error(res);
@@ -411,7 +406,6 @@ register_call_exec(struct ast_expr *call, struct state *state)
 static struct error *
 register_mov_exec(struct ast_variable *temp, struct state *state)
 {
-	printf("register_mov_exec...\n");
 	state_declare(state, temp, false);
 	struct value *v = state_readregister(state);
 	struct ast_expr *name = ast_expr_identifier_create(
@@ -462,8 +456,6 @@ jump_absexec(struct ast_stmt *, struct state *);
 static struct error *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool should_setup)
 {
-	printf("absstmt: %s\n", ast_stmt_str(stmt));
-	printf("state: %s\n", state_str(state));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
