@@ -745,7 +745,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		);
 	}
 
-	printf("call state: %s\n", state_str(state));
 	return result_value_create(NULL);
 	/*
 	struct result *res = call_absexec(expr, state);
@@ -1009,7 +1008,6 @@ prepare_parameters(int nparams, struct ast_variable **param,
 static struct result *
 expr_assign_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("assign: %s\n", ast_expr_str(expr));
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
@@ -1108,7 +1106,6 @@ alloc_absexec(struct ast_expr *, struct state *);
 struct result *
 ast_expr_abseval(struct ast_expr *expr, struct state *state)
 {
-	printf("expr: %s\n", ast_expr_str(expr));
 	switch (ast_expr_kind(expr)) {
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
@@ -1536,7 +1533,6 @@ assign_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_bloc
 		ast_expr_copy(lval), ast_expr_geninstr(rval, loc, b, s)
 	);
 	ast_block_append_stmt(b, ast_stmt_create_expr(loc, assign));
-	printf("b: %s\n", ast_block_str(b, "\t"));
 	return lval;
 }
 

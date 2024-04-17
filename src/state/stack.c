@@ -253,13 +253,13 @@ stack_undeclare(struct stack *stack, struct state *state)
 }
 
 static bool
-stack_call(struct stack *s)
+stack_iscall(struct stack *s)
 {
-	return s->kind = FRAME_CALL;
+	return s->kind == FRAME_CALL;
 }
 
 bool
-stack_nested(struct stack *s)
+stack_isnested(struct stack *s)
 {
 	return s->kind == FRAME_NESTED;
 }
@@ -287,7 +287,7 @@ stack_getvariable(struct stack *s, char *id)
 	assert(strcmp(id, KEYWORD_RETURN) != 0);
 
 	struct variable *v = map_get(s->varmap, id);
-	if (!v && !stack_call(s)) {
+	if (!v && !stack_iscall(s)) {
 		/* ⊢ block */
 		return stack_getvariable(s->prev, id);
 	}
