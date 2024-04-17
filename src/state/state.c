@@ -176,6 +176,12 @@ state_getprops(struct state *s)
 	return s->props;
 }
 
+int
+state_frameid(struct state *s)
+{
+	return stack_id(s->stack);
+}
+
 void
 state_pushframe(struct state *state, struct frame *f)
 {
@@ -217,7 +223,11 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 struct value *
 state_readregister(struct state *state)
 {
+	if (!state->reg) {
+		return NULL;
+	}
 	struct value *v = value_copy(state->reg);
+	value_destroy(state->reg);
 	state->reg = NULL;
 	return v;
 }

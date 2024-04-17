@@ -134,6 +134,8 @@ program_exec(struct program *p, bool abstract, struct state *s)
 	case PROGRAM_COUNTER_STMTS:
 		return program_stmt_step(p, abstract, s);
 	case PROGRAM_COUNTER_ATEND:
+		state_popframe(s);
+		return NULL;
 	default:
 		assert(false);
 	}
@@ -145,6 +147,8 @@ program_stmt_process(struct program *p, bool abstract, struct state *s);
 static struct error *
 program_stmt_step(struct program *p, bool abstract, struct state *s)
 {
+	printf("frame: %d\n", state_frameid(s));
+	printf("program:\n%s\n", program_str(p));
 	struct error *err = program_stmt_process(p, abstract, s);
 	if (!err) {
 		program_nextstmt(p, s);
@@ -152,6 +156,7 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 	}
 	struct error *return_err = error_to_return(err);
 	if (return_err) {
+		printf("retu\n");
 		p->s = PROGRAM_COUNTER_ATEND;
 		return NULL;
 	}
@@ -161,14 +166,15 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 static struct error *
 program_stmt_process(struct program *p, bool abstract, struct state *s)
 {
-	printf("program: %s\n", program_str(p));
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	if (state_linear(s)) {
+		printf("\nlinear\n");
 		if (abstract) {
 			return ast_stmt_absprocess(stmt, p->name, s, false, true);
 		}
 		return ast_stmt_process(stmt, p->name, s);
 	} else {
+		printf("\nnonlinear\n");
 		return ast_stmt_linearise(stmt, s);
 	}
 }

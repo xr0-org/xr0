@@ -362,6 +362,8 @@ iter_neteffect(struct ast_stmt *iter)
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("frameid %d\n", state_frameid(state));
+	printf("return: %s\n", ast_stmt_str(stmt));
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 
 	if (rv) {
@@ -370,12 +372,8 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 			return result_as_error(res);
 		}
 		if (result_hasvalue(res)) {
+			printf("writing\n");
 			state_writeregister(state, result_as_value(res));
-
-			struct object_res obj_res = state_getresult(state); 
-			assert(!obj_res.err);
-			object_assign(obj_res.obj, value_copy(result_as_value(res)));
-			/* destroy result if exists */
 		}
 	}
 	return error_return();
@@ -390,6 +388,7 @@ register_mov_exec(struct ast_variable *temp, struct state *);
 static struct error *
 stmt_register_exec(struct ast_stmt *stmt, struct state *state)
 {
+	printf("register stmt: %s\n", ast_stmt_str(stmt));
 	/* XXX: assert we are in intermediate frame */
 	if (ast_stmt_register_iscall(stmt)) {
 		return register_call_exec(ast_stmt_register_call(stmt), state);
@@ -420,10 +419,11 @@ register_mov_exec(struct ast_variable *temp, struct state *state)
 	);
 	struct lvalue_res res = ast_expr_lvalue(name, state);
 	if (res.err) {
-		assert(false);
+		return res.err;
 	}
 	struct object *obj = lvalue_object(res.lval);
 	object_assign(obj, v);
+	return NULL;
 }
 
 struct error *
@@ -627,7 +627,18 @@ comp_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool sho
 static struct error *
 jump_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	return stmt_jump_exec(stmt, state);
+	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
+
+	if (rv) {
+		struct result *res = ast_expr_abseval(rv, state);
+		if (result_iserror(res)) {
+			return result_as_error(res);
+		}
+		if (result_hasvalue(res)) {
+			state_writeregister(state, result_as_value(res));
+		}
+	}
+	return error_return();
 }
 
 static struct error *

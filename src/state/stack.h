@@ -14,6 +14,9 @@ stack_create(struct frame *, struct stack *prev);
 struct stack *
 stack_getframe(struct stack *s, int frame);
 
+int
+stack_id(struct stack *);
+
 struct location *
 stack_newblock(struct stack *stack);
 
