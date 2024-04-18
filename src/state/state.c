@@ -245,9 +245,9 @@ state_writeregister(struct state *state, struct value *v)
 void
 state_clearregister(struct state *state)
 {
+	/* XXX: used after initing the actual state */
 	state->reg = NULL;
 }
-
 
 struct error *
 state_stacktrace(struct state *s, struct error *err)

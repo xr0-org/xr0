@@ -170,12 +170,17 @@ static struct error *
 program_stmt_process(struct program *p, bool abstract, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
+	v_printf("stmt: %s\n", ast_stmt_str(stmt));
 	if (!state_linear(s)) {
+		v_printf("not linear\n");
 		return ast_stmt_linearise(stmt, s);
 	}
+	v_printf("linear\n");
 	if (abstract) {
+		v_printf("abstract\n");
 		return ast_stmt_absprocess(stmt, p->name, s, false, true);
 	}
+	v_printf("actual\n");
 	return ast_stmt_process(stmt, p->name, s);
 }
 
