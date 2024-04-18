@@ -271,6 +271,9 @@ path_step_actual(struct path *p)
 static struct error *
 path_audit(struct path *p)
 {
+	printf("auditing path\n");
+	printf("abstract: %s\n", state_str(p->abstract));
+	printf("actual: %s\n", state_str(p->actual));
 	if (state_hasgarbage(p->actual)) {
 		v_printf("actual: %s", state_str(p->actual));
 		return error_printf(

@@ -86,6 +86,10 @@ append_block(struct ast_block *b, struct ast_block *appendage);
 static struct error *
 labelled_linearise(struct ast_stmt *stmt, struct ast_block *b,struct state *state)
 {
+	/* XXX: only execute if in lowest frame*/
+	if (state_frameid(state) != 0) {
+		return NULL;
+	}
 	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
 	struct ast_stmt *substmt = ast_stmt_labelled_stmt(stmt);
 
@@ -151,10 +155,14 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct state *st
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
-
+	
 	struct ast_expr *newcond = ast_expr_geninstr(
 		cond, lexememarker_copy(loc), b, state
 	);
+	struct decision dec = sel_decide(cond, state);
+	if (dec.err) {
+		return dec.err;
+	}
 	struct ast_stmt *newsel = ast_stmt_create_sel(
 		lexememarker_copy(loc),
 		false,
@@ -340,7 +348,6 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("selexec\n");
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
