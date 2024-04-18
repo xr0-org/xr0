@@ -11,7 +11,9 @@ use crate::state::location::{location_copy, location_destroy, location_reference
 use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
 };
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, Error};
+use crate::util::{
+    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, Error, Result,
+};
 use crate::value::{
     value_abstractcopy, value_as_location, value_copy, value_destroy, value_ptr_create,
     value_references, value_referencesheap, value_str, value_struct_create, value_struct_member,
@@ -392,7 +394,7 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
     );
 }
 
-pub unsafe fn object_dealloc(obj: *mut Object, s: *mut State) -> *mut Error {
+pub unsafe fn object_dealloc(obj: *mut Object, s: *mut State) -> Result<()> {
     match (*obj).type_0 {
         0 => state_dealloc(s, (*obj).c2rust_unnamed.value),
         1 => range_dealloc((*obj).c2rust_unnamed.range, s),
@@ -523,8 +525,8 @@ pub unsafe fn range_size(r: *mut Range) -> *mut AstExpr {
     return (*r).size;
 }
 
-pub unsafe fn range_dealloc(r: *mut Range, s: *mut State) -> *mut Error {
-    return state_dealloc(s, value_ptr_create((*r).loc));
+pub unsafe fn range_dealloc(r: *mut Range, s: *mut State) -> Result<()> {
+    state_dealloc(s, value_ptr_create((*r).loc))
 }
 
 pub unsafe fn range_isdeallocand(r: *mut Range, s: *mut State) -> bool {

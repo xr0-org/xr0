@@ -16,7 +16,7 @@ use crate::object::{
 };
 use crate::state::heap::heap_newblock;
 use crate::state::state::{state_alloc, state_eval};
-use crate::util::{error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Error};
+use crate::util::{error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Result};
 use crate::{AstExpr, Heap, Location, Object, ObjectArr, State, StrBuilder, Value};
 
 #[derive(Copy, Clone)]
@@ -113,10 +113,7 @@ pub unsafe fn block_observe(
     drop(up);
     drop(Box::from_raw(lw_ptr));
 
-    let err: *mut Error = object_dealloc(obj_0, s);
-    if !err.is_null() {
-        panic!();
-    }
+    object_dealloc(obj_0, s).unwrap();
     object_arr_remove((*b).arr, index);
     if !upto.is_null() {
         let fresh0 = index;
@@ -150,7 +147,7 @@ pub unsafe fn block_range_alloc(
     lw: &AstExpr,
     up: &AstExpr,
     heap: *mut Heap,
-) -> *mut Error {
+) -> Result<()> {
     if !(object_arr_nobjects(b.arr) == 0 as libc::c_int) {
         panic!();
     }
@@ -167,7 +164,7 @@ pub unsafe fn block_range_alloc(
             ),
         ),
     );
-    return 0 as *mut Error;
+    Ok(())
 }
 
 pub unsafe fn block_range_aredeallocands(
@@ -241,29 +238,26 @@ pub unsafe fn block_range_dealloc(
     lw: &AstExpr,
     up: &AstExpr,
     s: *mut State,
-) -> *mut Error {
+) -> Result<()> {
     if hack_first_object_is_exactly_bounds(&*b, lw, up, s) {
-        let err: *mut Error = object_dealloc(
+        object_dealloc(
             *(object_arr_objects((*b).arr)).offset(0 as libc::c_int as isize),
             s,
-        );
-        if !err.is_null() {
-            return err;
-        }
+        )?;
         object_arr_remove((*b).arr, 0 as libc::c_int);
-        return 0 as *mut Error;
+        return Ok(());
     }
     let lw_index: libc::c_int = object_arr_index((*b).arr, lw, s);
     if lw_index == -(1 as libc::c_int) {
-        return error_create(
+        return Err(error_create(
             b"lower bound not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        );
+        ));
     }
     let up_index: libc::c_int = object_arr_index_upperincl((*b).arr, up, s);
     if up_index == -(1 as libc::c_int) {
-        return error_create(
+        return Err(error_create(
             b"upper bound not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        );
+        ));
     }
     let n: libc::c_int = object_arr_nobjects((*b).arr);
     let obj: *mut *mut Object = object_arr_objects((*b).arr);
@@ -294,14 +288,11 @@ pub unsafe fn block_range_dealloc(
     }
     let mut i_1: libc::c_int = lw_index;
     while i_1 <= up_index {
-        let err_0: *mut Error = object_dealloc(*obj.offset(i_1 as isize), s);
-        if !err_0.is_null() {
-            return err_0;
-        }
+        object_dealloc(*obj.offset(i_1 as isize), s)?;
         i_1 += 1;
     }
     (*b).arr = new;
-    return 0 as *mut Error;
+    Ok(())
 }
 
 pub unsafe fn block_undeclare(b: *mut Block, s: *mut State) {

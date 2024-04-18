@@ -1,4 +1,5 @@
 use std::ffi::CStr;
+use std::ptr;
 
 use libc::{free, malloc, strcmp, strlen};
 
@@ -12,7 +13,7 @@ use super::heap::{
 use super::location::{
     location_create_dereferencable, location_create_static, location_dealloc, location_getblock,
     location_offset, location_range_dealloc, location_toclump, location_toheap, location_tostack,
-    location_tostatic, location_type, location_with_offset, BlockRes, LOCATION_DEREFERENCABLE,
+    location_tostatic, location_type, location_with_offset, LOCATION_DEREFERENCABLE,
     LOCATION_DYNAMIC,
 };
 use super::r#static::{
@@ -32,7 +33,7 @@ use crate::ext::externals_types_str;
 use crate::object::{object_as_value, object_assign};
 use crate::props::{props_copy, props_create, props_destroy, props_str};
 use crate::util::{
-    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Error,
+    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Result,
 };
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
@@ -51,13 +52,6 @@ pub struct State {
     pub stack: *mut Stack,
     pub heap: *mut Heap,
     pub props: *mut Props,
-}
-
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ObjectRes {
-    pub obj: *mut Object,
-    pub err: *mut Error,
 }
 
 pub unsafe fn state_create(
@@ -250,14 +244,11 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
         address,
         Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
     );
-    let res: ObjectRes = state_get(state, loc, 1 as libc::c_int != 0);
-    if !(res.err).is_null() {
+    let obj = state_get(state, loc, 1 as libc::c_int != 0).unwrap();
+    if obj.is_null() {
         panic!();
     }
-    if (res.obj).is_null() {
-        panic!();
-    }
-    object_assign(res.obj, value_literal_create(dynamic_str(lit)));
+    object_assign(obj, value_literal_create(dynamic_str(lit)));
     static_memory_stringpool((*state).static_memory, lit, loc);
     return value_ptr_create(loc);
 }
@@ -279,10 +270,7 @@ pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
         return 0 as libc::c_int != 0;
     }
     let loc: *mut Location = value_as_location(v);
-    let res: ObjectRes = state_get(state, loc, 1 as libc::c_int != 0);
-    if !(res.err).is_null() {
-        panic!();
-    }
+    state_get(state, loc, 1 as libc::c_int != 0).unwrap();
     return location_tostatic(loc, (*state).static_memory) as libc::c_int != 0
         || location_toheap(loc, (*state).heap) as libc::c_int != 0
         || location_tostack(loc, (*state).stack) as libc::c_int != 0
@@ -297,10 +285,7 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
         return 0 as libc::c_int != 0;
     }
     let loc: *mut Location = value_as_location(v);
-    let res: ObjectRes = state_get(state, loc, 1 as libc::c_int != 0);
-    if !(res.err).is_null() {
-        panic!();
-    }
+    state_get(state, loc, 1 as libc::c_int != 0).unwrap();
     return location_toheap(loc, (*state).heap);
 }
 
@@ -308,62 +293,46 @@ pub unsafe fn state_getvconst(state: *mut State, id: *mut libc::c_char) -> *mut 
     return vconst_get((*state).vconst, id);
 }
 
-pub unsafe fn state_get(state: *mut State, loc: *mut Location, constructive: bool) -> ObjectRes {
-    let res: BlockRes = location_getblock(
+pub unsafe fn state_get(
+    state: *mut State,
+    loc: *mut Location,
+    constructive: bool,
+) -> Result<*mut Object> {
+    let b = location_getblock(
         loc,
         (*state).static_memory,
         (*state).vconst,
         (*state).stack,
         (*state).heap,
         (*state).clump,
-    );
-    if !(res.err).is_null() {
-        return {
-            let init = ObjectRes {
-                obj: 0 as *mut Object,
-                err: res.err,
-            };
-            init
-        };
-    }
-    if (res.b).is_null() {
+    )?;
+    if b.is_null() {
         if !(location_type(loc) as libc::c_uint == LOCATION_DYNAMIC as libc::c_int as libc::c_uint
             || location_type(loc) as libc::c_uint
                 == LOCATION_DEREFERENCABLE as libc::c_int as libc::c_uint)
         {
             panic!();
         }
-        return {
-            let init = ObjectRes {
-                obj: 0 as *mut Object,
-                err: 0 as *mut Error,
-            };
-            init
-        };
+        return Ok(ptr::null_mut());
     }
-    let obj: *mut Object = block_observe(res.b, &*location_offset(loc), state, constructive);
-    return {
-        let init = ObjectRes {
-            obj,
-            err: 0 as *mut Error,
-        };
-        init
-    };
+    Ok(block_observe(
+        b,
+        &*location_offset(loc),
+        state,
+        constructive,
+    ))
 }
 
 pub unsafe fn state_getblock(state: *mut State, loc: *mut Location) -> *mut Block {
-    let res: BlockRes = location_getblock(
+    location_getblock(
         loc,
         (*state).static_memory,
         (*state).vconst,
         (*state).stack,
         (*state).heap,
         (*state).clump,
-    );
-    if !res.err.is_null() {
-        panic!();
-    }
-    return res.b;
+    )
+    .unwrap()
 }
 
 pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
@@ -371,12 +340,9 @@ pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
     if v.is_null() {
         panic!();
     }
-    let res: ObjectRes = state_get(state, variable_location(v), 1 as libc::c_int != 0);
-    if !(res.err).is_null() {
-        panic!();
-    }
-    return res.obj;
+    state_get(state, variable_location(v), 1 as libc::c_int != 0).unwrap()
 }
+
 unsafe fn state_getresulttype(state: *mut State) -> *mut AstType {
     let v: *mut Variable = stack_getresult((*state).stack);
     if v.is_null() {
@@ -412,45 +378,31 @@ pub unsafe fn state_getobject(state: *mut State, id: *mut libc::c_char) -> *mut 
     if v.is_null() {
         panic!();
     }
-    let res: ObjectRes = state_get(state, variable_location(v), 1 as libc::c_int != 0);
-    if !(res.err).is_null() {
-        panic!();
-    }
-    return res.obj;
+    state_get(state, variable_location(v), 1 as libc::c_int != 0).unwrap()
 }
 
-pub unsafe fn state_deref(state: *mut State, ptr_val: *mut Value, index: &AstExpr) -> ObjectRes {
+pub unsafe fn state_deref(
+    state: *mut State,
+    ptr_val: *mut Value,
+    index: &AstExpr,
+) -> Result<*mut Object> {
     if value_issync(ptr_val) {
-        return {
-            let init = ObjectRes {
-                obj: 0 as *mut Object,
-                err: 0 as *mut Error,
-            };
-            init
-        };
+        return Ok(ptr::null_mut());
     }
     let deref_base: *mut Location = value_as_location(ptr_val);
     if deref_base.is_null() {
         panic!();
     }
     let deref: *mut Location = location_with_offset(deref_base, index);
-    let res: ObjectRes = state_get(state, deref, 1 as libc::c_int != 0);
-    if !(res.err).is_null() {
+    state_get(state, deref, 1 as libc::c_int != 0).map_err(|err| {
         let b: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b,
             b"undefined indirection: %s\0" as *const u8 as *const libc::c_char,
-            (*res.err).msg,
+            err.msg,
         );
-        return {
-            let init = ObjectRes {
-                obj: 0 as *mut Object,
-                err: error_create(strbuilder_build(b)),
-            };
-            init
-        };
-    }
-    return res;
+        error_create(strbuilder_build(b))
+    })
 }
 
 pub unsafe fn state_range_alloc(
@@ -458,48 +410,46 @@ pub unsafe fn state_range_alloc(
     obj: *mut Object,
     lw: &AstExpr,
     up: &AstExpr,
-) -> *mut Error {
+) -> Result<()> {
     let arr_val: *mut Value = object_as_value(obj);
     if arr_val.is_null() {
-        return error_create(
+        return Err(error_create(
             b"no value\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        );
+        ));
     }
     let deref: *mut Location = value_as_location(arr_val);
-    let res: BlockRes = location_getblock(
+    let b = location_getblock(
         deref,
         (*state).static_memory,
         (*state).vconst,
         (*state).stack,
         (*state).heap,
         (*state).clump,
-    );
-    if !(res.err).is_null() {
-        panic!();
-    }
-    if (res.b).is_null() {
-        return error_create(
+    )
+    .unwrap(); // panic rather than propagate the error - this is in the original
+    if b.is_null() {
+        return Err(error_create(
             b"no block\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        );
+        ));
     }
     if ast_expr_equal(lw, up) {
         panic!();
     }
-    return block_range_alloc(&*res.b, lw, up, (*state).heap);
+    block_range_alloc(&*b, lw, up, (*state).heap)
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> *mut Value {
     return value_ptr_create(heap_newblock((*state).heap));
 }
 
-pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> *mut Error {
+pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {
     if !value_islocation(val) {
-        return error_create(
+        return Err(error_create(
             b"undefined free of value not pointing at heap\0" as *const u8 as *const libc::c_char
                 as *mut libc::c_char,
-        );
+        ));
     }
-    return location_dealloc(value_as_location(val), (*state).heap);
+    location_dealloc(value_as_location(val), (*state).heap)
 }
 
 pub unsafe fn state_range_dealloc(
@@ -507,12 +457,12 @@ pub unsafe fn state_range_dealloc(
     obj: *mut Object,
     lw: &AstExpr,
     up: &AstExpr,
-) -> *mut Error {
+) -> Result<()> {
     let arr_val: *mut Value = object_as_value(obj);
     if arr_val.is_null() {
-        return error_create(
+        return Err(error_create(
             b"no value\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        );
+        ));
     }
     let deref: *mut Location = value_as_location(arr_val);
     return location_range_dealloc(deref, lw, up, state);
@@ -545,19 +495,16 @@ pub unsafe fn state_range_aredeallocands(
         return 0 as libc::c_int != 0;
     }
     let deref: *mut Location = value_as_location(arr_val);
-    let res: BlockRes = location_getblock(
+    let b = location_getblock(
         deref,
         (*state).static_memory,
         (*state).vconst,
         (*state).stack,
         (*state).heap,
         (*state).clump,
-    );
-    if !res.err.is_null() {
-        panic!();
-    }
-    return !(res.b).is_null() as libc::c_int != 0
-        && block_range_aredeallocands(&*res.b, lw, up, state) as libc::c_int != 0;
+    )
+    .unwrap();
+    return !b.is_null() && block_range_aredeallocands(&*b, lw, up, state);
 }
 
 pub unsafe fn state_hasgarbage(state: *mut State) -> bool {

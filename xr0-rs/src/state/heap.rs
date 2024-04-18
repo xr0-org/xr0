@@ -16,7 +16,7 @@ use crate::state::block::{
 use crate::state::location::{location_create_dynamic, location_destroy};
 use crate::state::state::state_references;
 use crate::util::{
-    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Error, Map,
+    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Map, Result,
 };
 use crate::value::{value_copy, value_destroy, value_str};
 use crate::{AstExpr, Block, BlockArr, Location, State, StrBuilder, Value};
@@ -134,17 +134,17 @@ pub unsafe fn heap_getblock(h: *mut Heap, address: libc::c_int) -> *mut Block {
     return *(block_arr_blocks((*h).blocks)).offset(address as isize);
 }
 
-pub unsafe fn heap_deallocblock(h: *mut Heap, address: libc::c_int) -> *mut Error {
+pub unsafe fn heap_deallocblock(h: *mut Heap, address: libc::c_int) -> Result<()> {
     if !(address < block_arr_nblocks((*h).blocks)) {
         panic!();
     }
     if *((*h).freed).offset(address as isize) {
-        return error_create(
+        return Err(error_create(
             b"double free\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        );
+        ));
     }
-    *((*h).freed).offset(address as isize) = 1 as libc::c_int != 0;
-    return 0 as *mut Error;
+    *((*h).freed).offset(address as isize) = true;
+    Ok(())
 }
 
 pub unsafe fn heap_blockisfreed(h: *mut Heap, address: libc::c_int) -> bool {

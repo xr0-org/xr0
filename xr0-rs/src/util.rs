@@ -1,7 +1,8 @@
+use std::fmt::{self, Debug, Formatter};
 use std::ptr;
 
 use libc::{
-    calloc, fclose, free, malloc, open_memstream, realloc, snprintf, strcmp, strlen, strncpy, FILE,
+    fclose, free, malloc, open_memstream, realloc, snprintf, strcmp, strlen, strncpy, FILE,
 };
 
 use crate::c_util::vfprintf;
@@ -30,6 +31,18 @@ pub struct StrBuilder {
 pub struct Error {
     pub msg: *mut libc::c_char,
     pub inner: *mut Error,
+}
+
+pub type Result<T, E = Box<Error>> = std::result::Result<T, E>;
+
+impl Debug for Error {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{:?}",
+            unsafe { std::ffi::CStr::from_ptr(self.msg) }.to_string_lossy()
+        )
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -77,7 +90,7 @@ unsafe fn entry_destroy(e: Entry) {
 impl Map {
     pub fn new() -> Box<Map> {
         Box::new(Map {
-            entry: std::ptr::null_mut(),
+            entry: ptr::null_mut(),
             n: 0,
         })
     }
@@ -251,15 +264,16 @@ pub unsafe fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char) {
     );
 }
 
-pub unsafe fn error_create(s: *mut libc::c_char) -> *mut Error {
-    let err: *mut Error = calloc(1, ::core::mem::size_of::<Error>()) as *mut Error;
-    (*err).msg = s;
-    return err;
+pub unsafe fn error_create(s: *mut libc::c_char) -> Box<Error> {
+    Box::new(Error {
+        msg: s,
+        inner: ptr::null_mut(),
+    })
 }
 
 pub unsafe fn string_arr_create() -> Box<StringArr> {
     Box::new(StringArr {
-        s: std::ptr::null_mut(),
+        s: ptr::null_mut(),
         n: 0,
     })
 }

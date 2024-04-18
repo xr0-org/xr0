@@ -13,13 +13,12 @@ use crate::state::block::{
     block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
     block_arr_nblocks, block_create, block_install, block_observe,
 };
-use crate::state::location::BlockRes;
 use crate::state::location::LOCATION_VCONST;
 use crate::state::location::{
     location_copy, location_create_automatic, location_destroy, location_getblock,
     location_getstackblock, location_offset, location_references, location_str, location_type,
 };
-use crate::state::state::{state_get, ObjectRes};
+use crate::state::state::state_get;
 use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc, Map,
 };
@@ -266,22 +265,20 @@ pub unsafe fn variable_create(
     (*v).type_0 = ast_type_copy(type_0);
     (*v).isparam = isparam;
     (*v).loc = stack_newblock(stack);
-    let res: BlockRes = location_getblock(
+    let b = location_getblock(
         (*v).loc,
         0 as *mut StaticMemory,
         0 as *mut VConst,
         stack,
         0 as *mut Heap,
         0 as *mut Clump,
-    );
-    if !(res.err).is_null() {
-        panic!();
-    }
-    if (res.b).is_null() as libc::c_int as libc::c_long != 0 {
+    )
+    .unwrap();
+    if b.is_null() {
         panic!();
     }
     block_install(
-        res.b,
+        b,
         object_value_create(
             Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
             0 as *mut Value,
@@ -303,25 +300,23 @@ pub unsafe fn variable_copy(old: *mut Variable) -> *mut Variable {
     (*new).loc = location_copy((*old).loc);
     return new;
 }
+
 unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Variable {
     let new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
     (*new).type_0 = ast_type_copy((*old).type_0);
     (*new).isparam = (*old).isparam;
     (*new).loc = location_copy((*old).loc);
-    let res: ObjectRes = state_get(s, (*new).loc, 0 as libc::c_int != 0);
-    if !(res.err).is_null() {
+    let obj = state_get(s, (*new).loc, 0 as libc::c_int != 0).unwrap();
+    if obj.is_null() {
         panic!();
     }
-    if (res.obj).is_null() as libc::c_int as libc::c_long != 0 {
-        panic!();
-    }
-    if object_isvalue(res.obj) {
-        let v: *mut Value = object_as_value(res.obj);
+    if object_isvalue(obj) {
+        let v: *mut Value = object_as_value(obj);
         if !v.is_null() {
-            object_assign(res.obj, value_abstractcopy(v, s));
+            object_assign(obj, value_abstractcopy(v, s));
         }
     }
-    return new;
+    new
 }
 
 pub unsafe fn variable_str(

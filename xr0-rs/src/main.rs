@@ -133,12 +133,11 @@ pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
             if !(ast_function_isaxiom(&*f) as libc::c_int != 0
                 || ast_function_isproto(&*f) as libc::c_int != 0)
             {
-                let err = ast_function_verify(f, ext);
-                if !err.is_null() {
+                if let Err(err) = ast_function_verify(f, ext) {
                     fprintf(
                         __stderrp,
                         b"%s\n\0" as *const u8 as *const libc::c_char,
-                        (*err).msg,
+                        err.msg,
                     );
                     exit(1 as libc::c_int);
                 }
@@ -161,12 +160,11 @@ pub unsafe fn pass_inorder(order: &mut StringArr, ext: *mut Externals) {
         if !(ast_function_isaxiom(&*f) as libc::c_int != 0
             || ast_function_isproto(&*f) as libc::c_int != 0)
         {
-            let err = ast_function_verify(f, ext);
-            if !err.is_null() {
+            if let Err(err) = ast_function_verify(f, ext) {
                 fprintf(
                     __stderrp,
                     b"%s\n\0" as *const u8 as *const libc::c_char,
-                    (*err).msg,
+                    err.msg,
                 );
                 exit(1 as libc::c_int);
             }
