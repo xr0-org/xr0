@@ -171,11 +171,10 @@ pub unsafe fn location_str(loc: *mut Location) -> *mut libc::c_char {
     }
     return strbuilder_build(b);
 }
+
 unsafe fn offsetzero(loc: *mut Location) -> bool {
-    let zero: *mut AstExpr = ast_expr_constant_create(0 as libc::c_int);
-    let eq: bool = ast_expr_equal(&*(*loc).offset, &*zero);
-    ast_expr_destroy(zero);
-    return eq;
+    let zero = ast_expr_constant_create(0 as libc::c_int);
+    ast_expr_equal(&*(*loc).offset, &zero)
 }
 
 pub unsafe fn location_type(loc: *mut Location) -> LocationType {

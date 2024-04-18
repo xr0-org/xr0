@@ -99,15 +99,15 @@ pub unsafe fn block_observe(
     }
     let lw = ast_expr_copy(offset);
     let up = ast_expr_sum_create(
-        ast_expr_copy(offset),
+        Box::from_raw(ast_expr_copy(offset)),
         ast_expr_constant_create(1 as libc::c_int),
     );
     // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down. I don't
     // know why it isn't a double free.
     let upto: *mut Object = object_upto(obj_0, lw, s);
     let observed: *mut Object = object_value_create(ast_expr_copy(&*lw), state_alloc(s));
-    let from: *mut Object = object_from(obj_0, &*up, s);
-    ast_expr_destroy(up);
+    let from: *mut Object = object_from(obj_0, &up, s);
+    drop(up);
     ast_expr_destroy(lw);
 
     let err: *mut Error = object_dealloc(obj_0, s);
@@ -156,7 +156,10 @@ pub unsafe fn block_range_alloc(
         object_range_create(
             ast_expr_copy(lw),
             range_create(
-                ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
+                Box::into_raw(ast_expr_difference_create(
+                    Box::from_raw(ast_expr_copy(up)),
+                    Box::from_raw(ast_expr_copy(lw)),
+                )),
                 heap_newblock(heap),
             ),
         ),
@@ -216,9 +219,18 @@ unsafe fn hack_first_object_is_exactly_bounds(
         return 0 as libc::c_int != 0;
     }
     // Note: Original leaks these outer expressions to avoid double-freeing the inner ones.
-    let same_lw = ast_expr_eq_create(lw as *const AstExpr as *mut AstExpr, object_lower(obj));
-    let same_up = ast_expr_eq_create(up as *const AstExpr as *mut AstExpr, object_upper(obj));
-    return state_eval(s, &*same_lw) && state_eval(s, &*same_up);
+    let same_lw = ast_expr_eq_create(
+        Box::from_raw(lw as *const AstExpr as *mut AstExpr),
+        Box::from_raw(object_lower(obj)),
+    );
+    let same_up = ast_expr_eq_create(
+        Box::from_raw(up as *const AstExpr as *mut AstExpr),
+        Box::from_raw(object_upper(obj)),
+    );
+    let result = state_eval(s, &same_lw) && state_eval(s, &same_up);
+    std::mem::forget(same_lw);
+    std::mem::forget(same_up);
+    result
 }
 
 pub unsafe fn block_range_dealloc(

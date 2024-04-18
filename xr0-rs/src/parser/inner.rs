@@ -7,7 +7,7 @@ use crate::util::dynamic_str;
 
 type BoxedAst = *mut Ast;
 type BoxedBlock = *mut AstBlock;
-type BoxedExpr = *mut AstExpr;
+type BoxedExpr = Box<AstExpr>;
 type BoxedFunction = *mut AstFunction;
 type BoxedStmt = *mut AstStmt;
 type BoxedType = *mut AstType;
@@ -46,7 +46,7 @@ struct BlockStatement {
 }
 
 enum PostfixOp {
-    ArrayAccess(*mut AstExpr),
+    ArrayAccess(Box<AstExpr>),
     Call(libc::c_int, *mut *mut AstExpr),
     Dot(*mut libc::c_char),
     Arrow(*mut libc::c_char),
@@ -68,17 +68,16 @@ unsafe fn strip_quotes(s: *const libc::c_char) -> BoxedCStr {
     t
 }
 
-unsafe fn expr_array_from_vec(v: Vec<*mut AstExpr>) -> ExprArray {
-    let size_bytes = std::mem::size_of::<*mut AstExpr>() * v.len();
+unsafe fn expr_array_from_vec(v: Vec<Box<AstExpr>>) -> ExprArray {
+    let n = v.len();
+    let size_bytes = std::mem::size_of::<*mut AstExpr>() * n;
     let expr = libc::malloc(size_bytes) as *mut *mut AstExpr;
     assert!(!expr.is_null());
-    libc::memmove(
-        expr as *mut libc::c_void,
-        v.as_ptr() as *const libc::c_void,
-        size_bytes,
-    );
+    for (i, e) in v.into_iter().enumerate() {
+        *expr.add(i) = Box::into_raw(e);
+    }
     ExprArray {
-        n: v.len() as libc::c_int,
+        n: n as libc::c_int,
         expr,
     }
 }
@@ -520,18 +519,18 @@ pub grammar c_parser(env: &Env) for str {
 
     rule expression_statement() -> BoxedStmt =
         ";" p:position!() { unsafe { ast_stmt_create_nop(env.lexloc(p)) } } /
-        e:expression() _ ";" p:position!() { unsafe { ast_stmt_create_expr(env.lexloc(p), e) } }
+        e:expression() _ ";" p:position!() { unsafe { ast_stmt_create_expr(env.lexloc(p), Box::into_raw(e)) } }
 
     rule selection_statement() -> BoxedStmt =
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() p:position!() {
             unsafe {
-                let neg_cond = ast_expr_unary_create(ast_expr_copy(&*cond), AstUnaryOp::Bang);
-                let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, neg_cond, alt, ptr::null_mut());
-                ast_stmt_create_sel(env.lexloc(p), false, cond, then, else_stmt)
+                let neg_cond = ast_expr_unary_create(Box::from_raw(ast_expr_copy(&*cond)), AstUnaryOp::Bang);
+                let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, Box::into_raw(neg_cond), alt, ptr::null_mut());
+                ast_stmt_create_sel(env.lexloc(p), false, Box::into_raw(cond), then, else_stmt)
             }
         } /
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() p:position!() {
-            unsafe { ast_stmt_create_sel(env.lexloc(p), false, cond, then, ptr::null_mut()) }
+            unsafe { ast_stmt_create_sel(env.lexloc(p), false, Box::into_raw(cond), then, ptr::null_mut()) }
         } /
         K(<"switch">) _ "(" _ v:expression() _ ")" _ cases:statement() p:position!() {
             unsafe { ast_stmt_create_nop(env.lexloc(p)) }
@@ -547,14 +546,14 @@ pub grammar c_parser(env: &Env) for str {
     rule for_iteration_statement(as_iteration_e: bool) -> BoxedStmt =
         K(<"for">) _ "(" _ init:expression_statement() _ cond:expression_statement() _ iter:expression() _ ")" _
         verif:optional_compound_verification() _ body:statement() p:position!() {
-            unsafe { ast_stmt_create_iter(env.lexloc(p), init, cond, iter, verif, body, as_iteration_e) }
+            unsafe { ast_stmt_create_iter(env.lexloc(p), init, cond, Box::into_raw(iter), verif, body, as_iteration_e) }
         }
 
     rule iteration_statement() -> BoxedStmt = for_iteration_statement(false)
 
     rule jump_statement() -> BoxedStmt =
         K(<"return">) _ expr:expression() _ ";" p:position!() {
-            unsafe { ast_stmt_create_jump(env.lexloc(p), AstJumpKind::Return, expr) }
+            unsafe { ast_stmt_create_jump(env.lexloc(p), AstJumpKind::Return, Box::into_raw(expr)) }
         }
 
     rule block_statement() -> BlockStatement =

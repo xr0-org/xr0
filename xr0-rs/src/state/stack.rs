@@ -50,7 +50,7 @@ pub unsafe fn stack_newblock(stack: *mut Stack) -> *mut Location {
     let loc: *mut Location = location_create_automatic(
         (*stack).id,
         address,
-        ast_expr_constant_create(0 as libc::c_int),
+        Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
     );
     return loc;
 }
@@ -275,16 +275,17 @@ pub unsafe fn variable_create(
         0 as *mut Clump,
     );
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            panic!();
-        }
+        panic!();
     }
     if (res.b).is_null() as libc::c_int as libc::c_long != 0 {
         panic!();
     }
     block_install(
         res.b,
-        object_value_create(ast_expr_constant_create(0 as libc::c_int), 0 as *mut Value),
+        object_value_create(
+            Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
+            0 as *mut Value,
+        ),
     );
     return v;
 }
@@ -309,9 +310,7 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
     (*new).loc = location_copy((*old).loc);
     let res: ObjectRes = state_get(s, (*new).loc, 0 as libc::c_int != 0);
     if !(res.err).is_null() {
-        if (0 as libc::c_int == 0) as libc::c_int as libc::c_long != 0 {
-            panic!();
-        }
+        panic!();
     }
     if (res.obj).is_null() as libc::c_int as libc::c_long != 0 {
         panic!();

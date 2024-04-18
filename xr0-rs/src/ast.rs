@@ -1,9 +1,10 @@
 #![allow(dead_code, unused_assignments, unused_variables)]
 
 use std::ffi::CStr;
+use std::fmt::{self, Display, Formatter};
 use std::ptr;
 
-use libc::{exit, fprintf, free, malloc, realloc, strcmp, strlen, strncmp};
+use libc::{exit, fprintf, free, malloc, realloc, strcmp, strncmp};
 
 use crate::c_util::__stderrp;
 use crate::ext::{
@@ -327,6 +328,17 @@ pub struct Ast {
     pub decl: *mut *mut AstExternDecl,
 }
 
+impl Display for AstExpr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        unsafe {
+            let s = ast_expr_str(self);
+            write!(f, "{:?}", std::ffi::CStr::from_ptr(s))?;
+            free(s as *mut libc::c_void);
+        }
+        Ok(())
+    }
+}
+
 unsafe fn expr_literal_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     let res: *mut Result = result_value_create(state_static_init(state, expr));
     return res;
@@ -346,10 +358,10 @@ unsafe fn rangeprocess_dealloc(
 unsafe fn hack_base_object_from_alloc(expr: &AstExpr, state: *mut State) -> *mut Object {
     let inner = ast_expr_unary_operand(expr);
     let i = ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
-    if !ast_expr_equal(ast_expr_binary_e2(inner), &*i) {
+    if !ast_expr_equal(ast_expr_binary_e2(inner), &i) {
         panic!();
     }
-    ast_expr_destroy(i);
+    drop(i);
     let res: LValueRes = ast_expr_lvalue(ast_expr_binary_e1(inner), state);
     if !(res.err).is_null() {
         panic!();
@@ -555,13 +567,13 @@ unsafe fn expr_isdeallocand_rangedecide(
     let inner = ast_expr_unary_operand(acc);
     let i = ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
     let j = ast_expr_identifier_create(dynamic_str(b"j\0" as *const u8 as *const libc::c_char));
-    if !(ast_expr_equal(ast_expr_binary_e2(inner), &*i) as libc::c_int != 0
-        || ast_expr_equal(ast_expr_binary_e2(inner), &*j) as libc::c_int != 0)
+    if !(ast_expr_equal(ast_expr_binary_e2(inner), &i)
+        || ast_expr_equal(ast_expr_binary_e2(inner), &j))
     {
         panic!();
     }
-    ast_expr_destroy(j);
-    ast_expr_destroy(i);
+    drop(j);
+    drop(i);
     let res: LValueRes = ast_expr_lvalue(ast_expr_binary_e1(acc), state);
     if !(res.err).is_null() {
         panic!();
@@ -589,7 +601,7 @@ pub unsafe fn ast_expr_exec(expr: &AstExpr, state: *mut State) -> *mut Error {
     return 0 as *mut Error;
 }
 
-pub unsafe fn ast_expr_arbarg_create() -> *mut AstExpr {
+pub unsafe fn ast_expr_arbarg_create() -> Box<AstExpr> {
     ast_expr_create(AstExprKind::ArbArg)
 }
 
@@ -620,11 +632,15 @@ unsafe fn binary_assume(b: &BinaryExpr, value: bool, s: *mut State) -> *mut Prer
     let r2: *mut Result = ast_expr_pf_reduce(&*b.e2, s);
     let v1: *mut Value = result_as_value(r1);
     let v2: *mut Value = result_as_value(r2);
-    return irreducible_assume(
-        &*ast_expr_binary_create(value_to_expr(v1), b.op, value_to_expr(v2)),
-        value,
-        s,
+    // Note: original leaks the expression.
+    let expr = ast_expr_binary_create(
+        Box::from_raw(value_to_expr(v1)),
+        b.op,
+        Box::from_raw(value_to_expr(v2)),
     );
+    let result = irreducible_assume(&expr, value, s);
+    std::mem::forget(expr);
+    result
 }
 
 unsafe fn irreducible_assume(e: &AstExpr, value: bool, s: *mut State) -> *mut Preresult {
@@ -643,8 +659,8 @@ unsafe fn irreducible_assume_actual(e: &AstExpr, s: *mut State) -> *mut Preresul
     return preresult_empty_create();
 }
 
-pub unsafe fn ast_expr_isdereferencable_create(assertand: *mut AstExpr) -> *mut AstExpr {
-    ast_expr_create(AstExprKind::IsDereferencable(Box::from_raw(assertand)))
+pub unsafe fn ast_expr_isdereferencable_create(assertand: Box<AstExpr>) -> Box<AstExpr> {
+    ast_expr_create(AstExprKind::IsDereferencable(assertand))
 }
 
 unsafe fn ast_expr_pf_reduce_assume(expr: &AstExpr, value: bool, s: *mut State) -> *mut Preresult {
@@ -709,23 +725,23 @@ unsafe fn hack_identifier_builtin_eval(id: *mut libc::c_char, state: *mut State)
     if !(state_getvconst(state, id)).is_null()
         || strncmp(id, b"ptr:\0" as *const u8 as *const libc::c_char, 4) == 0 as libc::c_int
     {
-        return result_value_create(value_sync_create(ast_expr_identifier_create(dynamic_str(
-            id,
-        ))));
+        return result_value_create(value_sync_create(Box::into_raw(
+            ast_expr_identifier_create(dynamic_str(id)),
+        )));
     }
     return result_error_create(error_create(
         b"not built-in\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     ));
 }
 
-pub unsafe fn ast_expr_isdeallocand_create(assertand: *mut AstExpr) -> *mut AstExpr {
-    ast_expr_create(AstExprKind::IsDeallocand(Box::from_raw(assertand)))
+pub unsafe fn ast_expr_isdeallocand_create(assertand: Box<AstExpr>) -> Box<AstExpr> {
+    ast_expr_create(AstExprKind::IsDeallocand(assertand))
 }
 
-pub unsafe fn ast_expr_assignment_create(root: *mut AstExpr, value: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_assignment_create(root: Box<AstExpr>, value: Box<AstExpr>) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Assignment(AssignmentExpr {
-        lval: Box::from_raw(root),
-        rval: Box::from_raw(value),
+        lval: root,
+        rval: value,
     }))
 }
 
@@ -737,15 +753,13 @@ unsafe fn ast_expr_bracketed_str_build(inner: &AstExpr, b: *mut StrBuilder) {
 
 unsafe fn expr_to_binary(expr: &AstExpr) -> *mut AstExpr {
     match &expr.kind {
-        AstExprKind::Binary(_) => return ast_expr_copy(expr),
-        _ => {
-            return ast_expr_binary_create(
-                ast_expr_copy(expr),
-                AstBinaryOp::Addition,
-                ast_expr_constant_create(0 as libc::c_int),
-            );
-        }
-    };
+        AstExprKind::Binary(_) => ast_expr_copy(expr),
+        _ => Box::into_raw(ast_expr_binary_create(
+            Box::from_raw(ast_expr_copy(expr)),
+            AstBinaryOp::Addition,
+            ast_expr_constant_create(0 as libc::c_int),
+        )),
+    }
 }
 
 unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
@@ -891,11 +905,11 @@ unsafe fn expr_binary_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
     if result_iserror(res2) {
         return res2;
     }
-    return result_value_create(value_sync_create(ast_expr_binary_create(
-        value_to_expr(result_as_value(res1)),
+    result_value_create(value_sync_create(Box::into_raw(ast_expr_binary_create(
+        Box::from_raw(value_to_expr(result_as_value(res1))),
         ast_expr_binary_op(expr),
-        value_to_expr(result_as_value(res2)),
-    )));
+        Box::from_raw(value_to_expr(result_as_value(res2))),
+    ))))
 }
 
 unsafe fn expr_incdec_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
@@ -1218,9 +1232,9 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> *mut Result 
     let computed_param: *mut *mut AstExpr =
         malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(nparams)) as *mut *mut AstExpr;
     for (i, &p) in uncomputed_params.iter().enumerate() {
-        let param: *mut AstExpr = ast_expr_identifier_create(dynamic_str(ast_variable_name(p)));
-        let res: *mut Result = ast_expr_eval(&*param, s);
-        ast_expr_destroy(param);
+        let param = ast_expr_identifier_create(dynamic_str(ast_variable_name(p)));
+        let res: *mut Result = ast_expr_eval(&param, s);
+        drop(param);
         if result_iserror(res) {
             return res;
         }
@@ -1230,17 +1244,17 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> *mut Result 
         let v: *mut Value = result_as_value(res);
         if value_islocation(v) {
             let ref mut fresh0 = *computed_param.offset(i as isize);
-            *fresh0 = ast_expr_identifier_create(value_str(v));
+            *fresh0 = Box::into_raw(ast_expr_identifier_create(value_str(v)));
         } else {
             let ref mut fresh1 = *computed_param.offset(i as isize);
             *fresh1 = value_to_expr(v);
         }
     }
-    return result_value_create(value_sync_create(ast_expr_call_create(
+    result_value_create(value_sync_create(Box::into_raw(ast_expr_call_create(
         ast_expr_identifier_create(dynamic_str(root)),
         uncomputed_params.len() as libc::c_int,
         computed_param,
-    )));
+    ))))
 }
 
 pub unsafe fn ast_expr_absexec(expr: &AstExpr, state: *mut State) -> *mut Result {
@@ -1319,13 +1333,13 @@ pub unsafe fn prepare_parameters(
             );
             return error_create(strbuilder_build(b));
         }
-        let name: *mut AstExpr = ast_expr_identifier_create(dynamic_str(ast_variable_name(param)));
-        let lval_res: LValueRes = ast_expr_lvalue(&*name, state);
+        let name = ast_expr_identifier_create(dynamic_str(ast_variable_name(param)));
+        let lval_res: LValueRes = ast_expr_lvalue(&name, state);
         if !(lval_res.err).is_null() {
             return lval_res.err;
         }
         let obj: *mut Object = lvalue_object(lval_res.lval);
-        ast_expr_destroy(name);
+        drop(name);
         object_assign(obj, value_copy(result_as_value(res)));
     }
     return 0 as *mut Error;
@@ -1471,11 +1485,11 @@ pub unsafe fn ast_expr_bracketed_root(expr: &AstExpr) -> &AstExpr {
     inner
 }
 
-pub unsafe fn ast_expr_bracketed_create(root: *mut AstExpr) -> *mut AstExpr {
-    ast_expr_create(AstExprKind::Bracketed(Box::from_raw(root)))
+pub unsafe fn ast_expr_bracketed_create(root: Box<AstExpr>) -> Box<AstExpr> {
+    ast_expr_create(AstExprKind::Bracketed(root))
 }
 
-pub unsafe fn ast_expr_literal_create(s: *mut libc::c_char) -> *mut AstExpr {
+pub unsafe fn ast_expr_literal_create(s: *mut libc::c_char) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::StringLiteral(s))
 }
 
@@ -1507,14 +1521,14 @@ unsafe fn pf_augment(v: *mut Value, call: &AstExpr, state: *mut State) -> *mut R
     return result_value_create(value_pf_augment(v, value_as_sync(result_as_value(res))));
 }
 
-pub unsafe fn ast_expr_constant_create_char(c: libc::c_char) -> *mut AstExpr {
+pub unsafe fn ast_expr_constant_create_char(c: libc::c_char) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Constant(ConstantExpr {
         ischar: true,
         constant: c as libc::c_int,
     }))
 }
 
-pub unsafe fn ast_expr_constant_create(k: libc::c_int) -> *mut AstExpr {
+pub unsafe fn ast_expr_constant_create(k: libc::c_int) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Constant(ConstantExpr {
         ischar: false,
         constant: k,
@@ -1528,11 +1542,11 @@ pub unsafe fn ast_expr_as_identifier(expr: &AstExpr) -> *mut libc::c_char {
     *id
 }
 
-unsafe fn ast_expr_create(kind: AstExprKind) -> *mut AstExpr {
-    Box::into_raw(Box::new(AstExpr { kind }))
+unsafe fn ast_expr_create(kind: AstExprKind) -> Box<AstExpr> {
+    Box::new(AstExpr { kind })
 }
 
-pub unsafe fn ast_expr_identifier_create(s: *mut libc::c_char) -> *mut AstExpr {
+pub unsafe fn ast_expr_identifier_create(s: *mut libc::c_char) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Identifier(s))
 }
 
@@ -1544,10 +1558,10 @@ unsafe fn unary_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
     if !result_hasvalue(res) {
         panic!();
     }
-    return result_value_create(value_sync_create(ast_expr_unary_create(
-        value_as_sync(result_as_value(res)),
+    result_value_create(value_sync_create(Box::into_raw(ast_expr_unary_create(
+        Box::from_raw(value_as_sync(result_as_value(res))),
         ast_expr_unary_op(e),
-    )));
+    ))))
 }
 unsafe fn binary_pf_reduce(
     e1: &AstExpr,
@@ -1569,11 +1583,11 @@ unsafe fn binary_pf_reduce(
     if !result_hasvalue(res2) {
         panic!();
     }
-    return result_value_create(value_sync_create(ast_expr_binary_create(
-        value_to_expr(result_as_value(res1)),
+    return result_value_create(value_sync_create(Box::into_raw(ast_expr_binary_create(
+        Box::from_raw(value_to_expr(result_as_value(res1))),
         op,
-        value_to_expr(result_as_value(res2)),
-    )));
+        Box::from_raw(value_to_expr(result_as_value(res2))),
+    ))));
 }
 
 unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
@@ -1596,11 +1610,11 @@ unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
         *fresh3 = value_to_expr(result_as_value(res));
         i += 1;
     }
-    return result_value_create(value_sync_create(ast_expr_call_create(
+    result_value_create(value_sync_create(Box::into_raw(ast_expr_call_create(
         ast_expr_identifier_create(dynamic_str(root)),
         nargs,
         reduced_arg,
-    )));
+    ))))
 }
 unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> *mut Result {
     let res: *mut Result = ast_expr_pf_reduce(ast_expr_member_root(expr), s);
@@ -1623,10 +1637,10 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> *mut Result {
     if !value_issync(v) {
         panic!();
     }
-    return result_value_create(value_sync_create(ast_expr_member_create(
-        value_as_sync(v),
+    return result_value_create(value_sync_create(Box::into_raw(ast_expr_member_create(
+        Box::from_raw(value_as_sync(v)),
         dynamic_str(field),
-    )));
+    ))));
 }
 
 pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> *mut Result {
@@ -1756,7 +1770,7 @@ impl Drop for CallExpr {
 pub unsafe fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> *mut AstExpr {
     let copy: *mut AstExpr = ast_expr_copy(expr);
     if invert {
-        ast_expr_unary_create(copy, AstUnaryOp::Bang)
+        Box::into_raw(ast_expr_unary_create(Box::from_raw(copy), AstUnaryOp::Bang))
     } else {
         copy
     }
@@ -1790,7 +1804,7 @@ pub unsafe fn ast_expr_incdec_root(expr: &AstExpr) -> &AstExpr {
     &incdec.operand
 }
 
-unsafe fn ast_expr_copy_call(expr: &AstExpr) -> *mut AstExpr {
+unsafe fn ast_expr_copy_call(expr: &AstExpr) -> Box<AstExpr> {
     let AstExprKind::Call(call) = &expr.kind else {
         panic!()
     };
@@ -1803,36 +1817,29 @@ unsafe fn ast_expr_copy_call(expr: &AstExpr) -> *mut AstExpr {
         *fresh4 = ast_expr_copy(&**(call.arg).offset(i as isize));
         i += 1;
     }
-    return ast_expr_call_create(ast_expr_copy(&call.fun), call.n, arg);
+    ast_expr_call_create(Box::from_raw(ast_expr_copy(&call.fun)), call.n, arg)
 }
 
 pub unsafe fn ast_expr_member_create(
-    struct_: *mut AstExpr,
+    struct_: Box<AstExpr>,
     field: *mut libc::c_char,
-) -> *mut AstExpr {
+) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::StructMember(StructMemberExpr {
-        root: Box::from_raw(struct_),
+        root: struct_,
         field,
     }))
 }
 
 pub unsafe fn ast_expr_binary_create(
-    e1: *mut AstExpr,
+    e1: Box<AstExpr>,
     op: AstBinaryOp,
-    e2: *mut AstExpr,
-) -> *mut AstExpr {
-    ast_expr_create(AstExprKind::Binary(BinaryExpr {
-        e1: Box::from_raw(e1),
-        op,
-        e2: Box::from_raw(e2),
-    }))
+    e2: Box<AstExpr>,
+) -> Box<AstExpr> {
+    ast_expr_create(AstExprKind::Binary(BinaryExpr { e1, op, e2 }))
 }
 
-pub unsafe fn ast_expr_unary_create(root: *mut AstExpr, op: AstUnaryOp) -> *mut AstExpr {
-    ast_expr_create(AstExprKind::Unary(UnaryExpr {
-        op,
-        arg: Box::from_raw(root),
-    }))
+pub unsafe fn ast_expr_unary_create(root: Box<AstExpr>, op: AstUnaryOp) -> Box<AstExpr> {
+    ast_expr_create(AstExprKind::Unary(UnaryExpr { op, arg: root }))
 }
 
 pub unsafe fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> *mut AstExpr {
@@ -1840,10 +1847,10 @@ pub unsafe fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> *mut AstExpr {
         panic!()
     };
 
-    ast_expr_assignment_create(
-        ast_expr_copy(&incdec.operand),
+    Box::into_raw(ast_expr_assignment_create(
+        Box::from_raw(ast_expr_copy(&incdec.operand)),
         ast_expr_binary_create(
-            ast_expr_copy(&incdec.operand),
+            Box::from_raw(ast_expr_copy(&incdec.operand)),
             if incdec.inc != 0 {
                 AstBinaryOp::Addition
             } else {
@@ -1851,12 +1858,12 @@ pub unsafe fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> *mut AstExpr {
             },
             ast_expr_constant_create(1 as libc::c_int),
         ),
-    )
+    ))
 }
 
-pub unsafe fn ast_expr_incdec_create(root: *mut AstExpr, inc: bool, pre: bool) -> *mut AstExpr {
+pub unsafe fn ast_expr_incdec_create(root: Box<AstExpr>, inc: bool, pre: bool) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::IncDec(IncDecExpr {
-        operand: Box::from_raw(root),
+        operand: root,
         inc: inc as libc::c_int,
         pre: pre as libc::c_int,
     }))
@@ -1884,18 +1891,18 @@ pub unsafe fn ast_expr_call_root(expr: &AstExpr) -> &AstExpr {
 }
 
 pub unsafe fn ast_expr_call_create(
-    root: *mut AstExpr,
+    root: Box<AstExpr>,
     narg: libc::c_int,
     arg: *mut *mut AstExpr,
-) -> *mut AstExpr {
+) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Call(CallExpr {
-        fun: Box::from_raw(root),
+        fun: root,
         n: narg,
         arg,
     }))
 }
 
-pub unsafe fn ast_expr_iteration_create() -> *mut AstExpr {
+pub unsafe fn ast_expr_iteration_create() -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Iteration)
 }
 
@@ -1917,10 +1924,10 @@ pub unsafe fn ast_expr_isisdereferencable(expr: &AstExpr) -> bool {
     return matches!(expr.kind, AstExprKind::IsDereferencable(_));
 }
 
-pub unsafe fn ast_expr_dealloc_create(arg: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_dealloc_create(arg: Box<AstExpr>) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Allocation(AllocExpr {
         kind: AstAllocKind::Dealloc,
-        arg: Box::from_raw(arg),
+        arg,
     }))
 }
 
@@ -2010,10 +2017,10 @@ unsafe fn ast_expr_alloc_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     free(arg as *mut libc::c_void);
 }
 
-pub unsafe fn ast_expr_alloc_create(arg: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_alloc_create(arg: Box<AstExpr>) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Allocation(AllocExpr {
         kind: AstAllocKind::Alloc,
-        arg: Box::from_raw(arg),
+        arg,
     }))
 }
 
@@ -2031,11 +2038,11 @@ pub unsafe fn ast_expr_isdeallocand_assertand(expr: &AstExpr) -> &AstExpr {
     assertand
 }
 
-unsafe fn ast_expr_alloc_copy(expr: &AstExpr) -> *mut AstExpr {
+unsafe fn ast_expr_alloc_copy(expr: &AstExpr) -> Box<AstExpr> {
     let AstExprKind::Allocation(alloc) = &expr.kind else {
         panic!()
     };
-    let arg: *mut AstExpr = ast_expr_copy(&*alloc.arg);
+    let arg = Box::from_raw(ast_expr_copy(&*alloc.arg));
     match alloc.kind {
         AstAllocKind::Alloc => ast_expr_alloc_create(arg),
         AstAllocKind::Dealloc => ast_expr_dealloc_create(arg),
@@ -2057,7 +2064,7 @@ pub unsafe fn ast_expr_assignment_rval(expr: &AstExpr) -> &AstExpr {
 }
 
 pub unsafe fn ast_expr_copy(expr: &AstExpr) -> *mut AstExpr {
-    match &expr.kind {
+    Box::into_raw(match &expr.kind {
         AstExprKind::Identifier(id) => ast_expr_identifier_create(dynamic_str(*id)),
         AstExprKind::Constant(c) => {
             if c.ischar {
@@ -2067,36 +2074,41 @@ pub unsafe fn ast_expr_copy(expr: &AstExpr) -> *mut AstExpr {
             }
         }
         AstExprKind::StringLiteral(s) => ast_expr_literal_create(dynamic_str(*s)),
-        AstExprKind::Bracketed(inner) => ast_expr_bracketed_create(ast_expr_copy(inner)),
+        AstExprKind::Bracketed(inner) => {
+            ast_expr_bracketed_create(Box::from_raw(ast_expr_copy(inner)))
+        }
         AstExprKind::Call(_) => ast_expr_copy_call(expr),
         AstExprKind::IncDec(incdec) => ast_expr_incdec_create(
-            ast_expr_copy(&incdec.operand),
+            Box::from_raw(ast_expr_copy(&incdec.operand)),
             incdec.inc != 0,
             incdec.pre != 0,
         ),
-        AstExprKind::StructMember(member) => {
-            ast_expr_member_create(ast_expr_copy(&*member.root), dynamic_str(member.field))
+        AstExprKind::StructMember(member) => ast_expr_member_create(
+            Box::from_raw(ast_expr_copy(&*member.root)),
+            dynamic_str(member.field),
+        ),
+        AstExprKind::Unary(unary) => {
+            ast_expr_unary_create(Box::from_raw(ast_expr_copy(&unary.arg)), unary.op)
         }
-        AstExprKind::Unary(unary) => ast_expr_unary_create(ast_expr_copy(&unary.arg), unary.op),
         AstExprKind::Binary(binary) => ast_expr_binary_create(
-            ast_expr_copy(&binary.e1),
+            Box::from_raw(ast_expr_copy(&binary.e1)),
             binary.op,
-            ast_expr_copy(&binary.e2),
+            Box::from_raw(ast_expr_copy(&binary.e2)),
         ),
         AstExprKind::Assignment(assignment) => ast_expr_assignment_create(
-            ast_expr_copy(&assignment.lval),
-            ast_expr_copy(&assignment.rval),
+            Box::from_raw(ast_expr_copy(&assignment.lval)),
+            Box::from_raw(ast_expr_copy(&assignment.rval)),
         ),
         AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_isdeallocand_create(ast_expr_copy(assertand))
+            ast_expr_isdeallocand_create(Box::from_raw(ast_expr_copy(assertand)))
         }
         AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_isdereferencable_create(ast_expr_copy(assertand))
+            ast_expr_isdereferencable_create(Box::from_raw(ast_expr_copy(assertand)))
         }
         AstExprKind::ArbArg => ast_expr_arbarg_create(),
         AstExprKind::Allocation(_) => ast_expr_alloc_copy(expr),
         _ => panic!(),
-    }
+    })
 }
 
 pub unsafe fn ast_expr_assignment_lval(expr: &AstExpr) -> &AstExpr {
@@ -2169,11 +2181,11 @@ pub unsafe fn ast_expr_binary_e1(expr: &AstExpr) -> &AstExpr {
     &binary.e1
 }
 
-pub unsafe fn ast_expr_difference_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_difference_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
     return ast_expr_binary_create(e1, AstBinaryOp::Subtraction, e2);
 }
 
-pub unsafe fn ast_expr_sum_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_sum_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
     return ast_expr_binary_create(e1, AstBinaryOp::Addition, e2);
 }
 
@@ -2199,7 +2211,7 @@ unsafe fn ast_expr_unary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     free(root as *mut libc::c_void);
 }
 
-pub unsafe fn ast_expr_ge_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_ge_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
     return ast_expr_binary_create(e1, AstBinaryOp::Ge, e2);
 }
 
@@ -2244,30 +2256,30 @@ pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
     drop(Box::from_raw(expr));
 }
 
-pub unsafe fn ast_expr_le_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_le_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
     return ast_expr_binary_create(e1, AstBinaryOp::Le, e2);
 }
 
-pub unsafe fn ast_expr_clump_create(arg: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_clump_create(arg: Box<AstExpr>) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Allocation(AllocExpr {
         kind: AstAllocKind::Clump,
-        arg: Box::from_raw(arg),
+        arg,
     }))
 }
 
-pub unsafe fn ast_expr_gt_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_gt_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
     return ast_expr_binary_create(e1, AstBinaryOp::Gt, e2);
 }
 
-pub unsafe fn ast_expr_lt_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_lt_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
     return ast_expr_binary_create(e1, AstBinaryOp::Lt, e2);
 }
 
-pub unsafe fn ast_expr_ne_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_ne_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
     return ast_expr_binary_create(e1, AstBinaryOp::Ne, e2);
 }
 
-pub unsafe fn ast_expr_eq_create(e1: *mut AstExpr, e2: *mut AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_eq_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
     return ast_expr_binary_create(e1, AstBinaryOp::Eq, e2);
 }
 
@@ -3177,16 +3189,17 @@ pub unsafe fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
 }
 
 unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
-    return ast_expr_absexec(
-        &*ast_expr_assignment_create(
-            ast_expr_identifier_create(
-                b"return\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-            ),
-            // Note: jump_rv can be null. Error in original.
-            ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap()),
+    // Note: Original leaks the expression to avoid a double free.
+    let expr = ast_expr_assignment_create(
+        ast_expr_identifier_create(
+            b"return\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ),
-        state,
+        // Note: jump_rv can be null. Error in original.
+        Box::from_raw(ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap())),
     );
+    let result = ast_expr_absexec(&expr, state);
+    std::mem::forget(expr);
+    result
 }
 
 pub unsafe fn ast_stmt_absexec(
@@ -4251,17 +4264,23 @@ pub unsafe fn ast_function_create(
 }
 
 pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
-    let fun = ptr::read(f);
-    ast_type_destroy(fun.ret);
-    for param in fun.params {
-        ast_variable_destroy(param);
-    }
-    ast_block_destroy(fun.abstract_0);
-    if !fun.body.is_null() {
-        ast_block_destroy(fun.body);
-    }
-    free(fun.name as *mut libc::c_void);
     drop(Box::from_raw(f));
+}
+
+impl Drop for AstFunction {
+    fn drop(&mut self) {
+        unsafe {
+            ast_type_destroy(self.ret);
+            for &param in &self.params {
+                ast_variable_destroy(param);
+            }
+            ast_block_destroy(self.abstract_0);
+            if !self.body.is_null() {
+                ast_block_destroy(self.body);
+            }
+            free(self.name as *mut libc::c_void);
+        }
+    }
 }
 
 pub unsafe fn ast_function_str(f: &AstFunction) -> *mut libc::c_char {

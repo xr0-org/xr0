@@ -356,10 +356,10 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
             if value_issync(obj_value) {
                 object_assign(
                     obj,
-                    value_sync_create(ast_expr_member_create(
-                        ast_expr_copy(&*root),
+                    value_sync_create(Box::into_raw(ast_expr_member_create(
+                        Box::from_raw(ast_expr_copy(&*root)),
                         dynamic_str(field),
-                    )),
+                    ))),
                 );
             }
         }
@@ -380,8 +380,10 @@ unsafe fn frommembers(members: *mut AstVariableArr) -> Box<Map> {
     while i < n {
         m.set(
             dynamic_str(ast_variable_name(*v.offset(i as isize))),
-            object_value_create(ast_expr_constant_create(0 as libc::c_int), 0 as *mut Value)
-                as *const libc::c_void,
+            object_value_create(
+                Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
+                0 as *mut Value,
+            ) as *const libc::c_void,
         );
         i += 1;
     }
@@ -651,7 +653,7 @@ pub unsafe fn value_as_sync(v: *mut Value) -> *mut AstExpr {
 
 pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
     match (*v).type_0 {
-        1 => ast_expr_identifier_create(value_str(v)),
+        1 => Box::into_raw(ast_expr_identifier_create(value_str(v))),
         3 => ast_expr_copy(&*value_as_literal(v)),
         0 => ast_expr_copy(&*value_as_sync(v)),
         2 => number_to_expr((*v).c2rust_unnamed.n),
@@ -663,7 +665,7 @@ pub unsafe fn value_isliteral(v: *mut Value) -> bool {
     if (*v).type_0 as libc::c_uint != VALUE_LITERAL as libc::c_int as libc::c_uint {
         return false;
     }
-    return 1 as libc::c_int != 0;
+    true
 }
 
 pub unsafe fn value_as_literal(v: *mut Value) -> *mut AstExpr {
@@ -673,7 +675,7 @@ pub unsafe fn value_as_literal(v: *mut Value) -> *mut AstExpr {
     {
         panic!();
     }
-    return ast_expr_literal_create((*v).c2rust_unnamed.s);
+    Box::into_raw(ast_expr_literal_create((*v).c2rust_unnamed.s))
 }
 
 pub unsafe fn value_type(v: *mut Value) -> ValueType {
@@ -1053,10 +1055,11 @@ pub unsafe fn number_ranges_to_expr(arr: *mut NumberRangeArr) -> *mut AstExpr {
     if !(number_range_arr_n(arr) == 1 as libc::c_int) {
         panic!();
     }
-    ast_expr_constant_create(number_range_as_constant(
+    Box::into_raw(ast_expr_constant_create(number_range_as_constant(
         *((*arr).range).offset(0 as libc::c_int as isize),
-    ))
+    )))
 }
+
 unsafe fn number_range_arr_canbe(arr: *mut NumberRangeArr, value: bool) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {

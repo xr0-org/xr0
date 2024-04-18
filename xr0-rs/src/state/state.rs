@@ -236,7 +236,7 @@ pub unsafe fn state_vconst(
         return v;
     }
     let c: *mut libc::c_char = vconst_declare((*state).vconst, v, comment, persist);
-    return value_sync_create(ast_expr_identifier_create(c));
+    return value_sync_create(Box::into_raw(ast_expr_identifier_create(c)));
 }
 
 pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value {
@@ -246,7 +246,10 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
         return value_ptr_create(loc);
     }
     let address: libc::c_int = static_memory_newblock((*state).static_memory);
-    loc = location_create_static(address, ast_expr_constant_create(0 as libc::c_int));
+    loc = location_create_static(
+        address,
+        Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
+    );
     let res: ObjectRes = state_get(state, loc, 1 as libc::c_int != 0);
     if !(res.err).is_null() {
         panic!();
@@ -261,8 +264,10 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
 
 pub unsafe fn state_clump(state: *mut State) -> *mut Value {
     let address: libc::c_int = clump_newblock((*state).clump);
-    let loc: *mut Location =
-        location_create_dereferencable(address, ast_expr_constant_create(0 as libc::c_int));
+    let loc: *mut Location = location_create_dereferencable(
+        address,
+        Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
+    );
     return value_ptr_create(loc);
 }
 

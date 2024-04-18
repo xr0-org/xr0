@@ -118,7 +118,10 @@ pub unsafe fn heap_newblock(h: *mut Heap) -> *mut Location {
         (::core::mem::size_of::<bool>()).wrapping_mul(n as usize),
     ) as *mut bool;
     *((*h).freed).offset(address as isize) = 0 as libc::c_int != 0;
-    return location_create_dynamic(address, ast_expr_constant_create(0 as libc::c_int));
+    return location_create_dynamic(
+        address,
+        Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
+    );
 }
 
 pub unsafe fn heap_getblock(h: *mut Heap, address: libc::c_int) -> *mut Block {
@@ -172,8 +175,10 @@ pub unsafe fn heap_referenced(h: *mut Heap, s: *mut State) -> bool {
     return 1 as libc::c_int != 0;
 }
 unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
-    let loc: *mut Location =
-        location_create_dynamic(addr, ast_expr_constant_create(0 as libc::c_int));
+    let loc: *mut Location = location_create_dynamic(
+        addr,
+        Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
+    );
     let referenced: bool = state_references(s, loc);
     location_destroy(loc);
     return referenced;
