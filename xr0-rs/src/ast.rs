@@ -3543,9 +3543,9 @@ pub unsafe fn ast_stmt_iter_upper_bound(stmt: &AstStmt) -> &AstExpr {
 unsafe fn iter_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
     let mut err: *mut Error = ptr::null_mut();
     let alloc = hack_alloc_from_neteffect(stmt);
-    let lw = ast_stmt_iter_lower_bound(stmt) as *const AstExpr as *mut AstExpr;
-    let up = ast_stmt_iter_upper_bound(stmt) as *const AstExpr as *mut AstExpr;
-    err = ast_expr_alloc_rangeprocess(alloc, &*lw, &*up, state);
+    let lw = ast_stmt_iter_lower_bound(stmt);
+    let up = ast_stmt_iter_upper_bound(stmt);
+    err = ast_expr_alloc_rangeprocess(alloc, lw, up, state);
     if !err.is_null() {
         return result_error_create(err);
     }
