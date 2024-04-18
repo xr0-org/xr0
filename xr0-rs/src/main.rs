@@ -8,7 +8,7 @@ use std::process::{self, Command, Stdio};
 use std::{env, ptr};
 
 use clap::Parser;
-use libc::{exit, fprintf, strcmp};
+use libc::strcmp;
 
 mod util;
 
@@ -29,7 +29,6 @@ use ast::{
     ast_functiondecl_create, ast_protostitch, ast_topological_order, Ast, AstExpr, AstExternDecl,
     AstFunction, AstType, AstVariable, AstVariableArr,
 };
-use c_util::__stderrp;
 use ext::{externals_create, externals_destroy, externals_getfunc, Externals};
 use math::MathExpr;
 use object::{Object, ObjectArr};
@@ -112,7 +111,7 @@ pub unsafe fn pass0(root_0: *mut Ast, ext: *mut Externals) {
                 ast_externdecl_install(decl, ext);
             } else if ast_function_isproto(&*f) {
                 if !verifyproto(f, (*root_0).n, (*root_0).decl) {
-                    exit(1 as libc::c_int);
+                    process::exit(1);
                 }
                 ast_externdecl_install(decl, ext);
             } else {
@@ -134,12 +133,8 @@ pub unsafe fn pass1(root_0: *mut Ast, ext: *mut Externals) {
                 || ast_function_isproto(&*f) as libc::c_int != 0)
             {
                 if let Err(err) = ast_function_verify(f, ext) {
-                    fprintf(
-                        __stderrp,
-                        b"%s\n\0" as *const u8 as *const libc::c_char,
-                        err.msg,
-                    );
-                    exit(1 as libc::c_int);
+                    eprintln!("{}", CStr::from_ptr(err.msg).to_string_lossy());
+                    process::exit(1);
                 }
                 vprintln!(
                     "qed {}",
@@ -161,17 +156,12 @@ pub unsafe fn pass_inorder(order: &mut StringArr, ext: *mut Externals) {
             || ast_function_isproto(&*f) as libc::c_int != 0)
         {
             if let Err(err) = ast_function_verify(f, ext) {
-                fprintf(
-                    __stderrp,
-                    b"%s\n\0" as *const u8 as *const libc::c_char,
-                    err.msg,
-                );
-                exit(1 as libc::c_int);
+                eprintln!("{}", CStr::from_ptr(err.msg).to_string_lossy());
+                process::exit(1);
             }
-            fprintf(
-                __stderrp,
-                b"qed %s\n\0" as *const u8 as *const libc::c_char,
-                ast_function_name(&*f),
+            eprintln!(
+                "qed {}",
+                CStr::from_ptr(ast_function_name(&*f)).to_string_lossy()
             );
         }
         i += 1;
@@ -207,26 +197,22 @@ unsafe fn verifyproto(
         if proto_defisvalid(proto, def) {
             return 1 as libc::c_int != 0;
         }
-        fprintf(
-            __stderrp,
-            b"function `%s' prototype and definition abstracts mismatch\n\0" as *const u8
-                as *const libc::c_char,
-            pname,
+        eprintln!(
+            "function `{}' prototype and definition abstracts mismatch",
+            CStr::from_ptr(pname).to_string_lossy()
         );
     } else if count == 0 as libc::c_int {
-        fprintf(
-            __stderrp,
-            b"function `%s' missing definition\n\0" as *const u8 as *const libc::c_char,
-            pname,
+        eprintln!(
+            "function `{}' missing definition",
+            CStr::from_ptr(pname).to_string_lossy()
         );
     } else if count > 1 as libc::c_int {
-        fprintf(
-            __stderrp,
-            b"function `%s' has multiple definitions\n\0" as *const u8 as *const libc::c_char,
-            pname,
+        eprintln!(
+            "function `{}' has multiple definitions",
+            CStr::from_ptr(pname).to_string_lossy()
         );
     }
-    return 0 as libc::c_int != 0;
+    false
 }
 
 unsafe fn proto_defisvalid(proto: *mut AstFunction, def: *mut AstFunction) -> bool {
@@ -257,18 +243,16 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
     if let Some(sortfunc) = &c.sort {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
         let order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, ext);
-        fprintf(
-            __stderrp,
-            b"%s\n\0" as *const u8 as *const libc::c_char,
-            string_arr_str(&order),
+        eprintln!(
+            "{}",
+            CStr::from_ptr(string_arr_str(&order)).to_string_lossy()
         );
     } else if let Some(sortfunc) = &c.verify {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
         let mut order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, ext);
-        fprintf(
-            __stderrp,
-            b"%s\n\0" as *const u8 as *const libc::c_char,
-            string_arr_str(&order),
+        eprintln!(
+            "{}",
+            CStr::from_ptr(string_arr_str(&order)).to_string_lossy()
         );
         pass_inorder(&mut order, ext);
     } else {
