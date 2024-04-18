@@ -201,7 +201,7 @@ pub struct AstFunction {
     pub ret: *mut AstType,
     pub name: *mut libc::c_char,
     pub params: Vec<*mut AstVariable>,
-    pub abstract_0: *mut AstBlock,
+    pub r#abstract: *mut AstBlock,
     pub body: *mut AstBlock, // can be null
 }
 
@@ -235,7 +235,7 @@ pub struct AstIterationStmt {
     pub cond: *mut AstStmt,
     pub body: *mut AstStmt,
     pub iter: Box<AstExpr>,
-    pub abstract_0: *mut AstBlock,
+    pub r#abstract: *mut AstBlock,
 }
 
 pub struct AstSelectionStmt {
@@ -2790,7 +2790,7 @@ pub unsafe fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
     let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!()
     };
-    &*iteration.abstract_0
+    &*iteration.r#abstract
 }
 
 pub unsafe fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
@@ -2809,9 +2809,9 @@ unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder)
     let cond: *mut libc::c_char = ast_stmt_str(&*iteration.cond);
     let body: *mut libc::c_char = ast_stmt_str(&*iteration.body);
     let iter: *mut libc::c_char = ast_expr_str(&iteration.iter);
-    let abs: *mut libc::c_char = (if !(iteration.abstract_0).is_null() {
+    let abs: *mut libc::c_char = (if !(iteration.r#abstract).is_null() {
         ast_block_str(
-            &*iteration.abstract_0,
+            &*iteration.r#abstract,
             b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ) as *const libc::c_char
     } else {
@@ -3121,7 +3121,7 @@ unsafe fn ast_stmt_copy_iter(
     let init = ast_stmt_copy(&*iteration.init);
     let cond = ast_stmt_copy(&*iteration.cond);
     let iter = ast_expr_copy(&iteration.iter);
-    let abstract_0 = ast_block_copy(&*iteration.abstract_0);
+    let abstract_0 = ast_block_copy(&*iteration.r#abstract);
     let body = ast_stmt_copy(&*iteration.body);
 
     ast_stmt_create_iter(loc, init, cond, iter, abstract_0, body, as_iteration_e)
@@ -3143,7 +3143,7 @@ pub unsafe fn ast_stmt_create_iter(
         cond,
         iter,
         body,
-        abstract_0,
+        r#abstract: abstract_0,
     };
     (*stmt).kind = if as_iteration_e {
         AstStmtKind::IterationE(iter)
@@ -3344,7 +3344,7 @@ impl Drop for AstStmtKind {
                     ast_stmt_destroy(iteration.init);
                     ast_stmt_destroy(iteration.cond);
                     ast_stmt_destroy(iteration.body);
-                    ast_block_destroy(iteration.abstract_0);
+                    ast_block_destroy(iteration.r#abstract);
                 }
                 AstStmtKind::Expr(_) => {}
                 AstStmtKind::Jump(_) => {}
@@ -3978,7 +3978,7 @@ pub unsafe fn ast_function_create(
         ret,
         name,
         params,
-        abstract_0,
+        r#abstract: abstract_0,
         body,
     }))
 }
@@ -3994,7 +3994,7 @@ impl Drop for AstFunction {
             for &param in &self.params {
                 ast_variable_destroy(param);
             }
-            ast_block_destroy(self.abstract_0);
+            ast_block_destroy(self.r#abstract);
             if !self.body.is_null() {
                 ast_block_destroy(self.body);
             }
@@ -4023,7 +4023,7 @@ pub unsafe fn ast_function_str(f: &AstFunction) -> *mut libc::c_char {
         free(v as *mut libc::c_void);
     }
     let abs: *mut libc::c_char = ast_block_str(
-        &*f.abstract_0,
+        &*f.r#abstract,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     strbuilder_printf(b, b") ~ [\n%s]\0" as *const u8 as *const libc::c_char, abs);
@@ -4057,7 +4057,7 @@ pub unsafe fn ast_function_copy(f: &AstFunction) -> *mut AstFunction {
         ast_type_copy(f.ret),
         dynamic_str(f.name),
         params,
-        ast_block_copy(&*f.abstract_0),
+        ast_block_copy(&*f.r#abstract),
         if !f.body.is_null() {
             ast_block_copy(&*f.body)
         } else {
@@ -4071,12 +4071,12 @@ pub unsafe fn ast_function_isaxiom(f: &AstFunction) -> bool {
 }
 
 pub unsafe fn ast_function_isproto(f: &AstFunction) -> bool {
-    return !(f.abstract_0).is_null() && (f.body).is_null();
+    return !(f.r#abstract).is_null() && (f.body).is_null();
 }
 
 pub unsafe fn ast_function_absisempty(f: &AstFunction) -> bool {
-    return ast_block_ndecls(&*f.abstract_0) == 0 as libc::c_int
-        && ast_block_nstmts(&*f.abstract_0) == 0 as libc::c_int;
+    return ast_block_ndecls(&*f.r#abstract) == 0 as libc::c_int
+        && ast_block_nstmts(&*f.r#abstract) == 0 as libc::c_int;
 }
 
 pub unsafe fn ast_function_type(f: &AstFunction) -> *mut AstType {
@@ -4093,8 +4093,8 @@ pub unsafe fn ast_function_body(f: &AstFunction) -> &AstBlock {
 }
 
 pub unsafe fn ast_function_abstract(f: &AstFunction) -> &AstBlock {
-    assert!(!f.abstract_0.is_null());
-    &*f.abstract_0
+    assert!(!f.r#abstract.is_null());
+    &*f.r#abstract
 }
 
 pub unsafe fn ast_function_params(f: &AstFunction) -> &[*mut AstVariable] {
@@ -4110,8 +4110,8 @@ pub unsafe fn ast_function_protostitch(
     ext: *mut Externals,
 ) -> *mut AstFunction {
     let proto: *mut AstFunction = externals_getfunc(ext, (*f).name);
-    if !proto.is_null() && !((*proto).abstract_0).is_null() {
-        (*f).abstract_0 = ast_block_copy(&*(*proto).abstract_0);
+    if !proto.is_null() && !((*proto).r#abstract).is_null() {
+        (*f).r#abstract = ast_block_copy(&*(*proto).r#abstract);
     }
     return f;
 }
@@ -4218,8 +4218,8 @@ unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Res
 }
 
 unsafe fn ast_function_setupabsexec(f: &AstFunction, state: *mut State) -> Result<()> {
-    let nstmts: libc::c_int = ast_block_nstmts(&*f.abstract_0);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(&*f.abstract_0);
+    let nstmts: libc::c_int = ast_block_nstmts(&*f.r#abstract);
+    let stmt: *mut *mut AstStmt = ast_block_stmts(&*f.r#abstract);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < nstmts {
         ast_stmt_setupabsexec(&**stmt.offset(i as isize), state)?;
@@ -4291,17 +4291,17 @@ unsafe fn path_verify(
 }
 
 pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result<*mut Value> {
-    let ndecls: libc::c_int = ast_block_ndecls(&*f.abstract_0);
+    let ndecls: libc::c_int = ast_block_ndecls(&*f.r#abstract);
     if ndecls != 0 {
-        let var: *mut *mut AstVariable = ast_block_decls(&*f.abstract_0);
+        let var: *mut *mut AstVariable = ast_block_decls(&*f.r#abstract);
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < ndecls {
             state_declare(state, *var.offset(i as isize), false);
             i += 1;
         }
     }
-    let nstmts: libc::c_int = ast_block_nstmts(&*f.abstract_0);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(&*f.abstract_0);
+    let nstmts: libc::c_int = ast_block_nstmts(&*f.r#abstract);
+    let stmt: *mut *mut AstStmt = ast_block_stmts(&*f.r#abstract);
     let mut i_0: libc::c_int = 0 as libc::c_int;
     while i_0 < nstmts {
         ast_stmt_absexec(&**stmt.offset(i_0 as isize), state, false)?;
@@ -4411,7 +4411,7 @@ unsafe fn abstract_paths(
         ast_type_copy(f.ret),
         split_name(f.name, cond),
         ast_variables_copy(&f.params),
-        ast_block_copy(&*f.abstract_0),
+        ast_block_copy(&*f.r#abstract),
         ast_block_copy(&*f.body),
     );
     // Note: Original leaks inv_assumption, but I think unintentionally.
@@ -4421,7 +4421,7 @@ unsafe fn abstract_paths(
         ast_type_copy(f.ret),
         split_name(f.name, &inv_assumption),
         ast_variables_copy(&f.params),
-        ast_block_copy(&*f.abstract_0),
+        ast_block_copy(&*f.r#abstract),
         ast_block_copy(&*f.body),
     );
     vec![f_true, f_false]
@@ -4508,7 +4508,7 @@ unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> Vec
         ast_type_copy(f.ret),
         split_name(f.name, cond),
         ast_variables_copy(&f.params),
-        ast_block_copy(&*f.abstract_0),
+        ast_block_copy(&*f.r#abstract),
         f.body,
     );
     // Note: Original leaks `inv_assumption` but I think accidentally.
@@ -4518,7 +4518,7 @@ unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> Vec
         ast_type_copy(f.ret),
         split_name(f.name, &*inv_assumption),
         ast_variables_copy(&f.params),
-        ast_block_copy(&*f.abstract_0),
+        ast_block_copy(&*f.r#abstract),
         f.body,
     );
     vec![f_true, f_false]

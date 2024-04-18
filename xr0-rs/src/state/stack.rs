@@ -39,9 +39,9 @@ pub struct Stack {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Variable {
-    pub type_0: *mut AstType,
+    pub r#type: *mut AstType,
     pub loc: *mut Location,
-    pub isparam: bool,
+    pub is_param: bool,
 }
 
 pub unsafe fn stack_newblock(stack: *mut Stack) -> *mut Location {
@@ -262,8 +262,8 @@ pub unsafe fn variable_create(
     isparam: bool,
 ) -> *mut Variable {
     let v: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
-    (*v).type_0 = ast_type_copy(type_0);
-    (*v).isparam = isparam;
+    (*v).r#type = ast_type_copy(type_0);
+    (*v).is_param = isparam;
     (*v).loc = stack_newblock(stack);
     let b = location_getblock(
         (*v).loc,
@@ -288,23 +288,23 @@ pub unsafe fn variable_create(
 }
 
 pub unsafe fn variable_destroy(v: *mut Variable) {
-    ast_type_destroy((*v).type_0);
+    ast_type_destroy((*v).r#type);
     location_destroy((*v).loc);
     free(v as *mut libc::c_void);
 }
 
 pub unsafe fn variable_copy(old: *mut Variable) -> *mut Variable {
     let new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
-    (*new).type_0 = ast_type_copy((*old).type_0);
-    (*new).isparam = (*old).isparam;
+    (*new).r#type = ast_type_copy((*old).r#type);
+    (*new).is_param = (*old).is_param;
     (*new).loc = location_copy((*old).loc);
     return new;
 }
 
 unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Variable {
     let new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
-    (*new).type_0 = ast_type_copy((*old).type_0);
-    (*new).isparam = (*old).isparam;
+    (*new).r#type = ast_type_copy((*old).r#type);
+    (*new).is_param = (*old).is_param;
     (*new).loc = location_copy((*old).loc);
     let obj = state_get(s, (*new).loc, 0 as libc::c_int != 0).unwrap();
     if obj.is_null() {
@@ -331,9 +331,9 @@ pub unsafe fn variable_str(
         panic!();
     }
     let b: *mut StrBuilder = strbuilder_create();
-    let type_0: *mut libc::c_char = ast_type_str((*var).type_0);
+    let type_0: *mut libc::c_char = ast_type_str((*var).r#type);
     let loc: *mut libc::c_char = location_str((*var).loc);
-    let isparam: *mut libc::c_char = (if (*var).isparam as libc::c_int != 0 {
+    let isparam: *mut libc::c_char = (if (*var).is_param as libc::c_int != 0 {
         b"param \0" as *const u8 as *const libc::c_char
     } else {
         b"\0" as *const u8 as *const libc::c_char
@@ -373,7 +373,7 @@ pub unsafe fn variable_location(v: *mut Variable) -> *mut Location {
 }
 
 pub unsafe fn variable_type(v: *mut Variable) -> *mut AstType {
-    return (*v).type_0;
+    return (*v).r#type;
 }
 
 pub unsafe fn variable_references(v: *mut Variable, loc: *mut Location, s: *mut State) -> bool {
@@ -384,5 +384,5 @@ pub unsafe fn variable_references(v: *mut Variable, loc: *mut Location, s: *mut 
 }
 
 pub unsafe fn variable_isparam(v: *mut Variable) -> bool {
-    return (*v).isparam;
+    return (*v).is_param;
 }
