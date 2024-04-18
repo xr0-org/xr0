@@ -264,6 +264,63 @@ stack_isnested(struct stack *s)
 	return s->kind == FRAME_NESTED;
 }
 
+static char *
+stack_propername(struct stack *);
+
+static char *
+stack_context(struct stack *);
+
+struct error *
+stack_trace(struct stack *s, struct error *err)
+{
+	if (s->kind != FRAME_CALL) {
+		assert(s->prev);
+		return stack_trace(s->prev, err);
+	}
+
+	struct strbuilder *b = strbuilder_create();
+
+	char *loc = program_loc(s->p);
+	char *err_str = error_str(err);
+	strbuilder_printf(b, "%s: %s (%s)", loc, err_str, stack_propername(s));
+	free(err_str);
+	free(loc);
+	char *context = stack_context(s->prev);
+	if (strlen(context)) {
+		strbuilder_printf(b, "%s", context);
+	}
+	free(context);
+
+	char *msg = strbuilder_build(b);
+	struct error *trace_err = error_printf("%s", msg);
+	free(msg);
+	return trace_err;
+}
+
+static char *
+stack_propername(struct stack *s)
+{
+	return s->kind == FRAME_CALL ? program_name(s->p) : stack_propername(s->prev);
+}
+
+static char *
+stack_context(struct stack *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	if (s->kind == FRAME_CALL) {
+		char *loc = program_loc(s->p);
+		strbuilder_printf(b, "\t%s (%s)", loc, stack_propername(s));
+		free(loc);
+	}
+	if (s->prev) {
+		char *prev = stack_context(s->prev);
+		if (strlen(prev)) {
+			strbuilder_printf(b, "\n%s", prev);
+		}
+	}
+	return strbuilder_build(b);
+}
+
 struct variable *
 stack_getresult(struct stack *s)
 {

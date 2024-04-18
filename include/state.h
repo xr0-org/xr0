@@ -151,6 +151,9 @@ state_readregister(struct state *);
 void
 state_writeregister(struct state *, struct value *);
 
+struct error *
+state_stacktrace(struct state *, struct error *);
+
 
 /* FRAME DTO */
 

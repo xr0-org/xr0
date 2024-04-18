@@ -242,6 +242,12 @@ state_writeregister(struct state *state, struct value *v)
 	state->reg = v;
 }
 
+struct error *
+state_stacktrace(struct state *s, struct error *err)
+{
+	return stack_trace(s->stack, err);
+}
+
 struct value *
 state_static_init(struct state *state, struct ast_expr *expr)
 {

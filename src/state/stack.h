@@ -53,6 +53,9 @@ stack_undeclare(struct stack *stack, struct state *state);
 bool
 stack_isnested(struct stack *);
 
+struct error *
+stack_trace(struct stack *, struct error *);
+
 struct variable *
 stack_getresult(struct stack *);
 

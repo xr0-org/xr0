@@ -24,4 +24,7 @@ program_atend(struct program *);
 struct error *
 program_exec(struct program *, bool abstract, struct state *);
 
+char *
+program_loc(struct program *);
+
 #endif
