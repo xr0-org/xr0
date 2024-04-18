@@ -195,6 +195,11 @@ path_init_abstract(struct path *p)
 	if (err) {
 		return err;
 	}
+	err = ast_function_setupabsexec(p->f, p->abstract);
+	if (err) {
+		return err;
+	}
+	state_clearregister(p->abstract);
 	p->path_state = PATH_STATE_ABSTRACT;
 	return NULL;
 }
@@ -221,6 +226,7 @@ path_init_actual(struct path *p)
 	if (err) {
 		return err;
 	}
+	state_clearregister(p->actual);
 	p->path_state = PATH_STATE_ACTUAL;
 	return NULL;
 }

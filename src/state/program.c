@@ -151,6 +151,7 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 {
 	v_printf("in frame: %d\n", state_frameid(s));
 	v_printf("program:\n%s\n", program_str(p));
+	v_printf("state: %s\n", state_str(s));
 	struct error *err = program_stmt_process(p, abstract, s);
 	if (!err) {
 		program_nextstmt(p, s);
