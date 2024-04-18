@@ -905,16 +905,14 @@ unsafe fn expr_binary_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
 }
 
 unsafe fn expr_incdec_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
-    let assign: *mut AstExpr = ast_expr_incdec_to_assignment(expr);
-    let mut res: *mut Result = 0 as *mut Result;
+    let assign = ast_expr_incdec_to_assignment(expr);
     if ast_expr_incdec_pre(expr) {
-        res = expr_assign_eval(&*assign, state);
+        expr_assign_eval(&assign, state)
     } else {
-        res = ast_expr_eval(ast_expr_incdec_root(expr), state);
-        result_destroy(expr_assign_eval(&*assign, state));
+        let res = ast_expr_eval(ast_expr_incdec_root(expr), state);
+        result_destroy(expr_assign_eval(&assign, state));
+        res
     }
-    ast_expr_destroy(assign);
-    return res;
 }
 
 unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
@@ -1834,12 +1832,12 @@ pub unsafe fn ast_expr_unary_create(root: Box<AstExpr>, op: AstUnaryOp) -> Box<A
     ast_expr_create(AstExprKind::Unary(UnaryExpr { op, arg: root }))
 }
 
-pub unsafe fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> *mut AstExpr {
+pub unsafe fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> Box<AstExpr> {
     let AstExprKind::IncDec(incdec) = &expr.kind else {
         panic!()
     };
 
-    Box::into_raw(ast_expr_assignment_create(
+    ast_expr_assignment_create(
         ast_expr_copy(&incdec.operand),
         ast_expr_binary_create(
             ast_expr_copy(&incdec.operand),
@@ -1850,7 +1848,7 @@ pub unsafe fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> *mut AstExpr {
             },
             ast_expr_constant_create(1 as libc::c_int),
         ),
-    ))
+    )
 }
 
 pub unsafe fn ast_expr_incdec_create(root: Box<AstExpr>, inc: bool, pre: bool) -> Box<AstExpr> {
