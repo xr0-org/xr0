@@ -737,11 +737,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	/* XXX: pass copy so we don't observe */
 	if ((err = call_setupverify(f, state_copy(state)))) {
 		return result_error_create(
-			error_printf(
-				"`%s' precondition failure\n"
-				"\t%w",
-				name, err
-			)
+			error_printf("precondition failure: %w", err)
 		);
 	}
 
@@ -1505,6 +1501,7 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 	case EXPR_IDENTIFIER:
+	case EXPR_ARBARG:
 		return expr;
 	case EXPR_UNARY:
 		return unary_geninstr(expr, loc, b, s);
