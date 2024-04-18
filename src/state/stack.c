@@ -280,22 +280,27 @@ stack_trace(struct stack *s, struct error *err)
 
 	struct strbuilder *b = strbuilder_create();
 
-	printf("program: %s\n", program_str(s->p));
 	char *loc = program_loc(s->p);
 	char *err_str = error_str(err);
 	strbuilder_printf(b, "%s: %s (%s)", loc, err_str, stack_propername(s));
 	free(err_str);
 	free(loc);
-	char *context = stack_context(s->prev);
-	if (strlen(context)) {
-		strbuilder_printf(b, "%s", context);
-	}
-	free(context);
+	if (s->prev) {
+		char *context = stack_context(s->prev);
+		if (strlen(context)) {
+			strbuilder_printf(b, "%s", context);
+		}
+		free(context);
 
+		char *msg = strbuilder_build(b);
+		struct error *trace_err = error_printf("%s", msg);
+		free(msg);
+		return trace_err;
+	}
 	char *msg = strbuilder_build(b);
-	struct error *trace_err = error_printf("%s", msg);
+	struct error *e = error_printf("%s", msg);
 	free(msg);
-	return trace_err;
+	return e;
 }
 
 static char *
