@@ -519,7 +519,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule expression_statement() -> BoxedStmt =
         ";" p:position!() { unsafe { ast_stmt_create_nop(env.lexloc(p)) } } /
-        e:expression() _ ";" p:position!() { unsafe { ast_stmt_create_expr(env.lexloc(p), Box::into_raw(e)) } }
+        e:expression() _ ";" p:position!() { unsafe { ast_stmt_create_expr(env.lexloc(p), e) } }
 
     rule selection_statement() -> BoxedStmt =
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() p:position!() {

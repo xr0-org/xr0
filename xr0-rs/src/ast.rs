@@ -2732,7 +2732,7 @@ pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> *mut AstStmt {
         ),
 
         AstStmtKind::Nop => ast_stmt_create_nop(loc),
-        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, Box::into_raw(ast_expr_copy(expr))),
+        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, ast_expr_copy(expr)),
         AstStmtKind::Compound(compound) => {
             ast_stmt_create_compound(loc, ast_block_copy(&**compound))
         }
@@ -3504,9 +3504,9 @@ pub unsafe fn ast_stmt_create_nop(loc: *mut LexemeMarker) -> *mut AstStmt {
     return stmt;
 }
 
-pub unsafe fn ast_stmt_create_expr(loc: *mut LexemeMarker, expr: *mut AstExpr) -> *mut AstStmt {
+pub unsafe fn ast_stmt_create_expr(loc: *mut LexemeMarker, expr: Box<AstExpr>) -> *mut AstStmt {
     let stmt: *mut AstStmt = ast_stmt_create(loc);
-    (*stmt).kind = AstStmtKind::Expr(Box::from_raw(expr));
+    (*stmt).kind = AstStmtKind::Expr(expr);
     return stmt;
 }
 
