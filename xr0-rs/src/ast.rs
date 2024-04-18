@@ -2,11 +2,11 @@
 
 use std::ffi::CStr;
 use std::fmt::{self, Display, Formatter};
+use std::process;
 use std::ptr;
 
-use libc::{exit, fprintf, free, malloc, realloc, strcmp, strncmp};
+use libc::{free, malloc, realloc, strcmp, strncmp};
 
-use crate::c_util::__stderrp;
 use crate::ext::{
     externals_declarefunc, externals_declarestruct, externals_declaretypedef, externals_declarevar,
     externals_getfunc, externals_getstruct, externals_gettypedef,
@@ -2308,11 +2308,8 @@ pub unsafe fn topological_order(fname: *mut libc::c_char, ext: *mut Externals) -
         }
     }
     if order.n != indegrees.len() {
-        fprintf(
-            __stderrp,
-            b"cycle detected in graph\0" as *const u8 as *const libc::c_char,
-        );
-        exit(1 as libc::c_int);
+        eprintln!("cycle detected in graph");
+        process::exit(1);
     }
     order
 }
@@ -4353,12 +4350,11 @@ unsafe fn recurse_buildgraph(
     dedup.set(fname, 1 as libc::c_int as *mut libc::c_void);
     let f: *mut AstFunction = externals_getfunc(ext, fname);
     if f.is_null() {
-        fprintf(
-            __stderrp,
-            b"function `%s' is not declared\n\0" as *const u8 as *const libc::c_char,
-            fname,
+        eprintln!(
+            "function `{}' is not declared",
+            CStr::from_ptr(fname).to_string_lossy()
         );
-        exit(1 as libc::c_int);
+        process::exit(1);
     }
     if f.is_null() {
         panic!();
