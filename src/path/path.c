@@ -265,6 +265,8 @@ path_step_actual(struct path *p)
 		path_split(p, error_get_undecideable_cond(uc_err));
 		return NULL;
 	}
+	printf("error: %s\n", error_str(err));
+	printf("state: %s\n", state_str(p->actual));
 	return state_stacktrace(p->actual, err);
 }
 

@@ -2,7 +2,6 @@
 
 int
 func(int *x) ~ [ 
-	int i;
 	setup: {
 		x = .malloc(1);
 		*x = $;

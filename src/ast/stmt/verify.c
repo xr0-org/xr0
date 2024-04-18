@@ -13,28 +13,37 @@
 #include "value.h"
 
 static struct error *
-expr_linearise(struct ast_stmt *, struct ast_block *, struct state *);
+expr_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
 
 static struct error *
-labelled_linearise(struct ast_stmt *, struct ast_block *, struct state *);
+labelled_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
 
 static struct error *
-compound_linearise(struct ast_stmt *, struct ast_block *, struct state *);
+compound_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
 
 static struct error *
-jump_linearise(struct ast_stmt *, struct ast_block *, struct state *);
+jump_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
 
 static struct error *
-selection_linearise(struct ast_stmt *, struct ast_block *, struct state *);
+selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
 
 static struct error *
-ast_stmt_linearise_proper(struct ast_stmt *, struct ast_block *, struct state *);
+ast_stmt_linearise_proper(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
 
 struct error *
 ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 {
+	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
 	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
-	struct error *err = ast_stmt_linearise_proper(stmt, b, state);
+	struct error *err = ast_stmt_linearise_proper(
+		stmt, b, lexememarker_copy(loc), state
+	);
 	if (err) {
 		return err;
 	}
@@ -46,31 +55,31 @@ ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
-ast_stmt_linearise_proper(struct ast_stmt *stmt, struct ast_block *b, struct state *state)
+ast_stmt_linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_EXPR:
-		return expr_linearise(stmt, b, state);
+		return expr_linearise(stmt, b, loc, state);
 	case STMT_LABELLED:
-		return labelled_linearise(stmt, b, state);
+		return labelled_linearise(stmt, b, loc, state);
 	case STMT_COMPOUND_V:
 		return NULL;
 	case STMT_COMPOUND:
-		return compound_linearise(stmt, b, state);
+		return compound_linearise(stmt, b, loc, state);
 	case STMT_JUMP:
-		return jump_linearise(stmt, b, state);
+		return jump_linearise(stmt, b, loc, state);
 	case STMT_SELECTION:
-		return selection_linearise(stmt, b, state);
+		return selection_linearise(stmt, b, loc, state);
 	default:
 		assert(false);
 	}
 }
 
 static struct error *
-expr_linearise(struct ast_stmt *stmt, struct ast_block *b, struct state *state)
+expr_linearise(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
 {
-	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
-
 	struct ast_expr *expr = ast_expr_geninstr(
 		ast_expr_copy(ast_stmt_as_expr(stmt)),
 		lexememarker_copy(loc),
@@ -84,17 +93,17 @@ static void
 append_block(struct ast_block *b, struct ast_block *appendage);
 
 static struct error *
-labelled_linearise(struct ast_stmt *stmt, struct ast_block *b,struct state *state)
+labelled_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
+		struct state *state)
 {
 	/* XXX: only execute if in lowest frame*/
 	if (state_frameid(state) != 0) {
 		return NULL;
 	}
-	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
 	struct ast_stmt *substmt = ast_stmt_labelled_stmt(stmt);
 
 	struct ast_block *b_sub = ast_block_create(NULL, 0, NULL, 0);
-	struct error *err = ast_stmt_linearise_proper(substmt, b_sub, state);
+	struct error *err = ast_stmt_linearise_proper(substmt, b_sub, loc, state);
 	if (err) {
 		return err;
 	}	
@@ -114,7 +123,8 @@ append_block(struct ast_block *b, struct ast_block *appendage)
 }
 
 static struct error *
-compound_linearise(struct ast_stmt *stmt, struct ast_block *b, struct state *state)
+compound_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
+		struct state *state)
 {
 	struct ast_block *comp = ast_stmt_as_block(stmt);
 	assert(ast_block_ndecls(comp) == 0);
@@ -123,7 +133,7 @@ compound_linearise(struct ast_stmt *stmt, struct ast_block *b, struct state *sta
 
 	for (int i = 0; i < nstmts; i++) {
 		struct ast_block *stmt_b = ast_block_create(NULL, 0, NULL, 0);	
-		struct error *err = ast_stmt_linearise_proper(stmts[i], b, state);
+		struct error *err = ast_stmt_linearise_proper(stmts[i], b, loc, state);
 		if (err) {
 			return err;
 		}
@@ -133,9 +143,9 @@ compound_linearise(struct ast_stmt *stmt, struct ast_block *b, struct state *sta
 }
 
 static struct error *
-jump_linearise(struct ast_stmt *stmt, struct ast_block *b, struct state *state)
+jump_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
+		struct state *state)
 {
-	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 
 	struct ast_expr *gen = ast_expr_geninstr(
@@ -149,9 +159,9 @@ jump_linearise(struct ast_stmt *stmt, struct ast_block *b, struct state *state)
 }
 
 static struct error *
-selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct state *state)
+selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
+		struct state *state)
 {
-	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
