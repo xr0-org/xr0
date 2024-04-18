@@ -155,11 +155,11 @@ pub struct AstVariableArr {
 
 pub struct AstVariable {
     pub name: *mut libc::c_char,
-    pub type_0: *mut AstType,
+    pub r#type: *mut AstType,
 }
 
 pub struct AstArrayType {
-    pub type_0: *mut AstType,
+    pub r#type: *mut AstType,
     pub length: libc::c_int,
 }
 
@@ -3560,7 +3560,7 @@ pub unsafe fn ast_type_create_arr(base: *mut AstType, length: libc::c_int) -> *m
     }
     ast_type_create(
         AstTypeBase::Array(AstArrayType {
-            type_0: base,
+            r#type: base,
             length,
         }),
         0 as AstTypeModifier,
@@ -3677,8 +3677,8 @@ pub unsafe fn ast_type_destroy(t: *mut AstType) {
             ast_type_destroy(*ptr_type);
         }
         AstTypeBase::Array(arr) => {
-            assert!(!arr.type_0.is_null());
-            ast_type_destroy(arr.type_0);
+            assert!(!arr.r#type.is_null());
+            ast_type_destroy(arr.r#type);
         }
         _ => {}
     }
@@ -3692,7 +3692,7 @@ pub unsafe fn ast_type_copy(t: *mut AstType) -> *mut AstType {
     match &(*t).base {
         AstTypeBase::Pointer(ptr_type) => return ast_type_create_ptr(ast_type_copy(*ptr_type)),
         AstTypeBase::Array(arr) => {
-            return ast_type_create_arr(ast_type_copy(arr.type_0), arr.length);
+            return ast_type_create_arr(ast_type_copy(arr.r#type), arr.length);
         }
         AstTypeBase::Struct(_) => return ast_type_copy_struct(t),
         AstTypeBase::UserDefined(name) => return ast_type_create_userdef(dynamic_str(*name)),
@@ -3824,7 +3824,7 @@ unsafe fn ast_type_str_build_ptr(b: *mut StrBuilder, ptr_type: *mut AstType) {
 }
 
 unsafe fn ast_type_str_build_arr(b: *mut StrBuilder, arr: &AstArrayType) {
-    let base: *mut libc::c_char = ast_type_str(arr.type_0);
+    let base: *mut libc::c_char = ast_type_str(arr.r#type);
     strbuilder_printf(
         b,
         b"%s[%d]\0" as *const u8 as *const libc::c_char,
@@ -3864,11 +3864,14 @@ pub unsafe fn ast_variable_create(
     name: *mut libc::c_char,
     type_0: *mut AstType,
 ) -> *mut AstVariable {
-    Box::into_raw(Box::new(AstVariable { name, type_0 }))
+    Box::into_raw(Box::new(AstVariable {
+        name,
+        r#type: type_0,
+    }))
 }
 
 pub unsafe fn ast_variable_destroy(v: *mut AstVariable) {
-    ast_type_destroy((*v).type_0);
+    ast_type_destroy((*v).r#type);
     free((*v).name as *mut libc::c_void);
     drop(Box::from_raw(v));
 }
@@ -3877,7 +3880,7 @@ pub unsafe fn ast_variable_copy(v: *mut AstVariable) -> *mut AstVariable {
     if v.is_null() {
         panic!();
     }
-    return ast_variable_create(dynamic_str((*v).name), ast_type_copy((*v).type_0));
+    return ast_variable_create(dynamic_str((*v).name), ast_type_copy((*v).r#type));
 }
 
 pub unsafe fn ast_variables_copy(v: &[*mut AstVariable]) -> Vec<*mut AstVariable> {
@@ -3888,7 +3891,7 @@ pub unsafe fn ast_variables_copy(v: &[*mut AstVariable]) -> Vec<*mut AstVariable
 
 pub unsafe fn ast_variable_str(v: *mut AstVariable) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    let t: *mut libc::c_char = ast_type_str((*v).type_0);
+    let t: *mut libc::c_char = ast_type_str((*v).r#type);
     strbuilder_printf(
         b,
         b"%s %s\0" as *const u8 as *const libc::c_char,
@@ -3904,7 +3907,7 @@ pub unsafe fn ast_variable_name(v: *mut AstVariable) -> *mut libc::c_char {
 }
 
 pub unsafe fn ast_variable_type(v: *mut AstVariable) -> *mut AstType {
-    return (*v).type_0;
+    return (*v).r#type;
 }
 
 pub unsafe fn ast_variable_arr_create() -> *mut AstVariableArr {
