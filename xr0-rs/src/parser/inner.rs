@@ -6,12 +6,10 @@ use crate::parser::env::Env;
 use crate::util::dynamic_str;
 
 type BoxedBlock = *mut AstBlock;
-type BoxedExpr = Box<AstExpr>;
 type BoxedFunction = *mut AstFunction;
 type BoxedStmt = *mut AstStmt;
 type BoxedType = *mut AstType;
 type BoxedVariable = *mut AstVariable;
-type BoxedExternDecl = Box<AstExternDecl>;
 type BoxedCStr = *mut libc::c_char;
 
 pub struct Declaration {
@@ -128,10 +126,10 @@ pub grammar c_parser(env: &Env) for str {
     rule oct() = ['0'..='7']
     rule hex() = ['0'..='9' | 'a'..='f' | 'A'..='F']
 
-    pub rule constant() -> BoxedExpr =
+    pub rule constant() -> Box<AstExpr> =
         numeric_constant() / character_constant()
 
-    rule numeric_constant() -> BoxedExpr =
+    rule numeric_constant() -> Box<AstExpr> =
         n:quiet! { integer_number() } { unsafe { ast_expr_constant_create(n) } } /
         expected!("number")
 
@@ -140,7 +138,7 @@ pub grammar c_parser(env: &Env) for str {
             parse_int(n)
         }
 
-    rule character_constant() -> BoxedExpr =
+    rule character_constant() -> Box<AstExpr> =
         c:quiet! { $("'" character()+ "'") } {
             unsafe {
                 ast_expr_constant_create_char(parse_char(c))
@@ -151,7 +149,7 @@ pub grammar c_parser(env: &Env) for str {
     rule character() = [^ '\'' | '\\' | '\n'] / "\\" [^ '\n']
 
     // String literals
-    rule string_literal() -> BoxedExpr =
+    rule string_literal() -> Box<AstExpr> =
         a:$("\"" string_char()* "\"") {
             unsafe {
                 let cstr = CString::new(a.to_string()).unwrap();
@@ -162,7 +160,7 @@ pub grammar c_parser(env: &Env) for str {
     rule string_char() = [^ '"' | '\\' | '\n'] / "\\" [^ '\n']
 
     // 6.5.1 Primary expression
-    rule primary_expression() -> BoxedExpr =
+    rule primary_expression() -> Box<AstExpr> =
         a:identifier() {
             unsafe { ast_expr_identifier_create(a) }
         } /
@@ -174,7 +172,7 @@ pub grammar c_parser(env: &Env) for str {
         "(" _ a:expression() _ ")" { a }
 
     // 6.5.2 Postfix operators
-    rule postfix_expression() -> BoxedExpr =
+    rule postfix_expression() -> Box<AstExpr> =
         a:primary_expression() ops:postfix_op()* {
             unsafe {
                 let mut a = a;
@@ -219,7 +217,7 @@ pub grammar c_parser(env: &Env) for str {
         _ "++" { PostfixOp::Inc } /
         _ "--" { PostfixOp::Dec }
 
-    rule allocation_expression() -> BoxedExpr =
+    rule allocation_expression() -> Box<AstExpr> =
         ".malloc" _ "(" a:expression() ")" { unsafe { ast_expr_alloc_create(a) } } /
         ".free" _ "(" a:expression() ")" { unsafe { ast_expr_dealloc_create(a) } } /
         ".clump" _ "(" a:expression() ")" { unsafe { ast_expr_clump_create(a) } }
@@ -227,13 +225,13 @@ pub grammar c_parser(env: &Env) for str {
     rule argument_expression_list() -> ExprArray =
         args:cs1(<assignment_expression()>) { unsafe { expr_array_from_vec(args) } }
 
-    rule isdeallocand_expression() -> BoxedExpr =
+    rule isdeallocand_expression() -> Box<AstExpr> =
         postfix_expression() /
         "@" _ a:isdeallocand_expression() { unsafe { ast_expr_isdeallocand_create(a) } } /
         "$" _ a:isdeallocand_expression() { unsafe { ast_expr_isdereferencable_create(a) } }
 
     // 6.5.3 Unary operators
-    rule unary_expression() -> BoxedExpr =
+    rule unary_expression() -> Box<AstExpr> =
         isdeallocand_expression() /
         "++" _ a:unary_expression() { unsafe { ast_expr_incdec_create(a, true, true) } } /
         "--" _ a:unary_expression() { unsafe { ast_expr_incdec_create(a, false, true) } } /
@@ -249,10 +247,10 @@ pub grammar c_parser(env: &Env) for str {
         "!" { AstUnaryOp::Bang }
 
     // 6.5.4 Cast expressions
-    rule cast_expression() -> BoxedExpr = unary_expression()
+    rule cast_expression() -> Box<AstExpr> = unary_expression()
 
     // 6.5.5 -- 6.5.14 Binary operators
-    rule binary_expression() -> BoxedExpr = precedence! {
+    rule binary_expression() -> Box<AstExpr> = precedence! {
         x:(@) _ "||" _ y:@ { x }
         --
         x:(@) _ "&&" _ y:@ { x }
@@ -275,10 +273,10 @@ pub grammar c_parser(env: &Env) for str {
         e:cast_expression() { e }
     }
 
-    rule conditional_expression() -> BoxedExpr = binary_expression()
+    rule conditional_expression() -> Box<AstExpr> = binary_expression()
 
     // 6.5.16 Assignment operators
-    rule assignment_expression() -> BoxedExpr =
+    rule assignment_expression() -> Box<AstExpr> =
         a:unary_expression() _ assignment_operator() _ b:assignment_expression() {
             unsafe { ast_expr_assignment_create(a, b) }
         } /
@@ -287,10 +285,10 @@ pub grammar c_parser(env: &Env) for str {
     rule assignment_operator() =
         "=" / ">>=" / "<<=" / "+=" / "-=" / "*=" / "/=" / "%=" / "&=" / "^=" / "|="
 
-    pub rule expression() -> BoxedExpr = assignment_expression();
+    pub rule expression() -> Box<AstExpr> = assignment_expression();
 
     // 6.6 Constant expressions
-    rule constant_expression() -> BoxedExpr = conditional_expression()
+    rule constant_expression() -> Box<AstExpr> = conditional_expression()
 
     // 6.7 Declarations
     rule declaration() -> Declaration =
@@ -625,7 +623,7 @@ pub grammar c_parser(env: &Env) for str {
             }
         }
 
-    rule external_declaration() -> BoxedExternDecl =
+    rule external_declaration() -> Box<AstExternDecl> =
         f:function_definition() { unsafe { ast_functiondecl_create(f) } } /
         d:declaration() { unsafe { ast_decl_create(d.name, d.t) } }
 
