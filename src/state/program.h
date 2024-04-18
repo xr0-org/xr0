@@ -15,6 +15,9 @@ program_destroy(struct program *);
 char *
 program_name(struct program *);
 
+char *
+program_str(struct program *);
+
 void
 program_changename(struct program *, char *);
 

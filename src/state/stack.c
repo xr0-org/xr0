@@ -280,6 +280,7 @@ stack_trace(struct stack *s, struct error *err)
 
 	struct strbuilder *b = strbuilder_create();
 
+	printf("program: %s\n", program_str(s->p));
 	char *loc = program_loc(s->p);
 	char *err_str = error_str(err);
 	strbuilder_printf(b, "%s: %s (%s)", loc, err_str, stack_propername(s));
