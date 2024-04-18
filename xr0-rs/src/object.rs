@@ -434,58 +434,6 @@ pub unsafe fn object_getmembertype(
     return value_struct_membertype(getorcreatestruct(obj, t, s), member);
 }
 
-pub unsafe fn object_result_error_create(err: *mut Error) -> *mut ObjectResult {
-    if err.is_null() {
-        panic!();
-    }
-    let r: *mut ObjectResult = malloc(::core::mem::size_of::<ObjectResult>()) as *mut ObjectResult;
-    (*r).val = 0 as *mut Object;
-    (*r).err = err;
-    return r;
-}
-
-pub unsafe fn object_result_value_create(val: *mut Object) -> *mut ObjectResult {
-    let r: *mut ObjectResult = malloc(::core::mem::size_of::<ObjectResult>()) as *mut ObjectResult;
-    (*r).val = val;
-    (*r).err = 0 as *mut Error;
-    return r;
-}
-
-pub unsafe fn object_result_destroy(res: *mut ObjectResult) {
-    if !((*res).err).is_null() {
-        panic!();
-    }
-    if !((*res).val).is_null() {
-        object_destroy((*res).val);
-    }
-    free(res as *mut libc::c_void);
-}
-
-pub unsafe fn object_result_iserror(res: *mut ObjectResult) -> bool {
-    return !((*res).err).is_null();
-}
-
-pub unsafe fn object_result_as_error(res: *mut ObjectResult) -> *mut Error {
-    if ((*res).err).is_null() {
-        panic!();
-    }
-    return (*res).err;
-}
-
-pub unsafe fn object_result_as_value(res: *mut ObjectResult) -> *mut Object {
-    if !((*res).err).is_null() {
-        panic!();
-    }
-    return (*res).val;
-}
-
-pub unsafe fn object_result_hasvalue(res: *mut ObjectResult) -> bool {
-    if object_result_iserror(res) {
-        panic!();
-    }
-    return !((*res).val).is_null();
-}
-
 pub unsafe fn range_create(size: *mut AstExpr, loc: *mut Location) -> *mut Range {
     let r: *mut Range = malloc(::core::mem::size_of::<Range>()) as *mut Range;
     (*r).size = size;
