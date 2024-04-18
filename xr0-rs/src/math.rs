@@ -8,31 +8,31 @@ use crate::StrBuilder;
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct MathExpr {
-    pub type_0: ExprType,
-    pub c2rust_unnamed: C2RustUnnamed,
+    pub r#type: ExprType,
+    pub kind: MathExprKind,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union C2RustUnnamed {
+pub union MathExprKind {
     pub a: *mut MathAtom,
-    pub sum: C2RustUnnamed_0,
+    pub sum: SumMathExpr,
     pub negated: *mut MathExpr,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_0 {
+pub struct SumMathExpr {
     pub e1: *mut MathExpr,
     pub e2: *mut MathExpr,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct MathAtom {
-    pub type_0: AtomType,
-    pub c2rust_unnamed: C2RustUnnamed_1,
+    pub r#type: AtomType,
+    pub kind: MathAtomKind,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union C2RustUnnamed_1 {
+pub union MathAtomKind {
     pub i: libc::c_uint,
     pub v: *mut libc::c_char,
 }
@@ -50,26 +50,28 @@ pub struct Tally {
 }
 
 pub unsafe fn math_eq(e1: *mut MathExpr, e2: *mut MathExpr) -> bool {
-    return math_le(e1, e2) as libc::c_int != 0 && math_le(e2, e1) as libc::c_int != 0;
+    math_le(e1, e2) && math_le(e2, e1)
 }
 
 pub unsafe fn math_lt(e1: *mut MathExpr, e2: *mut MathExpr) -> bool {
-    return math_le(e1, e2) as libc::c_int != 0 && !math_eq(e1, e2);
+    math_le(e1, e2) && !math_eq(e1, e2)
 }
 
 pub unsafe fn math_gt(e1: *mut MathExpr, e2: *mut MathExpr) -> bool {
-    return math_lt(e2, e1);
+    math_lt(e2, e1)
 }
 
 pub unsafe fn math_ge(e1: *mut MathExpr, e2: *mut MathExpr) -> bool {
-    return math_le(e2, e1);
+    math_le(e2, e1)
 }
+
 unsafe fn math_expr_fromint(i: libc::c_int) -> *mut MathExpr {
-    if i < 0 as libc::c_int {
+    if i < 0 {
         return math_expr_neg_create(math_expr_fromint(-i));
     }
     return math_expr_atom_create(math_atom_nat_create(i as libc::c_uint));
 }
+
 unsafe fn math_expr_fromvartally(id: *mut libc::c_char, num: libc::c_int) -> *mut MathExpr {
     if !(num != 0 as libc::c_int) {
         panic!();
@@ -94,33 +96,33 @@ pub unsafe fn math_le(e1: *mut MathExpr, e2: *mut MathExpr) -> bool {
 
 pub unsafe fn math_expr_atom_create(a: *mut MathAtom) -> *mut MathExpr {
     let e: *mut MathExpr = malloc(::core::mem::size_of::<MathExpr>()) as *mut MathExpr;
-    (*e).type_0 = EXPR_ATOM;
-    (*e).c2rust_unnamed.a = a;
+    (*e).r#type = EXPR_ATOM;
+    (*e).kind.a = a;
     return e;
 }
 
 pub unsafe fn math_expr_sum_create(e1: *mut MathExpr, e2: *mut MathExpr) -> *mut MathExpr {
     let e: *mut MathExpr = malloc(::core::mem::size_of::<MathExpr>()) as *mut MathExpr;
-    (*e).type_0 = EXPR_SUM;
-    (*e).c2rust_unnamed.sum.e1 = e1;
-    (*e).c2rust_unnamed.sum.e2 = e2;
+    (*e).r#type = EXPR_SUM;
+    (*e).kind.sum.e1 = e1;
+    (*e).kind.sum.e2 = e2;
     return e;
 }
 
 pub unsafe fn math_expr_neg_create(orig: *mut MathExpr) -> *mut MathExpr {
     let e: *mut MathExpr = malloc(::core::mem::size_of::<MathExpr>()) as *mut MathExpr;
-    (*e).type_0 = EXPR_NEG;
-    (*e).c2rust_unnamed.negated = orig;
+    (*e).r#type = EXPR_NEG;
+    (*e).kind.negated = orig;
     return e;
 }
 
 pub unsafe fn math_expr_copy(e: *mut MathExpr) -> *mut MathExpr {
-    match (*e).type_0 {
-        0 => return math_expr_atom_create(math_atom_copy((*e).c2rust_unnamed.a)),
+    match (*e).r#type {
+        0 => return math_expr_atom_create(math_atom_copy((*e).kind.a)),
         1 => {
             return math_expr_sum_create(
-                math_expr_copy((*e).c2rust_unnamed.sum.e1),
-                math_expr_copy((*e).c2rust_unnamed.sum.e2),
+                math_expr_copy((*e).kind.sum.e1),
+                math_expr_copy((*e).kind.sum.e2),
             );
         }
         _ => panic!(),
@@ -128,16 +130,16 @@ pub unsafe fn math_expr_copy(e: *mut MathExpr) -> *mut MathExpr {
 }
 
 pub unsafe fn math_expr_destroy(e: *mut MathExpr) {
-    match (*e).type_0 {
+    match (*e).r#type {
         0 => {
-            math_atom_destroy((*e).c2rust_unnamed.a);
+            math_atom_destroy((*e).kind.a);
         }
         1 => {
-            math_expr_destroy((*e).c2rust_unnamed.sum.e1);
-            math_expr_destroy((*e).c2rust_unnamed.sum.e2);
+            math_expr_destroy((*e).kind.sum.e1);
+            math_expr_destroy((*e).kind.sum.e2);
         }
         2 => {
-            math_expr_destroy((*e).c2rust_unnamed.negated);
+            math_expr_destroy((*e).kind.negated);
         }
         _ => panic!(),
     }
@@ -145,8 +147,8 @@ pub unsafe fn math_expr_destroy(e: *mut MathExpr) {
 }
 
 pub unsafe fn math_expr_str(e: *mut MathExpr) -> *mut libc::c_char {
-    match (*e).type_0 {
-        0 => math_atom_str((*e).c2rust_unnamed.a),
+    match (*e).r#type {
+        0 => math_atom_str((*e).kind.a),
         1 => math_expr_sum_str(e),
         2 => math_expr_neg_str(e),
         _ => panic!(),
@@ -155,8 +157,8 @@ pub unsafe fn math_expr_str(e: *mut MathExpr) -> *mut libc::c_char {
 
 unsafe fn math_expr_sum_str(e: *mut MathExpr) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    let e1: *mut libc::c_char = math_expr_str((*e).c2rust_unnamed.sum.e1);
-    let e2: *mut libc::c_char = math_expr_str((*e).c2rust_unnamed.sum.e2);
+    let e1: *mut libc::c_char = math_expr_str((*e).kind.sum.e1);
+    let e2: *mut libc::c_char = math_expr_str((*e).kind.sum.e2);
     let sign: *mut libc::c_char = (if *e2 as libc::c_int == '-' as i32 {
         b"\0" as *const u8 as *const libc::c_char
     } else {
@@ -175,7 +177,7 @@ unsafe fn math_expr_sum_str(e: *mut MathExpr) -> *mut libc::c_char {
 }
 unsafe fn math_expr_neg_str(e: *mut MathExpr) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    let orig: *mut libc::c_char = math_expr_str((*e).c2rust_unnamed.negated);
+    let orig: *mut libc::c_char = math_expr_str((*e).kind.negated);
     strbuilder_printf(b, b"-%s\0" as *const u8 as *const libc::c_char, orig);
     free(orig as *mut libc::c_void);
     return strbuilder_build(b);
@@ -221,8 +223,8 @@ pub unsafe fn math_expr_simplify(raw: *mut MathExpr) -> *mut MathExpr {
 }
 
 unsafe fn tally(e: *mut MathExpr) -> Tally {
-    match (*e).type_0 {
-        0 => atom_tally((*e).c2rust_unnamed.a),
+    match (*e).r#type {
+        0 => atom_tally((*e).kind.a),
         1 => sum_tally(e),
         2 => neg_tally(e),
         _ => panic!(),
@@ -230,11 +232,11 @@ unsafe fn tally(e: *mut MathExpr) -> Tally {
 }
 
 unsafe fn sum_tally(e: *mut MathExpr) -> Tally {
-    if !((*e).type_0 as libc::c_uint == EXPR_SUM as libc::c_int as libc::c_uint) {
+    if !((*e).r#type as libc::c_uint == EXPR_SUM as libc::c_int as libc::c_uint) {
         panic!();
     }
-    let r1: Tally = tally((*e).c2rust_unnamed.sum.e1);
-    let r2: Tally = tally((*e).c2rust_unnamed.sum.e2);
+    let r1: Tally = tally((*e).kind.sum.e1);
+    let r2: Tally = tally((*e).kind.sum.e2);
     return {
         let init = Tally {
             map: map_sum(r1.map, r2.map),
@@ -260,7 +262,7 @@ unsafe fn map_sum(m1: Box<Map>, m2: Box<Map>) -> Box<Map> {
 }
 
 unsafe fn neg_tally(e: *mut MathExpr) -> Tally {
-    let mut r: Tally = tally((*e).c2rust_unnamed.negated);
+    let mut r: Tally = tally((*e).kind.negated);
     let m = &mut r.map;
     for (_, v) in m.pairs_mut() {
         let val: libc::c_long = -(*v as libc::c_long);
@@ -285,31 +287,31 @@ unsafe fn variable_tally_eq(m1: Box<Map>, m2: Box<Map>) -> bool {
 
 pub unsafe fn math_atom_nat_create(i: libc::c_uint) -> *mut MathAtom {
     let a: *mut MathAtom = malloc(::core::mem::size_of::<MathAtom>()) as *mut MathAtom;
-    (*a).type_0 = ATOM_NAT;
-    (*a).c2rust_unnamed.i = i;
+    (*a).r#type = ATOM_NAT;
+    (*a).kind.i = i;
     return a;
 }
 
 pub unsafe fn math_atom_variable_create(s: *mut libc::c_char) -> *mut MathAtom {
     let a: *mut MathAtom = malloc(::core::mem::size_of::<MathAtom>()) as *mut MathAtom;
-    (*a).type_0 = ATOM_VARIABLE;
-    (*a).c2rust_unnamed.v = s;
+    (*a).r#type = ATOM_VARIABLE;
+    (*a).kind.v = s;
     return a;
 }
 
 pub unsafe fn math_atom_copy(a: *mut MathAtom) -> *mut MathAtom {
-    match (*a).type_0 {
-        0 => return math_atom_nat_create((*a).c2rust_unnamed.i),
-        1 => return math_atom_variable_create(dynamic_str((*a).c2rust_unnamed.v)),
+    match (*a).r#type {
+        0 => return math_atom_nat_create((*a).kind.i),
+        1 => return math_atom_variable_create(dynamic_str((*a).kind.v)),
         _ => panic!(),
     }
 }
 
 pub unsafe fn math_atom_destroy(a: *mut MathAtom) {
-    match (*a).type_0 {
+    match (*a).r#type {
         0 => {}
         1 => {
-            free((*a).c2rust_unnamed.v as *mut libc::c_void);
+            free((*a).kind.v as *mut libc::c_void);
         }
         _ => panic!(),
     }
@@ -317,10 +319,10 @@ pub unsafe fn math_atom_destroy(a: *mut MathAtom) {
 }
 
 pub unsafe fn math_atom_str(a: *mut MathAtom) -> *mut libc::c_char {
-    if (*a).type_0 as libc::c_uint == ATOM_VARIABLE as libc::c_int as libc::c_uint {
-        return dynamic_str((*a).c2rust_unnamed.v);
+    if (*a).r#type as libc::c_uint == ATOM_VARIABLE as libc::c_int as libc::c_uint {
+        return dynamic_str((*a).kind.v);
     }
-    if !((*a).type_0 as libc::c_uint == ATOM_NAT as libc::c_int as libc::c_uint) as libc::c_int
+    if !((*a).r#type as libc::c_uint == ATOM_NAT as libc::c_int as libc::c_uint) as libc::c_int
         as libc::c_long
         != 0
     {
@@ -328,21 +330,17 @@ pub unsafe fn math_atom_str(a: *mut MathAtom) -> *mut libc::c_char {
     } else {
     };
     let b: *mut StrBuilder = strbuilder_create();
-    strbuilder_printf(
-        b,
-        b"%d\0" as *const u8 as *const libc::c_char,
-        (*a).c2rust_unnamed.i,
-    );
+    strbuilder_printf(b, b"%d\0" as *const u8 as *const libc::c_char, (*a).kind.i);
     return strbuilder_build(b);
 }
 unsafe fn atom_tally(a: *mut MathAtom) -> Tally {
-    match (*a).type_0 {
+    match (*a).r#type {
         0 => Tally {
             map: Map::new(),
-            num: (*a).c2rust_unnamed.i as libc::c_int,
+            num: (*a).kind.i as libc::c_int,
         },
         1 => Tally {
-            map: map_fromvar(dynamic_str((*a).c2rust_unnamed.v)),
+            map: map_fromvar(dynamic_str((*a).kind.v)),
             num: 0 as libc::c_int,
         },
         _ => panic!("invalid math_atom type"),
