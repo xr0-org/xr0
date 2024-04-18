@@ -426,10 +426,8 @@ unsafe fn rangeprocess_alloc(
 pub unsafe fn ast_expr_matheval(e: &AstExpr) -> bool {
     match &e.kind {
         AstExprKind::Binary(binary) => {
-            let e1: *mut MathExpr =
-                math_expr(&binary.e1 as &AstExpr as *const AstExpr as *mut AstExpr);
-            let e2: *mut MathExpr =
-                math_expr(&binary.e2 as &AstExpr as *const AstExpr as *mut AstExpr);
+            let e1: *mut MathExpr = math_expr(&binary.e1);
+            let e2: *mut MathExpr = math_expr(&binary.e2);
             let val: bool = eval_prop(e1, binary.op, e2);
             math_expr_destroy(e2);
             math_expr_destroy(e1);
@@ -439,8 +437,8 @@ pub unsafe fn ast_expr_matheval(e: &AstExpr) -> bool {
     }
 }
 
-unsafe fn math_expr(e: *mut AstExpr) -> *mut MathExpr {
-    match &(*e).kind {
+unsafe fn math_expr(e: &AstExpr) -> *mut MathExpr {
+    match &e.kind {
         AstExprKind::Identifier(id) => {
             math_expr_atom_create(math_atom_variable_create(dynamic_str(*id)))
         }
@@ -453,20 +451,16 @@ unsafe fn math_expr(e: *mut AstExpr) -> *mut MathExpr {
                 math_expr_atom_create(math_atom_nat_create(c.constant as libc::c_uint))
             }
         }
-        AstExprKind::Binary(binary) => math_expr_sum_create(
-            math_expr(&binary.e1 as &AstExpr as *const AstExpr as *mut AstExpr),
-            binary_e2(
-                &binary.e2 as &AstExpr as *const AstExpr as *mut AstExpr,
-                binary.op,
-            ),
-        ),
+        AstExprKind::Binary(binary) => {
+            math_expr_sum_create(math_expr(&binary.e1), binary_e2(&binary.e2, binary.op))
+        }
         _ => {
             panic!();
         }
     }
 }
 
-unsafe fn binary_e2(e2: *mut AstExpr, op: AstBinaryOp) -> *mut MathExpr {
+unsafe fn binary_e2(e2: &AstExpr, op: AstBinaryOp) -> *mut MathExpr {
     match op {
         AstBinaryOp::Addition => math_expr(e2),
         AstBinaryOp::Subtraction => math_expr_neg_create(math_expr(e2)),
