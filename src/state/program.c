@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "ast.h"
+#include "lex.h"
 #include "program.h"
 #include "state.h"
 #include "util.h"
@@ -168,12 +169,29 @@ static struct error *
 program_stmt_process(struct program *p, bool abstract, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	if (state_linear(s)) {
-		if (abstract) {
-			return ast_stmt_absprocess(stmt, p->name, s, false, true);
-		}
-		return ast_stmt_process(stmt, p->name, s);
-	} else {
+	if (!state_linear(s)) {
 		return ast_stmt_linearise(stmt, s);
+	}
+	if (abstract) {
+		return ast_stmt_absprocess(stmt, p->name, s, false, true);
+	}
+	return ast_stmt_process(stmt, p->name, s);
+}
+
+char *
+program_loc(struct program *p)
+{
+	switch (p->s) {
+	case PROGRAM_COUNTER_STMTS:
+		return lexememarker_str(
+			ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index])
+		);
+	case PROGRAM_COUNTER_ATEND:
+		assert(p->index && ast_block_stmts(p->b)); /* i.e., it's nonzero */
+		return lexememarker_str(
+			ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index-1])
+		);
+	default:
+		assert(false);
 	}
 }

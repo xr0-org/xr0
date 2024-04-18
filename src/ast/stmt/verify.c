@@ -114,21 +114,11 @@ ast_stmt_process(struct ast_stmt *stmt, char *fname, struct state *state)
 
 	if (ast_stmt_kind(stmt) == STMT_COMPOUND_V) {
 		if ((err = ast_stmt_verify(stmt, state))) {
-			struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
-			assert(loc);
-			char *m = lexememarker_str(loc);
-			struct error *e = error_printf("%s: %w", m, err);
-			free(m);
-			return e;
+			return err;
 		}
 	}
 	if ((err = ast_stmt_exec(stmt, state))) {
-		struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
-		assert(loc);
-		char *m = lexememarker_str(loc);
-		struct error *e = error_printf("%s:%s: %w", m, fname, err);
-		free(m);
-		return e;
+		return err;
 	}
 	return NULL;
 }
@@ -248,8 +238,6 @@ stmt_register_exec(struct ast_stmt *stmt, struct state *state);
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("stmt: %s\n", ast_stmt_str(stmt));
-	printf("state: %s\n", state_str(state));
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
@@ -426,15 +414,7 @@ struct error *
 ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *state,
 		bool hack_old, bool should_setup)
 {
-	struct error *err = ast_stmt_absexec(stmt, state, hack_old, should_setup);
-	if (!err) {
-		return NULL;
-	}
-	struct lexememarker *loc = ast_stmt_lexememarker(stmt); 
-	assert(loc);
-	char *m = lexememarker_str(loc);
-	struct error *e = error_printf("%s:%s: %w", m, fname, err);
-	return e;
+	return ast_stmt_absexec(stmt, state, hack_old, should_setup);
 }
 
 static struct error *

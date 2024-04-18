@@ -239,11 +239,11 @@ path_step_abstract(struct path *p)
 		return NULL;
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
-	if (!uc_err) {
-		return err;
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
 	}
-	path_split(p, error_get_undecideable_cond(uc_err));
-	return NULL;
+	return state_stacktrace(p->abstract, err);
 }
 
 static struct error *
@@ -260,11 +260,11 @@ path_step_actual(struct path *p)
 		return NULL;
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
-	if (!uc_err) {
-		return err;
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
 	}
-	path_split(p, error_get_undecideable_cond(uc_err));
-	return NULL;
+	return state_stacktrace(p->actual, err);
 }
 
 static struct error *

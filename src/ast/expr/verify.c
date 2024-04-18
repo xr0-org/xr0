@@ -1529,6 +1529,7 @@ assign_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_bloc
 {
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
+	assert(ast_expr_kind(lval) == EXPR_IDENTIFIER);
 	struct ast_expr *assign = ast_expr_assignment_create(
 		ast_expr_copy(lval), ast_expr_geninstr(rval, loc, b, s)
 	);
@@ -1553,10 +1554,7 @@ call_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	/* XXX: handle root thats a call */
 	char *name = ast_expr_as_identifier(root);
 	struct ast_function *f = externals_getfunc(state_getext(s), name);
-	if (!f) {
-		/* error */
-		assert(false);
-	}
+	assert(f);
 	struct ast_type *rtype = ast_function_type(f);
 	struct ast_expr *call = ast_expr_call_create(
 		ast_expr_copy(root), nargs, gen_args
