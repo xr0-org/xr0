@@ -195,11 +195,6 @@ path_init_abstract(struct path *p)
 	if (err) {
 		return err;
 	}
-	err = ast_function_setupabsexec(p->f, p->abstract);
-	if (err) {
-		return err;
-	}
-	state_clearregister(p->abstract);
 	p->path_state = PATH_STATE_ABSTRACT;
 	return NULL;
 }
@@ -226,7 +221,7 @@ path_init_actual(struct path *p)
 	if (err) {
 		return err;
 	}
-	state_clearregister(p->actual);
+	state_clearregister(p->actual); /* XXX: not pretty */
 	p->path_state = PATH_STATE_ACTUAL;
 	return NULL;
 }
@@ -300,6 +295,7 @@ path_trystep(struct path *p);
 static struct error *
 path_step_split(struct path *p)
 {
+	v_printf("stepping through split\n");
 	/* path_atend holds this invariant whenever this function is called */ 
 	assert(!path_atend(p->p_true) || !path_atend(p->p_false));
 
