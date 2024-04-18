@@ -5000,42 +5000,27 @@ pub unsafe fn ast_externdecl_destroy(decl: *mut AstExternDecl) {
     drop(Box::from_raw(decl));
 }
 
-pub unsafe fn parse_int(mut s: *mut libc::c_char) -> libc::c_int {
-    let mut n: libc::c_int = 0 as libc::c_int;
-    while *s != 0 {
-        n = 10 as libc::c_int * n + (*s as libc::c_int - '0' as i32);
-        s = s.offset(1);
-    }
-    return n;
+pub fn parse_int(s: &str) -> libc::c_int {
+    s.parse().expect("parse error")
 }
 
-pub unsafe fn parse_char(s: *mut libc::c_char) -> libc::c_char {
-    if !(strlen(s) >= 3 && *s.offset(0 as libc::c_int as isize) as libc::c_int == '\'' as i32) {
-        panic!();
+pub unsafe fn parse_char(s: &str) -> libc::c_char {
+    assert!(s.starts_with('\'') && s.ends_with('\''));
+    let s = &s[1..s.len() - 1];
+    if s.starts_with('\\') {
+        parse_escape(&s[1..]) as libc::c_char
+    } else {
+        s.chars().next().expect("invalid char literal") as u32 as libc::c_char
     }
-    match *s.offset(1 as libc::c_int as isize) as libc::c_int {
-        92 => {
-            if !(*s.offset(3 as libc::c_int as isize) as libc::c_int == '\'' as i32) {
-                panic!();
-            }
-            return parse_escape(*s.offset(2 as libc::c_int as isize)) as libc::c_char;
-        }
-        _ => {
-            if !(*s.offset(2 as libc::c_int as isize) as libc::c_int == '\'' as i32) {
-                panic!();
-            }
-            return *s.offset(1 as libc::c_int as isize);
-        }
-    };
 }
 
-pub unsafe fn parse_escape(c: libc::c_char) -> libc::c_int {
-    match c as libc::c_int {
-        48 => return '\0' as i32,
-        116 => return '\t' as i32,
-        110 => return '\t' as i32,
+pub unsafe fn parse_escape(c: &str) -> libc::c_int {
+    match c {
+        "0" => '\0' as u32 as libc::c_int,
+        "t" => '\t' as u32 as libc::c_int,
+        "n" => '\t' as u32 as libc::c_int, // Note: '\t' rather than '\n', a bug in the original.
         _ => {
-            panic!();
+            panic!("unrecognized char escape sequence: {:?}", c);
         }
     }
 }

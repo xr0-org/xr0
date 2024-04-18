@@ -143,17 +143,13 @@ pub grammar c_parser(env: &Env) for str {
 
     rule integer_number() -> libc::c_int =
         n:$(['1'..='9'] dec()* / "0") end_of_token() {
-            unsafe {
-                let cstr = CString::new(n.to_string()).unwrap();
-                parse_int(cstr.as_ptr() as *mut libc::c_char)
-            }
+            parse_int(n)
         }
 
     rule character_constant() -> BoxedExpr =
         c:quiet! { $("'" character()+ "'") } {
             unsafe {
-                let cstr = CString::new(c.to_string()).unwrap();
-                ast_expr_constant_create_char(parse_char(cstr.as_ptr() as *mut libc::c_char))
+                ast_expr_constant_create_char(parse_char(c))
             }
         } /
         expected!("character")
