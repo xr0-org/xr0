@@ -357,7 +357,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
                 object_assign(
                     obj,
                     value_sync_create(Box::into_raw(ast_expr_member_create(
-                        Box::from_raw(ast_expr_copy(&*root)),
+                        ast_expr_copy(&*root),
                         dynamic_str(field),
                     ))),
                 );
@@ -654,8 +654,8 @@ pub unsafe fn value_as_sync(v: *mut Value) -> *mut AstExpr {
 pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
     match (*v).type_0 {
         1 => Box::into_raw(ast_expr_identifier_create(value_str(v))),
-        3 => ast_expr_copy(&*value_as_literal(v)),
-        0 => ast_expr_copy(&*value_as_sync(v)),
+        3 => Box::into_raw(ast_expr_copy(&*value_as_literal(v))),
+        0 => Box::into_raw(ast_expr_copy(&*value_as_sync(v))),
         2 => number_to_expr((*v).c2rust_unnamed.n),
         _ => panic!(),
     }
@@ -983,7 +983,7 @@ pub unsafe fn number_as_sync(n: *mut Number) -> *mut AstExpr {
 pub unsafe fn number_to_expr(n: *mut Number) -> *mut AstExpr {
     match (*n).type_0 {
         0 => number_ranges_to_expr((*n).c2rust_unnamed.ranges),
-        1 => ast_expr_copy(&*number_as_sync(n)),
+        1 => Box::into_raw(ast_expr_copy(&*number_as_sync(n))),
         _ => panic!(),
     }
 }
@@ -991,7 +991,9 @@ pub unsafe fn number_to_expr(n: *mut Number) -> *mut AstExpr {
 pub unsafe fn number_copy(num: *mut Number) -> *mut Number {
     match (*num).type_0 {
         0 => number_ranges_create(number_range_arr_copy((*num).c2rust_unnamed.ranges)),
-        1 => number_computed_create(ast_expr_copy(&*(*num).c2rust_unnamed.computation)),
+        1 => number_computed_create(Box::into_raw(ast_expr_copy(
+            &*(*num).c2rust_unnamed.computation,
+        ))),
         _ => panic!(),
     }
 }

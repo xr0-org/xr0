@@ -191,13 +191,18 @@ pub unsafe fn location_offset(loc: *mut Location) -> *mut AstExpr {
 
 pub unsafe fn location_copy(loc: *mut Location) -> *mut Location {
     match (*loc).type_0 {
-        0 => location_create_static((*loc).block, ast_expr_copy(&*(*loc).offset)),
-        1 => location_create_vconst((*loc).block, ast_expr_copy(&*(*loc).offset)),
-        2 => location_create_dereferencable((*loc).block, ast_expr_copy(&*(*loc).offset)),
-        3 => {
-            location_create_automatic((*loc).u.frame, (*loc).block, ast_expr_copy(&*(*loc).offset))
-        }
-        4 => location_create_dynamic((*loc).block, ast_expr_copy(&*(*loc).offset)),
+        0 => location_create_static((*loc).block, Box::into_raw(ast_expr_copy(&*(*loc).offset))),
+        1 => location_create_vconst((*loc).block, Box::into_raw(ast_expr_copy(&*(*loc).offset))),
+        2 => location_create_dereferencable(
+            (*loc).block,
+            Box::into_raw(ast_expr_copy(&*(*loc).offset)),
+        ),
+        3 => location_create_automatic(
+            (*loc).u.frame,
+            (*loc).block,
+            Box::into_raw(ast_expr_copy(&*(*loc).offset)),
+        ),
+        4 => location_create_dynamic((*loc).block, Box::into_raw(ast_expr_copy(&*(*loc).offset))),
         _ => panic!(),
     }
 }
@@ -207,7 +212,7 @@ pub unsafe fn location_with_offset(loc: *mut Location, offset: &AstExpr) -> *mut
         panic!();
     }
     let copy: *mut Location = location_copy(loc);
-    (*copy).offset = ast_expr_copy(offset);
+    (*copy).offset = Box::into_raw(ast_expr_copy(offset));
     return copy;
 }
 

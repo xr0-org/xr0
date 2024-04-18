@@ -3,8 +3,8 @@
 use libc::{calloc, free, malloc, realloc};
 
 use crate::ast::{
-    ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
-    ast_expr_eq_create, ast_expr_sum_create,
+    ast_expr_constant_create, ast_expr_copy, ast_expr_difference_create, ast_expr_eq_create,
+    ast_expr_sum_create,
 };
 use crate::object::{
     object_abstractcopy, object_arr_append, object_arr_copy, object_arr_create, object_arr_destroy,
@@ -89,7 +89,8 @@ pub unsafe fn block_observe(
         if !constructive {
             return 0 as *mut Object;
         }
-        let obj: *mut Object = object_value_create(ast_expr_copy(offset), 0 as *mut Value);
+        let obj: *mut Object =
+            object_value_create(Box::into_raw(ast_expr_copy(offset)), 0 as *mut Value);
         object_arr_append((*b).arr, obj);
         return obj;
     }
@@ -99,16 +100,18 @@ pub unsafe fn block_observe(
     }
     let lw = ast_expr_copy(offset);
     let up = ast_expr_sum_create(
-        Box::from_raw(ast_expr_copy(offset)),
+        ast_expr_copy(offset),
         ast_expr_constant_create(1 as libc::c_int),
     );
     // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down. I don't
     // know why it isn't a double free.
-    let upto: *mut Object = object_upto(obj_0, lw, s);
-    let observed: *mut Object = object_value_create(ast_expr_copy(&*lw), state_alloc(s));
+    let lw_ptr = Box::into_raw(lw);
+    let upto: *mut Object = object_upto(obj_0, lw_ptr, s);
+    let observed: *mut Object =
+        object_value_create(Box::into_raw(ast_expr_copy(&*lw_ptr)), state_alloc(s));
     let from: *mut Object = object_from(obj_0, &up, s);
     drop(up);
-    ast_expr_destroy(lw);
+    drop(Box::from_raw(lw_ptr));
 
     let err: *mut Error = object_dealloc(obj_0, s);
     if !err.is_null() {
@@ -154,11 +157,11 @@ pub unsafe fn block_range_alloc(
     object_arr_append(
         b.arr,
         object_range_create(
-            ast_expr_copy(lw),
+            Box::into_raw(ast_expr_copy(lw)),
             range_create(
                 Box::into_raw(ast_expr_difference_create(
-                    Box::from_raw(ast_expr_copy(up)),
-                    Box::from_raw(ast_expr_copy(lw)),
+                    ast_expr_copy(up),
+                    ast_expr_copy(lw),
                 )),
                 heap_newblock(heap),
             ),

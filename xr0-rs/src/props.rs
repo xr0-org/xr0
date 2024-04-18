@@ -23,7 +23,10 @@ pub unsafe fn props_copy(old: *mut Props) -> *mut Props {
     let new: *mut Props = props_create();
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*old).n {
-        props_install(new, ast_expr_copy(&**((*old).prop).offset(i as isize)));
+        props_install(
+            new,
+            Box::into_raw(ast_expr_copy(&**((*old).prop).offset(i as isize))),
+        );
         i += 1;
     }
     return new;

@@ -653,7 +653,7 @@ unsafe fn irreducible_assume_actual(e: &AstExpr, s: *mut State) -> *mut Preresul
     if props_contradicts(p, e) {
         return preresult_contradiction_create();
     }
-    props_install(state_getprops(s), ast_expr_copy(e));
+    props_install(state_getprops(s), Box::into_raw(ast_expr_copy(e)));
     return preresult_empty_create();
 }
 
@@ -751,9 +751,9 @@ unsafe fn ast_expr_bracketed_str_build(inner: &AstExpr, b: *mut StrBuilder) {
 
 unsafe fn expr_to_binary(expr: &AstExpr) -> *mut AstExpr {
     match &expr.kind {
-        AstExprKind::Binary(_) => ast_expr_copy(expr),
+        AstExprKind::Binary(_) => Box::into_raw(ast_expr_copy(expr)),
         _ => Box::into_raw(ast_expr_binary_create(
-            Box::from_raw(ast_expr_copy(expr)),
+            ast_expr_copy(expr),
             AstBinaryOp::Addition,
             ast_expr_constant_create(0 as libc::c_int),
         )),
@@ -1766,7 +1766,7 @@ impl Drop for CallExpr {
 }
 
 pub unsafe fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
-    let copy = Box::from_raw(ast_expr_copy(expr));
+    let copy = ast_expr_copy(expr);
     if invert {
         ast_expr_unary_create(copy, AstUnaryOp::Bang)
     } else {
@@ -1812,10 +1812,10 @@ unsafe fn ast_expr_copy_call(expr: &AstExpr) -> Box<AstExpr> {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
         let ref mut fresh4 = *arg.offset(i as isize);
-        *fresh4 = ast_expr_copy(&**(call.arg).offset(i as isize));
+        *fresh4 = Box::into_raw(ast_expr_copy(&**(call.arg).offset(i as isize)));
         i += 1;
     }
-    ast_expr_call_create(Box::from_raw(ast_expr_copy(&call.fun)), call.n, arg)
+    ast_expr_call_create(ast_expr_copy(&call.fun), call.n, arg)
 }
 
 pub unsafe fn ast_expr_member_create(
@@ -1846,9 +1846,9 @@ pub unsafe fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> *mut AstExpr {
     };
 
     Box::into_raw(ast_expr_assignment_create(
-        Box::from_raw(ast_expr_copy(&incdec.operand)),
+        ast_expr_copy(&incdec.operand),
         ast_expr_binary_create(
-            Box::from_raw(ast_expr_copy(&incdec.operand)),
+            ast_expr_copy(&incdec.operand),
             if incdec.inc != 0 {
                 AstBinaryOp::Addition
             } else {
@@ -2040,7 +2040,7 @@ unsafe fn ast_expr_alloc_copy(expr: &AstExpr) -> Box<AstExpr> {
     let AstExprKind::Allocation(alloc) = &expr.kind else {
         panic!()
     };
-    let arg = Box::from_raw(ast_expr_copy(&*alloc.arg));
+    let arg = ast_expr_copy(&*alloc.arg);
     match alloc.kind {
         AstAllocKind::Alloc => ast_expr_alloc_create(arg),
         AstAllocKind::Dealloc => ast_expr_dealloc_create(arg),
@@ -2061,8 +2061,8 @@ pub unsafe fn ast_expr_assignment_rval(expr: &AstExpr) -> &AstExpr {
     &assignment.rval
 }
 
-pub unsafe fn ast_expr_copy(expr: &AstExpr) -> *mut AstExpr {
-    Box::into_raw(match &expr.kind {
+pub unsafe fn ast_expr_copy(expr: &AstExpr) -> Box<AstExpr> {
+    match &expr.kind {
         AstExprKind::Identifier(id) => ast_expr_identifier_create(dynamic_str(*id)),
         AstExprKind::Constant(c) => {
             if c.ischar {
@@ -2072,41 +2072,36 @@ pub unsafe fn ast_expr_copy(expr: &AstExpr) -> *mut AstExpr {
             }
         }
         AstExprKind::StringLiteral(s) => ast_expr_literal_create(dynamic_str(*s)),
-        AstExprKind::Bracketed(inner) => {
-            ast_expr_bracketed_create(Box::from_raw(ast_expr_copy(inner)))
-        }
+        AstExprKind::Bracketed(inner) => ast_expr_bracketed_create(ast_expr_copy(inner)),
         AstExprKind::Call(_) => ast_expr_copy_call(expr),
         AstExprKind::IncDec(incdec) => ast_expr_incdec_create(
-            Box::from_raw(ast_expr_copy(&incdec.operand)),
+            ast_expr_copy(&incdec.operand),
             incdec.inc != 0,
             incdec.pre != 0,
         ),
-        AstExprKind::StructMember(member) => ast_expr_member_create(
-            Box::from_raw(ast_expr_copy(&*member.root)),
-            dynamic_str(member.field),
-        ),
-        AstExprKind::Unary(unary) => {
-            ast_expr_unary_create(Box::from_raw(ast_expr_copy(&unary.arg)), unary.op)
+        AstExprKind::StructMember(member) => {
+            ast_expr_member_create(ast_expr_copy(&*member.root), dynamic_str(member.field))
         }
+        AstExprKind::Unary(unary) => ast_expr_unary_create(ast_expr_copy(&unary.arg), unary.op),
         AstExprKind::Binary(binary) => ast_expr_binary_create(
-            Box::from_raw(ast_expr_copy(&binary.e1)),
+            ast_expr_copy(&binary.e1),
             binary.op,
-            Box::from_raw(ast_expr_copy(&binary.e2)),
+            ast_expr_copy(&binary.e2),
         ),
         AstExprKind::Assignment(assignment) => ast_expr_assignment_create(
-            Box::from_raw(ast_expr_copy(&assignment.lval)),
-            Box::from_raw(ast_expr_copy(&assignment.rval)),
+            ast_expr_copy(&assignment.lval),
+            ast_expr_copy(&assignment.rval),
         ),
         AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_isdeallocand_create(Box::from_raw(ast_expr_copy(assertand)))
+            ast_expr_isdeallocand_create(ast_expr_copy(assertand))
         }
         AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_isdereferencable_create(Box::from_raw(ast_expr_copy(assertand)))
+            ast_expr_isdereferencable_create(ast_expr_copy(assertand))
         }
         AstExprKind::ArbArg => ast_expr_arbarg_create(),
         AstExprKind::Allocation(_) => ast_expr_alloc_copy(expr),
         _ => panic!(),
-    })
+    }
 }
 
 pub unsafe fn ast_expr_assignment_lval(expr: &AstExpr) -> &AstExpr {
@@ -2744,7 +2739,7 @@ pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> *mut AstStmt {
         ),
 
         AstStmtKind::Nop => ast_stmt_create_nop(loc),
-        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, ast_expr_copy(expr)),
+        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, Box::into_raw(ast_expr_copy(expr))),
         AstStmtKind::Compound(compound) => {
             ast_stmt_create_compound(loc, ast_block_copy(&**compound))
         }
@@ -2754,7 +2749,7 @@ pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> *mut AstStmt {
         AstStmtKind::Selection(selection) => ast_stmt_create_sel(
             loc,
             selection.isswitch,
-            ast_expr_copy(&selection.cond),
+            Box::into_raw(ast_expr_copy(&selection.cond)),
             ast_stmt_copy(&*selection.body),
             if !(selection.nest).is_null() {
                 ast_stmt_copy(&*selection.nest)
@@ -2971,7 +2966,7 @@ unsafe fn iter_neteffect(iter: &AstStmt) -> *mut AstStmt {
         0 as *mut LexemeMarker,
         ast_stmt_copy(ast_stmt_iter_init(iter)),
         ast_stmt_copy(ast_stmt_iter_cond(iter)),
-        ast_expr_copy(ast_stmt_iter_iter(iter)),
+        Box::into_raw(ast_expr_copy(ast_stmt_iter_iter(iter))),
         ast_block_create(vec![], vec![]),
         ast_stmt_create_compound(
             0 as *mut LexemeMarker,
@@ -3119,11 +3114,8 @@ pub unsafe fn ast_stmt_str(stmt: &AstStmt) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 
-unsafe fn ast_expr_copy_ifnotnull(expr: &Option<Box<AstExpr>>) -> *mut AstExpr {
-    match expr {
-        Some(expr) => ast_expr_copy(expr),
-        None => ptr::null_mut(),
-    }
+unsafe fn ast_expr_copy_ifnotnull(expr: &Option<Box<AstExpr>>) -> Option<Box<AstExpr>> {
+    expr.as_ref().map(|expr| ast_expr_copy(expr))
 }
 
 pub unsafe fn ast_stmt_iter_cond(stmt: &AstStmt) -> &AstStmt {
@@ -3193,7 +3185,7 @@ unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> *mut Result {
             b"return\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ),
         // Note: jump_rv can be null. Error in original.
-        Box::from_raw(ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap())),
+        ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap()),
     );
     let result = ast_expr_absexec(&expr, state);
     std::mem::forget(expr);
@@ -3251,16 +3243,12 @@ pub unsafe fn ast_stmt_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
 pub unsafe fn ast_stmt_create_jump(
     loc: *mut LexemeMarker,
     kind: AstJumpKind,
-    rv: *mut AstExpr,
+    rv: Option<Box<AstExpr>>,
 ) -> *mut AstStmt {
     let stmt: *mut AstStmt = ast_stmt_create(loc);
     (*stmt).kind = AstStmtKind::Jump(AstJumpStmt {
         kind: AstJumpKind::Return,
-        rv: if rv.is_null() {
-            None
-        } else {
-            Some(Box::from_raw(rv))
-        },
+        rv,
     });
     return stmt;
 }
@@ -3383,7 +3371,15 @@ unsafe fn ast_stmt_copy_iter(
     let abstract_0 = ast_block_copy(&*iteration.abstract_0);
     let body = ast_stmt_copy(&*iteration.body);
 
-    ast_stmt_create_iter(loc, init, cond, iter, abstract_0, body, as_iteration_e)
+    ast_stmt_create_iter(
+        loc,
+        init,
+        cond,
+        Box::into_raw(iter),
+        abstract_0,
+        body,
+        as_iteration_e,
+    )
 }
 
 pub unsafe fn ast_stmt_create_iter(
