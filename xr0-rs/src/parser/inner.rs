@@ -110,17 +110,8 @@ pub grammar c_parser(env: &Env) for str {
 
     // Whitespace
     rule _() = quiet!{(newline() / [ ' ' | '\t'])*}
-    rule newline() =
-        "\r"? "\n" d:$(directive()?) {
-            unsafe {
-                env.newline();
-                if !d.is_empty() {
-                    env.directive(d)
-                }
-            }
-        }
+    rule newline() = "\r"? "\n" $(directive()?)
     rule directive() = "#" [^ '\n']*
-    rule start_directive() = d:$(directive()) { unsafe { env.directive(d); } }
 
     // Keywords
     rule end_of_token() = !['_' | 'a'..='z' | 'A'..='Z' | '0'..='9']
@@ -465,7 +456,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule statement() -> BoxedStmt =
         labelled_statement() /
-        p:position!() block:compound_statement() {
+        block:compound_statement() p:position!() {
             unsafe { ast_stmt_create_compound(env.lexloc(p), block) }
         } /
         expression_statement() /
@@ -473,7 +464,7 @@ pub grammar c_parser(env: &Env) for str {
         iteration_statement() /
         jump_statement() /
         iteration_effect_statement() /
-        p:position!() v:compound_verification_statement() {
+        v:compound_verification_statement() p:position!() {
             unsafe { ast_stmt_create_compound_v(env.lexloc(p), v) }
         }
 
@@ -487,13 +478,13 @@ pub grammar c_parser(env: &Env) for str {
         }
 
     rule labelled_statement() -> BoxedStmt =
-        p:position!() label:identifier() _ ":" _ s:statement() {
+        label:identifier() _ ":" _ s:statement() p:position!() {
             unsafe { ast_stmt_create_labelled(env.lexloc(p), label, s) }
         } /
-        p:position!() K(<"case">) _ constant_expression() _ ":" _ statement() {
+        K(<"case">) _ constant_expression() _ ":" _ statement() p:position!() {
             unsafe { ast_stmt_create_nop(env.lexloc(p)) }
         } /
-        p:position!() K(<"default">) _ ":" _ statement() {
+        K(<"default">) _ ":" _ statement() p:position!() {
             unsafe { ast_stmt_create_nop(env.lexloc(p)) }
         }
 
@@ -532,21 +523,21 @@ pub grammar c_parser(env: &Env) for str {
         stmts:list1(<statement()>) { stmts }
 
     rule expression_statement() -> BoxedStmt =
-        p:position!() ";" { unsafe { ast_stmt_create_nop(env.lexloc(p)) } } /
-        p:position!() e:expression() _ ";" { unsafe { ast_stmt_create_expr(env.lexloc(p), e) } }
+        ";" p:position!() { unsafe { ast_stmt_create_nop(env.lexloc(p)) } } /
+        e:expression() _ ";" p:position!() { unsafe { ast_stmt_create_expr(env.lexloc(p), e) } }
 
     rule selection_statement() -> BoxedStmt =
-        p:position!() K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() {
+        K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() p:position!() {
             unsafe {
                 let neg_cond = ast_expr_unary_create(ast_expr_copy(&*cond), AstUnaryOp::Bang);
                 let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, neg_cond, alt, ptr::null_mut());
                 ast_stmt_create_sel(env.lexloc(p), false, cond, then, else_stmt)
             }
         } /
-        p:position!() K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() {
+        K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() p:position!() {
             unsafe { ast_stmt_create_sel(env.lexloc(p), false, cond, then, ptr::null_mut()) }
         } /
-        p:position!() K(<"switch">) _ "(" _ v:expression() _ ")" _ cases:statement() {
+        K(<"switch">) _ "(" _ v:expression() _ ")" _ cases:statement() p:position!() {
             unsafe { ast_stmt_create_nop(env.lexloc(p)) }
         }
 
@@ -558,16 +549,15 @@ pub grammar c_parser(env: &Env) for str {
         }
 
     rule for_iteration_statement(as_iteration_e: bool) -> BoxedStmt =
-        p:position!()
         K(<"for">) _ "(" _ init:expression_statement() _ cond:expression_statement() _ iter:expression() _ ")" _
-        verif:optional_compound_verification() _ body:statement() {
+        verif:optional_compound_verification() _ body:statement() p:position!() {
             unsafe { ast_stmt_create_iter(env.lexloc(p), init, cond, iter, verif, body, as_iteration_e) }
         }
 
     rule iteration_statement() -> BoxedStmt = for_iteration_statement(false)
 
     rule jump_statement() -> BoxedStmt =
-        p:position!() K(<"return">) _ expr:expression() _ ";" {
+        K(<"return">) _ expr:expression() _ ";" p:position!() {
             unsafe { ast_stmt_create_jump(env.lexloc(p), AstJumpKind::Return, expr) }
         }
 
@@ -650,6 +640,6 @@ pub grammar c_parser(env: &Env) for str {
         d:declaration() { unsafe { ast_decl_create(d.name, d.t) } }
 
     pub rule translation_unit() -> BoxedAst =
-        start_directive()? _ decl:list1(<external_declaration()>) _ { unsafe { ast_from_vec(decl) } }
+        directive()? _ decl:list1(<external_declaration()>) _ { unsafe { ast_from_vec(decl) } }
 }
 }

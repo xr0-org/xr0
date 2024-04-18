@@ -1,18 +1,20 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ffi::CStr;
+use std::path::{Path, PathBuf};
 
-use libc::{exit, fprintf, free, isdigit, isspace, malloc};
+use libc::{free, malloc};
 
-use crate::c_util::__stderrp;
 use crate::util::{
-    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc,
-    StrBuilder,
+    self, dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, StrBuilder,
 };
 
 pub struct Env {
+    source: String,
     pub reserved: HashSet<&'static str>,
     pub typenames: RefCell<HashSet<Vec<u8>>>,
+    // these triples are (region start offset, filename, starting line)
+    pub regions: Vec<(usize, PathBuf, usize)>,
 }
 
 static RESERVED: &[&str] = &[
@@ -23,15 +25,61 @@ static RESERVED: &[&str] = &[
 ];
 
 impl Env {
-    pub fn new() -> Self {
+    pub fn new(filename: &Path, source: &str) -> Self {
+        // Scan the whole input for line markers. This is necessary since the peg parser rewinds,
+        // so interleaving parser and lexer actions doesn't make sense.
+        let mut regions = vec![(0, filename.to_path_buf(), 1)];
+        let mut pos = 0;
+        for line in source.split_inclusive('\n') {
+            pos += line.len();
+            let line = line.trim_start();
+            if line.starts_with('#') {
+                let (file, line_num) = parse_linemarker(&line[1..]);
+                regions.push((pos, file, line_num));
+            }
+        }
+
         Env {
+            source: source.to_string(),
             reserved: RESERVED.iter().copied().collect(),
             typenames: RefCell::new(HashSet::new()),
+            regions,
         }
     }
 
-    pub unsafe fn lexloc(&self, _p: usize) -> *mut LexemeMarker {
-        lexloc()
+    pub fn file_line_column(&self, offset: usize) -> (&Path, usize, usize) {
+        assert!(offset <= self.source.len(), "offset out of bounds");
+        let i = match self
+            .regions
+            .binary_search_by_key(&offset, |region| region.0)
+        {
+            Ok(i) => i,
+            Err(i) => i - 1,
+        };
+        let (region_start_offset, ref region_filename, mut line) = self.regions[i];
+
+        let mut column = 0;
+        for c in self.source[region_start_offset..offset].chars() {
+            match c {
+                '\n' => {
+                    line += 1;
+                    column = 0;
+                }
+                '\t' => {
+                    column += 8 - column % 8;
+                }
+                _ => {
+                    column += 1;
+                }
+            }
+        }
+        (region_filename, line, column)
+    }
+
+    pub unsafe fn lexloc(&self, p: usize) -> *mut LexemeMarker {
+        let (file, line, column) = self.file_line_column(p);
+        let filename_cstr = util::to_c_str(file.as_os_str().as_encoded_bytes());
+        lexememarker_create(line as libc::c_int, column as libc::c_int, filename_cstr, 0)
     }
 
     pub unsafe fn add_typename(&self, name: *const libc::c_char) {
@@ -45,16 +93,78 @@ impl Env {
         let typenames = self.typenames.borrow();
         typenames.contains(name.to_bytes())
     }
+}
 
-    pub unsafe fn newline(&self) {
-        marker.linenum += 1;
+fn parse_linemarker(line: &str) -> (PathBuf, usize) {
+    let mut chars = line.chars();
+    let mut c = chars.next().unwrap_or('\0');
+    if !c.is_whitespace() {
+        eprintln!("expected space before line number");
+        std::process::exit(1);
     }
+    while c.is_whitespace() {
+        c = chars.next().unwrap_or('\0');
+    }
+    if !c.is_digit(10) {
+        eprintln!("expected line number in line marker");
+        std::process::exit(1);
+    }
+    let mut linenum = 0;
+    while c.is_digit(10) {
+        linenum *= 10;
+        linenum += (c as u32 - '0' as u32) as usize;
+        c = chars.next().unwrap_or('\0');
+    }
+    if !c.is_whitespace() {
+        eprintln!("expected space before file name");
+        std::process::exit(1);
+    }
+    while c.is_whitespace() {
+        c = chars.next().unwrap_or('\0');
+    }
+    if c != '"' {
+        eprintln!("file name must begin with opening quote");
+        std::process::exit(1);
+    }
+    let s = chars.as_str();
+    loop {
+        c = chars.next().unwrap_or('"');
+        if c == '"' {
+            break;
+        }
+    }
+    let n = s.len() - chars.as_str().len() - 1; // -1 for closing quote
+    let name = &s[..n];
+    let mut flags: libc::c_int = 0 as libc::c_int;
+    c = chars.next().unwrap_or('\0');
+    if c.is_whitespace() {
+        while c != '\0' {
+            if c.is_digit(10) {
+                match c {
+                    '1' => {
+                        flags |= LM_FLAG_NEW_FILE as libc::c_int;
+                    }
+                    '2' => {
+                        flags |= LM_FLAG_RESUME_FILE as libc::c_int;
+                    }
+                    '3' => {
+                        flags |= LM_FLAG_SYS_HEADER as libc::c_int;
+                    }
+                    '4' => {
+                        flags |= LM_FLAG_IMPLICIT_EXTERN as libc::c_int;
+                    }
+                    _ => {
+                        eprintln!("invalid flag {:?}", c);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            c = chars.next().unwrap_or('\0');
+        }
+    }
+    let _ = flags;
 
-    pub unsafe fn directive(&self, d: &str) {
-        let mut iter = d.bytes().map(|b| b as libc::c_char);
-        assert_eq!(iter.next(), Some(b'#' as libc::c_char));
-        marker = process_linemarker(iter);
-    }
+    (PathBuf::from(name), linenum)
 }
 
 #[derive(Copy, Clone)]
@@ -70,21 +180,6 @@ pub const LM_FLAG_IMPLICIT_EXTERN: LineMarkerFlag = 8;
 pub const LM_FLAG_SYS_HEADER: LineMarkerFlag = 4;
 pub const LM_FLAG_RESUME_FILE: LineMarkerFlag = 2;
 pub const LM_FLAG_NEW_FILE: LineMarkerFlag = 1;
-
-#[allow(non_upper_case_globals)]
-pub static mut marker: LexemeMarker = LexemeMarker {
-    linenum: 0,
-    column: 0,
-    filename: 0 as *const libc::c_char as *mut libc::c_char,
-    flags: 0 as LineMarkerFlag,
-};
-
-pub unsafe fn lexloc() -> *mut LexemeMarker {
-    if (marker.filename).is_null() as libc::c_int as libc::c_long != 0 {
-        panic!();
-    }
-    return lexememarker_copy(std::ptr::addr_of_mut!(marker));
-}
 
 pub unsafe fn lexememarker_create(
     linenum: libc::c_int,
@@ -124,94 +219,4 @@ pub unsafe fn lexememarker_str(loc: &LexemeMarker) -> *mut libc::c_char {
         loc.column,
     );
     return strbuilder_build(b);
-}
-
-pub unsafe fn process_linemarker(mut bytes: impl Iterator<Item = libc::c_char>) -> LexemeMarker {
-    let mut c: libc::c_char = bytes.next().unwrap_or(0);
-    if isspace(c as libc::c_int) == 0 {
-        fprintf(
-            __stderrp,
-            b"expected space before line number\n\0" as *const u8 as *const libc::c_char,
-        );
-        exit(1 as libc::c_int);
-    }
-    while isspace(c as libc::c_int) != 0 {
-        c = bytes.next().unwrap_or(0);
-    }
-    if isdigit(c as libc::c_int) == 0 {
-        fprintf(
-            __stderrp,
-            b"expected line number in line marker\n\0" as *const u8 as *const libc::c_char,
-        );
-        exit(1 as libc::c_int);
-    }
-    let mut linenum: libc::c_int = 0 as libc::c_int;
-    while isdigit(c as libc::c_int) != 0 {
-        linenum *= 10 as libc::c_int;
-        linenum += c as libc::c_int - '0' as i32;
-        c = bytes.next().unwrap_or(0);
-    }
-    if isspace(c as libc::c_int) == 0 {
-        fprintf(
-            __stderrp,
-            b"expected space before file name\n\0" as *const u8 as *const libc::c_char,
-        );
-        exit(1 as libc::c_int);
-    }
-    while isspace(c as libc::c_int) != 0 {
-        c = bytes.next().unwrap_or(0);
-    }
-    if c as libc::c_int != '"' as i32 {
-        fprintf(
-            __stderrp,
-            b"file name must begin with opening quote\n\0" as *const u8 as *const libc::c_char,
-        );
-        exit(1 as libc::c_int);
-    }
-    let b: *mut StrBuilder = strbuilder_create();
-    loop {
-        c = bytes.next().unwrap_or(0);
-        if !(c as libc::c_int != '"' as i32) {
-            break;
-        }
-        strbuilder_putc(b, c);
-    }
-    let name: *mut libc::c_char = strbuilder_build(b);
-    let mut flags: libc::c_int = 0 as libc::c_int;
-    c = bytes.next().unwrap_or(0);
-    if isspace(c as libc::c_int) != 0 {
-        while c != 0 {
-            if isdigit(c as libc::c_int) != 0 {
-                match c as libc::c_int {
-                    49 => {
-                        flags |= LM_FLAG_NEW_FILE as libc::c_int;
-                    }
-                    50 => {
-                        flags |= LM_FLAG_RESUME_FILE as libc::c_int;
-                    }
-                    51 => {
-                        flags |= LM_FLAG_SYS_HEADER as libc::c_int;
-                    }
-                    52 => {
-                        flags |= LM_FLAG_IMPLICIT_EXTERN as libc::c_int;
-                    }
-                    _ => {
-                        fprintf(
-                            __stderrp,
-                            b"invalid flag `%c'\n\0" as *const u8 as *const libc::c_char,
-                            c as libc::c_int,
-                        );
-                        exit(1 as libc::c_int);
-                    }
-                }
-            }
-            c = bytes.next().unwrap_or(0);
-        }
-    }
-    LexemeMarker {
-        linenum,
-        column: 0 as libc::c_int,
-        filename: name,
-        flags: flags as LineMarkerFlag,
-    }
 }

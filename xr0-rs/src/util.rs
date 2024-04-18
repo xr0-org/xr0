@@ -47,6 +47,21 @@ pub unsafe extern "C" fn dynamic_str(s: *const libc::c_char) -> *mut libc::c_cha
     return t;
 }
 
+pub fn to_c_str(s: &[u8]) -> *mut libc::c_char {
+    let len = s.len();
+    unsafe {
+        let t = malloc(len + 1) as *mut libc::c_char;
+        assert!(!t.is_null());
+        libc::memcpy(
+            t as *mut libc::c_void,
+            &s[0] as *const u8 as *const libc::c_void,
+            len,
+        );
+        *t.add(len) = 0;
+        t
+    }
+}
+
 unsafe fn entry_create(key: *const libc::c_char, value: *const libc::c_void) -> Entry {
     assert!(!key.is_null());
     Entry {
