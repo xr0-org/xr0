@@ -642,12 +642,7 @@ pub unsafe fn value_issync(v: *mut Value) -> bool {
 }
 
 pub unsafe fn value_as_sync(v: *mut Value) -> *mut AstExpr {
-    if !((*v).type_0 as libc::c_uint == VALUE_SYNC as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
-        panic!();
-    }
+    assert_eq!((*v).type_0, VALUE_SYNC);
     return number_as_sync((*v).c2rust_unnamed.n);
 }
 
