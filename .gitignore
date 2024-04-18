@@ -10,3 +10,5 @@ a.out
 *.output
 *-preproc.[c0]
 xr0-deps/target
+src/*/*.rs
+src/*.rs
