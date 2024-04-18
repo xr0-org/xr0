@@ -308,8 +308,7 @@ pub enum AstExternDeclKind {
 }
 
 pub struct Ast {
-    pub n: libc::c_int,
-    pub decl: *mut *mut AstExternDecl,
+    pub decls: Vec<*mut AstExternDecl>,
 }
 
 impl Display for AstExpr {
@@ -1059,15 +1058,15 @@ unsafe fn call_absexec(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
     if !v.is_null() {
         return Ok(v);
     }
-    call_arbitraryresult(expr, f, s)
+    call_arbitraryresult(expr, &*f, s)
 }
 
 unsafe fn call_arbitraryresult(
     expr: &AstExpr,
-    f: *mut AstFunction,
+    f: &AstFunction,
     state: *mut State,
 ) -> Result<*mut Value> {
-    let res = call_to_computed_value(&*f, state)?;
+    let res = call_to_computed_value(f, state)?;
     assert!(!res.is_null());
     Ok(res)
 }
@@ -4622,41 +4621,14 @@ pub unsafe fn parse_escape(c: &str) -> libc::c_int {
     }
 }
 
-pub unsafe fn ast_create(decl: *mut AstExternDecl) -> *mut Ast {
-    let mut node = Box::new(Ast {
-        n: 0,
-        decl: ptr::null_mut(),
-    });
-    ast_append(&mut *node, decl);
-    Box::into_raw(node)
-}
-
 impl Drop for Ast {
     fn drop(&mut self) {
         unsafe {
-            let mut i: libc::c_int = 0 as libc::c_int;
-            while i < (*self).n {
-                ast_externdecl_destroy(*self.decl.offset(i as isize));
-                i += 1;
+            for &decl in &self.decls {
+                ast_externdecl_destroy(decl);
             }
-            free(self.decl as *mut libc::c_void);
         }
     }
-}
-
-pub unsafe fn ast_destroy(node: *mut Ast) {
-    drop(Box::from_raw(node));
-}
-
-pub unsafe fn ast_append(node: *mut Ast, decl: *mut AstExternDecl) -> *mut Ast {
-    (*node).n += 1;
-    (*node).decl = realloc(
-        (*node).decl as *mut libc::c_void,
-        (::core::mem::size_of::<*mut AstExternDecl>()).wrapping_mul((*node).n as usize),
-    ) as *mut *mut AstExternDecl;
-    let ref mut fresh16 = *((*node).decl).offset(((*node).n - 1 as libc::c_int) as isize);
-    *fresh16 = decl;
-    return node;
 }
 
 pub unsafe fn lvalue_create(t: *mut AstType, obj: *mut Object) -> *mut LValue {

@@ -11,7 +11,7 @@ pub use env::{lexememarker_copy, lexememarker_destroy, lexememarker_str, LexemeM
 pub fn parse_translation_unit(
     filename: &Path,
     source: &str,
-) -> Result<*mut Ast, peg::error::ParseError<peg::str::LineCol>> {
+) -> Result<Box<Ast>, peg::error::ParseError<peg::str::LineCol>> {
     let env = Env::new(filename, source);
     inner::c_parser::translation_unit(source, &env)
 }

@@ -5,7 +5,7 @@ use crate::ast::*;
 use crate::parser::env::Env;
 use crate::util::dynamic_str;
 
-type BoxedAst = *mut Ast;
+type BoxedAst = Box<Ast>;
 type BoxedBlock = *mut AstBlock;
 type BoxedExpr = Box<AstExpr>;
 type BoxedFunction = *mut AstFunction;
@@ -89,12 +89,8 @@ unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<*mut AstV
         .collect()
 }
 
-unsafe fn ast_from_vec(v: Vec<*mut AstExternDecl>) -> *mut Ast {
-    let mut root = ast_create(v[0]);
-    for &decl in &v[1..] {
-        root = ast_append(root, decl);
-    }
-    root
+unsafe fn ast_from_vec(decls: Vec<*mut AstExternDecl>) -> Box<Ast> {
+    Box::new(Ast { decls })
 }
 
 peg::parser! {
@@ -634,7 +630,7 @@ pub grammar c_parser(env: &Env) for str {
         f:function_definition() { unsafe { ast_functiondecl_create(f) } } /
         d:declaration() { unsafe { ast_decl_create(d.name, d.t) } }
 
-    pub rule translation_unit() -> BoxedAst =
+    pub rule translation_unit() -> Box<Ast> =
         directive()? _ decl:list1(<external_declaration()>) _ { unsafe { ast_from_vec(decl) } }
 }
 }
