@@ -1,5 +1,7 @@
 #![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
+use std::ptr;
+
 use libc::{free, malloc};
 
 use crate::state::block::{
@@ -58,8 +60,13 @@ pub unsafe fn static_memory_str(
 pub unsafe fn static_memory_copy(sm: *mut StaticMemory) -> *mut StaticMemory {
     let copy: *mut StaticMemory =
         malloc(::core::mem::size_of::<StaticMemory>()) as *mut StaticMemory;
-    (*copy).blocks = block_arr_copy((*sm).blocks);
-    (*copy).pool = pool_copy(&(*sm).pool);
+    ptr::write(
+        copy,
+        StaticMemory {
+            blocks: block_arr_copy((*sm).blocks),
+            pool: pool_copy(&(*sm).pool),
+        },
+    );
     return copy;
 }
 unsafe fn pool_copy(p: &Map) -> Box<Map> {
