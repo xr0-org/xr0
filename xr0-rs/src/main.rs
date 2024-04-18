@@ -250,7 +250,6 @@ unsafe fn proto_defisvalid(proto: *mut AstFunction, def: *mut AstFunction) -> bo
 
 unsafe fn verify(c: &Config) -> io::Result<()> {
     let source = preprocess(&c.infile, &c.include_dirs)?;
-    println!("SOURCE\n====\n{source}====\n");
     root = parser::parse_translation_unit(&c.infile, &source)
         .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{err}")))?;
 
