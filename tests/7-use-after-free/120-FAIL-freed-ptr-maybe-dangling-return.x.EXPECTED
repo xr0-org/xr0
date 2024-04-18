@@ -1,1 +1,1 @@
-7-use-after-free/120-FAIL-freed-ptr-maybe-dangling-return.x:34:8:main: undefined indirection: *(j) is not an lvalue
+7-use-after-free/120-FAIL-freed-ptr-maybe-dangling-return.x:36:10: undefined indirection: *(j) is not an lvalue (main)
