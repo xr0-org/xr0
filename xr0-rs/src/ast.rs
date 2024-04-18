@@ -290,12 +290,6 @@ pub struct AstStmtSplits {
     pub err: Option<Box<Error>>,
 }
 
-#[derive(Copy, Clone)]
-pub struct AstFunctionArr {
-    pub n: libc::c_int,
-    pub f: *mut *mut AstFunction,
-}
-
 pub struct AstExternDecl {
     pub kind: AstExternDeclKind,
 }
@@ -4328,29 +4322,20 @@ unsafe fn split_path_verify(
     cond: &AstExpr,
     abstract_state: *mut State,
 ) -> Result<()> {
-    let paths: *mut AstFunctionArr = body_paths(&*f, index, cond);
-    let n: libc::c_int = ast_function_arr_len(paths);
-    if !(n == 2 as libc::c_int) {
-        panic!();
-    }
-    let func: *mut *mut AstFunction = ast_function_arr_func(paths);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let actual_copy: *mut State =
-            state_copywithname(actual_state, ast_function_name(&**func.offset(i as isize)));
-        let abstract_copy: *mut State = state_copywithname(
-            abstract_state,
-            ast_function_name(&**func.offset(i as isize)),
-        );
-        // Note: original leaks expression.
-        let expr = ast_expr_inverted_copy(cond, i == 1 as libc::c_int);
+    let paths = body_paths(&*f, index, cond);
+    assert_eq!(paths.len(), 2);
+    // Note: Original leaks both functions.
+    for (i, f) in paths.into_iter().enumerate() {
+        let actual_copy: *mut State = state_copywithname(actual_state, ast_function_name(&*f));
+        let abstract_copy: *mut State = state_copywithname(abstract_state, ast_function_name(&*f));
+        // Note: Original leaks expression.
+        let expr = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&expr, actual_copy);
         std::mem::forget(expr);
         let r = r?;
         if !r.is_contradiction {
-            path_verify(*func.offset(i as isize), actual_copy, index, abstract_copy)?;
+            path_verify(f, actual_copy, index, abstract_copy)?;
         }
-        i += 1;
     }
     Ok(())
 }
@@ -4422,8 +4407,7 @@ unsafe fn abstract_paths(
     f: &AstFunction,
     index: libc::c_int,
     cond: &AstExpr,
-) -> *mut AstFunctionArr {
-    let res: *mut AstFunctionArr = ast_function_arr_create();
+) -> Vec<*mut AstFunction> {
     let f_true: *mut AstFunction = ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),
@@ -4442,9 +4426,7 @@ unsafe fn abstract_paths(
         ast_block_copy(&*f.abstract_0),
         ast_block_copy(&*f.body),
     );
-    ast_function_arr_append(res, f_true);
-    ast_function_arr_append(res, f_false);
-    return res;
+    vec![f_true, f_false]
 }
 
 unsafe fn split_path_absverify(
@@ -4453,23 +4435,16 @@ unsafe fn split_path_absverify(
     index: libc::c_int,
     cond: &AstExpr,
 ) -> Result<()> {
-    let paths: *mut AstFunctionArr = abstract_paths(&*f, index, cond);
-    let n: libc::c_int = ast_function_arr_len(paths);
-    if !(n == 2 as libc::c_int) {
-        panic!();
-    }
-    let func: *mut *mut AstFunction = ast_function_arr_func(paths);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let s_copy: *mut State =
-            state_copywithname(state, ast_function_name(&**func.offset(i as isize)));
+    let paths = abstract_paths(&*f, index, cond);
+    assert_eq!(paths.len(), 2);
+    for (i, f) in paths.into_iter().enumerate() {
+        let s_copy: *mut State = state_copywithname(state, ast_function_name(&*f));
         // Note: Original leaks `inv` but I think accidentally.
-        let inv = ast_expr_inverted_copy(cond, i == 1 as libc::c_int);
+        let inv = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&inv, s_copy)?;
         if !r.is_contradiction {
-            path_absverify(*func.offset(i as isize), s_copy, index)?;
+            path_absverify(f, s_copy, index)?;
         }
-        i += 1;
     }
     Ok(())
 }
@@ -4529,8 +4504,7 @@ unsafe fn split_paths_verify(
     Ok(())
 }
 
-unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> *mut AstFunctionArr {
-    let res: *mut AstFunctionArr = ast_function_arr_create();
+unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> Vec<*mut AstFunction> {
     let f_true: *mut AstFunction = ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),
@@ -4549,61 +4523,7 @@ unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> *mu
         ast_block_copy(&*f.abstract_0),
         f.body,
     );
-    ast_function_arr_append(res, f_true);
-    ast_function_arr_append(res, f_false);
-    return res;
-}
-
-pub unsafe fn ast_function_arr_create() -> *mut AstFunctionArr {
-    Box::into_raw(Box::new(AstFunctionArr {
-        n: 0,
-        f: ptr::null_mut(),
-    }))
-}
-
-pub unsafe fn ast_function_arr_copy(old: *mut AstFunctionArr) -> *mut AstFunctionArr {
-    let new: *mut AstFunctionArr = ast_function_arr_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*old).n {
-        ast_function_arr_append(new, ast_function_copy(&**((*old).f).offset(i as isize)));
-        i += 1;
-    }
-    return new;
-}
-
-pub unsafe fn ast_function_arr_destroy(arr: *mut AstFunctionArr) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        ast_function_destroy(*((*arr).f).offset(i as isize));
-        i += 1;
-    }
-    drop(Box::from_raw(arr));
-}
-
-pub unsafe fn ast_function_arr_append(arr: *mut AstFunctionArr, f: *mut AstFunction) {
-    (*arr).n += 1;
-    (*arr).f = realloc(
-        (*arr).f as *mut libc::c_void,
-        (::core::mem::size_of::<*mut AstFunction>()).wrapping_mul((*arr).n as usize),
-    ) as *mut *mut AstFunction;
-    let ref mut fresh15 = *((*arr).f).offset(((*arr).n - 1 as libc::c_int) as isize);
-    *fresh15 = f;
-}
-
-pub unsafe fn ast_function_arr_appendrange(arr: *mut AstFunctionArr, range: *mut AstFunctionArr) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*range).n {
-        ast_function_arr_append(arr, *((*range).f).offset(i as isize));
-        i += 1;
-    }
-}
-
-pub unsafe fn ast_function_arr_len(arr: *mut AstFunctionArr) -> libc::c_int {
-    return (*arr).n;
-}
-
-pub unsafe fn ast_function_arr_func(arr: *mut AstFunctionArr) -> *mut *mut AstFunction {
-    return (*arr).f;
+    vec![f_true, f_false]
 }
 
 pub unsafe fn ast_functiondecl_create(f: *mut AstFunction) -> *mut AstExternDecl {
