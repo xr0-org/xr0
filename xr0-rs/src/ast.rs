@@ -11,11 +11,7 @@ use crate::ext::{
     externals_declarefunc, externals_declarestruct, externals_declaretypedef, externals_declarevar,
     externals_getfunc, externals_getstruct, externals_gettypedef,
 };
-use crate::math::{
-    math_atom_nat_create, math_atom_variable_create, math_eq, math_expr_atom_create,
-    math_expr_destroy, math_expr_neg_create, math_expr_sum_create, math_ge, math_gt, math_le,
-    math_lt,
-};
+use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
 use crate::object::{
     object_as_value, object_assign, object_destroy, object_getmember, object_getmembertype,
     object_hasvalue,
@@ -42,7 +38,7 @@ use crate::value::{
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr, values_comparable,
 };
-use crate::{vprintln, Externals, MathExpr, Object, Props, State, StrBuilder, Value};
+use crate::{vprintln, Externals, Object, Props, State, StrBuilder, Value};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
@@ -408,49 +404,44 @@ unsafe fn rangeprocess_alloc(
 pub unsafe fn ast_expr_matheval(e: &AstExpr) -> bool {
     match &e.kind {
         AstExprKind::Binary(binary) => {
-            let e1: *mut MathExpr = math_expr(&binary.e1);
-            let e2: *mut MathExpr = math_expr(&binary.e2);
-            let val: bool = eval_prop(e1, binary.op, e2);
-            math_expr_destroy(e2);
-            math_expr_destroy(e1);
-            return val;
+            let e1 = math_expr(&binary.e1);
+            let e2 = math_expr(&binary.e2);
+            eval_prop(&e1, binary.op, &e2)
         }
         _ => panic!(),
     }
 }
 
-unsafe fn math_expr(e: &AstExpr) -> *mut MathExpr {
-    match &e.kind {
-        AstExprKind::Identifier(id) => {
-            math_expr_atom_create(math_atom_variable_create(dynamic_str(*id)))
-        }
+unsafe fn math_expr(e: &AstExpr) -> Box<MathExpr> {
+    Box::new(match &e.kind {
+        AstExprKind::Identifier(id) => MathExpr::Atom(MathAtom::Variable(dynamic_str(*id))),
         AstExprKind::Constant(c) => {
             if c.constant < 0 {
-                math_expr_neg_create(math_expr_atom_create(math_atom_nat_create(
+                MathExpr::Neg(Box::new(MathExpr::Atom(MathAtom::Nat(
                     -c.constant as libc::c_uint,
-                )))
+                ))))
             } else {
-                math_expr_atom_create(math_atom_nat_create(c.constant as libc::c_uint))
+                MathExpr::Atom(MathAtom::Nat(c.constant as libc::c_uint))
             }
         }
         AstExprKind::Binary(binary) => {
-            math_expr_sum_create(math_expr(&binary.e1), binary_e2(&binary.e2, binary.op))
+            MathExpr::Sum(math_expr(&binary.e1), binary_e2(&binary.e2, binary.op))
         }
         _ => {
             panic!();
         }
-    }
+    })
 }
 
-unsafe fn binary_e2(e2: &AstExpr, op: AstBinaryOp) -> *mut MathExpr {
+unsafe fn binary_e2(e2: &AstExpr, op: AstBinaryOp) -> Box<MathExpr> {
     match op {
         AstBinaryOp::Addition => math_expr(e2),
-        AstBinaryOp::Subtraction => math_expr_neg_create(math_expr(e2)),
+        AstBinaryOp::Subtraction => Box::new(MathExpr::Neg(math_expr(e2))),
         _ => panic!(),
     }
 }
 
-unsafe fn eval_prop(e1: *mut MathExpr, op: AstBinaryOp, e2: *mut MathExpr) -> bool {
+unsafe fn eval_prop(e1: &MathExpr, op: AstBinaryOp, e2: &MathExpr) -> bool {
     match op {
         AstBinaryOp::Eq => math_eq(e1, e2),
         AstBinaryOp::Ne => !math_eq(e1, e2),

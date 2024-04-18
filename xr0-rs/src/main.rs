@@ -30,7 +30,6 @@ use ast::{
     AstFunction, AstType, AstVariable, AstVariableArr,
 };
 use ext::{externals_create, externals_destroy, externals_getfunc, Externals};
-use math::MathExpr;
 use object::{Object, ObjectArr};
 use props::Props;
 use state::block::{Block, BlockArr};
