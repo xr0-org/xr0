@@ -743,14 +743,14 @@ unsafe fn ast_expr_bracketed_str_build(inner: &AstExpr, b: *mut StrBuilder) {
     free(root as *mut libc::c_void);
 }
 
-unsafe fn expr_to_binary(expr: &AstExpr) -> *mut AstExpr {
+unsafe fn expr_to_binary(expr: &AstExpr) -> Box<AstExpr> {
     match &expr.kind {
-        AstExprKind::Binary(_) => Box::into_raw(ast_expr_copy(expr)),
-        _ => Box::into_raw(ast_expr_binary_create(
+        AstExprKind::Binary(_) => ast_expr_copy(expr),
+        _ => ast_expr_binary_create(
             ast_expr_copy(expr),
             AstBinaryOp::Addition,
             ast_expr_constant_create(0 as libc::c_int),
-        )),
+        ),
     }
 }
 
@@ -1088,12 +1088,12 @@ pub unsafe fn expr_identifier_lvalue(expr: &AstExpr, state: *mut State) -> LValu
         init
     };
 }
+
 unsafe fn dereference_eval(expr: &AstExpr, state: *mut State) -> *mut Result {
-    let binary: *mut AstExpr = expr_to_binary(ast_expr_unary_operand(expr));
-    let res: *mut Result = binary_deref_eval(&*binary, state);
-    ast_expr_destroy(binary);
-    return res;
+    let binary = expr_to_binary(ast_expr_unary_operand(expr));
+    binary_deref_eval(&binary, state)
 }
+
 unsafe fn ast_expr_constant_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     let AstExprKind::Constant(c) = &expr.kind else {
         panic!()
