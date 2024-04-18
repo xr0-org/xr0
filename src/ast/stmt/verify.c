@@ -59,12 +59,13 @@ ast_stmt_linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_NOP:
+	case STMT_COMPOUND_V:
+		return NULL;
 	case STMT_EXPR:
 		return expr_linearise(stmt, b, loc, state);
 	case STMT_LABELLED:
 		return labelled_linearise(stmt, b, loc, state);
-	case STMT_COMPOUND_V:
-		return NULL;
 	case STMT_COMPOUND:
 		return compound_linearise(stmt, b, loc, state);
 	case STMT_JUMP:

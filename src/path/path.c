@@ -265,17 +265,13 @@ path_step_actual(struct path *p)
 		path_split(p, error_get_undecideable_cond(uc_err));
 		return NULL;
 	}
-	printf("error: %s\n", error_str(err));
-	printf("state: %s\n", state_str(p->actual));
 	return state_stacktrace(p->actual, err);
 }
 
 static struct error *
 path_audit(struct path *p)
 {
-	printf("auditing path\n");
-	printf("abstract: %s\n", state_str(p->abstract));
-	printf("actual: %s\n", state_str(p->actual));
+	v_printf("in path_audit\n");
 	if (state_hasgarbage(p->actual)) {
 		v_printf("actual: %s", state_str(p->actual));
 		return error_printf(
