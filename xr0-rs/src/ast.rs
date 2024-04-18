@@ -644,10 +644,8 @@ unsafe fn binary_assume(b: &BinaryExpr, value: bool, s: *mut State) -> *mut Prer
 }
 
 unsafe fn irreducible_assume(e: &AstExpr, value: bool, s: *mut State) -> *mut Preresult {
-    let prop: *mut AstExpr = ast_expr_inverted_copy(e, !value);
-    let r: *mut Preresult = irreducible_assume_actual(&*prop, s);
-    ast_expr_destroy(prop);
-    return r;
+    let prop = ast_expr_inverted_copy(e, !value);
+    irreducible_assume_actual(&prop, s)
 }
 
 unsafe fn irreducible_assume_actual(e: &AstExpr, s: *mut State) -> *mut Preresult {
@@ -1767,10 +1765,10 @@ impl Drop for CallExpr {
     }
 }
 
-pub unsafe fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> *mut AstExpr {
-    let copy: *mut AstExpr = ast_expr_copy(expr);
+pub unsafe fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
+    let copy = Box::from_raw(ast_expr_copy(expr));
     if invert {
-        Box::into_raw(ast_expr_unary_create(Box::from_raw(copy), AstUnaryOp::Bang))
+        ast_expr_unary_create(copy, AstUnaryOp::Bang)
     } else {
         copy
     }
@@ -4661,10 +4659,10 @@ unsafe fn split_path_verify(
             abstract_state,
             ast_function_name(&**func.offset(i as isize)),
         );
-        let r: *mut Preresult = ast_expr_assume(
-            &*ast_expr_inverted_copy(cond, i == 1 as libc::c_int),
-            actual_copy,
-        );
+        // Note: original leaks expression.
+        let expr = ast_expr_inverted_copy(cond, i == 1 as libc::c_int);
+        let r: *mut Preresult = ast_expr_assume(&expr, actual_copy);
+        std::mem::forget(expr);
         if preresult_iserror(r) {
             return preresult_as_error(r);
         }
@@ -4756,11 +4754,12 @@ unsafe fn abstract_paths(
         ast_block_copy(&*f.abstract_0),
         ast_block_copy(&*f.body),
     );
-    let inv_assumption: *mut AstExpr = ast_expr_inverted_copy(cond, true);
+    // Note: Original leaks inv_assumption, but I think unintentionally.
+    let inv_assumption = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),
-        split_name(f.name, &*inv_assumption),
+        split_name(f.name, &inv_assumption),
         ast_variables_copy(&f.params),
         ast_block_copy(&*f.abstract_0),
         ast_block_copy(&*f.body),
@@ -4787,10 +4786,9 @@ unsafe fn split_path_absverify(
     while i < n {
         let s_copy: *mut State =
             state_copywithname(state, ast_function_name(&**func.offset(i as isize)));
-        let r: *mut Preresult = ast_expr_assume(
-            &*ast_expr_inverted_copy(cond, i == 1 as libc::c_int),
-            s_copy,
-        );
+        // Note: Original leaks `inv` but I think accidentally.
+        let inv = ast_expr_inverted_copy(cond, i == 1 as libc::c_int);
+        let r: *mut Preresult = ast_expr_assume(&inv, s_copy);
         if preresult_iserror(r) {
             return preresult_as_error(r);
         }
@@ -4878,7 +4876,8 @@ unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> *mu
         ast_block_copy(&*f.abstract_0),
         f.body,
     );
-    let inv_assumption: *mut AstExpr = ast_expr_inverted_copy(cond, true);
+    // Note: Original leaks `inv_assumption` but I think accidentally.
+    let inv_assumption = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),

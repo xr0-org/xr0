@@ -101,23 +101,21 @@ pub unsafe fn props_get(p: *mut Props, e: *mut AstExpr) -> bool {
 }
 
 pub unsafe fn props_contradicts(p: *mut Props, p1: &AstExpr) -> bool {
-    let not_p1: *mut AstExpr = ast_expr_inverted_copy(p1, 1 as libc::c_int != 0);
-    let iscontradiction: bool = props_contradicts_actual(p, p1, &*not_p1);
-    ast_expr_destroy(not_p1);
-    return iscontradiction;
+    let not_p1 = ast_expr_inverted_copy(p1, true);
+    props_contradicts_actual(p, p1, &not_p1)
 }
 unsafe fn props_contradicts_actual(p: *mut Props, p1: &AstExpr, not_p1: &AstExpr) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*p).n {
         let p2: *mut AstExpr = *((*p).prop).offset(i as isize);
-        let not_p2: *mut AstExpr = ast_expr_inverted_copy(&*p2, 1 as libc::c_int != 0);
-        let contra: bool = ast_expr_equal(&*p1, &*not_p2) as libc::c_int != 0
+        let not_p2 = ast_expr_inverted_copy(&*p2, true);
+        let contra: bool = ast_expr_equal(&*p1, &not_p2) as libc::c_int != 0
             || ast_expr_equal(&*not_p1, &*p2) as libc::c_int != 0;
-        ast_expr_destroy(not_p2);
+        drop(not_p2);
         if contra {
-            return 1 as libc::c_int != 0;
+            return true;
         }
         i += 1;
     }
-    return 0 as libc::c_int != 0;
+    false
 }
