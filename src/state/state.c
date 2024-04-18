@@ -238,9 +238,16 @@ void
 state_writeregister(struct state *state, struct value *v)
 {
 	assert(!state->reg);
-	printf("writing to register: %s\n", v ? value_str(v) : "NULL");
+	v_printf("writing to register: %s\n", v ? value_str(v) : "NULL");
 	state->reg = v;
 }
+
+void
+state_clearregister(struct state *state)
+{
+	state->reg = NULL;
+}
+
 
 struct error *
 state_stacktrace(struct state *s, struct error *err)

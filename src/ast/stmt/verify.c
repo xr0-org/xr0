@@ -27,6 +27,7 @@ ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_EXPR:
 		return expr_linearise(stmt, state);
+	case STMT_LABELLED:
 	case STMT_COMPOUND_V:
 		return NULL;
 	case STMT_JUMP:
@@ -663,6 +664,7 @@ labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 sel_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
+	assert(false);
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
