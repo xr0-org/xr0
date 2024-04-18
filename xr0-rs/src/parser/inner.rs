@@ -5,14 +5,13 @@ use crate::ast::*;
 use crate::parser::env::Env;
 use crate::util::dynamic_str;
 
-type BoxedAst = Box<Ast>;
 type BoxedBlock = *mut AstBlock;
 type BoxedExpr = Box<AstExpr>;
 type BoxedFunction = *mut AstFunction;
 type BoxedStmt = *mut AstStmt;
 type BoxedType = *mut AstType;
 type BoxedVariable = *mut AstVariable;
-type BoxedExternDecl = *mut AstExternDecl;
+type BoxedExternDecl = Box<AstExternDecl>;
 type BoxedCStr = *mut libc::c_char;
 
 pub struct Declaration {
@@ -89,7 +88,7 @@ unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<*mut AstV
         .collect()
 }
 
-unsafe fn ast_from_vec(decls: Vec<*mut AstExternDecl>) -> Box<Ast> {
+unsafe fn ast_from_vec(decls: Vec<Box<AstExternDecl>>) -> Box<Ast> {
     Box::new(Ast { decls })
 }
 

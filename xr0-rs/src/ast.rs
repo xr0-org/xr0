@@ -308,7 +308,7 @@ pub enum AstExternDeclKind {
 }
 
 pub struct Ast {
-    pub decls: Vec<*mut AstExternDecl>,
+    pub decls: Vec<Box<AstExternDecl>>,
 }
 
 impl Display for AstExpr {
@@ -4521,25 +4521,28 @@ unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> Vec
     vec![f_true, f_false]
 }
 
-pub unsafe fn ast_functiondecl_create(f: *mut AstFunction) -> *mut AstExternDecl {
-    Box::into_raw(Box::new(AstExternDecl {
+pub unsafe fn ast_functiondecl_create(f: *mut AstFunction) -> Box<AstExternDecl> {
+    Box::new(AstExternDecl {
         kind: AstExternDeclKind::Function(f),
-    }))
+    })
 }
 
-pub unsafe fn ast_externdecl_isfunction(decl: *mut AstExternDecl) -> bool {
-    matches!((*decl).kind, AstExternDeclKind::Function(_))
-}
-
-pub unsafe fn ast_externdecl_as_function(decl: *mut AstExternDecl) -> *mut AstFunction {
+pub unsafe fn ast_externdecl_as_function_ptr(decl: &AstExternDecl) -> Option<*mut AstFunction> {
     match &(*decl).kind {
-        AstExternDeclKind::Function(f) => *f,
-        _ => panic!(),
+        AstExternDeclKind::Function(f) => Some(*f),
+        _ => None,
     }
 }
 
-pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> *mut AstExternDecl {
-    Box::into_raw(Box::new(AstExternDecl {
+pub unsafe fn ast_externdecl_as_function(decl: &AstExternDecl) -> Option<&AstFunction> {
+    match &(*decl).kind {
+        AstExternDeclKind::Function(f) => Some(&**f),
+        _ => None,
+    }
+}
+
+pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> Box<AstExternDecl> {
+    Box::new(AstExternDecl {
         kind: if ast_type_istypedef(t) {
             AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t })
         } else if ast_type_isstruct(&*t) {
@@ -4550,7 +4553,7 @@ pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> *mut 
         } else {
             AstExternDeclKind::Variable(ast_variable_create(name, t))
         },
-    }))
+    })
 }
 
 pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: *mut Externals) {
@@ -4592,10 +4595,6 @@ impl Drop for AstExternDeclKind {
     }
 }
 
-pub unsafe fn ast_externdecl_destroy(decl: *mut AstExternDecl) {
-    drop(Box::from_raw(decl));
-}
-
 pub fn parse_int(s: &str) -> libc::c_int {
     s.parse().expect("parse error")
 }
@@ -4617,16 +4616,6 @@ pub unsafe fn parse_escape(c: &str) -> libc::c_int {
         "n" => '\t' as u32 as libc::c_int, // Note: '\t' rather than '\n', a bug in the original.
         _ => {
             panic!("unrecognized char escape sequence: {:?}", c);
-        }
-    }
-}
-
-impl Drop for Ast {
-    fn drop(&mut self) {
-        unsafe {
-            for &decl in &self.decls {
-                ast_externdecl_destroy(decl);
-            }
         }
     }
 }
@@ -4657,5 +4646,5 @@ pub unsafe fn ast_topological_order(
 }
 
 pub unsafe fn ast_protostitch(f: *mut AstFunction, ext: *mut Externals) -> *mut AstFunction {
-    return ast_function_protostitch(f, ext);
+    ast_function_protostitch(f, ext)
 }

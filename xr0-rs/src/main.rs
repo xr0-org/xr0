@@ -1,11 +1,11 @@
 #![feature(c_variadic)]
 
+use std::env;
 use std::ffi::{CStr, CString};
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, Stdio};
-use std::{env, ptr};
 
 use clap::Parser;
 use libc::strcmp;
@@ -23,11 +23,11 @@ mod state;
 mod value;
 
 use ast::{
-    ast_block_str, ast_externdecl_as_function, ast_externdecl_install, ast_externdecl_isfunction,
-    ast_function_absisempty, ast_function_abstract, ast_function_copy, ast_function_isaxiom,
-    ast_function_isproto, ast_function_name, ast_function_verify, ast_functiondecl_create,
-    ast_protostitch, ast_topological_order, Ast, AstExpr, AstExternDecl, AstFunction, AstType,
-    AstVariable, AstVariableArr,
+    ast_block_str, ast_externdecl_as_function, ast_externdecl_as_function_ptr,
+    ast_externdecl_install, ast_function_absisempty, ast_function_abstract, ast_function_copy,
+    ast_function_isaxiom, ast_function_isproto, ast_function_name, ast_function_verify,
+    ast_functiondecl_create, ast_protostitch, ast_topological_order, Ast, AstExpr, AstExternDecl,
+    AstFunction, AstType, AstVariable, AstVariableArr,
 };
 use ext::{externals_create, externals_destroy, externals_getfunc, Externals};
 use math::MathExpr;
@@ -96,34 +96,42 @@ pub fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String>
     Ok(buf)
 }
 
-pub unsafe fn pass0(root: &Ast, ext: *mut Externals) {
-    for &decl in &root.decls {
-        if !ast_externdecl_isfunction(decl) {
-            ast_externdecl_install(decl, ext);
-        } else {
-            let f: *mut AstFunction = ast_externdecl_as_function(decl);
-            if ast_function_isaxiom(&*f) {
-                ast_externdecl_install(decl, ext);
-            } else if ast_function_isproto(&*f) {
-                if !verifyproto(f, &root.decls) {
-                    process::exit(1);
+pub unsafe fn pass0(root: &mut Ast, ext: *mut Externals) {
+    for decl in &root.decls {
+        match ast_externdecl_as_function_ptr(decl) {
+            None => {
+                ast_externdecl_install(&**decl as *const AstExternDecl as *mut AstExternDecl, ext);
+            }
+            Some(f) => {
+                if ast_function_isaxiom(&*f) {
+                    ast_externdecl_install(
+                        &**decl as *const AstExternDecl as *mut AstExternDecl,
+                        ext,
+                    );
+                } else if ast_function_isproto(&*f) {
+                    if !verifyproto(&*f, &root.decls) {
+                        process::exit(1);
+                    }
+                    ast_externdecl_install(
+                        &**decl as *const AstExternDecl as *mut AstExternDecl,
+                        ext,
+                    );
+                } else {
+                    let stitched: *mut AstFunction = ast_protostitch(f, ext);
+                    ast_externdecl_install(
+                        Box::into_raw(ast_functiondecl_create(ast_function_copy(&*stitched))),
+                        ext,
+                    );
                 }
-                ast_externdecl_install(decl, ext);
-            } else {
-                let stitched: *mut AstFunction = ast_protostitch(f, ext);
-                ast_externdecl_install(ast_functiondecl_create(ast_function_copy(&*stitched)), ext);
             }
         }
     }
 }
 
-pub unsafe fn pass1(root: &Ast, ext: *mut Externals) {
-    for &decl in &root.decls {
-        if ast_externdecl_isfunction(decl) {
-            let f: *mut AstFunction = ast_externdecl_as_function(decl);
-            if !(ast_function_isaxiom(&*f) as libc::c_int != 0
-                || ast_function_isproto(&*f) as libc::c_int != 0)
-            {
+pub unsafe fn pass1(root: &mut Ast, ext: *mut Externals) {
+    for decl in &mut root.decls {
+        if let Some(f) = ast_externdecl_as_function_ptr(decl) {
+            if !ast_function_isaxiom(&*f) && !ast_function_isproto(&*f) {
                 if let Err(err) = ast_function_verify(f, ext) {
                     eprintln!("{}", CStr::from_ptr(err.msg).to_string_lossy());
                     process::exit(1);
@@ -159,23 +167,23 @@ pub unsafe fn pass_inorder(order: &mut StringArr, ext: *mut Externals) {
     }
 }
 
-unsafe fn verifyproto(proto: *mut AstFunction, decls: &[*mut AstExternDecl]) -> bool {
-    let mut def: *mut AstFunction = ptr::null_mut();
+unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool {
+    let mut def: Option<&AstFunction> = None;
     let mut count: libc::c_int = 0 as libc::c_int;
-    let pname: *mut libc::c_char = ast_function_name(&*proto);
-    for &decl in decls {
-        if ast_externdecl_isfunction(decl) {
-            let d: *mut AstFunction = ast_externdecl_as_function(decl);
-            if !(ast_function_isaxiom(&*d) || ast_function_isproto(&*d)) {
-                if strcmp(pname, ast_function_name(&*d)) == 0 {
-                    def = d;
-                    count += 1;
-                }
+    let pname: *mut libc::c_char = ast_function_name(proto);
+    for decl in decls {
+        if let Some(d) = ast_externdecl_as_function(decl) {
+            if !ast_function_isaxiom(d)
+                && !ast_function_isproto(d)
+                && strcmp(pname, ast_function_name(d)) == 0
+            {
+                def = Some(d);
+                count += 1;
             }
         }
     }
     if count == 1 {
-        if proto_defisvalid(proto, def) {
+        if proto_defisvalid(proto, def.unwrap()) {
             return true;
         }
         eprintln!(
@@ -196,9 +204,9 @@ unsafe fn verifyproto(proto: *mut AstFunction, decls: &[*mut AstExternDecl]) -> 
     false
 }
 
-unsafe fn proto_defisvalid(proto: *mut AstFunction, def: *mut AstFunction) -> bool {
-    let proto_abs = ast_function_abstract(&*proto);
-    let def_abs = ast_function_abstract(&*def);
+unsafe fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
+    let proto_abs = ast_function_abstract(proto);
+    let def_abs = ast_function_abstract(def);
     let abs_match: bool = strcmp(
         ast_block_str(
             proto_abs,
@@ -209,17 +217,17 @@ unsafe fn proto_defisvalid(proto: *mut AstFunction, def: *mut AstFunction) -> bo
             b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ),
     ) == 0 as libc::c_int;
-    let protoabs_only: bool = ast_function_absisempty(&*def) as libc::c_int != 0;
+    let protoabs_only: bool = ast_function_absisempty(def) as libc::c_int != 0;
     abs_match || protoabs_only
 }
 
 unsafe fn verify(c: &Config) -> io::Result<()> {
     let source = preprocess(&c.infile, &c.include_dirs)?;
-    let root = parser::parse_translation_unit(&c.infile, &source)
+    let mut root = parser::parse_translation_unit(&c.infile, &source)
         .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{err}")))?;
 
     let ext: *mut Externals = externals_create();
-    pass0(&root, ext);
+    pass0(&mut root, ext);
 
     if let Some(sortfunc) = &c.sort {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
@@ -237,7 +245,7 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
         );
         pass_inorder(&mut order, ext);
     } else {
-        pass1(&root, ext);
+        pass1(&mut root, ext);
     }
 
     externals_destroy(ext);
