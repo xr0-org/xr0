@@ -1479,6 +1479,14 @@ want:
  */
 
 static struct ast_expr *
+unary_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
+binary_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
 alloc_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
 		struct state *);
 
@@ -1498,6 +1506,10 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	case EXPR_CONSTANT:
 	case EXPR_IDENTIFIER:
 		return expr;
+	case EXPR_UNARY:
+		return unary_geninstr(expr, loc, b, s);
+	case EXPR_BINARY:
+		return binary_geninstr(expr, loc, b, s);
 	case EXPR_ALLOCATION:
 		return alloc_geninstr(expr, loc, b, s);	
 	case EXPR_ASSIGNMENT:
@@ -1505,18 +1517,38 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	case EXPR_CALL:
 		return call_geninstr(expr, loc, b, s);
 	default:
+		printf("expr: %s\n", ast_expr_str(expr));
 		assert(false);
 	}
+}
+
+static struct ast_expr *
+unary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *gen_operand = ast_expr_geninstr(
+		ast_expr_unary_operand(expr), loc, b, s
+	);
+	return ast_expr_unary_create(gen_operand, ast_expr_unary_op(expr));
+}
+
+static struct ast_expr *
+binary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *gen_e1 = ast_expr_geninstr(ast_expr_binary_e1(expr), loc, b, s),
+			*gen_e2 = ast_expr_geninstr(ast_expr_binary_e2(expr), loc, b, s);
+	return ast_expr_binary_create(gen_e1, ast_expr_binary_op(expr), gen_e2);
 }
 
 static struct ast_expr *
 alloc_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
 		struct state *s)
 {
-	struct ast_expr	*arg = ast_expr_geninstr(ast_expr_alloc_arg(expr), loc, b, s);
+	struct ast_expr	*gen_arg = ast_expr_geninstr(ast_expr_alloc_arg(expr), loc, b, s);
 	enum ast_alloc_kind kind = ast_expr_alloc_kind(expr);
 
-	struct ast_expr *alloc = ast_expr_alloc_kind_create(arg, kind);
+	struct ast_expr *alloc = ast_expr_alloc_kind_create(gen_arg, kind);
 	struct ast_type *rtype = kind == DEALLOC
 		? ast_type_create_void()
 		: ast_type_create_voidptr();
@@ -1529,7 +1561,7 @@ assign_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_bloc
 {
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
-	assert(ast_expr_kind(lval) == EXPR_IDENTIFIER);
+	assert(ast_expr_kind(lval) == EXPR_IDENTIFIER || ast_expr_kind(lval) == EXPR_UNARY);
 	struct ast_expr *assign = ast_expr_assignment_create(
 		ast_expr_copy(lval), ast_expr_geninstr(rval, loc, b, s)
 	);
