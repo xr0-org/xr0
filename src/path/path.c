@@ -184,6 +184,7 @@ path_step(struct path *p)
 static struct error *
 path_init_abstract(struct path *p)
 {
+	printf("init abstract state\n");
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
@@ -202,6 +203,7 @@ path_init_abstract(struct path *p)
 static struct error *
 path_init_actual(struct path *p)
 {
+	printf("init actual state\n");
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_body(p->f),
@@ -229,7 +231,7 @@ path_init_actual(struct path *p)
 static struct error *
 path_step_abstract(struct path *p)
 {
-	v_printf("stepping through abstract\n");
+	v_printf("abstract: %s\n", state_str(p->abstract));
 	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
 		return path_step(p);
@@ -250,7 +252,7 @@ path_step_abstract(struct path *p)
 static struct error *
 path_step_actual(struct path *p)
 {
-	v_printf("stepping through actual\n");
+	v_printf("actual: %s\n", state_str(p->actual));
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
 		return path_step(p);
@@ -271,7 +273,7 @@ path_step_actual(struct path *p)
 static struct error *
 path_audit(struct path *p)
 {
-	v_printf("in path_audit\n");
+	v_printf("audit\n");
 	if (state_hasgarbage(p->actual)) {
 		v_printf("actual: %s", state_str(p->actual));
 		return error_printf(
