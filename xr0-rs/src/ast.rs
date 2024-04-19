@@ -1230,12 +1230,12 @@ unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result
         let arg: *mut Value = state_getloc(arg_state, id);
         if let Err(err) = verify_paramspec(param_0, arg, param_state, arg_state) {
             let b: *mut StrBuilder = strbuilder_create();
-            strbuilder_printf(
+            strbuilder_write!(
                 b,
-                b"parameter %s of %s %s\0" as *const u8 as *const libc::c_char,
-                id,
-                fname,
-                (*err).msg,
+                "parameter {} of {} {}",
+                cstr!(id),
+                cstr!(fname),
+                cstr!((*err).msg),
             );
             return Err(error_create(strbuilder_build(b)));
         }
@@ -1402,12 +1402,7 @@ unsafe fn ast_expr_member_str_build(expr: &AstExpr, b: *mut StrBuilder) {
         return ast_expr_member_deref_str_build(root, member.field, b);
     }
     let r: *mut libc::c_char = ast_expr_str(root);
-    strbuilder_printf(
-        b,
-        b"%s.%s\0" as *const u8 as *const libc::c_char,
-        r,
-        member.field,
-    );
+    strbuilder_write!(b, "{}.{}", cstr!(r), cstr!(member.field));
     free(r as *mut libc::c_void);
 }
 
@@ -1426,21 +1421,10 @@ unsafe fn ast_expr_member_deref_str_build(
     if matches!((*e2).kind, AstExprKind::Constant(_))
         && ast_expr_as_constant(&*e2) == 0 as libc::c_int
     {
-        strbuilder_printf(
-            b,
-            b"%s->%s\0" as *const u8 as *const libc::c_char,
-            left,
-            member,
-        );
+        strbuilder_write!(b, "{}->{}", cstr!(left), cstr!(member));
     } else {
         let index: *mut libc::c_char = ast_expr_str(e2);
-        strbuilder_printf(
-            b,
-            b"%s[%s].%s\0" as *const u8 as *const libc::c_char,
-            left,
-            index,
-            member,
-        );
+        strbuilder_write!(b, "{}[{}].{}", cstr!(left), cstr!(index), cstr!(member));
         free(index as *mut libc::c_void);
     }
     free(left as *mut libc::c_void);
@@ -1451,15 +1435,11 @@ unsafe fn ast_expr_incdec_str_build(expr: &AstExpr, b: *mut StrBuilder) {
         panic!()
     };
     let root: *mut libc::c_char = ast_expr_str(&incdec.operand);
-    let op: *mut libc::c_char = (if incdec.inc != 0 {
-        b"++\0" as *const u8 as *const libc::c_char
-    } else {
-        b"--\0" as *const u8 as *const libc::c_char
-    }) as *mut libc::c_char;
+    let op = if incdec.inc != 0 { "++" } else { "--" };
     if incdec.pre != 0 {
-        strbuilder_printf(b, b"%s%s\0" as *const u8 as *const libc::c_char, op, root);
+        strbuilder_write!(b, "{op}{}", cstr!(root));
     } else {
-        strbuilder_printf(b, b"%s%s\0" as *const u8 as *const libc::c_char, root, op);
+        strbuilder_write!(b, "{}{op}", cstr!(root));
     }
     free(root as *mut libc::c_void);
 }
@@ -1469,24 +1449,20 @@ unsafe fn ast_expr_call_str_build(expr: &AstExpr, b: *mut StrBuilder) {
         panic!()
     };
     let fun: *mut libc::c_char = ast_expr_str(&call.fun);
-    strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, fun);
+    strbuilder_write!(b, "{}(", cstr!(fun));
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
         let arg: *mut libc::c_char = ast_expr_str(&**call.arg.offset(i as isize));
-        strbuilder_printf(
+        strbuilder_write!(
             b,
-            b"%s%s\0" as *const u8 as *const libc::c_char,
-            arg,
-            if (i + 1 as libc::c_int) < call.n {
-                b", \0" as *const u8 as *const libc::c_char
-            } else {
-                b"\0" as *const u8 as *const libc::c_char
-            },
+            "{}{}",
+            cstr!(arg),
+            if i + 1 < call.n { ", " } else { "" },
         );
         free(arg as *mut libc::c_void);
         i += 1;
     }
-    strbuilder_printf(b, b")\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, ")");
     free(fun as *mut libc::c_void);
 }
 
@@ -1671,13 +1647,13 @@ pub unsafe fn ast_expr_str(expr: &AstExpr) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     match &expr.kind {
         AstExprKind::Identifier(id) => {
-            strbuilder_printf(b, *id);
+            strbuilder_write!(b, "{}", cstr!(*id));
         }
         AstExprKind::Constant(_) => {
             ast_expr_constant_str_build(expr, b);
         }
         AstExprKind::StringLiteral(s) => {
-            strbuilder_printf(b, b"\"%s\"\0" as *const u8 as *const libc::c_char, *s);
+            strbuilder_write!(b, "\"{}\"", cstr!(*s));
         }
         AstExprKind::Bracketed(inner) => {
             ast_expr_bracketed_str_build(inner, b);
@@ -1726,28 +1702,13 @@ unsafe fn ast_expr_alloc_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     let arg: *mut libc::c_char = ast_expr_str(&*alloc.arg);
     match alloc.kind {
         AstAllocKind::Alloc => {
-            strbuilder_printf(
-                b,
-                b".%s %s;\0" as *const u8 as *const libc::c_char,
-                b"malloc\0" as *const u8 as *const libc::c_char,
-                arg,
-            );
+            strbuilder_write!(b, ".{} {};", "malloc", cstr!(arg));
         }
         AstAllocKind::Dealloc => {
-            strbuilder_printf(
-                b,
-                b".%s %s;\0" as *const u8 as *const libc::c_char,
-                b"free\0" as *const u8 as *const libc::c_char,
-                arg,
-            );
+            strbuilder_write!(b, ".{} {};", "free", cstr!(arg));
         }
         AstAllocKind::Clump => {
-            strbuilder_printf(
-                b,
-                b".%s %s;\0" as *const u8 as *const libc::c_char,
-                b"clump\0" as *const u8 as *const libc::c_char,
-                arg,
-            );
+            strbuilder_write!(b, ".{} {};", "clump", cstr!(arg));
         }
     }
     free(arg as *mut libc::c_void);
@@ -1788,7 +1749,7 @@ unsafe fn ast_expr_alloc_copy(expr: &AstExpr) -> Box<AstExpr> {
 
 unsafe fn ast_expr_isdereferencable_str_build(assertand: &AstExpr, b: *mut StrBuilder) {
     let root: *mut libc::c_char = ast_expr_str(assertand);
-    strbuilder_printf(b, b"$%s\0" as *const u8 as *const libc::c_char, root);
+    strbuilder_write!(b, "${}", cstr!(root));
     free(root as *mut libc::c_void);
 }
 
@@ -1858,7 +1819,7 @@ pub unsafe fn ast_expr_binary_e2(expr: &AstExpr) -> &AstExpr {
 
 unsafe fn ast_expr_isdeallocand_str_build(assertand: &AstExpr, b: *mut StrBuilder) {
     let root: *mut libc::c_char = ast_expr_str(assertand);
-    strbuilder_printf(b, b"@%s\0" as *const u8 as *const libc::c_char, root);
+    strbuilder_write!(b, "@{}", cstr!(root));
     free(root as *mut libc::c_void);
 }
 
@@ -3683,34 +3644,34 @@ pub unsafe fn ast_type_str(t: *mut AstType) -> *mut libc::c_char {
             ast_type_str_build_struct(b, s);
         }
         AstTypeBase::UserDefined(name) => {
-            strbuilder_printf(b, b"%s\0" as *const u8 as *const libc::c_char, *name);
+            strbuilder_write!(b, "{}", cstr!(*name));
         }
         AstTypeBase::Void => {
-            strbuilder_printf(b, b"void\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "void");
         }
         AstTypeBase::Char => {
-            strbuilder_printf(b, b"char\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "char");
         }
         AstTypeBase::Short => {
-            strbuilder_printf(b, b"short\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "short");
         }
         AstTypeBase::Int => {
-            strbuilder_printf(b, b"int\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "int");
         }
         AstTypeBase::Long => {
-            strbuilder_printf(b, b"long\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "long");
         }
         AstTypeBase::Float => {
-            strbuilder_printf(b, b"float\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "float");
         }
         AstTypeBase::Double => {
-            strbuilder_printf(b, b"double\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "double");
         }
         AstTypeBase::Signed => {
-            strbuilder_printf(b, b"signed\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "signed");
         }
         AstTypeBase::Unsigned => {
-            strbuilder_printf(b, b"unsigned\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "unsigned");
         }
         _ => panic!(),
     }
