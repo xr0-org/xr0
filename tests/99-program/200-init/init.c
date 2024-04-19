@@ -24,4 +24,16 @@ foo()
 	struct man john;
 
 	struct list l1;
+
+	int i;
+
+	if (1) {
+		struct point p3;
+		struct man james;
+	}
+
+	for (i = 0; i < 20; i++) {
+		struct point p4;
+		struct man roger;
+	}
 }

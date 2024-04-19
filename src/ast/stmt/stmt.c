@@ -583,6 +583,36 @@ ast_stmt_str(struct ast_stmt *stmt)
 	return strbuilder_build(b);
 }
 
+static char *
+stmt_regular_initprint(struct ast_stmt *, char *indent, struct externals *ext);
+
+char *
+ast_stmt_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
+{
+	switch (stmt->kind) {
+	case STMT_NOP:
+	case STMT_EXPR:
+	case STMT_JUMP:
+		return stmt_regular_initprint(stmt, indent, ext);
+	case STMT_LABELLED:
+	case STMT_COMPOUND:
+	case STMT_SELECTION:
+	case STMT_ITERATION:
+	default:
+		assert(false);
+	}
+}
+
+static char *
+stmt_regular_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
+{
+	struct strbuilder *b = strbuilder_create();
+	char *s = ast_stmt_str(stmt);
+	strbuilder_printf(b, "%s%s;\n", indent, s);
+	free(s);
+	return strbuilder_build(b);
+}
+
 bool
 ast_stmt_equal(struct ast_stmt *s1, struct ast_stmt *s2)
 {

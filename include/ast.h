@@ -384,6 +384,9 @@ ast_stmt_copy(struct ast_stmt *);
 char *
 ast_stmt_str(struct ast_stmt *);
 
+char *
+ast_stmt_initprint(struct ast_stmt *, char *indent, struct externals *);
+
 bool
 ast_stmt_equal(struct ast_stmt *, struct ast_stmt *);
 
