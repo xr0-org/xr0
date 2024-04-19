@@ -181,7 +181,8 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 	}
 	struct error *return_err = error_to_return(err);
 	if (return_err) {
-		p->s = PROGRAM_COUNTER_ATEND;
+		printf("RETURN\n");
+		state_popframe(s);
 		return NULL;
 	}
 	return err;

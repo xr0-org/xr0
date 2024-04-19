@@ -205,12 +205,10 @@ void
 state_popframe(struct state *state)
 {
 	struct stack *old = state->stack;
-	if (stack_prev(old)) {
-		state->stack = stack_prev(old); /* pop */
-		assert(state->stack);
-		/* destroy old frame */
-		stack_destroy(old);
-	}
+	state->stack = stack_prev(old); /* pop */
+	assert(state->stack);
+	/* destroy old frame */
+	stack_destroy(old);
 }
 
 void
