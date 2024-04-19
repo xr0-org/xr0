@@ -91,11 +91,11 @@ pub unsafe fn props_get(p: *mut Props, e: *mut AstExpr) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*p).n {
         if ast_expr_equal(&*e, &**((*p).prop).offset(i as isize)) {
-            return 1 as libc::c_int != 0;
+            return true;
         }
         i += 1;
     }
-    return 0 as libc::c_int != 0;
+    return false;
 }
 
 pub unsafe fn props_contradicts(p: *mut Props, p1: &AstExpr) -> bool {

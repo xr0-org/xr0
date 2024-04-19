@@ -47,7 +47,6 @@ pub struct StructValue {
 
 #[derive(Clone)]
 pub struct Number {
-    pub r#type: NumberType,
     pub kind: NumberKind,
 }
 
@@ -545,7 +544,7 @@ pub unsafe fn value_assume(v: *mut Value, value: bool) -> bool {
 }
 
 unsafe fn number_create(kind: NumberKind) -> *mut Number {
-    Box::into_raw(Box::new(Number { r#type: 999, kind }))
+    Box::into_raw(Box::new(Number { kind }))
 }
 
 unsafe fn number_ranges_create(ranges: *mut NumberRangeArr) -> *mut Number {

@@ -89,11 +89,11 @@ unsafe fn printdelim(h: *mut Heap, start: libc::c_int) -> bool {
     let mut i: libc::c_int = start + 1 as libc::c_int;
     while i < n {
         if !*((*h).freed).offset(i as isize) {
-            return 1 as libc::c_int != 0;
+            return true;
         }
         i += 1;
     }
-    return 0 as libc::c_int != 0;
+    return false;
 }
 
 pub unsafe fn heap_blocks(h: *mut Heap) -> *mut BlockArr {
@@ -111,7 +111,7 @@ pub unsafe fn heap_newblock(h: *mut Heap) -> *mut Location {
         (*h).freed as *mut libc::c_void,
         (::core::mem::size_of::<bool>()).wrapping_mul(n as usize),
     ) as *mut bool;
-    *((*h).freed).offset(address as isize) = 0 as libc::c_int != 0;
+    *((*h).freed).offset(address as isize) = false;
     return location_create_dynamic(
         address,
         Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
@@ -162,11 +162,11 @@ pub unsafe fn heap_referenced(h: *mut Heap, s: *mut State) -> bool {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         if !*((*h).freed).offset(i as isize) && !block_referenced(s, i) {
-            return 0 as libc::c_int != 0;
+            return false;
         }
         i += 1;
     }
-    return 1 as libc::c_int != 0;
+    return true;
 }
 unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
     let loc: *mut Location = location_create_dynamic(

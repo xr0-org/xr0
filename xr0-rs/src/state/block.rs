@@ -133,11 +133,11 @@ pub unsafe fn block_references(b: *mut Block, loc: *mut Location, s: *mut State)
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         if object_references(*obj.offset(i as isize), loc, s) {
-            return 1 as libc::c_int != 0;
+            return true;
         }
         i += 1;
     }
-    return 0 as libc::c_int != 0;
+    return false;
 }
 
 pub unsafe fn block_range_alloc(
@@ -172,35 +172,35 @@ pub unsafe fn block_range_aredeallocands(
     s: *mut State,
 ) -> bool {
     if hack_first_object_is_exactly_bounds(b, lw, up, s) {
-        return 1 as libc::c_int != 0;
+        return true;
     }
     let lw_index: libc::c_int = object_arr_index(b.arr, lw, s);
     if lw_index == -(1 as libc::c_int) {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     let up_index: libc::c_int = object_arr_index_upperincl(b.arr, up, s);
     if up_index == -(1 as libc::c_int) {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     let obj: *mut *mut Object = object_arr_objects(b.arr);
     let mut i: libc::c_int = lw_index;
     while i < up_index {
         if !object_isdeallocand(*obj.offset(i as isize), s) {
-            return 0 as libc::c_int != 0;
+            return false;
         }
         if !object_contig_precedes(
             *obj.offset(i as isize),
             *obj.offset((i + 1 as libc::c_int) as isize),
             s,
         ) {
-            return 0 as libc::c_int != 0;
+            return false;
         }
         i += 1;
     }
     if !object_isdeallocand(*obj.offset(up_index as isize), s) {
         panic!();
     }
-    return 1 as libc::c_int != 0;
+    return true;
 }
 
 unsafe fn hack_first_object_is_exactly_bounds(
@@ -210,11 +210,11 @@ unsafe fn hack_first_object_is_exactly_bounds(
     s: *mut State,
 ) -> bool {
     if object_arr_nobjects(b.arr) == 0 as libc::c_int {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     let obj: *mut Object = *(object_arr_objects(b.arr)).offset(0 as libc::c_int as isize);
     if !object_isdeallocand(obj, s) {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     // Note: Original leaks these outer expressions to avoid double-freeing the inner ones.
     let same_lw = ast_expr_eq_create(

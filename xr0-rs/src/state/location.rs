@@ -241,7 +241,7 @@ pub unsafe fn location_equal(l1: *mut Location, l2: *mut Location) -> bool {
 
 pub unsafe fn location_references(l1: *mut Location, l2: *mut Location, s: *mut State) -> bool {
     if location_equal(l1, l2) {
-        return 1 as libc::c_int != 0;
+        return true;
     }
     let b: *mut Block = state_getblock(s, l1);
     return !b.is_null() && block_references(b, l2, s) as libc::c_int != 0;
@@ -254,11 +254,11 @@ pub unsafe fn location_isauto(loc: *mut Location) -> bool {
 pub unsafe fn location_referencesheap(l: *mut Location, s: *mut State) -> bool {
     if (*l).r#type as libc::c_uint == LOCATION_DYNAMIC as libc::c_int as libc::c_uint {
         if heap_blockisfreed(state_getheap(s), (*l).block) {
-            return 0 as libc::c_int != 0;
+            return false;
         }
-        return 1 as libc::c_int != 0;
+        return true;
     }
-    let obj = state_get(s, l, 0 as libc::c_int != 0).unwrap();
+    let obj = state_get(s, l, false).unwrap();
     !obj.is_null() && object_referencesheap(obj, s)
 }
 

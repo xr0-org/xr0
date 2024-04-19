@@ -75,7 +75,7 @@ pub unsafe fn stack_create(
             result: std::ptr::null_mut(),
         },
     );
-    (*stack).result = variable_create(return_type, stack, 0 as libc::c_int != 0);
+    (*stack).result = variable_create(return_type, stack, false);
     stack
 }
 
@@ -297,7 +297,7 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
     (*new).r#type = ast_type_copy((*old).r#type);
     (*new).is_param = (*old).is_param;
     (*new).loc = location_copy((*old).loc);
-    let obj = state_get(s, (*new).loc, 0 as libc::c_int != 0).unwrap();
+    let obj = state_get(s, (*new).loc, false).unwrap();
     if obj.is_null() {
         panic!();
     }
@@ -353,7 +353,7 @@ unsafe fn object_or_nothing_str(
     if b.is_null() as libc::c_int as libc::c_long != 0 {
         panic!();
     }
-    let obj: *mut Object = block_observe(b, &*location_offset(loc), state, 0 as libc::c_int != 0);
+    let obj: *mut Object = block_observe(b, &*location_offset(loc), state, false);
     if !obj.is_null() {
         return object_str(obj);
     }

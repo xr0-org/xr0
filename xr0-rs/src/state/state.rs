@@ -242,7 +242,7 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
         address,
         Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
     );
-    let obj = state_get(state, loc, 1 as libc::c_int != 0).unwrap();
+    let obj = state_get(state, loc, true).unwrap();
     if obj.is_null() {
         panic!();
     }
@@ -265,10 +265,10 @@ pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
         panic!();
     }
     if !value_islocation(&*v) {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     let loc: *mut Location = value_as_location(&*v);
-    state_get(state, loc, 1 as libc::c_int != 0).unwrap();
+    state_get(state, loc, true).unwrap();
     return location_tostatic(loc, (*state).static_memory) as libc::c_int != 0
         || location_toheap(loc, (*state).heap) as libc::c_int != 0
         || location_tostack(loc, (*state).stack) as libc::c_int != 0
@@ -280,10 +280,10 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
         panic!();
     }
     if !value_islocation(&*v) {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     let loc: *mut Location = value_as_location(&*v);
-    state_get(state, loc, 1 as libc::c_int != 0).unwrap();
+    state_get(state, loc, true).unwrap();
     return location_toheap(loc, (*state).heap);
 }
 
@@ -338,7 +338,7 @@ pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
     if v.is_null() {
         panic!();
     }
-    state_get(state, variable_location(v), 1 as libc::c_int != 0).unwrap()
+    state_get(state, variable_location(v), true).unwrap()
 }
 
 unsafe fn state_getresulttype(state: *mut State) -> *mut AstType {
@@ -376,7 +376,7 @@ pub unsafe fn state_getobject(state: *mut State, id: *mut libc::c_char) -> *mut 
     if v.is_null() {
         panic!();
     }
-    state_get(state, variable_location(v), 1 as libc::c_int != 0).unwrap()
+    state_get(state, variable_location(v), true).unwrap()
 }
 
 pub unsafe fn state_deref(
@@ -392,7 +392,7 @@ pub unsafe fn state_deref(
         panic!();
     }
     let deref: *mut Location = location_with_offset(deref_base, index);
-    state_get(state, deref, 1 as libc::c_int != 0).map_err(|err| {
+    state_get(state, deref, true).map_err(|err| {
         let b: *mut StrBuilder = strbuilder_create();
         strbuilder_write!(b, "undefined indirection: {}", cstr!(err.msg));
         error_create(strbuilder_build(b))
@@ -482,11 +482,11 @@ pub unsafe fn state_range_aredeallocands(
     up: &AstExpr,
 ) -> bool {
     if ast_expr_equal(&*lw, &*up) {
-        return 1 as libc::c_int != 0;
+        return true;
     }
     let arr_val: *mut Value = object_as_value(obj);
     if arr_val.is_null() {
-        return 0 as libc::c_int != 0;
+        return false;
     }
     let deref: *mut Location = value_as_location(&*arr_val);
     let b = location_getblock(

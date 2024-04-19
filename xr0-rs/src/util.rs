@@ -290,11 +290,11 @@ pub unsafe fn string_arr_contains(arr: &StringArr, s: *mut libc::c_char) -> bool
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < arr.n {
         if strcmp(s, *arr.s.offset(i as isize)) == 0 as libc::c_int {
-            return 1 as libc::c_int != 0;
+            return true;
         }
         i += 1;
     }
-    return 0 as libc::c_int != 0;
+    return false;
 }
 
 pub unsafe fn string_arr_str(string_arr: &StringArr) -> *mut libc::c_char {
