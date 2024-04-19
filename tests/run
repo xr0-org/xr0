@@ -60,10 +60,10 @@ do
 		else
 			printf "$fail"
                 	echo "=== ACTUAL"
-                	echo -- "$output"
+                	echo "$output"
                 	echo
                 	echo "=== EXPECTED"
-                	echo -- "$expected_output"
+                	echo "$expected_output"
                         echo
 		fi
 	else
