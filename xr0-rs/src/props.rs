@@ -9,7 +9,6 @@ use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_p
 use crate::{AstExpr, StrBuilder};
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Props {
     pub n: libc::c_int,
     pub prop: *mut *mut AstExpr,

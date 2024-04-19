@@ -37,7 +37,6 @@ pub struct Stack {
     pub prev: *mut Stack,
 }
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Variable {
     pub r#type: *mut AstType,
     pub loc: *mut Location,

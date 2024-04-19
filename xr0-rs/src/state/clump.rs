@@ -10,7 +10,6 @@ use crate::util::{strbuilder_build, strbuilder_create, strbuilder_printf};
 use crate::{Block, BlockArr, StrBuilder};
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Clump {
     pub blocks: *mut BlockArr,
 }

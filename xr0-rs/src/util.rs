@@ -13,23 +13,21 @@ pub struct Map {
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 struct Entry {
     key: *mut libc::c_char,
     value: *const libc::c_void,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct StrBuilder {
     pub cap: usize,
     pub buf: *mut libc::c_char,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Error {
     pub msg: *mut libc::c_char,
+    #[allow(dead_code)]
     pub inner: *mut Error,
 }
 
@@ -46,7 +44,6 @@ impl Debug for Error {
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct StringArr {
     pub n: libc::c_int,
     pub s: *mut *mut libc::c_char,

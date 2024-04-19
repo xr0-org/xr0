@@ -20,12 +20,10 @@ use crate::util::{error_create, strbuilder_build, strbuilder_create, strbuilder_
 use crate::{AstExpr, Heap, Location, Object, ObjectArr, State, StrBuilder, Value};
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Block {
     pub arr: *mut ObjectArr,
 }
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct BlockArr {
     pub n: libc::c_int,
     pub block: *mut *mut Block,

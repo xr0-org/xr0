@@ -61,28 +61,24 @@ pub const NUMBER_COMPUTED: NumberType = 1;
 pub const NUMBER_RANGES: NumberType = 0;
 
 #[derive(Clone)]
-#[repr(C)]
 pub struct NumberRangeArr {
     pub n: libc::c_int,
     pub range: *mut *mut NumberRange,
 }
 
 #[derive(Clone)]
-#[repr(C)]
 pub struct NumberRange {
     pub lower: *mut NumberValue,
     pub upper: *mut NumberValue,
 }
 
 #[derive(Clone)]
-#[repr(C)]
 pub struct NumberValue {
     pub r#type: NumberValueType,
     pub kind: NumberValueKind,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub union NumberValueKind {
     pub constant: libc::c_int,
     pub max: bool,
@@ -93,14 +89,12 @@ pub const NUMBER_VALUE_LIMIT: NumberValueType = 1;
 pub const NUMBER_VALUE_CONSTANT: NumberValueType = 0;
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct PtrValue {
     pub isindefinite: bool,
     pub kind: PtrValueKind,
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub union PtrValueKind {
     pub loc: *mut Location,
     pub n: *mut Number,

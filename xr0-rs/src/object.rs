@@ -22,20 +22,17 @@ use crate::value::{
 use crate::{AstExpr, AstType, Location, State, StrBuilder, Value};
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Object {
     pub r#type: ObjectType,
     pub offset: *mut AstExpr,
     pub c2rust_unnamed: ObjectKind,
 }
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub union ObjectKind {
     pub range: *mut Range,
     pub value: *mut Value,
 }
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Range {
     pub size: *mut AstExpr,
     pub loc: *mut Location,
@@ -44,13 +41,11 @@ pub type ObjectType = libc::c_uint;
 pub const OBJECT_DEALLOCAND_RANGE: ObjectType = 1;
 pub const OBJECT_VALUE: ObjectType = 0;
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct ObjectArr {
     pub n: libc::c_int,
     pub object: *mut *mut Object,
 }
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct ObjectResult {
     pub val: *mut Object,
     pub err: *mut Error,

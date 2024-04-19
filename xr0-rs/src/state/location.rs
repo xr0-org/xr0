@@ -24,7 +24,6 @@ use crate::util::{error_create, strbuilder_build, strbuilder_create, strbuilder_
 use crate::{AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, StrBuilder, VConst, Value};
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub struct Location {
     pub r#type: LocationType,
     pub u: C2RustUnnamed,
@@ -32,7 +31,6 @@ pub struct Location {
     pub offset: *mut AstExpr,
 }
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub union C2RustUnnamed {
     pub frame: libc::c_int,
 }
