@@ -15,11 +15,9 @@ use crate::state::block::{
 };
 use crate::state::location::{location_create_dynamic, location_destroy};
 use crate::state::state::state_references;
-use crate::util::{
-    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Map, Result,
-};
+use crate::util::{dynamic_str, error_create, strbuilder_build, strbuilder_create, Map, Result};
 use crate::value::{value_copy, value_destroy, value_str};
-use crate::{AstExpr, Block, BlockArr, Location, State, StrBuilder, Value};
+use crate::{cstr, strbuilder_write, AstExpr, Block, BlockArr, Location, State, StrBuilder, Value};
 
 #[derive(Copy, Clone)]
 pub struct Heap {
@@ -71,17 +69,12 @@ pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> *mut libc::c_
     while i < n {
         if !*((*h).freed).offset(i as isize) {
             let block: *mut libc::c_char = block_str(*arr.offset(i as isize));
-            strbuilder_printf(
+            strbuilder_write!(
                 b,
-                b"%s%d: %s%s\0" as *const u8 as *const libc::c_char,
-                indent,
-                i,
-                block,
-                if printdelim(h, i) as libc::c_int != 0 {
-                    b"\n\0" as *const u8 as *const libc::c_char
-                } else {
-                    b"\0" as *const u8 as *const libc::c_char
-                },
+                "{}{i}: {}{}",
+                cstr!(indent),
+                cstr!(block),
+                if printdelim(h, i) { "\n" } else { "" },
             );
             free(block as *mut libc::c_void);
         }
@@ -255,13 +248,9 @@ unsafe fn vconst_id(varmap: &Map, persistmap: &Map, persist: bool) -> *mut libc:
     let npersist: libc::c_int = count_true(persistmap);
     let b: *mut StrBuilder = strbuilder_create();
     if persist {
-        strbuilder_printf(b, b"$%d\0" as *const u8 as *const libc::c_char, npersist);
+        strbuilder_write!(b, "${npersist}");
     } else {
-        strbuilder_printf(
-            b,
-            b"#%d\0" as *const u8 as *const libc::c_char,
-            varmap.len() - npersist,
-        );
+        strbuilder_write!(b, "#{}", varmap.len() - npersist);
     }
     return strbuilder_build(b);
 }
@@ -312,18 +301,12 @@ pub unsafe fn vconst_str(v: *mut VConst, indent: *mut libc::c_char) -> *mut libc
     let m = &(*v).varmap;
     for (k, val) in m.pairs() {
         let value: *mut libc::c_char = value_str(val as *mut Value);
-        strbuilder_printf(
-            b,
-            b"%s%s: %s\0" as *const u8 as *const libc::c_char,
-            indent,
-            k,
-            value,
-        );
+        strbuilder_write!(b, "{}{}: {}", cstr!(indent), cstr!(k), cstr!(value));
         let comment: *mut libc::c_char = (*v).comment.get(k) as *mut libc::c_char;
         if !comment.is_null() {
-            strbuilder_printf(b, b"\t(%s)\0" as *const u8 as *const libc::c_char, comment);
+            strbuilder_write!(b, "\t({})", cstr!(comment));
         }
-        strbuilder_printf(b, b"\n\0" as *const u8 as *const libc::c_char);
+        strbuilder_write!(b, "\n");
         free(value as *mut libc::c_void);
     }
     return strbuilder_build(b);

@@ -213,16 +213,6 @@ pub unsafe fn strbuilder_vprintf(
     r
 }
 
-pub unsafe extern "C" fn strbuilder_printf(
-    b: *mut StrBuilder,
-    fmt: *const libc::c_char,
-    args: ...
-) -> libc::c_int {
-    let mut ap: ::core::ffi::VaListImpl;
-    ap = args.clone();
-    strbuilder_vprintf(b, fmt, ap.as_va_list())
-}
-
 pub unsafe fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char) {
     (*b).s.push(c as u8 as char);
 }

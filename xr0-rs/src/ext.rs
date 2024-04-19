@@ -3,8 +3,8 @@
 use libc::{free, malloc};
 
 use crate::ast::{ast_type_str, ast_type_struct_tag};
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, Map};
-use crate::{AstFunction, AstType, AstVariable, StrBuilder};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map};
+use crate::{cstr, strbuilder_write, AstFunction, AstType, AstVariable, StrBuilder};
 
 pub struct Externals {
     pub func: Box<Map>,
@@ -48,26 +48,15 @@ pub unsafe fn externals_types_str(
     let b: *mut StrBuilder = strbuilder_create();
     let mut m = &(*ext)._typedef;
     for (k, v) in m.pairs() {
-        let type_0: *mut libc::c_char = ast_type_str(v as *mut AstType);
-        strbuilder_printf(
-            b,
-            b"%s%s %s\n\0" as *const u8 as *const libc::c_char,
-            indent,
-            type_0,
-            k,
-        );
-        free(type_0 as *mut libc::c_void);
+        let ty: *mut libc::c_char = ast_type_str(v as *mut AstType);
+        strbuilder_write!(b, "{}{} {}\n", cstr!(indent), cstr!(ty), cstr!(k));
+        free(ty as *mut libc::c_void);
     }
     m = &(*ext)._struct;
     for v in m.values() {
-        let type_1: *mut libc::c_char = ast_type_str(v as *mut AstType);
-        strbuilder_printf(
-            b,
-            b"%s%s\n\0" as *const u8 as *const libc::c_char,
-            indent,
-            type_1,
-        );
-        free(type_1 as *mut libc::c_void);
+        let ty: *mut libc::c_char = ast_type_str(v as *mut AstType);
+        strbuilder_write!(b, "{}{}\n", cstr!(indent), cstr!(ty));
+        free(ty as *mut libc::c_void);
     }
     return strbuilder_build(b);
 }

@@ -20,8 +20,11 @@ use crate::state::heap::{heap_blockisfreed, heap_deallocblock, heap_getblock};
 use crate::state::r#static::static_memory_getblock;
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
-use crate::util::{error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Result};
-use crate::{AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, StrBuilder, VConst, Value};
+use crate::util::{error_create, strbuilder_build, strbuilder_create, Result};
+use crate::{
+    cstr, strbuilder_write, AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, StrBuilder,
+    VConst, Value,
+};
 
 #[derive(Copy, Clone)]
 pub struct Location {
@@ -136,27 +139,23 @@ pub unsafe fn location_str(loc: *mut Location) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     match (*loc).r#type {
         0 => {
-            strbuilder_printf(b, b"static:\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "static:");
         }
         3 => {
-            strbuilder_printf(
-                b,
-                b"stack[%d]:\0" as *const u8 as *const libc::c_char,
-                (*loc).u.frame,
-            );
+            strbuilder_write!(b, "stack[{}]:", (*loc).u.frame);
         }
         4 => {
-            strbuilder_printf(b, b"heap:\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "heap:");
         }
         2 => {
-            strbuilder_printf(b, b"clump:\0" as *const u8 as *const libc::c_char);
+            strbuilder_write!(b, "clump:");
         }
         _ => panic!(),
     }
-    strbuilder_printf(b, b"%d\0" as *const u8 as *const libc::c_char, (*loc).block);
+    strbuilder_write!(b, "{}", (*loc).block);
     if !offsetzero(loc) {
         let offset: *mut libc::c_char = ast_expr_str(&*(*loc).offset);
-        strbuilder_printf(b, b"+%s\0" as *const u8 as *const libc::c_char, offset);
+        strbuilder_write!(b, "+{}", cstr!(offset));
         free(offset as *mut libc::c_void);
     }
     return strbuilder_build(b);

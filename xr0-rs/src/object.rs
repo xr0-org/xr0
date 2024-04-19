@@ -11,15 +11,13 @@ use crate::state::location::{location_copy, location_destroy, location_reference
 use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
 };
-use crate::util::{
-    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, Error, Result,
-};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Error, Result};
 use crate::value::{
     value_abstractcopy, value_as_location, value_copy, value_destroy, value_ptr_create,
     value_references, value_referencesheap, value_str, value_struct_create, value_struct_member,
     value_struct_membertype,
 };
-use crate::{AstExpr, AstType, Location, State, StrBuilder, Value};
+use crate::{cstr, strbuilder_write, AstExpr, AstType, Location, State, StrBuilder, Value};
 
 #[derive(Copy, Clone)]
 pub struct Object {
@@ -129,14 +127,14 @@ pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Objec
 
 pub unsafe fn object_str(obj: *mut Object) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    strbuilder_printf(b, b"{\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "{{");
     let offset: *mut libc::c_char = ast_expr_str(&*(*obj).offset);
-    strbuilder_printf(b, b"%s:\0" as *const u8 as *const libc::c_char, offset);
+    strbuilder_write!(b, "{}:", cstr!(offset));
     free(offset as *mut libc::c_void);
     let inner: *mut libc::c_char = inner_str(obj);
-    strbuilder_printf(b, b"<%s>\0" as *const u8 as *const libc::c_char, inner);
+    strbuilder_write!(b, "<{}>", cstr!(inner));
     free(inner as *mut libc::c_void);
-    strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "}}");
     return strbuilder_build(b);
 }
 
@@ -453,12 +451,7 @@ pub unsafe fn range_str(r: *mut Range) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     let size: *mut libc::c_char = ast_expr_str(&*(*r).size);
     let loc: *mut libc::c_char = location_str((*r).loc);
-    strbuilder_printf(
-        b,
-        b"virt:%s@%s\0" as *const u8 as *const libc::c_char,
-        size,
-        loc,
-    );
+    strbuilder_write!(b, "virt:{}@{}", cstr!(size), cstr!(loc));
     free(loc as *mut libc::c_void);
     free(size as *mut libc::c_void);
     return strbuilder_build(b);
