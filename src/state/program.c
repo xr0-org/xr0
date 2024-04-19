@@ -135,7 +135,6 @@ program_exec(struct program *p, bool abstract, struct state *s)
 	case PROGRAM_COUNTER_STMTS:
 		return program_stmt_step(p, abstract, s);
 	case PROGRAM_COUNTER_ATEND:
-		v_printf("popping frame: %d\n", state_frameid(s));
 		state_popframe(s);
 		return NULL;
 	default:
@@ -149,9 +148,6 @@ program_stmt_process(struct program *p, bool abstract, struct state *s);
 static struct error *
 program_stmt_step(struct program *p, bool abstract, struct state *s)
 {
-	v_printf("in frame: %d\n", state_frameid(s));
-	v_printf("program:\n%s\n", program_str(p));
-	v_printf("state: %s\n", state_str(s));
 	struct error *err = program_stmt_process(p, abstract, s);
 	if (!err) {
 		program_nextstmt(p, s);
@@ -159,7 +155,6 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 	}
 	struct error *return_err = error_to_return(err);
 	if (return_err) {
-		v_printf("returning from frame %d\n", state_frameid(s));
 		p->s = PROGRAM_COUNTER_ATEND;
 		return NULL;
 	}
@@ -172,15 +167,11 @@ program_stmt_process(struct program *p, bool abstract, struct state *s)
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	v_printf("stmt: %s\n", ast_stmt_str(stmt));
 	if (!state_linear(s)) {
-		v_printf("not linear\n");
 		return ast_stmt_linearise(stmt, s);
 	}
-	v_printf("linear\n");
 	if (abstract) {
-		v_printf("abstract\n");
 		return ast_stmt_absprocess(stmt, p->name, s, false, true);
 	}
-	v_printf("actual\n");
 	return ast_stmt_process(stmt, p->name, s);
 }
 

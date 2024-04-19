@@ -204,18 +204,67 @@ ast_function_protostitch(struct ast_function *f, struct externals *ext)
 	return f;
 }
 
+static struct error *
+next(struct path *);
+
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
 	struct path *path = path_create(f, ext);
 	while (!path_atend(path)) {
-		struct error *err = path_step(path);
+		struct error *err = next(path);
 		if (err) {
 			return err;
 		}
 	}
 	path_destroy(path);
 	return NULL;
+}
+
+enum command {
+	COMMAND_STEP,
+};
+
+static enum command
+getcmd();
+
+static struct error *
+next(struct path *p)
+{
+	printf("(0db) ");
+	switch (getcmd()) {
+	case COMMAND_STEP:
+		return path_step(p);
+	default:
+		assert(false);
+	}
+}
+
+#define LINELEN 1000
+
+static enum command
+getcmd()
+{
+	char line[LINELEN];
+	if (!fgets(line, LINELEN, stdin)) {
+		fprintf(stderr, "error: cannot read\n");
+		return getcmd();
+	}
+	if (strlen(line) != 2) {
+		fprintf(stderr, "input must be single char\n");
+		return getcmd();
+	}
+	if (line[1] != '\n') {
+		fprintf(stderr, "input must be end with newline\n");
+		return getcmd();
+	}
+	switch (*line) {
+	case 's':
+		return COMMAND_STEP;
+	default:
+		fprintf(stderr, "unknown command `%c'", *line);
+		return getcmd();
+	}
 }
 
 static struct error *
