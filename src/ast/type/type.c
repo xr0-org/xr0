@@ -370,3 +370,18 @@ ast_type_ptr_type(struct ast_type *t)
 	assert(t->base == TYPE_POINTER);
 	return t->ptr_type;
 }
+
+char *
+ast_type_zeroinit(struct ast_type *t)
+{
+	struct strbuilder *b = strbuilder_create();
+	switch (t->base) {
+	case TYPE_INT:
+	case TYPE_CHAR:
+		strbuilder_printf(b, "0");
+		break;
+	default:
+		assert(false);
+	}
+	return strbuilder_build(b);
+}

@@ -119,3 +119,15 @@ ast_variable_arr_copy(struct ast_variable_arr *old)
 	}
 	return new;
 }
+
+char *
+ast_variable_initprint(struct ast_variable *v)
+{
+	struct strbuilder *b = strbuilder_create();
+	char *t = ast_type_str(v->type);
+	char *init = ast_type_zeroinit(v->type);
+	strbuilder_printf(b, "%s %s = %s", t, v->name, init);
+	free(init);
+	free(t);
+	return strbuilder_build(b);
+}

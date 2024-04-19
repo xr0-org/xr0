@@ -115,3 +115,44 @@ ast_externdecl_destroy(struct ast_externdecl *decl)
 	}
 	free(decl);
 }
+
+static char *
+ast_typedef_initprint(struct ast_externdecl *);
+
+static char *
+ast_struct_initprint(struct ast_externdecl *);
+
+char *
+ast_externdecl_initprint(struct ast_externdecl *decl)
+{
+	switch (decl->kind) {
+	case EXTERN_FUNCTION:
+		return ast_function_initprint(decl->function);
+	case EXTERN_VARIABLE:
+		/* TODO: globals */
+		assert(false);
+	case EXTERN_TYPEDEF:
+		return ast_typedef_initprint(decl);
+	case EXTERN_STRUCT:
+		return ast_struct_initprint(decl);
+	default:
+		assert(false);
+	}
+}
+
+static char *
+ast_typedef_initprint(struct ast_externdecl *decl)
+{
+	assert(decl->kind == EXTERN_TYPEDEF);
+	struct strbuilder *b = strbuilder_create();
+	char *t = ast_type_str(decl->_typedef.type);
+	strbuilder_printf(b, "%s %s;", t, decl->_typedef.name);
+	free(t);
+	return strbuilder_build(b);
+}
+
+static char *
+ast_struct_initprint(struct ast_externdecl *decl)
+{
+	assert(false);
+}

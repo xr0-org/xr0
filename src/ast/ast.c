@@ -43,6 +43,19 @@ ast_append(struct ast *node, struct ast_externdecl *decl)
 	return node;
 }
 
+char *
+ast_initprint(struct ast *node)
+{
+	struct strbuilder *b = strbuilder_create();
+	for (int i = 0; i < node->n; i++) {
+		char *s = ast_externdecl_initprint(node->decl[i]);
+		strbuilder_printf(b, "%s\n", s);
+		printf("%s\n", s);
+		free(s);
+	}
+	return strbuilder_build(b);
+}
+
 struct result {
 	struct value *val;
 	struct error *err;

@@ -413,4 +413,35 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 	map_set(g, dynamic_str(fname), val);
 }
 
+char *
+ast_function_initprint(struct ast_function *f)
+{
+	struct strbuilder *b = strbuilder_create();
+	if (f->isaxiom) {
+		strbuilder_printf(b, "axiom ");
+	}
+	char *ret = ast_type_str(f->ret);
+	strbuilder_printf(b, "%s\n", ret);
+	free(ret);
+	strbuilder_printf(b, "%s(", f->name);
+	for (int i = 0; i < f->nparam; i++) {
+		char *v = ast_variable_str(f->param[i]);
+		char *space = (i + 1 < f->nparam) ? ", " : "";
+		strbuilder_printf(b, "%s%s", v, space);
+		free(v);
+	}
+	strbuilder_printf(b, ")");
+	if (f->body) {
+		strbuilder_printf(b, "\n{\n");
+		char *body = ast_block_initprint(f->body, "\t");
+		strbuilder_printf(b, "%s", body);
+		free(body);
+		strbuilder_printf(b, "}");
+	} else {
+		strbuilder_printf(b, ";");
+	}
+	strbuilder_printf(b, "\n");
+	return strbuilder_build(b);
+}
+
 #include "arr.c"

@@ -262,6 +262,9 @@ ast_block_stmts(struct ast_block *b);
 bool
 ast_block_isterminal(struct ast_block *, struct state *);
 
+char *
+ast_block_initprint(struct ast_block *, char *indent);
+
 struct preconds_result {
 	struct ast_stmt *stmt;
 	struct error *err;
@@ -467,6 +470,9 @@ ast_type_isstruct(struct ast_type *);
 bool
 ast_type_istypedef(struct ast_type *);
 
+char *
+ast_type_zeroinit(struct ast_type *);
+
 struct value;
 struct externals;
 
@@ -515,6 +521,9 @@ ast_variable_create(char *name, struct ast_type *type);
 
 void
 ast_variable_destroy(struct ast_variable *);
+
+char *
+ast_variable_initprint(struct ast_variable *);
 
 struct ast_variable *
 ast_variable_copy(struct ast_variable *);
@@ -604,6 +613,9 @@ ast_function_setupabsexec(struct ast_function *f, struct state *state);
 struct result *
 ast_function_absexec(struct ast_function *, struct state *state);
 
+char *
+ast_function_initprint(struct ast_function *);
+
 struct ast_externdecl;
 
 struct ast_externdecl *
@@ -624,6 +636,9 @@ ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext);
 void
 ast_externdecl_destroy(struct ast_externdecl *);
 
+char *
+ast_externdecl_initprint(struct ast_externdecl *);
+
 struct ast {
 	int n;
 	struct ast_externdecl **decl;
@@ -643,5 +658,8 @@ ast_topological_order(char *fname, struct externals *ext);
 
 struct ast_function *
 ast_protostitch(struct ast_function *, struct externals *);
+
+char *
+ast_initprint(struct ast *);
 
 #endif

@@ -28,7 +28,7 @@
 int
 yyparse();
 
-enum execmode { EXECMODE_VERIFY, EXECMODE_STRIP, };
+enum execmode { EXECMODE_VERIFY, EXECMODE_STRIP, EXECMODE_INIT, };
 enum sortmode { SORTMODE_NONE, SORTMODE_SORT, SORTMODE_VERIFY };
 
 struct config {
@@ -62,8 +62,11 @@ parse_config(int argc, char *argv[])
 	struct string_arr *includedirs = default_includes();
 	char *outfile = OUTPUT_PATH;
 	int opt;
-	while ((opt = getopt(argc, argv, "vso:t:x:I:")) != -1) {
+	while ((opt = getopt(argc, argv, "vsio:t:x:I:")) != -1) {
 		switch (opt) {
+		case 'i':
+			mode = EXECMODE_INIT;
+			break;
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
 			break;
@@ -335,6 +338,9 @@ verify(struct config *c);
 static int
 strip(struct config *c);
 
+static int
+init(struct config *c);
+
 int
 main(int argc, char *argv[])
 {
@@ -348,6 +354,8 @@ main(int argc, char *argv[])
 		return verify(&c);
 	case EXECMODE_STRIP:
 		return strip(&c);
+	case EXECMODE_INIT:
+		return init(&c);
 	default:
 		assert(false);
 	}
@@ -474,4 +482,23 @@ skipvblock(FILE *f)
 			break;
 		}
 	}
+}
+
+
+static int
+init(struct config *c)
+{
+	/* preprocess */
+	extern FILE *yyin;
+	yyin = preprocess(c->infile, c->includedirs);
+
+	/* lex and parse */
+	lex_begin();
+	yyparse();
+	yylex_destroy();
+	lex_finish();
+
+	char *s = ast_initprint(root);
+	assert(false && s);
+	return 0;
 }

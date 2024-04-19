@@ -160,3 +160,20 @@ ast_block_preconds(struct ast_block *b)
 	}
 	return (struct preconds_result) { .stmt = NULL, .err = NULL };
 }
+
+char *
+ast_block_initprint(struct ast_block *b, char *indent)
+{
+	struct strbuilder *sb = strbuilder_create();
+	for (int i = 0; i < b->ndecl; i++) {
+		char *s = ast_variable_initprint(b->decl[i]);
+		strbuilder_printf(sb, "%s%s;\n", indent, s);
+		free(s);
+	}
+	for (int i = 0; i < b->nstmt; i++) {
+		char *s = ast_stmt_str(b->stmt[i]);
+		strbuilder_printf(sb, "%s%s\n", indent, s);
+		free(s);
+	}
+	return strbuilder_build(sb);
+}
