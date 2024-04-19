@@ -794,7 +794,7 @@ unsafe fn arbarg_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     return Ok(state_vconst(
         state,
         ast_type_create_ptr(ast_type_create(AstTypeBase::Void, 0)),
-        0 as *mut libc::c_char,
+        ptr::null_mut(),
         false,
     ));
 }
@@ -2302,7 +2302,7 @@ pub unsafe fn ast_block_preconds(b: &AstBlock) -> PrecondsResult {
         i += 1;
     }
     PrecondsResult {
-        stmt: 0 as *mut AstStmt,
+        stmt: ptr::null_mut(),
         err: None,
     }
 }
@@ -2401,7 +2401,7 @@ pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> *mut AstStmt {
             if !(selection.nest).is_null() {
                 ast_stmt_copy(&*selection.nest)
             } else {
-                0 as *mut AstStmt
+                ptr::null_mut()
             },
         ),
 
@@ -2597,19 +2597,19 @@ unsafe fn iter_neteffect(iter: &AstStmt) -> *mut AstStmt {
     let abs = ast_stmt_iter_abstract(iter);
     let nstmts: libc::c_int = ast_block_nstmts(abs);
     if nstmts == 0 {
-        return 0 as *mut AstStmt;
+        return ptr::null_mut();
     }
     if !(ast_block_ndecls(abs) == 0 as libc::c_int && nstmts == 1 as libc::c_int) {
         panic!();
     }
     return ast_stmt_create_iter(
-        0 as *mut LexemeMarker,
+        ptr::null_mut(),
         ast_stmt_copy(ast_stmt_iter_init(iter)),
         ast_stmt_copy(ast_stmt_iter_cond(iter)),
         ast_expr_copy(ast_stmt_iter_iter(iter)),
         ast_block_create(vec![], vec![]),
         ast_stmt_create_compound(
-            0 as *mut LexemeMarker,
+            ptr::null_mut(),
             ast_block_copy(ast_stmt_iter_abstract(iter)),
         ),
         false,
@@ -3100,7 +3100,7 @@ unsafe fn sel_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> 
         return ast_stmt_absexec(ast_stmt_sel_body(stmt), state, should_setup);
     }
     assert!(ast_stmt_sel_nest(stmt).is_none());
-    return Ok(0 as *mut Value);
+    return Ok(ptr::null_mut());
 }
 
 pub unsafe fn ast_stmt_sel_nest(stmt: &AstStmt) -> Option<&AstStmt> {
@@ -3417,10 +3417,7 @@ pub unsafe fn ast_type_create_ptr(referent: *mut AstType) -> *mut AstType {
 }
 
 pub unsafe fn ast_type_create_voidptr() -> *mut AstType {
-    ast_type_create(
-        AstTypeBase::Pointer(0 as *mut AstType),
-        0 as AstTypeModifier,
-    )
+    ast_type_create(AstTypeBase::Pointer(ptr::null_mut()), 0 as AstTypeModifier)
 }
 
 pub unsafe fn ast_type_create_arr(base: *mut AstType, length: libc::c_int) -> *mut AstType {
@@ -3500,7 +3497,7 @@ pub unsafe fn ast_type_struct_tag(t: &AstType) -> *mut libc::c_char {
 }
 
 pub unsafe fn ast_type_create_struct_anonym(members: Vec<*mut AstVariable>) -> *mut AstType {
-    ast_type_create_struct(0 as *mut libc::c_char, Some(Box::new(members)))
+    ast_type_create_struct(ptr::null_mut(), Some(Box::new(members)))
 }
 
 pub unsafe fn ast_type_create_struct_partial(tag: *mut libc::c_char) -> *mut AstType {
@@ -3516,7 +3513,7 @@ pub unsafe fn ast_type_copy_struct(old: *mut AstType) -> *mut AstType {
             tag: if !s.tag.is_null() {
                 dynamic_str(s.tag)
             } else {
-                0 as *mut libc::c_char
+                ptr::null_mut()
             },
             members: s.members.as_ref().map(|v| {
                 Box::new(
@@ -3903,7 +3900,7 @@ pub unsafe fn ast_function_copy(f: &AstFunction) -> *mut AstFunction {
         if !f.body.is_null() {
             ast_block_copy(&*f.body)
         } else {
-            0 as *mut AstBlock
+            ptr::null_mut()
         },
     );
 }

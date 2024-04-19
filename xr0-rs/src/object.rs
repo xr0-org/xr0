@@ -1,5 +1,7 @@
 #![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
+use std::ptr;
+
 use libc::{calloc, free, malloc, realloc};
 
 use crate::ast::{
@@ -99,7 +101,7 @@ pub unsafe fn object_copy(old: *mut Object) -> *mut Object {
             (*new).c2rust_unnamed.value = if !((*old).c2rust_unnamed.value).is_null() {
                 value_copy(&*(*old).c2rust_unnamed.value)
             } else {
-                0 as *mut Value
+                ptr::null_mut()
             };
         }
         1 => {
@@ -118,7 +120,7 @@ pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Objec
             if !((*old).c2rust_unnamed.value).is_null() {
                 value_abstractcopy(&*(*old).c2rust_unnamed.value, s)
             } else {
-                0 as *mut Value
+                ptr::null_mut()
             },
         ),
         _ => panic!(),
@@ -217,7 +219,7 @@ pub unsafe fn object_assign(obj: *mut Object, val: *mut Value) -> *mut Error {
         panic!();
     }
     (*obj).c2rust_unnamed.value = val;
-    return 0 as *mut Error;
+    return ptr::null_mut();
 }
 unsafe fn object_size(obj: *mut Object) -> *mut AstExpr {
     match (*obj).r#type {
@@ -320,7 +322,7 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
         panic!();
     }
     if e1 {
-        return 0 as *mut Object;
+        return ptr::null_mut();
     }
     if e2 {
         if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
@@ -363,7 +365,7 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
     ast_expr_destroy(prop0);
     if e0 {
         ast_expr_destroy(up);
-        return 0 as *mut Object;
+        return ptr::null_mut();
     }
     if e1 {
         if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {

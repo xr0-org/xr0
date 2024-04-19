@@ -1,5 +1,7 @@
 #![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
+use std::ptr;
+
 use libc::{calloc, free, malloc, strcmp};
 
 use crate::ast::{
@@ -22,8 +24,8 @@ use crate::state::state::state_get;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map};
 use crate::value::value_abstractcopy;
 use crate::{
-    cstr, strbuilder_write, AstType, AstVariable, Block, BlockArr, Clump, Heap, Location, Object,
-    State, StaticMemory, StrBuilder, VConst, Value,
+    cstr, strbuilder_write, AstType, AstVariable, Block, BlockArr, Location, Object, State,
+    StrBuilder, Value,
 };
 
 pub struct Stack {
@@ -88,7 +90,7 @@ pub unsafe fn stack_getframe(s: *mut Stack, frame: libc::c_int) -> *mut Stack {
         return s;
     }
     if ((*s).prev).is_null() {
-        return 0 as *mut Stack;
+        return ptr::null_mut();
     }
     return stack_getframe((*s).prev, frame);
 }
@@ -119,7 +121,7 @@ pub unsafe fn stack_copy(stack: *mut Stack) -> *mut Stack {
             varmap: varmap_copy(&(*stack).varmap),
             id: (*stack).id,
             result: variable_copy((*stack).result),
-            prev: std::ptr::null_mut(),
+            prev: ptr::null_mut(),
         },
     );
     if !((*stack).prev).is_null() {
@@ -256,11 +258,11 @@ pub unsafe fn variable_create(
     (*v).loc = stack_newblock(stack);
     let b = location_getblock(
         (*v).loc,
-        0 as *mut StaticMemory,
-        0 as *mut VConst,
+        ptr::null_mut(),
+        ptr::null_mut(),
         stack,
-        0 as *mut Heap,
-        0 as *mut Clump,
+        ptr::null_mut(),
+        ptr::null_mut(),
     )
     .unwrap();
     if b.is_null() {
@@ -270,7 +272,7 @@ pub unsafe fn variable_create(
         b,
         object_value_create(
             Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
-            0 as *mut Value,
+            ptr::null_mut(),
         ),
     );
     return v;
@@ -341,6 +343,7 @@ pub unsafe fn variable_str(
     free(type_0 as *mut libc::c_void);
     return strbuilder_build(b);
 }
+
 unsafe fn object_or_nothing_str(
     loc: *mut Location,
     stack: *mut Stack,

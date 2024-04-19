@@ -1,5 +1,7 @@
 #![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
+use std::ptr;
+
 use libc::{free, malloc};
 
 use crate::state::block::{
@@ -56,7 +58,7 @@ pub unsafe fn clump_newblock(c: *mut Clump) -> libc::c_int {
 
 pub unsafe fn clump_getblock(c: *mut Clump, address: libc::c_int) -> *mut Block {
     if address >= block_arr_nblocks((*c).blocks) {
-        return 0 as *mut Block;
+        return ptr::null_mut();
     }
     return *(block_arr_blocks((*c).blocks)).offset(address as isize);
 }

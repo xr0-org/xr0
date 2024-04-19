@@ -1,5 +1,7 @@
 #![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
+use std::ptr;
+
 use libc::{calloc, free, malloc, realloc};
 
 use crate::ast::{
@@ -18,7 +20,7 @@ use crate::state::heap::heap_newblock;
 use crate::state::state::{state_alloc, state_eval};
 use crate::util::{error_create, strbuilder_build, strbuilder_create, Result};
 use crate::{
-    cstr, strbuilder_write, AstExpr, Heap, Location, Object, ObjectArr, State, StrBuilder, Value,
+    cstr, strbuilder_write, AstExpr, Heap, Location, Object, ObjectArr, State, StrBuilder,
 };
 
 #[derive(Copy, Clone)]
@@ -83,10 +85,10 @@ pub unsafe fn block_observe(
     let mut index: libc::c_int = object_arr_index((*b).arr, offset, s);
     if index == -(1 as libc::c_int) {
         if !constructive {
-            return 0 as *mut Object;
+            return ptr::null_mut();
         }
         let obj: *mut Object =
-            object_value_create(Box::into_raw(ast_expr_copy(offset)), 0 as *mut Value);
+            object_value_create(Box::into_raw(ast_expr_copy(offset)), ptr::null_mut());
         object_arr_append((*b).arr, obj);
         return obj;
     }

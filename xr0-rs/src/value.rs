@@ -258,7 +258,7 @@ unsafe fn frommembers(members: *mut AstVariableArr) -> Box<Map> {
             dynamic_str(ast_variable_name(*v.offset(i as isize))),
             object_value_create(
                 Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
-                0 as *mut Value,
+                ptr::null_mut(),
             ) as *const libc::c_void,
         );
         i += 1;
@@ -315,7 +315,7 @@ pub unsafe fn value_struct_membertype(v: *mut Value, member: *mut libc::c_char) 
         }
         i += 1;
     }
-    0 as *mut AstType
+    ptr::null_mut()
 }
 
 pub unsafe fn value_struct_member(v: *mut Value, member: *mut libc::c_char) -> *mut Object {

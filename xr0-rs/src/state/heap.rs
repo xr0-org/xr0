@@ -6,6 +6,8 @@
     unused_variables
 )]
 
+use std::ptr;
+
 use libc::{free, malloc, realloc};
 
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
@@ -36,7 +38,7 @@ pub unsafe fn heap_create() -> *mut Heap {
         panic!();
     }
     (*h).blocks = block_arr_create();
-    (*h).freed = 0 as *mut bool;
+    (*h).freed = ptr::null_mut();
     return h;
 }
 
@@ -118,10 +120,10 @@ pub unsafe fn heap_newblock(h: *mut Heap) -> *mut Location {
 
 pub unsafe fn heap_getblock(h: *mut Heap, address: libc::c_int) -> *mut Block {
     if address >= block_arr_nblocks((*h).blocks) {
-        return 0 as *mut Block;
+        return ptr::null_mut();
     }
     if *((*h).freed).offset(address as isize) {
-        return 0 as *mut Block;
+        return ptr::null_mut();
     }
     return *(block_arr_blocks((*h).blocks)).offset(address as isize);
 }

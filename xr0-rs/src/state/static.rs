@@ -83,7 +83,7 @@ pub unsafe fn static_memory_newblock(sm: *mut StaticMemory) -> libc::c_int {
 
 pub unsafe fn static_memory_getblock(sm: *mut StaticMemory, address: libc::c_int) -> *mut Block {
     if address >= block_arr_nblocks((*sm).blocks) {
-        return 0 as *mut Block;
+        return ptr::null_mut();
     }
     return *(block_arr_blocks((*sm).blocks)).offset(address as isize);
 }

@@ -65,7 +65,7 @@ pub unsafe fn state_create(
     (*state).static_memory = static_memory_create();
     (*state).vconst = vconst_create();
     (*state).clump = clump_create();
-    (*state).stack = stack_create(func, 0 as *mut Stack, result_type);
+    (*state).stack = stack_create(func, ptr::null_mut(), result_type);
     (*state).heap = heap_create();
     (*state).props = props_create();
     return state;
@@ -85,7 +85,7 @@ pub unsafe fn state_create_withprops(
     (*state).static_memory = static_memory_create();
     (*state).vconst = vconst_create();
     (*state).clump = clump_create();
-    (*state).stack = stack_create(func, 0 as *mut Stack, result_type);
+    (*state).stack = stack_create(func, ptr::null_mut(), result_type);
     (*state).heap = heap_create();
     (*state).props = props_copy(props);
     return state;
