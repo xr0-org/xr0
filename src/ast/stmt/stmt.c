@@ -510,8 +510,8 @@ ast_stmt_register_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 		char *call = ast_expr_str(stmt->u._register.op.call);
 		strbuilder_printf(b, "call %s;", call);
 	} else {
-		char *tempvar = ast_variable_str(stmt->u._register.op.temp);
-		strbuilder_printf(b, "movret <%s>;", tempvar);
+		char *tempvar = ast_variable_name(stmt->u._register.op.temp);
+		strbuilder_printf(b, "movret %s;", tempvar);
 	}
 }
 

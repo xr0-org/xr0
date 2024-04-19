@@ -218,7 +218,6 @@ path_next_abstract(struct path *p)
 	if ((err = path_step(p))) {
 		return err;
 	}
-
 	while (path_continue(p, PATH_STATE_ABSTRACT, og_frame, og_index)) {
 		if ((err = path_step_abstract(p, false))) {
 			return err;
@@ -381,7 +380,7 @@ path_step_actual(struct path *p, bool print)
 	}
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
-		return path_step(p);
+		return NULL;
 	}
 
 	struct error *err = state_step(p->actual);
