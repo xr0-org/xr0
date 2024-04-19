@@ -9,8 +9,8 @@ use crate::state::block::{
     block_arr_nblocks, block_create, block_str,
 };
 use crate::state::location::location_copy;
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, Map};
-use crate::{Block, BlockArr, Location, StrBuilder};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map};
+use crate::{cstr, strbuilder_write, Block, BlockArr, Location, StrBuilder};
 
 pub struct StaticMemory {
     pub blocks: *mut BlockArr,
@@ -44,13 +44,7 @@ pub unsafe fn static_memory_str(
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let block: *mut libc::c_char = block_str(*arr.offset(i as isize));
-        strbuilder_printf(
-            b,
-            b"%s%d: %s\n\0" as *const u8 as *const libc::c_char,
-            indent,
-            i,
-            block,
-        );
+        strbuilder_write!(b, "{}{i}: {}\n", cstr!(indent), cstr!(block));
         free(block as *mut libc::c_void);
         i += 1;
     }

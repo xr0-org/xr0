@@ -23,7 +23,10 @@ use crate::state::state::{state_getext, state_vconst};
 use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc, Map,
 };
-use crate::{AstExpr, AstType, AstVariable, AstVariableArr, Location, Object, State, StrBuilder};
+use crate::{
+    cstr, strbuilder_write, AstExpr, AstType, AstVariable, AstVariableArr, Location, Object, State,
+    StrBuilder,
+};
 
 pub struct Value {
     pub kind: ValueKind,
@@ -167,12 +170,7 @@ pub unsafe fn value_struct_indefinite_create(
         let field: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
         let obj: *mut Object = (*sv.m).get(field) as *mut Object;
         let b: *mut StrBuilder = strbuilder_create();
-        strbuilder_printf(
-            b,
-            b"%s.%s\0" as *const u8 as *const libc::c_char,
-            comment,
-            field,
-        );
+        strbuilder_write!(b, "{}.{}", cstr!(comment), cstr!(field));
         object_assign(
             obj,
             state_vconst(

@@ -6,8 +6,8 @@ use crate::state::block::{
     block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
     block_arr_nblocks, block_create, block_str,
 };
-use crate::util::{strbuilder_build, strbuilder_create, strbuilder_printf};
-use crate::{Block, BlockArr, StrBuilder};
+use crate::util::{strbuilder_build, strbuilder_create};
+use crate::{cstr, strbuilder_write, Block, BlockArr, StrBuilder};
 
 #[derive(Copy, Clone)]
 pub struct Clump {
@@ -34,13 +34,7 @@ pub unsafe fn clump_str(c: *mut Clump, indent: *mut libc::c_char) -> *mut libc::
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let block: *mut libc::c_char = block_str(*arr.offset(i as isize));
-        strbuilder_printf(
-            b,
-            b"%s%d: %s\n\0" as *const u8 as *const libc::c_char,
-            indent,
-            i,
-            block,
-        );
+        strbuilder_write!(b, "{}{i}: {}\n", cstr!(indent), cstr!(block));
         free(block as *mut libc::c_void);
         i += 1;
     }

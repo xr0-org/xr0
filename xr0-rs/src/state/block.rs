@@ -16,8 +16,10 @@ use crate::object::{
 };
 use crate::state::heap::heap_newblock;
 use crate::state::state::{state_alloc, state_eval};
-use crate::util::{error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Result};
-use crate::{AstExpr, Heap, Location, Object, ObjectArr, State, StrBuilder, Value};
+use crate::util::{error_create, strbuilder_build, strbuilder_create, Result};
+use crate::{
+    cstr, strbuilder_write, AstExpr, Heap, Location, Object, ObjectArr, State, StrBuilder, Value,
+};
 
 #[derive(Copy, Clone)]
 pub struct Block {
@@ -53,15 +55,11 @@ pub unsafe fn block_str(block: *mut Block) -> *mut libc::c_char {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let s: *mut libc::c_char = object_str(*obj.offset(i as isize));
-        strbuilder_printf(
+        strbuilder_write!(
             b,
-            b"%s%s\0" as *const u8 as *const libc::c_char,
-            s,
-            if (i + 1 as libc::c_int) < n {
-                b", \0" as *const u8 as *const libc::c_char
-            } else {
-                b"\0" as *const u8 as *const libc::c_char
-            },
+            "{}{}",
+            cstr!(s),
+            if (i + 1 as libc::c_int) < n { ", " } else { "" },
         );
         free(s as *mut libc::c_void);
         i += 1;

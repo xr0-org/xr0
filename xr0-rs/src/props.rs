@@ -5,8 +5,8 @@ use libc::{calloc, free, realloc};
 use crate::ast::{
     ast_expr_copy, ast_expr_destroy, ast_expr_equal, ast_expr_inverted_copy, ast_expr_str,
 };
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf};
-use crate::{AstExpr, StrBuilder};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create};
+use crate::{cstr, strbuilder_write, AstExpr, StrBuilder};
 
 #[derive(Copy, Clone)]
 pub struct Props {
@@ -45,28 +45,24 @@ pub unsafe fn props_str(p: *mut Props, indent: *mut libc::c_char) -> *mut libc::
         return dynamic_str(b"\0" as *const u8 as *const libc::c_char);
     }
     let b: *mut StrBuilder = strbuilder_create();
-    strbuilder_printf(
-        b,
-        b"%s\xE2\x8A\xA2 \0" as *const u8 as *const libc::c_char,
-        indent,
-    );
+    strbuilder_write!(b, "{}\u{22a2} ", cstr!(indent));
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*p).n {
         let e: *mut libc::c_char = ast_expr_str(&**((*p).prop).offset(i as isize));
-        strbuilder_printf(
+        strbuilder_write!(
             b,
-            b"%s%s\0" as *const u8 as *const libc::c_char,
-            e,
+            "{}{}",
+            cstr!(e),
             if (i + 1 as libc::c_int) < (*p).n {
-                b", \0" as *const u8 as *const libc::c_char
+                ", "
             } else {
-                b"\0" as *const u8 as *const libc::c_char
+                ""
             },
         );
         free(e as *mut libc::c_void);
         i += 1;
     }
-    strbuilder_printf(b, b"\n\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "\n");
     return strbuilder_build(b);
 }
 

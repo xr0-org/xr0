@@ -38,7 +38,7 @@ use crate::value::{
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr,
 };
-use crate::{vprintln, Externals, Object, Props, State, StrBuilder, Value};
+use crate::{cstr, strbuilder_write, vprintln, Externals, Object, Props, State, StrBuilder, Value};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
@@ -641,25 +641,17 @@ unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Va
     if deref_obj.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
         let s: *mut libc::c_char = ast_expr_str(expr);
-        strbuilder_printf(
-            b,
-            b"undefined indirection: *(%s) has no value\0" as *const u8 as *const libc::c_char,
-            s,
-        );
+        strbuilder_write!(b, "undefined indirection: *({}) has no value", cstr!(s));
         free(s as *mut libc::c_void);
         return Err(error_create(strbuilder_build(b)));
     }
     let v: *mut Value = object_as_value(deref_obj);
     if v.is_null() {
-        let b_0: *mut StrBuilder = strbuilder_create();
-        let s_0: *mut libc::c_char = ast_expr_str(expr);
-        strbuilder_printf(
-            b_0,
-            b"undefined indirection: *(%s) has no value\0" as *const u8 as *const libc::c_char,
-            s_0,
-        );
-        free(s_0 as *mut libc::c_void);
-        return Err(error_create(strbuilder_build(b_0)));
+        let b: *mut StrBuilder = strbuilder_create();
+        let s: *mut libc::c_char = ast_expr_str(expr);
+        strbuilder_write!(b, "undefined indirection: *({}) has no value", cstr!(s));
+        free(s as *mut libc::c_void);
+        return Err(error_create(strbuilder_build(b)));
     }
     return Ok(value_copy(&*v));
 }
@@ -693,7 +685,7 @@ pub unsafe fn ast_expr_assignment_create(root: Box<AstExpr>, value: Box<AstExpr>
 
 unsafe fn ast_expr_bracketed_str_build(inner: &AstExpr, b: *mut StrBuilder) {
     let root: *mut libc::c_char = ast_expr_str(inner);
-    strbuilder_printf(b, b"(%s)\0" as *const u8 as *const libc::c_char, root);
+    strbuilder_write!(b, "({})", cstr!(root));
     free(root as *mut libc::c_void);
 }
 
@@ -721,11 +713,7 @@ unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> Result<*mut
     let obj: *mut Object = state_getobject(state, id);
     if obj.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
-        strbuilder_printf(
-            b,
-            b"unknown idenitfier %s\0" as *const u8 as *const libc::c_char,
-            id,
-        );
+        strbuilder_write!(b, "unknown idenitfier {}", cstr!(id));
         return Err(error_create(strbuilder_build(b)));
     }
     let val: *mut Value = object_as_value(obj);
@@ -734,13 +722,9 @@ unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> Result<*mut
             "state: {}",
             CStr::from_ptr(state_str(state)).to_string_lossy()
         );
-        let b_0: *mut StrBuilder = strbuilder_create();
-        strbuilder_printf(
-            b_0,
-            b"undefined memory access: %s has no value\0" as *const u8 as *const libc::c_char,
-            id,
-        );
-        return Err(error_create(strbuilder_build(b_0)));
+        let b: *mut StrBuilder = strbuilder_create();
+        strbuilder_write!(b, "undefined memory access: {} has no value", cstr!(id));
+        return Err(error_create(strbuilder_build(b)));
     }
     return Ok(value_copy(&*val));
 }
@@ -753,12 +737,7 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<*mut V
     if member.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
         let root_str: *mut libc::c_char = ast_expr_str(root);
-        strbuilder_printf(
-            b,
-            b"`%s' has no field `%s'\0" as *const u8 as *const libc::c_char,
-            root_str,
-            field,
-        );
+        strbuilder_write!(b, "`{}' has no field `{}'", cstr!(root_str), cstr!(field));
         free(root_str as *mut libc::c_void);
         return Err(error_create(strbuilder_build(b)));
     }
@@ -859,11 +838,7 @@ unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Val
     if obj.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
         let s: *mut libc::c_char = ast_expr_str(lval);
-        strbuilder_printf(
-            b,
-            b"undefined indirection: %s is not an lvalue\0" as *const u8 as *const libc::c_char,
-            s,
-        );
+        strbuilder_write!(b, "undefined indirection: {} is not an lvalue", cstr!(s));
         free(s as *mut libc::c_void);
         return Err(error_create(strbuilder_build(b)));
     }
@@ -961,21 +936,17 @@ unsafe fn ast_expr_constant_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     };
     let constant: libc::c_int = c.constant;
     if !c.ischar {
-        strbuilder_printf(b, b"%d\0" as *const u8 as *const libc::c_char, constant);
+        strbuilder_write!(b, "{constant}");
         return;
     }
-    match constant {
-        10 | 9 | 11 | 8 | 12 | 7 | 92 | 63 | 39 | 34 | 0 => {
-            strbuilder_printf(
-                b,
-                b"'%s'\0" as *const u8 as *const libc::c_char,
-                escape_str(constant as libc::c_char),
-            );
+    match char::try_from(constant as u32) {
+        Ok(c) => {
+            strbuilder_write!(b, "{:?}", c);
         }
         _ => {
-            strbuilder_printf(b, b"'%c'\0" as *const u8 as *const libc::c_char, constant);
+            strbuilder_write!(b, "'\\x{{{:x}}}'", constant as libc::c_uint);
         }
-    };
+    }
 }
 
 unsafe fn escape_str(c: libc::c_char) -> *mut libc::c_char {
@@ -1003,11 +974,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value
     let f: *mut AstFunction = externals_getfunc(state_getext(state), name);
     if f.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
-        strbuilder_printf(
-            b,
-            b"function `%s' not found\0" as *const u8 as *const libc::c_char,
-            name,
-        );
+        strbuilder_write!(b, "function `{}' not found", cstr!(name));
         return Err(error_create(strbuilder_build(b)));
     }
     let params = ast_function_params(&*f);
@@ -1038,11 +1005,7 @@ unsafe fn call_absexec(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let f: *mut AstFunction = externals_getfunc(state_getext(s), name);
     if f.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
-        strbuilder_printf(
-            b,
-            b"function `%s' not found\0" as *const u8 as *const libc::c_char,
-            name,
-        );
+        strbuilder_write!(b, "function `{}' not found", cstr!(name));
         return Err(error_create(strbuilder_build(b)));
     }
     let v = ast_function_absexec(&*f, s)?;
@@ -1147,12 +1110,11 @@ pub unsafe fn prepare_parameters(
         let arg = res?;
         if arg.is_null() {
             let b: *mut StrBuilder = strbuilder_create();
-            strbuilder_printf(
+            strbuilder_write!(
                 b,
-                b"parameter `%s' of function `%s' has no value\0" as *const u8
-                    as *const libc::c_char,
-                ast_variable_name(param),
-                fname,
+                "parameter `{}' of function `{}' has no value",
+                cstr!(ast_variable_name(param)),
+                cstr!(fname),
             );
             return Err(error_create(strbuilder_build(b)));
         }
