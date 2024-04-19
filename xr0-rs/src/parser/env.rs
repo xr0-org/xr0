@@ -5,9 +5,8 @@ use std::path::{Path, PathBuf};
 
 use libc::{free, malloc};
 
-use crate::util::{
-    self, dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, StrBuilder,
-};
+use crate::util::{self, dynamic_str, strbuilder_build, strbuilder_create, StrBuilder};
+use crate::{cstr, strbuilder_write};
 
 pub struct Env {
     source: String,
@@ -210,12 +209,6 @@ pub unsafe fn lexememarker_destroy(loc: *mut LexemeMarker) {
 
 pub unsafe fn lexememarker_str(loc: &LexemeMarker) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    strbuilder_printf(
-        b,
-        b"%s:%d:%d\0" as *const u8 as *const libc::c_char,
-        loc.filename,
-        loc.linenum,
-        loc.column,
-    );
+    strbuilder_write!(b, "{}:{}:{}", cstr!(loc.filename), loc.linenum, loc.column);
     return strbuilder_build(b);
 }

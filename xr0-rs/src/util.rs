@@ -215,7 +215,31 @@ unsafe fn strbuilder_realloc(b: *mut StrBuilder, len: usize) {
     }
 }
 
-unsafe fn strbuilder_append(b: *mut StrBuilder, s: *mut libc::c_char, len: usize) {
+#[macro_export]
+macro_rules! strbuilder_write {
+    ($b:expr, $($fmt:tt)+) => {
+        $crate::util::strbuilder_append_string($b, format!($($fmt)+))
+    }
+}
+
+#[macro_export]
+macro_rules! cstr {
+    ($c:expr) => {{
+        let c = $c;
+        if c.is_null() {
+            std::borrow::Cow::Borrowed("(null)")
+        } else {
+            std::ffi::CStr::from_ptr(c).to_string_lossy()
+        }
+    }};
+}
+
+pub unsafe fn strbuilder_append_string(b: *mut StrBuilder, s: String) {
+    let bytes = s.as_bytes();
+    strbuilder_append(b, bytes.as_ptr() as *const libc::c_char, bytes.len());
+}
+
+unsafe fn strbuilder_append(b: *mut StrBuilder, s: *const libc::c_char, len: usize) {
     let buflen = strlen((*b).buf) as libc::c_int;
     strbuilder_realloc(b, (buflen as usize).wrapping_add(len));
     let newlen: usize = (buflen as usize)
@@ -226,6 +250,7 @@ unsafe fn strbuilder_append(b: *mut StrBuilder, s: *mut libc::c_char, len: usize
         s,
         newlen.wrapping_sub(buflen as usize),
     );
+    *(*b).buf.add(newlen - 1) = 0;
 }
 
 pub unsafe fn strbuilder_vprintf(
