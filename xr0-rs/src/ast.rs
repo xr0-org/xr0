@@ -27,9 +27,9 @@ use crate::state::state::{
     state_range_dealloc, state_static_init, state_str, state_vconst,
 };
 use crate::util::{
-    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_printf,
-    strbuilder_putc, string_arr_append, string_arr_concat, string_arr_contains, string_arr_create,
-    string_arr_deque, string_arr_n, string_arr_s, Error, Map, Result, StringArr,
+    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_putc,
+    string_arr_append, string_arr_concat, string_arr_contains, string_arr_create, string_arr_deque,
+    string_arr_n, string_arr_s, Error, Map, Result, StringArr,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -3659,17 +3659,8 @@ unsafe fn mod_str(mod_0: libc::c_int) -> *mut libc::c_char {
         if m & mod_0 != 0 {
             let fresh11 = nmods;
             nmods = nmods - 1;
-            let space: *mut libc::c_char = (if fresh11 != 0 {
-                b" \0" as *const u8 as *const libc::c_char
-            } else {
-                b"\0" as *const u8 as *const libc::c_char
-            }) as *mut libc::c_char;
-            strbuilder_printf(
-                b,
-                b"%s%s\0" as *const u8 as *const libc::c_char,
-                modstr[i_0 as usize],
-                space,
-            );
+            let space = if fresh11 != 0 { " " } else { "" };
+            strbuilder_write!(b, "{}{space}", cstr!(modstr[i_0 as usize]));
         }
         i_0 += 1;
     }
@@ -3679,47 +3670,38 @@ unsafe fn mod_str(mod_0: libc::c_int) -> *mut libc::c_char {
 unsafe fn ast_type_str_build_ptr(b: *mut StrBuilder, ptr_type: *mut AstType) {
     let base: *mut libc::c_char = ast_type_str(ptr_type);
     let space: bool = !matches!((*ptr_type).base, AstTypeBase::Pointer(_));
-    strbuilder_printf(
+    strbuilder_write!(
         b,
-        b"%s%s*\0" as *const u8 as *const libc::c_char,
-        base,
-        if space as libc::c_int != 0 {
-            b" \0" as *const u8 as *const libc::c_char
-        } else {
-            b"\0" as *const u8 as *const libc::c_char
-        },
+        "{}{}*",
+        cstr!(base),
+        if space as libc::c_int != 0 { " " } else { "" },
     );
     free(base as *mut libc::c_void);
 }
 
 unsafe fn ast_type_str_build_arr(b: *mut StrBuilder, arr: &AstArrayType) {
     let base: *mut libc::c_char = ast_type_str(arr.r#type);
-    strbuilder_printf(
-        b,
-        b"%s[%d]\0" as *const u8 as *const libc::c_char,
-        base,
-        arr.length,
-    );
+    strbuilder_write!(b, "{}[{}]", cstr!(base), arr.length);
     free(base as *mut libc::c_void);
 }
 
 unsafe fn ast_type_str_build_struct(b: *mut StrBuilder, s: &AstStructType) {
     let tag: *mut libc::c_char = s.tag;
     assert!(!tag.is_null() || !s.members.is_none());
-    strbuilder_printf(b, b"struct \0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "struct ");
     if !tag.is_null() {
-        strbuilder_printf(b, tag);
+        strbuilder_write!(b, "{}", cstr!(tag));
     }
     let Some(members) = s.members.as_ref() else {
         return;
     };
-    strbuilder_printf(b, b" { \0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, " {{ ");
     for &field in members.iter() {
         let s: *mut libc::c_char = ast_variable_str(field);
-        strbuilder_printf(b, b"%s; \0" as *const u8 as *const libc::c_char, s);
+        strbuilder_write!(b, "{}; ", cstr!(s));
         free(s as *mut libc::c_void);
     }
-    strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "}}");
 }
 
 pub unsafe fn ast_type_ptr_type(t: *mut AstType) -> *mut AstType {
@@ -3761,12 +3743,7 @@ pub unsafe fn ast_variables_copy(v: &[*mut AstVariable]) -> Vec<*mut AstVariable
 pub unsafe fn ast_variable_str(v: *mut AstVariable) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     let t: *mut libc::c_char = ast_type_str((*v).r#type);
-    strbuilder_printf(
-        b,
-        b"%s %s\0" as *const u8 as *const libc::c_char,
-        t,
-        (*v).name,
-    );
+    strbuilder_write!(b, "{} {}", cstr!(t), cstr!((*v).name));
     free(t as *mut libc::c_void);
     return strbuilder_build(b);
 }
@@ -3875,39 +3852,35 @@ impl Drop for AstFunction {
 pub unsafe fn ast_function_str(f: &AstFunction) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     if f.isaxiom {
-        strbuilder_printf(b, b"axiom \0" as *const u8 as *const libc::c_char);
+        strbuilder_write!(b, "axiom ");
     }
     let ret: *mut libc::c_char = ast_type_str(f.ret);
-    strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, ret);
+    strbuilder_write!(b, "{}\n", cstr!(ret));
     free(ret as *mut libc::c_void);
-    strbuilder_printf(b, b"%s(\0" as *const u8 as *const libc::c_char, f.name);
+    strbuilder_write!(b, "{}(", cstr!(f.name));
     for (i, &param) in f.params.iter().enumerate() {
         let v: *mut libc::c_char = ast_variable_str(param);
-        let space: *mut libc::c_char = (if i + 1 < f.params.len() {
-            b", \0" as *const u8 as *const libc::c_char
-        } else {
-            b"\0" as *const u8 as *const libc::c_char
-        }) as *mut libc::c_char;
-        strbuilder_printf(b, b"%s%s\0" as *const u8 as *const libc::c_char, v, space);
+        let space = if i + 1 < f.params.len() { ", " } else { "" };
+        strbuilder_write!(b, "{}{space}", cstr!(v));
         free(v as *mut libc::c_void);
     }
     let abs: *mut libc::c_char = ast_block_str(
         &*f.r#abstract,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    strbuilder_printf(b, b") ~ [\n%s]\0" as *const u8 as *const libc::c_char, abs);
+    strbuilder_write!(b, ") ~ [\n{}]", cstr!(abs));
     free(abs as *mut libc::c_void);
     if !(f.body).is_null() {
         let body: *mut libc::c_char = ast_block_str(
             &*f.body,
             b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         );
-        strbuilder_printf(b, b"{\n%s}\0" as *const u8 as *const libc::c_char, body);
+        strbuilder_write!(b, "{{\n{}}}", cstr!(body));
         free(body as *mut libc::c_void);
     } else {
-        strbuilder_printf(b, b";\0" as *const u8 as *const libc::c_char);
+        strbuilder_write!(b, ";");
     }
-    strbuilder_printf(b, b"\n\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "\n");
     return strbuilder_build(b);
 }
 
@@ -4139,22 +4112,18 @@ unsafe fn path_verify(
             CStr::from_ptr(state_str(actual_state)).to_string_lossy()
         );
         let b: *mut StrBuilder = strbuilder_create();
-        strbuilder_printf(
-            b,
-            b"%s: garbage on heap\0" as *const u8 as *const libc::c_char,
-            ast_function_name(&*f),
-        );
+        strbuilder_write!(b, "{}: garbage on heap", cstr!(ast_function_name(&*f)),);
         return Err(error_create(strbuilder_build(b)));
     }
     let equiv: bool = state_equal(actual_state, abstract_state);
     if !equiv {
-        let b_0: *mut StrBuilder = strbuilder_create();
-        strbuilder_printf(
-            b_0,
-            b"%s: actual and abstract states differ\0" as *const u8 as *const libc::c_char,
-            ast_function_name(&*f),
+        let b: *mut StrBuilder = strbuilder_create();
+        strbuilder_write!(
+            b,
+            "{}: actual and abstract states differ",
+            cstr!(ast_function_name(&*f)),
         );
-        return Err(error_create(strbuilder_build(b_0)));
+        return Err(error_create(strbuilder_build(b)));
     }
     Ok(())
 }
@@ -4340,14 +4309,9 @@ pub unsafe fn ast_function_buildgraph(fname: *mut libc::c_char, ext: *mut Extern
 unsafe fn split_name(name: *mut libc::c_char, assumption: &AstExpr) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     let assumption_str: *mut libc::c_char = ast_expr_str(assumption);
-    strbuilder_printf(
-        b,
-        b"%s | %s\0" as *const u8 as *const libc::c_char,
-        name,
-        assumption_str,
-    );
+    strbuilder_write!(b, "{} | {}", cstr!(name), cstr!(assumption_str));
     free(assumption_str as *mut libc::c_void);
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 unsafe fn split_paths_verify(
