@@ -86,6 +86,7 @@ program_render(struct program *p)
 		strbuilder_printf(b, "%s\n", ast_block_render(p->b, p->index, false));
 		break;
 	case PROGRAM_COUNTER_ATEND:
+		strbuilder_printf(b, "\t<end of frame>");
 		break;
 	default:
 		assert(false);

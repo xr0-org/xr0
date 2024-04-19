@@ -186,11 +186,6 @@ stack_str(struct stack *stack, struct state *state)
 		free(var);
 		strbuilder_putc(b, '\n');
 	}
-	if (stack->result) {
-		char *result = variable_str(stack->result, stack, state);
-		strbuilder_printf(b, "\treturn: %s\n", result);
-		free(result);
-	}
 	strbuilder_printf(b, "\t");
 	/* TODO: fix length of line */
 	for (int i = 0, len = 30; i < len-2; i++ ) {

@@ -170,10 +170,6 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 	struct ast_expr *newcond = ast_expr_geninstr(
 		cond, lexememarker_copy(loc), b, state
 	);
-	struct decision dec = sel_decide(cond, state);
-	if (dec.err) {
-		return dec.err;
-	}
 	struct ast_stmt *newsel = ast_stmt_create_sel(
 		lexememarker_copy(loc),
 		false,
