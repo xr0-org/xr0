@@ -356,7 +356,7 @@ path_step_abstract(struct path *p, bool print)
 	}
 	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
-		return NULL;
+		return path_step(p);
 	}
 
 	struct error *err = state_step(p->abstract);

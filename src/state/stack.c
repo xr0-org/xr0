@@ -151,12 +151,25 @@ stack_copy(struct stack *stack)
 	return copy;
 }
 
+static void
+rename_lowestframe(struct stack *, char *new_name);
+
 struct stack *
 stack_copywithname(struct stack *stack, char *new_name)
 {
 	struct stack *copy = stack_copy(stack);
-	program_changename(copy->p, new_name);
+	rename_lowestframe(copy, new_name);
 	return copy;
+}
+
+static void
+rename_lowestframe(struct stack *s, char *new_name)
+{
+	if (s->prev) {
+		rename_lowestframe(s->prev, new_name);
+	} else {
+		program_changename(s->p, new_name);
+	}
 }
 
 static struct map *
