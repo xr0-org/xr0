@@ -643,6 +643,9 @@ struct error;
 struct error *
 ast_function_verify(struct ast_function *, struct externals *);
 
+struct error *
+ast_function_debug(struct ast_function *, struct externals *);
+
 struct result;
 
 struct error *
