@@ -204,11 +204,25 @@ ast_function_protostitch(struct ast_function *f, struct externals *ext)
 	return f;
 }
 
+struct error *
+ast_function_verify(struct ast_function *f, struct externals *ext)
+{
+	struct path *path = path_create(f, ext);
+	while (!path_atend(path)) {
+		struct error *err = path_step(path);
+		if (err) {
+			return err;
+		}
+	}
+	path_destroy(path);
+	return NULL;
+}
+
 static struct error *
 next(struct path *);
 
 struct error *
-ast_function_verify(struct ast_function *f, struct externals *ext)
+ast_function_debug(struct ast_function *f, struct externals *ext)
 {
 	struct path *path = path_create(f, ext);
 	while (!path_atend(path)) {
