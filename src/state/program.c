@@ -69,6 +69,25 @@ program_str(struct program *p)
 }
 
 char *
+program_render(struct program *p)
+{
+	struct strbuilder *b = strbuilder_create();
+	switch (p->s) {
+	case PROGRAM_COUNTER_DECLS:
+		strbuilder_printf(b, "%s\n", ast_block_render(p->b, p->index, true));
+		break;
+	case PROGRAM_COUNTER_STMTS:
+		strbuilder_printf(b, "%s\n", ast_block_render(p->b, p->index, false));
+		break;
+	case PROGRAM_COUNTER_ATEND:
+		break;
+	default:
+		assert(false);
+	}
+	return strbuilder_build(b);
+}
+
+char *
 program_name(struct program *p)
 {
 	return p->name;
@@ -166,7 +185,7 @@ program_stmt_process(struct program *p, bool abstract, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	v_printf("stmt: %s\n", ast_stmt_str(stmt));
-	if (!state_linear(s)) {
+	if (!state_islinear(s)) {
 		return ast_stmt_linearise(stmt, s);
 	}
 	if (abstract) {

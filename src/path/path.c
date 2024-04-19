@@ -182,9 +182,64 @@ path_step(struct path *p)
 }
 
 static struct error *
+path_next_abstract(struct path *);
+
+static struct error *
+path_next_actual(struct path *);
+
+struct error *
+path_next(struct path *p)
+{
+	switch (p->path_state) {
+	case PATH_STATE_UNINIT:
+		return path_step(p);
+	case PATH_STATE_ABSTRACT:
+		return path_next_abstract(p);
+	case PATH_STATE_ACTUAL:
+		return path_next_actual(p);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+path_next_abstract(struct path *p)
+{
+	struct error *err;
+
+	int currframe = state_frameid(p->abstract);
+	if ((err = path_step(p))) {
+		return err;
+	}
+	while (p->path_state == PATH_STATE_ABSTRACT &&
+			currframe < state_frameid(p->abstract)) {
+		printf("stepping...\n");
+		return path_step(p);
+	}
+	return NULL;
+}
+
+static struct error *
+path_next_actual(struct path *p)
+{
+	struct error *err;
+
+	int currframe = state_frameid(p->actual);
+	if ((err = path_step(p))) {
+		return err;
+	}
+	while (p->path_state == PATH_STATE_ACTUAL &&
+			currframe < state_frameid(p->actual)) {
+		printf("stepping...\n");
+		return path_step(p);
+	}
+	return NULL;
+}
+
+static struct error *
 path_init_abstract(struct path *p)
 {
-	printf("init abstract state\n");
+	v_printf("init abstract state\n");
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
@@ -203,7 +258,7 @@ path_init_abstract(struct path *p)
 static struct error *
 path_init_actual(struct path *p)
 {
-	printf("init actual state\n");
+	v_printf("init actual state\n");
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_body(p->f),
@@ -231,10 +286,11 @@ path_init_actual(struct path *p)
 static struct error *
 path_step_abstract(struct path *p)
 {
+	v_printf("text:\n%s\n", state_programtext(p->abstract));
 	v_printf("abstract: %s\n", state_str(p->abstract));
 	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
-		return path_step(p);
+		return NULL;
 	}
 
 	struct error *err = state_step(p->abstract);
@@ -252,6 +308,7 @@ path_step_abstract(struct path *p)
 static struct error *
 path_step_actual(struct path *p)
 {
+	v_printf("text:\n%s\n", state_programtext(p->actual));
 	v_printf("actual: %s\n", state_str(p->actual));
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;

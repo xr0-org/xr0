@@ -93,6 +93,12 @@ stack_getframe(struct stack *s, int frame)
 	return stack_getframe(s->prev, frame);
 }
 
+char *
+stack_programtext(struct stack *s)
+{
+	return program_render(s->p);
+}
+
 void
 stack_destroy(struct stack *stack)
 {
@@ -194,7 +200,7 @@ stack_str(struct stack *stack, struct state *state)
 }
 
 bool
-stack_linear(struct stack *s)
+stack_islinear(struct stack *s)
 {
 	return s->kind == FRAME_INTERMEDIATE;
 }

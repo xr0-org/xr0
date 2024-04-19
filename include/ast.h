@@ -257,6 +257,9 @@ ast_block_str(struct ast_block *, int indent_level);
 char *
 ast_block_absstr(struct ast_block *b, int indent_level);
 
+char *
+ast_block_render(struct ast_block *, int index, bool indecls);
+
 struct ast_block *
 ast_block_copy(struct ast_block *b);
 

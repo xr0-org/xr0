@@ -18,6 +18,9 @@ program_name(struct program *);
 char *
 program_str(struct program *);
 
+char *
+program_render(struct program *);
+
 void
 program_changename(struct program *, char *);
 

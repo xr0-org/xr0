@@ -140,9 +140,9 @@ state_str(struct state *state)
 }
 
 bool
-state_linear(struct state *s)
+state_islinear(struct state *s)
 {
-	return stack_linear(s->stack);
+	return stack_islinear(s->stack);
 }
 
 bool
@@ -174,6 +174,12 @@ struct props *
 state_getprops(struct state *s)
 {
 	return s->props;
+}
+
+char *
+state_programtext(struct state *s)
+{
+	return stack_programtext(s->stack);
 }
 
 int

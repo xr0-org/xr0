@@ -12,13 +12,16 @@ struct stack *
 stack_create(struct frame *, struct stack *prev);
 
 struct stack *
-stack_getframe(struct stack *s, int frame);
+stack_getframe(struct stack *, int frame);
+
+char *
+stack_programtext(struct stack *);
 
 int
 stack_id(struct stack *);
 
 struct location *
-stack_newblock(struct stack *stack);
+stack_newblock(struct stack *);
 
 void
 stack_destroy(struct stack *);
@@ -33,7 +36,7 @@ char *
 stack_str(struct stack *, struct state *);
 
 bool
-stack_linear(struct stack *);
+stack_islinear(struct stack *);
 
 bool
 stack_atend(struct stack *);
