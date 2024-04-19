@@ -498,7 +498,10 @@ init(struct config *c)
 	yylex_destroy();
 	lex_finish();
 
-	char *s = ast_initprint(root);
+	struct externals *ext = externals_create();
+	pass0(root, ext);
+
+	char *s = ast_initprint(root, ext);
 	assert(false && s);
 	return 0;
 }

@@ -414,7 +414,7 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 }
 
 char *
-ast_function_initprint(struct ast_function *f)
+ast_function_initprint(struct ast_function *f, struct externals *ext)
 {
 	struct strbuilder *b = strbuilder_create();
 	if (f->isaxiom) {
@@ -433,7 +433,7 @@ ast_function_initprint(struct ast_function *f)
 	strbuilder_printf(b, ")");
 	if (f->body) {
 		strbuilder_printf(b, "\n{\n");
-		char *body = ast_block_initprint(f->body, "\t");
+		char *body = ast_block_initprint(f->body, "\t", ext);
 		strbuilder_printf(b, "%s", body);
 		free(body);
 		strbuilder_printf(b, "}");

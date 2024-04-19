@@ -44,11 +44,11 @@ ast_append(struct ast *node, struct ast_externdecl *decl)
 }
 
 char *
-ast_initprint(struct ast *node)
+ast_initprint(struct ast *node, struct externals *ext)
 {
 	struct strbuilder *b = strbuilder_create();
 	for (int i = 0; i < node->n; i++) {
-		char *s = ast_externdecl_initprint(node->decl[i]);
+		char *s = ast_externdecl_initprint(node->decl[i], ext);
 		strbuilder_printf(b, "%s\n", s);
 		printf("%s\n", s);
 		free(s);

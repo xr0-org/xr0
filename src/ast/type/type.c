@@ -372,10 +372,10 @@ ast_type_ptr_type(struct ast_type *t)
 }
 
 static void
-struct_zeroinit(struct ast_type *, struct strbuilder *);
+struct_zeroinit(struct ast_type *, struct strbuilder *, struct externals *);
 
 char *
-ast_type_zeroinit(struct ast_type *t)
+ast_type_zeroinit(struct ast_type *t, struct externals *ext)
 {
 	struct strbuilder *b = strbuilder_create();
 	switch (t->base) {
@@ -387,7 +387,7 @@ ast_type_zeroinit(struct ast_type *t)
 		strbuilder_printf(b, "NULL");
 		break;
 	case TYPE_STRUCT:
-		struct_zeroinit(t, b);
+		struct_zeroinit(t, b, ext);
 		break;
 	default:
 		assert(false);
@@ -396,23 +396,32 @@ ast_type_zeroinit(struct ast_type *t)
 }
 
 static void
-struct_zeroinit(struct ast_type *t, struct strbuilder *b)
+struct_zeroinit(struct ast_type *t, struct strbuilder *b, struct externals *ext)
 {
 	char *tag = t->structunion.tag;
 	struct ast_variable_arr *members = t->structunion.members;
 
 	if (tag) {
 		strbuilder_printf(b, "(struct %s) ", t->structunion.tag);
-	}
-	strbuilder_printf(b, "{ ");
-	if (members) {
-		int n = ast_variable_arr_n(members);
-		struct ast_variable **v = ast_variable_arr_v(members);
-		for (int i = 0; i < n; i++) {
-			char *init = ast_type_zeroinit(ast_variable_type(v[i]));
-			strbuilder_printf(b, "%s%s ", init, (i+1<n? "," : "" ));
-			free(init);
+
+		struct ast_type *ext_t = externals_getstruct(ext, tag);
+		if (ext_t) {
+			assert(!members);
+			members = ext_t->structunion.members;
+		} else {
+			assert(members);
+			externals_declarestruct(ext, t);
 		}
+	}
+	assert(members);
+
+	strbuilder_printf(b, "{ ");
+	int n = ast_variable_arr_n(members);
+	struct ast_variable **v = ast_variable_arr_v(members);
+	for (int i = 0; i < n; i++) {
+		char *init = ast_type_zeroinit(ast_variable_type(v[i]), ext);
+		strbuilder_printf(b, "%s%s ", init, (i+1<n? "," : "" ));
+		free(init);
 	}
 	strbuilder_printf(b, "}");
 }

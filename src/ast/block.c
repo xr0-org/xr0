@@ -162,11 +162,11 @@ ast_block_preconds(struct ast_block *b)
 }
 
 char *
-ast_block_initprint(struct ast_block *b, char *indent)
+ast_block_initprint(struct ast_block *b, char *indent, struct externals *ext)
 {
 	struct strbuilder *sb = strbuilder_create();
 	for (int i = 0; i < b->ndecl; i++) {
-		char *s = ast_variable_initprint(b->decl[i]);
+		char *s = ast_variable_initprint(b->decl[i], ext);
 		strbuilder_printf(sb, "%s%s;\n", indent, s);
 		free(s);
 	}

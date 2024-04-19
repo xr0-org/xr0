@@ -117,46 +117,46 @@ ast_externdecl_destroy(struct ast_externdecl *decl)
 }
 
 static char *
-ast_typedef_initprint(struct ast_externdecl *);
+ast_typedef_initprint(struct ast_externdecl *, struct externals *);
 
 static char *
-ast_struct_initprint(struct ast_externdecl *);
+ast_struct_initprint(struct ast_externdecl *, struct externals *);
 
 char *
-ast_externdecl_initprint(struct ast_externdecl *decl)
+ast_externdecl_initprint(struct ast_externdecl *decl, struct externals *ext)
 {
 	switch (decl->kind) {
 	case EXTERN_FUNCTION:
-		return ast_function_initprint(decl->function);
+		return ast_function_initprint(decl->function, ext);
 	case EXTERN_VARIABLE:
 		/* TODO: globals */
 		assert(false);
 	case EXTERN_TYPEDEF:
-		return ast_typedef_initprint(decl);
+		return ast_typedef_initprint(decl, ext);
 	case EXTERN_STRUCT:
-		return ast_struct_initprint(decl);
+		return ast_struct_initprint(decl, ext);
 	default:
 		assert(false);
 	}
 }
 
 static char *
-ast_typedef_initprint(struct ast_externdecl *decl)
+ast_typedef_initprint(struct ast_externdecl *decl, struct externals *ext)
 {
 	assert(decl->kind == EXTERN_TYPEDEF);
 	struct strbuilder *b = strbuilder_create();
 	char *t = ast_type_str(decl->_typedef.type);
-	strbuilder_printf(b, "%s %s;", t, decl->_typedef.name);
+	strbuilder_printf(b, "%s %s;\n", t, decl->_typedef.name);
 	free(t);
 	return strbuilder_build(b);
 }
 
 static char *
-ast_struct_initprint(struct ast_externdecl *decl)
+ast_struct_initprint(struct ast_externdecl *decl, struct externals *ext)
 {
 	struct strbuilder *b = strbuilder_create();
 	char *s = ast_type_str(decl->_struct);
-	strbuilder_printf(b, "%s;", s);
+	strbuilder_printf(b, "%s;\n", s);
 	free(s);
 	return strbuilder_build(b);
 }
