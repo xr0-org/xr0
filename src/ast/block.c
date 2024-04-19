@@ -131,6 +131,31 @@ ast_block_absstr(struct ast_block *b, int indent)
 	return ast_block_str_div(b, indent, '[', ']');
 }
 
+char *
+ast_block_render(struct ast_block *b, int index, bool indecls)
+{
+	struct strbuilder *sb = strbuilder_create();
+	for (int i = 0; i < b->ndecl; i++) {
+		char *s = ast_variable_str(b->decl[i]);
+		if (i == index && indecls) {
+			strbuilder_printf(sb, "->\t%s;\n", s);
+		} else {
+			strbuilder_printf(sb, "\t%s;\n", s);
+		}
+		free(s);
+	}
+	for (int i = 0; i < b->nstmt; i++) {
+		char *s = ast_stmt_str(b->stmt[i], 0);
+		if (i == index && !indecls) {
+			strbuilder_printf(sb, "->\t%s\n", s);
+		} else {
+			strbuilder_printf(sb, "\t%s\n", s);
+		}
+		free(s);
+	}
+	return strbuilder_build(sb);
+}
+
 int
 ast_block_ndecls(struct ast_block *b)
 {

@@ -237,6 +237,8 @@ ast_function_debug(struct ast_function *f, struct externals *ext)
 
 enum command {
 	COMMAND_STEP,
+	COMMAND_NEXT,
+	COMMAND_QUIT,
 };
 
 static enum command
@@ -249,6 +251,10 @@ next(struct path *p)
 	switch (getcmd()) {
 	case COMMAND_STEP:
 		return path_step(p);
+	case COMMAND_NEXT:
+		return path_next(p);
+	case COMMAND_QUIT:
+		exit(0);
 	default:
 		assert(false);
 	}
@@ -275,6 +281,10 @@ getcmd()
 	switch (*line) {
 	case 's':
 		return COMMAND_STEP;
+	case 'n':
+		return COMMAND_NEXT;
+	case 'q':
+		return COMMAND_QUIT;
 	default:
 		fprintf(stderr, "unknown command `%c'", *line);
 		return getcmd();

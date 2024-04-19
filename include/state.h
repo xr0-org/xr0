@@ -64,6 +64,9 @@ state_getext(struct state *);
 struct props *
 state_getprops(struct state *);
 
+char *
+state_programtext(struct state *);
+
 int
 state_frameid(struct state *);
 
@@ -112,7 +115,7 @@ state_range_dealloc(struct state *, struct object *,
 		struct ast_expr *lw, struct ast_expr *up);
 
 bool
-state_linear(struct state *);
+state_islinear(struct state *);
 
 bool
 state_addresses_deallocand(struct state *, struct object *);
