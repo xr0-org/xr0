@@ -20,9 +20,7 @@ use crate::state::location::{
     location_transfigure,
 };
 use crate::state::state::{state_getext, state_vconst};
-use crate::util::{
-    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc, Map,
-};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map};
 use crate::{
     cstr, strbuilder_write, AstExpr, AstType, AstVariable, AstVariableArr, Location, Object, State,
     StrBuilder,
@@ -455,7 +453,7 @@ pub unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
         free(val_str as *mut libc::c_void);
         i += 1;
     }
-    strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "}}");
 }
 
 pub unsafe fn value_islocation(v: &Value) -> bool {

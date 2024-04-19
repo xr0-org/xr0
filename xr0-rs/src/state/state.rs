@@ -32,16 +32,14 @@ use crate::ast::{
 use crate::ext::externals_types_str;
 use crate::object::{object_as_value, object_assign};
 use crate::props::{props_copy, props_create, props_destroy, props_str};
-use crate::util::{
-    dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_printf, Result,
-};
+use crate::util::{dynamic_str, error_create, strbuilder_build, strbuilder_create, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
     value_ptr_create, value_sync_create,
 };
 use crate::{
-    vprintln, AstExpr, AstType, AstVariable, Block, Clump, Externals, Heap, Location, Object,
-    Props, Stack, StaticMemory, StrBuilder, VConst, Value, Variable,
+    cstr, strbuilder_write, vprintln, AstExpr, AstType, AstVariable, Block, Clump, Externals, Heap,
+    Location, Object, Props, Stack, StaticMemory, StrBuilder, VConst, Value, Variable,
 };
 
 pub struct State {
@@ -134,13 +132,13 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
 
 pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    strbuilder_printf(b, b"[[\n\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "[[\n");
     let ext: *mut libc::c_char = externals_types_str(
         (*state).ext,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     if strlen(ext) > 0 {
-        strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, ext);
+        strbuilder_write!(b, "{}\n", cstr!(ext));
     }
     free(ext as *mut libc::c_void);
     let static_mem: *mut libc::c_char = static_memory_str(
@@ -148,7 +146,7 @@ pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     if strlen(static_mem) > 0 {
-        strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, static_mem);
+        strbuilder_write!(b, "{}\n", cstr!(static_mem));
     }
     free(static_mem as *mut libc::c_void);
     let vconst: *mut libc::c_char = vconst_str(
@@ -156,7 +154,7 @@ pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     if strlen(vconst) > 0 {
-        strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, vconst);
+        strbuilder_write!(b, "{}\n", cstr!(vconst));
     }
     free(vconst as *mut libc::c_void);
     let clump: *mut libc::c_char = clump_str(
@@ -164,18 +162,18 @@ pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     if strlen(clump) > 0 {
-        strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, clump);
+        strbuilder_write!(b, "{}\n", cstr!(clump));
     }
     free(clump as *mut libc::c_void);
     let stack: *mut libc::c_char = stack_str((*state).stack, state);
-    strbuilder_printf(b, b"%s\n\0" as *const u8 as *const libc::c_char, stack);
+    strbuilder_write!(b, "{}\n", cstr!(stack));
     free(stack as *mut libc::c_void);
     let props: *mut libc::c_char = props_str(
         (*state).props,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     if strlen(props) > 0 {
-        strbuilder_printf(b, b"%s\0" as *const u8 as *const libc::c_char, props);
+        strbuilder_write!(b, "{}", cstr!(props));
     }
     free(props as *mut libc::c_void);
     let heap: *mut libc::c_char = heap_str(
@@ -183,10 +181,10 @@ pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     if strlen(heap) > 0 {
-        strbuilder_printf(b, b"\n%s\n\0" as *const u8 as *const libc::c_char, heap);
+        strbuilder_write!(b, "\n{}\n", cstr!(heap));
     }
     free(heap as *mut libc::c_void);
-    strbuilder_printf(b, b"]]\n\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "]]\n");
     return strbuilder_build(b);
 }
 
@@ -396,11 +394,7 @@ pub unsafe fn state_deref(
     let deref: *mut Location = location_with_offset(deref_base, index);
     state_get(state, deref, 1 as libc::c_int != 0).map_err(|err| {
         let b: *mut StrBuilder = strbuilder_create();
-        strbuilder_printf(
-            b,
-            b"undefined indirection: %s\0" as *const u8 as *const libc::c_char,
-            err.msg,
-        );
+        strbuilder_write!(b, "undefined indirection: {}", cstr!(err.msg));
         error_create(strbuilder_build(b))
     })
 }
