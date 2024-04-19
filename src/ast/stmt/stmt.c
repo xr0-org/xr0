@@ -584,7 +584,19 @@ ast_stmt_str(struct ast_stmt *stmt)
 }
 
 static char *
-stmt_regular_initprint(struct ast_stmt *, char *indent, struct externals *ext);
+regular_initprint(struct ast_stmt *, char *indent, struct externals *ext);
+
+static char *
+labelled_initprint(struct ast_stmt *, char *indent, struct externals *ext);
+
+static char *
+compound_initprint(struct ast_stmt *, char *indent, struct externals *ext);
+
+static char *
+sel_initprint(struct ast_stmt *, char *indent, struct externals *ext);
+
+static char *
+iter_initprint(struct ast_stmt *, char *indent, struct externals *ext);
 
 char *
 ast_stmt_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
@@ -593,25 +605,117 @@ ast_stmt_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
 	case STMT_NOP:
 	case STMT_EXPR:
 	case STMT_JUMP:
-		return stmt_regular_initprint(stmt, indent, ext);
+		return regular_initprint(stmt, indent, ext);
 	case STMT_LABELLED:
+		return labelled_initprint(stmt, indent, ext);
 	case STMT_COMPOUND:
+		return compound_initprint(stmt, indent, ext);
 	case STMT_SELECTION:
+		return sel_initprint(stmt, indent, ext);
 	case STMT_ITERATION:
+		return iter_initprint(stmt, indent, ext);
 	default:
 		assert(false);
 	}
 }
 
 static char *
-stmt_regular_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
+regular_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
 {
+	/* indent ignored because statement is "regular" and it is the
+	 * responsibility of the surrounding block to include it */
 	struct strbuilder *b = strbuilder_create();
 	char *s = ast_stmt_str(stmt);
-	strbuilder_printf(b, "%s%s;\n", indent, s);
+	strbuilder_printf(b, "%s\n", s);
 	free(s);
 	return strbuilder_build(b);
 }
+
+static char *
+labelled_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
+{
+	struct strbuilder *b = strbuilder_create();
+	char *s = ast_stmt_initprint(stmt->u.labelled.stmt, indent, ext);
+	strbuilder_printf(b, "%s: %s;\n", stmt->u.labelled.label, s);
+	free(s);
+	return strbuilder_build(b);
+}
+
+static char *
+append(char *s, char *t);
+
+static char *
+compound_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "{\n");
+	char *new_indent = append(indent, "\t");
+	char *block = ast_block_initprint(stmt->u.compound, new_indent, ext);
+	strbuilder_printf(b, "%s", block);
+	free(block);
+	free(new_indent);
+	strbuilder_printf(b, "%s}", indent);
+	return strbuilder_build(b);
+}
+
+static char *
+append(char *s, char *t)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s%s", s, t);
+	return strbuilder_build(b);
+}
+
+static char *
+sel_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
+{
+	assert(!stmt->u.selection.isswitch);
+	struct strbuilder *b = strbuilder_create();
+
+	char *cond = ast_expr_str(stmt->u.selection.cond),
+	     *body = ast_stmt_initprint(stmt->u.selection.body, indent, ext);
+
+	strbuilder_printf(
+		b,
+		"if (%s) %s",
+		cond, body
+	);
+
+	struct ast_stmt *nest_stmt = stmt->u.selection.nest;
+	if (nest_stmt) {
+		char *nest = ast_stmt_initprint(nest_stmt, indent, ext);
+		strbuilder_printf(
+			b,
+			" else %s",
+			nest
+		);
+		free(nest);
+	}
+
+	return strbuilder_build(b);
+}
+
+static char *
+iter_initprint(struct ast_stmt *stmt, char *indent, struct externals *ext)
+{
+	struct strbuilder *b = strbuilder_create();
+
+	char *init = ast_stmt_str(stmt->u.iteration.init),
+	     *cond = ast_stmt_str(stmt->u.iteration.cond),
+	     *body = ast_stmt_initprint(stmt->u.iteration.body, indent, ext),
+	     *iter = ast_expr_str(stmt->u.iteration.iter);
+
+	strbuilder_printf(
+		b,
+		"for (%s %s %s) %s",
+		init, cond, iter, body
+	);
+
+	free(init); free(cond); free(body); free(iter);
+
+	return strbuilder_build(b);
+}
+
 
 bool
 ast_stmt_equal(struct ast_stmt *s1, struct ast_stmt *s2)

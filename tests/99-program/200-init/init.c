@@ -27,9 +27,11 @@ foo()
 
 	int i;
 
-	if (1) {
+	abc: if (1) {
 		struct point p3;
 		struct man james;
+	} else {
+		struct list l2;
 	}
 
 	for (i = 0; i < 20; i++) {

@@ -167,12 +167,12 @@ ast_block_initprint(struct ast_block *b, char *indent, struct externals *ext)
 	struct strbuilder *sb = strbuilder_create();
 	for (int i = 0; i < b->ndecl; i++) {
 		char *s = ast_variable_initprint(b->decl[i], ext);
-		strbuilder_printf(sb, "%s%s", indent, s);
+		strbuilder_printf(sb, "%s%s\n", indent, s);
 		free(s);
 	}
 	for (int i = 0; i < b->nstmt; i++) {
 		char *s = ast_stmt_initprint(b->stmt[i], indent, ext);
-		strbuilder_printf(sb, "%s", s);
+		strbuilder_printf(sb, "%s%s\n", indent, s);
 		free(s);
 	}
 	return strbuilder_build(sb);
