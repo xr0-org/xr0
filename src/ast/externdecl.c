@@ -12,6 +12,7 @@ struct ast_externdecl {
 		EXTERN_VARIABLE,
 		EXTERN_TYPEDEF,
 		EXTERN_STRUCT,
+		EXTERN_INCLUDE,
 	} kind;
 	union {
 		struct ast_function *function;
@@ -21,6 +22,7 @@ struct ast_externdecl {
 			struct ast_type *type;
 		} _typedef;
 		struct ast_type *_struct;
+		char *include;
 	};
 };
 
@@ -65,6 +67,15 @@ ast_decl_create(char *name, struct ast_type *t)
 	return decl;
 }
 
+struct ast_externdecl *
+ast_include_create(char *filename)
+{
+	struct ast_externdecl *decl = malloc(sizeof(struct ast_externdecl));
+	decl->kind = EXTERN_INCLUDE;
+	decl->include = filename;
+	return decl;
+}
+
 void
 ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext)
 {
@@ -88,6 +99,8 @@ ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext)
 	case EXTERN_STRUCT:
 		externals_declarestruct(ext, decl->_struct);
 		break;
+	case EXTERN_INCLUDE:
+		break;
 	default:
 		assert(false);
 	}
@@ -110,6 +123,9 @@ ast_externdecl_destroy(struct ast_externdecl *decl)
 	case EXTERN_STRUCT:
 		ast_type_destroy(decl->_struct);
 		break;
+	case EXTERN_INCLUDE:
+		free(decl->include);
+		break;
 	default:
 		assert(false);
 	}
@@ -117,10 +133,13 @@ ast_externdecl_destroy(struct ast_externdecl *decl)
 }
 
 static char *
-ast_typedef_initprint(struct ast_externdecl *, struct externals *);
+typedef_initprint(struct ast_externdecl *, struct externals *);
 
 static char *
-ast_struct_initprint(struct ast_externdecl *, struct externals *);
+struct_initprint(struct ast_externdecl *, struct externals *);
+
+static char *
+include_initprint(char *);
 
 char *
 ast_externdecl_initprint(struct ast_externdecl *decl, struct externals *ext)
@@ -132,16 +151,18 @@ ast_externdecl_initprint(struct ast_externdecl *decl, struct externals *ext)
 		/* TODO: globals */
 		assert(false);
 	case EXTERN_TYPEDEF:
-		return ast_typedef_initprint(decl, ext);
+		return typedef_initprint(decl, ext);
 	case EXTERN_STRUCT:
-		return ast_struct_initprint(decl, ext);
+		return struct_initprint(decl, ext);
+	case EXTERN_INCLUDE:
+		return include_initprint(decl->include);
 	default:
 		assert(false);
 	}
 }
 
 static char *
-ast_typedef_initprint(struct ast_externdecl *decl, struct externals *ext)
+typedef_initprint(struct ast_externdecl *decl, struct externals *ext)
 {
 	assert(decl->kind == EXTERN_TYPEDEF);
 	struct strbuilder *b = strbuilder_create();
@@ -152,11 +173,19 @@ ast_typedef_initprint(struct ast_externdecl *decl, struct externals *ext)
 }
 
 static char *
-ast_struct_initprint(struct ast_externdecl *decl, struct externals *ext)
+struct_initprint(struct ast_externdecl *decl, struct externals *ext)
 {
 	struct strbuilder *b = strbuilder_create();
 	char *s = ast_type_str(decl->_struct);
 	strbuilder_printf(b, "%s;\n", s);
 	free(s);
+	return strbuilder_build(b);
+}
+
+static char *
+include_initprint(char *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "#include %s\n", s);
 	return strbuilder_build(b);
 }

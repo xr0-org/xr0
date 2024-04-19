@@ -633,6 +633,9 @@ ast_externdecl_as_function(struct ast_externdecl *);
 struct ast_externdecl *
 ast_decl_create(char *name, struct ast_type *);
 
+struct ast_externdecl *
+ast_include_create(char *filename);
+
 void
 ast_externdecl_install(struct ast_externdecl *decl, struct externals *ext);
 

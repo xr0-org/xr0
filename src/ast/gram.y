@@ -90,6 +90,7 @@ variable_array_create(struct ast_variable *v)
 %token AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
 %token SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN
 %token XOR_ASSIGN OR_ASSIGN TYPE_NAME
+%token PP_INCLUDE PP_LITERAL
 
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
@@ -170,7 +171,7 @@ variable_array_create(struct ast_variable *v)
 
 %type <expr_array> argument_expression_list
 
-%type <externdecl> external_declaration
+%type <externdecl> external_declaration include
 %type <function> function_definition
 %type <function_declarator> function_declarator
 %type <integer> pointer
@@ -796,6 +797,11 @@ translation_unit
 external_declaration
 	: function_definition	{ $$ = ast_functiondecl_create($1); }
 	| declaration		{ $$ = ast_decl_create($1.name, $1.t); }
+	| include
+	;
+
+include
+	: PP_INCLUDE PP_LITERAL	{ $$ = ast_include_create(dynamic_str(yytext)); }
 	;
 
 block_statement

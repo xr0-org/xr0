@@ -3,8 +3,8 @@
 int
 main()
 {
-	int x;
-	printf("x: %d\n", x);
+	int x; int y; int z;
+	printf("x: %d, y: %d, z: %d\n", x, y, z);
 }
 
 struct list {

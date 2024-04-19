@@ -18,6 +18,7 @@
 /* XXX */
 #define INCLUDE_ENVVAR		"XR0_INCLUDES"
 #define OUTPUT_PATH		"0.c"
+#define INIT_OUTPUT_PATH	"a.c"
 #define PREPROC_CMD_TEMPLATE	"cc %s -nostdinc -E -xc %s"
 #define PREPROC_CMD_BASE_LEN 	(strlen(PREPROC_CMD_TEMPLATE) - 4)
 
@@ -484,13 +485,12 @@ skipvblock(FILE *f)
 	}
 }
 
-
 static int
 init(struct config *c)
 {
 	/* preprocess */
 	extern FILE *yyin;
-	yyin = preprocess(c->infile, c->includedirs);
+	yyin = fopen(c->infile, "rb");
 
 	/* lex and parse */
 	lex_begin();
@@ -502,6 +502,12 @@ init(struct config *c)
 	pass0(root, ext);
 
 	char *s = ast_initprint(root, ext);
-	assert(false && s);
+
+	FILE *out = fopen(c->outfile, "w");
+	fprintf(out, "%s", s);
+	fclose(out);
+
+	free(s);
+
 	return 0;
 }

@@ -50,7 +50,6 @@ ast_initprint(struct ast *node, struct externals *ext)
 	for (int i = 0; i < node->n; i++) {
 		char *s = ast_externdecl_initprint(node->decl[i], ext);
 		strbuilder_printf(b, "%s\n", s);
-		printf("%s\n", s);
 		free(s);
 	}
 	return strbuilder_build(b);

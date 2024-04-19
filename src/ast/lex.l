@@ -28,7 +28,7 @@ check_type();
 %}
 
 %%
-"#"			{ preproc(); }
+"#include"		{ preproc(); return(PP_INCLUDE); }
 "/*"			{ comment(); }
 ".malloc"		{ count(); return(TK_ALLOC); }
 ".free"			{ count(); return(TK_DEALLOC); }
@@ -83,6 +83,7 @@ L?'(\\.|[^\\'])+'	{ count(); return(CHAR_LITERAL); }
 {D}+"."{D}*({E})?{FS}?	{ count(); return(CONSTANT); }
 
 L?\"(\\.|[^\\"])*\"	{ count(); return(STRING_LITERAL); }
+\<(\\.|[^\\>])*\>	{ count(); return(PP_LITERAL); }
 
 "..."			{ count(); return(ELLIPSIS); }
 ">>="			{ count(); return(RIGHT_ASSIGN); }
@@ -260,7 +261,12 @@ preproc()
 	if (marker.filename) {
 		free(marker.filename);
 	}
-	marker = process_linemarker();
+	marker = (struct lexememarker) {
+		.linenum = 1,
+		.column = 0,
+		.filename = dynamic_str("file"),
+		.flags = LM_FLAG_RESUME_FILE,
+	};
 }
 
 void
