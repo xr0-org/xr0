@@ -1,5 +1,7 @@
 #![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
+use std::ptr;
+
 use libc::{calloc, free, malloc, realloc, strcmp};
 
 use crate::ast::{
@@ -23,27 +25,17 @@ use crate::util::{
 };
 use crate::{AstExpr, AstType, AstVariable, AstVariableArr, Location, Object, State, StrBuilder};
 
-#[derive(Clone)]
-#[repr(C)]
 pub struct Value {
-    pub r#type: ValueType,
     pub kind: ValueKind,
 }
 
-pub type ValueType = libc::c_uint;
-pub const VALUE_STRUCT: ValueType = 4;
-pub const VALUE_LITERAL: ValueType = 3;
-pub const VALUE_INT: ValueType = 2;
-pub const VALUE_PTR: ValueType = 1;
-pub const VALUE_SYNC: ValueType = 0;
-
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub union ValueKind {
-    pub ptr: PtrValue,
-    pub n: *mut Number,
-    pub s: *mut libc::c_char,
-    pub _struct: StructValue,
+pub enum ValueKind {
+    Sync(*mut Number),
+    IndefinitePtr(*mut Number),
+    DefinitePtr(*mut Location),
+    Int(*mut Number),
+    Literal(*mut libc::c_char),
+    Struct(StructValue),
 }
 
 #[derive(Copy, Clone)]
@@ -116,199 +108,82 @@ pub union PtrValueKind {
     pub n: *mut Number,
 }
 
+fn value_create(kind: ValueKind) -> *mut Value {
+    Box::into_raw(Box::new(Value { kind }))
+}
+
 pub unsafe fn value_ptr_create(loc: *mut Location) -> *mut Value {
-    let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = VALUE_PTR;
-    (*v).kind.ptr.isindefinite = false;
-    (*v).kind.ptr.kind.loc = loc;
-    return v;
+    value_create(ValueKind::DefinitePtr(loc))
 }
 
 pub unsafe fn value_ptr_indefinite_create() -> *mut Value {
-    let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = VALUE_PTR;
-    (*v).kind.ptr.isindefinite = 1 as libc::c_int != 0;
-    (*v).kind.ptr.kind.n = number_indefinite_create();
-    return v;
-}
-unsafe fn ptr_referencesheap(v: *mut Value, s: *mut State) -> bool {
-    return !(*v).kind.ptr.isindefinite
-        && location_referencesheap((*v).kind.ptr.kind.loc, s) as libc::c_int != 0;
-}
-
-pub unsafe fn value_ptr_copy(old: *mut Value) -> *mut Value {
-    let new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if new.is_null() {
-        panic!();
-    }
-    (*new).r#type = VALUE_PTR;
-    (*new).kind.ptr.isindefinite = (*old).kind.ptr.isindefinite;
-    if (*old).kind.ptr.isindefinite {
-        (*new).kind.ptr.kind.n = number_copy((*old).kind.ptr.kind.n);
-    } else {
-        (*new).kind.ptr.kind.loc = location_copy((*old).kind.ptr.kind.loc);
-    }
-    return new;
-}
-
-pub unsafe fn value_ptr_sprint(v: *mut Value, b: *mut StrBuilder) {
-    let s: *mut libc::c_char = if (*v).kind.ptr.isindefinite as libc::c_int != 0 {
-        number_str((*v).kind.ptr.kind.n)
-    } else {
-        location_str((*v).kind.ptr.kind.loc)
-    };
-    strbuilder_printf(b, b"ptr:%s\0" as *const u8 as *const libc::c_char, s);
-    free(s as *mut libc::c_void);
+    value_create(ValueKind::IndefinitePtr(number_indefinite_create()))
 }
 
 pub unsafe fn value_int_create(val: libc::c_int) -> *mut Value {
-    let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = VALUE_INT;
-    (*v).kind.n = number_single_create(val);
-    return v;
+    value_create(ValueKind::Int(number_single_create(val)))
 }
 
 pub unsafe fn value_literal_create(lit: *mut libc::c_char) -> *mut Value {
-    let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if v.is_null() {
-        panic!();
+    value_create(ValueKind::Literal(dynamic_str(lit)))
+}
+
+unsafe fn ptr_referencesheap(v: *mut Value, s: *mut State) -> bool {
+    match &(*v).kind {
+        ValueKind::DefinitePtr(loc) => location_referencesheap(*loc, s),
+        ValueKind::IndefinitePtr(_) => false,
+        _ => panic!(),
     }
-    (*v).r#type = VALUE_LITERAL;
-    (*v).kind.s = dynamic_str(lit);
-    return v;
 }
 
 pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool) -> *mut Value {
-    match (*v).r#type {
-        0 | 3 => {
-            return if islval as libc::c_int != 0 {
-                0 as *mut Value
+    match &(*v).kind {
+        ValueKind::Sync(_) | ValueKind::Literal(_) => {
+            if islval {
+                ptr::null_mut()
             } else {
                 v
             }
         }
-        4 => {
+        ValueKind::Struct(_) => {
             panic!();
         }
-        2 => {}
-        1 => return location_transfigure(value_as_location(v), compare),
-        _ => {
-            panic!();
+        ValueKind::Int(_) => {
+            if islval {
+                ptr::null_mut()
+            } else {
+                state_vconst(compare, ast_type_create_voidptr(), ptr::null_mut(), false)
+            }
         }
+        ValueKind::DefinitePtr(loc) => location_transfigure(*loc, compare),
+        ValueKind::IndefinitePtr(_) => panic!(),
     }
-    return if islval as libc::c_int != 0 {
-        0 as *mut Value
-    } else {
-        state_vconst(
-            compare,
-            ast_type_create_voidptr(),
-            0 as *mut libc::c_char,
-            false,
-        )
-    };
 }
 
 pub unsafe fn value_int_ne_create(not_val: libc::c_int) -> *mut Value {
-    let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = VALUE_INT;
-    (*v).kind.n = number_ne_create(not_val);
-    return v;
+    value_create(ValueKind::Int(number_ne_create(not_val)))
 }
 
 pub unsafe fn value_int_range_create(lw: libc::c_int, excl_up: libc::c_int) -> *mut Value {
-    let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = VALUE_INT;
-    (*v).kind.n = number_with_range_create(lw, excl_up);
-    return v;
+    value_create(ValueKind::Int(number_with_range_create(lw, excl_up)))
 }
 
 pub unsafe fn value_int_indefinite_create() -> *mut Value {
-    let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = VALUE_INT;
-    (*v).kind.n = number_indefinite_create();
-    return v;
-}
-
-pub unsafe fn value_int_lw(v: *mut Value) -> libc::c_int {
-    return number_range_lw((*v).kind.n);
-}
-
-pub unsafe fn value_int_up(v: *mut Value) -> libc::c_int {
-    return number_range_up((*v).kind.n);
+    value_create(ValueKind::Int(number_indefinite_create()))
 }
 
 pub unsafe fn value_sync_create(e: *mut AstExpr) -> *mut Value {
-    let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = VALUE_SYNC;
-    (*v).kind.n = number_computed_create(e);
-    return v;
-}
-
-pub unsafe fn value_sync_copy(old: *mut Value) -> *mut Value {
-    if !((*old).r#type as libc::c_uint == VALUE_SYNC as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
-        panic!();
-    }
-    let new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if new.is_null() {
-        panic!();
-    }
-    (*new).r#type = VALUE_SYNC;
-    (*new).kind.n = number_copy((*old).kind.n);
-    return new;
-}
-
-pub unsafe fn value_int_copy(old: *mut Value) -> *mut Value {
-    if !((*old).r#type as libc::c_uint == VALUE_INT as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
-        panic!();
-    }
-    let new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if new.is_null() {
-        panic!();
-    }
-    (*new).r#type = VALUE_INT;
-    (*new).kind.n = number_copy((*old).kind.n);
-    return new;
+    value_create(ValueKind::Sync(number_computed_create(e)))
 }
 
 pub unsafe fn value_struct_create(t: *mut AstType) -> *mut Value {
     let members = ast_variable_arr_from_slice(
         ast_type_struct_members(&*t).expect("can't create value of incomplete type"),
     );
-    let v: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = VALUE_STRUCT;
-    (*v).kind._struct.members = members;
-    (*v).kind._struct.m = Box::into_raw(frommembers(members));
-    return v;
+    value_create(ValueKind::Struct(StructValue {
+        members,
+        m: Box::into_raw(frommembers(members)),
+    }))
 }
 
 pub unsafe fn value_struct_indefinite_create(
@@ -322,12 +197,15 @@ pub unsafe fn value_struct_indefinite_create(
         panic!();
     }
     let v: *mut Value = value_struct_create(t);
-    let n: libc::c_int = ast_variable_arr_n((*v).kind._struct.members);
-    let var: *mut *mut AstVariable = ast_variable_arr_v((*v).kind._struct.members);
+    let ValueKind::Struct(sv) = &(*v).kind else {
+        panic!();
+    };
+    let n: libc::c_int = ast_variable_arr_n(sv.members);
+    let var: *mut *mut AstVariable = ast_variable_arr_v(sv.members);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let field: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
-        let obj: *mut Object = (*(*v).kind._struct.m).get(field) as *mut Object;
+        let obj: *mut Object = (*sv.m).get(field) as *mut Object;
         let b: *mut StrBuilder = strbuilder_create();
         strbuilder_printf(
             b,
@@ -354,23 +232,24 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
         panic!();
     }
     let v: *mut Value = value_copy(old);
-    let n: libc::c_int = ast_variable_arr_n((*v).kind._struct.members);
-    let var: *mut *mut AstVariable = ast_variable_arr_v((*v).kind._struct.members);
+    let ValueKind::Struct(sv) = &(*v).kind else {
+        panic!();
+    };
+    let n: libc::c_int = ast_variable_arr_n(sv.members);
+    let var: *mut *mut AstVariable = ast_variable_arr_v(sv.members);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let field: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
-        let obj: *mut Object = (*(*v).kind._struct.m).get(field) as *mut Object;
+        let obj: *mut Object = (*sv.m).get(field) as *mut Object;
         let obj_value: *mut Value = object_as_value(obj);
-        if !obj_value.is_null() {
-            if value_issync(obj_value) {
-                object_assign(
-                    obj,
-                    value_sync_create(Box::into_raw(ast_expr_member_create(
-                        ast_expr_copy(&*root),
-                        dynamic_str(field),
-                    ))),
-                );
-            }
+        if !obj_value.is_null() && value_issync(obj_value) {
+            object_assign(
+                obj,
+                value_sync_create(Box::into_raw(ast_expr_member_create(
+                    ast_expr_copy(&*root),
+                    dynamic_str(field),
+                ))),
+            );
         }
         i += 1;
     }
@@ -378,7 +257,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
 }
 
 pub unsafe fn value_isstruct(v: *mut Value) -> bool {
-    return (*v).r#type as libc::c_uint == VALUE_STRUCT as libc::c_int as libc::c_uint;
+    matches!((*v).kind, ValueKind::Struct(_))
 }
 
 unsafe fn frommembers(members: *mut AstVariableArr) -> Box<Map> {
@@ -405,16 +284,6 @@ unsafe fn destroymembers(m: &Map) {
     }
 }
 
-pub unsafe fn value_struct_copy(old: *mut Value) -> *mut Value {
-    let new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if new.is_null() {
-        panic!();
-    }
-    (*new).r#type = VALUE_STRUCT;
-    (*new).kind._struct.members = ast_variable_arr_copy((*old).kind._struct.members);
-    (*new).kind._struct.m = Box::into_raw(copymembers(&*(*old).kind._struct.m));
-    return new;
-}
 unsafe fn copymembers(old: &Map) -> Box<Map> {
     let mut new = Map::new();
     for (k, v) in old.pairs() {
@@ -426,16 +295,13 @@ unsafe fn copymembers(old: &Map) -> Box<Map> {
     return new;
 }
 
-pub unsafe fn value_struct_abstractcopy(old: *mut Value, s: *mut State) -> *mut Value {
-    let new: *mut Value = malloc(::core::mem::size_of::<Value>()) as *mut Value;
-    if new.is_null() {
-        panic!();
-    }
-    (*new).r#type = VALUE_STRUCT;
-    (*new).kind._struct.members = ast_variable_arr_copy((*old).kind._struct.members);
-    (*new).kind._struct.m = Box::into_raw(abstractcopymembers(&*(*old).kind._struct.m, s));
-    return new;
+pub unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> *mut Value {
+    value_create(ValueKind::Struct(StructValue {
+        members: ast_variable_arr_copy(old.members),
+        m: Box::into_raw(abstractcopymembers(&*old.m, s)),
+    }))
 }
+
 unsafe fn abstractcopymembers(old: &Map, s: *mut State) -> Box<Map> {
     let mut new = Map::new();
     for (k, v) in old.pairs() {
@@ -448,7 +314,10 @@ unsafe fn abstractcopymembers(old: &Map, s: *mut State) -> Box<Map> {
 }
 
 pub unsafe fn value_struct_membertype(v: *mut Value, member: *mut libc::c_char) -> *mut AstType {
-    let members: *mut AstVariableArr = (*v).kind._struct.members;
+    let ValueKind::Struct(sv) = &(*v).kind else {
+        panic!();
+    };
+    let members: *mut AstVariableArr = sv.members;
     let n: libc::c_int = ast_variable_arr_n(members);
     let var: *mut *mut AstVariable = ast_variable_arr_v(members);
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -462,28 +331,133 @@ pub unsafe fn value_struct_membertype(v: *mut Value, member: *mut libc::c_char) 
 }
 
 pub unsafe fn value_struct_member(v: *mut Value, member: *mut libc::c_char) -> *mut Object {
-    return (*(*v).kind._struct.m).get(member) as *mut Object;
+    let ValueKind::Struct(sv) = &(*v).kind else {
+        panic!();
+    };
+    return (*sv.m).get(member) as *mut Object;
 }
-unsafe fn struct_referencesheap(v: *mut Value, s: *mut State) -> bool {
-    let m: &Map = &*(*v).kind._struct.m;
+
+unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
+    let m: &Map = &*sv.m;
     for p in m.values() {
         let val: *mut Value = object_as_value(p as *mut Object);
         if !val.is_null() && value_referencesheap(val, s) as libc::c_int != 0 {
-            return 1 as libc::c_int != 0;
+            return true;
         }
     }
     false
 }
 
-pub unsafe fn value_struct_sprint(v: *mut Value, b: *mut StrBuilder) {
+pub unsafe fn value_copy(v: *mut Value) -> *mut Value {
+    value_create(match &(*v).kind {
+        ValueKind::Sync(n) => ValueKind::Sync(number_copy(*n)),
+        ValueKind::DefinitePtr(loc) => ValueKind::DefinitePtr(location_copy(*loc)),
+        ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(number_copy(*n)),
+        ValueKind::Int(n) => ValueKind::Int(number_copy(*n)),
+        ValueKind::Literal(s) => ValueKind::Literal(dynamic_str(*s)),
+        ValueKind::Struct(struct_) => ValueKind::Struct(StructValue {
+            members: ast_variable_arr_copy(struct_.members),
+            m: Box::into_raw(copymembers(&*struct_.m)),
+        }),
+    })
+}
+
+pub unsafe fn value_abstractcopy(v: *mut Value, s: *mut State) -> *mut Value {
+    if !value_referencesheap(v, s) {
+        return ptr::null_mut();
+    }
+    match &(*v).kind {
+        ValueKind::IndefinitePtr(_) | ValueKind::DefinitePtr(_) => value_copy(v),
+        ValueKind::Struct(sv) => value_struct_abstractcopy(sv, s),
+        _ => panic!(),
+    }
+}
+
+impl Drop for ValueKind {
+    fn drop(&mut self) {
+        unsafe {
+            match self {
+                ValueKind::Sync(n) | ValueKind::IndefinitePtr(n) | ValueKind::Int(n) => {
+                    number_destroy(*n)
+                }
+                ValueKind::DefinitePtr(loc) => location_destroy(*loc),
+                ValueKind::Literal(s) => free(*s as *mut libc::c_void),
+                ValueKind::Struct(struct_) => {
+                    ast_variable_arr_destroy(struct_.members);
+                    destroymembers(&*struct_.m);
+                    Box::from_raw(struct_.m).destroy();
+                }
+            }
+        }
+    }
+}
+
+pub unsafe fn value_destroy(v: *mut Value) {
+    drop(Box::from_raw(v));
+}
+
+pub unsafe fn value_str(v: *mut Value) -> *mut libc::c_char {
+    let b: *mut StrBuilder = strbuilder_create();
+    match &(*v).kind {
+        ValueKind::Sync(n) => {
+            value_sync_sprint(*n, b);
+        }
+        ValueKind::DefinitePtr(loc) => {
+            value_definite_ptr_sprint(*loc, b);
+        }
+        ValueKind::IndefinitePtr(n) => {
+            value_indefinite_ptr_sprint(*n, b);
+        }
+        ValueKind::Int(n) => {
+            value_int_sprint(*n, b);
+        }
+        ValueKind::Literal(s) => {
+            strbuilder_printf(b, b"\"%s\"\0" as *const u8 as *const libc::c_char, *s);
+        }
+        ValueKind::Struct(sv) => {
+            value_struct_sprint(sv, b);
+        }
+    }
+    return strbuilder_build(b);
+}
+
+pub unsafe fn value_sync_sprint(n: *mut Number, b: *mut StrBuilder) {
+    strbuilder_printf(
+        b,
+        b"comp:%s\0" as *const u8 as *const libc::c_char,
+        number_str(n),
+    );
+}
+
+pub unsafe fn value_definite_ptr_sprint(loc: *mut Location, b: *mut StrBuilder) {
+    let s = location_str(loc);
+    strbuilder_printf(b, b"ptr:%s\0" as *const u8 as *const libc::c_char, s);
+    free(s as *mut libc::c_void);
+}
+
+pub unsafe fn value_indefinite_ptr_sprint(n: *mut Number, b: *mut StrBuilder) {
+    let s = number_str(n);
+    strbuilder_printf(b, b"ptr:%s\0" as *const u8 as *const libc::c_char, s);
+    free(s as *mut libc::c_void);
+}
+
+pub unsafe fn value_int_sprint(n: *mut Number, b: *mut StrBuilder) {
+    strbuilder_printf(
+        b,
+        b"int:%s\0" as *const u8 as *const libc::c_char,
+        number_str(n),
+    );
+}
+
+pub unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
     strbuilder_printf(b, b"struct:{\0" as *const u8 as *const libc::c_char);
-    let members: *mut AstVariableArr = (*v).kind._struct.members;
+    let members: *mut AstVariableArr = sv.members;
     let n: libc::c_int = ast_variable_arr_n(members);
     let var: *mut *mut AstVariable = ast_variable_arr_v(members);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let f: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
-        let val: *mut Value = object_as_value((*(*v).kind._struct.m).get(f) as *mut Object);
+        let val: *mut Value = object_as_value((*sv.m).get(f) as *mut Object);
         let val_str: *mut libc::c_char = if !val.is_null() {
             value_str(val)
         } else {
@@ -506,195 +480,92 @@ pub unsafe fn value_struct_sprint(v: *mut Value, b: *mut StrBuilder) {
     strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
 }
 
-pub unsafe fn value_int_sprint(v: *mut Value, b: *mut StrBuilder) {
-    strbuilder_printf(
-        b,
-        b"int:%s\0" as *const u8 as *const libc::c_char,
-        number_str((*v).kind.n),
-    );
-}
-
-pub unsafe fn value_sync_sprint(v: *mut Value, b: *mut StrBuilder) {
-    strbuilder_printf(
-        b,
-        b"comp:%s\0" as *const u8 as *const libc::c_char,
-        number_str((*v).kind.n),
-    );
-}
-
-pub unsafe fn value_copy(v: *mut Value) -> *mut Value {
-    match (*v).r#type {
-        0 => value_sync_copy(v),
-        1 => value_ptr_copy(v),
-        2 => value_int_copy(v),
-        3 => value_literal_create((*v).kind.s),
-        4 => value_struct_copy(v),
-        _ => panic!(),
-    }
-}
-
-pub unsafe fn value_abstractcopy(v: *mut Value, s: *mut State) -> *mut Value {
-    if !value_referencesheap(v, s) {
-        return 0 as *mut Value;
-    }
-    match (*v).r#type {
-        1 => value_copy(v),
-        4 => value_struct_abstractcopy(v, s),
-        _ => panic!(),
-    }
-}
-
-pub unsafe fn value_destroy(v: *mut Value) {
-    match (*v).r#type {
-        0 => {
-            number_destroy((*v).kind.n);
-        }
-        1 => {
-            if (*v).kind.ptr.isindefinite {
-                number_destroy((*v).kind.ptr.kind.n);
-            } else if !((*v).kind.ptr.kind.loc).is_null() {
-                location_destroy((*v).kind.ptr.kind.loc);
-            }
-        }
-        2 => {
-            number_destroy((*v).kind.n);
-        }
-        3 => {
-            free((*v).kind.s as *mut libc::c_void);
-        }
-        4 => {
-            ast_variable_arr_destroy((*v).kind._struct.members);
-            destroymembers(&*(*v).kind._struct.m);
-            Box::from_raw((*v).kind._struct.m).destroy();
-        }
-        _ => panic!(),
-    }
-    free(v as *mut libc::c_void);
-}
-
-pub unsafe fn value_str(v: *mut Value) -> *mut libc::c_char {
-    let b: *mut StrBuilder = strbuilder_create();
-    match (*v).r#type {
-        0 => {
-            value_sync_sprint(v, b);
-        }
-        1 => {
-            value_ptr_sprint(v, b);
-        }
-        2 => {
-            value_int_sprint(v, b);
-        }
-        3 => {
-            strbuilder_printf(
-                b,
-                b"\"%s\"\0" as *const u8 as *const libc::c_char,
-                (*v).kind.s,
-            );
-        }
-        4 => {
-            value_struct_sprint(v, b);
-        }
-        _ => panic!(),
-    }
-    return strbuilder_build(b);
-}
-
 pub unsafe fn value_islocation(v: *mut Value) -> bool {
     if v.is_null() {
         panic!();
     }
-    return (*v).r#type as libc::c_uint == VALUE_PTR as libc::c_int as libc::c_uint
-        && !(*v).kind.ptr.isindefinite;
+    matches!((*v).kind, ValueKind::DefinitePtr(_))
 }
 
 pub unsafe fn value_as_location(v: *mut Value) -> *mut Location {
-    if !value_islocation(v) {
+    let ValueKind::DefinitePtr(loc) = &(*v).kind else {
         panic!();
-    }
-    return (*v).kind.ptr.kind.loc;
+    };
+    *loc
 }
 
 pub unsafe fn value_referencesheap(v: *mut Value, s: *mut State) -> bool {
-    match (*v).r#type {
-        1 => return ptr_referencesheap(v, s),
-        4 => return struct_referencesheap(v, s),
+    match &(*v).kind {
+        ValueKind::DefinitePtr(_) | ValueKind::IndefinitePtr(_) => return ptr_referencesheap(v, s),
+        ValueKind::Struct(sv) => return struct_referencesheap(sv, s),
         _ => return false,
     };
 }
 
 pub unsafe fn value_as_constant(v: *mut Value) -> libc::c_int {
-    if !((*v).r#type as libc::c_uint == VALUE_INT as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    let ValueKind::Int(n) = &(*v).kind else {
         panic!();
-    }
-    return number_as_constant((*v).kind.n);
+    };
+    number_as_constant(*n)
 }
 
 pub unsafe fn value_isconstant(v: *mut Value) -> bool {
-    if (*v).r#type as libc::c_uint != VALUE_INT as libc::c_int as libc::c_uint {
-        return false;
+    match &(*v).kind {
+        ValueKind::Int(n) => number_isconstant(*n),
+        _ => false,
     }
-    return number_isconstant((*v).kind.n);
 }
 
 pub unsafe fn value_issync(v: *mut Value) -> bool {
-    if (*v).r#type as libc::c_uint != VALUE_SYNC as libc::c_int as libc::c_uint {
-        return false;
+    match &(*v).kind {
+        ValueKind::Sync(n) => number_issync(*n),
+        _ => false,
     }
-    return number_issync((*v).kind.n);
 }
 
 pub unsafe fn value_as_sync(v: *mut Value) -> *mut AstExpr {
-    assert_eq!((*v).r#type, VALUE_SYNC);
-    return number_as_sync((*v).kind.n);
+    let ValueKind::Sync(n) = &(*v).kind else {
+        panic!();
+    };
+    return number_as_sync(*n);
+}
+
+pub unsafe fn value_isint(v: *mut Value) -> bool {
+    matches!((*v).kind, ValueKind::Int(_))
 }
 
 pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
-    match (*v).r#type {
-        1 => Box::into_raw(ast_expr_identifier_create(value_str(v))),
-        3 => Box::into_raw(ast_expr_copy(&*value_as_literal(v))),
-        0 => Box::into_raw(ast_expr_copy(&*value_as_sync(v))),
-        2 => number_to_expr((*v).kind.n),
+    match &(*v).kind {
+        ValueKind::DefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
+        ValueKind::IndefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
+        ValueKind::Literal(_) => Box::into_raw(ast_expr_copy(&*value_as_literal(v))),
+        ValueKind::Sync(n) => Box::into_raw(ast_expr_copy(&*number_as_sync(*n))),
+        ValueKind::Int(n) => number_to_expr(*n),
         _ => panic!(),
     }
 }
 
 pub unsafe fn value_isliteral(v: *mut Value) -> bool {
-    if (*v).r#type as libc::c_uint != VALUE_LITERAL as libc::c_int as libc::c_uint {
-        return false;
-    }
-    true
+    matches!((*v).kind, ValueKind::Literal(_))
 }
 
 pub unsafe fn value_as_literal(v: *mut Value) -> *mut AstExpr {
-    if !((*v).r#type as libc::c_uint == VALUE_LITERAL as libc::c_int as libc::c_uint) as libc::c_int
-        as libc::c_long
-        != 0
-    {
+    let ValueKind::Literal(s) = &(*v).kind else {
         panic!();
-    }
-    Box::into_raw(ast_expr_literal_create((*v).kind.s))
-}
-
-pub unsafe fn value_type(v: *mut Value) -> ValueType {
-    return (*v).r#type;
+    };
+    Box::into_raw(ast_expr_literal_create(*s))
 }
 
 pub unsafe fn value_references(v: *mut Value, loc: *mut Location, s: *mut State) -> bool {
-    match (*v).r#type {
-        1 => {
-            return !(*v).kind.ptr.isindefinite
-                && location_references((*v).kind.ptr.kind.loc, loc, s) as libc::c_int != 0;
-        }
-        4 => return struct_references(v, loc, s),
-        _ => return false,
-    };
+    match &(*v).kind {
+        ValueKind::DefinitePtr(vloc) => location_references(*vloc, loc, s),
+        ValueKind::Struct(sv) => struct_references(sv, loc, s),
+        _ => false,
+    }
 }
 
-unsafe fn struct_references(v: *mut Value, loc: *mut Location, s: *mut State) -> bool {
-    let m: &Map = &*(*v).kind._struct.m;
+unsafe fn struct_references(sv: &StructValue, loc: *mut Location, s: *mut State) -> bool {
+    let m: &Map = &*sv.m;
     for p in m.values() {
         let val: *mut Value = object_as_value(p as *mut Object);
         if !val.is_null() && value_references(val, loc, s) as libc::c_int != 0 {
@@ -704,30 +575,20 @@ unsafe fn struct_references(v: *mut Value, loc: *mut Location, s: *mut State) ->
     false
 }
 
-pub unsafe fn values_comparable(v1: *mut Value, v2: *mut Value) -> bool {
-    (*v1).r#type as libc::c_uint == (*v2).r#type as libc::c_uint
-}
-
 pub unsafe fn value_equal(v1: *mut Value, v2: *mut Value) -> bool {
-    if !((*v1).r#type as libc::c_uint == (*v2).r#type as libc::c_uint) {
-        panic!();
-    }
-    match (*v1).r#type {
-        3 => strcmp((*v1).kind.s, (*v2).kind.s) == 0,
-        2 | 0 => number_equal((*v1).kind.n, (*v2).kind.n),
+    match (&(*v1).kind, &(*v2).kind) {
+        (ValueKind::Literal(s1), ValueKind::Literal(s2)) => strcmp(*s1, *s2) == 0,
+        (ValueKind::Int(n1), ValueKind::Int(n2)) | (ValueKind::Sync(n1), ValueKind::Sync(n2)) => {
+            number_equal(*n1, *n2)
+        }
         _ => panic!(),
     }
 }
 
 pub unsafe fn value_assume(v: *mut Value, value: bool) -> bool {
-    match (*v).r#type {
-        2 => number_assume((*v).kind.n, value),
-        1 => {
-            if !(*v).kind.ptr.isindefinite {
-                panic!();
-            }
-            number_assume((*v).kind.ptr.kind.n, value)
-        }
+    match &(*v).kind {
+        ValueKind::Int(n) => number_assume(*n, value),
+        ValueKind::IndefinitePtr(n) => number_assume(*n, value),
         _ => panic!(),
     }
 }
@@ -909,7 +770,7 @@ pub unsafe fn number_ranges_equal(n1: *mut Number, n2: *mut Number) -> bool {
         }
         i += 1;
     }
-    return 1 as libc::c_int != 0;
+    return true;
 }
 unsafe fn number_assume(n: *mut Number, value: bool) -> bool {
     if !((*n).r#type as libc::c_uint == NUMBER_RANGES as libc::c_int as libc::c_uint) as libc::c_int
@@ -922,7 +783,7 @@ unsafe fn number_assume(n: *mut Number, value: bool) -> bool {
         return false;
     }
     (*n).kind.ranges = number_range_assumed_value(value);
-    return 1 as libc::c_int != 0;
+    return true;
 }
 unsafe fn number_range_assumed_value(value: bool) -> *mut NumberRangeArr {
     if value {
@@ -1057,7 +918,7 @@ unsafe fn number_range_arr_canbe(arr: *mut NumberRangeArr, value: bool) -> bool 
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*arr).n {
         if number_range_canbe(*((*arr).range).offset(i as isize), value) {
-            return 1 as libc::c_int != 0;
+            return true;
         }
         i += 1;
     }
@@ -1161,7 +1022,7 @@ pub unsafe fn number_value_min_create() -> *mut NumberValue {
 }
 
 pub unsafe fn number_value_max_create() -> *mut NumberValue {
-    return number_value_limit_create(1 as libc::c_int != 0);
+    return number_value_limit_create(true);
 }
 
 pub unsafe fn number_value_destroy(v: *mut NumberValue) {

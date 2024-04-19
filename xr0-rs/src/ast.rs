@@ -33,10 +33,10 @@ use crate::util::{
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
-    value_int_create, value_int_indefinite_create, value_isconstant, value_islocation,
+    value_int_create, value_int_indefinite_create, value_isconstant, value_isint, value_islocation,
     value_isstruct, value_issync, value_literal_create, value_pf_augment,
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
-    value_sync_create, value_to_expr, values_comparable,
+    value_sync_create, value_to_expr,
 };
 use crate::{vprintln, Externals, Object, Props, State, StrBuilder, Value};
 
@@ -3052,7 +3052,7 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
         };
     }
     let zero: *mut Value = value_int_create(0 as libc::c_int);
-    if !values_comparable(zero, v) {
+    if !value_isint(v) {
         let b: *mut StrBuilder = strbuilder_create();
         let c_str: *mut libc::c_char = ast_expr_str(control);
         let v_str: *mut libc::c_char = value_str(v);
