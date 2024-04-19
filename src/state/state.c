@@ -235,7 +235,7 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 struct value *
 state_readregister(struct state *state)
 {
-	v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
+	// v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
 	if (!state->reg) {
 		return NULL;
 	}
@@ -250,7 +250,7 @@ void
 state_writeregister(struct state *state, struct value *v)
 {
 	assert(!state->reg);
-	v_printf("writing to register: %s\n", v ? value_str(v) : "NULL");
+	// v_printf("writing to register: %s\n", v ? value_str(v) : "NULL");
 	state->reg = v;
 }
 
