@@ -19,13 +19,11 @@ use crate::state::location::{
     location_getstackblock, location_offset, location_references, location_str, location_type,
 };
 use crate::state::state::state_get;
-use crate::util::{
-    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_printf, strbuilder_putc, Map,
-};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map};
 use crate::value::value_abstractcopy;
 use crate::{
-    AstType, AstVariable, Block, BlockArr, Clump, Heap, Location, Object, State, StaticMemory,
-    StrBuilder, VConst, Value,
+    cstr, strbuilder_write, AstType, AstVariable, Block, BlockArr, Clump, Heap, Location, Object,
+    State, StaticMemory, StrBuilder, VConst, Value,
 };
 
 pub struct Stack {
@@ -153,32 +151,24 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> *mut libc::c_ch
     let m: &Map = &(*stack).varmap;
     for (k, v) in m.pairs() {
         let var: *mut libc::c_char = variable_str(v as *mut Variable, stack, state);
-        strbuilder_printf(b, b"\t%s: %s\0" as *const u8 as *const libc::c_char, k, var);
+        strbuilder_write!(b, "\t{}: {}", cstr!(k), cstr!(var));
         free(var as *mut libc::c_void);
         strbuilder_putc(b, '\n' as i32 as libc::c_char);
     }
     let result: *mut libc::c_char = variable_str((*stack).result, stack, state);
-    strbuilder_printf(
-        b,
-        b"\treturn: %s\n\0" as *const u8 as *const libc::c_char,
-        result,
-    );
+    strbuilder_write!(b, "\treturn: {}\n", cstr!(result));
     free(result as *mut libc::c_void);
-    strbuilder_printf(b, b"\t\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "\t");
     let mut i_0: libc::c_int = 0 as libc::c_int;
     let len: libc::c_int = 30 as libc::c_int;
     while i_0 < len - 2 as libc::c_int {
         strbuilder_putc(b, '-' as i32 as libc::c_char);
         i_0 += 1;
     }
-    strbuilder_printf(
-        b,
-        b" %s\n\0" as *const u8 as *const libc::c_char,
-        (*stack).name,
-    );
+    strbuilder_write!(b, " {}\n", cstr!((*stack).name));
     if !((*stack).prev).is_null() {
         let prev: *mut libc::c_char = stack_str((*stack).prev, state);
-        strbuilder_printf(b, prev);
+        strbuilder_write!(b, "{}", cstr!(prev));
         free(prev as *mut libc::c_void);
     }
     return strbuilder_build(b);
@@ -338,13 +328,13 @@ pub unsafe fn variable_str(
         b"\0" as *const u8 as *const libc::c_char
     }) as *mut libc::c_char;
     let obj_str: *mut libc::c_char = object_or_nothing_str((*var).loc, stack, state);
-    strbuilder_printf(
+    strbuilder_write!(
         b,
-        b"{%s%s := %s} @ %s\0" as *const u8 as *const libc::c_char,
-        isparam,
-        type_0,
-        obj_str,
-        loc,
+        "{{{}{} := {}}} @ {}",
+        cstr!(isparam),
+        cstr!(type_0),
+        cstr!(obj_str),
+        cstr!(loc),
     );
     free(obj_str as *mut libc::c_void);
     free(loc as *mut libc::c_void);
