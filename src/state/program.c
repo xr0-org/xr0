@@ -80,10 +80,10 @@ program_render(struct program *p)
 	struct strbuilder *b = strbuilder_create();
 	switch (p->s) {
 	case PROGRAM_COUNTER_DECLS:
-		strbuilder_printf(b, "%s\n", ast_block_render(p->b, p->index, true));
+		strbuilder_printf(b, "%s", ast_block_render(p->b, p->index, true));
 		break;
 	case PROGRAM_COUNTER_STMTS:
-		strbuilder_printf(b, "%s\n", ast_block_render(p->b, p->index, false));
+		strbuilder_printf(b, "%s", ast_block_render(p->b, p->index, false));
 		break;
 	case PROGRAM_COUNTER_ATEND:
 		strbuilder_printf(b, "\t<end of frame>");
