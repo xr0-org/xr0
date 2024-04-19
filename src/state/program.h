@@ -18,6 +18,9 @@ program_name(struct program *);
 char *
 program_str(struct program *);
 
+int
+program_index(struct program *);
+
 char *
 program_render(struct program *);
 

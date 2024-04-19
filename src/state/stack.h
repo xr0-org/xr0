@@ -18,6 +18,9 @@ char *
 stack_programtext(struct stack *);
 
 int
+stack_programindex(struct stack *);
+
+int
 stack_id(struct stack *);
 
 struct location *
