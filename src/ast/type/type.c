@@ -371,6 +371,9 @@ ast_type_ptr_type(struct ast_type *t)
 	return t->ptr_type;
 }
 
+static void
+struct_zeroinit(struct ast_type *, struct strbuilder *);
+
 char *
 ast_type_zeroinit(struct ast_type *t)
 {
@@ -380,8 +383,36 @@ ast_type_zeroinit(struct ast_type *t)
 	case TYPE_CHAR:
 		strbuilder_printf(b, "0");
 		break;
+	case TYPE_POINTER:
+		strbuilder_printf(b, "NULL");
+		break;
+	case TYPE_STRUCT:
+		struct_zeroinit(t, b);
+		break;
 	default:
 		assert(false);
 	}
 	return strbuilder_build(b);
+}
+
+static void
+struct_zeroinit(struct ast_type *t, struct strbuilder *b)
+{
+	char *tag = t->structunion.tag;
+	struct ast_variable_arr *members = t->structunion.members;
+
+	if (tag) {
+		strbuilder_printf(b, "(struct %s) ", t->structunion.tag);
+	}
+	strbuilder_printf(b, "{ ");
+	if (members) {
+		int n = ast_variable_arr_n(members);
+		struct ast_variable **v = ast_variable_arr_v(members);
+		for (int i = 0; i < n; i++) {
+			char *init = ast_type_zeroinit(ast_variable_type(v[i]));
+			strbuilder_printf(b, "%s%s ", init, (i+1<n? "," : "" ));
+			free(init);
+		}
+	}
+	strbuilder_printf(b, "}");
 }

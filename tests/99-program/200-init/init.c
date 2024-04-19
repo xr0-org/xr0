@@ -15,10 +15,13 @@ struct list {
 void
 foo()
 {
+	struct { char c; char d; } cd;
+
 	struct point { int x; int y; } p;
 	struct point p2;
 
 	struct man { char *name; int age; };
-
 	struct man john;
+
+	struct list l1;
 }

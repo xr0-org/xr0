@@ -154,5 +154,9 @@ ast_typedef_initprint(struct ast_externdecl *decl)
 static char *
 ast_struct_initprint(struct ast_externdecl *decl)
 {
-	assert(false);
+	struct strbuilder *b = strbuilder_create();
+	char *s = ast_type_str(decl->_struct);
+	strbuilder_printf(b, "%s;", s);
+	free(s);
+	return strbuilder_build(b);
 }
