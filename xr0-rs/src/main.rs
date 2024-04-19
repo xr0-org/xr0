@@ -1,5 +1,3 @@
-#![feature(c_variadic)]
-
 use std::env;
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -13,7 +11,6 @@ use libc::strcmp;
 mod util;
 
 mod ast;
-mod c_util;
 mod ext;
 mod math;
 mod object;

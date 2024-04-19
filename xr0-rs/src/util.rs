@@ -1,9 +1,7 @@
 use std::fmt::{self, Debug, Formatter};
 use std::ptr;
 
-use libc::{fclose, free, malloc, open_memstream, realloc, strcmp, strlen, strncpy, FILE};
-
-use crate::c_util::vfprintf;
+use libc::{free, malloc, realloc, strcmp, strlen, strncpy};
 
 pub struct Map {
     entry: *mut Entry,
@@ -158,7 +156,7 @@ impl Map {
     pub fn pairs(&self) -> impl Iterator<Item = (*const libc::c_char, *const libc::c_void)> + '_ {
         self.table()
             .iter()
-            .map(|e| (e.key as *const libc::c_char, e.value as *const libc::c_void))
+            .map(|e| (e.key as *const libc::c_char, e.value))
     }
 
     pub fn pairs_mut(
@@ -190,27 +188,6 @@ pub unsafe fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char {
 
 pub unsafe fn strbuilder_append_string(b: *mut StrBuilder, s: String) {
     (*b).s.push_str(&s);
-}
-
-unsafe fn strbuilder_append(b: *mut StrBuilder, s: *const libc::c_char, len: usize) {
-    let bytes = std::slice::from_raw_parts(s as *const u8, len);
-    let s = String::from_utf8_lossy(bytes);
-    (*b).s.push_str(&s);
-}
-
-pub unsafe fn strbuilder_vprintf(
-    b: *mut StrBuilder,
-    fmt: *const libc::c_char,
-    mut ap: ::core::ffi::VaList,
-) -> libc::c_int {
-    let mut len: usize = 0;
-    let mut buf: *mut libc::c_char = 0 as *mut libc::c_char;
-    let out: *mut FILE = open_memstream(&mut buf, &mut len);
-    let r: libc::c_int = vfprintf(out, fmt, ap.as_va_list());
-    fclose(out);
-    strbuilder_append(b, buf, len);
-    free(buf as *mut libc::c_void);
-    r
 }
 
 pub unsafe fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char) {
