@@ -3033,7 +3033,7 @@ pub unsafe fn ast_stmt_create_iter(
 }
 
 unsafe fn ast_stmt_nop_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
-    strbuilder_printf(b, b";\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, ";");
 }
 
 pub unsafe fn ast_stmt_iter_body(stmt: &AstStmt) -> &AstStmt {
@@ -3092,12 +3092,7 @@ unsafe fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
         panic!();
     };
     let s: *mut libc::c_char = ast_stmt_str(&*labelled.stmt);
-    strbuilder_printf(
-        b,
-        b"%s: %s\0" as *const u8 as *const libc::c_char,
-        labelled.label,
-        s,
-    );
+    strbuilder_write!(b, "{}: {}", cstr!(labelled.label), cstr!(s));
     free(s as *mut libc::c_void);
 }
 
