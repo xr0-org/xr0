@@ -34,11 +34,14 @@ do
 	then
 		if [[ "$f" == *"verification"* ]]
 		then
+			#printf '\n%s' "$XR0 -x main -I $libx -v $f 2>&1 >/dev/null"
 			output=$($XR0 -x main -I $libx -v $f 2>&1 >/dev/null)
 		else
+			#printf '\n%s' "$XR0 -t main -I $libx $f 2>&1 >/dev/null"
 			output=$($XR0 -t main -I $libx $f 2>&1 >/dev/null)
 		fi
 	else 
+		#printf '\n%s' "$XR0 -I $libx $f 2>&1 >/dev/null"
 		output=$($XR0 -I $libx $f 2>&1 >/dev/null)
 	fi
         set -e
@@ -56,15 +59,26 @@ do
 			printf "$pass"
 		else
 			printf "$fail"
+                	echo "=== ACTUAL"
+                	echo -- "$output"
+                	echo
+                	echo "=== EXPECTED"
+                	echo -- "$expected_output"
+                        echo
 		fi
 	else
 		# silence is golden
-		if [[ "$output" -eq 0 ]] 
+		if [[ "$output" == "" ]]
 		then
 			npass=$((npass+1))
 			printf "$pass"
 		else
 			printf "$fail"
+                	echo "=== ACTUAL"
+                	echo -- "$output"
+                	echo
+                	echo "expected no output"
+                        echo
 		fi
 	fi
 done
