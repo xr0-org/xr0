@@ -104,7 +104,7 @@ pub unsafe fn object_copy(old: *mut Object) -> *mut Object {
     match (*old).r#type {
         0 => {
             (*new).c2rust_unnamed.value = if !((*old).c2rust_unnamed.value).is_null() {
-                value_copy((*old).c2rust_unnamed.value)
+                value_copy(&*(*old).c2rust_unnamed.value)
             } else {
                 0 as *mut Value
             };
@@ -123,7 +123,7 @@ pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Objec
         0 => object_value_create(
             Box::into_raw(ast_expr_copy(&*(*old).offset)),
             if !((*old).c2rust_unnamed.value).is_null() {
-                value_abstractcopy((*old).c2rust_unnamed.value, s)
+                value_abstractcopy(&*(*old).c2rust_unnamed.value, s)
             } else {
                 0 as *mut Value
             },
@@ -164,7 +164,7 @@ pub unsafe fn object_referencesheap(obj: *mut Object, s: *mut State) -> bool {
         return true;
     }
     return !((*obj).c2rust_unnamed.value).is_null()
-        && value_referencesheap((*obj).c2rust_unnamed.value, s);
+        && value_referencesheap(&*(*obj).c2rust_unnamed.value, s);
 }
 
 pub unsafe fn object_hasvalue(obj: *mut Object) -> bool {
@@ -189,7 +189,7 @@ pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
     match (*obj).r#type {
         0 => {
             !((*obj).c2rust_unnamed.value).is_null()
-                && state_isdeallocand(s, value_as_location((*obj).c2rust_unnamed.value))
+                && state_isdeallocand(s, value_as_location(&*(*obj).c2rust_unnamed.value))
                     as libc::c_int
                     != 0
         }
@@ -338,7 +338,7 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
         }
         return object_value_create(
             Box::into_raw(ast_expr_copy(&*(*obj).offset)),
-            value_copy((*obj).c2rust_unnamed.value),
+            value_copy(&*(*obj).c2rust_unnamed.value),
         );
     }
     return object_range_create(
@@ -348,7 +348,7 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
                 Box::from_raw(excl_up),
                 Box::from_raw(lw),
             )),
-            value_as_location(state_alloc(s)),
+            value_as_location(&*state_alloc(s)),
         ),
     );
 }
@@ -379,7 +379,7 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
         ast_expr_destroy(up);
         return object_value_create(
             Box::into_raw(ast_expr_copy(incl_lw)),
-            value_copy((*obj).c2rust_unnamed.value),
+            value_copy(&*(*obj).c2rust_unnamed.value),
         );
     }
     return object_range_create(
@@ -389,7 +389,7 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
                 Box::from_raw(up),
                 ast_expr_copy(incl_lw),
             )),
-            value_as_location(state_alloc(s)),
+            value_as_location(&*state_alloc(s)),
         ),
     );
 }

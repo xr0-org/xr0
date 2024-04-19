@@ -661,7 +661,7 @@ unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Va
         free(s_0 as *mut libc::c_void);
         return Err(error_create(strbuilder_build(b_0)));
     }
-    return Ok(value_copy(v));
+    return Ok(value_copy(&*v));
 }
 
 unsafe fn hack_identifier_builtin_eval(
@@ -742,7 +742,7 @@ unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> Result<*mut
         );
         return Err(error_create(strbuilder_build(b_0)));
     }
-    return Ok(value_copy(val));
+    return Ok(value_copy(&*val));
 }
 
 unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
@@ -764,7 +764,7 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<*mut V
     }
     let obj_value: *mut Value = object_as_value(member);
     let v: *mut Value = if !obj_value.is_null() {
-        value_copy(obj_value)
+        value_copy(&*obj_value)
     } else {
         ptr::null_mut()
     };
@@ -867,7 +867,7 @@ unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Val
         free(s as *mut libc::c_void);
         return Err(error_create(strbuilder_build(b)));
     }
-    object_assign(obj, value_copy(rval_val));
+    object_assign(obj, value_copy(&*rval_val));
     Ok(rval_val)
 }
 
@@ -1023,7 +1023,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value
     call_setupverify(f, state_copy(state))?;
     let mut v = call_absexec(expr, state)?;
     if !v.is_null() {
-        v = value_copy(v);
+        v = value_copy(&*v);
     }
     state_popframe(state);
     if !v.is_null() {
@@ -1073,7 +1073,7 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<*mut 
         let v = ast_expr_eval(&param, s)?;
         drop(param);
         assert!(!v.is_null());
-        if value_islocation(v) {
+        if value_islocation(&*v) {
             let ref mut fresh0 = *computed_param.offset(i as isize);
             *fresh0 = Box::into_raw(ast_expr_identifier_create(value_str(v)));
         } else {
@@ -1160,7 +1160,7 @@ pub unsafe fn prepare_parameters(
         let lval_lval = ast_expr_lvalue(&name, state)?;
         let obj: *mut Object = lvalue_object(lval_lval);
         drop(name);
-        object_assign(obj, value_copy(arg));
+        object_assign(obj, value_copy(&*arg));
     }
     Ok(())
 }
@@ -1206,7 +1206,7 @@ unsafe fn assign_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value
                 as *mut libc::c_char,
         ));
     }
-    object_assign(obj, value_copy(val));
+    object_assign(obj, value_copy(&*val));
     Ok(val)
 }
 
@@ -1229,8 +1229,8 @@ unsafe fn verify_paramspec(
             b"must be heap allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ));
     }
-    let param_obj = state_get(param_state, value_as_location(param), false)?;
-    let arg_obj = state_get(arg_state, value_as_location(arg), false)?;
+    let param_obj = state_get(param_state, value_as_location(&*param), false)?;
+    let arg_obj = state_get(arg_state, value_as_location(&*arg), false)?;
     if param_obj.is_null() {
         panic!();
     }
@@ -1311,8 +1311,8 @@ pub unsafe fn ast_expr_as_constant(expr: &AstExpr) -> libc::c_int {
 }
 
 unsafe fn pf_augment(v: *mut Value, call: &AstExpr, state: *mut State) -> Result<*mut Value> {
-    if !value_isstruct(v) {
-        return Ok(value_copy(v));
+    if !value_isstruct(&*v) {
+        return Ok(value_copy(&*v));
     }
     let res_val = ast_expr_pf_reduce(call, state)?;
     assert!(!res_val.is_null());
@@ -1400,15 +1400,15 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<*mut V
     let v = ast_expr_pf_reduce(ast_expr_member_root(expr), s)?;
     assert!(!v.is_null());
     let field: *mut libc::c_char = ast_expr_member_field(expr);
-    if value_isstruct(v) {
+    if value_isstruct(&*v) {
         let obj: *mut Object = value_struct_member(v, field);
         let obj_value: *mut Value = object_as_value(obj);
         if obj_value.is_null() {
             panic!();
         }
-        return Ok(value_copy(obj_value));
+        return Ok(value_copy(&*obj_value));
     }
-    if !value_issync(v) {
+    if !value_issync(&*v) {
         panic!();
     }
     return Ok(value_sync_create(Box::into_raw(ast_expr_member_create(
@@ -2749,7 +2749,7 @@ unsafe fn stmt_jump_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
         if obj.is_null() {
             panic!();
         }
-        object_assign(obj, value_copy(rv_val));
+        object_assign(obj, value_copy(&*rv_val));
     }
     Ok(())
 }
@@ -3012,7 +3012,7 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
         }
     };
     assert!(!v.is_null());
-    if value_issync(v) {
+    if value_issync(&*v) {
         let sync: *mut AstExpr = value_as_sync(v);
         let p: *mut Props = state_getprops(state);
         if props_get(p, sync) {
@@ -3033,8 +3033,8 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
             };
         }
     }
-    if value_isconstant(v) {
-        if value_as_constant(v) != 0 {
+    if value_isconstant(&*v) {
+        if value_as_constant(&*v) != 0 {
             return {
                 let init = Decision {
                     decision: true,
@@ -3052,7 +3052,7 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
         };
     }
     let zero: *mut Value = value_int_create(0 as libc::c_int);
-    if !value_isint(v) {
+    if !value_isint(&*v) {
         let b: *mut StrBuilder = strbuilder_create();
         let c_str: *mut libc::c_char = ast_expr_str(control);
         let v_str: *mut libc::c_char = value_str(v);
@@ -3418,7 +3418,7 @@ pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
 unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> AstStmtSplits {
     let v = ast_expr_pf_reduce(&selection.cond, s).unwrap();
     let e: *mut AstExpr = value_to_expr(v);
-    if condexists(&*e, s) as libc::c_int != 0 || value_isconstant(v) as libc::c_int != 0 {
+    if condexists(&*e, s) as libc::c_int != 0 || value_isconstant(&*v) as libc::c_int != 0 {
         return {
             let init = AstStmtSplits {
                 n: 0,

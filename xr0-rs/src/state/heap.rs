@@ -218,7 +218,7 @@ pub unsafe fn vconst_copy(old: *mut VConst) -> *mut VConst {
     for (k, v) in m.pairs() {
         (*new).varmap.set(
             dynamic_str(k),
-            value_copy(v as *mut Value) as *const libc::c_void,
+            value_copy(&*(v as *mut Value)) as *const libc::c_void,
         );
     }
     m = &(*old).comment;
@@ -289,7 +289,7 @@ pub unsafe fn vconst_undeclare(v: *mut VConst) {
         if !((*v).persist.get(key)).is_null() {
             varmap.set(
                 dynamic_str(key),
-                value_copy((*v).varmap.get(key) as *mut Value) as *const libc::c_void,
+                value_copy(&*((*v).varmap.get(key) as *mut Value)) as *const libc::c_void,
             );
             let c: *mut libc::c_char = (*v).comment.get(key) as *mut libc::c_char;
             if !c.is_null() {

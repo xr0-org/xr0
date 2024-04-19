@@ -128,8 +128,8 @@ pub unsafe fn value_literal_create(lit: *mut libc::c_char) -> *mut Value {
     value_create(ValueKind::Literal(dynamic_str(lit)))
 }
 
-unsafe fn ptr_referencesheap(v: *mut Value, s: *mut State) -> bool {
-    match &(*v).kind {
+unsafe fn ptr_referencesheap(v: &Value, s: *mut State) -> bool {
+    match &v.kind {
         ValueKind::DefinitePtr(loc) => location_referencesheap(*loc, s),
         ValueKind::IndefinitePtr(_) => false,
         _ => panic!(),
@@ -228,10 +228,10 @@ pub unsafe fn value_struct_indefinite_create(
 }
 
 pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Value {
-    if !value_isstruct(old) {
+    if !value_isstruct(&*old) {
         panic!();
     }
-    let v: *mut Value = value_copy(old);
+    let v: *mut Value = value_copy(&*old);
     let ValueKind::Struct(sv) = &(*v).kind else {
         panic!();
     };
@@ -242,7 +242,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
         let field: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
         let obj: *mut Object = (*sv.m).get(field) as *mut Object;
         let obj_value: *mut Value = object_as_value(obj);
-        if !obj_value.is_null() && value_issync(obj_value) {
+        if !obj_value.is_null() && value_issync(&*obj_value) {
             object_assign(
                 obj,
                 value_sync_create(Box::into_raw(ast_expr_member_create(
@@ -256,8 +256,8 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
     return v;
 }
 
-pub unsafe fn value_isstruct(v: *mut Value) -> bool {
-    matches!((*v).kind, ValueKind::Struct(_))
+pub fn value_isstruct(v: &Value) -> bool {
+    matches!(v.kind, ValueKind::Struct(_))
 }
 
 unsafe fn frommembers(members: *mut AstVariableArr) -> Box<Map> {
@@ -341,15 +341,15 @@ unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
     let m: &Map = &*sv.m;
     for p in m.values() {
         let val: *mut Value = object_as_value(p as *mut Object);
-        if !val.is_null() && value_referencesheap(val, s) as libc::c_int != 0 {
+        if !val.is_null() && value_referencesheap(&*val, s) as libc::c_int != 0 {
             return true;
         }
     }
     false
 }
 
-pub unsafe fn value_copy(v: *mut Value) -> *mut Value {
-    value_create(match &(*v).kind {
+pub unsafe fn value_copy(v: &Value) -> *mut Value {
+    value_create(match &v.kind {
         ValueKind::Sync(n) => ValueKind::Sync(number_copy(*n)),
         ValueKind::DefinitePtr(loc) => ValueKind::DefinitePtr(location_copy(*loc)),
         ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(number_copy(*n)),
@@ -362,11 +362,11 @@ pub unsafe fn value_copy(v: *mut Value) -> *mut Value {
     })
 }
 
-pub unsafe fn value_abstractcopy(v: *mut Value, s: *mut State) -> *mut Value {
+pub unsafe fn value_abstractcopy(v: &Value, s: *mut State) -> *mut Value {
     if !value_referencesheap(v, s) {
         return ptr::null_mut();
     }
-    match &(*v).kind {
+    match &v.kind {
         ValueKind::IndefinitePtr(_) | ValueKind::DefinitePtr(_) => value_copy(v),
         ValueKind::Struct(sv) => value_struct_abstractcopy(sv, s),
         _ => panic!(),
@@ -480,44 +480,41 @@ pub unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
     strbuilder_printf(b, b"}\0" as *const u8 as *const libc::c_char);
 }
 
-pub unsafe fn value_islocation(v: *mut Value) -> bool {
-    if v.is_null() {
-        panic!();
-    }
+pub unsafe fn value_islocation(v: &Value) -> bool {
     matches!((*v).kind, ValueKind::DefinitePtr(_))
 }
 
-pub unsafe fn value_as_location(v: *mut Value) -> *mut Location {
-    let ValueKind::DefinitePtr(loc) = &(*v).kind else {
+pub unsafe fn value_as_location(v: &Value) -> *mut Location {
+    let ValueKind::DefinitePtr(loc) = &v.kind else {
         panic!();
     };
     *loc
 }
 
-pub unsafe fn value_referencesheap(v: *mut Value, s: *mut State) -> bool {
-    match &(*v).kind {
+pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
+    match &v.kind {
         ValueKind::DefinitePtr(_) | ValueKind::IndefinitePtr(_) => return ptr_referencesheap(v, s),
         ValueKind::Struct(sv) => return struct_referencesheap(sv, s),
         _ => return false,
     };
 }
 
-pub unsafe fn value_as_constant(v: *mut Value) -> libc::c_int {
-    let ValueKind::Int(n) = &(*v).kind else {
+pub unsafe fn value_as_constant(v: &Value) -> libc::c_int {
+    let ValueKind::Int(n) = &v.kind else {
         panic!();
     };
     number_as_constant(*n)
 }
 
-pub unsafe fn value_isconstant(v: *mut Value) -> bool {
-    match &(*v).kind {
+pub unsafe fn value_isconstant(v: &Value) -> bool {
+    match &v.kind {
         ValueKind::Int(n) => number_isconstant(*n),
         _ => false,
     }
 }
 
-pub unsafe fn value_issync(v: *mut Value) -> bool {
-    match &(*v).kind {
+pub unsafe fn value_issync(v: &Value) -> bool {
+    match &v.kind {
         ValueKind::Sync(n) => number_issync(*n),
         _ => false,
     }
@@ -530,27 +527,27 @@ pub unsafe fn value_as_sync(v: *mut Value) -> *mut AstExpr {
     return number_as_sync(*n);
 }
 
-pub unsafe fn value_isint(v: *mut Value) -> bool {
-    matches!((*v).kind, ValueKind::Int(_))
+pub unsafe fn value_isint(v: &Value) -> bool {
+    matches!(v.kind, ValueKind::Int(_))
 }
 
 pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
     match &(*v).kind {
         ValueKind::DefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
         ValueKind::IndefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
-        ValueKind::Literal(_) => Box::into_raw(ast_expr_copy(&*value_as_literal(v))),
+        ValueKind::Literal(_) => Box::into_raw(ast_expr_copy(&*value_as_literal(&*v))),
         ValueKind::Sync(n) => Box::into_raw(ast_expr_copy(&*number_as_sync(*n))),
         ValueKind::Int(n) => number_to_expr(*n),
         _ => panic!(),
     }
 }
 
-pub unsafe fn value_isliteral(v: *mut Value) -> bool {
-    matches!((*v).kind, ValueKind::Literal(_))
+pub unsafe fn value_isliteral(v: &Value) -> bool {
+    matches!(v.kind, ValueKind::Literal(_))
 }
 
-pub unsafe fn value_as_literal(v: *mut Value) -> *mut AstExpr {
-    let ValueKind::Literal(s) = &(*v).kind else {
+pub unsafe fn value_as_literal(v: &Value) -> *mut AstExpr {
+    let ValueKind::Literal(s) = &v.kind else {
         panic!();
     };
     Box::into_raw(ast_expr_literal_create(*s))
