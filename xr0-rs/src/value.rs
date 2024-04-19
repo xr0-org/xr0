@@ -402,7 +402,7 @@ pub unsafe fn value_str(v: *mut Value) -> *mut libc::c_char {
             value_int_sprint(*n, b);
         }
         ValueKind::Literal(s) => {
-            strbuilder_printf(b, b"\"%s\"\0" as *const u8 as *const libc::c_char, *s);
+            strbuilder_write!(b, "\"{}\"", cstr!(*s));
         }
         ValueKind::Struct(sv) => {
             value_struct_sprint(sv, b);
@@ -412,35 +412,27 @@ pub unsafe fn value_str(v: *mut Value) -> *mut libc::c_char {
 }
 
 pub unsafe fn value_sync_sprint(n: *mut Number, b: *mut StrBuilder) {
-    strbuilder_printf(
-        b,
-        b"comp:%s\0" as *const u8 as *const libc::c_char,
-        number_str(n),
-    );
+    strbuilder_write!(b, "comp:{}", cstr!(number_str(n)));
 }
 
 pub unsafe fn value_definite_ptr_sprint(loc: *mut Location, b: *mut StrBuilder) {
     let s = location_str(loc);
-    strbuilder_printf(b, b"ptr:%s\0" as *const u8 as *const libc::c_char, s);
+    strbuilder_write!(b, "ptr:{}", cstr!(s));
     free(s as *mut libc::c_void);
 }
 
 pub unsafe fn value_indefinite_ptr_sprint(n: *mut Number, b: *mut StrBuilder) {
     let s = number_str(n);
-    strbuilder_printf(b, b"ptr:%s\0" as *const u8 as *const libc::c_char, s);
+    strbuilder_write!(b, "ptr:{}", cstr!(s));
     free(s as *mut libc::c_void);
 }
 
 pub unsafe fn value_int_sprint(n: *mut Number, b: *mut StrBuilder) {
-    strbuilder_printf(
-        b,
-        b"int:%s\0" as *const u8 as *const libc::c_char,
-        number_str(n),
-    );
+    strbuilder_write!(b, "int:{}", cstr!(number_str(n)));
 }
 
 pub unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
-    strbuilder_printf(b, b"struct:{\0" as *const u8 as *const libc::c_char);
+    strbuilder_write!(b, "struct:{{");
     let members: *mut AstVariableArr = sv.members;
     let n: libc::c_int = ast_variable_arr_n(members);
     let var: *mut *mut AstVariable = ast_variable_arr_v(members);
@@ -453,16 +445,12 @@ pub unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
         } else {
             dynamic_str(b"\0" as *const u8 as *const libc::c_char)
         };
-        strbuilder_printf(
+        strbuilder_write!(
             b,
-            b".%s = <%s>%s\0" as *const u8 as *const libc::c_char,
-            f,
-            val_str,
-            if (i + 1 as libc::c_int) < n {
-                b", \0" as *const u8 as *const libc::c_char
-            } else {
-                b"\0" as *const u8 as *const libc::c_char
-            },
+            ".{} = <{}>{}",
+            cstr!(f),
+            cstr!(val_str),
+            if i + 1 < n { ", " } else { "" },
         );
         free(val_str as *mut libc::c_void);
         i += 1;
@@ -690,16 +678,7 @@ unsafe fn number_ranges_sprint(ranges: *mut NumberRangeArr) -> *mut libc::c_char
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let r: *mut libc::c_char = number_range_str(*range.offset(i as isize));
-        strbuilder_printf(
-            b,
-            b"%s%s\0" as *const u8 as *const libc::c_char,
-            r,
-            if (i + 1 as libc::c_int) < n {
-                b", \0" as *const u8 as *const libc::c_char
-            } else {
-                b"\0" as *const u8 as *const libc::c_char
-            },
-        );
+        strbuilder_write!(b, "{}{}", cstr!(r), if i + 1 < n { ", " } else { "" });
         free(r as *mut libc::c_void);
         i += 1;
     }
@@ -902,17 +881,13 @@ unsafe fn number_range_upper(r: *mut NumberRange) -> *mut NumberValue {
 unsafe fn number_range_str(r: *mut NumberRange) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     if number_range_issingle(r) {
-        strbuilder_printf(
-            b,
-            b"%s\0" as *const u8 as *const libc::c_char,
-            number_value_str((*r).lower),
-        );
+        strbuilder_write!(b, "{}", cstr!(number_value_str((*r).lower)));
     } else {
-        strbuilder_printf(
+        strbuilder_write!(
             b,
-            b"%s:%s\0" as *const u8 as *const libc::c_char,
-            number_value_str((*r).lower),
-            number_value_str((*r).upper),
+            "{}:{}",
+            cstr!(number_value_str((*r).lower)),
+            cstr!(number_value_str((*r).upper)),
         );
     }
     return strbuilder_build(b);
@@ -987,22 +962,10 @@ unsafe fn number_value_str(v: *mut NumberValue) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     match (*v).r#type {
         0 => {
-            strbuilder_printf(
-                b,
-                b"%d\0" as *const u8 as *const libc::c_char,
-                (*v).kind.constant,
-            );
+            strbuilder_write!(b, "{}", (*v).kind.constant);
         }
         1 => {
-            strbuilder_printf(
-                b,
-                b"%s\0" as *const u8 as *const libc::c_char,
-                if (*v).kind.max as libc::c_int != 0 {
-                    b"MAX\0" as *const u8 as *const libc::c_char
-                } else {
-                    b"MIN\0" as *const u8 as *const libc::c_char
-                },
-            );
+            strbuilder_write!(b, "{}", if (*v).kind.max { "MAX" } else { "MIN" });
         }
         _ => panic!(),
     }
