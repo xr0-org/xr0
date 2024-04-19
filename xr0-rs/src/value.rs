@@ -74,31 +74,9 @@ pub struct NumberRange {
 }
 
 #[derive(Clone)]
-pub struct NumberValue {
-    pub r#type: NumberValueType,
-    pub kind: NumberValueKind,
-}
-
-#[derive(Copy, Clone)]
-pub union NumberValueKind {
-    pub constant: libc::c_int,
-    pub max: bool,
-}
-
-pub type NumberValueType = libc::c_uint;
-pub const NUMBER_VALUE_LIMIT: NumberValueType = 1;
-pub const NUMBER_VALUE_CONSTANT: NumberValueType = 0;
-
-#[derive(Copy, Clone)]
-pub struct PtrValue {
-    pub isindefinite: bool,
-    pub kind: PtrValueKind,
-}
-
-#[derive(Copy, Clone)]
-pub union PtrValueKind {
-    pub loc: *mut Location,
-    pub n: *mut Number,
+pub enum NumberValue {
+    Constant(libc::c_int),
+    Limit(bool),
 }
 
 fn value_create(kind: ValueKind) -> *mut Value {
@@ -925,110 +903,88 @@ unsafe fn number_range_as_constant(r: *mut NumberRange) -> libc::c_int {
 }
 
 unsafe fn number_value_constant_create(constant: libc::c_int) -> *mut NumberValue {
-    let v: *mut NumberValue = malloc(::core::mem::size_of::<NumberValue>()) as *mut NumberValue;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = NUMBER_VALUE_CONSTANT;
-    (*v).kind.constant = constant;
-    return v;
+    Box::into_raw(Box::new(NumberValue::Constant(constant)))
 }
 
 unsafe fn number_value_limit_create(max: bool) -> *mut NumberValue {
-    let v: *mut NumberValue = malloc(::core::mem::size_of::<NumberValue>()) as *mut NumberValue;
-    if v.is_null() {
-        panic!();
-    }
-    (*v).r#type = NUMBER_VALUE_LIMIT;
-    (*v).kind.max = max;
-    return v;
+    Box::into_raw(Box::new(NumberValue::Limit(max)))
 }
 
 unsafe fn number_value_min_create() -> *mut NumberValue {
-    return number_value_limit_create(false);
+    number_value_limit_create(false)
 }
 
 unsafe fn number_value_max_create() -> *mut NumberValue {
-    return number_value_limit_create(true);
+    number_value_limit_create(true)
 }
 
 unsafe fn number_value_destroy(v: *mut NumberValue) {
-    free(v as *mut libc::c_void);
+    drop(Box::from_raw(v));
 }
 
 unsafe fn number_value_str(v: *mut NumberValue) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    match (*v).r#type {
-        0 => {
-            strbuilder_write!(b, "{}", (*v).kind.constant);
+    match &*v {
+        NumberValue::Constant(k) => {
+            strbuilder_write!(b, "{k}");
         }
-        1 => {
-            strbuilder_write!(b, "{}", if (*v).kind.max { "MAX" } else { "MIN" });
+        NumberValue::Limit(true) => {
+            strbuilder_write!(b, "MAX");
         }
-        _ => panic!(),
+        NumberValue::Limit(false) => {
+            strbuilder_write!(b, "MIN");
+        }
     }
     return strbuilder_build(b);
 }
 
 unsafe fn number_value_copy(v: *mut NumberValue) -> *mut NumberValue {
-    match (*v).r#type {
-        0 => number_value_constant_create((*v).kind.constant),
-        1 => number_value_limit_create((*v).kind.max),
-        _ => panic!(),
+    match &*v {
+        NumberValue::Constant(k) => number_value_constant_create(*k),
+        NumberValue::Limit(max) => number_value_limit_create(*max),
     }
 }
 
 unsafe fn number_values_aresingle(v1: *mut NumberValue, v2: *mut NumberValue) -> bool {
-    if (*v1).r#type != (*v2).r#type {
-        return false;
-    }
-    match (*v1).r#type {
-        0 => (*v1).kind.constant == (*v2).kind.constant - 1 as libc::c_int,
-        1 => (*v1).kind.max as libc::c_int == (*v2).kind.max as libc::c_int,
+    match (&*v1, &*v2) {
+        (NumberValue::Constant(k1), NumberValue::Constant(k2)) => *k1 == *k2 - 1,
+        (NumberValue::Limit(max1), NumberValue::Limit(max2)) => *max1 == *max2,
         _ => panic!(),
     }
 }
 
 unsafe fn number_value_difference(v1: *mut NumberValue, v2: *mut NumberValue) -> libc::c_int {
-    if !((*v1).r#type as libc::c_uint == (*v2).r#type as libc::c_uint) {
-        panic!();
-    }
-    match (*v1).r#type {
-        0 => (*v1).kind.constant - (*v2).kind.constant,
+    match (&*v1, &*v2) {
+        (NumberValue::Constant(v1), NumberValue::Constant(v2)) => *v1 - *v2,
         _ => panic!(),
     }
 }
 
 unsafe fn number_value_equal(v1: *mut NumberValue, v2: *mut NumberValue) -> bool {
-    if (*v1).r#type as libc::c_uint != (*v2).r#type as libc::c_uint {
-        return false;
-    }
-    match (*v1).r#type {
-        0 => number_value_difference(v1, v2) == 0 as libc::c_int,
-        1 => (*v1).kind.max as libc::c_int == (*v2).kind.max as libc::c_int,
+    match (&*v1, &*v2) {
+        (NumberValue::Constant(k1), NumberValue::Constant(k2)) => *k1 == *k2,
+        (NumberValue::Limit(max1), NumberValue::Limit(max2)) => *max1 == *max2,
         _ => panic!(),
     }
 }
 
 unsafe fn number_value_as_constant(v: *mut NumberValue) -> libc::c_int {
-    if !((*v).r#type as libc::c_uint == NUMBER_VALUE_CONSTANT as libc::c_int as libc::c_uint) {
-        panic!();
+    match &*v {
+        NumberValue::Constant(k) => *k,
+        _ => panic!(),
     }
-    return (*v).kind.constant;
 }
 
 unsafe fn number_value_le_constant(v: *mut NumberValue, constant: libc::c_int) -> bool {
-    match (*v).r#type {
-        0 => (*v).kind.constant <= constant,
-        1 => !(*v).kind.max,
-        _ => panic!(),
+    match &*v {
+        NumberValue::Constant(k) => *k <= constant,
+        NumberValue::Limit(max) => !*max,
     }
 }
 
 unsafe fn constant_le_number_value(constant: libc::c_int, v: *mut NumberValue) -> bool {
-    match (*v).r#type {
-        0 => constant <= (*v).kind.constant,
-        1 => (*v).kind.max,
-        _ => panic!(),
+    match &*v {
+        NumberValue::Constant(k) => constant <= *k,
+        NumberValue::Limit(max) => *max,
     }
 }
