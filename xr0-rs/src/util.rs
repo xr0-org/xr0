@@ -279,11 +279,7 @@ pub unsafe extern "C" fn strbuilder_printf(
 }
 
 pub unsafe fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char) {
-    strbuilder_printf(
-        b,
-        b"%c\0" as *const u8 as *const libc::c_char,
-        c as libc::c_int,
-    );
+    strbuilder_append(b, &c, 1);
 }
 
 pub unsafe fn error_create(s: *mut libc::c_char) -> Box<Error> {
@@ -377,15 +373,11 @@ pub unsafe fn string_arr_str(string_arr: &StringArr) -> *mut libc::c_char {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let str: *mut libc::c_char = *s.offset(i as isize);
-        strbuilder_printf(
+        strbuilder_write!(
             b,
-            b"%s%s\0" as *const u8 as *const libc::c_char,
-            str,
-            if (i + 1 as libc::c_int) < n {
-                b", \0" as *const u8 as *const libc::c_char
-            } else {
-                b"\0" as *const u8 as *const libc::c_char
-            },
+            "{}{}",
+            cstr!(str),
+            if (i + 1 as libc::c_int) < n { ", " } else { "" },
         );
         i += 1;
     }
