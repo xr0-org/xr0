@@ -190,7 +190,7 @@ static struct error *
 program_stmt_process(struct program *p, bool abstract, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	v_printf("stmt: %s\n", ast_stmt_str(stmt));
+	// v_printf("stmt: %s\n", ast_stmt_str(stmt));
 	if (!state_islinear(s)) {
 		return ast_stmt_linearise(stmt, s);
 	}
