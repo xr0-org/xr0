@@ -102,7 +102,8 @@ state_str(struct state *state)
 	free(ext);
 	strbuilder_printf(
 		b,
-		"\treturn: {%s}\n\n",
+		"\treturn: {%s := {%s}}\n\n",
+		ast_type_str(variable_type(stack_getresult(state->stack))),
 		state->reg ? value_str(state->reg) : "empty"
 	);
 	char *static_mem = static_memory_str(state->static_memory, "\t");

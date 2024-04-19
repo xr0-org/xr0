@@ -380,7 +380,7 @@ path_step_actual(struct path *p, bool print)
 	}
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
-		return NULL;
+		return path_step(p);
 	}
 
 	struct error *err = state_step(p->actual);
