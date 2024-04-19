@@ -145,13 +145,13 @@ static struct error *
 path_init_abstract(struct path *p);
 
 static struct error *
-path_step_abstract(struct path *p);
+path_step_abstract(struct path *p, bool print);
 
 static struct error *
 path_init_actual(struct path *p);
 
 static struct error *
-path_step_actual(struct path *p);
+path_step_actual(struct path *p, bool print);
 
 static struct error *
 path_step_split(struct path *p);
@@ -166,11 +166,11 @@ path_step(struct path *p)
 	case PATH_STATE_UNINIT:
 		return path_init_abstract(p);
 	case PATH_STATE_ABSTRACT:
-		return path_step_abstract(p);
+		return path_step_abstract(p, true);
 	case PATH_STATE_HALFWAY:
 		return path_init_actual(p);
 	case PATH_STATE_ACTUAL:
-		return path_step_actual(p);
+		return path_step_actual(p, true);
 	case PATH_STATE_AUDIT:
 		return path_audit(p);
 	case PATH_STATE_SPLIT:
@@ -195,6 +195,8 @@ path_next(struct path *p)
 		return path_step(p);
 	case PATH_STATE_ABSTRACT:
 		return path_next_abstract(p);
+	case PATH_STATE_HALFWAY:
+		return path_step(p);
 	case PATH_STATE_ACTUAL:
 		return path_next_actual(p);
 	default:
@@ -202,21 +204,83 @@ path_next(struct path *p)
 	}
 }
 
+static bool
+path_continue(struct path *, enum path_state og_state, int og_frame,
+		int og_index);
+
 static struct error *
 path_next_abstract(struct path *p)
 {
 	struct error *err;
 
-	int currframe = state_frameid(p->abstract);
+	int og_frame = state_frameid(p->abstract);
+	int og_index = state_programindex(p->abstract);
 	if ((err = path_step(p))) {
 		return err;
 	}
-	while (p->path_state == PATH_STATE_ABSTRACT &&
-			currframe < state_frameid(p->abstract)) {
-		printf("stepping...\n");
-		return path_step(p);
+
+	while (path_continue(p, PATH_STATE_ABSTRACT, og_frame, og_index)) {
+		if ((err = path_step_abstract(p, false))) {
+			return err;
+		}
 	}
 	return NULL;
+}
+
+static bool
+path_insamestate(struct path *, enum path_state og_state);
+
+static bool
+path_inlowerframe(struct path *p, enum path_state og_state, int og_frameid);
+
+static bool
+path_insamestmt(struct path *p, enum path_state og_state, int og_frameid,
+		int og_program_index);
+
+static bool
+path_continue(struct path *p, enum path_state og_state, int og_frame,
+		int og_index)
+{
+	return path_insamestate(p, og_state) &&
+		(path_inlowerframe(p, og_state, og_frame) ||
+		path_insamestmt(p, og_state, og_frame, og_index));
+}
+
+static bool
+path_insamestate(struct path *p, enum path_state og_state)
+{
+	return p->path_state == og_state;
+}
+
+static bool
+path_inlowerframe(struct path *p, enum path_state og_state, int og_frame)
+{
+	switch (og_state) {
+	case PATH_STATE_ABSTRACT:
+		return og_frame < state_frameid(p->abstract);
+	case PATH_STATE_ACTUAL:
+		return og_frame < state_frameid(p->actual);
+	default:
+		assert(false);
+	}
+}
+
+static bool
+path_insamestmt(struct path *p, enum path_state og_state, int og_frame, int og_index)
+{
+	struct state *s;
+	switch (og_state) {
+	case PATH_STATE_ABSTRACT:
+		s = p->abstract;
+		break;
+	case PATH_STATE_ACTUAL:
+		s = p->actual;
+		break;
+	default:
+		assert(false);
+	}
+	return og_frame == state_frameid(s) &&
+		og_index == state_programindex(s);
 }
 
 static struct error *
@@ -224,14 +288,15 @@ path_next_actual(struct path *p)
 {
 	struct error *err;
 
-	int currframe = state_frameid(p->actual);
+	int og_frame = state_frameid(p->actual);
+	int og_index = state_programindex(p->actual);
 	if ((err = path_step(p))) {
 		return err;
 	}
-	while (p->path_state == PATH_STATE_ACTUAL &&
-			currframe < state_frameid(p->actual)) {
-		printf("stepping...\n");
-		return path_step(p);
+	while (path_continue(p, PATH_STATE_ACTUAL, og_frame, og_index)) {
+		if ((err = path_step_actual(p, false))) {
+			return err;
+		}
 	}
 	return NULL;
 }
@@ -284,10 +349,14 @@ path_init_actual(struct path *p)
 }
 
 static struct error *
-path_step_abstract(struct path *p)
+path_step_abstract(struct path *p, bool print)
 {
-	v_printf("text:\n%s\n", state_programtext(p->abstract));
-	v_printf("abstract: %s\n", state_str(p->abstract));
+	if (print) {
+		v_printf("frameid: %d\n", state_frameid(p->abstract));
+		v_printf("pindex: %d\n", state_programindex(p->abstract));
+		v_printf("text:\n%s\n", state_programtext(p->abstract));
+		v_printf("abstract: %s\n", state_str(p->abstract));
+	}
 	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
 		return NULL;
@@ -306,10 +375,14 @@ path_step_abstract(struct path *p)
 }
 
 static struct error *
-path_step_actual(struct path *p)
+path_step_actual(struct path *p, bool print)
 {
-	v_printf("text:\n%s\n", state_programtext(p->actual));
-	v_printf("actual: %s\n", state_str(p->actual));
+	if (print) {
+		v_printf("frameid: %d\n", state_frameid(p->actual));
+		v_printf("pindex: %d\n", state_programindex(p->actual));
+		v_printf("text:\n%s\n", state_programtext(p->actual));
+		v_printf("actual: %s\n", state_str(p->actual));
+	}
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
 		return path_step(p);

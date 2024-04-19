@@ -68,6 +68,12 @@ program_str(struct program *p)
 	return strbuilder_build(b);
 }
 
+int
+program_index(struct program *p)
+{
+	return p->index;
+}
+
 char *
 program_render(struct program *p)
 {

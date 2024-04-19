@@ -99,6 +99,12 @@ stack_programtext(struct stack *s)
 	return program_render(s->p);
 }
 
+int
+stack_programindex(struct stack *s)
+{
+	return program_index(s->p);
+}
+
 void
 stack_destroy(struct stack *stack)
 {

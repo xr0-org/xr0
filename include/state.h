@@ -68,6 +68,9 @@ char *
 state_programtext(struct state *);
 
 int
+state_programindex(struct state *);
+
+int
 state_frameid(struct state *);
 
 struct heap *
