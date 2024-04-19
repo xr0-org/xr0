@@ -3591,7 +3591,7 @@ pub unsafe fn ast_type_str(t: *mut AstType) -> *mut libc::c_char {
     }
     let b: *mut StrBuilder = strbuilder_create();
     let mod_0: *mut libc::c_char = mod_str((*t).modifiers);
-    strbuilder_printf(b, b"%s\0" as *const u8 as *const libc::c_char, mod_0);
+    strbuilder_write!(b, "{}", cstr!(mod_0));
     free(mod_0 as *mut libc::c_void);
     match &(*t).base {
         AstTypeBase::Pointer(ptr_type) => {

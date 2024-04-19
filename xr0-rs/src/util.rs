@@ -1,9 +1,7 @@
 use std::fmt::{self, Debug, Formatter};
 use std::ptr;
 
-use libc::{
-    fclose, free, malloc, open_memstream, realloc, snprintf, strcmp, strlen, strncpy, FILE,
-};
+use libc::{fclose, free, malloc, open_memstream, realloc, strcmp, strlen, strncpy, FILE};
 
 use crate::c_util::vfprintf;
 
@@ -18,10 +16,9 @@ struct Entry {
     value: *const libc::c_void,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct StrBuilder {
-    pub cap: usize,
-    pub buf: *mut libc::c_char,
+    s: String,
 }
 
 #[derive(Copy, Clone)]
@@ -179,78 +176,26 @@ impl Map {
 }
 
 pub unsafe fn strbuilder_create() -> *mut StrBuilder {
-    let b = malloc(::core::mem::size_of::<StrBuilder>()) as *mut StrBuilder;
-    (*b).cap = 100 as libc::c_int as usize;
-    (*b).buf = malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul((*b).cap))
-        as *mut libc::c_char;
-    *((*b).buf).offset(0 as libc::c_int as isize) = '\0' as i32 as libc::c_char;
-    return b;
+    Box::into_raw(Box::new(StrBuilder {
+        s: String::with_capacity(100),
+    }))
 }
 
 pub unsafe fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char {
-    if b.is_null() {
-        panic!();
-    }
-    let len = strlen((*b).buf).wrapping_add(1);
-    let s: *mut libc::c_char =
-        malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len)) as *mut libc::c_char;
-    snprintf(
-        s,
-        len,
-        b"%s\0" as *const u8 as *const libc::c_char,
-        (*b).buf,
-    );
-    free((*b).buf as *mut libc::c_void);
-    free(b as *mut libc::c_void);
-    return s;
-}
-
-unsafe fn strbuilder_realloc(b: *mut StrBuilder, len: usize) {
-    while (*b).cap <= len {
-        (*b).cap = (*b).cap * 2 as libc::c_int as usize;
-        (*b).buf = realloc(
-            (*b).buf as *mut libc::c_void,
-            (::core::mem::size_of::<libc::c_char>()).wrapping_mul((*b).cap),
-        ) as *mut libc::c_char;
-    }
-}
-
-#[macro_export]
-macro_rules! strbuilder_write {
-    ($b:expr, $($fmt:tt)+) => {
-        $crate::util::strbuilder_append_string($b, format!($($fmt)+))
-    }
-}
-
-#[macro_export]
-macro_rules! cstr {
-    ($c:expr) => {{
-        let c = $c;
-        if c.is_null() {
-            std::borrow::Cow::Borrowed("(null)")
-        } else {
-            std::ffi::CStr::from_ptr(c).to_string_lossy()
-        }
-    }};
+    let mut v = Box::from_raw(b).s.into_bytes();
+    v.push(0);
+    v.shrink_to_fit();
+    v.leak().as_mut_ptr() as *mut libc::c_char
 }
 
 pub unsafe fn strbuilder_append_string(b: *mut StrBuilder, s: String) {
-    let bytes = s.as_bytes();
-    strbuilder_append(b, bytes.as_ptr() as *const libc::c_char, bytes.len());
+    (*b).s.push_str(&s);
 }
 
 unsafe fn strbuilder_append(b: *mut StrBuilder, s: *const libc::c_char, len: usize) {
-    let buflen = strlen((*b).buf) as libc::c_int;
-    strbuilder_realloc(b, (buflen as usize).wrapping_add(len));
-    let newlen: usize = (buflen as usize)
-        .wrapping_add(len)
-        .wrapping_add(1 as libc::c_int as usize);
-    strncpy(
-        ((*b).buf).offset(buflen as isize),
-        s,
-        newlen.wrapping_sub(buflen as usize),
-    );
-    *(*b).buf.add(newlen - 1) = 0;
+    let bytes = std::slice::from_raw_parts(s as *const u8, len);
+    let s = String::from_utf8_lossy(bytes);
+    (*b).s.push_str(&s);
 }
 
 pub unsafe fn strbuilder_vprintf(
@@ -279,7 +224,26 @@ pub unsafe extern "C" fn strbuilder_printf(
 }
 
 pub unsafe fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char) {
-    strbuilder_append(b, &c, 1);
+    (*b).s.push(c as u8 as char);
+}
+
+#[macro_export]
+macro_rules! strbuilder_write {
+    ($b:expr, $($fmt:tt)+) => {
+        $crate::util::strbuilder_append_string($b, format!($($fmt)+))
+    }
+}
+
+#[macro_export]
+macro_rules! cstr {
+    ($c:expr) => {{
+        let c = $c;
+        if c.is_null() {
+            std::borrow::Cow::Borrowed("(null)")
+        } else {
+            std::ffi::CStr::from_ptr(c).to_string_lossy()
+        }
+    }};
 }
 
 pub unsafe fn error_create(s: *mut libc::c_char) -> Box<Error> {
