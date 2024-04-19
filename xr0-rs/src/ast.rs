@@ -2696,14 +2696,14 @@ unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder)
     } else {
         b"\0" as *const u8 as *const libc::c_char
     }) as *mut libc::c_char;
-    strbuilder_printf(
+    strbuilder_write!(
         b,
-        b"for (%s %s %s) [%s] { %s }\0" as *const u8 as *const libc::c_char,
-        init,
-        cond,
-        iter,
-        abs,
-        body,
+        "for ({} {} {}) [{}] {{ {} }}",
+        cstr!(init),
+        cstr!(cond),
+        cstr!(iter),
+        cstr!(abs),
+        cstr!(body),
     );
     free(init as *mut libc::c_void);
     free(cond as *mut libc::c_void);
@@ -2851,16 +2851,11 @@ unsafe fn ast_stmt_sel_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
     };
     let cond: *mut libc::c_char = ast_expr_str(&selection.cond);
     let body: *mut libc::c_char = ast_stmt_str(&*selection.body);
-    strbuilder_printf(
-        b,
-        b"if (%s) { %s }\0" as *const u8 as *const libc::c_char,
-        cond,
-        body,
-    );
+    strbuilder_write!(b, "if ({}) {{ {} }}", cstr!(cond), cstr!(body));
     let nest_stmt: *mut AstStmt = selection.nest;
     if !nest_stmt.is_null() {
         let nest: *mut libc::c_char = ast_stmt_str(&*nest_stmt);
-        strbuilder_printf(b, b" else %s\0" as *const u8 as *const libc::c_char, nest);
+        strbuilder_write!(b, " else {}", cstr!(nest));
         free(nest as *mut libc::c_void);
     }
     free(cond as *mut libc::c_void);
@@ -2944,11 +2939,11 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
         let b: *mut StrBuilder = strbuilder_create();
         let c_str: *mut libc::c_char = ast_expr_str(control);
         let v_str: *mut libc::c_char = value_str(v);
-        strbuilder_printf(
+        strbuilder_write!(
             b,
-            b"`%s' with value `%s' is undecidable\0" as *const u8 as *const libc::c_char,
-            c_str,
-            v_str,
+            "`{}' with value `{}' is undecidable",
+            cstr!(c_str),
+            cstr!(v_str),
         );
         free(v_str as *mut libc::c_void);
         free(c_str as *mut libc::c_void);
@@ -2975,13 +2970,13 @@ unsafe fn ast_stmt_compound_sprint(compound: &AstBlock, b: *mut StrBuilder) {
         compound,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    strbuilder_printf(b, s);
+    strbuilder_write!(b, "{}", cstr!(s));
     free(s as *mut libc::c_void);
 }
 
 unsafe fn ast_stmt_expr_sprint(expr: &AstExpr, b: *mut StrBuilder) {
     let s: *mut libc::c_char = ast_expr_str(expr);
-    strbuilder_printf(b, b"%s;\0" as *const u8 as *const libc::c_char, s);
+    strbuilder_write!(b, "{};", cstr!(s));
     free(s as *mut libc::c_void);
 }
 
