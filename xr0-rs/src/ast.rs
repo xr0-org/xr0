@@ -466,10 +466,10 @@ pub unsafe fn ast_expr_decide(expr: &AstExpr, state: *mut State) -> bool {
 unsafe fn expr_binary_decide(expr: &AstExpr, state: *mut State) -> bool {
     let root = ast_expr_eval(ast_expr_binary_e1(expr), state).unwrap();
     let last = ast_expr_eval(ast_expr_binary_e2(expr), state).unwrap();
-    return value_compare(root, ast_expr_binary_op(expr), last);
+    return value_compare(&*root, ast_expr_binary_op(expr), &*last);
 }
 
-unsafe fn value_compare(v1: *mut Value, op: AstBinaryOp, v2: *mut Value) -> bool {
+unsafe fn value_compare(v1: &Value, op: AstBinaryOp, v2: &Value) -> bool {
     match op {
         AstBinaryOp::Eq => value_equal(v1, v2),
         AstBinaryOp::Ne => !value_compare(v1, AstBinaryOp::Eq, v2),
@@ -3072,7 +3072,7 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
             init
         };
     }
-    let nonzero: bool = !value_equal(zero, v);
+    let nonzero: bool = !value_equal(&*zero, &*v);
     value_destroy(zero);
     return {
         let init = Decision {

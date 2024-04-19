@@ -572,8 +572,8 @@ unsafe fn struct_references(sv: &StructValue, loc: *mut Location, s: *mut State)
     false
 }
 
-pub unsafe fn value_equal(v1: *mut Value, v2: *mut Value) -> bool {
-    match (&(*v1).kind, &(*v2).kind) {
+pub unsafe fn value_equal(v1: &Value, v2: &Value) -> bool {
+    match (&v1.kind, &v2.kind) {
         (ValueKind::Literal(s1), ValueKind::Literal(s2)) => strcmp(*s1, *s2) == 0,
         (ValueKind::Int(n1), ValueKind::Int(n2)) | (ValueKind::Sync(n1), ValueKind::Sync(n2)) => {
             number_equal(*n1, *n2)
