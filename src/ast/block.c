@@ -5,8 +5,6 @@
 #include "ast.h"
 #include "util.h"
 
-#define TEMP_PREFIX "`T" /* unreachable from user space */
-
 struct ast_block {
 	int ndecl, nstmt;
 	struct ast_variable **decl;
@@ -138,7 +136,7 @@ ast_block_render(struct ast_block *b, int index, bool indecls)
 	for (int i = 0; i < b->ndecl; i++) {
 		char *s = ast_variable_str(b->decl[i]);
 		if (i == index && indecls) {
-			strbuilder_printf(sb, "->\t%s;\n", s);
+			strbuilder_printf(sb, "-->\t%s;\n", s);
 		} else {
 			strbuilder_printf(sb, "\t%s;\n", s);
 		}
@@ -147,7 +145,7 @@ ast_block_render(struct ast_block *b, int index, bool indecls)
 	for (int i = 0; i < b->nstmt; i++) {
 		char *s = ast_stmt_str(b->stmt[i], 0);
 		if (i == index && !indecls) {
-			strbuilder_printf(sb, "->\t%s\n", s);
+			strbuilder_printf(sb, "-->\t%s\n", s);
 		} else {
 			strbuilder_printf(sb, "\t%s\n", s);
 		}
@@ -252,6 +250,6 @@ static char *
 generate_tempvar(int tempid)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "%s%d", dynamic_str(TEMP_PREFIX), tempid);
+	strbuilder_printf(b, "<t%d>", tempid);
 	return strbuilder_build(b);
 }

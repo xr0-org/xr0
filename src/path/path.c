@@ -352,8 +352,6 @@ static struct error *
 path_step_abstract(struct path *p, bool print)
 {
 	if (print) {
-		v_printf("frameid: %d\n", state_frameid(p->abstract));
-		v_printf("pindex: %d\n", state_programindex(p->abstract));
 		v_printf("text:\n%s\n", state_programtext(p->abstract));
 		v_printf("abstract: %s\n", state_str(p->abstract));
 	}
@@ -378,8 +376,6 @@ static struct error *
 path_step_actual(struct path *p, bool print)
 {
 	if (print) {
-		v_printf("frameid: %d\n", state_frameid(p->actual));
-		v_printf("pindex: %d\n", state_programindex(p->actual));
 		v_printf("text:\n%s\n", state_programtext(p->actual));
 		v_printf("actual: %s\n", state_str(p->actual));
 	}
