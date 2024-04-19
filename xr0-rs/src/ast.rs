@@ -3383,10 +3383,10 @@ pub unsafe fn ast_stmt_preconds_validate(stmt: &AstStmt) -> Result<()> {
 unsafe fn preconds_selection_verify(stmt: &AstStmt) -> Result<()> {
     let b: *mut StrBuilder = strbuilder_create();
     let l = ast_stmt_lexememarker(stmt);
-    strbuilder_printf(
+    strbuilder_write!(
         b,
-        b"%s setup preconditions must be decidable\0" as *const u8 as *const libc::c_char,
-        lexememarker_str(l),
+        "{} setup preconditions must be decidable",
+        cstr!(lexememarker_str(l)),
     );
     Err(error_create(strbuilder_build(b)))
 }
