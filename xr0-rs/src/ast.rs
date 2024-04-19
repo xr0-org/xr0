@@ -1829,12 +1829,7 @@ unsafe fn ast_expr_assignment_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     };
     let root: *mut libc::c_char = ast_expr_str(&assignment.lval);
     let rval: *mut libc::c_char = ast_expr_str(&assignment.rval);
-    strbuilder_printf(
-        b,
-        b"%s = %s\0" as *const u8 as *const libc::c_char,
-        root,
-        rval,
-    );
+    strbuilder_write!(b, "{} = {}", cstr!(root), cstr!(rval));
     free(rval as *mut libc::c_void);
     free(root as *mut libc::c_void);
 }
@@ -1844,24 +1839,18 @@ unsafe fn ast_expr_binary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
         panic!()
     };
     let opstr = match binary.op {
-        AstBinaryOp::Eq => b"==\0" as &[u8],
-        AstBinaryOp::Ne => b"!=\0",
-        AstBinaryOp::Lt => b"<\0",
-        AstBinaryOp::Gt => b">\0",
-        AstBinaryOp::Le => b"<=\0",
-        AstBinaryOp::Ge => b">=\0",
-        AstBinaryOp::Addition => b"+\0",
-        AstBinaryOp::Subtraction => b"-\0",
+        AstBinaryOp::Eq => "==",
+        AstBinaryOp::Ne => "!=",
+        AstBinaryOp::Lt => "<",
+        AstBinaryOp::Gt => ">",
+        AstBinaryOp::Le => "<=",
+        AstBinaryOp::Ge => ">=",
+        AstBinaryOp::Addition => "+",
+        AstBinaryOp::Subtraction => "-",
     };
     let e1: *mut libc::c_char = ast_expr_str(&binary.e1);
     let e2: *mut libc::c_char = ast_expr_str(&binary.e2);
-    strbuilder_printf(
-        b,
-        b"%s%s%s\0" as *const u8 as *const libc::c_char,
-        e1,
-        opstr.as_ptr() as *const libc::c_char,
-        e2,
-    );
+    strbuilder_write!(b, "{}{opstr}{}", cstr!(e1), cstr!(e2));
     free(e1 as *mut libc::c_void);
     free(e2 as *mut libc::c_void);
 }
@@ -1886,20 +1875,15 @@ unsafe fn ast_expr_unary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
         panic!()
     };
     let c = match unary.op {
-        AstUnaryOp::Address => b'&',
-        AstUnaryOp::Dereference => b'*',
-        AstUnaryOp::Positive => b'+',
-        AstUnaryOp::Negative => b'-',
-        AstUnaryOp::OnesComplement => b'~',
-        AstUnaryOp::Bang => b'!',
-    } as libc::c_char;
+        AstUnaryOp::Address => "&",
+        AstUnaryOp::Dereference => "*",
+        AstUnaryOp::Positive => "+",
+        AstUnaryOp::Negative => "-",
+        AstUnaryOp::OnesComplement => "~",
+        AstUnaryOp::Bang => "!",
+    };
     let root: *mut libc::c_char = ast_expr_str(&unary.arg);
-    strbuilder_printf(
-        b,
-        b"%c(%s)\0" as *const u8 as *const libc::c_char,
-        c as libc::c_int,
-        root,
-    );
+    strbuilder_write!(b, "{c}({})", cstr!(root));
     free(root as *mut libc::c_void);
 }
 
@@ -2047,11 +2031,7 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     let f: *mut AstFunction = externals_getfunc(state_getext(state), name);
     if f.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
-        strbuilder_printf(
-            b,
-            b"function: `%s' not found\0" as *const u8 as *const libc::c_char,
-            name,
-        );
+        strbuilder_write!(b, "function: `{}' not found", cstr!(name));
         return AstStmtSplits {
             n: 0,
             cond: ptr::null_mut(),
@@ -2270,22 +2250,12 @@ pub unsafe fn ast_block_str(b: &AstBlock, indent: *mut libc::c_char) -> *mut lib
     let sb: *mut StrBuilder = strbuilder_create();
     for &decl in &b.decls {
         let s: *mut libc::c_char = ast_variable_str(decl);
-        strbuilder_printf(
-            sb,
-            b"%s%s;\n\0" as *const u8 as *const libc::c_char,
-            indent,
-            s,
-        );
+        strbuilder_write!(sb, "{}{};\n", cstr!(indent), cstr!(s));
         free(s as *mut libc::c_void);
     }
     for &stmt in &b.stmts {
         let s: *mut libc::c_char = ast_stmt_str(&*stmt);
-        strbuilder_printf(
-            sb,
-            b"%s%s\n\0" as *const u8 as *const libc::c_char,
-            indent,
-            s,
-        );
+        strbuilder_write!(sb, "{}{}\n", cstr!(indent), cstr!(s));
         free(s as *mut libc::c_void);
     }
     return strbuilder_build(sb);
@@ -2347,12 +2317,7 @@ pub unsafe fn ast_stmt_process(
             let b: *mut StrBuilder = strbuilder_create();
             let loc = ast_stmt_lexememarker(stmt);
             let m: *mut libc::c_char = lexememarker_str(loc);
-            strbuilder_printf(
-                b,
-                b"%s: %s\0" as *const u8 as *const libc::c_char,
-                m,
-                err.msg,
-            );
+            strbuilder_write!(b, "{}: {}", cstr!(m), cstr!(err.msg));
             free(m as *mut libc::c_void);
             return Err(error_create(strbuilder_build(b)));
         }
@@ -2361,12 +2326,12 @@ pub unsafe fn ast_stmt_process(
         let b: *mut StrBuilder = strbuilder_create();
         let loc = ast_stmt_lexememarker(stmt);
         let m: *mut libc::c_char = lexememarker_str(loc);
-        strbuilder_printf(
+        strbuilder_write!(
             b,
-            b"%s:%s: cannot exec statement: %s\0" as *const u8 as *const libc::c_char,
-            m,
-            fname,
-            err.msg,
+            "{}:{}: cannot exec statement: {}",
+            cstr!(m),
+            cstr!(fname),
+            cstr!(err.msg),
         );
         free(m as *mut libc::c_void);
         return Err(error_create(strbuilder_build(b)));
@@ -2696,7 +2661,7 @@ pub unsafe fn ast_stmt_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
 unsafe fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: *mut StrBuilder) {
     // Note: jump.rv can be null. Error in the original.
     let rv: *mut libc::c_char = ast_expr_str(jump.rv.as_ref().unwrap());
-    strbuilder_printf(b, b"return %s;\n\0" as *const u8 as *const libc::c_char, rv);
+    strbuilder_write!(b, "return {};\n", cstr!(rv));
     free(rv as *mut libc::c_void);
 }
 
