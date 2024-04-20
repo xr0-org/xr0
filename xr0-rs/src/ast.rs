@@ -3273,7 +3273,7 @@ pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
 unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> AstStmtSplits {
     let v = ast_expr_pf_reduce(&selection.cond, s).unwrap();
     let e: *mut AstExpr = value_to_expr(v);
-    if condexists(&*e, s) as libc::c_int != 0 || value_isconstant(&*v) as libc::c_int != 0 {
+    if condexists(&*e, s) || value_isconstant(&*v) {
         return {
             let init = AstStmtSplits {
                 n: 0,
@@ -3641,12 +3641,7 @@ unsafe fn mod_str(mod_0: libc::c_int) -> *mut libc::c_char {
 unsafe fn ast_type_str_build_ptr(b: *mut StrBuilder, ptr_type: *mut AstType) {
     let base: *mut libc::c_char = ast_type_str(ptr_type);
     let space: bool = !matches!((*ptr_type).base, AstTypeBase::Pointer(_));
-    strbuilder_write!(
-        b,
-        "{}{}*",
-        cstr!(base),
-        if space as libc::c_int != 0 { " " } else { "" },
-    );
+    strbuilder_write!(b, "{}{}*", cstr!(base), if space { " " } else { "" },);
     free(base as *mut libc::c_void);
 }
 

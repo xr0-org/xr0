@@ -293,10 +293,7 @@ unsafe fn location_auto_getblock(loc: *mut Location, s: *mut Stack) -> Result<*m
 }
 
 pub unsafe fn location_getstackblock(loc: *mut Location, s: *mut Stack) -> *mut Block {
-    if !((*loc).r#type as libc::c_uint == LOCATION_AUTOMATIC as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long
-        != 0
-    {
+    if !((*loc).r#type as libc::c_uint == LOCATION_AUTOMATIC as libc::c_int as libc::c_uint) {
         panic!();
     }
     return stack_getblock(s, (*loc).block);

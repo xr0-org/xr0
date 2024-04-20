@@ -185,8 +185,6 @@ pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
         0 => {
             !((*obj).c2rust_unnamed.value).is_null()
                 && state_isdeallocand(s, value_as_location(&*(*obj).c2rust_unnamed.value))
-                    as libc::c_int
-                    != 0
         }
         1 => range_isdeallocand((*obj).c2rust_unnamed.range, s),
         _ => panic!(),
@@ -197,25 +195,15 @@ pub unsafe fn object_references(obj: *mut Object, loc: *mut Location, s: *mut St
     if (*obj).r#type as libc::c_uint == OBJECT_DEALLOCAND_RANGE as libc::c_int as libc::c_uint {
         return range_references((*obj).c2rust_unnamed.range, loc, s);
     }
-    if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long
-        != 0
-    {
+    if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
         panic!();
     }
     let v: *mut Value = object_as_value(obj);
-    return if !v.is_null() {
-        value_references(v, loc, s) as libc::c_int
-    } else {
-        0 as libc::c_int
-    } != 0;
+    !v.is_null() && value_references(v, loc, s)
 }
 
 pub unsafe fn object_assign(obj: *mut Object, val: *mut Value) -> *mut Error {
-    if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
-        as libc::c_int as libc::c_long
-        != 0
-    {
+    if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
         panic!();
     }
     (*obj).c2rust_unnamed.value = val;
@@ -325,10 +313,7 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
         return ptr::null_mut();
     }
     if e2 {
-        if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint)
-            as libc::c_int as libc::c_long
-            != 0
-        {
+        if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
             panic!();
         }
         return object_value_create(

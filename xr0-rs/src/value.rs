@@ -306,7 +306,7 @@ unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
     let m: &Map = &*sv.m;
     for p in m.values() {
         let val: *mut Value = object_as_value(p as *mut Object);
-        if !val.is_null() && value_referencesheap(&*val, s) as libc::c_int != 0 {
+        if !val.is_null() && value_referencesheap(&*val, s) {
             return true;
         }
     }
@@ -518,7 +518,7 @@ unsafe fn struct_references(sv: &StructValue, loc: *mut Location, s: *mut State)
     let m: &Map = &*sv.m;
     for p in m.values() {
         let val: *mut Value = object_as_value(p as *mut Object);
-        if !val.is_null() && value_references(val, loc, s) as libc::c_int != 0 {
+        if !val.is_null() && value_references(val, loc, s) {
             return true;
         }
     }
@@ -616,7 +616,7 @@ unsafe fn number_range_lw(n: *mut Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
     };
-    if !(number_range_arr_n(*ranges) == 1 as libc::c_int) as libc::c_int as libc::c_long != 0 {
+    if !(number_range_arr_n(*ranges) == 1 as libc::c_int) {
         panic!();
     }
     let r: *mut NumberRange = *(number_range_arr_range(*ranges)).offset(0 as libc::c_int as isize);
@@ -627,7 +627,7 @@ unsafe fn number_range_up(n: *mut Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
     };
-    if !(number_range_arr_n(*ranges) == 1 as libc::c_int) as libc::c_int as libc::c_long != 0 {
+    if !(number_range_arr_n(*ranges) == 1 as libc::c_int) {
         panic!();
     }
     let r: *mut NumberRange = *(number_range_arr_range(*ranges)).offset(0 as libc::c_int as isize);
@@ -718,11 +718,10 @@ unsafe fn number_isconstant(n: *mut Number) -> bool {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
     };
-    return number_range_arr_n(*ranges) == 1 as libc::c_int
+    return number_range_arr_n(*ranges) == 1
         && number_range_issingle(
             *(number_range_arr_range(*ranges)).offset(0 as libc::c_int as isize),
-        ) as libc::c_int
-            != 0;
+        );
 }
 
 unsafe fn number_as_constant(n: *mut Number) -> libc::c_int {

@@ -80,10 +80,10 @@ pub unsafe fn stack_create(
 }
 
 pub unsafe fn stack_getframe(s: *mut Stack, frame: libc::c_int) -> *mut Stack {
-    if s.is_null() as libc::c_int as libc::c_long != 0 {
+    if s.is_null() {
         panic!();
     }
-    if !(frame >= 0 as libc::c_int) as libc::c_int as libc::c_long != 0 {
+    if !(frame >= 0 as libc::c_int) {
         panic!();
     }
     if (*s).id == frame {
@@ -225,15 +225,13 @@ pub unsafe fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Va
 
 pub unsafe fn stack_references(s: *mut Stack, loc: *mut Location, state: *mut State) -> bool {
     let result: *mut Variable = stack_getresult(s);
-    if !result.is_null() && variable_references(result, loc, state) as libc::c_int != 0 {
+    if !result.is_null() && variable_references(result, loc, state) {
         return true;
     }
     let m = &(*s).varmap;
     for p in m.values() {
         let var = p as *mut Variable;
-        if variable_isparam(var) as libc::c_int != 0
-            && variable_references(var, loc, state) as libc::c_int != 0
-        {
+        if variable_isparam(var) && variable_references(var, loc, state) {
             return true;
         }
     }
@@ -241,7 +239,7 @@ pub unsafe fn stack_references(s: *mut Stack, loc: *mut Location, state: *mut St
 }
 
 pub unsafe fn stack_getblock(s: *mut Stack, address: libc::c_int) -> *mut Block {
-    if !(address < block_arr_nblocks((*s).frame)) as libc::c_int as libc::c_long != 0 {
+    if !(address < block_arr_nblocks((*s).frame)) {
         panic!();
     }
     return *(block_arr_blocks((*s).frame)).offset(address as isize);
@@ -316,15 +314,14 @@ pub unsafe fn variable_str(
     state: *mut State,
 ) -> *mut libc::c_char {
     if !(location_type((*var).loc) as libc::c_uint
-        != LOCATION_VCONST as libc::c_int as libc::c_uint) as libc::c_int as libc::c_long
-        != 0
+        != LOCATION_VCONST as libc::c_int as libc::c_uint)
     {
         panic!();
     }
     let b: *mut StrBuilder = strbuilder_create();
     let type_0: *mut libc::c_char = ast_type_str((*var).r#type);
     let loc: *mut libc::c_char = location_str((*var).loc);
-    let isparam: *mut libc::c_char = (if (*var).is_param as libc::c_int != 0 {
+    let isparam: *mut libc::c_char = (if (*var).is_param {
         b"param \0" as *const u8 as *const libc::c_char
     } else {
         b"\0" as *const u8 as *const libc::c_char
@@ -350,7 +347,7 @@ unsafe fn object_or_nothing_str(
     state: *mut State,
 ) -> *mut libc::c_char {
     let b: *mut Block = location_getstackblock(loc, stack);
-    if b.is_null() as libc::c_int as libc::c_long != 0 {
+    if b.is_null() {
         panic!();
     }
     let obj: *mut Object = block_observe(b, &*location_offset(loc), state, false);
