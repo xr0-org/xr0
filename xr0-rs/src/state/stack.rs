@@ -285,7 +285,7 @@ pub unsafe fn variable_copy(old: *mut Variable) -> *mut Variable {
     let new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
     (*new).r#type = ast_type_copy((*old).r#type);
     (*new).is_param = (*old).is_param;
-    (*new).loc = location_copy((*old).loc);
+    (*new).loc = location_copy(&*(*old).loc);
     return new;
 }
 
@@ -293,7 +293,7 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
     let new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
     (*new).r#type = ast_type_copy((*old).r#type);
     (*new).is_param = (*old).is_param;
-    (*new).loc = location_copy((*old).loc);
+    (*new).loc = location_copy(&*(*old).loc);
     let obj = state_get(s, (*new).loc, false).unwrap();
     if obj.is_null() {
         panic!();
@@ -315,7 +315,7 @@ pub unsafe fn variable_str(
     assert!(!(*(*var).loc).type_is_vconst());
     let b: *mut StrBuilder = strbuilder_create();
     let type_0: *mut libc::c_char = ast_type_str((*var).r#type);
-    let loc: *mut libc::c_char = location_str((*var).loc);
+    let loc: *mut libc::c_char = location_str(&*(*var).loc);
     let isparam: *mut libc::c_char = (if (*var).is_param {
         b"param \0" as *const u8 as *const libc::c_char
     } else {

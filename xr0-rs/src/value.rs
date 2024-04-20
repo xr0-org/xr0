@@ -305,7 +305,7 @@ unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
 pub unsafe fn value_copy(v: &Value) -> *mut Value {
     value_create(match &v.kind {
         ValueKind::Sync(n) => ValueKind::Sync(number_copy(*n)),
-        ValueKind::DefinitePtr(loc) => ValueKind::DefinitePtr(location_copy(*loc)),
+        ValueKind::DefinitePtr(loc) => ValueKind::DefinitePtr(location_copy(&**loc)),
         ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(number_copy(*n)),
         ValueKind::Int(n) => ValueKind::Int(number_copy(*n)),
         ValueKind::Literal(s) => ValueKind::Literal(dynamic_str(*s)),
@@ -375,27 +375,27 @@ pub unsafe fn value_str(v: *mut Value) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 
-pub unsafe fn value_sync_sprint(n: *mut Number, b: *mut StrBuilder) {
+unsafe fn value_sync_sprint(n: *mut Number, b: *mut StrBuilder) {
     strbuilder_write!(b, "comp:{}", cstr!(number_str(n)));
 }
 
-pub unsafe fn value_definite_ptr_sprint(loc: *mut Location, b: *mut StrBuilder) {
-    let s = location_str(loc);
+unsafe fn value_definite_ptr_sprint(loc: *mut Location, b: *mut StrBuilder) {
+    let s = location_str(&*loc);
     strbuilder_write!(b, "ptr:{}", cstr!(s));
     free(s as *mut libc::c_void);
 }
 
-pub unsafe fn value_indefinite_ptr_sprint(n: *mut Number, b: *mut StrBuilder) {
+unsafe fn value_indefinite_ptr_sprint(n: *mut Number, b: *mut StrBuilder) {
     let s = number_str(n);
     strbuilder_write!(b, "ptr:{}", cstr!(s));
     free(s as *mut libc::c_void);
 }
 
-pub unsafe fn value_int_sprint(n: *mut Number, b: *mut StrBuilder) {
+unsafe fn value_int_sprint(n: *mut Number, b: *mut StrBuilder) {
     strbuilder_write!(b, "int:{}", cstr!(number_str(n)));
 }
 
-pub unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
+unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
     strbuilder_write!(b, "struct:{{");
     let members: *mut AstVariableArr = sv.members;
     let n: libc::c_int = ast_variable_arr_n(members);

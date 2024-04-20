@@ -423,7 +423,7 @@ pub unsafe fn range_create(size: *mut AstExpr, loc: *mut Location) -> *mut Range
 pub unsafe fn range_copy(r: *mut Range) -> *mut Range {
     return range_create(
         Box::into_raw(ast_expr_copy(&*(*r).size)),
-        location_copy((*r).loc),
+        location_copy(&*(*r).loc),
     );
 }
 
@@ -436,7 +436,7 @@ pub unsafe fn range_destroy(r: *mut Range) {
 pub unsafe fn range_str(r: *mut Range) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     let size: *mut libc::c_char = ast_expr_str(&*(*r).size);
-    let loc: *mut libc::c_char = location_str((*r).loc);
+    let loc: *mut libc::c_char = location_str(&*(*r).loc);
     strbuilder_write!(b, "virt:{}@{}", cstr!(size), cstr!(loc));
     free(loc as *mut libc::c_void);
     free(size as *mut libc::c_void);

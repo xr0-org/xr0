@@ -376,7 +376,7 @@ pub unsafe fn state_deref(
     if deref_base.is_null() {
         panic!();
     }
-    let deref: *mut Location = location_with_offset(deref_base, index);
+    let deref: *mut Location = location_with_offset(&*deref_base, index);
     state_get(state, deref, true).map_err(|err| {
         let b: *mut StrBuilder = strbuilder_create();
         strbuilder_write!(b, "undefined indirection: {}", cstr!(err.msg));
