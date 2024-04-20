@@ -2,7 +2,7 @@
 
 use std::ptr;
 
-use libc::{calloc, free, malloc, realloc, strcmp};
+use libc::{free, strcmp};
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_equal,
@@ -52,18 +52,8 @@ pub struct Number {
 
 #[derive(Clone)]
 pub enum NumberKind {
-    Ranges(*mut NumberRangeArr),
+    Ranges(Vec<NumberRange>),
     Computed(*mut AstExpr),
-}
-
-pub type NumberType = libc::c_uint;
-pub const NUMBER_COMPUTED: NumberType = 1;
-pub const NUMBER_RANGES: NumberType = 0;
-
-#[derive(Clone)]
-pub struct NumberRangeArr {
-    pub n: libc::c_int,
-    pub range: *mut *mut NumberRange,
 }
 
 #[derive(Clone)]
@@ -434,7 +424,7 @@ pub unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
 }
 
 pub unsafe fn value_islocation(v: &Value) -> bool {
-    matches!((*v).kind, ValueKind::DefinitePtr(_))
+    matches!(v.kind, ValueKind::DefinitePtr(_))
 }
 
 pub unsafe fn value_as_location(v: &Value) -> *mut Location {
@@ -446,10 +436,10 @@ pub unsafe fn value_as_location(v: &Value) -> *mut Location {
 
 pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
     match &v.kind {
-        ValueKind::DefinitePtr(_) | ValueKind::IndefinitePtr(_) => return ptr_referencesheap(v, s),
-        ValueKind::Struct(sv) => return struct_referencesheap(sv, s),
-        _ => return false,
-    };
+        ValueKind::DefinitePtr(_) | ValueKind::IndefinitePtr(_) => ptr_referencesheap(v, s),
+        ValueKind::Struct(sv) => struct_referencesheap(sv, s),
+        _ => false,
+    }
 }
 
 pub unsafe fn value_as_constant(v: &Value) -> libc::c_int {
@@ -477,7 +467,7 @@ pub unsafe fn value_as_sync(v: *mut Value) -> *mut AstExpr {
     let ValueKind::Sync(n) = &(*v).kind else {
         panic!();
     };
-    return number_as_sync(*n);
+    number_as_sync(*n)
 }
 
 pub unsafe fn value_isint(v: &Value) -> bool {
@@ -547,7 +537,7 @@ unsafe fn number_create(kind: NumberKind) -> *mut Number {
     Box::into_raw(Box::new(Number { kind }))
 }
 
-unsafe fn number_ranges_create(ranges: *mut NumberRangeArr) -> *mut Number {
+unsafe fn number_ranges_create(ranges: Vec<NumberRange>) -> *mut Number {
     number_create(NumberKind::Ranges(ranges))
 }
 
@@ -555,89 +545,65 @@ unsafe fn number_single_create(val: libc::c_int) -> *mut Number {
     number_create(NumberKind::Ranges(number_range_arr_single_create(val)))
 }
 
-unsafe fn number_range_arr_single_create(val: libc::c_int) -> *mut NumberRangeArr {
-    let arr: *mut NumberRangeArr = number_range_arr_create();
-    number_range_arr_append(
-        arr,
-        number_range_create(
-            number_value_constant_create(val),
-            number_value_constant_create(val + 1 as libc::c_int),
-        ),
-    );
-    return arr;
+unsafe fn number_range_arr_single_create(val: libc::c_int) -> Vec<NumberRange> {
+    vec![number_range_create(
+        number_value_constant_create(val),
+        number_value_constant_create(val + 1 as libc::c_int),
+    )]
 }
 
 unsafe fn number_computed_create(e: *mut AstExpr) -> *mut Number {
     number_create(NumberKind::Computed(e))
 }
 
-unsafe fn number_range_arr_ne_create(val: libc::c_int) -> *mut NumberRangeArr {
-    let arr: *mut NumberRangeArr = number_range_arr_create();
-    number_range_arr_append(
-        arr,
+unsafe fn number_range_arr_ne_create(val: libc::c_int) -> Vec<NumberRange> {
+    vec![
         number_range_create(number_value_min_create(), number_value_constant_create(val)),
-    );
-    number_range_arr_append(
-        arr,
         number_range_create(
             number_value_constant_create(val + 1 as libc::c_int),
             number_value_max_create(),
         ),
-    );
-    return arr;
+    ]
 }
 
 unsafe fn number_ne_create(val: libc::c_int) -> *mut Number {
-    return number_ranges_create(number_range_arr_ne_create(val));
+    number_ranges_create(number_range_arr_ne_create(val))
 }
 
 unsafe fn number_with_range_create(lw: libc::c_int, excl_up: libc::c_int) -> *mut Number {
-    let arr: *mut NumberRangeArr = number_range_arr_create();
-    number_range_arr_append(
-        arr,
-        number_range_create(
-            number_value_constant_create(lw),
-            number_value_constant_create(excl_up),
-        ),
-    );
-    return number_ranges_create(arr);
+    number_ranges_create(vec![number_range_create(
+        number_value_constant_create(lw),
+        number_value_constant_create(excl_up),
+    )])
 }
 
 unsafe fn number_indefinite_create() -> *mut Number {
-    let arr: *mut NumberRangeArr = number_range_arr_create();
-    number_range_arr_append(
-        arr,
-        number_range_create(number_value_min_create(), number_value_max_create()),
-    );
-    return number_ranges_create(arr);
+    number_ranges_create(vec![number_range_create(
+        number_value_min_create(),
+        number_value_max_create(),
+    )])
 }
 
 unsafe fn number_range_lw(n: *mut Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
     };
-    if !(number_range_arr_n(*ranges) == 1 as libc::c_int) {
-        panic!();
-    }
-    let r: *mut NumberRange = *(number_range_arr_range(*ranges)).offset(0 as libc::c_int as isize);
-    return number_value_as_constant(number_range_lower(r));
+    assert_eq!(ranges.len(), 1);
+    number_value_as_constant(ranges[0].lower)
 }
 
 unsafe fn number_range_up(n: *mut Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
     };
-    if !(number_range_arr_n(*ranges) == 1 as libc::c_int) {
-        panic!();
-    }
-    let r: *mut NumberRange = *(number_range_arr_range(*ranges)).offset(0 as libc::c_int as isize);
-    return number_value_as_constant(number_range_upper(r));
+    assert_eq!(ranges.len(), 1);
+    number_value_as_constant(ranges[0].upper)
 }
 
 unsafe fn number_destroy(n: *mut Number) {
     match &(*n).kind {
         NumberKind::Ranges(ranges) => {
-            number_range_arr_destroy(*ranges);
+            number_range_arr_destroy(ranges);
         }
         NumberKind::Computed(computation) => {
             ast_expr_destroy(*computation);
@@ -645,17 +611,14 @@ unsafe fn number_destroy(n: *mut Number) {
     }
 }
 
-unsafe fn number_ranges_sprint(ranges: *mut NumberRangeArr) -> *mut libc::c_char {
+unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    let n: libc::c_int = number_range_arr_n(ranges);
-    let range: *mut *mut NumberRange = number_range_arr_range(ranges);
     strbuilder_putc(b, '{' as i32 as libc::c_char);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let r: *mut libc::c_char = number_range_str(*range.offset(i as isize));
+    let n = ranges.len();
+    for (i, range) in ranges.iter().enumerate() {
+        let r = number_range_str(range);
         strbuilder_write!(b, "{}{}", cstr!(r), if i + 1 < n { ", " } else { "" });
         free(r as *mut libc::c_void);
-        i += 1;
     }
     strbuilder_putc(b, '}' as i32 as libc::c_char);
     return strbuilder_build(b);
@@ -663,7 +626,7 @@ unsafe fn number_ranges_sprint(ranges: *mut NumberRangeArr) -> *mut libc::c_char
 
 unsafe fn number_str(num: *mut Number) -> *mut libc::c_char {
     match &(*num).kind {
-        NumberKind::Ranges(ranges) => number_ranges_sprint(*ranges),
+        NumberKind::Ranges(ranges) => number_ranges_sprint(ranges),
         NumberKind::Computed(computation) => ast_expr_str(&**computation),
     }
 }
@@ -671,65 +634,55 @@ unsafe fn number_str(num: *mut Number) -> *mut libc::c_char {
 unsafe fn number_equal(n1: *mut Number, n2: *mut Number) -> bool {
     match (&(*n1).kind, &(*n2).kind) {
         (NumberKind::Ranges(ranges1), NumberKind::Ranges(ranges2)) => {
-            number_ranges_equal(*ranges1, *ranges2)
+            number_ranges_equal(ranges1, ranges2)
         }
         (NumberKind::Computed(c1), NumberKind::Computed(c2)) => ast_expr_equal(&**c1, &**c2),
         _ => panic!(),
     }
 }
 
-unsafe fn number_ranges_equal(n1: *mut NumberRangeArr, n2: *mut NumberRangeArr) -> bool {
-    let len: libc::c_int = number_range_arr_n(n1);
-    if len != number_range_arr_n(n2) {
+unsafe fn number_ranges_equal(n1: &[NumberRange], n2: &[NumberRange]) -> bool {
+    let len = n1.len();
+    if len != n2.len() {
         return false;
     }
-    let n1_r: *mut *mut NumberRange = number_range_arr_range(n1);
-    let n2_r: *mut *mut NumberRange = number_range_arr_range(n2);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < len {
-        if !number_range_equal(*n1_r.offset(i as isize), *n2_r.offset(i as isize)) {
-            return false;
-        }
-        i += 1;
-    }
-    return true;
+    n1.iter()
+        .zip(n2)
+        .all(|(nr1, nr2)| number_range_equal(nr1, nr2))
 }
 
 unsafe fn number_assume(n: *mut Number, value: bool) -> bool {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
     };
-    if !number_range_arr_canbe(*ranges, value) {
+    if !number_range_arr_canbe(ranges, value) {
         return false;
     }
     *ranges = number_range_assumed_value(value);
     return true;
 }
 
-unsafe fn number_range_assumed_value(value: bool) -> *mut NumberRangeArr {
+unsafe fn number_range_assumed_value(value: bool) -> Vec<NumberRange> {
     if value {
-        return number_range_arr_ne_create(0 as libc::c_int);
+        number_range_arr_ne_create(0)
     } else {
-        return number_range_arr_single_create(0 as libc::c_int);
-    };
+        number_range_arr_single_create(0)
+    }
 }
 
 unsafe fn number_isconstant(n: *mut Number) -> bool {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
     };
-    return number_range_arr_n(*ranges) == 1
-        && number_range_issingle(
-            *(number_range_arr_range(*ranges)).offset(0 as libc::c_int as isize),
-        );
+    ranges.len() == 1 && number_range_issingle(&ranges[0])
 }
 
 unsafe fn number_as_constant(n: *mut Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
     };
-    assert_eq!(number_range_arr_n(*ranges), 1);
-    return number_range_as_constant(*(number_range_arr_range(*ranges)));
+    assert_eq!(ranges.len(), 1);
+    number_range_as_constant(&ranges[0])
 }
 
 unsafe fn number_issync(n: *mut Number) -> bool {
@@ -745,103 +698,49 @@ unsafe fn number_as_sync(n: *mut Number) -> *mut AstExpr {
 
 unsafe fn number_to_expr(n: *mut Number) -> *mut AstExpr {
     match &(*n).kind {
-        NumberKind::Ranges(ranges) => number_ranges_to_expr(*ranges),
+        NumberKind::Ranges(ranges) => number_ranges_to_expr(ranges),
         NumberKind::Computed(computation) => Box::into_raw(ast_expr_copy(&**computation)),
     }
 }
 
 unsafe fn number_copy(num: *mut Number) -> *mut Number {
     match &(*num).kind {
-        NumberKind::Ranges(ranges) => number_ranges_create(number_range_arr_copy(*ranges)),
+        NumberKind::Ranges(ranges) => number_ranges_create(number_range_arr_copy(ranges)),
         NumberKind::Computed(computation) => {
             number_computed_create(Box::into_raw(ast_expr_copy(&**computation)))
         }
     }
 }
 
-unsafe fn number_range_arr_create() -> *mut NumberRangeArr {
-    let arr: *mut NumberRangeArr =
-        calloc(1, ::core::mem::size_of::<NumberRangeArr>()) as *mut NumberRangeArr;
-    if arr.is_null() {
-        panic!();
+unsafe fn number_range_arr_destroy(arr: &[NumberRange]) {
+    for range in arr {
+        number_range_destroy(range);
     }
-    return arr;
 }
 
-unsafe fn number_range_arr_destroy(arr: *mut NumberRangeArr) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        number_range_destroy(*((*arr).range).offset(i as isize));
-        i += 1;
+unsafe fn number_range_arr_copy(old: &[NumberRange]) -> Vec<NumberRange> {
+    old.iter().map(|range| number_range_copy(range)).collect()
+}
+
+unsafe fn number_ranges_to_expr(arr: &[NumberRange]) -> *mut AstExpr {
+    assert_eq!(arr.len(), 1);
+    Box::into_raw(ast_expr_constant_create(number_range_as_constant(&arr[0])))
+}
+
+unsafe fn number_range_arr_canbe(arr: &[NumberRange], value: bool) -> bool {
+    arr.iter().any(|range| number_range_canbe(range, value))
+}
+
+unsafe fn number_range_create(lw: *mut NumberValue, up: *mut NumberValue) -> NumberRange {
+    NumberRange {
+        lower: lw,
+        upper: up,
     }
-    free((*arr).range as *mut libc::c_void);
-    free(arr as *mut libc::c_void);
 }
 
-unsafe fn number_range_arr_n(arr: *mut NumberRangeArr) -> libc::c_int {
-    return (*arr).n;
-}
-
-unsafe fn number_range_arr_range(arr: *mut NumberRangeArr) -> *mut *mut NumberRange {
-    return (*arr).range;
-}
-
-unsafe fn number_range_arr_append(arr: *mut NumberRangeArr, r: *mut NumberRange) -> libc::c_int {
-    (*arr).n += 1;
-    (*arr).range = realloc(
-        (*arr).range as *mut libc::c_void,
-        (::core::mem::size_of::<*mut NumberRange>()).wrapping_mul((*arr).n as usize),
-    ) as *mut *mut NumberRange;
-    if ((*arr).range).is_null() {
-        panic!();
-    }
-    let loc: libc::c_int = (*arr).n - 1 as libc::c_int;
-    let ref mut fresh0 = *((*arr).range).offset(loc as isize);
-    *fresh0 = r;
-    return loc;
-}
-
-unsafe fn number_range_arr_copy(old: *mut NumberRangeArr) -> *mut NumberRangeArr {
-    let new: *mut NumberRangeArr = number_range_arr_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*old).n {
-        number_range_arr_append(new, number_range_copy(*((*old).range).offset(i as isize)));
-        i += 1;
-    }
-    new
-}
-
-unsafe fn number_ranges_to_expr(arr: *mut NumberRangeArr) -> *mut AstExpr {
-    if !(number_range_arr_n(arr) == 1 as libc::c_int) {
-        panic!();
-    }
-    Box::into_raw(ast_expr_constant_create(number_range_as_constant(
-        *((*arr).range).offset(0 as libc::c_int as isize),
-    )))
-}
-
-unsafe fn number_range_arr_canbe(arr: *mut NumberRangeArr, value: bool) -> bool {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        if number_range_canbe(*((*arr).range).offset(i as isize), value) {
-            return true;
-        }
-        i += 1;
-    }
-    return false;
-}
-
-unsafe fn number_range_create(lw: *mut NumberValue, up: *mut NumberValue) -> *mut NumberRange {
-    let r: *mut NumberRange = malloc(::core::mem::size_of::<NumberRange>()) as *mut NumberRange;
-    (*r).lower = lw;
-    (*r).upper = up;
-    return r;
-}
-
-unsafe fn number_range_destroy(r: *mut NumberRange) {
-    number_value_destroy((*r).lower);
-    number_value_destroy((*r).upper);
-    free(r as *mut libc::c_void);
+unsafe fn number_range_destroy(r: &NumberRange) {
+    number_value_destroy(r.lower);
+    number_value_destroy(r.upper);
 }
 
 unsafe fn number_range_lower(r: *mut NumberRange) -> *mut NumberValue {
@@ -852,52 +751,50 @@ unsafe fn number_range_upper(r: *mut NumberRange) -> *mut NumberValue {
     return (*r).upper;
 }
 
-unsafe fn number_range_str(r: *mut NumberRange) -> *mut libc::c_char {
+unsafe fn number_range_str(r: &NumberRange) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     if number_range_issingle(r) {
-        strbuilder_write!(b, "{}", cstr!(number_value_str((*r).lower)));
+        strbuilder_write!(b, "{}", cstr!(number_value_str(r.lower)));
     } else {
         strbuilder_write!(
             b,
             "{}:{}",
-            cstr!(number_value_str((*r).lower)),
-            cstr!(number_value_str((*r).upper)),
+            cstr!(number_value_str(r.lower)),
+            cstr!(number_value_str(r.upper)),
         );
     }
     return strbuilder_build(b);
 }
 
-unsafe fn number_range_copy(r: *mut NumberRange) -> *mut NumberRange {
-    return number_range_create(number_value_copy((*r).lower), number_value_copy((*r).upper));
+unsafe fn number_range_copy(r: &NumberRange) -> NumberRange {
+    return number_range_create(number_value_copy(r.lower), number_value_copy(r.upper));
 }
 
-unsafe fn number_range_canbe(r: *mut NumberRange, value: bool) -> bool {
+unsafe fn number_range_canbe(r: &NumberRange, value: bool) -> bool {
     if value {
-        if number_value_equal((*r).lower, (*r).upper) {
+        if number_value_equal(r.lower, r.upper) {
             return false;
         }
-        return number_value_le_constant((*r).lower, -(1 as libc::c_int)) as libc::c_int != 0
-            || constant_le_number_value(1 as libc::c_int, (*r).lower) as libc::c_int != 0;
+        number_value_le_constant(r.lower, -1) || constant_le_number_value(1, r.lower)
     } else {
-        return number_value_le_constant((*r).lower, 0 as libc::c_int) as libc::c_int != 0
-            && constant_le_number_value(1 as libc::c_int, (*r).upper) as libc::c_int != 0;
-    };
+        number_value_le_constant(r.lower, 0) && constant_le_number_value(1, r.upper)
+    }
 }
 
-unsafe fn number_range_issingle(r: *mut NumberRange) -> bool {
-    return number_values_aresingle((*r).lower, (*r).upper);
+unsafe fn number_range_issingle(r: &NumberRange) -> bool {
+    return number_values_aresingle(r.lower, r.upper);
 }
 
-unsafe fn number_range_equal(r1: *mut NumberRange, r2: *mut NumberRange) -> bool {
-    return number_value_equal((*r1).lower, (*r2).lower) as libc::c_int != 0
-        && number_value_equal((*r1).upper, (*r2).upper) as libc::c_int != 0;
+unsafe fn number_range_equal(r1: &NumberRange, r2: &NumberRange) -> bool {
+    return number_value_equal(r1.lower, r2.lower) as libc::c_int != 0
+        && number_value_equal(r1.upper, r2.upper) as libc::c_int != 0;
 }
 
-unsafe fn number_range_as_constant(r: *mut NumberRange) -> libc::c_int {
+unsafe fn number_range_as_constant(r: &NumberRange) -> libc::c_int {
     if !number_range_issingle(r) {
         panic!();
     }
-    return number_value_as_constant((*r).lower);
+    number_value_as_constant(r.lower)
 }
 
 unsafe fn number_value_constant_create(constant: libc::c_int) -> *mut NumberValue {
