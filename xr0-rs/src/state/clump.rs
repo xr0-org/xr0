@@ -21,7 +21,7 @@ pub unsafe fn clump_create() -> *mut Clump {
         panic!();
     }
     (*c).blocks = block_arr_create();
-    return c;
+    c
 }
 
 pub unsafe fn clump_destroy(c: *mut Clump) {
@@ -39,13 +39,13 @@ pub unsafe fn clump_str(c: *mut Clump, indent: *mut libc::c_char) -> *mut libc::
         free(block as *mut libc::c_void);
         i += 1;
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 pub unsafe fn clump_copy(c: *mut Clump) -> *mut Clump {
     let copy: *mut Clump = malloc(::core::mem::size_of::<Clump>()) as *mut Clump;
     (*copy).blocks = block_arr_copy((*c).blocks);
-    return copy;
+    copy
 }
 
 pub unsafe fn clump_newblock(c: *mut Clump) -> libc::c_int {
@@ -59,5 +59,5 @@ pub unsafe fn clump_getblock(c: *mut Clump, address: libc::c_int) -> *mut Block 
     if address >= block_arr_nblocks((*c).blocks) {
         return ptr::null_mut();
     }
-    return *(block_arr_blocks((*c).blocks)).offset(address as isize);
+    *(block_arr_blocks((*c).blocks)).offset(address as isize)
 }

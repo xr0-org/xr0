@@ -46,7 +46,7 @@ pub unsafe extern "C" fn dynamic_str(s: *const libc::c_char) -> *mut libc::c_cha
     let t: *mut libc::c_char =
         malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len)) as *mut libc::c_char;
     strncpy(t, s, len);
-    return t;
+    t
 }
 
 pub fn to_c_str(s: &[u8]) -> *mut libc::c_char {
@@ -244,7 +244,7 @@ pub unsafe fn string_arr_append(arr: &mut StringArr, s: *mut libc::c_char) -> li
     let loc: libc::c_int = arr.n - 1 as libc::c_int;
     let ref mut fresh1 = *arr.s.offset(loc as isize);
     *fresh1 = s;
-    return loc;
+    loc
 }
 
 pub unsafe fn string_arr_copy(old: &StringArr) -> Box<StringArr> {
@@ -254,7 +254,7 @@ pub unsafe fn string_arr_copy(old: &StringArr) -> Box<StringArr> {
         string_arr_append(&mut new, dynamic_str(*old.s.offset(i as isize)));
         i += 1;
     }
-    return new;
+    new
 }
 
 pub unsafe fn string_arr_concat(s1: &StringArr, s2: &StringArr) -> Box<StringArr> {
@@ -264,7 +264,7 @@ pub unsafe fn string_arr_concat(s1: &StringArr, s2: &StringArr) -> Box<StringArr
         string_arr_append(&mut new, *s2.s.offset(i as isize));
         i += 1;
     }
-    return new;
+    new
 }
 
 pub unsafe fn string_arr_deque(arr: &mut StringArr) -> *mut libc::c_char {
@@ -280,7 +280,7 @@ pub unsafe fn string_arr_deque(arr: &mut StringArr) -> *mut libc::c_char {
         arr.s as *mut libc::c_void,
         (::core::mem::size_of::<*mut libc::c_char>()).wrapping_mul(arr.n as usize),
     ) as *mut *mut libc::c_char;
-    return ret;
+    ret
 }
 
 pub unsafe fn string_arr_contains(arr: &StringArr, s: *mut libc::c_char) -> bool {
@@ -291,7 +291,7 @@ pub unsafe fn string_arr_contains(arr: &StringArr, s: *mut libc::c_char) -> bool
         }
         i += 1;
     }
-    return false;
+    false
 }
 
 pub unsafe fn string_arr_str(string_arr: &StringArr) -> *mut libc::c_char {
@@ -309,7 +309,7 @@ pub unsafe fn string_arr_str(string_arr: &StringArr) -> *mut libc::c_char {
         );
         i += 1;
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 pub static mut VERBOSE_MODE: libc::c_int = 0;

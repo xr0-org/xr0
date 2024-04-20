@@ -49,7 +49,7 @@ pub unsafe fn stack_newblock(stack: *mut Stack) -> *mut Location {
         address,
         ast_expr_constant_create(0 as libc::c_int),
     );
-    return loc;
+    loc
 }
 
 pub unsafe fn stack_create(
@@ -91,7 +91,7 @@ pub unsafe fn stack_getframe(s: *mut Stack, frame: libc::c_int) -> *mut Stack {
     if ((*s).prev).is_null() {
         return ptr::null_mut();
     }
-    return stack_getframe((*s).prev, frame);
+    stack_getframe((*s).prev, frame)
 }
 
 pub unsafe fn stack_destroy(stack: *mut Stack) {
@@ -107,7 +107,7 @@ pub unsafe fn stack_destroy(stack: *mut Stack) {
 }
 
 pub unsafe fn stack_prev(s: *mut Stack) -> *mut Stack {
-    return (*s).prev;
+    (*s).prev
 }
 
 pub unsafe fn stack_copy(stack: *mut Stack) -> *mut Stack {
@@ -126,14 +126,14 @@ pub unsafe fn stack_copy(stack: *mut Stack) -> *mut Stack {
     if !((*stack).prev).is_null() {
         (*copy).prev = stack_copy((*stack).prev);
     }
-    return copy;
+    copy
 }
 
 pub unsafe fn stack_copywithname(stack: *mut Stack, new_name: *mut libc::c_char) -> *mut Stack {
     let copy: *mut Stack = stack_copy(stack);
     free((*copy).name as *mut libc::c_void);
     (*copy).name = new_name;
-    return copy;
+    copy
 }
 
 unsafe fn varmap_copy(m: &Map) -> Box<Map> {
@@ -144,7 +144,7 @@ unsafe fn varmap_copy(m: &Map) -> Box<Map> {
             variable_copy(v as *mut Variable) as *const libc::c_void,
         );
     }
-    return m_copy;
+    m_copy
 }
 
 pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> *mut libc::c_char {
@@ -172,7 +172,7 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> *mut libc::c_ch
         strbuilder_write!(b, "{}", cstr!(prev));
         free(prev as *mut libc::c_void);
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 pub unsafe fn stack_declare(stack: *mut Stack, var: *mut AstVariable, isparam: bool) {
@@ -208,18 +208,18 @@ pub unsafe fn stack_undeclare(stack: *mut Stack, state: *mut State) {
 }
 
 pub unsafe fn stack_getresult(s: *mut Stack) -> *mut Variable {
-    return (*s).result;
+    (*s).result
 }
 
 pub unsafe fn stack_getvarmap(s: &mut Stack) -> &mut Map {
-    return &mut (*s).varmap;
+    &mut (*s).varmap
 }
 
 pub unsafe fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Variable {
     if !(strcmp(id, b"return\0" as *const u8 as *const libc::c_char) != 0 as libc::c_int) {
         panic!();
     }
-    return (*s).varmap.get(id) as *mut Variable;
+    (*s).varmap.get(id) as *mut Variable
 }
 
 pub unsafe fn stack_references(s: *mut Stack, loc: *mut Location, state: *mut State) -> bool {
@@ -241,7 +241,7 @@ pub unsafe fn stack_getblock(s: *mut Stack, address: libc::c_int) -> *mut Block 
     if !(address < block_arr_nblocks((*s).frame)) {
         panic!();
     }
-    return *(block_arr_blocks((*s).frame)).offset(address as isize);
+    *(block_arr_blocks((*s).frame)).offset(address as isize)
 }
 
 pub unsafe fn variable_create(
@@ -272,7 +272,7 @@ pub unsafe fn variable_create(
             ptr::null_mut(),
         ),
     );
-    return v;
+    v
 }
 
 pub unsafe fn variable_destroy(v: *mut Variable) {
@@ -286,7 +286,7 @@ pub unsafe fn variable_copy(old: *mut Variable) -> *mut Variable {
     (*new).r#type = ast_type_copy((*old).r#type);
     (*new).is_param = (*old).is_param;
     (*new).loc = location_copy(&*(*old).loc);
-    return new;
+    new
 }
 
 unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Variable {
@@ -333,7 +333,7 @@ pub unsafe fn variable_str(
     free(obj_str as *mut libc::c_void);
     free(loc as *mut libc::c_void);
     free(type_0 as *mut libc::c_void);
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 unsafe fn object_or_nothing_str(
@@ -349,22 +349,22 @@ unsafe fn object_or_nothing_str(
     if !obj.is_null() {
         return object_str(obj);
     }
-    return dynamic_str(b"\0" as *const u8 as *const libc::c_char);
+    dynamic_str(b"\0" as *const u8 as *const libc::c_char)
 }
 
 pub unsafe fn variable_location(v: *mut Variable) -> *mut Location {
-    return (*v).loc;
+    (*v).loc
 }
 
 pub unsafe fn variable_type(v: *mut Variable) -> *mut AstType {
-    return (*v).r#type;
+    (*v).r#type
 }
 
 pub unsafe fn variable_references(v: *mut Variable, loc: *mut Location, s: *mut State) -> bool {
     assert!(!(*loc).type_is_vconst());
-    return location_references((*v).loc, loc, s);
+    location_references((*v).loc, loc, s)
 }
 
 pub unsafe fn variable_isparam(v: *mut Variable) -> bool {
-    return (*v).is_param;
+    (*v).is_param
 }

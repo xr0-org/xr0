@@ -35,7 +35,7 @@ pub struct BlockArr {
 pub unsafe fn block_create() -> *mut Block {
     let b: *mut Block = malloc(::core::mem::size_of::<Block>()) as *mut Block;
     (*b).arr = object_arr_create();
-    return b;
+    b
 }
 
 pub unsafe fn block_destroy(b: *mut Block) {
@@ -46,7 +46,7 @@ pub unsafe fn block_destroy(b: *mut Block) {
 pub unsafe fn block_copy(old: *mut Block) -> *mut Block {
     let new: *mut Block = malloc(::core::mem::size_of::<Block>()) as *mut Block;
     (*new).arr = object_arr_copy((*old).arr);
-    return new;
+    new
 }
 
 pub unsafe fn block_str(block: *mut Block) -> *mut libc::c_char {
@@ -65,7 +65,7 @@ pub unsafe fn block_str(block: *mut Block) -> *mut libc::c_char {
         free(s as *mut libc::c_void);
         i += 1;
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 pub unsafe fn block_install(b: *mut Block, obj: *mut Object) {
@@ -123,7 +123,7 @@ pub unsafe fn block_observe(
     if !from.is_null() {
         object_arr_insert((*b).arr, index, from);
     }
-    return observed;
+    observed
 }
 
 pub unsafe fn block_references(b: *mut Block, loc: *mut Location, s: *mut State) -> bool {
@@ -136,7 +136,7 @@ pub unsafe fn block_references(b: *mut Block, loc: *mut Location, s: *mut State)
         }
         i += 1;
     }
-    return false;
+    false
 }
 
 pub unsafe fn block_range_alloc(
@@ -199,7 +199,7 @@ pub unsafe fn block_range_aredeallocands(
     if !object_isdeallocand(*obj.offset(up_index as isize), s) {
         panic!();
     }
-    return true;
+    true
 }
 
 unsafe fn hack_first_object_is_exactly_bounds(
@@ -313,7 +313,7 @@ pub unsafe fn block_arr_create() -> *mut BlockArr {
     if arr.is_null() {
         panic!();
     }
-    return arr;
+    arr
 }
 
 pub unsafe fn block_arr_destroy(arr: *mut BlockArr) {
@@ -333,15 +333,15 @@ pub unsafe fn block_arr_copy(old: *mut BlockArr) -> *mut BlockArr {
         block_arr_append(new, block_copy(*((*old).block).offset(i as isize)));
         i += 1;
     }
-    return new;
+    new
 }
 
 pub unsafe fn block_arr_blocks(arr: *mut BlockArr) -> *mut *mut Block {
-    return (*arr).block;
+    (*arr).block
 }
 
 pub unsafe fn block_arr_nblocks(arr: *mut BlockArr) -> libc::c_int {
-    return (*arr).n;
+    (*arr).n
 }
 
 pub unsafe fn block_arr_append(arr: *mut BlockArr, b: *mut Block) -> libc::c_int {
@@ -356,7 +356,7 @@ pub unsafe fn block_arr_append(arr: *mut BlockArr, b: *mut Block) -> libc::c_int
     let loc: libc::c_int = (*arr).n - 1 as libc::c_int;
     let ref mut fresh2 = *((*arr).block).offset(loc as isize);
     *fresh2 = b;
-    return loc;
+    loc
 }
 
 pub unsafe fn block_arr_delete(arr: *mut BlockArr, address: libc::c_int) {

@@ -14,7 +14,7 @@ pub struct Props {
 }
 
 pub unsafe fn props_create() -> *mut Props {
-    return calloc(1, ::core::mem::size_of::<Props>()) as *mut Props;
+    calloc(1, ::core::mem::size_of::<Props>()) as *mut Props
 }
 
 pub unsafe fn props_copy(old: *mut Props) -> *mut Props {
@@ -27,7 +27,7 @@ pub unsafe fn props_copy(old: *mut Props) -> *mut Props {
         );
         i += 1;
     }
-    return new;
+    new
 }
 
 pub unsafe fn props_destroy(p: *mut Props) {
@@ -62,15 +62,15 @@ pub unsafe fn props_str(p: *mut Props, indent: *mut libc::c_char) -> *mut libc::
         i += 1;
     }
     strbuilder_write!(b, "\n");
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 pub unsafe fn props_n(p: *mut Props) -> libc::c_int {
-    return (*p).n;
+    (*p).n
 }
 
 pub unsafe fn props_props(p: *mut Props) -> *mut *mut AstExpr {
-    return (*p).prop;
+    (*p).prop
 }
 
 pub unsafe fn props_install(p: *mut Props, e: *mut AstExpr) {
@@ -94,7 +94,7 @@ pub unsafe fn props_get(p: *mut Props, e: *mut AstExpr) -> bool {
         }
         i += 1;
     }
-    return false;
+    false
 }
 
 pub unsafe fn props_contradicts(p: *mut Props, p1: &AstExpr) -> bool {

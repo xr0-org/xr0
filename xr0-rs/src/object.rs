@@ -58,7 +58,7 @@ pub unsafe fn object_value_create(offset: *mut AstExpr, v: *mut Value) -> *mut O
     (*obj).offset = offset;
     (*obj).c2rust_unnamed.value = v;
     (*obj).r#type = OBJECT_VALUE;
-    return obj;
+    obj
 }
 
 pub unsafe fn object_range_create(offset: *mut AstExpr, r: *mut Range) -> *mut Object {
@@ -72,7 +72,7 @@ pub unsafe fn object_range_create(offset: *mut AstExpr, r: *mut Range) -> *mut O
     (*obj).offset = offset;
     (*obj).c2rust_unnamed.range = r;
     (*obj).r#type = OBJECT_DEALLOCAND_RANGE;
-    return obj;
+    obj
 }
 
 pub unsafe fn object_destroy(obj: *mut Object) {
@@ -108,7 +108,7 @@ pub unsafe fn object_copy(old: *mut Object) -> *mut Object {
         }
         _ => panic!(),
     }
-    return new;
+    new
 }
 
 pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Object {
@@ -136,7 +136,7 @@ pub unsafe fn object_str(obj: *mut Object) -> *mut libc::c_char {
     strbuilder_write!(b, "<{}>", cstr!(inner));
     free(inner as *mut libc::c_void);
     strbuilder_write!(b, "}}");
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 unsafe fn inner_str(obj: *mut Object) -> *mut libc::c_char {
@@ -169,14 +169,14 @@ pub unsafe fn object_hasvalue(obj: *mut Object) -> bool {
 }
 
 pub unsafe fn object_isvalue(obj: *mut Object) -> bool {
-    return (*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint;
+    (*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint
 }
 
 pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
     if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
         panic!();
     }
-    return (*obj).c2rust_unnamed.value;
+    (*obj).c2rust_unnamed.value
 }
 
 pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
@@ -206,7 +206,7 @@ pub unsafe fn object_assign(obj: *mut Object, val: *mut Value) -> *mut Error {
         panic!();
     }
     (*obj).c2rust_unnamed.value = val;
-    return ptr::null_mut();
+    ptr::null_mut()
 }
 unsafe fn object_size(obj: *mut Object) -> *mut AstExpr {
     match (*obj).r#type {
@@ -217,7 +217,7 @@ unsafe fn object_size(obj: *mut Object) -> *mut AstExpr {
 }
 
 pub unsafe fn object_lower(obj: *mut Object) -> *mut AstExpr {
-    return (*obj).offset;
+    (*obj).offset
 }
 
 pub unsafe fn object_upper(obj: *mut Object) -> *mut AstExpr {
@@ -387,7 +387,7 @@ pub unsafe fn object_getmember(
     member: *mut libc::c_char,
     s: *mut State,
 ) -> *mut Object {
-    return value_struct_member(getorcreatestruct(obj, t, s), member);
+    value_struct_member(getorcreatestruct(obj, t, s), member)
 }
 
 unsafe fn getorcreatestruct(obj: *mut Object, t: *mut AstType, s: *mut State) -> *mut Value {
@@ -401,7 +401,7 @@ unsafe fn getorcreatestruct(obj: *mut Object, t: *mut AstType, s: *mut State) ->
     }
     v = value_struct_create(complete);
     object_assign(obj, v);
-    return v;
+    v
 }
 
 pub unsafe fn object_getmembertype(
@@ -410,14 +410,14 @@ pub unsafe fn object_getmembertype(
     member: *mut libc::c_char,
     s: *mut State,
 ) -> *mut AstType {
-    return value_struct_membertype(getorcreatestruct(obj, t, s), member);
+    value_struct_membertype(getorcreatestruct(obj, t, s), member)
 }
 
 pub unsafe fn range_create(size: *mut AstExpr, loc: *mut Location) -> *mut Range {
     let r: *mut Range = malloc(::core::mem::size_of::<Range>()) as *mut Range;
     (*r).size = size;
     (*r).loc = loc;
-    return r;
+    r
 }
 
 pub unsafe fn range_copy(r: *mut Range) -> *mut Range {
@@ -440,11 +440,11 @@ pub unsafe fn range_str(r: *mut Range) -> *mut libc::c_char {
     strbuilder_write!(b, "virt:{}@{}", cstr!(size), cstr!(loc));
     free(loc as *mut libc::c_void);
     free(size as *mut libc::c_void);
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 pub unsafe fn range_size(r: *mut Range) -> *mut AstExpr {
-    return (*r).size;
+    (*r).size
 }
 
 pub unsafe fn range_dealloc(r: *mut Range, s: *mut State) -> Result<()> {
@@ -452,11 +452,11 @@ pub unsafe fn range_dealloc(r: *mut Range, s: *mut State) -> Result<()> {
 }
 
 pub unsafe fn range_isdeallocand(r: *mut Range, s: *mut State) -> bool {
-    return state_isdeallocand(s, (*r).loc);
+    state_isdeallocand(s, (*r).loc)
 }
 
 pub unsafe fn range_references(r: *mut Range, loc: *mut Location, s: *mut State) -> bool {
-    return location_references((*r).loc, loc, s);
+    location_references((*r).loc, loc, s)
 }
 
 pub unsafe fn object_arr_create() -> *mut ObjectArr {
@@ -464,7 +464,7 @@ pub unsafe fn object_arr_create() -> *mut ObjectArr {
     if arr.is_null() {
         panic!();
     }
-    return arr;
+    arr
 }
 
 pub unsafe fn object_arr_destroy(arr: *mut ObjectArr) {
@@ -484,15 +484,15 @@ pub unsafe fn object_arr_copy(arr: *mut ObjectArr) -> *mut ObjectArr {
         object_arr_append(copy, object_copy(*((*arr).object).offset(i as isize)));
         i += 1;
     }
-    return copy;
+    copy
 }
 
 pub unsafe fn object_arr_allocs(arr: *mut ObjectArr) -> *mut *mut Object {
-    return (*arr).object;
+    (*arr).object
 }
 
 pub unsafe fn object_arr_nallocs(arr: *mut ObjectArr) -> libc::c_int {
-    return (*arr).n;
+    (*arr).n
 }
 
 pub unsafe fn object_arr_index(
@@ -507,7 +507,7 @@ pub unsafe fn object_arr_index(
         }
         i += 1;
     }
-    return -(1 as libc::c_int);
+    -(1 as libc::c_int)
 }
 
 pub unsafe fn object_arr_index_upperincl(
@@ -522,7 +522,7 @@ pub unsafe fn object_arr_index_upperincl(
         }
         i += 1;
     }
-    return -(1 as libc::c_int);
+    -(1 as libc::c_int)
 }
 
 pub unsafe fn object_arr_insert(
@@ -546,11 +546,11 @@ pub unsafe fn object_arr_insert(
     }
     let ref mut fresh1 = *((*arr).object).offset(index as isize);
     *fresh1 = obj;
-    return index;
+    index
 }
 
 pub unsafe fn object_arr_append(arr: *mut ObjectArr, obj: *mut Object) -> libc::c_int {
-    return object_arr_insert(arr, (*arr).n, obj);
+    object_arr_insert(arr, (*arr).n, obj)
 }
 
 pub unsafe fn object_arr_remove(arr: *mut ObjectArr, index: libc::c_int) {
@@ -571,9 +571,9 @@ pub unsafe fn object_arr_remove(arr: *mut ObjectArr, index: libc::c_int) {
 }
 
 pub unsafe fn object_arr_nobjects(arr: *mut ObjectArr) -> libc::c_int {
-    return (*arr).n;
+    (*arr).n
 }
 
 pub unsafe fn object_arr_objects(arr: *mut ObjectArr) -> *mut *mut Object {
-    return (*arr).object;
+    (*arr).object
 }

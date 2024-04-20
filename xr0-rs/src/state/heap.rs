@@ -38,7 +38,7 @@ pub unsafe fn heap_create() -> *mut Heap {
     }
     (*h).blocks = block_arr_create();
     (*h).freed = ptr::null_mut();
-    return h;
+    h
 }
 
 pub unsafe fn heap_destroy(h: *mut Heap) {
@@ -59,7 +59,7 @@ pub unsafe fn heap_copy(h: *mut Heap) -> *mut Heap {
         i += 1;
     }
     (*copy).freed = freed_copy;
-    return copy;
+    copy
 }
 
 pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> *mut libc::c_char {
@@ -81,7 +81,7 @@ pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> *mut libc::c_
         }
         i += 1;
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 unsafe fn printdelim(h: *mut Heap, start: libc::c_int) -> bool {
     let n: libc::c_int = block_arr_nblocks((*h).blocks);
@@ -92,14 +92,14 @@ unsafe fn printdelim(h: *mut Heap, start: libc::c_int) -> bool {
         }
         i += 1;
     }
-    return false;
+    false
 }
 
 pub unsafe fn heap_blocks(h: *mut Heap) -> *mut BlockArr {
     if h.is_null() {
         panic!();
     }
-    return (*h).blocks;
+    (*h).blocks
 }
 
 pub unsafe fn heap_newblock(h: *mut Heap) -> *mut Location {
@@ -111,7 +111,7 @@ pub unsafe fn heap_newblock(h: *mut Heap) -> *mut Location {
         (::core::mem::size_of::<bool>()).wrapping_mul(n as usize),
     ) as *mut bool;
     *((*h).freed).offset(address as isize) = false;
-    return location_create_dynamic(address, ast_expr_constant_create(0 as libc::c_int));
+    location_create_dynamic(address, ast_expr_constant_create(0 as libc::c_int))
 }
 
 pub unsafe fn heap_getblock(h: *mut Heap, address: libc::c_int) -> *mut Block {
@@ -121,7 +121,7 @@ pub unsafe fn heap_getblock(h: *mut Heap, address: libc::c_int) -> *mut Block {
     if *((*h).freed).offset(address as isize) {
         return ptr::null_mut();
     }
-    return *(block_arr_blocks((*h).blocks)).offset(address as isize);
+    *(block_arr_blocks((*h).blocks)).offset(address as isize)
 }
 
 pub unsafe fn heap_deallocblock(h: *mut Heap, address: libc::c_int) -> Result<()> {
@@ -138,7 +138,7 @@ pub unsafe fn heap_deallocblock(h: *mut Heap, address: libc::c_int) -> Result<()
 }
 
 pub unsafe fn heap_blockisfreed(h: *mut Heap, address: libc::c_int) -> bool {
-    return *((*h).freed).offset(address as isize);
+    *((*h).freed).offset(address as isize)
 }
 
 pub unsafe fn heap_undeclare(h: *mut Heap, s: *mut State) {
@@ -162,14 +162,14 @@ pub unsafe fn heap_referenced(h: *mut Heap, s: *mut State) -> bool {
         }
         i += 1;
     }
-    return true;
+    true
 }
 unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
     let loc: *mut Location =
         location_create_dynamic(addr, ast_expr_constant_create(0 as libc::c_int));
     let referenced: bool = state_references(s, loc);
     location_destroy(loc);
-    return referenced;
+    referenced
 }
 
 pub unsafe fn vconst_create() -> *mut VConst {
@@ -182,7 +182,7 @@ pub unsafe fn vconst_create() -> *mut VConst {
             persist: Map::new(),
         },
     );
-    return v;
+    v
 }
 
 pub unsafe fn vconst_destroy(v: *mut VConst) {
@@ -220,7 +220,7 @@ pub unsafe fn vconst_copy(old: *mut VConst) -> *mut VConst {
     for (k, v) in m.pairs() {
         (*new).persist.set(dynamic_str(k), v);
     }
-    return new;
+    new
 }
 
 pub unsafe fn vconst_declare(
@@ -238,7 +238,7 @@ pub unsafe fn vconst_declare(
     }
     (*v).persist
         .set(dynamic_str(s), persist as usize as *mut libc::c_void);
-    return s;
+    s
 }
 unsafe fn vconst_id(varmap: &Map, persistmap: &Map, persist: bool) -> *mut libc::c_char {
     let npersist: libc::c_int = count_true(persistmap);
@@ -248,7 +248,7 @@ unsafe fn vconst_id(varmap: &Map, persistmap: &Map, persist: bool) -> *mut libc:
     } else {
         strbuilder_write!(b, "#{}", varmap.len() - npersist);
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 unsafe fn count_true(m: &Map) -> libc::c_int {
     let mut n: libc::c_int = 0 as libc::c_int;
@@ -257,11 +257,11 @@ unsafe fn count_true(m: &Map) -> libc::c_int {
             n += 1;
         }
     }
-    return n;
+    n
 }
 
 pub unsafe fn vconst_get(v: *mut VConst, id: *mut libc::c_char) -> *mut Value {
-    return (*v).varmap.get(id) as *mut Value;
+    (*v).varmap.get(id) as *mut Value
 }
 
 pub unsafe fn vconst_undeclare(v: *mut VConst) {
@@ -305,9 +305,9 @@ pub unsafe fn vconst_str(v: *mut VConst, indent: *mut libc::c_char) -> *mut libc
         strbuilder_write!(b, "\n");
         free(value as *mut libc::c_void);
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 pub unsafe fn vconst_eval(v: *mut VConst, e: &AstExpr) -> bool {
-    return ast_expr_matheval(e);
+    ast_expr_matheval(e)
 }

@@ -190,7 +190,7 @@ pub unsafe fn lexememarker_create(
     (*loc).column = column;
     (*loc).filename = filename;
     (*loc).flags = flags;
-    return loc;
+    loc
 }
 
 pub unsafe fn lexememarker_copy(loc: *mut LexemeMarker) -> *mut LexemeMarker {
@@ -210,5 +210,5 @@ pub unsafe fn lexememarker_destroy(loc: *mut LexemeMarker) {
 pub unsafe fn lexememarker_str(loc: &LexemeMarker) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_write!(b, "{}:{}:{}", cstr!(loc.filename), loc.linenum, loc.column);
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }

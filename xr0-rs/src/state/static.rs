@@ -48,7 +48,7 @@ pub unsafe fn static_memory_str(
         free(block as *mut libc::c_void);
         i += 1;
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 pub unsafe fn static_memory_copy(sm: *mut StaticMemory) -> *mut StaticMemory {
@@ -61,7 +61,7 @@ pub unsafe fn static_memory_copy(sm: *mut StaticMemory) -> *mut StaticMemory {
             pool: pool_copy(&(*sm).pool),
         },
     );
-    return copy;
+    copy
 }
 unsafe fn pool_copy(p: &Map) -> Box<Map> {
     let mut pcopy = Map::new();
@@ -71,21 +71,21 @@ unsafe fn pool_copy(p: &Map) -> Box<Map> {
             location_copy(&*(v as *mut Location)) as *const libc::c_void,
         );
     }
-    return pcopy;
+    pcopy
 }
 
 pub unsafe fn static_memory_newblock(sm: *mut StaticMemory) -> libc::c_int {
     let address: libc::c_int = block_arr_append((*sm).blocks, block_create());
     let n: libc::c_int = block_arr_nblocks((*sm).blocks);
     assert!(n > 0);
-    return address;
+    address
 }
 
 pub unsafe fn static_memory_getblock(sm: *mut StaticMemory, address: libc::c_int) -> *mut Block {
     if address >= block_arr_nblocks((*sm).blocks) {
         return ptr::null_mut();
     }
-    return *(block_arr_blocks((*sm).blocks)).offset(address as isize);
+    *(block_arr_blocks((*sm).blocks)).offset(address as isize)
 }
 
 pub unsafe fn static_memory_stringpool(
@@ -103,5 +103,5 @@ pub unsafe fn static_memory_checkpool(
     sm: *mut StaticMemory,
     lit: *mut libc::c_char,
 ) -> *mut Location {
-    return (*sm).pool.get(lit) as *mut Location;
+    (*sm).pool.get(lit) as *mut Location
 }

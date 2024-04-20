@@ -146,7 +146,7 @@ pub unsafe fn value_struct_indefinite_create(
         );
         i += 1;
     }
-    return v;
+    v
 }
 
 unsafe fn ptr_referencesheap(v: &Value, s: *mut State) -> bool {
@@ -207,7 +207,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
         }
         i += 1;
     }
-    return v;
+    v
 }
 
 pub fn value_isstruct(v: &Value) -> bool {
@@ -229,7 +229,7 @@ unsafe fn frommembers(members: *mut AstVariableArr) -> Box<Map> {
         );
         i += 1;
     }
-    return m;
+    m
 }
 
 unsafe fn destroymembers(m: &Map) {
@@ -246,7 +246,7 @@ unsafe fn copymembers(old: &Map) -> Box<Map> {
             object_copy(v as *mut Object) as *const libc::c_void,
         );
     }
-    return new;
+    new
 }
 
 pub unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> *mut Value {
@@ -264,7 +264,7 @@ unsafe fn abstractcopymembers(old: &Map, s: *mut State) -> Box<Map> {
             object_abstractcopy(v as *mut Object, s) as *const libc::c_void,
         );
     }
-    return new;
+    new
 }
 
 pub unsafe fn value_struct_membertype(v: *mut Value, member: *mut libc::c_char) -> *mut AstType {
@@ -288,7 +288,7 @@ pub unsafe fn value_struct_member(v: *mut Value, member: *mut libc::c_char) -> *
     let ValueKind::Struct(sv) = &(*v).kind else {
         panic!();
     };
-    return (*sv.m).get(member) as *mut Object;
+    (*sv.m).get(member) as *mut Object
 }
 
 unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
@@ -372,7 +372,7 @@ pub unsafe fn value_str(v: *mut Value) -> *mut libc::c_char {
             value_struct_sprint(sv, b);
         }
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 unsafe fn value_sync_sprint(n: *mut Number, b: *mut StrBuilder) {
@@ -618,7 +618,7 @@ unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> *mut libc::c_char {
         free(r as *mut libc::c_void);
     }
     strbuilder_putc(b, '}' as i32 as libc::c_char);
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 unsafe fn number_str(num: *mut Number) -> *mut libc::c_char {
@@ -656,7 +656,7 @@ unsafe fn number_assume(n: *mut Number, value: bool) -> bool {
         return false;
     }
     *ranges = number_range_assumed_value(value);
-    return true;
+    true
 }
 
 unsafe fn number_range_assumed_value(value: bool) -> Vec<NumberRange> {
@@ -737,7 +737,7 @@ unsafe fn number_range_str(r: &NumberRange) -> *mut libc::c_char {
             cstr!(number_value_str(&r.upper)),
         );
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 unsafe fn number_range_canbe(r: &NumberRange, value: bool) -> bool {
@@ -795,7 +795,7 @@ unsafe fn number_value_str(v: &NumberValue) -> *mut libc::c_char {
             strbuilder_write!(b, "MIN");
         }
     }
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 unsafe fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {

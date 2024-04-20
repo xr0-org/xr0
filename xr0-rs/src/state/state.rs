@@ -66,7 +66,7 @@ pub unsafe fn state_create(
     (*state).stack = stack_create(func, ptr::null_mut(), result_type);
     (*state).heap = heap_create();
     (*state).props = props_create();
-    return state;
+    state
 }
 
 pub unsafe fn state_create_withprops(
@@ -86,7 +86,7 @@ pub unsafe fn state_create_withprops(
     (*state).stack = stack_create(func, ptr::null_mut(), result_type);
     (*state).heap = heap_create();
     (*state).props = props_copy(props);
-    return state;
+    state
 }
 
 pub unsafe fn state_destroy(state: *mut State) {
@@ -110,7 +110,7 @@ pub unsafe fn state_copy(state: *mut State) -> *mut State {
     (*copy).stack = stack_copy((*state).stack);
     (*copy).heap = heap_copy((*state).heap);
     (*copy).props = props_copy((*state).props);
-    return copy;
+    copy
 }
 
 pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char) -> *mut State {
@@ -125,7 +125,7 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
     (*copy).stack = stack_copywithname((*state).stack, func_name);
     (*copy).heap = heap_copy((*state).heap);
     (*copy).props = props_copy((*state).props);
-    return copy;
+    copy
 }
 
 pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
@@ -181,19 +181,19 @@ pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
     }
     free(heap as *mut libc::c_void);
     strbuilder_write!(b, "]]\n");
-    return strbuilder_build(b);
+    strbuilder_build(b)
 }
 
 pub unsafe fn state_getext(s: *mut State) -> *mut Externals {
-    return (*s).ext;
+    (*s).ext
 }
 
 pub unsafe fn state_getheap(s: *mut State) -> *mut Heap {
-    return (*s).heap;
+    (*s).heap
 }
 
 pub unsafe fn state_getprops(s: *mut State) -> *mut Props {
-    return (*s).props;
+    (*s).props
 }
 
 pub unsafe fn state_pushframe(state: *mut State, func: *mut libc::c_char, ret_type: *mut AstType) {
@@ -224,7 +224,7 @@ pub unsafe fn state_vconst(
         return v;
     }
     let c: *mut libc::c_char = vconst_declare((*state).vconst, v, comment, persist);
-    return value_sync_create(Box::into_raw(ast_expr_identifier_create(c)));
+    value_sync_create(Box::into_raw(ast_expr_identifier_create(c)))
 }
 
 pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value {
@@ -241,13 +241,13 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
     }
     object_assign(obj, value_literal_create(dynamic_str(lit)));
     static_memory_stringpool((*state).static_memory, lit, loc);
-    return value_ptr_create(loc);
+    value_ptr_create(loc)
 }
 
 pub unsafe fn state_clump(state: *mut State) -> *mut Value {
     let address: libc::c_int = clump_newblock((*state).clump);
     let loc: *mut Location = location_create_dereferencable(address, ast_expr_constant_create(0));
-    return value_ptr_create(loc);
+    value_ptr_create(loc)
 }
 
 pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
@@ -274,11 +274,11 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
     }
     let loc: *mut Location = value_as_location(&*v);
     state_get(state, loc, true).unwrap();
-    return location_toheap(loc, (*state).heap);
+    location_toheap(loc, (*state).heap)
 }
 
 pub unsafe fn state_getvconst(state: *mut State, id: *mut libc::c_char) -> *mut Value {
-    return vconst_get((*state).vconst, id);
+    vconst_get((*state).vconst, id)
 }
 
 pub unsafe fn state_get(
@@ -331,7 +331,7 @@ unsafe fn state_getresulttype(state: *mut State) -> *mut AstType {
     if v.is_null() {
         panic!();
     }
-    return variable_type(v);
+    variable_type(v)
 }
 
 pub unsafe fn state_getobjecttype(state: *mut State, id: *mut libc::c_char) -> *mut AstType {
@@ -342,7 +342,7 @@ pub unsafe fn state_getobjecttype(state: *mut State, id: *mut libc::c_char) -> *
     if v.is_null() {
         panic!();
     }
-    return variable_type(v);
+    variable_type(v)
 }
 
 pub unsafe fn state_getloc(state: *mut State, id: *mut libc::c_char) -> *mut Value {
@@ -350,7 +350,7 @@ pub unsafe fn state_getloc(state: *mut State, id: *mut libc::c_char) -> *mut Val
     if v.is_null() {
         panic!();
     }
-    return value_ptr_create(variable_location(v));
+    value_ptr_create(variable_location(v))
 }
 
 pub unsafe fn state_getobject(state: *mut State, id: *mut libc::c_char) -> *mut Object {
@@ -418,7 +418,7 @@ pub unsafe fn state_range_alloc(
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> *mut Value {
-    return value_ptr_create(heap_newblock((*state).heap));
+    value_ptr_create(heap_newblock((*state).heap))
 }
 
 pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {
@@ -444,13 +444,13 @@ pub unsafe fn state_range_dealloc(
         ));
     }
     let deref: *mut Location = value_as_location(&*arr_val);
-    return location_range_dealloc(deref, lw, up, state);
+    location_range_dealloc(deref, lw, up, state)
 }
 
 pub unsafe fn state_addresses_deallocand(state: *mut State, obj: *mut Object) -> bool {
     let val: *mut Value = object_as_value(obj);
     let loc: *mut Location = value_as_location(&*val);
-    return state_isdeallocand(state, loc);
+    state_isdeallocand(state, loc)
 }
 
 pub unsafe fn state_isdeallocand(s: *mut State, loc: *mut Location) -> bool {
@@ -481,19 +481,19 @@ pub unsafe fn state_range_aredeallocands(
         (*state).clump,
     )
     .unwrap();
-    return !b.is_null() && block_range_aredeallocands(&*b, lw, up, state);
+    !b.is_null() && block_range_aredeallocands(&*b, lw, up, state)
 }
 
 pub unsafe fn state_hasgarbage(state: *mut State) -> bool {
-    return !heap_referenced((*state).heap, state);
+    !heap_referenced((*state).heap, state)
 }
 
 pub unsafe fn state_references(s: *mut State, loc: *mut Location) -> bool {
-    return stack_references((*s).stack, loc, s);
+    stack_references((*s).stack, loc, s)
 }
 
 pub unsafe fn state_eval(s: *mut State, e: &AstExpr) -> bool {
-    return vconst_eval((*s).vconst, e);
+    vconst_eval((*s).vconst, e)
 }
 
 pub unsafe fn state_equal(s1: *mut State, s2: *mut State) -> bool {
@@ -516,7 +516,7 @@ pub unsafe fn state_equal(s1: *mut State, s2: *mut State) -> bool {
     free(str1 as *mut libc::c_void);
     state_destroy(s2_c);
     state_destroy(s1_c);
-    return equal;
+    equal
 }
 unsafe fn state_undeclareliterals(s: *mut State) {
     static_memory_destroy((*s).static_memory);
