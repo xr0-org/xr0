@@ -1,14 +1,13 @@
 use std::ffi::CStr;
 use std::ptr;
 
-use libc::{free, malloc, strcmp, strlen};
+use libc::{free, strcmp, strlen};
 
 use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
 use super::clump::{clump_copy, clump_create, clump_destroy, clump_newblock, clump_str};
 use super::heap::{
-    heap_copy, heap_create, heap_destroy, heap_newblock, heap_referenced, heap_str, heap_undeclare,
-    vconst_copy, vconst_create, vconst_declare, vconst_eval, vconst_get, vconst_str,
-    vconst_undeclare,
+    heap_copy, heap_newblock, heap_referenced, heap_str, heap_undeclare, vconst_copy,
+    vconst_create, vconst_declare, vconst_eval, vconst_get, vconst_str, vconst_undeclare,
 };
 use super::location::{
     location_create_dereferencable, location_create_static, location_dealloc, location_getblock,
@@ -46,7 +45,7 @@ pub struct State {
     pub static_memory: *mut StaticMemory,
     pub clump: *mut Clump,
     pub stack: *mut Stack,
-    pub heap: *mut Heap,
+    pub heap: Heap,
     pub props: *mut Props,
 }
 
@@ -55,18 +54,15 @@ pub unsafe fn state_create(
     ext: *mut Externals,
     result_type: *mut AstType,
 ) -> *mut State {
-    let state: *mut State = malloc(::core::mem::size_of::<State>()) as *mut State;
-    if state.is_null() {
-        panic!();
-    }
-    (*state).ext = ext;
-    (*state).static_memory = static_memory_create();
-    (*state).vconst = vconst_create();
-    (*state).clump = clump_create();
-    (*state).stack = stack_create(func, ptr::null_mut(), result_type);
-    (*state).heap = heap_create();
-    (*state).props = props_create();
-    state
+    Box::into_raw(Box::new(State {
+        ext,
+        static_memory: static_memory_create(),
+        vconst: vconst_create(),
+        clump: clump_create(),
+        stack: stack_create(func, ptr::null_mut(), result_type),
+        heap: Heap::new(),
+        props: props_create(),
+    }))
 }
 
 pub unsafe fn state_create_withprops(
@@ -75,57 +71,54 @@ pub unsafe fn state_create_withprops(
     result_type: *mut AstType,
     props: *mut Props,
 ) -> *mut State {
-    let state: *mut State = malloc(::core::mem::size_of::<State>()) as *mut State;
-    if state.is_null() {
-        panic!();
-    }
-    (*state).ext = ext;
-    (*state).static_memory = static_memory_create();
-    (*state).vconst = vconst_create();
-    (*state).clump = clump_create();
-    (*state).stack = stack_create(func, ptr::null_mut(), result_type);
-    (*state).heap = heap_create();
-    (*state).props = props_copy(props);
-    state
+    Box::into_raw(Box::new(State {
+        ext,
+        static_memory: static_memory_create(),
+        vconst: vconst_create(),
+        clump: clump_create(),
+        stack: stack_create(func, ptr::null_mut(), result_type),
+        heap: Heap::new(),
+        props: props_copy(props),
+    }))
 }
 
 pub unsafe fn state_destroy(state: *mut State) {
-    static_memory_destroy((*state).static_memory);
-    clump_destroy((*state).clump);
-    stack_destroy((*state).stack);
-    heap_destroy((*state).heap);
-    props_destroy((*state).props);
-    free(state as *mut libc::c_void);
+    drop(Box::from_raw(state));
+}
+
+impl Drop for State {
+    fn drop(&mut self) {
+        unsafe {
+            static_memory_destroy(self.static_memory);
+            clump_destroy(self.clump);
+            stack_destroy(self.stack);
+            props_destroy(self.props);
+        }
+    }
 }
 
 pub unsafe fn state_copy(state: *mut State) -> *mut State {
-    let copy: *mut State = malloc(::core::mem::size_of::<State>()) as *mut State;
-    if copy.is_null() {
-        panic!();
-    }
-    (*copy).ext = (*state).ext;
-    (*copy).static_memory = static_memory_copy((*state).static_memory);
-    (*copy).vconst = vconst_copy((*state).vconst);
-    (*copy).clump = clump_copy((*state).clump);
-    (*copy).stack = stack_copy((*state).stack);
-    (*copy).heap = heap_copy((*state).heap);
-    (*copy).props = props_copy((*state).props);
-    copy
+    Box::into_raw(Box::new(State {
+        ext: (*state).ext,
+        static_memory: static_memory_copy((*state).static_memory),
+        vconst: vconst_copy((*state).vconst),
+        clump: clump_copy((*state).clump),
+        stack: stack_copy((*state).stack),
+        heap: heap_copy(&(*state).heap),
+        props: props_copy((*state).props),
+    }))
 }
 
 pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char) -> *mut State {
-    let copy: *mut State = malloc(::core::mem::size_of::<State>()) as *mut State;
-    if copy.is_null() {
-        panic!();
-    }
-    (*copy).ext = (*state).ext;
-    (*copy).static_memory = static_memory_copy((*state).static_memory);
-    (*copy).vconst = vconst_copy((*state).vconst);
-    (*copy).clump = clump_copy((*state).clump);
-    (*copy).stack = stack_copywithname((*state).stack, func_name);
-    (*copy).heap = heap_copy((*state).heap);
-    (*copy).props = props_copy((*state).props);
-    copy
+    Box::into_raw(Box::new(State {
+        ext: (*state).ext,
+        static_memory: static_memory_copy((*state).static_memory),
+        vconst: vconst_copy((*state).vconst),
+        clump: clump_copy((*state).clump),
+        stack: stack_copywithname((*state).stack, func_name),
+        heap: heap_copy(&(*state).heap),
+        props: props_copy((*state).props),
+    }))
 }
 
 pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
@@ -173,7 +166,7 @@ pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
     }
     free(props as *mut libc::c_void);
     let heap: *mut libc::c_char = heap_str(
-        (*state).heap,
+        &mut (*state).heap,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     if strlen(heap) > 0 {
@@ -189,7 +182,7 @@ pub unsafe fn state_getext(s: *mut State) -> *mut Externals {
 }
 
 pub unsafe fn state_getheap(s: *mut State) -> *mut Heap {
-    (*s).heap
+    &mut (*s).heap
 }
 
 pub unsafe fn state_getprops(s: *mut State) -> *mut Props {
@@ -260,7 +253,7 @@ pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
     let loc: *mut Location = value_as_location(&*v);
     state_get(state, loc, true).unwrap();
     location_tostatic(loc, (*state).static_memory)
-        || location_toheap(loc, (*state).heap)
+        || location_toheap(loc, &mut (*state).heap)
         || location_tostack(loc, (*state).stack)
         || location_toclump(loc, (*state).clump)
 }
@@ -274,7 +267,7 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
     }
     let loc: *mut Location = value_as_location(&*v);
     state_get(state, loc, true).unwrap();
-    location_toheap(loc, (*state).heap)
+    location_toheap(loc, &mut (*state).heap)
 }
 
 pub unsafe fn state_getvconst(state: *mut State, id: *mut libc::c_char) -> *mut Value {
@@ -291,7 +284,7 @@ pub unsafe fn state_get(
         (*state).static_memory,
         (*state).vconst,
         (*state).stack,
-        (*state).heap,
+        &mut (*state).heap,
         (*state).clump,
     )?;
     if b.is_null() {
@@ -312,7 +305,7 @@ pub unsafe fn state_getblock(state: *mut State, loc: *mut Location) -> *mut Bloc
         (*state).static_memory,
         (*state).vconst,
         (*state).stack,
-        (*state).heap,
+        &mut (*state).heap,
         (*state).clump,
     )
     .unwrap()
@@ -402,7 +395,7 @@ pub unsafe fn state_range_alloc(
         (*state).static_memory,
         (*state).vconst,
         (*state).stack,
-        (*state).heap,
+        &mut (*state).heap,
         (*state).clump,
     )
     .unwrap(); // panic rather than propagate the error - this is in the original
@@ -414,11 +407,11 @@ pub unsafe fn state_range_alloc(
     if ast_expr_equal(lw, up) {
         panic!();
     }
-    block_range_alloc(&*b, lw, up, (*state).heap)
+    block_range_alloc(&*b, lw, up, &mut (*state).heap)
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> *mut Value {
-    value_ptr_create(heap_newblock((*state).heap))
+    value_ptr_create(heap_newblock(&mut (*state).heap))
 }
 
 pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {
@@ -428,7 +421,7 @@ pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {
                 as *mut libc::c_char,
         ));
     }
-    location_dealloc(value_as_location(&*val), (*state).heap)
+    location_dealloc(value_as_location(&*val), &mut (*state).heap)
 }
 
 pub unsafe fn state_range_dealloc(
@@ -477,7 +470,7 @@ pub unsafe fn state_range_aredeallocands(
         (*state).static_memory,
         (*state).vconst,
         (*state).stack,
-        (*state).heap,
+        &mut (*state).heap,
         (*state).clump,
     )
     .unwrap();
@@ -485,7 +478,7 @@ pub unsafe fn state_range_aredeallocands(
 }
 
 pub unsafe fn state_hasgarbage(state: *mut State) -> bool {
-    !heap_referenced((*state).heap, state)
+    !heap_referenced(&mut (*state).heap, state)
 }
 
 pub unsafe fn state_references(s: *mut State, loc: *mut Location) -> bool {
@@ -518,15 +511,18 @@ pub unsafe fn state_equal(s1: *mut State, s2: *mut State) -> bool {
     state_destroy(s1_c);
     equal
 }
+
 unsafe fn state_undeclareliterals(s: *mut State) {
     static_memory_destroy((*s).static_memory);
     (*s).static_memory = static_memory_create();
 }
+
 unsafe fn state_undeclarevars(s: *mut State) {
-    heap_undeclare((*s).heap, s);
+    heap_undeclare(&mut (*s).heap, s);
     vconst_undeclare((*s).vconst);
     stack_undeclare((*s).stack, s);
 }
+
 unsafe fn state_popprops(s: *mut State) {
     props_destroy((*s).props);
     (*s).props = props_create();

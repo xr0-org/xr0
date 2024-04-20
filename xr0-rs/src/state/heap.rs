@@ -31,35 +31,38 @@ pub struct VConst {
     pub persist: Box<Map>,
 }
 
-pub unsafe fn heap_create() -> *mut Heap {
-    let h: *mut Heap = malloc(::core::mem::size_of::<Heap>()) as *mut Heap;
-    if h.is_null() {
-        panic!();
+impl Heap {
+    pub unsafe fn new() -> Self {
+        Heap {
+            blocks: block_arr_create(),
+            freed: ptr::null_mut(),
+        }
     }
-    (*h).blocks = block_arr_create();
-    (*h).freed = ptr::null_mut();
-    h
 }
 
-pub unsafe fn heap_destroy(h: *mut Heap) {
-    block_arr_destroy((*h).blocks);
-    free((*h).freed as *mut libc::c_void);
-    free(h as *mut libc::c_void);
+impl Drop for Heap {
+    fn drop(&mut self) {
+        unsafe {
+            block_arr_destroy(self.blocks);
+            free(self.freed as *mut libc::c_void);
+        }
+    }
 }
 
-pub unsafe fn heap_copy(h: *mut Heap) -> *mut Heap {
-    let copy: *mut Heap = malloc(::core::mem::size_of::<Heap>()) as *mut Heap;
-    (*copy).blocks = block_arr_copy((*h).blocks);
-    let n: libc::c_int = block_arr_nblocks((*h).blocks);
+pub unsafe fn heap_copy(h: &Heap) -> Heap {
+    let blocks = block_arr_copy(h.blocks);
+    let n: libc::c_int = block_arr_nblocks(h.blocks);
     let freed_copy: *mut bool =
         malloc((::core::mem::size_of::<bool>()).wrapping_mul(n as usize)) as *mut bool;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        *freed_copy.offset(i as isize) = *((*h).freed).offset(i as isize);
+        *freed_copy.offset(i as isize) = *(h.freed).offset(i as isize);
         i += 1;
     }
-    (*copy).freed = freed_copy;
-    copy
+    Heap {
+        blocks,
+        freed: freed_copy,
+    }
 }
 
 pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> *mut libc::c_char {
