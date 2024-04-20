@@ -945,25 +945,6 @@ unsafe fn ast_expr_constant_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     }
 }
 
-unsafe fn escape_str(c: libc::c_char) -> *mut libc::c_char {
-    match c as libc::c_int {
-        10 => return b"\\n\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        9 => return b"\\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        11 => return b"\\v\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        8 => return b"\\b\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        12 => return b"\\f\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        7 => return b"\\a\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        92 => return b"\\\\\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        63 => return b"\\?\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        39 => return b"\\'\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        34 => return b"\\\"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        0 => return b"\\0\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        _ => {
-            panic!();
-        }
-    }
-}
-
 unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name: *mut libc::c_char = ast_expr_as_identifier(&*root);
