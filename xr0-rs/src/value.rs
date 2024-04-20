@@ -55,13 +55,13 @@ pub enum NumberKind {
     Computed(*mut AstExpr),
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct NumberRange {
-    pub lower: *mut NumberValue,
-    pub upper: *mut NumberValue,
+    pub lower: NumberValue,
+    pub upper: NumberValue,
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum NumberValue {
     Constant(libc::c_int),
     Limit(bool),
@@ -601,9 +601,7 @@ unsafe fn number_range_up(n: *mut Number) -> libc::c_int {
 
 unsafe fn number_destroy(n: *mut Number) {
     match &(*n).kind {
-        NumberKind::Ranges(ranges) => {
-            number_range_arr_destroy(ranges);
-        }
+        NumberKind::Ranges(_) => {}
         NumberKind::Computed(computation) => {
             ast_expr_destroy(*computation);
         }
@@ -704,21 +702,11 @@ unsafe fn number_to_expr(n: *mut Number) -> *mut AstExpr {
 
 unsafe fn number_copy(num: *mut Number) -> *mut Number {
     match &(*num).kind {
-        NumberKind::Ranges(ranges) => number_ranges_create(number_range_arr_copy(ranges)),
+        NumberKind::Ranges(ranges) => number_ranges_create(ranges.clone()),
         NumberKind::Computed(computation) => {
             number_computed_create(Box::into_raw(ast_expr_copy(&**computation)))
         }
     }
-}
-
-unsafe fn number_range_arr_destroy(arr: &[NumberRange]) {
-    for range in arr {
-        number_range_destroy(range);
-    }
-}
-
-unsafe fn number_range_arr_copy(old: &[NumberRange]) -> Vec<NumberRange> {
-    old.iter().map(|range| number_range_copy(range)).collect()
 }
 
 unsafe fn number_ranges_to_expr(arr: &[NumberRange]) -> *mut AstExpr {
@@ -730,48 +718,31 @@ unsafe fn number_range_arr_canbe(arr: &[NumberRange], value: bool) -> bool {
     arr.iter().any(|range| number_range_canbe(range, value))
 }
 
-unsafe fn number_range_create(lw: *mut NumberValue, up: *mut NumberValue) -> NumberRange {
+unsafe fn number_range_create(lw: NumberValue, up: NumberValue) -> NumberRange {
     NumberRange {
         lower: lw,
         upper: up,
     }
 }
 
-unsafe fn number_range_destroy(r: &NumberRange) {
-    number_value_destroy(r.lower);
-    number_value_destroy(r.upper);
-}
-
-unsafe fn number_range_lower(r: *mut NumberRange) -> *mut NumberValue {
-    return (*r).lower;
-}
-
-unsafe fn number_range_upper(r: *mut NumberRange) -> *mut NumberValue {
-    return (*r).upper;
-}
-
 unsafe fn number_range_str(r: &NumberRange) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     if number_range_issingle(r) {
-        strbuilder_write!(b, "{}", cstr!(number_value_str(r.lower)));
+        strbuilder_write!(b, "{}", cstr!(number_value_str(&r.lower)));
     } else {
         strbuilder_write!(
             b,
             "{}:{}",
-            cstr!(number_value_str(r.lower)),
-            cstr!(number_value_str(r.upper)),
+            cstr!(number_value_str(&r.lower)),
+            cstr!(number_value_str(&r.upper)),
         );
     }
     return strbuilder_build(b);
 }
 
-unsafe fn number_range_copy(r: &NumberRange) -> NumberRange {
-    return number_range_create(number_value_copy(r.lower), number_value_copy(r.upper));
-}
-
 unsafe fn number_range_canbe(r: &NumberRange, value: bool) -> bool {
     if value {
-        if number_value_equal(r.lower, r.upper) {
+        if number_value_equal(&r.lower, &r.upper) {
             return false;
         }
         number_value_le_constant(r.lower, -1) || constant_le_number_value(1, r.lower)
@@ -781,12 +752,11 @@ unsafe fn number_range_canbe(r: &NumberRange, value: bool) -> bool {
 }
 
 unsafe fn number_range_issingle(r: &NumberRange) -> bool {
-    return number_values_aresingle(r.lower, r.upper);
+    number_values_aresingle(&r.lower, &r.upper)
 }
 
 unsafe fn number_range_equal(r1: &NumberRange, r2: &NumberRange) -> bool {
-    return number_value_equal(r1.lower, r2.lower) as libc::c_int != 0
-        && number_value_equal(r1.upper, r2.upper) as libc::c_int != 0;
+    number_value_equal(&r1.lower, &r2.lower) && number_value_equal(&r1.upper, &r2.upper)
 }
 
 unsafe fn number_range_as_constant(r: &NumberRange) -> libc::c_int {
@@ -796,27 +766,23 @@ unsafe fn number_range_as_constant(r: &NumberRange) -> libc::c_int {
     number_value_as_constant(r.lower)
 }
 
-unsafe fn number_value_constant_create(constant: libc::c_int) -> *mut NumberValue {
-    Box::into_raw(Box::new(NumberValue::Constant(constant)))
+unsafe fn number_value_constant_create(constant: libc::c_int) -> NumberValue {
+    NumberValue::Constant(constant)
 }
 
-unsafe fn number_value_limit_create(max: bool) -> *mut NumberValue {
-    Box::into_raw(Box::new(NumberValue::Limit(max)))
+unsafe fn number_value_limit_create(max: bool) -> NumberValue {
+    NumberValue::Limit(max)
 }
 
-unsafe fn number_value_min_create() -> *mut NumberValue {
+unsafe fn number_value_min_create() -> NumberValue {
     number_value_limit_create(false)
 }
 
-unsafe fn number_value_max_create() -> *mut NumberValue {
+unsafe fn number_value_max_create() -> NumberValue {
     number_value_limit_create(true)
 }
 
-unsafe fn number_value_destroy(v: *mut NumberValue) {
-    drop(Box::from_raw(v));
-}
-
-unsafe fn number_value_str(v: *mut NumberValue) -> *mut libc::c_char {
+unsafe fn number_value_str(v: &NumberValue) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     match &*v {
         NumberValue::Constant(k) => {
@@ -832,53 +798,46 @@ unsafe fn number_value_str(v: *mut NumberValue) -> *mut libc::c_char {
     return strbuilder_build(b);
 }
 
-unsafe fn number_value_copy(v: *mut NumberValue) -> *mut NumberValue {
-    match &*v {
-        NumberValue::Constant(k) => number_value_constant_create(*k),
-        NumberValue::Limit(max) => number_value_limit_create(*max),
-    }
-}
-
-unsafe fn number_values_aresingle(v1: *mut NumberValue, v2: *mut NumberValue) -> bool {
-    match (&*v1, &*v2) {
-        (NumberValue::Constant(k1), NumberValue::Constant(k2)) => *k1 == *k2 - 1,
-        (NumberValue::Limit(max1), NumberValue::Limit(max2)) => *max1 == *max2,
+unsafe fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {
+    match (*v1, *v2) {
+        (NumberValue::Constant(k1), NumberValue::Constant(k2)) => k1 == k2 - 1,
+        (NumberValue::Limit(max1), NumberValue::Limit(max2)) => max1 == max2,
         _ => panic!(),
     }
 }
 
-unsafe fn number_value_difference(v1: *mut NumberValue, v2: *mut NumberValue) -> libc::c_int {
-    match (&*v1, &*v2) {
-        (NumberValue::Constant(v1), NumberValue::Constant(v2)) => *v1 - *v2,
+unsafe fn number_value_difference(v1: &NumberValue, v2: &NumberValue) -> libc::c_int {
+    match (*v1, *v2) {
+        (NumberValue::Constant(v1), NumberValue::Constant(v2)) => v1 - v2,
         _ => panic!(),
     }
 }
 
-unsafe fn number_value_equal(v1: *mut NumberValue, v2: *mut NumberValue) -> bool {
-    match (&*v1, &*v2) {
-        (NumberValue::Constant(k1), NumberValue::Constant(k2)) => *k1 == *k2,
-        (NumberValue::Limit(max1), NumberValue::Limit(max2)) => *max1 == *max2,
+unsafe fn number_value_equal(v1: &NumberValue, v2: &NumberValue) -> bool {
+    match (*v1, *v2) {
+        (NumberValue::Constant(k1), NumberValue::Constant(k2)) => k1 == k2,
+        (NumberValue::Limit(max1), NumberValue::Limit(max2)) => max1 == max2,
         _ => panic!(),
     }
 }
 
-unsafe fn number_value_as_constant(v: *mut NumberValue) -> libc::c_int {
-    match &*v {
-        NumberValue::Constant(k) => *k,
+unsafe fn number_value_as_constant(v: NumberValue) -> libc::c_int {
+    match v {
+        NumberValue::Constant(k) => k,
         _ => panic!(),
     }
 }
 
-unsafe fn number_value_le_constant(v: *mut NumberValue, constant: libc::c_int) -> bool {
-    match &*v {
-        NumberValue::Constant(k) => *k <= constant,
-        NumberValue::Limit(max) => !*max,
+unsafe fn number_value_le_constant(v: NumberValue, constant: libc::c_int) -> bool {
+    match v {
+        NumberValue::Constant(k) => k <= constant,
+        NumberValue::Limit(max) => !max,
     }
 }
 
-unsafe fn constant_le_number_value(constant: libc::c_int, v: *mut NumberValue) -> bool {
-    match &*v {
-        NumberValue::Constant(k) => constant <= *k,
-        NumberValue::Limit(max) => *max,
+unsafe fn constant_le_number_value(constant: libc::c_int, v: NumberValue) -> bool {
+    match v {
+        NumberValue::Constant(k) => constant <= k,
+        NumberValue::Limit(max) => max,
     }
 }
