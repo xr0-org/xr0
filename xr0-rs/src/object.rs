@@ -1,8 +1,8 @@
-#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
+#![allow(non_snake_case, non_upper_case_globals, unused_assignments)]
 
 use std::ptr;
 
-use libc::{calloc, free, realloc};
+use libc::free;
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
@@ -40,16 +40,6 @@ pub struct Range {
 pub type ObjectType = libc::c_uint;
 pub const OBJECT_DEALLOCAND_RANGE: ObjectType = 1;
 pub const OBJECT_VALUE: ObjectType = 0;
-
-pub struct ObjectArr {
-    pub n: libc::c_int,
-    pub object: *mut *mut Object,
-}
-
-pub struct ObjectResult {
-    pub val: *mut Object,
-    pub err: *mut Error,
-}
 
 pub unsafe fn object_value_create(offset: *mut AstExpr, v: *mut Value) -> *mut Object {
     Box::into_raw(Box::new(Object {
@@ -238,6 +228,7 @@ pub unsafe fn object_contains_upperincl(obj: *mut Object, offset: &AstExpr, s: *
     result
 }
 
+#[allow(dead_code)]
 pub unsafe fn object_isempty(obj: *mut Object, s: *mut State) -> bool {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
@@ -262,6 +253,7 @@ pub unsafe fn object_contig_precedes(
     result
 }
 
+#[allow(dead_code)]
 pub unsafe fn object_issingular(obj: *mut Object, s: *mut State) -> bool {
     let lw: *mut AstExpr = (*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
@@ -443,42 +435,6 @@ pub unsafe fn range_references(r: *mut Range, loc: *mut Location, s: *mut State)
     location_references((*r).loc, loc, s)
 }
 
-pub unsafe fn object_arr_create() -> *mut ObjectArr {
-    let arr: *mut ObjectArr = calloc(1, ::core::mem::size_of::<ObjectArr>()) as *mut ObjectArr;
-    if arr.is_null() {
-        panic!();
-    }
-    arr
-}
-
-pub unsafe fn object_arr_destroy(arr: *mut ObjectArr) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        object_destroy(*((*arr).object).offset(i as isize));
-        i += 1;
-    }
-    free((*arr).object as *mut libc::c_void);
-    free(arr as *mut libc::c_void);
-}
-
-pub unsafe fn object_arr_copy(arr: *mut ObjectArr) -> *mut ObjectArr {
-    let copy: *mut ObjectArr = object_arr_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        object_arr_append(copy, object_copy(*((*arr).object).offset(i as isize)));
-        i += 1;
-    }
-    copy
-}
-
-pub unsafe fn object_arr_allocs(arr: *mut ObjectArr) -> *mut *mut Object {
-    (*arr).object
-}
-
-pub unsafe fn object_arr_nallocs(arr: *mut ObjectArr) -> libc::c_int {
-    (*arr).n
-}
-
 pub unsafe fn object_arr_index(
     arr: &[*mut Object],
     offset: &AstExpr,
@@ -503,57 +459,4 @@ pub unsafe fn object_arr_index_upperincl(
         }
     }
     None
-}
-
-pub unsafe fn object_arr_insert(
-    arr: *mut ObjectArr,
-    index: libc::c_int,
-    obj: *mut Object,
-) -> libc::c_int {
-    (*arr).n += 1;
-    (*arr).object = realloc(
-        (*arr).object as *mut libc::c_void,
-        (::core::mem::size_of::<*mut Object>()).wrapping_mul((*arr).n as usize),
-    ) as *mut *mut Object;
-    if ((*arr).object).is_null() {
-        panic!();
-    }
-    let mut i: libc::c_int = (*arr).n - 1 as libc::c_int;
-    while i > index {
-        let ref mut fresh0 = *((*arr).object).offset(i as isize);
-        *fresh0 = *((*arr).object).offset((i - 1 as libc::c_int) as isize);
-        i -= 1;
-    }
-    let ref mut fresh1 = *((*arr).object).offset(index as isize);
-    *fresh1 = obj;
-    index
-}
-
-pub unsafe fn object_arr_append(arr: *mut ObjectArr, obj: *mut Object) -> libc::c_int {
-    object_arr_insert(arr, (*arr).n, obj)
-}
-
-pub unsafe fn object_arr_remove(arr: *mut ObjectArr, index: libc::c_int) {
-    let mut i: libc::c_int = index;
-    while i < (*arr).n - 1 as libc::c_int {
-        let ref mut fresh2 = *((*arr).object).offset(i as isize);
-        *fresh2 = *((*arr).object).offset((i + 1 as libc::c_int) as isize);
-        i += 1;
-    }
-    (*arr).n -= 1;
-    (*arr).object = realloc(
-        (*arr).object as *mut libc::c_void,
-        (::core::mem::size_of::<*mut Object>()).wrapping_mul((*arr).n as usize),
-    ) as *mut *mut Object;
-    if !(!((*arr).object).is_null() || (*arr).n == 0) {
-        panic!();
-    }
-}
-
-pub unsafe fn object_arr_nobjects(arr: *mut ObjectArr) -> libc::c_int {
-    (*arr).n
-}
-
-pub unsafe fn object_arr_objects(arr: *mut ObjectArr) -> *mut *mut Object {
-    (*arr).object
 }
