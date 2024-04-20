@@ -182,7 +182,6 @@ pub const MOD_REGISTER: AstTypeModifier = 16;
 pub const MOD_CONST: AstTypeModifier = 32;
 pub const MOD_VOLATILE: AstTypeModifier = 64;
 
-#[derive(Copy, Clone)]
 pub struct LValue {
     pub t: *mut AstType,
     pub obj: *mut Object,
@@ -286,7 +285,6 @@ pub struct AstExternDecl {
     pub kind: AstExternDeclKind,
 }
 
-#[derive(Copy, Clone)]
 pub struct AstTypedefDecl {
     pub name: *mut libc::c_char,
     pub type_0: *mut AstType,

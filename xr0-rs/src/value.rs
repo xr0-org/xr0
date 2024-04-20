@@ -39,7 +39,6 @@ pub enum ValueKind {
     Struct(StructValue),
 }
 
-#[derive(Copy, Clone)]
 pub struct StructValue {
     pub members: *mut AstVariableArr,
     pub m: *mut Map,

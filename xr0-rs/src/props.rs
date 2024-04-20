@@ -8,7 +8,6 @@ use crate::ast::{
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create};
 use crate::{cstr, strbuilder_write, AstExpr, StrBuilder};
 
-#[derive(Copy, Clone)]
 pub struct Props {
     pub n: libc::c_int,
     pub prop: *mut *mut AstExpr,

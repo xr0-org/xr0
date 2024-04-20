@@ -26,14 +26,13 @@ use crate::{
     VConst, Value,
 };
 
-#[derive(Copy, Clone)]
 pub struct Location {
     pub r#type: LocationType,
     pub u: C2RustUnnamed,
     pub block: libc::c_int,
     pub offset: *mut AstExpr,
 }
-#[derive(Copy, Clone)]
+
 pub union C2RustUnnamed {
     pub frame: libc::c_int,
 }

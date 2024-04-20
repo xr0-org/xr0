@@ -166,7 +166,7 @@ fn parse_linemarker(line: &str) -> (PathBuf, usize) {
     (PathBuf::from(name), linenum)
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct LexemeMarker {
     pub linenum: libc::c_int,
     pub column: libc::c_int,

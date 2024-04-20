@@ -11,7 +11,6 @@ use crate::state::block::{
 use crate::util::{strbuilder_build, strbuilder_create};
 use crate::{cstr, strbuilder_write, Block, BlockArr, StrBuilder};
 
-#[derive(Copy, Clone)]
 pub struct Clump {
     pub blocks: *mut BlockArr,
 }

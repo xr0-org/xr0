@@ -8,18 +8,16 @@ pub struct Map {
     n: libc::c_int,
 }
 
-#[derive(Copy, Clone)]
 struct Entry {
     key: *mut libc::c_char,
     value: *const libc::c_void,
 }
 
-#[derive(Clone)]
 pub struct StrBuilder {
     s: String,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Error {
     pub msg: *mut libc::c_char,
     #[allow(dead_code)]
@@ -38,7 +36,6 @@ impl Debug for Error {
     }
 }
 
-#[derive(Copy, Clone)]
 pub struct StringArr {
     pub n: libc::c_int,
     pub s: *mut *mut libc::c_char,
@@ -75,7 +72,7 @@ unsafe fn entry_create(key: *const libc::c_char, value: *const libc::c_void) -> 
     }
 }
 
-unsafe fn entry_destroy(e: Entry) {
+unsafe fn entry_destroy(e: &Entry) {
     free(e.key as *mut libc::c_void);
 }
 
@@ -90,7 +87,7 @@ impl Map {
     pub unsafe fn destroy(self: Box<Map>) {
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < self.n {
-            entry_destroy(*(self.entry).offset(i as isize));
+            entry_destroy(&*(self.entry).offset(i as isize));
             i += 1;
         }
         free(self.entry as *mut libc::c_void);

@@ -23,11 +23,10 @@ use crate::{
     cstr, strbuilder_write, AstExpr, Heap, Location, Object, ObjectArr, State, StrBuilder,
 };
 
-#[derive(Copy, Clone)]
 pub struct Block {
     pub arr: *mut ObjectArr,
 }
-#[derive(Copy, Clone)]
+
 pub struct BlockArr {
     pub n: libc::c_int,
     pub block: *mut *mut Block,

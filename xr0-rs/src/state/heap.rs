@@ -21,7 +21,6 @@ use crate::util::{dynamic_str, error_create, strbuilder_build, strbuilder_create
 use crate::value::{value_copy, value_destroy, value_str};
 use crate::{cstr, strbuilder_write, AstExpr, Block, BlockArr, Location, State, StrBuilder, Value};
 
-#[derive(Copy, Clone)]
 pub struct Heap {
     pub blocks: *mut BlockArr,
     pub freed: *mut bool,

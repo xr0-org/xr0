@@ -36,7 +36,7 @@ pub struct Stack {
     pub id: libc::c_int,
     pub prev: *mut Stack,
 }
-#[derive(Copy, Clone)]
+
 pub struct Variable {
     pub r#type: *mut AstType,
     pub loc: *mut Location,
