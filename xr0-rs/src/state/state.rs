@@ -407,7 +407,7 @@ pub unsafe fn state_range_alloc(
     if ast_expr_equal(lw, up) {
         panic!();
     }
-    block_range_alloc(&*b, lw, up, &mut (*state).heap)
+    block_range_alloc(&mut *b, lw, up, &mut (*state).heap)
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> *mut Value {

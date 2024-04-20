@@ -27,7 +27,7 @@ use ast::{
     AstFunction, AstType, AstVariable, AstVariableArr,
 };
 use ext::Externals;
-use object::{Object, ObjectArr};
+use object::Object;
 use props::Props;
 use state::block::{Block, BlockArr};
 use state::clump::Clump;

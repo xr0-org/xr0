@@ -9,22 +9,18 @@ use crate::ast::{
     ast_expr_sum_create,
 };
 use crate::object::{
-    object_abstractcopy, object_arr_append, object_arr_copy, object_arr_create, object_arr_destroy,
-    object_arr_index, object_arr_index_upperincl, object_arr_insert, object_arr_nobjects,
-    object_arr_objects, object_arr_remove, object_contig_precedes, object_dealloc, object_from,
-    object_isdeallocand, object_isvalue, object_lower, object_range_create, object_references,
-    object_referencesheap, object_str, object_upper, object_upto, object_value_create,
-    range_create,
+    object_abstractcopy, object_arr_index, object_arr_index_upperincl, object_contig_precedes,
+    object_copy, object_dealloc, object_destroy, object_from, object_isdeallocand, object_isvalue,
+    object_lower, object_range_create, object_references, object_referencesheap, object_str,
+    object_upper, object_upto, object_value_create, range_create,
 };
 use crate::state::heap::heap_newblock;
 use crate::state::state::{state_alloc, state_eval};
 use crate::util::{error_create, strbuilder_build, strbuilder_create, Result};
-use crate::{
-    cstr, strbuilder_write, AstExpr, Heap, Location, Object, ObjectArr, State, StrBuilder,
-};
+use crate::{cstr, strbuilder_write, AstExpr, Heap, Location, Object, State, StrBuilder};
 
 pub struct Block {
-    pub arr: *mut ObjectArr,
+    pub arr: Vec<*mut Object>,
 }
 
 pub struct BlockArr {
@@ -33,9 +29,7 @@ pub struct BlockArr {
 }
 
 pub unsafe fn block_create() -> *mut Block {
-    Box::into_raw(Box::new(Block {
-        arr: object_arr_create(),
-    }))
+    Box::into_raw(Box::new(Block { arr: vec![] }))
 }
 
 pub unsafe fn block_destroy(b: *mut Block) {
@@ -45,41 +39,38 @@ pub unsafe fn block_destroy(b: *mut Block) {
 impl Drop for Block {
     fn drop(&mut self) {
         unsafe {
-            object_arr_destroy(self.arr);
+            for &obj in &self.arr {
+                object_destroy(obj);
+            }
         }
     }
 }
 
 pub unsafe fn block_copy(old: *mut Block) -> *mut Block {
     Box::into_raw(Box::new(Block {
-        arr: object_arr_copy((*old).arr),
+        arr: (*old)
+            .arr
+            .iter()
+            .copied()
+            .map(|obj| unsafe { object_copy(obj) })
+            .collect(),
     }))
 }
 
 pub unsafe fn block_str(block: *mut Block) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    let obj: *mut *mut Object = object_arr_objects((*block).arr);
-    let n: libc::c_int = object_arr_nobjects((*block).arr);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let s: *mut libc::c_char = object_str(*obj.offset(i as isize));
-        strbuilder_write!(
-            b,
-            "{}{}",
-            cstr!(s),
-            if (i + 1 as libc::c_int) < n { ", " } else { "" },
-        );
+    let n = (*block).arr.len();
+    for (i, &obj) in (*block).arr.iter().enumerate() {
+        let s: *mut libc::c_char = object_str(obj);
+        strbuilder_write!(b, "{}{}", cstr!(s), if i + 1 < n { ", " } else { "" },);
         free(s as *mut libc::c_void);
-        i += 1;
     }
     strbuilder_build(b)
 }
 
 pub unsafe fn block_install(b: *mut Block, obj: *mut Object) {
-    if !(object_arr_nobjects((*b).arr) == 0 as libc::c_int) {
-        panic!();
-    }
-    object_arr_append((*b).arr, obj);
+    assert!((*b).arr.is_empty());
+    (*b).arr.push(obj);
 }
 
 pub unsafe fn block_observe(
@@ -88,19 +79,18 @@ pub unsafe fn block_observe(
     s: *mut State,
     constructive: bool,
 ) -> *mut Object {
-    let mut index: libc::c_int = object_arr_index((*b).arr, offset, s);
-    if index == -(1 as libc::c_int) {
+    let Some(mut index) = object_arr_index(&(*b).arr, offset, s) else {
         if !constructive {
             return ptr::null_mut();
         }
         let obj: *mut Object =
             object_value_create(Box::into_raw(ast_expr_copy(offset)), ptr::null_mut());
-        object_arr_append((*b).arr, obj);
+        (*b).arr.push(obj);
         return obj;
-    }
-    let obj_0: *mut Object = *(object_arr_objects((*b).arr)).offset(index as isize);
-    if object_isvalue(obj_0) {
-        return obj_0;
+    };
+    let obj: *mut Object = (*b).arr[index];
+    if object_isvalue(obj) {
+        return obj;
     }
     let lw = ast_expr_copy(offset);
     let up = ast_expr_sum_create(
@@ -110,64 +100,48 @@ pub unsafe fn block_observe(
     // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down. I don't
     // know why it isn't a double free.
     let lw_ptr = Box::into_raw(lw);
-    let upto: *mut Object = object_upto(obj_0, lw_ptr, s);
+    let upto: *mut Object = object_upto(obj, lw_ptr, s);
     let observed: *mut Object =
         object_value_create(Box::into_raw(ast_expr_copy(&*lw_ptr)), state_alloc(s));
-    let from: *mut Object = object_from(obj_0, &up, s);
+    let from: *mut Object = object_from(obj, &up, s);
     drop(up);
     drop(Box::from_raw(lw_ptr));
 
-    object_dealloc(obj_0, s).unwrap();
-    object_arr_remove((*b).arr, index);
+    object_dealloc(obj, s).unwrap();
+    (*b).arr.remove(index);
     if !upto.is_null() {
-        let fresh0 = index;
-        index = index + 1;
-        object_arr_insert((*b).arr, fresh0, upto);
+        (*b).arr.insert(index, upto);
+        index += 1;
     }
-    let fresh1 = index;
-    index = index + 1;
-    object_arr_insert((*b).arr, fresh1, observed);
+    (*b).arr.insert(index, observed);
+    index += 1;
     if !from.is_null() {
-        object_arr_insert((*b).arr, index, from);
+        (*b).arr.insert(index, from);
     }
     observed
 }
 
 pub unsafe fn block_references(b: *mut Block, loc: *mut Location, s: *mut State) -> bool {
-    let n: libc::c_int = object_arr_nobjects((*b).arr);
-    let obj: *mut *mut Object = object_arr_objects((*b).arr);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        if object_references(*obj.offset(i as isize), loc, s) {
-            return true;
-        }
-        i += 1;
-    }
-    false
+    (*b).arr.iter().any(|&obj| object_references(obj, loc, s))
 }
 
 pub unsafe fn block_range_alloc(
-    b: &Block,
+    b: &mut Block,
     lw: &AstExpr,
     up: &AstExpr,
     heap: *mut Heap,
 ) -> Result<()> {
-    if !(object_arr_nobjects(b.arr) == 0 as libc::c_int) {
-        panic!();
-    }
-    object_arr_append(
-        b.arr,
-        object_range_create(
-            Box::into_raw(ast_expr_copy(lw)),
-            range_create(
-                Box::into_raw(ast_expr_difference_create(
-                    ast_expr_copy(up),
-                    ast_expr_copy(lw),
-                )),
-                heap_newblock(heap),
-            ),
+    assert!(b.arr.is_empty());
+    b.arr.push(object_range_create(
+        Box::into_raw(ast_expr_copy(lw)),
+        range_create(
+            Box::into_raw(ast_expr_difference_create(
+                ast_expr_copy(up),
+                ast_expr_copy(lw),
+            )),
+            heap_newblock(heap),
         ),
-    );
+    ));
     Ok(())
 }
 
@@ -180,32 +154,21 @@ pub unsafe fn block_range_aredeallocands(
     if hack_first_object_is_exactly_bounds(b, lw, up, s) {
         return true;
     }
-    let lw_index: libc::c_int = object_arr_index(b.arr, lw, s);
-    if lw_index == -(1 as libc::c_int) {
+    let Some(lw_index) = object_arr_index(&b.arr, lw, s) else {
         return false;
-    }
-    let up_index: libc::c_int = object_arr_index_upperincl(b.arr, up, s);
-    if up_index == -(1 as libc::c_int) {
+    };
+    let Some(up_index) = object_arr_index_upperincl(&b.arr, up, s) else {
         return false;
-    }
-    let obj: *mut *mut Object = object_arr_objects(b.arr);
-    let mut i: libc::c_int = lw_index;
-    while i < up_index {
-        if !object_isdeallocand(*obj.offset(i as isize), s) {
+    };
+    for i in lw_index..up_index {
+        if !object_isdeallocand(b.arr[i], s) {
             return false;
         }
-        if !object_contig_precedes(
-            *obj.offset(i as isize),
-            *obj.offset((i + 1 as libc::c_int) as isize),
-            s,
-        ) {
+        if !object_contig_precedes(b.arr[i], b.arr[i + 1], s) {
             return false;
         }
-        i += 1;
     }
-    if !object_isdeallocand(*obj.offset(up_index as isize), s) {
-        panic!();
-    }
+    assert!(object_isdeallocand(b.arr[up_index], s));
     true
 }
 
@@ -215,10 +178,8 @@ unsafe fn hack_first_object_is_exactly_bounds(
     up: &AstExpr,
     s: *mut State,
 ) -> bool {
-    if object_arr_nobjects(b.arr) == 0 as libc::c_int {
-        return false;
-    }
-    let obj: *mut Object = *(object_arr_objects(b.arr)).offset(0 as libc::c_int as isize);
+    assert!(!b.arr.is_empty());
+    let obj: *mut Object = b.arr[0];
     if !object_isdeallocand(obj, s) {
         return false;
     }
@@ -244,74 +205,53 @@ pub unsafe fn block_range_dealloc(
     s: *mut State,
 ) -> Result<()> {
     if hack_first_object_is_exactly_bounds(&*b, lw, up, s) {
-        object_dealloc(
-            *(object_arr_objects((*b).arr)).offset(0 as libc::c_int as isize),
-            s,
-        )?;
-        object_arr_remove((*b).arr, 0 as libc::c_int);
+        object_dealloc((*b).arr[0], s)?;
+        (*b).arr.remove(0);
         return Ok(());
     }
-    let lw_index: libc::c_int = object_arr_index((*b).arr, lw, s);
-    if lw_index == -(1 as libc::c_int) {
+    let Some(lw_index) = object_arr_index(&(*b).arr, lw, s) else {
         return Err(error_create(
             b"lower bound not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ));
-    }
-    let up_index: libc::c_int = object_arr_index_upperincl((*b).arr, up, s);
-    if up_index == -(1 as libc::c_int) {
+    };
+    let Some(up_index) = object_arr_index_upperincl(&(*b).arr, up, s) else {
         return Err(error_create(
             b"upper bound not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ));
-    }
-    let n: libc::c_int = object_arr_nobjects((*b).arr);
-    let obj: *mut *mut Object = object_arr_objects((*b).arr);
+    };
+    let n = (*b).arr.len();
     // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`. I
     // don't know why it isn't a double free.
-    let upto: *mut Object = object_upto(
-        *obj.offset(lw_index as isize),
-        lw as *const AstExpr as *mut AstExpr,
-        s,
-    );
-    let from: *mut Object = object_from(*obj.offset(up_index as isize), up, s);
-    let new: *mut ObjectArr = object_arr_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < lw_index {
-        object_arr_append(new, *obj.offset(i as isize));
-        i += 1;
-    }
+    let upto: *mut Object =
+        object_upto((*b).arr[lw_index], lw as *const AstExpr as *mut AstExpr, s);
+    let from: *mut Object = object_from((*b).arr[up_index], up, s);
+    let mut new = (*b).arr[..lw_index].to_vec();
     if !upto.is_null() {
-        object_arr_append((*b).arr, upto);
+        // Note: Possibly appending so that they'll be destroyed? But then (*b).arr is overwritten without destroying it.
+        (*b).arr.push(upto);
     }
     if !from.is_null() {
-        object_arr_append((*b).arr, from);
+        (*b).arr.push(from);
     }
-    let mut i_0: libc::c_int = up_index + 1 as libc::c_int;
-    while i_0 < n {
-        object_arr_append(new, *obj.offset(i_0 as isize));
-        i_0 += 1;
+    for i in (up_index + 1)..n {
+        // Note: Original uses `obj` after `object_arr_append` which might invalidate it. XXX BIG point
+        // in favor of Rust.
+        new.push((*b).arr[i]);
     }
-    let mut i_1: libc::c_int = lw_index;
-    while i_1 <= up_index {
-        object_dealloc(*obj.offset(i_1 as isize), s)?;
-        i_1 += 1;
+    for i in lw_index..=up_index {
+        object_dealloc((*b).arr[i], s)?;
     }
     (*b).arr = new;
     Ok(())
 }
 
 pub unsafe fn block_undeclare(b: *mut Block, s: *mut State) {
-    let new: *mut ObjectArr = object_arr_create();
-    let n: libc::c_int = object_arr_nobjects((*b).arr);
-    let object: *mut *mut Object = object_arr_objects((*b).arr);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let obj: *mut Object = *object.offset(i as isize);
+    let mut new = vec![];
+    for &obj in &(*b).arr {
         if object_referencesheap(obj, s) {
-            object_arr_append(new, object_abstractcopy(obj, s));
+            new.push(object_abstractcopy(obj, s));
         }
-        i += 1;
     }
-    object_arr_destroy((*b).arr);
     (*b).arr = new;
 }
 

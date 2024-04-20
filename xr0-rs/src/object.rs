@@ -480,33 +480,29 @@ pub unsafe fn object_arr_nallocs(arr: *mut ObjectArr) -> libc::c_int {
 }
 
 pub unsafe fn object_arr_index(
-    arr: *mut ObjectArr,
+    arr: &[*mut Object],
     offset: &AstExpr,
     state: *mut State,
-) -> libc::c_int {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        if object_contains(*((*arr).object).offset(i as isize), offset, state) {
-            return i;
+) -> Option<usize> {
+    for (i, &obj) in arr.iter().enumerate() {
+        if object_contains(obj, offset, state) {
+            return Some(i);
         }
-        i += 1;
     }
-    -(1 as libc::c_int)
+    None
 }
 
 pub unsafe fn object_arr_index_upperincl(
-    arr: *mut ObjectArr,
+    arr: &[*mut Object],
     offset: &AstExpr,
     state: *mut State,
-) -> libc::c_int {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        if object_contains_upperincl(*((*arr).object).offset(i as isize), offset, state) {
-            return i;
+) -> Option<usize> {
+    for (i, &obj) in arr.iter().enumerate() {
+        if object_contains_upperincl(obj, offset, state) {
+            return Some(i);
         }
-        i += 1;
     }
-    -(1 as libc::c_int)
+    None
 }
 
 pub unsafe fn object_arr_insert(
