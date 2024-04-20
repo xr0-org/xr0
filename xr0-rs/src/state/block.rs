@@ -2,7 +2,7 @@
 
 use std::ptr;
 
-use libc::{calloc, free, malloc, realloc};
+use libc::{calloc, free, realloc};
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_difference_create, ast_expr_eq_create,
@@ -33,20 +33,27 @@ pub struct BlockArr {
 }
 
 pub unsafe fn block_create() -> *mut Block {
-    let b: *mut Block = malloc(::core::mem::size_of::<Block>()) as *mut Block;
-    (*b).arr = object_arr_create();
-    b
+    Box::into_raw(Box::new(Block {
+        arr: object_arr_create(),
+    }))
 }
 
 pub unsafe fn block_destroy(b: *mut Block) {
-    object_arr_destroy((*b).arr);
-    free(b as *mut libc::c_void);
+    drop(Box::from_raw(b));
+}
+
+impl Drop for Block {
+    fn drop(&mut self) {
+        unsafe {
+            object_arr_destroy(self.arr);
+        }
+    }
 }
 
 pub unsafe fn block_copy(old: *mut Block) -> *mut Block {
-    let new: *mut Block = malloc(::core::mem::size_of::<Block>()) as *mut Block;
-    (*new).arr = object_arr_copy((*old).arr);
-    new
+    Box::into_raw(Box::new(Block {
+        arr: object_arr_copy((*old).arr),
+    }))
 }
 
 pub unsafe fn block_str(block: *mut Block) -> *mut libc::c_char {

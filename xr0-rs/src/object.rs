@@ -2,7 +2,7 @@
 
 use std::ptr;
 
-use libc::{calloc, free, malloc, realloc};
+use libc::{calloc, free, realloc};
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
@@ -394,10 +394,7 @@ pub unsafe fn object_getmembertype(
 }
 
 pub unsafe fn range_create(size: *mut AstExpr, loc: *mut Location) -> *mut Range {
-    let r: *mut Range = malloc(::core::mem::size_of::<Range>()) as *mut Range;
-    (*r).size = size;
-    (*r).loc = loc;
-    r
+    Box::into_raw(Box::new(Range { size, loc }))
 }
 
 pub unsafe fn range_copy(r: *mut Range) -> *mut Range {
@@ -408,9 +405,16 @@ pub unsafe fn range_copy(r: *mut Range) -> *mut Range {
 }
 
 pub unsafe fn range_destroy(r: *mut Range) {
-    ast_expr_destroy((*r).size);
-    location_destroy((*r).loc);
-    free(r as *mut libc::c_void);
+    drop(Box::from_raw(r));
+}
+
+impl Drop for Range {
+    fn drop(&mut self) {
+        unsafe {
+            ast_expr_destroy(self.size);
+            location_destroy(self.loc);
+        }
+    }
 }
 
 pub unsafe fn range_str(r: *mut Range) -> *mut libc::c_char {
