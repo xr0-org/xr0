@@ -15,10 +15,9 @@ use crate::state::block::{
     block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
     block_arr_nblocks, block_create, block_install, block_observe,
 };
-use crate::state::location::LOCATION_VCONST;
 use crate::state::location::{
     location_copy, location_create_automatic, location_destroy, location_getblock,
-    location_getstackblock, location_offset, location_references, location_str, location_type,
+    location_getstackblock, location_offset, location_references, location_str,
 };
 use crate::state::state::state_get;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map};
@@ -48,7 +47,7 @@ pub unsafe fn stack_newblock(stack: *mut Stack) -> *mut Location {
     let loc: *mut Location = location_create_automatic(
         (*stack).id,
         address,
-        Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
+        ast_expr_constant_create(0 as libc::c_int),
     );
     return loc;
 }
@@ -313,11 +312,7 @@ pub unsafe fn variable_str(
     stack: *mut Stack,
     state: *mut State,
 ) -> *mut libc::c_char {
-    if !(location_type((*var).loc) as libc::c_uint
-        != LOCATION_VCONST as libc::c_int as libc::c_uint)
-    {
-        panic!();
-    }
+    assert!(!(*(*var).loc).type_is_vconst());
     let b: *mut StrBuilder = strbuilder_create();
     let type_0: *mut libc::c_char = ast_type_str((*var).r#type);
     let loc: *mut libc::c_char = location_str((*var).loc);
@@ -350,7 +345,7 @@ unsafe fn object_or_nothing_str(
     if b.is_null() {
         panic!();
     }
-    let obj: *mut Object = block_observe(b, &*location_offset(loc), state, false);
+    let obj: *mut Object = block_observe(b, location_offset(&*loc), state, false);
     if !obj.is_null() {
         return object_str(obj);
     }
@@ -366,9 +361,7 @@ pub unsafe fn variable_type(v: *mut Variable) -> *mut AstType {
 }
 
 pub unsafe fn variable_references(v: *mut Variable, loc: *mut Location, s: *mut State) -> bool {
-    if !(location_type(loc) as libc::c_uint != LOCATION_VCONST as libc::c_int as libc::c_uint) {
-        panic!();
-    }
+    assert!(!(*loc).type_is_vconst());
     return location_references((*v).loc, loc, s);
 }
 

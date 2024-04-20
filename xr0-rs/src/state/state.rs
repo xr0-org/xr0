@@ -13,8 +13,7 @@ use super::heap::{
 use super::location::{
     location_create_dereferencable, location_create_static, location_dealloc, location_getblock,
     location_offset, location_range_dealloc, location_toclump, location_toheap, location_tostack,
-    location_tostatic, location_type, location_with_offset, LOCATION_DEREFERENCABLE,
-    LOCATION_DYNAMIC,
+    location_tostatic, location_with_offset,
 };
 use super::r#static::{
     static_memory_checkpool, static_memory_copy, static_memory_create, static_memory_destroy,
@@ -235,10 +234,7 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
         return value_ptr_create(loc);
     }
     let address: libc::c_int = static_memory_newblock((*state).static_memory);
-    loc = location_create_static(
-        address,
-        Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
-    );
+    loc = location_create_static(address, ast_expr_constant_create(0));
     let obj = state_get(state, loc, true).unwrap();
     if obj.is_null() {
         panic!();
@@ -250,10 +246,7 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
 
 pub unsafe fn state_clump(state: *mut State) -> *mut Value {
     let address: libc::c_int = clump_newblock((*state).clump);
-    let loc: *mut Location = location_create_dereferencable(
-        address,
-        Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
-    );
+    let loc: *mut Location = location_create_dereferencable(address, ast_expr_constant_create(0));
     return value_ptr_create(loc);
 }
 
@@ -266,10 +259,10 @@ pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
     }
     let loc: *mut Location = value_as_location(&*v);
     state_get(state, loc, true).unwrap();
-    return location_tostatic(loc, (*state).static_memory) as libc::c_int != 0
-        || location_toheap(loc, (*state).heap) as libc::c_int != 0
-        || location_tostack(loc, (*state).stack) as libc::c_int != 0
-        || location_toclump(loc, (*state).clump) as libc::c_int != 0;
+    location_tostatic(loc, (*state).static_memory)
+        || location_toheap(loc, (*state).heap)
+        || location_tostack(loc, (*state).stack)
+        || location_toclump(loc, (*state).clump)
 }
 
 pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
@@ -302,17 +295,12 @@ pub unsafe fn state_get(
         (*state).clump,
     )?;
     if b.is_null() {
-        if !(location_type(loc) as libc::c_uint == LOCATION_DYNAMIC as libc::c_int as libc::c_uint
-            || location_type(loc) as libc::c_uint
-                == LOCATION_DEREFERENCABLE as libc::c_int as libc::c_uint)
-        {
-            panic!();
-        }
+        assert!((*loc).type_is_dynamic() || (*loc).type_is_dereferencable());
         return Ok(ptr::null_mut());
     }
     Ok(block_observe(
         b,
-        &*location_offset(loc),
+        location_offset(&*loc),
         state,
         constructive,
     ))
@@ -466,10 +454,8 @@ pub unsafe fn state_addresses_deallocand(state: *mut State, obj: *mut Object) ->
 }
 
 pub unsafe fn state_isdeallocand(s: *mut State, loc: *mut Location) -> bool {
-    let type_equal: bool =
-        location_type(loc) as libc::c_uint == LOCATION_DYNAMIC as libc::c_int as libc::c_uint;
     let b: *mut Block = state_getblock(s, loc);
-    return type_equal as libc::c_int != 0 && !b.is_null();
+    (*loc).type_is_dynamic() && !b.is_null()
 }
 
 pub unsafe fn state_range_aredeallocands(
