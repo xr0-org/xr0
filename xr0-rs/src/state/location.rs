@@ -1,11 +1,3 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments,
-    unused_variables
-)]
-
 use libc::{free, printf};
 
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal, ast_expr_str};
@@ -114,7 +106,7 @@ pub unsafe fn location_destroy(loc: *mut Location) {
 
 pub unsafe fn location_str(loc: &Location) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    match &(*loc).kind {
+    match &loc.kind {
         LocationKind::Static => {
             strbuilder_write!(b, "static:");
         }
@@ -129,9 +121,9 @@ pub unsafe fn location_str(loc: &Location) -> *mut libc::c_char {
         }
         _ => panic!(),
     }
-    strbuilder_write!(b, "{}", (*loc).block);
+    strbuilder_write!(b, "{}", loc.block);
     if !offsetzero(loc) {
-        let offset: *mut libc::c_char = ast_expr_str(&(*loc).offset);
+        let offset: *mut libc::c_char = ast_expr_str(&loc.offset);
         strbuilder_write!(b, "+{}", cstr!(offset));
         free(offset as *mut libc::c_void);
     }
@@ -143,27 +135,21 @@ unsafe fn offsetzero(loc: &Location) -> bool {
     ast_expr_equal(&loc.offset, &zero)
 }
 
-pub unsafe fn location_block(loc: *mut Location) -> libc::c_int {
-    (*loc).block
-}
-
 pub unsafe fn location_offset(loc: &Location) -> &AstExpr {
     &loc.offset
 }
 
 pub unsafe fn location_copy(loc: &Location) -> *mut Location {
-    match &(*loc).kind {
-        LocationKind::Static => location_create_static((*loc).block, ast_expr_copy(&(*loc).offset)),
-        LocationKind::VConst => location_create_vconst((*loc).block, ast_expr_copy(&(*loc).offset)),
+    match &loc.kind {
+        LocationKind::Static => location_create_static(loc.block, ast_expr_copy(&loc.offset)),
+        LocationKind::VConst => location_create_vconst(loc.block, ast_expr_copy(&loc.offset)),
         LocationKind::Dereferencable => {
-            location_create_dereferencable((*loc).block, ast_expr_copy(&(*loc).offset))
+            location_create_dereferencable(loc.block, ast_expr_copy(&loc.offset))
         }
         LocationKind::Automatic { frame } => {
-            location_create_automatic(*frame, (*loc).block, ast_expr_copy(&(*loc).offset))
+            location_create_automatic(*frame, loc.block, ast_expr_copy(&loc.offset))
         }
-        LocationKind::Dynamic => {
-            location_create_dynamic((*loc).block, ast_expr_copy(&(*loc).offset))
-        }
+        LocationKind::Dynamic => location_create_dynamic(loc.block, ast_expr_copy(&loc.offset)),
     }
 }
 
@@ -200,23 +186,17 @@ pub unsafe fn location_toclump(loc: *mut Location, c: *mut Clump) -> bool {
     type_equal && !b.is_null()
 }
 
-pub unsafe fn location_equal(l1: *mut Location, l2: *mut Location) -> bool {
+unsafe fn location_equal(l1: &Location, l2: &Location) -> bool {
     // Note: Original did not compare the `frame` field of automatic locations.
-    (*l1).kind == (*l2).kind
-        && (*l1).block == (*l2).block
-        && ast_expr_equal(&(*l1).offset, &(*l2).offset)
+    l1.kind == l2.kind && l1.block == l2.block && ast_expr_equal(&l1.offset, &l2.offset)
 }
 
 pub unsafe fn location_references(l1: *mut Location, l2: *mut Location, s: *mut State) -> bool {
-    if location_equal(l1, l2) {
+    if location_equal(&*l1, &*l2) {
         return true;
     }
     let b: *mut Block = state_getblock(s, l1);
     !b.is_null() && block_references(b, l2, s)
-}
-
-pub unsafe fn location_isauto(loc: *mut Location) -> bool {
-    matches!((*loc).kind, LocationKind::Automatic { .. })
 }
 
 pub unsafe fn location_referencesheap(l: *mut Location, s: *mut State) -> bool {
