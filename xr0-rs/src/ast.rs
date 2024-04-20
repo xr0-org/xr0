@@ -7,10 +7,6 @@ use std::ptr;
 
 use libc::{free, malloc, realloc, strcmp, strncmp};
 
-use crate::ext::{
-    externals_declarefunc, externals_declarestruct, externals_declaretypedef, externals_declarevar,
-    externals_getfunc, externals_getstruct, externals_gettypedef,
-};
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
 use crate::object::{
     object_as_value, object_assign, object_destroy, object_getmember, object_getmembertype,
@@ -971,7 +967,7 @@ unsafe fn escape_str(c: libc::c_char) -> *mut libc::c_char {
 unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name: *mut libc::c_char = ast_expr_as_identifier(&*root);
-    let f: *mut AstFunction = externals_getfunc(state_getext(state), name);
+    let f: *mut AstFunction = (*state_getext(state)).get_func(name);
     if f.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
         strbuilder_write!(b, "function `{}' not found", cstr!(name));
@@ -1002,7 +998,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value
 unsafe fn call_absexec(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name: *mut libc::c_char = ast_expr_as_identifier(&*root);
-    let f: *mut AstFunction = externals_getfunc(state_getext(s), name);
+    let f: *mut AstFunction = (*state_getext(s)).get_func(name);
     if f.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
         strbuilder_write!(b, "function `{}' not found", cstr!(name));
@@ -2028,7 +2024,7 @@ pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> AstStmtSplits {
 unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     let root = ast_expr_call_root(expr);
     let name: *mut libc::c_char = ast_expr_as_identifier(root);
-    let f: *mut AstFunction = externals_getfunc(state_getext(state), name);
+    let f: *mut AstFunction = (*state_getext(state)).get_func(name);
     if f.is_null() {
         let b: *mut StrBuilder = strbuilder_create();
         strbuilder_write!(b, "function: `{}' not found", cstr!(name));
@@ -2181,7 +2177,7 @@ unsafe fn build_indegree_zero(indegrees: &Map) -> Box<StringArr> {
     indegree_zero
 }
 
-pub unsafe fn topological_order(fname: *mut libc::c_char, ext: *mut Externals) -> Box<StringArr> {
+pub unsafe fn topological_order(fname: *mut libc::c_char, ext: &Externals) -> Box<StringArr> {
     let mut order = string_arr_create();
     let g = ast_function_buildgraph(fname, ext);
     let indegrees = calculate_indegrees(&g);
@@ -3456,12 +3452,9 @@ pub unsafe fn ast_type_vconst(
     match &(*t).base {
         AstTypeBase::Int => value_int_indefinite_create(),
         AstTypeBase::Pointer(_) => value_ptr_indefinite_create(),
-        AstTypeBase::UserDefined(name) => ast_type_vconst(
-            externals_gettypedef(state_getext(s), *name),
-            s,
-            comment,
-            persist,
-        ),
+        AstTypeBase::UserDefined(name) => {
+            ast_type_vconst((*state_getext(s)).get_typedef(*name), s, comment, persist)
+        }
         AstTypeBase::Struct(_) => value_struct_indefinite_create(t, s, comment, persist),
         _ => panic!(),
     }
@@ -3479,7 +3472,7 @@ pub unsafe fn ast_type_struct_complete(t: *mut AstType, ext: *mut Externals) -> 
     if tag.is_null() {
         panic!();
     }
-    return externals_getstruct(ext, tag);
+    (*ext).get_struct(tag)
 }
 
 pub unsafe fn ast_type_struct_members(t: &AstType) -> Option<&[*mut AstVariable]> {
@@ -3948,7 +3941,7 @@ pub unsafe fn ast_function_protostitch(
     f: *mut AstFunction,
     ext: *mut Externals,
 ) -> *mut AstFunction {
-    let proto: *mut AstFunction = externals_getfunc(ext, (*f).name);
+    let proto: *mut AstFunction = (*ext).get_func((*f).name);
     if !proto.is_null() && !((*proto).r#abstract).is_null() {
         (*f).r#abstract = ast_block_copy(&*(*proto).r#abstract);
     }
@@ -4178,14 +4171,14 @@ unsafe fn recurse_buildgraph(
     g: &mut Map,
     dedup: &mut Map,
     fname: *mut libc::c_char,
-    ext: *mut Externals,
+    ext: &Externals,
 ) {
     let mut local_dedup = Map::new();
     if !(dedup.get(fname)).is_null() {
         return;
     }
     dedup.set(fname, 1 as libc::c_int as *mut libc::c_void);
-    let f: *mut AstFunction = externals_getfunc(ext, fname);
+    let f: *mut AstFunction = ext.get_func(fname);
     if f.is_null() {
         eprintln!(
             "function `{}' is not declared",
@@ -4216,7 +4209,7 @@ unsafe fn recurse_buildgraph(
         let mut j: libc::c_int = 0 as libc::c_int;
         while j < string_arr_n(&farr) {
             if (local_dedup.get(*func.offset(j as isize))).is_null() {
-                let f_0: *mut AstFunction = externals_getfunc(ext, *func.offset(j as isize));
+                let f_0: *mut AstFunction = ext.get_func(*func.offset(j as isize));
                 if !(*f_0).isaxiom {
                     string_arr_append(&mut val, *func.offset(j as isize));
                 }
@@ -4296,11 +4289,11 @@ unsafe fn split_paths_absverify(
     Ok(())
 }
 
-pub unsafe fn ast_function_buildgraph(fname: *mut libc::c_char, ext: *mut Externals) -> Box<Map> {
+pub unsafe fn ast_function_buildgraph(fname: *mut libc::c_char, ext: &Externals) -> Box<Map> {
     let mut dedup = Map::new();
     let mut g = Map::new();
     recurse_buildgraph(&mut g, &mut dedup, fname, ext);
-    return g;
+    g
 }
 
 unsafe fn split_name(name: *mut libc::c_char, assumption: &AstExpr) -> *mut libc::c_char {
@@ -4389,19 +4382,19 @@ pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> Box<A
     })
 }
 
-pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: *mut Externals) {
+pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: &mut Externals) {
     match &(*decl).kind {
         AstExternDeclKind::Function(f) => {
-            externals_declarefunc(ext, ast_function_name(&**f), *f);
+            ext.declare_func(ast_function_name(&**f), *f);
         }
         AstExternDeclKind::Variable(v) => {
-            externals_declarevar(ext, ast_variable_name(*v), *v);
+            ext.declare_var(ast_variable_name(*v), *v);
         }
         AstExternDeclKind::Typedef(typedef) => {
-            externals_declaretypedef(ext, typedef.name, typedef.type_0);
+            ext.declare_typedef(typedef.name, typedef.type_0);
         }
         AstExternDeclKind::Struct(s) => {
-            externals_declarestruct(ext, *s);
+            ext.declare_struct(*s);
         }
     }
 }
@@ -4473,7 +4466,7 @@ pub unsafe fn lvalue_object(l: *mut LValue) -> *mut Object {
 
 pub unsafe fn ast_topological_order(
     fname: *mut libc::c_char,
-    ext: *mut Externals,
+    ext: &mut Externals,
 ) -> Box<StringArr> {
     topological_order(fname, ext)
 }

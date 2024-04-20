@@ -29,7 +29,6 @@ use crate::ast::{
     ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
     ast_type_vconst,
 };
-use crate::ext::externals_types_str;
 use crate::object::{object_as_value, object_assign};
 use crate::props::{props_copy, props_create, props_destroy, props_str};
 use crate::util::{dynamic_str, error_create, strbuilder_build, strbuilder_create, Result};
@@ -133,10 +132,8 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
 pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_write!(b, "[[\n");
-    let ext: *mut libc::c_char = externals_types_str(
-        (*state).ext,
-        b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    );
+    let ext: *mut libc::c_char =
+        (*(*state).ext).types_str(b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char);
     if strlen(ext) > 0 {
         strbuilder_write!(b, "{}\n", cstr!(ext));
     }

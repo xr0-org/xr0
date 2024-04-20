@@ -26,7 +26,7 @@ use ast::{
     ast_functiondecl_create, ast_protostitch, ast_topological_order, Ast, AstExpr, AstExternDecl,
     AstFunction, AstType, AstVariable, AstVariableArr,
 };
-use ext::{externals_create, externals_destroy, externals_getfunc, Externals};
+use ext::Externals;
 use object::{Object, ObjectArr};
 use props::Props;
 use state::block::{Block, BlockArr};
@@ -92,7 +92,7 @@ pub fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String>
     Ok(buf)
 }
 
-pub unsafe fn pass0(root: &mut Ast, ext: *mut Externals) {
+pub unsafe fn pass0(root: &mut Ast, ext: &mut Externals) {
     for decl in &root.decls {
         match ast_externdecl_as_function_ptr(decl) {
             None => {
@@ -141,12 +141,12 @@ pub unsafe fn pass1(root: &mut Ast, ext: *mut Externals) {
     }
 }
 
-pub unsafe fn pass_inorder(order: &mut StringArr, ext: *mut Externals) {
+pub unsafe fn pass_inorder(order: &mut StringArr, ext: &mut Externals) {
     let n: libc::c_int = string_arr_n(order);
     let name: *mut *mut libc::c_char = string_arr_s(order);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        let f: *mut AstFunction = externals_getfunc(ext, *name.offset(i as isize));
+        let f: *mut AstFunction = ext.get_func(*name.offset(i as isize));
         if !(ast_function_isaxiom(&*f) as libc::c_int != 0
             || ast_function_isproto(&*f) as libc::c_int != 0)
         {
@@ -222,29 +222,29 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
     let mut root = parser::parse_translation_unit(&c.infile, &source)
         .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{err}")))?;
 
-    let ext: *mut Externals = externals_create();
-    pass0(&mut root, ext);
+    let mut ext = Externals::new();
+    pass0(&mut root, &mut ext);
 
     if let Some(sortfunc) = &c.sort {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-        let order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, ext);
+        let order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, &mut ext);
         eprintln!(
             "{}",
             CStr::from_ptr(string_arr_str(&order)).to_string_lossy()
         );
     } else if let Some(sortfunc) = &c.verify {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-        let mut order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, ext);
+        let mut order =
+            ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, &mut ext);
         eprintln!(
             "{}",
             CStr::from_ptr(string_arr_str(&order)).to_string_lossy()
         );
-        pass_inorder(&mut order, ext);
+        pass_inorder(&mut order, &mut ext);
     } else {
-        pass1(&mut root, ext);
+        pass1(&mut root, &mut ext);
     }
 
-    externals_destroy(ext);
     Ok(())
 }
 
