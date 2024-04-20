@@ -57,34 +57,24 @@ pub unsafe fn stack_create(
     prev: *mut Stack,
     return_type: *mut AstType,
 ) -> *mut Stack {
-    let stack: *mut Stack = calloc(1, ::core::mem::size_of::<Stack>()) as *mut Stack;
-    assert!(!stack.is_null());
-    std::ptr::write(
-        stack,
-        Stack {
-            name,
-            frame: block_arr_create(),
-            varmap: Map::new(),
-            prev,
-            id: if !prev.is_null() {
-                (*prev).id + 1 as libc::c_int
-            } else {
-                0 as libc::c_int
-            },
-            result: std::ptr::null_mut(),
-        },
-    );
-    (*stack).result = variable_create(return_type, stack, false);
-    stack
+    let mut stack = Box::new(Stack {
+        name,
+        frame: block_arr_create(),
+        varmap: Map::new(),
+        prev,
+        id: if !prev.is_null() { (*prev).id + 1 } else { 0 },
+        result: ptr::null_mut(),
+    });
+    let v = variable_create(return_type, &mut *stack, false);
+    stack.result = v;
+    Box::into_raw(stack)
 }
 
 pub unsafe fn stack_getframe(s: *mut Stack, frame: libc::c_int) -> *mut Stack {
     if s.is_null() {
         panic!();
     }
-    if !(frame >= 0 as libc::c_int) {
-        panic!();
-    }
+    assert!(frame >= 0);
     if (*s).id == frame {
         return s;
     }
@@ -95,15 +85,21 @@ pub unsafe fn stack_getframe(s: *mut Stack, frame: libc::c_int) -> *mut Stack {
 }
 
 pub unsafe fn stack_destroy(stack: *mut Stack) {
-    let stack_val = std::ptr::read(stack);
-    block_arr_destroy(stack_val.frame);
-    let m = stack_val.varmap;
-    for p in m.values() {
-        variable_destroy(p as *mut Variable);
+    drop(Box::from_raw(stack));
+}
+
+impl Drop for Stack {
+    fn drop(&mut self) {
+        unsafe {
+            block_arr_destroy(self.frame);
+            let m = std::mem::replace(&mut self.varmap, Map::new());
+            for p in m.values() {
+                variable_destroy(p as *mut Variable);
+            }
+            m.destroy();
+            variable_destroy(self.result);
+        }
     }
-    m.destroy();
-    variable_destroy(stack_val.result);
-    free(stack as *mut libc::c_void);
 }
 
 pub unsafe fn stack_prev(s: *mut Stack) -> *mut Stack {
@@ -211,14 +207,8 @@ pub unsafe fn stack_getresult(s: *mut Stack) -> *mut Variable {
     (*s).result
 }
 
-pub unsafe fn stack_getvarmap(s: &mut Stack) -> &mut Map {
-    &mut (*s).varmap
-}
-
 pub unsafe fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Variable {
-    if !(strcmp(id, b"return\0" as *const u8 as *const libc::c_char) != 0 as libc::c_int) {
-        panic!();
-    }
+    assert!(strcmp(id, b"return\0" as *const u8 as *const libc::c_char) != 0);
     (*s).varmap.get(id) as *mut Variable
 }
 
