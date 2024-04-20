@@ -22,20 +22,21 @@ use crate::value::{
 use crate::{cstr, strbuilder_write, AstExpr, AstType, Location, State, StrBuilder, Value};
 
 pub struct Object {
-    pub r#type: ObjectType,
+    pub obsolete_object_type: ObjectType,
+    pub kind: ObjectKind,
     pub offset: *mut AstExpr,
-    pub c2rust_unnamed: ObjectKind,
 }
 
-pub union ObjectKind {
-    pub range: *mut Range,
-    pub value: *mut Value,
+pub enum ObjectKind {
+    DeallocandRange(*mut Range),
+    Value(*mut Value),
 }
 
 pub struct Range {
     pub size: *mut AstExpr,
     pub loc: *mut Location,
 }
+
 pub type ObjectType = libc::c_uint;
 pub const OBJECT_DEALLOCAND_RANGE: ObjectType = 1;
 pub const OBJECT_VALUE: ObjectType = 0;
@@ -51,78 +52,70 @@ pub struct ObjectResult {
 }
 
 pub unsafe fn object_value_create(offset: *mut AstExpr, v: *mut Value) -> *mut Object {
-    let obj: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
-    if obj.is_null() {
-        panic!();
-    }
-    (*obj).offset = offset;
-    (*obj).c2rust_unnamed.value = v;
-    (*obj).r#type = OBJECT_VALUE;
-    obj
+    Box::into_raw(Box::new(Object {
+        obsolete_object_type: OBJECT_VALUE,
+        kind: ObjectKind::Value(v),
+        offset,
+    }))
 }
 
 pub unsafe fn object_range_create(offset: *mut AstExpr, r: *mut Range) -> *mut Object {
-    if r.is_null() {
-        panic!();
-    }
-    let obj: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
-    if obj.is_null() {
-        panic!();
-    }
-    (*obj).offset = offset;
-    (*obj).c2rust_unnamed.range = r;
-    (*obj).r#type = OBJECT_DEALLOCAND_RANGE;
-    obj
+    assert!(!r.is_null());
+    Box::into_raw(Box::new(Object {
+        obsolete_object_type: OBJECT_DEALLOCAND_RANGE,
+        kind: ObjectKind::DeallocandRange(r),
+        offset,
+    }))
 }
 
 pub unsafe fn object_destroy(obj: *mut Object) {
-    match (*obj).r#type {
-        0 => {
-            if !((*obj).c2rust_unnamed.value).is_null() {
-                value_destroy((*obj).c2rust_unnamed.value);
+    drop(Box::from_raw(obj));
+}
+
+impl Drop for Object {
+    fn drop(&mut self) {
+        unsafe {
+            match &self.kind {
+                ObjectKind::Value(v) => {
+                    if !(*v).is_null() {
+                        value_destroy(*v);
+                    }
+                }
+                ObjectKind::DeallocandRange(r) => {
+                    range_destroy(*r);
+                }
             }
+            ast_expr_destroy(self.offset);
         }
-        1 => {
-            range_destroy((*obj).c2rust_unnamed.range);
-        }
-        _ => panic!(),
     }
-    ast_expr_destroy((*obj).offset);
-    free(obj as *mut libc::c_void);
 }
 
 pub unsafe fn object_copy(old: *mut Object) -> *mut Object {
-    let new: *mut Object = malloc(::core::mem::size_of::<Object>()) as *mut Object;
-    (*new).offset = Box::into_raw(ast_expr_copy(&*(*old).offset));
-    (*new).r#type = (*old).r#type;
-    match (*old).r#type {
-        0 => {
-            (*new).c2rust_unnamed.value = if !((*old).c2rust_unnamed.value).is_null() {
-                value_copy(&*(*old).c2rust_unnamed.value)
+    Box::into_raw(Box::new(Object {
+        obsolete_object_type: (*old).obsolete_object_type,
+        kind: match &(*old).kind {
+            ObjectKind::Value(v) => ObjectKind::Value(if !(*v).is_null() {
+                value_copy(&**v)
             } else {
                 ptr::null_mut()
-            };
-        }
-        1 => {
-            (*new).c2rust_unnamed.range = range_copy((*old).c2rust_unnamed.range);
-        }
-        _ => panic!(),
-    }
-    new
+            }),
+            ObjectKind::DeallocandRange(range) => ObjectKind::DeallocandRange(range_copy(*range)),
+        },
+        offset: Box::into_raw(ast_expr_copy(&*(*old).offset)),
+    }))
 }
 
 pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Object {
-    match (*old).r#type {
-        1 => object_copy(old),
-        0 => object_value_create(
+    match &(*old).kind {
+        ObjectKind::DeallocandRange(_) => object_copy(old),
+        ObjectKind::Value(v) => object_value_create(
             Box::into_raw(ast_expr_copy(&*(*old).offset)),
-            if !((*old).c2rust_unnamed.value).is_null() {
-                value_abstractcopy(&*(*old).c2rust_unnamed.value, s)
+            if !(*v).is_null() {
+                value_abstractcopy(&**v, s)
             } else {
                 ptr::null_mut()
             },
         ),
-        _ => panic!(),
     }
 }
 
@@ -140,79 +133,70 @@ pub unsafe fn object_str(obj: *mut Object) -> *mut libc::c_char {
 }
 
 unsafe fn inner_str(obj: *mut Object) -> *mut libc::c_char {
-    match (*obj).r#type {
-        0 => {
-            if !((*obj).c2rust_unnamed.value).is_null() {
-                value_str((*obj).c2rust_unnamed.value)
+    match &(*obj).kind {
+        ObjectKind::Value(v) => {
+            if !(*v).is_null() {
+                value_str(*v)
             } else {
                 dynamic_str(b"\0" as *const u8 as *const libc::c_char)
             }
         }
-        1 => range_str((*obj).c2rust_unnamed.range),
-        _ => panic!(),
+        ObjectKind::DeallocandRange(range) => range_str(*range),
     }
 }
 
 pub unsafe fn object_referencesheap(obj: *mut Object, s: *mut State) -> bool {
-    if !object_isvalue(obj) {
-        return true;
+    match &(*obj).kind {
+        ObjectKind::Value(v) => !(*v).is_null() && value_referencesheap(&**v, s),
+        _ => true,
     }
-    return !((*obj).c2rust_unnamed.value).is_null()
-        && value_referencesheap(&*(*obj).c2rust_unnamed.value, s);
 }
 
 pub unsafe fn object_hasvalue(obj: *mut Object) -> bool {
-    if object_isvalue(obj) {
-        return !((*obj).c2rust_unnamed.value).is_null();
+    match &(*obj).kind {
+        ObjectKind::Value(v) => !(*v).is_null(),
+        _ => false,
     }
-    false
 }
 
 pub unsafe fn object_isvalue(obj: *mut Object) -> bool {
-    (*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint
+    (*obj).obsolete_object_type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint
 }
 
 pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
-    if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
+    let ObjectKind::Value(v) = &(*obj).kind else {
         panic!();
-    }
-    (*obj).c2rust_unnamed.value
+    };
+    *v
 }
 
 pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
-    match (*obj).r#type {
-        0 => {
-            !((*obj).c2rust_unnamed.value).is_null()
-                && state_isdeallocand(s, value_as_location(&*(*obj).c2rust_unnamed.value))
-        }
-        1 => range_isdeallocand((*obj).c2rust_unnamed.range, s),
-        _ => panic!(),
+    match &(*obj).kind {
+        ObjectKind::Value(v) => !(*v).is_null() && state_isdeallocand(s, value_as_location(&**v)),
+        ObjectKind::DeallocandRange(range) => range_isdeallocand(*range, s),
     }
 }
 
 pub unsafe fn object_references(obj: *mut Object, loc: *mut Location, s: *mut State) -> bool {
-    if (*obj).r#type as libc::c_uint == OBJECT_DEALLOCAND_RANGE as libc::c_int as libc::c_uint {
-        return range_references((*obj).c2rust_unnamed.range, loc, s);
+    match &(*obj).kind {
+        ObjectKind::DeallocandRange(range) => range_references(*range, loc, s),
+        ObjectKind::Value(v) => !(*v).is_null() && value_references(*v, loc, s),
     }
-    if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
-        panic!();
-    }
-    let v: *mut Value = object_as_value(obj);
-    !v.is_null() && value_references(v, loc, s)
 }
 
 pub unsafe fn object_assign(obj: *mut Object, val: *mut Value) -> *mut Error {
-    if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
+    if let ObjectKind::Value(v) = &mut (*obj).kind {
+        *v = val;
+    } else {
         panic!();
     }
-    (*obj).c2rust_unnamed.value = val;
     ptr::null_mut()
 }
+
 unsafe fn object_size(obj: *mut Object) -> *mut AstExpr {
-    match (*obj).r#type {
-        0 => Box::into_raw(ast_expr_constant_create(1 as libc::c_int)),
-        1 => Box::into_raw(ast_expr_copy(&*range_size((*obj).c2rust_unnamed.range))),
-        _ => panic!(),
+    match &(*obj).kind {
+        ObjectKind::Value(_) => Box::into_raw(ast_expr_constant_create(1)),
+        ObjectKind::DeallocandRange(range) => Box::into_raw(ast_expr_copy(&*range_size(*range))),
     }
 }
 
@@ -298,9 +282,9 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
     let prop0 = ast_expr_le_create(ast_expr_copy(&*lw), ast_expr_copy(&*excl_up));
     let prop1 = ast_expr_eq_create(ast_expr_copy(&*lw), ast_expr_copy(&*excl_up));
     let prop2 = ast_expr_eq_create(ast_expr_copy(&*up), ast_expr_copy(&*excl_up));
-    let e0: bool = state_eval(s, &*prop0);
-    let e1: bool = state_eval(s, &*prop1);
-    let e2: bool = state_eval(s, &*prop2);
+    let e0: bool = state_eval(s, &prop0);
+    let e1: bool = state_eval(s, &prop1);
+    let e2: bool = state_eval(s, &prop2);
     drop(prop2);
     drop(prop1);
     drop(prop0);
@@ -312,15 +296,15 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
         return ptr::null_mut();
     }
     if e2 {
-        if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
+        let ObjectKind::Value(v) = &(*obj).kind else {
             panic!();
-        }
+        };
         return object_value_create(
             Box::into_raw(ast_expr_copy(&*(*obj).offset)),
-            value_copy(&*(*obj).c2rust_unnamed.value),
+            value_copy(&**v),
         );
     }
-    return object_range_create(
+    object_range_create(
         Box::into_raw(ast_expr_copy(&*(*obj).offset)),
         range_create(
             Box::into_raw(ast_expr_difference_create(
@@ -329,7 +313,7 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
             )),
             value_as_location(&*state_alloc(s)),
         ),
-    );
+    )
 }
 
 pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) -> *mut Object {
@@ -352,16 +336,13 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
         return ptr::null_mut();
     }
     if e1 {
-        if !((*obj).r#type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint) {
+        let ObjectKind::Value(v) = &(*obj).kind else {
             panic!();
-        }
+        };
         ast_expr_destroy(up);
-        return object_value_create(
-            Box::into_raw(ast_expr_copy(incl_lw)),
-            value_copy(&*(*obj).c2rust_unnamed.value),
-        );
+        return object_value_create(Box::into_raw(ast_expr_copy(incl_lw)), value_copy(&**v));
     }
-    return object_range_create(
+    object_range_create(
         Box::into_raw(ast_expr_copy(incl_lw)),
         range_create(
             Box::into_raw(ast_expr_difference_create(
@@ -370,14 +351,13 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
             )),
             value_as_location(&*state_alloc(s)),
         ),
-    );
+    )
 }
 
 pub unsafe fn object_dealloc(obj: *mut Object, s: *mut State) -> Result<()> {
-    match (*obj).r#type {
-        0 => state_dealloc(s, (*obj).c2rust_unnamed.value),
-        1 => range_dealloc((*obj).c2rust_unnamed.range, s),
-        _ => panic!(),
+    match &(*obj).kind {
+        ObjectKind::Value(v) => state_dealloc(s, *v),
+        ObjectKind::DeallocandRange(range) => range_dealloc(*range, s),
     }
 }
 
@@ -421,10 +401,10 @@ pub unsafe fn range_create(size: *mut AstExpr, loc: *mut Location) -> *mut Range
 }
 
 pub unsafe fn range_copy(r: *mut Range) -> *mut Range {
-    return range_create(
+    range_create(
         Box::into_raw(ast_expr_copy(&*(*r).size)),
         location_copy(&*(*r).loc),
-    );
+    )
 }
 
 pub unsafe fn range_destroy(r: *mut Range) {
