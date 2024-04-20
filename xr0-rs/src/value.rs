@@ -784,7 +784,7 @@ unsafe fn number_value_max_create() -> NumberValue {
 
 unsafe fn number_value_str(v: &NumberValue) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    match &*v {
+    match v {
         NumberValue::Constant(k) => {
             strbuilder_write!(b, "{k}");
         }

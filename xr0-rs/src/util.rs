@@ -84,6 +84,7 @@ impl Map {
         })
     }
 
+    #[allow(clippy::boxed_local)]
     pub unsafe fn destroy(self: Box<Map>) {
         let mut i: libc::c_int = 0 as libc::c_int;
         while i < self.n {
@@ -104,7 +105,7 @@ impl Map {
             }
             i += 1;
         }
-        return -(1 as libc::c_int);
+        -1
     }
 
     pub unsafe fn get(&self, key: *const libc::c_char) -> *mut libc::c_void {
