@@ -24,7 +24,7 @@ use ast::{
     ast_externdecl_install, ast_function_absisempty, ast_function_abstract, ast_function_copy,
     ast_function_isaxiom, ast_function_isproto, ast_function_name, ast_function_verify,
     ast_functiondecl_create, ast_protostitch, ast_topological_order, Ast, AstExpr, AstExternDecl,
-    AstFunction, AstType, AstVariable, AstVariableArr,
+    AstFunction, AstType, AstVariable,
 };
 use ext::Externals;
 use object::Object;

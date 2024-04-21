@@ -3733,15 +3733,6 @@ pub unsafe fn ast_variable_arr_append(arr: *mut AstVariableArr, v: *mut AstVaria
     *fresh13 = v;
 }
 
-pub unsafe fn ast_variable_arr_destroy(arr: *mut AstVariableArr) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        ast_variable_destroy(*((*arr).v).offset(i as isize));
-        i += 1;
-    }
-    drop(Box::from_raw(arr));
-}
-
 pub unsafe fn ast_variable_arr_n(arr: *mut AstVariableArr) -> libc::c_int {
     (*arr).n
 }
@@ -3750,22 +3741,8 @@ pub unsafe fn ast_variable_arr_v(arr: *mut AstVariableArr) -> *mut *mut AstVaria
     (*arr).v
 }
 
-pub unsafe fn ast_variable_arr_copy(old: *mut AstVariableArr) -> *mut AstVariableArr {
-    let new: *mut AstVariableArr = ast_variable_arr_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*old).n {
-        ast_variable_arr_append(new, ast_variable_copy(*((*old).v).offset(i as isize)));
-        i += 1;
-    }
-    new
-}
-
-pub unsafe fn ast_variable_arr_from_slice(old: &[*mut AstVariable]) -> *mut AstVariableArr {
-    let new: *mut AstVariableArr = ast_variable_arr_create();
-    for &var_ptr in old {
-        ast_variable_arr_append(new, ast_variable_copy(var_ptr));
-    }
-    new
+pub unsafe fn ast_variable_arr_copy(old: &[*mut AstVariable]) -> Vec<*mut AstVariable> {
+    old.iter().map(|&var| ast_variable_copy(var)).collect()
 }
 
 pub unsafe fn ast_function_create(
