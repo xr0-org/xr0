@@ -65,31 +65,37 @@ pub enum AstBinaryOp {
     Subtraction,
 }
 
+#[derive(Clone)]
 pub struct AstExpr {
     kind: AstExprKind,
 }
 
+#[derive(Clone)]
 pub struct AllocExpr {
     kind: AstAllocKind,
     arg: Box<AstExpr>,
 }
 
+#[derive(Clone)]
 pub struct UnaryExpr {
     op: AstUnaryOp,
     arg: Box<AstExpr>,
 }
 
+#[derive(Clone)]
 pub struct BinaryExpr {
     op: AstBinaryOp,
     e1: Box<AstExpr>,
     e2: Box<AstExpr>,
 }
 
+#[derive(Clone)]
 pub struct AssignmentExpr {
     lval: Box<AstExpr>,
     rval: Box<AstExpr>,
 }
 
+#[derive(Clone)]
 pub struct IncDecExpr {
     operand: Box<AstExpr>,
     inc: libc::c_int,
@@ -108,11 +114,13 @@ pub struct ConstantExpr {
     ischar: bool,
 }
 
+#[derive(Clone)]
 pub struct StructMemberExpr {
     root: Box<AstExpr>,
-    field: *mut libc::c_char,
+    field: OwningCStr,
 }
 
+#[derive(Clone)]
 enum AstExprKind {
     Identifier(OwningCStr),
     Constant(ConstantExpr),
@@ -369,7 +377,7 @@ pub unsafe fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
             ast_expr_equal(&c1.fun, &c2.fun)
         }
         (AstExprKind::StructMember(m1), AstExprKind::StructMember(m2)) => {
-            ast_expr_equal(&m1.root, &m2.root) && strcmp(m1.field, m2.field) == 0
+            ast_expr_equal(&m1.root, &m2.root) && m1.field == m2.field
         }
         _ => false,
     }
@@ -1342,7 +1350,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<*mut V
     }
     Ok(value_sync_create(Box::into_raw(ast_expr_member_create(
         Box::from_raw(value_as_sync(v)),
-        dynamic_str(field),
+        OwningCStr::copy(CStr::from_ptr(field)),
     ))))
 }
 
@@ -1365,19 +1373,16 @@ unsafe fn ast_expr_member_str_build(expr: &AstExpr, b: *mut StrBuilder) {
         panic!()
     };
     let root = &member.root;
+    let field_name = member.field.as_str();
     if matches!(root.kind, AstExprKind::Unary(_)) {
-        return ast_expr_member_deref_str_build(root, member.field, b);
+        return ast_expr_member_deref_str_build(root, field_name, b);
     }
     let r: *mut libc::c_char = ast_expr_str(root);
-    strbuilder_write!(b, "{}.{}", cstr!(r), cstr!(member.field));
+    strbuilder_write!(b, "{}.{field_name}", cstr!(r));
     free(r as *mut libc::c_void);
 }
 
-unsafe fn ast_expr_member_deref_str_build(
-    root: &AstExpr,
-    member: *mut libc::c_char,
-    b: *mut StrBuilder,
-) {
+unsafe fn ast_expr_member_deref_str_build(root: &AstExpr, member: &str, b: *mut StrBuilder) {
     if !(ast_expr_unary_op(root) == AstUnaryOp::Dereference) {
         panic!();
     }
@@ -1388,10 +1393,10 @@ unsafe fn ast_expr_member_deref_str_build(
     if matches!((*e2).kind, AstExprKind::Constant(_))
         && ast_expr_as_constant(&*e2) == 0 as libc::c_int
     {
-        strbuilder_write!(b, "{}->{}", cstr!(left), cstr!(member));
+        strbuilder_write!(b, "{}->{member}", cstr!(left));
     } else {
         let index: *mut libc::c_char = ast_expr_str(e2);
-        strbuilder_write!(b, "{}[{}].{}", cstr!(left), cstr!(index), cstr!(member));
+        strbuilder_write!(b, "{}[{}].{member}", cstr!(left), cstr!(index));
         free(index as *mut libc::c_void);
     }
     free(left as *mut libc::c_void);
@@ -1459,7 +1464,7 @@ pub unsafe fn ast_expr_member_field(expr: &AstExpr) -> *mut libc::c_char {
     let AstExprKind::StructMember(member) = &expr.kind else {
         panic!()
     };
-    member.field
+    member.field.as_ptr()
 }
 
 pub unsafe fn ast_expr_member_root(expr: &AstExpr) -> &AstExpr {
@@ -1483,26 +1488,27 @@ pub unsafe fn ast_expr_incdec_root(expr: &AstExpr) -> &AstExpr {
     &incdec.operand
 }
 
-unsafe fn ast_expr_copy_call(expr: &AstExpr) -> Box<AstExpr> {
-    let AstExprKind::Call(call) = &expr.kind else {
-        panic!()
-    };
-    let arg: *mut *mut AstExpr =
-        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(call.n as usize))
-            as *mut *mut AstExpr;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < call.n {
-        let ref mut fresh4 = *arg.offset(i as isize);
-        *fresh4 = Box::into_raw(ast_expr_copy(&**(call.arg).offset(i as isize)));
-        i += 1;
+impl Clone for CallExpr {
+    fn clone(&self) -> CallExpr {
+        unsafe {
+            let arg: *mut *mut AstExpr =
+                malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(self.n as usize))
+                    as *mut *mut AstExpr;
+            for i in 0..self.n {
+                let ref mut fresh4 = *arg.add(i as usize);
+                *fresh4 = Box::into_raw(ast_expr_copy(&**(self.arg).add(i as usize)));
+            }
+
+            CallExpr {
+                fun: self.fun.clone(),
+                n: self.n,
+                arg,
+            }
+        }
     }
-    ast_expr_call_create(ast_expr_copy(&call.fun), call.n, arg)
 }
 
-pub unsafe fn ast_expr_member_create(
-    struct_: Box<AstExpr>,
-    field: *mut libc::c_char,
-) -> Box<AstExpr> {
+pub unsafe fn ast_expr_member_create(struct_: Box<AstExpr>, field: OwningCStr) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::StructMember(StructMemberExpr {
         root: struct_,
         field,
@@ -1728,46 +1734,7 @@ pub unsafe fn ast_expr_assignment_rval(expr: &AstExpr) -> &AstExpr {
 }
 
 pub unsafe fn ast_expr_copy(expr: &AstExpr) -> Box<AstExpr> {
-    match &expr.kind {
-        AstExprKind::Identifier(id) => ast_expr_identifier_create(id.clone().into_ptr()),
-        AstExprKind::Constant(c) => {
-            if c.ischar {
-                ast_expr_constant_create_char(c.constant as libc::c_char)
-            } else {
-                ast_expr_constant_create(c.constant)
-            }
-        }
-        AstExprKind::StringLiteral(s) => ast_expr_literal_create(s.clone().into_ptr()),
-        AstExprKind::Bracketed(inner) => ast_expr_bracketed_create(ast_expr_copy(inner)),
-        AstExprKind::Call(_) => ast_expr_copy_call(expr),
-        AstExprKind::IncDec(incdec) => ast_expr_incdec_create(
-            ast_expr_copy(&incdec.operand),
-            incdec.inc != 0,
-            incdec.pre != 0,
-        ),
-        AstExprKind::StructMember(member) => {
-            ast_expr_member_create(ast_expr_copy(&*member.root), dynamic_str(member.field))
-        }
-        AstExprKind::Unary(unary) => ast_expr_unary_create(ast_expr_copy(&unary.arg), unary.op),
-        AstExprKind::Binary(binary) => ast_expr_binary_create(
-            ast_expr_copy(&binary.e1),
-            binary.op,
-            ast_expr_copy(&binary.e2),
-        ),
-        AstExprKind::Assignment(assignment) => ast_expr_assignment_create(
-            ast_expr_copy(&assignment.lval),
-            ast_expr_copy(&assignment.rval),
-        ),
-        AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_isdeallocand_create(ast_expr_copy(assertand))
-        }
-        AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_isdereferencable_create(ast_expr_copy(assertand))
-        }
-        AstExprKind::ArbArg => ast_expr_arbarg_create(),
-        AstExprKind::Allocation(_) => ast_expr_alloc_copy(expr),
-        _ => panic!(),
-    }
+    Box::new(expr.clone())
 }
 
 pub unsafe fn ast_expr_assignment_lval(expr: &AstExpr) -> &AstExpr {

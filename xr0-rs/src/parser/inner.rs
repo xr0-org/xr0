@@ -1,9 +1,9 @@
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::ptr;
 
 use crate::ast::*;
 use crate::parser::env::Env;
-use crate::util::dynamic_str;
+use crate::util::{dynamic_str, OwningCStr};
 
 type BoxedBlock = *mut AstBlock;
 type BoxedFunction = *mut AstFunction;
@@ -186,7 +186,7 @@ pub grammar c_parser(env: &Env) for str {
                         PostfixOp::Call(argc, argv) =>
                             ast_expr_call_create(a, argc, argv),
                         PostfixOp::Dot(name) =>
-                            ast_expr_member_create(a, name),
+                            ast_expr_member_create(a, OwningCStr::copy(CStr::from_ptr(name))),
                         PostfixOp::Arrow(name) =>
                             ast_expr_member_create(
                                 ast_expr_unary_create(
@@ -197,7 +197,7 @@ pub grammar c_parser(env: &Env) for str {
                                     ),
                                     AstUnaryOp::Dereference
                                 ),
-                                name,
+                                OwningCStr::copy(CStr::from_ptr(name)),
                             ),
                         PostfixOp::Inc => ast_expr_incdec_create(a, true, false),
                         PostfixOp::Dec => ast_expr_incdec_create(a, false, false),

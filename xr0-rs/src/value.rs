@@ -21,7 +21,7 @@ use crate::state::location::{
     location_transfigure,
 };
 use crate::state::state::{state_getext, state_vconst};
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr};
 use crate::{
     cstr, strbuilder_write, AstExpr, AstType, AstVariable, Location, Object, State, StrBuilder,
 };
@@ -191,7 +191,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
                 obj,
                 value_sync_create(Box::into_raw(ast_expr_member_create(
                     ast_expr_copy(&*root),
-                    dynamic_str(field),
+                    OwningCStr::copy(CStr::from_ptr(field)),
                 ))),
             );
         }
