@@ -203,7 +203,7 @@ pub unsafe fn location_references(l1: &Location, l2: &Location, s: *mut State) -
 
 pub unsafe fn location_referencesheap(l: &Location, s: *mut State) -> bool {
     if matches!(l.kind, LocationKind::Dynamic) {
-        if heap_blockisfreed(state_getheap(s), (*l).block) {
+        if heap_blockisfreed(state_getheap(s), l.block) {
             return false;
         }
         return true;
