@@ -101,7 +101,7 @@ pub unsafe fn state_copy(state: *mut State) -> *mut State {
     Box::into_raw(Box::new(State {
         ext: (*state).ext,
         static_memory: static_memory_copy((*state).static_memory),
-        vconst: vconst_copy((*state).vconst),
+        vconst: vconst_copy(&*(*state).vconst),
         clump: clump_copy((*state).clump),
         stack: stack_copy((*state).stack),
         heap: heap_copy(&(*state).heap),
@@ -113,7 +113,7 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
     Box::into_raw(Box::new(State {
         ext: (*state).ext,
         static_memory: static_memory_copy((*state).static_memory),
-        vconst: vconst_copy((*state).vconst),
+        vconst: vconst_copy(&*(*state).vconst),
         clump: clump_copy((*state).clump),
         stack: stack_copywithname((*state).stack, func_name),
         heap: heap_copy(&(*state).heap),

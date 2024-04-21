@@ -203,27 +203,33 @@ impl Drop for VConst {
     }
 }
 
-pub unsafe fn vconst_copy(old: *mut VConst) -> *mut VConst {
-    let new: *mut VConst = vconst_create();
-    let mut m = &(*old).varmap;
-    for (k, v) in m.pairs() {
-        (*new).varmap.set(
+pub unsafe fn vconst_copy(old: &VConst) -> *mut VConst {
+    let mut varmap = Map::new();
+    for (k, v) in old.varmap.pairs() {
+        varmap.set(
             dynamic_str(k),
             value_copy(&*(v as *mut Value)) as *const libc::c_void,
         );
     }
-    m = &(*old).comment;
-    for (k, v) in m.pairs() {
-        (*new).comment.set(
+
+    let mut comment = Map::new();
+    for (k, v) in old.comment.pairs() {
+        comment.set(
             dynamic_str(k),
             dynamic_str(v as *const libc::c_char) as *const libc::c_void,
         );
     }
-    m = &(*old).persist;
-    for (k, v) in m.pairs() {
-        (*new).persist.set(dynamic_str(k), v);
+
+    let mut persist = Map::new();
+    for (k, v) in old.persist.pairs() {
+        persist.set(dynamic_str(k), v);
     }
-    new
+
+    Box::into_raw(Box::new(VConst {
+        varmap,
+        comment,
+        persist,
+    }))
 }
 
 pub unsafe fn vconst_declare(
