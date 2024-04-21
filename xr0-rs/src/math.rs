@@ -1,9 +1,7 @@
 use std::ffi::CStr;
 use std::fmt::{self, Display, Formatter};
 
-use libc::free;
-
-use crate::util::{dynamic_str, Map};
+use crate::util::{dynamic_str, Map, OwningCStr};
 
 #[derive(Clone)]
 pub enum MathExpr {
@@ -12,9 +10,10 @@ pub enum MathExpr {
     Neg(Box<MathExpr>),
 }
 
+#[derive(Clone)]
 pub enum MathAtom {
     Nat(libc::c_uint),
-    Variable(*mut libc::c_char),
+    Variable(OwningCStr),
 }
 
 pub struct Tally {
@@ -48,16 +47,18 @@ fn math_expr_fromint(i: libc::c_int) -> Box<MathExpr> {
 }
 
 #[allow(dead_code)]
-unsafe fn math_expr_fromvartally(id: *mut libc::c_char, num: libc::c_int) -> Box<MathExpr> {
+unsafe fn math_expr_fromvartally(id: &CStr, num: libc::c_int) -> Box<MathExpr> {
     assert_ne!(num, 0);
     if num < 0 {
         return Box::new(MathExpr::Neg(math_expr_fromvartally(id, -num)));
     }
-    let mut e = Box::new(MathExpr::Atom(MathAtom::Variable(id)));
+    // Note: In the original, the `id` is reused without copying. Destroying the expr would free it
+    // `num` times.
+    let mut e = Box::new(MathExpr::Atom(MathAtom::Variable(OwningCStr::copy(id))));
     for _ in 0..num - 1 {
         e = Box::new(MathExpr::Sum(
             e,
-            Box::new(MathExpr::Atom(MathAtom::Variable(id))),
+            Box::new(MathExpr::Atom(MathAtom::Variable(OwningCStr::copy(id)))),
         ));
     }
     e
@@ -104,11 +105,10 @@ pub unsafe fn math_expr_simplify(raw: &MathExpr) -> Box<MathExpr> {
     for (k, v) in m.pairs() {
         let v = v as isize;
         if v != 0 {
-            // Note: Key is reused without copying it in the original.
             expr = Some(math_expr_nullablesum(
                 expr,
                 Some(math_expr_fromvartally(
-                    k as *mut libc::c_char,
+                    CStr::from_ptr(k as *mut libc::c_char),
                     v as libc::c_int,
                 )),
             ));
@@ -178,31 +178,10 @@ unsafe fn variable_tally_eq(m1: Box<Map>, m2: Box<Map>) -> bool {
     res
 }
 
-impl Clone for MathAtom {
-    fn clone(&self) -> MathAtom {
-        match self {
-            MathAtom::Nat(i) => MathAtom::Nat(*i),
-            MathAtom::Variable(id) => MathAtom::Variable(unsafe { dynamic_str(*id) }),
-        }
-    }
-}
-
-impl Drop for MathAtom {
-    fn drop(&mut self) {
-        if let MathAtom::Variable(id) = self {
-            unsafe {
-                free(*id as *mut libc::c_void);
-            }
-        }
-    }
-}
-
 impl Display for MathAtom {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            MathAtom::Variable(id) => {
-                write!(f, "{}", unsafe { CStr::from_ptr(*id).to_string_lossy() })
-            }
+            MathAtom::Variable(id) => write!(f, "{id}"),
             MathAtom::Nat(i) => write!(f, "{i}"),
         }
     }
@@ -215,14 +194,14 @@ unsafe fn atom_tally(a: &MathAtom) -> Tally {
             num: *i as libc::c_int,
         },
         MathAtom::Variable(id) => Tally {
-            map: map_fromvar(dynamic_str(*id)),
+            map: map_fromvar(id.clone()),
             num: 0 as libc::c_int,
         },
     }
 }
 
-unsafe fn map_fromvar(id: *mut libc::c_char) -> Box<Map> {
+unsafe fn map_fromvar(id: OwningCStr) -> Box<Map> {
     let mut m = Map::new();
-    m.set(id, 1 as isize as *mut libc::c_void);
+    m.set(id.into_ptr(), 1usize as *mut libc::c_void);
     m
 }

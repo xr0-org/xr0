@@ -1,4 +1,5 @@
-use std::fmt::{self, Debug, Formatter};
+use std::ffi::CStr;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::ptr;
 
 use libc::{free, malloc, realloc, strcmp, strlen, strncpy};
@@ -320,6 +321,69 @@ macro_rules! vprintln {
     ( $( $args:tt )* ) => {
         if $crate::util::VERBOSE_MODE != 0 {
             println!($($args)*);
+        }
+    }
+}
+
+pub struct OwningCStr {
+    ptr: *mut libc::c_char,
+}
+
+impl OwningCStr {
+    pub unsafe fn new(ptr: *mut libc::c_char) -> Self {
+        assert!(!ptr.is_null());
+        OwningCStr { ptr }
+    }
+
+    pub fn copy(ptr: &CStr) -> Self {
+        unsafe { Self::new(dynamic_str(ptr.as_ptr())) }
+    }
+
+    pub fn as_ptr(&self) -> *mut libc::c_char {
+        self.ptr
+    }
+
+    pub fn into_ptr(self) -> *mut libc::c_char {
+        let p = self.ptr;
+        std::mem::forget(self);
+        p
+    }
+
+    pub fn as_str(&self) -> &str {
+        unsafe { CStr::from_ptr(self.ptr).to_str().unwrap() }
+    }
+}
+
+impl Display for OwningCStr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl Debug for OwningCStr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.as_str())
+    }
+}
+
+impl PartialEq for OwningCStr {
+    fn eq(&self, other: &OwningCStr) -> bool {
+        unsafe { CStr::from_ptr(self.ptr) == CStr::from_ptr(other.ptr) }
+    }
+}
+
+impl Drop for OwningCStr {
+    fn drop(&mut self) {
+        unsafe {
+            free(self.ptr as *mut libc::c_void);
+        }
+    }
+}
+
+impl Clone for OwningCStr {
+    fn clone(&self) -> OwningCStr {
+        OwningCStr {
+            ptr: unsafe { dynamic_str(self.ptr) },
         }
     }
 }

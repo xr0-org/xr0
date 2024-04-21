@@ -25,7 +25,7 @@ use crate::state::state::{
 use crate::util::{
     dynamic_str, error_create, strbuilder_build, strbuilder_create, strbuilder_putc,
     string_arr_append, string_arr_concat, string_arr_contains, string_arr_create, string_arr_deque,
-    string_arr_n, string_arr_s, Error, Map, Result, StringArr,
+    string_arr_n, string_arr_s, Error, Map, OwningCStr, Result, StringArr,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -102,6 +102,7 @@ pub struct CallExpr {
     arg: *mut *mut AstExpr,
 }
 
+#[derive(Clone)]
 pub struct ConstantExpr {
     constant: libc::c_int,
     ischar: bool,
@@ -113,9 +114,9 @@ pub struct StructMemberExpr {
 }
 
 enum AstExprKind {
-    Identifier(*mut libc::c_char),
+    Identifier(OwningCStr),
     Constant(ConstantExpr),
-    StringLiteral(*mut libc::c_char),
+    StringLiteral(OwningCStr),
     Bracketed(Box<AstExpr>),
     Iteration,
     Call(CallExpr),
@@ -343,8 +344,8 @@ unsafe fn hack_base_object_from_alloc(expr: &AstExpr, state: *mut State) -> *mut
 pub unsafe fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
     match (&e1.kind, &e2.kind) {
         (AstExprKind::Constant(c1), AstExprKind::Constant(c2)) => c1.constant == c2.constant,
-        (AstExprKind::Identifier(id1), AstExprKind::Identifier(id2)) => strcmp(*id1, *id2) == 0,
-        (AstExprKind::StringLiteral(s1), AstExprKind::StringLiteral(s2)) => strcmp(*s1, *s2) == 0,
+        (AstExprKind::Identifier(id1), AstExprKind::Identifier(id2)) => *id1 == *id2,
+        (AstExprKind::StringLiteral(s1), AstExprKind::StringLiteral(s2)) => *s1 == *s2,
         (AstExprKind::Assignment(a1), AstExprKind::Assignment(a2)) => {
             ast_expr_equal(&a1.lval, &a2.lval) && ast_expr_equal(&a1.rval, &a2.rval)
         }
@@ -403,7 +404,7 @@ pub unsafe fn ast_expr_matheval(e: &AstExpr) -> bool {
 
 unsafe fn math_expr(e: &AstExpr) -> Box<MathExpr> {
     Box::new(match &e.kind {
-        AstExprKind::Identifier(id) => MathExpr::Atom(MathAtom::Variable(dynamic_str(*id))),
+        AstExprKind::Identifier(id) => MathExpr::Atom(MathAtom::Variable(id.clone())),
         AstExprKind::Constant(c) => {
             if c.constant < 0 {
                 MathExpr::Neg(Box::new(MathExpr::Atom(MathAtom::Nat(
@@ -1221,14 +1222,14 @@ pub unsafe fn ast_expr_bracketed_create(root: Box<AstExpr>) -> Box<AstExpr> {
 }
 
 pub unsafe fn ast_expr_literal_create(s: *mut libc::c_char) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::StringLiteral(s))
+    ast_expr_create(AstExprKind::StringLiteral(OwningCStr::new(s)))
 }
 
 pub unsafe fn ast_expr_as_literal(expr: &AstExpr) -> *mut libc::c_char {
     let AstExprKind::StringLiteral(s) = &expr.kind else {
         panic!()
     };
-    *s
+    s.as_ptr()
 }
 
 pub unsafe fn ast_expr_as_constant(expr: &AstExpr) -> libc::c_int {
@@ -1265,7 +1266,7 @@ pub unsafe fn ast_expr_as_identifier(expr: &AstExpr) -> *mut libc::c_char {
     let AstExprKind::Identifier(id) = &expr.kind else {
         panic!()
     };
-    *id
+    id.as_ptr()
 }
 
 unsafe fn ast_expr_create(kind: AstExprKind) -> Box<AstExpr> {
@@ -1273,7 +1274,7 @@ unsafe fn ast_expr_create(kind: AstExprKind) -> Box<AstExpr> {
 }
 
 pub unsafe fn ast_expr_identifier_create(s: *mut libc::c_char) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Identifier(s))
+    ast_expr_create(AstExprKind::Identifier(OwningCStr::new(s)))
 }
 
 unsafe fn unary_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
@@ -1613,13 +1614,13 @@ pub unsafe fn ast_expr_str(expr: &AstExpr) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     match &expr.kind {
         AstExprKind::Identifier(id) => {
-            strbuilder_write!(b, "{}", cstr!(*id));
+            strbuilder_write!(b, "{id}");
         }
         AstExprKind::Constant(_) => {
             ast_expr_constant_str_build(expr, b);
         }
         AstExprKind::StringLiteral(s) => {
-            strbuilder_write!(b, "\"{}\"", cstr!(*s));
+            strbuilder_write!(b, "{s:?}");
         }
         AstExprKind::Bracketed(inner) => {
             ast_expr_bracketed_str_build(inner, b);
@@ -1728,7 +1729,7 @@ pub unsafe fn ast_expr_assignment_rval(expr: &AstExpr) -> &AstExpr {
 
 pub unsafe fn ast_expr_copy(expr: &AstExpr) -> Box<AstExpr> {
     match &expr.kind {
-        AstExprKind::Identifier(id) => ast_expr_identifier_create(dynamic_str(*id)),
+        AstExprKind::Identifier(id) => ast_expr_identifier_create(id.clone().into_ptr()),
         AstExprKind::Constant(c) => {
             if c.ischar {
                 ast_expr_constant_create_char(c.constant as libc::c_char)
@@ -1736,7 +1737,7 @@ pub unsafe fn ast_expr_copy(expr: &AstExpr) -> Box<AstExpr> {
                 ast_expr_constant_create(c.constant)
             }
         }
-        AstExprKind::StringLiteral(s) => ast_expr_literal_create(dynamic_str(*s)),
+        AstExprKind::StringLiteral(s) => ast_expr_literal_create(s.clone().into_ptr()),
         AstExprKind::Bracketed(inner) => ast_expr_bracketed_create(ast_expr_copy(inner)),
         AstExprKind::Call(_) => ast_expr_copy_call(expr),
         AstExprKind::IncDec(incdec) => ast_expr_incdec_create(
@@ -1862,36 +1863,6 @@ pub unsafe fn ast_expr_binary_op(expr: &AstExpr) -> AstBinaryOp {
         panic!()
     };
     binary.op
-}
-
-impl Drop for AstExprKind {
-    fn drop(&mut self) {
-        unsafe {
-            match self {
-                AstExprKind::Identifier(id) => {
-                    free(*id as *mut libc::c_void);
-                }
-                AstExprKind::StringLiteral(s) => {
-                    free(*s as *mut libc::c_void);
-                }
-                AstExprKind::Bracketed(_) => {}
-                AstExprKind::Call(_) => {}
-                AstExprKind::IncDec(_) => {}
-                AstExprKind::StructMember(_) => {}
-                AstExprKind::Unary(_) => {}
-                AstExprKind::Binary(_) => {}
-                AstExprKind::Assignment(_) => {}
-                AstExprKind::IsDeallocand(_) => {}
-                AstExprKind::IsDereferencable(assertand) => {}
-                AstExprKind::Constant(_) => {}
-                AstExprKind::ArbArg => {}
-                AstExprKind::Allocation(_) => {}
-                _ => {
-                    panic!();
-                }
-            }
-        }
-    }
 }
 
 pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
@@ -2085,7 +2056,7 @@ unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Box<StringArr> {
     let AstExprKind::Identifier(id) = &call.fun.kind else {
         panic!()
     };
-    string_arr_append(&mut res, dynamic_str(*id));
+    string_arr_append(&mut res, id.clone().into_ptr());
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < call.n {
         res = string_arr_concat(&res, &ast_expr_getfuncs(&**(call.arg).offset(i as isize)));
