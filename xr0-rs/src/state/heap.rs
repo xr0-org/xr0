@@ -6,6 +6,8 @@
     unused_variables
 )]
 
+use std::collections::HashMap;
+use std::ffi::CStr;
 use std::ptr;
 
 use libc::{free, malloc, realloc};
@@ -28,7 +30,7 @@ pub struct Heap {
 pub struct VConst {
     pub varmap: Box<Map>,
     pub comment: Box<Map>,
-    pub persist: Box<Map>,
+    pub persist: HashMap<String, bool>,
 }
 
 impl Heap {
@@ -179,7 +181,7 @@ pub unsafe fn vconst_create() -> *mut VConst {
     Box::into_raw(Box::new(VConst {
         varmap: Map::new(),
         comment: Map::new(),
-        persist: Map::new(),
+        persist: HashMap::new(),
     }))
 }
 
@@ -192,13 +194,11 @@ impl Drop for VConst {
         unsafe {
             let varmap = std::mem::replace(&mut self.varmap, Map::new());
             let comment = std::mem::replace(&mut self.comment, Map::new());
-            let persist = std::mem::replace(&mut self.persist, Map::new());
             for v in varmap.values() {
                 value_destroy(v as *mut Value);
             }
             varmap.destroy();
             comment.destroy();
-            persist.destroy();
         }
     }
 }
@@ -220,15 +220,10 @@ pub unsafe fn vconst_copy(old: &VConst) -> *mut VConst {
         );
     }
 
-    let mut persist = Map::new();
-    for (k, v) in old.persist.pairs() {
-        persist.set(dynamic_str(k), v);
-    }
-
     Box::into_raw(Box::new(VConst {
         varmap,
         comment,
-        persist,
+        persist: old.persist.clone(),
     }))
 }
 
@@ -245,28 +240,28 @@ pub unsafe fn vconst_declare(
         (*v).comment
             .set(dynamic_str(s), comment as *const libc::c_void);
     }
-    (*v).persist
-        .set(dynamic_str(s), persist as usize as *mut libc::c_void);
+    let s_string = CStr::from_ptr(s).to_str().unwrap().to_string();
+    (*v).persist.insert(s_string, persist);
     s
 }
-unsafe fn vconst_id(varmap: &Map, persistmap: &Map, persist: bool) -> *mut libc::c_char {
-    let npersist: libc::c_int = count_true(persistmap);
+
+unsafe fn vconst_id(
+    varmap: &Map,
+    persistmap: &HashMap<String, bool>,
+    persist: bool,
+) -> *mut libc::c_char {
+    let npersist = count_true(persistmap);
     let b: *mut StrBuilder = strbuilder_create();
     if persist {
         strbuilder_write!(b, "${npersist}");
     } else {
-        strbuilder_write!(b, "#{}", varmap.len() - npersist);
+        strbuilder_write!(b, "#{}", varmap.len() as usize - npersist);
     }
     strbuilder_build(b)
 }
-unsafe fn count_true(m: &Map) -> libc::c_int {
-    let mut n: libc::c_int = 0 as libc::c_int;
-    for v in m.values() {
-        if !v.is_null() {
-            n += 1;
-        }
-    }
-    n
+
+unsafe fn count_true(m: &HashMap<String, bool>) -> usize {
+    m.values().filter(|&&b| b).count()
 }
 
 pub unsafe fn vconst_get(v: *mut VConst, id: *mut libc::c_char) -> *mut Value {
@@ -276,10 +271,11 @@ pub unsafe fn vconst_get(v: *mut VConst, id: *mut libc::c_char) -> *mut Value {
 pub unsafe fn vconst_undeclare(v: &mut VConst) {
     let mut varmap = Map::new();
     let mut comment = Map::new();
-    let mut persist = Map::new();
+    let mut persist = HashMap::new();
     let m = &v.varmap;
     for key in m.keys() {
-        if !(v.persist.get(key)).is_null() {
+        let key_str = CStr::from_ptr(key).to_str().unwrap();
+        if v.persist.get(key_str).copied().unwrap_or(false) {
             varmap.set(
                 dynamic_str(key),
                 value_copy(&*(v.varmap.get(key) as *mut Value)) as *const libc::c_void,
@@ -288,7 +284,7 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
             if !c.is_null() {
                 comment.set(dynamic_str(key), dynamic_str(c) as *const libc::c_void);
             }
-            persist.set(dynamic_str(key), 1 as libc::c_int as *mut libc::c_void);
+            persist.insert(key_str.to_string(), true);
         }
     }
     std::mem::forget(std::mem::replace(&mut v.varmap, varmap));
