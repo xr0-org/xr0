@@ -36,7 +36,7 @@ pub enum ValueKind {
     DefinitePtr(*mut Location),
     Int(*mut Number),
     Literal(*mut libc::c_char),
-    Struct(StructValue),
+    Struct(Box<StructValue>),
 }
 
 pub struct StructValue {
@@ -107,10 +107,10 @@ pub unsafe fn value_struct_create(t: *mut AstType) -> *mut Value {
     let members = ast_variable_arr_from_slice(
         ast_type_struct_members(&*t).expect("can't create value of incomplete type"),
     );
-    value_create(ValueKind::Struct(StructValue {
+    value_create(ValueKind::Struct(Box::new(StructValue {
         members,
         m: Box::into_raw(frommembers(members)),
-    }))
+    })))
 }
 
 pub unsafe fn value_struct_indefinite_create(
@@ -250,10 +250,10 @@ unsafe fn copymembers(old: &Map) -> Box<Map> {
 }
 
 pub unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> *mut Value {
-    value_create(ValueKind::Struct(StructValue {
+    value_create(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(old.members),
         m: Box::into_raw(abstractcopymembers(&*old.m, s)),
-    }))
+    })))
 }
 
 unsafe fn abstractcopymembers(old: &Map, s: *mut State) -> Box<Map> {
@@ -309,10 +309,10 @@ pub unsafe fn value_copy(v: &Value) -> *mut Value {
         ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(number_copy(*n)),
         ValueKind::Int(n) => ValueKind::Int(number_copy(*n)),
         ValueKind::Literal(s) => ValueKind::Literal(dynamic_str(*s)),
-        ValueKind::Struct(struct_) => ValueKind::Struct(StructValue {
+        ValueKind::Struct(struct_) => ValueKind::Struct(Box::new(StructValue {
             members: ast_variable_arr_copy(struct_.members),
             m: Box::into_raw(copymembers(&*struct_.m)),
-        }),
+        })),
     })
 }
 
