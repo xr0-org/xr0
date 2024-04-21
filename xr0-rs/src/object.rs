@@ -22,7 +22,6 @@ use crate::value::{
 use crate::{cstr, strbuilder_write, AstExpr, AstType, Location, State, StrBuilder, Value};
 
 pub struct Object {
-    pub obsolete_object_type: ObjectType,
     pub kind: ObjectKind,
     pub offset: *mut AstExpr,
 }
@@ -37,13 +36,8 @@ pub struct Range {
     pub loc: *mut Location,
 }
 
-pub type ObjectType = libc::c_uint;
-pub const OBJECT_DEALLOCAND_RANGE: ObjectType = 1;
-pub const OBJECT_VALUE: ObjectType = 0;
-
 pub unsafe fn object_value_create(offset: *mut AstExpr, v: *mut Value) -> *mut Object {
     Box::into_raw(Box::new(Object {
-        obsolete_object_type: OBJECT_VALUE,
         kind: ObjectKind::Value(v),
         offset,
     }))
@@ -52,7 +46,6 @@ pub unsafe fn object_value_create(offset: *mut AstExpr, v: *mut Value) -> *mut O
 pub unsafe fn object_range_create(offset: *mut AstExpr, r: *mut Range) -> *mut Object {
     assert!(!r.is_null());
     Box::into_raw(Box::new(Object {
-        obsolete_object_type: OBJECT_DEALLOCAND_RANGE,
         kind: ObjectKind::DeallocandRange(r),
         offset,
     }))
@@ -82,7 +75,6 @@ impl Drop for Object {
 
 pub unsafe fn object_copy(old: *mut Object) -> *mut Object {
     Box::into_raw(Box::new(Object {
-        obsolete_object_type: (*old).obsolete_object_type,
         kind: match &(*old).kind {
             ObjectKind::Value(v) => ObjectKind::Value(if !(*v).is_null() {
                 value_copy(&**v)
@@ -150,7 +142,7 @@ pub unsafe fn object_hasvalue(obj: *mut Object) -> bool {
 }
 
 pub unsafe fn object_isvalue(obj: *mut Object) -> bool {
-    (*obj).obsolete_object_type as libc::c_uint == OBJECT_VALUE as libc::c_int as libc::c_uint
+    matches!((*obj).kind, ObjectKind::Value(_))
 }
 
 pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
