@@ -457,7 +457,7 @@ pub unsafe fn state_range_aredeallocands(
     lw: &AstExpr,
     up: &AstExpr,
 ) -> bool {
-    if ast_expr_equal(&*lw, &*up) {
+    if ast_expr_equal(lw, up) {
         return true;
     }
     let arr_val: *mut Value = object_as_value(obj);
