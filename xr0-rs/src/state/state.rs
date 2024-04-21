@@ -519,7 +519,7 @@ unsafe fn state_undeclareliterals(s: *mut State) {
 
 unsafe fn state_undeclarevars(s: *mut State) {
     heap_undeclare(&mut (*s).heap, s);
-    vconst_undeclare((*s).vconst);
+    vconst_undeclare(&mut *(*s).vconst);
     stack_undeclare((*s).stack, s);
 }
 

@@ -273,32 +273,27 @@ pub unsafe fn vconst_get(v: *mut VConst, id: *mut libc::c_char) -> *mut Value {
     (*v).varmap.get(id) as *mut Value
 }
 
-pub unsafe fn vconst_undeclare(v: *mut VConst) {
+pub unsafe fn vconst_undeclare(v: &mut VConst) {
     let mut varmap = Map::new();
     let mut comment = Map::new();
     let mut persist = Map::new();
-    let m = &(*v).varmap;
+    let m = &v.varmap;
     for key in m.keys() {
-        if !((*v).persist.get(key)).is_null() {
+        if !(v.persist.get(key)).is_null() {
             varmap.set(
                 dynamic_str(key),
-                value_copy(&*((*v).varmap.get(key) as *mut Value)) as *const libc::c_void,
+                value_copy(&*(v.varmap.get(key) as *mut Value)) as *const libc::c_void,
             );
-            let c: *mut libc::c_char = (*v).comment.get(key) as *mut libc::c_char;
+            let c: *mut libc::c_char = v.comment.get(key) as *mut libc::c_char;
             if !c.is_null() {
                 comment.set(dynamic_str(key), dynamic_str(c) as *const libc::c_void);
             }
             persist.set(dynamic_str(key), 1 as libc::c_int as *mut libc::c_void);
         }
     }
-    std::ptr::write(
-        v,
-        VConst {
-            varmap,
-            comment,
-            persist,
-        },
-    );
+    std::mem::forget(std::mem::replace(&mut v.varmap, varmap));
+    std::mem::forget(std::mem::replace(&mut v.comment, comment));
+    std::mem::forget(std::mem::replace(&mut v.persist, persist));
 }
 
 pub unsafe fn vconst_str(v: *mut VConst, indent: *mut libc::c_char) -> *mut libc::c_char {
