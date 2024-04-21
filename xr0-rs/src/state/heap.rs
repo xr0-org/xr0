@@ -164,12 +164,12 @@ unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
     referenced
 }
 
-pub unsafe fn vconst_create() -> *mut VConst {
-    Box::into_raw(Box::new(VConst {
+pub unsafe fn vconst_create() -> VConst {
+    VConst {
         varmap: BTreeMap::new(),
         comment: HashMap::new(),
         persist: HashMap::new(),
-    }))
+    }
 }
 
 impl Drop for VConst {
@@ -182,21 +182,21 @@ impl Drop for VConst {
     }
 }
 
-pub unsafe fn vconst_copy(old: &VConst) -> *mut VConst {
+pub unsafe fn vconst_copy(old: &VConst) -> VConst {
     let varmap = old
         .varmap
         .iter()
         .map(|(k, &v)| (k.clone(), value_copy(&*v)))
         .collect();
-    Box::into_raw(Box::new(VConst {
+    VConst {
         varmap,
         comment: old.comment.clone(),
         persist: old.persist.clone(),
-    }))
+    }
 }
 
 pub unsafe fn vconst_declare(
-    v: *mut VConst,
+    v: &mut VConst,
     val: *mut Value,
     comment: *mut libc::c_char,
     persist: bool,
@@ -232,7 +232,7 @@ unsafe fn count_true(m: &HashMap<String, bool>) -> usize {
     m.values().filter(|&&b| b).count()
 }
 
-pub unsafe fn vconst_get(v: *mut VConst, id: *mut libc::c_char) -> *mut Value {
+pub unsafe fn vconst_get(v: &VConst, id: *mut libc::c_char) -> *mut Value {
     let id_str = CStr::from_ptr(id).to_str().unwrap();
     (*v).varmap.get(id_str).copied().unwrap_or(ptr::null_mut())
 }
@@ -258,7 +258,7 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
     v.persist = persist;
 }
 
-pub unsafe fn vconst_str(v: *mut VConst, indent: *mut libc::c_char) -> *mut libc::c_char {
+pub unsafe fn vconst_str(v: &VConst, indent: *mut libc::c_char) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     for (k, &val) in &(*v).varmap {
         let value: *mut libc::c_char = value_str(val);
@@ -272,6 +272,6 @@ pub unsafe fn vconst_str(v: *mut VConst, indent: *mut libc::c_char) -> *mut libc
     strbuilder_build(b)
 }
 
-pub unsafe fn vconst_eval(v: *mut VConst, e: &AstExpr) -> bool {
+pub unsafe fn vconst_eval(_v: &VConst, e: &AstExpr) -> bool {
     ast_expr_matheval(e)
 }

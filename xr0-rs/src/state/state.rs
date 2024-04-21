@@ -41,7 +41,7 @@ use crate::{
 
 pub struct State {
     pub ext: *mut Externals,
-    pub vconst: *mut VConst,
+    pub vconst: VConst,
     pub static_memory: *mut StaticMemory,
     pub clump: *mut Clump,
     pub stack: *mut Stack,
@@ -101,7 +101,7 @@ pub unsafe fn state_copy(state: *mut State) -> *mut State {
     Box::into_raw(Box::new(State {
         ext: (*state).ext,
         static_memory: static_memory_copy((*state).static_memory),
-        vconst: vconst_copy(&*(*state).vconst),
+        vconst: vconst_copy(&(*state).vconst),
         clump: clump_copy((*state).clump),
         stack: stack_copy((*state).stack),
         heap: heap_copy(&(*state).heap),
@@ -113,7 +113,7 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
     Box::into_raw(Box::new(State {
         ext: (*state).ext,
         static_memory: static_memory_copy((*state).static_memory),
-        vconst: vconst_copy(&*(*state).vconst),
+        vconst: vconst_copy(&(*state).vconst),
         clump: clump_copy((*state).clump),
         stack: stack_copywithname((*state).stack, func_name),
         heap: heap_copy(&(*state).heap),
@@ -139,7 +139,7 @@ pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
     }
     free(static_mem as *mut libc::c_void);
     let vconst: *mut libc::c_char = vconst_str(
-        (*state).vconst,
+        &(*state).vconst,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     if strlen(vconst) > 0 {
@@ -216,7 +216,7 @@ pub unsafe fn state_vconst(
     if value_isstruct(&*v) {
         return v;
     }
-    let c: *mut libc::c_char = vconst_declare((*state).vconst, v, comment, persist);
+    let c: *mut libc::c_char = vconst_declare(&mut (*state).vconst, v, comment, persist);
     value_sync_create(Box::into_raw(ast_expr_identifier_create(c)))
 }
 
@@ -271,7 +271,7 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
 }
 
 pub unsafe fn state_getvconst(state: *mut State, id: *mut libc::c_char) -> *mut Value {
-    vconst_get((*state).vconst, id)
+    vconst_get(&(*state).vconst, id)
 }
 
 pub unsafe fn state_get(
@@ -282,7 +282,7 @@ pub unsafe fn state_get(
     let b = location_getblock(
         loc,
         (*state).static_memory,
-        &*(*state).vconst,
+        &(*state).vconst,
         (*state).stack,
         &mut (*state).heap,
         (*state).clump,
@@ -298,7 +298,7 @@ pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option
     let p = location_getblock(
         loc,
         state.static_memory,
-        &*state.vconst,
+        &state.vconst,
         state.stack,
         &mut state.heap,
         state.clump,
@@ -393,7 +393,7 @@ pub unsafe fn state_range_alloc(
     let b = location_getblock(
         &*deref,
         (*state).static_memory,
-        &*(*state).vconst,
+        &(*state).vconst,
         (*state).stack,
         &mut (*state).heap,
         (*state).clump,
@@ -468,7 +468,7 @@ pub unsafe fn state_range_aredeallocands(
     let b = location_getblock(
         &*deref,
         (*state).static_memory,
-        &*(*state).vconst,
+        &(*state).vconst,
         (*state).stack,
         &mut (*state).heap,
         (*state).clump,
@@ -486,7 +486,7 @@ pub unsafe fn state_references(s: *mut State, loc: &Location) -> bool {
 }
 
 pub unsafe fn state_eval(s: *mut State, e: &AstExpr) -> bool {
-    vconst_eval((*s).vconst, e)
+    vconst_eval(&(*s).vconst, e)
 }
 
 pub unsafe fn state_equal(s1: *mut State, s2: *mut State) -> bool {
@@ -519,7 +519,7 @@ unsafe fn state_undeclareliterals(s: *mut State) {
 
 unsafe fn state_undeclarevars(s: *mut State) {
     heap_undeclare(&mut (*s).heap, s);
-    vconst_undeclare(&mut *(*s).vconst);
+    vconst_undeclare(&mut (*s).vconst);
     stack_undeclare((*s).stack, s);
 }
 
