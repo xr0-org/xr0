@@ -1,6 +1,8 @@
 #![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
-use libc::{calloc, free, realloc};
+use std::ptr;
+
+use libc::{free, realloc};
 
 use crate::ast::{
     ast_expr_copy, ast_expr_destroy, ast_expr_equal, ast_expr_inverted_copy, ast_expr_str,
@@ -14,7 +16,10 @@ pub struct Props {
 }
 
 pub unsafe fn props_create() -> *mut Props {
-    calloc(1, ::core::mem::size_of::<Props>()) as *mut Props
+    Box::into_raw(Box::new(Props {
+        n: 0,
+        prop: ptr::null_mut(),
+    }))
 }
 
 pub unsafe fn props_copy(old: *mut Props) -> *mut Props {
@@ -31,12 +36,19 @@ pub unsafe fn props_copy(old: *mut Props) -> *mut Props {
 }
 
 pub unsafe fn props_destroy(p: *mut Props) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*p).n {
-        ast_expr_destroy(*((*p).prop).offset(i as isize));
-        i += 1;
+    drop(Box::from_raw(p));
+}
+
+impl Drop for Props {
+    fn drop(&mut self) {
+        unsafe {
+            let mut i: libc::c_int = 0 as libc::c_int;
+            while i < self.n {
+                ast_expr_destroy(*self.prop.offset(i as isize));
+                i += 1;
+            }
+        }
     }
-    free(p as *mut libc::c_void);
 }
 
 pub unsafe fn props_str(p: *mut Props, indent: *mut libc::c_char) -> *mut libc::c_char {
