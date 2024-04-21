@@ -82,6 +82,7 @@ pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> *mut libc::c_
     }
     strbuilder_build(b)
 }
+
 unsafe fn printdelim(h: *mut Heap, start: libc::c_int) -> bool {
     let n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut i: libc::c_int = start + 1 as libc::c_int;
@@ -156,6 +157,7 @@ pub unsafe fn heap_referenced(h: *mut Heap, s: *mut State) -> bool {
     }
     true
 }
+
 unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
     let loc: *mut Location =
         location_create_dynamic(addr, ast_expr_constant_create(0 as libc::c_int));
@@ -253,9 +255,9 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
             persist.insert(key.clone(), true);
         }
     }
-    std::mem::forget(std::mem::replace(&mut v.varmap, varmap));
-    std::mem::forget(std::mem::replace(&mut v.comment, comment));
-    std::mem::forget(std::mem::replace(&mut v.persist, persist));
+    v.varmap = varmap;
+    v.comment = comment;
+    v.persist = persist;
 }
 
 pub unsafe fn vconst_str(v: *mut VConst, indent: *mut libc::c_char) -> *mut libc::c_char {
