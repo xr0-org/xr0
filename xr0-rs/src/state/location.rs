@@ -195,8 +195,10 @@ pub unsafe fn location_references(l1: *mut Location, l2: *mut Location, s: *mut 
     if location_equal(&*l1, &*l2) {
         return true;
     }
-    let b: *mut Block = state_getblock(s, l1);
-    !b.is_null() && block_references(b, l2, s)
+    match state_getblock(&mut *s, l1) {
+        None => false,
+        Some(b) => block_references(b, l2, s),
+    }
 }
 
 pub unsafe fn location_referencesheap(l: *mut Location, s: *mut State) -> bool {
@@ -266,13 +268,12 @@ pub unsafe fn location_range_dealloc(
     if !offsetzero(&*loc) {
         panic!();
     }
-    let b: *mut Block = state_getblock(state, loc);
-    if b.is_null() {
+    let Some(b) = state_getblock(&mut *state, loc) else {
         return Err(error_create(
             b"cannot get block\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ));
-    }
-    if !block_range_aredeallocands(&*b, lw, up, state) {
+    };
+    if !block_range_aredeallocands(b, lw, up, state) {
         printf(
             b"block: %s\n\0" as *const u8 as *const libc::c_char,
             block_str(b),

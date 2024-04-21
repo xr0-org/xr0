@@ -199,49 +199,48 @@ unsafe fn hack_first_object_is_exactly_bounds(
 }
 
 pub unsafe fn block_range_dealloc(
-    b: *mut Block,
+    b: &mut Block,
     lw: &AstExpr,
     up: &AstExpr,
     s: *mut State,
 ) -> Result<()> {
-    if hack_first_object_is_exactly_bounds(&*b, lw, up, s) {
-        object_dealloc((*b).arr[0], s)?;
-        (*b).arr.remove(0);
+    if hack_first_object_is_exactly_bounds(b, lw, up, s) {
+        object_dealloc(b.arr[0], s)?;
+        b.arr.remove(0);
         return Ok(());
     }
-    let Some(lw_index) = object_arr_index(&(*b).arr, lw, s) else {
+    let Some(lw_index) = object_arr_index(&b.arr, lw, s) else {
         return Err(error_create(
             b"lower bound not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ));
     };
-    let Some(up_index) = object_arr_index_upperincl(&(*b).arr, up, s) else {
+    let Some(up_index) = object_arr_index_upperincl(&b.arr, up, s) else {
         return Err(error_create(
             b"upper bound not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ));
     };
-    let n = (*b).arr.len();
+    let n = b.arr.len();
     // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`. I
     // don't know why it isn't a double free.
-    let upto: *mut Object =
-        object_upto((*b).arr[lw_index], lw as *const AstExpr as *mut AstExpr, s);
-    let from: *mut Object = object_from((*b).arr[up_index], up, s);
-    let mut new = (*b).arr[..lw_index].to_vec();
+    let upto: *mut Object = object_upto(b.arr[lw_index], lw as *const AstExpr as *mut AstExpr, s);
+    let from: *mut Object = object_from(b.arr[up_index], up, s);
+    let mut new = b.arr[..lw_index].to_vec();
     if !upto.is_null() {
-        // Note: Possibly appending so that they'll be destroyed? But then (*b).arr is overwritten without destroying it.
-        (*b).arr.push(upto);
+        // Note: Possibly appending so that they'll be destroyed? But then b.arr is overwritten without destroying it.
+        b.arr.push(upto);
     }
     if !from.is_null() {
-        (*b).arr.push(from);
+        b.arr.push(from);
     }
     for i in (up_index + 1)..n {
         // Note: Original uses `obj` after `object_arr_append` which might invalidate it. XXX BIG point
         // in favor of Rust.
-        new.push((*b).arr[i]);
+        new.push(b.arr[i]);
     }
     for i in lw_index..=up_index {
-        object_dealloc((*b).arr[i], s)?;
+        object_dealloc(b.arr[i], s)?;
     }
-    (*b).arr = new;
+    b.arr = new;
     Ok(())
 }
 

@@ -299,16 +299,21 @@ pub unsafe fn state_get(
     ))
 }
 
-pub unsafe fn state_getblock(state: *mut State, loc: *mut Location) -> *mut Block {
-    location_getblock(
+pub unsafe fn state_getblock(state: &mut State, loc: *mut Location) -> Option<&mut Block> {
+    let p = location_getblock(
         loc,
-        (*state).static_memory,
-        (*state).vconst,
-        (*state).stack,
-        &mut (*state).heap,
-        (*state).clump,
+        state.static_memory,
+        state.vconst,
+        state.stack,
+        &mut state.heap,
+        state.clump,
     )
-    .unwrap()
+    .unwrap();
+    if p.is_null() {
+        None
+    } else {
+        Some(&mut *p)
+    }
 }
 
 pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
@@ -447,8 +452,8 @@ pub unsafe fn state_addresses_deallocand(state: *mut State, obj: *mut Object) ->
 }
 
 pub unsafe fn state_isdeallocand(s: *mut State, loc: *mut Location) -> bool {
-    let b: *mut Block = state_getblock(s, loc);
-    (*loc).type_is_dynamic() && !b.is_null()
+    let b = state_getblock(&mut *s, loc);
+    (*loc).type_is_dynamic() && b.is_some()
 }
 
 pub unsafe fn state_range_aredeallocands(
