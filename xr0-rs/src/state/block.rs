@@ -135,10 +135,7 @@ pub unsafe fn block_range_alloc(
     b.arr.push(object_range_create(
         Box::into_raw(ast_expr_copy(lw)),
         range_create(
-            Box::into_raw(ast_expr_difference_create(
-                ast_expr_copy(up),
-                ast_expr_copy(lw),
-            )),
+            ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
             heap_newblock(heap),
         ),
     ));

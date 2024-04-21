@@ -33,7 +33,7 @@ pub enum ObjectKind {
 }
 
 pub struct Range {
-    pub size: *mut AstExpr,
+    size: Box<AstExpr>,
     pub loc: *mut Location,
 }
 
@@ -186,7 +186,7 @@ pub unsafe fn object_assign(obj: *mut Object, val: *mut Value) -> *mut Error {
 unsafe fn object_size(obj: *mut Object) -> *mut AstExpr {
     match &(*obj).kind {
         ObjectKind::Value(_) => Box::into_raw(ast_expr_constant_create(1)),
-        ObjectKind::DeallocandRange(range) => Box::into_raw(ast_expr_copy(&*range_size(*range))),
+        ObjectKind::DeallocandRange(range) => Box::into_raw(ast_expr_copy(range_size(&**range))),
     }
 }
 
@@ -299,10 +299,7 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
     object_range_create(
         Box::into_raw(ast_expr_copy(&*(*obj).offset)),
         range_create(
-            Box::into_raw(ast_expr_difference_create(
-                Box::from_raw(excl_up),
-                Box::from_raw(lw),
-            )),
+            ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
             value_as_location(&*state_alloc(s)),
         ),
     )
@@ -337,10 +334,7 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
     object_range_create(
         Box::into_raw(ast_expr_copy(incl_lw)),
         range_create(
-            Box::into_raw(ast_expr_difference_create(
-                Box::from_raw(up),
-                ast_expr_copy(incl_lw),
-            )),
+            ast_expr_difference_create(Box::from_raw(up), ast_expr_copy(incl_lw)),
             value_as_location(&*state_alloc(s)),
         ),
     )
@@ -385,15 +379,12 @@ pub unsafe fn object_getmembertype(
     value_struct_membertype(getorcreatestruct(obj, t, s), member)
 }
 
-pub unsafe fn range_create(size: *mut AstExpr, loc: *mut Location) -> *mut Range {
+pub unsafe fn range_create(size: Box<AstExpr>, loc: *mut Location) -> *mut Range {
     Box::into_raw(Box::new(Range { size, loc }))
 }
 
 pub unsafe fn range_copy(r: *mut Range) -> *mut Range {
-    range_create(
-        Box::into_raw(ast_expr_copy(&*(*r).size)),
-        location_copy(&*(*r).loc),
-    )
+    range_create(ast_expr_copy(&(*r).size), location_copy(&*(*r).loc))
 }
 
 pub unsafe fn range_destroy(r: *mut Range) {
@@ -403,7 +394,6 @@ pub unsafe fn range_destroy(r: *mut Range) {
 impl Drop for Range {
     fn drop(&mut self) {
         unsafe {
-            ast_expr_destroy(self.size);
             location_destroy(self.loc);
         }
     }
@@ -411,7 +401,7 @@ impl Drop for Range {
 
 pub unsafe fn range_str(r: *mut Range) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    let size: *mut libc::c_char = ast_expr_str(&*(*r).size);
+    let size: *mut libc::c_char = ast_expr_str(&(*r).size);
     let loc: *mut libc::c_char = location_str(&*(*r).loc);
     strbuilder_write!(b, "virt:{}@{}", cstr!(size), cstr!(loc));
     free(loc as *mut libc::c_void);
@@ -419,8 +409,8 @@ pub unsafe fn range_str(r: *mut Range) -> *mut libc::c_char {
     strbuilder_build(b)
 }
 
-pub unsafe fn range_size(r: *mut Range) -> *mut AstExpr {
-    (*r).size
+pub unsafe fn range_size(r: &Range) -> &AstExpr {
+    &r.size
 }
 
 pub unsafe fn range_dealloc(r: *mut Range, s: *mut State) -> Result<()> {

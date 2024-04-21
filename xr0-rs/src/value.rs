@@ -142,7 +142,7 @@ pub unsafe fn value_struct_indefinite_create(
 
 unsafe fn ptr_referencesheap(v: &Value, s: *mut State) -> bool {
     match &v.kind {
-        ValueKind::DefinitePtr(loc) => location_referencesheap(*loc, s),
+        ValueKind::DefinitePtr(loc) => location_referencesheap(&**loc, s),
         ValueKind::IndefinitePtr(_) => false,
         _ => panic!(),
     }

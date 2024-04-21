@@ -201,14 +201,14 @@ pub unsafe fn location_references(l1: *mut Location, l2: *mut Location, s: *mut 
     }
 }
 
-pub unsafe fn location_referencesheap(l: *mut Location, s: *mut State) -> bool {
-    if matches!((*l).kind, LocationKind::Dynamic) {
+pub unsafe fn location_referencesheap(l: &Location, s: *mut State) -> bool {
+    if matches!(l.kind, LocationKind::Dynamic) {
         if heap_blockisfreed(state_getheap(s), (*l).block) {
             return false;
         }
         return true;
     }
-    let obj = state_get(s, &*l, false).unwrap();
+    let obj = state_get(s, l, false).unwrap();
     !obj.is_null() && object_referencesheap(obj, s)
 }
 
