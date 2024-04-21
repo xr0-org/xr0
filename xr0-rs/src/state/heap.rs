@@ -118,9 +118,7 @@ pub unsafe fn heap_getblock(h: *mut Heap, address: libc::c_int) -> *mut Block {
 }
 
 pub unsafe fn heap_deallocblock(h: *mut Heap, address: libc::c_int) -> Result<()> {
-    if !(address < block_arr_nblocks((*h).blocks)) {
-        panic!();
-    }
+    assert!(address < block_arr_nblocks((*h).blocks));
     if *((*h).freed).offset(address as isize) {
         return Err(error_create(
             b"double free\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
