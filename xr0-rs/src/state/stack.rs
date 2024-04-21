@@ -16,7 +16,7 @@ use crate::state::block::{
     block_arr_nblocks, block_create, block_install, block_observe,
 };
 use crate::state::location::{
-    location_copy, location_create_automatic, location_destroy, location_getblock,
+    location_auto_getblock, location_copy, location_create_automatic, location_destroy,
     location_getstackblock, location_offset, location_references, location_str,
 };
 use crate::state::state::state_get;
@@ -243,15 +243,7 @@ pub unsafe fn variable_create(
     (*v).r#type = ast_type_copy(type_0);
     (*v).is_param = isparam;
     (*v).loc = stack_newblock(stack);
-    let b = location_getblock(
-        &*(*v).loc,
-        ptr::null_mut(),
-        ptr::null_mut(),
-        stack,
-        ptr::null_mut(),
-        ptr::null_mut(),
-    )
-    .unwrap();
+    let b = location_auto_getblock(&*(*v).loc, stack).unwrap();
     if b.is_null() {
         panic!();
     }

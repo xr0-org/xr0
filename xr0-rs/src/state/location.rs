@@ -215,7 +215,7 @@ pub unsafe fn location_referencesheap(l: &Location, s: *mut State) -> bool {
 pub unsafe fn location_getblock(
     loc: &Location,
     sm: *mut StaticMemory,
-    v: *mut VConst,
+    _v: &VConst,
     s: *mut Stack,
     h: *mut Heap,
     c: *mut Clump,
@@ -232,7 +232,7 @@ pub unsafe fn location_getblock(
     }
 }
 
-unsafe fn location_auto_getblock(loc: &Location, s: *mut Stack) -> Result<*mut Block> {
+pub unsafe fn location_auto_getblock(loc: &Location, s: *mut Stack) -> Result<*mut Block> {
     let LocationKind::Automatic { frame } = &loc.kind else {
         panic!();
     };

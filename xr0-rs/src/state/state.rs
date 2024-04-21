@@ -282,7 +282,7 @@ pub unsafe fn state_get(
     let b = location_getblock(
         loc,
         (*state).static_memory,
-        (*state).vconst,
+        &*(*state).vconst,
         (*state).stack,
         &mut (*state).heap,
         (*state).clump,
@@ -298,7 +298,7 @@ pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option
     let p = location_getblock(
         loc,
         state.static_memory,
-        state.vconst,
+        &*state.vconst,
         state.stack,
         &mut state.heap,
         state.clump,
@@ -393,7 +393,7 @@ pub unsafe fn state_range_alloc(
     let b = location_getblock(
         &*deref,
         (*state).static_memory,
-        (*state).vconst,
+        &*(*state).vconst,
         (*state).stack,
         &mut (*state).heap,
         (*state).clump,
@@ -468,7 +468,7 @@ pub unsafe fn state_range_aredeallocands(
     let b = location_getblock(
         &*deref,
         (*state).static_memory,
-        (*state).vconst,
+        &*(*state).vconst,
         (*state).stack,
         &mut (*state).heap,
         (*state).clump,
