@@ -176,31 +176,31 @@ unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
 }
 
 pub unsafe fn vconst_create() -> *mut VConst {
-    let v: *mut VConst = malloc(::core::mem::size_of::<VConst>()) as *mut VConst;
-    std::ptr::write(
-        v,
-        VConst {
-            varmap: Map::new(),
-            comment: Map::new(),
-            persist: Map::new(),
-        },
-    );
-    v
+    Box::into_raw(Box::new(VConst {
+        varmap: Map::new(),
+        comment: Map::new(),
+        persist: Map::new(),
+    }))
 }
 
 pub unsafe fn vconst_destroy(v: *mut VConst) {
-    let VConst {
-        varmap: m,
-        comment,
-        persist,
-    } = std::ptr::read(v);
-    for v in m.values() {
-        value_destroy(v as *mut Value);
+    drop(Box::from_raw(v));
+}
+
+impl Drop for VConst {
+    fn drop(&mut self) {
+        unsafe {
+            let varmap = std::mem::replace(&mut self.varmap, Map::new());
+            let comment = std::mem::replace(&mut self.comment, Map::new());
+            let persist = std::mem::replace(&mut self.persist, Map::new());
+            for v in varmap.values() {
+                value_destroy(v as *mut Value);
+            }
+            varmap.destroy();
+            comment.destroy();
+            persist.destroy();
+        }
     }
-    m.destroy();
-    comment.destroy();
-    persist.destroy();
-    free(v as *mut libc::c_void);
 }
 
 pub unsafe fn vconst_copy(old: *mut VConst) -> *mut VConst {
