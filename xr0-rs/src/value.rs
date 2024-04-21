@@ -1,5 +1,7 @@
 #![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
 
+use std::collections::HashMap;
+use std::ffi::CStr;
 use std::ptr;
 
 use libc::{free, strcmp};
@@ -20,7 +22,7 @@ use crate::state::location::{
     location_transfigure,
 };
 use crate::state::state::{state_getext, state_vconst};
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc};
 use crate::{
     cstr, strbuilder_write, AstExpr, AstType, AstVariable, AstVariableArr, Location, Object, State,
     StrBuilder,
@@ -41,7 +43,7 @@ pub enum ValueKind {
 
 pub struct StructValue {
     pub members: *mut AstVariableArr,
-    pub m: *mut Map,
+    pub m: HashMap<String, *mut Object>,
 }
 
 #[derive(Clone)]
@@ -109,7 +111,7 @@ pub unsafe fn value_struct_create(t: *mut AstType) -> *mut Value {
     );
     value_create(ValueKind::Struct(Box::new(StructValue {
         members,
-        m: Box::into_raw(frommembers(members)),
+        m: from_members(members),
     })))
 }
 
@@ -132,9 +134,11 @@ pub unsafe fn value_struct_indefinite_create(
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let field: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
-        let obj: *mut Object = (*sv.m).get(field) as *mut Object;
+        let field = CStr::from_ptr(field).to_str().unwrap();
+
+        let obj: *mut Object = sv.m.get(field).copied().unwrap();
         let b: *mut StrBuilder = strbuilder_create();
-        strbuilder_write!(b, "{}.{}", cstr!(comment), cstr!(field));
+        strbuilder_write!(b, "{}.{field}", cstr!(comment));
         object_assign(
             obj,
             state_vconst(
@@ -194,7 +198,8 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let field: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
-        let obj: *mut Object = (*sv.m).get(field) as *mut Object;
+        let field_str = CStr::from_ptr(field).to_str().unwrap();
+        let obj = *sv.m.get(field_str).unwrap();
         let obj_value: *mut Value = object_as_value(obj);
         if !obj_value.is_null() && value_issync(&*obj_value) {
             object_assign(
@@ -214,57 +219,46 @@ pub fn value_isstruct(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Struct(_))
 }
 
-unsafe fn frommembers(members: *mut AstVariableArr) -> Box<Map> {
-    let mut m = Map::new();
+unsafe fn from_members(members: *mut AstVariableArr) -> HashMap<String, *mut Object> {
+    let mut m = HashMap::new();
     let n: libc::c_int = ast_variable_arr_n(members);
     let v: *mut *mut AstVariable = ast_variable_arr_v(members);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        m.set(
-            dynamic_str(ast_variable_name(*v.offset(i as isize))),
+        let id = ast_variable_name(*v.offset(i as isize));
+        let id = CStr::from_ptr(id).to_str().unwrap().to_string();
+        m.insert(
+            id,
             object_value_create(
                 Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
                 ptr::null_mut(),
-            ) as *const libc::c_void,
+            ),
         );
         i += 1;
     }
     m
 }
 
-unsafe fn destroymembers(m: &Map) {
-    for p in m.values() {
-        object_destroy(p as *mut Object);
-    }
-}
-
-unsafe fn copymembers(old: &Map) -> Box<Map> {
-    let mut new = Map::new();
-    for (k, v) in old.pairs() {
-        new.set(
-            dynamic_str(k),
-            object_copy(v as *mut Object) as *const libc::c_void,
-        );
-    }
-    new
+unsafe fn copy_members(old: &HashMap<String, *mut Object>) -> HashMap<String, *mut Object> {
+    old.iter()
+        .map(|(k, &v)| (k.clone(), object_copy(v)))
+        .collect()
 }
 
 pub unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> *mut Value {
     value_create(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(old.members),
-        m: Box::into_raw(abstractcopymembers(&*old.m, s)),
+        m: abstract_copy_members(&old.m, s),
     })))
 }
 
-unsafe fn abstractcopymembers(old: &Map, s: *mut State) -> Box<Map> {
-    let mut new = Map::new();
-    for (k, v) in old.pairs() {
-        new.set(
-            dynamic_str(k),
-            object_abstractcopy(v as *mut Object, s) as *const libc::c_void,
-        );
-    }
-    new
+unsafe fn abstract_copy_members(
+    old: &HashMap<String, *mut Object>,
+    s: *mut State,
+) -> HashMap<String, *mut Object> {
+    old.iter()
+        .map(|(k, &v)| (k.clone(), object_abstractcopy(v, s)))
+        .collect()
 }
 
 pub unsafe fn value_struct_membertype(v: *mut Value, member: *mut libc::c_char) -> *mut AstType {
@@ -288,13 +282,13 @@ pub unsafe fn value_struct_member(v: *mut Value, member: *mut libc::c_char) -> *
     let ValueKind::Struct(sv) = &(*v).kind else {
         panic!();
     };
-    (*sv.m).get(member) as *mut Object
+    let member = CStr::from_ptr(member).to_str().unwrap();
+    sv.m.get(member).copied().unwrap_or(ptr::null_mut())
 }
 
 unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
-    let m: &Map = &*sv.m;
-    for p in m.values() {
-        let val: *mut Value = object_as_value(p as *mut Object);
+    for &p in sv.m.values() {
+        let val: *mut Value = object_as_value(p);
         if !val.is_null() && value_referencesheap(&*val, s) {
             return true;
         }
@@ -311,7 +305,7 @@ pub unsafe fn value_copy(v: &Value) -> *mut Value {
         ValueKind::Literal(s) => ValueKind::Literal(dynamic_str(*s)),
         ValueKind::Struct(struct_) => ValueKind::Struct(Box::new(StructValue {
             members: ast_variable_arr_copy(struct_.members),
-            m: Box::into_raw(copymembers(&*struct_.m)),
+            m: copy_members(&struct_.m),
         })),
     })
 }
@@ -336,11 +330,18 @@ impl Drop for ValueKind {
                 }
                 ValueKind::DefinitePtr(loc) => location_destroy(*loc),
                 ValueKind::Literal(s) => free(*s as *mut libc::c_void),
-                ValueKind::Struct(struct_) => {
-                    ast_variable_arr_destroy(struct_.members);
-                    destroymembers(&*struct_.m);
-                    Box::from_raw(struct_.m).destroy();
-                }
+                ValueKind::Struct(_) => {}
+            }
+        }
+    }
+}
+
+impl Drop for StructValue {
+    fn drop(&mut self) {
+        unsafe {
+            ast_variable_arr_destroy(self.members);
+            for &p in self.m.values() {
+                object_destroy(p);
             }
         }
     }
@@ -403,7 +404,8 @@ unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         let f: *mut libc::c_char = ast_variable_name(*var.offset(i as isize));
-        let val: *mut Value = object_as_value((*sv.m).get(f) as *mut Object);
+        let f_str = CStr::from_ptr(f).to_str().unwrap();
+        let val: *mut Value = object_as_value(sv.m.get(f_str).copied().unwrap());
         let val_str: *mut libc::c_char = if !val.is_null() {
             value_str(val)
         } else {
@@ -504,14 +506,10 @@ pub unsafe fn value_references(v: *mut Value, loc: *mut Location, s: *mut State)
 }
 
 unsafe fn struct_references(sv: &StructValue, loc: *mut Location, s: *mut State) -> bool {
-    let m: &Map = &*sv.m;
-    for p in m.values() {
-        let val: *mut Value = object_as_value(p as *mut Object);
-        if !val.is_null() && value_references(val, loc, s) {
-            return true;
-        }
-    }
-    false
+    sv.m.values().any(|&obj| {
+        let val: *mut Value = object_as_value(obj);
+        !val.is_null() && value_references(val, loc, s)
+    })
 }
 
 pub unsafe fn value_equal(v1: &Value, v2: &Value) -> bool {
