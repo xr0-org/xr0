@@ -195,7 +195,7 @@ pub unsafe fn location_references(l1: *mut Location, l2: *mut Location, s: *mut 
     if location_equal(&*l1, &*l2) {
         return true;
     }
-    match state_getblock(&mut *s, l1) {
+    match state_getblock(&mut *s, &*l1) {
         None => false,
         Some(b) => block_references(b, l2, s),
     }
@@ -213,7 +213,7 @@ pub unsafe fn location_referencesheap(l: *mut Location, s: *mut State) -> bool {
 }
 
 pub unsafe fn location_getblock(
-    loc: *mut Location,
+    loc: &Location,
     sm: *mut StaticMemory,
     v: *mut VConst,
     s: *mut Stack,
@@ -223,17 +223,17 @@ pub unsafe fn location_getblock(
     if s.is_null() {
         panic!();
     }
-    match (*loc).kind {
-        LocationKind::Static => Ok(static_memory_getblock(sm, (*loc).block)),
+    match loc.kind {
+        LocationKind::Static => Ok(static_memory_getblock(sm, loc.block)),
         LocationKind::Automatic { .. } => location_auto_getblock(loc, s),
-        LocationKind::Dynamic => Ok(heap_getblock(h, (*loc).block)),
-        LocationKind::Dereferencable => Ok(clump_getblock(c, (*loc).block)),
+        LocationKind::Dynamic => Ok(heap_getblock(h, loc.block)),
+        LocationKind::Dereferencable => Ok(clump_getblock(c, loc.block)),
         _ => panic!(),
     }
 }
 
-unsafe fn location_auto_getblock(loc: *mut Location, s: *mut Stack) -> Result<*mut Block> {
-    let LocationKind::Automatic { frame } = &(*loc).kind else {
+unsafe fn location_auto_getblock(loc: &Location, s: *mut Stack) -> Result<*mut Block> {
+    let LocationKind::Automatic { frame } = &loc.kind else {
         panic!();
     };
     let f: *mut Stack = stack_getframe(s, *frame);
@@ -242,7 +242,7 @@ unsafe fn location_auto_getblock(loc: *mut Location, s: *mut Stack) -> Result<*m
             b"stack frame doesn't exist\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ));
     }
-    Ok(stack_getblock(f, (*loc).block))
+    Ok(stack_getblock(f, loc.block))
 }
 
 pub unsafe fn location_getstackblock(loc: *mut Location, s: *mut Stack) -> *mut Block {
@@ -268,7 +268,7 @@ pub unsafe fn location_range_dealloc(
     if !offsetzero(&*loc) {
         panic!();
     }
-    let Some(b) = state_getblock(&mut *state, loc) else {
+    let Some(b) = state_getblock(&mut *state, &*loc) else {
         return Err(error_create(
             b"cannot get block\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ));

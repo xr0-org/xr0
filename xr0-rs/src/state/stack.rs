@@ -244,7 +244,7 @@ pub unsafe fn variable_create(
     (*v).is_param = isparam;
     (*v).loc = stack_newblock(stack);
     let b = location_getblock(
-        (*v).loc,
+        &*(*v).loc,
         ptr::null_mut(),
         ptr::null_mut(),
         stack,
