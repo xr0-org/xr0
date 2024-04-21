@@ -191,11 +191,11 @@ unsafe fn location_equal(l1: &Location, l2: &Location) -> bool {
     l1.kind == l2.kind && l1.block == l2.block && ast_expr_equal(&l1.offset, &l2.offset)
 }
 
-pub unsafe fn location_references(l1: *mut Location, l2: *mut Location, s: *mut State) -> bool {
-    if location_equal(&*l1, &*l2) {
+pub unsafe fn location_references(l1: &Location, l2: &Location, s: *mut State) -> bool {
+    if location_equal(l1, l2) {
         return true;
     }
-    match state_getblock(&mut *s, &*l1) {
+    match state_getblock(&mut *s, l1) {
         None => false,
         Some(b) => block_references(b, l2, s),
     }

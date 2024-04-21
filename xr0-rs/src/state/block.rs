@@ -121,7 +121,7 @@ pub unsafe fn block_observe(
     observed
 }
 
-pub unsafe fn block_references(b: *mut Block, loc: *mut Location, s: *mut State) -> bool {
+pub unsafe fn block_references(b: *mut Block, loc: &Location, s: *mut State) -> bool {
     (*b).arr.iter().any(|&obj| object_references(obj, loc, s))
 }
 
@@ -136,7 +136,7 @@ pub unsafe fn block_range_alloc(
         Box::into_raw(ast_expr_copy(lw)),
         range_create(
             ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
-            heap_newblock(heap),
+            Box::from_raw(heap_newblock(heap)),
         ),
     ));
     Ok(())

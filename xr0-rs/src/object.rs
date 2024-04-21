@@ -9,7 +9,7 @@ use crate::ast::{
     ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_str,
     ast_expr_sum_create, ast_type_struct_complete,
 };
-use crate::state::location::{location_copy, location_destroy, location_references, location_str};
+use crate::state::location::{location_copy, location_references, location_str};
 use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
 };
@@ -33,7 +33,7 @@ pub enum ObjectKind {
 
 pub struct Range {
     size: Box<AstExpr>,
-    pub loc: *mut Location,
+    loc: Box<Location>,
 }
 
 pub unsafe fn object_value_create(offset: *mut AstExpr, v: *mut Value) -> *mut Object {
@@ -151,12 +151,12 @@ pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
 
 pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
     match &(*obj).kind {
-        ObjectKind::Value(v) => !(*v).is_null() && state_isdeallocand(s, value_as_location(&**v)),
+        ObjectKind::Value(v) => !(*v).is_null() && state_isdeallocand(s, &*value_as_location(&**v)),
         ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
     }
 }
 
-pub unsafe fn object_references(obj: *mut Object, loc: *mut Location, s: *mut State) -> bool {
+pub unsafe fn object_references(obj: *mut Object, loc: &Location, s: *mut State) -> bool {
     match &(*obj).kind {
         ObjectKind::DeallocandRange(range) => range_references(range, loc, s),
         ObjectKind::Value(v) => !(*v).is_null() && value_references(*v, loc, s),
@@ -289,7 +289,7 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
         Box::into_raw(ast_expr_copy(&*(*obj).offset)),
         range_create(
             ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
-            value_as_location(&*state_alloc(s)),
+            Box::from_raw(value_as_location(&*state_alloc(s))),
         ),
     )
 }
@@ -324,7 +324,7 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
         Box::into_raw(ast_expr_copy(incl_lw)),
         range_create(
             ast_expr_difference_create(Box::from_raw(up), ast_expr_copy(incl_lw)),
-            value_as_location(&*state_alloc(s)),
+            Box::from_raw(value_as_location(&*state_alloc(s))),
         ),
     )
 }
@@ -368,20 +368,15 @@ pub unsafe fn object_getmembertype(
     value_struct_membertype(getorcreatestruct(obj, t, s), member)
 }
 
-pub unsafe fn range_create(size: Box<AstExpr>, loc: *mut Location) -> Box<Range> {
+pub unsafe fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {
     Box::new(Range { size, loc })
 }
 
 pub unsafe fn range_copy(r: &Range) -> Box<Range> {
-    range_create(ast_expr_copy(&r.size), location_copy(&*r.loc))
-}
-
-impl Drop for Range {
-    fn drop(&mut self) {
-        unsafe {
-            location_destroy(self.loc);
-        }
-    }
+    range_create(
+        ast_expr_copy(&r.size),
+        Box::from_raw(location_copy(&*r.loc)),
+    )
 }
 
 pub unsafe fn range_str(r: &Range) -> *mut libc::c_char {
@@ -399,15 +394,18 @@ pub unsafe fn range_size(r: &Range) -> &AstExpr {
 }
 
 pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
-    state_dealloc(s, value_ptr_create(r.loc))
+    state_dealloc(
+        s,
+        value_ptr_create(&*r.loc as *const Location as *mut Location),
+    )
 }
 
 pub unsafe fn range_isdeallocand(r: &Range, s: *mut State) -> bool {
-    state_isdeallocand(s, r.loc)
+    state_isdeallocand(s, &r.loc)
 }
 
-pub unsafe fn range_references(r: &Range, loc: *mut Location, s: *mut State) -> bool {
-    location_references(r.loc, loc, s)
+pub unsafe fn range_references(r: &Range, loc: &Location, s: *mut State) -> bool {
+    location_references(&r.loc, loc, s)
 }
 
 pub unsafe fn object_arr_index(

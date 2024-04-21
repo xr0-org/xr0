@@ -443,12 +443,12 @@ pub unsafe fn state_range_dealloc(
 pub unsafe fn state_addresses_deallocand(state: *mut State, obj: *mut Object) -> bool {
     let val: *mut Value = object_as_value(obj);
     let loc: *mut Location = value_as_location(&*val);
-    state_isdeallocand(state, loc)
+    state_isdeallocand(state, &*loc)
 }
 
-pub unsafe fn state_isdeallocand(s: *mut State, loc: *mut Location) -> bool {
-    let b = state_getblock(&mut *s, &*loc);
-    (*loc).type_is_dynamic() && b.is_some()
+pub unsafe fn state_isdeallocand(s: *mut State, loc: &Location) -> bool {
+    let b = state_getblock(&mut *s, loc);
+    loc.type_is_dynamic() && b.is_some()
 }
 
 pub unsafe fn state_range_aredeallocands(
@@ -481,7 +481,7 @@ pub unsafe fn state_hasgarbage(state: *mut State) -> bool {
     !heap_referenced(&mut (*state).heap, state)
 }
 
-pub unsafe fn state_references(s: *mut State, loc: *mut Location) -> bool {
+pub unsafe fn state_references(s: *mut State, loc: &Location) -> bool {
     stack_references((*s).stack, loc, s)
 }
 

@@ -170,7 +170,7 @@ pub unsafe fn heap_referenced(h: *mut Heap, s: *mut State) -> bool {
 unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
     let loc: *mut Location =
         location_create_dynamic(addr, ast_expr_constant_create(0 as libc::c_int));
-    let referenced: bool = state_references(s, loc);
+    let referenced = state_references(s, &*loc);
     location_destroy(loc);
     referenced
 }

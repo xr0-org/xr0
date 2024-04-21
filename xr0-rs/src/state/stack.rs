@@ -212,7 +212,7 @@ pub unsafe fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Va
     (*s).varmap.get(id) as *mut Variable
 }
 
-pub unsafe fn stack_references(s: *mut Stack, loc: *mut Location, state: *mut State) -> bool {
+pub unsafe fn stack_references(s: *mut Stack, loc: &Location, state: *mut State) -> bool {
     let result: *mut Variable = stack_getresult(s);
     if !result.is_null() && variable_references(result, loc, state) {
         return true;
@@ -350,9 +350,9 @@ pub unsafe fn variable_type(v: *mut Variable) -> *mut AstType {
     (*v).r#type
 }
 
-pub unsafe fn variable_references(v: *mut Variable, loc: *mut Location, s: *mut State) -> bool {
+pub unsafe fn variable_references(v: *mut Variable, loc: &Location, s: *mut State) -> bool {
     assert!(!(*loc).type_is_vconst());
-    location_references((*v).loc, loc, s)
+    location_references(&*(*v).loc, loc, s)
 }
 
 pub unsafe fn variable_isparam(v: *mut Variable) -> bool {
