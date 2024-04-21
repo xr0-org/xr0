@@ -1,11 +1,3 @@
-#![allow(
-    dead_code,
-    non_snake_case,
-    non_upper_case_globals,
-    unused_assignments,
-    unused_variables
-)]
-
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::CStr;
 use std::ptr;
@@ -27,6 +19,7 @@ pub struct Heap {
     pub blocks: *mut BlockArr,
     pub freed: *mut bool,
 }
+
 pub struct VConst {
     // Note: Iteration order of varmap is significant in vconst_str.
     pub varmap: BTreeMap<String, *mut Value>,
@@ -99,13 +92,6 @@ unsafe fn printdelim(h: *mut Heap, start: libc::c_int) -> bool {
         i += 1;
     }
     false
-}
-
-pub unsafe fn heap_blocks(h: *mut Heap) -> *mut BlockArr {
-    if h.is_null() {
-        panic!();
-    }
-    (*h).blocks
 }
 
 pub unsafe fn heap_newblock(h: *mut Heap) -> *mut Location {
@@ -184,10 +170,6 @@ pub unsafe fn vconst_create() -> *mut VConst {
         comment: HashMap::new(),
         persist: HashMap::new(),
     }))
-}
-
-pub unsafe fn vconst_destroy(v: *mut VConst) {
-    drop(Box::from_raw(v));
 }
 
 impl Drop for VConst {
