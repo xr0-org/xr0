@@ -140,11 +140,6 @@ pub struct AstStructType {
     pub members: Option<Box<Vec<*mut AstVariable>>>,
 }
 
-pub struct AstVariableArr {
-    pub n: libc::c_int,
-    pub v: *mut *mut AstVariable,
-}
-
 pub struct AstVariable {
     pub name: *mut libc::c_char,
     pub r#type: *mut AstType,
@@ -3714,31 +3709,6 @@ pub unsafe fn ast_variable_name(v: *mut AstVariable) -> *mut libc::c_char {
 
 pub unsafe fn ast_variable_type(v: *mut AstVariable) -> *mut AstType {
     (*v).r#type
-}
-
-pub unsafe fn ast_variable_arr_create() -> *mut AstVariableArr {
-    Box::into_raw(Box::new(AstVariableArr {
-        n: 0,
-        v: ptr::null_mut(),
-    }))
-}
-
-pub unsafe fn ast_variable_arr_append(arr: *mut AstVariableArr, v: *mut AstVariable) {
-    (*arr).n += 1;
-    (*arr).v = realloc(
-        (*arr).v as *mut libc::c_void,
-        (::core::mem::size_of::<*mut AstVariable>()).wrapping_mul((*arr).n as usize),
-    ) as *mut *mut AstVariable;
-    let ref mut fresh13 = *((*arr).v).offset(((*arr).n - 1 as libc::c_int) as isize);
-    *fresh13 = v;
-}
-
-pub unsafe fn ast_variable_arr_n(arr: *mut AstVariableArr) -> libc::c_int {
-    (*arr).n
-}
-
-pub unsafe fn ast_variable_arr_v(arr: *mut AstVariableArr) -> *mut *mut AstVariable {
-    (*arr).v
 }
 
 pub unsafe fn ast_variable_arr_copy(old: &[*mut AstVariable]) -> Vec<*mut AstVariable> {
