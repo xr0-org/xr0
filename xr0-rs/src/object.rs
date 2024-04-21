@@ -27,7 +27,7 @@ pub struct Object {
 }
 
 pub enum ObjectKind {
-    DeallocandRange(*mut Range),
+    DeallocandRange(Box<Range>),
     Value(*mut Value),
 }
 
@@ -43,8 +43,7 @@ pub unsafe fn object_value_create(offset: *mut AstExpr, v: *mut Value) -> *mut O
     }))
 }
 
-pub unsafe fn object_range_create(offset: *mut AstExpr, r: *mut Range) -> *mut Object {
-    assert!(!r.is_null());
+pub unsafe fn object_range_create(offset: *mut AstExpr, r: Box<Range>) -> *mut Object {
     Box::into_raw(Box::new(Object {
         kind: ObjectKind::DeallocandRange(r),
         offset,
@@ -64,9 +63,7 @@ impl Drop for Object {
                         value_destroy(*v);
                     }
                 }
-                ObjectKind::DeallocandRange(r) => {
-                    range_destroy(*r);
-                }
+                ObjectKind::DeallocandRange(_) => {}
             }
             ast_expr_destroy(self.offset);
         }
@@ -81,7 +78,7 @@ pub unsafe fn object_copy(old: *mut Object) -> *mut Object {
             } else {
                 ptr::null_mut()
             }),
-            ObjectKind::DeallocandRange(range) => ObjectKind::DeallocandRange(range_copy(*range)),
+            ObjectKind::DeallocandRange(range) => ObjectKind::DeallocandRange(range_copy(range)),
         },
         offset: Box::into_raw(ast_expr_copy(&*(*old).offset)),
     }))
@@ -123,7 +120,7 @@ unsafe fn inner_str(obj: *mut Object) -> *mut libc::c_char {
                 dynamic_str(b"\0" as *const u8 as *const libc::c_char)
             }
         }
-        ObjectKind::DeallocandRange(range) => range_str(*range),
+        ObjectKind::DeallocandRange(range) => range_str(range),
     }
 }
 
@@ -155,13 +152,13 @@ pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
 pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
     match &(*obj).kind {
         ObjectKind::Value(v) => !(*v).is_null() && state_isdeallocand(s, value_as_location(&**v)),
-        ObjectKind::DeallocandRange(range) => range_isdeallocand(*range, s),
+        ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
     }
 }
 
 pub unsafe fn object_references(obj: *mut Object, loc: *mut Location, s: *mut State) -> bool {
     match &(*obj).kind {
-        ObjectKind::DeallocandRange(range) => range_references(*range, loc, s),
+        ObjectKind::DeallocandRange(range) => range_references(range, loc, s),
         ObjectKind::Value(v) => !(*v).is_null() && value_references(*v, loc, s),
     }
 }
@@ -335,7 +332,7 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
 pub unsafe fn object_dealloc(obj: *mut Object, s: *mut State) -> Result<()> {
     match &(*obj).kind {
         ObjectKind::Value(v) => state_dealloc(s, *v),
-        ObjectKind::DeallocandRange(range) => range_dealloc(*range, s),
+        ObjectKind::DeallocandRange(range) => range_dealloc(range, s),
     }
 }
 
@@ -371,16 +368,12 @@ pub unsafe fn object_getmembertype(
     value_struct_membertype(getorcreatestruct(obj, t, s), member)
 }
 
-pub unsafe fn range_create(size: Box<AstExpr>, loc: *mut Location) -> *mut Range {
-    Box::into_raw(Box::new(Range { size, loc }))
+pub unsafe fn range_create(size: Box<AstExpr>, loc: *mut Location) -> Box<Range> {
+    Box::new(Range { size, loc })
 }
 
-pub unsafe fn range_copy(r: *mut Range) -> *mut Range {
-    range_create(ast_expr_copy(&(*r).size), location_copy(&*(*r).loc))
-}
-
-pub unsafe fn range_destroy(r: *mut Range) {
-    drop(Box::from_raw(r));
+pub unsafe fn range_copy(r: &Range) -> Box<Range> {
+    range_create(ast_expr_copy(&r.size), location_copy(&*r.loc))
 }
 
 impl Drop for Range {
@@ -391,10 +384,10 @@ impl Drop for Range {
     }
 }
 
-pub unsafe fn range_str(r: *mut Range) -> *mut libc::c_char {
+pub unsafe fn range_str(r: &Range) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    let size: *mut libc::c_char = ast_expr_str(&(*r).size);
-    let loc: *mut libc::c_char = location_str(&*(*r).loc);
+    let size: *mut libc::c_char = ast_expr_str(&r.size);
+    let loc: *mut libc::c_char = location_str(&*r.loc);
     strbuilder_write!(b, "virt:{}@{}", cstr!(size), cstr!(loc));
     free(loc as *mut libc::c_void);
     free(size as *mut libc::c_void);
@@ -405,16 +398,16 @@ pub unsafe fn range_size(r: &Range) -> &AstExpr {
     &r.size
 }
 
-pub unsafe fn range_dealloc(r: *mut Range, s: *mut State) -> Result<()> {
-    state_dealloc(s, value_ptr_create((*r).loc))
+pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
+    state_dealloc(s, value_ptr_create(r.loc))
 }
 
-pub unsafe fn range_isdeallocand(r: *mut Range, s: *mut State) -> bool {
-    state_isdeallocand(s, (*r).loc)
+pub unsafe fn range_isdeallocand(r: &Range, s: *mut State) -> bool {
+    state_isdeallocand(s, r.loc)
 }
 
-pub unsafe fn range_references(r: *mut Range, loc: *mut Location, s: *mut State) -> bool {
-    location_references((*r).loc, loc, s)
+pub unsafe fn range_references(r: &Range, loc: *mut Location, s: *mut State) -> bool {
+    location_references(r.loc, loc, s)
 }
 
 pub unsafe fn object_arr_index(
