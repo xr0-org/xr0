@@ -208,7 +208,7 @@ pub unsafe fn location_referencesheap(l: *mut Location, s: *mut State) -> bool {
         }
         return true;
     }
-    let obj = state_get(s, l, false).unwrap();
+    let obj = state_get(s, &*l, false).unwrap();
     !obj.is_null() && object_referencesheap(obj, s)
 }
 

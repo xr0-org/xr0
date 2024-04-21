@@ -284,7 +284,7 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
     (*new).r#type = ast_type_copy((*old).r#type);
     (*new).is_param = (*old).is_param;
     (*new).loc = location_copy(&*(*old).loc);
-    let obj = state_get(s, (*new).loc, false).unwrap();
+    let obj = state_get(s, &*(*new).loc, false).unwrap();
     if obj.is_null() {
         panic!();
     }

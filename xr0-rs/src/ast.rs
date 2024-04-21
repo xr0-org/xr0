@@ -1157,8 +1157,8 @@ unsafe fn verify_paramspec(
             b"must be heap allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
         ));
     }
-    let param_obj = state_get(param_state, value_as_location(&*param), false)?;
-    let arg_obj = state_get(arg_state, value_as_location(&*arg), false)?;
+    let param_obj = state_get(param_state, &*value_as_location(&*param), false)?;
+    let arg_obj = state_get(arg_state, &*value_as_location(&*arg), false)?;
     if param_obj.is_null() {
         panic!();
     }
