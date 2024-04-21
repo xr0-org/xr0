@@ -6,7 +6,7 @@
     unused_variables
 )]
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::CStr;
 use std::ptr;
 
@@ -19,7 +19,7 @@ use crate::state::block::{
 };
 use crate::state::location::{location_create_dynamic, location_destroy};
 use crate::state::state::state_references;
-use crate::util::{dynamic_str, error_create, strbuilder_build, strbuilder_create, Map, Result};
+use crate::util::{error_create, strbuilder_build, strbuilder_create, Result};
 use crate::value::{value_copy, value_destroy, value_str};
 use crate::{cstr, strbuilder_write, AstExpr, Block, BlockArr, Location, State, StrBuilder, Value};
 
@@ -28,7 +28,8 @@ pub struct Heap {
     pub freed: *mut bool,
 }
 pub struct VConst {
-    pub varmap: Box<Map>,
+    // Note: Iteration order of varmap is significant in vconst_str.
+    pub varmap: BTreeMap<String, *mut Value>,
     pub comment: HashMap<String, String>,
     pub persist: HashMap<String, bool>,
 }
@@ -179,7 +180,7 @@ unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
 
 pub unsafe fn vconst_create() -> *mut VConst {
     Box::into_raw(Box::new(VConst {
-        varmap: Map::new(),
+        varmap: BTreeMap::new(),
         comment: HashMap::new(),
         persist: HashMap::new(),
     }))
@@ -191,25 +192,20 @@ pub unsafe fn vconst_destroy(v: *mut VConst) {
 
 impl Drop for VConst {
     fn drop(&mut self) {
-        unsafe {
-            let varmap = std::mem::replace(&mut self.varmap, Map::new());
-            for v in varmap.values() {
-                value_destroy(v as *mut Value);
+        for &v in self.varmap.values() {
+            unsafe {
+                value_destroy(v);
             }
-            varmap.destroy();
         }
     }
 }
 
 pub unsafe fn vconst_copy(old: &VConst) -> *mut VConst {
-    let mut varmap = Map::new();
-    for (k, v) in old.varmap.pairs() {
-        varmap.set(
-            dynamic_str(k),
-            value_copy(&*(v as *mut Value)) as *const libc::c_void,
-        );
-    }
-
+    let varmap = old
+        .varmap
+        .iter()
+        .map(|(k, &v)| (k.clone(), value_copy(&*v)))
+        .collect();
     Box::into_raw(Box::new(VConst {
         varmap,
         comment: old.comment.clone(),
@@ -225,8 +221,8 @@ pub unsafe fn vconst_declare(
 ) -> *mut libc::c_char {
     let m = &mut (*v).varmap;
     let s: *mut libc::c_char = vconst_id(m, &(*v).persist, persist);
-    m.set(dynamic_str(s), val as *const libc::c_void);
     let s_string = CStr::from_ptr(s).to_str().unwrap().to_string();
+    m.insert(s_string.clone(), val);
     if !comment.is_null() {
         let comment_string = CStr::from_ptr(comment).to_str().unwrap().to_string();
         (*v).comment.insert(s_string.clone(), comment_string);
@@ -236,7 +232,7 @@ pub unsafe fn vconst_declare(
 }
 
 unsafe fn vconst_id(
-    varmap: &Map,
+    varmap: &BTreeMap<String, *mut Value>,
     persistmap: &HashMap<String, bool>,
     persist: bool,
 ) -> *mut libc::c_char {
@@ -245,7 +241,7 @@ unsafe fn vconst_id(
     if persist {
         strbuilder_write!(b, "${npersist}");
     } else {
-        strbuilder_write!(b, "#{}", varmap.len() as usize - npersist);
+        strbuilder_write!(b, "#{}", varmap.len() - npersist);
     }
     strbuilder_build(b)
 }
@@ -255,25 +251,24 @@ unsafe fn count_true(m: &HashMap<String, bool>) -> usize {
 }
 
 pub unsafe fn vconst_get(v: *mut VConst, id: *mut libc::c_char) -> *mut Value {
-    (*v).varmap.get(id) as *mut Value
+    let id_str = CStr::from_ptr(id).to_str().unwrap();
+    (*v).varmap.get(id_str).copied().unwrap_or(ptr::null_mut())
 }
 
 pub unsafe fn vconst_undeclare(v: &mut VConst) {
-    let mut varmap = Map::new();
+    let mut varmap = BTreeMap::new();
     let mut comment = HashMap::new();
     let mut persist = HashMap::new();
-    let m = &v.varmap;
-    for key in m.keys() {
-        let key_str = CStr::from_ptr(key).to_str().unwrap();
-        if v.persist.get(key_str).copied().unwrap_or(false) {
-            varmap.set(
-                dynamic_str(key),
-                value_copy(&*(v.varmap.get(key) as *mut Value)) as *const libc::c_void,
+    for key in v.varmap.keys() {
+        if v.persist.get(key).copied().unwrap_or(false) {
+            varmap.insert(
+                key.clone(),
+                value_copy(&*(v.varmap.get(key).copied().unwrap())),
             );
-            if let Some(c) = v.comment.get(key_str) {
-                comment.insert(key_str.to_string(), c.clone());
+            if let Some(c) = v.comment.get(key) {
+                comment.insert(key.clone(), c.clone());
             }
-            persist.insert(key_str.to_string(), true);
+            persist.insert(key.clone(), true);
         }
     }
     std::mem::forget(std::mem::replace(&mut v.varmap, varmap));
@@ -283,12 +278,10 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
 
 pub unsafe fn vconst_str(v: *mut VConst, indent: *mut libc::c_char) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    let m = &(*v).varmap;
-    for (k, val) in m.pairs() {
-        let value: *mut libc::c_char = value_str(val as *mut Value);
-        let k_str = CStr::from_ptr(k).to_str().unwrap();
-        strbuilder_write!(b, "{}{}: {}", cstr!(indent), k_str, cstr!(value));
-        if let Some(comment) = (*v).comment.get(k_str) {
+    for (k, &val) in &(*v).varmap {
+        let value: *mut libc::c_char = value_str(val);
+        strbuilder_write!(b, "{}{}: {}", cstr!(indent), k, cstr!(value));
+        if let Some(comment) = (*v).comment.get(k) {
             strbuilder_write!(b, "\t({comment})");
         }
         strbuilder_write!(b, "\n");
