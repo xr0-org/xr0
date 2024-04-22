@@ -1817,11 +1817,8 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
             i += 1;
         }
     }
-    let nstmts: libc::c_int = ast_block_nstmts(abs);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(abs);
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < nstmts {
-        let splits: AstStmtSplits = ast_stmt_splits(&**stmt.offset(i_0 as isize), s_copy);
+    for stmt in &abs.stmts {
+        let splits: AstStmtSplits = ast_stmt_splits(stmt, s_copy);
         let mut j: libc::c_int = 0 as libc::c_int;
         while j < splits.n {
             n += 1;
@@ -1833,7 +1830,6 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
             *fresh5 = *(splits.cond).offset(j as isize);
             j += 1;
         }
-        i_0 += 1;
     }
     state_popframe(s_copy);
     AstStmtSplits { n, cond, err: None }
@@ -2012,8 +2008,8 @@ pub unsafe fn ast_block_nstmts(b: &AstBlock) -> libc::c_int {
     b.stmts.len() as libc::c_int
 }
 
-pub unsafe fn ast_block_stmts(b: &AstBlock) -> *mut *mut AstStmt {
-    b.stmts.as_slice().as_ptr() as *mut *mut AstStmt
+pub unsafe fn ast_block_stmts(b: &AstBlock) -> &[Box<AstStmt>] {
+    &b.stmts
 }
 
 pub unsafe fn ast_block_isterminal(b: &AstBlock, s: *mut State) -> bool {
@@ -2021,12 +2017,9 @@ pub unsafe fn ast_block_isterminal(b: &AstBlock, s: *mut State) -> bool {
 }
 
 pub unsafe fn ast_block_preconds(b: &AstBlock) -> PrecondsResult {
-    let n: libc::c_int = ast_block_nstmts(b);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(b);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        if ast_stmt_ispre(&**stmt.offset(i as isize)) {
-            let preconds = ast_stmt_labelled_stmt(&**stmt.offset(i as isize));
+    for stmt in &b.stmts {
+        if ast_stmt_ispre(stmt) {
+            let preconds = ast_stmt_labelled_stmt(stmt);
             if let Err(err) = ast_stmt_preconds_validate(preconds) {
                 return PrecondsResult {
                     stmt: ptr::null_mut(),
@@ -2038,7 +2031,6 @@ pub unsafe fn ast_block_preconds(b: &AstBlock) -> PrecondsResult {
                 err: None,
             };
         }
-        i += 1;
     }
     PrecondsResult {
         stmt: ptr::null_mut(),
@@ -2156,17 +2148,13 @@ unsafe fn comp_setupabsexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     if ast_block_ndecls(b) != 0 {
         panic!();
     }
-    let nstmt: libc::c_int = ast_block_nstmts(b);
-    let stmts: *mut *mut AstStmt = ast_block_stmts(b);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nstmt {
-        if ast_stmt_ispre(&**stmts.offset(i as isize)) {
-            stmt_setupabsexec(&**stmts.offset(i as isize), state)?;
-            if ast_stmt_isterminal(&**stmts.offset(i as isize), state) {
+    for stmt in &b.stmts {
+        if ast_stmt_ispre(stmt) {
+            stmt_setupabsexec(stmt, state)?;
+            if ast_stmt_isterminal(stmt, state) {
                 break;
             }
         }
-        i += 1;
     }
     Ok(())
 }
@@ -2213,12 +2201,8 @@ pub unsafe fn ast_stmt_ispre(stmt: &AstStmt) -> bool {
 unsafe fn stmt_v_block_verify(v_block_stmt: &AstStmt, state: *mut State) -> Result<()> {
     let b = ast_stmt_as_v_block(v_block_stmt);
     assert_eq!(ast_block_ndecls(b), 0);
-    let nstmts: libc::c_int = ast_block_nstmts(b);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(b);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nstmts {
-        ast_stmt_verify(&**stmt.offset(i as isize), state)?;
-        i += 1;
+    for stmt in &b.stmts {
+        ast_stmt_verify(stmt, state)?;
     }
     Ok(())
 }
@@ -2247,8 +2231,8 @@ unsafe fn stmt_iter_verify(stmt: &AstStmt, state: *mut State) -> Result<()> {
     assert!(matches!(body.kind, AstStmtKind::Compound(_)));
     let block = ast_stmt_as_block(body);
     assert_eq!(ast_block_ndecls(block), 0);
-    assert_eq!(ast_block_nstmts(block), 1);
-    let assertion = ast_stmt_as_expr(&**(ast_block_stmts(block)).offset(0 as libc::c_int as isize));
+    assert_eq!(block.stmts.len(), 1);
+    let assertion = ast_stmt_as_expr(&block.stmts[0]);
     let lw = ast_stmt_iter_lower_bound(stmt);
     let up = ast_stmt_iter_upper_bound(stmt);
     if !ast_expr_rangedecide(assertion, lw, up, state) {
@@ -2270,15 +2254,11 @@ pub unsafe fn ast_stmt_verify(stmt: &AstStmt, state: *mut State) -> Result<()> {
 unsafe fn stmt_compound_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     let b = ast_stmt_as_block(stmt);
     assert_eq!(ast_block_ndecls(b), 0);
-    let nstmt: libc::c_int = ast_block_nstmts(b);
-    let stmts: *mut *mut AstStmt = ast_block_stmts(b);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nstmt {
-        ast_stmt_exec(&**stmts.offset(i as isize), state)?;
-        if ast_stmt_isterminal(&**stmts.offset(i as isize), state) {
+    for stmt in &b.stmts {
+        ast_stmt_exec(stmt, state)?;
+        if ast_stmt_isterminal(stmt, state) {
             break;
         }
-        i += 1;
     }
     Ok(())
 }
@@ -2476,12 +2456,9 @@ unsafe fn comp_absexec(
     should_setup: bool,
 ) -> Result<*mut Value> {
     let b = ast_stmt_as_block(stmt);
-    let stmts: *mut *mut AstStmt = ast_block_stmts(b);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < ast_block_nstmts(b) {
+    for stmt in &b.stmts {
         // Note: original leaks these values.
-        let _ = ast_stmt_absexec(&**stmts.offset(i as isize), state, should_setup)?;
-        i += 1;
+        let _ = ast_stmt_absexec(stmt, state, should_setup)?;
     }
     Ok(ptr::null_mut())
 }
@@ -2714,8 +2691,8 @@ unsafe fn hack_alloc_from_neteffect(stmt: &AstStmt) -> &AstExpr {
     assert!(matches!(body.kind, AstStmtKind::Compound(_)));
     let block = ast_stmt_as_block(body);
     assert_eq!(ast_block_ndecls(block), 0);
-    assert_eq!(ast_block_nstmts(block), 1);
-    ast_stmt_as_expr(&**(ast_block_stmts(block)).offset(0 as libc::c_int as isize))
+    assert_eq!(block.stmts.len(), 1);
+    ast_stmt_as_expr(&block.stmts[0])
 }
 
 pub unsafe fn ast_stmt_iter_lower_bound(stmt: &AstStmt) -> &AstExpr {
@@ -2973,11 +2950,8 @@ unsafe fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Box<Strin
 
 unsafe fn ast_stmt_compound_getfuncs(block: &AstBlock) -> Box<StringArr> {
     let mut res = string_arr_create();
-    let stmts: *mut *mut AstStmt = ast_block_stmts(block);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < ast_block_nstmts(block) {
-        res = string_arr_concat(&res, &ast_stmt_getfuncs(&**stmts.offset(i as isize)));
-        i += 1;
+    for stmt in &block.stmts {
+        res = string_arr_concat(&res, &ast_stmt_getfuncs(stmt));
     }
     res
 }
@@ -2998,11 +2972,8 @@ unsafe fn preconds_selection_verify(stmt: &AstStmt) -> Result<()> {
 }
 
 unsafe fn preconds_compound_verify(block: &AstBlock) -> Result<()> {
-    let stmts: *mut *mut AstStmt = ast_block_stmts(block);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < ast_block_nstmts(block) {
-        ast_stmt_preconds_validate(&**stmts.offset(i as isize))?;
-        i += 1;
+    for stmt in &block.stmts {
+        ast_stmt_preconds_validate(stmt)?;
     }
     Ok(())
 }
@@ -3517,11 +3488,9 @@ unsafe fn path_absverify_withstate(f: *mut AstFunction, state: *mut State) -> Re
 
 unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_int) -> Result<()> {
     let abs = ast_function_abstract(&*f);
-    let nstmts: libc::c_int = ast_block_nstmts(abs);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(abs);
-    let mut i: libc::c_int = index;
-    while i < nstmts {
-        let mut splits: AstStmtSplits = ast_stmt_splits(&**stmt.offset(i as isize), state);
+    for i in index as usize..abs.stmts.len() {
+        let stmt = &abs.stmts[i];
+        let mut splits: AstStmtSplits = ast_stmt_splits(stmt, state);
         if let Some(err) = splits.err {
             return Err(err);
         }
@@ -3529,12 +3498,11 @@ unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_
             if (splits.cond).is_null() {
                 panic!();
             }
-            return split_paths_absverify(f, state, i, &mut splits);
+            return split_paths_absverify(f, state, i as libc::c_int, &mut splits);
         }
-        if !ast_stmt_ispre(&**stmt.offset(i as isize)) {
-            ast_stmt_absexec(&**stmt.offset(i as isize), state, true)?;
+        if !ast_stmt_ispre(stmt) {
+            ast_stmt_absexec(stmt, state, true)?;
         }
-        i += 1;
     }
     abstract_audit(f, state)?;
     Ok(())
@@ -3593,12 +3561,8 @@ unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Res
 }
 
 unsafe fn ast_function_setupabsexec(f: &AstFunction, state: *mut State) -> Result<()> {
-    let nstmts: libc::c_int = ast_block_nstmts(&*f.r#abstract);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(&*f.r#abstract);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nstmts {
-        ast_stmt_setupabsexec(&**stmt.offset(i as isize), state)?;
-        i += 1;
+    for stmt in &(*f.r#abstract).stmts {
+        ast_stmt_setupabsexec(stmt, state)?;
     }
     Ok(())
 }
@@ -3625,19 +3589,23 @@ unsafe fn path_verify(
     abstract_state: *mut State,
 ) -> Result<()> {
     let fname = ast_function_name(&*f);
-    let nstmts: libc::c_int = ast_block_nstmts(&*(*f).body);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(&*(*f).body);
-    let mut i: libc::c_int = index;
-    while i < nstmts {
-        let mut splits: AstStmtSplits = ast_stmt_splits(&**stmt.offset(i as isize), actual_state);
+    let stmts = &(*(*f).body).stmts;
+    for i in index as usize..stmts.len() {
+        let stmt = &stmts[i];
+        let mut splits: AstStmtSplits = ast_stmt_splits(stmt, actual_state);
         if splits.n != 0 {
-            return split_paths_verify(f, actual_state, i, &mut splits, abstract_state);
+            return split_paths_verify(
+                f,
+                actual_state,
+                i as libc::c_int,
+                &mut splits,
+                abstract_state,
+            );
         }
-        ast_stmt_process(&**stmt.offset(i as isize), fname, actual_state)?;
-        if ast_stmt_isterminal(&**stmt.offset(i as isize), actual_state) {
+        ast_stmt_process(stmt, fname, actual_state)?;
+        if ast_stmt_isterminal(stmt, actual_state) {
             break;
         }
-        i += 1;
     }
     if state_hasgarbage(actual_state) {
         vprintln!("actual: {}", state_str(actual_state));
@@ -3666,12 +3634,8 @@ pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result
             i += 1;
         }
     }
-    let nstmts: libc::c_int = ast_block_nstmts(&*f.r#abstract);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(&*f.r#abstract);
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < nstmts {
-        ast_stmt_absexec(&**stmt.offset(i_0 as isize), state, false)?;
-        i_0 += 1;
+    for stmt in &(*f.r#abstract).stmts {
+        ast_stmt_absexec(stmt, state, false)?;
     }
     let obj: *mut Object = state_getresult(state);
     if obj.is_null() {
@@ -3734,15 +3698,9 @@ unsafe fn recurse_buildgraph(
         panic!();
     }
     let body: *mut AstBlock = (*f).body;
-    let nstmts: libc::c_int = ast_block_nstmts(&*body);
-    let stmt: *mut *mut AstStmt = ast_block_stmts(&*body);
-    if stmt.is_null() {
-        panic!();
-    }
     let mut val = string_arr_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nstmts {
-        let mut farr = ast_stmt_getfuncs(&**stmt.offset(i as isize));
+    for stmt in &(*body).stmts {
+        let mut farr = ast_stmt_getfuncs(stmt);
         let func: *mut *mut libc::c_char = string_arr_s(&mut farr);
         let mut j: libc::c_int = 0 as libc::c_int;
         while j < string_arr_n(&farr) {
@@ -3759,7 +3717,6 @@ unsafe fn recurse_buildgraph(
             }
             j += 1;
         }
-        i += 1;
     }
     g.set(
         dynamic_str(fname),
