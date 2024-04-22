@@ -12,7 +12,7 @@ use crate::object::{
     object_as_value, object_assign, object_destroy, object_getmember, object_getmembertype,
     object_hasvalue,
 };
-use crate::parser::{lexememarker_copy, lexememarker_destroy, lexememarker_str, LexemeMarker};
+use crate::parser::{lexememarker_copy, lexememarker_destroy, LexemeMarker};
 use crate::props::{props_contradicts, props_get, props_install};
 use crate::state::state::{
     state_addresses_deallocand, state_alloc, state_clump, state_copy, state_copywithname,
@@ -2147,23 +2147,13 @@ pub unsafe fn ast_stmt_process(
         if let Err(err) = ast_stmt_verify(stmt, state) {
             let b: *mut StrBuilder = strbuilder_create();
             let loc = ast_stmt_lexememarker(stmt);
-            let m = lexememarker_str(loc);
-            let err_msg = format!("{}: {}", cstr!(m), err.msg);
-            free(m as *mut libc::c_void);
-            return Err(Error::new(err_msg));
+            return Err(Error::new(format!("{loc}: {}", err.msg)));
         }
     }
     if let Err(err) = ast_stmt_exec(stmt, state) {
         let b: *mut StrBuilder = strbuilder_create();
         let loc = ast_stmt_lexememarker(stmt);
-        let m = lexememarker_str(loc);
-        let err_msg = format!(
-            "{}:{}: cannot exec statement: {}",
-            cstr!(m),
-            cstr!(fname),
-            err.msg,
-        );
-        free(m as *mut libc::c_void);
+        let err_msg = format!("{loc}:{}: cannot exec statement: {}", cstr!(fname), err.msg,);
         return Err(Error::new(err_msg));
     }
     Ok(())
@@ -3193,8 +3183,7 @@ unsafe fn preconds_selection_verify(stmt: &AstStmt) -> Result<()> {
     let b: *mut StrBuilder = strbuilder_create();
     let l = ast_stmt_lexememarker(stmt);
     Err(Error::new(format!(
-        "{} setup preconditions must be decidable",
-        cstr!(lexememarker_str(l)),
+        "{l} setup preconditions must be decidable",
     )))
 }
 

@@ -1,12 +1,13 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ffi::CStr;
+use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use libc::{free, malloc};
 
-use crate::util::{self, dynamic_str, strbuilder_build, strbuilder_create, StrBuilder};
-use crate::{cstr, strbuilder_write};
+use crate::cstr;
+use crate::util::{self, dynamic_str};
 
 pub struct Env {
     source: String,
@@ -207,8 +208,16 @@ pub unsafe fn lexememarker_destroy(loc: *mut LexemeMarker) {
     free(loc as *mut libc::c_void);
 }
 
-pub unsafe fn lexememarker_str(loc: &LexemeMarker) -> *mut libc::c_char {
-    let b: *mut StrBuilder = strbuilder_create();
-    strbuilder_write!(b, "{}:{}:{}", cstr!(loc.filename), loc.linenum, loc.column);
-    strbuilder_build(b)
+impl Display for LexemeMarker {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        unsafe {
+            write!(
+                f,
+                "{}:{}:{}",
+                cstr!(self.filename),
+                self.linenum,
+                self.column
+            )
+        }
+    }
 }
