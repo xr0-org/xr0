@@ -5,7 +5,7 @@ use std::fmt::{self, Display, Formatter};
 use std::process;
 use std::ptr;
 
-use libc::{malloc, realloc, strncmp};
+use libc::{malloc, strncmp};
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
 use crate::object::{
@@ -280,11 +280,11 @@ pub struct Preresult {
     pub is_contradiction: bool,
 }
 
-// TODO: kill
+// TODO: look into some more reasonable error handling mechanism, this one is really iffy
 #[derive(Clone)]
 pub struct AstStmtSplits {
-    pub n: libc::c_int,
-    pub cond: *mut *mut AstExpr,
+    // Note: In the original this array is heap-allocated but never freed.
+    pub conds: Vec<*mut AstExpr>,
     pub err: Option<Box<Error>>,
 }
 
@@ -1774,8 +1774,7 @@ pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> AstStmtSplits {
         | AstExprKind::ArbArg
         | AstExprKind::IsDereferencable(_)
         | AstExprKind::Allocation(_) => AstStmtSplits {
-            n: 0,
-            cond: ptr::null_mut(),
+            conds: vec![],
             err: None,
         },
         _ => panic!(),
@@ -1788,8 +1787,7 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     let f: *mut AstFunction = (*state_getext(state)).get_func(name);
     if f.is_null() {
         return AstStmtSplits {
-            n: 0,
-            cond: ptr::null_mut(),
+            conds: vec![],
             err: Some(Error::new(format!("function: `{}' not found", cstr!(name)))),
         };
     }
@@ -1800,55 +1798,32 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     state_pushframe(s_copy, dynamic_str(name), ret_type);
     if let Err(err) = prepare_parameters(params, args, name, s_copy) {
         return AstStmtSplits {
-            n: 0,
-            cond: ptr::null_mut(),
+            conds: vec![],
             err: Some(err),
         };
     }
-    let mut n: libc::c_int = 0 as libc::c_int;
-    let mut cond: *mut *mut AstExpr = ptr::null_mut();
+    let mut conds = vec![];
     let abs = ast_function_abstract(&*f);
     for &var in &abs.decls {
         state_declare(s_copy, var, false);
     }
     for stmt in &abs.stmts {
-        let splits: AstStmtSplits = ast_stmt_splits(stmt, s_copy);
-        let mut j: libc::c_int = 0 as libc::c_int;
-        while j < splits.n {
-            n += 1;
-            cond = realloc(
-                cond as *mut libc::c_void,
-                (::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(n as usize),
-            ) as *mut *mut AstExpr;
-            let ref mut fresh5 = *cond.offset((n - 1 as libc::c_int) as isize);
-            *fresh5 = *(splits.cond).offset(j as isize);
-            j += 1;
-        }
+        // Note: errors ignored in the original!
+        let mut splits = ast_stmt_splits(stmt, s_copy);
+        conds.append(&mut splits.conds);
     }
     state_popframe(s_copy);
-    AstStmtSplits { n, cond, err: None }
+    AstStmtSplits { conds, err: None }
 }
 
 unsafe fn binary_splits(e: &AstExpr, s: *mut State) -> AstStmtSplits {
     let s1: AstStmtSplits = ast_expr_splits(ast_expr_binary_e1(e), s);
-    let s2: AstStmtSplits = ast_expr_splits(ast_expr_binary_e2(e), s);
-    let n: libc::c_int = s1.n + s2.n;
-    let cond: *mut *mut AstExpr =
-        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(n as usize))
-            as *mut *mut AstExpr;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < s1.n {
-        let ref mut fresh6 = *cond.offset(i as isize);
-        *fresh6 = *(s1.cond).offset(i as isize);
-        i += 1;
-    }
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < s2.n {
-        let ref mut fresh7 = *cond.offset((i_0 + s1.n) as isize);
-        *fresh7 = *(s2.cond).offset(i_0 as isize);
-        i_0 += 1;
-    }
-    AstStmtSplits { n, cond, err: None }
+    let mut s2: AstStmtSplits = ast_expr_splits(ast_expr_binary_e2(e), s);
+    // Note: s1.err and s2.err are ignored in the original.
+
+    let mut conds = s1.conds;
+    conds.append(&mut s2.conds);
+    AstStmtSplits { conds, err: None }
 }
 
 unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Box<StringArr> {
@@ -2856,8 +2831,7 @@ pub unsafe fn ast_stmt_getfuncs(stmt: &AstStmt) -> Box<StringArr> {
 pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
     match &stmt.kind {
         AstStmtKind::Nop => AstStmtSplits {
-            n: 0,
-            cond: ptr::null_mut(),
+            conds: vec![],
             err: None,
         },
         AstStmtKind::Expr(expr) => ast_expr_splits(expr, s),
@@ -2867,16 +2841,14 @@ pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
                 return ast_expr_splits(rv, s);
             }
             AstStmtSplits {
-                n: 0,
-                cond: ptr::null_mut(),
+                conds: vec![],
                 err: None,
             }
         }
         AstStmtKind::Labelled(labelled) => ast_stmt_splits(&labelled.stmt, s),
         AstStmtKind::Iteration(_) | AstStmtKind::Compound(_) | AstStmtKind::CompoundV(_) => {
             AstStmtSplits {
-                n: 0,
-                cond: ptr::null_mut(),
+                conds: vec![],
                 err: None,
             }
         }
@@ -2889,18 +2861,12 @@ unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> AstStm
     let e: *mut AstExpr = value_to_expr(v);
     if condexists(&*e, s) || value_isconstant(&*v) {
         return AstStmtSplits {
-            n: 0,
-            cond: ptr::null_mut(),
+            conds: vec![],
             err: None,
         };
     }
-    let cond: *mut *mut AstExpr =
-        malloc(::core::mem::size_of::<*mut AstExpr>()) as *mut *mut AstExpr;
-    let ref mut fresh10 = *cond.offset(0 as libc::c_int as isize);
-    *fresh10 = e;
     AstStmtSplits {
-        n: 1 as libc::c_int,
-        cond,
+        conds: vec![e],
         err: None,
     }
 }
@@ -3484,10 +3450,7 @@ unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_
         if let Some(err) = splits.err {
             return Err(err);
         }
-        if splits.n != 0 {
-            if (splits.cond).is_null() {
-                panic!();
-            }
+        if !splits.conds.is_empty() {
             return split_paths_absverify(f, state, i as libc::c_int, &mut splits);
         }
         if !ast_stmt_ispre(stmt) {
@@ -3579,7 +3542,7 @@ unsafe fn path_verify(
     for i in index as usize..stmts.len() {
         let stmt = &stmts[i];
         let mut splits: AstStmtSplits = ast_stmt_splits(stmt, actual_state);
-        if splits.n != 0 {
+        if !splits.conds.is_empty() {
             return split_paths_verify(
                 f,
                 actual_state,
@@ -3756,10 +3719,8 @@ unsafe fn split_paths_absverify(
     index: libc::c_int,
     splits: *mut AstStmtSplits,
 ) -> Result<()> {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*splits).n {
-        split_path_absverify(f, state, index, &**(*splits).cond.offset(i as isize))?;
-        i += 1;
+    for &cond in &(*splits).conds {
+        split_path_absverify(f, state, index, &*cond)?;
     }
     Ok(())
 }
@@ -3784,16 +3745,8 @@ unsafe fn split_paths_verify(
     splits: *mut AstStmtSplits,
     abstract_state: *mut State,
 ) -> Result<()> {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*splits).n {
-        split_path_verify(
-            f,
-            actual_state,
-            index,
-            &**((*splits).cond).offset(i as isize),
-            abstract_state,
-        )?;
-        i += 1;
+    for &cond in &(*splits).conds {
+        split_path_verify(f, actual_state, index, &*cond, abstract_state)?;
     }
     Ok(())
 }
