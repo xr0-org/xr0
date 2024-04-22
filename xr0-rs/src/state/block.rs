@@ -1,8 +1,6 @@
-#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
+#![allow(dead_code)]
 
 use std::ptr;
-
-use libc::{calloc, free, realloc};
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_difference_create, ast_expr_eq_create,
@@ -21,11 +19,6 @@ use crate::{strbuilder_write, AstExpr, Heap, Location, Object, State, StrBuilder
 
 pub struct Block {
     pub arr: Vec<*mut Object>,
-}
-
-pub struct BlockArr {
-    pub n: libc::c_int,
-    pub block: *mut *mut Block,
 }
 
 pub unsafe fn block_create() -> *mut Block {
@@ -250,59 +243,4 @@ pub unsafe fn block_undeclare(b: *mut Block, s: *mut State) {
         }
     }
     (*b).arr = new;
-}
-
-pub unsafe fn block_arr_create() -> *mut BlockArr {
-    let arr: *mut BlockArr = calloc(1, ::core::mem::size_of::<BlockArr>()) as *mut BlockArr;
-    if arr.is_null() {
-        panic!();
-    }
-    arr
-}
-
-pub unsafe fn block_arr_destroy(arr: *mut BlockArr) {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*arr).n {
-        block_destroy(*((*arr).block).offset(i as isize));
-        i += 1;
-    }
-    free((*arr).block as *mut libc::c_void);
-    free(arr as *mut libc::c_void);
-}
-
-pub unsafe fn block_arr_copy(old: *mut BlockArr) -> *mut BlockArr {
-    let new: *mut BlockArr = block_arr_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < (*old).n {
-        block_arr_append(new, block_copy(*((*old).block).offset(i as isize)));
-        i += 1;
-    }
-    new
-}
-
-pub unsafe fn block_arr_blocks(arr: *mut BlockArr) -> *mut *mut Block {
-    (*arr).block
-}
-
-pub unsafe fn block_arr_nblocks(arr: *mut BlockArr) -> libc::c_int {
-    (*arr).n
-}
-
-pub unsafe fn block_arr_append(arr: *mut BlockArr, b: *mut Block) -> libc::c_int {
-    (*arr).n += 1;
-    (*arr).block = realloc(
-        (*arr).block as *mut libc::c_void,
-        (::core::mem::size_of::<BlockArr>()).wrapping_mul((*arr).n as usize),
-    ) as *mut *mut Block;
-    if ((*arr).block).is_null() {
-        panic!();
-    }
-    let loc: libc::c_int = (*arr).n - 1 as libc::c_int;
-    let ref mut fresh2 = *((*arr).block).offset(loc as isize);
-    *fresh2 = b;
-    loc
-}
-
-pub unsafe fn block_arr_delete(arr: *mut BlockArr, address: libc::c_int) {
-    panic!();
 }
