@@ -324,6 +324,9 @@ pub struct OwningCStr {
 impl OwningCStr {
     pub unsafe fn new(ptr: *mut libc::c_char) -> Self {
         assert!(!ptr.is_null());
+        if let Err(err) = CStr::from_ptr(ptr).to_str() {
+            panic!("non-UTF-8 string {:?}: {err}", CStr::from_ptr(ptr));
+        }
         OwningCStr { ptr }
     }
 
