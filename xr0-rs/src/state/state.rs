@@ -160,8 +160,8 @@ pub unsafe fn state_getheap(s: *mut State) -> *mut Heap {
     &mut (*s).heap
 }
 
-pub unsafe fn state_getprops(s: *mut State) -> *mut Props {
-    &mut (*s).props
+pub unsafe fn state_getprops(s: &mut State) -> &mut Props {
+    &mut s.props
 }
 
 pub unsafe fn state_pushframe(state: *mut State, func: *mut libc::c_char, ret_type: *mut AstType) {

@@ -34,7 +34,7 @@ use crate::value::{
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr,
 };
-use crate::{cstr, strbuilder_write, vprintln, Externals, Object, Props, State, StrBuilder, Value};
+use crate::{cstr, strbuilder_write, vprintln, Externals, Object, State, StrBuilder, Value};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
@@ -590,13 +590,13 @@ unsafe fn irreducible_assume(e: &AstExpr, value: bool, s: *mut State) -> Result<
 }
 
 unsafe fn irreducible_assume_actual(e: &AstExpr, s: *mut State) -> Result<Preresult> {
-    let p: *mut Props = state_getprops(s);
+    let p = state_getprops(&mut *s);
     if props_contradicts(p, e) {
         return Ok(Preresult {
             is_contradiction: true,
         });
     }
-    props_install(state_getprops(s), Box::into_raw(ast_expr_copy(e)));
+    props_install(p, ast_expr_copy(e));
     Ok(Preresult {
         is_contradiction: false,
     })
@@ -1061,8 +1061,10 @@ pub unsafe fn prepare_parameters(
 }
 
 unsafe fn isdereferencable_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
-    let p: *mut Props = state_getprops(state);
-    props_install(p, expr as *const AstExpr as *mut AstExpr);
+    let p = state_getprops(&mut *state);
+    // XXX FIXME: This definitely isn't OK. absexec has some weird stuff going on in the original.
+    // Could clone here instead.
+    props_install(p, Box::from_raw(expr as *const AstExpr as *mut AstExpr));
     Ok(ptr::null_mut())
 }
 
@@ -2505,8 +2507,8 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
     assert!(!v.is_null());
     if value_issync(&*v) {
         let sync: *mut AstExpr = value_as_sync(v);
-        let p: *mut Props = state_getprops(state);
-        if props_get(p, sync) {
+        let p = state_getprops(&mut *state);
+        if props_get(p, &*sync) {
             return Decision {
                 decision: true,
                 err: None,
@@ -2858,8 +2860,8 @@ unsafe fn condexists(cond: &AstExpr, s: *mut State) -> bool {
     assert!(!val.is_null());
     // Note: original doesn't free this.
     let reduced: *mut AstExpr = value_to_expr(val);
-    let p: *mut Props = state_getprops(s);
-    props_get(p, reduced) || props_contradicts(p, &*reduced)
+    let p = state_getprops(&mut *s);
+    props_get(p, &*reduced) || props_contradicts(p, &*reduced)
 }
 
 unsafe fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Vec<OwningCStr> {
@@ -3473,7 +3475,7 @@ unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Res
         dynamic_str(ast_function_name(&*f)),
         state_getext(abstract_state),
         ast_function_type(&*f),
-        (*state_getprops(abstract_state)).clone(),
+        (state_getprops(&mut *abstract_state)).clone(),
     );
     ast_function_initparams(&*f, actual_state).unwrap();
     ast_function_setupabsexec(&*f, actual_state)?;
