@@ -347,12 +347,12 @@ pub grammar c_parser(env: &Env) for str {
         K(<"char">) { unsafe { ast_type_create(AstTypeBase::Char, 0) } } /
         K(<"int">) { unsafe { ast_type_create(AstTypeBase::Int, 0) } } /
         struct_or_union_specifier() /
-        t:typedef_name() { unsafe { ast_type_create_userdef(dynamic_str(t)) } }
+        t:typedef_name() { unsafe { ast_type_create_userdef(t) } }
 
-    rule typedef_name() -> BoxedCStr = i:identifier() {?
+    rule typedef_name() -> OwningCStr = i:identifier() {?
         unsafe {
             if env.is_typename(i) {
-                Ok(i)
+                Ok(OwningCStr::new(i))
             } else {
                 Err("<unused>")
             }

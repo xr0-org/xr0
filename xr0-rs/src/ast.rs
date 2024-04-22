@@ -177,7 +177,7 @@ pub enum AstTypeBase {
     Struct(AstStructType),
     Union(AstStructType),
     Enum,
-    UserDefined(*mut libc::c_char),
+    UserDefined(OwningCStr),
 }
 
 pub type AstTypeModifier = libc::c_uint;
@@ -3247,7 +3247,7 @@ pub unsafe fn ast_type_create_struct(
     )
 }
 
-pub unsafe fn ast_type_create_userdef(name: *mut libc::c_char) -> *mut AstType {
+pub unsafe fn ast_type_create_userdef(name: OwningCStr) -> *mut AstType {
     ast_type_create(AstTypeBase::UserDefined(name), 0 as AstTypeModifier)
 }
 
@@ -3260,9 +3260,12 @@ pub unsafe fn ast_type_vconst(
     match &(*t).base {
         AstTypeBase::Int => value_int_indefinite_create(),
         AstTypeBase::Pointer(_) => value_ptr_indefinite_create(),
-        AstTypeBase::UserDefined(name) => {
-            ast_type_vconst((*state_getext(s)).get_typedef(*name), s, comment, persist)
-        }
+        AstTypeBase::UserDefined(name) => ast_type_vconst(
+            (*state_getext(s)).get_typedef(name.as_ptr()),
+            s,
+            comment,
+            persist,
+        ),
         AstTypeBase::Struct(_) => value_struct_indefinite_create(t, s, comment, persist),
         _ => panic!(),
     }
@@ -3356,21 +3359,13 @@ pub unsafe fn ast_type_copy(t: *mut AstType) -> *mut AstType {
         panic!();
     }
     match &(*t).base {
-        AstTypeBase::Pointer(ptr_type) => return ast_type_create_ptr(ast_type_copy(*ptr_type)),
-        AstTypeBase::Array(arr) => {
-            return ast_type_create_arr(ast_type_copy(arr.r#type), arr.length);
-        }
-        AstTypeBase::Struct(_) => return ast_type_copy_struct(t),
-        AstTypeBase::UserDefined(name) => return ast_type_create_userdef(dynamic_str(*name)),
-        AstTypeBase::Void => {
-            return ast_type_create(AstTypeBase::Void, (*t).modifiers as AstTypeModifier)
-        }
-        AstTypeBase::Int => {
-            return ast_type_create(AstTypeBase::Int, (*t).modifiers as AstTypeModifier)
-        }
-        AstTypeBase::Char => {
-            return ast_type_create(AstTypeBase::Char, (*t).modifiers as AstTypeModifier)
-        }
+        AstTypeBase::Pointer(ptr_type) => ast_type_create_ptr(ast_type_copy(*ptr_type)),
+        AstTypeBase::Array(arr) => ast_type_create_arr(ast_type_copy(arr.r#type), arr.length),
+        AstTypeBase::Struct(_) => ast_type_copy_struct(t),
+        AstTypeBase::UserDefined(name) => ast_type_create_userdef(name.clone()),
+        AstTypeBase::Void => ast_type_create(AstTypeBase::Void, (*t).modifiers as AstTypeModifier),
+        AstTypeBase::Int => ast_type_create(AstTypeBase::Int, (*t).modifiers as AstTypeModifier),
+        AstTypeBase::Char => ast_type_create(AstTypeBase::Char, (*t).modifiers as AstTypeModifier),
         _ => {
             panic!();
         }
@@ -3396,7 +3391,7 @@ pub unsafe fn ast_type_str(t: *mut AstType) -> *mut libc::c_char {
             ast_type_str_build_struct(b, s);
         }
         AstTypeBase::UserDefined(name) => {
-            strbuilder_write!(b, "{}", cstr!(*name));
+            strbuilder_write!(b, "{name}");
         }
         AstTypeBase::Void => {
             strbuilder_write!(b, "void");
