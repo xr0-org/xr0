@@ -197,7 +197,7 @@ pub struct LValue {
 pub struct AstFunction {
     pub isaxiom: bool,
     pub ret: *mut AstType,
-    pub name: *mut libc::c_char,
+    pub name: OwningCStr,
     pub params: Vec<*mut AstVariable>,
     pub r#abstract: *mut AstBlock,
     pub body: *mut AstBlock, // can be null
@@ -3554,7 +3554,7 @@ pub unsafe fn ast_variable_arr_copy(old: &[*mut AstVariable]) -> Vec<*mut AstVar
 pub unsafe fn ast_function_create(
     isaxiom: bool,
     ret: *mut AstType,
-    name: *mut libc::c_char,
+    name: OwningCStr,
     params: Vec<*mut AstVariable>,
     abstract_0: *mut AstBlock,
     body: *mut AstBlock,
@@ -3587,7 +3587,6 @@ impl Drop for AstFunction {
             if !self.body.is_null() {
                 ast_block_destroy(self.body);
             }
-            free(self.name as *mut libc::c_void);
         }
     }
 }
@@ -3600,7 +3599,7 @@ pub unsafe fn ast_function_str(f: &AstFunction) -> *mut libc::c_char {
     let ret = ast_type_str(f.ret);
     strbuilder_write!(b, "{}\n", cstr!(ret));
     free(ret as *mut libc::c_void);
-    strbuilder_write!(b, "{}(", cstr!(f.name));
+    strbuilder_write!(b, "{}(", f.name);
     for (i, &param) in f.params.iter().enumerate() {
         let v = ast_variable_str(param);
         let space = if i + 1 < f.params.len() { ", " } else { "" };
@@ -3628,7 +3627,7 @@ pub unsafe fn ast_function_str(f: &AstFunction) -> *mut libc::c_char {
 }
 
 pub unsafe fn ast_function_name(f: &AstFunction) -> *mut libc::c_char {
-    f.name
+    f.name.as_ptr()
 }
 
 pub unsafe fn ast_function_copy(f: &AstFunction) -> *mut AstFunction {
@@ -3640,7 +3639,7 @@ pub unsafe fn ast_function_copy(f: &AstFunction) -> *mut AstFunction {
     return ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),
-        dynamic_str(f.name),
+        f.name.clone(),
         params,
         ast_block_copy(&*f.r#abstract),
         if !f.body.is_null() {
@@ -3669,11 +3668,7 @@ pub unsafe fn ast_function_type(f: &AstFunction) -> *mut AstType {
 }
 
 pub unsafe fn ast_function_body(f: &AstFunction) -> &AstBlock {
-    assert!(
-        !f.body.is_null(),
-        "cannot find body for {:?}",
-        CStr::from_ptr(f.name)
-    );
+    assert!(!f.body.is_null(), "cannot find body for {:?}", f.name);
     &*f.body
 }
 
@@ -3694,7 +3689,7 @@ pub unsafe fn ast_function_protostitch(
     f: *mut AstFunction,
     ext: *mut Externals,
 ) -> *mut AstFunction {
-    let proto: *mut AstFunction = (*ext).get_func((*f).name);
+    let proto: *mut AstFunction = (*ext).get_func((*f).name.as_ptr());
     if !proto.is_null() && !((*proto).r#abstract).is_null() {
         (*f).r#abstract = ast_block_copy(&*(*proto).r#abstract);
     }
@@ -3988,7 +3983,7 @@ unsafe fn abstract_paths(
     let f_true: *mut AstFunction = ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),
-        split_name(f.name, cond),
+        split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
         ast_block_copy(&*f.r#abstract),
         ast_block_copy(&*f.body),
@@ -3998,7 +3993,7 @@ unsafe fn abstract_paths(
     let f_false: *mut AstFunction = ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),
-        split_name(f.name, &inv_assumption),
+        split_name(f.name.as_ptr(), &inv_assumption),
         ast_variables_copy(&f.params),
         ast_block_copy(&*f.r#abstract),
         ast_block_copy(&*f.body),
@@ -4047,10 +4042,10 @@ pub unsafe fn ast_function_buildgraph(fname: *mut libc::c_char, ext: &Externals)
     g
 }
 
-unsafe fn split_name(name: *mut libc::c_char, assumption: &AstExpr) -> *mut libc::c_char {
+unsafe fn split_name(name: *mut libc::c_char, assumption: &AstExpr) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_write!(b, "{} | {assumption}", cstr!(name));
-    strbuilder_build(b)
+    OwningCStr::new(strbuilder_build(b))
 }
 
 unsafe fn split_paths_verify(
@@ -4078,7 +4073,7 @@ unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> Vec
     let f_true: *mut AstFunction = ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),
-        split_name(f.name, cond),
+        split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
         ast_block_copy(&*f.r#abstract),
         f.body,
@@ -4088,7 +4083,7 @@ unsafe fn body_paths(f: &AstFunction, index: libc::c_int, cond: &AstExpr) -> Vec
     let f_false: *mut AstFunction = ast_function_create(
         f.isaxiom,
         ast_type_copy(f.ret),
-        split_name(f.name, &*inv_assumption),
+        split_name(f.name.as_ptr(), &*inv_assumption),
         ast_variables_copy(&f.params),
         ast_block_copy(&*f.r#abstract),
         f.body,

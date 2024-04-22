@@ -574,7 +574,7 @@ pub grammar c_parser(env: &Env) for str {
                 ast_function_create(
                     true,
                     t,
-                    decl.decl.name,
+                    OwningCStr::new(decl.decl.name),
                     decl.decl.params,
                     if body.r#abstract.is_null() {
                         ast_block_create(vec![], vec![])
@@ -594,7 +594,7 @@ pub grammar c_parser(env: &Env) for str {
                 ast_function_create(
                     false,
                     t,
-                    decl.decl.name,
+                    OwningCStr::new(decl.decl.name),
                     decl.decl.params,
                     if body.r#abstract.is_null() {
                         ast_block_create(vec![], vec![])
@@ -612,7 +612,7 @@ pub grammar c_parser(env: &Env) for str {
                 ast_function_create(
                     false,
                     ast_type_create(AstTypeBase::Void, 0),
-                    decl.decl.name,
+                    OwningCStr::new(decl.decl.name),
                     decl.decl.params,
                     if body.r#abstract.is_null() {
                         ast_block_create(vec![], vec![])
