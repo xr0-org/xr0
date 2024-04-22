@@ -10,7 +10,7 @@ use crate::state::location::{location_create_dynamic, location_destroy};
 use crate::state::state::state_references;
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{value_copy, value_destroy, value_str};
-use crate::{cstr, strbuilder_write, AstExpr, Block, Location, State, StrBuilder, Value};
+use crate::{strbuilder_write, AstExpr, Block, Location, State, StrBuilder, Value};
 
 pub struct Heap {
     pub blocks: Vec<Box<Block>>,
@@ -57,14 +57,13 @@ pub unsafe fn heap_copy(h: &Heap) -> Heap {
     }
 }
 
-pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> OwningCStr {
+pub unsafe fn heap_str(h: *mut Heap, indent: &str) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     for (i, block) in (*h).blocks.iter().enumerate() {
         if !*((*h).freed).add(i) {
             strbuilder_write!(
                 b,
-                "{}{i}: {}{}",
-                cstr!(indent),
+                "{indent}{i}: {}{}",
                 block_str(block),
                 if printdelim(h, i) { "\n" } else { "" },
             );
@@ -237,11 +236,11 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
     v.persist = persist;
 }
 
-pub unsafe fn vconst_str(v: &VConst, indent: *mut libc::c_char) -> OwningCStr {
+pub unsafe fn vconst_str(v: &VConst, indent: &str) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     for (k, &val) in &v.varmap {
         let value = value_str(val);
-        strbuilder_write!(b, "{}{k}: {value}", cstr!(indent));
+        strbuilder_write!(b, "{indent}{k}: {value}");
         if let Some(comment) = v.comment.get(k) {
             strbuilder_write!(b, "\t({comment})");
         }

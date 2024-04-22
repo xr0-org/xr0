@@ -204,13 +204,7 @@ unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool
 unsafe fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
     let proto_abs = ast_function_abstract(proto);
     let def_abs = ast_function_abstract(def);
-    let abs_match: bool = ast_block_str(
-        proto_abs,
-        b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    ) == ast_block_str(
-        def_abs,
-        b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    );
+    let abs_match: bool = ast_block_str(proto_abs, "") == ast_block_str(def_abs, "");
     let protoabs_only: bool = ast_function_absisempty(def) as libc::c_int != 0;
     abs_match || protoabs_only
 }

@@ -3,7 +3,7 @@ use std::ptr;
 use crate::state::block::{block_create, block_str};
 use crate::state::location::location_copy;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
-use crate::{cstr, strbuilder_write, Block, Location, StrBuilder};
+use crate::{strbuilder_write, Block, Location, StrBuilder};
 
 pub struct StaticMemory {
     pub blocks: Vec<Box<Block>>,
@@ -22,10 +22,10 @@ pub unsafe fn static_memory_destroy(sm: *mut StaticMemory) {
     drop(Box::from_raw(sm));
 }
 
-pub unsafe fn static_memory_str(sm: *mut StaticMemory, indent: *mut libc::c_char) -> OwningCStr {
+pub unsafe fn static_memory_str(sm: *mut StaticMemory, indent: &str) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     for (i, block) in (*sm).blocks.iter().enumerate() {
-        strbuilder_write!(b, "{}{i}: {}\n", cstr!(indent), block_str(block));
+        strbuilder_write!(b, "{indent}{i}: {}\n", block_str(block));
     }
     strbuilder_build(b)
 }

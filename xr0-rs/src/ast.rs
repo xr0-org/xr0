@@ -1940,15 +1940,15 @@ pub unsafe fn ast_block_copy(b: &AstBlock) -> *mut AstBlock {
     );
 }
 
-pub unsafe fn ast_block_str(b: &AstBlock, indent: *mut libc::c_char) -> OwningCStr {
+pub unsafe fn ast_block_str(b: &AstBlock, indent: &str) -> OwningCStr {
     let sb: *mut StrBuilder = strbuilder_create();
     for &decl in &b.decls {
         let s = ast_variable_str(decl);
-        strbuilder_write!(sb, "{}{s};\n", cstr!(indent));
+        strbuilder_write!(sb, "{indent}{s};\n");
     }
     for stmt in &b.stmts {
         let s = ast_stmt_str(stmt);
-        strbuilder_write!(sb, "{}{s}\n", cstr!(indent));
+        strbuilder_write!(sb, "{indent}{s}\n");
     }
     strbuilder_build(sb)
 }
@@ -2324,10 +2324,7 @@ unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder)
     let body = ast_stmt_str(&iteration.body);
     let iter = &iteration.iter;
     let abs = if !(iteration.r#abstract).is_null() {
-        ast_block_str(
-            &*iteration.r#abstract,
-            b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        )
+        ast_block_str(&*iteration.r#abstract, "\t")
     } else {
         OwningCStr::empty()
     };
@@ -2551,10 +2548,7 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
 }
 
 unsafe fn ast_stmt_compound_sprint(compound: &AstBlock, b: *mut StrBuilder) {
-    let s = ast_block_str(
-        compound,
-        b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    );
+    let s = ast_block_str(compound, "\t");
     strbuilder_write!(b, "{s}");
 }
 
@@ -3316,16 +3310,10 @@ pub unsafe fn ast_function_str(f: &AstFunction) -> OwningCStr {
         let space = if i + 1 < f.params.len() { ", " } else { "" };
         strbuilder_write!(b, "{v}{space}");
     }
-    let abs = ast_block_str(
-        &*f.r#abstract,
-        b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    );
+    let abs = ast_block_str(&*f.r#abstract, "\t");
     strbuilder_write!(b, ") ~ [\n{abs}]");
     if !(f.body).is_null() {
-        let body = ast_block_str(
-            &*f.body,
-            b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        );
+        let body = ast_block_str(&*f.body, "\t");
         strbuilder_write!(b, "{{\n{body}}}");
     } else {
         strbuilder_write!(b, ";");

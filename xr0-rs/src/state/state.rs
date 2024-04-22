@@ -122,45 +122,29 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
 pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_write!(b, "[[\n");
-    let ext =
-        (*(*state).ext).types_str(b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char);
+    let ext = (*(*state).ext).types_str("\t");
     if !ext.is_empty() {
         strbuilder_write!(b, "{ext}\n");
     }
-    let static_mem = static_memory_str(
-        (*state).static_memory,
-        b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    );
+    let static_mem = static_memory_str((*state).static_memory, "\t");
     if !static_mem.is_empty() {
         strbuilder_write!(b, "{static_mem}\n");
     }
-    let vconst = vconst_str(
-        &(*state).vconst,
-        b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    );
+    let vconst = vconst_str(&(*state).vconst, "\t");
     if !vconst.is_empty() {
         strbuilder_write!(b, "{vconst}\n");
     }
-    let clump = clump_str(
-        (*state).clump,
-        b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    );
+    let clump = clump_str((*state).clump, "\t");
     if !clump.is_empty() {
         strbuilder_write!(b, "{clump}\n");
     }
     let stack = stack_str((*state).stack, state);
     strbuilder_write!(b, "{stack}\n");
-    let props = props_str(
-        &(*state).props,
-        b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    );
+    let props = props_str(&(*state).props, "\t");
     if !props.is_empty() {
         strbuilder_write!(b, "{props}");
     }
-    let heap = heap_str(
-        &mut (*state).heap,
-        b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-    );
+    let heap = heap_str(&mut (*state).heap, "\t");
     if !heap.is_empty() {
         strbuilder_write!(b, "\n{heap}\n");
     }

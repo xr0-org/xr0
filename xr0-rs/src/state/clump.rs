@@ -2,7 +2,7 @@ use std::ptr;
 
 use crate::state::block::{block_create, block_str};
 use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
-use crate::{cstr, strbuilder_write, Block, StrBuilder};
+use crate::{strbuilder_write, Block, StrBuilder};
 
 #[derive(Clone)]
 pub struct Clump {
@@ -17,10 +17,10 @@ pub unsafe fn clump_destroy(c: *mut Clump) {
     drop(Box::from_raw(c));
 }
 
-pub unsafe fn clump_str(c: *mut Clump, indent: *mut libc::c_char) -> OwningCStr {
+pub unsafe fn clump_str(c: *mut Clump, indent: &str) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     for (i, block) in (*c).blocks.iter().enumerate() {
-        strbuilder_write!(b, "{}{i}: {}\n", cstr!(indent), block_str(block));
+        strbuilder_write!(b, "{indent}{i}: {}\n", block_str(block));
     }
     strbuilder_build(b)
 }
