@@ -5,18 +5,15 @@ use std::ptr;
 use libc::{free, malloc, realloc};
 
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
-use crate::state::block::{
-    block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
-    block_arr_nblocks, block_create, block_str, block_undeclare,
-};
+use crate::state::block::{block_create, block_str, block_undeclare};
 use crate::state::location::{location_create_dynamic, location_destroy};
 use crate::state::state::state_references;
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{value_copy, value_destroy, value_str};
-use crate::{cstr, strbuilder_write, AstExpr, Block, BlockArr, Location, State, StrBuilder, Value};
+use crate::{cstr, strbuilder_write, AstExpr, Block, Location, State, StrBuilder, Value};
 
 pub struct Heap {
-    pub blocks: *mut BlockArr,
+    pub blocks: Vec<Box<Block>>,
     pub freed: *mut bool,
 }
 
@@ -30,7 +27,7 @@ pub struct VConst {
 impl Heap {
     pub unsafe fn new() -> Self {
         Heap {
-            blocks: block_arr_create(),
+            blocks: vec![],
             freed: ptr::null_mut(),
         }
     }
@@ -39,15 +36,14 @@ impl Heap {
 impl Drop for Heap {
     fn drop(&mut self) {
         unsafe {
-            block_arr_destroy(self.blocks);
             free(self.freed as *mut libc::c_void);
         }
     }
 }
 
 pub unsafe fn heap_copy(h: &Heap) -> Heap {
-    let blocks = block_arr_copy(h.blocks);
-    let n: libc::c_int = block_arr_nblocks(h.blocks);
+    let blocks = h.blocks.clone();
+    let n: libc::c_int = h.blocks.len() as libc::c_int;
     let freed_copy: *mut bool =
         malloc((::core::mem::size_of::<bool>()).wrapping_mul(n as usize)) as *mut bool;
     let mut i: libc::c_int = 0 as libc::c_int;
@@ -63,60 +59,53 @@ pub unsafe fn heap_copy(h: &Heap) -> Heap {
 
 pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    let arr: *mut *mut Block = block_arr_blocks((*h).blocks);
-    let n: libc::c_int = block_arr_nblocks((*h).blocks);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        if !*((*h).freed).offset(i as isize) {
-            let block = block_str(&**arr.offset(i as isize));
+    for (i, block) in (*h).blocks.iter().enumerate() {
+        if !*((*h).freed).add(i) {
             strbuilder_write!(
                 b,
-                "{}{i}: {block}{}",
+                "{}{i}: {}{}",
                 cstr!(indent),
+                block_str(block),
                 if printdelim(h, i) { "\n" } else { "" },
             );
         }
-        i += 1;
     }
     strbuilder_build(b)
 }
 
-unsafe fn printdelim(h: *mut Heap, start: libc::c_int) -> bool {
-    let n: libc::c_int = block_arr_nblocks((*h).blocks);
-    let mut i: libc::c_int = start + 1 as libc::c_int;
-    while i < n {
-        if !*((*h).freed).offset(i as isize) {
+unsafe fn printdelim(h: *mut Heap, start: usize) -> bool {
+    for i in start + 1..(*h).blocks.len() {
+        if !*((*h).freed).add(i) {
             return true;
         }
-        i += 1;
     }
     false
 }
 
 pub unsafe fn heap_newblock(h: *mut Heap) -> *mut Location {
-    let address: libc::c_int = block_arr_append((*h).blocks, block_create());
-    let n: libc::c_int = block_arr_nblocks((*h).blocks);
-    assert!(n > 0);
+    let address = (*h).blocks.len() as libc::c_int;
+    (*h).blocks.push(Box::from_raw(block_create()));
+    let n = (*h).blocks.len();
     (*h).freed = realloc(
         (*h).freed as *mut libc::c_void,
-        (::core::mem::size_of::<bool>()).wrapping_mul(n as usize),
+        (::core::mem::size_of::<bool>()).wrapping_mul(n),
     ) as *mut bool;
     *((*h).freed).offset(address as isize) = false;
     location_create_dynamic(address, ast_expr_constant_create(0 as libc::c_int))
 }
 
 pub unsafe fn heap_getblock(h: *mut Heap, address: libc::c_int) -> *mut Block {
-    if address >= block_arr_nblocks((*h).blocks) {
+    if address as usize >= (*h).blocks.len() {
         return ptr::null_mut();
     }
     if *((*h).freed).offset(address as isize) {
         return ptr::null_mut();
     }
-    *(block_arr_blocks((*h).blocks)).offset(address as isize)
+    &mut *(*h).blocks[address as usize]
 }
 
 pub unsafe fn heap_deallocblock(h: *mut Heap, address: libc::c_int) -> Result<()> {
-    assert!(address < block_arr_nblocks((*h).blocks));
+    assert!((address as usize) < (*h).blocks.len());
     if *((*h).freed).offset(address as isize) {
         return Err(Error::new("double free".to_string()));
     }
@@ -129,25 +118,19 @@ pub unsafe fn heap_blockisfreed(h: *mut Heap, address: libc::c_int) -> bool {
 }
 
 pub unsafe fn heap_undeclare(h: *mut Heap, s: *mut State) {
-    let n: libc::c_int = block_arr_nblocks((*h).blocks);
-    let b: *mut *mut Block = block_arr_blocks((*h).blocks);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        if !*((*h).freed).offset(i as isize) {
-            block_undeclare(*b.offset(i as isize), s);
+    let n = (*h).blocks.len();
+    for i in 0..n {
+        if !*((*h).freed).add(i) {
+            block_undeclare(&mut *(*h).blocks[i], s);
         }
-        i += 1;
     }
 }
 
 pub unsafe fn heap_referenced(h: *mut Heap, s: *mut State) -> bool {
-    let n: libc::c_int = block_arr_nblocks((*h).blocks);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        if !*((*h).freed).offset(i as isize) && !block_referenced(s, i) {
+    for i in 0..(*h).blocks.len() {
+        if !*((*h).freed).add(i) && !block_referenced(s, i as libc::c_int) {
             return false;
         }
-        i += 1;
     }
     true
 }
