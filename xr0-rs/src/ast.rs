@@ -1846,7 +1846,7 @@ unsafe fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, li
     let mut indegrees = InsertionOrderMap::new();
     for (key, deps) in g {
         if indegrees.get(CStr::from_ptr(key.as_ptr())).is_none() {
-            indegrees.insert(OwningCStr::copy(&key), 0);
+            indegrees.insert(OwningCStr::copy(key), 0);
             let mut j: libc::c_int = 0 as libc::c_int;
             while j < deps.n {
                 let dep_key = *deps.s.offset(j as isize);
@@ -1859,11 +1859,7 @@ unsafe fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, li
     }
     for (key, count) in &mut indegrees {
         if let Some(n_arr) = g.get(CStr::from_ptr(key.as_ptr())) {
-            let mut j_0: libc::c_int = 0 as libc::c_int;
-            while j_0 < n_arr.n {
-                *count += 1;
-                j_0 += 1;
-            }
+            *count += n_arr.n;
         }
     }
     indegrees
