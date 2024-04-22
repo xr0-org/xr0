@@ -82,7 +82,7 @@ unsafe fn expr_array_from_vec(v: Vec<Box<AstExpr>>) -> ExprArray {
 unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<*mut AstVariable> {
     decls
         .into_iter()
-        .map(|decl| ast_variable_create(decl.name, decl.t))
+        .map(|decl| ast_variable_create(OwningCStr::new(decl.name), decl.t))
         .collect()
 }
 
@@ -376,7 +376,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule struct_declaration() -> BoxedVariable =
         d:declaration() {
-            unsafe { ast_variable_create(d.name, d.t) }
+            unsafe { ast_variable_create(OwningCStr::new(d.name), d.t) }
         }
 
     rule type_qualifier() -> AstTypeModifier =
@@ -429,11 +429,12 @@ pub grammar c_parser(env: &Env) for str {
                 for _ in 0..decl.ptr_valence {
                     t = ast_type_create_ptr(t);
                 }
-                ast_variable_create(decl.name, t)
+                let name = if decl.name.is_null() { dynamic_str(&(0 as libc::c_char)) } else { decl.name };
+                ast_variable_create(OwningCStr::new(name), t)
             }
         } /
         t:declaration_specifiers() {
-            unsafe { ast_variable_create(dynamic_str(&(0 as libc::c_char)), t) }
+            unsafe { ast_variable_create(OwningCStr::new(dynamic_str(&(0 as libc::c_char))), t) }
         }
 
     rule type_name() -> BoxedType =

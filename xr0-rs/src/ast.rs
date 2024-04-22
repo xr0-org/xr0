@@ -150,7 +150,10 @@ pub struct AstStructType {
 }
 
 pub struct AstVariable {
-    pub name: *mut libc::c_char,
+    // Note: In the original, `name` could be null. However in most situations (almost all; an
+    // exception is the parameter in `fclose(FILE *);` which has no name) this would be invalid, so
+    // we end up banning it.
+    pub name: OwningCStr,
     pub r#type: *mut AstType,
 }
 
@@ -3499,10 +3502,9 @@ pub unsafe fn ast_type_ptr_type(t: *mut AstType) -> *mut AstType {
     *ptr_type
 }
 
-pub unsafe fn ast_variable_create(
-    name: *mut libc::c_char,
-    type_0: *mut AstType,
-) -> *mut AstVariable {
+pub unsafe fn ast_variable_create(name: OwningCStr, type_0: *mut AstType) -> *mut AstVariable {
+    // Note: In the original, this function can take a null name and create a variable with null name.
+    // This is actually done for the arguments in function declarations like `void fclose(FILE*);`.
     Box::into_raw(Box::new(AstVariable {
         name,
         r#type: type_0,
@@ -3510,16 +3512,22 @@ pub unsafe fn ast_variable_create(
 }
 
 pub unsafe fn ast_variable_destroy(v: *mut AstVariable) {
-    ast_type_destroy((*v).r#type);
-    free((*v).name as *mut libc::c_void);
     drop(Box::from_raw(v));
+}
+
+impl Drop for AstVariable {
+    fn drop(&mut self) {
+        unsafe {
+            ast_type_destroy(self.r#type);
+        }
+    }
 }
 
 pub unsafe fn ast_variable_copy(v: *mut AstVariable) -> *mut AstVariable {
     if v.is_null() {
         panic!();
     }
-    ast_variable_create(dynamic_str((*v).name), ast_type_copy((*v).r#type))
+    ast_variable_create((*v).name.clone(), ast_type_copy((*v).r#type))
 }
 
 pub unsafe fn ast_variables_copy(v: &[*mut AstVariable]) -> Vec<*mut AstVariable> {
@@ -3531,13 +3539,13 @@ pub unsafe fn ast_variables_copy(v: &[*mut AstVariable]) -> Vec<*mut AstVariable
 pub unsafe fn ast_variable_str(v: *mut AstVariable) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     let t = ast_type_str((*v).r#type);
-    strbuilder_write!(b, "{} {}", cstr!(t), cstr!((*v).name));
+    strbuilder_write!(b, "{} {}", cstr!(t), (*v).name);
     free(t as *mut libc::c_void);
     strbuilder_build(b)
 }
 
 pub unsafe fn ast_variable_name(v: *mut AstVariable) -> *mut libc::c_char {
-    (*v).name
+    (*v).name.as_ptr()
 }
 
 pub unsafe fn ast_variable_type(v: *mut AstVariable) -> *mut AstType {
@@ -4123,7 +4131,7 @@ pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> Box<A
             }
             AstExternDeclKind::Struct(t)
         } else {
-            AstExternDeclKind::Variable(ast_variable_create(name, t))
+            AstExternDeclKind::Variable(ast_variable_create(OwningCStr::new(name), t))
         },
     })
 }
