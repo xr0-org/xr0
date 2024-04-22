@@ -51,8 +51,8 @@ pub unsafe fn state_create(
     func: *mut libc::c_char,
     ext: *mut Externals,
     result_type: *mut AstType,
-) -> *mut State {
-    Box::into_raw(Box::new(State {
+) -> State {
+    State {
         ext,
         static_memory: static_memory_create(),
         vconst: vconst_create(),
@@ -60,7 +60,7 @@ pub unsafe fn state_create(
         stack: stack_create(func, ptr::null_mut(), result_type),
         heap: Heap::new(),
         props: Props::new(),
-    }))
+    }
 }
 
 pub unsafe fn state_create_withprops(
@@ -68,8 +68,8 @@ pub unsafe fn state_create_withprops(
     ext: *mut Externals,
     result_type: *mut AstType,
     props: Props,
-) -> *mut State {
-    Box::into_raw(Box::new(State {
+) -> State {
+    State {
         ext,
         static_memory: static_memory_create(),
         vconst: vconst_create(),
@@ -77,7 +77,7 @@ pub unsafe fn state_create_withprops(
         stack: stack_create(func, ptr::null_mut(), result_type),
         heap: Heap::new(),
         props,
-    }))
+    }
 }
 
 pub unsafe fn state_destroy(state: *mut State) {

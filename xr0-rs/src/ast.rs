@@ -1132,18 +1132,18 @@ unsafe fn verify_paramspec(
 
 unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result<()> {
     let fname = ast_function_name(&*f);
-    let param_state: *mut State = state_create(
+    let mut param_state = state_create(
         dynamic_str(fname),
         state_getext(arg_state),
         ast_function_type(&*f),
     );
-    ast_function_initparams(&*f, param_state)?;
+    ast_function_initparams(&*f, &mut param_state)?;
     let params = ast_function_params(&*f);
     for &p in params {
         let id = ast_variable_name(p);
-        let param_0: *mut Value = state_getloc(param_state, id);
+        let param_0: *mut Value = state_getloc(&mut param_state, id);
         let arg: *mut Value = state_getloc(arg_state, id);
-        if let Err(err) = verify_paramspec(param_0, arg, param_state, arg_state) {
+        if let Err(err) = verify_paramspec(param_0, arg, &mut param_state, arg_state) {
             return Err(Error::new(format!(
                 "parameter {} of {} {}",
                 cstr!(id),
@@ -1152,6 +1152,7 @@ unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result
             )));
         }
     }
+    // Note: Original leaks the state.
     Ok(())
 }
 
@@ -3393,14 +3394,13 @@ pub unsafe fn ast_function_protostitch(
 }
 
 pub unsafe fn ast_function_verify(f: *mut AstFunction, ext: *mut Externals) -> Result<()> {
-    let state: *mut State = state_create(
+    let mut state = state_create(
         dynamic_str(ast_function_name(&*f)),
         ext,
         ast_function_type(&*f),
     );
-    ast_function_initparams(&*f, state)?;
-    path_absverify_withstate(f, state)?;
-    state_destroy(state);
+    ast_function_initparams(&*f, &mut state)?;
+    path_absverify_withstate(f, &mut state)?;
     Ok(())
 }
 
@@ -3470,16 +3470,15 @@ unsafe fn inititalise_param(param: *mut AstVariable, state: *mut State) -> Resul
 }
 
 unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Result<()> {
-    let actual_state: *mut State = state_create_withprops(
+    let mut actual_state = state_create_withprops(
         dynamic_str(ast_function_name(&*f)),
         state_getext(abstract_state),
         ast_function_type(&*f),
         (state_getprops(&mut *abstract_state)).clone(),
     );
-    ast_function_initparams(&*f, actual_state).unwrap();
-    ast_function_setupabsexec(&*f, actual_state)?;
-    abstract_auditwithstate(f, actual_state, abstract_state)?;
-    state_destroy(actual_state);
+    ast_function_initparams(&*f, &mut actual_state).unwrap();
+    ast_function_setupabsexec(&*f, &mut actual_state)?;
+    abstract_auditwithstate(f, &mut actual_state, abstract_state)?;
     Ok(())
 }
 
