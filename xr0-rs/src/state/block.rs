@@ -67,7 +67,7 @@ pub unsafe fn block_observe(
     s: *mut State,
     constructive: bool,
 ) -> *mut Object {
-    let Some(mut index) = object_arr_index(&(*b).arr, offset, s) else {
+    let Some(mut index) = object_arr_index(&(*b).arr, offset, &*s) else {
         if !constructive {
             return ptr::null_mut();
         }
@@ -139,17 +139,17 @@ pub unsafe fn block_range_aredeallocands(
     if hack_first_object_is_exactly_bounds(b, lw, up, s) {
         return true;
     }
-    let Some(lw_index) = object_arr_index(&b.arr, lw, s) else {
+    let Some(lw_index) = object_arr_index(&b.arr, lw, &*s) else {
         return false;
     };
-    let Some(up_index) = object_arr_index_upperincl(&b.arr, up, s) else {
+    let Some(up_index) = object_arr_index_upperincl(&b.arr, up, &*s) else {
         return false;
     };
     for i in lw_index..up_index {
         if !object_isdeallocand(b.arr[i], s) {
             return false;
         }
-        if !object_contig_precedes(b.arr[i], b.arr[i + 1], s) {
+        if !object_contig_precedes(b.arr[i], b.arr[i + 1], &*s) {
             return false;
         }
     }
@@ -177,7 +177,7 @@ unsafe fn hack_first_object_is_exactly_bounds(
         Box::from_raw(up as *const AstExpr as *mut AstExpr),
         Box::from_raw(object_upper(obj)),
     );
-    let result = state_eval(s, &same_lw) && state_eval(s, &same_up);
+    let result = state_eval(&*s, &same_lw) && state_eval(&*s, &same_up);
     std::mem::forget(same_lw);
     std::mem::forget(same_up);
     result
@@ -194,10 +194,10 @@ pub unsafe fn block_range_dealloc(
         b.arr.remove(0);
         return Ok(());
     }
-    let Some(lw_index) = object_arr_index(&b.arr, lw, s) else {
+    let Some(lw_index) = object_arr_index(&b.arr, lw, &*s) else {
         return Err(Error::new("lower bound not allocated".to_string()));
     };
-    let Some(up_index) = object_arr_index_upperincl(&b.arr, up, s) else {
+    let Some(up_index) = object_arr_index_upperincl(&b.arr, up, &*s) else {
         return Err(Error::new("upper bound not allocated".to_string()));
     };
     let n = b.arr.len();
