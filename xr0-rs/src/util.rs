@@ -224,14 +224,6 @@ pub unsafe fn string_arr_create() -> Box<StringArr> {
     })
 }
 
-pub unsafe fn string_arr_s(arr: &mut StringArr) -> *mut *mut libc::c_char {
-    arr.s
-}
-
-pub unsafe fn string_arr_n(arr: &StringArr) -> libc::c_int {
-    arr.n
-}
-
 pub unsafe fn string_arr_append(arr: &mut StringArr, s: *mut libc::c_char) -> libc::c_int {
     arr.n += 1;
     arr.s = realloc(
@@ -271,24 +263,6 @@ pub unsafe fn string_arr_contains(arr: &StringArr, s: *mut libc::c_char) -> bool
         i += 1;
     }
     false
-}
-
-pub unsafe fn string_arr_str(string_arr: &StringArr) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
-    let s: *mut *mut libc::c_char = string_arr.s;
-    let n: libc::c_int = string_arr.n;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let str: *mut libc::c_char = *s.offset(i as isize);
-        strbuilder_write!(
-            b,
-            "{}{}",
-            cstr!(str),
-            if (i + 1 as libc::c_int) < n { ", " } else { "" },
-        );
-        i += 1;
-    }
-    strbuilder_build(b)
 }
 
 pub static mut VERBOSE_MODE: libc::c_int = 0;

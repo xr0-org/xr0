@@ -41,7 +41,7 @@ use state::location::Location;
 use state::r#static::StaticMemory;
 use state::stack::{Stack, Variable};
 use state::state::State;
-use util::{string_arr_n, string_arr_s, string_arr_str, StrBuilder, StringArr, VERBOSE_MODE};
+use util::{OwningCStr, StrBuilder, VERBOSE_MODE};
 use value::Value;
 
 #[derive(Parser)]
@@ -146,12 +146,9 @@ pub unsafe fn pass1(root: &mut Ast, ext: *mut Externals) {
     }
 }
 
-pub unsafe fn pass_inorder(order: &mut StringArr, ext: &mut Externals) {
-    let n: libc::c_int = string_arr_n(order);
-    let name: *mut *mut libc::c_char = string_arr_s(order);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let f: *mut AstFunction = ext.get_func(*name.offset(i as isize));
+pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &mut Externals) {
+    for name in order {
+        let f: *mut AstFunction = ext.get_func(name.as_ptr());
         if !(ast_function_isaxiom(&*f) as libc::c_int != 0
             || ast_function_isproto(&*f) as libc::c_int != 0)
         {
@@ -164,7 +161,6 @@ pub unsafe fn pass_inorder(order: &mut StringArr, ext: &mut Externals) {
                 CStr::from_ptr(ast_function_name(&*f)).to_string_lossy()
             );
         }
-        i += 1;
     }
 }
 
@@ -230,13 +226,14 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
     if let Some(sortfunc) = &c.sort {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
         let order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, &mut ext);
-        eprintln!("{}", string_arr_str(&order));
+        let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
+        eprintln!("{}", strs.join(", "));
     } else if let Some(sortfunc) = &c.verify {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-        let mut order =
-            ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, &mut ext);
-        eprintln!("{}", string_arr_str(&order));
-        pass_inorder(&mut order, &mut ext);
+        let order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, &mut ext);
+        let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
+        eprintln!("{}", strs.join(", "));
+        pass_inorder(&order, &mut ext);
     } else {
         pass1(&mut root, &mut ext);
     }

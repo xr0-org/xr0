@@ -1895,14 +1895,14 @@ unsafe fn build_indegree_zero(indegrees: &Map) -> Box<StringArr> {
     indegree_zero
 }
 
-pub unsafe fn topological_order(fname: *mut libc::c_char, ext: &Externals) -> Box<StringArr> {
-    let mut order = string_arr_create();
+pub unsafe fn topological_order(fname: *mut libc::c_char, ext: &Externals) -> Vec<OwningCStr> {
+    let mut order = vec![];
     let g = ast_function_buildgraph(fname, ext);
     let indegrees = calculate_indegrees(&g);
     let mut indegree_zero = build_indegree_zero(&indegrees);
     while indegree_zero.n > 0 as libc::c_int {
         let curr = string_arr_deque(&mut indegree_zero);
-        string_arr_append(&mut order, curr);
+        order.push(OwningCStr::new(curr));
         for key in (*g).keys() {
             let v: *mut StringArr = g.get(key) as *mut StringArr;
             if string_arr_contains(&*v, curr) {
@@ -1914,7 +1914,7 @@ pub unsafe fn topological_order(fname: *mut libc::c_char, ext: &Externals) -> Bo
             }
         }
     }
-    if order.n != indegrees.len() {
+    if order.len() != indegrees.len() as usize {
         eprintln!("cycle detected in graph");
         process::exit(1);
     }
@@ -3887,7 +3887,7 @@ pub unsafe fn lvalue_object(l: *mut LValue) -> *mut Object {
 pub unsafe fn ast_topological_order(
     fname: *mut libc::c_char,
     ext: &mut Externals,
-) -> Box<StringArr> {
+) -> Vec<OwningCStr> {
     topological_order(fname, ext)
 }
 
