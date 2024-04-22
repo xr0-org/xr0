@@ -7,7 +7,6 @@ use crate::util::{dynamic_str, OwningCStr};
 
 type BoxedBlock = *mut AstBlock;
 type BoxedFunction = *mut AstFunction;
-type BoxedStmt = *mut AstStmt;
 type BoxedType = *mut AstType;
 type BoxedVariable = *mut AstVariable;
 type BoxedCStr = *mut libc::c_char;
@@ -443,7 +442,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule abstract_declarator() -> libc::c_int = pointer()
 
-    rule statement() -> BoxedStmt =
+    rule statement() -> Box<AstStmt> =
         labelled_statement() /
         block:compound_statement() p:position!() {
             unsafe { ast_stmt_create_compound(env.lexloc(p), block) }
@@ -466,7 +465,7 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_type_create(AstTypeBase::Int, 0) }
         }
 
-    rule labelled_statement() -> BoxedStmt =
+    rule labelled_statement() -> Box<AstStmt> =
         label:identifier() _ ":" _ s:statement() p:position!() {
             unsafe { ast_stmt_create_labelled(env.lexloc(p), OwningCStr::new(label), s) }
         } /
@@ -494,7 +493,7 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_block_create(vec![], vec![]) }
         }
 
-    rule iteration_effect_statement() -> BoxedStmt =
+    rule iteration_effect_statement() -> Box<AstStmt> =
         "." _ s:for_iteration_statement(true) { s }
 
     rule compound_verification_statement() -> BoxedBlock =
@@ -508,23 +507,23 @@ pub grammar c_parser(env: &Env) for str {
     rule declaration_list() -> Vec<BoxedVariable> =
         decls:list1(<declaration()>) { unsafe { variable_array_from_decl_vec(decls) } }
 
-    rule statement_list() -> Vec<BoxedStmt> =
+    rule statement_list() -> Vec<Box<AstStmt>> =
         stmts:list1(<statement()>) { stmts }
 
-    rule expression_statement() -> BoxedStmt =
+    rule expression_statement() -> Box<AstStmt> =
         ";" p:position!() { unsafe { ast_stmt_create_nop(env.lexloc(p)) } } /
         e:expression() _ ";" p:position!() { unsafe { ast_stmt_create_expr(env.lexloc(p), e) } }
 
-    rule selection_statement() -> BoxedStmt =
+    rule selection_statement() -> Box<AstStmt> =
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() p:position!() {
             unsafe {
                 let neg_cond = ast_expr_unary_create(ast_expr_copy(&*cond), AstUnaryOp::Bang);
-                let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, neg_cond, alt, ptr::null_mut());
-                ast_stmt_create_sel(env.lexloc(p), false, cond, then, else_stmt)
+                let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, neg_cond, alt, None);
+                ast_stmt_create_sel(env.lexloc(p), false, cond, then, Some(else_stmt))
             }
         } /
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() p:position!() {
-            unsafe { ast_stmt_create_sel(env.lexloc(p), false, cond, then, ptr::null_mut()) }
+            unsafe { ast_stmt_create_sel(env.lexloc(p), false, cond, then, None) }
         } /
         K(<"switch">) _ "(" _ v:expression() _ ")" _ cases:statement() p:position!() {
             unsafe { ast_stmt_create_nop(env.lexloc(p)) }
@@ -537,15 +536,15 @@ pub grammar c_parser(env: &Env) for str {
             })
         }
 
-    rule for_iteration_statement(as_iteration_e: bool) -> BoxedStmt =
+    rule for_iteration_statement(as_iteration_e: bool) -> Box<AstStmt> =
         K(<"for">) _ "(" _ init:expression_statement() _ cond:expression_statement() _ iter:expression() _ ")" _
         verif:optional_compound_verification() _ body:statement() p:position!() {
             unsafe { ast_stmt_create_iter(env.lexloc(p), init, cond, iter, verif, body, as_iteration_e) }
         }
 
-    rule iteration_statement() -> BoxedStmt = for_iteration_statement(false)
+    rule iteration_statement() -> Box<AstStmt> = for_iteration_statement(false)
 
-    rule jump_statement() -> BoxedStmt =
+    rule jump_statement() -> Box<AstStmt> =
         K(<"return">) _ expr:expression() _ ";" p:position!() {
             unsafe { ast_stmt_create_jump(env.lexloc(p), AstJumpKind::Return, Some(expr)) }
         }
