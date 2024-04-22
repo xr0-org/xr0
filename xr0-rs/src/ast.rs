@@ -3569,16 +3569,17 @@ unsafe fn split_path_verify(
     assert_eq!(paths.len(), 2);
     // Note: Original leaks both functions.
     for (i, f) in paths.into_iter().enumerate() {
-        let actual_copy: *mut State = state_copywithname(actual_state, ast_function_name(&*f));
-        let abstract_copy: *mut State = state_copywithname(abstract_state, ast_function_name(&*f));
+        let mut actual_copy = state_copywithname(&*actual_state, ast_function_name(&*f));
+        let mut abstract_copy = state_copywithname(&*abstract_state, ast_function_name(&*f));
         // Note: Original leaks expression.
         let expr = ast_expr_inverted_copy(cond, i == 1);
-        let r = ast_expr_assume(&expr, actual_copy);
+        let r = ast_expr_assume(&expr, &mut actual_copy);
         std::mem::forget(expr);
         let r = r?;
         if !r.is_contradiction {
-            path_verify(f, actual_copy, index, abstract_copy)?;
+            path_verify(f, &mut actual_copy, index, &mut abstract_copy)?;
         }
+        // Note: Original leaks both state copies.
     }
     Ok(())
 }
@@ -3660,12 +3661,12 @@ unsafe fn split_path_absverify(
     let paths = abstract_paths(&*f, index, cond);
     assert_eq!(paths.len(), 2);
     for (i, f) in paths.into_iter().enumerate() {
-        let s_copy: *mut State = state_copywithname(state, ast_function_name(&*f));
+        let mut s_copy = state_copywithname(&*state, ast_function_name(&*f));
         // Note: Original leaks `inv` but I think accidentally.
         let inv = ast_expr_inverted_copy(cond, i == 1);
-        let r = ast_expr_assume(&inv, s_copy)?;
+        let r = ast_expr_assume(&inv, &mut s_copy)?;
         if !r.is_contradiction {
-            path_absverify(f, s_copy, index)?;
+            path_absverify(f, &mut s_copy, index)?;
         }
     }
     Ok(())

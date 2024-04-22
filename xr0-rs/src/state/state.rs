@@ -102,16 +102,16 @@ pub unsafe fn state_copy(state: &State) -> State {
     }
 }
 
-pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char) -> *mut State {
-    Box::into_raw(Box::new(State {
-        ext: (*state).ext,
-        static_memory: static_memory_copy((*state).static_memory),
-        vconst: vconst_copy(&(*state).vconst),
-        clump: Box::into_raw(Box::new((*(*state).clump).clone())),
-        stack: stack_copywithname((*state).stack, func_name),
-        heap: heap_copy(&(*state).heap),
-        props: (*state).props.clone(),
-    }))
+pub unsafe fn state_copywithname(state: &State, func_name: *mut libc::c_char) -> State {
+    State {
+        ext: state.ext,
+        static_memory: static_memory_copy(state.static_memory),
+        vconst: vconst_copy(&state.vconst),
+        clump: Box::into_raw(Box::new((*state.clump).clone())),
+        stack: stack_copywithname(state.stack, func_name),
+        heap: heap_copy(&state.heap),
+        props: state.props.clone(),
+    }
 }
 
 pub unsafe fn state_str(state: *mut State) -> OwningCStr {
