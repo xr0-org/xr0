@@ -145,7 +145,7 @@ pub struct AstType {
 }
 
 pub struct AstStructType {
-    pub tag: *mut libc::c_char,
+    pub tag: Option<OwningCStr>,
     pub members: Option<Box<Vec<*mut AstVariable>>>,
 }
 
@@ -3235,7 +3235,7 @@ pub unsafe fn ast_type_create_arr(base: *mut AstType, length: libc::c_int) -> *m
 }
 
 pub unsafe fn ast_type_create_struct(
-    tag: *mut libc::c_char,
+    tag: Option<OwningCStr>,
     members: Option<Box<Vec<*mut AstVariable>>>,
 ) -> *mut AstType {
     ast_type_create(
@@ -3291,15 +3291,18 @@ pub unsafe fn ast_type_struct_tag(t: &AstType) -> *mut libc::c_char {
     let AstTypeBase::Struct(s) = &t.base else {
         panic!()
     };
-    s.tag
+    match &s.tag {
+        Some(cstr) => cstr.as_ptr(),
+        None => ptr::null_mut(),
+    }
 }
 
 pub unsafe fn ast_type_create_struct_anonym(members: Vec<*mut AstVariable>) -> *mut AstType {
-    ast_type_create_struct(ptr::null_mut(), Some(Box::new(members)))
+    ast_type_create_struct(None, Some(Box::new(members)))
 }
 
-pub unsafe fn ast_type_create_struct_partial(tag: *mut libc::c_char) -> *mut AstType {
-    ast_type_create_struct(tag, None)
+pub unsafe fn ast_type_create_struct_partial(tag: OwningCStr) -> *mut AstType {
+    ast_type_create_struct(Some(tag), None)
 }
 
 pub unsafe fn ast_type_copy_struct(old: *mut AstType) -> *mut AstType {
@@ -3308,11 +3311,7 @@ pub unsafe fn ast_type_copy_struct(old: *mut AstType) -> *mut AstType {
     };
     ast_type_create(
         AstTypeBase::Struct(AstStructType {
-            tag: if !s.tag.is_null() {
-                dynamic_str(s.tag)
-            } else {
-                ptr::null_mut()
-            },
+            tag: s.tag.clone(),
             members: s.members.as_ref().map(|v| {
                 Box::new(
                     v.iter()
@@ -3476,11 +3475,10 @@ unsafe fn ast_type_str_build_arr(b: *mut StrBuilder, arr: &AstArrayType) {
 }
 
 unsafe fn ast_type_str_build_struct(b: *mut StrBuilder, s: &AstStructType) {
-    let tag = s.tag;
-    assert!(!tag.is_null() || !s.members.is_none());
+    assert!(s.tag.is_some() || s.members.is_some());
     strbuilder_write!(b, "struct ");
-    if !tag.is_null() {
-        strbuilder_write!(b, "{}", cstr!(tag));
+    if let Some(tag) = &s.tag {
+        strbuilder_write!(b, "{tag}");
     }
     let Some(members) = s.members.as_ref() else {
         return;

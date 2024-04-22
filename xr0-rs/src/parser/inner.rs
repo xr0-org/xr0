@@ -362,13 +362,13 @@ pub grammar c_parser(env: &Env) for str {
     // note: unions are unsupported in the original
     rule struct_or_union_specifier() -> BoxedType =
         "struct" _ tag:identifier() _ "{" _ fields:struct_declaration_list() _ "}" {
-            unsafe { ast_type_create_struct(tag, Some(Box::new(fields))) }
+            unsafe { ast_type_create_struct(Some(OwningCStr::new(tag)), Some(Box::new(fields))) }
         } /
         "struct" _ "{" _ fields:struct_declaration_list() _ "}" {
             unsafe { ast_type_create_struct_anonym(fields) }
         } /
         "struct" _ tag:identifier() {
-            unsafe { ast_type_create_struct_partial(tag) }
+            unsafe { ast_type_create_struct_partial(OwningCStr::new(tag)) }
         }
 
     rule struct_declaration_list() -> Vec<BoxedVariable> =
