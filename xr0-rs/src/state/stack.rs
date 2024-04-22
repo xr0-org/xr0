@@ -2,7 +2,7 @@
 
 use std::ptr;
 
-use libc::{calloc, free, malloc, strcmp};
+use libc::{free, malloc, strcmp};
 
 use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_destroy, ast_type_str, ast_variable_name,
@@ -11,10 +11,7 @@ use crate::ast::{
 use crate::object::{
     object_as_value, object_assign, object_isvalue, object_str, object_value_create,
 };
-use crate::state::block::{
-    block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
-    block_arr_nblocks, block_create, block_install, block_observe,
-};
+use crate::state::block::{block_create, block_install, block_observe};
 use crate::state::location::{
     location_auto_getblock, location_copy, location_create_automatic, location_destroy,
     location_getstackblock, location_offset, location_references, location_str,
@@ -25,13 +22,12 @@ use crate::util::{
 };
 use crate::value::value_abstractcopy;
 use crate::{
-    cstr, strbuilder_write, AstType, AstVariable, Block, BlockArr, Location, Object, State,
-    StrBuilder, Value,
+    cstr, strbuilder_write, AstType, AstVariable, Block, Location, Object, State, StrBuilder, Value,
 };
 
 pub struct Stack {
     pub name: *mut libc::c_char,
-    pub frame: *mut BlockArr,
+    pub frame: Vec<Box<Block>>,
     pub varmap: Box<Map>,
     pub result: *mut Variable,
     pub id: libc::c_int,
@@ -45,7 +41,8 @@ pub struct Variable {
 }
 
 pub unsafe fn stack_newblock(stack: *mut Stack) -> *mut Location {
-    let address: libc::c_int = block_arr_append((*stack).frame, block_create());
+    let address = (*stack).frame.len() as libc::c_int;
+    (*stack).frame.push(Box::from_raw(block_create()));
     let loc: *mut Location = location_create_automatic(
         (*stack).id,
         address,
@@ -61,7 +58,7 @@ pub unsafe fn stack_create(
 ) -> *mut Stack {
     let mut stack = Box::new(Stack {
         name,
-        frame: block_arr_create(),
+        frame: vec![],
         varmap: Map::new(),
         prev,
         id: if !prev.is_null() { (*prev).id + 1 } else { 0 },
@@ -93,7 +90,6 @@ pub unsafe fn stack_destroy(stack: *mut Stack) {
 impl Drop for Stack {
     fn drop(&mut self) {
         unsafe {
-            block_arr_destroy(self.frame);
             let m = std::mem::replace(&mut self.varmap, Map::new());
             for p in m.values() {
                 variable_destroy(p as *mut Variable);
@@ -109,22 +105,18 @@ pub unsafe fn stack_prev(s: *mut Stack) -> *mut Stack {
 }
 
 pub unsafe fn stack_copy(stack: *mut Stack) -> *mut Stack {
-    let copy: *mut Stack = calloc(1, ::core::mem::size_of::<Stack>()) as *mut Stack;
-    std::ptr::write(
-        copy,
-        Stack {
-            name: dynamic_str((*stack).name),
-            frame: block_arr_copy((*stack).frame),
-            varmap: varmap_copy(&(*stack).varmap),
-            id: (*stack).id,
-            result: variable_copy((*stack).result),
-            prev: ptr::null_mut(),
+    Box::into_raw(Box::new(Stack {
+        name: dynamic_str((*stack).name),
+        frame: (*stack).frame.clone(),
+        varmap: varmap_copy(&(*stack).varmap),
+        id: (*stack).id,
+        result: variable_copy((*stack).result),
+        prev: if ((*stack).prev).is_null() {
+            ptr::null_mut()
+        } else {
+            stack_copy((*stack).prev)
         },
-    );
-    if !((*stack).prev).is_null() {
-        (*copy).prev = stack_copy((*stack).prev);
-    }
-    copy
+    }))
 }
 
 pub unsafe fn stack_copywithname(stack: *mut Stack, new_name: *mut libc::c_char) -> *mut Stack {
@@ -226,10 +218,8 @@ pub unsafe fn stack_references(s: *mut Stack, loc: &Location, state: *mut State)
 }
 
 pub unsafe fn stack_getblock(s: *mut Stack, address: libc::c_int) -> *mut Block {
-    if !(address < block_arr_nblocks((*s).frame)) {
-        panic!();
-    }
-    *(block_arr_blocks((*s).frame)).offset(address as isize)
+    assert!((address as usize) < (*s).frame.len());
+    &mut *(*s).frame[address as usize]
 }
 
 pub unsafe fn variable_create(

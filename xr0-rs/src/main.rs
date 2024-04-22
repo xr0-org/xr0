@@ -29,7 +29,7 @@ use ast::{
 use ext::Externals;
 use object::Object;
 use props::Props;
-use state::block::{Block, BlockArr};
+use state::block::Block;
 use state::clump::Clump;
 use state::heap::{Heap, VConst};
 use state::location::Location;
