@@ -9,22 +9,20 @@ pub struct Props {
     pub props: Vec<Box<AstExpr>>,
 }
 
-pub unsafe fn props_create() -> *mut Props {
-    Box::into_raw(Box::new(Props { props: vec![] }))
+impl Props {
+    pub fn new() -> Props {
+        Props { props: vec![] }
+    }
 }
 
-pub unsafe fn props_destroy(p: *mut Props) {
-    drop(Box::from_raw(p));
-}
-
-pub unsafe fn props_str(p: *mut Props, indent: *mut libc::c_char) -> OwningCStr {
-    if (*p).props.is_empty() {
+pub unsafe fn props_str(p: &Props, indent: *mut libc::c_char) -> OwningCStr {
+    if p.props.is_empty() {
         return OwningCStr::empty();
     }
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_write!(b, "{}\u{22a2} ", cstr!(indent));
-    for (i, e) in (*p).props.iter().enumerate() {
-        strbuilder_write!(b, "{e}{}", if i + 1 < (*p).props.len() { ", " } else { "" },);
+    for (i, e) in p.props.iter().enumerate() {
+        strbuilder_write!(b, "{e}{}", if i + 1 < p.props.len() { ", " } else { "" },);
     }
     strbuilder_write!(b, "\n");
     strbuilder_build(b)

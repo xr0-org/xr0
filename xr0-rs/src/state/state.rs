@@ -27,7 +27,7 @@ use crate::ast::{
     ast_type_vconst,
 };
 use crate::object::{object_as_value, object_assign};
-use crate::props::{props_create, props_destroy, props_str};
+use crate::props::props_str;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
@@ -45,7 +45,7 @@ pub struct State {
     pub clump: *mut Clump,
     pub stack: *mut Stack,
     pub heap: Heap,
-    pub props: *mut Props,
+    pub props: Props,
 }
 
 pub unsafe fn state_create(
@@ -60,7 +60,7 @@ pub unsafe fn state_create(
         clump: clump_create(),
         stack: stack_create(func, ptr::null_mut(), result_type),
         heap: Heap::new(),
-        props: props_create(),
+        props: Props::new(),
     }))
 }
 
@@ -68,7 +68,7 @@ pub unsafe fn state_create_withprops(
     func: *mut libc::c_char,
     ext: *mut Externals,
     result_type: *mut AstType,
-    props: *mut Props,
+    props: Props,
 ) -> *mut State {
     Box::into_raw(Box::new(State {
         ext,
@@ -77,7 +77,7 @@ pub unsafe fn state_create_withprops(
         clump: clump_create(),
         stack: stack_create(func, ptr::null_mut(), result_type),
         heap: Heap::new(),
-        props: Box::into_raw(Box::new((*props).clone())),
+        props,
     }))
 }
 
@@ -91,7 +91,6 @@ impl Drop for State {
             static_memory_destroy(self.static_memory);
             clump_destroy(self.clump);
             stack_destroy(self.stack);
-            props_destroy(self.props);
         }
     }
 }
@@ -104,7 +103,7 @@ pub unsafe fn state_copy(state: *mut State) -> *mut State {
         clump: clump_copy((*state).clump),
         stack: stack_copy((*state).stack),
         heap: heap_copy(&(*state).heap),
-        props: Box::into_raw(Box::new((*(*state).props).clone())),
+        props: (*state).props.clone(),
     }))
 }
 
@@ -116,7 +115,7 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
         clump: clump_copy((*state).clump),
         stack: stack_copywithname((*state).stack, func_name),
         heap: heap_copy(&(*state).heap),
-        props: Box::into_raw(Box::new((*(*state).props).clone())),
+        props: (*state).props.clone(),
     }))
 }
 
@@ -152,7 +151,7 @@ pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     let stack = stack_str((*state).stack, state);
     strbuilder_write!(b, "{stack}\n");
     let props = props_str(
-        (*state).props,
+        &(*state).props,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
     if !props.is_empty() {
@@ -178,7 +177,7 @@ pub unsafe fn state_getheap(s: *mut State) -> *mut Heap {
 }
 
 pub unsafe fn state_getprops(s: *mut State) -> *mut Props {
-    (*s).props
+    &mut (*s).props
 }
 
 pub unsafe fn state_pushframe(state: *mut State, func: *mut libc::c_char, ret_type: *mut AstType) {
@@ -504,6 +503,5 @@ unsafe fn state_undeclarevars(s: *mut State) {
 }
 
 unsafe fn state_popprops(s: *mut State) {
-    props_destroy((*s).props);
-    (*s).props = props_create();
+    (*s).props = Props::new();
 }

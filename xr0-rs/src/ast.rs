@@ -3504,7 +3504,7 @@ unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Res
         dynamic_str(ast_function_name(&*f)),
         state_getext(abstract_state),
         ast_function_type(&*f),
-        state_getprops(abstract_state),
+        (*state_getprops(abstract_state)).clone(),
     );
     ast_function_initparams(&*f, actual_state).unwrap();
     ast_function_setupabsexec(&*f, actual_state)?;
