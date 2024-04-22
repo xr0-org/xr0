@@ -1,4 +1,4 @@
-#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
+#![allow(dead_code, unused_assignments)]
 
 use std::ptr;
 

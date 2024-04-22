@@ -1,4 +1,4 @@
-#![allow(dead_code, non_snake_case, non_upper_case_globals, unused_assignments)]
+#![allow(dead_code, unused_assignments)]
 
 use crate::ast::{ast_expr_equal, ast_expr_inverted_copy};
 use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
