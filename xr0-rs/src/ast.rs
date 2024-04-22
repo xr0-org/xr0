@@ -24,8 +24,8 @@ use crate::state::state::{
 };
 use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, string_arr_append,
-    string_arr_concat, string_arr_contains, string_arr_create, string_arr_deque, string_arr_n,
-    string_arr_s, Error, Map, OwningCStr, Result, StringArr,
+    string_arr_contains, string_arr_create, string_arr_deque, Error, Map, OwningCStr, Result,
+    StringArr,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -1735,7 +1735,7 @@ pub unsafe fn ast_expr_unary_op(expr: &AstExpr) -> AstUnaryOp {
     unary.op
 }
 
-pub unsafe fn ast_expr_getfuncs(expr: &AstExpr) -> Box<StringArr> {
+pub unsafe fn ast_expr_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
     match &expr.kind {
         AstExprKind::Identifier(_)
         | AstExprKind::Constant(_)
@@ -1743,19 +1743,19 @@ pub unsafe fn ast_expr_getfuncs(expr: &AstExpr) -> Box<StringArr> {
         | AstExprKind::StructMember(_)
         | AstExprKind::IsDeallocand(_)
         | AstExprKind::IsDereferencable(_)
-        | AstExprKind::ArbArg => string_arr_create(),
+        | AstExprKind::ArbArg => vec![],
         AstExprKind::Call(_) => ast_expr_call_getfuncs(expr),
         AstExprKind::Bracketed(inner) => ast_expr_getfuncs(inner),
         AstExprKind::IncDec(incdec) => ast_expr_getfuncs(&incdec.operand),
         AstExprKind::Unary(unary) => ast_expr_getfuncs(&unary.arg),
-        AstExprKind::Assignment(assignment) => string_arr_concat(
-            &ast_expr_getfuncs(&assignment.lval),
-            &ast_expr_getfuncs(&assignment.rval),
-        ),
-        AstExprKind::Binary(binary) => string_arr_concat(
-            &ast_expr_getfuncs(&binary.e1),
-            &ast_expr_getfuncs(&binary.e2),
-        ),
+        AstExprKind::Assignment(assignment) => [
+            ast_expr_getfuncs(&assignment.lval),
+            ast_expr_getfuncs(&assignment.rval),
+        ]
+        .concat(),
+        AstExprKind::Binary(binary) => {
+            [ast_expr_getfuncs(&binary.e1), ast_expr_getfuncs(&binary.e2)].concat()
+        }
         _ => panic!("invalid expr kind"),
     }
 }
@@ -1817,26 +1817,27 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
 }
 
 unsafe fn binary_splits(e: &AstExpr, s: *mut State) -> AstStmtSplits {
-    let s1: AstStmtSplits = ast_expr_splits(ast_expr_binary_e1(e), s);
-    let mut s2: AstStmtSplits = ast_expr_splits(ast_expr_binary_e2(e), s);
+    let s1 = ast_expr_splits(ast_expr_binary_e1(e), s);
+    let s2 = ast_expr_splits(ast_expr_binary_e2(e), s);
     // Note: s1.err and s2.err are ignored in the original.
 
-    let mut conds = s1.conds;
-    conds.append(&mut s2.conds);
-    AstStmtSplits { conds, err: None }
+    AstStmtSplits {
+        conds: [s1.conds, s2.conds].concat(),
+        err: None,
+    }
 }
 
-unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Box<StringArr> {
+unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
     let AstExprKind::Call(call) = &expr.kind else {
         panic!()
     };
-    let mut res = string_arr_create();
+    let mut res = vec![];
     let AstExprKind::Identifier(id) = &call.fun.kind else {
         panic!()
     };
-    string_arr_append(&mut res, id.clone().into_ptr());
+    res.push(id.clone());
     for arg in &call.args {
-        res = string_arr_concat(&res, &ast_expr_getfuncs(arg));
+        res.append(&mut ast_expr_getfuncs(arg));
     }
     res
 }
@@ -2810,9 +2811,9 @@ pub unsafe fn ast_stmt_as_v_block(stmt: &AstStmt) -> &AstBlock {
     &**block
 }
 
-pub unsafe fn ast_stmt_getfuncs(stmt: &AstStmt) -> Box<StringArr> {
+pub unsafe fn ast_stmt_getfuncs(stmt: &AstStmt) -> Vec<OwningCStr> {
     match &stmt.kind {
-        AstStmtKind::Nop => string_arr_create(),
+        AstStmtKind::Nop => vec![],
         AstStmtKind::Labelled(labelled) => ast_stmt_getfuncs(&labelled.stmt),
         AstStmtKind::Compound(block) | AstStmtKind::CompoundV(block) => {
             ast_stmt_compound_getfuncs(&**block)
@@ -2880,38 +2881,31 @@ unsafe fn condexists(cond: &AstExpr, s: *mut State) -> bool {
     props_get(p, reduced) || props_contradicts(p, &*reduced)
 }
 
-unsafe fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Box<StringArr> {
+unsafe fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Vec<OwningCStr> {
     let cond_arr = ast_expr_getfuncs(&selection.cond);
     let body_arr = ast_stmt_getfuncs(&selection.body);
     let nest_arr = if let Some(nest) = &selection.nest {
         ast_stmt_getfuncs(nest)
     } else {
-        string_arr_create()
+        vec![]
     };
-    string_arr_concat(
-        &string_arr_create(),
-        &string_arr_concat(&cond_arr, &string_arr_concat(&body_arr, &nest_arr)),
-    )
+    [cond_arr, body_arr, nest_arr].concat()
 }
 
-unsafe fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Box<StringArr> {
-    let init_arr = ast_stmt_getfuncs(&iteration.init);
-    let cond_arr = ast_stmt_getfuncs(&iteration.cond);
-    let body_arr = ast_stmt_getfuncs(&iteration.body);
-    let iter_arr = ast_expr_getfuncs(&iteration.iter);
-    string_arr_concat(
-        &string_arr_create(),
-        &string_arr_concat(
-            &string_arr_concat(&init_arr, &cond_arr),
-            &string_arr_concat(&body_arr, &iter_arr),
-        ),
-    )
+unsafe fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Vec<OwningCStr> {
+    [
+        ast_stmt_getfuncs(&iteration.init),
+        ast_stmt_getfuncs(&iteration.cond),
+        ast_stmt_getfuncs(&iteration.body),
+        ast_expr_getfuncs(&iteration.iter),
+    ]
+    .concat()
 }
 
-unsafe fn ast_stmt_compound_getfuncs(block: &AstBlock) -> Box<StringArr> {
-    let mut res = string_arr_create();
+unsafe fn ast_stmt_compound_getfuncs(block: &AstBlock) -> Vec<OwningCStr> {
+    let mut res = vec![];
     for stmt in &block.stmts {
-        res = string_arr_concat(&res, &ast_stmt_getfuncs(stmt));
+        res.append(&mut ast_stmt_getfuncs(stmt));
     }
     res
 }
@@ -3644,22 +3638,18 @@ unsafe fn recurse_buildgraph(
     let body: *mut AstBlock = (*f).body;
     let mut val = string_arr_create();
     for stmt in &(*body).stmts {
-        let mut farr = ast_stmt_getfuncs(stmt);
-        let func: *mut *mut libc::c_char = string_arr_s(&mut farr);
-        let mut j: libc::c_int = 0 as libc::c_int;
-        while j < string_arr_n(&farr) {
-            if (local_dedup.get(*func.offset(j as isize))).is_null() {
-                let f_0: *mut AstFunction = ext.get_func(*func.offset(j as isize));
+        let farr = ast_stmt_getfuncs(stmt);
+
+        for func in farr {
+            let func = func.into_ptr();
+            if (local_dedup.get(func)).is_null() {
+                let f_0: *mut AstFunction = ext.get_func(func);
                 if !(*f_0).isaxiom {
-                    string_arr_append(&mut val, *func.offset(j as isize));
+                    string_arr_append(&mut val, func);
                 }
-                local_dedup.set(
-                    *func.offset(j as isize),
-                    1 as libc::c_int as *mut libc::c_void,
-                );
-                recurse_buildgraph(g, dedup, *func.offset(j as isize), ext);
+                local_dedup.set(func, 1 as libc::c_int as *mut libc::c_void);
+                recurse_buildgraph(g, dedup, func, ext);
             }
-            j += 1;
         }
     }
     g.set(

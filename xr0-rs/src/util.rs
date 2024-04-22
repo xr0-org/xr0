@@ -246,26 +246,6 @@ pub unsafe fn string_arr_append(arr: &mut StringArr, s: *mut libc::c_char) -> li
     loc
 }
 
-pub unsafe fn string_arr_copy(old: &StringArr) -> Box<StringArr> {
-    let mut new = string_arr_create();
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < old.n {
-        string_arr_append(&mut new, dynamic_str(*old.s.offset(i as isize)));
-        i += 1;
-    }
-    new
-}
-
-pub unsafe fn string_arr_concat(s1: &StringArr, s2: &StringArr) -> Box<StringArr> {
-    let mut new = string_arr_copy(s1);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < s2.n {
-        string_arr_append(&mut new, *s2.s.offset(i as isize));
-        i += 1;
-    }
-    new
-}
-
 pub unsafe fn string_arr_deque(arr: &mut StringArr) -> *mut libc::c_char {
     let ret: *mut libc::c_char = dynamic_str(*arr.s.offset(0 as libc::c_int as isize));
     let mut i: libc::c_int = 0 as libc::c_int;
