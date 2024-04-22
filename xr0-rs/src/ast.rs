@@ -293,7 +293,7 @@ pub struct AstExternDecl {
 }
 
 pub struct AstTypedefDecl {
-    pub name: *mut libc::c_char,
+    pub name: OwningCStr,
     pub type_0: *mut AstType,
 }
 
@@ -4102,7 +4102,7 @@ pub unsafe fn ast_externdecl_as_function(decl: &AstExternDecl) -> Option<&AstFun
     }
 }
 
-pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> Box<AstExternDecl> {
+pub unsafe fn ast_decl_create(name: OwningCStr, t: *mut AstType) -> Box<AstExternDecl> {
     Box::new(AstExternDecl {
         kind: if ast_type_istypedef(t) {
             AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t })
@@ -4112,7 +4112,7 @@ pub unsafe fn ast_decl_create(name: *mut libc::c_char, t: *mut AstType) -> Box<A
             }
             AstExternDeclKind::Struct(t)
         } else {
-            AstExternDeclKind::Variable(ast_variable_create(OwningCStr::new(name), t))
+            AstExternDeclKind::Variable(ast_variable_create(name, t))
         },
     })
 }
@@ -4126,7 +4126,7 @@ pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: &mut Externa
             ext.declare_var(ast_variable_name(*v), *v);
         }
         AstExternDeclKind::Typedef(typedef) => {
-            ext.declare_typedef(typedef.name, typedef.type_0);
+            ext.declare_typedef(typedef.name.as_ptr(), typedef.type_0);
         }
         AstExternDeclKind::Struct(s) => {
             ext.declare_struct(*s);
@@ -4145,7 +4145,6 @@ impl Drop for AstExternDeclKind {
                     ast_variable_destroy(*v);
                 }
                 AstExternDeclKind::Typedef(td) => {
-                    free(td.name as *mut libc::c_void);
                     ast_type_destroy(td.type_0);
                 }
                 AstExternDeclKind::Struct(s) => {

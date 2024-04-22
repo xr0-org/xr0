@@ -626,7 +626,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule external_declaration() -> Box<AstExternDecl> =
         f:function_definition() { unsafe { ast_functiondecl_create(f) } } /
-        d:declaration() { unsafe { ast_decl_create(d.name, d.t) } }
+        d:declaration() { unsafe { ast_decl_create(OwningCStr::new(dynamic_str(d.name)), d.t) } }
 
     pub rule translation_unit() -> Box<Ast> =
         directive()? _ decl:list1(<external_declaration()>) _ { unsafe { ast_from_vec(decl) } }
