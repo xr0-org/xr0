@@ -1808,14 +1808,8 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     let mut n: libc::c_int = 0 as libc::c_int;
     let mut cond: *mut *mut AstExpr = ptr::null_mut();
     let abs = ast_function_abstract(&*f);
-    let ndecls: libc::c_int = ast_block_ndecls(abs);
-    if ndecls != 0 {
-        let var: *mut *mut AstVariable = ast_block_decls(abs);
-        let mut i: libc::c_int = 0 as libc::c_int;
-        while i < ndecls {
-            state_declare(s_copy, *var.offset(i as isize), false);
-            i += 1;
-        }
+    for &var in &abs.decls {
+        state_declare(s_copy, var, false);
     }
     for stmt in &abs.stmts {
         let splits: AstStmtSplits = ast_stmt_splits(stmt, s_copy);
@@ -2000,8 +1994,8 @@ pub unsafe fn ast_block_ndecls(b: &AstBlock) -> libc::c_int {
     b.decls.len() as libc::c_int
 }
 
-pub unsafe fn ast_block_decls(b: &AstBlock) -> *mut *mut AstVariable {
-    b.decls.as_slice().as_ptr() as *mut *mut AstVariable
+pub unsafe fn ast_block_decls(b: &AstBlock) -> &[*mut AstVariable] {
+    &b.decls
 }
 
 pub unsafe fn ast_block_nstmts(b: &AstBlock) -> libc::c_int {
@@ -3476,12 +3470,8 @@ pub unsafe fn ast_function_verify(f: *mut AstFunction, ext: *mut Externals) -> R
 
 unsafe fn path_absverify_withstate(f: *mut AstFunction, state: *mut State) -> Result<()> {
     let abs = ast_function_abstract(&*f);
-    let ndecls: libc::c_int = ast_block_ndecls(abs);
-    let var: *mut *mut AstVariable = ast_block_decls(abs);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < ndecls {
-        state_declare(state, *var.offset(i as isize), false);
-        i += 1;
+    for &var in &abs.decls {
+        state_declare(state, var, false);
     }
     path_absverify(f, state, 0 as libc::c_int)
 }
@@ -3572,12 +3562,8 @@ unsafe fn abstract_auditwithstate(
     actual_state: *mut State,
     abstract_state: *mut State,
 ) -> Result<()> {
-    let ndecls: libc::c_int = ast_block_ndecls(&*(*f).body);
-    let var: *mut *mut AstVariable = ast_block_decls(&*(*f).body);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < ndecls {
-        state_declare(actual_state, *var.offset(i as isize), false);
-        i += 1;
+    for &decl in &(*(*f).body).decls {
+        state_declare(actual_state, decl, false);
     }
     path_verify(f, actual_state, 0 as libc::c_int, abstract_state)
 }
@@ -3625,14 +3611,8 @@ unsafe fn path_verify(
 }
 
 pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result<*mut Value> {
-    let ndecls: libc::c_int = ast_block_ndecls(&*f.r#abstract);
-    if ndecls != 0 {
-        let var: *mut *mut AstVariable = ast_block_decls(&*f.r#abstract);
-        let mut i: libc::c_int = 0 as libc::c_int;
-        while i < ndecls {
-            state_declare(state, *var.offset(i as isize), false);
-            i += 1;
-        }
+    for &decl in &(*f.r#abstract).decls {
+        state_declare(state, decl, false);
     }
     for stmt in &(*f.r#abstract).stmts {
         ast_stmt_absexec(stmt, state, false)?;
