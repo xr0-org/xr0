@@ -3534,7 +3534,7 @@ unsafe fn path_verify(
             cstr!(ast_function_name(&*f)),
         )));
     }
-    let equiv: bool = state_equal(actual_state, abstract_state);
+    let equiv: bool = state_equal(&*actual_state, &*abstract_state);
     if !equiv {
         return Err(Error::new(format!(
             "{}: actual and abstract states differ",
