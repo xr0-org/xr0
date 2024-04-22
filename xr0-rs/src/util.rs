@@ -1,7 +1,6 @@
 use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::fmt::{self, Debug, Display, Formatter};
-use std::hash::Hash;
 use std::ptr;
 
 use libc::{free, malloc, realloc, strcmp, strlen, strncpy};
@@ -278,6 +277,7 @@ macro_rules! vprintln {
     }
 }
 
+#[derive(Eq)]
 pub struct OwningCStr {
     ptr: *mut libc::c_char,
 }
@@ -354,6 +354,12 @@ impl Clone for OwningCStr {
     }
 }
 
+impl Borrow<CStr> for OwningCStr {
+    fn borrow(&self) -> &CStr {
+        unsafe { CStr::from_ptr(self.as_ptr()) }
+    }
+}
+
 /// Map that keeps entries in insertion order.
 /// Implemented as an alist for now.
 #[derive(Clone)]
@@ -372,9 +378,17 @@ impl<K, V> InsertionOrderMap<K, V> {
         InsertionOrderMap { items: vec![] }
     }
 
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
     pub fn insert(&mut self, key: K, value: V)
     where
-        K: Hash + Eq,
+        K: Eq,
     {
         for (k, v) in &mut self.items {
             if *k == key {
@@ -387,11 +401,24 @@ impl<K, V> InsertionOrderMap<K, V> {
 
     pub fn get<Q>(&self, key: &Q) -> Option<&V>
     where
-        Q: Hash + Eq + ?Sized,
-        K: Hash + Eq + Borrow<Q>,
+        Q: Eq + ?Sized,
+        K: Eq + Borrow<Q>,
     {
         for (k, v) in &self.items {
             if k.borrow() == key {
+                return Some(v);
+            }
+        }
+        None
+    }
+
+    pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
+    where
+        Q: Eq + ?Sized,
+        K: Eq + Borrow<Q>,
+    {
+        for (k, v) in &mut self.items {
+            if (k as &K).borrow() == key {
                 return Some(v);
             }
         }
@@ -419,5 +446,27 @@ impl<'a, K: 'a, V: 'a> Iterator for Iter<'a, K, V> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(|(k, v)| (k, v))
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a mut InsertionOrderMap<K, V> {
+    type IntoIter = IterMut<'a, K, V>;
+    type Item = (&'a K, &'a mut V);
+
+    fn into_iter(self) -> Self::IntoIter {
+        IterMut {
+            inner: self.items.iter_mut(),
+        }
+    }
+}
+
+pub struct IterMut<'a, K, V> {
+    inner: std::slice::IterMut<'a, (K, V)>,
+}
+
+impl<'a, K: 'a, V: 'a> Iterator for IterMut<'a, K, V> {
+    type Item = (&'a K, &'a mut V);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|(k, v)| -> Self::Item { (k, v) })
     }
 }

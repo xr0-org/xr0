@@ -1842,32 +1842,25 @@ unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
     res
 }
 
-unsafe fn calculate_indegrees(g: &FuncGraph) -> Box<Map> {
-    let mut indegrees = Map::new();
+unsafe fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, libc::c_int> {
+    let mut indegrees = InsertionOrderMap::new();
     for (key, deps) in g {
-        if indegrees.get(key.as_ptr()).is_null() {
-            indegrees.set(
-                dynamic_str(key.as_ptr()),
-                dynamic_int(0 as libc::c_int) as *const libc::c_void,
-            );
+        if indegrees.get(CStr::from_ptr(key.as_ptr())).is_none() {
+            indegrees.insert(OwningCStr::copy(&key), 0);
             let mut j: libc::c_int = 0 as libc::c_int;
             while j < deps.n {
                 let dep_key = *deps.s.offset(j as isize);
-                if (indegrees.get(dep_key)).is_null() {
-                    indegrees.set(
-                        dynamic_str(dep_key),
-                        dynamic_int(0 as libc::c_int) as *const libc::c_void,
-                    );
+                if indegrees.get(CStr::from_ptr(dep_key)).is_none() {
+                    indegrees.insert(OwningCStr::new(dynamic_str(dep_key)), 0);
                 }
                 j += 1;
             }
         }
     }
-    for key in indegrees.keys() {
-        if let Some(n_arr) = g.get(CStr::from_ptr(key)) {
+    for (key, count) in &mut indegrees {
+        if let Some(n_arr) = g.get(CStr::from_ptr(key.as_ptr())) {
             let mut j_0: libc::c_int = 0 as libc::c_int;
             while j_0 < n_arr.n {
-                let count: *mut libc::c_int = indegrees.get(key) as *mut libc::c_int;
                 *count += 1;
                 j_0 += 1;
             }
@@ -1882,12 +1875,13 @@ unsafe fn dynamic_int(i: libc::c_int) -> *mut libc::c_int {
     val
 }
 
-unsafe fn build_indegree_zero(indegrees: &Map) -> Box<StringArr> {
+unsafe fn build_indegree_zero(
+    indegrees: &InsertionOrderMap<OwningCStr, libc::c_int>,
+) -> Box<StringArr> {
     let mut indegree_zero = string_arr_create();
-    for key in indegrees.keys() {
-        let val: *mut libc::c_int = indegrees.get(key) as *mut libc::c_int;
-        if *val == 0 as libc::c_int {
-            string_arr_append(&mut indegree_zero, dynamic_str(key));
+    for (key, val) in indegrees {
+        if *val == 0 {
+            string_arr_append(&mut indegree_zero, dynamic_str(key.as_ptr()));
         }
     }
     indegree_zero
@@ -1896,14 +1890,14 @@ unsafe fn build_indegree_zero(indegrees: &Map) -> Box<StringArr> {
 pub unsafe fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
     let mut order = vec![];
     let g = ast_function_buildgraph(fname, ext);
-    let indegrees = calculate_indegrees(&g);
+    let mut indegrees = calculate_indegrees(&g);
     let mut indegree_zero = build_indegree_zero(&indegrees);
     while indegree_zero.n > 0 {
         let curr = string_arr_deque(&mut indegree_zero);
         order.push(OwningCStr::new(curr));
         for (key, v) in &g {
             if string_arr_contains(v, curr) {
-                let count: *mut libc::c_int = indegrees.get(key.as_ptr()) as *mut libc::c_int;
+                let count = indegrees.get_mut(key.as_c_str()).unwrap();
                 *count -= 1;
                 if *count == 0 {
                     string_arr_append(&mut indegree_zero, dynamic_str(key.as_ptr()));
