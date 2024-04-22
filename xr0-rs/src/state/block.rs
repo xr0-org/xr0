@@ -46,21 +46,27 @@ impl Drop for Block {
     }
 }
 
-pub unsafe fn block_copy(old: *mut Block) -> *mut Block {
-    Box::into_raw(Box::new(Block {
-        arr: (*old)
-            .arr
-            .iter()
-            .copied()
-            .map(|obj| unsafe { object_copy(obj) })
-            .collect(),
-    }))
+impl Clone for Block {
+    fn clone(&self) -> Block {
+        Block {
+            arr: self
+                .arr
+                .iter()
+                .copied()
+                .map(|obj| unsafe { object_copy(obj) })
+                .collect(),
+        }
+    }
 }
 
-pub unsafe fn block_str(block: *mut Block) -> OwningCStr {
+pub unsafe fn block_copy(old: *mut Block) -> *mut Block {
+    Box::into_raw(Box::new((*old).clone()))
+}
+
+pub unsafe fn block_str(block: &Block) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    let n = (*block).arr.len();
-    for (i, &obj) in (*block).arr.iter().enumerate() {
+    let n = block.arr.len();
+    for (i, &obj) in block.arr.iter().enumerate() {
         let s = object_str(obj);
         strbuilder_write!(b, "{s}{}", if i + 1 < n { ", " } else { "" });
     }

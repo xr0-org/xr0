@@ -3,7 +3,7 @@ use std::ptr;
 use libc::strcmp;
 
 use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
-use super::clump::{clump_copy, clump_create, clump_destroy, clump_newblock, clump_str};
+use super::clump::{clump_create, clump_destroy, clump_newblock, clump_str};
 use super::heap::{
     heap_copy, heap_newblock, heap_referenced, heap_str, heap_undeclare, vconst_copy,
     vconst_create, vconst_declare, vconst_eval, vconst_get, vconst_str, vconst_undeclare,
@@ -100,7 +100,7 @@ pub unsafe fn state_copy(state: *mut State) -> *mut State {
         ext: (*state).ext,
         static_memory: static_memory_copy((*state).static_memory),
         vconst: vconst_copy(&(*state).vconst),
-        clump: clump_copy((*state).clump),
+        clump: Box::into_raw(Box::new((*(*state).clump).clone())),
         stack: stack_copy((*state).stack),
         heap: heap_copy(&(*state).heap),
         props: (*state).props.clone(),
@@ -112,7 +112,7 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
         ext: (*state).ext,
         static_memory: static_memory_copy((*state).static_memory),
         vconst: vconst_copy(&(*state).vconst),
-        clump: clump_copy((*state).clump),
+        clump: Box::into_raw(Box::new((*(*state).clump).clone())),
         stack: stack_copywithname((*state).stack, func_name),
         heap: heap_copy(&(*state).heap),
         props: (*state).props.clone(),

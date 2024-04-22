@@ -40,7 +40,7 @@ pub unsafe fn static_memory_str(sm: *mut StaticMemory, indent: *mut libc::c_char
     let arr: *mut *mut Block = block_arr_blocks((*sm).blocks);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        let block = block_str(*arr.offset(i as isize));
+        let block = block_str(&**arr.offset(i as isize));
         strbuilder_write!(b, "{}{i}: {block}\n", cstr!(indent));
         i += 1;
     }

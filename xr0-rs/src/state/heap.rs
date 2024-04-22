@@ -68,7 +68,7 @@ pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> OwningCStr {
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         if !*((*h).freed).offset(i as isize) {
-            let block = block_str(*arr.offset(i as isize));
+            let block = block_str(&**arr.offset(i as isize));
             strbuilder_write!(
                 b,
                 "{}{i}: {block}{}",
