@@ -80,10 +80,6 @@ pub unsafe fn state_create_withprops(
     }
 }
 
-pub unsafe fn state_destroy(state: *mut State) {
-    drop(Box::from_raw(state));
-}
-
 impl Drop for State {
     fn drop(&mut self) {
         unsafe {
@@ -94,16 +90,16 @@ impl Drop for State {
     }
 }
 
-pub unsafe fn state_copy(state: *mut State) -> *mut State {
-    Box::into_raw(Box::new(State {
-        ext: (*state).ext,
-        static_memory: static_memory_copy((*state).static_memory),
-        vconst: vconst_copy(&(*state).vconst),
-        clump: Box::into_raw(Box::new((*(*state).clump).clone())),
-        stack: stack_copy((*state).stack),
-        heap: heap_copy(&(*state).heap),
-        props: (*state).props.clone(),
-    }))
+pub unsafe fn state_copy(state: &State) -> State {
+    State {
+        ext: state.ext,
+        static_memory: static_memory_copy(state.static_memory),
+        vconst: vconst_copy(&state.vconst),
+        clump: Box::into_raw(Box::new((*state.clump).clone())),
+        stack: stack_copy(state.stack),
+        heap: heap_copy(&state.heap),
+        props: state.props.clone(),
+    }
 }
 
 pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char) -> *mut State {
@@ -454,23 +450,21 @@ pub unsafe fn state_eval(s: *mut State, e: &AstExpr) -> bool {
 }
 
 pub unsafe fn state_equal(s1: *mut State, s2: *mut State) -> bool {
-    let s1_c: *mut State = state_copy(s1);
-    let s2_c: *mut State = state_copy(s2);
-    state_undeclareliterals(s1_c);
-    state_undeclareliterals(s2_c);
-    state_undeclarevars(s1_c);
-    state_undeclarevars(s2_c);
-    state_popprops(s1_c);
-    state_popprops(s2_c);
-    let str1 = state_str(s1_c);
-    let str2 = state_str(s2_c);
+    let mut s1_c = state_copy(&*s1);
+    let mut s2_c = state_copy(&*s2);
+    state_undeclareliterals(&mut s1_c);
+    state_undeclareliterals(&mut s2_c);
+    state_undeclarevars(&mut s1_c);
+    state_undeclarevars(&mut s2_c);
+    state_popprops(&mut s1_c);
+    state_popprops(&mut s2_c);
+    let str1 = state_str(&mut s1_c);
+    let str2 = state_str(&mut s2_c);
     let equal = str1 == str2;
     if !equal {
         vprintln!("actual: {str1}");
         vprintln!("abstract: {str2}");
     }
-    state_destroy(s2_c);
-    state_destroy(s1_c);
     equal
 }
 

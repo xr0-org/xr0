@@ -15,10 +15,10 @@ use crate::object::{
 use crate::parser::{lexememarker_copy, lexememarker_destroy, LexemeMarker};
 use crate::state::state::{
     state_addresses_deallocand, state_alloc, state_clump, state_copy, state_copywithname,
-    state_create, state_create_withprops, state_dealloc, state_declare, state_deref, state_destroy,
-    state_equal, state_get, state_getext, state_getloc, state_getobject, state_getobjecttype,
-    state_getprops, state_getresult, state_getvconst, state_hasgarbage, state_isalloc,
-    state_islval, state_popframe, state_pushframe, state_range_alloc, state_range_aredeallocands,
+    state_create, state_create_withprops, state_dealloc, state_declare, state_deref, state_equal,
+    state_get, state_getext, state_getloc, state_getobject, state_getobjecttype, state_getprops,
+    state_getresult, state_getvconst, state_hasgarbage, state_isalloc, state_islval,
+    state_popframe, state_pushframe, state_range_alloc, state_range_aredeallocands,
     state_range_dealloc, state_static_init, state_str, state_vconst,
 };
 use crate::util::{
@@ -616,10 +616,10 @@ unsafe fn ast_expr_pf_reduce_assume(
 }
 
 unsafe fn identifier_assume(expr: &AstExpr, value: bool, s: *mut State) -> Result<Preresult> {
-    let s_copy: *mut State = state_copy(s);
-    let res_val = ast_expr_eval(expr, s_copy).unwrap();
+    let mut s_copy = state_copy(&*s);
+    let res_val = ast_expr_eval(expr, &mut s_copy).unwrap();
     assert!(!res_val.is_null());
-    state_destroy(s_copy);
+    drop(s_copy);
     irreducible_assume(&*value_as_sync(res_val), value, s)
 }
 
@@ -928,7 +928,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value
     let args = prepare_arguments(ast_expr_call_args(expr), params, state);
     state_pushframe(state, dynamic_str(name), rtype);
     prepare_parameters(params, args, name, state)?;
-    call_setupverify(f, state_copy(state))?;
+    call_setupverify(f, &mut state_copy(&*state))?;
     let mut v = call_absexec(expr, state)?;
     if !v.is_null() {
         v = value_copy(&*v);
@@ -1794,11 +1794,11 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
         };
     }
     let params = ast_function_params(&*f);
-    let s_copy: *mut State = state_copy(state);
-    let args = prepare_arguments(ast_expr_call_args(expr), params, s_copy);
+    let mut s_copy = state_copy(&*state);
+    let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
     let ret_type: *mut AstType = ast_function_type(&*f);
-    state_pushframe(s_copy, dynamic_str(name), ret_type);
-    if let Err(err) = prepare_parameters(params, args, name, s_copy) {
+    state_pushframe(&mut s_copy, dynamic_str(name), ret_type);
+    if let Err(err) = prepare_parameters(params, args, name, &mut s_copy) {
         return AstStmtSplits {
             conds: vec![],
             err: Some(err),
@@ -1807,14 +1807,15 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     let mut conds = vec![];
     let abs = ast_function_abstract(&*f);
     for &var in &abs.decls {
-        state_declare(s_copy, var, false);
+        state_declare(&mut s_copy, var, false);
     }
     for stmt in &abs.stmts {
         // Note: errors ignored in the original!
-        let mut splits = ast_stmt_splits(stmt, s_copy);
+        let mut splits = ast_stmt_splits(stmt, &mut s_copy);
         conds.append(&mut splits.conds);
     }
-    state_popframe(s_copy);
+    state_popframe(&mut s_copy);
+    // Note: Original leaks s_copy
     AstStmtSplits { conds, err: None }
 }
 
