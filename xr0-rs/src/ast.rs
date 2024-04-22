@@ -1895,7 +1895,7 @@ unsafe fn build_indegree_zero(indegrees: &Map) -> Box<StringArr> {
     indegree_zero
 }
 
-pub unsafe fn topological_order(fname: *mut libc::c_char, ext: &Externals) -> Vec<OwningCStr> {
+pub unsafe fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
     let mut order = vec![];
     let g = ast_function_buildgraph(fname, ext);
     let indegrees = calculate_indegrees(&g);
@@ -3607,23 +3607,15 @@ unsafe fn split_path_verify(
     Ok(())
 }
 
-unsafe fn recurse_buildgraph(
-    g: &mut Map,
-    dedup: &mut Map,
-    fname: *mut libc::c_char,
-    ext: &Externals,
-) {
+unsafe fn recurse_buildgraph(g: &mut Map, dedup: &mut Map, fname: &CStr, ext: &Externals) {
     let mut local_dedup = Map::new();
-    if !(dedup.get(fname)).is_null() {
+    if !(dedup.get(fname.as_ptr())).is_null() {
         return;
     }
-    dedup.set(fname, 1 as libc::c_int as *mut libc::c_void);
-    let f: *mut AstFunction = ext.get_func(fname);
+    dedup.set(fname.as_ptr(), 1 as libc::c_int as *mut libc::c_void);
+    let f: *mut AstFunction = ext.get_func(fname.as_ptr());
     if f.is_null() {
-        eprintln!(
-            "function `{}' is not declared",
-            CStr::from_ptr(fname).to_string_lossy()
-        );
+        eprintln!("function `{}' is not declared", fname.to_string_lossy());
         process::exit(1);
     }
     if f.is_null() {
@@ -3648,12 +3640,12 @@ unsafe fn recurse_buildgraph(
                     string_arr_append(&mut val, func);
                 }
                 local_dedup.set(func, 1 as libc::c_int as *mut libc::c_void);
-                recurse_buildgraph(g, dedup, func, ext);
+                recurse_buildgraph(g, dedup, CStr::from_ptr(func), ext);
             }
         }
     }
     g.set(
-        dynamic_str(fname),
+        dynamic_str(fname.as_ptr()),
         Box::into_raw(val) as *const libc::c_void,
     );
 }
@@ -3716,7 +3708,7 @@ unsafe fn split_paths_absverify(
     Ok(())
 }
 
-pub unsafe fn ast_function_buildgraph(fname: *mut libc::c_char, ext: &Externals) -> Box<Map> {
+pub unsafe fn ast_function_buildgraph(fname: &CStr, ext: &Externals) -> Box<Map> {
     let mut dedup = Map::new();
     let mut g = Map::new();
     recurse_buildgraph(&mut g, &mut dedup, fname, ext);
@@ -3884,10 +3876,7 @@ pub unsafe fn lvalue_object(l: *mut LValue) -> *mut Object {
     (*l).obj
 }
 
-pub unsafe fn ast_topological_order(
-    fname: *mut libc::c_char,
-    ext: &mut Externals,
-) -> Vec<OwningCStr> {
+pub unsafe fn ast_topological_order(fname: &CStr, ext: &mut Externals) -> Vec<OwningCStr> {
     topological_order(fname, ext)
 }
 

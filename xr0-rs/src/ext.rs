@@ -54,17 +54,17 @@ impl Externals {
         self._struct.insert(id, t);
     }
 
-    pub unsafe fn get_func(&self, id: *mut libc::c_char) -> *mut AstFunction {
+    pub unsafe fn get_func(&self, id: *const libc::c_char) -> *mut AstFunction {
         let id = CStr::from_ptr(id).to_str().unwrap();
         self.func.get(id).copied().unwrap_or(ptr::null_mut())
     }
 
-    pub unsafe fn get_typedef(&self, id: *mut libc::c_char) -> *mut AstType {
+    pub unsafe fn get_typedef(&self, id: *const libc::c_char) -> *mut AstType {
         let id = CStr::from_ptr(id).to_str().unwrap();
         self.typedef.get(id).copied().unwrap_or(ptr::null_mut())
     }
 
-    pub unsafe fn get_struct(&self, id: *mut libc::c_char) -> *mut AstType {
+    pub unsafe fn get_struct(&self, id: *const libc::c_char) -> *mut AstType {
         let id = CStr::from_ptr(id).to_str().unwrap();
         self._struct.get(id).copied().unwrap_or(ptr::null_mut())
     }

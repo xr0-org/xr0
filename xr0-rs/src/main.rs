@@ -225,12 +225,12 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
 
     if let Some(sortfunc) = &c.sort {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-        let order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, &mut ext);
+        let order = ast_topological_order(&sortfunc_cstr, &mut ext);
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
     } else if let Some(sortfunc) = &c.verify {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-        let order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, &mut ext);
+        let order = ast_topological_order(&sortfunc_cstr, &mut ext);
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
         pass_inorder(&order, &mut ext);
