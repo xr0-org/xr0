@@ -174,11 +174,11 @@ pub unsafe fn strbuilder_create() -> *mut StrBuilder {
     }))
 }
 
-pub unsafe fn strbuilder_build(b: *mut StrBuilder) -> *mut libc::c_char {
+pub unsafe fn strbuilder_build(b: *mut StrBuilder) -> OwningCStr {
     let mut v = Box::from_raw(b).s.into_bytes();
     v.push(0);
     v.shrink_to_fit();
-    v.leak().as_mut_ptr() as *mut libc::c_char
+    OwningCStr::new(v.leak().as_mut_ptr() as *mut libc::c_char)
 }
 
 pub unsafe fn strbuilder_append_string(b: *mut StrBuilder, s: String) {
@@ -294,7 +294,7 @@ pub unsafe fn string_arr_contains(arr: &StringArr, s: *mut libc::c_char) -> bool
     false
 }
 
-pub unsafe fn string_arr_str(string_arr: &StringArr) -> *mut libc::c_char {
+pub unsafe fn string_arr_str(string_arr: &StringArr) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     let s: *mut *mut libc::c_char = string_arr.s;
     let n: libc::c_int = string_arr.n;
@@ -334,6 +334,16 @@ impl OwningCStr {
             panic!("non-UTF-8 string {:?}: {err}", CStr::from_ptr(ptr));
         }
         OwningCStr { ptr }
+    }
+
+    pub unsafe fn empty() -> Self {
+        OwningCStr {
+            ptr: dynamic_str(b"\0" as *const u8 as *const libc::c_char),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        unsafe { CStr::from_ptr(self.ptr).is_empty() }
     }
 
     pub fn copy(ptr: &CStr) -> Self {

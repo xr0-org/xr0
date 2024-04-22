@@ -11,7 +11,7 @@ use crate::state::block::{
 };
 use crate::state::location::{location_create_dynamic, location_destroy};
 use crate::state::state::state_references;
-use crate::util::{strbuilder_build, strbuilder_create, Error, Result};
+use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{value_copy, value_destroy, value_str};
 use crate::{cstr, strbuilder_write, AstExpr, Block, BlockArr, Location, State, StrBuilder, Value};
 
@@ -61,22 +61,20 @@ pub unsafe fn heap_copy(h: &Heap) -> Heap {
     }
 }
 
-pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> *mut libc::c_char {
+pub unsafe fn heap_str(h: *mut Heap, indent: *mut libc::c_char) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     let arr: *mut *mut Block = block_arr_blocks((*h).blocks);
     let n: libc::c_int = block_arr_nblocks((*h).blocks);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
         if !*((*h).freed).offset(i as isize) {
-            let block: *mut libc::c_char = block_str(*arr.offset(i as isize));
+            let block = block_str(*arr.offset(i as isize));
             strbuilder_write!(
                 b,
-                "{}{i}: {}{}",
+                "{}{i}: {block}{}",
                 cstr!(indent),
-                cstr!(block),
                 if printdelim(h, i) { "\n" } else { "" },
             );
-            free(block as *mut libc::c_void);
         }
         i += 1;
     }
@@ -198,10 +196,10 @@ pub unsafe fn vconst_declare(
     val: *mut Value,
     comment: *mut libc::c_char,
     persist: bool,
-) -> *mut libc::c_char {
+) -> OwningCStr {
     let m = &mut (*v).varmap;
-    let s: *mut libc::c_char = vconst_id(m, &(*v).persist, persist);
-    let s_string = CStr::from_ptr(s).to_str().unwrap().to_string();
+    let s = vconst_id(m, &(*v).persist, persist);
+    let s_string = s.to_string();
     m.insert(s_string.clone(), val);
     if !comment.is_null() {
         let comment_string = CStr::from_ptr(comment).to_str().unwrap().to_string();
@@ -215,7 +213,7 @@ unsafe fn vconst_id(
     varmap: &BTreeMap<String, *mut Value>,
     persistmap: &HashMap<String, bool>,
     persist: bool,
-) -> *mut libc::c_char {
+) -> OwningCStr {
     let npersist = count_true(persistmap);
     let b: *mut StrBuilder = strbuilder_create();
     if persist {
@@ -256,16 +254,15 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
     v.persist = persist;
 }
 
-pub unsafe fn vconst_str(v: &VConst, indent: *mut libc::c_char) -> *mut libc::c_char {
+pub unsafe fn vconst_str(v: &VConst, indent: *mut libc::c_char) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     for (k, &val) in &(*v).varmap {
-        let value: *mut libc::c_char = value_str(val);
-        strbuilder_write!(b, "{}{}: {}", cstr!(indent), k, cstr!(value));
+        let value = value_str(val);
+        strbuilder_write!(b, "{}{k}: {value}", cstr!(indent));
         if let Some(comment) = (*v).comment.get(k) {
             strbuilder_write!(b, "\t({comment})");
         }
         strbuilder_write!(b, "\n");
-        free(value as *mut libc::c_void);
     }
     strbuilder_build(b)
 }

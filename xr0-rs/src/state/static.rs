@@ -2,14 +2,14 @@
 
 use std::ptr;
 
-use libc::{free, malloc};
+use libc::malloc;
 
 use crate::state::block::{
     block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
     block_arr_nblocks, block_create, block_str,
 };
 use crate::state::location::location_copy;
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
 use crate::{cstr, strbuilder_write, Block, BlockArr, Location, StrBuilder};
 
 pub struct StaticMemory {
@@ -34,18 +34,14 @@ pub unsafe fn static_memory_destroy(sm: *mut StaticMemory) {
     block_arr_destroy((*sm).blocks);
 }
 
-pub unsafe fn static_memory_str(
-    sm: *mut StaticMemory,
-    indent: *mut libc::c_char,
-) -> *mut libc::c_char {
+pub unsafe fn static_memory_str(sm: *mut StaticMemory, indent: *mut libc::c_char) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     let n: libc::c_int = block_arr_nblocks((*sm).blocks);
     let arr: *mut *mut Block = block_arr_blocks((*sm).blocks);
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < n {
-        let block: *mut libc::c_char = block_str(*arr.offset(i as isize));
-        strbuilder_write!(b, "{}{i}: {}\n", cstr!(indent), cstr!(block));
-        free(block as *mut libc::c_void);
+        let block = block_str(*arr.offset(i as isize));
+        strbuilder_write!(b, "{}{i}: {block}\n", cstr!(indent));
         i += 1;
     }
     strbuilder_build(b)

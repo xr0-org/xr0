@@ -2,8 +2,6 @@
 
 use std::ptr;
 
-use libc::free;
-
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
     ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create,
@@ -13,13 +11,13 @@ use crate::state::location::{location_copy, location_references, location_str};
 use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
 };
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Error, Result};
+use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{
     value_abstractcopy, value_as_location, value_copy, value_destroy, value_ptr_create,
     value_references, value_referencesheap, value_str, value_struct_create, value_struct_member,
     value_struct_membertype,
 };
-use crate::{cstr, strbuilder_write, AstExpr, AstType, Location, State, StrBuilder, Value};
+use crate::{strbuilder_write, AstExpr, AstType, Location, State, StrBuilder, Value};
 
 pub struct Object {
     pub kind: ObjectKind,
@@ -98,25 +96,22 @@ pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Objec
     }
 }
 
-pub unsafe fn object_str(obj: *mut Object) -> *mut libc::c_char {
+pub unsafe fn object_str(obj: *mut Object) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_write!(b, "{{");
-    let offset = &*(*obj).offset;
-    strbuilder_write!(b, "{offset}:");
-    let inner = inner_str(obj);
-    strbuilder_write!(b, "<{}>", cstr!(inner));
-    free(inner as *mut libc::c_void);
+    strbuilder_write!(b, "{}:", &*(*obj).offset);
+    strbuilder_write!(b, "<{}>", inner_str(obj));
     strbuilder_write!(b, "}}");
     strbuilder_build(b)
 }
 
-unsafe fn inner_str(obj: *mut Object) -> *mut libc::c_char {
+unsafe fn inner_str(obj: *mut Object) -> OwningCStr {
     match &(*obj).kind {
         ObjectKind::Value(v) => {
             if !(*v).is_null() {
                 value_str(*v)
             } else {
-                dynamic_str(b"\0" as *const u8 as *const libc::c_char)
+                OwningCStr::empty()
             }
         }
         ObjectKind::DeallocandRange(range) => range_str(range),
@@ -378,11 +373,9 @@ pub unsafe fn range_copy(r: &Range) -> Box<Range> {
     )
 }
 
-pub unsafe fn range_str(r: &Range) -> *mut libc::c_char {
+pub unsafe fn range_str(r: &Range) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    let loc = location_str(&*r.loc);
-    strbuilder_write!(b, "virt:{}@{}", r.size, cstr!(loc));
-    free(loc as *mut libc::c_void);
+    strbuilder_write!(b, "virt:{}@{}", r.size, location_str(&*r.loc));
     strbuilder_build(b)
 }
 

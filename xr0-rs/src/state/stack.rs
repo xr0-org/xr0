@@ -20,7 +20,9 @@ use crate::state::location::{
     location_getstackblock, location_offset, location_references, location_str,
 };
 use crate::state::state::state_get;
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map};
+use crate::util::{
+    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map, OwningCStr,
+};
 use crate::value::value_abstractcopy;
 use crate::{
     cstr, strbuilder_write, AstType, AstVariable, Block, BlockArr, Location, Object, State,
@@ -143,18 +145,16 @@ unsafe fn varmap_copy(m: &Map) -> Box<Map> {
     m_copy
 }
 
-pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> *mut libc::c_char {
+pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     let m: &Map = &(*stack).varmap;
     for (k, v) in m.pairs() {
-        let var: *mut libc::c_char = variable_str(v as *mut Variable, stack, state);
-        strbuilder_write!(b, "\t{}: {}", cstr!(k), cstr!(var));
-        free(var as *mut libc::c_void);
+        let var = variable_str(v as *mut Variable, stack, state);
+        strbuilder_write!(b, "\t{}: {var}", cstr!(k));
         strbuilder_putc(b, '\n' as i32 as libc::c_char);
     }
-    let result: *mut libc::c_char = variable_str((*stack).result, stack, state);
-    strbuilder_write!(b, "\treturn: {}\n", cstr!(result));
-    free(result as *mut libc::c_void);
+    let result = variable_str((*stack).result, stack, state);
+    strbuilder_write!(b, "\treturn: {result}\n");
     strbuilder_write!(b, "\t");
     let mut i_0: libc::c_int = 0 as libc::c_int;
     let len: libc::c_int = 30 as libc::c_int;
@@ -164,9 +164,7 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> *mut libc::c_ch
     }
     strbuilder_write!(b, " {}\n", cstr!((*stack).name));
     if !((*stack).prev).is_null() {
-        let prev: *mut libc::c_char = stack_str((*stack).prev, state);
-        strbuilder_write!(b, "{}", cstr!(prev));
-        free(prev as *mut libc::c_void);
+        strbuilder_write!(b, "{}", stack_str((*stack).prev, state));
     }
     strbuilder_build(b)
 }
@@ -289,32 +287,14 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
     new
 }
 
-pub unsafe fn variable_str(
-    var: *mut Variable,
-    stack: *mut Stack,
-    state: *mut State,
-) -> *mut libc::c_char {
+pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> OwningCStr {
     assert!(!(*(*var).loc).type_is_vconst());
     let b: *mut StrBuilder = strbuilder_create();
-    let type_0: *mut libc::c_char = ast_type_str((*var).r#type);
-    let loc: *mut libc::c_char = location_str(&*(*var).loc);
-    let isparam: *mut libc::c_char = (if (*var).is_param {
-        b"param \0" as *const u8 as *const libc::c_char
-    } else {
-        b"\0" as *const u8 as *const libc::c_char
-    }) as *mut libc::c_char;
-    let obj_str: *mut libc::c_char = object_or_nothing_str((*var).loc, stack, state);
-    strbuilder_write!(
-        b,
-        "{{{}{} := {}}} @ {}",
-        cstr!(isparam),
-        cstr!(type_0),
-        cstr!(obj_str),
-        cstr!(loc),
-    );
-    free(obj_str as *mut libc::c_void);
-    free(loc as *mut libc::c_void);
-    free(type_0 as *mut libc::c_void);
+    let type_0 = ast_type_str((*var).r#type);
+    let isparam = if (*var).is_param { "param " } else { "" };
+    let obj_str = object_or_nothing_str((*var).loc, stack, state);
+    let loc = location_str(&*(*var).loc);
+    strbuilder_write!(b, "{{{isparam}{type_0} := {obj_str}}} @ {loc}");
     strbuilder_build(b)
 }
 
@@ -322,7 +302,7 @@ unsafe fn object_or_nothing_str(
     loc: *mut Location,
     stack: *mut Stack,
     state: *mut State,
-) -> *mut libc::c_char {
+) -> OwningCStr {
     let b: *mut Block = location_getstackblock(loc, stack);
     if b.is_null() {
         panic!();
@@ -331,7 +311,7 @@ unsafe fn object_or_nothing_str(
     if !obj.is_null() {
         return object_str(obj);
     }
-    dynamic_str(b"\0" as *const u8 as *const libc::c_char)
+    OwningCStr::empty()
 }
 
 pub unsafe fn variable_location(v: *mut Variable) -> *mut Location {

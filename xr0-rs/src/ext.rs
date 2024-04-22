@@ -2,10 +2,8 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ptr;
 
-use libc::free;
-
 use crate::ast::{ast_type_str, ast_type_struct_tag};
-use crate::util::{strbuilder_build, strbuilder_create};
+use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
 use crate::{cstr, strbuilder_write, AstFunction, AstType, AstVariable, StrBuilder};
 
 #[derive(Default)]
@@ -21,19 +19,15 @@ impl Externals {
         Externals::default()
     }
 
-    pub unsafe fn types_str(&self, indent: *mut libc::c_char) -> *mut libc::c_char {
+    pub unsafe fn types_str(&self, indent: *mut libc::c_char) -> OwningCStr {
         let b: *mut StrBuilder = strbuilder_create();
         for (k, v) in &self.typedef {
-            let ty = ast_type_str(*v);
-            strbuilder_write!(b, "{}{} {k}\n", cstr!(indent), cstr!(ty));
-            free(ty as *mut libc::c_void);
+            strbuilder_write!(b, "{}{} {k}\n", cstr!(indent), ast_type_str(*v));
         }
         for v in self._struct.values() {
-            let ty = ast_type_str(*v);
-            strbuilder_write!(b, "{}{}\n", cstr!(indent), cstr!(ty));
-            free(ty as *mut libc::c_void);
+            strbuilder_write!(b, "{}{}\n", cstr!(indent), ast_type_str(*v));
         }
-        return strbuilder_build(b);
+        strbuilder_build(b)
     }
 
     pub unsafe fn declare_func(&mut self, id: *mut libc::c_char, f: *mut AstFunction) {

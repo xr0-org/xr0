@@ -134,7 +134,12 @@ pub unsafe fn value_struct_indefinite_create(
         strbuilder_write!(b, "{}.{field}", cstr!(comment));
         object_assign(
             obj,
-            state_vconst(s, ast_variable_type(var), strbuilder_build(b), persist),
+            state_vconst(
+                s,
+                ast_variable_type(var),
+                strbuilder_build(b).into_ptr(),
+                persist,
+            ),
         );
     }
     v
@@ -328,7 +333,7 @@ pub unsafe fn value_destroy(v: *mut Value) {
     drop(Box::from_raw(v));
 }
 
-pub unsafe fn value_str(v: *mut Value) -> *mut libc::c_char {
+pub unsafe fn value_str(v: *mut Value) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     match &(*v).kind {
         ValueKind::Sync(n) => {
@@ -354,23 +359,20 @@ pub unsafe fn value_str(v: *mut Value) -> *mut libc::c_char {
 }
 
 unsafe fn value_sync_sprint(n: *mut Number, b: *mut StrBuilder) {
-    strbuilder_write!(b, "comp:{}", cstr!(number_str(n)));
+    strbuilder_write!(b, "comp:{}", number_str(n));
 }
 
 unsafe fn value_definite_ptr_sprint(loc: *mut Location, b: *mut StrBuilder) {
     let s = location_str(&*loc);
-    strbuilder_write!(b, "ptr:{}", cstr!(s));
-    free(s as *mut libc::c_void);
+    strbuilder_write!(b, "ptr:{s}");
 }
 
 unsafe fn value_indefinite_ptr_sprint(n: *mut Number, b: *mut StrBuilder) {
-    let s = number_str(n);
-    strbuilder_write!(b, "ptr:{}", cstr!(s));
-    free(s as *mut libc::c_void);
+    strbuilder_write!(b, "ptr:{}", number_str(n));
 }
 
 unsafe fn value_int_sprint(n: *mut Number, b: *mut StrBuilder) {
-    strbuilder_write!(b, "int:{}", cstr!(number_str(n)));
+    strbuilder_write!(b, "int:{}", number_str(n));
 }
 
 unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
@@ -380,19 +382,17 @@ unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
         let f: *mut libc::c_char = ast_variable_name(var);
         let f_str = CStr::from_ptr(f).to_str().unwrap();
         let val: *mut Value = object_as_value(sv.m.get(f_str).copied().unwrap());
-        let val_str: *mut libc::c_char = if !val.is_null() {
+        let val_str = if !val.is_null() {
             value_str(val)
         } else {
-            dynamic_str(b"\0" as *const u8 as *const libc::c_char)
+            OwningCStr::empty()
         };
         strbuilder_write!(
             b,
-            ".{} = <{}>{}",
+            ".{} = <{val_str}>{}",
             cstr!(f),
-            cstr!(val_str),
             if i + 1 < n { ", " } else { "" },
         );
-        free(val_str as *mut libc::c_void);
     }
     strbuilder_write!(b, "}}");
 }
@@ -450,8 +450,12 @@ pub unsafe fn value_isint(v: &Value) -> bool {
 
 pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
     match &(*v).kind {
-        ValueKind::DefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
-        ValueKind::IndefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
+        ValueKind::DefinitePtr(_) => {
+            Box::into_raw(ast_expr_identifier_create(value_str(v).into_ptr()))
+        }
+        ValueKind::IndefinitePtr(_) => {
+            Box::into_raw(ast_expr_identifier_create(value_str(v).into_ptr()))
+        }
         ValueKind::Literal(_) => Box::into_raw(ast_expr_copy(&*value_as_literal(&*v))),
         ValueKind::Sync(n) => Box::into_raw(ast_expr_copy(&*number_as_sync(*n))),
         ValueKind::Int(n) => number_to_expr(*n),
@@ -579,23 +583,22 @@ unsafe fn number_destroy(n: *mut Number) {
     }
 }
 
-unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> *mut libc::c_char {
+unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_putc(b, '{' as i32 as libc::c_char);
     let n = ranges.len();
     for (i, range) in ranges.iter().enumerate() {
         let r = number_range_str(range);
-        strbuilder_write!(b, "{}{}", cstr!(r), if i + 1 < n { ", " } else { "" });
-        free(r as *mut libc::c_void);
+        strbuilder_write!(b, "{r}{}", if i + 1 < n { ", " } else { "" });
     }
     strbuilder_putc(b, '}' as i32 as libc::c_char);
     strbuilder_build(b)
 }
 
-unsafe fn number_str(num: *mut Number) -> *mut libc::c_char {
+unsafe fn number_str(num: *mut Number) -> OwningCStr {
     match &(*num).kind {
         NumberKind::Ranges(ranges) => number_ranges_sprint(ranges),
-        NumberKind::Computed(computation) => ast_expr_str(&**computation).into_ptr(),
+        NumberKind::Computed(computation) => ast_expr_str(&**computation),
     }
 }
 
@@ -696,16 +699,16 @@ unsafe fn number_range_create(lw: NumberValue, up: NumberValue) -> NumberRange {
     }
 }
 
-unsafe fn number_range_str(r: &NumberRange) -> *mut libc::c_char {
+unsafe fn number_range_str(r: &NumberRange) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     if number_range_issingle(r) {
-        strbuilder_write!(b, "{}", cstr!(number_value_str(&r.lower)));
+        strbuilder_write!(b, "{}", number_value_str(&r.lower));
     } else {
         strbuilder_write!(
             b,
             "{}:{}",
-            cstr!(number_value_str(&r.lower)),
-            cstr!(number_value_str(&r.upper)),
+            number_value_str(&r.lower),
+            number_value_str(&r.upper),
         );
     }
     strbuilder_build(b)
@@ -753,7 +756,7 @@ unsafe fn number_value_max_create() -> NumberValue {
     number_value_limit_create(true)
 }
 
-unsafe fn number_value_str(v: &NumberValue) -> *mut libc::c_char {
+unsafe fn number_value_str(v: &NumberValue) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     match v {
         NumberValue::Constant(k) => {

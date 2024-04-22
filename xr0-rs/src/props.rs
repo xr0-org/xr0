@@ -5,7 +5,7 @@ use std::ptr;
 use libc::realloc;
 
 use crate::ast::{ast_expr_copy, ast_expr_destroy, ast_expr_equal, ast_expr_inverted_copy};
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create};
+use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
 use crate::{cstr, strbuilder_write, AstExpr, StrBuilder};
 
 pub struct Props {
@@ -49,9 +49,9 @@ impl Drop for Props {
     }
 }
 
-pub unsafe fn props_str(p: *mut Props, indent: *mut libc::c_char) -> *mut libc::c_char {
+pub unsafe fn props_str(p: *mut Props, indent: *mut libc::c_char) -> OwningCStr {
     if (*p).n == 0 as libc::c_int {
-        return dynamic_str(b"\0" as *const u8 as *const libc::c_char);
+        return OwningCStr::empty();
     }
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_write!(b, "{}\u{22a2} ", cstr!(indent));

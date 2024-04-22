@@ -203,16 +203,13 @@ unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool
 unsafe fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
     let proto_abs = ast_function_abstract(proto);
     let def_abs = ast_function_abstract(def);
-    let abs_match: bool = strcmp(
-        ast_block_str(
-            proto_abs,
-            b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ),
-        ast_block_str(
-            def_abs,
-            b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ),
-    ) == 0 as libc::c_int;
+    let abs_match: bool = ast_block_str(
+        proto_abs,
+        b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+    ) == ast_block_str(
+        def_abs,
+        b"\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
+    );
     let protoabs_only: bool = ast_function_absisempty(def) as libc::c_int != 0;
     abs_match || protoabs_only
 }
@@ -228,18 +225,12 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
     if let Some(sortfunc) = &c.sort {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
         let order = ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, &mut ext);
-        eprintln!(
-            "{}",
-            CStr::from_ptr(string_arr_str(&order)).to_string_lossy()
-        );
+        eprintln!("{}", string_arr_str(&order));
     } else if let Some(sortfunc) = &c.verify {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
         let mut order =
             ast_topological_order(sortfunc_cstr.as_ptr() as *mut libc::c_char, &mut ext);
-        eprintln!(
-            "{}",
-            CStr::from_ptr(string_arr_str(&order)).to_string_lossy()
-        );
+        eprintln!("{}", string_arr_str(&order));
         pass_inorder(&mut order, &mut ext);
     } else {
         pass1(&mut root, &mut ext);

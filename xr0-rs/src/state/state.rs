@@ -1,7 +1,6 @@
-use std::ffi::CStr;
 use std::ptr;
 
-use libc::{free, strcmp, strlen};
+use libc::strcmp;
 
 use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
 use super::clump::{clump_copy, clump_create, clump_destroy, clump_newblock, clump_str};
@@ -29,13 +28,13 @@ use crate::ast::{
 };
 use crate::object::{object_as_value, object_assign};
 use crate::props::{props_copy, props_create, props_destroy, props_str};
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Error, Result};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
     value_ptr_create, value_sync_create,
 };
 use crate::{
-    cstr, strbuilder_write, vprintln, AstExpr, AstType, AstVariable, Block, Clump, Externals, Heap,
+    strbuilder_write, vprintln, AstExpr, AstType, AstVariable, Block, Clump, Externals, Heap,
     Location, Object, Props, Stack, StaticMemory, StrBuilder, VConst, Value, Variable,
 };
 
@@ -121,58 +120,51 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
     }))
 }
 
-pub unsafe fn state_str(state: *mut State) -> *mut libc::c_char {
+pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_write!(b, "[[\n");
-    let ext: *mut libc::c_char =
+    let ext =
         (*(*state).ext).types_str(b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char);
-    if strlen(ext) > 0 {
-        strbuilder_write!(b, "{}\n", cstr!(ext));
+    if !ext.is_empty() {
+        strbuilder_write!(b, "{ext}\n");
     }
-    free(ext as *mut libc::c_void);
-    let static_mem: *mut libc::c_char = static_memory_str(
+    let static_mem = static_memory_str(
         (*state).static_memory,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(static_mem) > 0 {
-        strbuilder_write!(b, "{}\n", cstr!(static_mem));
+    if !static_mem.is_empty() {
+        strbuilder_write!(b, "{static_mem}\n");
     }
-    free(static_mem as *mut libc::c_void);
-    let vconst: *mut libc::c_char = vconst_str(
+    let vconst = vconst_str(
         &(*state).vconst,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(vconst) > 0 {
-        strbuilder_write!(b, "{}\n", cstr!(vconst));
+    if !vconst.is_empty() {
+        strbuilder_write!(b, "{vconst}\n");
     }
-    free(vconst as *mut libc::c_void);
-    let clump: *mut libc::c_char = clump_str(
+    let clump = clump_str(
         (*state).clump,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(clump) > 0 {
-        strbuilder_write!(b, "{}\n", cstr!(clump));
+    if !clump.is_empty() {
+        strbuilder_write!(b, "{clump}\n");
     }
-    free(clump as *mut libc::c_void);
-    let stack: *mut libc::c_char = stack_str((*state).stack, state);
-    strbuilder_write!(b, "{}\n", cstr!(stack));
-    free(stack as *mut libc::c_void);
-    let props: *mut libc::c_char = props_str(
+    let stack = stack_str((*state).stack, state);
+    strbuilder_write!(b, "{stack}\n");
+    let props = props_str(
         (*state).props,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(props) > 0 {
-        strbuilder_write!(b, "{}", cstr!(props));
+    if !props.is_empty() {
+        strbuilder_write!(b, "{props}");
     }
-    free(props as *mut libc::c_void);
-    let heap: *mut libc::c_char = heap_str(
+    let heap = heap_str(
         &mut (*state).heap,
         b"\t\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
     );
-    if strlen(heap) > 0 {
-        strbuilder_write!(b, "\n{}\n", cstr!(heap));
+    if !heap.is_empty() {
+        strbuilder_write!(b, "\n{heap}\n");
     }
-    free(heap as *mut libc::c_void);
     strbuilder_write!(b, "]]\n");
     strbuilder_build(b)
 }
@@ -216,8 +208,8 @@ pub unsafe fn state_vconst(
     if value_isstruct(&*v) {
         return v;
     }
-    let c: *mut libc::c_char = vconst_declare(&mut (*state).vconst, v, comment, persist);
-    value_sync_create(Box::into_raw(ast_expr_identifier_create(c)))
+    let c = vconst_declare(&mut (*state).vconst, v, comment, persist);
+    value_sync_create(Box::into_raw(ast_expr_identifier_create(c.into_ptr())))
 }
 
 pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value {
@@ -488,15 +480,13 @@ pub unsafe fn state_equal(s1: *mut State, s2: *mut State) -> bool {
     state_undeclarevars(s2_c);
     state_popprops(s1_c);
     state_popprops(s2_c);
-    let str1: *mut libc::c_char = state_str(s1_c);
-    let str2: *mut libc::c_char = state_str(s2_c);
-    let equal: bool = strcmp(str1, str2) == 0 as libc::c_int;
+    let str1 = state_str(s1_c);
+    let str2 = state_str(s2_c);
+    let equal = str1 == str2;
     if !equal {
-        vprintln!("actual: {}", CStr::from_ptr(str1).to_string_lossy());
-        vprintln!("abstract: {}", CStr::from_ptr(str2).to_string_lossy());
+        vprintln!("actual: {str1}");
+        vprintln!("abstract: {str2}");
     }
-    free(str2 as *mut libc::c_void);
-    free(str1 as *mut libc::c_void);
     state_destroy(s2_c);
     state_destroy(s1_c);
     equal

@@ -10,7 +10,7 @@ use crate::state::heap::{heap_blockisfreed, heap_deallocblock, heap_getblock};
 use crate::state::r#static::static_memory_getblock;
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
-use crate::util::{strbuilder_build, strbuilder_create, Error, Result};
+use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::{
     strbuilder_write, AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, StrBuilder, VConst,
     Value,
@@ -104,7 +104,7 @@ pub unsafe fn location_destroy(loc: *mut Location) {
     drop(Box::from_raw(loc))
 }
 
-pub unsafe fn location_str(loc: &Location) -> *mut libc::c_char {
+pub unsafe fn location_str(loc: &Location) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     match &loc.kind {
         LocationKind::Static => {
