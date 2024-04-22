@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_assignments)]
-
 use std::ptr;
 
 use libc::{free, malloc, strcmp};

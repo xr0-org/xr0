@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_assignments)]
-
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ptr;
@@ -87,10 +85,12 @@ pub unsafe fn value_literal_create(lit: *mut libc::c_char) -> *mut Value {
     value_create(ValueKind::Literal(dynamic_str(lit)))
 }
 
+#[allow(dead_code)]
 pub unsafe fn value_int_ne_create(not_val: libc::c_int) -> *mut Value {
     value_create(ValueKind::Int(number_ne_create(not_val)))
 }
 
+#[allow(dead_code)]
 pub unsafe fn value_int_range_create(lw: libc::c_int, excl_up: libc::c_int) -> *mut Value {
     value_create(ValueKind::Int(number_with_range_create(lw, excl_up)))
 }
@@ -153,6 +153,7 @@ unsafe fn ptr_referencesheap(v: &Value, s: *mut State) -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool) -> *mut Value {
     match &(*v).kind {
         ValueKind::Sync(_) | ValueKind::Literal(_) => {
@@ -463,6 +464,7 @@ pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
     }
 }
 
+#[allow(dead_code)]
 pub unsafe fn value_isliteral(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Literal(_))
 }
@@ -499,6 +501,7 @@ pub unsafe fn value_equal(v1: &Value, v2: &Value) -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub unsafe fn value_assume(v: *mut Value, value: bool) -> bool {
     match &(*v).kind {
         ValueKind::Int(n) => number_assume(*n, value),
@@ -558,6 +561,7 @@ unsafe fn number_indefinite_create() -> *mut Number {
     )])
 }
 
+#[allow(dead_code)]
 unsafe fn number_range_lw(n: *mut Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
@@ -566,6 +570,7 @@ unsafe fn number_range_lw(n: *mut Number) -> libc::c_int {
     number_value_as_constant(ranges[0].lower)
 }
 
+#[allow(dead_code)]
 unsafe fn number_range_up(n: *mut Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
@@ -780,6 +785,7 @@ unsafe fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {
     }
 }
 
+#[allow(dead_code)]
 unsafe fn number_value_difference(v1: &NumberValue, v2: &NumberValue) -> libc::c_int {
     match (*v1, *v2) {
         (NumberValue::Constant(v1), NumberValue::Constant(v2)) => v1 - v2,

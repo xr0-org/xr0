@@ -1,5 +1,3 @@
-#![allow(unused_assignments)]
-
 use std::ptr;
 
 use crate::ast::{
@@ -169,7 +167,7 @@ pub unsafe fn object_assign(obj: *mut Object, val: *mut Value) -> *mut Error {
 unsafe fn object_size(obj: *mut Object) -> *mut AstExpr {
     match &(*obj).kind {
         ObjectKind::Value(_) => Box::into_raw(ast_expr_constant_create(1)),
-        ObjectKind::DeallocandRange(range) => Box::into_raw(ast_expr_copy(range_size(&**range))),
+        ObjectKind::DeallocandRange(range) => Box::into_raw(ast_expr_copy(range_size(range))),
     }
 }
 
@@ -367,15 +365,12 @@ pub unsafe fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range>
 }
 
 pub unsafe fn range_copy(r: &Range) -> Box<Range> {
-    range_create(
-        ast_expr_copy(&r.size),
-        Box::from_raw(location_copy(&*r.loc)),
-    )
+    range_create(ast_expr_copy(&r.size), Box::from_raw(location_copy(&r.loc)))
 }
 
 pub unsafe fn range_str(r: &Range) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    strbuilder_write!(b, "virt:{}@{}", r.size, location_str(&*r.loc));
+    strbuilder_write!(b, "virt:{}@{}", r.size, location_str(&r.loc));
     strbuilder_build(b)
 }
 

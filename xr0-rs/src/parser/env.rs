@@ -33,8 +33,8 @@ impl Env {
         for line in source.split_inclusive('\n') {
             pos += line.len();
             let line = line.trim_start();
-            if line.starts_with('#') {
-                let (file, line_num) = parse_linemarker(&line[1..]);
+            if let Some(rest) = line.strip_prefix('#') {
+                let (file, line_num) = parse_linemarker(rest);
                 regions.push((pos, file, line_num));
             }
         }
@@ -105,12 +105,12 @@ fn parse_linemarker(line: &str) -> (PathBuf, usize) {
     while c.is_whitespace() {
         c = chars.next().unwrap_or('\0');
     }
-    if !c.is_digit(10) {
+    if !c.is_ascii_digit() {
         eprintln!("expected line number in line marker");
         std::process::exit(1);
     }
     let mut linenum = 0;
-    while c.is_digit(10) {
+    while c.is_ascii_digit() {
         linenum *= 10;
         linenum += (c as u32 - '0' as u32) as usize;
         c = chars.next().unwrap_or('\0');
@@ -139,7 +139,7 @@ fn parse_linemarker(line: &str) -> (PathBuf, usize) {
     c = chars.next().unwrap_or('\0');
     if c.is_whitespace() {
         while c != '\0' {
-            if c.is_digit(10) {
+            if c.is_ascii_digit() {
                 match c {
                     '1' => {
                         flags |= LM_FLAG_NEW_FILE as libc::c_int;
@@ -195,12 +195,12 @@ pub unsafe fn lexememarker_create(
 }
 
 pub unsafe fn lexememarker_copy(loc: *mut LexemeMarker) -> *mut LexemeMarker {
-    return lexememarker_create(
+    lexememarker_create(
         (*loc).linenum,
         (*loc).column,
         dynamic_str((*loc).filename),
         (*loc).flags,
-    );
+    )
 }
 
 pub unsafe fn lexememarker_destroy(loc: *mut LexemeMarker) {

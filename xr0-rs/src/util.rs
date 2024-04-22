@@ -235,15 +235,14 @@ pub unsafe fn string_arr_n(arr: &StringArr) -> libc::c_int {
 pub unsafe fn string_arr_append(arr: &mut StringArr, s: *mut libc::c_char) -> libc::c_int {
     arr.n += 1;
     arr.s = realloc(
-        (*arr).s as *mut libc::c_void,
-        (::core::mem::size_of::<StringArr>()).wrapping_mul((*arr).n as usize),
+        arr.s as *mut libc::c_void,
+        (::core::mem::size_of::<StringArr>()).wrapping_mul(arr.n as usize),
     ) as *mut *mut libc::c_char;
     if arr.s.is_null() {
         panic!();
     }
     let loc: libc::c_int = arr.n - 1 as libc::c_int;
-    let ref mut fresh1 = *arr.s.offset(loc as isize);
-    *fresh1 = s;
+    *arr.s.offset(loc as isize) = s;
     loc
 }
 
@@ -271,8 +270,8 @@ pub unsafe fn string_arr_deque(arr: &mut StringArr) -> *mut libc::c_char {
     let ret: *mut libc::c_char = dynamic_str(*arr.s.offset(0 as libc::c_int as isize));
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < arr.n - 1 as libc::c_int {
-        let ref mut fresh2 = *(arr.s).offset(i as isize);
-        *fresh2 = *arr.s.offset((i + 1 as libc::c_int) as isize);
+        let s = *arr.s.offset((i + 1 as libc::c_int) as isize);
+        *(arr.s).offset(i as isize) = s;
         i += 1;
     }
     arr.n -= 1;

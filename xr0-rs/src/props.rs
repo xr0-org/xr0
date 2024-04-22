@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_assignments)]
-
 use crate::ast::{ast_expr_equal, ast_expr_inverted_copy};
 use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
 use crate::{cstr, strbuilder_write, AstExpr, StrBuilder};
@@ -47,6 +45,6 @@ pub unsafe fn props_contradicts(p: *mut Props, p1: &AstExpr) -> bool {
 unsafe fn props_contradicts_actual(p: *mut Props, p1: &AstExpr, not_p1: &AstExpr) -> bool {
     (*p).props.iter().any(|p2| {
         let not_p2 = ast_expr_inverted_copy(p2, true);
-        ast_expr_equal(&*p1, &not_p2) || ast_expr_equal(&*not_p1, &*p2)
+        ast_expr_equal(p1, &not_p2) || ast_expr_equal(not_p1, p2)
     })
 }

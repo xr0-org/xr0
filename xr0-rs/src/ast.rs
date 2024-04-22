@@ -2491,7 +2491,7 @@ unsafe fn ast_stmt_sel_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
 }
 
 pub unsafe fn ast_stmt_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
-    match &(*stmt).kind {
+    match &stmt.kind {
         AstStmtKind::Jump(jump) => jump.kind == AstJumpKind::Return,
         AstStmtKind::Compound(block) => ast_block_isterminal(&**block, s),
         AstStmtKind::Selection(_) => sel_isterminal(stmt, s),
@@ -3539,6 +3539,7 @@ unsafe fn path_verify(
 ) -> Result<()> {
     let fname = ast_function_name(&*f);
     let stmts = &(*(*f).body).stmts;
+    #[allow(clippy::needless_range_loop)]
     for i in index as usize..stmts.len() {
         let stmt = &stmts[i];
         let mut splits: AstStmtSplits = ast_stmt_splits(stmt, actual_state);

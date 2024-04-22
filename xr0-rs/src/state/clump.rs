@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_assignments)]
-
 use std::ptr;
 
 use crate::state::block::{block_create, block_str};

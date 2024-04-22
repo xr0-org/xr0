@@ -180,15 +180,15 @@ pub unsafe fn vconst_declare(
     comment: *mut libc::c_char,
     persist: bool,
 ) -> OwningCStr {
-    let m = &mut (*v).varmap;
-    let s = vconst_id(m, &(*v).persist, persist);
+    let m = &mut v.varmap;
+    let s = vconst_id(m, &v.persist, persist);
     let s_string = s.to_string();
     m.insert(s_string.clone(), val);
     if !comment.is_null() {
         let comment_string = CStr::from_ptr(comment).to_str().unwrap().to_string();
-        (*v).comment.insert(s_string.clone(), comment_string);
+        v.comment.insert(s_string.clone(), comment_string);
     }
-    (*v).persist.insert(s_string, persist);
+    v.persist.insert(s_string, persist);
     s
 }
 
@@ -213,7 +213,7 @@ unsafe fn count_true(m: &HashMap<String, bool>) -> usize {
 
 pub unsafe fn vconst_get(v: &VConst, id: *mut libc::c_char) -> *mut Value {
     let id_str = CStr::from_ptr(id).to_str().unwrap();
-    (*v).varmap.get(id_str).copied().unwrap_or(ptr::null_mut())
+    v.varmap.get(id_str).copied().unwrap_or(ptr::null_mut())
 }
 
 pub unsafe fn vconst_undeclare(v: &mut VConst) {
@@ -239,10 +239,10 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
 
 pub unsafe fn vconst_str(v: &VConst, indent: *mut libc::c_char) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    for (k, &val) in &(*v).varmap {
+    for (k, &val) in &v.varmap {
         let value = value_str(val);
         strbuilder_write!(b, "{}{k}: {value}", cstr!(indent));
-        if let Some(comment) = (*v).comment.get(k) {
+        if let Some(comment) = v.comment.get(k) {
             strbuilder_write!(b, "\t({comment})");
         }
         strbuilder_write!(b, "\n");
