@@ -27,7 +27,6 @@ use crate::ast::{
     ast_type_vconst,
 };
 use crate::object::{object_as_value, object_assign};
-use crate::props::props_str;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
@@ -140,7 +139,7 @@ pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     }
     let stack = stack_str((*state).stack, state);
     strbuilder_write!(b, "{stack}\n");
-    let props = props_str(&(*state).props, "\t");
+    let props = (*state).props.str("\t");
     if !props.is_empty() {
         strbuilder_write!(b, "{props}");
     }

@@ -13,7 +13,6 @@ use crate::object::{
     object_hasvalue,
 };
 use crate::parser::{lexememarker_copy, lexememarker_destroy, LexemeMarker};
-use crate::props::{props_contradicts, props_get, props_install};
 use crate::state::state::{
     state_addresses_deallocand, state_alloc, state_clump, state_copy, state_copywithname,
     state_create, state_create_withprops, state_dealloc, state_declare, state_deref, state_destroy,
@@ -591,12 +590,12 @@ unsafe fn irreducible_assume(e: &AstExpr, value: bool, s: *mut State) -> Result<
 
 unsafe fn irreducible_assume_actual(e: &AstExpr, s: *mut State) -> Result<Preresult> {
     let p = state_getprops(&mut *s);
-    if props_contradicts(p, e) {
+    if p.contradicts(e) {
         return Ok(Preresult {
             is_contradiction: true,
         });
     }
-    props_install(p, ast_expr_copy(e));
+    p.install(ast_expr_copy(e));
     Ok(Preresult {
         is_contradiction: false,
     })
@@ -1064,7 +1063,7 @@ unsafe fn isdereferencable_absexec(expr: &AstExpr, state: *mut State) -> Result<
     let p = state_getprops(&mut *state);
     // XXX FIXME: This definitely isn't OK. absexec has some weird stuff going on in the original.
     // Could clone here instead.
-    props_install(p, Box::from_raw(expr as *const AstExpr as *mut AstExpr));
+    p.install(Box::from_raw(expr as *const AstExpr as *mut AstExpr));
     Ok(ptr::null_mut())
 }
 
@@ -2508,12 +2507,12 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
     if value_issync(&*v) {
         let sync: *mut AstExpr = value_as_sync(v);
         let p = state_getprops(&mut *state);
-        if props_get(p, &*sync) {
+        if p.get(&*sync) {
             return Decision {
                 decision: true,
                 err: None,
             };
-        } else if props_contradicts(p, &*sync) {
+        } else if p.contradicts(&*sync) {
             return Decision {
                 decision: false,
                 err: None,
@@ -2861,7 +2860,7 @@ unsafe fn condexists(cond: &AstExpr, s: *mut State) -> bool {
     // Note: original doesn't free this.
     let reduced: *mut AstExpr = value_to_expr(val);
     let p = state_getprops(&mut *s);
-    props_get(p, &*reduced) || props_contradicts(p, &*reduced)
+    p.get(&*reduced) || p.contradicts(&*reduced)
 }
 
 unsafe fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Vec<OwningCStr> {
