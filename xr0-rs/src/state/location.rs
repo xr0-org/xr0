@@ -1,6 +1,6 @@
-use libc::{free, printf};
+use libc::printf;
 
-use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal, ast_expr_str};
+use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
 use crate::state::block::{
     block_range_aredeallocands, block_range_dealloc, block_references, block_str,
@@ -10,10 +10,10 @@ use crate::state::heap::{heap_blockisfreed, heap_deallocblock, heap_getblock};
 use crate::state::r#static::static_memory_getblock;
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
-use crate::util::{error_create, strbuilder_build, strbuilder_create, Result};
+use crate::util::{strbuilder_build, strbuilder_create, Error, Result};
 use crate::{
-    cstr, strbuilder_write, AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, StrBuilder,
-    VConst, Value,
+    strbuilder_write, AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, StrBuilder, VConst,
+    Value,
 };
 
 pub struct Location {
@@ -123,9 +123,7 @@ pub unsafe fn location_str(loc: &Location) -> *mut libc::c_char {
     }
     strbuilder_write!(b, "{}", loc.block);
     if !offsetzero(loc) {
-        let offset: *mut libc::c_char = ast_expr_str(&loc.offset);
-        strbuilder_write!(b, "+{}", cstr!(offset));
-        free(offset as *mut libc::c_void);
+        strbuilder_write!(b, "+{}", loc.offset);
     }
     strbuilder_build(b)
 }
@@ -238,9 +236,7 @@ pub unsafe fn location_auto_getblock(loc: &Location, s: *mut Stack) -> Result<*m
     };
     let f: *mut Stack = stack_getframe(s, *frame);
     if f.is_null() {
-        return Err(error_create(
-            b"stack frame doesn't exist\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ));
+        return Err(Error::new("stack frame doesn't exist".to_string()));
     }
     Ok(stack_getblock(f, loc.block))
 }
@@ -252,9 +248,7 @@ pub unsafe fn location_getstackblock(loc: *mut Location, s: *mut Stack) -> *mut 
 
 pub unsafe fn location_dealloc(loc: *mut Location, heap: *mut Heap) -> Result<()> {
     if !matches!((*loc).kind, LocationKind::Dynamic) {
-        return Err(error_create(
-            b"not heap location\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ));
+        return Err(Error::new("not heap location".to_string()));
     }
     heap_deallocblock(heap, (*loc).block)
 }
@@ -269,24 +263,16 @@ pub unsafe fn location_range_dealloc(
         panic!();
     }
     let Some(b) = state_getblock(&mut *state, &*loc) else {
-        return Err(error_create(
-            b"cannot get block\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ));
+        return Err(Error::new("cannot get block".to_string()));
     };
     if !block_range_aredeallocands(b, lw, up, state) {
         printf(
             b"block: %s\n\0" as *const u8 as *const libc::c_char,
             block_str(b),
         );
-        printf(
-            b"lw: %s, up: %s\n\0" as *const u8 as *const libc::c_char,
-            ast_expr_str(lw),
-            ast_expr_str(up),
-        );
+        println!("lw: {lw}, up: {up}");
         debug_assert!(false);
-        return Err(error_create(
-            b"some values not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ));
+        return Err(Error::new("some values not allocated".to_string()));
     }
     block_range_dealloc(b, lw, up, state)
 }

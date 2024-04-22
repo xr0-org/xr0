@@ -2,11 +2,9 @@
 
 use std::ptr;
 
-use libc::{free, realloc};
+use libc::realloc;
 
-use crate::ast::{
-    ast_expr_copy, ast_expr_destroy, ast_expr_equal, ast_expr_inverted_copy, ast_expr_str,
-};
+use crate::ast::{ast_expr_copy, ast_expr_destroy, ast_expr_equal, ast_expr_inverted_copy};
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create};
 use crate::{cstr, strbuilder_write, AstExpr, StrBuilder};
 
@@ -59,18 +57,16 @@ pub unsafe fn props_str(p: *mut Props, indent: *mut libc::c_char) -> *mut libc::
     strbuilder_write!(b, "{}\u{22a2} ", cstr!(indent));
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < (*p).n {
-        let e: *mut libc::c_char = ast_expr_str(&**((*p).prop).offset(i as isize));
+        let e = &**((*p).prop).offset(i as isize);
         strbuilder_write!(
             b,
-            "{}{}",
-            cstr!(e),
+            "{e}{}",
             if (i + 1 as libc::c_int) < (*p).n {
                 ", "
             } else {
                 ""
             },
         );
-        free(e as *mut libc::c_void);
         i += 1;
     }
     strbuilder_write!(b, "\n");

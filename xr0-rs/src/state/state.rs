@@ -29,7 +29,7 @@ use crate::ast::{
 };
 use crate::object::{object_as_value, object_assign};
 use crate::props::{props_copy, props_create, props_destroy, props_str};
-use crate::util::{dynamic_str, error_create, strbuilder_build, strbuilder_create, Result};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Error, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
     value_ptr_create, value_sync_create,
@@ -370,11 +370,8 @@ pub unsafe fn state_deref(
         panic!();
     }
     let deref: *mut Location = location_with_offset(&*deref_base, index);
-    state_get(state, &*deref, true).map_err(|err| {
-        let b: *mut StrBuilder = strbuilder_create();
-        strbuilder_write!(b, "undefined indirection: {}", cstr!(err.msg));
-        error_create(strbuilder_build(b))
-    })
+    state_get(state, &*deref, true)
+        .map_err(|err| Error::new(format!("undefined indirection: {}", err.msg)))
 }
 
 pub unsafe fn state_range_alloc(
@@ -385,9 +382,7 @@ pub unsafe fn state_range_alloc(
 ) -> Result<()> {
     let arr_val: *mut Value = object_as_value(obj);
     if arr_val.is_null() {
-        return Err(error_create(
-            b"no value\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ));
+        return Err(Error::new("no value".to_string()));
     }
     let deref: *mut Location = value_as_location(&*arr_val);
     let b = location_getblock(
@@ -400,9 +395,7 @@ pub unsafe fn state_range_alloc(
     )
     .unwrap(); // panic rather than propagate the error - this is in the original
     if b.is_null() {
-        return Err(error_create(
-            b"no block\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ));
+        return Err(Error::new("no block".to_string()));
     }
     if ast_expr_equal(lw, up) {
         panic!();
@@ -416,9 +409,8 @@ pub unsafe fn state_alloc(state: *mut State) -> *mut Value {
 
 pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {
     if !value_islocation(&*val) {
-        return Err(error_create(
-            b"undefined free of value not pointing at heap\0" as *const u8 as *const libc::c_char
-                as *mut libc::c_char,
+        return Err(Error::new(
+            "undefined free of value not pointing at heap".to_string(),
         ));
     }
     location_dealloc(value_as_location(&*val), &mut (*state).heap)
@@ -432,9 +424,7 @@ pub unsafe fn state_range_dealloc(
 ) -> Result<()> {
     let arr_val: *mut Value = object_as_value(obj);
     if arr_val.is_null() {
-        return Err(error_create(
-            b"no value\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ));
+        return Err(Error::new("no value".to_string()));
     }
     let deref: *mut Location = value_as_location(&*arr_val);
     location_range_dealloc(deref, lw, up, state)

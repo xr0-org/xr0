@@ -129,7 +129,7 @@ pub unsafe fn pass1(root: &mut Ast, ext: *mut Externals) {
         if let Some(f) = ast_externdecl_as_function_ptr(decl) {
             if !ast_function_isaxiom(&*f) && !ast_function_isproto(&*f) {
                 if let Err(err) = ast_function_verify(f, ext) {
-                    eprintln!("{}", CStr::from_ptr(err.msg).to_string_lossy());
+                    eprintln!("{}", err.msg);
                     process::exit(1);
                 }
                 vprintln!(
@@ -151,7 +151,7 @@ pub unsafe fn pass_inorder(order: &mut StringArr, ext: &mut Externals) {
             || ast_function_isproto(&*f) as libc::c_int != 0)
         {
             if let Err(err) = ast_function_verify(f, ext) {
-                eprintln!("{}", CStr::from_ptr(err.msg).to_string_lossy());
+                eprintln!("{}", err.msg);
                 process::exit(1);
             }
             eprintln!(

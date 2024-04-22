@@ -6,7 +6,7 @@ use libc::free;
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
-    ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_str,
+    ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create,
     ast_expr_sum_create, ast_type_struct_complete,
 };
 use crate::state::location::{location_copy, location_references, location_str};
@@ -101,10 +101,9 @@ pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Objec
 pub unsafe fn object_str(obj: *mut Object) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
     strbuilder_write!(b, "{{");
-    let offset: *mut libc::c_char = ast_expr_str(&*(*obj).offset);
-    strbuilder_write!(b, "{}:", cstr!(offset));
-    free(offset as *mut libc::c_void);
-    let inner: *mut libc::c_char = inner_str(obj);
+    let offset = &*(*obj).offset;
+    strbuilder_write!(b, "{offset}:");
+    let inner = inner_str(obj);
     strbuilder_write!(b, "<{}>", cstr!(inner));
     free(inner as *mut libc::c_void);
     strbuilder_write!(b, "}}");
@@ -381,11 +380,9 @@ pub unsafe fn range_copy(r: &Range) -> Box<Range> {
 
 pub unsafe fn range_str(r: &Range) -> *mut libc::c_char {
     let b: *mut StrBuilder = strbuilder_create();
-    let size: *mut libc::c_char = ast_expr_str(&r.size);
-    let loc: *mut libc::c_char = location_str(&*r.loc);
-    strbuilder_write!(b, "virt:{}@{}", cstr!(size), cstr!(loc));
+    let loc = location_str(&*r.loc);
+    strbuilder_write!(b, "virt:{}@{}", r.size, cstr!(loc));
     free(loc as *mut libc::c_void);
-    free(size as *mut libc::c_void);
     strbuilder_build(b)
 }
 

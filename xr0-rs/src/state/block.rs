@@ -16,7 +16,7 @@ use crate::object::{
 };
 use crate::state::heap::heap_newblock;
 use crate::state::state::{state_alloc, state_eval};
-use crate::util::{error_create, strbuilder_build, strbuilder_create, Result};
+use crate::util::{strbuilder_build, strbuilder_create, Error, Result};
 use crate::{cstr, strbuilder_write, AstExpr, Heap, Location, Object, State, StrBuilder};
 
 pub struct Block {
@@ -207,14 +207,10 @@ pub unsafe fn block_range_dealloc(
         return Ok(());
     }
     let Some(lw_index) = object_arr_index(&b.arr, lw, s) else {
-        return Err(error_create(
-            b"lower bound not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ));
+        return Err(Error::new("lower bound not allocated".to_string()));
     };
     let Some(up_index) = object_arr_index_upperincl(&b.arr, up, s) else {
-        return Err(error_create(
-            b"upper bound not allocated\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ));
+        return Err(Error::new("upper bound not allocated".to_string()));
     };
     let n = b.arr.len();
     // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`. I

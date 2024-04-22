@@ -595,7 +595,7 @@ unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> *mut libc::c_char {
 unsafe fn number_str(num: *mut Number) -> *mut libc::c_char {
     match &(*num).kind {
         NumberKind::Ranges(ranges) => number_ranges_sprint(ranges),
-        NumberKind::Computed(computation) => ast_expr_str(&**computation),
+        NumberKind::Computed(computation) => ast_expr_str(&**computation).into_ptr(),
     }
 }
 

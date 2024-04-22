@@ -18,24 +18,14 @@ pub struct StrBuilder {
     s: String,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Error {
-    pub msg: *mut libc::c_char,
+    pub msg: String,
     #[allow(dead_code)]
     pub inner: *mut Error,
 }
 
 pub type Result<T, E = Box<Error>> = std::result::Result<T, E>;
-
-impl Debug for Error {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{:?}",
-            unsafe { std::ffi::CStr::from_ptr(self.msg) }.to_string_lossy()
-        )
-    }
-}
 
 pub struct StringArr {
     pub n: libc::c_int,
@@ -212,11 +202,13 @@ macro_rules! cstr {
     }};
 }
 
-pub unsafe fn error_create(s: *mut libc::c_char) -> Box<Error> {
-    Box::new(Error {
-        msg: s,
-        inner: ptr::null_mut(),
-    })
+impl Error {
+    pub fn new(s: String) -> Box<Error> {
+        Box::new(Error {
+            msg: s,
+            inner: ptr::null_mut(),
+        })
+    }
 }
 
 pub unsafe fn string_arr_create() -> Box<StringArr> {
