@@ -32,6 +32,12 @@ pub struct StringArr {
     pub s: *mut *mut libc::c_char,
 }
 
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
 pub unsafe extern "C" fn dynamic_str(s: *const libc::c_char) -> *mut libc::c_char {
     let len = strlen(s).wrapping_add(1);
     let t: *mut libc::c_char =
