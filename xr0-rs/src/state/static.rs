@@ -2,63 +2,51 @@
 
 use std::ptr;
 
-use libc::malloc;
-
-use crate::state::block::{
-    block_arr_append, block_arr_blocks, block_arr_copy, block_arr_create, block_arr_destroy,
-    block_arr_nblocks, block_create, block_str,
-};
+use crate::state::block::{block_create, block_str};
 use crate::state::location::location_copy;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
-use crate::{cstr, strbuilder_write, Block, BlockArr, Location, StrBuilder};
+use crate::{cstr, strbuilder_write, Block, Location, StrBuilder};
 
 pub struct StaticMemory {
-    pub blocks: *mut BlockArr,
+    pub blocks: Vec<Box<Block>>,
     pub pool: Box<Map>,
 }
 
 pub unsafe fn static_memory_create() -> *mut StaticMemory {
-    let sm: *mut StaticMemory = malloc(::core::mem::size_of::<StaticMemory>()) as *mut StaticMemory;
-    assert!(!sm.is_null());
-    std::ptr::write(
-        sm,
-        StaticMemory {
-            blocks: block_arr_create(),
-            pool: Map::new(),
-        },
-    );
-    sm
+    Box::into_raw(Box::new(StaticMemory {
+        blocks: vec![],
+        pool: Map::new(),
+    }))
 }
 
 pub unsafe fn static_memory_destroy(sm: *mut StaticMemory) {
-    block_arr_destroy((*sm).blocks);
+    // Note: Original leaked the StaticMemory itself.
+    drop(Box::from_raw(sm));
 }
 
 pub unsafe fn static_memory_str(sm: *mut StaticMemory, indent: *mut libc::c_char) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    let n: libc::c_int = block_arr_nblocks((*sm).blocks);
-    let arr: *mut *mut Block = block_arr_blocks((*sm).blocks);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < n {
-        let block = block_str(&**arr.offset(i as isize));
-        strbuilder_write!(b, "{}{i}: {block}\n", cstr!(indent));
-        i += 1;
+    for (i, block) in (*sm).blocks.iter().enumerate() {
+        strbuilder_write!(b, "{}{i}: {}\n", cstr!(indent), block_str(block));
     }
     strbuilder_build(b)
 }
 
 pub unsafe fn static_memory_copy(sm: *mut StaticMemory) -> *mut StaticMemory {
-    let copy: *mut StaticMemory =
-        malloc(::core::mem::size_of::<StaticMemory>()) as *mut StaticMemory;
-    ptr::write(
-        copy,
-        StaticMemory {
-            blocks: block_arr_copy((*sm).blocks),
-            pool: pool_copy(&(*sm).pool),
-        },
-    );
-    copy
+    Box::into_raw(Box::new((*sm).clone()))
 }
+
+impl Clone for StaticMemory {
+    fn clone(&self) -> Self {
+        unsafe {
+            StaticMemory {
+                blocks: self.blocks.clone(),
+                pool: pool_copy(&self.pool),
+            }
+        }
+    }
+}
+
 unsafe fn pool_copy(p: &Map) -> Box<Map> {
     let mut pcopy = Map::new();
     for (k, v) in p.pairs() {
@@ -71,17 +59,16 @@ unsafe fn pool_copy(p: &Map) -> Box<Map> {
 }
 
 pub unsafe fn static_memory_newblock(sm: *mut StaticMemory) -> libc::c_int {
-    let address: libc::c_int = block_arr_append((*sm).blocks, block_create());
-    let n: libc::c_int = block_arr_nblocks((*sm).blocks);
-    assert!(n > 0);
+    let address = (*sm).blocks.len() as libc::c_int;
+    (*sm).blocks.push(Box::from_raw(block_create()));
     address
 }
 
 pub unsafe fn static_memory_getblock(sm: *mut StaticMemory, address: libc::c_int) -> *mut Block {
-    if address >= block_arr_nblocks((*sm).blocks) {
+    if address as usize >= (*sm).blocks.len() {
         return ptr::null_mut();
     }
-    *(block_arr_blocks((*sm).blocks)).offset(address as isize)
+    &mut *(*sm).blocks[address as usize]
 }
 
 pub unsafe fn static_memory_stringpool(
