@@ -102,10 +102,10 @@ pub struct IncDecExpr {
     pre: libc::c_int,
 }
 
+#[derive(Clone)]
 pub struct CallExpr {
     fun: Box<AstExpr>,
-    n: libc::c_int,
-    arg: *mut *mut AstExpr,
+    args: Vec<Box<AstExpr>>,
 }
 
 #[derive(Clone)]
@@ -362,17 +362,13 @@ pub unsafe fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
             b1.op == b2.op && ast_expr_equal(&b1.e1, &b2.e1) && ast_expr_equal(&b1.e2, &b2.e2)
         }
         (AstExprKind::Call(c1), AstExprKind::Call(c2)) => {
-            if c1.n != c2.n {
-                return false;
-            }
-            let mut i: libc::c_int = 0 as libc::c_int;
-            while i < c1.n {
-                if !ast_expr_equal(&**c1.arg.offset(i as isize), &**c2.arg.offset(i as isize)) {
-                    return false;
-                }
-                i += 1;
-            }
-            ast_expr_equal(&c1.fun, &c2.fun)
+            c1.args.len() == c2.args.len()
+                && c1
+                    .args
+                    .iter()
+                    .zip(&c2.args)
+                    .all(|(arg1, arg2)| ast_expr_equal(arg1, arg2))
+                && ast_expr_equal(&c1.fun, &c2.fun)
         }
         (AstExprKind::StructMember(m1), AstExprKind::StructMember(m2)) => {
             ast_expr_equal(&m1.root, &m2.root) && m1.field == m2.field
@@ -933,12 +929,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value
     }
     let params = ast_function_params(&*f);
     let rtype = ast_function_type(&*f);
-    let args = prepare_arguments(
-        ast_expr_call_nargs(expr),
-        ast_expr_call_args(expr),
-        params,
-        state,
-    );
+    let args = prepare_arguments(ast_expr_call_args(expr), params, state);
     state_pushframe(state, dynamic_str(name), rtype);
     prepare_parameters(params, args, name, state)?;
     call_setupverify(f, state_copy(state))?;
@@ -981,25 +972,21 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<*mut 
     let root = ast_function_name(f);
     let uncomputed_params = ast_function_params(f);
     let nparams = uncomputed_params.len();
-    let computed_param: *mut *mut AstExpr =
-        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(nparams)) as *mut *mut AstExpr;
-    for (i, &p) in uncomputed_params.iter().enumerate() {
+    let mut computed_params = Vec::with_capacity(nparams);
+    for &p in uncomputed_params {
         let param = ast_expr_identifier_create(dynamic_str(ast_variable_name(p)));
         let v = ast_expr_eval(&param, s)?;
         drop(param);
         assert!(!v.is_null());
-        if value_islocation(&*v) {
-            let ref mut fresh0 = *computed_param.offset(i as isize);
-            *fresh0 = Box::into_raw(ast_expr_identifier_create(value_str(v)));
+        computed_params.push(if value_islocation(&*v) {
+            ast_expr_identifier_create(value_str(v))
         } else {
-            let ref mut fresh1 = *computed_param.offset(i as isize);
-            *fresh1 = value_to_expr(v);
-        }
+            Box::from_raw(value_to_expr(v))
+        });
     }
     Ok(value_sync_create(Box::into_raw(ast_expr_call_create(
         ast_expr_identifier_create(dynamic_str(root)),
-        uncomputed_params.len() as libc::c_int,
-        computed_param,
+        computed_params,
     ))))
 }
 
@@ -1083,19 +1070,12 @@ unsafe fn isdereferencable_absexec(expr: &AstExpr, state: *mut State) -> Result<
 }
 
 pub unsafe fn prepare_arguments(
-    nargs: libc::c_int,
-    arg: *mut *mut AstExpr,
+    args: &[Box<AstExpr>],
     params: &[*mut AstVariable],
     state: *mut State,
 ) -> Vec<Result<*mut Value>> {
-    assert_eq!(nargs as isize, params.len() as isize);
-    let mut args = vec![];
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nargs {
-        args.push(ast_expr_eval(&**arg.offset(i as isize), state));
-        i += 1;
-    }
-    args
+    assert_eq!(args.len(), params.len());
+    args.iter().map(|arg| ast_expr_eval(arg, state)).collect()
 }
 
 unsafe fn assign_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
@@ -1276,23 +1256,16 @@ unsafe fn binary_pf_reduce(
 
 unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let root = ast_expr_as_identifier(ast_expr_call_root(e));
-    let nargs: libc::c_int = ast_expr_call_nargs(e);
-    let unreduced_arg: *mut *mut AstExpr = ast_expr_call_args(e);
-    let reduced_arg: *mut *mut AstExpr =
-        malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(nargs as usize))
-            as *mut *mut AstExpr;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < nargs {
-        let arg = ast_expr_pf_reduce(&**unreduced_arg.offset(i as isize), s)?;
-        assert!(!arg.is_null());
-        let ref mut fresh3 = *reduced_arg.offset(i as isize);
-        *fresh3 = value_to_expr(arg);
-        i += 1;
+    let unreduced_args = ast_expr_call_args(e);
+    let mut reduced_args = Vec::with_capacity(unreduced_args.len());
+    for arg in unreduced_args {
+        let val = ast_expr_pf_reduce(arg, s)?;
+        assert!(!val.is_null());
+        reduced_args.push(Box::from_raw(value_to_expr(val)));
     }
     Ok(value_sync_create(Box::into_raw(ast_expr_call_create(
         ast_expr_identifier_create(dynamic_str(root)),
-        nargs,
-        reduced_arg,
+        reduced_args,
     ))))
 }
 
@@ -1375,26 +1348,14 @@ unsafe fn ast_expr_call_str_build(expr: &AstExpr, b: *mut StrBuilder) {
         panic!()
     };
     strbuilder_write!(b, "{}(", call.fun);
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < call.n {
-        let arg = &**call.arg.offset(i as isize);
-        strbuilder_write!(b, "{arg}{}", if i + 1 < call.n { ", " } else { "" },);
-        i += 1;
+    for (i, arg) in call.args.iter().enumerate() {
+        strbuilder_write!(
+            b,
+            "{arg}{}",
+            if i + 1 < call.args.len() { ", " } else { "" },
+        );
     }
     strbuilder_write!(b, ")");
-}
-
-impl Drop for CallExpr {
-    fn drop(&mut self) {
-        unsafe {
-            let mut i: libc::c_int = 0 as libc::c_int;
-            while i < self.n {
-                ast_expr_destroy(*self.arg.offset(i as isize));
-                i += 1;
-            }
-            free(self.arg as *mut libc::c_void);
-        }
-    }
 }
 
 pub unsafe fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
@@ -1432,26 +1393,6 @@ pub unsafe fn ast_expr_incdec_root(expr: &AstExpr) -> &AstExpr {
         panic!()
     };
     &incdec.operand
-}
-
-impl Clone for CallExpr {
-    fn clone(&self) -> CallExpr {
-        unsafe {
-            let arg: *mut *mut AstExpr =
-                malloc((::core::mem::size_of::<*mut AstExpr>()).wrapping_mul(self.n as usize))
-                    as *mut *mut AstExpr;
-            for i in 0..self.n {
-                let ref mut fresh4 = *arg.add(i as usize);
-                *fresh4 = Box::into_raw(ast_expr_copy(&**(self.arg).add(i as usize)));
-            }
-
-            CallExpr {
-                fun: self.fun.clone(),
-                n: self.n,
-                arg,
-            }
-        }
-    }
 }
 
 pub unsafe fn ast_expr_member_create(struct_: Box<AstExpr>, field: OwningCStr) -> Box<AstExpr> {
@@ -1500,18 +1441,11 @@ pub unsafe fn ast_expr_incdec_create(root: Box<AstExpr>, inc: bool, pre: bool) -
     }))
 }
 
-pub unsafe fn ast_expr_call_args(expr: &AstExpr) -> *mut *mut AstExpr {
+pub unsafe fn ast_expr_call_args(expr: &AstExpr) -> &[Box<AstExpr>] {
     let AstExprKind::Call(call) = &expr.kind else {
         panic!()
     };
-    call.arg
-}
-
-pub unsafe fn ast_expr_call_nargs(expr: &AstExpr) -> libc::c_int {
-    let AstExprKind::Call(call) = &expr.kind else {
-        panic!()
-    };
-    call.n
+    &call.args
 }
 
 pub unsafe fn ast_expr_call_root(expr: &AstExpr) -> &AstExpr {
@@ -1521,16 +1455,8 @@ pub unsafe fn ast_expr_call_root(expr: &AstExpr) -> &AstExpr {
     &call.fun
 }
 
-pub unsafe fn ast_expr_call_create(
-    root: Box<AstExpr>,
-    narg: libc::c_int,
-    arg: *mut *mut AstExpr,
-) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Call(CallExpr {
-        fun: root,
-        n: narg,
-        arg,
-    }))
+pub unsafe fn ast_expr_call_create(fun: Box<AstExpr>, args: Vec<Box<AstExpr>>) -> Box<AstExpr> {
+    ast_expr_create(AstExprKind::Call(CallExpr { fun, args }))
 }
 
 pub unsafe fn ast_expr_iteration_create() -> Box<AstExpr> {
@@ -1872,12 +1798,7 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     }
     let params = ast_function_params(&*f);
     let s_copy: *mut State = state_copy(state);
-    let args = prepare_arguments(
-        ast_expr_call_nargs(expr),
-        ast_expr_call_args(expr),
-        params,
-        s_copy,
-    );
+    let args = prepare_arguments(ast_expr_call_args(expr), params, s_copy);
     let ret_type: *mut AstType = ast_function_type(&*f);
     state_pushframe(s_copy, dynamic_str(name), ret_type);
     if let Err(err) = prepare_parameters(params, args, name, s_copy) {
@@ -1952,10 +1873,8 @@ unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Box<StringArr> {
         panic!()
     };
     string_arr_append(&mut res, id.clone().into_ptr());
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < call.n {
-        res = string_arr_concat(&res, &ast_expr_getfuncs(&**(call.arg).offset(i as isize)));
-        i += 1;
+    for arg in &call.args {
+        res = string_arr_concat(&res, &ast_expr_getfuncs(arg));
     }
     res
 }

@@ -31,11 +31,6 @@ pub struct Declarator {
     pub name: *mut libc::c_char,
 }
 
-pub struct ExprArray {
-    pub n: libc::c_int,
-    pub expr: *mut *mut AstExpr,
-}
-
 struct BlockStatement {
     r#abstract: *mut AstBlock,
     body: *mut AstBlock,
@@ -43,7 +38,7 @@ struct BlockStatement {
 
 enum PostfixOp {
     ArrayAccess(Box<AstExpr>),
-    Call(libc::c_int, *mut *mut AstExpr),
+    Call(Vec<Box<AstExpr>>),
     Dot(*mut libc::c_char),
     Arrow(*mut libc::c_char),
     Inc,
@@ -62,20 +57,6 @@ unsafe fn strip_quotes(s: *const libc::c_char) -> BoxedCStr {
     );
     *t.add(len - 1) = 0;
     t
-}
-
-unsafe fn expr_array_from_vec(v: Vec<Box<AstExpr>>) -> ExprArray {
-    let n = v.len();
-    let size_bytes = std::mem::size_of::<*mut AstExpr>() * n;
-    let expr = libc::malloc(size_bytes) as *mut *mut AstExpr;
-    assert!(!expr.is_null());
-    for (i, e) in v.into_iter().enumerate() {
-        *expr.add(i) = Box::into_raw(e);
-    }
-    ExprArray {
-        n: n as libc::c_int,
-        expr,
-    }
 }
 
 unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<*mut AstVariable> {
@@ -182,8 +163,8 @@ pub grammar c_parser(env: &Env) for str {
                                 ast_expr_binary_create(a, AstBinaryOp::Addition, i),
                                 AstUnaryOp::Dereference,
                             ),
-                        PostfixOp::Call(argc, argv) =>
-                            ast_expr_call_create(a, argc, argv),
+                        PostfixOp::Call(args) =>
+                            ast_expr_call_create(a, args),
                         PostfixOp::Dot(name) =>
                             ast_expr_member_create(a, OwningCStr::copy(CStr::from_ptr(name))),
                         PostfixOp::Arrow(name) =>
@@ -209,8 +190,8 @@ pub grammar c_parser(env: &Env) for str {
 
     rule postfix_op() -> PostfixOp =
         _ "[" _ i:expression() _ "]" { PostfixOp::ArrayAccess(i) } /
-        _ "(" _ ")" { PostfixOp::Call(0, ptr::null_mut()) } /
-        _ "(" _ args:argument_expression_list() _ ")" { PostfixOp::Call(args.n, args.expr) } /
+        _ "(" _ ")" { PostfixOp::Call(vec![]) } /
+        _ "(" _ args:argument_expression_list() _ ")" { PostfixOp::Call(args) } /
         _ "." _ m:identifier() { PostfixOp::Dot(m) } /
         _ "->" _ m:identifier() { PostfixOp::Arrow(m) } /
         _ "++" { PostfixOp::Inc } /
@@ -221,8 +202,8 @@ pub grammar c_parser(env: &Env) for str {
         ".free" _ "(" a:expression() ")" { unsafe { ast_expr_dealloc_create(a) } } /
         ".clump" _ "(" a:expression() ")" { unsafe { ast_expr_clump_create(a) } }
 
-    rule argument_expression_list() -> ExprArray =
-        args:cs1(<assignment_expression()>) { unsafe { expr_array_from_vec(args) } }
+    rule argument_expression_list() -> Vec<Box<AstExpr>> =
+        args:cs1(<assignment_expression()>) { args }
 
     rule isdeallocand_expression() -> Box<AstExpr> =
         postfix_expression() /
