@@ -468,7 +468,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule labelled_statement() -> BoxedStmt =
         label:identifier() _ ":" _ s:statement() p:position!() {
-            unsafe { ast_stmt_create_labelled(env.lexloc(p), label, s) }
+            unsafe { ast_stmt_create_labelled(env.lexloc(p), OwningCStr::new(label), s) }
         } /
         K(<"case">) _ constant_expression() _ ":" _ statement() p:position!() {
             unsafe { ast_stmt_create_nop(env.lexloc(p)) }

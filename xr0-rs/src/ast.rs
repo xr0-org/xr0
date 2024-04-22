@@ -5,7 +5,7 @@ use std::fmt::{self, Display, Formatter};
 use std::process;
 use std::ptr;
 
-use libc::{free, malloc, realloc, strcmp, strncmp};
+use libc::{free, malloc, realloc, strncmp};
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
 use crate::object::{
@@ -244,7 +244,7 @@ pub struct AstSelectionStmt {
 }
 
 pub struct AstLabelledStmt {
-    pub label: *mut libc::c_char,
+    pub label: OwningCStr,
     pub stmt: *mut AstStmt,
 }
 
@@ -2201,12 +2201,10 @@ pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> *mut AstStmt {
     } else {
         0 as *mut LexemeMarker
     };
-    match &(*stmt).kind {
-        AstStmtKind::Labelled(labelled) => ast_stmt_create_labelled(
-            loc,
-            dynamic_str(labelled.label),
-            ast_stmt_copy(&*labelled.stmt),
-        ),
+    match &stmt.kind {
+        AstStmtKind::Labelled(labelled) => {
+            ast_stmt_create_labelled(loc, labelled.label.clone(), ast_stmt_copy(&*labelled.stmt))
+        }
 
         AstStmtKind::Nop => ast_stmt_create_nop(loc),
         AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, ast_expr_copy(expr)),
@@ -2301,10 +2299,7 @@ pub unsafe fn ast_stmt_isassume(stmt: &AstStmt) -> bool {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         return false;
     };
-    strcmp(
-        labelled.label,
-        b"assume\0" as *const u8 as *const libc::c_char,
-    ) == 0
+    labelled.label.as_str() == "assume"
 }
 
 unsafe fn stmt_installprop(stmt: &AstStmt, state: *mut State) -> Result<Preresult> {
@@ -2315,10 +2310,7 @@ pub unsafe fn ast_stmt_ispre(stmt: &AstStmt) -> bool {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         return false;
     };
-    strcmp(
-        labelled.label,
-        b"setup\0" as *const u8 as *const libc::c_char,
-    ) == 0
+    labelled.label.as_str() == "setup"
 }
 
 unsafe fn stmt_v_block_verify(v_block_stmt: &AstStmt, state: *mut State) -> Result<()> {
@@ -2586,7 +2578,7 @@ pub unsafe fn ast_stmt_labelled_label(stmt: &AstStmt) -> *mut libc::c_char {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         panic!()
     };
-    labelled.label
+    labelled.label.as_ptr()
 }
 
 unsafe fn sel_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
@@ -2894,7 +2886,7 @@ unsafe fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
         panic!();
     };
     let s = ast_stmt_str(&*labelled.stmt);
-    strbuilder_write!(b, "{}: {}", cstr!(labelled.label), cstr!(s));
+    strbuilder_write!(b, "{}: {}", labelled.label, cstr!(s));
     free(s as *mut libc::c_void);
 }
 
@@ -2923,7 +2915,7 @@ pub unsafe fn ast_stmt_sel_nest(stmt: &AstStmt) -> Option<&AstStmt> {
 
 pub unsafe fn ast_stmt_create_labelled(
     loc: *mut LexemeMarker,
-    label: *mut libc::c_char,
+    label: OwningCStr,
     substmt: *mut AstStmt,
 ) -> *mut AstStmt {
     let stmt: *mut AstStmt = ast_stmt_create(loc);
@@ -3003,7 +2995,6 @@ impl Drop for AstStmtKind {
         unsafe {
             match self {
                 AstStmtKind::Labelled(labelled) => {
-                    free(labelled.label as *mut libc::c_void);
                     ast_stmt_destroy(labelled.stmt);
                 }
                 AstStmtKind::Nop => {}
