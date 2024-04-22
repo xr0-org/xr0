@@ -84,7 +84,7 @@ unsafe fn printdelim(h: *mut Heap, start: usize) -> bool {
 
 pub unsafe fn heap_newblock(h: *mut Heap) -> *mut Location {
     let address = (*h).blocks.len() as libc::c_int;
-    (*h).blocks.push(Box::from_raw(block_create()));
+    (*h).blocks.push(block_create());
     let n = (*h).blocks.len();
     (*h).freed = realloc(
         (*h).freed as *mut libc::c_void,

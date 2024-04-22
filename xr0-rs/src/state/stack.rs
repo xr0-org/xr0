@@ -42,7 +42,7 @@ pub struct Variable {
 
 pub unsafe fn stack_newblock(stack: *mut Stack) -> *mut Location {
     let address = (*stack).frame.len() as libc::c_int;
-    (*stack).frame.push(Box::from_raw(block_create()));
+    (*stack).frame.push(block_create());
     let loc: *mut Location = location_create_automatic(
         (*stack).id,
         address,

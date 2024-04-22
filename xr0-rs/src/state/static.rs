@@ -60,7 +60,7 @@ unsafe fn pool_copy(p: &Map) -> Box<Map> {
 
 pub unsafe fn static_memory_newblock(sm: *mut StaticMemory) -> libc::c_int {
     let address = (*sm).blocks.len() as libc::c_int;
-    (*sm).blocks.push(Box::from_raw(block_create()));
+    (*sm).blocks.push(block_create());
     address
 }
 

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::ptr;
 
 use crate::ast::{
@@ -21,12 +19,8 @@ pub struct Block {
     pub arr: Vec<*mut Object>,
 }
 
-pub unsafe fn block_create() -> *mut Block {
-    Box::into_raw(Box::new(Block { arr: vec![] }))
-}
-
-pub unsafe fn block_destroy(b: *mut Block) {
-    drop(Box::from_raw(b));
+pub unsafe fn block_create() -> Box<Block> {
+    Box::new(Block { arr: vec![] })
 }
 
 impl Drop for Block {
@@ -50,10 +44,6 @@ impl Clone for Block {
                 .collect(),
         }
     }
-}
-
-pub unsafe fn block_copy(old: *mut Block) -> *mut Block {
-    Box::into_raw(Box::new((*old).clone()))
 }
 
 pub unsafe fn block_str(block: &Block) -> OwningCStr {

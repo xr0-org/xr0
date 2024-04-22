@@ -29,7 +29,7 @@ pub unsafe fn clump_str(c: *mut Clump, indent: *mut libc::c_char) -> OwningCStr 
 
 pub unsafe fn clump_newblock(c: *mut Clump) -> libc::c_int {
     let address = (*c).blocks.len() as libc::c_int;
-    (*c).blocks.push(Box::from_raw(block_create()));
+    (*c).blocks.push(block_create());
     address
 }
 
