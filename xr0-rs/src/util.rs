@@ -1,5 +1,7 @@
+use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::hash::Hash;
 use std::ptr;
 
 use libc::{free, malloc, realloc, strcmp, strlen, strncpy};
@@ -349,5 +351,73 @@ impl Clone for OwningCStr {
         OwningCStr {
             ptr: unsafe { dynamic_str(self.ptr) },
         }
+    }
+}
+
+/// Map that keeps entries in insertion order.
+/// Implemented as an alist for now.
+#[derive(Clone)]
+pub struct InsertionOrderMap<K, V> {
+    items: Vec<(K, V)>,
+}
+
+impl<K, V> Default for InsertionOrderMap<K, V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<K, V> InsertionOrderMap<K, V> {
+    pub fn new() -> Self {
+        InsertionOrderMap { items: vec![] }
+    }
+
+    pub fn insert(&mut self, key: K, value: V)
+    where
+        K: Hash + Eq,
+    {
+        for (k, v) in &mut self.items {
+            if *k == key {
+                *v = value;
+                return;
+            }
+        }
+        self.items.push((key, value));
+    }
+
+    pub fn get<Q>(&self, key: &Q) -> Option<&V>
+    where
+        Q: Hash + Eq + ?Sized,
+        K: Hash + Eq + Borrow<Q>,
+    {
+        for (k, v) in &self.items {
+            if k.borrow() == key {
+                return Some(v);
+            }
+        }
+        None
+    }
+}
+
+impl<'a, K, V> IntoIterator for &'a InsertionOrderMap<K, V> {
+    type IntoIter = Iter<'a, K, V>;
+    type Item = (&'a K, &'a V);
+
+    fn into_iter(self) -> Self::IntoIter {
+        Iter {
+            inner: self.items.iter(),
+        }
+    }
+}
+
+pub struct Iter<'a, K, V> {
+    inner: std::slice::Iter<'a, (K, V)>,
+}
+
+impl<'a, K: 'a, V: 'a> Iterator for Iter<'a, K, V> {
+    type Item = (&'a K, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|(k, v)| (k, v))
     }
 }

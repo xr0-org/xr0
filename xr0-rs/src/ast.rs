@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::fmt::{self, Display, Formatter};
 use std::process;
 use std::ptr;
@@ -24,8 +24,8 @@ use crate::state::state::{
 };
 use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, string_arr_append,
-    string_arr_contains, string_arr_create, string_arr_deque, Error, Map, OwningCStr, Result,
-    StringArr,
+    string_arr_contains, string_arr_create, string_arr_deque, Error, InsertionOrderMap, Map,
+    OwningCStr, Result, StringArr,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -1842,18 +1842,17 @@ unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
     res
 }
 
-unsafe fn calculate_indegrees(g: &Map) -> Box<Map> {
+unsafe fn calculate_indegrees(g: &FuncGraph) -> Box<Map> {
     let mut indegrees = Map::new();
-    for key in g.keys() {
-        let deps: *mut StringArr = g.get(key) as *mut StringArr;
-        if (indegrees.get(key)).is_null() {
+    for (key, deps) in g {
+        if indegrees.get(key.as_ptr()).is_null() {
             indegrees.set(
-                dynamic_str(key),
+                dynamic_str(key.as_ptr()),
                 dynamic_int(0 as libc::c_int) as *const libc::c_void,
             );
             let mut j: libc::c_int = 0 as libc::c_int;
-            while j < (*deps).n {
-                let dep_key = *((*deps).s).offset(j as isize);
+            while j < deps.n {
+                let dep_key = *deps.s.offset(j as isize);
                 if (indegrees.get(dep_key)).is_null() {
                     indegrees.set(
                         dynamic_str(dep_key),
@@ -1865,10 +1864,9 @@ unsafe fn calculate_indegrees(g: &Map) -> Box<Map> {
         }
     }
     for key in indegrees.keys() {
-        let n_arr: *mut StringArr = g.get(key) as *mut StringArr;
-        if !n_arr.is_null() {
+        if let Some(n_arr) = g.get(CStr::from_ptr(key)) {
             let mut j_0: libc::c_int = 0 as libc::c_int;
-            while j_0 < (*n_arr).n {
+            while j_0 < n_arr.n {
                 let count: *mut libc::c_int = indegrees.get(key) as *mut libc::c_int;
                 *count += 1;
                 j_0 += 1;
@@ -1900,16 +1898,15 @@ pub unsafe fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr
     let g = ast_function_buildgraph(fname, ext);
     let indegrees = calculate_indegrees(&g);
     let mut indegree_zero = build_indegree_zero(&indegrees);
-    while indegree_zero.n > 0 as libc::c_int {
+    while indegree_zero.n > 0 {
         let curr = string_arr_deque(&mut indegree_zero);
         order.push(OwningCStr::new(curr));
-        for key in (*g).keys() {
-            let v: *mut StringArr = g.get(key) as *mut StringArr;
-            if string_arr_contains(&*v, curr) {
-                let count: *mut libc::c_int = indegrees.get(key) as *mut libc::c_int;
+        for (key, v) in &g {
+            if string_arr_contains(v, curr) {
+                let count: *mut libc::c_int = indegrees.get(key.as_ptr()) as *mut libc::c_int;
                 *count -= 1;
-                if *count == 0 as libc::c_int {
-                    string_arr_append(&mut indegree_zero, dynamic_str(key));
+                if *count == 0 {
+                    string_arr_append(&mut indegree_zero, dynamic_str(key.as_ptr()));
                 }
             }
         }
@@ -3607,7 +3604,9 @@ unsafe fn split_path_verify(
     Ok(())
 }
 
-unsafe fn recurse_buildgraph(g: &mut Map, dedup: &mut Map, fname: &CStr, ext: &Externals) {
+type FuncGraph = InsertionOrderMap<CString, Box<StringArr>>;
+
+unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, ext: &Externals) {
     let mut local_dedup = Map::new();
     if !(dedup.get(fname.as_ptr())).is_null() {
         return;
@@ -3644,10 +3643,7 @@ unsafe fn recurse_buildgraph(g: &mut Map, dedup: &mut Map, fname: &CStr, ext: &E
             }
         }
     }
-    g.set(
-        dynamic_str(fname.as_ptr()),
-        Box::into_raw(val) as *const libc::c_void,
-    );
+    g.insert(fname.into(), val);
 }
 
 unsafe fn abstract_paths(
@@ -3708,9 +3704,9 @@ unsafe fn split_paths_absverify(
     Ok(())
 }
 
-pub unsafe fn ast_function_buildgraph(fname: &CStr, ext: &Externals) -> Box<Map> {
+pub unsafe fn ast_function_buildgraph(fname: &CStr, ext: &Externals) -> FuncGraph {
     let mut dedup = Map::new();
-    let mut g = Map::new();
+    let mut g = InsertionOrderMap::new();
     recurse_buildgraph(&mut g, &mut dedup, fname, ext);
     g
 }
