@@ -27,7 +27,7 @@ use crate::ast::{
     ast_type_vconst,
 };
 use crate::object::{object_as_value, object_assign};
-use crate::props::{props_copy, props_create, props_destroy, props_str};
+use crate::props::{props_create, props_destroy, props_str};
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
@@ -77,7 +77,7 @@ pub unsafe fn state_create_withprops(
         clump: clump_create(),
         stack: stack_create(func, ptr::null_mut(), result_type),
         heap: Heap::new(),
-        props: props_copy(props),
+        props: Box::into_raw(Box::new((*props).clone())),
     }))
 }
 
@@ -104,7 +104,7 @@ pub unsafe fn state_copy(state: *mut State) -> *mut State {
         clump: clump_copy((*state).clump),
         stack: stack_copy((*state).stack),
         heap: heap_copy(&(*state).heap),
-        props: props_copy((*state).props),
+        props: Box::into_raw(Box::new((*(*state).props).clone())),
     }))
 }
 
@@ -116,7 +116,7 @@ pub unsafe fn state_copywithname(state: *mut State, func_name: *mut libc::c_char
         clump: clump_copy((*state).clump),
         stack: stack_copywithname((*state).stack, func_name),
         heap: heap_copy(&(*state).heap),
-        props: props_copy((*state).props),
+        props: Box::into_raw(Box::new((*(*state).props).clone())),
     }))
 }
 
