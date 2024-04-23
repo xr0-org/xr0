@@ -262,15 +262,15 @@ pub unsafe fn location_dealloc(loc: &Location, heap: *mut Heap) -> Result<()> {
 }
 
 pub unsafe fn location_range_dealloc(
-    loc: *mut Location,
+    loc: &Location,
     lw: &AstExpr,
     up: &AstExpr,
     state: *mut State,
 ) -> Result<()> {
-    if !offsetzero(&*loc) {
+    if !offsetzero(loc) {
         panic!();
     }
-    let Some(b) = state_getblock(&mut *state, &*loc) else {
+    let Some(b) = state_getblock(&mut *state, loc) else {
         return Err(Error::new("cannot get block".to_string()));
     };
     if !block_range_aredeallocands(b, lw, up, state) {

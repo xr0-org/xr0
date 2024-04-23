@@ -401,7 +401,7 @@ pub unsafe fn state_range_dealloc(
         return Err(Error::new("no value".to_string()));
     }
     let deref: *mut Location = value_as_location(&*arr_val);
-    location_range_dealloc(deref, lw, up, state)
+    location_range_dealloc(&*deref, lw, up, state)
 }
 
 pub unsafe fn state_addresses_deallocand(state: *mut State, obj: *mut Object) -> bool {
