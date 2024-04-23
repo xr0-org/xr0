@@ -13,14 +13,14 @@ use super::location::{
     location_offset, location_range_dealloc, location_toclump, location_toheap, location_tostack,
     location_tostatic, location_with_offset,
 };
-use super::r#static::{
-    static_memory_checkpool, static_memory_copy, static_memory_create, static_memory_destroy,
-    static_memory_newblock, static_memory_str, static_memory_stringpool,
-};
 use super::stack::{
     stack_copy, stack_copywithname, stack_create, stack_declare, stack_destroy, stack_getresult,
     stack_getvariable, stack_prev, stack_references, stack_str, stack_undeclare, variable_location,
     variable_type,
+};
+use super::static_memory::{
+    static_memory_checkpool, static_memory_copy, static_memory_create, static_memory_destroy,
+    static_memory_newblock, static_memory_str, static_memory_stringpool,
 };
 use crate::ast::{
     ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,

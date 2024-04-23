@@ -36,9 +36,9 @@ use state::block::Block;
 use state::clump::Clump;
 use state::heap::{Heap, VConst};
 use state::location::Location;
-use state::r#static::StaticMemory;
 use state::stack::{Stack, Variable};
 use state::state::State;
+use state::static_memory::StaticMemory;
 use util::{OwningCStr, StrBuilder, VERBOSE_MODE};
 use value::Value;
 

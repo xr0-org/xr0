@@ -5,4 +5,4 @@ pub mod location;
 pub mod stack;
 #[allow(clippy::module_inception)]
 pub mod state;
-pub mod r#static;
+pub mod static_memory;
