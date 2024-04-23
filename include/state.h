@@ -163,6 +163,9 @@ state_clearregister(struct state *);
 struct error *
 state_stacktrace(struct state *, struct error *);
 
+void
+state_return(struct state *);
+
 
 /* FRAME DTO */
 

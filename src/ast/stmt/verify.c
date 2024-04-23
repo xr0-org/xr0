@@ -133,12 +133,10 @@ compound_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememark
 	struct ast_stmt **stmts = ast_block_stmts(comp);
 
 	for (int i = 0; i < nstmts; i++) {
-		struct ast_block *stmt_b = ast_block_create(NULL, 0, NULL, 0);	
 		struct error *err = ast_stmt_linearise_proper(stmts[i], b, loc, state);
 		if (err) {
 			return err;
 		}
-		append_block(b, stmt_b);
 	}
 	return NULL;
 }

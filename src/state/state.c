@@ -266,6 +266,12 @@ state_stacktrace(struct state *s, struct error *err)
 	return stack_trace(s->stack, err);
 }
 
+void
+state_return(struct state *s)
+{
+	stack_return(s->stack);	
+}
+
 struct value *
 state_static_init(struct state *state, struct ast_expr *expr)
 {

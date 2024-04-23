@@ -27,6 +27,9 @@ program_render(struct program *);
 void
 program_changename(struct program *, char *);
 
+void
+program_setatend(struct program *);
+
 bool
 program_atend(struct program *);
 
