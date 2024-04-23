@@ -26,10 +26,8 @@ mod value;
 
 use ast::{
     ast_block_str, ast_externdecl_as_function, ast_externdecl_as_function_ptr,
-    ast_externdecl_install, ast_function_absisempty, ast_function_abstract, ast_function_copy,
-    ast_function_isaxiom, ast_function_isproto, ast_function_name, ast_function_verify,
-    ast_functiondecl_create, ast_protostitch, ast_topological_order, Ast, AstExpr, AstExternDecl,
-    AstFunction, AstType, AstVariable,
+    ast_externdecl_install, ast_function_verify, ast_functiondecl_create, ast_protostitch,
+    ast_topological_order, Ast, AstExpr, AstExternDecl, AstFunction, AstType, AstVariable,
 };
 use ext::Externals;
 use object::Object;
@@ -104,12 +102,12 @@ pub unsafe fn pass0(root: &mut Ast, ext: &mut Externals) {
                 ast_externdecl_install(&**decl as *const AstExternDecl as *mut AstExternDecl, ext);
             }
             Some(f) => {
-                if ast_function_isaxiom(&*f) {
+                if (*f).is_axiom() {
                     ast_externdecl_install(
                         &**decl as *const AstExternDecl as *mut AstExternDecl,
                         ext,
                     );
-                } else if ast_function_isproto(&*f) {
+                } else if (*f).is_proto() {
                     if !verifyproto(&*f, &root.decls) {
                         process::exit(1);
                     }
@@ -120,7 +118,7 @@ pub unsafe fn pass0(root: &mut Ast, ext: &mut Externals) {
                 } else {
                     let stitched: *mut AstFunction = ast_protostitch(f, ext);
                     ast_externdecl_install(
-                        Box::into_raw(ast_functiondecl_create(ast_function_copy(&*stitched))),
+                        Box::into_raw(ast_functiondecl_create((*stitched).copy())),
                         ext,
                     );
                 }
@@ -132,15 +130,12 @@ pub unsafe fn pass0(root: &mut Ast, ext: &mut Externals) {
 pub unsafe fn pass1(root: &mut Ast, ext: *mut Externals) {
     for decl in &mut root.decls {
         if let Some(f) = ast_externdecl_as_function_ptr(decl) {
-            if !ast_function_isaxiom(&*f) && !ast_function_isproto(&*f) {
+            if !(*f).is_axiom() && !(*f).is_proto() {
                 if let Err(err) = ast_function_verify(f, ext) {
                     eprintln!("{}", err.msg);
                     process::exit(1);
                 }
-                vprintln!(
-                    "qed {}",
-                    CStr::from_ptr(ast_function_name(&*f)).to_string_lossy()
-                );
+                vprintln!("qed {}", CStr::from_ptr((*f).name()).to_string_lossy());
             }
         }
     }
@@ -149,17 +144,12 @@ pub unsafe fn pass1(root: &mut Ast, ext: *mut Externals) {
 pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &mut Externals) {
     for name in order {
         let f: *mut AstFunction = ext.get_func(name.as_ptr());
-        if !(ast_function_isaxiom(&*f) as libc::c_int != 0
-            || ast_function_isproto(&*f) as libc::c_int != 0)
-        {
+        if !((*f).is_axiom() || (*f).is_proto()) {
             if let Err(err) = ast_function_verify(f, ext) {
                 eprintln!("{}", err.msg);
                 process::exit(1);
             }
-            eprintln!(
-                "qed {}",
-                CStr::from_ptr(ast_function_name(&*f)).to_string_lossy()
-            );
+            eprintln!("qed {}", CStr::from_ptr((*f).name()).to_string_lossy());
         }
     }
 }
@@ -167,13 +157,10 @@ pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &mut Externals) {
 unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool {
     let mut def: Option<&AstFunction> = None;
     let mut count: libc::c_int = 0 as libc::c_int;
-    let pname: *mut libc::c_char = ast_function_name(proto);
+    let pname: *mut libc::c_char = proto.name();
     for decl in decls {
         if let Some(d) = ast_externdecl_as_function(decl) {
-            if !ast_function_isaxiom(d)
-                && !ast_function_isproto(d)
-                && strcmp(pname, ast_function_name(d)) == 0
-            {
+            if !d.is_axiom() && !d.is_proto() && strcmp(pname, d.name()) == 0 {
                 def = Some(d);
                 count += 1;
             }
@@ -202,10 +189,10 @@ unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool
 }
 
 unsafe fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
-    let proto_abs = ast_function_abstract(proto);
-    let def_abs = ast_function_abstract(def);
-    let abs_match: bool = ast_block_str(proto_abs, "") == ast_block_str(def_abs, "");
-    let protoabs_only: bool = ast_function_absisempty(def) as libc::c_int != 0;
+    let proto_abs = proto.abstract_block();
+    let def_abs = def.abstract_block();
+    let abs_match = ast_block_str(proto_abs, "") == ast_block_str(def_abs, "");
+    let protoabs_only = def.abs_is_empty();
     abs_match || protoabs_only
 }
 

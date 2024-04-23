@@ -194,7 +194,7 @@ pub struct LValue {
 }
 
 pub struct AstFunction {
-    pub isaxiom: bool,
+    pub is_axiom: bool,
     pub ret: *mut AstType,
     pub name: OwningCStr,
     pub params: Vec<*mut AstVariable>,
@@ -923,8 +923,8 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value
     if f.is_null() {
         return Err(Error::new(format!("function `{}' not found", cstr!(name))));
     }
-    let params = ast_function_params(&*f);
-    let rtype = ast_function_type(&*f);
+    let params = (*f).params();
+    let rtype = (*f).rtype();
     let args = prepare_arguments(ast_expr_call_args(expr), params, state);
     state_pushframe(state, dynamic_str(name), rtype);
     prepare_parameters(params, args, name, state)?;
@@ -965,8 +965,8 @@ unsafe fn call_arbitraryresult(
 }
 
 unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<*mut Value> {
-    let root = ast_function_name(f);
-    let uncomputed_params = ast_function_params(f);
+    let root = f.name();
+    let uncomputed_params = f.params();
     let nparams = uncomputed_params.len();
     let mut computed_params = Vec::with_capacity(nparams);
     for &p in uncomputed_params {
@@ -1131,14 +1131,10 @@ unsafe fn verify_paramspec(
 }
 
 unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result<()> {
-    let fname = ast_function_name(&*f);
-    let mut param_state = state_create(
-        dynamic_str(fname),
-        state_getext(arg_state),
-        ast_function_type(&*f),
-    );
+    let fname = (*f).name();
+    let mut param_state = state_create(dynamic_str(fname), state_getext(arg_state), (*f).rtype());
     ast_function_initparams(&*f, &mut param_state)?;
-    let params = ast_function_params(&*f);
+    let params = (*f).params();
     for &p in params {
         let id = ast_variable_name(p);
         let param_0: *mut Value = state_getloc(&mut param_state, id);
@@ -1793,10 +1789,10 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
             err: Some(Error::new(format!("function: `{}' not found", cstr!(name)))),
         };
     }
-    let params = ast_function_params(&*f);
+    let params = (*f).params();
     let mut s_copy = state_copy(&*state);
     let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
-    let ret_type: *mut AstType = ast_function_type(&*f);
+    let ret_type: *mut AstType = (*f).rtype();
     state_pushframe(&mut s_copy, dynamic_str(name), ret_type);
     if let Err(err) = prepare_parameters(params, args, name, &mut s_copy) {
         return AstStmtSplits {
@@ -1805,7 +1801,7 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
         };
     }
     let mut conds = vec![];
-    let abs = ast_function_abstract(&*f);
+    let abs = (*f).abstract_block();
     for &var in &abs.decls {
         state_declare(&mut s_copy, var, false);
     }
@@ -3270,7 +3266,7 @@ pub unsafe fn ast_function_create(
         panic!();
     }
     Box::into_raw(Box::new(AstFunction {
-        isaxiom,
+        is_axiom: isaxiom,
         ret,
         name,
         params,
@@ -3298,86 +3294,88 @@ impl Drop for AstFunction {
     }
 }
 
-pub unsafe fn ast_function_str(f: &AstFunction) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
-    if f.isaxiom {
-        strbuilder_write!(b, "axiom ");
-    }
-    strbuilder_write!(b, "{}\n", ast_type_str(f.ret));
-    strbuilder_write!(b, "{}(", f.name);
-    for (i, &param) in f.params.iter().enumerate() {
-        let v = ast_variable_str(param);
-        let space = if i + 1 < f.params.len() { ", " } else { "" };
-        strbuilder_write!(b, "{v}{space}");
-    }
-    let abs = ast_block_str(&*f.r#abstract, "\t");
-    strbuilder_write!(b, ") ~ [\n{abs}]");
-    if !(f.body).is_null() {
-        let body = ast_block_str(&*f.body, "\t");
-        strbuilder_write!(b, "{{\n{body}}}");
-    } else {
-        strbuilder_write!(b, ";");
-    }
-    strbuilder_write!(b, "\n");
-    strbuilder_build(b)
-}
-
-pub unsafe fn ast_function_name(f: &AstFunction) -> *mut libc::c_char {
-    f.name.as_ptr()
-}
-
-pub unsafe fn ast_function_copy(f: &AstFunction) -> *mut AstFunction {
-    let params = f
-        .params
-        .iter()
-        .map(|&param| ast_variable_copy(param))
-        .collect();
-    ast_function_create(
-        f.isaxiom,
-        ast_type_copy(f.ret),
-        f.name.clone(),
-        params,
-        ast_block_copy(&*f.r#abstract),
-        if !f.body.is_null() {
-            ast_block_copy(&*f.body)
+impl AstFunction {
+    pub unsafe fn str(&self) -> OwningCStr {
+        let b: *mut StrBuilder = strbuilder_create();
+        if self.is_axiom {
+            strbuilder_write!(b, "axiom ");
+        }
+        strbuilder_write!(b, "{}\n", ast_type_str(self.ret));
+        strbuilder_write!(b, "{}(", self.name);
+        for (i, &param) in self.params.iter().enumerate() {
+            let v = ast_variable_str(param);
+            let space = if i + 1 < self.params.len() { ", " } else { "" };
+            strbuilder_write!(b, "{v}{space}");
+        }
+        let abs = ast_block_str(&*self.r#abstract, "\t");
+        strbuilder_write!(b, ") ~ [\n{abs}]");
+        if !(self.body).is_null() {
+            let body = ast_block_str(&*self.body, "\t");
+            strbuilder_write!(b, "{{\n{body}}}");
         } else {
-            ptr::null_mut()
-        },
-    )
-}
+            strbuilder_write!(b, ";");
+        }
+        strbuilder_write!(b, "\n");
+        strbuilder_build(b)
+    }
 
-pub unsafe fn ast_function_isaxiom(f: &AstFunction) -> bool {
-    f.isaxiom
-}
+    pub unsafe fn name(&self) -> *mut libc::c_char {
+        self.name.as_ptr()
+    }
 
-pub unsafe fn ast_function_isproto(f: &AstFunction) -> bool {
-    !(f.r#abstract).is_null() && (f.body).is_null()
-}
+    pub unsafe fn copy(&self) -> *mut AstFunction {
+        let params = self
+            .params
+            .iter()
+            .map(|&param| ast_variable_copy(param))
+            .collect();
+        ast_function_create(
+            self.is_axiom,
+            ast_type_copy(self.ret),
+            self.name.clone(),
+            params,
+            ast_block_copy(&*self.r#abstract),
+            if !self.body.is_null() {
+                ast_block_copy(&*self.body)
+            } else {
+                ptr::null_mut()
+            },
+        )
+    }
 
-pub unsafe fn ast_function_absisempty(f: &AstFunction) -> bool {
-    ast_block_ndecls(&*f.r#abstract) == 0 && ast_block_nstmts(&*f.r#abstract) == 0
-}
+    pub unsafe fn is_axiom(&self) -> bool {
+        self.is_axiom
+    }
 
-pub unsafe fn ast_function_type(f: &AstFunction) -> *mut AstType {
-    f.ret
-}
+    pub unsafe fn is_proto(&self) -> bool {
+        !(self.r#abstract).is_null() && (self.body).is_null()
+    }
 
-pub unsafe fn ast_function_body(f: &AstFunction) -> &AstBlock {
-    assert!(!f.body.is_null(), "cannot find body for {:?}", f.name);
-    &*f.body
-}
+    pub unsafe fn abs_is_empty(&self) -> bool {
+        ast_block_ndecls(&*self.r#abstract) == 0 && ast_block_nstmts(&*self.r#abstract) == 0
+    }
 
-pub unsafe fn ast_function_abstract(f: &AstFunction) -> &AstBlock {
-    assert!(!f.r#abstract.is_null());
-    &*f.r#abstract
-}
+    pub unsafe fn rtype(&self) -> *mut AstType {
+        self.ret
+    }
 
-pub unsafe fn ast_function_params(f: &AstFunction) -> &[*mut AstVariable] {
-    f.params.as_slice()
-}
+    pub unsafe fn body(&self) -> &AstBlock {
+        assert!(!self.body.is_null(), "cannot find body for {:?}", self.name);
+        &*self.body
+    }
 
-pub unsafe fn ast_function_preconditions(f: &AstFunction) -> PrecondsResult {
-    ast_block_preconds(ast_function_abstract(f))
+    pub unsafe fn abstract_block(&self) -> &AstBlock {
+        assert!(!self.r#abstract.is_null());
+        &*self.r#abstract
+    }
+
+    pub unsafe fn params(&self) -> &[*mut AstVariable] {
+        self.params.as_slice()
+    }
+
+    pub unsafe fn preconditions(&self) -> PrecondsResult {
+        ast_block_preconds(self.abstract_block())
+    }
 }
 
 pub unsafe fn ast_function_protostitch(
@@ -3392,18 +3390,14 @@ pub unsafe fn ast_function_protostitch(
 }
 
 pub unsafe fn ast_function_verify(f: *mut AstFunction, ext: *mut Externals) -> Result<()> {
-    let mut state = state_create(
-        dynamic_str(ast_function_name(&*f)),
-        ext,
-        ast_function_type(&*f),
-    );
+    let mut state = state_create(dynamic_str((*f).name()), ext, (*f).rtype());
     ast_function_initparams(&*f, &mut state)?;
     path_absverify_withstate(f, &mut state)?;
     Ok(())
 }
 
 unsafe fn path_absverify_withstate(f: *mut AstFunction, state: *mut State) -> Result<()> {
-    let abs = ast_function_abstract(&*f);
+    let abs = (*f).abstract_block();
     for &var in &abs.decls {
         state_declare(state, var, false);
     }
@@ -3411,7 +3405,7 @@ unsafe fn path_absverify_withstate(f: *mut AstFunction, state: *mut State) -> Re
 }
 
 unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_int) -> Result<()> {
-    let abs = ast_function_abstract(&*f);
+    let abs = (*f).abstract_block();
     for i in index as usize..abs.stmts.len() {
         let stmt = &abs.stmts[i];
         let mut splits: AstStmtSplits = ast_stmt_splits(stmt, state);
@@ -3430,7 +3424,7 @@ unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_
 }
 
 pub unsafe fn ast_function_initparams(f: &AstFunction, s: *mut State) -> Result<()> {
-    let params = ast_function_params(f);
+    let params = f.params();
     for &param in params {
         state_declare(s, param, true);
     }
@@ -3442,7 +3436,7 @@ pub unsafe fn ast_function_initparams(f: &AstFunction, s: *mut State) -> Result<
 }
 
 unsafe fn ast_function_precondsinit(f: &AstFunction, s: *mut State) -> Result<()> {
-    let pre: PrecondsResult = ast_function_preconditions(f);
+    let pre: PrecondsResult = f.preconditions();
     if let Some(err) = pre.err {
         return Err(err);
     }
@@ -3469,9 +3463,9 @@ unsafe fn inititalise_param(param: *mut AstVariable, state: *mut State) -> Resul
 
 unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Result<()> {
     let mut actual_state = state_create_withprops(
-        dynamic_str(ast_function_name(&*f)),
+        dynamic_str((*f).name()),
         state_getext(abstract_state),
-        ast_function_type(&*f),
+        (*f).rtype(),
         (state_getprops(&mut *abstract_state)).clone(),
     );
     ast_function_initparams(&*f, &mut actual_state).unwrap();
@@ -3504,7 +3498,7 @@ unsafe fn path_verify(
     index: libc::c_int,
     abstract_state: *mut State,
 ) -> Result<()> {
-    let fname = ast_function_name(&*f);
+    let fname = (*f).name();
     let stmts = &(*(*f).body).stmts;
     #[allow(clippy::needless_range_loop)]
     for i in index as usize..stmts.len() {
@@ -3528,14 +3522,14 @@ unsafe fn path_verify(
         vprintln!("actual: {}", state_str(actual_state));
         return Err(Error::new(format!(
             "{}: garbage on heap",
-            cstr!(ast_function_name(&*f)),
+            cstr!((*f).name()),
         )));
     }
     let equiv: bool = state_equal(&*actual_state, &*abstract_state);
     if !equiv {
         return Err(Error::new(format!(
             "{}: actual and abstract states differ",
-            cstr!(ast_function_name(&*f)),
+            cstr!((*f).name()),
         )));
     }
     Ok(())
@@ -3566,8 +3560,8 @@ unsafe fn split_path_verify(
     assert_eq!(paths.len(), 2);
     // Note: Original leaks both functions.
     for (i, f) in paths.into_iter().enumerate() {
-        let mut actual_copy = state_copywithname(&*actual_state, ast_function_name(&*f));
-        let mut abstract_copy = state_copywithname(&*abstract_state, ast_function_name(&*f));
+        let mut actual_copy = state_copywithname(&*actual_state, (*f).name());
+        let mut abstract_copy = state_copywithname(&*abstract_state, (*f).name());
         // Note: Original leaks expression.
         let expr = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&expr, &mut actual_copy);
@@ -3597,7 +3591,7 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
     if f.is_null() {
         panic!();
     }
-    if (*f).isaxiom {
+    if (*f).is_axiom {
         return;
     }
     if ((*f).body).is_null() {
@@ -3612,7 +3606,7 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
             if (local_dedup.get(func.as_ptr())).is_null() {
                 let func = func.into_ptr(); // transfer of ownership (it's going into val)
                 let f_0: *mut AstFunction = ext.get_func(func);
-                if !(*f_0).isaxiom {
+                if !(*f_0).is_axiom {
                     val.push(func);
                 }
                 local_dedup.set(func, 1 as libc::c_int as *mut libc::c_void);
@@ -3629,7 +3623,7 @@ unsafe fn abstract_paths(
     cond: &AstExpr,
 ) -> Vec<*mut AstFunction> {
     let f_true: *mut AstFunction = ast_function_create(
-        f.isaxiom,
+        f.is_axiom,
         ast_type_copy(f.ret),
         split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
@@ -3639,7 +3633,7 @@ unsafe fn abstract_paths(
     // Note: Original leaks inv_assumption, but I think unintentionally.
     let inv_assumption = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
-        f.isaxiom,
+        f.is_axiom,
         ast_type_copy(f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
         ast_variables_copy(&f.params),
@@ -3658,7 +3652,7 @@ unsafe fn split_path_absverify(
     let paths = abstract_paths(&*f, index, cond);
     assert_eq!(paths.len(), 2);
     for (i, f) in paths.into_iter().enumerate() {
-        let mut s_copy = state_copywithname(&*state, ast_function_name(&*f));
+        let mut s_copy = state_copywithname(&*state, (*f).name());
         // Note: Original leaks `inv` but I think accidentally.
         let inv = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&inv, &mut s_copy)?;
@@ -3713,7 +3707,7 @@ unsafe fn body_paths(
     cond: &AstExpr,
 ) -> Vec<*mut AstFunction> {
     let f_true: *mut AstFunction = ast_function_create(
-        f.isaxiom,
+        f.is_axiom,
         ast_type_copy(f.ret),
         split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
@@ -3723,7 +3717,7 @@ unsafe fn body_paths(
     // Note: Original leaks `inv_assumption` but I think accidentally.
     let inv_assumption = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
-        f.isaxiom,
+        f.is_axiom,
         ast_type_copy(f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
         ast_variables_copy(&f.params),
@@ -3771,7 +3765,7 @@ pub unsafe fn ast_decl_create(name: OwningCStr, t: *mut AstType) -> Box<AstExter
 pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: &mut Externals) {
     match &(*decl).kind {
         AstExternDeclKind::Function(f) => {
-            ext.declare_func(ast_function_name(&**f), *f);
+            ext.declare_func((**f).name(), *f);
         }
         AstExternDeclKind::Variable(v) => {
             ext.declare_var(ast_variable_name(*v), *v);
