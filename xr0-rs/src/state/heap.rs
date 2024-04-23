@@ -214,7 +214,7 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
 pub unsafe fn vconst_str(v: &VConst, indent: &str) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     for (k, &val) in &v.varmap {
-        let value = value_str(val);
+        let value = value_str(&*val);
         strbuilder_write!(b, "{indent}{k}: {value}");
         if let Some(comment) = v.comment.get(k) {
             strbuilder_write!(b, "\t({comment})");

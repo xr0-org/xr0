@@ -107,7 +107,7 @@ unsafe fn inner_str(obj: *mut Object) -> OwningCStr {
     match &(*obj).kind {
         ObjectKind::Value(v) => {
             if !(*v).is_null() {
-                value_str(*v)
+                value_str(&**v)
             } else {
                 OwningCStr::empty()
             }

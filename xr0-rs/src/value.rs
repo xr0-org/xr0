@@ -5,10 +5,10 @@ use std::ptr;
 use libc::strcmp;
 
 use crate::ast::{
-    ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_equal,
-    ast_expr_identifier_create, ast_expr_literal_create, ast_expr_member_create, ast_expr_str,
-    ast_type_create_voidptr, ast_type_struct_complete, ast_type_struct_members,
-    ast_variable_arr_copy, ast_variable_name, ast_variable_type,
+    ast_expr_constant_create, ast_expr_copy, ast_expr_equal, ast_expr_identifier_create,
+    ast_expr_literal_create, ast_expr_member_create, ast_expr_str, ast_type_create_voidptr,
+    ast_type_struct_complete, ast_type_struct_members, ast_variable_arr_copy, ast_variable_name,
+    ast_variable_type,
 };
 use crate::object::{
     object_abstractcopy, object_as_value, object_assign, object_copy, object_destroy,
@@ -30,9 +30,9 @@ pub struct Value {
 
 pub enum ValueKind {
     Sync(Box<Number>),
-    IndefinitePtr(*mut Number),
+    IndefinitePtr(Box<Number>),
     DefinitePtr(*mut Location),
-    Int(*mut Number),
+    Int(Box<Number>),
     Literal(OwningCStr),
     Struct(Box<StructValue>),
 }
@@ -99,7 +99,7 @@ pub unsafe fn value_int_indefinite_create() -> *mut Value {
 }
 
 pub unsafe fn value_sync_create(e: *mut AstExpr) -> *mut Value {
-    value_create(ValueKind::Sync(Box::from_raw(number_computed_create(e))))
+    value_create(ValueKind::Sync(number_computed_create(e)))
 }
 
 pub unsafe fn value_struct_create(t: &AstType) -> *mut Value {
@@ -283,8 +283,8 @@ pub unsafe fn value_copy(v: &Value) -> *mut Value {
     value_create(match &v.kind {
         ValueKind::Sync(n) => ValueKind::Sync(n.clone()),
         ValueKind::DefinitePtr(loc) => ValueKind::DefinitePtr(Box::into_raw(location_copy(&**loc))),
-        ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(number_copy(*n)),
-        ValueKind::Int(n) => ValueKind::Int(number_copy(*n)),
+        ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(n.clone()),
+        ValueKind::Int(n) => ValueKind::Int(n.clone()),
         ValueKind::Literal(s) => ValueKind::Literal(s.clone()),
         ValueKind::Struct(struct_) => ValueKind::Struct(Box::new(StructValue {
             members: ast_variable_arr_copy(&struct_.members),
@@ -309,7 +309,7 @@ impl Drop for ValueKind {
         unsafe {
             match self {
                 ValueKind::Sync(_) => {}
-                ValueKind::IndefinitePtr(n) | ValueKind::Int(n) => number_destroy(*n),
+                ValueKind::IndefinitePtr(_) | ValueKind::Int(_) => {}
                 ValueKind::DefinitePtr(loc) => location_destroy(*loc),
                 ValueKind::Literal(_) => {}
                 ValueKind::Struct(_) => {}
@@ -332,9 +332,9 @@ pub unsafe fn value_destroy(v: *mut Value) {
     drop(Box::from_raw(v));
 }
 
-pub unsafe fn value_str(v: *mut Value) -> OwningCStr {
+pub unsafe fn value_str(v: &Value) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    match &(*v).kind {
+    match &v.kind {
         ValueKind::Sync(n) => {
             value_sync_sprint(n, b);
         }
@@ -342,10 +342,10 @@ pub unsafe fn value_str(v: *mut Value) -> OwningCStr {
             value_definite_ptr_sprint(*loc, b);
         }
         ValueKind::IndefinitePtr(n) => {
-            value_indefinite_ptr_sprint(&**n, b);
+            value_indefinite_ptr_sprint(n, b);
         }
         ValueKind::Int(n) => {
-            value_int_sprint(&**n, b);
+            value_int_sprint(n, b);
         }
         ValueKind::Literal(s) => {
             strbuilder_write!(b, "\"{s}\"");
@@ -382,7 +382,7 @@ unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
         let f_str = CStr::from_ptr(f).to_str().unwrap();
         let val: *mut Value = object_as_value(sv.m.get(f_str).copied().unwrap());
         let val_str = if !val.is_null() {
-            value_str(val)
+            value_str(&*val)
         } else {
             OwningCStr::empty()
         };
@@ -419,7 +419,7 @@ pub unsafe fn value_as_constant(v: &Value) -> libc::c_int {
     let ValueKind::Int(n) = &v.kind else {
         panic!();
     };
-    number_as_constant(*n)
+    number_as_constant(n)
 }
 
 pub unsafe fn value_isconstant(v: &Value) -> bool {
@@ -454,13 +454,13 @@ pub unsafe fn value_isint(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Int(_))
 }
 
-pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
-    match &(*v).kind {
-        ValueKind::DefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
-        ValueKind::IndefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
-        ValueKind::Literal(_) => Box::into_raw(ast_expr_copy(&*value_as_literal(&*v))),
-        ValueKind::Sync(n) => Box::into_raw(ast_expr_copy(number_as_sync(n))),
-        ValueKind::Int(n) => number_to_expr(*n),
+pub unsafe fn value_to_expr(v: &Value) -> Box<AstExpr> {
+    match &v.kind {
+        ValueKind::DefinitePtr(_) => ast_expr_identifier_create(value_str(v)),
+        ValueKind::IndefinitePtr(_) => ast_expr_identifier_create(value_str(v)),
+        ValueKind::Literal(_) => ast_expr_copy(&*value_as_literal(v)),
+        ValueKind::Sync(n) => ast_expr_copy(number_as_sync(n)),
+        ValueKind::Int(n) => number_to_expr(n),
         _ => panic!(),
     }
 }
@@ -503,22 +503,22 @@ pub unsafe fn value_equal(v1: &Value, v2: &Value) -> bool {
 
 #[allow(dead_code)]
 pub unsafe fn value_assume(v: *mut Value, value: bool) -> bool {
-    match &(*v).kind {
-        ValueKind::Int(n) => number_assume(*n, value),
-        ValueKind::IndefinitePtr(n) => number_assume(*n, value),
+    match &mut (*v).kind {
+        ValueKind::Int(n) => number_assume(n, value),
+        ValueKind::IndefinitePtr(n) => number_assume(n, value),
         _ => panic!(),
     }
 }
 
-unsafe fn number_create(kind: NumberKind) -> *mut Number {
-    Box::into_raw(Box::new(Number { kind }))
+unsafe fn number_create(kind: NumberKind) -> Box<Number> {
+    Box::new(Number { kind })
 }
 
-unsafe fn number_ranges_create(ranges: Vec<NumberRange>) -> *mut Number {
+unsafe fn number_ranges_create(ranges: Vec<NumberRange>) -> Box<Number> {
     number_create(NumberKind::Ranges(ranges))
 }
 
-unsafe fn number_single_create(val: libc::c_int) -> *mut Number {
+unsafe fn number_single_create(val: libc::c_int) -> Box<Number> {
     number_create(NumberKind::Ranges(number_range_arr_single_create(val)))
 }
 
@@ -529,7 +529,7 @@ unsafe fn number_range_arr_single_create(val: libc::c_int) -> Vec<NumberRange> {
     )]
 }
 
-unsafe fn number_computed_create(e: *mut AstExpr) -> *mut Number {
+unsafe fn number_computed_create(e: *mut AstExpr) -> Box<Number> {
     number_create(NumberKind::Computed(e))
 }
 
@@ -543,18 +543,18 @@ unsafe fn number_range_arr_ne_create(val: libc::c_int) -> Vec<NumberRange> {
     ]
 }
 
-unsafe fn number_ne_create(val: libc::c_int) -> *mut Number {
+unsafe fn number_ne_create(val: libc::c_int) -> Box<Number> {
     number_ranges_create(number_range_arr_ne_create(val))
 }
 
-unsafe fn number_with_range_create(lw: libc::c_int, excl_up: libc::c_int) -> *mut Number {
+unsafe fn number_with_range_create(lw: libc::c_int, excl_up: libc::c_int) -> Box<Number> {
     number_ranges_create(vec![number_range_create(
         number_value_constant_create(lw),
         number_value_constant_create(excl_up),
     )])
 }
 
-unsafe fn number_indefinite_create() -> *mut Number {
+unsafe fn number_indefinite_create() -> Box<Number> {
     number_ranges_create(vec![number_range_create(
         number_value_min_create(),
         number_value_max_create(),
@@ -562,8 +562,8 @@ unsafe fn number_indefinite_create() -> *mut Number {
 }
 
 #[allow(dead_code)]
-unsafe fn number_range_lw(n: *mut Number) -> libc::c_int {
-    let NumberKind::Ranges(ranges) = &mut (*n).kind else {
+unsafe fn number_range_lw(n: &Number) -> libc::c_int {
+    let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
     assert_eq!(ranges.len(), 1);
@@ -571,21 +571,12 @@ unsafe fn number_range_lw(n: *mut Number) -> libc::c_int {
 }
 
 #[allow(dead_code)]
-unsafe fn number_range_up(n: *mut Number) -> libc::c_int {
-    let NumberKind::Ranges(ranges) = &mut (*n).kind else {
+unsafe fn number_range_up(n: &Number) -> libc::c_int {
+    let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
     assert_eq!(ranges.len(), 1);
     number_value_as_constant(ranges[0].upper)
-}
-
-unsafe fn number_destroy(n: *mut Number) {
-    match &(*n).kind {
-        NumberKind::Ranges(_) => {}
-        NumberKind::Computed(computation) => {
-            ast_expr_destroy(*computation);
-        }
-    }
 }
 
 unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
@@ -627,7 +618,7 @@ unsafe fn number_ranges_equal(n1: &[NumberRange], n2: &[NumberRange]) -> bool {
         .all(|(nr1, nr2)| number_range_equal(nr1, nr2))
 }
 
-unsafe fn number_assume(n: *mut Number, value: bool) -> bool {
+unsafe fn number_assume(n: &mut Number, value: bool) -> bool {
     let NumberKind::Ranges(ranges) = &mut (*n).kind else {
         panic!();
     };
@@ -653,8 +644,8 @@ unsafe fn number_isconstant(n: &Number) -> bool {
     ranges.len() == 1 && number_range_issingle(&ranges[0])
 }
 
-unsafe fn number_as_constant(n: *mut Number) -> libc::c_int {
-    let NumberKind::Ranges(ranges) = &mut (*n).kind else {
+unsafe fn number_as_constant(n: &Number) -> libc::c_int {
+    let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
     assert_eq!(ranges.len(), 1);
@@ -679,15 +670,11 @@ unsafe fn number_into_sync(n: *mut Number) -> *mut AstExpr {
     *computation
 }
 
-unsafe fn number_to_expr(n: *mut Number) -> *mut AstExpr {
-    match &(*n).kind {
+unsafe fn number_to_expr(n: &Number) -> Box<AstExpr> {
+    match &n.kind {
         NumberKind::Ranges(ranges) => number_ranges_to_expr(ranges),
-        NumberKind::Computed(computation) => Box::into_raw(ast_expr_copy(&**computation)),
+        NumberKind::Computed(computation) => ast_expr_copy(&**computation),
     }
-}
-
-unsafe fn number_copy(num: *mut Number) -> *mut Number {
-    Box::into_raw(Box::new((*num).clone()))
 }
 
 impl Clone for NumberKind {
@@ -703,9 +690,9 @@ impl Clone for NumberKind {
     }
 }
 
-unsafe fn number_ranges_to_expr(arr: &[NumberRange]) -> *mut AstExpr {
+unsafe fn number_ranges_to_expr(arr: &[NumberRange]) -> Box<AstExpr> {
     assert_eq!(arr.len(), 1);
-    Box::into_raw(ast_expr_constant_create(number_range_as_constant(&arr[0])))
+    ast_expr_constant_create(number_range_as_constant(&arr[0]))
 }
 
 unsafe fn number_range_arr_canbe(arr: &[NumberRange], value: bool) -> bool {

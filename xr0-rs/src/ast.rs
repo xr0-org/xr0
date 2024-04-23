@@ -576,11 +576,7 @@ unsafe fn binary_assume(b: &BinaryExpr, value: bool, s: *mut State) -> Result<Pr
     let v1 = ast_expr_pf_reduce(&b.e1, s).unwrap();
     let v2 = ast_expr_pf_reduce(&b.e2, s).unwrap();
     // Note: original leaks the expression.
-    let expr = ast_expr_binary_create(
-        Box::from_raw(value_to_expr(v1)),
-        b.op,
-        Box::from_raw(value_to_expr(v2)),
-    );
+    let expr = ast_expr_binary_create(value_to_expr(&*v1), b.op, value_to_expr(&*v2));
     let result = irreducible_assume(&expr, value, s);
     std::mem::forget(expr);
     result
@@ -746,8 +742,8 @@ pub unsafe fn ast_expr_alloc_rangeprocess(
 ) -> Result<()> {
     let lw_val = ast_expr_eval(lw, state)?;
     let up_val = ast_expr_eval(up, state)?;
-    let res_lw = Box::from_raw(value_to_expr(lw_val));
-    let res_up = Box::from_raw(value_to_expr(up_val));
+    let res_lw = value_to_expr(&*lw_val);
+    let res_up = value_to_expr(&*up_val);
     match &alloc.kind {
         AstExprKind::Assignment(_) => rangeprocess_alloc(alloc, &res_lw, &res_up, state),
         AstExprKind::Allocation(_) => rangeprocess_dealloc(alloc, &res_lw, &res_up, state),
@@ -786,9 +782,9 @@ unsafe fn expr_binary_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Val
     let v1 = ast_expr_eval(e1, state)?;
     let v2 = ast_expr_eval(e2, state)?;
     Ok(value_sync_create(Box::into_raw(ast_expr_binary_create(
-        Box::from_raw(value_to_expr(v1)),
+        value_to_expr(&*v1),
         ast_expr_binary_op(expr),
-        Box::from_raw(value_to_expr(v2)),
+        value_to_expr(&*v2),
     ))))
 }
 
@@ -983,9 +979,9 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<*mut 
         drop(param);
         assert!(!v.is_null());
         computed_params.push(if value_islocation(&*v) {
-            ast_expr_identifier_create(value_str(v))
+            ast_expr_identifier_create(value_str(&*v))
         } else {
-            Box::from_raw(value_to_expr(v))
+            value_to_expr(&*v)
         });
     }
     Ok(value_sync_create(Box::into_raw(ast_expr_call_create(
@@ -1251,9 +1247,9 @@ unsafe fn binary_pf_reduce(
     let v2 = ast_expr_pf_reduce(e2, s)?;
     assert!(!v2.is_null());
     Ok(value_sync_create(Box::into_raw(ast_expr_binary_create(
-        Box::from_raw(value_to_expr(v1)),
+        value_to_expr(&*v1),
         op,
-        Box::from_raw(value_to_expr(v2)),
+        value_to_expr(&*v2),
     ))))
 }
 
@@ -1264,7 +1260,7 @@ unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
     for arg in unreduced_args {
         let val = ast_expr_pf_reduce(arg, s)?;
         assert!(!val.is_null());
-        reduced_args.push(Box::from_raw(value_to_expr(val)));
+        reduced_args.push(value_to_expr(&*val));
     }
     Ok(value_sync_create(Box::into_raw(ast_expr_call_create(
         ast_expr_identifier_create(OwningCStr::copy_char_ptr(root)),
@@ -2436,7 +2432,7 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Result<bool> {
     }
     let zero: *mut Value = value_int_create(0 as libc::c_int);
     if !value_isint(&*v) {
-        let v_str = value_str(v);
+        let v_str = value_str(&*v);
         return Err(Error::new(format!(
             "`{control}' with value `{v_str}' is undecidable"
         )));
@@ -2688,15 +2684,15 @@ pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
 
 unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> AstStmtSplits {
     let v = ast_expr_pf_reduce(&selection.cond, s).unwrap();
-    let e: *mut AstExpr = value_to_expr(v);
-    if condexists(&*e, s) || value_isconstant(&*v) {
+    let e = value_to_expr(&*v);
+    if condexists(&e, s) || value_isconstant(&*v) {
         return AstStmtSplits {
             conds: vec![],
             err: None,
         };
     }
     AstStmtSplits {
-        conds: vec![e],
+        conds: vec![Box::into_raw(e)],
         err: None,
     }
 }
@@ -2705,9 +2701,9 @@ unsafe fn condexists(cond: &AstExpr, s: *mut State) -> bool {
     let val = ast_expr_pf_reduce(cond, s).unwrap();
     assert!(!val.is_null());
     // Note: original doesn't free this.
-    let reduced: *mut AstExpr = value_to_expr(val);
+    let reduced = value_to_expr(&*val);
     let p = state_getprops(&mut *s);
-    p.get(&*reduced) || p.contradicts(&*reduced)
+    p.get(&reduced) || p.contradicts(&reduced)
 }
 
 unsafe fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Vec<OwningCStr> {
