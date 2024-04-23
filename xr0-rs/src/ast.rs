@@ -209,21 +209,26 @@ pub struct AstFunction {
     pub body: *mut AstBlock, // can be null
 }
 
+#[derive(Clone)]
 pub struct AstBlock {
     pub decls: Vec<Box<AstVariable>>,
     pub stmts: Vec<Box<AstStmt>>,
 }
 
+// Note: In the original, `ast_stmt_copy` did not handle allocation statements.
+#[derive(Clone)]
 pub struct AstStmt {
     pub kind: AstStmtKind,
     pub loc: Box<LexemeMarker>,
 }
 
+#[derive(Clone)]
 pub struct AstAllocStmt {
     pub kind: AstAllocKind,
     pub arg: Box<AstExpr>,
 }
 
+#[derive(Clone)]
 pub struct AstJumpStmt {
     pub kind: AstJumpKind,
     pub rv: Option<Box<AstExpr>>,
@@ -234,14 +239,16 @@ pub enum AstJumpKind {
     Return,
 }
 
+#[derive(Clone)]
 pub struct AstIterationStmt {
     pub init: Box<AstStmt>,
     pub cond: Box<AstStmt>,
     pub body: Box<AstStmt>,
     pub iter: Box<AstExpr>,
-    pub r#abstract: *mut AstBlock,
+    pub r#abstract: Box<AstBlock>,
 }
 
+#[derive(Clone)]
 pub struct AstSelectionStmt {
     pub isswitch: bool,
     pub cond: Box<AstExpr>,
@@ -249,11 +256,13 @@ pub struct AstSelectionStmt {
     pub nest: Option<Box<AstStmt>>,
 }
 
+#[derive(Clone)]
 pub struct AstLabelledStmt {
     pub label: OwningCStr,
     pub stmt: Box<AstStmt>,
 }
 
+#[derive(Clone)]
 pub enum AstStmtKind {
     Nop,
     Labelled(AstLabelledStmt),
@@ -2044,35 +2053,7 @@ unsafe fn labelled_absexec(
 }
 
 pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> Box<AstStmt> {
-    let loc = stmt.loc.clone();
-    match &stmt.kind {
-        AstStmtKind::Labelled(labelled) => {
-            ast_stmt_create_labelled(loc, labelled.label.clone(), ast_stmt_copy(&labelled.stmt))
-        }
-
-        AstStmtKind::Nop => ast_stmt_create_nop(loc),
-        AstStmtKind::Expr(expr) => ast_stmt_create_expr(loc, ast_expr_copy(expr)),
-        AstStmtKind::Compound(compound) => {
-            ast_stmt_create_compound(loc, ast_block_copy(&**compound))
-        }
-        AstStmtKind::CompoundV(compound) => {
-            ast_stmt_create_compound_v(loc, ast_block_copy(&**compound))
-        }
-        AstStmtKind::Selection(selection) => ast_stmt_create_sel(
-            loc,
-            selection.isswitch,
-            ast_expr_copy(&selection.cond),
-            ast_stmt_copy(&selection.body),
-            selection.nest.as_ref().map(|stmt| ast_stmt_copy(stmt)),
-        ),
-
-        AstStmtKind::Iteration(iteration) => ast_stmt_copy_iter(loc, iteration, false),
-        AstStmtKind::IterationE(iteration) => ast_stmt_copy_iter(loc, iteration, true),
-        AstStmtKind::Jump(jump) => {
-            ast_stmt_create_jump(loc, jump.kind, ast_expr_copy_ifnotnull(&jump.rv))
-        }
-        _ => panic!(),
-    }
+    Box::new(stmt.clone())
 }
 
 unsafe fn labelled_setupabsexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
@@ -2300,7 +2281,7 @@ pub unsafe fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
     let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!()
     };
-    &*iteration.r#abstract
+    &iteration.r#abstract
 }
 
 pub unsafe fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
@@ -2319,11 +2300,7 @@ unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder)
     let cond = ast_stmt_str(&iteration.cond);
     let body = ast_stmt_str(&iteration.body);
     let iter = &iteration.iter;
-    let abs = if !(iteration.r#abstract).is_null() {
-        ast_block_str(&*iteration.r#abstract, "\t")
-    } else {
-        OwningCStr::empty()
-    };
+    let abs = ast_block_str(&iteration.r#abstract, "\t");
     strbuilder_write!(b, "for ({init} {cond} {iter}) [{abs}] {{ {body} }}");
 }
 
@@ -2554,36 +2531,22 @@ unsafe fn ast_stmt_create(loc: Box<LexemeMarker>, kind: AstStmtKind) -> Box<AstS
     Box::new(AstStmt { kind, loc })
 }
 
-unsafe fn ast_stmt_copy_iter(
-    loc: Box<LexemeMarker>,
-    iteration: &AstIterationStmt,
-    as_iteration_e: bool,
-) -> Box<AstStmt> {
-    let init = ast_stmt_copy(&iteration.init);
-    let cond = ast_stmt_copy(&iteration.cond);
-    let iter = ast_expr_copy(&iteration.iter);
-    let abstract_0 = ast_block_copy(&*iteration.r#abstract);
-    let body = ast_stmt_copy(&iteration.body);
-
-    ast_stmt_create_iter(loc, init, cond, iter, abstract_0, body, as_iteration_e)
-}
-
 pub unsafe fn ast_stmt_create_iter(
     loc: Box<LexemeMarker>,
     init: Box<AstStmt>,
     cond: Box<AstStmt>,
     iter: Box<AstExpr>,
-    abstract_0: *mut AstBlock,
+    abstract_: *mut AstBlock,
     body: Box<AstStmt>,
     as_iteration_e: bool,
 ) -> Box<AstStmt> {
-    assert!(!abstract_0.is_null());
+    assert!(!abstract_.is_null());
     let iter = AstIterationStmt {
         init,
         cond,
         iter,
         body,
-        r#abstract: abstract_0,
+        r#abstract: Box::from_raw(abstract_),
     };
     ast_stmt_create(
         loc,
@@ -2739,29 +2702,6 @@ pub unsafe fn ast_stmt_destroy(stmt: *mut AstStmt) {
     drop(Box::from_raw(stmt));
 }
 
-impl Drop for AstStmtKind {
-    fn drop(&mut self) {
-        unsafe {
-            match self {
-                AstStmtKind::Labelled(_) => {}
-                AstStmtKind::Nop => {}
-                AstStmtKind::Compound(block) | AstStmtKind::CompoundV(block) => {
-                    ast_block_destroy(*block);
-                }
-                AstStmtKind::Selection(_) => {}
-                AstStmtKind::Iteration(iteration) | AstStmtKind::IterationE(iteration) => {
-                    ast_block_destroy(iteration.r#abstract);
-                }
-                AstStmtKind::Expr(_) => {}
-                AstStmtKind::Jump(_) => {}
-                _ => {
-                    panic!();
-                }
-            }
-        }
-    }
-}
-
 pub unsafe fn ast_stmt_as_expr(stmt: &AstStmt) -> &AstExpr {
     let AstStmtKind::Expr(expr) = &stmt.kind else {
         panic!();
@@ -2898,11 +2838,11 @@ unsafe fn preconds_compound_verify(block: &AstBlock) -> Result<()> {
 }
 
 pub unsafe fn ast_type_isint(t: &AstType) -> bool {
-    matches!((*t).base, AstTypeBase::Int)
+    matches!(t.base, AstTypeBase::Int)
 }
 
 pub unsafe fn ast_type_ispointer(t: &AstType) -> bool {
-    matches!((*t).base, AstTypeBase::Pointer(_))
+    matches!(t.base, AstTypeBase::Pointer(_))
 }
 
 pub unsafe fn ast_type_create(base: AstTypeBase, modifiers: AstTypeModifier) -> Box<AstType> {
@@ -2970,7 +2910,7 @@ pub unsafe fn ast_type_struct_complete<'a>(
     if ast_type_struct_members(t).is_some() {
         return Some(t);
     }
-    let tag = ast_type_struct_tag(&*t);
+    let tag = ast_type_struct_tag(t);
     if tag.is_null() {
         panic!();
     }
@@ -3098,7 +3038,7 @@ unsafe fn mod_str(mod_0: libc::c_int) -> OwningCStr {
 
 unsafe fn ast_type_str_build_ptr(b: *mut StrBuilder, ptr_type: &AstType) {
     let base = ast_type_str(ptr_type);
-    let space: bool = !matches!((*ptr_type).base, AstTypeBase::Pointer(_));
+    let space: bool = !matches!(ptr_type.base, AstTypeBase::Pointer(_));
     strbuilder_write!(b, "{base}{}*", if space { " " } else { "" },);
 }
 
@@ -3148,7 +3088,7 @@ pub unsafe fn ast_variables_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>
 pub unsafe fn ast_variable_str(v: &AstVariable) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     let t = ast_type_str(&v.r#type);
-    strbuilder_write!(b, "{t} {}", (*v).name);
+    strbuilder_write!(b, "{t} {}", v.name);
     strbuilder_build(b)
 }
 
