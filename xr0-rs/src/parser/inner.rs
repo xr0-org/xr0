@@ -28,7 +28,7 @@ pub struct Declarator {
 }
 
 struct BlockStatement {
-    r#abstract: Option<Box<AstBlock>>,
+    abstract_: Option<Box<AstBlock>>,
     body: Option<Box<AstBlock>>,
 }
 
@@ -545,16 +545,16 @@ pub grammar c_parser(env: &Env) for str {
 
     rule block_statement() -> BlockStatement =
         ";" {
-            BlockStatement { r#abstract: None, body: None }
+            BlockStatement { abstract_: None, body: None }
         } /
         c:compound_statement() {
-            BlockStatement { r#abstract: None, body: Some(c) }
+            BlockStatement { abstract_: None, body: Some(c) }
         } /
         v:compound_verification_statement() _ ";" {
-            BlockStatement { r#abstract: Some(v), body: None }
+            BlockStatement { abstract_: Some(v), body: None }
         } /
         v:compound_verification_statement() _ c:compound_statement() {
-            BlockStatement { r#abstract: Some(v), body: Some(c) }
+            BlockStatement { abstract_: Some(v), body: Some(c) }
         }
 
     rule function_definition() -> BoxedFunction =
@@ -569,7 +569,7 @@ pub grammar c_parser(env: &Env) for str {
                     t,
                     decl.decl.name,
                     decl.decl.params,
-                    body.r#abstract.unwrap_or_else(||
+                    body.abstract_.unwrap_or_else(||
                         ast_block_create(vec![], vec![])),
                     body.body.map(SemiBox::Owned),
                 )
@@ -586,7 +586,7 @@ pub grammar c_parser(env: &Env) for str {
                     t,
                     decl.decl.name,
                     decl.decl.params,
-                    body.r#abstract.unwrap_or_else(||
+                    body.abstract_.unwrap_or_else(||
                         ast_block_create(vec![], vec![])),
                     body.body.map(SemiBox::Owned),
                 )
@@ -601,7 +601,7 @@ pub grammar c_parser(env: &Env) for str {
                     ast_type_create(AstTypeBase::Void, 0),
                     decl.decl.name,
                     decl.decl.params,
-                    body.r#abstract.unwrap_or_else(||
+                    body.abstract_.unwrap_or_else(||
                         ast_block_create(vec![], vec![])),
                     body.body.map(SemiBox::Owned),
                 )

@@ -32,7 +32,7 @@ pub struct Stack {
 }
 
 pub struct Variable {
-    pub r#type: Box<AstType>,
+    pub type_: Box<AstType>,
     pub loc: *mut Location,
     pub is_param: bool,
 }
@@ -216,7 +216,7 @@ pub unsafe fn stack_getblock(s: *mut Stack, address: libc::c_int) -> *mut Block 
 
 pub unsafe fn variable_create(type_: &AstType, stack: *mut Stack, isparam: bool) -> *mut Variable {
     let v = Box::new(Variable {
-        r#type: ast_type_copy(type_),
+        type_: ast_type_copy(type_),
         is_param: isparam,
         loc: stack_newblock(stack),
     });
@@ -248,7 +248,7 @@ impl Drop for Variable {
 
 pub unsafe fn variable_copy(old: *mut Variable) -> *mut Variable {
     Box::into_raw(Box::new(Variable {
-        r#type: ast_type_copy(&(*old).r#type),
+        type_: ast_type_copy(&(*old).type_),
         is_param: (*old).is_param,
         loc: location_copy(&*(*old).loc),
     }))
@@ -256,7 +256,7 @@ pub unsafe fn variable_copy(old: *mut Variable) -> *mut Variable {
 
 unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Variable {
     let new = Box::new(Variable {
-        r#type: ast_type_copy(&(*old).r#type),
+        type_: ast_type_copy(&(*old).type_),
         is_param: (*old).is_param,
         loc: location_copy(&*(*old).loc),
     });
@@ -276,7 +276,7 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
 pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> OwningCStr {
     assert!(!(*(*var).loc).type_is_vconst());
     let b: *mut StrBuilder = strbuilder_create();
-    let type_ = ast_type_str(&(*var).r#type);
+    let type_ = ast_type_str(&(*var).type_);
     let isparam = if (*var).is_param { "param " } else { "" };
     let obj_str = object_or_nothing_str((*var).loc, stack, state);
     let loc = location_str(&*(*var).loc);
@@ -305,7 +305,7 @@ pub unsafe fn variable_location(v: *mut Variable) -> *mut Location {
 }
 
 pub unsafe fn variable_type(v: *mut Variable) -> *mut AstType {
-    &mut *(*v).r#type
+    &mut *(*v).type_
 }
 
 pub unsafe fn variable_references(v: *mut Variable, loc: &Location, s: *mut State) -> bool {

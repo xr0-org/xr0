@@ -157,12 +157,12 @@ pub struct AstVariable {
     // exception is the parameter in `fclose(FILE *);` which has no name) this would be invalid, so
     // we end up banning it.
     pub name: OwningCStr,
-    pub r#type: Box<AstType>,
+    pub type_: Box<AstType>,
 }
 
 #[derive(Clone)]
 pub struct AstArrayType {
-    pub r#type: Box<AstType>,
+    pub type_: Box<AstType>,
     pub length: libc::c_int,
 }
 
@@ -206,7 +206,7 @@ pub struct AstFunction<'ast> {
     pub ret: Box<AstType>,
     pub name: OwningCStr,
     pub params: Vec<Box<AstVariable>>,
-    pub r#abstract: Box<AstBlock>,
+    pub abstract_: Box<AstBlock>,
     pub body: Option<SemiBox<'ast, AstBlock>>,
 }
 
@@ -246,7 +246,7 @@ pub struct AstIterationStmt {
     pub cond: Box<AstStmt>,
     pub body: Box<AstStmt>,
     pub iter: Box<AstExpr>,
-    pub r#abstract: Box<AstBlock>,
+    pub abstract_: Box<AstBlock>,
 }
 
 #[derive(Clone)]
@@ -2237,7 +2237,7 @@ pub unsafe fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
     let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!()
     };
-    &iteration.r#abstract
+    &iteration.abstract_
 }
 
 pub unsafe fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
@@ -2256,7 +2256,7 @@ unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder)
     let cond = ast_stmt_str(&iteration.cond);
     let body = ast_stmt_str(&iteration.body);
     let iter = &iteration.iter;
-    let abs = ast_block_str(&iteration.r#abstract, "\t");
+    let abs = ast_block_str(&iteration.abstract_, "\t");
     strbuilder_write!(b, "for ({init} {cond} {iter}) [{abs}] {{ {body} }}");
 }
 
@@ -2473,7 +2473,7 @@ pub unsafe fn ast_stmt_create_iter(
         cond,
         iter,
         body,
-        r#abstract: abstract_,
+        abstract_,
     };
     ast_stmt_create(
         loc,
@@ -2784,7 +2784,7 @@ pub unsafe fn ast_type_create_voidptr() -> Box<AstType> {
 pub unsafe fn ast_type_create_arr(base: Box<AstType>, length: libc::c_int) -> Box<AstType> {
     ast_type_create(
         AstTypeBase::Array(AstArrayType {
-            r#type: base,
+            type_: base,
             length,
         }),
         0,
@@ -2967,7 +2967,7 @@ unsafe fn ast_type_str_build_ptr(b: *mut StrBuilder, ptr_type: &AstType) {
 }
 
 unsafe fn ast_type_str_build_arr(b: *mut StrBuilder, arr: &AstArrayType) {
-    let base = ast_type_str(&arr.r#type);
+    let base = ast_type_str(&arr.type_);
     strbuilder_write!(b, "{base}[{}]", arr.length);
 }
 
@@ -2998,7 +2998,7 @@ pub unsafe fn ast_type_ptr_type(t: &AstType) -> Option<&AstType> {
 pub unsafe fn ast_variable_create(name: OwningCStr, ty: Box<AstType>) -> Box<AstVariable> {
     // Note: In the original, this function can take a null name and create a variable with null name.
     // This is actually done for the arguments in function declarations like `void fclose(FILE*);`.
-    Box::new(AstVariable { name, r#type: ty })
+    Box::new(AstVariable { name, type_: ty })
 }
 
 pub unsafe fn ast_variable_copy(v: &AstVariable) -> Box<AstVariable> {
@@ -3011,7 +3011,7 @@ pub unsafe fn ast_variables_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>
 
 pub unsafe fn ast_variable_str(v: &AstVariable) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    let t = ast_type_str(&v.r#type);
+    let t = ast_type_str(&v.type_);
     strbuilder_write!(b, "{t} {}", v.name);
     strbuilder_build(b)
 }
@@ -3021,7 +3021,7 @@ pub unsafe fn ast_variable_name(v: &AstVariable) -> *mut libc::c_char {
 }
 
 pub unsafe fn ast_variable_type(v: &AstVariable) -> &AstType {
-    &v.r#type
+    &v.type_
 }
 
 pub unsafe fn ast_variable_arr_copy(old: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
@@ -3041,7 +3041,7 @@ pub unsafe fn ast_function_create(
         ret,
         name,
         params,
-        r#abstract: abstract_0,
+        abstract_: abstract_0,
         body,
     }))
 }
@@ -3063,7 +3063,7 @@ impl<'ast> AstFunction<'ast> {
             let space = if i + 1 < self.params.len() { ", " } else { "" };
             strbuilder_write!(b, "{v}{space}");
         }
-        let abs = ast_block_str(&self.r#abstract, "\t");
+        let abs = ast_block_str(&self.abstract_, "\t");
         strbuilder_write!(b, ") ~ [\n{abs}]");
         if let Some(body) = &self.body {
             let body = ast_block_str(body, "\t");
@@ -3092,7 +3092,7 @@ impl<'ast> AstFunction<'ast> {
     }
 
     pub unsafe fn abs_is_empty(&self) -> bool {
-        ast_block_ndecls(&self.r#abstract) == 0 && ast_block_nstmts(&self.r#abstract) == 0
+        ast_block_ndecls(&self.abstract_) == 0 && ast_block_nstmts(&self.abstract_) == 0
     }
 
     pub unsafe fn rtype(&self) -> &AstType {
@@ -3107,7 +3107,7 @@ impl<'ast> AstFunction<'ast> {
     }
 
     pub unsafe fn abstract_block(&self) -> &AstBlock {
-        &self.r#abstract
+        &self.abstract_
     }
 
     pub unsafe fn params(&self) -> &[Box<AstVariable>] {
@@ -3125,7 +3125,7 @@ pub unsafe fn ast_function_protostitch(
 ) -> *mut AstFunction {
     let proto: *mut AstFunction = (*ext).get_func((*f).name.as_ptr());
     if !proto.is_null() {
-        (*f).r#abstract = (*proto).r#abstract.clone();
+        (*f).abstract_ = (*proto).abstract_.clone();
     }
     f
 }
@@ -3219,7 +3219,7 @@ unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Res
 }
 
 unsafe fn ast_function_setupabsexec(f: &AstFunction, state: *mut State) -> Result<()> {
-    for stmt in &f.r#abstract.stmts {
+    for stmt in &f.abstract_.stmts {
         ast_stmt_setupabsexec(stmt, state)?;
     }
     Ok(())
@@ -3280,10 +3280,10 @@ unsafe fn path_verify(
 }
 
 pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result<*mut Value> {
-    for decl in &f.r#abstract.decls {
+    for decl in &f.abstract_.decls {
         state_declare(state, decl, false);
     }
-    for stmt in &f.r#abstract.stmts {
+    for stmt in &f.abstract_.stmts {
         ast_stmt_absexec(stmt, state, false)?;
     }
     let obj: *mut Object = state_getresult(state);
@@ -3369,7 +3369,7 @@ unsafe fn abstract_paths<'origin>(
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
-        f.r#abstract.clone(),
+        f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
     // Note: Original leaks inv_assumption, but I think unintentionally.
@@ -3379,7 +3379,7 @@ unsafe fn abstract_paths<'origin>(
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
         ast_variables_copy(&f.params),
-        f.r#abstract.clone(),
+        f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
     vec![f_true, f_false]
@@ -3453,7 +3453,7 @@ unsafe fn body_paths<'origin>(
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
-        f.r#abstract.clone(),
+        f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
     // Note: Original leaks `inv_assumption` but I think accidentally.
@@ -3463,7 +3463,7 @@ unsafe fn body_paths<'origin>(
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
         ast_variables_copy(&f.params),
-        f.r#abstract.clone(),
+        f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
     vec![f_true, f_false]
