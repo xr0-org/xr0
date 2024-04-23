@@ -282,30 +282,30 @@ pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option
 }
 
 pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
-    let v: *mut Variable = stack_getresult((*state).stack);
+    let v: *mut Variable = stack_getresult(&*(*state).stack);
     if v.is_null() {
         panic!();
     }
     state_get(state, &*variable_location(v), true).unwrap()
 }
 
-unsafe fn state_getresulttype(state: *mut State) -> *mut AstType {
-    let v: *mut Variable = stack_getresult((*state).stack);
+unsafe fn state_getresulttype(state: &State) -> &AstType {
+    let v: *mut Variable = stack_getresult(&*state.stack);
     if v.is_null() {
         panic!();
     }
-    variable_type(v)
+    &*variable_type(v)
 }
 
-pub unsafe fn state_getobjecttype(state: *mut State, id: *mut libc::c_char) -> *mut AstType {
+pub unsafe fn state_getobjecttype(state: &State, id: *mut libc::c_char) -> &AstType {
     if strcmp(id, b"return\0" as *const u8 as *const libc::c_char) == 0 as libc::c_int {
         return state_getresulttype(state);
     }
-    let v: *mut Variable = stack_getvariable((*state).stack, id);
+    let v: *mut Variable = stack_getvariable(state.stack, id);
     if v.is_null() {
         panic!();
     }
-    variable_type(v)
+    &*variable_type(v)
 }
 
 pub unsafe fn state_getloc(state: *mut State, id: *mut libc::c_char) -> *mut Value {

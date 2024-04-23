@@ -185,8 +185,8 @@ pub unsafe fn stack_undeclare(stack: *mut Stack, state: *mut State) {
     m.destroy();
 }
 
-pub unsafe fn stack_getresult(s: *mut Stack) -> *mut Variable {
-    (*s).result
+pub unsafe fn stack_getresult(s: &Stack) -> *mut Variable {
+    s.result
 }
 
 pub unsafe fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Variable {
@@ -195,7 +195,7 @@ pub unsafe fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Va
 }
 
 pub unsafe fn stack_references(s: *mut Stack, loc: &Location, state: *mut State) -> bool {
-    let result: *mut Variable = stack_getresult(s);
+    let result: *mut Variable = stack_getresult(&*s);
     if !result.is_null() && variable_references(result, loc, state) {
         return true;
     }

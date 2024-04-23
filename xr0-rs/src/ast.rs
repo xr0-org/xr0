@@ -187,8 +187,9 @@ pub const MOD_REGISTER: AstTypeModifier = 16;
 pub const MOD_CONST: AstTypeModifier = 32;
 pub const MOD_VOLATILE: AstTypeModifier = 64;
 
-pub struct LValue {
-    pub t: *const AstType,
+// most likely this is a borrow of the type
+pub struct LValue<'ast> {
+    pub t: Option<&'ast AstType>,
     pub obj: *mut Object,
 }
 
@@ -338,7 +339,7 @@ unsafe fn hack_base_object_from_alloc(expr: &AstExpr, state: *mut State) -> *mut
     }
     drop(i);
     let lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state).unwrap();
-    let obj: *mut Object = lvalue_object(lval);
+    let obj: *mut Object = lvalue_object(&lval);
     if obj.is_null() {
         panic!();
     }
@@ -475,7 +476,7 @@ unsafe fn expr_isdeallocand_decide(expr: &AstExpr, state: *mut State) -> bool {
 unsafe fn hack_object_from_assertion(expr: &AstExpr, state: *mut State) -> *mut Object {
     let assertand = ast_expr_isdeallocand_assertand(expr);
     let res_lval = ast_expr_lvalue(assertand, state).unwrap();
-    let obj: *mut Object = lvalue_object(res_lval);
+    let obj: *mut Object = lvalue_object(&res_lval);
     if obj.is_null() {
         panic!();
     }
@@ -522,7 +523,7 @@ unsafe fn expr_isdeallocand_rangedecide(
     drop(j);
     drop(i);
     let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), state).unwrap();
-    let obj: *mut Object = lvalue_object(res_lval);
+    let obj: *mut Object = lvalue_object(&res_lval);
     if obj.is_null() {
         panic!();
     }
@@ -808,7 +809,7 @@ unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Val
         return Err(Error::new("undefined indirection (rvalue)".to_string()));
     }
     let lval_lval = ast_expr_lvalue(lval, state)?;
-    let obj: *mut Object = lvalue_object(lval_lval);
+    let obj: *mut Object = lvalue_object(&lval_lval);
     if obj.is_null() {
         return Err(Error::new(format!(
             "undefined indirection: {lval} is not an lvalue"
@@ -818,7 +819,7 @@ unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Val
     Ok(rval_val)
 }
 
-pub unsafe fn ast_expr_lvalue(expr: &AstExpr, state: *mut State) -> Result<*mut LValue> {
+pub unsafe fn ast_expr_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
     match &expr.kind {
         AstExprKind::Identifier(_) => expr_identifier_lvalue(expr, state),
         AstExprKind::Unary(_) => expr_unary_lvalue(expr, state),
@@ -827,35 +828,40 @@ pub unsafe fn ast_expr_lvalue(expr: &AstExpr, state: *mut State) -> Result<*mut 
     }
 }
 
-pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Result<*mut LValue> {
+pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
     let root = ast_expr_member_root(expr);
     // Note: Original fails to check for errors.
     let root_lval = ast_expr_lvalue(root, state).unwrap();
-    let root_obj: *mut Object = lvalue_object(root_lval);
+    let root_obj: *mut Object = lvalue_object(&root_lval);
     if root_obj.is_null() {
         panic!();
     }
     let field = ast_expr_member_field(expr);
-    let member: *mut Object = object_getmember(root_obj, lvalue_type(&*root_lval), field, state);
+    let member: *mut Object = object_getmember(root_obj, lvalue_type(&root_lval), field, state);
     if member.is_null() {
         return Err(Error::new("lvalue error".to_string()));
     }
-    let t = object_getmembertype(root_obj, lvalue_type(&*root_lval), field, state).unwrap();
+    let t = object_getmembertype(root_obj, lvalue_type(&root_lval), field, state);
     Ok(lvalue_create(t, member))
 }
 
-pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<*mut LValue> {
+pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
     if !(ast_expr_unary_op(expr) == AstUnaryOp::Dereference) {
         panic!();
     }
     let inner = ast_expr_unary_operand(expr);
     if matches!(inner.kind, AstExprKind::Identifier(_)) {
         let root_lval = ast_expr_lvalue(inner, state)?;
-        let root_obj: *mut Object = lvalue_object(root_lval);
+        let root_obj: *mut Object = lvalue_object(&root_lval);
         if root_obj.is_null() {
-            return Ok(ptr::null_mut());
+            // `root` freed
+
+            // Note: The original does `return (struct lvalue_res) { .lval = NULL, .err = NULL };`
+            // here but I believe every single caller dereferences lval without checking it for
+            // null, so it will crash.
+            panic!();
         }
-        let t = ast_type_ptr_type(lvalue_type(&*root_lval)).unwrap();
+        let t = ast_type_ptr_type(lvalue_type(&root_lval));
         let root_val: *mut Value = object_as_value(root_obj);
         if root_val.is_null() {
             panic!();
@@ -864,26 +870,29 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<*mu
         return Ok(lvalue_create(t, obj));
     }
     let root_lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state)?;
-    let root_obj: *mut Object = lvalue_object(root_lval);
+    let root_obj: *mut Object = lvalue_object(&root_lval);
     if root_obj.is_null() {
-        return Ok(ptr::null_mut());
+        // `root` freed
+
+        // Note: Original returns null. See note above.
+        panic!();
     }
-    let t = ast_type_ptr_type(lvalue_type(&*root_lval)).unwrap();
+    let t = ast_type_ptr_type(lvalue_type(&root_lval));
     let root_val: *mut Value = object_as_value(root_obj);
     if root_val.is_null() {
         panic!();
     }
     let Ok(res_obj) = state_deref(state, root_val, ast_expr_binary_e2(inner)) else {
-        // Note: error suppressed in original
-        return Ok(ptr::null_mut());
+        // Note: Original returns null. See note above.
+        panic!();
     };
     Ok(lvalue_create(t, res_obj))
 }
 
-pub unsafe fn expr_identifier_lvalue(expr: &AstExpr, state: *mut State) -> Result<*mut LValue> {
+pub unsafe fn expr_identifier_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
     let id = ast_expr_as_identifier(expr);
     Ok(lvalue_create(
-        state_getobjecttype(state, id),
+        Some(state_getobjecttype(&*state, id)),
         state_getobject(state, id),
     ))
 }
@@ -1048,7 +1057,7 @@ pub unsafe fn prepare_parameters(
         }
         let name = ast_expr_identifier_create(OwningCStr::copy_char_ptr(ast_variable_name(param)));
         let lval_lval = ast_expr_lvalue(&name, state)?;
-        let obj: *mut Object = lvalue_object(lval_lval);
+        let obj: *mut Object = lvalue_object(&lval_lval);
         drop(name);
         object_assign(obj, value_copy(&*arg));
     }
@@ -1081,7 +1090,7 @@ unsafe fn assign_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value
         return Err(Error::new("undefined indirection (rvalue)".to_string()));
     }
     let lval_res = ast_expr_lvalue(lval, state)?;
-    let obj: *mut Object = lvalue_object(lval_res);
+    let obj: *mut Object = lvalue_object(&lval_res);
     if obj.is_null() {
         return Err(Error::new("undefined indirection (lvalue)".to_string()));
     }
@@ -3750,16 +3759,16 @@ pub unsafe fn parse_escape(c: &str) -> libc::c_int {
     }
 }
 
-pub unsafe fn lvalue_create(t: *const AstType, obj: *mut Object) -> *mut LValue {
-    Box::into_raw(Box::new(LValue { t, obj }))
+pub unsafe fn lvalue_create(t: Option<&AstType>, obj: *mut Object) -> LValue {
+    LValue { t, obj }
 }
 
-pub unsafe fn lvalue_type(l: &LValue) -> &AstType {
-    &*(*l).t
+pub unsafe fn lvalue_type<'ast>(l: &LValue<'ast>) -> &'ast AstType {
+    l.t.unwrap()
 }
 
-pub unsafe fn lvalue_object(l: *mut LValue) -> *mut Object {
-    (*l).obj
+pub unsafe fn lvalue_object(l: &LValue) -> *mut Object {
+    l.obj
 }
 
 pub unsafe fn ast_topological_order(fname: &CStr, ext: &mut Externals) -> Vec<OwningCStr> {
