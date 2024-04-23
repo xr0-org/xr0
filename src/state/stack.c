@@ -106,6 +106,15 @@ stack_programindex(struct stack *s)
 }
 
 void
+stack_return(struct stack *s)
+{
+	program_setatend(s->p);
+	if (s->prev && s->kind != FRAME_CALL) {
+		stack_return(s->prev);
+	}
+}
+
+void
 stack_destroy(struct stack *stack)
 {
 	block_arr_destroy(stack->memory);

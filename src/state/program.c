@@ -33,6 +33,12 @@ program_create(struct ast_block *b, char *name)
 	return p;
 }
 
+void
+program_setatend(struct program *p)
+{
+	p->s = PROGRAM_COUNTER_ATEND;
+}
+
 static enum program_state
 program_state_init(struct ast_block *b)
 {
@@ -182,7 +188,7 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 	struct error *return_err = error_to_return(err);
 	if (return_err) {
 		printf("RETURN\n");
-		state_popframe(s);
+		state_return(s);
 		return NULL;
 	}
 	return err;

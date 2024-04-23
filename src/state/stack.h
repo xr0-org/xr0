@@ -20,6 +20,9 @@ stack_programtext(struct stack *);
 int
 stack_programindex(struct stack *);
 
+void
+stack_return(struct stack *);
+
 int
 stack_id(struct stack *);
 
