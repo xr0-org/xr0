@@ -28,11 +28,6 @@ pub struct Error {
 
 pub type Result<T, E = Box<Error>> = std::result::Result<T, E>;
 
-pub struct StringArr {
-    pub n: libc::c_int,
-    pub s: *mut *mut libc::c_char,
-}
-
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.msg)
@@ -218,45 +213,10 @@ impl Error {
     }
 }
 
-impl StringArr {
-    pub fn len(&self) -> usize {
-        self.n as usize
-    }
-}
-
-impl std::ops::Index<usize> for StringArr {
-    type Output = *mut libc::c_char;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        unsafe { &*self.s.add(index) }
-    }
-}
-
-pub unsafe fn string_arr_create() -> Box<StringArr> {
-    Box::new(StringArr {
-        s: ptr::null_mut(),
-        n: 0,
-    })
-}
-
-pub unsafe fn string_arr_append(arr: &mut StringArr, s: *mut libc::c_char) -> libc::c_int {
-    arr.n += 1;
-    arr.s = realloc(
-        arr.s as *mut libc::c_void,
-        (::core::mem::size_of::<StringArr>()).wrapping_mul(arr.n as usize),
-    ) as *mut *mut libc::c_char;
-    if arr.s.is_null() {
-        panic!();
-    }
-    let loc: libc::c_int = arr.n - 1 as libc::c_int;
-    *arr.s.offset(loc as isize) = s;
-    loc
-}
-
-pub unsafe fn string_arr_contains(arr: &StringArr, s: *mut libc::c_char) -> bool {
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < arr.n {
-        if strcmp(s, *arr.s.offset(i as isize)) == 0 as libc::c_int {
+pub unsafe fn string_arr_contains(arr: &[*mut libc::c_char], s: *mut libc::c_char) -> bool {
+    let mut i = 0;
+    while i < arr.len() {
+        if strcmp(s, arr[i]) == 0 as libc::c_int {
             return true;
         }
         i += 1;

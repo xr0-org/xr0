@@ -23,9 +23,8 @@ use crate::state::state::{
     state_range_dealloc, state_static_init, state_str, state_vconst,
 };
 use crate::util::{
-    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, string_arr_append,
-    string_arr_contains, string_arr_create, Error, InsertionOrderMap, Map, OwningCStr, Result,
-    StringArr,
+    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, string_arr_contains, Error,
+    InsertionOrderMap, Map, OwningCStr, Result,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -1861,7 +1860,7 @@ unsafe fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, li
     }
     for (key, count) in &mut indegrees {
         if let Some(n_arr) = g.get(CStr::from_ptr(key.as_ptr())) {
-            *count += n_arr.n;
+            *count += n_arr.len() as libc::c_int;
         }
     }
     indegrees
@@ -3582,7 +3581,7 @@ unsafe fn split_path_verify(
     Ok(())
 }
 
-type FuncGraph = InsertionOrderMap<CString, Box<StringArr>>;
+type FuncGraph = InsertionOrderMap<CString, Vec<*mut libc::c_char>>;
 
 unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, ext: &Externals) {
     let mut local_dedup = Map::new();
@@ -3605,16 +3604,16 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
         panic!();
     }
     let body: *mut AstBlock = (*f).body;
-    let mut val = string_arr_create();
+    let mut val = vec![];
     for stmt in &(*body).stmts {
         let farr = ast_stmt_getfuncs(stmt);
 
         for func in farr {
-            let func = func.into_ptr();
-            if (local_dedup.get(func)).is_null() {
+            if (local_dedup.get(func.as_ptr())).is_null() {
+                let func = func.into_ptr(); // transfer of ownership (it's going into val)
                 let f_0: *mut AstFunction = ext.get_func(func);
                 if !(*f_0).isaxiom {
-                    string_arr_append(&mut val, func);
+                    val.push(func);
                 }
                 local_dedup.set(func, 1 as libc::c_int as *mut libc::c_void);
                 recurse_buildgraph(g, dedup, CStr::from_ptr(func), ext);
