@@ -277,19 +277,12 @@ pub enum AstStmtKind {
     Allocation(AstAllocStmt),
 }
 
-// TODO: kill
-#[derive(Clone)]
-pub struct PrecondsResult {
-    pub stmt: *mut AstStmt,
-    pub err: Option<Box<Error>>,
-}
-
 #[derive(Clone)]
 pub struct Preresult {
     pub is_contradiction: bool,
 }
 
-// TODO: look into some more reasonable error handling mechanism, this one is really iffy
+// TODO: resultify
 #[derive(Clone)]
 pub struct AstStmtSplits {
     // Note: In the original this array is heap-allocated but never freed.
@@ -1959,26 +1952,15 @@ pub unsafe fn ast_block_isterminal(b: &AstBlock, s: *mut State) -> bool {
     b.stmts.iter().any(|stmt| ast_stmt_isterminal(stmt, s))
 }
 
-pub unsafe fn ast_block_preconds(b: &AstBlock) -> PrecondsResult {
+pub unsafe fn ast_block_preconds(b: &AstBlock) -> Result<Option<&AstStmt>> {
     for stmt in &b.stmts {
         if ast_stmt_ispre(stmt) {
             let preconds = ast_stmt_labelled_stmt(stmt);
-            if let Err(err) = ast_stmt_preconds_validate(preconds) {
-                return PrecondsResult {
-                    stmt: ptr::null_mut(),
-                    err: Some(err),
-                };
-            }
-            return PrecondsResult {
-                stmt: preconds as *const AstStmt as *mut AstStmt, // TODO - figure out if this is safe
-                err: None,
-            };
+            ast_stmt_preconds_validate(preconds)?;
+            return Ok(Some(preconds));
         }
     }
-    PrecondsResult {
-        stmt: ptr::null_mut(),
-        err: None,
-    }
+    Ok(None)
 }
 
 pub unsafe fn ast_stmt_process(
@@ -3132,7 +3114,7 @@ impl<'ast> AstFunction<'ast> {
         self.params.as_slice()
     }
 
-    pub unsafe fn preconditions(&self) -> PrecondsResult {
+    pub unsafe fn preconditions(&self) -> Result<Option<&AstStmt>> {
         ast_block_preconds(self.abstract_block())
     }
 }
@@ -3194,15 +3176,18 @@ pub unsafe fn ast_function_initparams(f: &AstFunction, s: *mut State) -> Result<
     Ok(())
 }
 
+// TODO: resultify
+#[derive(Clone)]
+pub struct PrecondsResult {
+    pub stmt: *mut AstStmt,
+    pub err: Option<Box<Error>>,
+}
+
 unsafe fn ast_function_precondsinit(f: &AstFunction, s: *mut State) -> Result<()> {
-    let pre: PrecondsResult = f.preconditions();
-    if let Some(err) = pre.err {
-        return Err(err);
+    let pre_stmt = f.preconditions()?;
+    if let Some(stmt) = pre_stmt {
+        ast_stmt_absexec(stmt, s, true)?;
     }
-    if pre.stmt.is_null() {
-        return Ok(());
-    }
-    ast_stmt_absexec(&*pre.stmt, s, true)?;
     Ok(())
 }
 
