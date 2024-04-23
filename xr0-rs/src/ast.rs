@@ -1850,8 +1850,7 @@ unsafe fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, li
     for (key, deps) in g {
         if indegrees.get(CStr::from_ptr(key.as_ptr())).is_none() {
             indegrees.insert(OwningCStr::copy(key), 0);
-            for j in 0..deps.len() {
-                let dep_key = deps[j];
+            for &dep_key in deps {
                 if indegrees.get(CStr::from_ptr(dep_key)).is_none() {
                     indegrees.insert(OwningCStr::new(dynamic_str(dep_key)), 0);
                 }
@@ -1887,6 +1886,7 @@ unsafe fn build_indegree_zero(
 pub unsafe fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
     let mut order = vec![];
     let g = ast_function_buildgraph(fname, ext);
+    // Note: Original leaks indegree_zero.
     let mut indegrees = calculate_indegrees(&g);
     let mut indegree_zero = build_indegree_zero(&indegrees);
     while let Some(curr) = indegree_zero.pop_front() {
