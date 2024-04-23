@@ -1,10 +1,9 @@
 use std::ptr;
 
-use libc::{free, malloc, strcmp};
+use libc::{free, strcmp};
 
 use crate::ast::{
-    ast_expr_constant_create, ast_type_copy, ast_type_destroy, ast_type_str, ast_variable_name,
-    ast_variable_type,
+    ast_expr_constant_create, ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type,
 };
 use crate::object::{
     object_as_value, object_assign, object_isvalue, object_str, object_value_create,
@@ -33,7 +32,7 @@ pub struct Stack {
 }
 
 pub struct Variable {
-    pub r#type: *mut AstType,
+    pub r#type: Box<AstType>,
     pub loc: *mut Location,
     pub is_param: bool,
 }
@@ -41,18 +40,13 @@ pub struct Variable {
 pub unsafe fn stack_newblock(stack: *mut Stack) -> *mut Location {
     let address = (*stack).frame.len() as libc::c_int;
     (*stack).frame.push(block_create());
-    let loc: *mut Location = location_create_automatic(
-        (*stack).id,
-        address,
-        ast_expr_constant_create(0 as libc::c_int),
-    );
-    loc
+    location_create_automatic((*stack).id, address, ast_expr_constant_create(0))
 }
 
 pub unsafe fn stack_create(
     name: *mut libc::c_char,
     prev: *mut Stack,
-    return_type: *mut AstType,
+    return_type: &AstType,
 ) -> *mut Stack {
     let mut stack = Box::new(Stack {
         name,
@@ -220,16 +214,13 @@ pub unsafe fn stack_getblock(s: *mut Stack, address: libc::c_int) -> *mut Block 
     &mut *(*s).frame[address as usize]
 }
 
-pub unsafe fn variable_create(
-    type_0: *mut AstType,
-    stack: *mut Stack,
-    isparam: bool,
-) -> *mut Variable {
-    let v: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
-    (*v).r#type = ast_type_copy(type_0);
-    (*v).is_param = isparam;
-    (*v).loc = stack_newblock(stack);
-    let b = location_auto_getblock(&*(*v).loc, stack).unwrap();
+pub unsafe fn variable_create(type_: &AstType, stack: *mut Stack, isparam: bool) -> *mut Variable {
+    let v = Box::new(Variable {
+        r#type: ast_type_copy(type_),
+        is_param: isparam,
+        loc: stack_newblock(stack),
+    });
+    let b = location_auto_getblock(&*v.loc, stack).unwrap();
     if b.is_null() {
         panic!();
     }
@@ -240,29 +231,36 @@ pub unsafe fn variable_create(
             ptr::null_mut(),
         ),
     );
-    v
+    Box::into_raw(v)
 }
 
 pub unsafe fn variable_destroy(v: *mut Variable) {
-    ast_type_destroy((*v).r#type);
-    location_destroy((*v).loc);
-    free(v as *mut libc::c_void);
+    drop(Box::from_raw(v))
+}
+
+impl Drop for Variable {
+    fn drop(&mut self) {
+        unsafe {
+            location_destroy(self.loc);
+        }
+    }
 }
 
 pub unsafe fn variable_copy(old: *mut Variable) -> *mut Variable {
-    let new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
-    (*new).r#type = ast_type_copy((*old).r#type);
-    (*new).is_param = (*old).is_param;
-    (*new).loc = location_copy(&*(*old).loc);
-    new
+    Box::into_raw(Box::new(Variable {
+        r#type: ast_type_copy(&(*old).r#type),
+        is_param: (*old).is_param,
+        loc: location_copy(&*(*old).loc),
+    }))
 }
 
 unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Variable {
-    let new: *mut Variable = malloc(::core::mem::size_of::<Variable>()) as *mut Variable;
-    (*new).r#type = ast_type_copy((*old).r#type);
-    (*new).is_param = (*old).is_param;
-    (*new).loc = location_copy(&*(*old).loc);
-    let obj = state_get(s, &*(*new).loc, false).unwrap();
+    let new = Box::new(Variable {
+        r#type: ast_type_copy(&(*old).r#type),
+        is_param: (*old).is_param,
+        loc: location_copy(&*(*old).loc),
+    });
+    let obj = state_get(s, &*new.loc, false).unwrap();
     if obj.is_null() {
         panic!();
     }
@@ -272,17 +270,17 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
             object_assign(obj, value_abstractcopy(&*v, s));
         }
     }
-    new
+    Box::into_raw(new)
 }
 
 pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> OwningCStr {
     assert!(!(*(*var).loc).type_is_vconst());
     let b: *mut StrBuilder = strbuilder_create();
-    let type_0 = ast_type_str((*var).r#type);
+    let type_ = ast_type_str(&(*var).r#type);
     let isparam = if (*var).is_param { "param " } else { "" };
     let obj_str = object_or_nothing_str((*var).loc, stack, state);
     let loc = location_str(&*(*var).loc);
-    strbuilder_write!(b, "{{{isparam}{type_0} := {obj_str}}} @ {loc}");
+    strbuilder_write!(b, "{{{isparam}{type_} := {obj_str}}} @ {loc}");
     strbuilder_build(b)
 }
 
@@ -307,7 +305,7 @@ pub unsafe fn variable_location(v: *mut Variable) -> *mut Location {
 }
 
 pub unsafe fn variable_type(v: *mut Variable) -> *mut AstType {
-    (*v).r#type
+    &mut *(*v).r#type
 }
 
 pub unsafe fn variable_references(v: *mut Variable, loc: &Location, s: *mut State) -> bool {

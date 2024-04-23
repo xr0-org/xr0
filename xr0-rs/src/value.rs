@@ -103,8 +103,8 @@ pub unsafe fn value_sync_create(e: *mut AstExpr) -> *mut Value {
     value_create(ValueKind::Sync(number_computed_create(e)))
 }
 
-pub unsafe fn value_struct_create(t: *mut AstType) -> *mut Value {
-    let members = ast_type_struct_members(&*t).expect("can't create value of incomplete type");
+pub unsafe fn value_struct_create(t: &AstType) -> *mut Value {
+    let members = ast_type_struct_members(t).expect("can't create value of incomplete type");
     value_create(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(members),
         m: from_members(members),
@@ -112,13 +112,15 @@ pub unsafe fn value_struct_create(t: *mut AstType) -> *mut Value {
 }
 
 pub unsafe fn value_struct_indefinite_create(
-    mut t: *mut AstType,
+    mut t: &AstType,
     s: *mut State,
     comment: *mut libc::c_char,
     persist: bool,
 ) -> *mut Value {
-    t = ast_type_struct_complete(t, state_getext(s));
-    if (ast_type_struct_members(&*t)).is_none() {
+    // Note: The original doesn't null-check here. I wonder how it would handle `typedef struct foo
+    // foo;`.
+    t = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
+    if (ast_type_struct_members(t)).is_none() {
         panic!();
     }
     let v: *mut Value = value_struct_create(t);
@@ -170,7 +172,8 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
             if islval {
                 ptr::null_mut()
             } else {
-                state_vconst(compare, ast_type_create_voidptr(), ptr::null_mut(), false)
+                // Note: Original leaked this type.
+                state_vconst(compare, &ast_type_create_voidptr(), ptr::null_mut(), false)
             }
         }
         ValueKind::DefinitePtr(loc) => location_transfigure(*loc, compare),
@@ -247,16 +250,16 @@ unsafe fn abstract_copy_members(
         .collect()
 }
 
-pub unsafe fn value_struct_membertype(v: *mut Value, member: *mut libc::c_char) -> *mut AstType {
+pub unsafe fn value_struct_membertype(v: &Value, member: *mut libc::c_char) -> Option<&AstType> {
     let ValueKind::Struct(sv) = &(*v).kind else {
         panic!();
     };
     for var in &sv.members {
         if strcmp(member, ast_variable_name(var)) == 0 as libc::c_int {
-            return ast_variable_type(var);
+            return Some(ast_variable_type(var));
         }
     }
-    ptr::null_mut()
+    None
 }
 
 pub unsafe fn value_struct_member(v: *mut Value, member: *mut libc::c_char) -> *mut Object {

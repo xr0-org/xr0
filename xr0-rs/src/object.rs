@@ -326,22 +326,19 @@ pub unsafe fn object_dealloc(obj: *mut Object, s: *mut State) -> Result<()> {
 
 pub unsafe fn object_getmember(
     obj: *mut Object,
-    t: *mut AstType,
+    t: &AstType,
     member: *mut libc::c_char,
     s: *mut State,
 ) -> *mut Object {
     value_struct_member(getorcreatestruct(obj, t, s), member)
 }
 
-unsafe fn getorcreatestruct(obj: *mut Object, t: *mut AstType, s: *mut State) -> *mut Value {
+unsafe fn getorcreatestruct(obj: *mut Object, t: &AstType, s: *mut State) -> *mut Value {
     let mut v: *mut Value = object_as_value(obj);
     if !v.is_null() {
         return v;
     }
-    let complete: *mut AstType = ast_type_struct_complete(t, state_getext(s));
-    if complete.is_null() {
-        panic!();
-    }
+    let complete = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
     v = value_struct_create(complete);
     object_assign(obj, v);
     v
@@ -349,11 +346,11 @@ unsafe fn getorcreatestruct(obj: *mut Object, t: *mut AstType, s: *mut State) ->
 
 pub unsafe fn object_getmembertype(
     obj: *mut Object,
-    t: *mut AstType,
+    t: &AstType,
     member: *mut libc::c_char,
     s: *mut State,
-) -> *mut AstType {
-    value_struct_membertype(getorcreatestruct(obj, t, s), member)
+) -> Option<&AstType> {
+    value_struct_membertype(&*getorcreatestruct(obj, t, s), member)
 }
 
 pub unsafe fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {

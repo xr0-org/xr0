@@ -50,7 +50,7 @@ pub struct State {
 pub unsafe fn state_create(
     func: *mut libc::c_char,
     ext: *mut Externals,
-    result_type: *mut AstType,
+    result_type: &AstType,
 ) -> State {
     State {
         ext,
@@ -66,7 +66,7 @@ pub unsafe fn state_create(
 pub unsafe fn state_create_withprops(
     func: *mut libc::c_char,
     ext: *mut Externals,
-    result_type: *mut AstType,
+    result_type: &AstType,
     props: Props,
 ) -> State {
     State {
@@ -159,7 +159,7 @@ pub unsafe fn state_getprops(s: &mut State) -> &mut Props {
     &mut s.props
 }
 
-pub unsafe fn state_pushframe(state: *mut State, func: *mut libc::c_char, ret_type: *mut AstType) {
+pub unsafe fn state_pushframe(state: *mut State, func: *mut libc::c_char, ret_type: &AstType) {
     (*state).stack = stack_create(func, (*state).stack, ret_type);
 }
 
@@ -178,7 +178,7 @@ pub unsafe fn state_declare(state: *mut State, var: &AstVariable, isparam: bool)
 
 pub unsafe fn state_vconst(
     state: *mut State,
-    t: *mut AstType,
+    t: &AstType,
     comment: *mut libc::c_char,
     persist: bool,
 ) -> *mut Value {

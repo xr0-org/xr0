@@ -10,8 +10,8 @@ use crate::{strbuilder_write, AstFunction, AstType, AstVariable, StrBuilder};
 pub struct Externals {
     func: HashMap<String, *mut AstFunction>,
     var: HashMap<String, *mut AstVariable>,
-    typedef: HashMap<String, *mut AstType>,
-    _struct: HashMap<String, *mut AstType>,
+    typedef: HashMap<String, *const AstType>,
+    _struct: HashMap<String, *const AstType>,
 }
 
 impl Externals {
@@ -22,10 +22,10 @@ impl Externals {
     pub unsafe fn types_str(&self, indent: &str) -> OwningCStr {
         let b: *mut StrBuilder = strbuilder_create();
         for (k, v) in &self.typedef {
-            strbuilder_write!(b, "{indent}{} {k}\n", ast_type_str(*v));
+            strbuilder_write!(b, "{indent}{} {k}\n", ast_type_str(&**v));
         }
         for v in self._struct.values() {
-            strbuilder_write!(b, "{indent}{}\n", ast_type_str(*v));
+            strbuilder_write!(b, "{indent}{}\n", ast_type_str(&**v));
         }
         strbuilder_build(b)
     }
@@ -40,12 +40,12 @@ impl Externals {
         self.var.insert(id, v);
     }
 
-    pub unsafe fn declare_typedef(&mut self, id: *mut libc::c_char, t: *mut AstType) {
+    pub unsafe fn declare_typedef(&mut self, id: *mut libc::c_char, t: *const AstType) {
         let id = CStr::from_ptr(id).to_str().unwrap().to_string();
         self.typedef.insert(id, t);
     }
 
-    pub unsafe fn declare_struct(&mut self, t: *mut AstType) {
+    pub unsafe fn declare_struct(&mut self, t: *const AstType) {
         let id = ast_type_struct_tag(&*t);
         if id.is_null() {
             panic!();
@@ -59,13 +59,13 @@ impl Externals {
         self.func.get(id).copied().unwrap_or(ptr::null_mut())
     }
 
-    pub unsafe fn get_typedef(&self, id: *const libc::c_char) -> *mut AstType {
+    pub unsafe fn get_typedef(&self, id: *const libc::c_char) -> Option<&AstType> {
         let id = CStr::from_ptr(id).to_str().unwrap();
-        self.typedef.get(id).copied().unwrap_or(ptr::null_mut())
+        self.typedef.get(id).map(|&p| &*p)
     }
 
-    pub unsafe fn get_struct(&self, id: *const libc::c_char) -> *mut AstType {
+    pub unsafe fn get_struct(&self, id: *const libc::c_char) -> Option<&AstType> {
         let id = CStr::from_ptr(id).to_str().unwrap();
-        self._struct.get(id).copied().unwrap_or(ptr::null_mut())
+        self._struct.get(id).map(|&p| &*p)
     }
 }

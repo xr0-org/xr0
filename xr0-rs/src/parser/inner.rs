@@ -7,12 +7,11 @@ use crate::util::OwningCStr;
 
 type BoxedBlock = *mut AstBlock;
 type BoxedFunction = *mut AstFunction;
-type BoxedType = *mut AstType;
 type BoxedCStr = *mut libc::c_char;
 
 pub struct Declaration {
     pub name: Option<OwningCStr>,
-    pub t: *mut AstType,
+    pub t: Box<AstType>,
 }
 
 pub struct DirectFunctionDeclarator {
@@ -283,7 +282,7 @@ pub grammar c_parser(env: &Env) for str {
         } /
         t:declaration_specifiers() _ v:declarator() _ ";" {
             unsafe {
-                let is_typedef = (*t).modifiers & MOD_TYPEDEF as libc::c_int != 0;
+                let is_typedef = t.modifiers & MOD_TYPEDEF != 0;
 
                 let mut t = t;
                 for _ in 0..v.ptr_valence {
@@ -307,12 +306,13 @@ pub grammar c_parser(env: &Env) for str {
         storage_class_specifier() /
         type_qualifier()
 
-    rule declaration_specifiers() -> BoxedType =
+    rule declaration_specifiers() -> Box<AstType> =
         type_specifier() /
         type_specifier() _ t:declaration_specifiers() { t } /
         m:declaration_modifier() _ s:declaration_specifiers() {
+            let mut s = s;
             unsafe {
-                ast_type_mod_or(s, m);
+                ast_type_mod_or(&mut s, m);
             }
             s
         }
@@ -333,7 +333,7 @@ pub grammar c_parser(env: &Env) for str {
         K(<"auto">) { MOD_AUTO } /
         K(<"register">) { MOD_REGISTER }
 
-    rule type_specifier() -> BoxedType =
+    rule type_specifier() -> Box<AstType> =
         K(<"void">) { unsafe { ast_type_create(AstTypeBase::Void, 0) } } /
         K(<"char">) { unsafe { ast_type_create(AstTypeBase::Char, 0) } } /
         K(<"int">) { unsafe { ast_type_create(AstTypeBase::Int, 0) } } /
@@ -351,7 +351,7 @@ pub grammar c_parser(env: &Env) for str {
     }
 
     // note: unions are unsupported in the original
-    rule struct_or_union_specifier() -> BoxedType =
+    rule struct_or_union_specifier() -> Box<AstType> =
         "struct" _ tag:identifier() _ "{" _ fields:struct_declaration_list() _ "}" {
             unsafe { ast_type_create_struct(Some(tag), Some(Box::new(fields))) }
         } /
@@ -432,7 +432,7 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_variable_create(OwningCStr::empty(), t) }
         }
 
-    rule type_name() -> BoxedType =
+    rule type_name() -> Box<AstType> =
         t:specifier_qualifier_list() _ abstract_declarator() { t } /
         specifier_qualifier_list()
 
@@ -452,7 +452,7 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_stmt_create_compound_v(env.lexloc(p), v) }
         }
 
-    rule specifier_qualifier_list() -> BoxedType =
+    rule specifier_qualifier_list() -> Box<AstType> =
         q:type_specifier() _ specifier_qualifier_list() { q } /
         q:type_specifier() { q } /
         // Note: original is I guess UB? type confusion

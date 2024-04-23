@@ -10,8 +10,7 @@ use libc::{malloc, strncmp};
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
 use crate::object::{
-    object_as_value, object_assign, object_destroy, object_getmember, object_getmembertype,
-    object_hasvalue,
+    object_as_value, object_assign, object_getmember, object_getmembertype, object_hasvalue,
 };
 use crate::parser::{lexememarker_copy, lexememarker_destroy, LexemeMarker};
 use crate::state::state::{
@@ -139,7 +138,7 @@ enum AstExprKind {
 }
 
 pub struct AstType {
-    pub modifiers: libc::c_int,
+    pub modifiers: libc::c_uint,
     pub base: AstTypeBase,
 }
 
@@ -153,11 +152,11 @@ pub struct AstVariable {
     // exception is the parameter in `fclose(FILE *);` which has no name) this would be invalid, so
     // we end up banning it.
     pub name: OwningCStr,
-    pub r#type: *mut AstType,
+    pub r#type: Box<AstType>,
 }
 
 pub struct AstArrayType {
-    pub r#type: *mut AstType,
+    pub r#type: Box<AstType>,
     pub length: libc::c_int,
 }
 
@@ -171,7 +170,7 @@ pub enum AstTypeBase {
     Double,
     Signed,
     Unsigned,
-    Pointer(*mut AstType),
+    Pointer(Option<Box<AstType>>),
     Array(AstArrayType),
     Struct(AstStructType),
     Union(AstStructType),
@@ -189,13 +188,13 @@ pub const MOD_CONST: AstTypeModifier = 32;
 pub const MOD_VOLATILE: AstTypeModifier = 64;
 
 pub struct LValue {
-    pub t: *mut AstType,
+    pub t: *const AstType,
     pub obj: *mut Object,
 }
 
 pub struct AstFunction {
     pub is_axiom: bool,
-    pub ret: *mut AstType,
+    pub ret: Box<AstType>,
     pub name: OwningCStr,
     pub params: Vec<Box<AstVariable>>,
     pub r#abstract: *mut AstBlock,
@@ -293,14 +292,14 @@ pub struct AstExternDecl {
 
 pub struct AstTypedefDecl {
     pub name: OwningCStr,
-    pub type_0: *mut AstType,
+    pub type_0: Box<AstType>,
 }
 
 pub enum AstExternDeclKind {
     Function(*mut AstFunction),
     Variable(Box<AstVariable>),
     Typedef(AstTypedefDecl),
-    Struct(*mut AstType),
+    Struct(Box<AstType>),
 }
 
 pub struct Ast {
@@ -771,7 +770,7 @@ pub unsafe fn ast_expr_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Va
 unsafe fn arbarg_eval(_expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     Ok(state_vconst(
         state,
-        ast_type_create_ptr(ast_type_create(AstTypeBase::Void, 0)),
+        &ast_type_create_ptr(ast_type_create(AstTypeBase::Void, 0)),
         ptr::null_mut(),
         false,
     ))
@@ -837,14 +836,11 @@ pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Res
         panic!();
     }
     let field = ast_expr_member_field(expr);
-    let member: *mut Object = object_getmember(root_obj, lvalue_type(root_lval), field, state);
+    let member: *mut Object = object_getmember(root_obj, lvalue_type(&*root_lval), field, state);
     if member.is_null() {
         return Err(Error::new("lvalue error".to_string()));
     }
-    let t: *mut AstType = object_getmembertype(root_obj, lvalue_type(root_lval), field, state);
-    if t.is_null() {
-        panic!();
-    }
+    let t = object_getmembertype(root_obj, lvalue_type(&*root_lval), field, state).unwrap();
     Ok(lvalue_create(t, member))
 }
 
@@ -859,7 +855,7 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<*mu
         if root_obj.is_null() {
             return Ok(ptr::null_mut());
         }
-        let t: *mut AstType = ast_type_ptr_type(lvalue_type(root_lval));
+        let t = ast_type_ptr_type(lvalue_type(&*root_lval)).unwrap();
         let root_val: *mut Value = object_as_value(root_obj);
         if root_val.is_null() {
             panic!();
@@ -868,20 +864,20 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<*mu
         return Ok(lvalue_create(t, obj));
     }
     let root_lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state)?;
-    let root_obj_0: *mut Object = lvalue_object(root_lval);
-    if root_obj_0.is_null() {
+    let root_obj: *mut Object = lvalue_object(root_lval);
+    if root_obj.is_null() {
         return Ok(ptr::null_mut());
     }
-    let t_0: *mut AstType = ast_type_ptr_type(lvalue_type(root_lval));
-    let root_val_0: *mut Value = object_as_value(root_obj_0);
-    if root_val_0.is_null() {
+    let t = ast_type_ptr_type(lvalue_type(&*root_lval)).unwrap();
+    let root_val: *mut Value = object_as_value(root_obj);
+    if root_val.is_null() {
         panic!();
     }
-    let Ok(res_obj) = state_deref(state, root_val_0, ast_expr_binary_e2(inner)) else {
+    let Ok(res_obj) = state_deref(state, root_val, ast_expr_binary_e2(inner)) else {
         // Note: error suppressed in original
         return Ok(ptr::null_mut());
     };
-    Ok(lvalue_create(t_0, res_obj))
+    Ok(lvalue_create(t, res_obj))
 }
 
 pub unsafe fn expr_identifier_lvalue(expr: &AstExpr, state: *mut State) -> Result<*mut LValue> {
@@ -1792,7 +1788,7 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     let params = (*f).params();
     let mut s_copy = state_copy(&*state);
     let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
-    let ret_type: *mut AstType = (*f).rtype();
+    let ret_type = (*f).rtype();
     state_pushframe(&mut s_copy, dynamic_str(name), ret_type);
     if let Err(err) = prepare_parameters(params, args, name, &mut s_copy) {
         return AstStmtSplits {
@@ -2896,68 +2892,59 @@ unsafe fn preconds_compound_verify(block: &AstBlock) -> Result<()> {
     Ok(())
 }
 
-pub unsafe fn ast_type_isint(t: *mut AstType) -> bool {
+pub unsafe fn ast_type_isint(t: &AstType) -> bool {
     matches!((*t).base, AstTypeBase::Int)
 }
 
-pub unsafe fn ast_type_ispointer(t: *mut AstType) -> bool {
+pub unsafe fn ast_type_ispointer(t: &AstType) -> bool {
     matches!((*t).base, AstTypeBase::Pointer(_))
 }
 
-pub unsafe fn ast_type_create(base: AstTypeBase, modifiers: AstTypeModifier) -> *mut AstType {
-    Box::into_raw(Box::new(AstType {
-        base,
-        modifiers: modifiers as libc::c_int,
-    }))
+pub unsafe fn ast_type_create(base: AstTypeBase, modifiers: AstTypeModifier) -> Box<AstType> {
+    Box::new(AstType { base, modifiers })
 }
 
-pub unsafe fn ast_type_create_ptr(referent: *mut AstType) -> *mut AstType {
-    assert!(!referent.is_null());
-    ast_type_create(AstTypeBase::Pointer(referent), 0 as AstTypeModifier)
+pub unsafe fn ast_type_create_ptr(referent: Box<AstType>) -> Box<AstType> {
+    ast_type_create(AstTypeBase::Pointer(Some(referent)), 0)
 }
 
-pub unsafe fn ast_type_create_voidptr() -> *mut AstType {
-    ast_type_create(AstTypeBase::Pointer(ptr::null_mut()), 0 as AstTypeModifier)
+pub unsafe fn ast_type_create_voidptr() -> Box<AstType> {
+    ast_type_create(AstTypeBase::Pointer(None), 0)
 }
 
-pub unsafe fn ast_type_create_arr(base: *mut AstType, length: libc::c_int) -> *mut AstType {
-    if base.is_null() {
-        panic!();
-    }
+pub unsafe fn ast_type_create_arr(base: Box<AstType>, length: libc::c_int) -> Box<AstType> {
     ast_type_create(
         AstTypeBase::Array(AstArrayType {
             r#type: base,
             length,
         }),
-        0 as AstTypeModifier,
+        0,
     )
 }
 
 pub unsafe fn ast_type_create_struct(
     tag: Option<OwningCStr>,
     members: Option<Box<Vec<Box<AstVariable>>>>,
-) -> *mut AstType {
-    ast_type_create(
-        AstTypeBase::Struct(AstStructType { tag, members }),
-        0 as AstTypeModifier,
-    )
+) -> Box<AstType> {
+    ast_type_create(AstTypeBase::Struct(AstStructType { tag, members }), 0)
 }
 
-pub unsafe fn ast_type_create_userdef(name: OwningCStr) -> *mut AstType {
-    ast_type_create(AstTypeBase::UserDefined(name), 0 as AstTypeModifier)
+pub unsafe fn ast_type_create_userdef(name: OwningCStr) -> Box<AstType> {
+    ast_type_create(AstTypeBase::UserDefined(name), 0)
 }
 
 pub unsafe fn ast_type_vconst(
-    t: *mut AstType,
+    t: &AstType,
     s: *mut State,
     comment: *mut libc::c_char,
     persist: bool,
 ) -> *mut Value {
-    match &(*t).base {
+    match &t.base {
         AstTypeBase::Int => value_int_indefinite_create(),
         AstTypeBase::Pointer(_) => value_ptr_indefinite_create(),
         AstTypeBase::UserDefined(name) => ast_type_vconst(
-            (*state_getext(s)).get_typedef(name.as_ptr()),
+            // Note: Original does not null-check here.
+            (*state_getext(s)).get_typedef(name.as_ptr()).unwrap(),
             s,
             comment,
             persist,
@@ -2971,15 +2958,18 @@ pub unsafe fn ast_type_isstruct(t: &AstType) -> bool {
     matches!(t.base, AstTypeBase::Struct(_))
 }
 
-pub unsafe fn ast_type_struct_complete(t: *mut AstType, ext: *mut Externals) -> *mut AstType {
-    if ast_type_struct_members(&*t).is_some() {
-        return t;
+pub unsafe fn ast_type_struct_complete<'a>(
+    t: &'a AstType,
+    ext: &'a Externals,
+) -> Option<&'a AstType> {
+    if ast_type_struct_members(t).is_some() {
+        return Some(t);
     }
     let tag = ast_type_struct_tag(&*t);
     if tag.is_null() {
         panic!();
     }
-    (*ext).get_struct(tag)
+    ext.get_struct(tag)
 }
 
 pub unsafe fn ast_type_struct_members(t: &AstType) -> Option<&[Box<AstVariable>]> {
@@ -2999,15 +2989,15 @@ pub unsafe fn ast_type_struct_tag(t: &AstType) -> *mut libc::c_char {
     }
 }
 
-pub unsafe fn ast_type_create_struct_anonym(members: Vec<Box<AstVariable>>) -> *mut AstType {
+pub unsafe fn ast_type_create_struct_anonym(members: Vec<Box<AstVariable>>) -> Box<AstType> {
     ast_type_create_struct(None, Some(Box::new(members)))
 }
 
-pub unsafe fn ast_type_create_struct_partial(tag: OwningCStr) -> *mut AstType {
+pub unsafe fn ast_type_create_struct_partial(tag: OwningCStr) -> Box<AstType> {
     ast_type_create_struct(Some(tag), None)
 }
 
-pub unsafe fn ast_type_copy_struct(old: *mut AstType) -> *mut AstType {
+pub unsafe fn ast_type_copy_struct(old: &AstType) -> Box<AstType> {
     let AstTypeBase::Struct(s) = &(*old).base else {
         panic!();
     };
@@ -3023,56 +3013,38 @@ pub unsafe fn ast_type_copy_struct(old: *mut AstType) -> *mut AstType {
     )
 }
 
-pub unsafe fn ast_type_mod_or(t: *mut AstType, m: AstTypeModifier) {
-    (*t).modifiers = ((*t).modifiers as libc::c_uint | m as libc::c_uint) as libc::c_int;
+pub unsafe fn ast_type_mod_or(t: &mut AstType, m: AstTypeModifier) {
+    t.modifiers |= m;
 }
 
-pub unsafe fn ast_type_istypedef(t: *mut AstType) -> bool {
-    ((*t).modifiers as libc::c_uint as AstTypeModifier) & MOD_TYPEDEF != 0
+pub unsafe fn ast_type_istypedef(t: &AstType) -> bool {
+    t.modifiers & MOD_TYPEDEF != 0
 }
 
-pub unsafe fn ast_type_destroy(t: *mut AstType) {
-    match &(*t).base {
+pub unsafe fn ast_type_copy(t: &AstType) -> Box<AstType> {
+    // Note: In the original, ast_type_copy(ast_type_create_voidptr()) would assert.
+    match &t.base {
         AstTypeBase::Pointer(ptr_type) => {
-            assert!(!ptr_type.is_null());
-            ast_type_destroy(*ptr_type);
+            ast_type_create_ptr(ast_type_copy(ptr_type.as_ref().unwrap()))
         }
-        AstTypeBase::Array(arr) => {
-            assert!(!arr.r#type.is_null());
-            ast_type_destroy(arr.r#type);
-        }
-        _ => {}
-    }
-    drop(Box::from_raw(t));
-}
-
-pub unsafe fn ast_type_copy(t: *mut AstType) -> *mut AstType {
-    if t.is_null() {
-        panic!();
-    }
-    match &(*t).base {
-        AstTypeBase::Pointer(ptr_type) => ast_type_create_ptr(ast_type_copy(*ptr_type)),
-        AstTypeBase::Array(arr) => ast_type_create_arr(ast_type_copy(arr.r#type), arr.length),
+        AstTypeBase::Array(arr) => ast_type_create_arr(ast_type_copy(&arr.r#type), arr.length),
         AstTypeBase::Struct(_) => ast_type_copy_struct(t),
         AstTypeBase::UserDefined(name) => ast_type_create_userdef(name.clone()),
-        AstTypeBase::Void => ast_type_create(AstTypeBase::Void, (*t).modifiers as AstTypeModifier),
-        AstTypeBase::Int => ast_type_create(AstTypeBase::Int, (*t).modifiers as AstTypeModifier),
-        AstTypeBase::Char => ast_type_create(AstTypeBase::Char, (*t).modifiers as AstTypeModifier),
+        AstTypeBase::Void => ast_type_create(AstTypeBase::Void, (*t).modifiers),
+        AstTypeBase::Int => ast_type_create(AstTypeBase::Int, (*t).modifiers),
+        AstTypeBase::Char => ast_type_create(AstTypeBase::Char, (*t).modifiers),
         _ => {
             panic!();
         }
     }
 }
 
-pub unsafe fn ast_type_str(t: *mut AstType) -> OwningCStr {
-    if t.is_null() {
-        panic!();
-    }
+pub unsafe fn ast_type_str(t: &AstType) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    strbuilder_write!(b, "{}", mod_str((*t).modifiers));
-    match &(*t).base {
+    strbuilder_write!(b, "{}", mod_str(t.modifiers as libc::c_int));
+    match &t.base {
         AstTypeBase::Pointer(ptr_type) => {
-            ast_type_str_build_ptr(b, *ptr_type);
+            ast_type_str_build_ptr(b, ptr_type.as_ref().unwrap());
         }
         AstTypeBase::Array(arr) => {
             ast_type_str_build_arr(b, arr);
@@ -3149,14 +3121,14 @@ unsafe fn mod_str(mod_0: libc::c_int) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn ast_type_str_build_ptr(b: *mut StrBuilder, ptr_type: *mut AstType) {
+unsafe fn ast_type_str_build_ptr(b: *mut StrBuilder, ptr_type: &AstType) {
     let base = ast_type_str(ptr_type);
     let space: bool = !matches!((*ptr_type).base, AstTypeBase::Pointer(_));
     strbuilder_write!(b, "{base}{}*", if space { " " } else { "" },);
 }
 
 unsafe fn ast_type_str_build_arr(b: *mut StrBuilder, arr: &AstArrayType) {
-    let base = ast_type_str(arr.r#type);
+    let base = ast_type_str(&arr.r#type);
     strbuilder_write!(b, "{base}[{}]", arr.length);
 }
 
@@ -3177,41 +3149,30 @@ unsafe fn ast_type_str_build_struct(b: *mut StrBuilder, s: &AstStructType) {
     strbuilder_write!(b, "}}");
 }
 
-pub unsafe fn ast_type_ptr_type(t: *mut AstType) -> *mut AstType {
-    let AstTypeBase::Pointer(ptr_type) = &(*t).base else {
+pub unsafe fn ast_type_ptr_type(t: &AstType) -> Option<&AstType> {
+    let AstTypeBase::Pointer(ptr_type) = &t.base else {
         panic!()
     };
-    *ptr_type
+    ptr_type.as_deref()
 }
 
-pub unsafe fn ast_variable_create(name: OwningCStr, type_0: *mut AstType) -> Box<AstVariable> {
+pub unsafe fn ast_variable_create(name: OwningCStr, ty: Box<AstType>) -> Box<AstVariable> {
     // Note: In the original, this function can take a null name and create a variable with null name.
     // This is actually done for the arguments in function declarations like `void fclose(FILE*);`.
-    Box::new(AstVariable {
-        name,
-        r#type: type_0,
-    })
-}
-
-impl Drop for AstVariable {
-    fn drop(&mut self) {
-        unsafe {
-            ast_type_destroy(self.r#type);
-        }
-    }
+    Box::new(AstVariable { name, r#type: ty })
 }
 
 pub unsafe fn ast_variable_copy(v: &AstVariable) -> Box<AstVariable> {
-    ast_variable_create((*v).name.clone(), ast_type_copy((*v).r#type))
+    ast_variable_create(v.name.clone(), ast_type_copy(&v.r#type))
 }
 
 pub unsafe fn ast_variables_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
-    v.iter().map(|var_ptr| ast_variable_copy(var_ptr)).collect()
+    v.iter().map(|var| ast_variable_copy(var)).collect()
 }
 
 pub unsafe fn ast_variable_str(v: &AstVariable) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
-    let t = ast_type_str((*v).r#type);
+    let t = ast_type_str(&v.r#type);
     strbuilder_write!(b, "{t} {}", (*v).name);
     strbuilder_build(b)
 }
@@ -3220,8 +3181,8 @@ pub unsafe fn ast_variable_name(v: &AstVariable) -> *mut libc::c_char {
     v.name.as_ptr()
 }
 
-pub unsafe fn ast_variable_type(v: &AstVariable) -> *mut AstType {
-    v.r#type
+pub unsafe fn ast_variable_type(v: &AstVariable) -> &AstType {
+    &v.r#type
 }
 
 pub unsafe fn ast_variable_arr_copy(old: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
@@ -3230,7 +3191,7 @@ pub unsafe fn ast_variable_arr_copy(old: &[Box<AstVariable>]) -> Vec<Box<AstVari
 
 pub unsafe fn ast_function_create(
     isaxiom: bool,
-    ret: *mut AstType,
+    ret: Box<AstType>,
     name: OwningCStr,
     params: Vec<Box<AstVariable>>,
     abstract_0: *mut AstBlock,
@@ -3256,7 +3217,6 @@ pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
 impl Drop for AstFunction {
     fn drop(&mut self) {
         unsafe {
-            ast_type_destroy(self.ret);
             ast_block_destroy(self.r#abstract);
             if !self.body.is_null() {
                 ast_block_destroy(self.body);
@@ -3271,7 +3231,7 @@ impl AstFunction {
         if self.is_axiom {
             strbuilder_write!(b, "axiom ");
         }
-        strbuilder_write!(b, "{}\n", ast_type_str(self.ret));
+        strbuilder_write!(b, "{}\n", ast_type_str(&self.ret));
         strbuilder_write!(b, "{}(", self.name);
         for (i, param) in self.params.iter().enumerate() {
             let v = ast_variable_str(param);
@@ -3302,7 +3262,7 @@ impl AstFunction {
             .collect();
         ast_function_create(
             self.is_axiom,
-            ast_type_copy(self.ret),
+            ast_type_copy(&self.ret),
             self.name.clone(),
             params,
             ast_block_copy(&*self.r#abstract),
@@ -3326,8 +3286,8 @@ impl AstFunction {
         ast_block_ndecls(&*self.r#abstract) == 0 && ast_block_nstmts(&*self.r#abstract) == 0
     }
 
-    pub unsafe fn rtype(&self) -> *mut AstType {
-        self.ret
+    pub unsafe fn rtype(&self) -> &AstType {
+        &self.ret
     }
 
     pub unsafe fn body(&self) -> &AstBlock {
@@ -3420,7 +3380,7 @@ unsafe fn ast_function_precondsinit(f: &AstFunction, s: *mut State) -> Result<()
 
 unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()> {
     let name = ast_variable_name(param);
-    let t: *mut AstType = ast_variable_type(param);
+    let t = ast_variable_type(param);
     let obj: *mut Object = state_getobject(state, name);
     if obj.is_null() {
         panic!();
@@ -3595,7 +3555,7 @@ unsafe fn abstract_paths(
 ) -> Vec<*mut AstFunction> {
     let f_true: *mut AstFunction = ast_function_create(
         f.is_axiom,
-        ast_type_copy(f.ret),
+        ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
         ast_block_copy(&*f.r#abstract),
@@ -3605,7 +3565,7 @@ unsafe fn abstract_paths(
     let inv_assumption = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
         f.is_axiom,
-        ast_type_copy(f.ret),
+        ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
         ast_variables_copy(&f.params),
         ast_block_copy(&*f.r#abstract),
@@ -3679,7 +3639,7 @@ unsafe fn body_paths(
 ) -> Vec<*mut AstFunction> {
     let f_true: *mut AstFunction = ast_function_create(
         f.is_axiom,
-        ast_type_copy(f.ret),
+        ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
         ast_block_copy(&*f.r#abstract),
@@ -3689,7 +3649,7 @@ unsafe fn body_paths(
     let inv_assumption = ast_expr_inverted_copy(cond, true);
     let f_false: *mut AstFunction = ast_function_create(
         f.is_axiom,
-        ast_type_copy(f.ret),
+        ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
         ast_variables_copy(&f.params),
         ast_block_copy(&*f.r#abstract),
@@ -3718,12 +3678,12 @@ pub unsafe fn ast_externdecl_as_function(decl: &AstExternDecl) -> Option<&AstFun
     }
 }
 
-pub unsafe fn ast_decl_create(name: OwningCStr, t: *mut AstType) -> Box<AstExternDecl> {
+pub unsafe fn ast_decl_create(name: OwningCStr, t: Box<AstType>) -> Box<AstExternDecl> {
     Box::new(AstExternDecl {
-        kind: if ast_type_istypedef(t) {
+        kind: if ast_type_istypedef(&t) {
             AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t })
-        } else if ast_type_isstruct(&*t) {
-            if (ast_type_struct_tag(&*t)).is_null() {
+        } else if ast_type_isstruct(&t) {
+            if (ast_type_struct_tag(&t)).is_null() {
                 panic!();
             }
             AstExternDeclKind::Struct(t)
@@ -3742,10 +3702,10 @@ pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: &mut Externa
             ext.declare_var(ast_variable_name(v), &mut **v);
         }
         AstExternDeclKind::Typedef(typedef) => {
-            ext.declare_typedef(typedef.name.as_ptr(), typedef.type_0);
+            ext.declare_typedef(typedef.name.as_ptr(), &*typedef.type_0);
         }
         AstExternDeclKind::Struct(s) => {
-            ext.declare_struct(*s);
+            ext.declare_struct(&**s);
         }
     }
 }
@@ -3758,12 +3718,8 @@ impl Drop for AstExternDeclKind {
                     ast_function_destroy(*f);
                 }
                 AstExternDeclKind::Variable(_) => {}
-                AstExternDeclKind::Typedef(td) => {
-                    ast_type_destroy(td.type_0);
-                }
-                AstExternDeclKind::Struct(s) => {
-                    ast_type_destroy(*s);
-                }
+                AstExternDeclKind::Typedef(_) => {}
+                AstExternDeclKind::Struct(_) => {}
             }
         }
     }
@@ -3794,18 +3750,12 @@ pub unsafe fn parse_escape(c: &str) -> libc::c_int {
     }
 }
 
-pub unsafe fn lvalue_create(t: *mut AstType, obj: *mut Object) -> *mut LValue {
+pub unsafe fn lvalue_create(t: *const AstType, obj: *mut Object) -> *mut LValue {
     Box::into_raw(Box::new(LValue { t, obj }))
 }
 
-pub unsafe fn lvalue_destroy(l: *mut LValue) {
-    ast_type_destroy((*l).t);
-    object_destroy((*l).obj);
-    drop(Box::from_raw(l));
-}
-
-pub unsafe fn lvalue_type(l: *mut LValue) -> *mut AstType {
-    (*l).t
+pub unsafe fn lvalue_type(l: &LValue) -> &AstType {
+    &*(*l).t
 }
 
 pub unsafe fn lvalue_object(l: *mut LValue) -> *mut Object {
