@@ -279,13 +279,6 @@ pub enum AstStmtKind {
 
 // TODO: kill
 #[derive(Clone)]
-pub struct Decision {
-    pub decision: bool,
-    pub err: Option<Box<Error>>,
-}
-
-// TODO: kill
-#[derive(Clone)]
 pub struct PrecondsResult {
     pub stmt: *mut AstStmt,
     pub err: Option<Box<Error>>,
@@ -2050,11 +2043,8 @@ unsafe fn labelled_setupabsexec(stmt: &AstStmt, state: *mut State) -> Result<()>
 }
 
 unsafe fn sel_setupabsexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
-    let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
-    if let Some(err) = dec.err {
-        return Err(err);
-    }
-    if dec.decision {
+    let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
+    if decision {
         return stmt_setupabsexec(ast_stmt_sel_body(stmt), state);
     }
     assert!(ast_stmt_sel_nest(stmt).is_none());
@@ -2182,11 +2172,8 @@ unsafe fn stmt_compound_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
 }
 
 unsafe fn stmt_sel_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
-    let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
-    if let Some(err) = dec.err {
-        return Err(err);
-    }
-    if dec.decision {
+    let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
+    if decision {
         return ast_stmt_exec(ast_stmt_sel_body(stmt), state);
     }
     assert!(ast_stmt_sel_nest(stmt).is_none());
@@ -2304,10 +2291,10 @@ pub unsafe fn ast_stmt_str(stmt: &AstStmt) -> OwningCStr {
             ast_stmt_expr_sprint(expr, b);
         }
         AstStmtKind::Compound(compound) => {
-            ast_stmt_compound_sprint(&**compound, b);
+            ast_stmt_compound_sprint(compound, b);
         }
         AstStmtKind::CompoundV(compound) => {
-            ast_stmt_compound_sprint(&**compound, b);
+            ast_stmt_compound_sprint(compound, b);
         }
         AstStmtKind::Selection(_) => {
             ast_stmt_sel_sprint(stmt, b);
@@ -2354,11 +2341,8 @@ pub unsafe fn ast_stmt_labelled_label(stmt: &AstStmt) -> *mut libc::c_char {
 }
 
 unsafe fn sel_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
-    let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), s);
-    if dec.err.is_some() {
-        panic!();
-    }
-    if dec.decision {
+    let decision = sel_decide(ast_stmt_sel_cond(stmt), s).unwrap();
+    if decision {
         return ast_stmt_isterminal(ast_stmt_sel_body(stmt), s);
     }
     false
@@ -2450,59 +2434,34 @@ pub unsafe fn ast_stmt_create_jump(
     ast_stmt_create(loc, AstStmtKind::Jump(AstJumpStmt { kind, rv }))
 }
 
-pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Decision {
-    let v = match ast_expr_pf_reduce(control, state) {
-        Ok(v) => v,
-        Err(err) => {
-            return Decision {
-                decision: false,
-                err: Some(err),
-            }
-        }
-    };
+pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Result<bool> {
+    let v = ast_expr_pf_reduce(control, state)?;
     assert!(!v.is_null());
     if value_issync(&*v) {
         let sync: *mut AstExpr = value_as_sync(v);
         let p = state_getprops(&mut *state);
         if p.get(&*sync) {
-            return Decision {
-                decision: true,
-                err: None,
-            };
+            return Ok(true);
         } else if p.contradicts(&*sync) {
-            return Decision {
-                decision: false,
-                err: None,
-            };
+            return Ok(false);
         }
     }
     if value_isconstant(&*v) {
         if value_as_constant(&*v) != 0 {
-            return Decision {
-                decision: true,
-                err: None,
-            };
+            return Ok(true);
         }
-        return Decision {
-            decision: false,
-            err: None,
-        };
+        return Ok(false);
     }
     let zero: *mut Value = value_int_create(0 as libc::c_int);
     if !value_isint(&*v) {
         let v_str = value_str(v);
-        let err_str = format!("`{control}' with value `{v_str}' is undecidable");
-        return Decision {
-            decision: false,
-            err: Some(Error::new(err_str)),
-        };
+        return Err(Error::new(format!(
+            "`{control}' with value `{v_str}' is undecidable"
+        )));
     }
     let nonzero: bool = !value_equal(&*zero, &*v);
     value_destroy(zero);
-    Decision {
-        decision: nonzero,
-        err: None,
-    }
+    Ok(nonzero)
 }
 
 unsafe fn ast_stmt_compound_sprint(compound: &AstBlock, b: *mut StrBuilder) {
@@ -2608,11 +2567,8 @@ unsafe fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
 }
 
 unsafe fn sel_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> Result<*mut Value> {
-    let dec: Decision = sel_decide(ast_stmt_sel_cond(stmt), state);
-    if let Some(err) = dec.err {
-        return Err(err);
-    }
-    if dec.decision {
+    let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
+    if decision {
         return ast_stmt_absexec(ast_stmt_sel_body(stmt), state, should_setup);
     }
     assert!(ast_stmt_sel_nest(stmt).is_none());
