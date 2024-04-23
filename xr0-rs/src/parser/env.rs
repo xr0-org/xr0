@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::ffi::CStr;
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 
@@ -12,7 +11,7 @@ use crate::util::{self, dynamic_str};
 pub struct Env {
     source: String,
     pub reserved: HashSet<&'static str>,
-    pub typenames: RefCell<HashSet<Vec<u8>>>,
+    pub typenames: RefCell<HashSet<String>>,
     // these triples are (region start offset, filename, starting line)
     pub regions: Vec<(usize, PathBuf, usize)>,
 }
@@ -82,16 +81,14 @@ impl Env {
         lexememarker_create(line as libc::c_int, column as libc::c_int, filename_cstr, 0)
     }
 
-    pub unsafe fn add_typename(&self, name: *const libc::c_char) {
-        let name = CStr::from_ptr(name);
+    pub unsafe fn add_typename(&self, name: &str) {
         let mut typenames = self.typenames.borrow_mut();
-        typenames.insert(name.to_bytes().to_vec());
+        typenames.insert(name.to_string());
     }
 
-    pub unsafe fn is_typename(&self, name: *const libc::c_char) -> bool {
-        let name = CStr::from_ptr(name);
+    pub unsafe fn is_typename(&self, name: &str) -> bool {
         let typenames = self.typenames.borrow();
-        typenames.contains(name.to_bytes())
+        typenames.contains(name)
     }
 }
 

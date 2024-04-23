@@ -293,6 +293,10 @@ impl OwningCStr {
     pub fn as_str(&self) -> &str {
         unsafe { CStr::from_ptr(self.ptr).to_str().unwrap() }
     }
+
+    pub fn as_cstr(&self) -> &CStr {
+        unsafe { CStr::from_ptr(self.ptr) }
+    }
 }
 
 impl Display for OwningCStr {

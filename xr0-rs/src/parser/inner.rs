@@ -1,9 +1,9 @@
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::ptr;
 
 use crate::ast::*;
 use crate::parser::env::Env;
-use crate::util::{dynamic_str, OwningCStr};
+use crate::util::OwningCStr;
 
 type BoxedBlock = *mut AstBlock;
 type BoxedFunction = *mut AstFunction;
@@ -12,12 +12,12 @@ type BoxedVariable = *mut AstVariable;
 type BoxedCStr = *mut libc::c_char;
 
 pub struct Declaration {
-    pub name: *mut libc::c_char,
+    pub name: Option<OwningCStr>,
     pub t: *mut AstType,
 }
 
 pub struct DirectFunctionDeclarator {
-    pub name: *mut libc::c_char,
+    pub name: OwningCStr,
     pub params: Vec<*mut AstVariable>,
 }
 
@@ -28,7 +28,7 @@ pub struct FunctionDeclarator {
 
 pub struct Declarator {
     pub ptr_valence: libc::c_int,
-    pub name: *mut libc::c_char,
+    pub name: Option<OwningCStr>,
 }
 
 struct BlockStatement {
@@ -39,8 +39,8 @@ struct BlockStatement {
 enum PostfixOp {
     ArrayAccess(Box<AstExpr>),
     Call(Vec<Box<AstExpr>>),
-    Dot(*mut libc::c_char),
-    Arrow(*mut libc::c_char),
+    Dot(OwningCStr),
+    Arrow(OwningCStr),
     Inc,
     Dec,
 }
@@ -62,11 +62,11 @@ unsafe fn strip_quotes(s: *const libc::c_char) -> BoxedCStr {
 unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<*mut AstVariable> {
     decls
         .into_iter()
-        .map(|decl| ast_variable_create(OwningCStr::new(decl.name), decl.t))
+        .map(|decl| ast_variable_create(decl.name.unwrap(), decl.t))
         .collect()
 }
 
-unsafe fn ast_from_vec(decls: Vec<Box<AstExternDecl>>) -> Box<Ast> {
+fn ast_from_vec(decls: Vec<Box<AstExternDecl>>) -> Box<Ast> {
     Box::new(Ast { decls })
 }
 
@@ -90,11 +90,10 @@ pub grammar c_parser(env: &Env) for str {
     rule K<T>(t: rule<T>) -> T = quiet! { e:t() end_of_token() { e } }
 
     // Identifiers
-    rule identifier() -> BoxedCStr =
+    rule identifier() -> OwningCStr =
         n:quiet! { $(['_' | 'a'..='z' | 'A'..='Z'] ['_' | 'a'..='z' | 'A'..='Z' | '0'..='9']*) } {?
             if !env.reserved.contains(n) {
-                let cstr = CString::new(n.to_string()).unwrap();
-                Ok(unsafe { dynamic_str(cstr.as_ptr()) })
+                Ok(unsafe { OwningCStr::copy_str(n) })
             } else {
                 Err("identifier")
             }
@@ -142,7 +141,7 @@ pub grammar c_parser(env: &Env) for str {
     // 6.5.1 Primary expression
     rule primary_expression() -> Box<AstExpr> =
         a:identifier() {
-            unsafe { ast_expr_identifier_create(OwningCStr::new(a)) }
+            unsafe { ast_expr_identifier_create(a) }
         } /
         "$" {
             unsafe { ast_expr_arbarg_create() }
@@ -166,7 +165,7 @@ pub grammar c_parser(env: &Env) for str {
                         PostfixOp::Call(args) =>
                             ast_expr_call_create(a, args),
                         PostfixOp::Dot(name) =>
-                            ast_expr_member_create(a, OwningCStr::copy(CStr::from_ptr(name))),
+                            ast_expr_member_create(a, name),
                         PostfixOp::Arrow(name) =>
                             ast_expr_member_create(
                                 ast_expr_unary_create(
@@ -177,7 +176,7 @@ pub grammar c_parser(env: &Env) for str {
                                     ),
                                     AstUnaryOp::Dereference
                                 ),
-                                OwningCStr::copy(CStr::from_ptr(name)),
+                                name,
                             ),
                         PostfixOp::Inc => ast_expr_incdec_create(a, true, false),
                         PostfixOp::Dec => ast_expr_incdec_create(a, false, false),
@@ -274,7 +273,13 @@ pub grammar c_parser(env: &Env) for str {
     rule declaration() -> Declaration =
         t:declaration_specifiers() _ ";" {
             unsafe {
-                Declaration { name: ast_type_struct_tag(&*t), t }
+                let tag = ast_type_struct_tag(&*t);
+                let name = if tag.is_null() {
+                    None
+                } else {
+                    Some(OwningCStr::copy_char_ptr(tag))
+                };
+                Declaration { name, t }
             }
         } /
         t:declaration_specifiers() _ v:declarator() _ ";" {
@@ -286,7 +291,14 @@ pub grammar c_parser(env: &Env) for str {
                     t = ast_type_create_ptr(t);
                 }
                 if is_typedef {
-                    env.add_typename(v.name);
+                    // Note: I think the original doesn't check for null here, so you can probably
+                    // crash it with `typedef int;` Certainly the handler for `declaration :
+                    // declaration_specifiers init_declarator_list ';'` in the original can create
+                    // a `struct declaration` with null `.name`, and I am sure it's not checked for
+                    // everywhere.
+                    if let Some(name) = &v.name {
+                        env.add_typename(name.as_str());
+                    }
                 }
                 Declaration { name: v.name, t }
             }
@@ -331,8 +343,8 @@ pub grammar c_parser(env: &Env) for str {
 
     rule typedef_name() -> OwningCStr = i:identifier() {?
         unsafe {
-            if env.is_typename(i) {
-                Ok(OwningCStr::new(i))
+            if env.is_typename(i.as_str()) {
+                Ok(i)
             } else {
                 Err("<unused>")
             }
@@ -342,21 +354,25 @@ pub grammar c_parser(env: &Env) for str {
     // note: unions are unsupported in the original
     rule struct_or_union_specifier() -> BoxedType =
         "struct" _ tag:identifier() _ "{" _ fields:struct_declaration_list() _ "}" {
-            unsafe { ast_type_create_struct(Some(OwningCStr::new(tag)), Some(Box::new(fields))) }
+            unsafe { ast_type_create_struct(Some(tag), Some(Box::new(fields))) }
         } /
         "struct" _ "{" _ fields:struct_declaration_list() _ "}" {
             unsafe { ast_type_create_struct_anonym(fields) }
         } /
         "struct" _ tag:identifier() {
-            unsafe { ast_type_create_struct_partial(OwningCStr::new(tag)) }
+            unsafe { ast_type_create_struct_partial(tag) }
         }
 
     rule struct_declaration_list() -> Vec<BoxedVariable> =
         decls:list1(<struct_declaration()>) { decls }
 
     rule struct_declaration() -> BoxedVariable =
-        d:declaration() {
-            unsafe { ast_variable_create(OwningCStr::new(d.name), d.t) }
+        d:declaration() {?
+            if let Some(name) = d.name {
+                Ok(unsafe { ast_variable_create(name, d.t) })
+            } else {
+                Err("variable with no name")
+            }
         }
 
     rule type_qualifier() -> AstTypeModifier =
@@ -382,11 +398,11 @@ pub grammar c_parser(env: &Env) for str {
         }
 
     rule declarator() -> Declarator =
-        p:pointer() _ name:direct_declarator() { Declarator { ptr_valence: p, name } } /
-        name:direct_declarator() { Declarator { ptr_valence: 0, name } } /
-        p:pointer() { Declarator { ptr_valence: p, name: ptr::null_mut() } }
+        p:pointer() _ name:direct_declarator() { Declarator { ptr_valence: p, name: Some(name) } } /
+        name:direct_declarator() { Declarator { ptr_valence: 0, name: Some(name) } } /
+        p:pointer() { Declarator { ptr_valence: p, name: None } }
 
-    rule direct_declarator() -> BoxedCStr =
+    rule direct_declarator() -> OwningCStr =
         // Note: declarator postfix syntax is ignored in the original
         name:identifier() direct_declarator_postfix()* { name }
 
@@ -409,12 +425,12 @@ pub grammar c_parser(env: &Env) for str {
                 for _ in 0..decl.ptr_valence {
                     t = ast_type_create_ptr(t);
                 }
-                let name = if decl.name.is_null() { dynamic_str(&(0 as libc::c_char)) } else { decl.name };
-                ast_variable_create(OwningCStr::new(name), t)
+                let name = decl.name.unwrap_or(OwningCStr::empty());
+                ast_variable_create(name, t)
             }
         } /
         t:declaration_specifiers() {
-            unsafe { ast_variable_create(OwningCStr::new(dynamic_str(&(0 as libc::c_char))), t) }
+            unsafe { ast_variable_create(OwningCStr::empty(), t) }
         }
 
     rule type_name() -> BoxedType =
@@ -448,7 +464,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule labelled_statement() -> Box<AstStmt> =
         label:identifier() _ ":" _ s:statement() p:position!() {
-            unsafe { ast_stmt_create_labelled(env.lexloc(p), OwningCStr::new(label), s) }
+            unsafe { ast_stmt_create_labelled(env.lexloc(p), label, s) }
         } /
         K(<"case">) _ constant_expression() _ ":" _ statement() p:position!() {
             unsafe { ast_stmt_create_nop(env.lexloc(p)) }
@@ -554,7 +570,7 @@ pub grammar c_parser(env: &Env) for str {
                 ast_function_create(
                     true,
                     t,
-                    OwningCStr::new(decl.decl.name),
+                    decl.decl.name,
                     decl.decl.params,
                     if body.r#abstract.is_null() {
                         ast_block_create(vec![], vec![])
@@ -574,7 +590,7 @@ pub grammar c_parser(env: &Env) for str {
                 ast_function_create(
                     false,
                     t,
-                    OwningCStr::new(decl.decl.name),
+                    decl.decl.name,
                     decl.decl.params,
                     if body.r#abstract.is_null() {
                         ast_block_create(vec![], vec![])
@@ -592,7 +608,7 @@ pub grammar c_parser(env: &Env) for str {
                 ast_function_create(
                     false,
                     ast_type_create(AstTypeBase::Void, 0),
-                    OwningCStr::new(decl.decl.name),
+                    decl.decl.name,
                     decl.decl.params,
                     if body.r#abstract.is_null() {
                         ast_block_create(vec![], vec![])
@@ -606,7 +622,13 @@ pub grammar c_parser(env: &Env) for str {
 
     rule external_declaration() -> Box<AstExternDecl> =
         f:function_definition() { unsafe { ast_functiondecl_create(f) } } /
-        d:declaration() { unsafe { ast_decl_create(OwningCStr::new(dynamic_str(d.name)), d.t) } }
+        d:declaration() {?
+            if let Some(name) = d.name {
+                Ok(unsafe { ast_decl_create(name, d.t) })
+            } else {
+                Err("global declaration with no name")
+            }
+        }
 
     pub rule translation_unit() -> Box<Ast> =
         directive()? _ decl:list1(<external_declaration()>) _ { unsafe { ast_from_vec(decl) } }
