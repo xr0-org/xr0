@@ -6,7 +6,7 @@ mod env;
 mod inner;
 
 use env::Env;
-pub use env::{lexememarker_copy, lexememarker_destroy, LexemeMarker};
+pub use env::LexemeMarker;
 
 pub fn parse_translation_unit(
     filename: &Path,

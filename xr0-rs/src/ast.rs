@@ -12,7 +12,7 @@ use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExp
 use crate::object::{
     object_as_value, object_assign, object_getmember, object_getmembertype, object_hasvalue,
 };
-use crate::parser::{lexememarker_copy, lexememarker_destroy, LexemeMarker};
+use crate::parser::LexemeMarker;
 use crate::state::state::{
     state_addresses_deallocand, state_alloc, state_clump, state_copy, state_copywithname,
     state_create, state_create_withprops, state_dealloc, state_declare, state_deref, state_equal,
@@ -216,7 +216,7 @@ pub struct AstBlock {
 
 pub struct AstStmt {
     pub kind: AstStmtKind,
-    pub loc: *mut LexemeMarker,
+    pub loc: Box<LexemeMarker>,
 }
 
 pub struct AstAllocStmt {
@@ -2044,11 +2044,7 @@ unsafe fn labelled_absexec(
 }
 
 pub unsafe fn ast_stmt_copy(stmt: &AstStmt) -> Box<AstStmt> {
-    let loc: *mut LexemeMarker = if !(stmt.loc).is_null() {
-        lexememarker_copy(stmt.loc)
-    } else {
-        ptr::null_mut()
-    };
+    let loc = stmt.loc.clone();
     match &stmt.kind {
         AstStmtKind::Labelled(labelled) => {
             ast_stmt_create_labelled(loc, labelled.label.clone(), ast_stmt_copy(&labelled.stmt))
@@ -2238,14 +2234,17 @@ unsafe fn iter_neteffect(iter: &AstStmt) -> Option<Box<AstStmt>> {
     if !(ast_block_ndecls(abs) == 0 as libc::c_int && nstmts == 1 as libc::c_int) {
         panic!();
     }
+    // Note: Original passes NULL lexeme marker to these two constructors. In the Rust version, the
+    // lexeme marker isn't nullable. It isn't worth warping the universe for this hack, so we dig
+    // up with some phony locations.
     Some(ast_stmt_create_iter(
-        ptr::null_mut(),
+        Box::new(ast_stmt_lexememarker(iter).clone()),
         ast_stmt_copy(ast_stmt_iter_init(iter)),
         ast_stmt_copy(ast_stmt_iter_cond(iter)),
         ast_expr_copy(ast_stmt_iter_iter(iter)),
         ast_block_create(vec![], vec![]),
         ast_stmt_create_compound(
-            ptr::null_mut(),
+            Box::new(ast_stmt_lexememarker(ast_stmt_iter_body(iter)).clone()),
             ast_block_copy(ast_stmt_iter_abstract(iter)),
         ),
         false,
@@ -2312,7 +2311,7 @@ pub unsafe fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
 }
 
 pub unsafe fn ast_stmt_lexememarker(stmt: &AstStmt) -> &LexemeMarker {
-    &*stmt.loc
+    &stmt.loc
 }
 
 unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder) {
@@ -2480,7 +2479,7 @@ pub unsafe fn ast_stmt_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
 }
 
 pub unsafe fn ast_stmt_create_jump(
-    loc: *mut LexemeMarker,
+    loc: Box<LexemeMarker>,
     kind: AstJumpKind,
     rv: Option<Box<AstExpr>>,
 ) -> Box<AstStmt> {
@@ -2551,12 +2550,12 @@ unsafe fn ast_stmt_expr_sprint(expr: &AstExpr, b: *mut StrBuilder) {
     strbuilder_write!(b, "{expr};");
 }
 
-unsafe fn ast_stmt_create(loc: *mut LexemeMarker, kind: AstStmtKind) -> Box<AstStmt> {
+unsafe fn ast_stmt_create(loc: Box<LexemeMarker>, kind: AstStmtKind) -> Box<AstStmt> {
     Box::new(AstStmt { kind, loc })
 }
 
 unsafe fn ast_stmt_copy_iter(
-    loc: *mut LexemeMarker,
+    loc: Box<LexemeMarker>,
     iteration: &AstIterationStmt,
     as_iteration_e: bool,
 ) -> Box<AstStmt> {
@@ -2570,7 +2569,7 @@ unsafe fn ast_stmt_copy_iter(
 }
 
 pub unsafe fn ast_stmt_create_iter(
-    loc: *mut LexemeMarker,
+    loc: Box<LexemeMarker>,
     init: Box<AstStmt>,
     cond: Box<AstStmt>,
     iter: Box<AstExpr>,
@@ -2608,7 +2607,7 @@ pub unsafe fn ast_stmt_iter_body(stmt: &AstStmt) -> &AstStmt {
 }
 
 pub unsafe fn ast_stmt_create_sel(
-    loc: *mut LexemeMarker,
+    loc: Box<LexemeMarker>,
     isswitch: bool,
     cond: Box<AstExpr>,
     body: Box<AstStmt>,
@@ -2628,7 +2627,7 @@ pub unsafe fn ast_stmt_create_sel(
     )
 }
 
-pub unsafe fn ast_stmt_create_compound_v(loc: *mut LexemeMarker, b: *mut AstBlock) -> Box<AstStmt> {
+pub unsafe fn ast_stmt_create_compound_v(loc: Box<LexemeMarker>, b: *mut AstBlock) -> Box<AstStmt> {
     ast_stmt_create(loc, AstStmtKind::CompoundV(b))
 }
 
@@ -2679,7 +2678,7 @@ pub unsafe fn ast_stmt_sel_nest(stmt: &AstStmt) -> Option<&AstStmt> {
 }
 
 pub unsafe fn ast_stmt_create_labelled(
-    loc: *mut LexemeMarker,
+    loc: Box<LexemeMarker>,
     label: OwningCStr,
     substmt: Box<AstStmt>,
 ) -> Box<AstStmt> {
@@ -2692,15 +2691,15 @@ pub unsafe fn ast_stmt_create_labelled(
     )
 }
 
-pub unsafe fn ast_stmt_create_nop(loc: *mut LexemeMarker) -> Box<AstStmt> {
+pub unsafe fn ast_stmt_create_nop(loc: Box<LexemeMarker>) -> Box<AstStmt> {
     ast_stmt_create(loc, AstStmtKind::Nop)
 }
 
-pub unsafe fn ast_stmt_create_expr(loc: *mut LexemeMarker, expr: Box<AstExpr>) -> Box<AstStmt> {
+pub unsafe fn ast_stmt_create_expr(loc: Box<LexemeMarker>, expr: Box<AstExpr>) -> Box<AstStmt> {
     ast_stmt_create(loc, AstStmtKind::Expr(expr))
 }
 
-pub unsafe fn ast_stmt_create_compound(loc: *mut LexemeMarker, b: *mut AstBlock) -> Box<AstStmt> {
+pub unsafe fn ast_stmt_create_compound(loc: Box<LexemeMarker>, b: *mut AstBlock) -> Box<AstStmt> {
     ast_stmt_create(loc, AstStmtKind::Compound(b))
 }
 
@@ -2738,16 +2737,6 @@ unsafe fn iter_absexec(stmt: &AstStmt, state: *mut State) -> Result<*mut Value> 
 
 pub unsafe fn ast_stmt_destroy(stmt: *mut AstStmt) {
     drop(Box::from_raw(stmt));
-}
-
-impl Drop for AstStmt {
-    fn drop(&mut self) {
-        unsafe {
-            if !self.loc.is_null() {
-                lexememarker_destroy(self.loc);
-            }
-        }
-    }
 }
 
 impl Drop for AstStmtKind {

@@ -3,10 +3,7 @@ use std::collections::HashSet;
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 
-use libc::{free, malloc};
-
-use crate::cstr;
-use crate::util::{self, dynamic_str};
+use crate::util::OwningCStr;
 
 pub struct Env {
     source: String,
@@ -75,10 +72,15 @@ impl Env {
         (region_filename, line, column)
     }
 
-    pub unsafe fn lexloc(&self, p: usize) -> *mut LexemeMarker {
+    pub unsafe fn lexloc(&self, p: usize) -> Box<LexemeMarker> {
         let (file, line, column) = self.file_line_column(p);
-        let filename_cstr = util::to_c_str(file.as_os_str().as_encoded_bytes());
-        lexememarker_create(line as libc::c_int, column as libc::c_int, filename_cstr, 0)
+        let filename = OwningCStr::copy_str(&file.display().to_string());
+        Box::new(LexemeMarker {
+            linenum: line as libc::c_int,
+            column: column as libc::c_int,
+            filename,
+            flags: 0,
+        })
     }
 
     pub unsafe fn add_typename(&self, name: &str) {
@@ -168,53 +170,18 @@ fn parse_linemarker(line: &str) -> (PathBuf, usize) {
 pub struct LexemeMarker {
     pub linenum: libc::c_int,
     pub column: libc::c_int,
-    pub filename: *mut libc::c_char,
+    pub filename: OwningCStr,
     pub flags: LineMarkerFlag,
 }
+
 pub type LineMarkerFlag = libc::c_uint;
 pub const LM_FLAG_IMPLICIT_EXTERN: LineMarkerFlag = 8;
 pub const LM_FLAG_SYS_HEADER: LineMarkerFlag = 4;
 pub const LM_FLAG_RESUME_FILE: LineMarkerFlag = 2;
 pub const LM_FLAG_NEW_FILE: LineMarkerFlag = 1;
 
-pub unsafe fn lexememarker_create(
-    linenum: libc::c_int,
-    column: libc::c_int,
-    filename: *mut libc::c_char,
-    flags: LineMarkerFlag,
-) -> *mut LexemeMarker {
-    let loc = malloc(::core::mem::size_of::<LexemeMarker>()) as *mut LexemeMarker;
-    (*loc).linenum = linenum;
-    (*loc).column = column;
-    (*loc).filename = filename;
-    (*loc).flags = flags;
-    loc
-}
-
-pub unsafe fn lexememarker_copy(loc: *mut LexemeMarker) -> *mut LexemeMarker {
-    lexememarker_create(
-        (*loc).linenum,
-        (*loc).column,
-        dynamic_str((*loc).filename),
-        (*loc).flags,
-    )
-}
-
-pub unsafe fn lexememarker_destroy(loc: *mut LexemeMarker) {
-    free((*loc).filename as *mut libc::c_void);
-    free(loc as *mut libc::c_void);
-}
-
 impl Display for LexemeMarker {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        unsafe {
-            write!(
-                f,
-                "{}:{}:{}",
-                cstr!(self.filename),
-                self.linenum,
-                self.column
-            )
-        }
+        write!(f, "{}:{}:{}", self.filename, self.linenum, self.column)
     }
 }
