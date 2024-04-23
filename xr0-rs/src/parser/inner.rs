@@ -1,11 +1,8 @@
-use std::ffi::CString;
-
 use crate::ast::*;
 use crate::parser::env::Env;
 use crate::util::{OwningCStr, SemiBox};
 
 type BoxedFunction = *mut AstFunction<'static>;
-type BoxedCStr = *mut libc::c_char;
 
 pub struct Declaration {
     pub name: Option<OwningCStr>,
@@ -39,20 +36,6 @@ enum PostfixOp {
     Arrow(OwningCStr),
     Inc,
     Dec,
-}
-
-/* XXX */
-unsafe fn strip_quotes(s: *const libc::c_char) -> BoxedCStr {
-    assert_eq!(*s, b'"' as libc::c_char);
-    let len = libc::strlen(s) - 2 + 1;
-    let t = libc::malloc(len) as *mut libc::c_char;
-    libc::memcpy(
-        t as *mut libc::c_void,
-        s.offset(1) as *const libc::c_void,
-        len - 1,
-    );
-    *t.add(len - 1) = 0;
-    t
 }
 
 unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<Box<AstVariable>> {
@@ -125,10 +108,9 @@ pub grammar c_parser(env: &Env) for str {
 
     // String literals
     rule string_literal() -> Box<AstExpr> =
-        a:$("\"" string_char()* "\"") {
+        "\"" a:$(string_char()*) "\"" {
             unsafe {
-                let cstr = CString::new(a.to_string()).unwrap();
-                ast_expr_literal_create(strip_quotes(cstr.as_ptr()))
+                ast_expr_literal_create(OwningCStr::copy_str(a))
             }
         }
 

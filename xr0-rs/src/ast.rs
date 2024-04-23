@@ -27,8 +27,8 @@ use crate::util::{
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
-    value_int_create, value_int_indefinite_create, value_isconstant, value_isint, value_islocation,
-    value_isstruct, value_issync, value_literal_create, value_pf_augment,
+    value_int_create, value_int_indefinite_create, value_into_sync, value_isconstant, value_isint,
+    value_islocation, value_isstruct, value_issync, value_literal_create, value_pf_augment,
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr,
 };
@@ -615,7 +615,7 @@ unsafe fn ast_expr_pf_reduce_assume(
 ) -> Result<Preresult> {
     let res_val = ast_expr_pf_reduce(expr, s).unwrap();
     assert!(!res_val.is_null());
-    irreducible_assume(&*value_as_sync(res_val), value, s)
+    irreducible_assume(&*value_into_sync(res_val), value, s)
 }
 
 unsafe fn identifier_assume(expr: &AstExpr, value: bool, s: *mut State) -> Result<Preresult> {
@@ -623,7 +623,7 @@ unsafe fn identifier_assume(expr: &AstExpr, value: bool, s: *mut State) -> Resul
     let res_val = ast_expr_eval(expr, &mut s_copy).unwrap();
     assert!(!res_val.is_null());
     drop(s_copy);
-    irreducible_assume(&*value_as_sync(res_val), value, s)
+    irreducible_assume(&*value_into_sync(res_val), value, s)
 }
 
 unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
@@ -1171,8 +1171,8 @@ pub unsafe fn ast_expr_bracketed_create(root: Box<AstExpr>) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Bracketed(root))
 }
 
-pub unsafe fn ast_expr_literal_create(s: *mut libc::c_char) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::StringLiteral(OwningCStr::new(s)))
+pub unsafe fn ast_expr_literal_create(s: OwningCStr) -> Box<AstExpr> {
+    ast_expr_create(AstExprKind::StringLiteral(s))
 }
 
 pub unsafe fn ast_expr_as_literal(expr: &AstExpr) -> *mut libc::c_char {
@@ -1195,7 +1195,7 @@ unsafe fn pf_augment(v: *mut Value, call: &AstExpr, state: *mut State) -> Result
     }
     let res_val = ast_expr_pf_reduce(call, state)?;
     assert!(!res_val.is_null());
-    Ok(value_pf_augment(v, value_as_sync(res_val)))
+    Ok(value_pf_augment(v, value_as_sync(&*res_val)))
 }
 
 pub unsafe fn ast_expr_constant_create_char(c: libc::c_char) -> Box<AstExpr> {
@@ -1235,7 +1235,7 @@ unsafe fn unary_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let res_val = ast_expr_pf_reduce(ast_expr_unary_operand(e), s)?;
     assert!(!res_val.is_null());
     Ok(value_sync_create(Box::into_raw(ast_expr_unary_create(
-        Box::from_raw(value_as_sync(res_val)),
+        Box::from_raw(value_into_sync(res_val)),
         ast_expr_unary_op(e),
     ))))
 }
@@ -1288,7 +1288,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<*mut V
         panic!();
     }
     Ok(value_sync_create(Box::into_raw(ast_expr_member_create(
-        Box::from_raw(value_as_sync(v)),
+        Box::from_raw(value_into_sync(v)),
         OwningCStr::copy(CStr::from_ptr(field)),
     ))))
 }
@@ -2420,11 +2420,11 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Result<bool> {
     let v = ast_expr_pf_reduce(control, state)?;
     assert!(!v.is_null());
     if value_issync(&*v) {
-        let sync: *mut AstExpr = value_as_sync(v);
+        let sync = value_as_sync(&*v);
         let p = state_getprops(&mut *state);
-        if p.get(&*sync) {
+        if p.get(sync) {
             return Ok(true);
-        } else if p.contradicts(&*sync) {
+        } else if p.contradicts(sync) {
             return Ok(false);
         }
     }

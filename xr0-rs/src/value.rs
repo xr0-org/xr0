@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::ptr;
 
-use libc::{free, strcmp};
+use libc::strcmp;
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_equal,
@@ -19,7 +19,7 @@ use crate::state::location::{
     location_transfigure,
 };
 use crate::state::state::{state_getext, state_vconst};
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr};
+use crate::util::{strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr};
 use crate::{
     cstr, strbuilder_write, AstExpr, AstType, AstVariable, Location, Object, State, StrBuilder,
 };
@@ -29,11 +29,11 @@ pub struct Value {
 }
 
 pub enum ValueKind {
-    Sync(*mut Number),
+    Sync(Box<Number>),
     IndefinitePtr(*mut Number),
     DefinitePtr(*mut Location),
     Int(*mut Number),
-    Literal(*mut libc::c_char),
+    Literal(OwningCStr),
     Struct(Box<StructValue>),
 }
 
@@ -47,7 +47,6 @@ pub struct Number {
     pub kind: NumberKind,
 }
 
-#[derive(Clone)]
 pub enum NumberKind {
     Ranges(Vec<NumberRange>),
     Computed(*mut AstExpr),
@@ -82,7 +81,7 @@ pub unsafe fn value_int_create(val: libc::c_int) -> *mut Value {
 }
 
 pub unsafe fn value_literal_create(lit: *mut libc::c_char) -> *mut Value {
-    value_create(ValueKind::Literal(dynamic_str(lit)))
+    value_create(ValueKind::Literal(OwningCStr::copy_char_ptr(lit)))
 }
 
 #[allow(dead_code)]
@@ -100,7 +99,7 @@ pub unsafe fn value_int_indefinite_create() -> *mut Value {
 }
 
 pub unsafe fn value_sync_create(e: *mut AstExpr) -> *mut Value {
-    value_create(ValueKind::Sync(number_computed_create(e)))
+    value_create(ValueKind::Sync(Box::from_raw(number_computed_create(e))))
 }
 
 pub unsafe fn value_struct_create(t: &AstType) -> *mut Value {
@@ -181,7 +180,7 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
     }
 }
 
-pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Value {
+pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> *mut Value {
     if !value_isstruct(&*old) {
         panic!();
     }
@@ -199,7 +198,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
             object_assign(
                 obj,
                 value_sync_create(Box::into_raw(ast_expr_member_create(
-                    ast_expr_copy(&*root),
+                    ast_expr_copy(root),
                     OwningCStr::copy(CStr::from_ptr(field)),
                 ))),
             );
@@ -282,11 +281,11 @@ unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
 
 pub unsafe fn value_copy(v: &Value) -> *mut Value {
     value_create(match &v.kind {
-        ValueKind::Sync(n) => ValueKind::Sync(number_copy(*n)),
+        ValueKind::Sync(n) => ValueKind::Sync(n.clone()),
         ValueKind::DefinitePtr(loc) => ValueKind::DefinitePtr(Box::into_raw(location_copy(&**loc))),
         ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(number_copy(*n)),
         ValueKind::Int(n) => ValueKind::Int(number_copy(*n)),
-        ValueKind::Literal(s) => ValueKind::Literal(dynamic_str(*s)),
+        ValueKind::Literal(s) => ValueKind::Literal(s.clone()),
         ValueKind::Struct(struct_) => ValueKind::Struct(Box::new(StructValue {
             members: ast_variable_arr_copy(&struct_.members),
             m: copy_members(&struct_.m),
@@ -309,11 +308,10 @@ impl Drop for ValueKind {
     fn drop(&mut self) {
         unsafe {
             match self {
-                ValueKind::Sync(n) | ValueKind::IndefinitePtr(n) | ValueKind::Int(n) => {
-                    number_destroy(*n)
-                }
+                ValueKind::Sync(_) => {}
+                ValueKind::IndefinitePtr(n) | ValueKind::Int(n) => number_destroy(*n),
                 ValueKind::DefinitePtr(loc) => location_destroy(*loc),
-                ValueKind::Literal(s) => free(*s as *mut libc::c_void),
+                ValueKind::Literal(_) => {}
                 ValueKind::Struct(_) => {}
             }
         }
@@ -338,19 +336,19 @@ pub unsafe fn value_str(v: *mut Value) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     match &(*v).kind {
         ValueKind::Sync(n) => {
-            value_sync_sprint(*n, b);
+            value_sync_sprint(n, b);
         }
         ValueKind::DefinitePtr(loc) => {
             value_definite_ptr_sprint(*loc, b);
         }
         ValueKind::IndefinitePtr(n) => {
-            value_indefinite_ptr_sprint(*n, b);
+            value_indefinite_ptr_sprint(&**n, b);
         }
         ValueKind::Int(n) => {
-            value_int_sprint(*n, b);
+            value_int_sprint(&**n, b);
         }
         ValueKind::Literal(s) => {
-            strbuilder_write!(b, "\"{}\"", cstr!(*s));
+            strbuilder_write!(b, "\"{s}\"");
         }
         ValueKind::Struct(sv) => {
             value_struct_sprint(sv, b);
@@ -359,7 +357,7 @@ pub unsafe fn value_str(v: *mut Value) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn value_sync_sprint(n: *mut Number, b: *mut StrBuilder) {
+unsafe fn value_sync_sprint(n: &Number, b: *mut StrBuilder) {
     strbuilder_write!(b, "comp:{}", number_str(n));
 }
 
@@ -368,11 +366,11 @@ unsafe fn value_definite_ptr_sprint(loc: *mut Location, b: *mut StrBuilder) {
     strbuilder_write!(b, "ptr:{s}");
 }
 
-unsafe fn value_indefinite_ptr_sprint(n: *mut Number, b: *mut StrBuilder) {
+unsafe fn value_indefinite_ptr_sprint(n: &Number, b: *mut StrBuilder) {
     strbuilder_write!(b, "ptr:{}", number_str(n));
 }
 
-unsafe fn value_int_sprint(n: *mut Number, b: *mut StrBuilder) {
+unsafe fn value_int_sprint(n: &Number, b: *mut StrBuilder) {
     strbuilder_write!(b, "int:{}", number_str(n));
 }
 
@@ -426,23 +424,30 @@ pub unsafe fn value_as_constant(v: &Value) -> libc::c_int {
 
 pub unsafe fn value_isconstant(v: &Value) -> bool {
     match &v.kind {
-        ValueKind::Int(n) => number_isconstant(*n),
+        ValueKind::Int(n) => number_isconstant(&**n),
         _ => false,
     }
 }
 
 pub unsafe fn value_issync(v: &Value) -> bool {
     match &v.kind {
-        ValueKind::Sync(n) => number_issync(*n),
+        ValueKind::Sync(n) => number_issync(n),
         _ => false,
     }
 }
 
-pub unsafe fn value_as_sync(v: *mut Value) -> *mut AstExpr {
-    let ValueKind::Sync(n) = &(*v).kind else {
+pub unsafe fn value_as_sync(v: &Value) -> &AstExpr {
+    let ValueKind::Sync(n) = &v.kind else {
         panic!();
     };
-    number_as_sync(*n)
+    number_as_sync(n)
+}
+
+pub unsafe fn value_into_sync(v: *mut Value) -> *mut AstExpr {
+    let ValueKind::Sync(n) = &mut (*v).kind else {
+        panic!();
+    };
+    number_into_sync(&mut **n)
 }
 
 pub unsafe fn value_isint(v: &Value) -> bool {
@@ -454,7 +459,7 @@ pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
         ValueKind::DefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
         ValueKind::IndefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
         ValueKind::Literal(_) => Box::into_raw(ast_expr_copy(&*value_as_literal(&*v))),
-        ValueKind::Sync(n) => Box::into_raw(ast_expr_copy(&*number_as_sync(*n))),
+        ValueKind::Sync(n) => Box::into_raw(ast_expr_copy(number_as_sync(n))),
         ValueKind::Int(n) => number_to_expr(*n),
         _ => panic!(),
     }
@@ -469,7 +474,7 @@ pub unsafe fn value_as_literal(v: &Value) -> *mut AstExpr {
     let ValueKind::Literal(s) = &v.kind else {
         panic!();
     };
-    Box::into_raw(ast_expr_literal_create(*s))
+    Box::into_raw(ast_expr_literal_create(s.clone()))
 }
 
 pub unsafe fn value_references(v: *mut Value, loc: &Location, s: *mut State) -> bool {
@@ -489,10 +494,9 @@ unsafe fn struct_references(sv: &StructValue, loc: &Location, s: *mut State) -> 
 
 pub unsafe fn value_equal(v1: &Value, v2: &Value) -> bool {
     match (&v1.kind, &v2.kind) {
-        (ValueKind::Literal(s1), ValueKind::Literal(s2)) => strcmp(*s1, *s2) == 0,
-        (ValueKind::Int(n1), ValueKind::Int(n2)) | (ValueKind::Sync(n1), ValueKind::Sync(n2)) => {
-            number_equal(*n1, *n2)
-        }
+        (ValueKind::Literal(s1), ValueKind::Literal(s2)) => s1 == s2,
+        (ValueKind::Sync(n1), ValueKind::Sync(n2)) => number_equal(n1, n2),
+        (ValueKind::Int(n1), ValueKind::Int(n2)) => number_equal(&**n1, &**n2),
         _ => panic!(),
     }
 }
@@ -596,15 +600,15 @@ unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn number_str(num: *mut Number) -> OwningCStr {
-    match &(*num).kind {
+unsafe fn number_str(num: &Number) -> OwningCStr {
+    match &num.kind {
         NumberKind::Ranges(ranges) => number_ranges_sprint(ranges),
         NumberKind::Computed(computation) => ast_expr_str(&**computation),
     }
 }
 
-unsafe fn number_equal(n1: *mut Number, n2: *mut Number) -> bool {
-    match (&(*n1).kind, &(*n2).kind) {
+unsafe fn number_equal(n1: &Number, n2: &Number) -> bool {
+    match (&n1.kind, &n2.kind) {
         (NumberKind::Ranges(ranges1), NumberKind::Ranges(ranges2)) => {
             number_ranges_equal(ranges1, ranges2)
         }
@@ -642,8 +646,8 @@ unsafe fn number_range_assumed_value(value: bool) -> Vec<NumberRange> {
     }
 }
 
-unsafe fn number_isconstant(n: *mut Number) -> bool {
-    let NumberKind::Ranges(ranges) = &mut (*n).kind else {
+unsafe fn number_isconstant(n: &Number) -> bool {
+    let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
     ranges.len() == 1 && number_range_issingle(&ranges[0])
@@ -657,11 +661,18 @@ unsafe fn number_as_constant(n: *mut Number) -> libc::c_int {
     number_range_as_constant(&ranges[0])
 }
 
-unsafe fn number_issync(n: *mut Number) -> bool {
-    matches!((*n).kind, NumberKind::Computed(_))
+unsafe fn number_issync(n: &Number) -> bool {
+    matches!(n.kind, NumberKind::Computed(_))
 }
 
-unsafe fn number_as_sync(n: *mut Number) -> *mut AstExpr {
+unsafe fn number_as_sync(n: &Number) -> &AstExpr {
+    let NumberKind::Computed(computation) = &n.kind else {
+        panic!();
+    };
+    &**computation
+}
+
+unsafe fn number_into_sync(n: *mut Number) -> *mut AstExpr {
     let NumberKind::Computed(computation) = &mut (*n).kind else {
         panic!();
     };
@@ -676,10 +687,18 @@ unsafe fn number_to_expr(n: *mut Number) -> *mut AstExpr {
 }
 
 unsafe fn number_copy(num: *mut Number) -> *mut Number {
-    match &(*num).kind {
-        NumberKind::Ranges(ranges) => number_ranges_create(ranges.clone()),
-        NumberKind::Computed(computation) => {
-            number_computed_create(Box::into_raw(ast_expr_copy(&**computation)))
+    Box::into_raw(Box::new((*num).clone()))
+}
+
+impl Clone for NumberKind {
+    fn clone(&self) -> Self {
+        unsafe {
+            match &self {
+                NumberKind::Ranges(ranges) => NumberKind::Ranges(ranges.clone()),
+                NumberKind::Computed(computation) => {
+                    NumberKind::Computed(Box::into_raw(ast_expr_copy(&**computation)))
+                }
+            }
         }
     }
 }
