@@ -3001,7 +3001,7 @@ pub unsafe fn ast_variable_copy(v: &AstVariable) -> Box<AstVariable> {
     Box::new(v.clone())
 }
 
-pub unsafe fn ast_variables_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
+pub unsafe fn ast_variable_arr_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
     v.to_vec()
 }
 
@@ -3018,10 +3018,6 @@ pub unsafe fn ast_variable_name(v: &AstVariable) -> *mut libc::c_char {
 
 pub unsafe fn ast_variable_type(v: &AstVariable) -> &AstType {
     &v.type_
-}
-
-pub unsafe fn ast_variable_arr_copy(old: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
-    old.iter().map(|var| ast_variable_copy(var)).collect()
 }
 
 pub unsafe fn ast_function_create(
@@ -3364,7 +3360,7 @@ unsafe fn abstract_paths<'origin>(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), cond),
-        ast_variables_copy(&f.params),
+        ast_variable_arr_copy(&f.params),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
@@ -3374,7 +3370,7 @@ unsafe fn abstract_paths<'origin>(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
-        ast_variables_copy(&f.params),
+        ast_variable_arr_copy(&f.params),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
@@ -3448,7 +3444,7 @@ unsafe fn body_paths<'origin>(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), cond),
-        ast_variables_copy(&f.params),
+        ast_variable_arr_copy(&f.params),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
@@ -3458,7 +3454,7 @@ unsafe fn body_paths<'origin>(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
-        ast_variables_copy(&f.params),
+        ast_variable_arr_copy(&f.params),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
