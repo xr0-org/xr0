@@ -218,6 +218,20 @@ impl Error {
     }
 }
 
+impl StringArr {
+    pub fn len(&self) -> usize {
+        self.n as usize
+    }
+}
+
+impl std::ops::Index<usize> for StringArr {
+    type Output = *mut libc::c_char;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        unsafe { &*self.s.add(index) }
+    }
+}
+
 pub unsafe fn string_arr_create() -> Box<StringArr> {
     Box::new(StringArr {
         s: ptr::null_mut(),
@@ -237,22 +251,6 @@ pub unsafe fn string_arr_append(arr: &mut StringArr, s: *mut libc::c_char) -> li
     let loc: libc::c_int = arr.n - 1 as libc::c_int;
     *arr.s.offset(loc as isize) = s;
     loc
-}
-
-pub unsafe fn string_arr_deque(arr: &mut StringArr) -> *mut libc::c_char {
-    let ret: *mut libc::c_char = dynamic_str(*arr.s.offset(0 as libc::c_int as isize));
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < arr.n - 1 as libc::c_int {
-        let s = *arr.s.offset((i + 1 as libc::c_int) as isize);
-        *(arr.s).offset(i as isize) = s;
-        i += 1;
-    }
-    arr.n -= 1;
-    arr.s = realloc(
-        arr.s as *mut libc::c_void,
-        (::core::mem::size_of::<*mut libc::c_char>()).wrapping_mul(arr.n as usize),
-    ) as *mut *mut libc::c_char;
-    ret
 }
 
 pub unsafe fn string_arr_contains(arr: &StringArr, s: *mut libc::c_char) -> bool {

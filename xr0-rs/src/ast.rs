@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::collections::VecDeque;
 use std::ffi::{CStr, CString};
 use std::fmt::{self, Display, Formatter};
 use std::process;
@@ -23,8 +24,8 @@ use crate::state::state::{
 };
 use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, string_arr_append,
-    string_arr_contains, string_arr_create, string_arr_deque, Error, InsertionOrderMap, Map,
-    OwningCStr, Result, StringArr,
+    string_arr_contains, string_arr_create, Error, InsertionOrderMap, Map, OwningCStr, Result,
+    StringArr,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -1850,13 +1851,11 @@ unsafe fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, li
     for (key, deps) in g {
         if indegrees.get(CStr::from_ptr(key.as_ptr())).is_none() {
             indegrees.insert(OwningCStr::copy(key), 0);
-            let mut j: libc::c_int = 0 as libc::c_int;
-            while j < deps.n {
-                let dep_key = *deps.s.offset(j as isize);
+            for j in 0..deps.len() {
+                let dep_key = deps[j];
                 if indegrees.get(CStr::from_ptr(dep_key)).is_none() {
                     indegrees.insert(OwningCStr::new(dynamic_str(dep_key)), 0);
                 }
-                j += 1;
             }
         }
     }
@@ -1876,11 +1875,11 @@ unsafe fn dynamic_int(i: libc::c_int) -> *mut libc::c_int {
 
 unsafe fn build_indegree_zero(
     indegrees: &InsertionOrderMap<OwningCStr, libc::c_int>,
-) -> Box<StringArr> {
-    let mut indegree_zero = string_arr_create();
+) -> VecDeque<OwningCStr> {
+    let mut indegree_zero = VecDeque::new();
     for (key, val) in indegrees {
         if *val == 0 {
-            string_arr_append(&mut indegree_zero, dynamic_str(key.as_ptr()));
+            indegree_zero.push_back(key.clone());
         }
     }
     indegree_zero
@@ -1891,15 +1890,14 @@ pub unsafe fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr
     let g = ast_function_buildgraph(fname, ext);
     let mut indegrees = calculate_indegrees(&g);
     let mut indegree_zero = build_indegree_zero(&indegrees);
-    while indegree_zero.n > 0 {
-        let curr = string_arr_deque(&mut indegree_zero);
-        order.push(OwningCStr::new(curr));
+    while let Some(curr) = indegree_zero.pop_front() {
+        order.push(curr.clone());
         for (key, v) in &g {
-            if string_arr_contains(v, curr) {
+            if string_arr_contains(v, curr.as_ptr()) {
                 let count = indegrees.get_mut(key.as_c_str()).unwrap();
                 *count -= 1;
                 if *count == 0 {
-                    string_arr_append(&mut indegree_zero, dynamic_str(key.as_ptr()));
+                    indegree_zero.push_back(OwningCStr::copy(key.as_c_str()));
                 }
             }
         }
