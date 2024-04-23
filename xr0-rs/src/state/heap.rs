@@ -4,7 +4,7 @@ use std::ptr;
 
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
 use crate::state::block::{block_create, block_str, block_undeclare};
-use crate::state::location::{location_create_dynamic, location_destroy};
+use crate::state::location::location_create_dynamic;
 use crate::state::state::state_references;
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{value_copy, value_destroy, value_str};
@@ -62,7 +62,7 @@ unsafe fn printdelim(h: *mut Heap, start: usize) -> bool {
     false
 }
 
-pub unsafe fn heap_newblock(h: *mut Heap) -> *mut Location {
+pub unsafe fn heap_newblock(h: *mut Heap) -> Box<Location> {
     let address = (*h).blocks.len() as libc::c_int;
     (*h).blocks.push(HeapBlock {
         block: block_create(),
@@ -113,10 +113,8 @@ pub unsafe fn heap_referenced(h: *mut Heap, s: *mut State) -> bool {
 }
 
 unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
-    let loc: *mut Location = location_create_dynamic(addr, ast_expr_constant_create(0));
-    let referenced = state_references(s, &*loc);
-    location_destroy(loc);
-    referenced
+    let loc = location_create_dynamic(addr, ast_expr_constant_create(0));
+    state_references(s, &loc)
 }
 
 pub unsafe fn vconst_create() -> VConst {

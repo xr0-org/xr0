@@ -358,7 +358,7 @@ pub unsafe fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range>
 }
 
 pub unsafe fn range_copy(r: &Range) -> Box<Range> {
-    range_create(ast_expr_copy(&r.size), Box::from_raw(location_copy(&r.loc)))
+    range_create(ast_expr_copy(&r.size), location_copy(&r.loc))
 }
 
 pub unsafe fn range_str(r: &Range) -> OwningCStr {

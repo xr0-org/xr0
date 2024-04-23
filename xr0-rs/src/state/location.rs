@@ -47,51 +47,51 @@ impl Location {
     }
 }
 
-pub unsafe fn location_create_vconst(block: libc::c_int, offset: Box<AstExpr>) -> *mut Location {
-    Box::into_raw(Box::new(Location {
+pub unsafe fn location_create_vconst(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+    Box::new(Location {
         kind: LocationKind::VConst,
         block,
         offset,
-    }))
+    })
 }
 
 pub unsafe fn location_create_dereferencable(
     block: libc::c_int,
     offset: Box<AstExpr>,
-) -> *mut Location {
-    Box::into_raw(Box::new(Location {
+) -> Box<Location> {
+    Box::new(Location {
         kind: LocationKind::Dereferencable,
         block,
         offset,
-    }))
+    })
 }
 
-pub unsafe fn location_create_static(block: libc::c_int, offset: Box<AstExpr>) -> *mut Location {
-    Box::into_raw(Box::new(Location {
+pub unsafe fn location_create_static(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+    Box::new(Location {
         kind: LocationKind::Static,
         block,
         offset,
-    }))
+    })
 }
 
-pub unsafe fn location_create_dynamic(block: libc::c_int, offset: Box<AstExpr>) -> *mut Location {
-    Box::into_raw(Box::new(Location {
+pub unsafe fn location_create_dynamic(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+    Box::new(Location {
         kind: LocationKind::Dynamic,
         block,
         offset,
-    }))
+    })
 }
 
 pub unsafe fn location_create_automatic(
     frame: libc::c_int,
     block: libc::c_int,
     offset: Box<AstExpr>,
-) -> *mut Location {
-    Box::into_raw(Box::new(Location {
+) -> Box<Location> {
+    Box::new(Location {
         kind: LocationKind::Automatic { frame },
         block,
         offset,
-    }))
+    })
 }
 
 pub unsafe fn location_transfigure(loc: *mut Location, compare: *mut State) -> *mut Value {
@@ -139,7 +139,7 @@ pub unsafe fn location_offset(loc: &Location) -> &AstExpr {
     &loc.offset
 }
 
-pub unsafe fn location_copy(loc: &Location) -> *mut Location {
+pub unsafe fn location_copy(loc: &Location) -> Box<Location> {
     match &loc.kind {
         LocationKind::Static => location_create_static(loc.block, ast_expr_copy(&loc.offset)),
         LocationKind::VConst => location_create_vconst(loc.block, ast_expr_copy(&loc.offset)),
@@ -157,9 +157,9 @@ pub unsafe fn location_with_offset(loc: &Location, offset: &AstExpr) -> *mut Loc
     if !offsetzero(loc) {
         panic!();
     }
-    let copy: *mut Location = location_copy(loc);
-    (*copy).offset = ast_expr_copy(offset);
-    copy
+    let mut copy = location_copy(loc);
+    copy.offset = ast_expr_copy(offset);
+    Box::into_raw(copy)
 }
 
 pub unsafe fn location_tostatic(loc: *mut Location, sm: &StaticMemory) -> bool {

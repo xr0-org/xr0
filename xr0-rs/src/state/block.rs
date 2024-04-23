@@ -124,7 +124,7 @@ pub unsafe fn block_range_alloc(
         Box::into_raw(ast_expr_copy(lw)),
         range_create(
             ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
-            Box::from_raw(heap_newblock(heap)),
+            heap_newblock(heap),
         ),
     ));
     Ok(())

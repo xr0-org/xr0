@@ -37,7 +37,7 @@ pub struct Variable {
     pub is_param: bool,
 }
 
-pub unsafe fn stack_newblock(stack: *mut Stack) -> *mut Location {
+pub unsafe fn stack_newblock(stack: *mut Stack) -> Box<Location> {
     let address = (*stack).frame.len() as libc::c_int;
     (*stack).frame.push(block_create());
     location_create_automatic((*stack).id, address, ast_expr_constant_create(0))
@@ -218,7 +218,7 @@ pub unsafe fn variable_create(type_: &AstType, stack: *mut Stack, isparam: bool)
     let v = Box::new(Variable {
         type_: ast_type_copy(type_),
         is_param: isparam,
-        loc: stack_newblock(stack),
+        loc: Box::into_raw(stack_newblock(stack)),
     });
     let b = location_auto_getblock(&*v.loc, stack).unwrap();
     if b.is_null() {
@@ -250,7 +250,7 @@ pub unsafe fn variable_copy(old: *mut Variable) -> *mut Variable {
     Box::into_raw(Box::new(Variable {
         type_: ast_type_copy(&(*old).type_),
         is_param: (*old).is_param,
-        loc: location_copy(&*(*old).loc),
+        loc: Box::into_raw(location_copy(&*(*old).loc)),
     }))
 }
 
@@ -258,7 +258,7 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
     let new = Box::new(Variable {
         type_: ast_type_copy(&(*old).type_),
         is_param: (*old).is_param,
-        loc: location_copy(&*(*old).loc),
+        loc: Box::into_raw(location_copy(&*(*old).loc)),
     });
     let obj = state_get(s, &*new.loc, false).unwrap();
     if obj.is_null() {

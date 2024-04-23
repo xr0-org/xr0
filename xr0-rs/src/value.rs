@@ -283,7 +283,7 @@ unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
 pub unsafe fn value_copy(v: &Value) -> *mut Value {
     value_create(match &v.kind {
         ValueKind::Sync(n) => ValueKind::Sync(number_copy(*n)),
-        ValueKind::DefinitePtr(loc) => ValueKind::DefinitePtr(location_copy(&**loc)),
+        ValueKind::DefinitePtr(loc) => ValueKind::DefinitePtr(Box::into_raw(location_copy(&**loc))),
         ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(number_copy(*n)),
         ValueKind::Int(n) => ValueKind::Int(number_copy(*n)),
         ValueKind::Literal(s) => ValueKind::Literal(dynamic_str(*s)),

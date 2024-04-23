@@ -192,12 +192,12 @@ pub unsafe fn state_vconst(
 
 pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value {
     let lit: *mut libc::c_char = ast_expr_as_literal(expr);
-    let mut loc: *mut Location = static_memory_checkpool(&mut (*state).static_memory, lit);
+    let mut loc: *mut Location = static_memory_checkpool(&(*state).static_memory, lit);
     if !loc.is_null() {
         return value_ptr_create(loc);
     }
     let address: libc::c_int = static_memory_newblock(&mut (*state).static_memory);
-    loc = location_create_static(address, ast_expr_constant_create(0));
+    loc = Box::into_raw(location_create_static(address, ast_expr_constant_create(0)));
     let obj = state_get(state, &*loc, true).unwrap();
     if obj.is_null() {
         panic!();
@@ -209,7 +209,10 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
 
 pub unsafe fn state_clump(state: *mut State) -> *mut Value {
     let address: libc::c_int = clump_newblock((*state).clump);
-    let loc: *mut Location = location_create_dereferencable(address, ast_expr_constant_create(0));
+    let loc = Box::into_raw(location_create_dereferencable(
+        address,
+        ast_expr_constant_create(0),
+    ));
     value_ptr_create(loc)
 }
 
@@ -222,7 +225,7 @@ pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
     }
     let loc: *mut Location = value_as_location(&*v);
     state_get(state, &*loc, true).unwrap();
-    location_tostatic(loc, &mut (*state).static_memory)
+    location_tostatic(loc, &(*state).static_memory)
         || location_toheap(loc, &mut (*state).heap)
         || location_tostack(loc, (*state).stack)
         || location_toclump(loc, (*state).clump)
@@ -374,7 +377,7 @@ pub unsafe fn state_range_alloc(
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> *mut Value {
-    value_ptr_create(heap_newblock(&mut (*state).heap))
+    value_ptr_create(Box::into_raw(heap_newblock(&mut (*state).heap)))
 }
 
 pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {

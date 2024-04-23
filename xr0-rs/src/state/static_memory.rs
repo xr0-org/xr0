@@ -41,7 +41,7 @@ unsafe fn pool_copy(p: &Map) -> Box<Map> {
     for (k, v) in p.pairs() {
         pcopy.set(
             dynamic_str(k),
-            location_copy(&*(v as *mut Location)) as *const libc::c_void,
+            Box::into_raw(location_copy(&*(v as *mut Location))) as *const libc::c_void,
         );
     }
     pcopy
@@ -73,7 +73,7 @@ pub unsafe fn static_memory_stringpool(
 ) {
     sm.pool.set(
         dynamic_str(lit),
-        location_copy(&*loc) as *const libc::c_void,
+        Box::into_raw(location_copy(&*loc)) as *const libc::c_void,
     );
 }
 
