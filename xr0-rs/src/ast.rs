@@ -2365,7 +2365,7 @@ pub unsafe fn ast_stmt_as_block(stmt: &AstStmt) -> &AstBlock {
     let AstStmtKind::Compound(block) = &stmt.kind else {
         panic!();
     };
-    &**block
+    block
 }
 
 pub unsafe fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
@@ -2420,7 +2420,7 @@ unsafe fn ast_stmt_sel_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
 pub unsafe fn ast_stmt_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
     match &stmt.kind {
         AstStmtKind::Jump(jump) => jump.kind == AstJumpKind::Return,
-        AstStmtKind::Compound(block) => ast_block_isterminal(&**block, s),
+        AstStmtKind::Compound(block) => ast_block_isterminal(block, s),
         AstStmtKind::Selection(_) => sel_isterminal(stmt, s),
         _ => false,
     }
@@ -2655,7 +2655,7 @@ pub unsafe fn ast_stmt_as_v_block(stmt: &AstStmt) -> &AstBlock {
     let AstStmtKind::CompoundV(block) = &stmt.kind else {
         panic!();
     };
-    &**block
+    block
 }
 
 pub unsafe fn ast_stmt_getfuncs(stmt: &AstStmt) -> Vec<OwningCStr> {
@@ -2663,7 +2663,7 @@ pub unsafe fn ast_stmt_getfuncs(stmt: &AstStmt) -> Vec<OwningCStr> {
         AstStmtKind::Nop => vec![],
         AstStmtKind::Labelled(labelled) => ast_stmt_getfuncs(&labelled.stmt),
         AstStmtKind::Compound(block) | AstStmtKind::CompoundV(block) => {
-            ast_stmt_compound_getfuncs(&**block)
+            ast_stmt_compound_getfuncs(block)
         }
         AstStmtKind::Expr(expr) => ast_expr_getfuncs(expr),
         AstStmtKind::Selection(selection) => ast_stmt_selection_getfuncs(selection),
@@ -2761,7 +2761,7 @@ pub unsafe fn ast_stmt_preconds_validate(stmt: &AstStmt) -> Result<()> {
     match &stmt.kind {
         AstStmtKind::Expr(_) | AstStmtKind::Allocation(_) | AstStmtKind::Iteration(_) => Ok(()),
         AstStmtKind::Selection(_) => preconds_selection_verify(stmt),
-        AstStmtKind::Compound(block) => preconds_compound_verify(&**block),
+        AstStmtKind::Compound(block) => preconds_compound_verify(block),
         _ => panic!(),
     }
 }
@@ -3046,14 +3046,14 @@ pub unsafe fn ast_variable_arr_copy(old: &[Box<AstVariable>]) -> Vec<Box<AstVari
     old.iter().map(|var| ast_variable_copy(var)).collect()
 }
 
-pub unsafe fn ast_function_create<'ast>(
+pub unsafe fn ast_function_create(
     is_axiom: bool,
     ret: Box<AstType>,
     name: OwningCStr,
     params: Vec<Box<AstVariable>>,
     abstract_0: Box<AstBlock>,
-    body: Option<SemiBox<'ast, AstBlock>>,
-) -> *mut AstFunction<'ast> {
+    body: Option<SemiBox<AstBlock>>,
+) -> *mut AstFunction {
     Box::into_raw(Box::new(AstFunction {
         is_axiom,
         ret,
@@ -3081,7 +3081,7 @@ impl<'ast> AstFunction<'ast> {
             let space = if i + 1 < self.params.len() { ", " } else { "" };
             strbuilder_write!(b, "{v}{space}");
         }
-        let abs = ast_block_str(&*self.r#abstract, "\t");
+        let abs = ast_block_str(&self.r#abstract, "\t");
         strbuilder_write!(b, ") ~ [\n{abs}]");
         if let Some(body) = &self.body {
             let body = ast_block_str(body, "\t");
@@ -3110,7 +3110,7 @@ impl<'ast> AstFunction<'ast> {
     }
 
     pub unsafe fn abs_is_empty(&self) -> bool {
-        ast_block_ndecls(&*self.r#abstract) == 0 && ast_block_nstmts(&*self.r#abstract) == 0
+        ast_block_ndecls(&self.r#abstract) == 0 && ast_block_nstmts(&self.r#abstract) == 0
     }
 
     pub unsafe fn rtype(&self) -> &AstType {
@@ -3125,7 +3125,7 @@ impl<'ast> AstFunction<'ast> {
     }
 
     pub unsafe fn abstract_block(&self) -> &AstBlock {
-        &*self.r#abstract
+        &self.r#abstract
     }
 
     pub unsafe fn params(&self) -> &[Box<AstVariable>] {
@@ -3234,7 +3234,7 @@ unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Res
 }
 
 unsafe fn ast_function_setupabsexec(f: &AstFunction, state: *mut State) -> Result<()> {
-    for stmt in &(*f.r#abstract).stmts {
+    for stmt in &f.r#abstract.stmts {
         ast_stmt_setupabsexec(stmt, state)?;
     }
     Ok(())
@@ -3295,10 +3295,10 @@ unsafe fn path_verify(
 }
 
 pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result<*mut Value> {
-    for decl in &(*f.r#abstract).decls {
+    for decl in &f.r#abstract.decls {
         state_declare(state, decl, false);
     }
-    for stmt in &(*f.r#abstract).stmts {
+    for stmt in &f.r#abstract.stmts {
         ast_stmt_absexec(stmt, state, false)?;
     }
     let obj: *mut Object = state_getresult(state);
@@ -3374,8 +3374,8 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
     g.insert(fname.into(), val);
 }
 
-unsafe fn abstract_paths<'origin, 'ast>(
-    f: &'origin AstFunction<'ast>,
+unsafe fn abstract_paths<'origin>(
+    f: &'origin AstFunction,
     _index: libc::c_int,
     cond: &AstExpr,
 ) -> Vec<*mut AstFunction<'origin>> {
@@ -3458,8 +3458,8 @@ unsafe fn split_paths_verify(
     Ok(())
 }
 
-unsafe fn body_paths<'origin, 'ast>(
-    f: &'origin AstFunction<'ast>,
+unsafe fn body_paths<'origin>(
+    f: &'origin AstFunction,
     _index: libc::c_int,
     cond: &AstExpr,
 ) -> Vec<*mut AstFunction<'origin>> {

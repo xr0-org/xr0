@@ -251,7 +251,7 @@ unsafe fn abstract_copy_members(
 }
 
 pub unsafe fn value_struct_membertype(v: &Value, member: *mut libc::c_char) -> Option<&AstType> {
-    let ValueKind::Struct(sv) = &(*v).kind else {
+    let ValueKind::Struct(sv) = &v.kind else {
         panic!();
     };
     for var in &sv.members {

@@ -450,8 +450,8 @@ pub unsafe fn state_eval(s: &State, e: &AstExpr) -> bool {
 }
 
 pub unsafe fn state_equal(s1: &State, s2: &State) -> bool {
-    let mut s1_c = state_copy(&*s1);
-    let mut s2_c = state_copy(&*s2);
+    let mut s1_c = state_copy(s1);
+    let mut s2_c = state_copy(s2);
     state_undeclareliterals(&mut s1_c);
     state_undeclareliterals(&mut s2_c);
     state_undeclarevars(&mut s1_c);
