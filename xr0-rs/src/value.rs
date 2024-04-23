@@ -24,6 +24,7 @@ use crate::{
     cstr, strbuilder_write, AstExpr, AstType, AstVariable, Location, Object, State, StrBuilder,
 };
 
+#[derive(Clone)]
 pub struct Value {
     pub kind: ValueKind,
 }
@@ -280,17 +281,27 @@ unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
 }
 
 pub unsafe fn value_copy(v: &Value) -> *mut Value {
-    value_create(match &v.kind {
-        ValueKind::Sync(n) => ValueKind::Sync(n.clone()),
-        ValueKind::DefinitePtr(loc) => ValueKind::DefinitePtr(Box::into_raw(location_copy(&**loc))),
-        ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(n.clone()),
-        ValueKind::Int(n) => ValueKind::Int(n.clone()),
-        ValueKind::Literal(s) => ValueKind::Literal(s.clone()),
-        ValueKind::Struct(struct_) => ValueKind::Struct(Box::new(StructValue {
-            members: ast_variable_arr_copy(&struct_.members),
-            m: copy_members(&struct_.m),
-        })),
-    })
+    value_create(v.kind.clone())
+}
+
+impl Clone for ValueKind {
+    fn clone(&self) -> Self {
+        unsafe {
+            match self {
+                ValueKind::Sync(n) => ValueKind::Sync(n.clone()),
+                ValueKind::DefinitePtr(loc) => {
+                    ValueKind::DefinitePtr(Box::into_raw(location_copy(&**loc)))
+                }
+                ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(n.clone()),
+                ValueKind::Int(n) => ValueKind::Int(n.clone()),
+                ValueKind::Literal(s) => ValueKind::Literal(s.clone()),
+                ValueKind::Struct(struct_) => ValueKind::Struct(Box::new(StructValue {
+                    members: struct_.members.clone(),
+                    m: copy_members(&struct_.m),
+                })),
+            }
+        }
+    }
 }
 
 pub unsafe fn value_abstractcopy(v: &Value, s: *mut State) -> *mut Value {
