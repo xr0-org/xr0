@@ -137,16 +137,21 @@ enum AstExprKind {
     Allocation(AllocExpr),
 }
 
+// Note: In the original, `ast_type_copy(ast_type_create_voidptr())` would assert, and modifiers
+// were not always copied.
+#[derive(Clone)]
 pub struct AstType {
     pub modifiers: libc::c_uint,
     pub base: AstTypeBase,
 }
 
+#[derive(Clone)]
 pub struct AstStructType {
     pub tag: Option<OwningCStr>,
     pub members: Option<Box<Vec<Box<AstVariable>>>>,
 }
 
+#[derive(Clone)]
 pub struct AstVariable {
     // Note: In the original, `name` could be null. However in most situations (almost all; an
     // exception is the parameter in `fclose(FILE *);` which has no name) this would be invalid, so
@@ -155,11 +160,13 @@ pub struct AstVariable {
     pub r#type: Box<AstType>,
 }
 
+#[derive(Clone)]
 pub struct AstArrayType {
     pub r#type: Box<AstType>,
     pub length: libc::c_int,
 }
 
+#[derive(Clone)]
 pub enum AstTypeBase {
     Void,
     Char,
@@ -3006,22 +3013,6 @@ pub unsafe fn ast_type_create_struct_partial(tag: OwningCStr) -> Box<AstType> {
     ast_type_create_struct(Some(tag), None)
 }
 
-pub unsafe fn ast_type_copy_struct(old: &AstType) -> Box<AstType> {
-    let AstTypeBase::Struct(s) = &(*old).base else {
-        panic!();
-    };
-    ast_type_create(
-        AstTypeBase::Struct(AstStructType {
-            tag: s.tag.clone(),
-            members: s
-                .members
-                .as_ref()
-                .map(|v| Box::new(v.iter().map(|var_ptr| ast_variable_copy(var_ptr)).collect())),
-        }),
-        (*old).modifiers as libc::c_uint as AstTypeModifier,
-    )
-}
-
 pub unsafe fn ast_type_mod_or(t: &mut AstType, m: AstTypeModifier) {
     t.modifiers |= m;
 }
@@ -3031,21 +3022,7 @@ pub unsafe fn ast_type_istypedef(t: &AstType) -> bool {
 }
 
 pub unsafe fn ast_type_copy(t: &AstType) -> Box<AstType> {
-    // Note: In the original, ast_type_copy(ast_type_create_voidptr()) would assert.
-    match &t.base {
-        AstTypeBase::Pointer(ptr_type) => {
-            ast_type_create_ptr(ast_type_copy(ptr_type.as_ref().unwrap()))
-        }
-        AstTypeBase::Array(arr) => ast_type_create_arr(ast_type_copy(&arr.r#type), arr.length),
-        AstTypeBase::Struct(_) => ast_type_copy_struct(t),
-        AstTypeBase::UserDefined(name) => ast_type_create_userdef(name.clone()),
-        AstTypeBase::Void => ast_type_create(AstTypeBase::Void, (*t).modifiers),
-        AstTypeBase::Int => ast_type_create(AstTypeBase::Int, (*t).modifiers),
-        AstTypeBase::Char => ast_type_create(AstTypeBase::Char, (*t).modifiers),
-        _ => {
-            panic!();
-        }
-    }
+    Box::new(t.clone())
 }
 
 pub unsafe fn ast_type_str(t: &AstType) -> OwningCStr {
