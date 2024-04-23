@@ -172,7 +172,7 @@ pub unsafe fn state_popframe(state: *mut State) {
     stack_destroy(old);
 }
 
-pub unsafe fn state_declare(state: *mut State, var: *mut AstVariable, isparam: bool) {
+pub unsafe fn state_declare(state: *mut State, var: &AstVariable, isparam: bool) {
     stack_declare((*state).stack, var, isparam);
 }
 

@@ -159,7 +159,7 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
     strbuilder_build(b)
 }
 
-pub unsafe fn stack_declare(stack: *mut Stack, var: *mut AstVariable, isparam: bool) {
+pub unsafe fn stack_declare(stack: *mut Stack, var: &AstVariable, isparam: bool) {
     let id: *mut libc::c_char = ast_variable_name(var);
     if !((*stack).varmap.get(id)).is_null() {
         panic!("expected varmap.get(id) to be null");

@@ -8,7 +8,6 @@ use crate::util::OwningCStr;
 type BoxedBlock = *mut AstBlock;
 type BoxedFunction = *mut AstFunction;
 type BoxedType = *mut AstType;
-type BoxedVariable = *mut AstVariable;
 type BoxedCStr = *mut libc::c_char;
 
 pub struct Declaration {
@@ -18,7 +17,7 @@ pub struct Declaration {
 
 pub struct DirectFunctionDeclarator {
     pub name: OwningCStr,
-    pub params: Vec<*mut AstVariable>,
+    pub params: Vec<Box<AstVariable>>,
 }
 
 pub struct FunctionDeclarator {
@@ -59,7 +58,7 @@ unsafe fn strip_quotes(s: *const libc::c_char) -> BoxedCStr {
     t
 }
 
-unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<*mut AstVariable> {
+unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<Box<AstVariable>> {
     decls
         .into_iter()
         .map(|decl| ast_variable_create(decl.name.unwrap(), decl.t))
@@ -363,10 +362,10 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_type_create_struct_partial(tag) }
         }
 
-    rule struct_declaration_list() -> Vec<BoxedVariable> =
+    rule struct_declaration_list() -> Vec<Box<AstVariable>> =
         decls:list1(<struct_declaration()>) { decls }
 
-    rule struct_declaration() -> BoxedVariable =
+    rule struct_declaration() -> Box<AstVariable> =
         d:declaration() {?
             if let Some(name) = d.name {
                 Ok(unsafe { ast_variable_create(name, d.t) })
@@ -413,12 +412,12 @@ pub grammar c_parser(env: &Env) for str {
     rule pointer() -> libc::c_int =
         s:$("*"+) { s.len() as libc::c_int }
 
-    rule parameter_type_list() -> Vec<BoxedVariable> = parameter_list()
+    rule parameter_type_list() -> Vec<Box<AstVariable>> = parameter_list()
 
-    rule parameter_list() -> Vec<BoxedVariable> =
+    rule parameter_list() -> Vec<Box<AstVariable>> =
         decls:cs1(<parameter_declaration()>) { decls }
 
-    rule parameter_declaration() -> BoxedVariable =
+    rule parameter_declaration() -> Box<AstVariable> =
         t:declaration_specifiers() _ decl:declarator() {
             unsafe {
                 let mut t = t;
@@ -501,7 +500,7 @@ pub grammar c_parser(env: &Env) for str {
             b
         }
 
-    rule declaration_list() -> Vec<BoxedVariable> =
+    rule declaration_list() -> Vec<Box<AstVariable>> =
         decls:list1(<declaration()>) { unsafe { variable_array_from_decl_vec(decls) } }
 
     rule statement_list() -> Vec<Box<AstStmt>> =

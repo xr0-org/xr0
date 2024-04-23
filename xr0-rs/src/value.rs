@@ -8,7 +8,7 @@ use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_equal,
     ast_expr_identifier_create, ast_expr_literal_create, ast_expr_member_create, ast_expr_str,
     ast_type_create_voidptr, ast_type_struct_complete, ast_type_struct_members,
-    ast_variable_arr_copy, ast_variable_destroy, ast_variable_name, ast_variable_type,
+    ast_variable_arr_copy, ast_variable_name, ast_variable_type,
 };
 use crate::object::{
     object_abstractcopy, object_as_value, object_assign, object_copy, object_destroy,
@@ -38,7 +38,7 @@ pub enum ValueKind {
 }
 
 pub struct StructValue {
-    pub members: Vec<*mut AstVariable>,
+    pub members: Vec<Box<AstVariable>>,
     pub m: HashMap<String, *mut Object>,
 }
 
@@ -125,7 +125,7 @@ pub unsafe fn value_struct_indefinite_create(
     let ValueKind::Struct(sv) = &(*v).kind else {
         panic!();
     };
-    for &var in &sv.members {
+    for var in &sv.members {
         let field: *mut libc::c_char = ast_variable_name(var);
         let field = CStr::from_ptr(field).to_str().unwrap();
 
@@ -187,7 +187,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: *mut AstExpr) -> *mut Valu
         panic!();
     };
 
-    for &var in &sv.members {
+    for var in &sv.members {
         let field: *mut libc::c_char = ast_variable_name(var);
         let field_str = CStr::from_ptr(field).to_str().unwrap();
         let obj = *sv.m.get(field_str).unwrap();
@@ -209,9 +209,9 @@ pub fn value_isstruct(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Struct(_))
 }
 
-unsafe fn from_members(members: &[*mut AstVariable]) -> HashMap<String, *mut Object> {
+unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, *mut Object> {
     let mut m = HashMap::new();
-    for &var in members {
+    for var in members {
         let id = ast_variable_name(var);
         let id = CStr::from_ptr(id).to_str().unwrap().to_string();
         m.insert(
@@ -251,7 +251,7 @@ pub unsafe fn value_struct_membertype(v: *mut Value, member: *mut libc::c_char) 
     let ValueKind::Struct(sv) = &(*v).kind else {
         panic!();
     };
-    for &var in &sv.members {
+    for var in &sv.members {
         if strcmp(member, ast_variable_name(var)) == 0 as libc::c_int {
             return ast_variable_type(var);
         }
@@ -320,9 +320,6 @@ impl Drop for ValueKind {
 impl Drop for StructValue {
     fn drop(&mut self) {
         unsafe {
-            for &var in &self.members {
-                ast_variable_destroy(var);
-            }
             for &p in self.m.values() {
                 object_destroy(p);
             }
@@ -379,7 +376,7 @@ unsafe fn value_int_sprint(n: *mut Number, b: *mut StrBuilder) {
 unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
     strbuilder_write!(b, "struct:{{");
     let n = sv.members.len();
-    for (i, &var) in sv.members.iter().enumerate() {
+    for (i, var) in sv.members.iter().enumerate() {
         let f: *mut libc::c_char = ast_variable_name(var);
         let f_str = CStr::from_ptr(f).to_str().unwrap();
         let val: *mut Value = object_as_value(sv.m.get(f_str).copied().unwrap());

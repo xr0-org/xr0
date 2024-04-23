@@ -145,7 +145,7 @@ pub struct AstType {
 
 pub struct AstStructType {
     pub tag: Option<OwningCStr>,
-    pub members: Option<Box<Vec<*mut AstVariable>>>,
+    pub members: Option<Box<Vec<Box<AstVariable>>>>,
 }
 
 pub struct AstVariable {
@@ -197,13 +197,13 @@ pub struct AstFunction {
     pub is_axiom: bool,
     pub ret: *mut AstType,
     pub name: OwningCStr,
-    pub params: Vec<*mut AstVariable>,
+    pub params: Vec<Box<AstVariable>>,
     pub r#abstract: *mut AstBlock,
     pub body: *mut AstBlock, // can be null
 }
 
 pub struct AstBlock {
-    pub decls: Vec<*mut AstVariable>,
+    pub decls: Vec<Box<AstVariable>>,
     pub stmts: Vec<Box<AstStmt>>,
 }
 
@@ -298,7 +298,7 @@ pub struct AstTypedefDecl {
 
 pub enum AstExternDeclKind {
     Function(*mut AstFunction),
-    Variable(*mut AstVariable),
+    Variable(Box<AstVariable>),
     Typedef(AstTypedefDecl),
     Struct(*mut AstType),
 }
@@ -969,7 +969,7 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<*mut 
     let uncomputed_params = f.params();
     let nparams = uncomputed_params.len();
     let mut computed_params = Vec::with_capacity(nparams);
-    for &p in uncomputed_params {
+    for p in uncomputed_params {
         let param = ast_expr_identifier_create(OwningCStr::copy_char_ptr(ast_variable_name(p)));
         let v = ast_expr_eval(&param, s)?;
         drop(param);
@@ -1033,13 +1033,13 @@ unsafe fn dealloc_process(expr: &AstExpr, state: *mut State) -> Result<*mut Valu
 }
 
 pub unsafe fn prepare_parameters(
-    params: &[*mut AstVariable],
+    params: &[Box<AstVariable>],
     args: Vec<Result<*mut Value>>,
     fname: *mut libc::c_char,
     state: *mut State,
 ) -> Result<()> {
     assert_eq!(params.len(), args.len());
-    for (&param, res) in params.iter().zip(args) {
+    for (param, res) in params.iter().zip(args) {
         state_declare(state, param, true);
 
         let arg = res?;
@@ -1069,7 +1069,7 @@ unsafe fn isdereferencable_absexec(expr: &AstExpr, state: *mut State) -> Result<
 
 pub unsafe fn prepare_arguments(
     args: &[Box<AstExpr>],
-    params: &[*mut AstVariable],
+    params: &[Box<AstVariable>],
     state: *mut State,
 ) -> Vec<Result<*mut Value>> {
     assert_eq!(args.len(), params.len());
@@ -1135,7 +1135,7 @@ unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result
     let mut param_state = state_create(dynamic_str(fname), state_getext(arg_state), (*f).rtype());
     ast_function_initparams(&*f, &mut param_state)?;
     let params = (*f).params();
-    for &p in params {
+    for p in params {
         let id = ast_variable_name(p);
         let param_0: *mut Value = state_getloc(&mut param_state, id);
         let arg: *mut Value = state_getloc(arg_state, id);
@@ -1802,7 +1802,7 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     }
     let mut conds = vec![];
     let abs = (*f).abstract_block();
-    for &var in &abs.decls {
+    for var in &abs.decls {
         state_declare(&mut s_copy, var, false);
     }
     for stmt in &abs.stmts {
@@ -1905,20 +1905,10 @@ pub unsafe fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr
 }
 
 pub unsafe fn ast_block_create(
-    decls: Vec<*mut AstVariable>,
+    decls: Vec<Box<AstVariable>>,
     stmts: Vec<Box<AstStmt>>,
 ) -> *mut AstBlock {
     Box::into_raw(Box::new(AstBlock { decls, stmts }))
-}
-
-impl Drop for AstBlock {
-    fn drop(&mut self) {
-        unsafe {
-            for &decl in &self.decls {
-                ast_variable_destroy(decl);
-            }
-        }
-    }
 }
 
 pub unsafe fn ast_block_destroy(b: *mut AstBlock) {
@@ -1929,7 +1919,6 @@ pub unsafe fn ast_block_copy(b: &AstBlock) -> *mut AstBlock {
     return ast_block_create(
         b.decls
             .iter()
-            .copied()
             .map(|var_ptr| unsafe { ast_variable_copy(var_ptr) })
             .collect(),
         b.stmts.iter().map(|stmt| ast_stmt_copy(stmt)).collect(),
@@ -1938,7 +1927,7 @@ pub unsafe fn ast_block_copy(b: &AstBlock) -> *mut AstBlock {
 
 pub unsafe fn ast_block_str(b: &AstBlock, indent: &str) -> OwningCStr {
     let sb: *mut StrBuilder = strbuilder_create();
-    for &decl in &b.decls {
+    for decl in &b.decls {
         let s = ast_variable_str(decl);
         strbuilder_write!(sb, "{indent}{s};\n");
     }
@@ -1953,7 +1942,7 @@ pub unsafe fn ast_block_ndecls(b: &AstBlock) -> libc::c_int {
     b.decls.len() as libc::c_int
 }
 
-pub unsafe fn ast_block_decls(b: &AstBlock) -> &[*mut AstVariable] {
+pub unsafe fn ast_block_decls(b: &AstBlock) -> &[Box<AstVariable>] {
     &b.decls
 }
 
@@ -2946,7 +2935,7 @@ pub unsafe fn ast_type_create_arr(base: *mut AstType, length: libc::c_int) -> *m
 
 pub unsafe fn ast_type_create_struct(
     tag: Option<OwningCStr>,
-    members: Option<Box<Vec<*mut AstVariable>>>,
+    members: Option<Box<Vec<Box<AstVariable>>>>,
 ) -> *mut AstType {
     ast_type_create(
         AstTypeBase::Struct(AstStructType { tag, members }),
@@ -2993,7 +2982,7 @@ pub unsafe fn ast_type_struct_complete(t: *mut AstType, ext: *mut Externals) -> 
     (*ext).get_struct(tag)
 }
 
-pub unsafe fn ast_type_struct_members(t: &AstType) -> Option<&[*mut AstVariable]> {
+pub unsafe fn ast_type_struct_members(t: &AstType) -> Option<&[Box<AstVariable>]> {
     let AstTypeBase::Struct(s) = &t.base else {
         panic!()
     };
@@ -3010,7 +2999,7 @@ pub unsafe fn ast_type_struct_tag(t: &AstType) -> *mut libc::c_char {
     }
 }
 
-pub unsafe fn ast_type_create_struct_anonym(members: Vec<*mut AstVariable>) -> *mut AstType {
+pub unsafe fn ast_type_create_struct_anonym(members: Vec<Box<AstVariable>>) -> *mut AstType {
     ast_type_create_struct(None, Some(Box::new(members)))
 }
 
@@ -3025,14 +3014,10 @@ pub unsafe fn ast_type_copy_struct(old: *mut AstType) -> *mut AstType {
     ast_type_create(
         AstTypeBase::Struct(AstStructType {
             tag: s.tag.clone(),
-            members: s.members.as_ref().map(|v| {
-                Box::new(
-                    v.iter()
-                        .copied()
-                        .map(|var_ptr| ast_variable_copy(var_ptr))
-                        .collect(),
-                )
-            }),
+            members: s
+                .members
+                .as_ref()
+                .map(|v| Box::new(v.iter().map(|var_ptr| ast_variable_copy(var_ptr)).collect())),
         }),
         (*old).modifiers as libc::c_uint as AstTypeModifier,
     )
@@ -3185,7 +3170,7 @@ unsafe fn ast_type_str_build_struct(b: *mut StrBuilder, s: &AstStructType) {
         return;
     };
     strbuilder_write!(b, " {{ ");
-    for &field in members.iter() {
+    for field in members.iter() {
         let s = ast_variable_str(field);
         strbuilder_write!(b, "{s}; ");
     }
@@ -3199,17 +3184,13 @@ pub unsafe fn ast_type_ptr_type(t: *mut AstType) -> *mut AstType {
     *ptr_type
 }
 
-pub unsafe fn ast_variable_create(name: OwningCStr, type_0: *mut AstType) -> *mut AstVariable {
+pub unsafe fn ast_variable_create(name: OwningCStr, type_0: *mut AstType) -> Box<AstVariable> {
     // Note: In the original, this function can take a null name and create a variable with null name.
     // This is actually done for the arguments in function declarations like `void fclose(FILE*);`.
-    Box::into_raw(Box::new(AstVariable {
+    Box::new(AstVariable {
         name,
         r#type: type_0,
-    }))
-}
-
-pub unsafe fn ast_variable_destroy(v: *mut AstVariable) {
-    drop(Box::from_raw(v));
+    })
 }
 
 impl Drop for AstVariable {
@@ -3220,43 +3201,38 @@ impl Drop for AstVariable {
     }
 }
 
-pub unsafe fn ast_variable_copy(v: *mut AstVariable) -> *mut AstVariable {
-    if v.is_null() {
-        panic!();
-    }
+pub unsafe fn ast_variable_copy(v: &AstVariable) -> Box<AstVariable> {
     ast_variable_create((*v).name.clone(), ast_type_copy((*v).r#type))
 }
 
-pub unsafe fn ast_variables_copy(v: &[*mut AstVariable]) -> Vec<*mut AstVariable> {
-    v.iter()
-        .map(|&var_ptr| ast_variable_copy(var_ptr))
-        .collect()
+pub unsafe fn ast_variables_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
+    v.iter().map(|var_ptr| ast_variable_copy(var_ptr)).collect()
 }
 
-pub unsafe fn ast_variable_str(v: *mut AstVariable) -> OwningCStr {
+pub unsafe fn ast_variable_str(v: &AstVariable) -> OwningCStr {
     let b: *mut StrBuilder = strbuilder_create();
     let t = ast_type_str((*v).r#type);
     strbuilder_write!(b, "{t} {}", (*v).name);
     strbuilder_build(b)
 }
 
-pub unsafe fn ast_variable_name(v: *mut AstVariable) -> *mut libc::c_char {
-    (*v).name.as_ptr()
+pub unsafe fn ast_variable_name(v: &AstVariable) -> *mut libc::c_char {
+    v.name.as_ptr()
 }
 
-pub unsafe fn ast_variable_type(v: *mut AstVariable) -> *mut AstType {
-    (*v).r#type
+pub unsafe fn ast_variable_type(v: &AstVariable) -> *mut AstType {
+    v.r#type
 }
 
-pub unsafe fn ast_variable_arr_copy(old: &[*mut AstVariable]) -> Vec<*mut AstVariable> {
-    old.iter().map(|&var| ast_variable_copy(var)).collect()
+pub unsafe fn ast_variable_arr_copy(old: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
+    old.iter().map(|var| ast_variable_copy(var)).collect()
 }
 
 pub unsafe fn ast_function_create(
     isaxiom: bool,
     ret: *mut AstType,
     name: OwningCStr,
-    params: Vec<*mut AstVariable>,
+    params: Vec<Box<AstVariable>>,
     abstract_0: *mut AstBlock,
     body: *mut AstBlock,
 ) -> *mut AstFunction {
@@ -3281,9 +3257,6 @@ impl Drop for AstFunction {
     fn drop(&mut self) {
         unsafe {
             ast_type_destroy(self.ret);
-            for &param in &self.params {
-                ast_variable_destroy(param);
-            }
             ast_block_destroy(self.r#abstract);
             if !self.body.is_null() {
                 ast_block_destroy(self.body);
@@ -3300,7 +3273,7 @@ impl AstFunction {
         }
         strbuilder_write!(b, "{}\n", ast_type_str(self.ret));
         strbuilder_write!(b, "{}(", self.name);
-        for (i, &param) in self.params.iter().enumerate() {
+        for (i, param) in self.params.iter().enumerate() {
             let v = ast_variable_str(param);
             let space = if i + 1 < self.params.len() { ", " } else { "" };
             strbuilder_write!(b, "{v}{space}");
@@ -3325,7 +3298,7 @@ impl AstFunction {
         let params = self
             .params
             .iter()
-            .map(|&param| ast_variable_copy(param))
+            .map(|param| ast_variable_copy(param))
             .collect();
         ast_function_create(
             self.is_axiom,
@@ -3367,7 +3340,7 @@ impl AstFunction {
         &*self.r#abstract
     }
 
-    pub unsafe fn params(&self) -> &[*mut AstVariable] {
+    pub unsafe fn params(&self) -> &[Box<AstVariable>] {
         self.params.as_slice()
     }
 
@@ -3396,7 +3369,7 @@ pub unsafe fn ast_function_verify(f: *mut AstFunction, ext: *mut Externals) -> R
 
 unsafe fn path_absverify_withstate(f: *mut AstFunction, state: *mut State) -> Result<()> {
     let abs = (*f).abstract_block();
-    for &var in &abs.decls {
+    for var in &abs.decls {
         state_declare(state, var, false);
     }
     path_absverify(f, state, 0 as libc::c_int)
@@ -3423,11 +3396,11 @@ unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_
 
 pub unsafe fn ast_function_initparams(f: &AstFunction, s: *mut State) -> Result<()> {
     let params = f.params();
-    for &param in params {
+    for param in params {
         state_declare(s, param, true);
     }
     ast_function_precondsinit(f, s)?;
-    for &param in params {
+    for param in params {
         inititalise_param(param, s)?;
     }
     Ok(())
@@ -3445,7 +3418,7 @@ unsafe fn ast_function_precondsinit(f: &AstFunction, s: *mut State) -> Result<()
     Ok(())
 }
 
-unsafe fn inititalise_param(param: *mut AstVariable, state: *mut State) -> Result<()> {
+unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()> {
     let name = ast_variable_name(param);
     let t: *mut AstType = ast_variable_type(param);
     let obj: *mut Object = state_getobject(state, name);
@@ -3484,7 +3457,7 @@ unsafe fn abstract_auditwithstate(
     actual_state: *mut State,
     abstract_state: *mut State,
 ) -> Result<()> {
-    for &decl in &(*(*f).body).decls {
+    for decl in &(*(*f).body).decls {
         state_declare(actual_state, decl, false);
     }
     path_verify(f, actual_state, 0 as libc::c_int, abstract_state)
@@ -3534,7 +3507,7 @@ unsafe fn path_verify(
 }
 
 pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result<*mut Value> {
-    for &decl in &(*f.r#abstract).decls {
+    for decl in &(*f.r#abstract).decls {
         state_declare(state, decl, false);
     }
     for stmt in &(*f.r#abstract).stmts {
@@ -3761,12 +3734,12 @@ pub unsafe fn ast_decl_create(name: OwningCStr, t: *mut AstType) -> Box<AstExter
 }
 
 pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: &mut Externals) {
-    match &(*decl).kind {
+    match &mut (*decl).kind {
         AstExternDeclKind::Function(f) => {
             ext.declare_func((**f).name(), *f);
         }
         AstExternDeclKind::Variable(v) => {
-            ext.declare_var(ast_variable_name(*v), *v);
+            ext.declare_var(ast_variable_name(v), &mut **v);
         }
         AstExternDeclKind::Typedef(typedef) => {
             ext.declare_typedef(typedef.name.as_ptr(), typedef.type_0);
@@ -3784,9 +3757,7 @@ impl Drop for AstExternDeclKind {
                 AstExternDeclKind::Function(f) => {
                     ast_function_destroy(*f);
                 }
-                AstExternDeclKind::Variable(v) => {
-                    ast_variable_destroy(*v);
-                }
+                AstExternDeclKind::Variable(_) => {}
                 AstExternDeclKind::Typedef(td) => {
                     ast_type_destroy(td.type_0);
                 }
