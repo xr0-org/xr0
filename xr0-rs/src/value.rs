@@ -176,7 +176,7 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
                 state_vconst(compare, &ast_type_create_voidptr(), ptr::null_mut(), false)
             }
         }
-        ValueKind::DefinitePtr(loc) => location_transfigure(*loc, compare),
+        ValueKind::DefinitePtr(loc) => location_transfigure(&**loc, compare),
         ValueKind::IndefinitePtr(_) => panic!(),
     }
 }

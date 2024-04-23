@@ -94,7 +94,7 @@ pub unsafe fn location_create_automatic(
     })
 }
 
-pub unsafe fn location_transfigure(loc: *mut Location, compare: *mut State) -> *mut Value {
+pub unsafe fn location_transfigure(loc: &Location, compare: *mut State) -> *mut Value {
     match &(*loc).kind {
         LocationKind::Automatic { .. } | LocationKind::Dereferencable => state_clump(compare),
         LocationKind::Dynamic => state_alloc(compare),
@@ -153,36 +153,36 @@ pub unsafe fn location_copy(loc: &Location) -> Box<Location> {
     }
 }
 
-pub unsafe fn location_with_offset(loc: &Location, offset: &AstExpr) -> *mut Location {
+pub unsafe fn location_with_offset(loc: &Location, offset: &AstExpr) -> Box<Location> {
     if !offsetzero(loc) {
         panic!();
     }
     let mut copy = location_copy(loc);
     copy.offset = ast_expr_copy(offset);
-    Box::into_raw(copy)
+    copy
 }
 
-pub unsafe fn location_tostatic(loc: *mut Location, sm: &StaticMemory) -> bool {
-    let type_equal = matches!((*loc).kind, LocationKind::Static);
-    let b = static_memory_hasblock(sm, (*loc).block);
+pub unsafe fn location_tostatic(loc: &Location, sm: &StaticMemory) -> bool {
+    let type_equal = matches!(loc.kind, LocationKind::Static);
+    let b = static_memory_hasblock(sm, loc.block);
     type_equal && b
 }
 
-pub unsafe fn location_toheap(loc: *mut Location, h: *mut Heap) -> bool {
-    let type_equal = matches!((*loc).kind, LocationKind::Dynamic);
-    let b: *mut Block = heap_getblock(h, (*loc).block);
+pub unsafe fn location_toheap(loc: &Location, h: *mut Heap) -> bool {
+    let type_equal = matches!(loc.kind, LocationKind::Dynamic);
+    let b: *mut Block = heap_getblock(h, loc.block);
     type_equal && !b.is_null()
 }
 
-pub unsafe fn location_tostack(loc: *mut Location, s: *mut Stack) -> bool {
-    let type_equal = matches!((*loc).kind, LocationKind::Automatic { .. });
-    let b: *mut Block = stack_getblock(s, (*loc).block);
+pub unsafe fn location_tostack(loc: &Location, s: *mut Stack) -> bool {
+    let type_equal = matches!(loc.kind, LocationKind::Automatic { .. });
+    let b: *mut Block = stack_getblock(s, loc.block);
     type_equal && !b.is_null()
 }
 
-pub unsafe fn location_toclump(loc: *mut Location, c: *mut Clump) -> bool {
-    let type_equal = matches!((*loc).kind, LocationKind::Dereferencable);
-    let b: *mut Block = clump_getblock(c, (*loc).block);
+pub unsafe fn location_toclump(loc: &Location, c: *mut Clump) -> bool {
+    let type_equal = matches!(loc.kind, LocationKind::Dereferencable);
+    let b: *mut Block = clump_getblock(c, loc.block);
     type_equal && !b.is_null()
 }
 
@@ -249,16 +249,16 @@ pub unsafe fn location_auto_getblock(loc: &Location, s: *mut Stack) -> Result<*m
     Ok(stack_getblock(f, loc.block))
 }
 
-pub unsafe fn location_getstackblock(loc: *mut Location, s: *mut Stack) -> *mut Block {
-    assert!(matches!((*loc).kind, LocationKind::Automatic { .. }));
-    stack_getblock(s, (*loc).block)
+pub unsafe fn location_getstackblock(loc: &Location, s: *mut Stack) -> *mut Block {
+    assert!(matches!(loc.kind, LocationKind::Automatic { .. }));
+    stack_getblock(s, loc.block)
 }
 
-pub unsafe fn location_dealloc(loc: *mut Location, heap: *mut Heap) -> Result<()> {
-    if !matches!((*loc).kind, LocationKind::Dynamic) {
+pub unsafe fn location_dealloc(loc: &Location, heap: *mut Heap) -> Result<()> {
+    if !matches!(loc.kind, LocationKind::Dynamic) {
         return Err(Error::new("not heap location".to_string()));
     }
-    heap_deallocblock(heap, (*loc).block)
+    heap_deallocblock(heap, loc.block)
 }
 
 pub unsafe fn location_range_dealloc(

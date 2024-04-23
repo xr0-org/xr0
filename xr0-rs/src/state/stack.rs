@@ -289,7 +289,7 @@ unsafe fn object_or_nothing_str(
     stack: *mut Stack,
     state: *mut State,
 ) -> OwningCStr {
-    let b: *mut Block = location_getstackblock(loc, stack);
+    let b: *mut Block = location_getstackblock(&*loc, stack);
     if b.is_null() {
         panic!();
     }

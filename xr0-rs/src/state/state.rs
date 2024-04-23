@@ -225,10 +225,10 @@ pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
     }
     let loc: *mut Location = value_as_location(&*v);
     state_get(state, &*loc, true).unwrap();
-    location_tostatic(loc, &(*state).static_memory)
-        || location_toheap(loc, &mut (*state).heap)
-        || location_tostack(loc, (*state).stack)
-        || location_toclump(loc, (*state).clump)
+    location_tostatic(&*loc, &(*state).static_memory)
+        || location_toheap(&*loc, &mut (*state).heap)
+        || location_tostack(&*loc, (*state).stack)
+        || location_toclump(&*loc, (*state).clump)
 }
 
 pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
@@ -240,7 +240,7 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
     }
     let loc: *mut Location = value_as_location(&*v);
     state_get(state, &*loc, true).unwrap();
-    location_toheap(loc, &mut (*state).heap)
+    location_toheap(&*loc, &mut (*state).heap)
 }
 
 pub unsafe fn state_getvconst(state: *mut State, id: *mut libc::c_char) -> *mut Value {
@@ -342,8 +342,9 @@ pub unsafe fn state_deref(
     if deref_base.is_null() {
         panic!();
     }
-    let deref: *mut Location = location_with_offset(&*deref_base, index);
-    state_get(state, &*deref, true)
+    // Note: the original leaked this location.
+    let deref = location_with_offset(&*deref_base, index);
+    state_get(state, &deref, true)
         .map_err(|err| Error::new(format!("undefined indirection: {}", err.msg)))
 }
 
@@ -386,7 +387,7 @@ pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {
             "undefined free of value not pointing at heap".to_string(),
         ));
     }
-    location_dealloc(value_as_location(&*val), &mut (*state).heap)
+    location_dealloc(&*value_as_location(&*val), &mut (*state).heap)
 }
 
 pub unsafe fn state_range_dealloc(
