@@ -451,12 +451,8 @@ pub unsafe fn value_isint(v: &Value) -> bool {
 
 pub unsafe fn value_to_expr(v: *mut Value) -> *mut AstExpr {
     match &(*v).kind {
-        ValueKind::DefinitePtr(_) => {
-            Box::into_raw(ast_expr_identifier_create(value_str(v).into_ptr()))
-        }
-        ValueKind::IndefinitePtr(_) => {
-            Box::into_raw(ast_expr_identifier_create(value_str(v).into_ptr()))
-        }
+        ValueKind::DefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
+        ValueKind::IndefinitePtr(_) => Box::into_raw(ast_expr_identifier_create(value_str(v))),
         ValueKind::Literal(_) => Box::into_raw(ast_expr_copy(&*value_as_literal(&*v))),
         ValueKind::Sync(n) => Box::into_raw(ast_expr_copy(&*number_as_sync(*n))),
         ValueKind::Int(n) => number_to_expr(*n),

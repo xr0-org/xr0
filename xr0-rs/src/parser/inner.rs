@@ -142,7 +142,7 @@ pub grammar c_parser(env: &Env) for str {
     // 6.5.1 Primary expression
     rule primary_expression() -> Box<AstExpr> =
         a:identifier() {
-            unsafe { ast_expr_identifier_create(a) }
+            unsafe { ast_expr_identifier_create(OwningCStr::new(a)) }
         } /
         "$" {
             unsafe { ast_expr_arbarg_create() }

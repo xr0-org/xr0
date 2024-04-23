@@ -333,7 +333,7 @@ unsafe fn rangeprocess_dealloc(
 
 unsafe fn hack_base_object_from_alloc(expr: &AstExpr, state: *mut State) -> *mut Object {
     let inner = ast_expr_unary_operand(expr);
-    let i = ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
+    let i = ast_expr_identifier_create(OwningCStr::copy_str("i"));
     if !ast_expr_equal(ast_expr_binary_e2(inner), &i) {
         panic!();
     }
@@ -513,8 +513,8 @@ unsafe fn expr_isdeallocand_rangedecide(
     let acc = ast_expr_isdeallocand_assertand(expr);
     assert_eq!(ast_expr_unary_op(acc), AstUnaryOp::Dereference);
     let inner = ast_expr_unary_operand(acc);
-    let i = ast_expr_identifier_create(dynamic_str(b"i\0" as *const u8 as *const libc::c_char));
-    let j = ast_expr_identifier_create(dynamic_str(b"j\0" as *const u8 as *const libc::c_char));
+    let i = ast_expr_identifier_create(OwningCStr::copy_str("i"));
+    let j = ast_expr_identifier_create(OwningCStr::copy_str("j"));
     if !(ast_expr_equal(ast_expr_binary_e2(inner), &i)
         || ast_expr_equal(ast_expr_binary_e2(inner), &j))
     {
@@ -651,7 +651,7 @@ unsafe fn hack_identifier_builtin_eval(
         || strncmp(id, b"ptr:\0" as *const u8 as *const libc::c_char, 4) == 0 as libc::c_int
     {
         return Ok(value_sync_create(Box::into_raw(
-            ast_expr_identifier_create(dynamic_str(id)),
+            ast_expr_identifier_create(OwningCStr::copy_char_ptr(id)),
         )));
     }
     Err(Error::new("not built-in".to_string()))
@@ -970,18 +970,18 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<*mut 
     let nparams = uncomputed_params.len();
     let mut computed_params = Vec::with_capacity(nparams);
     for &p in uncomputed_params {
-        let param = ast_expr_identifier_create(dynamic_str(ast_variable_name(p)));
+        let param = ast_expr_identifier_create(OwningCStr::copy_char_ptr(ast_variable_name(p)));
         let v = ast_expr_eval(&param, s)?;
         drop(param);
         assert!(!v.is_null());
         computed_params.push(if value_islocation(&*v) {
-            ast_expr_identifier_create(value_str(v).into_ptr())
+            ast_expr_identifier_create(value_str(v))
         } else {
             Box::from_raw(value_to_expr(v))
         });
     }
     Ok(value_sync_create(Box::into_raw(ast_expr_call_create(
-        ast_expr_identifier_create(dynamic_str(root)),
+        ast_expr_identifier_create(OwningCStr::copy_char_ptr(root)),
         computed_params,
     ))))
 }
@@ -1050,7 +1050,7 @@ pub unsafe fn prepare_parameters(
                 cstr!(fname),
             )));
         }
-        let name = ast_expr_identifier_create(dynamic_str(ast_variable_name(param)));
+        let name = ast_expr_identifier_create(OwningCStr::copy_char_ptr(ast_variable_name(param)));
         let lval_lval = ast_expr_lvalue(&name, state)?;
         let obj: *mut Object = lvalue_object(lval_lval);
         drop(name);
@@ -1219,8 +1219,8 @@ pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
     drop(Box::from_raw(expr));
 }
 
-pub unsafe fn ast_expr_identifier_create(s: *mut libc::c_char) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Identifier(OwningCStr::new(s)))
+pub unsafe fn ast_expr_identifier_create(s: OwningCStr) -> Box<AstExpr> {
+    ast_expr_create(AstExprKind::Identifier(s))
 }
 
 unsafe fn unary_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
@@ -1259,7 +1259,7 @@ unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
         reduced_args.push(Box::from_raw(value_to_expr(val)));
     }
     Ok(value_sync_create(Box::into_raw(ast_expr_call_create(
-        ast_expr_identifier_create(dynamic_str(root)),
+        ast_expr_identifier_create(OwningCStr::copy_char_ptr(root)),
         reduced_args,
     ))))
 }
@@ -2430,9 +2430,7 @@ pub unsafe fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
 unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> Result<*mut Value> {
     // Note: Original leaks the expression to avoid a double free.
     let expr = ast_expr_assignment_create(
-        ast_expr_identifier_create(
-            b"return\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        ),
+        ast_expr_identifier_create(OwningCStr::copy_str("return")),
         // Note: jump_rv can be null. Error in original.
         ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap()),
     );

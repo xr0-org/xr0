@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::mem;
 use std::ptr;
 
 use libc::{free, malloc, realloc, strcmp, strlen, strncpy};
@@ -37,7 +38,7 @@ impl Display for Error {
 pub unsafe extern "C" fn dynamic_str(s: *const libc::c_char) -> *mut libc::c_char {
     let len = strlen(s).wrapping_add(1);
     let t: *mut libc::c_char =
-        malloc((::core::mem::size_of::<libc::c_char>()).wrapping_mul(len)) as *mut libc::c_char;
+        malloc((mem::size_of::<libc::c_char>()).wrapping_mul(len)) as *mut libc::c_char;
     strncpy(t, s, len);
     t
 }
@@ -118,7 +119,7 @@ impl Map {
         self.n += 1;
         self.entry = realloc(
             self.entry as *mut libc::c_void,
-            (::core::mem::size_of::<Entry>() as libc::c_ulong).wrapping_mul(self.n as libc::c_ulong)
+            (mem::size_of::<Entry>() as libc::c_ulong).wrapping_mul(self.n as libc::c_ulong)
                 as usize,
         ) as *mut Entry;
         *self.entry.offset((self.n - 1 as libc::c_int) as isize) = entry_create(key, value);
@@ -261,6 +262,22 @@ impl OwningCStr {
 
     pub fn copy(ptr: &CStr) -> Self {
         unsafe { Self::new(dynamic_str(ptr.as_ptr())) }
+    }
+
+    pub unsafe fn copy_char_ptr(ptr: *const libc::c_char) -> Self {
+        OwningCStr::copy(CStr::from_ptr(ptr))
+    }
+
+    pub fn copy_str(s: &str) -> Self {
+        let n = s.len();
+        unsafe {
+            let p = libc::calloc(n + 1, mem::size_of::<libc::c_char>());
+            assert!(!p.is_null());
+            libc::memcpy(p, s.as_bytes().as_ptr() as *const libc::c_void, n);
+            OwningCStr {
+                ptr: p as *mut libc::c_char,
+            }
+        }
     }
 
     pub fn as_ptr(&self) -> *mut libc::c_char {
