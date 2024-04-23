@@ -1,12 +1,10 @@
 use std::ffi::CString;
-use std::ptr;
 
 use crate::ast::*;
 use crate::parser::env::Env;
-use crate::util::OwningCStr;
+use crate::util::{OwningCStr, SemiBox};
 
-type BoxedBlock = *mut AstBlock;
-type BoxedFunction = *mut AstFunction;
+type BoxedFunction = *mut AstFunction<'static>;
 type BoxedCStr = *mut libc::c_char;
 
 pub struct Declaration {
@@ -30,8 +28,8 @@ pub struct Declarator {
 }
 
 struct BlockStatement {
-    r#abstract: *mut AstBlock,
-    body: *mut AstBlock,
+    r#abstract: Option<Box<AstBlock>>,
+    body: Option<Box<AstBlock>>,
 }
 
 enum PostfixOp {
@@ -472,10 +470,10 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_stmt_create_nop(env.lexloc(p)) }
         }
 
-    rule compound_statement() -> BoxedBlock =
+    rule compound_statement() -> Box<AstBlock> =
         "{" _ b:block() _ "}" { b }
 
-    rule block() -> BoxedBlock =
+    rule block() -> Box<AstBlock> =
         d:declaration_list() _ s:statement_list() {
             unsafe { ast_block_create(d, s) }
         } /
@@ -492,7 +490,7 @@ pub grammar c_parser(env: &Env) for str {
     rule iteration_effect_statement() -> Box<AstStmt> =
         "." _ s:for_iteration_statement(true) { s }
 
-    rule compound_verification_statement() -> BoxedBlock =
+    rule compound_verification_statement() -> Box<AstBlock> =
         "~" _ "[" _ "]" {
             unsafe { ast_block_create(vec![], vec![]) }
         } /
@@ -525,7 +523,7 @@ pub grammar c_parser(env: &Env) for str {
             unsafe { ast_stmt_create_nop(env.lexloc(p)) }
         }
 
-    rule optional_compound_verification() -> BoxedBlock =
+    rule optional_compound_verification() -> Box<AstBlock> =
         vs:compound_verification_statement()? {
             vs.unwrap_or_else(|| {
                 unsafe { ast_block_create(vec![], vec![]) }
@@ -547,16 +545,16 @@ pub grammar c_parser(env: &Env) for str {
 
     rule block_statement() -> BlockStatement =
         ";" {
-            BlockStatement { r#abstract: ptr::null_mut(), body: ptr::null_mut() }
+            BlockStatement { r#abstract: None, body: None }
         } /
         c:compound_statement() {
-            BlockStatement { r#abstract: ptr::null_mut(), body: c }
+            BlockStatement { r#abstract: None, body: Some(c) }
         } /
         v:compound_verification_statement() _ ";" {
-            BlockStatement { r#abstract: v, body: ptr::null_mut() }
+            BlockStatement { r#abstract: Some(v), body: None }
         } /
         v:compound_verification_statement() _ c:compound_statement() {
-            BlockStatement { r#abstract: v, body: c }
+            BlockStatement { r#abstract: Some(v), body: Some(c) }
         }
 
     rule function_definition() -> BoxedFunction =
@@ -571,12 +569,9 @@ pub grammar c_parser(env: &Env) for str {
                     t,
                     decl.decl.name,
                     decl.decl.params,
-                    if body.r#abstract.is_null() {
-                        ast_block_create(vec![], vec![])
-                    } else {
-                        body.r#abstract
-                    },
-                    body.body
+                    body.r#abstract.unwrap_or_else(||
+                        ast_block_create(vec![], vec![])),
+                    body.body.map(SemiBox::Owned),
                 )
             }
         } /
@@ -591,12 +586,9 @@ pub grammar c_parser(env: &Env) for str {
                     t,
                     decl.decl.name,
                     decl.decl.params,
-                    if body.r#abstract.is_null() {
-                        ast_block_create(vec![], vec![])
-                    } else {
-                        body.r#abstract
-                    },
-                    body.body
+                    body.r#abstract.unwrap_or_else(||
+                        ast_block_create(vec![], vec![])),
+                    body.body.map(SemiBox::Owned),
                 )
             }
         } /
@@ -609,12 +601,9 @@ pub grammar c_parser(env: &Env) for str {
                     ast_type_create(AstTypeBase::Void, 0),
                     decl.decl.name,
                     decl.decl.params,
-                    if body.r#abstract.is_null() {
-                        ast_block_create(vec![], vec![])
-                    } else {
-                        body.r#abstract
-                    },
-                    body.body
+                    body.r#abstract.unwrap_or_else(||
+                        ast_block_create(vec![], vec![])),
+                    body.body.map(SemiBox::Owned),
                 )
             }
         }

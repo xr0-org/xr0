@@ -23,7 +23,7 @@ use crate::state::state::{
 };
 use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, string_arr_contains, Error,
-    InsertionOrderMap, Map, OwningCStr, Result,
+    InsertionOrderMap, Map, OwningCStr, Result, SemiBox,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -200,13 +200,14 @@ pub struct LValue<'ast> {
     pub obj: *mut Object,
 }
 
-pub struct AstFunction {
+#[derive(Clone)]
+pub struct AstFunction<'ast> {
     pub is_axiom: bool,
     pub ret: Box<AstType>,
     pub name: OwningCStr,
     pub params: Vec<Box<AstVariable>>,
-    pub r#abstract: *mut AstBlock,
-    pub body: *mut AstBlock, // can be null
+    pub r#abstract: Box<AstBlock>,
+    pub body: Option<SemiBox<'ast, AstBlock>>,
 }
 
 #[derive(Clone)]
@@ -266,8 +267,8 @@ pub struct AstLabelledStmt {
 pub enum AstStmtKind {
     Nop,
     Labelled(AstLabelledStmt),
-    Compound(*mut AstBlock),
-    CompoundV(*mut AstBlock),
+    Compound(Box<AstBlock>),
+    CompoundV(Box<AstBlock>),
     Expr(Box<AstExpr>),
     Selection(AstSelectionStmt),
     Iteration(AstIterationStmt),
@@ -313,7 +314,7 @@ pub struct AstTypedefDecl {
 }
 
 pub enum AstExternDeclKind {
-    Function(*mut AstFunction),
+    Function(*mut AstFunction<'static>),
     Variable(Box<AstVariable>),
     Typedef(AstTypedefDecl),
     Struct(Box<AstType>),
@@ -940,7 +941,7 @@ unsafe fn ast_expr_constant_str_build(expr: &AstExpr, b: *mut StrBuilder) {
 unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction = (*state_getext(state)).get_func(name);
+    let f: *mut AstFunction<'static> = (*state_getext(state)).get_func(name);
     if f.is_null() {
         return Err(Error::new(format!("function `{}' not found", cstr!(name))));
     }
@@ -964,7 +965,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value
 unsafe fn call_absexec(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction = (*state_getext(s)).get_func(name);
+    let f: *mut AstFunction<'static> = (*state_getext(s)).get_func(name);
     if f.is_null() {
         return Err(Error::new(format!("function `{}' not found", cstr!(name))));
     }
@@ -1928,22 +1929,8 @@ pub unsafe fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr
 pub unsafe fn ast_block_create(
     decls: Vec<Box<AstVariable>>,
     stmts: Vec<Box<AstStmt>>,
-) -> *mut AstBlock {
-    Box::into_raw(Box::new(AstBlock { decls, stmts }))
-}
-
-pub unsafe fn ast_block_destroy(b: *mut AstBlock) {
-    drop(Box::from_raw(b));
-}
-
-pub unsafe fn ast_block_copy(b: &AstBlock) -> *mut AstBlock {
-    return ast_block_create(
-        b.decls
-            .iter()
-            .map(|var_ptr| unsafe { ast_variable_copy(var_ptr) })
-            .collect(),
-        b.stmts.iter().map(|stmt| ast_stmt_copy(stmt)).collect(),
-    );
+) -> Box<AstBlock> {
+    Box::new(AstBlock { decls, stmts })
 }
 
 pub unsafe fn ast_block_str(b: &AstBlock, indent: &str) -> OwningCStr {
@@ -2226,7 +2213,7 @@ unsafe fn iter_neteffect(iter: &AstStmt) -> Option<Box<AstStmt>> {
         ast_block_create(vec![], vec![]),
         ast_stmt_create_compound(
             Box::new(ast_stmt_lexememarker(ast_stmt_iter_body(iter)).clone()),
-            ast_block_copy(ast_stmt_iter_abstract(iter)),
+            Box::new(ast_stmt_iter_abstract(iter).clone()),
         ),
         false,
     ))
@@ -2536,17 +2523,16 @@ pub unsafe fn ast_stmt_create_iter(
     init: Box<AstStmt>,
     cond: Box<AstStmt>,
     iter: Box<AstExpr>,
-    abstract_: *mut AstBlock,
+    abstract_: Box<AstBlock>,
     body: Box<AstStmt>,
     as_iteration_e: bool,
 ) -> Box<AstStmt> {
-    assert!(!abstract_.is_null());
     let iter = AstIterationStmt {
         init,
         cond,
         iter,
         body,
-        r#abstract: Box::from_raw(abstract_),
+        r#abstract: abstract_,
     };
     ast_stmt_create(
         loc,
@@ -2590,7 +2576,7 @@ pub unsafe fn ast_stmt_create_sel(
     )
 }
 
-pub unsafe fn ast_stmt_create_compound_v(loc: Box<LexemeMarker>, b: *mut AstBlock) -> Box<AstStmt> {
+pub unsafe fn ast_stmt_create_compound_v(loc: Box<LexemeMarker>, b: Box<AstBlock>) -> Box<AstStmt> {
     ast_stmt_create(loc, AstStmtKind::CompoundV(b))
 }
 
@@ -2662,7 +2648,7 @@ pub unsafe fn ast_stmt_create_expr(loc: Box<LexemeMarker>, expr: Box<AstExpr>) -
     ast_stmt_create(loc, AstStmtKind::Expr(expr))
 }
 
-pub unsafe fn ast_stmt_create_compound(loc: Box<LexemeMarker>, b: *mut AstBlock) -> Box<AstStmt> {
+pub unsafe fn ast_stmt_create_compound(loc: Box<LexemeMarker>, b: Box<AstBlock>) -> Box<AstStmt> {
     ast_stmt_create(loc, AstStmtKind::Compound(b))
 }
 
@@ -3078,11 +3064,11 @@ pub unsafe fn ast_variable_create(name: OwningCStr, ty: Box<AstType>) -> Box<Ast
 }
 
 pub unsafe fn ast_variable_copy(v: &AstVariable) -> Box<AstVariable> {
-    ast_variable_create(v.name.clone(), ast_type_copy(&v.r#type))
+    Box::new(v.clone())
 }
 
 pub unsafe fn ast_variables_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
-    v.iter().map(|var| ast_variable_copy(var)).collect()
+    v.to_vec()
 }
 
 pub unsafe fn ast_variable_str(v: &AstVariable) -> OwningCStr {
@@ -3104,19 +3090,16 @@ pub unsafe fn ast_variable_arr_copy(old: &[Box<AstVariable>]) -> Vec<Box<AstVari
     old.iter().map(|var| ast_variable_copy(var)).collect()
 }
 
-pub unsafe fn ast_function_create(
-    isaxiom: bool,
+pub unsafe fn ast_function_create<'ast>(
+    is_axiom: bool,
     ret: Box<AstType>,
     name: OwningCStr,
     params: Vec<Box<AstVariable>>,
-    abstract_0: *mut AstBlock,
-    body: *mut AstBlock,
-) -> *mut AstFunction {
-    if abstract_0.is_null() {
-        panic!();
-    }
+    abstract_0: Box<AstBlock>,
+    body: Option<SemiBox<'ast, AstBlock>>,
+) -> *mut AstFunction<'ast> {
     Box::into_raw(Box::new(AstFunction {
-        is_axiom: isaxiom,
+        is_axiom,
         ret,
         name,
         params,
@@ -3129,18 +3112,7 @@ pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
     drop(Box::from_raw(f));
 }
 
-impl Drop for AstFunction {
-    fn drop(&mut self) {
-        unsafe {
-            ast_block_destroy(self.r#abstract);
-            if !self.body.is_null() {
-                ast_block_destroy(self.body);
-            }
-        }
-    }
-}
-
-impl AstFunction {
+impl<'ast> AstFunction<'ast> {
     pub unsafe fn str(&self) -> OwningCStr {
         let b: *mut StrBuilder = strbuilder_create();
         if self.is_axiom {
@@ -3155,8 +3127,8 @@ impl AstFunction {
         }
         let abs = ast_block_str(&*self.r#abstract, "\t");
         strbuilder_write!(b, ") ~ [\n{abs}]");
-        if !(self.body).is_null() {
-            let body = ast_block_str(&*self.body, "\t");
+        if let Some(body) = &self.body {
+            let body = ast_block_str(body, "\t");
             strbuilder_write!(b, "{{\n{body}}}");
         } else {
             strbuilder_write!(b, ";");
@@ -3169,24 +3141,8 @@ impl AstFunction {
         self.name.as_ptr()
     }
 
-    pub unsafe fn copy(&self) -> *mut AstFunction {
-        let params = self
-            .params
-            .iter()
-            .map(|param| ast_variable_copy(param))
-            .collect();
-        ast_function_create(
-            self.is_axiom,
-            ast_type_copy(&self.ret),
-            self.name.clone(),
-            params,
-            ast_block_copy(&*self.r#abstract),
-            if !self.body.is_null() {
-                ast_block_copy(&*self.body)
-            } else {
-                ptr::null_mut()
-            },
-        )
+    pub unsafe fn copy(&self) -> *mut AstFunction<'ast> {
+        Box::into_raw(Box::new(self.clone()))
     }
 
     pub unsafe fn is_axiom(&self) -> bool {
@@ -3194,7 +3150,7 @@ impl AstFunction {
     }
 
     pub unsafe fn is_proto(&self) -> bool {
-        !(self.r#abstract).is_null() && (self.body).is_null()
+        self.body.is_none()
     }
 
     pub unsafe fn abs_is_empty(&self) -> bool {
@@ -3206,12 +3162,13 @@ impl AstFunction {
     }
 
     pub unsafe fn body(&self) -> &AstBlock {
-        assert!(!self.body.is_null(), "cannot find body for {:?}", self.name);
-        &*self.body
+        let Some(body) = self.body.as_ref() else {
+            panic!("cannot find body for {:?}", self.name);
+        };
+        body
     }
 
     pub unsafe fn abstract_block(&self) -> &AstBlock {
-        assert!(!self.r#abstract.is_null());
         &*self.r#abstract
     }
 
@@ -3229,8 +3186,8 @@ pub unsafe fn ast_function_protostitch(
     ext: *mut Externals,
 ) -> *mut AstFunction {
     let proto: *mut AstFunction = (*ext).get_func((*f).name.as_ptr());
-    if !proto.is_null() && !((*proto).r#abstract).is_null() {
-        (*f).r#abstract = ast_block_copy(&*(*proto).r#abstract);
+    if !proto.is_null() {
+        (*f).r#abstract = (*proto).r#abstract.clone();
     }
     f
 }
@@ -3332,7 +3289,7 @@ unsafe fn abstract_auditwithstate(
     actual_state: *mut State,
     abstract_state: *mut State,
 ) -> Result<()> {
-    for decl in &(*(*f).body).decls {
+    for decl in &(*f).body.as_ref().unwrap().decls {
         state_declare(actual_state, decl, false);
     }
     path_verify(f, actual_state, 0 as libc::c_int, abstract_state)
@@ -3345,7 +3302,7 @@ unsafe fn path_verify(
     abstract_state: *mut State,
 ) -> Result<()> {
     let fname = (*f).name();
-    let stmts = &(*(*f).body).stmts;
+    let stmts = &(*f).body.as_ref().unwrap().stmts;
     #[allow(clippy::needless_range_loop)]
     for i in index as usize..stmts.len() {
         let stmt = &stmts[i];
@@ -3404,7 +3361,8 @@ unsafe fn split_path_verify(
 ) -> Result<()> {
     let paths = body_paths(&*f, index, cond);
     assert_eq!(paths.len(), 2);
-    // Note: Original leaks both functions.
+    // Note: Original leaks both functions to avoid triple-freeing the body.
+    // We borrow instead.
     for (i, f) in paths.into_iter().enumerate() {
         let mut actual_copy = state_copywithname(&*actual_state, (*f).name());
         let mut abstract_copy = state_copywithname(&*abstract_state, (*f).name());
@@ -3440,12 +3398,9 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
     if (*f).is_axiom {
         return;
     }
-    if ((*f).body).is_null() {
-        panic!();
-    }
-    let body: *mut AstBlock = (*f).body;
+    let body = (*f).body.as_deref().unwrap();
     let mut val = vec![];
-    for stmt in &(*body).stmts {
+    for stmt in &body.stmts {
         let farr = ast_stmt_getfuncs(stmt);
 
         for func in farr {
@@ -3463,18 +3418,18 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
     g.insert(fname.into(), val);
 }
 
-unsafe fn abstract_paths(
-    f: &AstFunction,
+unsafe fn abstract_paths<'origin, 'ast>(
+    f: &'origin AstFunction<'ast>,
     _index: libc::c_int,
     cond: &AstExpr,
-) -> Vec<*mut AstFunction> {
+) -> Vec<*mut AstFunction<'origin>> {
     let f_true: *mut AstFunction = ast_function_create(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
-        ast_block_copy(&*f.r#abstract),
-        ast_block_copy(&*f.body),
+        f.r#abstract.clone(),
+        f.body.as_ref().map(|body| body.reborrow()),
     );
     // Note: Original leaks inv_assumption, but I think unintentionally.
     let inv_assumption = ast_expr_inverted_copy(cond, true);
@@ -3483,8 +3438,8 @@ unsafe fn abstract_paths(
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
         ast_variables_copy(&f.params),
-        ast_block_copy(&*f.r#abstract),
-        ast_block_copy(&*f.body),
+        f.r#abstract.clone(),
+        f.body.as_ref().map(|body| body.reborrow()),
     );
     vec![f_true, f_false]
 }
@@ -3547,18 +3502,18 @@ unsafe fn split_paths_verify(
     Ok(())
 }
 
-unsafe fn body_paths(
-    f: &AstFunction,
+unsafe fn body_paths<'origin, 'ast>(
+    f: &'origin AstFunction<'ast>,
     _index: libc::c_int,
     cond: &AstExpr,
-) -> Vec<*mut AstFunction> {
+) -> Vec<*mut AstFunction<'origin>> {
     let f_true: *mut AstFunction = ast_function_create(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), cond),
         ast_variables_copy(&f.params),
-        ast_block_copy(&*f.r#abstract),
-        f.body,
+        f.r#abstract.clone(),
+        f.body.as_ref().map(|body| body.reborrow()),
     );
     // Note: Original leaks `inv_assumption` but I think accidentally.
     let inv_assumption = ast_expr_inverted_copy(cond, true);
@@ -3567,19 +3522,21 @@ unsafe fn body_paths(
         ast_type_copy(&f.ret),
         split_name(f.name.as_ptr(), &inv_assumption),
         ast_variables_copy(&f.params),
-        ast_block_copy(&*f.r#abstract),
-        f.body,
+        f.r#abstract.clone(),
+        f.body.as_ref().map(|body| body.reborrow()),
     );
     vec![f_true, f_false]
 }
 
-pub unsafe fn ast_functiondecl_create(f: *mut AstFunction) -> Box<AstExternDecl> {
+pub unsafe fn ast_functiondecl_create(f: *mut AstFunction<'static>) -> Box<AstExternDecl> {
     Box::new(AstExternDecl {
         kind: AstExternDeclKind::Function(f),
     })
 }
 
-pub unsafe fn ast_externdecl_as_function_ptr(decl: &AstExternDecl) -> Option<*mut AstFunction> {
+pub unsafe fn ast_externdecl_as_function_ptr(
+    decl: &AstExternDecl,
+) -> Option<*mut AstFunction<'static>> {
     match &decl.kind {
         AstExternDeclKind::Function(f) => Some(*f),
         _ => None,

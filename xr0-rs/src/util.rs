@@ -2,6 +2,7 @@ use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::mem;
+use std::ops::Deref;
 use std::ptr;
 
 use libc::{free, malloc, realloc, strcmp, strlen, strncpy};
@@ -32,6 +33,34 @@ pub type Result<T, E = Box<Error>> = std::result::Result<T, E>;
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.msg)
+    }
+}
+
+/// Like Box<T>, but not necessarily owning; possibly borrowed. Useful when hacking together
+/// existing AST bits with twine and duct tape to make a temporary new AST for something.
+#[derive(Clone)]
+pub enum SemiBox<'a, T> {
+    Owned(Box<T>),
+    Borrowed(&'a T),
+}
+
+impl<'a, T> Deref for SemiBox<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        match self {
+            SemiBox::Owned(b) => b,
+            SemiBox::Borrowed(r) => r,
+        }
+    }
+}
+
+impl<'a, T> SemiBox<'a, T> {
+    pub fn reborrow<'parent>(self: &'parent SemiBox<'a, T>) -> SemiBox<'parent, T> {
+        match self {
+            SemiBox::Owned(b) => SemiBox::Borrowed(&**b),
+            SemiBox::Borrowed(r) => SemiBox::Borrowed(r),
+        }
     }
 }
 

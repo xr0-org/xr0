@@ -8,7 +8,7 @@ use crate::{strbuilder_write, AstFunction, AstType, AstVariable, StrBuilder};
 
 #[derive(Default)]
 pub struct Externals {
-    func: HashMap<String, *mut AstFunction>,
+    func: HashMap<String, *mut AstFunction<'static>>,
     var: HashMap<String, *mut AstVariable>,
     typedef: HashMap<String, *const AstType>,
     _struct: HashMap<String, *const AstType>,
@@ -30,7 +30,7 @@ impl Externals {
         strbuilder_build(b)
     }
 
-    pub unsafe fn declare_func(&mut self, id: *mut libc::c_char, f: *mut AstFunction) {
+    pub unsafe fn declare_func(&mut self, id: *mut libc::c_char, f: *mut AstFunction<'static>) {
         let id = CStr::from_ptr(id).to_str().unwrap().to_string();
         self.func.insert(id, f);
     }
@@ -54,7 +54,7 @@ impl Externals {
         self._struct.insert(id, t);
     }
 
-    pub unsafe fn get_func(&self, id: *const libc::c_char) -> *mut AstFunction {
+    pub unsafe fn get_func(&self, id: *const libc::c_char) -> *mut AstFunction<'static> {
         let id = CStr::from_ptr(id).to_str().unwrap();
         self.func.get(id).copied().unwrap_or(ptr::null_mut())
     }
