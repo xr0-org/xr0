@@ -1,3 +1,5 @@
+use std::ptr;
+
 use libc::printf;
 
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
@@ -9,7 +11,7 @@ use crate::state::clump::clump_getblock;
 use crate::state::heap::{heap_blockisfreed, heap_deallocblock, heap_getblock};
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
-use crate::state::static_memory::static_memory_getblock;
+use crate::state::static_memory::{static_memory_getblock, static_memory_hasblock};
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::{
     strbuilder_write, AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, StrBuilder, VConst,
@@ -160,10 +162,10 @@ pub unsafe fn location_with_offset(loc: &Location, offset: &AstExpr) -> *mut Loc
     copy
 }
 
-pub unsafe fn location_tostatic(loc: *mut Location, sm: *mut StaticMemory) -> bool {
+pub unsafe fn location_tostatic(loc: *mut Location, sm: &StaticMemory) -> bool {
     let type_equal = matches!((*loc).kind, LocationKind::Static);
-    let b: *mut Block = static_memory_getblock(sm, (*loc).block);
-    type_equal && !b.is_null()
+    let b = static_memory_hasblock(sm, (*loc).block);
+    type_equal && b
 }
 
 pub unsafe fn location_toheap(loc: *mut Location, h: *mut Heap) -> bool {
@@ -212,7 +214,7 @@ pub unsafe fn location_referencesheap(l: &Location, s: *mut State) -> bool {
 
 pub unsafe fn location_getblock(
     loc: &Location,
-    sm: *mut StaticMemory,
+    sm: &mut StaticMemory,
     _v: &VConst,
     s: *mut Stack,
     h: *mut Heap,
@@ -222,7 +224,13 @@ pub unsafe fn location_getblock(
         panic!();
     }
     match loc.kind {
-        LocationKind::Static => Ok(static_memory_getblock(sm, loc.block)),
+        LocationKind::Static => {
+            let block_ptr = match static_memory_getblock(sm, loc.block) {
+                Some(block) => block,
+                None => ptr::null_mut(),
+            };
+            Ok(block_ptr)
+        }
         LocationKind::Automatic { .. } => location_auto_getblock(loc, s),
         LocationKind::Dynamic => Ok(heap_getblock(h, loc.block)),
         LocationKind::Dereferencable => Ok(clump_getblock(c, loc.block)),
