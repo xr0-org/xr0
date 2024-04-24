@@ -969,7 +969,7 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<*mut 
     let nparams = uncomputed_params.len();
     let mut computed_params = Vec::with_capacity(nparams);
     for p in uncomputed_params {
-        let param = ast_expr_identifier_create(OwningCStr::copy_char_ptr(ast_variable_name(p)));
+        let param = ast_expr_identifier_create(ast_variable_name(p).clone());
         let v = ast_expr_eval(&param, s)?;
         drop(param);
         assert!(!v.is_null());
@@ -1045,11 +1045,11 @@ pub unsafe fn prepare_parameters(
         if arg.is_null() {
             return Err(Error::new(format!(
                 "parameter `{}' of function `{}' has no value",
-                cstr!(ast_variable_name(param)),
+                ast_variable_name(param),
                 cstr!(fname),
             )));
         }
-        let name = ast_expr_identifier_create(OwningCStr::copy_char_ptr(ast_variable_name(param)));
+        let name = ast_expr_identifier_create(ast_variable_name(param).clone());
         let lval_lval = ast_expr_lvalue(&name, state)?;
         let obj: *mut Object = lvalue_object(&lval_lval);
         drop(name);
@@ -1136,12 +1136,11 @@ unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result
     let params = (*f).params();
     for p in params {
         let id = ast_variable_name(p);
-        let param_0: *mut Value = state_getloc(&mut param_state, id);
-        let arg: *mut Value = state_getloc(arg_state, id);
+        let param_0: *mut Value = state_getloc(&mut param_state, id.as_ptr());
+        let arg: *mut Value = state_getloc(arg_state, id.as_ptr());
         if let Err(err) = verify_paramspec(param_0, arg, &mut param_state, arg_state) {
             return Err(Error::new(format!(
-                "parameter {} of {} {}",
-                cstr!(id),
+                "parameter {id} of {} {}",
                 cstr!(fname),
                 err.msg
             )));
@@ -2965,8 +2964,8 @@ pub fn ast_variable_str(v: &AstVariable) -> OwningCStr {
     strbuilder_build(b)
 }
 
-pub fn ast_variable_name(v: &AstVariable) -> *mut libc::c_char {
-    v.name.as_ptr()
+pub fn ast_variable_name(v: &AstVariable) -> &OwningCStr {
+    &v.name
 }
 
 pub fn ast_variable_type(v: &AstVariable) -> &AstType {
@@ -3136,12 +3135,12 @@ unsafe fn ast_function_precondsinit(f: &AstFunction, s: *mut State) -> Result<()
 unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()> {
     let name = ast_variable_name(param);
     let t = ast_variable_type(param);
-    let obj: *mut Object = state_getobject(state, name);
+    let obj: *mut Object = state_getobject(state, name.as_ptr());
     if obj.is_null() {
         panic!();
     }
     if !object_hasvalue(obj) {
-        let val: *mut Value = state_vconst(state, t, dynamic_str(name), true);
+        let val: *mut Value = state_vconst(state, t, dynamic_str(name.as_ptr()), true);
         object_assign(obj, val);
     }
     Ok(())
@@ -3455,7 +3454,7 @@ pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: &mut Externa
             ext.declare_func((**f).name(), *f);
         }
         AstExternDeclKind::Variable(v) => {
-            ext.declare_var(ast_variable_name(v), &mut **v);
+            ext.declare_var(ast_variable_name(v).as_ptr(), &mut **v);
         }
         AstExternDeclKind::Typedef(typedef) => {
             ext.declare_typedef(typedef.name.as_ptr(), &*typedef.type_0);

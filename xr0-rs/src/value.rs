@@ -127,8 +127,7 @@ pub unsafe fn value_struct_indefinite_create(
         panic!();
     };
     for var in &sv.members {
-        let field: *mut libc::c_char = ast_variable_name(var);
-        let field = CStr::from_ptr(field).to_str().unwrap();
+        let field = ast_variable_name(var).as_str();
 
         let obj: *mut Object = sv.m.get(field).copied().unwrap();
         let mut b = strbuilder_create();
@@ -182,17 +181,13 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> *mut Value {
     };
 
     for var in &sv.members {
-        let field: *mut libc::c_char = ast_variable_name(var);
-        let field_str = CStr::from_ptr(field).to_str().unwrap();
-        let obj = *sv.m.get(field_str).unwrap();
+        let field = ast_variable_name(var);
+        let obj = *sv.m.get(field.as_str()).unwrap();
         let obj_value: *mut Value = object_as_value(obj);
         if !obj_value.is_null() && value_issync(&*obj_value) {
             object_assign(
                 obj,
-                value_sync_create(ast_expr_member_create(
-                    ast_expr_copy(root),
-                    OwningCStr::copy(CStr::from_ptr(field)),
-                )),
+                value_sync_create(ast_expr_member_create(ast_expr_copy(root), field.clone())),
             );
         }
     }
@@ -206,8 +201,7 @@ pub fn value_isstruct(v: &Value) -> bool {
 unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, *mut Object> {
     let mut m = HashMap::new();
     for var in members {
-        let id = ast_variable_name(var);
-        let id = CStr::from_ptr(id).to_str().unwrap().to_string();
+        let id = ast_variable_name(var).as_str().to_string();
         m.insert(
             id,
             object_value_create(ast_expr_constant_create(0), ptr::null_mut()),
@@ -243,7 +237,7 @@ pub unsafe fn value_struct_membertype(v: &Value, member: *mut libc::c_char) -> O
         panic!();
     };
     for var in &sv.members {
-        if strcmp(member, ast_variable_name(var)) == 0 as libc::c_int {
+        if strcmp(member, ast_variable_name(var).as_ptr()) == 0 as libc::c_int {
             return Some(ast_variable_type(var));
         }
     }
@@ -344,9 +338,8 @@ unsafe fn value_struct_sprint(sv: &StructValue, b: &mut StrBuilder) {
     strbuilder_write!(*b, "struct:{{");
     let n = sv.members.len();
     for (i, var) in sv.members.iter().enumerate() {
-        let f: *mut libc::c_char = ast_variable_name(var);
-        let f_str = CStr::from_ptr(f).to_str().unwrap();
-        let val: *mut Value = object_as_value(sv.m.get(f_str).copied().unwrap());
+        let f = ast_variable_name(var).as_str();
+        let val: *mut Value = object_as_value(sv.m.get(f).copied().unwrap());
         let val_str = if !val.is_null() {
             value_str(&*val)
         } else {
@@ -354,8 +347,7 @@ unsafe fn value_struct_sprint(sv: &StructValue, b: &mut StrBuilder) {
         };
         strbuilder_write!(
             *b,
-            ".{} = <{val_str}>{}",
-            cstr!(f),
+            ".{f} = <{val_str}>{}",
             if i + 1 < n { ", " } else { "" },
         );
     }
