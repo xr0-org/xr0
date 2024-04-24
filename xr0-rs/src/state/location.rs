@@ -1,7 +1,5 @@
 use std::ptr;
 
-use libc::printf;
-
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
 use crate::state::block::{
@@ -270,10 +268,7 @@ pub unsafe fn location_range_dealloc(
         return Err(Error::new("cannot get block".to_string()));
     };
     if !block_range_aredeallocands(b, lw, up, state) {
-        printf(
-            b"block: %s\n\0" as *const u8 as *const libc::c_char,
-            block_str(b),
-        );
+        println!("block: {}", block_str(b));
         println!("lw: {lw}, up: {up}");
         debug_assert!(false);
         return Err(Error::new("some values not allocated".to_string()));
