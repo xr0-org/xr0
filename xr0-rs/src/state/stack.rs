@@ -226,10 +226,7 @@ pub unsafe fn variable_create(type_: &AstType, stack: *mut Stack, isparam: bool)
     }
     block_install(
         b,
-        object_value_create(
-            Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
-            ptr::null_mut(),
-        ),
+        object_value_create(ast_expr_constant_create(0 as libc::c_int), ptr::null_mut()),
     );
     Box::into_raw(v)
 }

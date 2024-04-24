@@ -71,8 +71,7 @@ pub unsafe fn block_observe(
         if !constructive {
             return ptr::null_mut();
         }
-        let obj: *mut Object =
-            object_value_create(Box::into_raw(ast_expr_copy(offset)), ptr::null_mut());
+        let obj: *mut Object = object_value_create(ast_expr_copy(offset), ptr::null_mut());
         (*b).arr.push(obj);
         return obj;
     };
@@ -89,8 +88,7 @@ pub unsafe fn block_observe(
     // know why it isn't a double free.
     let lw_ptr = Box::into_raw(lw);
     let upto: *mut Object = object_upto(obj, lw_ptr, s);
-    let observed: *mut Object =
-        object_value_create(Box::into_raw(ast_expr_copy(&*lw_ptr)), state_alloc(s));
+    let observed: *mut Object = object_value_create(ast_expr_copy(&*lw_ptr), state_alloc(s));
     let from: *mut Object = object_from(obj, &up, s);
     drop(up);
     drop(Box::from_raw(lw_ptr));
@@ -121,7 +119,7 @@ pub unsafe fn block_range_alloc(
 ) -> Result<()> {
     assert!(b.arr.is_empty());
     b.arr.push(object_range_create(
-        Box::into_raw(ast_expr_copy(lw)),
+        ast_expr_copy(lw),
         range_create(
             ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
             heap_newblock(heap),

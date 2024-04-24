@@ -212,10 +212,7 @@ unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, *mut Obj
         let id = CStr::from_ptr(id).to_str().unwrap().to_string();
         m.insert(
             id,
-            object_value_create(
-                Box::into_raw(ast_expr_constant_create(0 as libc::c_int)),
-                ptr::null_mut(),
-            ),
+            object_value_create(ast_expr_constant_create(0), ptr::null_mut()),
         );
     }
     m
