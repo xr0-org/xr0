@@ -8,7 +8,6 @@ use crate::state::block::{
 use crate::state::heap::{heap_blockisfreed, heap_deallocblock, heap_getblock};
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
-use crate::state::static_memory::{static_memory_getblock, static_memory_hasblock};
 use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::{strbuilder_write, AstExpr, Value};
@@ -156,8 +155,7 @@ pub unsafe fn location_with_offset(loc: &Location, offset: &AstExpr) -> Box<Loca
 
 pub unsafe fn location_tostatic(loc: &Location, sm: &StaticMemory) -> bool {
     let type_equal = matches!(loc.kind, LocationKind::Static);
-    let b = static_memory_hasblock(sm, loc.block);
-    type_equal && b
+    type_equal && sm.has_block(loc.block)
 }
 
 pub unsafe fn location_toheap(loc: &Location, h: *mut Heap) -> bool {
@@ -217,7 +215,7 @@ pub unsafe fn location_getblock(
     }
     match loc.kind {
         LocationKind::Static => {
-            let block_ptr = match static_memory_getblock(sm, loc.block) {
+            let block_ptr = match sm.get_block(loc.block) {
                 Some(block) => block,
                 None => ptr::null_mut(),
             };

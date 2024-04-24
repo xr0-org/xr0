@@ -19,44 +19,41 @@ impl StaticMemory {
             pool: HashMap::new(),
         }
     }
-}
 
-pub unsafe fn static_memory_str(sm: &StaticMemory, indent: &str) -> OwningCStr {
-    let mut b = strbuilder_create();
-    for (i, block) in sm.blocks.iter().enumerate() {
-        strbuilder_write!(b, "{indent}{i}: {}\n", block_str(block));
+    pub unsafe fn str(&self, indent: &str) -> OwningCStr {
+        let mut b = strbuilder_create();
+        for (i, block) in self.blocks.iter().enumerate() {
+            strbuilder_write!(b, "{indent}{i}: {}\n", block_str(block));
+        }
+        strbuilder_build(b)
     }
-    strbuilder_build(b)
-}
 
-pub unsafe fn static_memory_newblock(sm: &mut StaticMemory) -> libc::c_int {
-    let address = sm.blocks.len() as libc::c_int;
-    sm.blocks.push(block_create());
-    address
-}
+    pub unsafe fn new_block(&mut self) -> libc::c_int {
+        let address = self.blocks.len() as libc::c_int;
+        self.blocks.push(block_create());
+        address
+    }
 
-pub unsafe fn static_memory_hasblock(sm: &StaticMemory, address: libc::c_int) -> bool {
-    (address as usize) < sm.blocks.len()
-}
+    pub fn has_block(&self, address: libc::c_int) -> bool {
+        (address as usize) < self.blocks.len()
+    }
 
-pub unsafe fn static_memory_getblock(
-    sm: &mut StaticMemory,
-    address: libc::c_int,
-) -> Option<&mut Block> {
-    sm.blocks
-        .get_mut(address as usize)
-        .map(|block| &mut **block)
-}
+    pub unsafe fn get_block(&mut self, address: libc::c_int) -> Option<&mut Block> {
+        self.blocks
+            .get_mut(address as usize)
+            .map(|block| &mut **block)
+    }
 
-/* string pooling to write one string literal to static_memory and all subsequent
- * literals reference it is used to avoid infinite loops in splitting logic with
- * different literals per selection condition */
-pub unsafe fn static_memory_stringpool(sm: &mut StaticMemory, lit: &str, loc: &Location) {
-    sm.pool.insert(lit.to_string(), Box::new(loc.clone()));
-}
+    /* string pooling to write one string literal to static_memory and all subsequent
+     * literals reference it is used to avoid infinite loops in splitting logic with
+     * different literals per selection condition */
+    pub fn string_pool(&mut self, lit: &str, loc: &Location) {
+        self.pool.insert(lit.to_string(), Box::new(loc.clone()));
+    }
 
-pub unsafe fn static_memory_checkpool(sm: &StaticMemory, lit: &str) -> *mut Location {
-    sm.pool.get(lit).map_or(ptr::null_mut(), |boxed| {
-        &**boxed as *const Location as *mut Location
-    })
+    pub unsafe fn check_pool(&self, lit: &str) -> *mut Location {
+        self.pool.get(lit).map_or(ptr::null_mut(), |boxed| {
+            &**boxed as *const Location as *mut Location
+        })
+    }
 }

@@ -17,9 +17,6 @@ use super::stack::{
     stack_getvariable, stack_prev, stack_references, stack_str, stack_undeclare, variable_location,
     variable_type,
 };
-use super::static_memory::{
-    static_memory_checkpool, static_memory_newblock, static_memory_str, static_memory_stringpool,
-};
 use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
 use crate::ast::{
     ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
@@ -120,7 +117,7 @@ pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     if !ext.is_empty() {
         strbuilder_write!(b, "{ext}\n");
     }
-    let static_mem = static_memory_str(&(*state).static_memory, "\t");
+    let static_mem = (*state).static_memory.str("\t");
     if !static_mem.is_empty() {
         strbuilder_write!(b, "{static_mem}\n");
     }
@@ -191,18 +188,19 @@ pub unsafe fn state_vconst(
 
 pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value> {
     let lit = ast_expr_as_literal(expr);
-    let loc: *mut Location = static_memory_checkpool(&(*state).static_memory, lit.as_str());
+    let loc: *mut Location = (*state).static_memory.check_pool(lit.as_str());
     if !loc.is_null() {
+        // FIXME this is definitely not kosher - multiple boxes can point to the same Location
         return value_ptr_create(Box::from_raw(loc));
     }
-    let address: libc::c_int = static_memory_newblock(&mut (*state).static_memory);
+    let address = (*state).static_memory.new_block();
     let loc = location_create_static(address, ast_expr_constant_create(0));
     let obj = state_get(state, &loc, true).unwrap();
     if obj.is_null() {
         panic!();
     }
     object_assign(&mut *obj, Box::into_raw(value_literal_create(lit.as_str())));
-    static_memory_stringpool(&mut (*state).static_memory, lit.as_str(), &loc);
+    (*state).static_memory.string_pool(lit.as_str(), &loc);
     value_ptr_create(loc)
 }
 
