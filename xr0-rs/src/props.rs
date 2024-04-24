@@ -1,6 +1,6 @@
 use crate::ast::{ast_expr_equal, ast_expr_inverted_copy};
 use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
-use crate::{strbuilder_write, AstExpr, StrBuilder};
+use crate::{strbuilder_write, AstExpr};
 
 #[derive(Clone)]
 pub struct Props {
@@ -16,7 +16,7 @@ impl Props {
         if self.props.is_empty() {
             return OwningCStr::empty();
         }
-        let b: *mut StrBuilder = strbuilder_create();
+        let mut b = strbuilder_create();
         strbuilder_write!(b, "{indent}\u{22a2} ");
         for (i, e) in self.props.iter().enumerate() {
             strbuilder_write!(b, "{e}{}", if i + 1 < self.props.len() { ", " } else { "" },);

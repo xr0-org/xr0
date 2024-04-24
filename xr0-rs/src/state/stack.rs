@@ -18,9 +18,7 @@ use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map, OwningCStr,
 };
 use crate::value::value_abstractcopy;
-use crate::{
-    cstr, strbuilder_write, AstType, AstVariable, Block, Location, Object, State, StrBuilder, Value,
-};
+use crate::{cstr, strbuilder_write, AstType, AstVariable, Block, Location, Object, State, Value};
 
 pub struct Stack {
     pub name: *mut libc::c_char,
@@ -130,12 +128,12 @@ unsafe fn varmap_copy(m: &Map) -> Box<Map> {
 }
 
 pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     let m: &Map = &(*stack).varmap;
     for (k, v) in m.pairs() {
         let var = variable_str(v as *mut Variable, stack, state);
         strbuilder_write!(b, "\t{}: {var}", cstr!(k));
-        strbuilder_putc(b, '\n' as i32 as libc::c_char);
+        strbuilder_putc(&mut b, '\n' as i32 as libc::c_char);
     }
     let result = variable_str((*stack).result, stack, state);
     strbuilder_write!(b, "\treturn: {result}\n");
@@ -143,7 +141,7 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
     let mut i_0: libc::c_int = 0 as libc::c_int;
     let len: libc::c_int = 30 as libc::c_int;
     while i_0 < len - 2 as libc::c_int {
-        strbuilder_putc(b, '-' as i32 as libc::c_char);
+        strbuilder_putc(&mut b, '-' as i32 as libc::c_char);
         i_0 += 1;
     }
     strbuilder_write!(b, " {}\n", cstr!((*stack).name));
@@ -272,7 +270,7 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
 
 pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> OwningCStr {
     assert!(!(*(*var).loc).type_is_vconst());
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     let type_ = ast_type_str(&(*var).type_);
     let isparam = if (*var).is_param { "param " } else { "" };
     let obj_str = object_or_nothing_str((*var).loc, stack, state);

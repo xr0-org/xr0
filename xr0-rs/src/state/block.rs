@@ -13,7 +13,7 @@ use crate::object::{
 use crate::state::heap::heap_newblock;
 use crate::state::state::{state_alloc, state_eval};
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
-use crate::{strbuilder_write, AstExpr, Heap, Location, Object, State, StrBuilder};
+use crate::{strbuilder_write, AstExpr, Heap, Location, Object, State};
 
 pub struct Block {
     pub arr: Vec<*mut Object>,
@@ -47,7 +47,7 @@ impl Clone for Block {
 }
 
 pub unsafe fn block_str(block: &Block) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     let n = block.arr.len();
     for (i, &obj) in block.arr.iter().enumerate() {
         let s = object_str(obj);

@@ -8,7 +8,7 @@ use crate::state::location::location_create_dynamic;
 use crate::state::state::state_references;
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::value_str;
-use crate::{strbuilder_write, AstExpr, Block, Location, State, StrBuilder, Value};
+use crate::{strbuilder_write, AstExpr, Block, Location, State, Value};
 
 #[derive(Clone)]
 pub struct Heap {
@@ -36,7 +36,7 @@ impl Heap {
 }
 
 pub unsafe fn heap_str(h: *mut Heap, indent: &str) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     for (i, hb) in (*h).blocks.iter().enumerate() {
         if !hb.freed {
             strbuilder_write!(
@@ -146,7 +146,7 @@ unsafe fn vconst_id(
     persist: bool,
 ) -> OwningCStr {
     let npersist = count_true(persistmap);
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     if persist {
         strbuilder_write!(b, "${npersist}");
     } else {
@@ -185,7 +185,7 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
 }
 
 pub unsafe fn vconst_str(v: &VConst, indent: &str) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     for (k, val) in &v.varmap {
         let value = value_str(val);
         strbuilder_write!(b, "{indent}{k}: {value}");

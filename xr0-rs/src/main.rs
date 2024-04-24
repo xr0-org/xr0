@@ -39,7 +39,7 @@ use state::location::Location;
 use state::stack::{Stack, Variable};
 use state::state::State;
 use state::static_memory::StaticMemory;
-use util::{OwningCStr, StrBuilder, VERBOSE_MODE};
+use util::{OwningCStr, VERBOSE_MODE};
 use value::Value;
 
 #[derive(Parser)]

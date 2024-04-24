@@ -23,7 +23,7 @@ use crate::state::state::{
 };
 use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, string_arr_contains, Error,
-    InsertionOrderMap, Map, OwningCStr, Result, SemiBox,
+    InsertionOrderMap, Map, OwningCStr, Result, SemiBox, StrBuilder,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -32,7 +32,7 @@ use crate::value::{
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr,
 };
-use crate::{cstr, strbuilder_write, vprintln, Externals, Object, State, StrBuilder, Value};
+use crate::{cstr, strbuilder_write, vprintln, Externals, Object, State, Value};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
@@ -665,8 +665,8 @@ pub unsafe fn ast_expr_assignment_create(root: Box<AstExpr>, value: Box<AstExpr>
     }))
 }
 
-unsafe fn ast_expr_bracketed_str_build(inner: &AstExpr, b: *mut StrBuilder) {
-    strbuilder_write!(b, "({inner})");
+unsafe fn ast_expr_bracketed_str_build(inner: &AstExpr, b: &mut StrBuilder) {
+    strbuilder_write!(*b, "({inner})");
 }
 
 unsafe fn expr_to_binary(expr: &AstExpr) -> Box<AstExpr> {
@@ -899,21 +899,21 @@ unsafe fn dereference_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Val
     binary_deref_eval(&binary, state)
 }
 
-unsafe fn ast_expr_constant_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_constant_str_build(expr: &AstExpr, b: &mut StrBuilder) {
     let AstExprKind::Constant(c) = &expr.kind else {
         panic!()
     };
     let constant: libc::c_int = c.constant;
     if !c.ischar {
-        strbuilder_write!(b, "{constant}");
+        strbuilder_write!(*b, "{constant}");
         return;
     }
     match char::try_from(constant as u32) {
         Ok(c) => {
-            strbuilder_write!(b, "{:?}", c);
+            strbuilder_write!(*b, "{:?}", c);
         }
         _ => {
-            strbuilder_write!(b, "'\\x{{{:x}}}'", constant as libc::c_uint);
+            strbuilder_write!(*b, "'\\x{{{:x}}}'", constant as libc::c_uint);
         }
     }
 }
@@ -1301,7 +1301,7 @@ pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Valu
     }
 }
 
-unsafe fn ast_expr_member_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_member_str_build(expr: &AstExpr, b: &mut StrBuilder) {
     let AstExprKind::StructMember(member) = &expr.kind else {
         panic!()
     };
@@ -1310,10 +1310,10 @@ unsafe fn ast_expr_member_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     if matches!(root.kind, AstExprKind::Unary(_)) {
         return ast_expr_member_deref_str_build(root, field_name, b);
     }
-    strbuilder_write!(b, "{root}.{field_name}");
+    strbuilder_write!(*b, "{root}.{field_name}");
 }
 
-unsafe fn ast_expr_member_deref_str_build(root: &AstExpr, member: &str, b: *mut StrBuilder) {
+unsafe fn ast_expr_member_deref_str_build(root: &AstExpr, member: &str, b: &mut StrBuilder) {
     if !(ast_expr_unary_op(root) == AstUnaryOp::Dereference) {
         panic!();
     }
@@ -1321,38 +1321,38 @@ unsafe fn ast_expr_member_deref_str_build(root: &AstExpr, member: &str, b: *mut 
     let e1 = ast_expr_binary_e1(inner);
     let e2 = ast_expr_binary_e2(inner);
     if matches!(e2.kind, AstExprKind::Constant(_)) && ast_expr_as_constant(e2) == 0 as libc::c_int {
-        strbuilder_write!(b, "{e1}->{member}");
+        strbuilder_write!(*b, "{e1}->{member}");
     } else {
-        strbuilder_write!(b, "{e1}[{e2}].{member}");
+        strbuilder_write!(*b, "{e1}[{e2}].{member}");
     }
 }
 
-unsafe fn ast_expr_incdec_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_incdec_str_build(expr: &AstExpr, b: &mut StrBuilder) {
     let AstExprKind::IncDec(incdec) = &expr.kind else {
         panic!()
     };
     let root = &incdec.operand;
     let op = if incdec.inc != 0 { "++" } else { "--" };
     if incdec.pre != 0 {
-        strbuilder_write!(b, "{op}{root}");
+        strbuilder_write!(*b, "{op}{root}");
     } else {
-        strbuilder_write!(b, "{root}{op}");
+        strbuilder_write!(*b, "{root}{op}");
     }
 }
 
-unsafe fn ast_expr_call_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_call_str_build(expr: &AstExpr, b: &mut StrBuilder) {
     let AstExprKind::Call(call) = &expr.kind else {
         panic!()
     };
-    strbuilder_write!(b, "{}(", call.fun);
+    strbuilder_write!(*b, "{}(", call.fun);
     for (i, arg) in call.args.iter().enumerate() {
         strbuilder_write!(
-            b,
+            *b,
             "{arg}{}",
             if i + 1 < call.args.len() { ", " } else { "" },
         );
     }
-    strbuilder_write!(b, ")");
+    strbuilder_write!(*b, ")");
 }
 
 pub unsafe fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
@@ -1486,49 +1486,49 @@ pub unsafe fn ast_expr_dealloc_create(arg: Box<AstExpr>) -> Box<AstExpr> {
 }
 
 pub unsafe fn ast_expr_str(expr: &AstExpr) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     match &expr.kind {
         AstExprKind::Identifier(id) => {
             strbuilder_write!(b, "{id}");
         }
         AstExprKind::Constant(_) => {
-            ast_expr_constant_str_build(expr, b);
+            ast_expr_constant_str_build(expr, &mut b);
         }
         AstExprKind::StringLiteral(s) => {
             strbuilder_write!(b, "{s:?}");
         }
         AstExprKind::Bracketed(inner) => {
-            ast_expr_bracketed_str_build(inner, b);
+            ast_expr_bracketed_str_build(inner, &mut b);
         }
         AstExprKind::Call(_) => {
-            ast_expr_call_str_build(expr, b);
+            ast_expr_call_str_build(expr, &mut b);
         }
         AstExprKind::IncDec(_) => {
-            ast_expr_incdec_str_build(expr, b);
+            ast_expr_incdec_str_build(expr, &mut b);
         }
         AstExprKind::StructMember(_) => {
-            ast_expr_member_str_build(expr, b);
+            ast_expr_member_str_build(expr, &mut b);
         }
         AstExprKind::Unary(_) => {
-            ast_expr_unary_str_build(expr, b);
+            ast_expr_unary_str_build(expr, &mut b);
         }
         AstExprKind::Binary(_) => {
-            ast_expr_binary_str_build(expr, b);
+            ast_expr_binary_str_build(expr, &mut b);
         }
         AstExprKind::Assignment(_) => {
-            ast_expr_assignment_str_build(expr, b);
+            ast_expr_assignment_str_build(expr, &mut b);
         }
         AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_isdeallocand_str_build(assertand, b);
+            ast_expr_isdeallocand_str_build(assertand, &mut b);
         }
         AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_isdereferencable_str_build(assertand, b);
+            ast_expr_isdereferencable_str_build(assertand, &mut b);
         }
         AstExprKind::ArbArg => {
-            strbuilder_putc(b, '$' as i32 as libc::c_char);
+            strbuilder_putc(&mut b, '$' as i32 as libc::c_char);
         }
         AstExprKind::Allocation(_) => {
-            ast_expr_alloc_str_build(expr, b);
+            ast_expr_alloc_str_build(expr, &mut b);
         }
         _ => {
             panic!();
@@ -1537,20 +1537,20 @@ pub unsafe fn ast_expr_str(expr: &AstExpr) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn ast_expr_alloc_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+fn ast_expr_alloc_str_build(expr: &AstExpr, b: &mut StrBuilder) {
     let AstExprKind::Allocation(alloc) = &expr.kind else {
         panic!()
     };
     let arg = &*alloc.arg;
     match alloc.kind {
         AstAllocKind::Alloc => {
-            strbuilder_write!(b, ".{} {arg};", "malloc");
+            strbuilder_write!(*b, ".{} {arg};", "malloc");
         }
         AstAllocKind::Dealloc => {
-            strbuilder_write!(b, ".{} {arg};", "free");
+            strbuilder_write!(*b, ".{} {arg};", "free");
         }
         AstAllocKind::Clump => {
-            strbuilder_write!(b, ".{} {arg};", "clump");
+            strbuilder_write!(*b, ".{} {arg};", "clump");
         }
     }
 }
@@ -1588,8 +1588,8 @@ unsafe fn ast_expr_alloc_copy(expr: &AstExpr) -> Box<AstExpr> {
     }
 }
 
-unsafe fn ast_expr_isdereferencable_str_build(assertand: &AstExpr, b: *mut StrBuilder) {
-    strbuilder_write!(b, "${assertand}");
+unsafe fn ast_expr_isdereferencable_str_build(assertand: &AstExpr, b: &mut StrBuilder) {
+    strbuilder_write!(*b, "${assertand}");
 }
 
 pub unsafe fn ast_expr_assignment_rval(expr: &AstExpr) -> &AstExpr {
@@ -1617,18 +1617,18 @@ pub unsafe fn ast_expr_binary_e2(expr: &AstExpr) -> &AstExpr {
     &binary.e2
 }
 
-unsafe fn ast_expr_isdeallocand_str_build(assertand: &AstExpr, b: *mut StrBuilder) {
-    strbuilder_write!(b, "@{assertand}");
+unsafe fn ast_expr_isdeallocand_str_build(assertand: &AstExpr, b: &mut StrBuilder) {
+    strbuilder_write!(*b, "@{assertand}");
 }
 
-unsafe fn ast_expr_assignment_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_assignment_str_build(expr: &AstExpr, b: &mut StrBuilder) {
     let AstExprKind::Assignment(assignment) = &expr.kind else {
         panic!()
     };
-    strbuilder_write!(b, "{} = {}", assignment.lval, assignment.rval);
+    strbuilder_write!(*b, "{} = {}", assignment.lval, assignment.rval);
 }
 
-unsafe fn ast_expr_binary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_binary_str_build(expr: &AstExpr, b: &mut StrBuilder) {
     let AstExprKind::Binary(binary) = &expr.kind else {
         panic!()
     };
@@ -1644,7 +1644,7 @@ unsafe fn ast_expr_binary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
     };
     let e1 = &binary.e1;
     let e2 = &binary.e2;
-    strbuilder_write!(b, "{e1}{opstr}{e2}");
+    strbuilder_write!(*b, "{e1}{opstr}{e2}");
 }
 
 pub unsafe fn ast_expr_binary_e1(expr: &AstExpr) -> &AstExpr {
@@ -1662,7 +1662,7 @@ pub unsafe fn ast_expr_sum_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<Ast
     ast_expr_binary_create(e1, AstBinaryOp::Addition, e2)
 }
 
-unsafe fn ast_expr_unary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
+unsafe fn ast_expr_unary_str_build(expr: &AstExpr, b: &mut StrBuilder) {
     let AstExprKind::Unary(unary) = &expr.kind else {
         panic!()
     };
@@ -1675,7 +1675,7 @@ unsafe fn ast_expr_unary_str_build(expr: &AstExpr, b: *mut StrBuilder) {
         AstUnaryOp::Bang => "!",
     };
     let root = &unary.arg;
-    strbuilder_write!(b, "{c}({root})");
+    strbuilder_write!(*b, "{c}({root})");
 }
 
 pub unsafe fn ast_expr_ge_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
@@ -1901,7 +1901,7 @@ pub unsafe fn ast_block_create(
 }
 
 pub unsafe fn ast_block_str(b: &AstBlock, indent: &str) -> OwningCStr {
-    let sb: *mut StrBuilder = strbuilder_create();
+    let mut sb = strbuilder_create();
     for decl in &b.decls {
         let s = ast_variable_str(decl);
         strbuilder_write!(sb, "{indent}{s};\n");
@@ -2208,10 +2208,10 @@ pub unsafe fn ast_stmt_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     }
 }
 
-unsafe fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: *mut StrBuilder) {
+unsafe fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: &mut StrBuilder) {
     // Note: jump.rv can be null. Error in the original.
     let rv = jump.rv.as_ref().unwrap();
-    strbuilder_write!(b, "return {rv};\n");
+    strbuilder_write!(*b, "return {rv};\n");
 }
 
 pub unsafe fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
@@ -2232,44 +2232,44 @@ pub unsafe fn ast_stmt_lexememarker(stmt: &AstStmt) -> &LexemeMarker {
     &stmt.loc
 }
 
-unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: *mut StrBuilder) {
+unsafe fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: &mut StrBuilder) {
     let init = ast_stmt_str(&iteration.init);
     let cond = ast_stmt_str(&iteration.cond);
     let body = ast_stmt_str(&iteration.body);
     let iter = &iteration.iter;
     let abs = ast_block_str(&iteration.abstract_, "\t");
-    strbuilder_write!(b, "for ({init} {cond} {iter}) [{abs}] {{ {body} }}");
+    strbuilder_write!(*b, "for ({init} {cond} {iter}) [{abs}] {{ {body} }}");
 }
 
 pub unsafe fn ast_stmt_str(stmt: &AstStmt) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     match &stmt.kind {
         AstStmtKind::Labelled(_) => {
-            ast_stmt_labelled_sprint(stmt, b);
+            ast_stmt_labelled_sprint(stmt, &mut b);
         }
         AstStmtKind::Nop => {
-            ast_stmt_nop_sprint(b);
+            ast_stmt_nop_sprint(&mut b);
         }
         AstStmtKind::Expr(expr) => {
-            ast_stmt_expr_sprint(expr, b);
+            ast_stmt_expr_sprint(expr, &mut b);
         }
         AstStmtKind::Compound(compound) => {
-            ast_stmt_compound_sprint(compound, b);
+            ast_stmt_compound_sprint(compound, &mut b);
         }
         AstStmtKind::CompoundV(compound) => {
-            ast_stmt_compound_sprint(compound, b);
+            ast_stmt_compound_sprint(compound, &mut b);
         }
         AstStmtKind::Selection(_) => {
-            ast_stmt_sel_sprint(stmt, b);
+            ast_stmt_sel_sprint(stmt, &mut b);
         }
         AstStmtKind::Iteration(iteration) => {
-            ast_stmt_iter_sprint(iteration, b);
+            ast_stmt_iter_sprint(iteration, &mut b);
         }
         AstStmtKind::IterationE(iteration) => {
-            ast_stmt_iter_sprint(iteration, b);
+            ast_stmt_iter_sprint(iteration, &mut b);
         }
         AstStmtKind::Jump(jump) => {
-            ast_stmt_jump_sprint(jump, b);
+            ast_stmt_jump_sprint(jump, &mut b);
         }
         _ => {
             panic!();
@@ -2367,16 +2367,16 @@ pub unsafe fn ast_stmt_absexec(
     }
 }
 
-unsafe fn ast_stmt_sel_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
+unsafe fn ast_stmt_sel_sprint(stmt: &AstStmt, b: &mut StrBuilder) {
     let AstStmtKind::Selection(selection) = &stmt.kind else {
         panic!();
     };
     let cond = &selection.cond;
     let body = ast_stmt_str(&selection.body);
-    strbuilder_write!(b, "if ({cond}) {{ {body} }}");
+    strbuilder_write!(*b, "if ({cond}) {{ {body} }}");
     if let Some(nest_stmt) = &selection.nest {
         let nest = ast_stmt_str(nest_stmt);
-        strbuilder_write!(b, " else {nest}");
+        strbuilder_write!(*b, " else {nest}");
     }
 }
 
@@ -2427,13 +2427,13 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Result<bool> {
     Ok(nonzero)
 }
 
-unsafe fn ast_stmt_compound_sprint(compound: &AstBlock, b: *mut StrBuilder) {
+unsafe fn ast_stmt_compound_sprint(compound: &AstBlock, b: &mut StrBuilder) {
     let s = ast_block_str(compound, "\t");
-    strbuilder_write!(b, "{s}");
+    strbuilder_write!(*b, "{s}");
 }
 
-unsafe fn ast_stmt_expr_sprint(expr: &AstExpr, b: *mut StrBuilder) {
-    strbuilder_write!(b, "{expr};");
+unsafe fn ast_stmt_expr_sprint(expr: &AstExpr, b: &mut StrBuilder) {
+    strbuilder_write!(*b, "{expr};");
 }
 
 unsafe fn ast_stmt_create(loc: Box<LexemeMarker>, kind: AstStmtKind) -> Box<AstStmt> {
@@ -2466,8 +2466,8 @@ pub unsafe fn ast_stmt_create_iter(
     )
 }
 
-unsafe fn ast_stmt_nop_sprint(b: *mut StrBuilder) {
-    strbuilder_write!(b, ";");
+unsafe fn ast_stmt_nop_sprint(b: &mut StrBuilder) {
+    strbuilder_write!(*b, ";");
 }
 
 pub unsafe fn ast_stmt_iter_body(stmt: &AstStmt) -> &AstStmt {
@@ -2521,12 +2521,12 @@ pub unsafe fn ast_stmt_iter_lower_bound(stmt: &AstStmt) -> &AstExpr {
     ast_expr_assignment_rval(expr)
 }
 
-unsafe fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: *mut StrBuilder) {
+unsafe fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: &mut StrBuilder) {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         panic!();
     };
     let s = ast_stmt_str(&labelled.stmt);
-    strbuilder_write!(b, "{}: {s}", labelled.label);
+    strbuilder_write!(*b, "{}: {s}", labelled.label);
 }
 
 unsafe fn sel_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> Result<*mut Value> {
@@ -2848,17 +2848,17 @@ pub unsafe fn ast_type_copy(t: &AstType) -> Box<AstType> {
 }
 
 pub unsafe fn ast_type_str(t: &AstType) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     strbuilder_write!(b, "{}", mod_str(t.modifiers as libc::c_int));
     match &t.base {
         AstTypeBase::Pointer(ptr_type) => {
-            ast_type_str_build_ptr(b, ptr_type.as_ref().unwrap());
+            ast_type_str_build_ptr(&mut b, ptr_type.as_ref().unwrap());
         }
         AstTypeBase::Array(arr) => {
-            ast_type_str_build_arr(b, arr);
+            ast_type_str_build_arr(&mut b, arr);
         }
         AstTypeBase::Struct(s) => {
-            ast_type_str_build_struct(b, s);
+            ast_type_str_build_struct(&mut b, s);
         }
         AstTypeBase::UserDefined(name) => {
             strbuilder_write!(b, "{name}");
@@ -2906,7 +2906,7 @@ unsafe fn mod_str(mod_0: libc::c_int) -> OwningCStr {
         b"volatile\0" as *const u8 as *const libc::c_char,
     ];
     let modlen: libc::c_int = 7 as libc::c_int;
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     let mut nmods: libc::c_int = 0 as libc::c_int;
     let mut i: libc::c_int = 0 as libc::c_int;
     while i < modlen {
@@ -2929,32 +2929,32 @@ unsafe fn mod_str(mod_0: libc::c_int) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn ast_type_str_build_ptr(b: *mut StrBuilder, ptr_type: &AstType) {
+unsafe fn ast_type_str_build_ptr(b: &mut StrBuilder, ptr_type: &AstType) {
     let base = ast_type_str(ptr_type);
     let space: bool = !matches!(ptr_type.base, AstTypeBase::Pointer(_));
-    strbuilder_write!(b, "{base}{}*", if space { " " } else { "" },);
+    strbuilder_write!(*b, "{base}{}*", if space { " " } else { "" },);
 }
 
-unsafe fn ast_type_str_build_arr(b: *mut StrBuilder, arr: &AstArrayType) {
+unsafe fn ast_type_str_build_arr(b: &mut StrBuilder, arr: &AstArrayType) {
     let base = ast_type_str(&arr.type_);
-    strbuilder_write!(b, "{base}[{}]", arr.length);
+    strbuilder_write!(*b, "{base}[{}]", arr.length);
 }
 
-unsafe fn ast_type_str_build_struct(b: *mut StrBuilder, s: &AstStructType) {
+unsafe fn ast_type_str_build_struct(b: &mut StrBuilder, s: &AstStructType) {
     assert!(s.tag.is_some() || s.members.is_some());
-    strbuilder_write!(b, "struct ");
+    strbuilder_write!(*b, "struct ");
     if let Some(tag) = &s.tag {
-        strbuilder_write!(b, "{tag}");
+        strbuilder_write!(*b, "{tag}");
     }
     let Some(members) = s.members.as_ref() else {
         return;
     };
-    strbuilder_write!(b, " {{ ");
+    strbuilder_write!(*b, " {{ ");
     for field in members.iter() {
         let s = ast_variable_str(field);
-        strbuilder_write!(b, "{s}; ");
+        strbuilder_write!(*b, "{s}; ");
     }
-    strbuilder_write!(b, "}}");
+    strbuilder_write!(*b, "}}");
 }
 
 pub unsafe fn ast_type_ptr_type(t: &AstType) -> Option<&AstType> {
@@ -2979,7 +2979,7 @@ pub unsafe fn ast_variable_arr_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariab
 }
 
 pub unsafe fn ast_variable_str(v: &AstVariable) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     let t = ast_type_str(&v.type_);
     strbuilder_write!(b, "{t} {}", v.name);
     strbuilder_build(b)
@@ -3017,7 +3017,7 @@ pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
 
 impl<'ast> AstFunction<'ast> {
     pub unsafe fn str(&self) -> OwningCStr {
-        let b: *mut StrBuilder = strbuilder_create();
+        let mut b = strbuilder_create();
         if self.is_axiom {
             strbuilder_write!(b, "axiom ");
         }
@@ -3392,7 +3392,7 @@ pub unsafe fn ast_function_buildgraph(fname: &CStr, ext: &Externals) -> FuncGrap
 }
 
 unsafe fn split_name(name: *mut libc::c_char, assumption: &AstExpr) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     strbuilder_write!(b, "{} | {assumption}", cstr!(name));
     strbuilder_build(b)
 }

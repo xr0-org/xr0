@@ -33,7 +33,7 @@ use crate::value::{
 };
 use crate::{
     strbuilder_write, vprintln, AstExpr, AstType, AstVariable, Block, Clump, Externals, Heap,
-    Location, Object, Props, Stack, StaticMemory, StrBuilder, VConst, Value, Variable,
+    Location, Object, Props, Stack, StaticMemory, VConst, Value, Variable,
 };
 
 pub struct State {
@@ -115,7 +115,7 @@ pub unsafe fn state_copywithname(state: &State, func_name: *mut libc::c_char) ->
 }
 
 pub unsafe fn state_str(state: *mut State) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     strbuilder_write!(b, "[[\n");
     let ext = (*(*state).ext).types_str("\t");
     if !ext.is_empty() {

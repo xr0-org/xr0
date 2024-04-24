@@ -15,7 +15,7 @@ use crate::value::{
     value_ptr_create, value_references, value_referencesheap, value_str, value_struct_create,
     value_struct_member, value_struct_membertype,
 };
-use crate::{strbuilder_write, AstExpr, AstType, Location, State, StrBuilder, Value};
+use crate::{strbuilder_write, AstExpr, AstType, Location, State, Value};
 
 pub struct Object {
     pub kind: ObjectKind,
@@ -95,7 +95,7 @@ pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Objec
 }
 
 pub unsafe fn object_str(obj: *mut Object) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     strbuilder_write!(b, "{{");
     strbuilder_write!(b, "{}:", &*(*obj).offset);
     strbuilder_write!(b, "<{}>", inner_str(obj));
@@ -353,7 +353,7 @@ pub unsafe fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range>
 }
 
 pub unsafe fn range_str(r: &Range) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     strbuilder_write!(b, "virt:{}@{}", r.size, location_str(&r.loc));
     strbuilder_build(b)
 }

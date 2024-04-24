@@ -14,8 +14,7 @@ use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, s
 use crate::state::static_memory::{static_memory_getblock, static_memory_hasblock};
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::{
-    strbuilder_write, AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, StrBuilder, VConst,
-    Value,
+    strbuilder_write, AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, VConst, Value,
 };
 
 #[derive(Clone)]
@@ -112,7 +111,7 @@ pub unsafe fn location_destroy(loc: *mut Location) {
 }
 
 pub unsafe fn location_str(loc: &Location) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     match &loc.kind {
         LocationKind::Static => {
             strbuilder_write!(b, "static:");

@@ -1,7 +1,7 @@
 use crate::state::block::{block_create, block_str};
 use crate::state::location::location_copy;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
-use crate::{strbuilder_write, Block, Location, StrBuilder};
+use crate::{strbuilder_write, Block, Location};
 
 pub struct StaticMemory {
     pub blocks: Vec<Box<Block>>,
@@ -18,7 +18,7 @@ impl StaticMemory {
 }
 
 pub unsafe fn static_memory_str(sm: &StaticMemory, indent: &str) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     for (i, block) in sm.blocks.iter().enumerate() {
         strbuilder_write!(b, "{indent}{i}: {}\n", block_str(block));
     }

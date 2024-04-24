@@ -18,10 +18,8 @@ use crate::state::location::{
     location_references, location_referencesheap, location_str, location_transfigure,
 };
 use crate::state::state::{state_getext, state_vconst};
-use crate::util::{strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr};
-use crate::{
-    cstr, strbuilder_write, AstExpr, AstType, AstVariable, Location, Object, State, StrBuilder,
-};
+use crate::util::{strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr, StrBuilder};
+use crate::{cstr, strbuilder_write, AstExpr, AstType, AstVariable, Location, Object, State};
 
 #[derive(Clone)]
 pub struct Value {
@@ -133,7 +131,7 @@ pub unsafe fn value_struct_indefinite_create(
         let field = CStr::from_ptr(field).to_str().unwrap();
 
         let obj: *mut Object = sv.m.get(field).copied().unwrap();
-        let b: *mut StrBuilder = strbuilder_create();
+        let mut b = strbuilder_create();
         strbuilder_write!(b, "{}.{field}", cstr!(comment));
         object_assign(
             obj,
@@ -301,49 +299,49 @@ pub unsafe fn value_destroy(v: *mut Value) {
 }
 
 pub unsafe fn value_str(v: &Value) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     match &v.kind {
         ValueKind::Sync(n) => {
-            value_sync_sprint(n, b);
+            value_sync_sprint(n, &mut b);
         }
         ValueKind::DefinitePtr(loc) => {
-            value_definite_ptr_sprint(loc, b);
+            value_definite_ptr_sprint(loc, &mut b);
         }
         ValueKind::IndefinitePtr(n) => {
-            value_indefinite_ptr_sprint(n, b);
+            value_indefinite_ptr_sprint(n, &mut b);
         }
         ValueKind::Int(n) => {
-            value_int_sprint(n, b);
+            value_int_sprint(n, &mut b);
         }
         ValueKind::Literal(s) => {
             strbuilder_write!(b, "\"{s}\"");
         }
         ValueKind::Struct(sv) => {
-            value_struct_sprint(sv, b);
+            value_struct_sprint(sv, &mut b);
         }
     }
     strbuilder_build(b)
 }
 
-unsafe fn value_sync_sprint(n: &Number, b: *mut StrBuilder) {
-    strbuilder_write!(b, "comp:{}", number_str(n));
+unsafe fn value_sync_sprint(n: &Number, b: &mut StrBuilder) {
+    strbuilder_write!(*b, "comp:{}", number_str(n));
 }
 
-unsafe fn value_definite_ptr_sprint(loc: &Location, b: *mut StrBuilder) {
+unsafe fn value_definite_ptr_sprint(loc: &Location, b: &mut StrBuilder) {
     let s = location_str(loc);
-    strbuilder_write!(b, "ptr:{s}");
+    strbuilder_write!(*b, "ptr:{s}");
 }
 
-unsafe fn value_indefinite_ptr_sprint(n: &Number, b: *mut StrBuilder) {
-    strbuilder_write!(b, "ptr:{}", number_str(n));
+unsafe fn value_indefinite_ptr_sprint(n: &Number, b: &mut StrBuilder) {
+    strbuilder_write!(*b, "ptr:{}", number_str(n));
 }
 
-unsafe fn value_int_sprint(n: &Number, b: *mut StrBuilder) {
-    strbuilder_write!(b, "int:{}", number_str(n));
+unsafe fn value_int_sprint(n: &Number, b: &mut StrBuilder) {
+    strbuilder_write!(*b, "int:{}", number_str(n));
 }
 
-unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
-    strbuilder_write!(b, "struct:{{");
+unsafe fn value_struct_sprint(sv: &StructValue, b: &mut StrBuilder) {
+    strbuilder_write!(*b, "struct:{{");
     let n = sv.members.len();
     for (i, var) in sv.members.iter().enumerate() {
         let f: *mut libc::c_char = ast_variable_name(var);
@@ -355,13 +353,13 @@ unsafe fn value_struct_sprint(sv: &StructValue, b: *mut StrBuilder) {
             OwningCStr::empty()
         };
         strbuilder_write!(
-            b,
+            *b,
             ".{} = <{val_str}>{}",
             cstr!(f),
             if i + 1 < n { ", " } else { "" },
         );
     }
-    strbuilder_write!(b, "}}");
+    strbuilder_write!(*b, "}}");
 }
 
 pub unsafe fn value_islocation(v: &Value) -> bool {
@@ -569,14 +567,14 @@ unsafe fn number_range_up(n: &Number) -> libc::c_int {
 }
 
 unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
-    strbuilder_putc(b, '{' as i32 as libc::c_char);
+    let mut b = strbuilder_create();
+    strbuilder_putc(&mut b, '{' as i32 as libc::c_char);
     let n = ranges.len();
     for (i, range) in ranges.iter().enumerate() {
         let r = number_range_str(range);
         strbuilder_write!(b, "{r}{}", if i + 1 < n { ", " } else { "" });
     }
-    strbuilder_putc(b, '}' as i32 as libc::c_char);
+    strbuilder_putc(&mut b, '}' as i32 as libc::c_char);
     strbuilder_build(b)
 }
 
@@ -683,7 +681,7 @@ unsafe fn number_range_create(lw: NumberValue, up: NumberValue) -> NumberRange {
 }
 
 unsafe fn number_range_str(r: &NumberRange) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     if number_range_issingle(r) {
         strbuilder_write!(b, "{}", number_value_str(&r.lower));
     } else {
@@ -740,7 +738,7 @@ unsafe fn number_value_max_create() -> NumberValue {
 }
 
 unsafe fn number_value_str(v: &NumberValue) -> OwningCStr {
-    let b: *mut StrBuilder = strbuilder_create();
+    let mut b = strbuilder_create();
     match v {
         NumberValue::Constant(k) => {
             strbuilder_write!(b, "{k}");

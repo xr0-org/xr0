@@ -179,31 +179,31 @@ impl Map {
     }
 }
 
-pub unsafe fn strbuilder_create() -> *mut StrBuilder {
-    Box::into_raw(Box::new(StrBuilder {
+pub fn strbuilder_create() -> StrBuilder {
+    StrBuilder {
         s: String::with_capacity(100),
-    }))
+    }
 }
 
-pub unsafe fn strbuilder_build(b: *mut StrBuilder) -> OwningCStr {
-    let mut v = Box::from_raw(b).s.into_bytes();
+pub fn strbuilder_build(b: StrBuilder) -> OwningCStr {
+    let mut v = b.s.into_bytes();
     v.push(0);
     v.shrink_to_fit();
-    OwningCStr::new(v.leak().as_mut_ptr() as *mut libc::c_char)
+    unsafe { OwningCStr::new(v.leak().as_mut_ptr() as *mut libc::c_char) }
 }
 
-pub unsafe fn strbuilder_append_string(b: *mut StrBuilder, s: String) {
-    (*b).s.push_str(&s);
+pub fn strbuilder_append_string(b: &mut StrBuilder, s: String) {
+    b.s.push_str(&s);
 }
 
-pub unsafe fn strbuilder_putc(b: *mut StrBuilder, c: libc::c_char) {
-    (*b).s.push(c as u8 as char);
+pub fn strbuilder_putc(b: &mut StrBuilder, c: libc::c_char) {
+    b.s.push(c as u8 as char);
 }
 
 #[macro_export]
 macro_rules! strbuilder_write {
     ($b:expr, $($fmt:tt)+) => {
-        $crate::util::strbuilder_append_string($b, format!($($fmt)+))
+        $crate::util::strbuilder_append_string(&mut $b, format!($($fmt)+))
     }
 }
 
