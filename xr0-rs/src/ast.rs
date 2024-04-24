@@ -1962,20 +1962,16 @@ pub fn ast_stmt_labelled_stmt(stmt: &AstStmt) -> &AstStmt {
     &labelled.stmt
 }
 
-unsafe fn labelled_absexec(
-    stmt: &AstStmt,
-    state: *mut State,
-    should_setup: bool,
-) -> Result<*mut Value> {
+unsafe fn labelled_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> Result<()> {
     if !ast_stmt_ispre(stmt) {
         let s = ast_stmt_str(stmt);
         panic!("expected precondition, got: {s}");
     }
     let setup = ast_stmt_labelled_stmt(stmt);
-    if !should_setup {
-        return Ok(ptr::null_mut());
+    if should_setup {
+        ast_stmt_absexec(setup, state, should_setup)?;
     }
-    ast_stmt_absexec(setup, state, should_setup)
+    Ok(())
 }
 
 pub fn ast_stmt_copy(stmt: &AstStmt) -> Box<AstStmt> {
@@ -1983,9 +1979,7 @@ pub fn ast_stmt_copy(stmt: &AstStmt) -> Box<AstStmt> {
 }
 
 unsafe fn labelled_setupabsexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
-    // Note: original leaks this value; we drop it instead.
-    let _ = ast_stmt_absexec(stmt, state, true)?;
-    Ok(())
+    ast_stmt_absexec(stmt, state, true)
 }
 
 unsafe fn sel_setupabsexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
@@ -2294,17 +2288,12 @@ unsafe fn sel_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
     false
 }
 
-unsafe fn comp_absexec(
-    stmt: &AstStmt,
-    state: *mut State,
-    should_setup: bool,
-) -> Result<*mut Value> {
+unsafe fn comp_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> Result<()> {
     let b = ast_stmt_as_block(stmt);
     for stmt in &b.stmts {
-        // Note: original leaks these values.
-        let _ = ast_stmt_absexec(stmt, state, should_setup)?;
+        ast_stmt_absexec(stmt, state, should_setup)?;
     }
-    Ok(ptr::null_mut())
+    Ok(())
 }
 
 pub fn ast_stmt_as_block(stmt: &AstStmt) -> &AstBlock {
@@ -2321,7 +2310,7 @@ pub fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
     jump.rv.as_deref()
 }
 
-unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> Result<*mut Value> {
+unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     // Note: Original leaks the expression to avoid a double free.
     let expr = ast_expr_assignment_create(
         ast_expr_identifier_create(OwningCStr::copy_str("return")),
@@ -2330,18 +2319,22 @@ unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> Result<*mut Value> 
     );
     let result = ast_expr_absexec(&expr, state);
     std::mem::forget(expr);
-    result
+    result?;
+    Ok(())
 }
 
 pub unsafe fn ast_stmt_absexec(
     stmt: &AstStmt,
     state: *mut State,
     should_setup: bool,
-) -> Result<*mut Value> {
+) -> Result<()> {
     match &stmt.kind {
-        AstStmtKind::Nop => Ok(ptr::null_mut()),
+        AstStmtKind::Nop => Ok(()),
         AstStmtKind::Labelled(_) => labelled_absexec(stmt, state, should_setup),
-        AstStmtKind::Expr(_) => ast_expr_absexec(ast_stmt_as_expr(stmt), state),
+        AstStmtKind::Expr(_) => {
+            let _ = ast_expr_absexec(ast_stmt_as_expr(stmt), state)?;
+            Ok(())
+        }
         AstStmtKind::Selection(_) => sel_absexec(stmt, state, should_setup),
         AstStmtKind::Iteration(_) => iter_absexec(stmt, state),
         AstStmtKind::Compound(_) => comp_absexec(stmt, state, should_setup),
@@ -2512,13 +2505,13 @@ fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: &mut StrBuilder) {
     strbuilder_write!(*b, "{}: {s}", labelled.label);
 }
 
-unsafe fn sel_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> Result<*mut Value> {
+unsafe fn sel_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> Result<()> {
     let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
     if decision {
         return ast_stmt_absexec(ast_stmt_sel_body(stmt), state, should_setup);
     }
     assert!(ast_stmt_sel_nest(stmt).is_none());
-    Ok(ptr::null_mut())
+    Ok(())
 }
 
 pub fn ast_stmt_sel_nest(stmt: &AstStmt) -> Option<&AstStmt> {
@@ -2578,12 +2571,12 @@ pub fn ast_stmt_iter_upper_bound(stmt: &AstStmt) -> &AstExpr {
     ast_expr_binary_e2(expr)
 }
 
-unsafe fn iter_absexec(stmt: &AstStmt, state: *mut State) -> Result<*mut Value> {
+unsafe fn iter_absexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     let alloc = hack_alloc_from_neteffect(stmt);
     let lw = ast_stmt_iter_lower_bound(stmt);
     let up = ast_stmt_iter_upper_bound(stmt);
     ast_expr_alloc_rangeprocess(alloc, lw, up, state)?;
-    Ok(ptr::null_mut())
+    Ok(())
 }
 
 pub unsafe fn ast_stmt_destroy(stmt: *mut AstStmt) {
