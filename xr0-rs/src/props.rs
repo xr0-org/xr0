@@ -25,23 +25,23 @@ impl Props {
         strbuilder_build(b)
     }
 
-    pub unsafe fn install(&mut self, e: Box<AstExpr>) {
+    pub fn install(&mut self, e: Box<AstExpr>) {
         if self.contradicts(&e) {
             panic!();
         }
         self.props.push(e);
     }
 
-    pub unsafe fn get(&mut self, e: &AstExpr) -> bool {
+    pub fn get(&mut self, e: &AstExpr) -> bool {
         self.props.iter().any(|prop| ast_expr_equal(e, prop))
     }
 
-    pub unsafe fn contradicts(&self, p1: &AstExpr) -> bool {
+    pub fn contradicts(&self, p1: &AstExpr) -> bool {
         let not_p1 = ast_expr_inverted_copy(p1, true);
         self.contradicts_actual(p1, &not_p1)
     }
 
-    unsafe fn contradicts_actual(&self, p1: &AstExpr, not_p1: &AstExpr) -> bool {
+    fn contradicts_actual(&self, p1: &AstExpr, not_p1: &AstExpr) -> bool {
         self.props.iter().any(|p2| {
             let not_p2 = ast_expr_inverted_copy(p2, true);
             ast_expr_equal(p1, &not_p2) || ast_expr_equal(not_p1, p2)

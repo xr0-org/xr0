@@ -28,7 +28,7 @@ impl StaticMemory {
         strbuilder_build(b)
     }
 
-    pub unsafe fn new_block(&mut self) -> libc::c_int {
+    pub fn new_block(&mut self) -> libc::c_int {
         let address = self.blocks.len() as libc::c_int;
         self.blocks.push(block_create());
         address
@@ -38,7 +38,7 @@ impl StaticMemory {
         (address as usize) < self.blocks.len()
     }
 
-    pub unsafe fn get_block(&mut self, address: libc::c_int) -> Option<&mut Block> {
+    pub fn get_block(&mut self, address: libc::c_int) -> Option<&mut Block> {
         self.blocks
             .get_mut(address as usize)
             .map(|block| &mut **block)

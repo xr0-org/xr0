@@ -46,7 +46,7 @@ impl Location {
 }
 
 #[allow(dead_code)]
-pub unsafe fn location_create_vconst(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+pub fn location_create_vconst(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
     Box::new(Location {
         kind: LocationKind::VConst,
         block,
@@ -54,10 +54,7 @@ pub unsafe fn location_create_vconst(block: libc::c_int, offset: Box<AstExpr>) -
     })
 }
 
-pub unsafe fn location_create_dereferencable(
-    block: libc::c_int,
-    offset: Box<AstExpr>,
-) -> Box<Location> {
+pub fn location_create_dereferencable(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
     Box::new(Location {
         kind: LocationKind::Dereferencable,
         block,
@@ -65,7 +62,7 @@ pub unsafe fn location_create_dereferencable(
     })
 }
 
-pub unsafe fn location_create_static(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+pub fn location_create_static(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
     Box::new(Location {
         kind: LocationKind::Static,
         block,
@@ -73,7 +70,7 @@ pub unsafe fn location_create_static(block: libc::c_int, offset: Box<AstExpr>) -
     })
 }
 
-pub unsafe fn location_create_dynamic(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+pub fn location_create_dynamic(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
     Box::new(Location {
         kind: LocationKind::Dynamic,
         block,
@@ -81,7 +78,7 @@ pub unsafe fn location_create_dynamic(block: libc::c_int, offset: Box<AstExpr>) 
     })
 }
 
-pub unsafe fn location_create_automatic(
+pub fn location_create_automatic(
     frame: libc::c_int,
     block: libc::c_int,
     offset: Box<AstExpr>,
@@ -136,15 +133,15 @@ fn offsetzero(loc: &Location) -> bool {
     ast_expr_equal(&loc.offset, &zero)
 }
 
-pub unsafe fn location_offset(loc: &Location) -> &AstExpr {
+pub fn location_offset(loc: &Location) -> &AstExpr {
     &loc.offset
 }
 
-pub unsafe fn location_copy(loc: &Location) -> Box<Location> {
+pub fn location_copy(loc: &Location) -> Box<Location> {
     Box::new(loc.clone())
 }
 
-pub unsafe fn location_with_offset(loc: &Location, offset: &AstExpr) -> Box<Location> {
+pub fn location_with_offset(loc: &Location, offset: &AstExpr) -> Box<Location> {
     if !offsetzero(loc) {
         panic!();
     }
@@ -153,7 +150,7 @@ pub unsafe fn location_with_offset(loc: &Location, offset: &AstExpr) -> Box<Loca
     copy
 }
 
-pub unsafe fn location_tostatic(loc: &Location, sm: &StaticMemory) -> bool {
+pub fn location_tostatic(loc: &Location, sm: &StaticMemory) -> bool {
     let type_equal = matches!(loc.kind, LocationKind::Static);
     type_equal && sm.has_block(loc.block)
 }
@@ -170,7 +167,7 @@ pub unsafe fn location_tostack(loc: &Location, s: *mut Stack) -> bool {
     type_equal && !b.is_null()
 }
 
-pub unsafe fn location_toclump(loc: &Location, c: &mut Clump) -> bool {
+pub fn location_toclump(loc: &Location, c: &mut Clump) -> bool {
     let type_equal = matches!(loc.kind, LocationKind::Dereferencable);
     let b = c.get_block(loc.block);
     type_equal && b.is_some()
