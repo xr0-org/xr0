@@ -264,9 +264,9 @@ impl OwningCStr {
         OwningCStr { ptr }
     }
 
-    pub unsafe fn empty() -> Self {
+    pub fn empty() -> Self {
         OwningCStr {
-            ptr: dynamic_str(b"\0" as *const u8 as *const libc::c_char),
+            ptr: unsafe { dynamic_str(b"\0" as *const u8 as *const libc::c_char) },
         }
     }
 

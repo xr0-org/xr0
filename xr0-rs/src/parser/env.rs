@@ -72,7 +72,7 @@ impl Env {
         (region_filename, line, column)
     }
 
-    pub unsafe fn lexloc(&self, p: usize) -> Box<LexemeMarker> {
+    pub fn lexloc(&self, p: usize) -> Box<LexemeMarker> {
         let (file, line, column) = self.file_line_column(p);
         let filename = OwningCStr::copy_str(&file.display().to_string());
         Box::new(LexemeMarker {
@@ -83,12 +83,12 @@ impl Env {
         })
     }
 
-    pub unsafe fn add_typename(&self, name: &str) {
+    pub fn add_typename(&self, name: &str) {
         let mut typenames = self.typenames.borrow_mut();
         typenames.insert(name.to_string());
     }
 
-    pub unsafe fn is_typename(&self, name: &str) -> bool {
+    pub fn is_typename(&self, name: &str) -> bool {
         let typenames = self.typenames.borrow();
         typenames.contains(name)
     }

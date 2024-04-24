@@ -38,7 +38,7 @@ enum PostfixOp {
     Dec,
 }
 
-unsafe fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<Box<AstVariable>> {
+fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<Box<AstVariable>> {
     decls
         .into_iter()
         .map(|decl| ast_variable_create(decl.name.unwrap(), decl.t))
@@ -72,7 +72,7 @@ pub grammar c_parser(env: &Env) for str {
     rule identifier() -> OwningCStr =
         n:quiet! { $(['_' | 'a'..='z' | 'A'..='Z'] ['_' | 'a'..='z' | 'A'..='Z' | '0'..='9']*) } {?
             if !env.reserved.contains(n) {
-                Ok(unsafe { OwningCStr::copy_str(n) })
+                Ok(OwningCStr::copy_str(n))
             } else {
                 Err("identifier")
             }
@@ -88,7 +88,7 @@ pub grammar c_parser(env: &Env) for str {
         numeric_constant() / character_constant()
 
     rule numeric_constant() -> Box<AstExpr> =
-        n:quiet! { integer_number() } { unsafe { ast_expr_constant_create(n) } } /
+        n:quiet! { integer_number() } { ast_expr_constant_create(n) } /
         expected!("number")
 
     rule integer_number() -> libc::c_int =
@@ -98,9 +98,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule character_constant() -> Box<AstExpr> =
         c:quiet! { $("'" character()+ "'") } {
-            unsafe {
-                ast_expr_constant_create_char(parse_char(c))
-            }
+            ast_expr_constant_create_char(parse_char(c))
         } /
         expected!("character")
 
@@ -109,9 +107,7 @@ pub grammar c_parser(env: &Env) for str {
     // String literals
     rule string_literal() -> Box<AstExpr> =
         "\"" a:$(string_char()*) "\"" {
-            unsafe {
-                ast_expr_literal_create(OwningCStr::copy_str(a))
-            }
+            ast_expr_literal_create(OwningCStr::copy_str(a))
         }
 
     rule string_char() = [^ '"' | '\\' | '\n'] / "\\" [^ '\n']
@@ -119,10 +115,10 @@ pub grammar c_parser(env: &Env) for str {
     // 6.5.1 Primary expression
     rule primary_expression() -> Box<AstExpr> =
         a:identifier() {
-            unsafe { ast_expr_identifier_create(a) }
+            ast_expr_identifier_create(a)
         } /
         "$" {
-            unsafe { ast_expr_arbarg_create() }
+            ast_expr_arbarg_create()
         } /
         constant() /
         string_literal() /
@@ -131,37 +127,35 @@ pub grammar c_parser(env: &Env) for str {
     // 6.5.2 Postfix operators
     rule postfix_expression() -> Box<AstExpr> =
         a:primary_expression() ops:postfix_op()* {
-            unsafe {
-                let mut a = a;
-                for op in ops {
-                    a = match op {
-                        PostfixOp::ArrayAccess(i) =>
+            let mut a = a;
+            for op in ops {
+                a = match op {
+                    PostfixOp::ArrayAccess(i) =>
+                        ast_expr_unary_create(
+                            ast_expr_binary_create(a, AstBinaryOp::Addition, i),
+                            AstUnaryOp::Dereference,
+                        ),
+                    PostfixOp::Call(args) =>
+                        ast_expr_call_create(a, args),
+                    PostfixOp::Dot(name) =>
+                        ast_expr_member_create(a, name),
+                    PostfixOp::Arrow(name) =>
+                        ast_expr_member_create(
                             ast_expr_unary_create(
-                                ast_expr_binary_create(a, AstBinaryOp::Addition, i),
-                                AstUnaryOp::Dereference,
-                            ),
-                        PostfixOp::Call(args) =>
-                            ast_expr_call_create(a, args),
-                        PostfixOp::Dot(name) =>
-                            ast_expr_member_create(a, name),
-                        PostfixOp::Arrow(name) =>
-                            ast_expr_member_create(
-                                ast_expr_unary_create(
-                                    ast_expr_binary_create(
-                                        a,
-                                        AstBinaryOp::Addition,
-                                        ast_expr_constant_create(0)
-                                    ),
-                                    AstUnaryOp::Dereference
+                                ast_expr_binary_create(
+                                    a,
+                                    AstBinaryOp::Addition,
+                                    ast_expr_constant_create(0)
                                 ),
-                                name,
+                                AstUnaryOp::Dereference
                             ),
-                        PostfixOp::Inc => ast_expr_incdec_create(a, true, false),
-                        PostfixOp::Dec => ast_expr_incdec_create(a, false, false),
-                    };
-                }
-                a
+                            name,
+                        ),
+                    PostfixOp::Inc => ast_expr_incdec_create(a, true, false),
+                    PostfixOp::Dec => ast_expr_incdec_create(a, false, false),
+                };
             }
+            a
         } /
         allocation_expression()
 
@@ -175,25 +169,25 @@ pub grammar c_parser(env: &Env) for str {
         _ "--" { PostfixOp::Dec }
 
     rule allocation_expression() -> Box<AstExpr> =
-        ".malloc" _ "(" a:expression() ")" { unsafe { ast_expr_alloc_create(a) } } /
-        ".free" _ "(" a:expression() ")" { unsafe { ast_expr_dealloc_create(a) } } /
-        ".clump" _ "(" a:expression() ")" { unsafe { ast_expr_clump_create(a) } }
+        ".malloc" _ "(" a:expression() ")" { ast_expr_alloc_create(a) } /
+        ".free" _ "(" a:expression() ")" { ast_expr_dealloc_create(a) } /
+        ".clump" _ "(" a:expression() ")" { ast_expr_clump_create(a) }
 
     rule argument_expression_list() -> Vec<Box<AstExpr>> =
         args:cs1(<assignment_expression()>) { args }
 
     rule isdeallocand_expression() -> Box<AstExpr> =
         postfix_expression() /
-        "@" _ a:isdeallocand_expression() { unsafe { ast_expr_isdeallocand_create(a) } } /
-        "$" _ a:isdeallocand_expression() { unsafe { ast_expr_isdereferencable_create(a) } }
+        "@" _ a:isdeallocand_expression() { ast_expr_isdeallocand_create(a) } /
+        "$" _ a:isdeallocand_expression() { ast_expr_isdereferencable_create(a) }
 
     // 6.5.3 Unary operators
     rule unary_expression() -> Box<AstExpr> =
         isdeallocand_expression() /
-        "++" _ a:unary_expression() { unsafe { ast_expr_incdec_create(a, true, true) } } /
-        "--" _ a:unary_expression() { unsafe { ast_expr_incdec_create(a, false, true) } } /
-        op:unary_operator() _ e:cast_expression() { unsafe { ast_expr_unary_create(e, op) } } /
-        "sizeof" _ "(" _ ty:type_name() _ ")" { unsafe { ast_expr_constant_create(1) /* XXX */ } }
+        "++" _ a:unary_expression() { ast_expr_incdec_create(a, true, true) } /
+        "--" _ a:unary_expression() { ast_expr_incdec_create(a, false, true) } /
+        op:unary_operator() _ e:cast_expression() { ast_expr_unary_create(e, op) } /
+        "sizeof" _ "(" _ ty:type_name() _ ")" { ast_expr_constant_create(1) /* XXX */ }
 
     rule unary_operator() -> AstUnaryOp =
         "&" !"&" { AstUnaryOp::Address } /
@@ -212,16 +206,16 @@ pub grammar c_parser(env: &Env) for str {
         --
         x:(@) _ "&&" _ y:@ { x }
         --
-        x:(@) _ "==" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Eq, y) } }
-        x:(@) _ "!=" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Ne, y) } }
+        x:(@) _ "==" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Eq, y) }
+        x:(@) _ "!=" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Ne, y) }
         --
-        x:(@) _ "<" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Lt, y) } }
-        x:(@) _ ">" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Gt, y) } }
-        x:(@) _ "<=" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Le, y) } }
-        x:(@) _ ">=" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Ge, y) } }
+        x:(@) _ "<" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Lt, y) }
+        x:(@) _ ">" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Gt, y) }
+        x:(@) _ "<=" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Le, y) }
+        x:(@) _ ">=" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Ge, y) }
         --
-        x:(@) _ "+" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Addition, y) } }
-        x:(@) _ "-" _ y:@ { unsafe { ast_expr_binary_create(x, AstBinaryOp::Subtraction, y) } }
+        x:(@) _ "+" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Addition, y) }
+        x:(@) _ "-" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Subtraction, y) }
         --
         x:(@) _ "*" _ y:@ { x }
         x:(@) _ "/" _ y:@ { x }
@@ -235,7 +229,7 @@ pub grammar c_parser(env: &Env) for str {
     // 6.5.16 Assignment operators
     rule assignment_expression() -> Box<AstExpr> =
         a:unary_expression() _ assignment_operator() _ b:assignment_expression() {
-            unsafe { ast_expr_assignment_create(a, b) }
+            ast_expr_assignment_create(a, b)
         } /
         conditional_expression()
 
@@ -261,25 +255,23 @@ pub grammar c_parser(env: &Env) for str {
             }
         } /
         t:declaration_specifiers() _ v:declarator() _ ";" {
-            unsafe {
-                let is_typedef = t.modifiers & MOD_TYPEDEF != 0;
+            let is_typedef = t.modifiers & MOD_TYPEDEF != 0;
 
-                let mut t = t;
-                for _ in 0..v.ptr_valence {
-                    t = ast_type_create_ptr(t);
-                }
-                if is_typedef {
-                    // Note: I think the original doesn't check for null here, so you can probably
-                    // crash it with `typedef int;` Certainly the handler for `declaration :
-                    // declaration_specifiers init_declarator_list ';'` in the original can create
-                    // a `struct declaration` with null `.name`, and I am sure it's not checked for
-                    // everywhere.
-                    if let Some(name) = &v.name {
-                        env.add_typename(name.as_str());
-                    }
-                }
-                Declaration { name: v.name, t }
+            let mut t = t;
+            for _ in 0..v.ptr_valence {
+                t = ast_type_create_ptr(t);
             }
+            if is_typedef {
+                // Note: I think the original doesn't check for null here, so you can probably
+                // crash it with `typedef int;` Certainly the handler for `declaration :
+                // declaration_specifiers init_declarator_list ';'` in the original can create
+                // a `struct declaration` with null `.name`, and I am sure it's not checked for
+                // everywhere.
+                if let Some(name) = &v.name {
+                    env.add_typename(name.as_str());
+                }
+            }
+            Declaration { name: v.name, t }
         }
 
     rule declaration_modifier() -> AstTypeModifier =
@@ -291,9 +283,7 @@ pub grammar c_parser(env: &Env) for str {
         type_specifier() _ t:declaration_specifiers() { t } /
         m:declaration_modifier() _ s:declaration_specifiers() {
             let mut s = s;
-            unsafe {
-                ast_type_mod_or(&mut s, m);
-            }
+            ast_type_mod_or(&mut s, m);
             s
         }
 
@@ -314,32 +304,30 @@ pub grammar c_parser(env: &Env) for str {
         K(<"register">) { MOD_REGISTER }
 
     rule type_specifier() -> Box<AstType> =
-        K(<"void">) { unsafe { ast_type_create(AstTypeBase::Void, 0) } } /
-        K(<"char">) { unsafe { ast_type_create(AstTypeBase::Char, 0) } } /
-        K(<"int">) { unsafe { ast_type_create(AstTypeBase::Int, 0) } } /
+        K(<"void">) { ast_type_create(AstTypeBase::Void, 0) } /
+        K(<"char">) { ast_type_create(AstTypeBase::Char, 0) } /
+        K(<"int">) { ast_type_create(AstTypeBase::Int, 0) } /
         struct_or_union_specifier() /
-        t:typedef_name() { unsafe { ast_type_create_userdef(t) } }
+        t:typedef_name() { ast_type_create_userdef(t) }
 
     rule typedef_name() -> OwningCStr = i:identifier() {?
-        unsafe {
-            if env.is_typename(i.as_str()) {
-                Ok(i)
-            } else {
-                Err("<unused>")
-            }
+        if env.is_typename(i.as_str()) {
+            Ok(i)
+        } else {
+            Err("<unused>")
         }
     }
 
     // note: unions are unsupported in the original
     rule struct_or_union_specifier() -> Box<AstType> =
         "struct" _ tag:identifier() _ "{" _ fields:struct_declaration_list() _ "}" {
-            unsafe { ast_type_create_struct(Some(tag), Some(Box::new(fields))) }
+            ast_type_create_struct(Some(tag), Some(Box::new(fields)))
         } /
         "struct" _ "{" _ fields:struct_declaration_list() _ "}" {
-            unsafe { ast_type_create_struct_anonym(fields) }
+            ast_type_create_struct_anonym(fields)
         } /
         "struct" _ tag:identifier() {
-            unsafe { ast_type_create_struct_partial(tag) }
+            ast_type_create_struct_partial(tag)
         }
 
     rule struct_declaration_list() -> Vec<Box<AstVariable>> =
@@ -348,7 +336,7 @@ pub grammar c_parser(env: &Env) for str {
     rule struct_declaration() -> Box<AstVariable> =
         d:declaration() {?
             if let Some(name) = d.name {
-                Ok(unsafe { ast_variable_create(name, d.t) })
+                Ok(ast_variable_create(name, d.t))
             } else {
                 Err("variable with no name")
             }
@@ -368,9 +356,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule direct_function_declarator() -> DirectFunctionDeclarator =
         name:identifier() _ "(" _ params:parameter_type_list() _ ")" {
-            unsafe {
-                DirectFunctionDeclarator { name, params }
-            }
+            DirectFunctionDeclarator { name, params }
         } /
         name:identifier() _ "(" _ ")" {
             DirectFunctionDeclarator { name, params: vec![] }
@@ -399,17 +385,15 @@ pub grammar c_parser(env: &Env) for str {
 
     rule parameter_declaration() -> Box<AstVariable> =
         t:declaration_specifiers() _ decl:declarator() {
-            unsafe {
-                let mut t = t;
-                for _ in 0..decl.ptr_valence {
-                    t = ast_type_create_ptr(t);
-                }
-                let name = decl.name.unwrap_or(OwningCStr::empty());
-                ast_variable_create(name, t)
+            let mut t = t;
+            for _ in 0..decl.ptr_valence {
+                t = ast_type_create_ptr(t);
             }
+            let name = decl.name.unwrap_or(OwningCStr::empty());
+            ast_variable_create(name, t)
         } /
         t:declaration_specifiers() {
-            unsafe { ast_variable_create(OwningCStr::empty(), t) }
+            ast_variable_create(OwningCStr::empty(), t)
         }
 
     rule type_name() -> Box<AstType> =
@@ -421,7 +405,7 @@ pub grammar c_parser(env: &Env) for str {
     rule statement() -> Box<AstStmt> =
         labelled_statement() /
         block:compound_statement() p:position!() {
-            unsafe { ast_stmt_create_compound(env.lexloc(p), block) }
+            ast_stmt_create_compound(env.lexloc(p), block)
         } /
         expression_statement() /
         selection_statement() /
@@ -429,7 +413,7 @@ pub grammar c_parser(env: &Env) for str {
         jump_statement() /
         iteration_effect_statement() /
         v:compound_verification_statement() p:position!() {
-            unsafe { ast_stmt_create_compound_v(env.lexloc(p), v) }
+            ast_stmt_create_compound_v(env.lexloc(p), v)
         }
 
     rule specifier_qualifier_list() -> Box<AstType> =
@@ -438,18 +422,18 @@ pub grammar c_parser(env: &Env) for str {
         // Note: original is I guess UB? type confusion
         type_qualifier() _ t:specifier_qualifier_list() { t } /
         type_qualifier() {
-            unsafe { ast_type_create(AstTypeBase::Int, 0) }
+            ast_type_create(AstTypeBase::Int, 0)
         }
 
     rule labelled_statement() -> Box<AstStmt> =
         label:identifier() _ ":" _ s:statement() p:position!() {
-            unsafe { ast_stmt_create_labelled(env.lexloc(p), label, s) }
+            ast_stmt_create_labelled(env.lexloc(p), label, s)
         } /
         K(<"case">) _ constant_expression() _ ":" _ statement() p:position!() {
-            unsafe { ast_stmt_create_nop(env.lexloc(p)) }
+            ast_stmt_create_nop(env.lexloc(p))
         } /
         K(<"default">) _ ":" _ statement() p:position!() {
-            unsafe { ast_stmt_create_nop(env.lexloc(p)) }
+            ast_stmt_create_nop(env.lexloc(p))
         }
 
     rule compound_statement() -> Box<AstBlock> =
@@ -457,16 +441,16 @@ pub grammar c_parser(env: &Env) for str {
 
     rule block() -> Box<AstBlock> =
         d:declaration_list() _ s:statement_list() {
-            unsafe { ast_block_create(d, s) }
+            ast_block_create(d, s)
         } /
         d:declaration_list() {
-            unsafe { ast_block_create(d, vec![]) }
+            ast_block_create(d, vec![])
         } /
         s:statement_list() {
-            unsafe { ast_block_create(vec![], s) }
+            ast_block_create(vec![], s)
         } /
         /* empty */ {
-            unsafe { ast_block_create(vec![], vec![]) }
+            ast_block_create(vec![], vec![])
         }
 
     rule iteration_effect_statement() -> Box<AstStmt> =
@@ -474,55 +458,53 @@ pub grammar c_parser(env: &Env) for str {
 
     rule compound_verification_statement() -> Box<AstBlock> =
         "~" _ "[" _ "]" {
-            unsafe { ast_block_create(vec![], vec![]) }
+            ast_block_create(vec![], vec![])
         } /
         "~" _ "[" _ b:block() _ "]" {
             b
         }
 
     rule declaration_list() -> Vec<Box<AstVariable>> =
-        decls:list1(<declaration()>) { unsafe { variable_array_from_decl_vec(decls) } }
+        decls:list1(<declaration()>) { variable_array_from_decl_vec(decls) }
 
     rule statement_list() -> Vec<Box<AstStmt>> =
         stmts:list1(<statement()>) { stmts }
 
     rule expression_statement() -> Box<AstStmt> =
-        ";" p:position!() { unsafe { ast_stmt_create_nop(env.lexloc(p)) } } /
-        e:expression() _ ";" p:position!() { unsafe { ast_stmt_create_expr(env.lexloc(p), e) } }
+        ";" p:position!() { ast_stmt_create_nop(env.lexloc(p)) } /
+        e:expression() _ ";" p:position!() { ast_stmt_create_expr(env.lexloc(p), e) }
 
     rule selection_statement() -> Box<AstStmt> =
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() p:position!() {
-            unsafe {
-                let neg_cond = ast_expr_unary_create(ast_expr_copy(&cond), AstUnaryOp::Bang);
-                let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, neg_cond, alt, None);
-                ast_stmt_create_sel(env.lexloc(p), false, cond, then, Some(else_stmt))
-            }
+            let neg_cond = ast_expr_unary_create(ast_expr_copy(&cond), AstUnaryOp::Bang);
+            let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, neg_cond, alt, None);
+            ast_stmt_create_sel(env.lexloc(p), false, cond, then, Some(else_stmt))
         } /
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() p:position!() {
-            unsafe { ast_stmt_create_sel(env.lexloc(p), false, cond, then, None) }
+            ast_stmt_create_sel(env.lexloc(p), false, cond, then, None)
         } /
         K(<"switch">) _ "(" _ v:expression() _ ")" _ cases:statement() p:position!() {
-            unsafe { ast_stmt_create_nop(env.lexloc(p)) }
+            ast_stmt_create_nop(env.lexloc(p))
         }
 
     rule optional_compound_verification() -> Box<AstBlock> =
         vs:compound_verification_statement()? {
             vs.unwrap_or_else(|| {
-                unsafe { ast_block_create(vec![], vec![]) }
+                ast_block_create(vec![], vec![])
             })
         }
 
     rule for_iteration_statement(as_iteration_e: bool) -> Box<AstStmt> =
         K(<"for">) _ "(" _ init:expression_statement() _ cond:expression_statement() _ iter:expression() _ ")" _
         verif:optional_compound_verification() _ body:statement() p:position!() {
-            unsafe { ast_stmt_create_iter(env.lexloc(p), init, cond, iter, verif, body, as_iteration_e) }
+            ast_stmt_create_iter(env.lexloc(p), init, cond, iter, verif, body, as_iteration_e)
         }
 
     rule iteration_statement() -> Box<AstStmt> = for_iteration_statement(false)
 
     rule jump_statement() -> Box<AstStmt> =
         K(<"return">) _ expr:expression() _ ";" p:position!() {
-            unsafe { ast_stmt_create_jump(env.lexloc(p), AstJumpKind::Return, Some(expr)) }
+            ast_stmt_create_jump(env.lexloc(p), AstJumpKind::Return, Some(expr))
         }
 
     rule block_statement() -> BlockStatement =
@@ -541,66 +523,60 @@ pub grammar c_parser(env: &Env) for str {
 
     rule function_definition() -> BoxedFunction =
         K(<"axiom">) _ t:declaration_specifiers() _ decl:function_declarator() _ body:block_statement() {
-            unsafe {
-                let mut t = t;
-                for _ in 0..decl.ptr_valence {
-                    t = ast_type_create_ptr(t);
-                }
-                ast_function_create(
-                    true,
-                    t,
-                    decl.decl.name,
-                    decl.decl.params,
-                    body.abstract_.unwrap_or_else(||
-                        ast_block_create(vec![], vec![])),
-                    body.body.map(SemiBox::Owned),
-                )
+            let mut t = t;
+            for _ in 0..decl.ptr_valence {
+                t = ast_type_create_ptr(t);
             }
+            ast_function_create(
+                true,
+                t,
+                decl.decl.name,
+                decl.decl.params,
+                body.abstract_.unwrap_or_else(||
+                                              ast_block_create(vec![], vec![])),
+                body.body.map(SemiBox::Owned),
+            )
         } /
         t:declaration_specifiers() _ decl:function_declarator() _ body:block_statement() {
-            unsafe {
-                let mut t = t;
-                for _ in 0..decl.ptr_valence {
-                    t = ast_type_create_ptr(t);
-                }
-                ast_function_create(
-                    false,
-                    t,
-                    decl.decl.name,
-                    decl.decl.params,
-                    body.abstract_.unwrap_or_else(||
-                        ast_block_create(vec![], vec![])),
-                    body.body.map(SemiBox::Owned),
-                )
+            let mut t = t;
+            for _ in 0..decl.ptr_valence {
+                t = ast_type_create_ptr(t);
             }
+            ast_function_create(
+                false,
+                t,
+                decl.decl.name,
+                decl.decl.params,
+                body.abstract_.unwrap_or_else(||
+                                              ast_block_create(vec![], vec![])),
+                body.body.map(SemiBox::Owned),
+            )
         } /
         // Note: this was in the original. surely shouldn't be allowed, and implicit return type
         // should be int if it is allowed.
         decl:function_declarator() _ body:block_statement() {
-            unsafe {
-                ast_function_create(
-                    false,
-                    ast_type_create(AstTypeBase::Void, 0),
-                    decl.decl.name,
-                    decl.decl.params,
-                    body.abstract_.unwrap_or_else(||
-                        ast_block_create(vec![], vec![])),
-                    body.body.map(SemiBox::Owned),
-                )
-            }
+            ast_function_create(
+                false,
+                ast_type_create(AstTypeBase::Void, 0),
+                decl.decl.name,
+                decl.decl.params,
+                body.abstract_.unwrap_or_else(||
+                                              ast_block_create(vec![], vec![])),
+                body.body.map(SemiBox::Owned),
+            )
         }
 
     rule external_declaration() -> Box<AstExternDecl> =
-        f:function_definition() { unsafe { ast_functiondecl_create(f) } } /
+        f:function_definition() { ast_functiondecl_create(f) } /
         d:declaration() {?
             if let Some(name) = d.name {
-                Ok(unsafe { ast_decl_create(name, d.t) })
+                Ok(ast_decl_create(name, d.t))
             } else {
                 Err("global declaration with no name")
             }
         }
 
     pub rule translation_unit() -> Box<Ast> =
-        directive()? _ decl:list1(<external_declaration()>) _ { unsafe { ast_from_vec(decl) } }
+        directive()? _ decl:list1(<external_declaration()>) _ { ast_from_vec(decl) }
 }
 }
