@@ -782,21 +782,21 @@ static struct result *
 call_absexec(struct ast_expr *expr, struct state *s)
 {
 	assert(false);
-	struct ast_expr *root = ast_expr_call_root(expr);
-	/* TODO: function-valued-expressions */
-	char *name = ast_expr_as_identifier(root);
+	/*struct ast_expr *root = ast_expr_call_root(expr);*/
+	/*[> TODO: function-valued-expressions <]*/
+	/*char *name = ast_expr_as_identifier(root);*/
 
-	struct ast_function *f = externals_getfunc(state_getext(s), name);
-	if (!f) {
-		return result_error_create(
-			error_printf("function `%s' not found", name)
-		);
-	}
-	struct result *res = ast_function_absexec(f, s);
-	if (result_iserror(res) || result_hasvalue(res)) {
-		return res;
-	}
-	return call_arbitraryresult(expr, f, s);
+	/*struct ast_function *f = externals_getfunc(state_getext(s), name);*/
+	/*if (!f) {*/
+		/*return result_error_create(*/
+			/*error_printf("function `%s' not found", name)*/
+		/*);*/
+	/*}*/
+	/*struct result *res = ast_function_absexec(f, s);*/
+	/*if (result_iserror(res) || result_hasvalue(res)) {*/
+		/*return res;*/
+	/*}*/
+	/*return call_arbitraryresult(expr, f, s);*/
 }
 
 static struct error *
@@ -1504,6 +1504,8 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 		return expr;
 	case EXPR_UNARY:
 		return unary_geninstr(expr, loc, b, s);
+	case EXPR_BRACKETED:
+		assert(false);
 	case EXPR_BINARY:
 		return binary_geninstr(expr, loc, b, s);
 	case EXPR_ALLOCATION:
