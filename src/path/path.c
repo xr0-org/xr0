@@ -7,6 +7,7 @@
 #include "object.h"
 #include "state.h"
 #include "path.h"
+#include "value.h"
 
 struct path {
 	enum path_state {
@@ -395,10 +396,14 @@ path_step_actual(struct path *p, bool print)
 	return state_stacktrace(p->actual, err);
 }
 
+static void
+hack_preserve_behaviour(struct path *);
+
 static struct error *
 path_audit(struct path *p)
 {
 	v_printf("audit\n");
+	hack_preserve_behaviour(p);
 	if (state_hasgarbage(p->actual)) {
 		v_printf("actual: %s", state_str(p->actual));
 		return error_printf(
@@ -415,6 +420,16 @@ path_audit(struct path *p)
 	}
 	p->path_state = PATH_STATE_ATEND;
 	return NULL;
+}
+
+static void
+hack_preserve_behaviour(struct path *p)
+{
+	struct value *r_abstract = state_readregister(p->abstract),
+		     *r_actual = state_readregister(p->actual);
+	if (r_actual && !r_abstract) {
+		state_writeregister(p->abstract, value_int_create(0));
+	}
 }
 
 static struct error *

@@ -232,7 +232,7 @@ state_vconst(struct state *state, struct ast_type *t, char *comment, bool persis
 }
 
 struct value *
-state_readregister(struct state *state)
+state_popregister(struct state *state)
 {
 	//v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
 	if (!state->reg) {
@@ -243,6 +243,13 @@ state_readregister(struct state *state)
 		state->reg = NULL;
 	}
 	return v;
+}
+
+struct value *
+state_readregister(struct state *state)
+{
+	//v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
+	return state->reg;
 }
 
 void

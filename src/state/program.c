@@ -187,7 +187,6 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 	}
 	struct error *return_err = error_to_return(err);
 	if (return_err) {
-		printf("RETURN\n");
 		state_return(s);
 		return NULL;
 	}
