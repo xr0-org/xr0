@@ -187,7 +187,7 @@ pub unsafe fn state_vconst(
         return v;
     }
     let c = vconst_declare(&mut (*state).vconst, v, comment, persist);
-    value_sync_create(Box::into_raw(ast_expr_identifier_create(c)))
+    value_sync_create(ast_expr_identifier_create(c))
 }
 
 pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value {

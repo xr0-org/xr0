@@ -15,8 +15,7 @@ use crate::object::{
     object_value_create,
 };
 use crate::state::location::{
-    location_copy, location_destroy, location_references, location_referencesheap, location_str,
-    location_transfigure,
+    location_copy, location_references, location_referencesheap, location_str, location_transfigure,
 };
 use crate::state::state::{state_getext, state_vconst};
 use crate::util::{strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr};
@@ -48,9 +47,10 @@ pub struct Number {
     pub kind: NumberKind,
 }
 
+#[derive(Clone)]
 pub enum NumberKind {
     Ranges(Vec<NumberRange>),
-    Computed(*mut AstExpr),
+    Computed(Box<AstExpr>),
 }
 
 #[derive(Copy, Clone)]
@@ -99,7 +99,7 @@ pub unsafe fn value_int_indefinite_create() -> *mut Value {
     value_create(ValueKind::Int(number_indefinite_create()))
 }
 
-pub unsafe fn value_sync_create(e: *mut AstExpr) -> *mut Value {
+pub unsafe fn value_sync_create(e: Box<AstExpr>) -> *mut Value {
     value_create(ValueKind::Sync(number_computed_create(e)))
 }
 
@@ -198,10 +198,10 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> *mut Value {
         if !obj_value.is_null() && value_issync(&*obj_value) {
             object_assign(
                 obj,
-                value_sync_create(Box::into_raw(ast_expr_member_create(
+                value_sync_create(ast_expr_member_create(
                     ast_expr_copy(root),
                     OwningCStr::copy(CStr::from_ptr(field)),
-                ))),
+                )),
             );
         }
     }
@@ -323,20 +323,6 @@ pub unsafe fn value_abstractcopy(v: &Value, s: *mut State) -> *mut Value {
     }
 }
 
-impl Drop for ValueKind {
-    fn drop(&mut self) {
-        unsafe {
-            match self {
-                ValueKind::Sync(_) => {}
-                ValueKind::IndefinitePtr(_) | ValueKind::Int(_) => {}
-                ValueKind::DefinitePtr(loc) => location_destroy(*loc),
-                ValueKind::Literal(_) => {}
-                ValueKind::Struct(_) => {}
-            }
-        }
-    }
-}
-
 impl Drop for StructValue {
     fn drop(&mut self) {
         unsafe {
@@ -426,11 +412,11 @@ pub unsafe fn value_as_location(v: &Value) -> &Location {
     &**loc
 }
 
-pub unsafe fn value_into_location(v: *mut Value) -> *mut Location {
+pub unsafe fn value_into_location(v: *mut Value) -> Box<Location> {
     let ValueKind::DefinitePtr(loc) = &(*v).kind else {
         panic!();
     };
-    *loc
+    Box::from_raw(*loc)
 }
 
 pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
@@ -469,11 +455,12 @@ pub unsafe fn value_as_sync(v: &Value) -> &AstExpr {
     number_as_sync(n)
 }
 
-pub unsafe fn value_into_sync(v: *mut Value) -> *mut AstExpr {
-    let ValueKind::Sync(n) = &mut (*v).kind else {
+pub unsafe fn value_into_sync(v: *mut Value) -> Box<AstExpr> {
+    let v = *Box::from_raw(v);
+    let ValueKind::Sync(n) = v.kind else {
         panic!();
     };
-    number_into_sync(&mut **n)
+    number_into_sync(*n)
 }
 
 pub unsafe fn value_isint(v: &Value) -> bool {
@@ -556,7 +543,7 @@ unsafe fn number_range_arr_single_create(val: libc::c_int) -> Vec<NumberRange> {
     )]
 }
 
-unsafe fn number_computed_create(e: *mut AstExpr) -> Box<Number> {
+unsafe fn number_computed_create(e: Box<AstExpr>) -> Box<Number> {
     number_create(NumberKind::Computed(e))
 }
 
@@ -621,7 +608,7 @@ unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
 unsafe fn number_str(num: &Number) -> OwningCStr {
     match &num.kind {
         NumberKind::Ranges(ranges) => number_ranges_sprint(ranges),
-        NumberKind::Computed(computation) => ast_expr_str(&**computation),
+        NumberKind::Computed(computation) => ast_expr_str(computation),
     }
 }
 
@@ -630,7 +617,7 @@ unsafe fn number_equal(n1: &Number, n2: &Number) -> bool {
         (NumberKind::Ranges(ranges1), NumberKind::Ranges(ranges2)) => {
             number_ranges_equal(ranges1, ranges2)
         }
-        (NumberKind::Computed(c1), NumberKind::Computed(c2)) => ast_expr_equal(&**c1, &**c2),
+        (NumberKind::Computed(c1), NumberKind::Computed(c2)) => ast_expr_equal(c1, c2),
         _ => panic!(),
     }
 }
@@ -687,33 +674,20 @@ unsafe fn number_as_sync(n: &Number) -> &AstExpr {
     let NumberKind::Computed(computation) = &n.kind else {
         panic!();
     };
-    &**computation
+    computation
 }
 
-unsafe fn number_into_sync(n: *mut Number) -> *mut AstExpr {
-    let NumberKind::Computed(computation) = &mut (*n).kind else {
+unsafe fn number_into_sync(n: Number) -> Box<AstExpr> {
+    let NumberKind::Computed(computation) = n.kind else {
         panic!();
     };
-    *computation
+    computation
 }
 
 unsafe fn number_to_expr(n: &Number) -> Box<AstExpr> {
     match &n.kind {
         NumberKind::Ranges(ranges) => number_ranges_to_expr(ranges),
-        NumberKind::Computed(computation) => ast_expr_copy(&**computation),
-    }
-}
-
-impl Clone for NumberKind {
-    fn clone(&self) -> Self {
-        unsafe {
-            match &self {
-                NumberKind::Ranges(ranges) => NumberKind::Ranges(ranges.clone()),
-                NumberKind::Computed(computation) => {
-                    NumberKind::Computed(Box::into_raw(ast_expr_copy(&**computation)))
-                }
-            }
-        }
+        NumberKind::Computed(computation) => ast_expr_copy(computation),
     }
 }
 

@@ -277,7 +277,7 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
         Box::into_raw(ast_expr_copy(&*(*obj).offset)),
         range_create(
             ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
-            Box::from_raw(value_into_location(state_alloc(s))),
+            value_into_location(state_alloc(s)),
         ),
     )
 }
@@ -312,7 +312,7 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
         Box::into_raw(ast_expr_copy(incl_lw)),
         range_create(
             ast_expr_difference_create(Box::from_raw(up), ast_expr_copy(incl_lw)),
-            Box::from_raw(value_into_location(state_alloc(s))),
+            value_into_location(state_alloc(s)),
         ),
     )
 }

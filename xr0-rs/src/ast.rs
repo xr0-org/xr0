@@ -609,7 +609,7 @@ unsafe fn ast_expr_pf_reduce_assume(
 ) -> Result<Preresult> {
     let res_val = ast_expr_pf_reduce(expr, s).unwrap();
     assert!(!res_val.is_null());
-    irreducible_assume(&*value_into_sync(res_val), value, s)
+    irreducible_assume(&value_into_sync(res_val), value, s)
 }
 
 unsafe fn identifier_assume(expr: &AstExpr, value: bool, s: *mut State) -> Result<Preresult> {
@@ -617,7 +617,7 @@ unsafe fn identifier_assume(expr: &AstExpr, value: bool, s: *mut State) -> Resul
     let res_val = ast_expr_eval(expr, &mut s_copy).unwrap();
     assert!(!res_val.is_null());
     drop(s_copy);
-    irreducible_assume(&*value_into_sync(res_val), value, s)
+    irreducible_assume(&value_into_sync(res_val), value, s)
 }
 
 unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
@@ -647,8 +647,8 @@ unsafe fn hack_identifier_builtin_eval(
     if !(state_getvconst(state, id)).is_null()
         || strncmp(id, b"ptr:\0" as *const u8 as *const libc::c_char, 4) == 0 as libc::c_int
     {
-        return Ok(value_sync_create(Box::into_raw(
-            ast_expr_identifier_create(OwningCStr::copy_char_ptr(id)),
+        return Ok(value_sync_create(ast_expr_identifier_create(
+            OwningCStr::copy_char_ptr(id),
         )));
     }
     Err(Error::new("not built-in".to_string()))
@@ -779,11 +779,11 @@ unsafe fn expr_binary_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Val
     let e2 = ast_expr_binary_e2(expr);
     let v1 = ast_expr_eval(e1, state)?;
     let v2 = ast_expr_eval(e2, state)?;
-    Ok(value_sync_create(Box::into_raw(ast_expr_binary_create(
+    Ok(value_sync_create(ast_expr_binary_create(
         value_to_expr(&*v1),
         ast_expr_binary_op(expr),
         value_to_expr(&*v2),
-    ))))
+    )))
 }
 
 unsafe fn expr_incdec_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
@@ -982,10 +982,10 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<*mut 
             value_to_expr(&*v)
         });
     }
-    Ok(value_sync_create(Box::into_raw(ast_expr_call_create(
+    Ok(value_sync_create(ast_expr_call_create(
         ast_expr_identifier_create(OwningCStr::copy_char_ptr(root)),
         computed_params,
-    ))))
+    )))
 }
 
 pub unsafe fn ast_expr_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
@@ -1228,10 +1228,10 @@ pub unsafe fn ast_expr_identifier_create(s: OwningCStr) -> Box<AstExpr> {
 unsafe fn unary_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let res_val = ast_expr_pf_reduce(ast_expr_unary_operand(e), s)?;
     assert!(!res_val.is_null());
-    Ok(value_sync_create(Box::into_raw(ast_expr_unary_create(
-        Box::from_raw(value_into_sync(res_val)),
+    Ok(value_sync_create(ast_expr_unary_create(
+        value_into_sync(res_val),
         ast_expr_unary_op(e),
-    ))))
+    )))
 }
 
 unsafe fn binary_pf_reduce(
@@ -1244,11 +1244,11 @@ unsafe fn binary_pf_reduce(
     assert!(!v1.is_null());
     let v2 = ast_expr_pf_reduce(e2, s)?;
     assert!(!v2.is_null());
-    Ok(value_sync_create(Box::into_raw(ast_expr_binary_create(
+    Ok(value_sync_create(ast_expr_binary_create(
         value_to_expr(&*v1),
         op,
         value_to_expr(&*v2),
-    ))))
+    )))
 }
 
 unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
@@ -1260,10 +1260,10 @@ unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
         assert!(!val.is_null());
         reduced_args.push(value_to_expr(&*val));
     }
-    Ok(value_sync_create(Box::into_raw(ast_expr_call_create(
+    Ok(value_sync_create(ast_expr_call_create(
         ast_expr_identifier_create(OwningCStr::copy_char_ptr(root)),
         reduced_args,
-    ))))
+    )))
 }
 
 unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
@@ -1281,10 +1281,10 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<*mut V
     if !value_issync(&*v) {
         panic!();
     }
-    Ok(value_sync_create(Box::into_raw(ast_expr_member_create(
-        Box::from_raw(value_into_sync(v)),
+    Ok(value_sync_create(ast_expr_member_create(
+        value_into_sync(v),
         OwningCStr::copy(CStr::from_ptr(field)),
-    ))))
+    )))
 }
 
 pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
