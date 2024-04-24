@@ -15,7 +15,7 @@ use crate::object::{
     object_value_create,
 };
 use crate::state::location::{
-    location_copy, location_references, location_referencesheap, location_str, location_transfigure,
+    location_references, location_referencesheap, location_str, location_transfigure,
 };
 use crate::state::state::{state_getext, state_vconst};
 use crate::util::{strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr};
@@ -28,10 +28,11 @@ pub struct Value {
     pub kind: ValueKind,
 }
 
+#[derive(Clone)]
 pub enum ValueKind {
     Sync(Box<Number>),
     IndefinitePtr(Box<Number>),
-    DefinitePtr(*mut Location),
+    DefinitePtr(Box<Location>),
     Int(Box<Number>),
     Literal(OwningCStr),
     Struct(Box<StructValue>),
@@ -70,7 +71,7 @@ fn value_create(kind: ValueKind) -> *mut Value {
 }
 
 pub unsafe fn value_ptr_create(loc: Box<Location>) -> *mut Value {
-    value_create(ValueKind::DefinitePtr(Box::into_raw(loc)))
+    value_create(ValueKind::DefinitePtr(loc))
 }
 
 pub unsafe fn value_ptr_indefinite_create() -> *mut Value {
@@ -168,7 +169,7 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
                 state_vconst(compare, &ast_type_create_voidptr(), ptr::null_mut(), false)
             }
         }
-        ValueKind::DefinitePtr(loc) => location_transfigure(&**loc, compare),
+        ValueKind::DefinitePtr(loc) => location_transfigure(loc, compare),
         ValueKind::IndefinitePtr(_) => panic!(),
     }
 }
@@ -266,23 +267,6 @@ pub unsafe fn value_copy(v: &Value) -> *mut Value {
     value_create(v.kind.clone())
 }
 
-impl Clone for ValueKind {
-    fn clone(&self) -> Self {
-        unsafe {
-            match self {
-                ValueKind::Sync(n) => ValueKind::Sync(n.clone()),
-                ValueKind::DefinitePtr(loc) => {
-                    ValueKind::DefinitePtr(Box::into_raw(location_copy(&**loc)))
-                }
-                ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(n.clone()),
-                ValueKind::Int(n) => ValueKind::Int(n.clone()),
-                ValueKind::Literal(s) => ValueKind::Literal(s.clone()),
-                ValueKind::Struct(struct_) => ValueKind::Struct(struct_.clone()),
-            }
-        }
-    }
-}
-
 impl Clone for StructValue {
     fn clone(&self) -> Self {
         unsafe {
@@ -326,7 +310,7 @@ pub unsafe fn value_str(v: &Value) -> OwningCStr {
             value_sync_sprint(n, b);
         }
         ValueKind::DefinitePtr(loc) => {
-            value_definite_ptr_sprint(*loc, b);
+            value_definite_ptr_sprint(loc, b);
         }
         ValueKind::IndefinitePtr(n) => {
             value_indefinite_ptr_sprint(n, b);
@@ -348,8 +332,8 @@ unsafe fn value_sync_sprint(n: &Number, b: *mut StrBuilder) {
     strbuilder_write!(b, "comp:{}", number_str(n));
 }
 
-unsafe fn value_definite_ptr_sprint(loc: *mut Location, b: *mut StrBuilder) {
-    let s = location_str(&*loc);
+unsafe fn value_definite_ptr_sprint(loc: &Location, b: *mut StrBuilder) {
+    let s = location_str(loc);
     strbuilder_write!(b, "ptr:{s}");
 }
 
@@ -391,14 +375,15 @@ pub unsafe fn value_as_location(v: &Value) -> &Location {
     let ValueKind::DefinitePtr(loc) = &v.kind else {
         panic!();
     };
-    &**loc
+    loc
 }
 
 pub unsafe fn value_into_location(v: *mut Value) -> Box<Location> {
-    let ValueKind::DefinitePtr(loc) = &(*v).kind else {
+    let v = Box::from_raw(v);
+    let ValueKind::DefinitePtr(loc) = v.kind else {
         panic!();
     };
-    Box::from_raw(*loc)
+    loc
 }
 
 pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
@@ -485,7 +470,7 @@ pub unsafe fn value_as_literal(v: &Value) -> *mut AstExpr {
 
 pub unsafe fn value_references(v: *mut Value, loc: &Location, s: *mut State) -> bool {
     match &(*v).kind {
-        ValueKind::DefinitePtr(vloc) => location_references(&**vloc, loc, s),
+        ValueKind::DefinitePtr(vloc) => location_references(vloc, loc, s),
         ValueKind::Struct(sv) => struct_references(sv, loc, s),
         _ => false,
     }
