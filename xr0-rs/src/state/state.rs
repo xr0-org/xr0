@@ -191,19 +191,19 @@ pub unsafe fn state_vconst(
 
 pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value> {
     let lit = ast_expr_as_literal(expr);
-    let mut loc: *mut Location = static_memory_checkpool(&(*state).static_memory, lit.as_ptr());
+    let loc: *mut Location = static_memory_checkpool(&(*state).static_memory, lit.as_str());
     if !loc.is_null() {
         return value_ptr_create(Box::from_raw(loc));
     }
     let address: libc::c_int = static_memory_newblock(&mut (*state).static_memory);
-    loc = Box::into_raw(location_create_static(address, ast_expr_constant_create(0)));
-    let obj = state_get(state, &*loc, true).unwrap();
+    let loc = location_create_static(address, ast_expr_constant_create(0));
+    let obj = state_get(state, &loc, true).unwrap();
     if obj.is_null() {
         panic!();
     }
     object_assign(&mut *obj, Box::into_raw(value_literal_create(lit.as_str())));
-    static_memory_stringpool(&mut (*state).static_memory, lit.as_ptr(), loc);
-    value_ptr_create(Box::from_raw(loc))
+    static_memory_stringpool(&mut (*state).static_memory, lit.as_str(), &loc);
+    value_ptr_create(loc)
 }
 
 pub unsafe fn state_clump(state: *mut State) -> Box<Value> {
