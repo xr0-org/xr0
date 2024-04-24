@@ -18,18 +18,22 @@ use crate::{
     Value,
 };
 
+#[derive(Clone)]
 pub struct Location {
     kind: LocationKind,
     block: libc::c_int,
     offset: Box<AstExpr>,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 enum LocationKind {
     Static,
+    #[allow(dead_code)]
     VConst,
     Dereferencable,
-    Automatic { frame: libc::c_int },
+    Automatic {
+        frame: libc::c_int,
+    },
     Dynamic,
 }
 
@@ -47,6 +51,7 @@ impl Location {
     }
 }
 
+#[allow(dead_code)]
 pub unsafe fn location_create_vconst(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
     Box::new(Location {
         kind: LocationKind::VConst,
@@ -140,17 +145,7 @@ pub unsafe fn location_offset(loc: &Location) -> &AstExpr {
 }
 
 pub unsafe fn location_copy(loc: &Location) -> Box<Location> {
-    match &loc.kind {
-        LocationKind::Static => location_create_static(loc.block, ast_expr_copy(&loc.offset)),
-        LocationKind::VConst => location_create_vconst(loc.block, ast_expr_copy(&loc.offset)),
-        LocationKind::Dereferencable => {
-            location_create_dereferencable(loc.block, ast_expr_copy(&loc.offset))
-        }
-        LocationKind::Automatic { frame } => {
-            location_create_automatic(*frame, loc.block, ast_expr_copy(&loc.offset))
-        }
-        LocationKind::Dynamic => location_create_dynamic(loc.block, ast_expr_copy(&loc.offset)),
-    }
+    Box::new(loc.clone())
 }
 
 pub unsafe fn location_with_offset(loc: &Location, offset: &AstExpr) -> Box<Location> {
