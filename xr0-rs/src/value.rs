@@ -1,8 +1,5 @@
 use std::collections::HashMap;
-use std::ffi::CStr;
 use std::ptr;
-
-use libc::strcmp;
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_equal, ast_expr_identifier_create,
@@ -19,7 +16,7 @@ use crate::state::location::{
 };
 use crate::state::state::{state_getext, state_vconst};
 use crate::util::{strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr, StrBuilder};
-use crate::{cstr, strbuilder_write, AstExpr, AstType, AstVariable, Location, Object, State};
+use crate::{strbuilder_write, AstExpr, AstType, AstVariable, Location, Object, State};
 
 #[derive(Clone)]
 pub struct Value {
@@ -80,8 +77,8 @@ pub fn value_int_create(val: libc::c_int) -> Box<Value> {
     value_create(ValueKind::Int(number_single_create(val)))
 }
 
-pub unsafe fn value_literal_create(lit: *mut libc::c_char) -> Box<Value> {
-    value_create(ValueKind::Literal(OwningCStr::copy_char_ptr(lit)))
+pub unsafe fn value_literal_create(lit: &str) -> Box<Value> {
+    value_create(ValueKind::Literal(OwningCStr::copy_str(lit)))
 }
 
 #[allow(dead_code)]
@@ -113,7 +110,7 @@ pub unsafe fn value_struct_create(t: &AstType) -> Box<Value> {
 pub unsafe fn value_struct_indefinite_create(
     mut t: &AstType,
     s: *mut State,
-    comment: *mut libc::c_char,
+    comment: &str,
     persist: bool,
 ) -> Box<Value> {
     // Note: The original doesn't null-check here. I wonder how it would handle `typedef struct foo
@@ -131,13 +128,14 @@ pub unsafe fn value_struct_indefinite_create(
 
         let obj: *mut Object = sv.m.get(field).copied().unwrap();
         let mut b = strbuilder_create();
-        strbuilder_write!(b, "{}.{field}", cstr!(comment));
+        strbuilder_write!(b, "{comment}.{field}");
+        let comment = strbuilder_build(b);
         object_assign(
             &mut *obj,
             Box::into_raw(state_vconst(
                 s,
                 ast_variable_type(var),
-                strbuilder_build(b).into_ptr(),
+                Some(comment.as_str()),
                 persist,
             )),
         );
@@ -166,7 +164,7 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
                 Box::into_raw(state_vconst(
                     compare,
                     &ast_type_create_voidptr(),
-                    ptr::null_mut(),
+                    None,
                     false,
                 ))
             }
@@ -243,23 +241,22 @@ unsafe fn abstract_copy_members(
         .collect()
 }
 
-pub unsafe fn value_struct_membertype(v: &Value, member: *mut libc::c_char) -> Option<&AstType> {
+pub unsafe fn value_struct_membertype<'v>(v: &'v Value, member: &str) -> Option<&'v AstType> {
     let ValueKind::Struct(sv) = &v.kind else {
         panic!();
     };
     for var in &sv.members {
-        if strcmp(member, ast_variable_name(var).as_ptr()) == 0 as libc::c_int {
+        if member == ast_variable_name(var).as_str() {
             return Some(ast_variable_type(var));
         }
     }
     None
 }
 
-pub unsafe fn value_struct_member(v: *mut Value, member: *mut libc::c_char) -> *mut Object {
+pub unsafe fn value_struct_member(v: *mut Value, member: &str) -> *mut Object {
     let ValueKind::Struct(sv) = &(*v).kind else {
         panic!();
     };
-    let member = CStr::from_ptr(member).to_str().unwrap();
     sv.m.get(member).copied().unwrap_or(ptr::null_mut())
 }
 

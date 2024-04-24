@@ -336,7 +336,7 @@ pub unsafe fn object_dealloc(obj: *mut Object, s: *mut State) -> Result<()> {
 pub unsafe fn object_getmember(
     obj: *mut Object,
     t: &AstType,
-    member: *mut libc::c_char,
+    member: &str,
     s: *mut State,
 ) -> *mut Object {
     value_struct_member(getorcreatestruct(obj, t, s), member)
@@ -353,12 +353,12 @@ unsafe fn getorcreatestruct(obj: *mut Object, t: &AstType, s: *mut State) -> *mu
     v
 }
 
-pub unsafe fn object_getmembertype(
+pub unsafe fn object_getmembertype<'t>(
     obj: *mut Object,
-    t: &AstType,
-    member: *mut libc::c_char,
+    t: &'t AstType,
+    member: &str,
     s: *mut State,
-) -> Option<&AstType> {
+) -> Option<&'t AstType> {
     value_struct_membertype(&*getorcreatestruct(obj, t, s), member)
 }
 

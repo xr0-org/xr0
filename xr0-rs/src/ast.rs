@@ -6,8 +6,6 @@ use std::fmt::{self, Display, Formatter};
 use std::process;
 use std::ptr;
 
-use libc::strncmp;
-
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
 use crate::object::{
     object_as_value, object_assign, object_getmember, object_getmembertype, object_hasvalue,
@@ -641,15 +639,10 @@ unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Val
     Ok(value_copy(&*v))
 }
 
-unsafe fn hack_identifier_builtin_eval(
-    id: *mut libc::c_char,
-    state: *mut State,
-) -> Result<Box<Value>> {
-    if !(state_getvconst(state, id)).is_null()
-        || strncmp(id, b"ptr:\0" as *const u8 as *const libc::c_char, 4) == 0 as libc::c_int
-    {
+unsafe fn hack_identifier_builtin_eval(id: &str, state: *mut State) -> Result<Box<Value>> {
+    if !(state_getvconst(state, id)).is_null() || id.starts_with("ptr:") {
         return Ok(value_sync_create(ast_expr_identifier_create(
-            OwningCStr::copy_char_ptr(id),
+            OwningCStr::copy_str(id),
         )));
     }
     Err(Error::new("not built-in".to_string()))
@@ -683,11 +676,11 @@ fn expr_to_binary(expr: &AstExpr) -> Box<AstExpr> {
 
 unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     let id = ast_expr_as_identifier(expr);
-    if let Ok(res) = hack_identifier_builtin_eval(id.as_ptr(), state) {
+    if let Ok(res) = hack_identifier_builtin_eval(id.as_str(), state) {
         return Ok(res);
     }
     if id.as_str().starts_with('#') {
-        return Ok(value_literal_create(id.as_ptr()));
+        return Ok(value_literal_create(id.as_str()));
     }
     let obj: *mut Object = state_getobject(state, id.as_ptr());
     if obj.is_null() {
@@ -707,7 +700,7 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let root = ast_expr_member_root(expr);
     let res_val = ast_expr_eval(root, s)?;
     let field = ast_expr_member_field(expr);
-    let member: *mut Object = value_struct_member(Box::into_raw(res_val), field.as_ptr());
+    let member: *mut Object = value_struct_member(Box::into_raw(res_val), field.as_str());
     if member.is_null() {
         return Err(Error::new(format!("`{root}' has no field `{field}'")));
     }
@@ -761,7 +754,7 @@ unsafe fn arbarg_eval(_expr: &AstExpr, state: *mut State) -> Result<Box<Value>> 
     Ok(state_vconst(
         state,
         &ast_type_create_ptr(ast_type_create(AstTypeBase::Void, 0)),
-        ptr::null_mut(),
+        None,
         false,
     ))
 }
@@ -825,11 +818,11 @@ pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Res
     }
     let field = ast_expr_member_field(expr);
     let member: *mut Object =
-        object_getmember(root_obj, lvalue_type(&root_lval), field.as_ptr(), state);
+        object_getmember(root_obj, lvalue_type(&root_lval), field.as_str(), state);
     if member.is_null() {
         return Err(Error::new("lvalue error".to_string()));
     }
-    let t = object_getmembertype(root_obj, lvalue_type(&root_lval), field.as_ptr(), state);
+    let t = object_getmembertype(root_obj, lvalue_type(&root_lval), field.as_str(), state);
     Ok(lvalue_create(t, member))
 }
 
@@ -912,7 +905,7 @@ fn ast_expr_constant_str_build(expr: &AstExpr, b: &mut StrBuilder) {
 unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction<'static> = (*state_getext(state)).get_func(name.as_ptr());
+    let f: *mut AstFunction<'static> = (*state_getext(state)).get_func(name.as_str());
     if f.is_null() {
         return Err(Error::new(format!("function `{name}' not found")));
     }
@@ -920,7 +913,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>
     let rtype = (*f).rtype();
     let args = prepare_arguments(ast_expr_call_args(expr), params, state);
     state_pushframe(state, dynamic_str(name.as_ptr()), rtype);
-    prepare_parameters(params, args, name.as_ptr(), state)?;
+    prepare_parameters(params, args, name.as_str(), state)?;
     call_setupverify(f, &mut state_copy(&*state))?;
     let mut v = call_absexec(expr, state)?;
     if !v.is_null() {
@@ -937,7 +930,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>
 unsafe fn call_absexec(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction<'static> = (*state_getext(s)).get_func(name.as_ptr());
+    let f: *mut AstFunction<'static> = (*state_getext(s)).get_func(name.as_str());
     if f.is_null() {
         return Err(Error::new(format!("function `{name}' not found")));
     }
@@ -998,10 +991,7 @@ unsafe fn expr_unary_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value
     match ast_expr_unary_op(expr) {
         AstUnaryOp::Dereference => dereference_eval(expr, state),
         AstUnaryOp::Address => address_eval(expr, state),
-        AstUnaryOp::Bang => Ok(value_literal_create(
-            b"hack\0" as *const u8 as *const libc::c_char as *mut libc::c_char,
-        )),
-
+        AstUnaryOp::Bang => Ok(value_literal_create("hack")),
         _ => panic!(),
     }
 }
@@ -1026,7 +1016,7 @@ unsafe fn dealloc_process(expr: &AstExpr, state: *mut State) -> Result<*mut Valu
 pub unsafe fn prepare_parameters(
     params: &[Box<AstVariable>],
     args: Vec<Result<Box<Value>>>,
-    _fname: *mut libc::c_char,
+    _fname: &str,
     state: *mut State,
 ) -> Result<()> {
     assert_eq!(params.len(), args.len());
@@ -1252,7 +1242,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let v = ast_expr_pf_reduce(ast_expr_member_root(expr), s)?;
     let field = ast_expr_member_field(expr);
     if value_isstruct(&v) {
-        let obj: *mut Object = value_struct_member(Box::into_raw(v), field.as_ptr());
+        let obj: *mut Object = value_struct_member(Box::into_raw(v), field.as_str());
         let obj_value: *mut Value = object_as_value(obj);
         if obj_value.is_null() {
             panic!();
@@ -1758,7 +1748,7 @@ pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplit
 unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> Result<AstStmtSplits> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction = (*state_getext(state)).get_func(name.as_ptr());
+    let f: *mut AstFunction = (*state_getext(state)).get_func(name.as_str());
     if f.is_null() {
         return Err(Error::new(format!("function: `{name}' not found")));
     }
@@ -1767,7 +1757,7 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> Result<AstStmtSplits
     let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
     let ret_type = (*f).rtype();
     state_pushframe(&mut s_copy, dynamic_str(name.as_ptr()), ret_type);
-    prepare_parameters(params, args, name.as_ptr(), &mut s_copy)?;
+    prepare_parameters(params, args, name.as_str(), &mut s_copy)?;
     let mut conds = vec![];
     let abs = (*f).abstract_block();
     for var in &abs.decls {
@@ -1912,11 +1902,7 @@ pub fn ast_block_preconds(b: &AstBlock) -> Result<Option<&AstStmt>> {
     Ok(None)
 }
 
-pub unsafe fn ast_stmt_process(
-    stmt: &AstStmt,
-    fname: *mut libc::c_char,
-    state: *mut State,
-) -> Result<()> {
+pub unsafe fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: *mut State) -> Result<()> {
     if matches!(stmt.kind, AstStmtKind::CompoundV(_)) {
         if let Err(err) = ast_stmt_verify(stmt, state) {
             let loc = ast_stmt_lexememarker(stmt);
@@ -1925,7 +1911,7 @@ pub unsafe fn ast_stmt_process(
     }
     if let Err(err) = ast_stmt_exec(stmt, state) {
         let loc = ast_stmt_lexememarker(stmt);
-        let err_msg = format!("{loc}:{}: cannot exec statement: {}", cstr!(fname), err.msg,);
+        let err_msg = format!("{loc}:{fname}: cannot exec statement: {}", err.msg);
         return Err(Error::new(err_msg));
     }
     Ok(())
@@ -2735,7 +2721,7 @@ pub fn ast_type_create_userdef(name: OwningCStr) -> Box<AstType> {
 pub unsafe fn ast_type_vconst(
     t: &AstType,
     s: *mut State,
-    comment: *mut libc::c_char,
+    comment: &str,
     persist: bool,
 ) -> Box<Value> {
     match &t.base {
@@ -2743,7 +2729,7 @@ pub unsafe fn ast_type_vconst(
         AstTypeBase::Pointer(_) => value_ptr_indefinite_create(),
         AstTypeBase::UserDefined(name) => ast_type_vconst(
             // Note: Original does not null-check here.
-            (*state_getext(s)).get_typedef(name.as_ptr()).unwrap(),
+            (*state_getext(s)).get_typedef(name.as_str()).unwrap(),
             s,
             comment,
             persist,
@@ -2767,7 +2753,7 @@ pub unsafe fn ast_type_struct_complete<'a>(
     let Some(tag) = ast_type_struct_tag(t) else {
         panic!();
     };
-    ext.get_struct(tag.as_ptr())
+    ext.get_struct(tag.as_str())
 }
 
 pub fn ast_type_struct_members(t: &AstType) -> Option<&[Box<AstVariable>]> {
@@ -3045,7 +3031,7 @@ pub unsafe fn ast_function_protostitch(
     f: *mut AstFunction,
     ext: *mut Externals,
 ) -> *mut AstFunction {
-    let proto: *mut AstFunction = (*ext).get_func((*f).name.as_ptr());
+    let proto: *mut AstFunction = (*ext).get_func((*f).name.as_str());
     if !proto.is_null() {
         (*f).abstract_ = (*proto).abstract_.clone();
     }
@@ -3118,7 +3104,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
         panic!();
     }
     if !object_hasvalue(obj) {
-        let val = Box::into_raw(state_vconst(state, t, dynamic_str(name.as_ptr()), true));
+        let val = Box::into_raw(state_vconst(state, t, Some(name.as_str()), true));
         object_assign(&mut *obj, val);
     }
     Ok(())
@@ -3179,7 +3165,7 @@ unsafe fn path_verify(
                 );
             }
             _ => {
-                ast_stmt_process(stmt, fname.as_ptr(), actual_state)?;
+                ast_stmt_process(stmt, fname.as_str(), actual_state)?;
                 if ast_stmt_isterminal(stmt, actual_state) {
                     break;
                 }
@@ -3248,7 +3234,7 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
         return;
     }
     dedup.set(fname.as_ptr(), 1 as libc::c_int as *mut libc::c_void);
-    let f: *mut AstFunction = ext.get_func(fname.as_ptr());
+    let f: *mut AstFunction = ext.get_func(fname.to_str().unwrap());
     if f.is_null() {
         eprintln!("function `{}' is not declared", fname.to_string_lossy());
         process::exit(1);
@@ -3267,7 +3253,7 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
         for func in farr {
             if (local_dedup.get(func.as_ptr())).is_null() {
                 let func = func.into_ptr(); // transfer of ownership (it's going into val)
-                let f_0: *mut AstFunction = ext.get_func(func);
+                let f_0: *mut AstFunction = ext.get_func(CStr::from_ptr(func).to_str().unwrap());
                 if !(*f_0).is_axiom {
                     val.push(func);
                 }
@@ -3425,13 +3411,14 @@ pub fn ast_decl_create(name: OwningCStr, t: Box<AstType>) -> Box<AstExternDecl> 
 pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: &mut Externals) {
     match &mut (*decl).kind {
         AstExternDeclKind::Function(f) => {
-            ext.declare_func((**f).name().as_ptr(), *f);
+            ext.declare_func((**f).name().as_str(), *f);
         }
         AstExternDeclKind::Variable(v) => {
-            ext.declare_var(ast_variable_name(v).as_ptr(), &mut **v);
+            let variable: *mut AstVariable = &mut **v;
+            ext.declare_var(ast_variable_name(v).as_str(), variable);
         }
         AstExternDeclKind::Typedef(typedef) => {
-            ext.declare_typedef(typedef.name.as_ptr(), &*typedef.type_0);
+            ext.declare_typedef(typedef.name.as_str(), &*typedef.type_0);
         }
         AstExternDeclKind::Struct(s) => {
             ext.declare_struct(&**s);

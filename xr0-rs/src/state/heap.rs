@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, HashMap};
-use std::ffi::CStr;
 use std::ptr;
 
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
@@ -125,16 +124,15 @@ pub unsafe fn vconst_create() -> VConst {
 pub unsafe fn vconst_declare(
     v: &mut VConst,
     val: *mut Value,
-    comment: *mut libc::c_char,
+    comment: Option<&str>,
     persist: bool,
 ) -> OwningCStr {
     let m = &mut v.varmap;
     let s = vconst_id(m, &v.persist, persist);
     let s_string = s.to_string();
     m.insert(s_string.clone(), Box::from_raw(val));
-    if !comment.is_null() {
-        let comment_string = CStr::from_ptr(comment).to_str().unwrap().to_string();
-        v.comment.insert(s_string.clone(), comment_string);
+    if let Some(comment) = comment {
+        v.comment.insert(s_string.clone(), comment.to_string());
     }
     v.persist.insert(s_string, persist);
     s
@@ -159,9 +157,8 @@ unsafe fn count_true(m: &HashMap<String, bool>) -> usize {
     m.values().filter(|&&b| b).count()
 }
 
-pub unsafe fn vconst_get(v: &VConst, id: *mut libc::c_char) -> *mut Value {
-    let id_str = CStr::from_ptr(id).to_str().unwrap();
-    v.varmap.get(id_str).map_or(ptr::null_mut(), |value| {
+pub unsafe fn vconst_get(v: &VConst, id: &str) -> *mut Value {
+    v.varmap.get(id).map_or(ptr::null_mut(), |value| {
         &**value as *const Value as *mut Value
     })
 }

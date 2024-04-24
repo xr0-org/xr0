@@ -142,7 +142,7 @@ pub unsafe fn pass1(root: &mut Ast, ext: *mut Externals) {
 
 pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &mut Externals) {
     for name in order {
-        let f: *mut AstFunction = ext.get_func(name.as_ptr());
+        let f: *mut AstFunction = ext.get_func(name.as_str());
         if !((*f).is_axiom() || (*f).is_proto()) {
             if let Err(err) = ast_function_verify(f, ext) {
                 eprintln!("{}", err.msg);

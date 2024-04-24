@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ffi::CStr;
 use std::ptr;
 
 use crate::ast::{ast_type_str, ast_type_struct_tag};
@@ -30,19 +29,16 @@ impl Externals {
         strbuilder_build(b)
     }
 
-    pub unsafe fn declare_func(&mut self, id: *mut libc::c_char, f: *mut AstFunction<'static>) {
-        let id = CStr::from_ptr(id).to_str().unwrap().to_string();
-        self.func.insert(id, f);
+    pub unsafe fn declare_func(&mut self, id: &str, f: *mut AstFunction<'static>) {
+        self.func.insert(id.to_string(), f);
     }
 
-    pub unsafe fn declare_var(&mut self, id: *mut libc::c_char, v: *mut AstVariable) {
-        let id = CStr::from_ptr(id).to_str().unwrap().to_string();
-        self.var.insert(id, v);
+    pub unsafe fn declare_var(&mut self, id: &str, v: *mut AstVariable) {
+        self.var.insert(id.to_string(), v);
     }
 
-    pub unsafe fn declare_typedef(&mut self, id: *mut libc::c_char, t: *const AstType) {
-        let id = CStr::from_ptr(id).to_str().unwrap().to_string();
-        self.typedef.insert(id, t);
+    pub unsafe fn declare_typedef(&mut self, id: &str, t: *const AstType) {
+        self.typedef.insert(id.to_string(), t);
     }
 
     pub unsafe fn declare_struct(&mut self, t: *const AstType) {
@@ -50,18 +46,15 @@ impl Externals {
         self._struct.insert(id, t);
     }
 
-    pub unsafe fn get_func(&self, id: *const libc::c_char) -> *mut AstFunction<'static> {
-        let id = CStr::from_ptr(id).to_str().unwrap();
+    pub unsafe fn get_func(&self, id: &str) -> *mut AstFunction<'static> {
         self.func.get(id).copied().unwrap_or(ptr::null_mut())
     }
 
-    pub unsafe fn get_typedef(&self, id: *const libc::c_char) -> Option<&AstType> {
-        let id = CStr::from_ptr(id).to_str().unwrap();
+    pub unsafe fn get_typedef(&self, id: &str) -> Option<&AstType> {
         self.typedef.get(id).map(|&p| &*p)
     }
 
-    pub unsafe fn get_struct(&self, id: *const libc::c_char) -> Option<&AstType> {
-        let id = CStr::from_ptr(id).to_str().unwrap();
+    pub unsafe fn get_struct(&self, id: &str) -> Option<&AstType> {
         self._struct.get(id).map(|&p| &*p)
     }
 }

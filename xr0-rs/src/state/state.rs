@@ -26,7 +26,7 @@ use crate::ast::{
     ast_type_vconst,
 };
 use crate::object::{object_as_value, object_assign};
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
+use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
     value_ptr_create, value_sync_create,
@@ -179,10 +179,10 @@ pub unsafe fn state_declare(state: *mut State, var: &AstVariable, isparam: bool)
 pub unsafe fn state_vconst(
     state: *mut State,
     t: &AstType,
-    comment: *mut libc::c_char,
+    comment: Option<&str>,
     persist: bool,
 ) -> Box<Value> {
-    let v = ast_type_vconst(t, state, comment, persist);
+    let v = ast_type_vconst(t, state, comment.unwrap_or(""), persist);
     if value_isstruct(&v) {
         return v;
     }
@@ -202,10 +202,7 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value>
     if obj.is_null() {
         panic!();
     }
-    object_assign(
-        &mut *obj,
-        Box::into_raw(value_literal_create(dynamic_str(lit.as_ptr()))),
-    );
+    object_assign(&mut *obj, Box::into_raw(value_literal_create(lit.as_str())));
     static_memory_stringpool(&mut (*state).static_memory, lit.as_ptr(), loc);
     value_ptr_create(Box::from_raw(loc))
 }
@@ -246,7 +243,7 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
     location_toheap(loc, &mut (*state).heap)
 }
 
-pub unsafe fn state_getvconst(state: *mut State, id: *mut libc::c_char) -> *mut Value {
+pub unsafe fn state_getvconst(state: *mut State, id: &str) -> *mut Value {
     vconst_get(&(*state).vconst, id)
 }
 
