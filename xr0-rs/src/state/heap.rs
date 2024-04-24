@@ -21,6 +21,7 @@ struct HeapBlock {
     freed: bool,
 }
 
+#[derive(Clone)]
 pub struct VConst {
     // Note: Iteration order of varmap is significant in vconst_str.
     pub varmap: BTreeMap<String, Box<Value>>,
@@ -118,15 +119,6 @@ pub unsafe fn vconst_create() -> VConst {
         varmap: BTreeMap::new(),
         comment: HashMap::new(),
         persist: HashMap::new(),
-    }
-}
-
-// XXX TODO: replace with derive(Clone)
-pub unsafe fn vconst_copy(old: &VConst) -> VConst {
-    VConst {
-        varmap: old.varmap.clone(),
-        comment: old.comment.clone(),
-        persist: old.persist.clone(),
     }
 }
 

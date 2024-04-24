@@ -5,8 +5,8 @@ use libc::strcmp;
 use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
 use super::clump::{clump_create, clump_destroy, clump_newblock, clump_str};
 use super::heap::{
-    heap_newblock, heap_referenced, heap_str, heap_undeclare, vconst_copy, vconst_create,
-    vconst_declare, vconst_eval, vconst_get, vconst_str, vconst_undeclare,
+    heap_newblock, heap_referenced, heap_str, heap_undeclare, vconst_create, vconst_declare,
+    vconst_eval, vconst_get, vconst_str, vconst_undeclare,
 };
 use super::location::{
     location_create_dereferencable, location_create_static, location_dealloc, location_getblock,
@@ -94,7 +94,7 @@ pub unsafe fn state_copy(state: &State) -> State {
     State {
         ext: state.ext,
         static_memory: state.static_memory.clone(),
-        vconst: vconst_copy(&state.vconst),
+        vconst: state.vconst.clone(),
         clump: Box::into_raw(Box::new((*state.clump).clone())),
         stack: stack_copy(state.stack),
         heap: state.heap.clone(),
@@ -106,7 +106,7 @@ pub unsafe fn state_copywithname(state: &State, func_name: *mut libc::c_char) ->
     State {
         ext: state.ext,
         static_memory: state.static_memory.clone(),
-        vconst: vconst_copy(&state.vconst),
+        vconst: state.vconst.clone(),
         clump: Box::into_raw(Box::new((*state.clump).clone())),
         stack: stack_copywithname(state.stack, func_name),
         heap: state.heap.clone(),
