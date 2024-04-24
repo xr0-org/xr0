@@ -282,12 +282,10 @@ pub struct Preresult {
     pub is_contradiction: bool,
 }
 
-// TODO: resultify
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AstStmtSplits {
     // Note: In the original this array is heap-allocated but never freed.
     pub conds: Vec<*mut AstExpr>,
-    pub err: Option<Box<Error>>,
 }
 
 pub struct AstExternDecl {
@@ -1762,7 +1760,7 @@ pub unsafe fn ast_expr_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
     }
 }
 
-pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> AstStmtSplits {
+pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplits> {
     match &e.kind {
         AstExprKind::Call(_) => call_splits(e, s),
         AstExprKind::Assignment(assignment) => ast_expr_splits(&assignment.rval, s),
@@ -1775,35 +1773,24 @@ pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> AstStmtSplits {
         | AstExprKind::StringLiteral(_)
         | AstExprKind::ArbArg
         | AstExprKind::IsDereferencable(_)
-        | AstExprKind::Allocation(_) => AstStmtSplits {
-            conds: vec![],
-            err: None,
-        },
+        | AstExprKind::Allocation(_) => Ok(AstStmtSplits { conds: vec![] }),
         _ => panic!(),
     }
 }
 
-unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
+unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> Result<AstStmtSplits> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
     let f: *mut AstFunction = (*state_getext(state)).get_func(name);
     if f.is_null() {
-        return AstStmtSplits {
-            conds: vec![],
-            err: Some(Error::new(format!("function: `{}' not found", cstr!(name)))),
-        };
+        return Err(Error::new(format!("function: `{}' not found", cstr!(name))));
     }
     let params = (*f).params();
     let mut s_copy = state_copy(&*state);
     let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
     let ret_type = (*f).rtype();
     state_pushframe(&mut s_copy, dynamic_str(name), ret_type);
-    if let Err(err) = prepare_parameters(params, args, name, &mut s_copy) {
-        return AstStmtSplits {
-            conds: vec![],
-            err: Some(err),
-        };
-    }
+    prepare_parameters(params, args, name, &mut s_copy)?;
     let mut conds = vec![];
     let abs = (*f).abstract_block();
     for var in &abs.decls {
@@ -1811,23 +1798,21 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> AstStmtSplits {
     }
     for stmt in &abs.stmts {
         // Note: errors ignored in the original!
-        let mut splits = ast_stmt_splits(stmt, &mut s_copy);
+        let mut splits = ast_stmt_splits(stmt, &mut s_copy).unwrap_or_default();
         conds.append(&mut splits.conds);
     }
     state_popframe(&mut s_copy);
     // Note: Original leaks s_copy
-    AstStmtSplits { conds, err: None }
+    Ok(AstStmtSplits { conds })
 }
 
-unsafe fn binary_splits(e: &AstExpr, s: *mut State) -> AstStmtSplits {
-    let s1 = ast_expr_splits(ast_expr_binary_e1(e), s);
-    let s2 = ast_expr_splits(ast_expr_binary_e2(e), s);
+unsafe fn binary_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplits> {
     // Note: s1.err and s2.err are ignored in the original.
-
-    AstStmtSplits {
+    let s1 = ast_expr_splits(ast_expr_binary_e1(e), s).unwrap_or_default();
+    let s2 = ast_expr_splits(ast_expr_binary_e2(e), s).unwrap_or_default();
+    Ok(AstStmtSplits {
         conds: [s1.conds, s2.conds].concat(),
-        err: None,
-    }
+    })
 }
 
 unsafe fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
@@ -2654,46 +2639,34 @@ pub unsafe fn ast_stmt_getfuncs(stmt: &AstStmt) -> Vec<OwningCStr> {
     }
 }
 
-pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> AstStmtSplits {
+pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> Result<AstStmtSplits> {
     match &stmt.kind {
-        AstStmtKind::Nop => AstStmtSplits {
-            conds: vec![],
-            err: None,
-        },
+        AstStmtKind::Nop => Ok(AstStmtSplits { conds: vec![] }),
         AstStmtKind::Expr(expr) => ast_expr_splits(expr, s),
         AstStmtKind::Selection(selection) => stmt_sel_splits(selection, s),
         AstStmtKind::Jump(jump) => {
             if let Some(rv) = &jump.rv {
                 return ast_expr_splits(rv, s);
             }
-            AstStmtSplits {
-                conds: vec![],
-                err: None,
-            }
+            Ok(AstStmtSplits { conds: vec![] })
         }
         AstStmtKind::Labelled(labelled) => ast_stmt_splits(&labelled.stmt, s),
         AstStmtKind::Iteration(_) | AstStmtKind::Compound(_) | AstStmtKind::CompoundV(_) => {
-            AstStmtSplits {
-                conds: vec![],
-                err: None,
-            }
+            Ok(AstStmtSplits { conds: vec![] })
         }
         _ => panic!(),
     }
 }
 
-unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> AstStmtSplits {
+unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> Result<AstStmtSplits> {
     let v = ast_expr_pf_reduce(&selection.cond, s).unwrap();
     let e = value_to_expr(&*v);
     if condexists(&e, s) || value_isconstant(&*v) {
-        return AstStmtSplits {
-            conds: vec![],
-            err: None,
-        };
-    }
-    AstStmtSplits {
-        conds: vec![Box::into_raw(e)],
-        err: None,
+        Ok(AstStmtSplits { conds: vec![] })
+    } else {
+        Ok(AstStmtSplits {
+            conds: vec![Box::into_raw(e)],
+        })
     }
 }
 
@@ -3141,10 +3114,7 @@ unsafe fn path_absverify(f: *mut AstFunction, state: *mut State, index: libc::c_
     let abs = (*f).abstract_block();
     for i in index as usize..abs.stmts.len() {
         let stmt = &abs.stmts[i];
-        let mut splits: AstStmtSplits = ast_stmt_splits(stmt, state);
-        if let Some(err) = splits.err {
-            return Err(err);
-        }
+        let mut splits = ast_stmt_splits(stmt, state)?;
         if !splits.conds.is_empty() {
             return split_paths_absverify(f, state, i as libc::c_int, &mut splits);
         }
@@ -3239,19 +3209,24 @@ unsafe fn path_verify(
     #[allow(clippy::needless_range_loop)]
     for i in index as usize..stmts.len() {
         let stmt = &stmts[i];
-        let mut splits: AstStmtSplits = ast_stmt_splits(stmt, actual_state);
-        if !splits.conds.is_empty() {
-            return split_paths_verify(
-                f,
-                actual_state,
-                i as libc::c_int,
-                &mut splits,
-                abstract_state,
-            );
-        }
-        ast_stmt_process(stmt, fname, actual_state)?;
-        if ast_stmt_isterminal(stmt, actual_state) {
-            break;
+        // splits.err is ignored in the original
+        let splits = ast_stmt_splits(stmt, actual_state);
+        match splits {
+            Ok(mut splits) if !splits.conds.is_empty() => {
+                return split_paths_verify(
+                    f,
+                    actual_state,
+                    i as libc::c_int,
+                    &mut splits,
+                    abstract_state,
+                );
+            }
+            _ => {
+                ast_stmt_process(stmt, fname, actual_state)?;
+                if ast_stmt_isterminal(stmt, actual_state) {
+                    break;
+                }
+            }
         }
     }
     if state_hasgarbage(actual_state) {
