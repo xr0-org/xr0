@@ -244,10 +244,8 @@ pub grammar c_parser(env: &Env) for str {
     // 6.7 Declarations
     rule declaration() -> Declaration =
         t:declaration_specifiers() _ ";" {
-            unsafe {
-                let name = ast_type_struct_tag(&t).cloned();
-                Declaration { name, t }
-            }
+            let name = ast_type_struct_tag(&t).cloned();
+            Declaration { name, t }
         } /
         t:declaration_specifiers() _ v:declarator() _ ";" {
             let is_typedef = t.modifiers & MOD_TYPEDEF != 0;
