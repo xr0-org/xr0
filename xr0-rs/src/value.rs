@@ -435,7 +435,7 @@ pub unsafe fn value_as_constant(v: &Value) -> libc::c_int {
 
 pub unsafe fn value_isconstant(v: &Value) -> bool {
     match &v.kind {
-        ValueKind::Int(n) => number_isconstant(&**n),
+        ValueKind::Int(n) => number_isconstant(n),
         _ => false,
     }
 }
@@ -506,8 +506,9 @@ unsafe fn struct_references(sv: &StructValue, loc: &Location, s: *mut State) -> 
 pub unsafe fn value_equal(v1: &Value, v2: &Value) -> bool {
     match (&v1.kind, &v2.kind) {
         (ValueKind::Literal(s1), ValueKind::Literal(s2)) => s1 == s2,
-        (ValueKind::Sync(n1), ValueKind::Sync(n2)) => number_equal(n1, n2),
-        (ValueKind::Int(n1), ValueKind::Int(n2)) => number_equal(&**n1, &**n2),
+        (ValueKind::Sync(n1), ValueKind::Sync(n2)) | (ValueKind::Int(n1), ValueKind::Int(n2)) => {
+            number_equal(n1, n2)
+        }
         _ => panic!(),
     }
 }
@@ -630,7 +631,7 @@ unsafe fn number_ranges_equal(n1: &[NumberRange], n2: &[NumberRange]) -> bool {
 }
 
 unsafe fn number_assume(n: &mut Number, value: bool) -> bool {
-    let NumberKind::Ranges(ranges) = &mut (*n).kind else {
+    let NumberKind::Ranges(ranges) = &mut n.kind else {
         panic!();
     };
     if !number_range_arr_canbe(ranges, value) {
