@@ -9,13 +9,14 @@ use crate::state::location::{location_references, location_str};
 use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
 };
+use crate::state::State;
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{
     value_abstractcopy, value_as_location, value_copy, value_destroy, value_into_location,
     value_ptr_create, value_references, value_referencesheap, value_str, value_struct_create,
     value_struct_member, value_struct_membertype,
 };
-use crate::{strbuilder_write, AstExpr, AstType, Location, State, Value};
+use crate::{strbuilder_write, AstExpr, AstType, Location, Value};
 
 pub struct Object {
     pub kind: ObjectKind,

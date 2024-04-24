@@ -15,8 +15,9 @@ use crate::state::location::{
     location_references, location_referencesheap, location_str, location_transfigure,
 };
 use crate::state::state::{state_getext, state_vconst};
+use crate::state::State;
 use crate::util::{strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr, StrBuilder};
-use crate::{strbuilder_write, AstExpr, AstType, AstVariable, Location, Object, State};
+use crate::{strbuilder_write, AstExpr, AstType, AstVariable, Location, Object};
 
 #[derive(Clone)]
 pub struct Value {
@@ -77,7 +78,7 @@ pub fn value_int_create(val: libc::c_int) -> Box<Value> {
     value_create(ValueKind::Int(number_single_create(val)))
 }
 
-pub unsafe fn value_literal_create(lit: &str) -> Box<Value> {
+pub fn value_literal_create(lit: &str) -> Box<Value> {
     value_create(ValueKind::Literal(OwningCStr::copy_str(lit)))
 }
 

@@ -7,15 +7,13 @@ use crate::object::object_referencesheap;
 use crate::state::block::{
     block_range_aredeallocands, block_range_dealloc, block_references, block_str,
 };
-use crate::state::clump::clump_getblock;
 use crate::state::heap::{heap_blockisfreed, heap_deallocblock, heap_getblock};
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
 use crate::state::static_memory::{static_memory_getblock, static_memory_hasblock};
+use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
-use crate::{
-    strbuilder_write, AstExpr, Block, Clump, Heap, Stack, State, StaticMemory, VConst, Value,
-};
+use crate::{strbuilder_write, AstExpr, Value};
 
 #[derive(Clone)]
 pub struct Location {
@@ -176,10 +174,10 @@ pub unsafe fn location_tostack(loc: &Location, s: *mut Stack) -> bool {
     type_equal && !b.is_null()
 }
 
-pub unsafe fn location_toclump(loc: &Location, c: *mut Clump) -> bool {
+pub unsafe fn location_toclump(loc: &Location, c: &mut Clump) -> bool {
     let type_equal = matches!(loc.kind, LocationKind::Dereferencable);
-    let b: *mut Block = clump_getblock(c, loc.block);
-    type_equal && !b.is_null()
+    let b = c.get_block(loc.block);
+    type_equal && b.is_some()
 }
 
 unsafe fn location_equal(l1: &Location, l2: &Location) -> bool {
@@ -214,7 +212,7 @@ pub unsafe fn location_getblock(
     _v: &VConst,
     s: *mut Stack,
     h: *mut Heap,
-    c: *mut Clump,
+    c: &mut Clump,
 ) -> Result<*mut Block> {
     if s.is_null() {
         panic!();
@@ -229,7 +227,9 @@ pub unsafe fn location_getblock(
         }
         LocationKind::Automatic { .. } => location_auto_getblock(loc, s),
         LocationKind::Dynamic => Ok(heap_getblock(h, loc.block)),
-        LocationKind::Dereferencable => Ok(clump_getblock(c, loc.block)),
+        LocationKind::Dereferencable => Ok(c
+            .get_block(loc.block)
+            .map_or(ptr::null_mut(), |blk| blk as *mut Block)),
         _ => panic!(),
     }
 }

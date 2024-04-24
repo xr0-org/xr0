@@ -31,13 +31,8 @@ use ast::{
 use ext::Externals;
 use object::Object;
 use props::Props;
-use state::block::Block;
-use state::clump::Clump;
-use state::heap::{Heap, VConst};
 use state::location::Location;
-use state::stack::{Stack, Variable};
-use state::state::State;
-use state::static_memory::StaticMemory;
+use state::stack::Variable;
 use util::{OwningCStr, VERBOSE_MODE};
 use value::Value;
 

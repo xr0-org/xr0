@@ -1,7 +1,8 @@
+use super::Block;
 use crate::state::block::{block_create, block_str};
 use crate::state::location::location_copy;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
-use crate::{strbuilder_write, Block, Location};
+use crate::{strbuilder_write, Location};
 
 pub struct StaticMemory {
     pub blocks: Vec<Box<Block>>,

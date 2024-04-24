@@ -2,6 +2,7 @@ use std::ptr;
 
 use libc::{free, strcmp};
 
+use super::{Block, State};
 use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type,
 };
@@ -18,7 +19,7 @@ use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map, OwningCStr,
 };
 use crate::value::value_abstractcopy;
-use crate::{cstr, strbuilder_write, AstType, AstVariable, Block, Location, Object, State, Value};
+use crate::{cstr, strbuilder_write, AstType, AstVariable, Location, Object, Value};
 
 pub struct Stack {
     pub name: *mut libc::c_char,

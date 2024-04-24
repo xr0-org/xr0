@@ -3,7 +3,6 @@ use std::ptr;
 use libc::strcmp;
 
 use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
-use super::clump::{clump_create, clump_destroy, clump_newblock, clump_str};
 use super::heap::{
     heap_newblock, heap_referenced, heap_str, heap_undeclare, vconst_create, vconst_declare,
     vconst_eval, vconst_get, vconst_str, vconst_undeclare,
@@ -21,6 +20,7 @@ use super::stack::{
 use super::static_memory::{
     static_memory_checkpool, static_memory_newblock, static_memory_str, static_memory_stringpool,
 };
+use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
 use crate::ast::{
     ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
     ast_type_vconst,
@@ -32,15 +32,15 @@ use crate::value::{
     value_ptr_create, value_sync_create,
 };
 use crate::{
-    strbuilder_write, vprintln, AstExpr, AstType, AstVariable, Block, Clump, Externals, Heap,
-    Location, Object, Props, Stack, StaticMemory, VConst, Value, Variable,
+    strbuilder_write, vprintln, AstExpr, AstType, AstVariable, Externals, Location, Object, Props,
+    Value, Variable,
 };
 
 pub struct State {
     pub ext: *mut Externals,
     pub vconst: VConst,
     pub static_memory: StaticMemory,
-    pub clump: *mut Clump,
+    pub clump: Clump,
     pub stack: *mut Stack,
     pub heap: Heap,
     pub props: Props,
@@ -55,7 +55,7 @@ pub unsafe fn state_create(
         ext,
         static_memory: StaticMemory::new(),
         vconst: vconst_create(),
-        clump: clump_create(),
+        clump: Clump::new(),
         stack: stack_create(func, ptr::null_mut(), result_type),
         heap: Heap::new(),
         props: Props::new(),
@@ -72,7 +72,7 @@ pub unsafe fn state_create_withprops(
         ext,
         static_memory: StaticMemory::new(),
         vconst: vconst_create(),
-        clump: clump_create(),
+        clump: Clump::new(),
         stack: stack_create(func, ptr::null_mut(), result_type),
         heap: Heap::new(),
         props,
@@ -84,7 +84,6 @@ impl Drop for State {
         unsafe {
             // Note: The original used a function `static_memory_destroy` which leaked the allocation
             // containing the static_memory value.
-            clump_destroy(self.clump);
             stack_destroy(self.stack);
         }
     }
@@ -95,7 +94,7 @@ pub unsafe fn state_copy(state: &State) -> State {
         ext: state.ext,
         static_memory: state.static_memory.clone(),
         vconst: state.vconst.clone(),
-        clump: Box::into_raw(Box::new((*state.clump).clone())),
+        clump: state.clump.clone(),
         stack: stack_copy(state.stack),
         heap: state.heap.clone(),
         props: state.props.clone(),
@@ -107,7 +106,7 @@ pub unsafe fn state_copywithname(state: &State, func_name: *mut libc::c_char) ->
         ext: state.ext,
         static_memory: state.static_memory.clone(),
         vconst: state.vconst.clone(),
-        clump: Box::into_raw(Box::new((*state.clump).clone())),
+        clump: state.clump.clone(),
         stack: stack_copywithname(state.stack, func_name),
         heap: state.heap.clone(),
         props: state.props.clone(),
@@ -129,7 +128,7 @@ pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     if !vconst.is_empty() {
         strbuilder_write!(b, "{vconst}\n");
     }
-    let clump = clump_str((*state).clump, "\t");
+    let clump = &(*state).clump.str("\t");
     if !clump.is_empty() {
         strbuilder_write!(b, "{clump}\n");
     }
@@ -208,7 +207,7 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value>
 }
 
 pub unsafe fn state_clump(state: *mut State) -> Box<Value> {
-    let address: libc::c_int = clump_newblock((*state).clump);
+    let address: libc::c_int = (*state).clump.new_block();
     let loc = Box::into_raw(location_create_dereferencable(
         address,
         ast_expr_constant_create(0),
@@ -228,7 +227,7 @@ pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
     location_tostatic(loc, &(*state).static_memory)
         || location_toheap(loc, &mut (*state).heap)
         || location_tostack(loc, (*state).stack)
-        || location_toclump(loc, (*state).clump)
+        || location_toclump(loc, &mut (*state).clump)
 }
 
 pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
@@ -258,7 +257,7 @@ pub unsafe fn state_get(
         &(*state).vconst,
         (*state).stack,
         &mut (*state).heap,
-        (*state).clump,
+        &mut (*state).clump,
     )?;
     if b.is_null() {
         assert!(loc.type_is_dynamic() || loc.type_is_dereferencable());
@@ -274,7 +273,7 @@ pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option
         &state.vconst,
         state.stack,
         &mut state.heap,
-        state.clump,
+        &mut state.clump,
     )
     .unwrap();
     if p.is_null() {
@@ -362,7 +361,7 @@ pub unsafe fn state_range_alloc(
         &(*state).vconst,
         (*state).stack,
         &mut (*state).heap,
-        (*state).clump,
+        &mut (*state).clump,
     )
     .unwrap(); // panic rather than propagate the error - this is in the original
     if b.is_null() {
@@ -432,7 +431,7 @@ pub unsafe fn state_range_aredeallocands(
         &(*state).vconst,
         (*state).stack,
         &mut (*state).heap,
-        (*state).clump,
+        &mut (*state).clump,
     )
     .unwrap();
     !b.is_null() && block_range_aredeallocands(&*b, lw, up, state)

@@ -1,13 +1,14 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ptr;
 
+use super::{Block, State};
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
 use crate::state::block::{block_create, block_str, block_undeclare};
 use crate::state::location::location_create_dynamic;
 use crate::state::state::state_references;
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::value_str;
-use crate::{strbuilder_write, AstExpr, Block, Location, State, Value};
+use crate::{strbuilder_write, AstExpr, Location, Value};
 
 #[derive(Clone)]
 pub struct Heap {

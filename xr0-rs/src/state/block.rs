@@ -1,5 +1,6 @@
 use std::ptr;
 
+use super::{Heap, State};
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_difference_create, ast_expr_eq_create,
     ast_expr_sum_create,
@@ -13,13 +14,13 @@ use crate::object::{
 use crate::state::heap::heap_newblock;
 use crate::state::state::{state_alloc, state_eval};
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
-use crate::{strbuilder_write, AstExpr, Heap, Location, Object, State};
+use crate::{strbuilder_write, AstExpr, Location, Object};
 
 pub struct Block {
     pub arr: Vec<*mut Object>,
 }
 
-pub unsafe fn block_create() -> Box<Block> {
+pub fn block_create() -> Box<Block> {
     Box::new(Block { arr: vec![] })
 }
 

@@ -19,6 +19,7 @@ use crate::state::state::{
     state_popframe, state_pushframe, state_range_alloc, state_range_aredeallocands,
     state_range_dealloc, state_static_init, state_str, state_vconst,
 };
+use crate::state::State;
 use crate::util::{
     dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, string_arr_contains, Error,
     InsertionOrderMap, Map, OwningCStr, Result, SemiBox, StrBuilder,
@@ -30,7 +31,7 @@ use crate::value::{
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr,
 };
-use crate::{cstr, strbuilder_write, vprintln, Externals, Object, State, Value};
+use crate::{cstr, strbuilder_write, vprintln, Externals, Object, Value};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
