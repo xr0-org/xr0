@@ -681,7 +681,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		struct result_arr *args, char *fname, struct state *state);
 
 static struct error *
-call_setupverify(struct ast_function *, struct state *state);
+call_setupverify(struct ast_function *, struct ast_expr *, struct state *state);
 
 static struct result *
 call_absexec(struct ast_expr *call, struct state *);
@@ -724,7 +724,8 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		ast_function_abstract(f),
 		ast_function_type(f),
 		true,
-		ast_expr_copy(expr)
+		ast_expr_copy(expr),
+		f
 	);
 	state_pushframe(state, call_frame);
 
@@ -733,7 +734,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	/* XXX: pass copy so we don't observe */
-	if ((err = call_setupverify(f, state_copy(state)))) {
+	if ((err = call_setupverify(f, ast_expr_copy(expr), state_copy(state)))) {
 		return result_error_create(
 			error_printf("precondition failure: %w", err)
 		);
@@ -776,9 +777,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct result *
-call_arbitraryresult(struct ast_expr *call, struct ast_function *, struct state *);
-
-static struct result *
 call_absexec(struct ast_expr *expr, struct state *s)
 {
 	assert(false);
@@ -804,13 +802,18 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 		struct state *arg_state);
 
 static struct error *
-call_setupverify(struct ast_function *f, struct state *arg_state)
+call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *arg_state)
 {
 	struct error *err;
 
 	char *fname = ast_function_name(f);
 	struct frame *setupframe = frame_call_create(
-		fname, ast_function_abstract(f), ast_function_type(f), true, NULL
+		fname,
+		ast_function_abstract(f),
+		ast_function_type(f),
+		true,
+		ast_expr_copy(call),
+		f
 	);
 	struct state *param_state = state_create(
 		setupframe,
@@ -897,16 +900,16 @@ ast_expr_pf_augment(struct value *v, struct ast_expr *call, struct state *state)
 static struct result *
 call_to_computed_value(struct ast_function *, struct state *s);
 
-static struct result *
-call_arbitraryresult(struct ast_expr *expr, struct ast_function *f,
+struct value *
+ast_expr_call_arbitrary(struct ast_expr *expr, struct ast_function *f,
 		struct state *state)
 {
 	struct result *res = call_to_computed_value(f, state);
 	if (result_iserror(res)) {
-		return res;
+		assert(false);
 	}
 	assert(result_hasvalue(res));
-	return res;
+	return result_as_value(res);
 }
 
 static struct result *

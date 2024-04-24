@@ -235,6 +235,12 @@ struct value;
 struct result *
 ast_expr_pf_augment(struct value *, struct ast_expr *, struct state *);
 
+struct ast_function;
+
+struct value *
+ast_expr_call_arbitrary(struct ast_expr *, struct ast_function *,
+	struct state *);
+
 struct ast_block;
 struct lexememarker;
 
@@ -582,7 +588,6 @@ ast_variable_name(struct ast_variable *);
 struct ast_type *
 ast_variable_type(struct ast_variable *);
 
-struct ast_function;
 
 /* ast_function_create: name must be allocated on the heap */
 struct ast_function *
