@@ -372,9 +372,10 @@ pub unsafe fn range_size(r: &Range) -> &AstExpr {
 }
 
 pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
+    // FIXME - this is clearly insane, take Range by value
     state_dealloc(
         s,
-        value_ptr_create(&*r.loc as *const Location as *mut Location),
+        value_ptr_create(Box::from_raw(&*r.loc as *const Location as *mut Location)),
     )
 }
 

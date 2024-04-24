@@ -194,7 +194,7 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
     let lit: *mut libc::c_char = ast_expr_as_literal(expr);
     let mut loc: *mut Location = static_memory_checkpool(&(*state).static_memory, lit);
     if !loc.is_null() {
-        return value_ptr_create(loc);
+        return value_ptr_create(Box::from_raw(loc));
     }
     let address: libc::c_int = static_memory_newblock(&mut (*state).static_memory);
     loc = Box::into_raw(location_create_static(address, ast_expr_constant_create(0)));
@@ -204,7 +204,7 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
     }
     object_assign(obj, value_literal_create(dynamic_str(lit)));
     static_memory_stringpool(&mut (*state).static_memory, lit, loc);
-    value_ptr_create(loc)
+    value_ptr_create(Box::from_raw(loc))
 }
 
 pub unsafe fn state_clump(state: *mut State) -> *mut Value {
@@ -213,7 +213,7 @@ pub unsafe fn state_clump(state: *mut State) -> *mut Value {
         address,
         ast_expr_constant_create(0),
     ));
-    value_ptr_create(loc)
+    value_ptr_create(Box::from_raw(loc))
 }
 
 pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
@@ -316,7 +316,7 @@ pub unsafe fn state_getloc(state: *mut State, id: *mut libc::c_char) -> *mut Val
     if v.is_null() {
         panic!();
     }
-    value_ptr_create(variable_location(v))
+    value_ptr_create(Box::from_raw(variable_location(v)))
 }
 
 pub unsafe fn state_getobject(state: *mut State, id: *mut libc::c_char) -> *mut Object {
@@ -375,7 +375,7 @@ pub unsafe fn state_range_alloc(
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> *mut Value {
-    value_ptr_create(Box::into_raw(heap_newblock(&mut (*state).heap)))
+    value_ptr_create(heap_newblock(&mut (*state).heap))
 }
 
 pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {

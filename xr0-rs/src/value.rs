@@ -69,8 +69,8 @@ fn value_create(kind: ValueKind) -> *mut Value {
     Box::into_raw(Box::new(Value { kind }))
 }
 
-pub unsafe fn value_ptr_create(loc: *mut Location) -> *mut Value {
-    value_create(ValueKind::DefinitePtr(loc))
+pub unsafe fn value_ptr_create(loc: Box<Location>) -> *mut Value {
+    value_create(ValueKind::DefinitePtr(Box::into_raw(loc)))
 }
 
 pub unsafe fn value_ptr_indefinite_create() -> *mut Value {
