@@ -110,7 +110,7 @@ pub unsafe fn location_destroy(loc: *mut Location) {
     drop(Box::from_raw(loc))
 }
 
-pub unsafe fn location_str(loc: &Location) -> OwningCStr {
+pub fn location_str(loc: &Location) -> OwningCStr {
     let mut b = strbuilder_create();
     match &loc.kind {
         LocationKind::Static => {
@@ -134,7 +134,7 @@ pub unsafe fn location_str(loc: &Location) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn offsetzero(loc: &Location) -> bool {
+fn offsetzero(loc: &Location) -> bool {
     let zero = ast_expr_constant_create(0);
     ast_expr_equal(&loc.offset, &zero)
 }

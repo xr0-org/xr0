@@ -68,15 +68,15 @@ fn value_create(kind: ValueKind) -> *mut Value {
     Box::into_raw(Box::new(Value { kind }))
 }
 
-pub unsafe fn value_ptr_create(loc: Box<Location>) -> *mut Value {
+pub fn value_ptr_create(loc: Box<Location>) -> *mut Value {
     value_create(ValueKind::DefinitePtr(loc))
 }
 
-pub unsafe fn value_ptr_indefinite_create() -> *mut Value {
+pub fn value_ptr_indefinite_create() -> *mut Value {
     value_create(ValueKind::IndefinitePtr(number_indefinite_create()))
 }
 
-pub unsafe fn value_int_create(val: libc::c_int) -> *mut Value {
+pub fn value_int_create(val: libc::c_int) -> *mut Value {
     value_create(ValueKind::Int(number_single_create(val)))
 }
 
@@ -85,20 +85,20 @@ pub unsafe fn value_literal_create(lit: *mut libc::c_char) -> *mut Value {
 }
 
 #[allow(dead_code)]
-pub unsafe fn value_int_ne_create(not_val: libc::c_int) -> *mut Value {
+pub fn value_int_ne_create(not_val: libc::c_int) -> *mut Value {
     value_create(ValueKind::Int(number_ne_create(not_val)))
 }
 
 #[allow(dead_code)]
-pub unsafe fn value_int_range_create(lw: libc::c_int, excl_up: libc::c_int) -> *mut Value {
+pub fn value_int_range_create(lw: libc::c_int, excl_up: libc::c_int) -> *mut Value {
     value_create(ValueKind::Int(number_with_range_create(lw, excl_up)))
 }
 
-pub unsafe fn value_int_indefinite_create() -> *mut Value {
+pub fn value_int_indefinite_create() -> *mut Value {
     value_create(ValueKind::Int(number_indefinite_create()))
 }
 
-pub unsafe fn value_sync_create(e: Box<AstExpr>) -> *mut Value {
+pub fn value_sync_create(e: Box<AstExpr>) -> *mut Value {
     value_create(ValueKind::Sync(number_computed_create(e)))
 }
 
@@ -317,20 +317,20 @@ pub unsafe fn value_str(v: &Value) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn value_sync_sprint(n: &Number, b: &mut StrBuilder) {
+fn value_sync_sprint(n: &Number, b: &mut StrBuilder) {
     strbuilder_write!(*b, "comp:{}", number_str(n));
 }
 
-unsafe fn value_definite_ptr_sprint(loc: &Location, b: &mut StrBuilder) {
+fn value_definite_ptr_sprint(loc: &Location, b: &mut StrBuilder) {
     let s = location_str(loc);
     strbuilder_write!(*b, "ptr:{s}");
 }
 
-unsafe fn value_indefinite_ptr_sprint(n: &Number, b: &mut StrBuilder) {
+fn value_indefinite_ptr_sprint(n: &Number, b: &mut StrBuilder) {
     strbuilder_write!(*b, "ptr:{}", number_str(n));
 }
 
-unsafe fn value_int_sprint(n: &Number, b: &mut StrBuilder) {
+fn value_int_sprint(n: &Number, b: &mut StrBuilder) {
     strbuilder_write!(*b, "int:{}", number_str(n));
 }
 
@@ -354,11 +354,11 @@ unsafe fn value_struct_sprint(sv: &StructValue, b: &mut StrBuilder) {
     strbuilder_write!(*b, "}}");
 }
 
-pub unsafe fn value_islocation(v: &Value) -> bool {
+pub fn value_islocation(v: &Value) -> bool {
     matches!(v.kind, ValueKind::DefinitePtr(_))
 }
 
-pub unsafe fn value_as_location(v: &Value) -> &Location {
+pub fn value_as_location(v: &Value) -> &Location {
     let ValueKind::DefinitePtr(loc) = &v.kind else {
         panic!();
     };
@@ -375,7 +375,7 @@ pub unsafe fn value_into_location(v: *mut Value) -> Box<Location> {
 
 pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
     match &v.kind {
-        ValueKind::DefinitePtr(loc) => location_referencesheap(&**loc, s),
+        ValueKind::DefinitePtr(loc) => location_referencesheap(loc, s),
         ValueKind::IndefinitePtr(_) => false,
         ValueKind::Struct(sv) => struct_referencesheap(sv, s),
         _ => false,
@@ -392,28 +392,28 @@ unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
     false
 }
 
-pub unsafe fn value_as_constant(v: &Value) -> libc::c_int {
+pub fn value_as_constant(v: &Value) -> libc::c_int {
     let ValueKind::Int(n) = &v.kind else {
         panic!();
     };
     number_as_constant(n)
 }
 
-pub unsafe fn value_isconstant(v: &Value) -> bool {
+pub fn value_isconstant(v: &Value) -> bool {
     match &v.kind {
         ValueKind::Int(n) => number_isconstant(n),
         _ => false,
     }
 }
 
-pub unsafe fn value_issync(v: &Value) -> bool {
+pub fn value_issync(v: &Value) -> bool {
     match &v.kind {
         ValueKind::Sync(n) => number_issync(n),
         _ => false,
     }
 }
 
-pub unsafe fn value_as_sync(v: &Value) -> &AstExpr {
+pub fn value_as_sync(v: &Value) -> &AstExpr {
     let ValueKind::Sync(n) = &v.kind else {
         panic!();
     };
@@ -428,7 +428,7 @@ pub unsafe fn value_into_sync(v: *mut Value) -> Box<AstExpr> {
     number_into_sync(*n)
 }
 
-pub unsafe fn value_isint(v: &Value) -> bool {
+pub fn value_isint(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Int(_))
 }
 
@@ -444,7 +444,7 @@ pub unsafe fn value_to_expr(v: &Value) -> Box<AstExpr> {
 }
 
 #[allow(dead_code)]
-pub unsafe fn value_isliteral(v: &Value) -> bool {
+pub fn value_isliteral(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Literal(_))
 }
 
@@ -470,7 +470,7 @@ unsafe fn struct_references(sv: &StructValue, loc: &Location, s: *mut State) -> 
     })
 }
 
-pub unsafe fn value_equal(v1: &Value, v2: &Value) -> bool {
+pub fn value_equal(v1: &Value, v2: &Value) -> bool {
     match (&v1.kind, &v2.kind) {
         (ValueKind::Literal(s1), ValueKind::Literal(s2)) => s1 == s2,
         (ValueKind::Sync(n1), ValueKind::Sync(n2)) | (ValueKind::Int(n1), ValueKind::Int(n2)) => {
@@ -489,30 +489,30 @@ pub unsafe fn value_assume(v: *mut Value, value: bool) -> bool {
     }
 }
 
-unsafe fn number_create(kind: NumberKind) -> Box<Number> {
+fn number_create(kind: NumberKind) -> Box<Number> {
     Box::new(Number { kind })
 }
 
-unsafe fn number_ranges_create(ranges: Vec<NumberRange>) -> Box<Number> {
+fn number_ranges_create(ranges: Vec<NumberRange>) -> Box<Number> {
     number_create(NumberKind::Ranges(ranges))
 }
 
-unsafe fn number_single_create(val: libc::c_int) -> Box<Number> {
+fn number_single_create(val: libc::c_int) -> Box<Number> {
     number_create(NumberKind::Ranges(number_range_arr_single_create(val)))
 }
 
-unsafe fn number_range_arr_single_create(val: libc::c_int) -> Vec<NumberRange> {
+fn number_range_arr_single_create(val: libc::c_int) -> Vec<NumberRange> {
     vec![number_range_create(
         number_value_constant_create(val),
         number_value_constant_create(val + 1 as libc::c_int),
     )]
 }
 
-unsafe fn number_computed_create(e: Box<AstExpr>) -> Box<Number> {
+fn number_computed_create(e: Box<AstExpr>) -> Box<Number> {
     number_create(NumberKind::Computed(e))
 }
 
-unsafe fn number_range_arr_ne_create(val: libc::c_int) -> Vec<NumberRange> {
+fn number_range_arr_ne_create(val: libc::c_int) -> Vec<NumberRange> {
     vec![
         number_range_create(number_value_min_create(), number_value_constant_create(val)),
         number_range_create(
@@ -522,18 +522,18 @@ unsafe fn number_range_arr_ne_create(val: libc::c_int) -> Vec<NumberRange> {
     ]
 }
 
-unsafe fn number_ne_create(val: libc::c_int) -> Box<Number> {
+fn number_ne_create(val: libc::c_int) -> Box<Number> {
     number_ranges_create(number_range_arr_ne_create(val))
 }
 
-unsafe fn number_with_range_create(lw: libc::c_int, excl_up: libc::c_int) -> Box<Number> {
+fn number_with_range_create(lw: libc::c_int, excl_up: libc::c_int) -> Box<Number> {
     number_ranges_create(vec![number_range_create(
         number_value_constant_create(lw),
         number_value_constant_create(excl_up),
     )])
 }
 
-unsafe fn number_indefinite_create() -> Box<Number> {
+fn number_indefinite_create() -> Box<Number> {
     number_ranges_create(vec![number_range_create(
         number_value_min_create(),
         number_value_max_create(),
@@ -541,7 +541,7 @@ unsafe fn number_indefinite_create() -> Box<Number> {
 }
 
 #[allow(dead_code)]
-unsafe fn number_range_lw(n: &Number) -> libc::c_int {
+fn number_range_lw(n: &Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
@@ -550,7 +550,7 @@ unsafe fn number_range_lw(n: &Number) -> libc::c_int {
 }
 
 #[allow(dead_code)]
-unsafe fn number_range_up(n: &Number) -> libc::c_int {
+fn number_range_up(n: &Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
@@ -558,7 +558,7 @@ unsafe fn number_range_up(n: &Number) -> libc::c_int {
     number_value_as_constant(ranges[0].upper)
 }
 
-unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
+fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
     let mut b = strbuilder_create();
     strbuilder_putc(&mut b, '{' as i32 as libc::c_char);
     let n = ranges.len();
@@ -570,14 +570,14 @@ unsafe fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn number_str(num: &Number) -> OwningCStr {
+fn number_str(num: &Number) -> OwningCStr {
     match &num.kind {
         NumberKind::Ranges(ranges) => number_ranges_sprint(ranges),
         NumberKind::Computed(computation) => ast_expr_str(computation),
     }
 }
 
-unsafe fn number_equal(n1: &Number, n2: &Number) -> bool {
+fn number_equal(n1: &Number, n2: &Number) -> bool {
     match (&n1.kind, &n2.kind) {
         (NumberKind::Ranges(ranges1), NumberKind::Ranges(ranges2)) => {
             number_ranges_equal(ranges1, ranges2)
@@ -587,7 +587,7 @@ unsafe fn number_equal(n1: &Number, n2: &Number) -> bool {
     }
 }
 
-unsafe fn number_ranges_equal(n1: &[NumberRange], n2: &[NumberRange]) -> bool {
+fn number_ranges_equal(n1: &[NumberRange], n2: &[NumberRange]) -> bool {
     let len = n1.len();
     if len != n2.len() {
         return false;
@@ -597,7 +597,7 @@ unsafe fn number_ranges_equal(n1: &[NumberRange], n2: &[NumberRange]) -> bool {
         .all(|(nr1, nr2)| number_range_equal(nr1, nr2))
 }
 
-unsafe fn number_assume(n: &mut Number, value: bool) -> bool {
+fn number_assume(n: &mut Number, value: bool) -> bool {
     let NumberKind::Ranges(ranges) = &mut n.kind else {
         panic!();
     };
@@ -608,7 +608,7 @@ unsafe fn number_assume(n: &mut Number, value: bool) -> bool {
     true
 }
 
-unsafe fn number_range_assumed_value(value: bool) -> Vec<NumberRange> {
+fn number_range_assumed_value(value: bool) -> Vec<NumberRange> {
     if value {
         number_range_arr_ne_create(0)
     } else {
@@ -616,14 +616,14 @@ unsafe fn number_range_assumed_value(value: bool) -> Vec<NumberRange> {
     }
 }
 
-unsafe fn number_isconstant(n: &Number) -> bool {
+fn number_isconstant(n: &Number) -> bool {
     let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
     ranges.len() == 1 && number_range_issingle(&ranges[0])
 }
 
-unsafe fn number_as_constant(n: &Number) -> libc::c_int {
+fn number_as_constant(n: &Number) -> libc::c_int {
     let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
@@ -631,48 +631,48 @@ unsafe fn number_as_constant(n: &Number) -> libc::c_int {
     number_range_as_constant(&ranges[0])
 }
 
-unsafe fn number_issync(n: &Number) -> bool {
+fn number_issync(n: &Number) -> bool {
     matches!(n.kind, NumberKind::Computed(_))
 }
 
-unsafe fn number_as_sync(n: &Number) -> &AstExpr {
+fn number_as_sync(n: &Number) -> &AstExpr {
     let NumberKind::Computed(computation) = &n.kind else {
         panic!();
     };
     computation
 }
 
-unsafe fn number_into_sync(n: Number) -> Box<AstExpr> {
+fn number_into_sync(n: Number) -> Box<AstExpr> {
     let NumberKind::Computed(computation) = n.kind else {
         panic!();
     };
     computation
 }
 
-unsafe fn number_to_expr(n: &Number) -> Box<AstExpr> {
+fn number_to_expr(n: &Number) -> Box<AstExpr> {
     match &n.kind {
         NumberKind::Ranges(ranges) => number_ranges_to_expr(ranges),
         NumberKind::Computed(computation) => ast_expr_copy(computation),
     }
 }
 
-unsafe fn number_ranges_to_expr(arr: &[NumberRange]) -> Box<AstExpr> {
+fn number_ranges_to_expr(arr: &[NumberRange]) -> Box<AstExpr> {
     assert_eq!(arr.len(), 1);
     ast_expr_constant_create(number_range_as_constant(&arr[0]))
 }
 
-unsafe fn number_range_arr_canbe(arr: &[NumberRange], value: bool) -> bool {
+fn number_range_arr_canbe(arr: &[NumberRange], value: bool) -> bool {
     arr.iter().any(|range| number_range_canbe(range, value))
 }
 
-unsafe fn number_range_create(lw: NumberValue, up: NumberValue) -> NumberRange {
+fn number_range_create(lw: NumberValue, up: NumberValue) -> NumberRange {
     NumberRange {
         lower: lw,
         upper: up,
     }
 }
 
-unsafe fn number_range_str(r: &NumberRange) -> OwningCStr {
+fn number_range_str(r: &NumberRange) -> OwningCStr {
     let mut b = strbuilder_create();
     if number_range_issingle(r) {
         strbuilder_write!(b, "{}", number_value_str(&r.lower));
@@ -687,7 +687,7 @@ unsafe fn number_range_str(r: &NumberRange) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn number_range_canbe(r: &NumberRange, value: bool) -> bool {
+fn number_range_canbe(r: &NumberRange, value: bool) -> bool {
     if value {
         if number_value_equal(&r.lower, &r.upper) {
             return false;
@@ -698,38 +698,38 @@ unsafe fn number_range_canbe(r: &NumberRange, value: bool) -> bool {
     }
 }
 
-unsafe fn number_range_issingle(r: &NumberRange) -> bool {
+fn number_range_issingle(r: &NumberRange) -> bool {
     number_values_aresingle(&r.lower, &r.upper)
 }
 
-unsafe fn number_range_equal(r1: &NumberRange, r2: &NumberRange) -> bool {
+fn number_range_equal(r1: &NumberRange, r2: &NumberRange) -> bool {
     number_value_equal(&r1.lower, &r2.lower) && number_value_equal(&r1.upper, &r2.upper)
 }
 
-unsafe fn number_range_as_constant(r: &NumberRange) -> libc::c_int {
+fn number_range_as_constant(r: &NumberRange) -> libc::c_int {
     if !number_range_issingle(r) {
         panic!();
     }
     number_value_as_constant(r.lower)
 }
 
-unsafe fn number_value_constant_create(constant: libc::c_int) -> NumberValue {
+fn number_value_constant_create(constant: libc::c_int) -> NumberValue {
     NumberValue::Constant(constant)
 }
 
-unsafe fn number_value_limit_create(max: bool) -> NumberValue {
+fn number_value_limit_create(max: bool) -> NumberValue {
     NumberValue::Limit(max)
 }
 
-unsafe fn number_value_min_create() -> NumberValue {
+fn number_value_min_create() -> NumberValue {
     number_value_limit_create(false)
 }
 
-unsafe fn number_value_max_create() -> NumberValue {
+fn number_value_max_create() -> NumberValue {
     number_value_limit_create(true)
 }
 
-unsafe fn number_value_str(v: &NumberValue) -> OwningCStr {
+fn number_value_str(v: &NumberValue) -> OwningCStr {
     let mut b = strbuilder_create();
     match v {
         NumberValue::Constant(k) => {
@@ -745,7 +745,7 @@ unsafe fn number_value_str(v: &NumberValue) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {
+fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {
     match (*v1, *v2) {
         (NumberValue::Constant(k1), NumberValue::Constant(k2)) => k1 == k2 - 1,
         (NumberValue::Limit(max1), NumberValue::Limit(max2)) => max1 == max2,
@@ -754,14 +754,14 @@ unsafe fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {
 }
 
 #[allow(dead_code)]
-unsafe fn number_value_difference(v1: &NumberValue, v2: &NumberValue) -> libc::c_int {
+fn number_value_difference(v1: &NumberValue, v2: &NumberValue) -> libc::c_int {
     match (*v1, *v2) {
         (NumberValue::Constant(v1), NumberValue::Constant(v2)) => v1 - v2,
         _ => panic!(),
     }
 }
 
-unsafe fn number_value_equal(v1: &NumberValue, v2: &NumberValue) -> bool {
+fn number_value_equal(v1: &NumberValue, v2: &NumberValue) -> bool {
     match (*v1, *v2) {
         (NumberValue::Constant(k1), NumberValue::Constant(k2)) => k1 == k2,
         (NumberValue::Limit(max1), NumberValue::Limit(max2)) => max1 == max2,
@@ -769,21 +769,21 @@ unsafe fn number_value_equal(v1: &NumberValue, v2: &NumberValue) -> bool {
     }
 }
 
-unsafe fn number_value_as_constant(v: NumberValue) -> libc::c_int {
+fn number_value_as_constant(v: NumberValue) -> libc::c_int {
     match v {
         NumberValue::Constant(k) => k,
         _ => panic!(),
     }
 }
 
-unsafe fn number_value_le_constant(v: NumberValue, constant: libc::c_int) -> bool {
+fn number_value_le_constant(v: NumberValue, constant: libc::c_int) -> bool {
     match v {
         NumberValue::Constant(k) => k <= constant,
         NumberValue::Limit(max) => !max,
     }
 }
 
-unsafe fn constant_le_number_value(constant: libc::c_int, v: NumberValue) -> bool {
+fn constant_le_number_value(constant: libc::c_int, v: NumberValue) -> bool {
     match v {
         NumberValue::Constant(k) => constant <= k,
         NumberValue::Limit(max) => max,
