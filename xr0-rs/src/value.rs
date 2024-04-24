@@ -147,14 +147,6 @@ pub unsafe fn value_struct_indefinite_create(
     v
 }
 
-unsafe fn ptr_referencesheap(v: &Value, s: *mut State) -> bool {
-    match &v.kind {
-        ValueKind::DefinitePtr(loc) => location_referencesheap(&**loc, s),
-        ValueKind::IndefinitePtr(_) => false,
-        _ => panic!(),
-    }
-}
-
 #[allow(dead_code)]
 pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool) -> *mut Value {
     match &(*v).kind {
@@ -268,16 +260,6 @@ pub unsafe fn value_struct_member(v: *mut Value, member: *mut libc::c_char) -> *
     };
     let member = CStr::from_ptr(member).to_str().unwrap();
     sv.m.get(member).copied().unwrap_or(ptr::null_mut())
-}
-
-unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
-    for &p in sv.m.values() {
-        let val: *mut Value = object_as_value(p);
-        if !val.is_null() && value_referencesheap(&*val, s) {
-            return true;
-        }
-    }
-    false
 }
 
 pub unsafe fn value_copy(v: &Value) -> *mut Value {
@@ -421,10 +403,21 @@ pub unsafe fn value_into_location(v: *mut Value) -> Box<Location> {
 
 pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
     match &v.kind {
-        ValueKind::DefinitePtr(_) | ValueKind::IndefinitePtr(_) => ptr_referencesheap(v, s),
+        ValueKind::DefinitePtr(loc) => location_referencesheap(&**loc, s),
+        ValueKind::IndefinitePtr(_) => false,
         ValueKind::Struct(sv) => struct_referencesheap(sv, s),
         _ => false,
     }
+}
+
+unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
+    for &p in sv.m.values() {
+        let val: *mut Value = object_as_value(p);
+        if !val.is_null() && value_referencesheap(&*val, s) {
+            return true;
+        }
+    }
+    false
 }
 
 pub unsafe fn value_as_constant(v: &Value) -> libc::c_int {
