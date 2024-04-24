@@ -472,7 +472,7 @@ static struct error *
 register_mov_exec(struct ast_variable *temp, struct state *state)
 {
 	state_declare(state, temp, false);
-	struct value *v = state_readregister(state);
+	struct value *v = state_popregister(state);
 	struct ast_expr *name = ast_expr_identifier_create(
 		dynamic_str(ast_variable_name(temp))
 	);

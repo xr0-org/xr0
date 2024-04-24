@@ -152,6 +152,9 @@ bool
 state_equal(struct state *s1, struct state *s2);
 
 struct value *
+state_popregister(struct state *);
+
+struct value *
 state_readregister(struct state *);
 
 void
