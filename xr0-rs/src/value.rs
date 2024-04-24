@@ -295,10 +295,18 @@ impl Clone for ValueKind {
                 ValueKind::IndefinitePtr(n) => ValueKind::IndefinitePtr(n.clone()),
                 ValueKind::Int(n) => ValueKind::Int(n.clone()),
                 ValueKind::Literal(s) => ValueKind::Literal(s.clone()),
-                ValueKind::Struct(struct_) => ValueKind::Struct(Box::new(StructValue {
-                    members: struct_.members.clone(),
-                    m: copy_members(&struct_.m),
-                })),
+                ValueKind::Struct(struct_) => ValueKind::Struct(struct_.clone()),
+            }
+        }
+    }
+}
+
+impl Clone for StructValue {
+    fn clone(&self) -> Self {
+        unsafe {
+            StructValue {
+                members: self.members.clone(),
+                m: copy_members(&self.m),
             }
         }
     }
