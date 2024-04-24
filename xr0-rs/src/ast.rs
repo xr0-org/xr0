@@ -681,25 +681,24 @@ fn expr_to_binary(expr: &AstExpr) -> Box<AstExpr> {
 }
 
 unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
-    if let Ok(res) = hack_identifier_builtin_eval(ast_expr_as_identifier(expr), state) {
+    let id = ast_expr_as_identifier(expr);
+    if let Ok(res) = hack_identifier_builtin_eval(id.as_ptr(), state) {
         if !res.is_null() {
             return Ok(res);
         }
     }
-    let id = ast_expr_as_identifier(expr);
-    if *id.offset(0 as libc::c_int as isize) as libc::c_int == '#' as i32 {
-        return Ok(value_literal_create(id));
+    if id.as_str().starts_with('#') {
+        return Ok(value_literal_create(id.as_ptr()));
     }
-    let obj: *mut Object = state_getobject(state, id);
+    let obj: *mut Object = state_getobject(state, id.as_ptr());
     if obj.is_null() {
-        return Err(Error::new(format!("unknown idenitfier {}", cstr!(id))));
+        return Err(Error::new(format!("unknown idenitfier {id}")));
     }
     let val: *mut Value = object_as_value(obj);
     if val.is_null() {
         vprintln!("state: {}", state_str(state));
         return Err(Error::new(format!(
-            "undefined memory access: {} has no value",
-            cstr!(id)
+            "undefined memory access: {id} has no value",
         )));
     }
     Ok(value_copy(&*val))
@@ -728,7 +727,7 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<*mut V
 unsafe fn address_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     let operand = ast_expr_unary_operand(expr);
     let id = ast_expr_as_identifier(operand);
-    let v: *mut Value = state_getloc(state, id);
+    let v: *mut Value = state_getloc(state, id.as_ptr());
     Ok(v)
 }
 
@@ -889,8 +888,8 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LVa
 pub unsafe fn expr_identifier_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
     let id = ast_expr_as_identifier(expr);
     Ok(lvalue_create(
-        Some(state_getobjecttype(&*state, id)),
-        state_getobject(state, id),
+        Some(state_getobjecttype(&*state, id.as_ptr())),
+        state_getobject(state, id.as_ptr()),
     ))
 }
 
@@ -921,15 +920,15 @@ fn ast_expr_constant_str_build(expr: &AstExpr, b: &mut StrBuilder) {
 unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction<'static> = (*state_getext(state)).get_func(name);
+    let f: *mut AstFunction<'static> = (*state_getext(state)).get_func(name.as_ptr());
     if f.is_null() {
-        return Err(Error::new(format!("function `{}' not found", cstr!(name))));
+        return Err(Error::new(format!("function `{name}' not found")));
     }
     let params = (*f).params();
     let rtype = (*f).rtype();
     let args = prepare_arguments(ast_expr_call_args(expr), params, state);
-    state_pushframe(state, dynamic_str(name), rtype);
-    prepare_parameters(params, args, name, state)?;
+    state_pushframe(state, dynamic_str(name.as_ptr()), rtype);
+    prepare_parameters(params, args, name.as_ptr(), state)?;
     call_setupverify(f, &mut state_copy(&*state))?;
     let mut v = call_absexec(expr, state)?;
     if !v.is_null() {
@@ -945,9 +944,9 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Value
 unsafe fn call_absexec(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction<'static> = (*state_getext(s)).get_func(name);
+    let f: *mut AstFunction<'static> = (*state_getext(s)).get_func(name.as_ptr());
     if f.is_null() {
-        return Err(Error::new(format!("function `{}' not found", cstr!(name))));
+        return Err(Error::new(format!("function `{name}' not found")));
     }
     let v = ast_function_absexec(&*f, s)?;
     if !v.is_null() {
@@ -1169,11 +1168,11 @@ pub fn ast_expr_literal_create(s: OwningCStr) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::StringLiteral(s))
 }
 
-pub fn ast_expr_as_literal(expr: &AstExpr) -> *mut libc::c_char {
+pub fn ast_expr_as_literal(expr: &AstExpr) -> &OwningCStr {
     let AstExprKind::StringLiteral(s) = &expr.kind else {
         panic!()
     };
-    s.as_ptr()
+    s
 }
 
 pub fn ast_expr_as_constant(expr: &AstExpr) -> libc::c_int {
@@ -1206,11 +1205,11 @@ pub fn ast_expr_constant_create(k: libc::c_int) -> Box<AstExpr> {
     }))
 }
 
-pub fn ast_expr_as_identifier(expr: &AstExpr) -> *mut libc::c_char {
+pub fn ast_expr_as_identifier(expr: &AstExpr) -> &OwningCStr {
     let AstExprKind::Identifier(id) = &expr.kind else {
         panic!()
     };
-    id.as_ptr()
+    id
 }
 
 fn ast_expr_create(kind: AstExprKind) -> Box<AstExpr> {
@@ -1261,7 +1260,7 @@ unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> Result<*mut Value> {
         reduced_args.push(value_to_expr(&*val));
     }
     Ok(value_sync_create(ast_expr_call_create(
-        ast_expr_identifier_create(OwningCStr::copy_char_ptr(root)),
+        ast_expr_identifier_create(root.clone()),
         reduced_args,
     )))
 }
@@ -1777,16 +1776,16 @@ pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplit
 unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> Result<AstStmtSplits> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction = (*state_getext(state)).get_func(name);
+    let f: *mut AstFunction = (*state_getext(state)).get_func(name.as_ptr());
     if f.is_null() {
-        return Err(Error::new(format!("function: `{}' not found", cstr!(name))));
+        return Err(Error::new(format!("function: `{name}' not found")));
     }
     let params = (*f).params();
     let mut s_copy = state_copy(&*state);
     let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
     let ret_type = (*f).rtype();
-    state_pushframe(&mut s_copy, dynamic_str(name), ret_type);
-    prepare_parameters(params, args, name, &mut s_copy)?;
+    state_pushframe(&mut s_copy, dynamic_str(name.as_ptr()), ret_type);
+    prepare_parameters(params, args, name.as_ptr(), &mut s_copy)?;
     let mut conds = vec![];
     let abs = (*f).abstract_block();
     for var in &abs.decls {

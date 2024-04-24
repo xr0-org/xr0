@@ -191,8 +191,8 @@ pub unsafe fn state_vconst(
 }
 
 pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value {
-    let lit: *mut libc::c_char = ast_expr_as_literal(expr);
-    let mut loc: *mut Location = static_memory_checkpool(&(*state).static_memory, lit);
+    let lit = ast_expr_as_literal(expr);
+    let mut loc: *mut Location = static_memory_checkpool(&(*state).static_memory, lit.as_ptr());
     if !loc.is_null() {
         return value_ptr_create(Box::from_raw(loc));
     }
@@ -202,8 +202,8 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
     if obj.is_null() {
         panic!();
     }
-    object_assign(obj, value_literal_create(dynamic_str(lit)));
-    static_memory_stringpool(&mut (*state).static_memory, lit, loc);
+    object_assign(obj, value_literal_create(dynamic_str(lit.as_ptr())));
+    static_memory_stringpool(&mut (*state).static_memory, lit.as_ptr(), loc);
     value_ptr_create(Box::from_raw(loc))
 }
 
