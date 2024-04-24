@@ -310,7 +310,8 @@ path_init_abstract(struct path *p)
 		ast_function_abstract(p->f),
 		ast_function_type(p->f),
 		true,
-		NULL
+		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
+		p->f
 	);
 	p->abstract = state_create(f, p->ext);
 	struct error *err = ast_function_initparams(p->f, p->abstract);
@@ -330,7 +331,8 @@ path_init_actual(struct path *p)
 		ast_function_body(p->f),
 		ast_function_type(p->f),
 		false,
-		NULL
+		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
+		p->f
 	);
 	p->actual = state_create_withprops(
 		f,

@@ -28,6 +28,7 @@ struct stack {
 	struct stack *prev;
 	enum frame_kind kind;
 	struct ast_expr *call;
+	struct ast_function *f;
 };
 
 struct frame {
@@ -37,6 +38,7 @@ struct frame {
 	bool abstract;
 	enum frame_kind kind;
 	struct ast_expr *call;
+	struct ast_function *f;
 };
 
 struct location *
@@ -69,8 +71,8 @@ stack_create(struct frame *f, struct stack *prev)
 
 	if (stack->kind == FRAME_CALL) {
 		stack->call = f->call;
+		stack->f = f->f;
 	}
-
 
 	return stack;
 }
@@ -167,6 +169,10 @@ stack_copy(struct stack *stack)
 		copy->prev = stack_copy(stack->prev);
 	}
 	copy->kind = stack->kind;
+	if (stack->kind == FRAME_CALL) {
+		copy->call = ast_expr_copy(stack->call);
+		copy->f = ast_function_copy(stack->f);
+	}
 	return copy;
 }
 
@@ -378,6 +384,20 @@ stack_getvariable(struct stack *s, char *id)
 	return v;
 }
 
+void
+stack_popprep(struct stack *s, struct state *state)
+{
+	if (s->kind == FRAME_CALL) {
+		struct value *v = state_readregister(state);
+		if (!v) {
+			state_writeregister(
+				state,
+				ast_expr_call_arbitrary(s->call, s->f, state)
+			);
+		}	
+	}
+}
+
 bool
 stack_references(struct stack *s, struct location *loc, struct state *state)
 {
@@ -423,10 +443,11 @@ frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs,
 }
 
 struct frame *
-frame_call_create(char *n, struct ast_block *b, struct ast_type *r, bool abs, struct ast_expr *call)
+frame_call_create(char *n, struct ast_block *b, struct ast_type *r, bool abs, struct ast_expr *call, struct ast_function *func)
 {
 	struct frame *f = frame_create(n, b, r, abs, FRAME_CALL);
 	f->call = call;
+	f->f = func;
 	return f;
 }
 
@@ -448,13 +469,18 @@ frame_copy(struct frame *f)
 	if (f->kind == FRAME_CALL) {
 		assert(f->ret_type);
 	}
-	return frame_create(
+	struct frame *copy = frame_create(
 		dynamic_str(f->name),
 		ast_block_copy(f->b),
 		f->ret_type ? ast_type_copy(f->ret_type) : NULL,
 		f->abstract,
 		f->kind
 	); 
+	if (f->kind == FRAME_CALL) {
+		copy->f = ast_function_copy(f->f);
+		copy->call = ast_expr_copy(f->call);
+	}
+	return copy;
 }
 
 static void

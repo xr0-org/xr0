@@ -176,7 +176,7 @@ state_framecall(struct state *);
 /* FRAME DTO */
 
 struct frame *
-frame_call_create(char *name, struct ast_block *, struct ast_type *, bool abs, struct ast_expr *);
+frame_call_create(char *name, struct ast_block *, struct ast_type *, bool abs, struct ast_expr *, struct ast_function *);
 
 struct frame *
 frame_block_create(char *name, struct ast_block *, bool abs);

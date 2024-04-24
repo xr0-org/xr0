@@ -203,6 +203,8 @@ state_pushframe(struct state *state, struct frame *f)
 void
 state_popframe(struct state *state)
 {
+	stack_popprep(state->stack, state);
+
 	struct stack *old = state->stack;
 	state->stack = stack_prev(old); /* pop */
 	assert(state->stack);
