@@ -28,6 +28,7 @@ struct stack {
 	int id;
 	struct stack *prev;
 	enum frame_kind kind;
+	struct ast_expr *call;
 };
 
 struct frame {
@@ -36,6 +37,7 @@ struct frame {
 	struct ast_type *ret_type;
 	bool abstract;
 	enum frame_kind kind;
+	struct ast_expr *call;
 };
 
 struct location *
@@ -67,6 +69,11 @@ stack_create(struct frame *f, struct stack *prev)
 	stack->kind = f->kind;
 	stack->result = stack->kind != FRAME_CALL
 		? NULL : variable_create(f->ret_type, stack, false);
+
+	if (stack->kind == FRAME_CALL) {
+		stack->call = f->call;
+	}
+
 
 	return stack;
 }
@@ -114,6 +121,16 @@ stack_return(struct stack *s)
 	}
 }
 
+struct ast_expr *
+stack_framecall(struct stack *s)
+{
+	if (s->kind == FRAME_CALL) {
+		assert(s->call);
+		return s->call;
+	}
+	return NULL;
+}
+
 void
 stack_destroy(struct stack *stack)
 {
@@ -128,6 +145,8 @@ stack_destroy(struct stack *stack)
 	if (stack->result) {
 		variable_destroy(stack->result);
 	}
+
+	/* XXX: call expr leak */
 
 	program_destroy(stack->p);
 	free(stack);
@@ -431,9 +450,11 @@ frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs,
 }
 
 struct frame *
-frame_call_create(char *n, struct ast_block *b, struct ast_type *r, bool abs)
+frame_call_create(char *n, struct ast_block *b, struct ast_type *r, bool abs, struct ast_expr *call)
 {
-	return frame_create(n, b, r, abs, FRAME_CALL);
+	struct frame *f = frame_create(n, b, r, abs, FRAME_CALL);
+	f->call = call;
+	return f;
 }
 
 struct frame *

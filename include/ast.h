@@ -230,6 +230,11 @@ ast_expr_abseval(struct ast_expr *, struct state *);
 struct result *
 ast_expr_pf_reduce(struct ast_expr *, struct state *);
 
+struct value;
+
+struct result *
+ast_expr_pf_augment(struct value *, struct ast_expr *, struct state *);
+
 struct ast_block;
 struct lexememarker;
 
@@ -514,7 +519,6 @@ ast_type_isstruct(struct ast_type *);
 bool
 ast_type_istypedef(struct ast_type *);
 
-struct value;
 struct externals;
 
 struct value *

@@ -279,6 +279,12 @@ state_return(struct state *s)
 	stack_return(s->stack);	
 }
 
+struct ast_expr *
+state_framecall(struct state *s)
+{
+	return stack_framecall(s->stack);
+}
+
 struct value *
 state_static_init(struct state *state, struct ast_expr *expr)
 {
