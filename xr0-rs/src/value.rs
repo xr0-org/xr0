@@ -204,7 +204,10 @@ unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, *mut Obj
         let id = ast_variable_name(var).as_str().to_string();
         m.insert(
             id,
-            object_value_create(ast_expr_constant_create(0), ptr::null_mut()),
+            Box::into_raw(object_value_create(
+                ast_expr_constant_create(0),
+                ptr::null_mut(),
+            )),
         );
     }
     m
@@ -212,7 +215,7 @@ unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, *mut Obj
 
 unsafe fn copy_members(old: &HashMap<String, *mut Object>) -> HashMap<String, *mut Object> {
     old.iter()
-        .map(|(k, &v)| (k.clone(), object_copy(v)))
+        .map(|(k, &v)| (k.clone(), Box::into_raw(object_copy(v))))
         .collect()
 }
 
@@ -228,7 +231,7 @@ unsafe fn abstract_copy_members(
     s: *mut State,
 ) -> HashMap<String, *mut Object> {
     old.iter()
-        .map(|(k, &v)| (k.clone(), object_abstractcopy(v, s)))
+        .map(|(k, &v)| (k.clone(), Box::into_raw(object_abstractcopy(v, s))))
         .collect()
 }
 

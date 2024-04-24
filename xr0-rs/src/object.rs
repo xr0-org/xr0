@@ -33,18 +33,18 @@ pub struct Range {
     loc: Box<Location>,
 }
 
-pub unsafe fn object_value_create(offset: Box<AstExpr>, v: *mut Value) -> *mut Object {
-    Box::into_raw(Box::new(Object {
+pub unsafe fn object_value_create(offset: Box<AstExpr>, v: *mut Value) -> Box<Object> {
+    Box::new(Object {
         kind: ObjectKind::Value(v),
         offset,
-    }))
+    })
 }
 
-pub unsafe fn object_range_create(offset: Box<AstExpr>, r: Box<Range>) -> *mut Object {
-    Box::into_raw(Box::new(Object {
+pub unsafe fn object_range_create(offset: Box<AstExpr>, r: Box<Range>) -> Box<Object> {
+    Box::new(Object {
         kind: ObjectKind::DeallocandRange(r),
         offset,
-    }))
+    })
 }
 
 pub unsafe fn object_destroy(obj: *mut Object) {
@@ -66,8 +66,8 @@ impl Drop for Object {
     }
 }
 
-pub unsafe fn object_copy(old: *mut Object) -> *mut Object {
-    Box::into_raw(Box::new(Object {
+pub unsafe fn object_copy(old: *mut Object) -> Box<Object> {
+    Box::new(Object {
         kind: match &(*old).kind {
             ObjectKind::Value(v) => ObjectKind::Value(if !(*v).is_null() {
                 value_copy(&**v)
@@ -77,10 +77,10 @@ pub unsafe fn object_copy(old: *mut Object) -> *mut Object {
             ObjectKind::DeallocandRange(range) => ObjectKind::DeallocandRange(range.clone()),
         },
         offset: ast_expr_copy(&*(*old).offset),
-    }))
+    })
 }
 
-pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> *mut Object {
+pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> Box<Object> {
     match &(*old).kind {
         ObjectKind::DeallocandRange(_) => object_copy(old),
         ObjectKind::Value(v) => object_value_create(
@@ -245,7 +245,11 @@ pub unsafe fn object_issingular(obj: *mut Object, s: &State) -> bool {
     result
 }
 
-pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State) -> *mut Object {
+pub unsafe fn object_upto(
+    obj: *mut Object,
+    excl_up: *mut AstExpr,
+    s: *mut State,
+) -> Option<Box<Object>> {
     let lw: *mut AstExpr = &mut *(*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
     let prop0 = ast_expr_le_create(ast_expr_copy(&*lw), ast_expr_copy(&*excl_up));
@@ -262,28 +266,35 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
         panic!();
     }
     if e1 {
-        return ptr::null_mut();
+        return None;
     }
     if e2 {
         let ObjectKind::Value(v) = &(*obj).kind else {
             panic!();
         };
-        return object_value_create(ast_expr_copy(&*(*obj).offset), value_copy(&**v));
+        return Some(object_value_create(
+            ast_expr_copy(&*(*obj).offset),
+            value_copy(&**v),
+        ));
     }
 
     // Note: This makes one copy of `obj->offset` but also just does `Box::from_raw(lw)` which ...
     // seems like it's take ownership of `obj->offset`, and maybe we leak `obj` to avoid a double
     // free?
-    object_range_create(
+    Some(object_range_create(
         ast_expr_copy(&*(*obj).offset),
         range_create(
             ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
             value_into_location(state_alloc(s)),
         ),
-    )
+    ))
 }
 
-pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) -> *mut Object {
+pub unsafe fn object_from(
+    obj: *mut Object,
+    incl_lw: &AstExpr,
+    s: *mut State,
+) -> Option<Box<Object>> {
     let lw = &(*obj).offset;
     let up: *mut AstExpr = object_upper(obj);
     let prop0 = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(&*up));
@@ -294,22 +305,25 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
     drop(prop0);
     if e0 {
         ast_expr_destroy(up);
-        return ptr::null_mut();
+        return None;
     }
     if e1 {
         let ObjectKind::Value(v) = &(*obj).kind else {
             panic!();
         };
         ast_expr_destroy(up);
-        return object_value_create(ast_expr_copy(incl_lw), value_copy(&**v));
+        return Some(object_value_create(
+            ast_expr_copy(incl_lw),
+            value_copy(&**v),
+        ));
     }
-    object_range_create(
+    Some(object_range_create(
         ast_expr_copy(incl_lw),
         range_create(
             ast_expr_difference_create(Box::from_raw(up), ast_expr_copy(incl_lw)),
             value_into_location(state_alloc(s)),
         ),
-    )
+    ))
 }
 
 pub unsafe fn object_dealloc(obj: *mut Object, s: *mut State) -> Result<()> {
@@ -348,17 +362,17 @@ pub unsafe fn object_getmembertype(
     value_struct_membertype(&*getorcreatestruct(obj, t, s), member)
 }
 
-pub unsafe fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {
+pub fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {
     Box::new(Range { size, loc })
 }
 
-pub unsafe fn range_str(r: &Range) -> OwningCStr {
+pub fn range_str(r: &Range) -> OwningCStr {
     let mut b = strbuilder_create();
     strbuilder_write!(b, "virt:{}@{}", r.size, location_str(&r.loc));
     strbuilder_build(b)
 }
 
-pub unsafe fn range_size(r: &Range) -> &AstExpr {
+pub fn range_size(r: &Range) -> &AstExpr {
     &r.size
 }
 

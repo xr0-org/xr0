@@ -40,7 +40,7 @@ impl Clone for Block {
                 .arr
                 .iter()
                 .copied()
-                .map(|obj| unsafe { object_copy(obj) })
+                .map(|obj| unsafe { Box::into_raw(object_copy(obj)) })
                 .collect(),
         }
     }
@@ -71,7 +71,8 @@ pub unsafe fn block_observe(
         if !constructive {
             return ptr::null_mut();
         }
-        let obj: *mut Object = object_value_create(ast_expr_copy(offset), ptr::null_mut());
+        let obj: *mut Object =
+            Box::into_raw(object_value_create(ast_expr_copy(offset), ptr::null_mut()));
         (*b).arr.push(obj);
         return obj;
     };
@@ -87,22 +88,23 @@ pub unsafe fn block_observe(
     // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down. I don't
     // know why it isn't a double free.
     let lw_ptr = Box::into_raw(lw);
-    let upto: *mut Object = object_upto(obj, lw_ptr, s);
-    let observed: *mut Object = object_value_create(ast_expr_copy(&*lw_ptr), state_alloc(s));
-    let from: *mut Object = object_from(obj, &up, s);
+    let upto = object_upto(obj, lw_ptr, s);
+    let observed = object_value_create(ast_expr_copy(&*lw_ptr), state_alloc(s));
+    let from = object_from(obj, &up, s);
     drop(up);
     drop(Box::from_raw(lw_ptr));
 
     object_dealloc(obj, s).unwrap();
     (*b).arr.remove(index);
-    if !upto.is_null() {
-        (*b).arr.insert(index, upto);
+    if let Some(upto) = upto {
+        (*b).arr.insert(index, Box::into_raw(upto));
         index += 1;
     }
+    let observed = Box::into_raw(observed);
     (*b).arr.insert(index, observed);
     index += 1;
-    if !from.is_null() {
-        (*b).arr.insert(index, from);
+    if let Some(from) = from {
+        (*b).arr.insert(index, Box::into_raw(from));
     }
     observed
 }
@@ -118,13 +120,13 @@ pub unsafe fn block_range_alloc(
     heap: *mut Heap,
 ) -> Result<()> {
     assert!(b.arr.is_empty());
-    b.arr.push(object_range_create(
+    b.arr.push(Box::into_raw(object_range_create(
         ast_expr_copy(lw),
         range_create(
             ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
             heap_newblock(heap),
         ),
-    ));
+    )));
     Ok(())
 }
 
@@ -201,15 +203,15 @@ pub unsafe fn block_range_dealloc(
     let n = b.arr.len();
     // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`. I
     // don't know why it isn't a double free.
-    let upto: *mut Object = object_upto(b.arr[lw_index], lw as *const AstExpr as *mut AstExpr, s);
-    let from: *mut Object = object_from(b.arr[up_index], up, s);
+    let upto = object_upto(b.arr[lw_index], lw as *const AstExpr as *mut AstExpr, s);
+    let from = object_from(b.arr[up_index], up, s);
     let mut new = b.arr[..lw_index].to_vec();
-    if !upto.is_null() {
+    if let Some(upto) = upto {
         // Note: Possibly appending so that they'll be destroyed? But then b.arr is overwritten without destroying it.
-        b.arr.push(upto);
+        b.arr.push(Box::into_raw(upto));
     }
-    if !from.is_null() {
-        b.arr.push(from);
+    if let Some(from) = from {
+        b.arr.push(Box::into_raw(from));
     }
     for i in (up_index + 1)..n {
         // Note: Original uses `obj` after `object_arr_append` which might invalidate it. XXX BIG point
@@ -227,7 +229,7 @@ pub unsafe fn block_undeclare(b: *mut Block, s: *mut State) {
     let mut new = vec![];
     for &obj in &(*b).arr {
         if object_referencesheap(obj, s) {
-            new.push(object_abstractcopy(obj, s));
+            new.push(Box::into_raw(object_abstractcopy(obj, s)));
         }
     }
     (*b).arr = new;
