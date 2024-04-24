@@ -980,7 +980,7 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<*mut 
         });
     }
     Ok(value_sync_create(ast_expr_call_create(
-        ast_expr_identifier_create(OwningCStr::copy_char_ptr(root)),
+        ast_expr_identifier_create(root.clone()),
         computed_params,
     )))
 }
@@ -1131,7 +1131,11 @@ unsafe fn verify_paramspec(
 
 unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result<()> {
     let fname = (*f).name();
-    let mut param_state = state_create(dynamic_str(fname), state_getext(arg_state), (*f).rtype());
+    let mut param_state = state_create(
+        dynamic_str(fname.as_ptr()),
+        state_getext(arg_state),
+        (*f).rtype(),
+    );
     ast_function_initparams(&*f, &mut param_state)?;
     let params = (*f).params();
     for p in params {
@@ -1139,11 +1143,7 @@ unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result
         let param_0: *mut Value = state_getloc(&mut param_state, id.as_ptr());
         let arg: *mut Value = state_getloc(arg_state, id.as_ptr());
         if let Err(err) = verify_paramspec(param_0, arg, &mut param_state, arg_state) {
-            return Err(Error::new(format!(
-                "parameter {id} of {} {}",
-                cstr!(fname),
-                err.msg
-            )));
+            return Err(Error::new(format!("parameter {id} of {fname} {}", err.msg)));
         }
     }
     // Note: Original leaks the state.
@@ -3019,8 +3019,8 @@ impl<'ast> AstFunction<'ast> {
         strbuilder_build(b)
     }
 
-    pub fn name(&self) -> *mut libc::c_char {
-        self.name.as_ptr()
+    pub fn name(&self) -> &OwningCStr {
+        &self.name
     }
 
     pub fn copy(&self) -> *mut AstFunction<'ast> {
@@ -3075,7 +3075,7 @@ pub unsafe fn ast_function_protostitch(
 }
 
 pub unsafe fn ast_function_verify(f: *mut AstFunction, ext: *mut Externals) -> Result<()> {
-    let mut state = state_create(dynamic_str((*f).name()), ext, (*f).rtype());
+    let mut state = state_create(dynamic_str((*f).name().as_ptr()), ext, (*f).rtype());
     ast_function_initparams(&*f, &mut state)?;
     path_absverify_withstate(f, &mut state)?;
     Ok(())
@@ -3148,7 +3148,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
 
 unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Result<()> {
     let mut actual_state = state_create_withprops(
-        dynamic_str((*f).name()),
+        dynamic_str((*f).name().as_ptr()),
         state_getext(abstract_state),
         (*f).rtype(),
         (state_getprops(&mut *abstract_state)).clone(),
@@ -3201,7 +3201,7 @@ unsafe fn path_verify(
                 );
             }
             _ => {
-                ast_stmt_process(stmt, fname, actual_state)?;
+                ast_stmt_process(stmt, fname.as_ptr(), actual_state)?;
                 if ast_stmt_isterminal(stmt, actual_state) {
                     break;
                 }
@@ -3210,16 +3210,12 @@ unsafe fn path_verify(
     }
     if state_hasgarbage(actual_state) {
         vprintln!("actual: {}", state_str(actual_state));
-        return Err(Error::new(format!(
-            "{}: garbage on heap",
-            cstr!((*f).name()),
-        )));
+        return Err(Error::new(format!("{fname}: garbage on heap")));
     }
     let equiv: bool = state_equal(&*actual_state, &*abstract_state);
     if !equiv {
         return Err(Error::new(format!(
-            "{}: actual and abstract states differ",
-            cstr!((*f).name()),
+            "{fname}: actual and abstract states differ",
         )));
     }
     Ok(())
@@ -3251,8 +3247,8 @@ unsafe fn split_path_verify(
     // Note: Original leaks both functions to avoid triple-freeing the body.
     // We borrow instead.
     for (i, f) in paths.into_iter().enumerate() {
-        let mut actual_copy = state_copywithname(&*actual_state, (*f).name());
-        let mut abstract_copy = state_copywithname(&*abstract_state, (*f).name());
+        let mut actual_copy = state_copywithname(&*actual_state, (*f).name().as_ptr());
+        let mut abstract_copy = state_copywithname(&*abstract_state, (*f).name().as_ptr());
         // Note: Original leaks expression.
         let expr = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&expr, &mut actual_copy);
@@ -3340,7 +3336,7 @@ unsafe fn split_path_absverify(
     let paths = abstract_paths(&*f, index, cond);
     assert_eq!(paths.len(), 2);
     for (i, f) in paths.into_iter().enumerate() {
-        let mut s_copy = state_copywithname(&*state, (*f).name());
+        let mut s_copy = state_copywithname(&*state, (*f).name().as_ptr());
         // Note: Original leaks `inv` but I think accidentally.
         let inv = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&inv, &mut s_copy)?;
@@ -3451,7 +3447,7 @@ pub fn ast_decl_create(name: OwningCStr, t: Box<AstType>) -> Box<AstExternDecl> 
 pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: &mut Externals) {
     match &mut (*decl).kind {
         AstExternDeclKind::Function(f) => {
-            ext.declare_func((**f).name(), *f);
+            ext.declare_func((**f).name().as_ptr(), *f);
         }
         AstExternDeclKind::Variable(v) => {
             ext.declare_var(ast_variable_name(v).as_ptr(), &mut **v);

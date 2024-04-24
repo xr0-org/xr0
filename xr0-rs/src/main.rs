@@ -4,14 +4,13 @@
 #![allow(clippy::box_collection)]
 
 use std::env;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, Stdio};
 
 use clap::Parser;
-use libc::strcmp;
 
 mod util;
 
@@ -135,7 +134,7 @@ pub unsafe fn pass1(root: &mut Ast, ext: *mut Externals) {
                     eprintln!("{}", err.msg);
                     process::exit(1);
                 }
-                vprintln!("qed {}", CStr::from_ptr((*f).name()).to_string_lossy());
+                vprintln!("qed {}", (*f).name());
             }
         }
     }
@@ -149,7 +148,7 @@ pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &mut Externals) {
                 eprintln!("{}", err.msg);
                 process::exit(1);
             }
-            eprintln!("qed {}", CStr::from_ptr((*f).name()).to_string_lossy());
+            eprintln!("qed {}", (*f).name());
         }
     }
 }
@@ -157,10 +156,10 @@ pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &mut Externals) {
 unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool {
     let mut def: Option<&AstFunction> = None;
     let mut count: libc::c_int = 0 as libc::c_int;
-    let pname: *mut libc::c_char = proto.name();
+    let pname = proto.name();
     for decl in decls {
         if let Some(d) = ast_externdecl_as_function(decl) {
-            if !d.is_axiom() && !d.is_proto() && strcmp(pname, d.name()) == 0 {
+            if !d.is_axiom() && !d.is_proto() && pname == d.name() {
                 def = Some(d);
                 count += 1;
             }
@@ -170,20 +169,11 @@ unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool
         if proto_defisvalid(proto, def.unwrap()) {
             return true;
         }
-        eprintln!(
-            "function `{}' prototype and definition abstracts mismatch",
-            CStr::from_ptr(pname).to_string_lossy()
-        );
-    } else if count == 0 as libc::c_int {
-        eprintln!(
-            "function `{}' missing definition",
-            CStr::from_ptr(pname).to_string_lossy()
-        );
-    } else if count > 1 as libc::c_int {
-        eprintln!(
-            "function `{}' has multiple definitions",
-            CStr::from_ptr(pname).to_string_lossy()
-        );
+        eprintln!("function `{pname}' prototype and definition abstracts mismatch");
+    } else if count == 0 {
+        eprintln!("function `{pname}' missing definition");
+    } else if count > 1 {
+        eprintln!("function `{pname}' has multiple definitions");
     }
     false
 }
