@@ -100,8 +100,10 @@ pub unsafe fn location_create_automatic(
 
 pub unsafe fn location_transfigure(loc: &Location, compare: *mut State) -> *mut Value {
     match &loc.kind {
-        LocationKind::Automatic { .. } | LocationKind::Dereferencable => state_clump(compare),
-        LocationKind::Dynamic => state_alloc(compare),
+        LocationKind::Automatic { .. } | LocationKind::Dereferencable => {
+            Box::into_raw(state_clump(compare))
+        }
+        LocationKind::Dynamic => Box::into_raw(state_alloc(compare)),
         _ => panic!(),
     }
 }

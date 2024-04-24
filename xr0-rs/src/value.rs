@@ -64,45 +64,45 @@ pub enum NumberValue {
     Limit(bool),
 }
 
-fn value_create(kind: ValueKind) -> *mut Value {
-    Box::into_raw(Box::new(Value { kind }))
+fn value_create(kind: ValueKind) -> Box<Value> {
+    Box::new(Value { kind })
 }
 
-pub fn value_ptr_create(loc: Box<Location>) -> *mut Value {
+pub fn value_ptr_create(loc: Box<Location>) -> Box<Value> {
     value_create(ValueKind::DefinitePtr(loc))
 }
 
-pub fn value_ptr_indefinite_create() -> *mut Value {
+pub fn value_ptr_indefinite_create() -> Box<Value> {
     value_create(ValueKind::IndefinitePtr(number_indefinite_create()))
 }
 
-pub fn value_int_create(val: libc::c_int) -> *mut Value {
+pub fn value_int_create(val: libc::c_int) -> Box<Value> {
     value_create(ValueKind::Int(number_single_create(val)))
 }
 
-pub unsafe fn value_literal_create(lit: *mut libc::c_char) -> *mut Value {
+pub unsafe fn value_literal_create(lit: *mut libc::c_char) -> Box<Value> {
     value_create(ValueKind::Literal(OwningCStr::copy_char_ptr(lit)))
 }
 
 #[allow(dead_code)]
-pub fn value_int_ne_create(not_val: libc::c_int) -> *mut Value {
+pub fn value_int_ne_create(not_val: libc::c_int) -> Box<Value> {
     value_create(ValueKind::Int(number_ne_create(not_val)))
 }
 
 #[allow(dead_code)]
-pub fn value_int_range_create(lw: libc::c_int, excl_up: libc::c_int) -> *mut Value {
+pub fn value_int_range_create(lw: libc::c_int, excl_up: libc::c_int) -> Box<Value> {
     value_create(ValueKind::Int(number_with_range_create(lw, excl_up)))
 }
 
-pub fn value_int_indefinite_create() -> *mut Value {
+pub fn value_int_indefinite_create() -> Box<Value> {
     value_create(ValueKind::Int(number_indefinite_create()))
 }
 
-pub fn value_sync_create(e: Box<AstExpr>) -> *mut Value {
+pub fn value_sync_create(e: Box<AstExpr>) -> Box<Value> {
     value_create(ValueKind::Sync(number_computed_create(e)))
 }
 
-pub unsafe fn value_struct_create(t: &AstType) -> *mut Value {
+pub unsafe fn value_struct_create(t: &AstType) -> Box<Value> {
     let members = ast_type_struct_members(t).expect("can't create value of incomplete type");
     value_create(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(members),
@@ -115,15 +115,15 @@ pub unsafe fn value_struct_indefinite_create(
     s: *mut State,
     comment: *mut libc::c_char,
     persist: bool,
-) -> *mut Value {
+) -> Box<Value> {
     // Note: The original doesn't null-check here. I wonder how it would handle `typedef struct foo
     // foo;`.
     t = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
     if (ast_type_struct_members(t)).is_none() {
         panic!();
     }
-    let v: *mut Value = value_struct_create(t);
-    let ValueKind::Struct(sv) = &(*v).kind else {
+    let v = value_struct_create(t);
+    let ValueKind::Struct(sv) = &v.kind else {
         panic!();
     };
     for var in &sv.members {
@@ -134,12 +134,12 @@ pub unsafe fn value_struct_indefinite_create(
         strbuilder_write!(b, "{}.{field}", cstr!(comment));
         object_assign(
             &mut *obj,
-            state_vconst(
+            Box::into_raw(state_vconst(
                 s,
                 ast_variable_type(var),
                 strbuilder_build(b).into_ptr(),
                 persist,
-            ),
+            )),
         );
     }
     v
@@ -163,7 +163,12 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
                 ptr::null_mut()
             } else {
                 // Note: Original leaked this type.
-                state_vconst(compare, &ast_type_create_voidptr(), ptr::null_mut(), false)
+                Box::into_raw(state_vconst(
+                    compare,
+                    &ast_type_create_voidptr(),
+                    ptr::null_mut(),
+                    false,
+                ))
             }
         }
         ValueKind::DefinitePtr(loc) => location_transfigure(loc, compare),
@@ -171,12 +176,12 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
     }
 }
 
-pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> *mut Value {
+pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> Box<Value> {
     if !value_isstruct(&*old) {
         panic!();
     }
-    let v: *mut Value = value_copy(&*old);
-    let ValueKind::Struct(sv) = &(*v).kind else {
+    let v = value_copy(&*old);
+    let ValueKind::Struct(sv) = &v.kind else {
         panic!();
     };
 
@@ -187,7 +192,10 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> *mut Value {
         if !obj_value.is_null() && value_issync(&*obj_value) {
             object_assign(
                 &mut *obj,
-                value_sync_create(ast_expr_member_create(ast_expr_copy(root), field.clone())),
+                Box::into_raw(value_sync_create(ast_expr_member_create(
+                    ast_expr_copy(root),
+                    field.clone(),
+                ))),
             );
         }
     }
@@ -219,7 +227,7 @@ unsafe fn copy_members(old: &HashMap<String, *mut Object>) -> HashMap<String, *m
         .collect()
 }
 
-pub unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> *mut Value {
+unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> Box<Value> {
     value_create(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(&old.members),
         m: abstract_copy_members(&old.m, s),
@@ -255,8 +263,8 @@ pub unsafe fn value_struct_member(v: *mut Value, member: *mut libc::c_char) -> *
     sv.m.get(member).copied().unwrap_or(ptr::null_mut())
 }
 
-pub unsafe fn value_copy(v: &Value) -> *mut Value {
-    value_create(v.kind.clone())
+pub unsafe fn value_copy(v: &Value) -> Box<Value> {
+    Box::new(v.clone())
 }
 
 impl Clone for StructValue {
@@ -270,15 +278,15 @@ impl Clone for StructValue {
     }
 }
 
-pub unsafe fn value_abstractcopy(v: &Value, s: *mut State) -> *mut Value {
+pub unsafe fn value_abstractcopy(v: &Value, s: *mut State) -> Option<Box<Value>> {
     if !value_referencesheap(v, s) {
-        return ptr::null_mut();
+        return None;
     }
-    match &v.kind {
+    Some(match &v.kind {
         ValueKind::IndefinitePtr(_) | ValueKind::DefinitePtr(_) => value_copy(v),
         ValueKind::Struct(sv) => value_struct_abstractcopy(sv, s),
         _ => panic!(),
-    }
+    })
 }
 
 impl Drop for StructValue {

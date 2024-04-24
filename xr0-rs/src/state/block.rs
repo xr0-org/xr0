@@ -89,7 +89,7 @@ pub unsafe fn block_observe(
     // know why it isn't a double free.
     let lw_ptr = Box::into_raw(lw);
     let upto = object_upto(obj, lw_ptr, s);
-    let observed = object_value_create(ast_expr_copy(&*lw_ptr), state_alloc(s));
+    let observed = object_value_create(ast_expr_copy(&*lw_ptr), Box::into_raw(state_alloc(s)));
     let from = object_from(obj, &up, s);
     drop(up);
     drop(Box::from_raw(lw_ptr));

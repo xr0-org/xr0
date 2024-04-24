@@ -70,7 +70,7 @@ pub unsafe fn object_copy(old: *mut Object) -> Box<Object> {
     Box::new(Object {
         kind: match &(*old).kind {
             ObjectKind::Value(v) => ObjectKind::Value(if !(*v).is_null() {
-                value_copy(&**v)
+                Box::into_raw(value_copy(&**v))
             } else {
                 ptr::null_mut()
             }),
@@ -86,7 +86,7 @@ pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> Box<Object
         ObjectKind::Value(v) => object_value_create(
             ast_expr_copy(&*(*old).offset),
             if !(*v).is_null() {
-                value_abstractcopy(&**v, s)
+                value_abstractcopy(&**v, s).map_or(ptr::null_mut(), |v| Box::into_raw(v))
             } else {
                 ptr::null_mut()
             },
@@ -274,7 +274,7 @@ pub unsafe fn object_upto(
         };
         return Some(object_value_create(
             ast_expr_copy(&*(*obj).offset),
-            value_copy(&**v),
+            Box::into_raw(value_copy(&**v)),
         ));
     }
 
@@ -285,7 +285,7 @@ pub unsafe fn object_upto(
         ast_expr_copy(&*(*obj).offset),
         range_create(
             ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
-            value_into_location(state_alloc(s)),
+            value_into_location(Box::into_raw(state_alloc(s))),
         ),
     ))
 }
@@ -314,14 +314,14 @@ pub unsafe fn object_from(
         ast_expr_destroy(up);
         return Some(object_value_create(
             ast_expr_copy(incl_lw),
-            value_copy(&**v),
+            Box::into_raw(value_copy(&**v)),
         ));
     }
     Some(object_range_create(
         ast_expr_copy(incl_lw),
         range_create(
             ast_expr_difference_create(Box::from_raw(up), ast_expr_copy(incl_lw)),
-            value_into_location(state_alloc(s)),
+            value_into_location(Box::into_raw(state_alloc(s))),
         ),
     ))
 }
@@ -348,7 +348,7 @@ unsafe fn getorcreatestruct(obj: *mut Object, t: &AstType, s: *mut State) -> *mu
         return v;
     }
     let complete = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
-    v = value_struct_create(complete);
+    v = Box::into_raw(value_struct_create(complete));
     object_assign(&mut *obj, v);
     v
 }
@@ -380,7 +380,9 @@ pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
     // FIXME - this is clearly insane, take Range by value
     state_dealloc(
         s,
-        value_ptr_create(Box::from_raw(&*r.loc as *const Location as *mut Location)),
+        Box::into_raw(value_ptr_create(Box::from_raw(
+            &*r.loc as *const Location as *mut Location,
+        ))),
     )
 }
 

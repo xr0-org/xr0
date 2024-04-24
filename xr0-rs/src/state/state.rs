@@ -181,16 +181,16 @@ pub unsafe fn state_vconst(
     t: &AstType,
     comment: *mut libc::c_char,
     persist: bool,
-) -> *mut Value {
-    let v: *mut Value = ast_type_vconst(t, state, comment, persist);
-    if value_isstruct(&*v) {
+) -> Box<Value> {
+    let v = ast_type_vconst(t, state, comment, persist);
+    if value_isstruct(&v) {
         return v;
     }
-    let c = vconst_declare(&mut (*state).vconst, v, comment, persist);
+    let c = vconst_declare(&mut (*state).vconst, Box::into_raw(v), comment, persist);
     value_sync_create(ast_expr_identifier_create(c))
 }
 
-pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value {
+pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value> {
     let lit = ast_expr_as_literal(expr);
     let mut loc: *mut Location = static_memory_checkpool(&(*state).static_memory, lit.as_ptr());
     if !loc.is_null() {
@@ -202,12 +202,15 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
     if obj.is_null() {
         panic!();
     }
-    object_assign(&mut *obj, value_literal_create(dynamic_str(lit.as_ptr())));
+    object_assign(
+        &mut *obj,
+        Box::into_raw(value_literal_create(dynamic_str(lit.as_ptr()))),
+    );
     static_memory_stringpool(&mut (*state).static_memory, lit.as_ptr(), loc);
     value_ptr_create(Box::from_raw(loc))
 }
 
-pub unsafe fn state_clump(state: *mut State) -> *mut Value {
+pub unsafe fn state_clump(state: *mut State) -> Box<Value> {
     let address: libc::c_int = clump_newblock((*state).clump);
     let loc = Box::into_raw(location_create_dereferencable(
         address,
@@ -311,7 +314,7 @@ pub unsafe fn state_getobjecttype(state: &State, id: *mut libc::c_char) -> &AstT
     &*variable_type(v)
 }
 
-pub unsafe fn state_getloc(state: *mut State, id: *mut libc::c_char) -> *mut Value {
+pub unsafe fn state_getloc(state: *mut State, id: *mut libc::c_char) -> Box<Value> {
     let v: *mut Variable = stack_getvariable((*state).stack, id);
     if v.is_null() {
         panic!();
@@ -374,7 +377,7 @@ pub unsafe fn state_range_alloc(
     block_range_alloc(&mut *b, lw, up, &mut (*state).heap)
 }
 
-pub unsafe fn state_alloc(state: *mut State) -> *mut Value {
+pub unsafe fn state_alloc(state: *mut State) -> Box<Value> {
     value_ptr_create(heap_newblock(&mut (*state).heap))
 }
 
