@@ -708,12 +708,9 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<*mut V
     let root = ast_expr_member_root(expr);
     let res_val = ast_expr_eval(root, s)?;
     let field = ast_expr_member_field(expr);
-    let member: *mut Object = value_struct_member(res_val, field);
+    let member: *mut Object = value_struct_member(res_val, field.as_ptr());
     if member.is_null() {
-        return Err(Error::new(format!(
-            "`{root}' has no field `{}'",
-            cstr!(field)
-        )));
+        return Err(Error::new(format!("`{root}' has no field `{field}'")));
     }
     let obj_value: *mut Value = object_as_value(member);
     let v: *mut Value = if !obj_value.is_null() {
@@ -833,11 +830,12 @@ pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Res
         panic!();
     }
     let field = ast_expr_member_field(expr);
-    let member: *mut Object = object_getmember(root_obj, lvalue_type(&root_lval), field, state);
+    let member: *mut Object =
+        object_getmember(root_obj, lvalue_type(&root_lval), field.as_ptr(), state);
     if member.is_null() {
         return Err(Error::new("lvalue error".to_string()));
     }
-    let t = object_getmembertype(root_obj, lvalue_type(&root_lval), field, state);
+    let t = object_getmembertype(root_obj, lvalue_type(&root_lval), field.as_ptr(), state);
     Ok(lvalue_create(t, member))
 }
 
@@ -1270,7 +1268,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<*mut V
     assert!(!v.is_null());
     let field = ast_expr_member_field(expr);
     if value_isstruct(&*v) {
-        let obj: *mut Object = value_struct_member(v, field);
+        let obj: *mut Object = value_struct_member(v, field.as_ptr());
         let obj_value: *mut Value = object_as_value(obj);
         if obj_value.is_null() {
             panic!();
@@ -1282,7 +1280,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<*mut V
     }
     Ok(value_sync_create(ast_expr_member_create(
         value_into_sync(v),
-        OwningCStr::copy(CStr::from_ptr(field)),
+        field.clone(),
     )))
 }
 
@@ -1363,11 +1361,11 @@ pub fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
     }
 }
 
-pub fn ast_expr_member_field(expr: &AstExpr) -> *mut libc::c_char {
+pub fn ast_expr_member_field(expr: &AstExpr) -> &OwningCStr {
     let AstExprKind::StructMember(member) = &expr.kind else {
         panic!()
     };
-    member.field.as_ptr()
+    &member.field
 }
 
 pub fn ast_expr_member_root(expr: &AstExpr) -> &AstExpr {
@@ -2282,11 +2280,11 @@ pub fn ast_stmt_iter_init(stmt: &AstStmt) -> &AstStmt {
     &iteration.init
 }
 
-pub fn ast_stmt_labelled_label(stmt: &AstStmt) -> *mut libc::c_char {
+pub fn ast_stmt_labelled_label(stmt: &AstStmt) -> &OwningCStr {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         panic!()
     };
-    labelled.label.as_ptr()
+    &labelled.label
 }
 
 unsafe fn sel_isterminal(stmt: &AstStmt, s: *mut State) -> bool {
@@ -2789,11 +2787,10 @@ pub unsafe fn ast_type_struct_complete<'a>(
     if ast_type_struct_members(t).is_some() {
         return Some(t);
     }
-    let tag = ast_type_struct_tag(t);
-    if tag.is_null() {
+    let Some(tag) = ast_type_struct_tag(t) else {
         panic!();
-    }
-    ext.get_struct(tag)
+    };
+    ext.get_struct(tag.as_ptr())
 }
 
 pub fn ast_type_struct_members(t: &AstType) -> Option<&[Box<AstVariable>]> {
@@ -2803,14 +2800,11 @@ pub fn ast_type_struct_members(t: &AstType) -> Option<&[Box<AstVariable>]> {
     s.members.as_ref().map(|v| v.as_slice())
 }
 
-pub fn ast_type_struct_tag(t: &AstType) -> *mut libc::c_char {
+pub fn ast_type_struct_tag(t: &AstType) -> Option<&OwningCStr> {
     let AstTypeBase::Struct(s) = &t.base else {
         panic!()
     };
-    match &s.tag {
-        Some(cstr) => cstr.as_ptr(),
-        None => ptr::null_mut(),
-    }
+    s.tag.as_ref()
 }
 
 pub fn ast_type_create_struct_anonym(members: Vec<Box<AstVariable>>) -> Box<AstType> {
@@ -3447,9 +3441,7 @@ pub fn ast_decl_create(name: OwningCStr, t: Box<AstType>) -> Box<AstExternDecl> 
         kind: if ast_type_istypedef(&t) {
             AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t })
         } else if ast_type_isstruct(&t) {
-            if (ast_type_struct_tag(&t)).is_null() {
-                panic!();
-            }
+            assert!(ast_type_struct_tag(&t).is_some());
             AstExternDeclKind::Struct(t)
         } else {
             AstExternDeclKind::Variable(ast_variable_create(name, t))

@@ -46,11 +46,7 @@ impl Externals {
     }
 
     pub unsafe fn declare_struct(&mut self, t: *const AstType) {
-        let id = ast_type_struct_tag(&*t);
-        if id.is_null() {
-            panic!();
-        }
-        let id = CStr::from_ptr(id).to_str().unwrap().to_string();
+        let id = ast_type_struct_tag(&*t).unwrap().as_str().to_string();
         self._struct.insert(id, t);
     }
 

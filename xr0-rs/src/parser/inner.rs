@@ -245,12 +245,7 @@ pub grammar c_parser(env: &Env) for str {
     rule declaration() -> Declaration =
         t:declaration_specifiers() _ ";" {
             unsafe {
-                let tag = ast_type_struct_tag(&t);
-                let name = if tag.is_null() {
-                    None
-                } else {
-                    Some(OwningCStr::copy_char_ptr(tag))
-                };
+                let name = ast_type_struct_tag(&t).cloned();
                 Declaration { name, t }
             }
         } /
