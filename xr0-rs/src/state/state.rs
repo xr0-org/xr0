@@ -384,7 +384,7 @@ pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {
             "undefined free of value not pointing at heap".to_string(),
         ));
     }
-    location_dealloc(&*value_as_location(&*val), &mut (*state).heap)
+    location_dealloc(value_as_location(&*val), &mut (*state).heap)
 }
 
 pub unsafe fn state_range_dealloc(

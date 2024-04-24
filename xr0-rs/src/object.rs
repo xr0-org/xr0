@@ -76,7 +76,7 @@ pub unsafe fn object_copy(old: *mut Object) -> Box<Object> {
             }),
             ObjectKind::DeallocandRange(range) => ObjectKind::DeallocandRange(range.clone()),
         },
-        offset: ast_expr_copy(&*(*old).offset),
+        offset: ast_expr_copy(&(*old).offset),
     })
 }
 
@@ -84,9 +84,9 @@ pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> Box<Object
     match &(*old).kind {
         ObjectKind::DeallocandRange(_) => object_copy(old),
         ObjectKind::Value(v) => object_value_create(
-            ast_expr_copy(&*(*old).offset),
+            ast_expr_copy(&(*old).offset),
             if !(*v).is_null() {
-                value_abstractcopy(&**v, s).map_or(ptr::null_mut(), |v| Box::into_raw(v))
+                value_abstractcopy(&**v, s).map_or(ptr::null_mut(), Box::into_raw)
             } else {
                 ptr::null_mut()
             },
@@ -156,7 +156,7 @@ pub unsafe fn object_references(obj: &Object, loc: &Location, s: *mut State) -> 
 }
 
 pub unsafe fn object_assign(obj: &mut Object, val: *mut Value) -> *mut Error {
-    if let ObjectKind::Value(v) = &mut (*obj).kind {
+    if let ObjectKind::Value(v) = &mut obj.kind {
         *v = val;
     } else {
         panic!();
@@ -177,7 +177,7 @@ pub unsafe fn object_lower(obj: &mut Object) -> *mut AstExpr {
 
 pub unsafe fn object_upper(obj: &Object) -> *mut AstExpr {
     Box::into_raw(ast_expr_sum_create(
-        ast_expr_copy(&*(*obj).offset),
+        ast_expr_copy(&obj.offset),
         Box::from_raw(object_size(obj)),
     ))
 }
@@ -273,7 +273,7 @@ pub unsafe fn object_upto(
             panic!();
         };
         return Some(object_value_create(
-            ast_expr_copy(&*(*obj).offset),
+            ast_expr_copy(&(*obj).offset),
             Box::into_raw(value_copy(&**v)),
         ));
     }
@@ -282,7 +282,7 @@ pub unsafe fn object_upto(
     // seems like it's take ownership of `obj->offset`, and maybe we leak `obj` to avoid a double
     // free?
     Some(object_range_create(
-        ast_expr_copy(&*(*obj).offset),
+        ast_expr_copy(&(*obj).offset),
         range_create(
             ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
             value_into_location(Box::into_raw(state_alloc(s))),
