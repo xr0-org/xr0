@@ -23,6 +23,9 @@ stack_programindex(struct stack *);
 void
 stack_return(struct stack *);
 
+struct ast_expr *
+stack_framecall(struct stack *);
+
 int
 stack_id(struct stack *);
 

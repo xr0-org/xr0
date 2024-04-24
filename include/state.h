@@ -169,11 +169,14 @@ state_stacktrace(struct state *, struct error *);
 void
 state_return(struct state *);
 
+struct ast_expr *
+state_framecall(struct state *);
+
 
 /* FRAME DTO */
 
 struct frame *
-frame_call_create(char *name, struct ast_block *, struct ast_type *, bool abs);
+frame_call_create(char *name, struct ast_block *, struct ast_type *, bool abs, struct ast_expr *);
 
 struct frame *
 frame_block_create(char *name, struct ast_block *, bool abs);

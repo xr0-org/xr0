@@ -309,7 +309,8 @@ path_init_abstract(struct path *p)
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
 		ast_function_type(p->f),
-		true
+		true,
+		NULL
 	);
 	p->abstract = state_create(f, p->ext);
 	struct error *err = ast_function_initparams(p->f, p->abstract);
@@ -328,7 +329,8 @@ path_init_actual(struct path *p)
 		ast_function_name(p->f),
 		ast_function_body(p->f),
 		ast_function_type(p->f),
-		false
+		false,
+		NULL
 	);
 	p->actual = state_create_withprops(
 		f,
@@ -404,6 +406,7 @@ path_audit(struct path *p)
 {
 	v_printf("audit\n");
 	hack_preserve_behaviour(p);
+
 	if (state_hasgarbage(p->actual)) {
 		v_printf("actual: %s", state_str(p->actual));
 		return error_printf(

@@ -687,9 +687,6 @@ static struct result *
 call_absexec(struct ast_expr *call, struct state *);
 
 static struct result *
-pf_augment(struct value *v, struct ast_expr *root, struct state *);
-
-static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	struct error *err;
@@ -726,7 +723,8 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		true
+		true,
+		ast_expr_copy(expr)
 	);
 	state_pushframe(state, call_frame);
 
@@ -812,7 +810,7 @@ call_setupverify(struct ast_function *f, struct state *arg_state)
 
 	char *fname = ast_function_name(f);
 	struct frame *setupframe = frame_call_create(
-		fname, ast_function_abstract(f), ast_function_type(f), true
+		fname, ast_function_abstract(f), ast_function_type(f), true, NULL
 	);
 	struct state *param_state = state_create(
 		setupframe,
@@ -880,8 +878,8 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 	);
 }
 
-static struct result *
-pf_augment(struct value *v, struct ast_expr *call, struct state *state)
+struct result *
+ast_expr_pf_augment(struct value *v, struct ast_expr *call, struct state *state)
 {
 	if (!value_isstruct(v)) {
 		return result_value_create(value_copy(v));
@@ -1501,6 +1499,7 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 	case EXPR_IDENTIFIER:
+	case EXPR_STRING_LITERAL:
 	case EXPR_ARBARG:
 		return expr;
 	case EXPR_UNARY:

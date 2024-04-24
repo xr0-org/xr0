@@ -468,21 +468,41 @@ register_call_exec(struct ast_expr *call, struct state *state)
 	return NULL;
 }
 
+static struct result *
+hack_default_values(struct state *);
+
 static struct error *
 register_mov_exec(struct ast_variable *temp, struct state *state)
 {
 	state_declare(state, temp, false);
-	struct value *v = state_popregister(state);
+
+	struct result *res = hack_default_values(state);
+	if (result_iserror(res)) {
+		return result_as_error(res);
+	}
+	struct value *v = result_as_value(res);
+
 	struct ast_expr *name = ast_expr_identifier_create(
 		dynamic_str(ast_variable_name(temp))
 	);
-	struct lvalue_res res = ast_expr_lvalue(name, state);
-	if (res.err) {
-		return res.err;
+	struct lvalue_res lval_res = ast_expr_lvalue(name, state);
+	if (lval_res.err) {
+		return lval_res.err;
 	}
-	struct object *obj = lvalue_object(res.lval);
+	struct object *obj = lvalue_object(lval_res.lval);
 	object_assign(obj, v);
 	return NULL;
+}
+
+static struct result *
+hack_default_values(struct state *state)
+{
+	struct ast_expr *expr = state_framecall(state);
+	struct value *v = state_popregister(state);
+	if (!v) {
+		v = value_int_create(0);	
+	}
+	return ast_expr_pf_augment(v, expr, state);
 }
 
 struct error *
