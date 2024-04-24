@@ -419,8 +419,15 @@ pub unsafe fn value_islocation(v: &Value) -> bool {
     matches!(v.kind, ValueKind::DefinitePtr(_))
 }
 
-pub unsafe fn value_as_location(v: &Value) -> *mut Location {
+pub unsafe fn value_as_location(v: &Value) -> &Location {
     let ValueKind::DefinitePtr(loc) = &v.kind else {
+        panic!();
+    };
+    &**loc
+}
+
+pub unsafe fn value_into_location(v: *mut Value) -> *mut Location {
+    let ValueKind::DefinitePtr(loc) = &(*v).kind else {
         panic!();
     };
     *loc

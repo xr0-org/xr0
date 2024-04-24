@@ -11,9 +11,9 @@ use crate::state::state::{
 };
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::value::{
-    value_abstractcopy, value_as_location, value_copy, value_destroy, value_ptr_create,
-    value_references, value_referencesheap, value_str, value_struct_create, value_struct_member,
-    value_struct_membertype,
+    value_abstractcopy, value_as_location, value_copy, value_destroy, value_into_location,
+    value_ptr_create, value_references, value_referencesheap, value_str, value_struct_create,
+    value_struct_member, value_struct_membertype,
 };
 use crate::{strbuilder_write, AstExpr, AstType, Location, State, StrBuilder, Value};
 
@@ -143,7 +143,7 @@ pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
 
 pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
     match &(*obj).kind {
-        ObjectKind::Value(v) => !(*v).is_null() && state_isdeallocand(s, &*value_as_location(&**v)),
+        ObjectKind::Value(v) => !(*v).is_null() && state_isdeallocand(s, value_as_location(&**v)),
         ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
     }
 }
@@ -277,7 +277,7 @@ pub unsafe fn object_upto(obj: *mut Object, excl_up: *mut AstExpr, s: *mut State
         Box::into_raw(ast_expr_copy(&*(*obj).offset)),
         range_create(
             ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
-            Box::from_raw(value_as_location(&*state_alloc(s))),
+            Box::from_raw(value_into_location(state_alloc(s))),
         ),
     )
 }
@@ -312,7 +312,7 @@ pub unsafe fn object_from(obj: *mut Object, incl_lw: &AstExpr, s: *mut State) ->
         Box::into_raw(ast_expr_copy(incl_lw)),
         range_create(
             ast_expr_difference_create(Box::from_raw(up), ast_expr_copy(incl_lw)),
-            Box::from_raw(value_as_location(&*state_alloc(s))),
+            Box::from_raw(value_into_location(state_alloc(s))),
         ),
     )
 }

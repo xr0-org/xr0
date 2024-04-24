@@ -223,12 +223,12 @@ pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
     if !value_islocation(&*v) {
         return false;
     }
-    let loc: *mut Location = value_as_location(&*v);
-    state_get(state, &*loc, true).unwrap();
-    location_tostatic(&*loc, &(*state).static_memory)
-        || location_toheap(&*loc, &mut (*state).heap)
-        || location_tostack(&*loc, (*state).stack)
-        || location_toclump(&*loc, (*state).clump)
+    let loc = value_as_location(&*v);
+    state_get(state, loc, true).unwrap();
+    location_tostatic(loc, &(*state).static_memory)
+        || location_toheap(loc, &mut (*state).heap)
+        || location_tostack(loc, (*state).stack)
+        || location_toclump(loc, (*state).clump)
 }
 
 pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
@@ -238,9 +238,9 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
     if !value_islocation(&*v) {
         return false;
     }
-    let loc: *mut Location = value_as_location(&*v);
-    state_get(state, &*loc, true).unwrap();
-    location_toheap(&*loc, &mut (*state).heap)
+    let loc = value_as_location(&*v);
+    state_get(state, loc, true).unwrap();
+    location_toheap(loc, &mut (*state).heap)
 }
 
 pub unsafe fn state_getvconst(state: *mut State, id: *mut libc::c_char) -> *mut Value {
@@ -338,12 +338,9 @@ pub unsafe fn state_deref(
     if value_issync(&*ptr_val) {
         return Ok(ptr::null_mut());
     }
-    let deref_base: *mut Location = value_as_location(&*ptr_val);
-    if deref_base.is_null() {
-        panic!();
-    }
+    let deref_base = value_as_location(&*ptr_val);
     // Note: the original leaked this location.
-    let deref = location_with_offset(&*deref_base, index);
+    let deref = location_with_offset(deref_base, index);
     state_get(state, &deref, true)
         .map_err(|err| Error::new(format!("undefined indirection: {}", err.msg)))
 }
@@ -358,9 +355,9 @@ pub unsafe fn state_range_alloc(
     if arr_val.is_null() {
         return Err(Error::new("no value".to_string()));
     }
-    let deref: *mut Location = value_as_location(&*arr_val);
+    let deref = value_as_location(&*arr_val);
     let b = location_getblock(
-        &*deref,
+        deref,
         &mut (*state).static_memory,
         &(*state).vconst,
         (*state).stack,
@@ -400,14 +397,14 @@ pub unsafe fn state_range_dealloc(
     if arr_val.is_null() {
         return Err(Error::new("no value".to_string()));
     }
-    let deref: *mut Location = value_as_location(&*arr_val);
-    location_range_dealloc(&*deref, lw, up, state)
+    let deref = value_as_location(&*arr_val);
+    location_range_dealloc(deref, lw, up, state)
 }
 
 pub unsafe fn state_addresses_deallocand(state: *mut State, obj: *mut Object) -> bool {
     let val: *mut Value = object_as_value(obj);
-    let loc: *mut Location = value_as_location(&*val);
-    state_isdeallocand(state, &*loc)
+    let loc = value_as_location(&*val);
+    state_isdeallocand(state, loc)
 }
 
 pub unsafe fn state_isdeallocand(s: *mut State, loc: &Location) -> bool {
@@ -428,9 +425,9 @@ pub unsafe fn state_range_aredeallocands(
     if arr_val.is_null() {
         return false;
     }
-    let deref: *mut Location = value_as_location(&*arr_val);
+    let deref = value_as_location(&*arr_val);
     let b = location_getblock(
-        &*deref,
+        deref,
         &mut (*state).static_memory,
         &(*state).vconst,
         (*state).stack,
