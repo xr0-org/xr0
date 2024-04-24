@@ -110,7 +110,7 @@ pub unsafe fn block_observe(
 }
 
 pub unsafe fn block_references(b: *mut Block, loc: &Location, s: *mut State) -> bool {
-    (*b).arr.iter().any(|&obj| object_references(obj, loc, s))
+    (*b).arr.iter().any(|obj| object_references(&**obj, loc, s))
 }
 
 pub unsafe fn block_range_alloc(
@@ -146,14 +146,14 @@ pub unsafe fn block_range_aredeallocands(
         return false;
     };
     for i in lw_index..up_index {
-        if !object_isdeallocand(b.arr[i], s) {
+        if !object_isdeallocand(&*b.arr[i], s) {
             return false;
         }
         if !object_contig_precedes(b.arr[i], b.arr[i + 1], &*s) {
             return false;
         }
     }
-    assert!(object_isdeallocand(b.arr[up_index], s));
+    assert!(object_isdeallocand(&*b.arr[up_index], s));
     true
 }
 
@@ -165,17 +165,17 @@ unsafe fn hack_first_object_is_exactly_bounds(
 ) -> bool {
     assert!(!b.arr.is_empty());
     let obj: *mut Object = b.arr[0];
-    if !object_isdeallocand(obj, s) {
+    if !object_isdeallocand(&*obj, s) {
         return false;
     }
     // Note: Original leaks these outer expressions to avoid double-freeing the inner ones.
     let same_lw = ast_expr_eq_create(
         Box::from_raw(lw as *const AstExpr as *mut AstExpr),
-        Box::from_raw(object_lower(obj)),
+        Box::from_raw(object_lower(&mut *obj)),
     );
     let same_up = ast_expr_eq_create(
         Box::from_raw(up as *const AstExpr as *mut AstExpr),
-        Box::from_raw(object_upper(obj)),
+        Box::from_raw(object_upper(&*obj)),
     );
     let result = state_eval(&*s, &same_lw) && state_eval(&*s, &same_up);
     std::mem::forget(same_lw);

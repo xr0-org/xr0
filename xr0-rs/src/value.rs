@@ -133,7 +133,7 @@ pub unsafe fn value_struct_indefinite_create(
         let mut b = strbuilder_create();
         strbuilder_write!(b, "{}.{field}", cstr!(comment));
         object_assign(
-            obj,
+            &mut *obj,
             state_vconst(
                 s,
                 ast_variable_type(var),
@@ -186,7 +186,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> *mut Value {
         let obj_value: *mut Value = object_as_value(obj);
         if !obj_value.is_null() && value_issync(&*obj_value) {
             object_assign(
-                obj,
+                &mut *obj,
                 value_sync_create(ast_expr_member_create(ast_expr_copy(root), field.clone())),
             );
         }

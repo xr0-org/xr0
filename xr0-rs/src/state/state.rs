@@ -202,7 +202,7 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> *mut Value
     if obj.is_null() {
         panic!();
     }
-    object_assign(obj, value_literal_create(dynamic_str(lit.as_ptr())));
+    object_assign(&mut *obj, value_literal_create(dynamic_str(lit.as_ptr())));
     static_memory_stringpool(&mut (*state).static_memory, lit.as_ptr(), loc);
     value_ptr_create(Box::from_raw(loc))
 }

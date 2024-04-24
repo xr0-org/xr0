@@ -141,21 +141,21 @@ pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
     *v
 }
 
-pub unsafe fn object_isdeallocand(obj: *mut Object, s: *mut State) -> bool {
-    match &(*obj).kind {
+pub unsafe fn object_isdeallocand(obj: &Object, s: *mut State) -> bool {
+    match &obj.kind {
         ObjectKind::Value(v) => !(*v).is_null() && state_isdeallocand(s, value_as_location(&**v)),
         ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
     }
 }
 
-pub unsafe fn object_references(obj: *mut Object, loc: &Location, s: *mut State) -> bool {
-    match &(*obj).kind {
+pub unsafe fn object_references(obj: &Object, loc: &Location, s: *mut State) -> bool {
+    match &obj.kind {
         ObjectKind::DeallocandRange(range) => range_references(range, loc, s),
         ObjectKind::Value(v) => !(*v).is_null() && value_references(*v, loc, s),
     }
 }
 
-pub unsafe fn object_assign(obj: *mut Object, val: *mut Value) -> *mut Error {
+pub unsafe fn object_assign(obj: &mut Object, val: *mut Value) -> *mut Error {
     if let ObjectKind::Value(v) = &mut (*obj).kind {
         *v = val;
     } else {
@@ -164,26 +164,26 @@ pub unsafe fn object_assign(obj: *mut Object, val: *mut Value) -> *mut Error {
     ptr::null_mut()
 }
 
-unsafe fn object_size(obj: *mut Object) -> *mut AstExpr {
-    match &(*obj).kind {
+unsafe fn object_size(obj: &Object) -> *mut AstExpr {
+    match &obj.kind {
         ObjectKind::Value(_) => Box::into_raw(ast_expr_constant_create(1)),
         ObjectKind::DeallocandRange(range) => Box::into_raw(ast_expr_copy(range_size(range))),
     }
 }
 
-pub unsafe fn object_lower(obj: *mut Object) -> *mut AstExpr {
-    &mut *(*obj).offset
+pub unsafe fn object_lower(obj: &mut Object) -> *mut AstExpr {
+    &mut *obj.offset
 }
 
-pub unsafe fn object_upper(obj: *mut Object) -> *mut AstExpr {
+pub unsafe fn object_upper(obj: &Object) -> *mut AstExpr {
     Box::into_raw(ast_expr_sum_create(
         ast_expr_copy(&*(*obj).offset),
         Box::from_raw(object_size(obj)),
     ))
 }
 
-pub unsafe fn object_contains(obj: *mut Object, offset: &AstExpr, s: &State) -> bool {
-    let lw = &*(*obj).offset;
+pub unsafe fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
+    let lw = &*obj.offset;
     let up: *mut AstExpr = object_upper(obj);
     let of = offset;
     // Note: Original leaks the expressions to avoid double-freeing subexpressions.
@@ -198,7 +198,7 @@ pub unsafe fn object_contains(obj: *mut Object, offset: &AstExpr, s: &State) -> 
 
 pub unsafe fn object_contains_upperincl(obj: *mut Object, offset: &AstExpr, s: &State) -> bool {
     let lw: *mut AstExpr = &mut *(*obj).offset;
-    let up: *mut AstExpr = object_upper(obj);
+    let up: *mut AstExpr = object_upper(&*obj);
     let of: *mut AstExpr = offset as *const AstExpr as *mut AstExpr;
     // Note: Original leaks the expressions to avoid double-freeing subexpressions.
     let lower_bound_expr = ast_expr_le_create(Box::from_raw(lw), Box::from_raw(of));
@@ -212,7 +212,7 @@ pub unsafe fn object_contains_upperincl(obj: *mut Object, offset: &AstExpr, s: &
 #[allow(dead_code)]
 pub unsafe fn object_isempty(obj: *mut Object, s: &State) -> bool {
     let lw: *mut AstExpr = &mut *(*obj).offset;
-    let up: *mut AstExpr = object_upper(obj);
+    let up: *mut AstExpr = object_upper(&*obj);
     // Note: Original leaks the expression to avoid double-freeing subexpressions.
     let expr = ast_expr_eq_create(Box::from_raw(lw), Box::from_raw(up));
     let result = state_eval(s, &expr);
@@ -221,7 +221,7 @@ pub unsafe fn object_isempty(obj: *mut Object, s: &State) -> bool {
 }
 
 pub unsafe fn object_contig_precedes(before: *mut Object, after: *mut Object, s: &State) -> bool {
-    let lw: *mut AstExpr = object_upper(before);
+    let lw: *mut AstExpr = object_upper(&*before);
     let up: *mut AstExpr = &mut *(*after).offset;
     // Note: Original leaks the expression to avoid double-freeing subexpressions.
     let expr = ast_expr_eq_create(Box::from_raw(lw), Box::from_raw(up));
@@ -233,7 +233,7 @@ pub unsafe fn object_contig_precedes(before: *mut Object, after: *mut Object, s:
 #[allow(dead_code)]
 pub unsafe fn object_issingular(obj: *mut Object, s: &State) -> bool {
     let lw: *mut AstExpr = &mut *(*obj).offset;
-    let up: *mut AstExpr = object_upper(obj);
+    let up: *mut AstExpr = object_upper(&*obj);
     let lw_succ = ast_expr_sum_create(
         Box::from_raw(lw),
         ast_expr_constant_create(1 as libc::c_int),
@@ -251,7 +251,7 @@ pub unsafe fn object_upto(
     s: *mut State,
 ) -> Option<Box<Object>> {
     let lw: *mut AstExpr = &mut *(*obj).offset;
-    let up: *mut AstExpr = object_upper(obj);
+    let up: *mut AstExpr = object_upper(&*obj);
     let prop0 = ast_expr_le_create(ast_expr_copy(&*lw), ast_expr_copy(&*excl_up));
     let prop1 = ast_expr_eq_create(ast_expr_copy(&*lw), ast_expr_copy(&*excl_up));
     let prop2 = ast_expr_eq_create(ast_expr_copy(&*up), ast_expr_copy(&*excl_up));
@@ -296,7 +296,7 @@ pub unsafe fn object_from(
     s: *mut State,
 ) -> Option<Box<Object>> {
     let lw = &(*obj).offset;
-    let up: *mut AstExpr = object_upper(obj);
+    let up: *mut AstExpr = object_upper(&*obj);
     let prop0 = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(&*up));
     let prop1 = ast_expr_eq_create(ast_expr_copy(incl_lw), ast_expr_copy(lw));
     let e0: bool = state_eval(&*s, &prop0);
@@ -349,7 +349,7 @@ unsafe fn getorcreatestruct(obj: *mut Object, t: &AstType, s: *mut State) -> *mu
     }
     let complete = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
     v = value_struct_create(complete);
-    object_assign(obj, v);
+    object_assign(&mut *obj, v);
     v
 }
 
@@ -398,7 +398,7 @@ pub unsafe fn object_arr_index(
     state: &State,
 ) -> Option<usize> {
     for (i, &obj) in arr.iter().enumerate() {
-        if object_contains(obj, offset, state) {
+        if object_contains(&*obj, offset, state) {
             return Some(i);
         }
     }

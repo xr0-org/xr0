@@ -265,7 +265,7 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
     if object_isvalue(obj) {
         let v: *mut Value = object_as_value(obj);
         if !v.is_null() {
-            object_assign(obj, value_abstractcopy(&*v, s));
+            object_assign(&mut *obj, value_abstractcopy(&*v, s));
         }
     }
     Box::into_raw(new)

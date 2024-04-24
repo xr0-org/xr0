@@ -808,7 +808,7 @@ unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> Result<*mut Val
             "undefined indirection: {lval} is not an lvalue"
         )));
     }
-    object_assign(obj, value_copy(&*rval_val));
+    object_assign(&mut *obj, value_copy(&*rval_val));
     Ok(rval_val)
 }
 
@@ -1053,7 +1053,7 @@ pub unsafe fn prepare_parameters(
         let lval_lval = ast_expr_lvalue(&name, state)?;
         let obj: *mut Object = lvalue_object(&lval_lval);
         drop(name);
-        object_assign(obj, value_copy(&*arg));
+        object_assign(&mut *obj, value_copy(&*arg));
     }
     Ok(())
 }
@@ -1088,7 +1088,7 @@ unsafe fn assign_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value
     if obj.is_null() {
         return Err(Error::new("undefined indirection (lvalue)".to_string()));
     }
-    object_assign(obj, value_copy(&*val));
+    object_assign(&mut *obj, value_copy(&*val));
     Ok(val)
 }
 
@@ -2170,7 +2170,7 @@ unsafe fn stmt_jump_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
         if obj.is_null() {
             panic!();
         }
-        object_assign(obj, value_copy(&*rv_val));
+        object_assign(&mut *obj, value_copy(&*rv_val));
     }
     Ok(())
 }
@@ -3141,7 +3141,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
     }
     if !object_hasvalue(obj) {
         let val: *mut Value = state_vconst(state, t, dynamic_str(name.as_ptr()), true);
-        object_assign(obj, val);
+        object_assign(&mut *obj, val);
     }
     Ok(())
 }
