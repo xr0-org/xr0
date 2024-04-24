@@ -23,7 +23,6 @@ struct stack {
 
 	/* lvalues of blocks in frame */
 	struct map *varmap;
-	struct variable *result;
 
 	int id;
 	struct stack *prev;
@@ -67,8 +66,6 @@ stack_create(struct frame *f, struct stack *prev)
 	stack->id = prev ? prev->id + 1 : 0;
 
 	stack->kind = f->kind;
-	stack->result = stack->kind != FRAME_CALL
-		? NULL : variable_create(f->ret_type, stack, false);
 
 	if (stack->kind == FRAME_CALL) {
 		stack->call = f->call;
@@ -142,10 +139,6 @@ stack_destroy(struct stack *stack)
 	}
 	map_destroy(m);
 
-	if (stack->result) {
-		variable_destroy(stack->result);
-	}
-
 	/* XXX: call expr leak */
 
 	program_destroy(stack->p);
@@ -170,8 +163,6 @@ stack_copy(struct stack *stack)
 	copy->memory = block_arr_copy(stack->memory);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->id = stack->id;
-	copy->result = stack->result
-		? variable_copy(stack->result) : NULL;
 	if (stack->prev) {
 		copy->prev = stack_copy(stack->prev);
 	}
@@ -277,13 +268,6 @@ variable_abstractcopy(struct variable *v, struct state *s);
 void
 stack_undeclare(struct stack *stack, struct state *state)
 {
-	if (stack->result) {
-		struct variable *old_result = stack->result;
-		assert(old_result);
-		stack->result = variable_abstractcopy(old_result, state);
-		variable_destroy(old_result);
-	}
-
 	struct map *m = stack->varmap;
 	stack->varmap = map_create();
 	for (int i = 0; i < m->n; i++) {
@@ -373,17 +357,6 @@ stack_context(struct stack *s)
 		}
 	}
 	return strbuilder_build(b);
-}
-
-struct variable *
-stack_getresult(struct stack *s)
-{
-	if (!s->prev || s->kind == FRAME_CALL) {
-		/* ⊢ lowest frame || call */
-		return s->result;
-	}
-	/* ⊢ block || intermediate  */
-	return stack_getresult(s->prev);
 }
 
 struct map *

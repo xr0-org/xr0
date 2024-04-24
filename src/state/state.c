@@ -102,8 +102,7 @@ state_str(struct state *state)
 	free(ext);
 	strbuilder_printf(
 		b,
-		"\treturn: {%s := {%s}}\n\n",
-		ast_type_str(variable_type(stack_getresult(state->stack))),
+		"\treturn: {<type> := {%s}}\n\n",
 		state->reg ? value_str(state->reg) : "empty"
 	);
 	char *static_mem = static_memory_str(state->static_memory, "\t");
@@ -405,33 +404,12 @@ state_getblock(struct state *state, struct location *loc)
 	return res.b;
 }
 
-struct object_res
-state_getresult(struct state *state)
-{
-	struct variable *v = stack_getresult(state->stack);
-	assert(v);
-
-	struct object_res res = state_get(state, variable_location(v), true);
-	if (res.err) {
-		assert(false);
-	}
-	return res;
-}
-
-static struct ast_type *
-state_getresulttype(struct state *state)
-{
-	struct variable *v = stack_getresult(state->stack);
-	assert(v);
-
-	return variable_type(v);
-}
-
 struct ast_type *
 state_getobjecttype(struct state *state, char *id)
 {
 	if (strcmp(id, KEYWORD_RETURN) == 0) {
-		return state_getresulttype(state);
+		assert(false);
+		//return state_getresulttype(state);
 	}
 
 	struct variable *v = stack_getvariable(state->stack, id);
@@ -453,7 +431,8 @@ struct object_res
 state_getobject(struct state *state, char *id)
 {
 	if (strcmp(id, KEYWORD_RETURN) == 0) {
-		return state_getresult(state);
+		assert(false);
+		/*return state_getresult(state);*/
 	}
 
 	struct variable *v = stack_getvariable(state->stack, id);
@@ -665,9 +644,14 @@ state_undeclareliterals(struct state *s)
 
 static void
 state_undeclarevars(struct state *s)
-{
+{	
 	heap_undeclare(s->heap, s);
 	vconst_undeclare(s->vconst);
+	struct value *v = state_readregister(s);
+	if (v) {
+		/* XXX: avoid state_writeregister assert */
+		s->reg = value_abstractcopy(v, s);
+	}
 	stack_undeclare(s->stack, s);
 }
 

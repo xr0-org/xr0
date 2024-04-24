@@ -384,33 +384,6 @@ ast_function_setupabsexec(struct ast_function *f, struct state *state)
 	return NULL;
 }
 
-struct result *
-ast_function_absexec(struct ast_function *f, struct state *state)
-{
-	int ndecls = ast_block_ndecls(f->abstract);
-	if (ndecls) {
-		struct ast_variable **var = ast_block_decls(f->abstract);
-		for (int i = 0; i < ndecls; i++) {
-			state_declare(state, var[i], false);
-		}
-	}
-
-	char *fname = ast_function_name(f);
-	int nstmts = ast_block_nstmts(f->abstract);
-	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
-	for (int i = 0; i < nstmts; i++) {
-		struct error *err = ast_stmt_absprocess(stmt[i], fname, state, true, false);
-		if (err) {
-			return result_error_create(err);
-		}
-	}
-
-	/* wrap result and return */ 
-	struct object_res res = state_getresult(state);
-	assert(!res.err);
-	return result_value_create(object_as_value(res.obj));
-}
-
 static void
 recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externals *ext);
 

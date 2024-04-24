@@ -658,9 +658,6 @@ struct result;
 struct error *
 ast_function_setupabsexec(struct ast_function *f, struct state *state);
 
-struct result *
-ast_function_absexec(struct ast_function *, struct state *state);
-
 struct ast_externdecl;
 
 struct ast_externdecl *

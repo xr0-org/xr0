@@ -68,9 +68,6 @@ stack_isnested(struct stack *);
 struct error *
 stack_trace(struct stack *, struct error *);
 
-struct variable *
-stack_getresult(struct stack *);
-
 struct map *
 stack_getvarmap(struct stack *);
 
