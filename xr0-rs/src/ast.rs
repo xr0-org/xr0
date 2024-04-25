@@ -35,9 +35,9 @@ use crate::{cstr, strbuilder_write, vprintln, Externals, Object, Value};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
-    Clump,
-    Dealloc,
     Alloc,
+    Dealloc,
+    Clump,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -108,13 +108,13 @@ pub struct CallExpr {
 #[derive(Clone)]
 pub struct ConstantExpr {
     constant: libc::c_int,
-    ischar: bool,
+    is_char: bool,
 }
 
 #[derive(Clone)]
 pub struct StructMemberExpr {
     root: Box<AstExpr>,
-    field: OwningCStr,
+    member: OwningCStr,
 }
 
 #[derive(Clone)]
@@ -309,7 +309,23 @@ pub struct Ast {
 
 impl Display for AstExpr {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", ast_expr_str(self))
+        match &self.kind {
+            AstExprKind::Identifier(id) => write!(f, "{id}"),
+            AstExprKind::Constant(constant) => write!(f, "{constant}"),
+            AstExprKind::StringLiteral(s) => write!(f, "{s:?}"),
+            AstExprKind::Bracketed(inner) => write!(f, "({inner})"),
+            AstExprKind::Call(call) => write!(f, "{call}"),
+            AstExprKind::IncDec(incdec) => write!(f, "{incdec}"),
+            AstExprKind::StructMember(sm) => write!(f, "{sm}"),
+            AstExprKind::Unary(u) => write!(f, "{u}"),
+            AstExprKind::Binary(b) => write!(f, "{b}"),
+            AstExprKind::Assignment(a) => write!(f, "{a}"),
+            AstExprKind::IsDeallocand(assertand) => write!(f, "@{assertand}"),
+            AstExprKind::IsDereferencable(assertand) => write!(f, "${assertand}"),
+            AstExprKind::ArbArg => write!(f, "$"),
+            AstExprKind::Allocation(alloc) => write!(f, "{alloc}"),
+            AstExprKind::Iteration => panic!(),
+        }
     }
 }
 
@@ -370,7 +386,7 @@ pub fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
                 && ast_expr_equal(&c1.fun, &c2.fun)
         }
         (AstExprKind::StructMember(m1), AstExprKind::StructMember(m2)) => {
-            ast_expr_equal(&m1.root, &m2.root) && m1.field == m2.field
+            ast_expr_equal(&m1.root, &m2.root) && m1.member == m2.member
         }
         _ => false,
     }
@@ -660,10 +676,6 @@ pub fn ast_expr_assignment_create(root: Box<AstExpr>, value: Box<AstExpr>) -> Bo
     }))
 }
 
-fn ast_expr_bracketed_str_build(inner: &AstExpr, b: &mut StrBuilder) {
-    strbuilder_write!(*b, "({inner})");
-}
-
 fn expr_to_binary(expr: &AstExpr) -> Box<AstExpr> {
     match &expr.kind {
         AstExprKind::Binary(_) => ast_expr_copy(expr),
@@ -884,21 +896,16 @@ unsafe fn dereference_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Valu
     binary_deref_eval(&binary, state)
 }
 
-fn ast_expr_constant_str_build(expr: &AstExpr, b: &mut StrBuilder) {
-    let AstExprKind::Constant(c) = &expr.kind else {
-        panic!()
-    };
-    let constant: libc::c_int = c.constant;
-    if !c.ischar {
-        strbuilder_write!(*b, "{constant}");
-        return;
-    }
-    match char::try_from(constant as u32) {
-        Ok(c) => {
-            strbuilder_write!(*b, "{:?}", c);
+impl Display for ConstantExpr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let constant: libc::c_int = self.constant;
+        if !self.is_char {
+            return write!(f, "{constant}");
         }
-        _ => {
-            strbuilder_write!(*b, "'\\x{{{:x}}}'", constant as libc::c_uint);
+        // XXX FIXME: this generates Rust character literals, should generate C syntax
+        match char::try_from(constant as u32) {
+            Ok(c) => write!(f, "{:?}", c),
+            _ => write!(f, "'\\x{{{:x}}}'", constant as libc::c_uint),
         }
     }
 }
@@ -1171,14 +1178,14 @@ unsafe fn pf_augment(v: *mut Value, call: &AstExpr, state: *mut State) -> Result
 
 pub fn ast_expr_constant_create_char(c: libc::c_char) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Constant(ConstantExpr {
-        ischar: true,
+        is_char: true,
         constant: c as libc::c_int,
     }))
 }
 
 pub fn ast_expr_constant_create(k: libc::c_int) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Constant(ConstantExpr {
-        ischar: false,
+        is_char: false,
         constant: k,
     }))
 }
@@ -1273,58 +1280,49 @@ pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> Result<Box<Value
     }
 }
 
-fn ast_expr_member_str_build(expr: &AstExpr, b: &mut StrBuilder) {
-    let AstExprKind::StructMember(member) = &expr.kind else {
-        panic!()
-    };
-    let root = &member.root;
-    let field_name = member.field.as_str();
-    if matches!(root.kind, AstExprKind::Unary(_)) {
-        return ast_expr_member_deref_str_build(root, field_name, b);
-    }
-    strbuilder_write!(*b, "{root}.{field_name}");
-}
+impl Display for StructMemberExpr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let StructMemberExpr { root, member } = self;
+        if let AstExprKind::Unary(unary) = &root.kind {
+            let UnaryExpr { op, arg: inner } = unary;
+            assert_eq!(*op, AstUnaryOp::Dereference);
 
-fn ast_expr_member_deref_str_build(root: &AstExpr, member: &str, b: &mut StrBuilder) {
-    if !(ast_expr_unary_op(root) == AstUnaryOp::Dereference) {
-        panic!();
-    }
-    let inner = ast_expr_unary_operand(root);
-    let e1 = ast_expr_binary_e1(inner);
-    let e2 = ast_expr_binary_e2(inner);
-    if matches!(e2.kind, AstExprKind::Constant(_)) && ast_expr_as_constant(e2) == 0 as libc::c_int {
-        strbuilder_write!(*b, "{e1}->{member}");
-    } else {
-        strbuilder_write!(*b, "{e1}[{e2}].{member}");
+            let e1 = ast_expr_binary_e1(inner);
+            let e2 = ast_expr_binary_e2(inner);
+            if matches!(e2.kind, AstExprKind::Constant(_)) && ast_expr_as_constant(e2) == 0 {
+                write!(f, "{e1}->{member}")
+            } else {
+                write!(f, "{e1}[{e2}].{member}")
+            }
+        } else {
+            write!(f, "{root}.{member}")
+        }
     }
 }
 
-fn ast_expr_incdec_str_build(expr: &AstExpr, b: &mut StrBuilder) {
-    let AstExprKind::IncDec(incdec) = &expr.kind else {
-        panic!()
-    };
-    let root = &incdec.operand;
-    let op = if incdec.inc != 0 { "++" } else { "--" };
-    if incdec.pre != 0 {
-        strbuilder_write!(*b, "{op}{root}");
-    } else {
-        strbuilder_write!(*b, "{root}{op}");
+impl Display for IncDecExpr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let root = &self.operand;
+        let op = if self.inc != 0 { "++" } else { "--" };
+        if self.pre != 0 {
+            write!(f, "{op}{root}")
+        } else {
+            write!(f, "{root}{op}")
+        }
     }
 }
 
-fn ast_expr_call_str_build(expr: &AstExpr, b: &mut StrBuilder) {
-    let AstExprKind::Call(call) = &expr.kind else {
-        panic!()
-    };
-    strbuilder_write!(*b, "{}(", call.fun);
-    for (i, arg) in call.args.iter().enumerate() {
-        strbuilder_write!(
-            *b,
-            "{arg}{}",
-            if i + 1 < call.args.len() { ", " } else { "" },
-        );
+impl Display for CallExpr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}(", self.fun)?;
+        for (i, arg) in self.args.iter().enumerate() {
+            write!(f, "{arg}")?;
+            if i + 1 < self.args.len() {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, ")")
     }
-    strbuilder_write!(*b, ")");
 }
 
 pub fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
@@ -1340,7 +1338,7 @@ pub fn ast_expr_member_field(expr: &AstExpr) -> &OwningCStr {
     let AstExprKind::StructMember(member) = &expr.kind else {
         panic!()
     };
-    &member.field
+    &member.member
 }
 
 pub fn ast_expr_member_root(expr: &AstExpr) -> &AstExpr {
@@ -1367,7 +1365,7 @@ pub fn ast_expr_incdec_root(expr: &AstExpr) -> &AstExpr {
 pub fn ast_expr_member_create(struct_: Box<AstExpr>, field: OwningCStr) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::StructMember(StructMemberExpr {
         root: struct_,
-        field,
+        member: field,
     }))
 }
 
@@ -1453,73 +1451,15 @@ pub fn ast_expr_dealloc_create(arg: Box<AstExpr>) -> Box<AstExpr> {
     }))
 }
 
-pub fn ast_expr_str(expr: &AstExpr) -> OwningCStr {
-    let mut b = strbuilder_create();
-    match &expr.kind {
-        AstExprKind::Identifier(id) => {
-            strbuilder_write!(b, "{id}");
-        }
-        AstExprKind::Constant(_) => {
-            ast_expr_constant_str_build(expr, &mut b);
-        }
-        AstExprKind::StringLiteral(s) => {
-            strbuilder_write!(b, "{s:?}");
-        }
-        AstExprKind::Bracketed(inner) => {
-            ast_expr_bracketed_str_build(inner, &mut b);
-        }
-        AstExprKind::Call(_) => {
-            ast_expr_call_str_build(expr, &mut b);
-        }
-        AstExprKind::IncDec(_) => {
-            ast_expr_incdec_str_build(expr, &mut b);
-        }
-        AstExprKind::StructMember(_) => {
-            ast_expr_member_str_build(expr, &mut b);
-        }
-        AstExprKind::Unary(_) => {
-            ast_expr_unary_str_build(expr, &mut b);
-        }
-        AstExprKind::Binary(_) => {
-            ast_expr_binary_str_build(expr, &mut b);
-        }
-        AstExprKind::Assignment(_) => {
-            ast_expr_assignment_str_build(expr, &mut b);
-        }
-        AstExprKind::IsDeallocand(assertand) => {
-            ast_expr_isdeallocand_str_build(assertand, &mut b);
-        }
-        AstExprKind::IsDereferencable(assertand) => {
-            ast_expr_isdereferencable_str_build(assertand, &mut b);
-        }
-        AstExprKind::ArbArg => {
-            b.push('$');
-        }
-        AstExprKind::Allocation(_) => {
-            ast_expr_alloc_str_build(expr, &mut b);
-        }
-        _ => {
-            panic!();
-        }
-    }
-    strbuilder_build(b)
-}
-
-fn ast_expr_alloc_str_build(expr: &AstExpr, b: &mut StrBuilder) {
-    let AstExprKind::Allocation(alloc) = &expr.kind else {
-        panic!()
-    };
-    let arg = &*alloc.arg;
-    match alloc.kind {
-        AstAllocKind::Alloc => {
-            strbuilder_write!(*b, ".{} {arg};", "malloc");
-        }
-        AstAllocKind::Dealloc => {
-            strbuilder_write!(*b, ".{} {arg};", "free");
-        }
-        AstAllocKind::Clump => {
-            strbuilder_write!(*b, ".{} {arg};", "clump");
-        }
+impl Display for AllocExpr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let AllocExpr { kind, arg } = self;
+        let kw = match kind {
+            AstAllocKind::Alloc => "malloc",
+            AstAllocKind::Dealloc => "free",
+            AstAllocKind::Clump => "clump",
+        };
+        write!(f, ".{kw} {arg};")
     }
 }
 
@@ -1556,10 +1496,6 @@ fn ast_expr_alloc_copy(expr: &AstExpr) -> Box<AstExpr> {
     }
 }
 
-fn ast_expr_isdereferencable_str_build(assertand: &AstExpr, b: &mut StrBuilder) {
-    strbuilder_write!(*b, "${assertand}");
-}
-
 pub fn ast_expr_assignment_rval(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Assignment(assignment) = &expr.kind else {
         panic!()
@@ -1585,34 +1521,28 @@ pub fn ast_expr_binary_e2(expr: &AstExpr) -> &AstExpr {
     &binary.e2
 }
 
-fn ast_expr_isdeallocand_str_build(assertand: &AstExpr, b: &mut StrBuilder) {
-    strbuilder_write!(*b, "@{assertand}");
+impl Display for AssignmentExpr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let AssignmentExpr { lval, rval } = self;
+        write!(f, "{lval} = {rval}")
+    }
 }
 
-fn ast_expr_assignment_str_build(expr: &AstExpr, b: &mut StrBuilder) {
-    let AstExprKind::Assignment(assignment) = &expr.kind else {
-        panic!()
-    };
-    strbuilder_write!(*b, "{} = {}", assignment.lval, assignment.rval);
-}
-
-fn ast_expr_binary_str_build(expr: &AstExpr, b: &mut StrBuilder) {
-    let AstExprKind::Binary(binary) = &expr.kind else {
-        panic!()
-    };
-    let opstr = match binary.op {
-        AstBinaryOp::Eq => "==",
-        AstBinaryOp::Ne => "!=",
-        AstBinaryOp::Lt => "<",
-        AstBinaryOp::Gt => ">",
-        AstBinaryOp::Le => "<=",
-        AstBinaryOp::Ge => ">=",
-        AstBinaryOp::Addition => "+",
-        AstBinaryOp::Subtraction => "-",
-    };
-    let e1 = &binary.e1;
-    let e2 = &binary.e2;
-    strbuilder_write!(*b, "{e1}{opstr}{e2}");
+impl Display for BinaryExpr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let BinaryExpr { op, e1, e2 } = self;
+        let opstr = match op {
+            AstBinaryOp::Eq => "==",
+            AstBinaryOp::Ne => "!=",
+            AstBinaryOp::Lt => "<",
+            AstBinaryOp::Gt => ">",
+            AstBinaryOp::Le => "<=",
+            AstBinaryOp::Ge => ">=",
+            AstBinaryOp::Addition => "+",
+            AstBinaryOp::Subtraction => "-",
+        };
+        write!(f, "{e1}{opstr}{e2}")
+    }
 }
 
 pub fn ast_expr_binary_e1(expr: &AstExpr) -> &AstExpr {
@@ -1630,20 +1560,19 @@ pub fn ast_expr_sum_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
     ast_expr_binary_create(e1, AstBinaryOp::Addition, e2)
 }
 
-fn ast_expr_unary_str_build(expr: &AstExpr, b: &mut StrBuilder) {
-    let AstExprKind::Unary(unary) = &expr.kind else {
-        panic!()
-    };
-    let c = match unary.op {
-        AstUnaryOp::Address => "&",
-        AstUnaryOp::Dereference => "*",
-        AstUnaryOp::Positive => "+",
-        AstUnaryOp::Negative => "-",
-        AstUnaryOp::OnesComplement => "~",
-        AstUnaryOp::Bang => "!",
-    };
-    let root = &unary.arg;
-    strbuilder_write!(*b, "{c}({root})");
+impl Display for UnaryExpr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let UnaryExpr { op, arg } = self;
+        let c = match op {
+            AstUnaryOp::Address => "&",
+            AstUnaryOp::Dereference => "*",
+            AstUnaryOp::Positive => "+",
+            AstUnaryOp::Negative => "-",
+            AstUnaryOp::OnesComplement => "~",
+            AstUnaryOp::Bang => "!",
+        };
+        write!(f, "{c}({arg})")
+    }
 }
 
 pub fn ast_expr_ge_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
