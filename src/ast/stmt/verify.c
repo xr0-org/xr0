@@ -726,6 +726,7 @@ comp_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool sho
 			if (err) {
 				return err;
 			}
+			state_clearregister(state); /* XXX: not pretty we should step */
 		}
 		return NULL;
 	}
