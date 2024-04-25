@@ -64,6 +64,9 @@ ast_expr_incdec_root(struct ast_expr *);
 bool
 ast_expr_incdec_pre(struct ast_expr *);
 
+bool
+ast_expr_incdec_inc(struct ast_expr *);
+
 struct ast_expr *
 ast_expr_member_create(struct ast_expr *, char *);
 
