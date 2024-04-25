@@ -4,7 +4,7 @@ use std::ptr;
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_equal, ast_expr_identifier_create,
-    ast_expr_literal_create, ast_expr_member_create, ast_expr_str, ast_type_create_voidptr,
+    ast_expr_literal_create, ast_expr_member_create, ast_type_create_voidptr,
     ast_type_struct_complete, ast_type_struct_members, ast_variable_arr_copy, ast_variable_name,
     ast_variable_type,
 };
@@ -15,8 +15,8 @@ use crate::object::{
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
 use crate::state::state::{state_getext, state_vconst};
 use crate::state::State;
-use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
-use crate::{strbuilder_write, AstExpr, AstType, AstVariable, Location, Object};
+use crate::util::OwningCStr;
+use crate::{AstExpr, AstType, AstVariable, Location, Object};
 
 #[derive(Clone)]
 pub struct Value {
@@ -127,15 +127,13 @@ pub unsafe fn value_struct_indefinite_create(
         let field = ast_variable_name(var).as_str();
 
         let obj: *mut Object = sv.m.get(field).copied().unwrap();
-        let mut b = strbuilder_create();
-        strbuilder_write!(b, "{comment}.{field}");
-        let comment = strbuilder_build(b);
+        let comment = format!("{comment}.{field}");
         object_assign(
             &mut *obj,
             Box::into_raw(state_vconst(
                 s,
                 ast_variable_type(var),
-                Some(comment.as_str()),
+                Some(&comment),
                 persist,
             )),
         );
@@ -542,22 +540,24 @@ fn number_range_up(n: &Number) -> libc::c_int {
     number_value_as_constant(ranges[0].upper)
 }
 
-fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
-    let mut b = strbuilder_create();
-    b.push('{');
+fn number_ranges_to_string(ranges: &[NumberRange]) -> String {
+    let mut b = "{".to_string();
     let n = ranges.len();
     for (i, range) in ranges.iter().enumerate() {
-        strbuilder_write!(b, "{range}{}", if i + 1 < n { ", " } else { "" });
+        b += &format!("{range}");
+        if i + 1 < n {
+            b += ", ";
+        }
     }
     b.push('}');
-    strbuilder_build(b)
+    b
 }
 
 impl Display for Number {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.kind {
-            NumberKind::Ranges(ranges) => write!(f, "{}", number_ranges_sprint(ranges)),
-            NumberKind::Computed(computation) => write!(f, "{}", ast_expr_str(computation)),
+            NumberKind::Ranges(ranges) => write!(f, "{}", number_ranges_to_string(ranges)),
+            NumberKind::Computed(computation) => write!(f, "{computation}"),
         }
     }
 }
