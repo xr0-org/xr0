@@ -1,9 +1,6 @@
 use std::ptr;
 
 use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
-use super::heap::{
-    vconst_create, vconst_declare, vconst_eval, vconst_get, vconst_str, vconst_undeclare,
-};
 use super::location::{
     location_copy, location_create_dereferencable, location_create_static, location_dealloc,
     location_getblock, location_offset, location_range_dealloc, location_toclump, location_toheap,
@@ -44,7 +41,7 @@ pub unsafe fn state_create(func: OwningCStr, ext: *mut Externals, result_type: &
     State {
         ext,
         static_memory: StaticMemory::new(),
-        vconst: vconst_create(),
+        vconst: VConst::new(),
         clump: Clump::new(),
         stack: stack_create(func, ptr::null_mut(), result_type),
         heap: Heap::new(),
@@ -61,7 +58,7 @@ pub unsafe fn state_create_withprops(
     State {
         ext,
         static_memory: StaticMemory::new(),
-        vconst: vconst_create(),
+        vconst: VConst::new(),
         clump: Clump::new(),
         stack: stack_create(func, ptr::null_mut(), result_type),
         heap: Heap::new(),
@@ -114,7 +111,7 @@ pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     if !static_mem.is_empty() {
         strbuilder_write!(b, "{static_mem}\n");
     }
-    let vconst = vconst_str(&(*state).vconst, "\t");
+    let vconst = (*state).vconst.str("\t");
     if !vconst.is_empty() {
         strbuilder_write!(b, "{vconst}\n");
     }
@@ -175,7 +172,7 @@ pub unsafe fn state_vconst(
     if value_isstruct(&v) {
         return v;
     }
-    let c = vconst_declare(&mut (*state).vconst, Box::into_raw(v), comment, persist);
+    let c = (*state).vconst.declare(v, comment, persist);
     value_sync_create(ast_expr_identifier_create(c))
 }
 
@@ -233,8 +230,8 @@ pub unsafe fn state_isalloc(state: *mut State, v: *mut Value) -> bool {
     location_toheap(loc, &mut (*state).heap)
 }
 
-pub unsafe fn state_getvconst(state: *mut State, id: &str) -> *mut Value {
-    vconst_get(&(*state).vconst, id)
+pub unsafe fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Value> {
+    state.vconst.get(id)
 }
 
 pub unsafe fn state_get(
@@ -439,7 +436,7 @@ pub unsafe fn state_references(s: *mut State, loc: &Location) -> bool {
 }
 
 pub unsafe fn state_eval(s: &State, e: &AstExpr) -> bool {
-    vconst_eval(&s.vconst, e)
+    s.vconst.eval(e)
 }
 
 pub unsafe fn state_equal(s1: &State, s2: &State) -> bool {
@@ -467,7 +464,7 @@ unsafe fn state_undeclareliterals(s: *mut State) {
 
 unsafe fn state_undeclarevars(s: *mut State) {
     (*s).heap.undeclare(s);
-    vconst_undeclare(&mut (*s).vconst);
+    (*s).vconst.undeclare();
     stack_undeclare((*s).stack, s);
 }
 

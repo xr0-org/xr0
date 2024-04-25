@@ -657,7 +657,7 @@ unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Val
 }
 
 unsafe fn hack_identifier_builtin_eval(id: &str, state: *mut State) -> Result<Box<Value>> {
-    if !(state_getvconst(state, id)).is_null() || id.starts_with("ptr:") {
+    if !(state_getvconst(&*state, id)).is_none() || id.starts_with("ptr:") {
         return Ok(value_sync_create(ast_expr_identifier_create(
             OwningCStr::copy_str(id),
         )));

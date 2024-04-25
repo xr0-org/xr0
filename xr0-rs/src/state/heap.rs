@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, HashMap};
-use std::ptr;
 
 use super::{Block, State};
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
@@ -113,86 +112,72 @@ unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
     state_references(s, &loc)
 }
 
-pub unsafe fn vconst_create() -> VConst {
-    VConst {
-        varmap: BTreeMap::new(),
-        comment: HashMap::new(),
-        persist: HashMap::new(),
+impl VConst {
+    pub fn new() -> VConst {
+        VConst {
+            varmap: BTreeMap::new(),
+            comment: HashMap::new(),
+            persist: HashMap::new(),
+        }
     }
-}
 
-pub unsafe fn vconst_declare(
-    v: &mut VConst,
-    val: *mut Value,
-    comment: Option<&str>,
-    persist: bool,
-) -> OwningCStr {
-    let m = &mut v.varmap;
-    let s = vconst_id(m, &v.persist, persist);
-    let s_string = s.to_string();
-    m.insert(s_string.clone(), Box::from_raw(val));
-    if let Some(comment) = comment {
-        v.comment.insert(s_string.clone(), comment.to_string());
+    pub fn declare(&mut self, val: Box<Value>, comment: Option<&str>, persist: bool) -> OwningCStr {
+        let s = self.id(persist);
+        let s_string = s.to_string();
+        self.varmap.insert(s_string.clone(), val);
+        if let Some(comment) = comment {
+            self.comment.insert(s_string.clone(), comment.to_string());
+        }
+        self.persist.insert(s_string, persist);
+        s
     }
-    v.persist.insert(s_string, persist);
-    s
-}
 
-unsafe fn vconst_id(
-    varmap: &BTreeMap<String, Box<Value>>,
-    persistmap: &HashMap<String, bool>,
-    persist: bool,
-) -> OwningCStr {
-    let npersist = count_true(persistmap);
-    let mut b = strbuilder_create();
-    if persist {
-        strbuilder_write!(b, "${npersist}");
-    } else {
-        strbuilder_write!(b, "#{}", varmap.len() - npersist);
+    fn id(&mut self, persist: bool) -> OwningCStr {
+        let npersist = self.persist.values().filter(|&&b| b).count();
+        let mut b = strbuilder_create();
+        if persist {
+            strbuilder_write!(b, "${npersist}");
+        } else {
+            strbuilder_write!(b, "#{}", self.varmap.len() - npersist);
+        }
+        strbuilder_build(b)
     }
-    strbuilder_build(b)
-}
 
-unsafe fn count_true(m: &HashMap<String, bool>) -> usize {
-    m.values().filter(|&&b| b).count()
-}
+    pub fn get(&self, id: &str) -> Option<&Value> {
+        self.varmap.get(id).map(|boxed| &**boxed)
+    }
 
-pub unsafe fn vconst_get(v: &VConst, id: &str) -> *mut Value {
-    v.varmap.get(id).map_or(ptr::null_mut(), |value| {
-        &**value as *const Value as *mut Value
-    })
-}
-
-pub unsafe fn vconst_undeclare(v: &mut VConst) {
-    let mut varmap = BTreeMap::new();
-    let mut comment = HashMap::new();
-    let mut persist = HashMap::new();
-    for (key, value) in &v.varmap {
-        if v.persist.get(key).copied().unwrap_or(false) {
-            varmap.insert(key.clone(), value.clone());
-            if let Some(c) = v.comment.get(key) {
-                comment.insert(key.clone(), c.clone());
+    pub fn undeclare(&mut self) {
+        let mut varmap = BTreeMap::new();
+        let mut comment = HashMap::new();
+        let mut persist = HashMap::new();
+        for (key, value) in &self.varmap {
+            if self.persist.get(key).copied().unwrap_or(false) {
+                varmap.insert(key.clone(), value.clone());
+                if let Some(c) = self.comment.get(key) {
+                    comment.insert(key.clone(), c.clone());
+                }
+                persist.insert(key.clone(), true);
             }
-            persist.insert(key.clone(), true);
         }
+        self.varmap = varmap;
+        self.comment = comment;
+        self.persist = persist;
     }
-    v.varmap = varmap;
-    v.comment = comment;
-    v.persist = persist;
-}
 
-pub unsafe fn vconst_str(v: &VConst, indent: &str) -> OwningCStr {
-    let mut b = strbuilder_create();
-    for (k, val) in &v.varmap {
-        strbuilder_write!(b, "{indent}{k}: {val}");
-        if let Some(comment) = v.comment.get(k) {
-            strbuilder_write!(b, "\t({comment})");
+    pub fn str(&self, indent: &str) -> OwningCStr {
+        let mut b = strbuilder_create();
+        for (k, val) in &self.varmap {
+            strbuilder_write!(b, "{indent}{k}: {val}");
+            if let Some(comment) = self.comment.get(k) {
+                strbuilder_write!(b, "\t({comment})");
+            }
+            strbuilder_write!(b, "\n");
         }
-        strbuilder_write!(b, "\n");
+        strbuilder_build(b)
     }
-    strbuilder_build(b)
-}
 
-pub unsafe fn vconst_eval(_v: &VConst, e: &AstExpr) -> bool {
-    ast_expr_matheval(e)
+    pub unsafe fn eval(&self, e: &AstExpr) -> bool {
+        ast_expr_matheval(e)
+    }
 }
