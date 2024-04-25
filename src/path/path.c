@@ -347,7 +347,6 @@ path_init_actual(struct path *p)
 	if (err) {
 		return err;
 	}
-	state_clearregister(p->actual); /* XXX: not pretty */
 	p->path_state = PATH_STATE_ACTUAL;
 	return NULL;
 }

@@ -63,15 +63,8 @@ ast_stmt_linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
-	case STMT_NOP:
-	case STMT_COMPOUND_V:
-		return NULL;
 	case STMT_EXPR:
 		return expr_linearise(stmt, b, loc, state);
-	case STMT_LABELLED:
-		return labelled_linearise(stmt, b, loc, state);
-	case STMT_COMPOUND:
-		return compound_linearise(stmt, b, loc, state);
 	case STMT_JUMP:
 		return jump_linearise(stmt, b, loc, state);
 	case STMT_SELECTION:
@@ -218,6 +211,9 @@ ast_stmt_process(struct ast_stmt *stmt, char *fname, struct state *state)
 		if ((err = ast_stmt_verify(stmt, state))) {
 			return err;
 		}
+	}
+	if (ast_stmt_ispre(stmt)) {
+		return NULL;
 	}
 	if ((err = ast_stmt_exec(stmt, state))) {
 		return err;
@@ -701,25 +697,12 @@ hack_alloc_from_neteffect(struct ast_stmt *stmt)
 static struct error *
 comp_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool should_setup)
 {
-	if (hack_old) {
-		struct ast_block *b = ast_stmt_as_block(stmt);
-		int nstmts = ast_block_nstmts(b);
-		struct ast_stmt **stmt = ast_block_stmts(b);
-		for (int i = 0; i < nstmts; i++) {
-			struct error *err = ast_stmt_absexec(stmt[i], state, hack_old, should_setup);
-			if (err) {
-				return err;
-			}
-			state_clearregister(state); /* XXX: 7-use-after-free/004-conditions.x */
-		}
-		return NULL;
-	}
-
 	struct frame *block_frame = frame_block_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
 		true
 	);
+	printf("stmt: %s\n", ast_stmt_str(stmt));
 	state_pushframe(state, block_frame);
 	return NULL;
 }

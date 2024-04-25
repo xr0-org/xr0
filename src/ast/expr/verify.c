@@ -723,7 +723,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		true,
+		false,
 		ast_expr_copy(expr),
 		f
 	);
@@ -1150,7 +1150,9 @@ alloc_absexec(struct ast_expr *expr, struct state *state)
 	if (result_iserror(res)) {
 		return res;
 	}
-	state_writeregister(state, result_as_value(res));
+	if (result_hasvalue(res)) {
+		state_writeregister(state, result_as_value(res));
+	}
 	return res;
 }
 
