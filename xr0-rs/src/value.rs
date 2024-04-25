@@ -12,9 +12,7 @@ use crate::object::{
     object_abstractcopy, object_as_value, object_assign, object_copy, object_destroy,
     object_value_create,
 };
-use crate::state::location::{
-    location_references, location_referencesheap, location_str, location_transfigure,
-};
+use crate::state::location::{location_references, location_referencesheap, location_transfigure};
 use crate::state::state::{state_getext, state_vconst};
 use crate::state::State;
 use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
@@ -306,7 +304,7 @@ impl Display for Value {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.kind {
             ValueKind::Sync(n) => write!(f, "comp:{n}"),
-            ValueKind::DefinitePtr(loc) => write!(f, "ptr:{}", location_str(loc)),
+            ValueKind::DefinitePtr(loc) => write!(f, "ptr:{loc}"),
             ValueKind::IndefinitePtr(n) => write!(f, "ptr:{n}"),
             ValueKind::Int(n) => write!(f, "int:{n}"),
             ValueKind::Literal(s) => write!(f, "\"{s}\""),

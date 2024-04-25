@@ -5,7 +5,7 @@ use crate::ast::{
     ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create,
     ast_expr_sum_create, ast_type_struct_complete,
 };
-use crate::state::location::{location_references, location_str};
+use crate::state::location::location_references;
 use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
 };
@@ -369,7 +369,7 @@ pub fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {
 
 pub fn range_str(r: &Range) -> OwningCStr {
     let mut b = strbuilder_create();
-    strbuilder_write!(b, "virt:{}@{}", r.size, location_str(&r.loc));
+    strbuilder_write!(b, "virt:{}@{}", r.size, r.loc);
     strbuilder_build(b)
 }
 

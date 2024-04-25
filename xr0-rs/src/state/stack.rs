@@ -12,7 +12,7 @@ use crate::object::{
 use crate::state::block::{block_create, block_install, block_observe};
 use crate::state::location::{
     location_auto_getblock, location_copy, location_create_automatic, location_destroy,
-    location_getstackblock, location_offset, location_references, location_str,
+    location_getstackblock, location_offset, location_references,
 };
 use crate::state::state::state_get;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
@@ -279,7 +279,7 @@ pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut St
     let type_ = ast_type_str(&(*var).type_);
     let isparam = if (*var).is_param { "param " } else { "" };
     let obj_str = object_or_nothing_str((*var).loc, stack, state);
-    let loc = location_str(&*(*var).loc);
+    let loc = &*(*var).loc;
     strbuilder_write!(b, "{{{isparam}{type_} := {obj_str}}} @ {loc}");
     strbuilder_build(b)
 }

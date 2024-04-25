@@ -1,3 +1,4 @@
+use std::fmt::{self, Display, Formatter};
 use std::ptr;
 
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
@@ -8,8 +9,8 @@ use crate::state::block::{
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
 use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
-use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
-use crate::{strbuilder_write, AstExpr, Value};
+use crate::util::{Error, Result};
+use crate::{AstExpr, Value};
 
 #[derive(Clone)]
 pub struct Location {
@@ -103,28 +104,21 @@ pub unsafe fn location_destroy(loc: *mut Location) {
     drop(Box::from_raw(loc))
 }
 
-pub fn location_str(loc: &Location) -> OwningCStr {
-    let mut b = strbuilder_create();
-    match &loc.kind {
-        LocationKind::Static => {
-            strbuilder_write!(b, "static:");
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match &self.kind {
+            LocationKind::Static => write!(f, "static:")?,
+            LocationKind::Automatic { frame } => write!(f, "stack[{}]:", *frame)?,
+            LocationKind::Dynamic => write!(f, "heap:")?,
+            LocationKind::Dereferencable => write!(f, "clump:")?,
+            _ => panic!(),
         }
-        LocationKind::Automatic { frame } => {
-            strbuilder_write!(b, "stack[{}]:", *frame);
+        write!(f, "{}", self.block)?;
+        if !offsetzero(self) {
+            write!(f, "+{}", self.offset)?;
         }
-        LocationKind::Dynamic => {
-            strbuilder_write!(b, "heap:");
-        }
-        LocationKind::Dereferencable => {
-            strbuilder_write!(b, "clump:");
-        }
-        _ => panic!(),
+        Ok(())
     }
-    strbuilder_write!(b, "{}", loc.block);
-    if !offsetzero(loc) {
-        strbuilder_write!(b, "+{}", loc.offset);
-    }
-    strbuilder_build(b)
 }
 
 fn offsetzero(loc: &Location) -> bool {
