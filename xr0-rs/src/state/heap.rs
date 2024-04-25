@@ -33,80 +33,80 @@ impl Heap {
     pub unsafe fn new() -> Self {
         Heap { blocks: vec![] }
     }
-}
 
-pub unsafe fn heap_str(h: *mut Heap, indent: &str) -> OwningCStr {
-    let mut b = strbuilder_create();
-    for (i, hb) in (*h).blocks.iter().enumerate() {
-        if !hb.freed {
-            strbuilder_write!(
-                b,
-                "{indent}{i}: {}{}",
-                block_str(&hb.block),
-                if printdelim(h, i) { "\n" } else { "" },
-            );
+    pub unsafe fn str(&self, indent: &str) -> OwningCStr {
+        let mut b = strbuilder_create();
+        for (i, hb) in self.blocks.iter().enumerate() {
+            if !hb.freed {
+                strbuilder_write!(
+                    b,
+                    "{indent}{i}: {}{}",
+                    block_str(&hb.block),
+                    if self.print_delim(i) { "\n" } else { "" },
+                );
+            }
+        }
+        strbuilder_build(b)
+    }
+
+    fn print_delim(&self, start: usize) -> bool {
+        for i in start + 1..self.blocks.len() {
+            if !self.blocks[i].freed {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn new_block(&mut self) -> Box<Location> {
+        let address = self.blocks.len() as libc::c_int;
+        self.blocks.push(HeapBlock {
+            block: block_create(),
+            freed: false,
+        });
+        location_create_dynamic(address, ast_expr_constant_create(0))
+    }
+
+    pub fn get_block(&mut self, address: libc::c_int) -> Option<&mut Block> {
+        if address as usize >= self.blocks.len() {
+            return None;
+        }
+        let hb = &mut self.blocks[address as usize];
+        if hb.freed {
+            return None;
+        }
+        Some(&mut hb.block)
+    }
+
+    pub fn dealloc_block(&mut self, address: libc::c_int) -> Result<()> {
+        if self.blocks[address as usize].freed {
+            return Err(Error::new("double free".to_string()));
+        }
+        self.blocks[address as usize].freed = true;
+        Ok(())
+    }
+
+    pub fn block_is_freed(&self, address: libc::c_int) -> bool {
+        self.blocks[address as usize].freed
+    }
+
+    pub unsafe fn undeclare(&mut self, s: *mut State) {
+        // DANGER: s aliases h and `block_undeclare` actually accesses h.
+        for i in 0..self.blocks.len() {
+            if !self.blocks[i].freed {
+                block_undeclare(&mut *self.blocks[i].block, s);
+            }
         }
     }
-    strbuilder_build(b)
-}
 
-unsafe fn printdelim(h: *mut Heap, start: usize) -> bool {
-    for i in start + 1..(*h).blocks.len() {
-        if !(*h).blocks[i].freed {
-            return true;
+    pub unsafe fn referenced(&self, s: *mut State) -> bool {
+        for i in 0..self.blocks.len() {
+            if !self.blocks[i].freed && !block_referenced(s, i as libc::c_int) {
+                return false;
+            }
         }
+        true
     }
-    false
-}
-
-pub unsafe fn heap_newblock(h: *mut Heap) -> Box<Location> {
-    let address = (*h).blocks.len() as libc::c_int;
-    (*h).blocks.push(HeapBlock {
-        block: block_create(),
-        freed: false,
-    });
-    location_create_dynamic(address, ast_expr_constant_create(0))
-}
-
-pub unsafe fn heap_getblock(h: *mut Heap, address: libc::c_int) -> *mut Block {
-    if address as usize >= (*h).blocks.len() {
-        return ptr::null_mut();
-    }
-    let hb = &mut (*h).blocks[address as usize];
-    if hb.freed {
-        return ptr::null_mut();
-    }
-    &mut *hb.block
-}
-
-pub unsafe fn heap_deallocblock(h: *mut Heap, address: libc::c_int) -> Result<()> {
-    if (*h).blocks[address as usize].freed {
-        return Err(Error::new("double free".to_string()));
-    }
-    (*h).blocks[address as usize].freed = true;
-    Ok(())
-}
-
-pub unsafe fn heap_blockisfreed(h: *mut Heap, address: libc::c_int) -> bool {
-    (*h).blocks[address as usize].freed
-}
-
-pub unsafe fn heap_undeclare(h: *mut Heap, s: *mut State) {
-    // DANGER: s aliases h and `block_undeclare` actually accesses h.
-    for i in 0..(*h).blocks.len() {
-        if !(*h).blocks[i].freed {
-            block_undeclare(&mut *(*h).blocks[i].block, s);
-        }
-    }
-}
-
-pub unsafe fn heap_referenced(h: *mut Heap, s: *mut State) -> bool {
-    for i in 0..(*h).blocks.len() {
-        if !(*h).blocks[i].freed && !block_referenced(s, i as libc::c_int) {
-            return false;
-        }
-    }
-    true
 }
 
 unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {

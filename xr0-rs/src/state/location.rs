@@ -5,7 +5,6 @@ use crate::object::object_referencesheap;
 use crate::state::block::{
     block_range_aredeallocands, block_range_dealloc, block_references, block_str,
 };
-use crate::state::heap::{heap_blockisfreed, heap_deallocblock, heap_getblock};
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
 use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
@@ -157,8 +156,8 @@ pub fn location_tostatic(loc: &Location, sm: &StaticMemory) -> bool {
 
 pub unsafe fn location_toheap(loc: &Location, h: *mut Heap) -> bool {
     let type_equal = matches!(loc.kind, LocationKind::Dynamic);
-    let b: *mut Block = heap_getblock(h, loc.block);
-    type_equal && !b.is_null()
+    let b = (*h).get_block(loc.block);
+    type_equal && b.is_some()
 }
 
 pub unsafe fn location_tostack(loc: &Location, s: *mut Stack) -> bool {
@@ -173,7 +172,7 @@ pub fn location_toclump(loc: &Location, c: &mut Clump) -> bool {
     type_equal && b.is_some()
 }
 
-unsafe fn location_equal(l1: &Location, l2: &Location) -> bool {
+fn location_equal(l1: &Location, l2: &Location) -> bool {
     // Note: Original did not compare the `frame` field of automatic locations.
     l1.kind == l2.kind && l1.block == l2.block && ast_expr_equal(&l1.offset, &l2.offset)
 }
@@ -190,7 +189,7 @@ pub unsafe fn location_references(l1: &Location, l2: &Location, s: *mut State) -
 
 pub unsafe fn location_referencesheap(l: &Location, s: *mut State) -> bool {
     if matches!(l.kind, LocationKind::Dynamic) {
-        if heap_blockisfreed(state_getheap(s), l.block) {
+        if (*state_getheap(s)).block_is_freed(l.block) {
             return false;
         }
         return true;
@@ -219,7 +218,9 @@ pub unsafe fn location_getblock(
             Ok(block_ptr)
         }
         LocationKind::Automatic { .. } => location_auto_getblock(loc, s),
-        LocationKind::Dynamic => Ok(heap_getblock(h, loc.block)),
+        LocationKind::Dynamic => Ok((*h)
+            .get_block(loc.block)
+            .map_or(ptr::null_mut(), |blk| blk as *mut Block)),
         LocationKind::Dereferencable => Ok(c
             .get_block(loc.block)
             .map_or(ptr::null_mut(), |blk| blk as *mut Block)),
@@ -247,7 +248,7 @@ pub unsafe fn location_dealloc(loc: &Location, heap: *mut Heap) -> Result<()> {
     if !matches!(loc.kind, LocationKind::Dynamic) {
         return Err(Error::new("not heap location".to_string()));
     }
-    heap_deallocblock(heap, loc.block)
+    (*heap).dealloc_block(loc.block)
 }
 
 pub unsafe fn location_range_dealloc(

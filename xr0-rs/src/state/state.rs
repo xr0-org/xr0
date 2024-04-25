@@ -4,8 +4,7 @@ use libc::strcmp;
 
 use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
 use super::heap::{
-    heap_newblock, heap_referenced, heap_str, heap_undeclare, vconst_create, vconst_declare,
-    vconst_eval, vconst_get, vconst_str, vconst_undeclare,
+    vconst_create, vconst_declare, vconst_eval, vconst_get, vconst_str, vconst_undeclare,
 };
 use super::location::{
     location_create_dereferencable, location_create_static, location_dealloc, location_getblock,
@@ -135,7 +134,7 @@ pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     if !props.is_empty() {
         strbuilder_write!(b, "{props}");
     }
-    let heap = heap_str(&mut (*state).heap, "\t");
+    let heap = (*state).heap.str("\t");
     if !heap.is_empty() {
         strbuilder_write!(b, "\n{heap}\n");
     }
@@ -372,7 +371,7 @@ pub unsafe fn state_range_alloc(
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> Box<Value> {
-    value_ptr_create(heap_newblock(&mut (*state).heap))
+    value_ptr_create((*state).heap.new_block())
 }
 
 pub unsafe fn state_dealloc(state: *mut State, val: *mut Value) -> Result<()> {
@@ -436,7 +435,7 @@ pub unsafe fn state_range_aredeallocands(
 }
 
 pub unsafe fn state_hasgarbage(state: *mut State) -> bool {
-    !heap_referenced(&mut (*state).heap, state)
+    !(*state).heap.referenced(state)
 }
 
 pub unsafe fn state_references(s: *mut State, loc: &Location) -> bool {
@@ -471,7 +470,7 @@ unsafe fn state_undeclareliterals(s: *mut State) {
 }
 
 unsafe fn state_undeclarevars(s: *mut State) {
-    heap_undeclare(&mut (*s).heap, s);
+    (*s).heap.undeclare(s);
     vconst_undeclare(&mut (*s).vconst);
     stack_undeclare((*s).stack, s);
 }

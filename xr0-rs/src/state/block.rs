@@ -11,7 +11,6 @@ use crate::object::{
     object_lower, object_range_create, object_references, object_referencesheap, object_str,
     object_upper, object_upto, object_value_create, range_create,
 };
-use crate::state::heap::heap_newblock;
 use crate::state::state::{state_alloc, state_eval};
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
 use crate::{strbuilder_write, AstExpr, Location, Object};
@@ -118,14 +117,14 @@ pub unsafe fn block_range_alloc(
     b: &mut Block,
     lw: &AstExpr,
     up: &AstExpr,
-    heap: *mut Heap,
+    heap: &mut Heap,
 ) -> Result<()> {
     assert!(b.arr.is_empty());
     b.arr.push(Box::into_raw(object_range_create(
         ast_expr_copy(lw),
         range_create(
             ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
-            heap_newblock(heap),
+            heap.new_block(),
         ),
     )));
     Ok(())
