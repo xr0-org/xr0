@@ -525,6 +525,9 @@ ast_type_isstruct(struct ast_type *);
 bool
 ast_type_istypedef(struct ast_type *);
 
+bool
+ast_type_isvoid(struct ast_type *);
+
 struct externals;
 
 struct value *
@@ -624,6 +627,9 @@ ast_function_isproto(struct ast_function *f);
 
 bool
 ast_function_absisempty(struct ast_function *f);
+
+bool
+ast_function_isvoid(struct ast_function *f);
 
 struct ast_type *
 ast_function_type(struct ast_function *f);

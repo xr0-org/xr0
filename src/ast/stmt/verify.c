@@ -500,7 +500,7 @@ hack_default_values(struct state *state)
 	struct ast_expr *expr = state_framecall(state);
 	struct value *v = state_popregister(state);
 	if (!v) {
-		v = value_int_create(0);	
+		return result_value_create(NULL);
 	}
 	return ast_expr_pf_augment(v, expr, state);
 }

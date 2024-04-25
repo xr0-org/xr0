@@ -387,14 +387,14 @@ stack_getvariable(struct stack *s, char *id)
 void
 stack_popprep(struct stack *s, struct state *state)
 {
-	if (s->kind == FRAME_CALL) {
+	if (s->kind == FRAME_CALL && !ast_function_isvoid(s->f)) {
 		struct value *v = state_readregister(state);
 		if (!v) {
 			state_writeregister(
 				state,
 				ast_expr_call_arbitrary(s->call, s->f, state)
 			);
-		}	
+		}
 	}
 }
 
@@ -439,6 +439,8 @@ frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs,
 	}
 	f->abstract = abs;
 	f->kind = kind;
+	f->call = NULL;
+	f->f = NULL;
 	return f;
 }
 

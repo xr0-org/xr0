@@ -1572,9 +1572,17 @@ assign_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_bloc
 {
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
-	assert(ast_expr_kind(lval) == EXPR_IDENTIFIER || ast_expr_kind(lval) == EXPR_UNARY);
+	assert(
+		ast_expr_kind(lval) == EXPR_IDENTIFIER ||
+		ast_expr_kind(lval) == EXPR_UNARY ||
+		ast_expr_kind(lval) == EXPR_STRUCTMEMBER
+	);
+	struct ast_expr *gen_rval = ast_expr_geninstr(rval, loc, b, s);
+	if (!gen_rval) {
+		assert(false); /* XXX: user error void func */
+	}
 	struct ast_expr *assign = ast_expr_assignment_create(
-		ast_expr_copy(lval), ast_expr_geninstr(rval, loc, b, s)
+		ast_expr_copy(lval), gen_rval
 	);
 	ast_block_append_stmt(b, ast_stmt_create_expr(loc, assign));
 	return lval;
@@ -1590,7 +1598,11 @@ call_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	struct ast_expr **gen_args = malloc(sizeof(struct ast_expr *) * nargs);
 
 	for (int i = 0; i < nargs; i++) {
-		gen_args[i] = ast_expr_geninstr(args[i], loc, b, s);
+		struct ast_expr *gen_arg = ast_expr_geninstr(args[i], loc, b, s);
+		if (!gen_arg) {
+			assert(false); /* XXX: user error void func */
+		}
+		gen_args[i] = gen_arg;
 	}
 
 	struct ast_expr *root = ast_expr_call_root(expr);
@@ -1609,7 +1621,13 @@ static struct ast_expr *
 structmember_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
 		struct state *s)
 {
-	assert(false);
+	struct ast_expr *root_gen = ast_expr_geninstr(
+		ast_expr_member_root(expr), loc, b, s
+	);
+	if (!root_gen) {
+		assert(false); /* XXX: user error void root */
+	}
+	return ast_expr_member_create(root_gen, dynamic_str(ast_expr_member_field(expr)));
 }
 
 static struct ast_expr *
