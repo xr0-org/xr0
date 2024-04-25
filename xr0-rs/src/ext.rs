@@ -9,7 +9,7 @@ pub struct Externals {
     func: HashMap<String, *mut AstFunction<'static>>,
     var: HashMap<String, *mut AstVariable>,
     typedef: HashMap<String, *const AstType>,
-    _struct: HashMap<String, *const AstType>,
+    struct_: HashMap<String, *const AstType>,
 }
 
 impl Externals {
@@ -22,7 +22,7 @@ impl Externals {
         for (k, v) in &self.typedef {
             strbuilder_write!(b, "{indent}{} {k}\n", ast_type_str(&**v));
         }
-        for v in self._struct.values() {
+        for v in self.struct_.values() {
             strbuilder_write!(b, "{indent}{}\n", ast_type_str(&**v));
         }
         strbuilder_build(b)
@@ -42,7 +42,7 @@ impl Externals {
 
     pub unsafe fn declare_struct(&mut self, t: *const AstType) {
         let id = ast_type_struct_tag(&*t).unwrap().as_str().to_string();
-        self._struct.insert(id, t);
+        self.struct_.insert(id, t);
     }
 
     pub unsafe fn get_func(&self, id: &str) -> Option<&AstFunction<'static>> {
@@ -54,6 +54,6 @@ impl Externals {
     }
 
     pub unsafe fn get_struct(&self, id: &str) -> Option<&AstType> {
-        self._struct.get(id).map(|&p| &*p)
+        self.struct_.get(id).map(|&p| &*p)
     }
 }
