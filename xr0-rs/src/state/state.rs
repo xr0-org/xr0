@@ -280,19 +280,13 @@ pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option
 }
 
 pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
-    let v: *mut Variable = stack_getresult(&*(*state).stack);
-    if v.is_null() {
-        panic!();
-    }
-    state_get(state, variable_location(&*v), true).unwrap()
+    let v = stack_getresult(&*(*state).stack);
+    state_get(state, variable_location(v), true).unwrap()
 }
 
 unsafe fn state_getresulttype(state: &State) -> &AstType {
-    let v: *mut Variable = stack_getresult(&*state.stack);
-    if v.is_null() {
-        panic!();
-    }
-    &*variable_type(v)
+    let v = stack_getresult(&*state.stack);
+    variable_type(v)
 }
 
 pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType {
@@ -303,7 +297,7 @@ pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType
     if v.is_null() {
         panic!();
     }
-    &*variable_type(v)
+    variable_type(&*v)
 }
 
 pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
