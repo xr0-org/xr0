@@ -96,9 +96,6 @@ expr_linearise(struct ast_stmt *stmt, struct ast_block *b,
 	return NULL;
 }
 
-static void
-append_block(struct ast_block *b, struct ast_block *appendage);
-
 static struct error *
 labelled_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
 		struct state *state)
@@ -109,24 +106,11 @@ labelled_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememark
 	}
 	struct ast_stmt *substmt = ast_stmt_labelled_stmt(stmt);
 
-	struct ast_block *b_sub = ast_block_create(NULL, 0, NULL, 0);
-	struct error *err = ast_stmt_linearise_proper(substmt, b_sub, loc, state);
+	struct error *err = ast_stmt_linearise_proper(substmt, b, loc, state);
 	if (err) {
 		return err;
 	}	
-	append_block(b, b_sub);
 	return NULL;
-}
-
-static void
-append_block(struct ast_block *b, struct ast_block *appendage)
-{
-	int n = ast_block_nstmts(appendage);
-	struct ast_stmt **stmt = ast_block_stmts(appendage);
-
-	for (int i = 0; i < n; i++) {
-		ast_block_append_stmt(b, stmt[i]);	
-	}
 }
 
 static struct error *
@@ -615,7 +599,7 @@ labelled_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool
 	}
 
 	/* hack_old flag irrelevant here */
-	return ast_stmt_absexec(setup, state, true, should_setup);	
+	return ast_stmt_absexec(setup, state, hack_old, should_setup);	
 }
 
 static struct error *
@@ -726,7 +710,7 @@ comp_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool sho
 			if (err) {
 				return err;
 			}
-			state_clearregister(state); /* XXX: not pretty we should step */
+			state_clearregister(state); /* XXX: 7-use-after-free/004-conditions.x */
 		}
 		return NULL;
 	}
