@@ -41,7 +41,7 @@ ast_stmt_linearise_proper(struct ast_stmt *, struct ast_block *, struct lexemema
 		struct state *);
 
 struct error *
-ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
+ast_stmt_linearise(struct ast_stmt *stmt, struct state *state, bool abstract)
 {
 	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
 	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
@@ -52,7 +52,7 @@ ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 		return err;
 	}
 	struct frame *inter_frame = frame_intermediate_create(
-		dynamic_str("inter"), b, false
+		dynamic_str("inter"), b, abstract
 	);
 	state_pushframe(state, inter_frame);
 	return NULL;
@@ -574,6 +574,8 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool
 		return comp_absexec(stmt, state, hack_old, should_setup);
 	case STMT_JUMP:
 		return jump_absexec(stmt, state);
+	case STMT_REGISTER:
+		return stmt_register_exec(stmt, state);
 	default:
 		assert(false);
 	}

@@ -199,11 +199,13 @@ program_stmt_process(struct program *p, bool abstract, struct state *s)
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	// v_printf("stmt: %s\n", ast_stmt_str(stmt));
 	if (!state_islinear(s) && ast_stmt_linearisable(stmt)) {
-		return ast_stmt_linearise(stmt, s);
+		return ast_stmt_linearise(stmt, s, abstract);
 	}
 	if (abstract) {
+		printf("abstract\n");
 		return ast_stmt_absprocess(stmt, p->name, s, false, true);
 	}
+	printf("actual\n");
 	return ast_stmt_process(stmt, p->name, s);
 }
 
