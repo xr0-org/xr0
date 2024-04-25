@@ -34,10 +34,12 @@ pub struct Variable {
     pub is_param: bool,
 }
 
-pub unsafe fn stack_newblock(stack: *mut Stack) -> Box<Location> {
-    let address = (*stack).frame.len() as libc::c_int;
-    (*stack).frame.push(block_create());
-    location_create_automatic((*stack).id, address, ast_expr_constant_create(0))
+impl Stack {
+    pub fn new_block(&mut self) -> Box<Location> {
+        let address = self.frame.len() as libc::c_int;
+        self.frame.push(block_create());
+        location_create_automatic(self.id, address, ast_expr_constant_create(0))
+    }
 }
 
 pub unsafe fn stack_create(
@@ -192,13 +194,13 @@ pub unsafe fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Va
 
 pub unsafe fn stack_references(s: *mut Stack, loc: &Location, state: *mut State) -> bool {
     let result: *mut Variable = stack_getresult(&*s);
-    if !result.is_null() && variable_references(result, loc, state) {
+    if !result.is_null() && variable_references(&*result, loc, state) {
         return true;
     }
     let m = &(*s).varmap;
     for p in m.values() {
         let var = p as *mut Variable;
-        if variable_isparam(var) && variable_references(var, loc, state) {
+        if variable_isparam(var) && variable_references(&*var, loc, state) {
             return true;
         }
     }
@@ -214,7 +216,7 @@ pub unsafe fn variable_create(type_: &AstType, stack: *mut Stack, isparam: bool)
     let v = Box::new(Variable {
         type_: ast_type_copy(type_),
         is_param: isparam,
-        loc: Box::into_raw(stack_newblock(stack)),
+        loc: Box::into_raw((*stack).new_block()),
     });
     let b = location_auto_getblock(&*v.loc, stack).unwrap();
     if b.is_null() {
@@ -307,9 +309,9 @@ pub unsafe fn variable_type(v: *mut Variable) -> *mut AstType {
     &mut *(*v).type_
 }
 
-pub unsafe fn variable_references(v: *mut Variable, loc: &Location, s: *mut State) -> bool {
-    assert!(!(*loc).type_is_vconst());
-    location_references(&*(*v).loc, loc, s)
+pub unsafe fn variable_references(v: &Variable, loc: &Location, s: *mut State) -> bool {
+    assert!(!loc.type_is_vconst());
+    location_references(&*v.loc, loc, s)
 }
 
 pub unsafe fn variable_isparam(v: *mut Variable) -> bool {
