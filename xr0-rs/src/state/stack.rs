@@ -206,7 +206,7 @@ pub unsafe fn stack_references(s: *mut Stack, loc: &Location, state: *mut State)
 }
 
 pub unsafe fn stack_getblock(s: &mut Stack, address: libc::c_int) -> &mut Block {
-    &mut *s.frame[address as usize]
+    &mut s.frame[address as usize]
 }
 
 pub unsafe fn variable_create(type_: &AstType, stack: *mut Stack, isparam: bool) -> *mut Variable {
