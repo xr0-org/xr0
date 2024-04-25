@@ -2367,9 +2367,9 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Result<bool> {
     }
     let zero = value_int_create(0);
     if !value_isint(&*v) {
-        let v_str = value_str(&*v);
         return Err(Error::new(format!(
-            "`{control}' with value `{v_str}' is undecidable"
+            "`{control}' with value `{}' is undecidable",
+            *v
         )));
     }
     Ok(!value_equal(&zero, &*v))

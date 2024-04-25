@@ -7,7 +7,6 @@ use crate::state::block::{block_create, block_str, block_undeclare};
 use crate::state::location::location_create_dynamic;
 use crate::state::state::state_references;
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
-use crate::value::value_str;
 use crate::{strbuilder_write, AstExpr, Location, Value};
 
 #[derive(Clone)]
@@ -185,8 +184,7 @@ pub unsafe fn vconst_undeclare(v: &mut VConst) {
 pub unsafe fn vconst_str(v: &VConst, indent: &str) -> OwningCStr {
     let mut b = strbuilder_create();
     for (k, val) in &v.varmap {
-        let value = value_str(val);
-        strbuilder_write!(b, "{indent}{k}: {value}");
+        strbuilder_write!(b, "{indent}{k}: {val}");
         if let Some(comment) = v.comment.get(k) {
             strbuilder_write!(b, "\t({comment})");
         }

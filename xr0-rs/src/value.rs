@@ -17,7 +17,7 @@ use crate::state::location::{
 };
 use crate::state::state::{state_getext, state_vconst};
 use crate::state::State;
-use crate::util::{strbuilder_build, strbuilder_create, OwningCStr, StrBuilder};
+use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
 use crate::{strbuilder_write, AstExpr, AstType, AstVariable, Location, Object};
 
 #[derive(Clone)]
@@ -302,66 +302,42 @@ pub unsafe fn value_destroy(v: *mut Value) {
     drop(Box::from_raw(v));
 }
 
-pub unsafe fn value_str(v: &Value) -> OwningCStr {
-    let mut b = strbuilder_create();
-    match &v.kind {
-        ValueKind::Sync(n) => {
-            value_sync_sprint(n, &mut b);
-        }
-        ValueKind::DefinitePtr(loc) => {
-            value_definite_ptr_sprint(loc, &mut b);
-        }
-        ValueKind::IndefinitePtr(n) => {
-            value_indefinite_ptr_sprint(n, &mut b);
-        }
-        ValueKind::Int(n) => {
-            value_int_sprint(n, &mut b);
-        }
-        ValueKind::Literal(s) => {
-            strbuilder_write!(b, "\"{s}\"");
-        }
-        ValueKind::Struct(sv) => {
-            value_struct_sprint(sv, &mut b);
+impl Display for Value {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match &self.kind {
+            ValueKind::Sync(n) => write!(f, "comp:{n}"),
+            ValueKind::DefinitePtr(loc) => write!(f, "ptr:{}", location_str(loc)),
+            ValueKind::IndefinitePtr(n) => write!(f, "ptr:{n}"),
+            ValueKind::Int(n) => write!(f, "int:{n}"),
+            ValueKind::Literal(s) => write!(f, "\"{s}\""),
+            ValueKind::Struct(sv) => write!(f, "{sv}"),
         }
     }
-    strbuilder_build(b)
 }
 
-fn value_sync_sprint(n: &Number, b: &mut StrBuilder) {
-    strbuilder_write!(*b, "comp:{}", number_str(n));
+pub fn value_str(v: &Value) -> OwningCStr {
+    OwningCStr::from(format!("{v}"))
 }
 
-fn value_definite_ptr_sprint(loc: &Location, b: &mut StrBuilder) {
-    let s = location_str(loc);
-    strbuilder_write!(*b, "ptr:{s}");
-}
-
-fn value_indefinite_ptr_sprint(n: &Number, b: &mut StrBuilder) {
-    strbuilder_write!(*b, "ptr:{}", number_str(n));
-}
-
-fn value_int_sprint(n: &Number, b: &mut StrBuilder) {
-    strbuilder_write!(*b, "int:{}", number_str(n));
-}
-
-unsafe fn value_struct_sprint(sv: &StructValue, b: &mut StrBuilder) {
-    strbuilder_write!(*b, "struct:{{");
-    let n = sv.members.len();
-    for (i, var) in sv.members.iter().enumerate() {
-        let f = ast_variable_name(var).as_str();
-        let val: *mut Value = object_as_value(sv.m.get(f).copied().unwrap());
-        let val_str = if !val.is_null() {
-            value_str(&*val)
-        } else {
-            OwningCStr::empty()
-        };
-        strbuilder_write!(
-            *b,
-            ".{f} = <{val_str}>{}",
-            if i + 1 < n { ", " } else { "" },
-        );
+impl Display for StructValue {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "struct:{{")?;
+        let n = self.members.len();
+        for (i, var) in self.members.iter().enumerate() {
+            let name = ast_variable_name(var).as_str();
+            unsafe {
+                let val: *mut Value = object_as_value(self.m.get(name).copied().unwrap());
+                let val_str = if !val.is_null() {
+                    format!("{}", *val)
+                } else {
+                    "".to_string()
+                };
+                let delim = if i + 1 < n { ", " } else { "" };
+                write!(f, ".{name} = <{val_str}>{delim}")?;
+            }
+        }
+        write!(f, "}}")
     }
-    strbuilder_write!(*b, "}}");
 }
 
 pub fn value_islocation(v: &Value) -> bool {
@@ -579,10 +555,12 @@ fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
     strbuilder_build(b)
 }
 
-fn number_str(num: &Number) -> OwningCStr {
-    match &num.kind {
-        NumberKind::Ranges(ranges) => number_ranges_sprint(ranges),
-        NumberKind::Computed(computation) => ast_expr_str(computation),
+impl Display for Number {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match &self.kind {
+            NumberKind::Ranges(ranges) => write!(f, "{}", number_ranges_sprint(ranges)),
+            NumberKind::Computed(computation) => write!(f, "{}", ast_expr_str(computation)),
+        }
     }
 }
 

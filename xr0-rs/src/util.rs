@@ -186,10 +186,7 @@ pub fn strbuilder_create() -> StrBuilder {
 }
 
 pub fn strbuilder_build(b: StrBuilder) -> OwningCStr {
-    let mut v = b.s.into_bytes();
-    v.push(0);
-    v.shrink_to_fit();
-    unsafe { OwningCStr::new(v.leak().as_mut_ptr() as *mut libc::c_char) }
+    b.s.into()
 }
 
 pub fn strbuilder_append_string(b: &mut StrBuilder, s: String) {
@@ -199,6 +196,15 @@ pub fn strbuilder_append_string(b: &mut StrBuilder, s: String) {
 impl StrBuilder {
     pub fn push(&mut self, c: char) {
         self.s.push(c);
+    }
+}
+
+impl From<String> for OwningCStr {
+    fn from(s: String) -> OwningCStr {
+        let mut v = s.into_bytes();
+        v.push(0);
+        v.shrink_to_fit();
+        unsafe { OwningCStr::new(v.leak().as_mut_ptr() as *mut libc::c_char) }
     }
 }
 
