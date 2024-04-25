@@ -30,7 +30,7 @@ do
 	then
 		if [[ "$f" == *"verification"* ]]
 		then
-			output=$($XR0 -x main -I $libx -v $f 2>&1 >/dev/null)
+			output=$($XR0 -x main -I $libx $f 2>&1 >/dev/null)
 		else
 			output=$($XR0 -t main -I $libx $f 2>&1 >/dev/null)
 		fi

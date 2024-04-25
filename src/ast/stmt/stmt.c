@@ -384,9 +384,15 @@ struct ast_expr *
 ast_stmt_iter_lower_bound(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ITERATION);
-	struct ast_stmt *init = stmt->u.iteration.init;
-	assert(init->kind == STMT_EXPR);
-	return ast_expr_assignment_rval(init->u.expr);
+	struct ast_expr *init = ast_stmt_as_expr(stmt->u.iteration.init);
+	switch (ast_expr_kind(init)) {
+	case EXPR_IDENTIFIER:
+		return init;
+	case EXPR_ASSIGNMENT:
+		return ast_expr_assignment_rval(init);
+	default:
+		assert(false);
+	}
 }
 
 struct ast_expr *
