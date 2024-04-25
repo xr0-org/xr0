@@ -913,12 +913,11 @@ impl Display for ConstantExpr {
 unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction<'static> = (*state_getext(state)).get_func(name.as_str());
-    if f.is_null() {
+    let Some(f) = (*state_getext(state)).get_func(name.as_str()) else {
         return Err(Error::new(format!("function `{name}' not found")));
-    }
-    let params = (*f).params();
-    let rtype = (*f).rtype();
+    };
+    let params = f.params();
+    let rtype = f.rtype();
     let args = prepare_arguments(ast_expr_call_args(expr), params, state);
     state_pushframe(state, name.clone(), rtype);
     prepare_parameters(params, args, name.as_str(), state)?;
@@ -938,15 +937,14 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>
 unsafe fn call_absexec(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction<'static> = (*state_getext(s)).get_func(name.as_str());
-    if f.is_null() {
+    let Some(f) = (*state_getext(s)).get_func(name.as_str()) else {
         return Err(Error::new(format!("function `{name}' not found")));
-    }
-    let v = ast_function_absexec(&*f, s)?;
+    };
+    let v = ast_function_absexec(f, s)?;
     if !v.is_null() {
         return Ok(v);
     }
-    let v = call_arbitraryresult(expr, &*f, s)?;
+    let v = call_arbitraryresult(expr, f, s)?;
     Ok(Box::into_raw(v))
 }
 
@@ -1113,11 +1111,11 @@ unsafe fn verify_paramspec(
     )
 }
 
-unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result<()> {
-    let fname = (*f).name();
-    let mut param_state = state_create(fname.clone(), state_getext(arg_state), (*f).rtype());
-    ast_function_initparams(&*f, &mut param_state)?;
-    let params = (*f).params();
+unsafe fn call_setupverify(f: &AstFunction, arg_state: *mut State) -> Result<()> {
+    let fname = f.name();
+    let mut param_state = state_create(fname.clone(), state_getext(arg_state), f.rtype());
+    ast_function_initparams(f, &mut param_state)?;
+    let params = f.params();
     for p in params {
         let id = ast_variable_name(p);
         let param = state_getloc(&mut param_state, id.as_str());
@@ -1674,18 +1672,17 @@ pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplit
 unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> Result<AstStmtSplits> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let f: *mut AstFunction = (*state_getext(state)).get_func(name.as_str());
-    if f.is_null() {
+    let Some(f) = (*state_getext(state)).get_func(name.as_str()) else {
         return Err(Error::new(format!("function: `{name}' not found")));
-    }
-    let params = (*f).params();
+    };
+    let params = f.params();
     let mut s_copy = state_copy(&*state);
     let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
-    let ret_type = (*f).rtype();
+    let ret_type = f.rtype();
     state_pushframe(&mut s_copy, name.clone(), ret_type);
     prepare_parameters(params, args, name.as_str(), &mut s_copy)?;
     let mut conds = vec![];
-    let abs = (*f).abstract_block();
+    let abs = f.abstract_block();
     for var in &abs.decls {
         state_declare(&mut s_copy, var, false);
     }
@@ -2948,9 +2945,8 @@ pub unsafe fn ast_function_protostitch(
     f: *mut AstFunction,
     ext: *mut Externals,
 ) -> *mut AstFunction {
-    let proto: *mut AstFunction = (*ext).get_func((*f).name.as_str());
-    if !proto.is_null() {
-        (*f).abstract_ = (*proto).abstract_.clone();
+    if let Some(proto) = (*ext).get_func((*f).name.as_str()) {
+        (*f).abstract_ = proto.abstract_.clone();
     }
     f
 }
@@ -3151,18 +3147,14 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
         return;
     }
     dedup.set(fname.as_ptr(), 1 as libc::c_int as *mut libc::c_void);
-    let f: *mut AstFunction = ext.get_func(fname.to_str().unwrap());
-    if f.is_null() {
+    let Some(f) = ext.get_func(fname.to_str().unwrap()) else {
         eprintln!("function `{}' is not declared", fname.to_string_lossy());
         process::exit(1);
-    }
-    if f.is_null() {
-        panic!();
-    }
-    if (*f).is_axiom {
+    };
+    if f.is_axiom {
         return;
     }
-    let body = (*f).body.as_deref().unwrap();
+    let body = f.body.as_deref().unwrap();
     let mut val = vec![];
     for stmt in &body.stmts {
         let farr = ast_stmt_getfuncs(stmt);
@@ -3170,8 +3162,10 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
         for func in farr {
             if (local_dedup.get(func.as_ptr())).is_null() {
                 let func = func.into_ptr(); // transfer of ownership (it's going into val)
-                let f_0: *mut AstFunction = ext.get_func(CStr::from_ptr(func).to_str().unwrap());
-                if !(*f_0).is_axiom {
+                let f = ext
+                    .get_func(CStr::from_ptr(func).to_str().unwrap())
+                    .unwrap();
+                if !f.is_axiom {
                     val.push(func);
                 }
                 local_dedup.set(func, 1 as libc::c_int as *mut libc::c_void);

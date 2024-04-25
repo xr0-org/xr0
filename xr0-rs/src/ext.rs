@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ptr;
 
 use crate::ast::{ast_type_str, ast_type_struct_tag};
 use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
@@ -46,8 +45,8 @@ impl Externals {
         self._struct.insert(id, t);
     }
 
-    pub unsafe fn get_func(&self, id: &str) -> *mut AstFunction<'static> {
-        self.func.get(id).copied().unwrap_or(ptr::null_mut())
+    pub unsafe fn get_func(&self, id: &str) -> Option<&AstFunction<'static>> {
+        self.func.get(id).map(|ptr| &**ptr)
     }
 
     pub unsafe fn get_typedef(&self, id: &str) -> Option<&AstType> {
