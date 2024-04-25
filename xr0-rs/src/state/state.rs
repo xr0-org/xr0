@@ -256,7 +256,12 @@ pub unsafe fn state_get(
         assert!(loc.type_is_dynamic() || loc.type_is_dereferencable());
         return Ok(ptr::null_mut());
     }
-    Ok(block_observe(b, location_offset(loc), state, constructive))
+    Ok(block_observe(
+        &mut *b,
+        location_offset(loc),
+        state,
+        constructive,
+    ))
 }
 
 pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option<&'s mut Block> {

@@ -154,10 +154,9 @@ pub unsafe fn location_toheap(loc: &Location, h: *mut Heap) -> bool {
     type_equal && b.is_some()
 }
 
-pub unsafe fn location_tostack(loc: &Location, s: *mut Stack) -> bool {
-    let type_equal = matches!(loc.kind, LocationKind::Automatic { .. });
-    let b: *mut Block = stack_getblock(s, loc.block);
-    type_equal && !b.is_null()
+pub unsafe fn location_tostack(loc: &Location, _s: *mut Stack) -> bool {
+    // Note: Original adds a null check that can't fail.
+    matches!(loc.kind, LocationKind::Automatic { .. })
 }
 
 pub fn location_toclump(loc: &Location, c: &mut Clump) -> bool {
@@ -230,10 +229,10 @@ pub unsafe fn location_auto_getblock(loc: &Location, s: *mut Stack) -> Result<*m
     if f.is_null() {
         return Err(Error::new("stack frame doesn't exist".to_string()));
     }
-    Ok(stack_getblock(f, loc.block))
+    Ok(stack_getblock(&mut *f, loc.block))
 }
 
-pub unsafe fn location_getstackblock(loc: &Location, s: *mut Stack) -> *mut Block {
+pub unsafe fn location_getstackblock<'s>(loc: &Location, s: &'s mut Stack) -> &'s mut Block {
     assert!(matches!(loc.kind, LocationKind::Automatic { .. }));
     stack_getblock(s, loc.block)
 }

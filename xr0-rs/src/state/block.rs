@@ -62,21 +62,21 @@ pub unsafe fn block_install(b: *mut Block, obj: *mut Object) {
 }
 
 pub unsafe fn block_observe(
-    b: *mut Block,
+    b: &mut Block,
     offset: &AstExpr,
     s: *mut State,
     constructive: bool,
 ) -> *mut Object {
-    let Some(mut index) = object_arr_index(&(*b).arr, offset, &*s) else {
+    let Some(mut index) = object_arr_index(&b.arr, offset, &*s) else {
         if !constructive {
             return ptr::null_mut();
         }
         let obj: *mut Object =
             Box::into_raw(object_value_create(ast_expr_copy(offset), ptr::null_mut()));
-        (*b).arr.push(obj);
+        b.arr.push(obj);
         return obj;
     };
-    let obj: *mut Object = (*b).arr[index];
+    let obj: *mut Object = b.arr[index];
     if object_isvalue(obj) {
         return obj;
     }
@@ -95,16 +95,16 @@ pub unsafe fn block_observe(
     drop(Box::from_raw(lw_ptr));
 
     object_dealloc(obj, s).unwrap();
-    (*b).arr.remove(index);
+    b.arr.remove(index);
     if let Some(upto) = upto {
-        (*b).arr.insert(index, Box::into_raw(upto));
+        b.arr.insert(index, Box::into_raw(upto));
         index += 1;
     }
     let observed = Box::into_raw(observed);
-    (*b).arr.insert(index, observed);
+    b.arr.insert(index, observed);
     index += 1;
     if let Some(from) = from {
-        (*b).arr.insert(index, Box::into_raw(from));
+        b.arr.insert(index, Box::into_raw(from));
     }
     observed
 }

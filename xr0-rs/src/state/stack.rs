@@ -207,9 +207,8 @@ pub unsafe fn stack_references(s: *mut Stack, loc: &Location, state: *mut State)
     false
 }
 
-pub unsafe fn stack_getblock(s: *mut Stack, address: libc::c_int) -> *mut Block {
-    assert!((address as usize) < (*s).frame.len());
-    &mut *(*s).frame[address as usize]
+pub unsafe fn stack_getblock(s: &mut Stack, address: libc::c_int) -> &mut Block {
+    &mut *s.frame[address as usize]
 }
 
 pub unsafe fn variable_create(type_: &AstType, stack: *mut Stack, isparam: bool) -> *mut Variable {
@@ -290,10 +289,7 @@ unsafe fn object_or_nothing_str(
     stack: *mut Stack,
     state: *mut State,
 ) -> OwningCStr {
-    let b: *mut Block = location_getstackblock(&*loc, stack);
-    if b.is_null() {
-        panic!();
-    }
+    let b = location_getstackblock(&*loc, &mut *stack);
     let obj: *mut Object = block_observe(b, location_offset(&*loc), state, false);
     if !obj.is_null() {
         return object_str(obj);
