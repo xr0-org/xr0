@@ -42,11 +42,7 @@ pub struct State {
     pub props: Props,
 }
 
-pub unsafe fn state_create(
-    func: *mut libc::c_char,
-    ext: *mut Externals,
-    result_type: &AstType,
-) -> State {
+pub unsafe fn state_create(func: OwningCStr, ext: *mut Externals, result_type: &AstType) -> State {
     State {
         ext,
         static_memory: StaticMemory::new(),
@@ -59,7 +55,7 @@ pub unsafe fn state_create(
 }
 
 pub unsafe fn state_create_withprops(
-    func: *mut libc::c_char,
+    func: OwningCStr,
     ext: *mut Externals,
     result_type: &AstType,
     props: Props,
@@ -97,7 +93,7 @@ pub unsafe fn state_copy(state: &State) -> State {
     }
 }
 
-pub unsafe fn state_copywithname(state: &State, func_name: *mut libc::c_char) -> State {
+pub unsafe fn state_copywithname(state: &State, func_name: OwningCStr) -> State {
     State {
         ext: state.ext,
         static_memory: state.static_memory.clone(),
@@ -154,7 +150,7 @@ pub unsafe fn state_getprops(s: &mut State) -> &mut Props {
     &mut s.props
 }
 
-pub unsafe fn state_pushframe(state: *mut State, func: *mut libc::c_char, ret_type: &AstType) {
+pub unsafe fn state_pushframe(state: *mut State, func: OwningCStr, ret_type: &AstType) {
     (*state).stack = stack_create(func, (*state).stack, ret_type);
 }
 

@@ -920,7 +920,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>
     let params = (*f).params();
     let rtype = (*f).rtype();
     let args = prepare_arguments(ast_expr_call_args(expr), params, state);
-    state_pushframe(state, dynamic_str(name.as_ptr()), rtype);
+    state_pushframe(state, name.clone(), rtype);
     prepare_parameters(params, args, name.as_str(), state)?;
     call_setupverify(f, &mut state_copy(&*state))?;
     let mut v = call_absexec(expr, state)?;
@@ -1115,11 +1115,7 @@ unsafe fn verify_paramspec(
 
 unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result<()> {
     let fname = (*f).name();
-    let mut param_state = state_create(
-        dynamic_str(fname.as_ptr()),
-        state_getext(arg_state),
-        (*f).rtype(),
-    );
+    let mut param_state = state_create(fname.clone(), state_getext(arg_state), (*f).rtype());
     ast_function_initparams(&*f, &mut param_state)?;
     let params = (*f).params();
     for p in params {
@@ -1686,7 +1682,7 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> Result<AstStmtSplits
     let mut s_copy = state_copy(&*state);
     let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
     let ret_type = (*f).rtype();
-    state_pushframe(&mut s_copy, dynamic_str(name.as_ptr()), ret_type);
+    state_pushframe(&mut s_copy, name.clone(), ret_type);
     prepare_parameters(params, args, name.as_str(), &mut s_copy)?;
     let mut conds = vec![];
     let abs = (*f).abstract_block();
@@ -2960,7 +2956,7 @@ pub unsafe fn ast_function_protostitch(
 }
 
 pub unsafe fn ast_function_verify(f: *mut AstFunction, ext: *mut Externals) -> Result<()> {
-    let mut state = state_create(dynamic_str((*f).name().as_ptr()), ext, (*f).rtype());
+    let mut state = state_create((*f).name().clone(), ext, (*f).rtype());
     ast_function_initparams(&*f, &mut state)?;
     path_absverify_withstate(f, &mut state)?;
     Ok(())
@@ -3033,7 +3029,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
 
 unsafe fn abstract_audit(f: *mut AstFunction, abstract_state: *mut State) -> Result<()> {
     let mut actual_state = state_create_withprops(
-        dynamic_str((*f).name().as_ptr()),
+        (*f).name().clone(),
         state_getext(abstract_state),
         (*f).rtype(),
         (state_getprops(&mut *abstract_state)).clone(),
@@ -3132,8 +3128,8 @@ unsafe fn split_path_verify(
     // Note: Original leaks both functions to avoid triple-freeing the body.
     // We borrow instead.
     for (i, f) in paths.into_iter().enumerate() {
-        let mut actual_copy = state_copywithname(&*actual_state, (*f).name().as_ptr());
-        let mut abstract_copy = state_copywithname(&*abstract_state, (*f).name().as_ptr());
+        let mut actual_copy = state_copywithname(&*actual_state, (*f).name().clone());
+        let mut abstract_copy = state_copywithname(&*abstract_state, (*f).name().clone());
         // Note: Original leaks expression.
         let expr = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&expr, &mut actual_copy);
@@ -3221,7 +3217,9 @@ unsafe fn split_path_absverify(
     let paths = abstract_paths(&*f, index, cond);
     assert_eq!(paths.len(), 2);
     for (i, f) in paths.into_iter().enumerate() {
-        let mut s_copy = state_copywithname(&*state, (*f).name().as_ptr());
+        // Note: Original does not copy f.name here -- which should be a double free, but s_copy is
+        // leaked.
+        let mut s_copy = state_copywithname(&*state, (*f).name().clone());
         // Note: Original leaks `inv` but I think accidentally.
         let inv = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&inv, &mut s_copy)?;

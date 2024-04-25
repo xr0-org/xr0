@@ -1,6 +1,6 @@
 use std::ptr;
 
-use libc::{free, strcmp};
+use libc::strcmp;
 
 use super::{Block, State};
 use crate::ast::{
@@ -20,7 +20,7 @@ use crate::value::value_abstractcopy;
 use crate::{cstr, strbuilder_write, AstType, AstVariable, Location, Object, Value};
 
 pub struct Stack {
-    pub name: *mut libc::c_char,
+    pub name: OwningCStr,
     pub frame: Vec<Box<Block>>,
     pub varmap: Box<Map>,
     pub result: *mut Variable,
@@ -41,7 +41,7 @@ pub unsafe fn stack_newblock(stack: *mut Stack) -> Box<Location> {
 }
 
 pub unsafe fn stack_create(
-    name: *mut libc::c_char,
+    name: OwningCStr,
     prev: *mut Stack,
     return_type: &AstType,
 ) -> *mut Stack {
@@ -95,7 +95,7 @@ pub unsafe fn stack_prev(s: *mut Stack) -> *mut Stack {
 
 pub unsafe fn stack_copy(stack: *mut Stack) -> *mut Stack {
     Box::into_raw(Box::new(Stack {
-        name: dynamic_str((*stack).name),
+        name: (*stack).name.clone(),
         frame: (*stack).frame.clone(),
         varmap: varmap_copy(&(*stack).varmap),
         id: (*stack).id,
@@ -108,9 +108,8 @@ pub unsafe fn stack_copy(stack: *mut Stack) -> *mut Stack {
     }))
 }
 
-pub unsafe fn stack_copywithname(stack: *mut Stack, new_name: *mut libc::c_char) -> *mut Stack {
+pub unsafe fn stack_copywithname(stack: *mut Stack, new_name: OwningCStr) -> *mut Stack {
     let copy: *mut Stack = stack_copy(stack);
-    free((*copy).name as *mut libc::c_void);
     (*copy).name = new_name;
     copy
 }
@@ -143,7 +142,7 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
         b.push('-');
         i_0 += 1;
     }
-    strbuilder_write!(b, " {}\n", cstr!((*stack).name));
+    strbuilder_write!(b, " {}\n", (*stack).name);
     if !((*stack).prev).is_null() {
         strbuilder_write!(b, "{}", stack_str((*stack).prev, state));
     }
