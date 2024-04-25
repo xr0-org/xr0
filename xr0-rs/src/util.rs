@@ -196,8 +196,10 @@ pub fn strbuilder_append_string(b: &mut StrBuilder, s: String) {
     b.s.push_str(&s);
 }
 
-pub fn strbuilder_putc(b: &mut StrBuilder, c: libc::c_char) {
-    b.s.push(c as u8 as char);
+impl StrBuilder {
+    pub fn push(&mut self, c: char) {
+        self.s.push(c);
+    }
 }
 
 #[macro_export]

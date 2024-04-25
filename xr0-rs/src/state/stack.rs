@@ -15,9 +15,7 @@ use crate::state::location::{
     location_getstackblock, location_offset, location_references, location_str,
 };
 use crate::state::state::state_get;
-use crate::util::{
-    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, Map, OwningCStr,
-};
+use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
 use crate::value::value_abstractcopy;
 use crate::{cstr, strbuilder_write, AstType, AstVariable, Location, Object, Value};
 
@@ -134,7 +132,7 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
     for (k, v) in m.pairs() {
         let var = variable_str(v as *mut Variable, stack, state);
         strbuilder_write!(b, "\t{}: {var}", cstr!(k));
-        strbuilder_putc(&mut b, '\n' as i32 as libc::c_char);
+        b.push('\n');
     }
     let result = variable_str((*stack).result, stack, state);
     strbuilder_write!(b, "\treturn: {result}\n");
@@ -142,7 +140,7 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
     let mut i_0: libc::c_int = 0 as libc::c_int;
     let len: libc::c_int = 30 as libc::c_int;
     while i_0 < len - 2 as libc::c_int {
-        strbuilder_putc(&mut b, '-' as i32 as libc::c_char);
+        b.push('-');
         i_0 += 1;
     }
     strbuilder_write!(b, " {}\n", cstr!((*stack).name));

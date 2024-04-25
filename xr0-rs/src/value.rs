@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{self, Display, Formatter};
 use std::ptr;
 
 use crate::ast::{
@@ -16,7 +17,7 @@ use crate::state::location::{
 };
 use crate::state::state::{state_getext, state_vconst};
 use crate::state::State;
-use crate::util::{strbuilder_build, strbuilder_create, strbuilder_putc, OwningCStr, StrBuilder};
+use crate::util::{strbuilder_build, strbuilder_create, OwningCStr, StrBuilder};
 use crate::{strbuilder_write, AstExpr, AstType, AstVariable, Location, Object};
 
 #[derive(Clone)]
@@ -569,13 +570,12 @@ fn number_range_up(n: &Number) -> libc::c_int {
 
 fn number_ranges_sprint(ranges: &[NumberRange]) -> OwningCStr {
     let mut b = strbuilder_create();
-    strbuilder_putc(&mut b, '{' as i32 as libc::c_char);
+    b.push('{');
     let n = ranges.len();
     for (i, range) in ranges.iter().enumerate() {
-        let r = number_range_str(range);
-        strbuilder_write!(b, "{r}{}", if i + 1 < n { ", " } else { "" });
+        strbuilder_write!(b, "{range}{}", if i + 1 < n { ", " } else { "" });
     }
-    strbuilder_putc(&mut b, '}' as i32 as libc::c_char);
+    b.push('}');
     strbuilder_build(b)
 }
 
@@ -681,19 +681,14 @@ fn number_range_create(lw: NumberValue, up: NumberValue) -> NumberRange {
     }
 }
 
-fn number_range_str(r: &NumberRange) -> OwningCStr {
-    let mut b = strbuilder_create();
-    if number_range_issingle(r) {
-        strbuilder_write!(b, "{}", number_value_str(&r.lower));
-    } else {
-        strbuilder_write!(
-            b,
-            "{}:{}",
-            number_value_str(&r.lower),
-            number_value_str(&r.upper),
-        );
+impl Display for NumberRange {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        if number_range_issingle(self) {
+            write!(f, "{}", self.lower)
+        } else {
+            write!(f, "{}:{}", self.lower, self.upper)
+        }
     }
-    strbuilder_build(b)
 }
 
 fn number_range_canbe(r: &NumberRange, value: bool) -> bool {
@@ -738,20 +733,14 @@ fn number_value_max_create() -> NumberValue {
     number_value_limit_create(true)
 }
 
-fn number_value_str(v: &NumberValue) -> OwningCStr {
-    let mut b = strbuilder_create();
-    match v {
-        NumberValue::Constant(k) => {
-            strbuilder_write!(b, "{k}");
-        }
-        NumberValue::Limit(true) => {
-            strbuilder_write!(b, "MAX");
-        }
-        NumberValue::Limit(false) => {
-            strbuilder_write!(b, "MIN");
+impl Display for NumberValue {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            NumberValue::Constant(k) => write!(f, "{k}"),
+            NumberValue::Limit(true) => write!(f, "MAX"),
+            NumberValue::Limit(false) => write!(f, "MIN"),
         }
     }
-    strbuilder_build(b)
 }
 
 fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {

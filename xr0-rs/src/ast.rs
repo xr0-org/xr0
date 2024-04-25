@@ -21,7 +21,7 @@ use crate::state::state::{
 };
 use crate::state::State;
 use crate::util::{
-    dynamic_str, strbuilder_build, strbuilder_create, strbuilder_putc, string_arr_contains, Error,
+    dynamic_str, strbuilder_build, strbuilder_create, string_arr_contains, Error,
     InsertionOrderMap, Map, OwningCStr, Result, SemiBox, StrBuilder,
 };
 use crate::value::{
@@ -1493,7 +1493,7 @@ pub fn ast_expr_str(expr: &AstExpr) -> OwningCStr {
             ast_expr_isdereferencable_str_build(assertand, &mut b);
         }
         AstExprKind::ArbArg => {
-            strbuilder_putc(&mut b, '$' as i32 as libc::c_char);
+            b.push('$');
         }
         AstExprKind::Allocation(_) => {
             ast_expr_alloc_str_build(expr, &mut b);
