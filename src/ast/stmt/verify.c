@@ -697,6 +697,19 @@ hack_alloc_from_neteffect(struct ast_stmt *stmt)
 static struct error *
 comp_absexec(struct ast_stmt *stmt, struct state *state, bool hack_old, bool should_setup)
 {
+	if (hack_old) {
+		struct ast_block *b = ast_stmt_as_block(stmt);
+		int nstmts = ast_block_nstmts(b);
+		struct ast_stmt **stmt = ast_block_stmts(b);
+		for (int i = 0; i < nstmts; i++) {
+			struct error *err = ast_stmt_absexec(stmt[i], state, hack_old, should_setup);
+			if (err) {
+				return err;
+			}
+			state_clearregister(state); /* XXX */
+		}
+		return NULL;
+	}
 	struct frame *block_frame = frame_block_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
