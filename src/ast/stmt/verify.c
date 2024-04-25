@@ -33,6 +33,10 @@ selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *
 		struct state *);
 
 static struct error *
+iteration_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
+
+static struct error *
 ast_stmt_linearise_proper(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
@@ -72,6 +76,8 @@ ast_stmt_linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		return jump_linearise(stmt, b, loc, state);
 	case STMT_SELECTION:
 		return selection_linearise(stmt, b, loc, state);
+	case STMT_ITERATION:
+		return iteration_linearise(stmt, b, loc, state);
 	default:
 		assert(false);
 	}
@@ -176,6 +182,46 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 		nest ? ast_stmt_copy(nest) : NULL
 	);
 	ast_block_append_stmt(b, newsel);
+	return NULL;
+}
+
+static struct error *
+iteration_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
+		struct state *state)
+{
+	struct ast_stmt *gen_init = ast_stmt_create_expr(
+		lexememarker_copy(loc),
+		ast_expr_geninstr(
+			ast_expr_copy(ast_stmt_as_expr(ast_stmt_iter_init(stmt))),
+			lexememarker_copy(loc),
+			b,
+			state
+		)
+	);
+	struct ast_stmt *gen_cond = ast_stmt_create_expr(
+		lexememarker_copy(loc),
+		ast_expr_geninstr(
+			ast_expr_copy(ast_stmt_as_expr(ast_stmt_iter_cond(stmt))),
+			lexememarker_copy(loc),
+			b,
+			state
+		)
+	);
+	struct ast_expr *gen_iter = ast_expr_geninstr(
+		ast_expr_copy(ast_stmt_iter_iter(stmt)),
+		lexememarker_copy(loc),
+		b,
+		state
+	);
+	struct ast_stmt *newiter = ast_stmt_create_iter(
+		lexememarker_copy(loc),
+		gen_init,
+		gen_cond,
+		gen_iter,
+		ast_block_copy(ast_stmt_iter_abstract(stmt)),
+		ast_stmt_copy(ast_stmt_iter_body(stmt))
+	);
+	ast_block_append_stmt(b, newiter);
 	return NULL;
 }
 

@@ -272,6 +272,14 @@ ast_expr_incdec_pre(struct ast_expr *expr)
 	return expr->u.incdec.pre;
 }
 
+bool
+ast_expr_incdec_inc(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_INCDEC);
+
+	return expr->u.incdec.inc;
+}
+
 struct ast_expr *
 ast_expr_incdec_root(struct ast_expr *expr)
 {

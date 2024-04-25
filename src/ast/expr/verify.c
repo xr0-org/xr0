@@ -1484,6 +1484,10 @@ binary_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
 		struct state *);
 
 static struct ast_expr *
+incdec_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
 alloc_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
 		struct state *);
 
@@ -1517,6 +1521,8 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 		return unary_geninstr(expr, loc, b, s);	
 	case EXPR_BINARY:
 		return binary_geninstr(expr, loc, b, s);
+	case EXPR_INCDEC:
+		return incdec_geninstr(expr, loc, b, s);
 	case EXPR_ALLOCATION:
 		return alloc_geninstr(expr, loc, b, s);	
 	case EXPR_ASSIGNMENT:
@@ -1550,6 +1556,18 @@ binary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_bloc
 	struct ast_expr *gen_e1 = ast_expr_geninstr(ast_expr_binary_e1(expr), loc, b, s),
 			*gen_e2 = ast_expr_geninstr(ast_expr_binary_e2(expr), loc, b, s);
 	return ast_expr_binary_create(gen_e1, ast_expr_binary_op(expr), gen_e2);
+}
+
+static struct ast_expr *
+incdec_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *gen_root = ast_expr_geninstr(
+		ast_expr_incdec_root(expr), loc, b, s
+	);
+	return ast_expr_incdec_create(
+		gen_root, ast_expr_incdec_inc(expr), ast_expr_incdec_pre(expr)
+	);
 }
 
 static struct ast_expr *
