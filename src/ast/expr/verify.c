@@ -1480,10 +1480,6 @@ unary_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
 		struct state *);
 
 static struct ast_expr *
-bracketed_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
-		struct state *);
-
-static struct ast_expr *
 binary_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
 		struct state *);
 
@@ -1499,6 +1495,14 @@ static struct ast_expr *
 call_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
 		struct state *);
 
+static struct ast_expr *
+structmember_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
+bracketed_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
 struct ast_expr *
 ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 		struct ast_block *b, struct state *s) 
@@ -1510,9 +1514,7 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	case EXPR_ARBARG:
 		return expr;
 	case EXPR_UNARY:
-		return unary_geninstr(expr, loc, b, s);
-	case EXPR_BRACKETED:
-		return bracketed_geninstr(expr, loc, b, s);
+		return unary_geninstr(expr, loc, b, s);	
 	case EXPR_BINARY:
 		return binary_geninstr(expr, loc, b, s);
 	case EXPR_ALLOCATION:
@@ -1521,6 +1523,10 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 		return assign_geninstr(expr, loc, b, s);
 	case EXPR_CALL:
 		return call_geninstr(expr, loc, b, s);
+	case EXPR_STRUCTMEMBER:
+		return structmember_geninstr(expr, loc, b, s);
+	case EXPR_BRACKETED:
+		return bracketed_geninstr(expr, loc, b, s);
 	default:
 		printf("expr: %s\n", ast_expr_str(expr));
 		assert(false);
@@ -1536,18 +1542,6 @@ unary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block
 	);
 	return ast_expr_unary_create(gen_operand, ast_expr_unary_op(expr));
 }
-
-static struct ast_expr *
-bracketed_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
-		struct state *s)
-{
-	struct ast_expr *gen_root = ast_expr_geninstr(
-		ast_expr_bracketed_root(expr), loc, b, s
-	);
-	return ast_expr_bracketed_create(gen_root);
-}
-
-
 
 static struct ast_expr *
 binary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
@@ -1609,4 +1603,21 @@ call_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 		ast_expr_copy(root), nargs, gen_args
 	);
 	return ast_block_call_create(b, loc, rtype, call);
+}
+
+static struct ast_expr *
+structmember_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	assert(false);
+}
+
+static struct ast_expr *
+bracketed_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *gen_root = ast_expr_geninstr(
+		ast_expr_bracketed_root(expr), loc, b, s
+	);
+	return ast_expr_bracketed_create(gen_root);
 }
