@@ -31,7 +31,7 @@ use crate::value::{
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr,
 };
-use crate::{cstr, strbuilder_write, vprintln, Externals, Object, Value};
+use crate::{strbuilder_write, vprintln, Externals, Object, Value};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
@@ -1864,10 +1864,7 @@ pub fn ast_stmt_labelled_stmt(stmt: &AstStmt) -> &AstStmt {
 }
 
 unsafe fn labelled_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> Result<()> {
-    if !ast_stmt_ispre(stmt) {
-        let s = ast_stmt_str(stmt);
-        panic!("expected precondition, got: {s}");
-    }
+    assert!(ast_stmt_ispre(stmt));
     let setup = ast_stmt_labelled_stmt(stmt);
     if should_setup {
         ast_stmt_absexec(setup, state, should_setup)?;
@@ -2769,14 +2766,8 @@ pub fn ast_type_str(t: &AstType) -> OwningCStr {
 }
 
 unsafe fn mod_str(mod_0: libc::c_int) -> OwningCStr {
-    let modstr: [*const libc::c_char; 7] = [
-        b"typedef\0" as *const u8 as *const libc::c_char,
-        b"extern\0" as *const u8 as *const libc::c_char,
-        b"static\0" as *const u8 as *const libc::c_char,
-        b"auto\0" as *const u8 as *const libc::c_char,
-        b"register\0" as *const u8 as *const libc::c_char,
-        b"const\0" as *const u8 as *const libc::c_char,
-        b"volatile\0" as *const u8 as *const libc::c_char,
+    let modstr: [&'static str; 7] = [
+        "typedef", "extern", "static", "auto", "register", "const", "volatile",
     ];
     let modlen: libc::c_int = 7 as libc::c_int;
     let mut b = strbuilder_create();
@@ -2795,7 +2786,7 @@ unsafe fn mod_str(mod_0: libc::c_int) -> OwningCStr {
             let fresh11 = nmods;
             nmods -= 1;
             let space = if fresh11 != 0 { " " } else { "" };
-            strbuilder_write!(b, "{}{space}", cstr!(modstr[i_0 as usize]));
+            strbuilder_write!(b, "{}{space}", modstr[i_0 as usize]);
         }
         i_0 += 1;
     }
@@ -3195,7 +3186,7 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
     g.insert(fname.into(), val);
 }
 
-unsafe fn abstract_paths<'origin>(
+fn abstract_paths<'origin>(
     f: &'origin AstFunction,
     _index: libc::c_int,
     cond: &AstExpr,
@@ -3203,7 +3194,7 @@ unsafe fn abstract_paths<'origin>(
     let f_true: *mut AstFunction = ast_function_create(
         f.is_axiom,
         ast_type_copy(&f.ret),
-        split_name(f.name.as_ptr(), cond),
+        split_name(f.name.as_str(), cond),
         ast_variable_arr_copy(&f.params),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
@@ -3213,7 +3204,7 @@ unsafe fn abstract_paths<'origin>(
     let f_false: *mut AstFunction = ast_function_create(
         f.is_axiom,
         ast_type_copy(&f.ret),
-        split_name(f.name.as_ptr(), &inv_assumption),
+        split_name(f.name.as_str(), &inv_assumption),
         ast_variable_arr_copy(&f.params),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
@@ -3260,9 +3251,9 @@ pub unsafe fn ast_function_buildgraph(fname: &CStr, ext: &Externals) -> FuncGrap
     g
 }
 
-unsafe fn split_name(name: *mut libc::c_char, assumption: &AstExpr) -> OwningCStr {
+fn split_name(name: &str, assumption: &AstExpr) -> OwningCStr {
     let mut b = strbuilder_create();
-    strbuilder_write!(b, "{} | {assumption}", cstr!(name));
+    strbuilder_write!(b, "{name} | {assumption}");
     strbuilder_build(b)
 }
 
@@ -3279,7 +3270,7 @@ unsafe fn split_paths_verify(
     Ok(())
 }
 
-unsafe fn body_paths<'origin>(
+fn body_paths<'origin>(
     f: &'origin AstFunction,
     _index: libc::c_int,
     cond: &AstExpr,
@@ -3287,7 +3278,7 @@ unsafe fn body_paths<'origin>(
     let f_true: *mut AstFunction = ast_function_create(
         f.is_axiom,
         ast_type_copy(&f.ret),
-        split_name(f.name.as_ptr(), cond),
+        split_name(f.name.as_str(), cond),
         ast_variable_arr_copy(&f.params),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
@@ -3297,7 +3288,7 @@ unsafe fn body_paths<'origin>(
     let f_false: *mut AstFunction = ast_function_create(
         f.is_axiom,
         ast_type_copy(&f.ret),
-        split_name(f.name.as_ptr(), &inv_assumption),
+        split_name(f.name.as_str(), &inv_assumption),
         ast_variable_arr_copy(&f.params),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
