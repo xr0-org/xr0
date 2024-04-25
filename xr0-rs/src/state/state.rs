@@ -1,7 +1,5 @@
 use std::ptr;
 
-use libc::strcmp;
-
 use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
 use super::heap::{
     vconst_create, vconst_declare, vconst_eval, vconst_get, vconst_str, vconst_undeclare,
@@ -297,8 +295,8 @@ unsafe fn state_getresulttype(state: &State) -> &AstType {
     &*variable_type(v)
 }
 
-pub unsafe fn state_getobjecttype(state: &State, id: *mut libc::c_char) -> &AstType {
-    if strcmp(id, b"return\0" as *const u8 as *const libc::c_char) == 0 as libc::c_int {
+pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType {
+    if id == "return" {
         return state_getresulttype(state);
     }
     let v: *mut Variable = stack_getvariable(state.stack, id);
@@ -308,7 +306,7 @@ pub unsafe fn state_getobjecttype(state: &State, id: *mut libc::c_char) -> &AstT
     &*variable_type(v)
 }
 
-pub unsafe fn state_getloc(state: *mut State, id: *mut libc::c_char) -> Box<Value> {
+pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
     let v: *mut Variable = stack_getvariable((*state).stack, id);
     if v.is_null() {
         panic!();
@@ -316,8 +314,8 @@ pub unsafe fn state_getloc(state: *mut State, id: *mut libc::c_char) -> Box<Valu
     value_ptr_create(Box::from_raw(variable_location(v)))
 }
 
-pub unsafe fn state_getobject(state: *mut State, id: *mut libc::c_char) -> *mut Object {
-    if strcmp(id, b"return\0" as *const u8 as *const libc::c_char) == 0 as libc::c_int {
+pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
+    if id == "return" {
         return state_getresult(state);
     }
     let v: *mut Variable = stack_getvariable((*state).stack, id);

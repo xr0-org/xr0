@@ -1,7 +1,5 @@
 use std::ptr;
 
-use libc::strcmp;
-
 use super::{Block, State};
 use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type,
@@ -187,9 +185,9 @@ pub unsafe fn stack_getresult(s: &Stack) -> *mut Variable {
     s.result
 }
 
-pub unsafe fn stack_getvariable(s: *mut Stack, id: *mut libc::c_char) -> *mut Variable {
-    assert!(strcmp(id, b"return\0" as *const u8 as *const libc::c_char) != 0);
-    (*s).varmap.get(id) as *mut Variable
+pub unsafe fn stack_getvariable(s: *mut Stack, id: &str) -> *mut Variable {
+    assert_ne!(id, "return");
+    (*s).varmap.get_by_str(id) as *mut Variable
 }
 
 pub unsafe fn stack_references(s: *mut Stack, loc: &Location, state: *mut State) -> bool {

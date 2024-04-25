@@ -695,7 +695,7 @@ unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> Result<Box<
     if id.as_str().starts_with('#') {
         return Ok(value_literal_create(id.as_str()));
     }
-    let obj: *mut Object = state_getobject(state, id.as_ptr());
+    let obj: *mut Object = state_getobject(state, id.as_str());
     if obj.is_null() {
         return Err(Error::new(format!("unknown idenitfier {id}")));
     }
@@ -726,7 +726,7 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<Box<Va
 unsafe fn address_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     let operand = ast_expr_unary_operand(expr);
     let id = ast_expr_as_identifier(operand);
-    Ok(state_getloc(state, id.as_ptr()))
+    Ok(state_getloc(state, id.as_str()))
 }
 
 pub unsafe fn ast_expr_alloc_rangeprocess(
@@ -886,8 +886,8 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LVa
 pub unsafe fn expr_identifier_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
     let id = ast_expr_as_identifier(expr);
     Ok(lvalue_create(
-        Some(state_getobjecttype(&*state, id.as_ptr())),
-        state_getobject(state, id.as_ptr()),
+        Some(state_getobjecttype(&*state, id.as_str())),
+        state_getobject(state, id.as_str()),
     ))
 }
 
@@ -1120,8 +1120,8 @@ unsafe fn call_setupverify(f: *mut AstFunction, arg_state: *mut State) -> Result
     let params = (*f).params();
     for p in params {
         let id = ast_variable_name(p);
-        let param = state_getloc(&mut param_state, id.as_ptr());
-        let arg = state_getloc(arg_state, id.as_ptr());
+        let param = state_getloc(&mut param_state, id.as_str());
+        let arg = state_getloc(arg_state, id.as_str());
         if let Err(err) = verify_paramspec(
             Box::into_raw(param),
             Box::into_raw(arg),
@@ -3016,7 +3016,7 @@ unsafe fn ast_function_precondsinit(f: &AstFunction, s: *mut State) -> Result<()
 unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()> {
     let name = ast_variable_name(param);
     let t = ast_variable_type(param);
-    let obj: *mut Object = state_getobject(state, name.as_ptr());
+    let obj: *mut Object = state_getobject(state, name.as_str());
     if obj.is_null() {
         panic!();
     }

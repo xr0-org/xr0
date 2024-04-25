@@ -116,6 +116,15 @@ impl Map {
         -1
     }
 
+    pub unsafe fn get_by_str(&self, key: &str) -> *mut libc::c_void {
+        for i in 0..self.n as usize {
+            if CStr::from_ptr((*self.entry.add(i)).key).to_str().unwrap() == key {
+                return (*self.entry.add(i)).value as *mut libc::c_void;
+            }
+        }
+        ptr::null_mut()
+    }
+
     pub unsafe fn get(&self, key: *const libc::c_char) -> *mut libc::c_void {
         let index = self.getindex(key);
         if index != -1 {
