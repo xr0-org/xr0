@@ -5,9 +5,9 @@ use super::heap::{
     vconst_create, vconst_declare, vconst_eval, vconst_get, vconst_str, vconst_undeclare,
 };
 use super::location::{
-    location_create_dereferencable, location_create_static, location_dealloc, location_getblock,
-    location_offset, location_range_dealloc, location_toclump, location_toheap, location_tostack,
-    location_tostatic, location_with_offset,
+    location_copy, location_create_dereferencable, location_create_static, location_dealloc,
+    location_getblock, location_offset, location_range_dealloc, location_toclump, location_toheap,
+    location_tostack, location_tostatic, location_with_offset,
 };
 use super::stack::{
     stack_copy, stack_copywithname, stack_create, stack_declare, stack_destroy, stack_getresult,
@@ -284,7 +284,7 @@ pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
     if v.is_null() {
         panic!();
     }
-    state_get(state, &*variable_location(v), true).unwrap()
+    state_get(state, variable_location(&*v), true).unwrap()
 }
 
 unsafe fn state_getresulttype(state: &State) -> &AstType {
@@ -307,11 +307,14 @@ pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType
 }
 
 pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
+    // In the original, this apparently borrows the Location representing the variable's location,
+    // but then passes it to value_ptr_create without copying. We copy because I don't see how this
+    // isn't a double free otherwise.
     let v: *mut Variable = stack_getvariable((*state).stack, id);
     if v.is_null() {
         panic!();
     }
-    value_ptr_create(Box::from_raw(variable_location(v)))
+    value_ptr_create(location_copy(variable_location(&*v)))
 }
 
 pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
@@ -322,7 +325,7 @@ pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
     if v.is_null() {
         panic!();
     }
-    state_get(state, &*variable_location(v), true).unwrap()
+    state_get(state, variable_location(&*v), true).unwrap()
 }
 
 pub unsafe fn state_deref(

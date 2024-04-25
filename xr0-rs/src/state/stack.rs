@@ -295,8 +295,8 @@ unsafe fn object_or_nothing_str(
     OwningCStr::empty()
 }
 
-pub unsafe fn variable_location(v: *mut Variable) -> *mut Location {
-    (*v).loc
+pub unsafe fn variable_location(v: &Variable) -> &Location {
+    &*v.loc
 }
 
 pub unsafe fn variable_type(v: *mut Variable) -> *mut AstType {
