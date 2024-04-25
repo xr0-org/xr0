@@ -25,7 +25,7 @@ pub struct Object {
 
 pub enum ObjectKind {
     DeallocandRange(Box<Range>),
-    Value(*mut Value),
+    Value(*mut Value), // nullable
 }
 
 #[derive(Clone)]

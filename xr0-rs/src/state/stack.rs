@@ -54,22 +54,19 @@ pub unsafe fn stack_create(
         result: ptr::null_mut(),
     });
     let v = variable_create(return_type, &mut *stack, false);
-    stack.result = v;
+    stack.result = Box::into_raw(v);
     Box::into_raw(stack)
 }
 
-pub unsafe fn stack_getframe(s: *mut Stack, frame: libc::c_int) -> *mut Stack {
-    if s.is_null() {
-        panic!();
-    }
+pub unsafe fn stack_getframe(s: &mut Stack, frame: libc::c_int) -> Option<&mut Stack> {
     assert!(frame >= 0);
-    if (*s).id == frame {
-        return s;
+    if s.id == frame {
+        return Some(s);
     }
     if ((*s).prev).is_null() {
-        return ptr::null_mut();
+        return None;
     }
-    stack_getframe((*s).prev, frame)
+    stack_getframe(&mut *(*s).prev, frame)
 }
 
 pub unsafe fn stack_destroy(stack: *mut Stack) {
@@ -156,7 +153,11 @@ pub unsafe fn stack_declare(stack: *mut Stack, var: &AstVariable, isparam: bool)
     }
     (*stack).varmap.set(
         dynamic_str(id.as_ptr()),
-        variable_create(ast_variable_type(var), stack, isparam) as *const libc::c_void,
+        Box::into_raw(variable_create(
+            ast_variable_type(var),
+            &mut *stack,
+            isparam,
+        )) as *const libc::c_void,
     );
 }
 
@@ -209,13 +210,9 @@ pub unsafe fn stack_getblock(s: &mut Stack, address: libc::c_int) -> &mut Block 
     &mut s.frame[address as usize]
 }
 
-pub unsafe fn variable_create(type_: &AstType, stack: *mut Stack, isparam: bool) -> *mut Variable {
-    let v = Box::new(Variable {
-        type_: ast_type_copy(type_),
-        is_param: isparam,
-        loc: Box::into_raw((*stack).new_block()),
-    });
-    let b = location_auto_getblock(&*v.loc, stack).unwrap();
+pub unsafe fn variable_create(type_: &AstType, stack: &mut Stack, isparam: bool) -> Box<Variable> {
+    let loc = (*stack).new_block();
+    let b = location_auto_getblock(&loc, stack).unwrap();
     if b.is_null() {
         panic!();
     }
@@ -226,7 +223,11 @@ pub unsafe fn variable_create(type_: &AstType, stack: *mut Stack, isparam: bool)
             ptr::null_mut(),
         )),
     );
-    Box::into_raw(v)
+    Box::new(Variable {
+        type_: ast_type_copy(type_),
+        is_param: isparam,
+        loc: Box::into_raw(loc),
+    })
 }
 
 pub unsafe fn variable_destroy(v: *mut Variable) {

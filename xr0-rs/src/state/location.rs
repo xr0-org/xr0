@@ -210,7 +210,7 @@ pub unsafe fn location_getblock(
             };
             Ok(block_ptr)
         }
-        LocationKind::Automatic { .. } => location_auto_getblock(loc, s),
+        LocationKind::Automatic { .. } => location_auto_getblock(loc, &mut *s),
         LocationKind::Dynamic => Ok((*h)
             .get_block(loc.block)
             .map_or(ptr::null_mut(), |blk| blk as *mut Block)),
@@ -221,15 +221,14 @@ pub unsafe fn location_getblock(
     }
 }
 
-pub unsafe fn location_auto_getblock(loc: &Location, s: *mut Stack) -> Result<*mut Block> {
+pub unsafe fn location_auto_getblock(loc: &Location, s: &mut Stack) -> Result<*mut Block> {
     let LocationKind::Automatic { frame } = &loc.kind else {
         panic!();
     };
-    let f: *mut Stack = stack_getframe(s, *frame);
-    if f.is_null() {
+    let Some(f) = stack_getframe(s, *frame) else {
         return Err(Error::new("stack frame doesn't exist".to_string()));
-    }
-    Ok(stack_getblock(&mut *f, loc.block))
+    };
+    Ok(stack_getblock(f, loc.block))
 }
 
 pub unsafe fn location_getstackblock<'s>(loc: &Location, s: &'s mut Stack) -> &'s mut Block {
