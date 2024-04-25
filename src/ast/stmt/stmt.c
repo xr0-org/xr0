@@ -685,6 +685,20 @@ ast_stmt_equal(struct ast_stmt *s1, struct ast_stmt *s2)
 	}
 }
 
+bool
+ast_stmt_linearisable(struct ast_stmt *stmt)
+{
+	switch (stmt->kind) {
+	case STMT_NOP:
+	case STMT_LABELLED:
+	case STMT_COMPOUND:
+	case STMT_COMPOUND_V:
+		return false;
+	default:
+		return true;
+	}
+}
+
 enum ast_stmt_kind
 ast_stmt_kind(struct ast_stmt *stmt)
 {

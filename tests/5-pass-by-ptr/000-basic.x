@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-void *
+void
 assign(void *p) ~ [
 	setup: p = .clump(1);
 	*p = 1;
