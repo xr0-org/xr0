@@ -21,8 +21,8 @@ use crate::state::state::{
 };
 use crate::state::State;
 use crate::util::{
-    strbuilder_build, strbuilder_create, string_arr_contains, Error, InsertionOrderMap, Map,
-    OwningCStr, Result, SemiBox, StrBuilder,
+    strbuilder_build, strbuilder_create, string_arr_contains, Error, InsertionOrderMap, OwningCStr,
+    Result, SemiBox, StrBuilder,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -3139,12 +3139,19 @@ unsafe fn split_path_verify(
 
 type FuncGraph = InsertionOrderMap<CString, Vec<OwningCStr>>;
 
-unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, ext: &Externals) {
+type DedupSet<'a> = InsertionOrderMap<&'a CStr, ()>;
+
+unsafe fn recurse_buildgraph<'a>(
+    g: &mut FuncGraph,
+    dedup: &mut DedupSet<'a>,
+    fname: &'a CStr,
+    ext: &Externals,
+) {
     let mut local_dedup = vec![];
-    if !(dedup.get(fname.as_ptr())).is_null() {
+    if dedup.get(fname).is_some() {
         return;
     }
-    dedup.set(fname.as_ptr(), 1 as libc::c_int as *mut libc::c_void);
+    dedup.insert(fname, ());
     let Some(f) = ext.get_func(fname.to_str().unwrap()) else {
         eprintln!("function `{}' is not declared", fname.to_string_lossy());
         process::exit(1);
@@ -3235,7 +3242,7 @@ unsafe fn split_paths_absverify(
 }
 
 pub unsafe fn ast_function_buildgraph(fname: &CStr, ext: &Externals) -> FuncGraph {
-    let mut dedup = Map::new();
+    let mut dedup = InsertionOrderMap::new();
     let mut g = InsertionOrderMap::new();
     recurse_buildgraph(&mut g, &mut dedup, fname, ext);
     g
