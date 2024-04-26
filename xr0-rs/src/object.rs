@@ -11,7 +11,7 @@ use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
 };
 use crate::state::State;
-use crate::util::{Error, Result};
+use crate::util::Result;
 use crate::value::{
     value_abstractcopy, value_as_location, value_copy, value_into_location, value_ptr_create,
     value_references, value_referencesheap, value_struct_create, value_struct_member,
@@ -127,16 +127,11 @@ pub unsafe fn object_references(obj: &Object, loc: &Location, s: *mut State) -> 
     }
 }
 
-pub unsafe fn object_assign(obj: &mut Object, val: *mut Value) -> *mut Error {
+pub unsafe fn object_assign(obj: &mut Object, val: Option<Box<Value>>) {
     let ObjectKind::Value(v) = &mut obj.kind else {
         panic!();
     };
-    *v = if val.is_null() {
-        None
-    } else {
-        Some(Box::from_raw(val))
-    };
-    ptr::null_mut()
+    *v = val;
 }
 
 unsafe fn object_size(obj: &Object) -> *mut AstExpr {
@@ -321,14 +316,13 @@ pub unsafe fn object_getmember(
 }
 
 unsafe fn getorcreatestruct(obj: *mut Object, t: &AstType, s: *mut State) -> *mut Value {
-    let mut v: *mut Value = object_as_value(obj);
+    let v: *mut Value = object_as_value(obj);
     if !v.is_null() {
         return v;
     }
     let complete = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
-    v = Box::into_raw(value_struct_create(complete));
-    object_assign(&mut *obj, v);
-    v
+    object_assign(&mut *obj, Some(value_struct_create(complete)));
+    object_as_value(&mut *obj)
 }
 
 pub unsafe fn object_getmembertype<'t>(

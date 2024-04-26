@@ -130,7 +130,7 @@ pub unsafe fn value_struct_indefinite_create(
         let comment = format!("{comment}.{field}");
         object_assign(
             &mut *obj,
-            Box::into_raw(state_vconst(
+            Some(state_vconst(
                 s,
                 ast_variable_type(var),
                 Some(&comment),
@@ -188,7 +188,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> Box<Value> {
         if !obj_value.is_null() && value_issync(&*obj_value) {
             object_assign(
                 &mut *obj,
-                Box::into_raw(value_sync_create(ast_expr_member_create(
+                Some(value_sync_create(ast_expr_member_create(
                     ast_expr_copy(root),
                     field.clone(),
                 ))),

@@ -809,7 +809,7 @@ unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Valu
             "undefined indirection: {lval} is not an lvalue"
         )));
     }
-    object_assign(&mut *obj, Box::into_raw(value_copy(&rval_val)));
+    object_assign(&mut *obj, Some(value_copy(&rval_val)));
     Ok(rval_val)
 }
 
@@ -1036,7 +1036,7 @@ pub unsafe fn prepare_parameters(
         let obj: *mut Object = lvalue_object(&lval_lval);
         drop(name);
         // Note: I think the arg is copied needlessly in the original, and one is leaked.
-        object_assign(&mut *obj, Box::into_raw(value_copy(&*Box::into_raw(arg))));
+        object_assign(&mut *obj, Some(value_copy(&*Box::into_raw(arg))));
     }
     Ok(())
 }
@@ -1071,7 +1071,7 @@ unsafe fn assign_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value
     if obj.is_null() {
         return Err(Error::new("undefined indirection (lvalue)".to_string()));
     }
-    object_assign(&mut *obj, Box::into_raw(value_copy(&*val)));
+    object_assign(&mut *obj, Some(value_copy(&*val)));
     Ok(val)
 }
 
@@ -2052,10 +2052,7 @@ unsafe fn stmt_jump_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     if obj.is_null() {
         panic!();
     }
-    object_assign(
-        &mut *obj,
-        Box::into_raw(value_copy(&*Box::into_raw(rv_val))),
-    );
+    object_assign(&mut *obj, Some(value_copy(&rv_val)));
     Ok(())
 }
 
@@ -3019,8 +3016,8 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
         panic!();
     }
     if !object_hasvalue(&*obj) {
-        let val = Box::into_raw(state_vconst(state, t, Some(name.as_str()), true));
-        object_assign(&mut *obj, val);
+        let val = state_vconst(state, t, Some(name.as_str()), true);
+        object_assign(&mut *obj, Some(val));
     }
     Ok(())
 }
