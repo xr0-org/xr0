@@ -1076,22 +1076,22 @@ unsafe fn assign_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value
 }
 
 unsafe fn verify_paramspec(
-    param: *mut Value,
-    arg: *mut Value,
+    param: &Value,
+    arg: &Value,
     param_state: *mut State,
     arg_state: *mut State,
 ) -> Result<()> {
-    if !state_islval(param_state, &*param) {
+    if !state_islval(param_state, param) {
         return Ok(());
     }
-    if !state_islval(arg_state, &*arg) {
+    if !state_islval(arg_state, arg) {
         return Err(Error::new("must be lvalue".to_string()));
     }
     if state_isalloc(param_state, param) as libc::c_int != 0 && !state_isalloc(arg_state, arg) {
         return Err(Error::new("must be heap allocated".to_string()));
     }
-    let param_obj = state_get(param_state, value_as_location(&*param), false)?;
-    let arg_obj = state_get(arg_state, value_as_location(&*arg), false)?;
+    let param_obj = state_get(param_state, value_as_location(param), false)?;
+    let arg_obj = state_get(arg_state, value_as_location(arg), false)?;
     if param_obj.is_null() {
         panic!();
     }
@@ -1105,8 +1105,8 @@ unsafe fn verify_paramspec(
         return Err(Error::new("must be rvalue".to_string()));
     }
     verify_paramspec(
-        object_as_value(param_obj),
-        object_as_value(arg_obj),
+        &*object_as_value(param_obj),
+        &*object_as_value(arg_obj),
         param_state,
         arg_state,
     )
@@ -1119,14 +1119,11 @@ unsafe fn call_setupverify(f: &AstFunction, arg_state: *mut State) -> Result<()>
     let params = f.params();
     for p in params {
         let id = ast_variable_name(p);
+        // Note: `param` and `arg` are deliberately leaked in the original to avoid double-freeing
+        // the variable's location.
         let param = state_getloc(&mut param_state, id.as_str());
         let arg = state_getloc(arg_state, id.as_str());
-        if let Err(err) = verify_paramspec(
-            Box::into_raw(param),
-            Box::into_raw(arg),
-            &mut param_state,
-            arg_state,
-        ) {
+        if let Err(err) = verify_paramspec(&param, &arg, &mut param_state, arg_state) {
             return Err(Error::new(format!("parameter {id} of {fname} {}", err.msg)));
         }
     }
