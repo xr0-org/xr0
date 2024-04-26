@@ -699,6 +699,8 @@ ast_stmt_linearisable(struct ast_stmt *stmt)
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:
+	case STMT_ITERATION_E:
+	case STMT_ITERATION:
 		return false;
 	default:
 		return true;
