@@ -312,7 +312,7 @@ pub unsafe fn object_getmember(
     member: &str,
     s: *mut State,
 ) -> *mut Object {
-    value_struct_member(getorcreatestruct(obj, t, s), member)
+    value_struct_member(&*getorcreatestruct(obj, t, s), member)
 }
 
 unsafe fn getorcreatestruct(obj: *mut Object, t: &AstType, s: *mut State) -> *mut Value {

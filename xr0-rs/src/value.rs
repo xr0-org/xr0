@@ -248,8 +248,8 @@ pub unsafe fn value_struct_membertype<'v>(v: &'v Value, member: &str) -> Option<
     None
 }
 
-pub unsafe fn value_struct_member(v: *mut Value, member: &str) -> *mut Object {
-    let ValueKind::Struct(sv) = &(*v).kind else {
+pub unsafe fn value_struct_member(v: &Value, member: &str) -> *mut Object {
+    let ValueKind::Struct(sv) = &v.kind else {
         panic!();
     };
     sv.m.get(member).copied().unwrap_or(ptr::null_mut())

@@ -714,7 +714,7 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let root = ast_expr_member_root(expr);
     let res_val = ast_expr_eval(root, s)?;
     let field = ast_expr_member_field(expr);
-    let member: *mut Object = value_struct_member(Box::into_raw(res_val), field.as_str());
+    let member: *mut Object = value_struct_member(&res_val, field.as_str());
     if member.is_null() {
         return Err(Error::new(format!("`{root}' has no field `{field}'")));
     }
@@ -1242,7 +1242,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let v = ast_expr_pf_reduce(ast_expr_member_root(expr), s)?;
     let field = ast_expr_member_field(expr);
     if value_isstruct(&v) {
-        let obj: *mut Object = value_struct_member(Box::into_raw(v), field.as_str());
+        let obj: *mut Object = value_struct_member(&v, field.as_str());
         let obj_value: *mut Value = object_as_value(obj);
         if obj_value.is_null() {
             panic!();
