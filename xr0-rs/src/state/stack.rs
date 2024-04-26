@@ -210,10 +210,7 @@ pub unsafe fn stack_getblock(s: &mut Stack, address: libc::c_int) -> &mut Block 
 pub unsafe fn variable_create(type_: &AstType, stack: &mut Stack, isparam: bool) -> Box<Variable> {
     let loc = (*stack).new_block();
     let b = location_auto_getblock(&loc, stack).unwrap();
-    b.install(object_value_create(
-        ast_expr_constant_create(0),
-        ptr::null_mut(),
-    ));
+    b.install(object_value_create(ast_expr_constant_create(0), None));
     Box::new(Variable {
         type_: ast_type_copy(type_),
         is_param: isparam,

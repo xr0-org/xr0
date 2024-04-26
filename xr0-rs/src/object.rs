@@ -36,7 +36,8 @@ pub struct Range {
     loc: Box<Location>,
 }
 
-pub unsafe fn object_value_create(offset: Box<AstExpr>, v: *mut Value) -> Box<Object> {
+pub unsafe fn object_value_create(offset: Box<AstExpr>, v: Option<Box<Value>>) -> Box<Object> {
+    let v = v.map_or(ptr::null_mut(), Box::into_raw);
     Box::new(Object {
         kind: ObjectKind::Value(v),
         offset,
@@ -92,9 +93,9 @@ pub unsafe fn object_abstractcopy(old: &Object, s: *mut State) -> Box<Object> {
         ObjectKind::Value(v) => object_value_create(
             old.offset.clone(),
             if !(*v).is_null() {
-                value_abstractcopy(&**v, s).map_or(ptr::null_mut(), Box::into_raw)
+                value_abstractcopy(&**v, s)
             } else {
-                ptr::null_mut()
+                None
             },
         ),
     }
@@ -283,7 +284,7 @@ pub unsafe fn object_upto(
         };
         return Some(object_value_create(
             ast_expr_copy(&obj.offset),
-            Box::into_raw(value_copy(&**v)),
+            Some(value_copy(&**v)),
         ));
     }
 
@@ -319,7 +320,7 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
         ast_expr_destroy(up);
         return Some(object_value_create(
             ast_expr_copy(incl_lw),
-            Box::into_raw(value_copy(&**v)),
+            Some(value_copy(&**v)),
         ));
     }
     Some(object_range_create(

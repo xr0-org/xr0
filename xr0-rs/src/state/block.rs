@@ -1,5 +1,4 @@
 use std::fmt::{self, Display, Formatter};
-use std::ptr;
 
 use super::{Heap, State};
 use crate::ast::{
@@ -51,7 +50,7 @@ impl Block {
             if !constructive {
                 return None;
             }
-            let obj = object_value_create(ast_expr_copy(offset), ptr::null_mut());
+            let obj = object_value_create(ast_expr_copy(offset), None);
             let index = self.arr.len();
             self.arr.push(obj);
             return Some(&self.arr[index]);
@@ -69,7 +68,7 @@ impl Block {
         // know why it isn't a double free.
         let lw_ptr = Box::into_raw(lw);
         let upto = object_upto(obj, lw_ptr, s);
-        let observed = object_value_create(ast_expr_copy(&*lw_ptr), Box::into_raw(state_alloc(s)));
+        let observed = object_value_create(ast_expr_copy(&*lw_ptr), Some(state_alloc(s)));
         let from = object_from(obj, &up, s);
         drop(up);
         drop(Box::from_raw(lw_ptr));
