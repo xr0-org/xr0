@@ -1,11 +1,8 @@
 use std::fmt::{self, Display, Formatter};
-use std::ptr;
 
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
-use crate::state::block::{
-    block_range_aredeallocands, block_range_dealloc, block_references, block_str,
-};
+use crate::state::block::{block_range_aredeallocands, block_range_dealloc, block_references};
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
 use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
@@ -191,37 +188,27 @@ pub unsafe fn location_referencesheap(l: &Location, s: *mut State) -> bool {
     !obj.is_null() && object_referencesheap(obj, s)
 }
 
-pub unsafe fn location_getblock(
+pub unsafe fn location_getblock<'s>(
     loc: &Location,
-    sm: &mut StaticMemory,
-    _v: &VConst,
-    s: *mut Stack,
-    h: *mut Heap,
-    c: &mut Clump,
-) -> Result<*mut Block> {
-    if s.is_null() {
-        panic!();
-    }
+    sm: &'s mut StaticMemory,
+    _v: &'s mut VConst,
+    s: &'s mut Stack,
+    h: &'s mut Heap,
+    c: &'s mut Clump,
+) -> Result<Option<&'s mut Block>> {
     match loc.kind {
-        LocationKind::Static => {
-            let block_ptr = match sm.get_block(loc.block) {
-                Some(block) => block,
-                None => ptr::null_mut(),
-            };
-            Ok(block_ptr)
-        }
-        LocationKind::Automatic { .. } => location_auto_getblock(loc, &mut *s),
-        LocationKind::Dynamic => Ok((*h)
-            .get_block(loc.block)
-            .map_or(ptr::null_mut(), |blk| blk as *mut Block)),
-        LocationKind::Dereferencable => Ok(c
-            .get_block(loc.block)
-            .map_or(ptr::null_mut(), |blk| blk as *mut Block)),
+        LocationKind::Static => Ok(sm.get_block(loc.block)),
+        LocationKind::Automatic { .. } => location_auto_getblock(loc, &mut *s).map(Some),
+        LocationKind::Dynamic => Ok((*h).get_block(loc.block)),
+        LocationKind::Dereferencable => Ok(c.get_block(loc.block)),
         _ => panic!(),
     }
 }
 
-pub unsafe fn location_auto_getblock(loc: &Location, s: &mut Stack) -> Result<*mut Block> {
+pub unsafe fn location_auto_getblock<'stack>(
+    loc: &Location,
+    s: &'stack mut Stack,
+) -> Result<&'stack mut Block> {
     let LocationKind::Automatic { frame } = &loc.kind else {
         panic!();
     };
@@ -256,7 +243,7 @@ pub unsafe fn location_range_dealloc(
         return Err(Error::new("cannot get block".to_string()));
     };
     if !block_range_aredeallocands(b, lw, up, state) {
-        println!("block: {}", block_str(b));
+        println!("block: {b}");
         println!("lw: {lw}, up: {up}");
         debug_assert!(false);
         return Err(Error::new("some values not allocated".to_string()));

@@ -5,7 +5,7 @@ use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type,
 };
 use crate::object::{object_as_value, object_assign, object_isvalue, object_value_create};
-use crate::state::block::{block_create, block_install, block_observe};
+use crate::state::block::block_observe;
 use crate::state::location::{
     location_auto_getblock, location_copy, location_create_automatic, location_destroy,
     location_getstackblock, location_offset, location_references,
@@ -33,7 +33,7 @@ pub struct Variable {
 impl Stack {
     pub fn new_block(&mut self) -> Box<Location> {
         let address = self.frame.len() as libc::c_int;
-        self.frame.push(block_create());
+        self.frame.push(Block::new());
         location_create_automatic(self.id, address, ast_expr_constant_create(0))
     }
 }
@@ -211,16 +211,10 @@ pub unsafe fn stack_getblock(s: &mut Stack, address: libc::c_int) -> &mut Block 
 pub unsafe fn variable_create(type_: &AstType, stack: &mut Stack, isparam: bool) -> Box<Variable> {
     let loc = (*stack).new_block();
     let b = location_auto_getblock(&loc, stack).unwrap();
-    if b.is_null() {
-        panic!();
-    }
-    block_install(
-        b,
-        Box::into_raw(object_value_create(
-            ast_expr_constant_create(0),
-            ptr::null_mut(),
-        )),
-    );
+    b.install(object_value_create(
+        ast_expr_constant_create(0),
+        ptr::null_mut(),
+    ));
     Box::new(Variable {
         type_: ast_type_copy(type_),
         is_param: isparam,

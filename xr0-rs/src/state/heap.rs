@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use super::{Block, State};
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
-use crate::state::block::{block_create, block_str, block_undeclare};
+use crate::state::block::block_undeclare;
 use crate::state::location::location_create_dynamic;
 use crate::state::state::state_references;
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
@@ -39,7 +39,7 @@ impl Heap {
                 strbuilder_write!(
                     b,
                     "{indent}{i}: {}{}",
-                    block_str(&hb.block),
+                    hb.block,
                     if self.print_delim(i) { "\n" } else { "" },
                 );
             }
@@ -59,7 +59,7 @@ impl Heap {
     pub fn new_block(&mut self) -> Box<Location> {
         let address = self.blocks.len() as libc::c_int;
         self.blocks.push(HeapBlock {
-            block: block_create(),
+            block: Block::new(),
             freed: false,
         });
         location_create_dynamic(address, ast_expr_constant_create(0))

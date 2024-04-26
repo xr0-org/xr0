@@ -1,3 +1,4 @@
+use std::fmt::{self, Display, Formatter};
 use std::ptr;
 
 use super::{Heap, State};
@@ -12,15 +13,11 @@ use crate::object::{
     object_upto, object_value_create, range_create,
 };
 use crate::state::state::{state_alloc, state_eval};
-use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
-use crate::{strbuilder_write, AstExpr, Location, Object};
+use crate::util::{Error, Result};
+use crate::{AstExpr, Location, Object};
 
 pub struct Block {
     pub arr: Vec<*mut Object>,
-}
-
-pub fn block_create() -> Box<Block> {
-    Box::new(Block { arr: vec![] })
 }
 
 impl Drop for Block {
@@ -46,18 +43,27 @@ impl Clone for Block {
     }
 }
 
-pub unsafe fn block_str(block: &Block) -> OwningCStr {
-    let mut b = strbuilder_create();
-    let n = block.arr.len();
-    for (i, &obj) in block.arr.iter().enumerate() {
-        strbuilder_write!(b, "{}{}", &*obj, if i + 1 < n { ", " } else { "" });
+impl Display for Block {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let n = self.arr.len();
+        for (i, &obj) in self.arr.iter().enumerate() {
+            unsafe {
+                write!(f, "{}{}", &*obj, if i + 1 < n { ", " } else { "" })?;
+            }
+        }
+        Ok(())
     }
-    strbuilder_build(b)
 }
 
-pub unsafe fn block_install(b: *mut Block, obj: *mut Object) {
-    assert!((*b).arr.is_empty());
-    (*b).arr.push(obj);
+impl Block {
+    pub fn new() -> Box<Block> {
+        Box::new(Block { arr: vec![] })
+    }
+
+    pub fn install(&mut self, obj: Box<Object>) {
+        assert!(self.arr.is_empty());
+        self.arr.push(Box::into_raw(obj));
+    }
 }
 
 pub unsafe fn block_observe(
@@ -112,6 +118,7 @@ pub unsafe fn block_references(b: *mut Block, loc: &Location, s: *mut State) -> 
     (*b).arr.iter().any(|obj| object_references(&**obj, loc, s))
 }
 
+// XXX FIXME: `b` may be an element of `heap`, verboten aliasing
 pub unsafe fn block_range_alloc(
     b: &mut Block,
     lw: &AstExpr,

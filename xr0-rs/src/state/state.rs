@@ -242,38 +242,30 @@ pub unsafe fn state_get(
     let b = location_getblock(
         loc,
         &mut (*state).static_memory,
-        &(*state).vconst,
-        (*state).stack,
+        &mut (*state).vconst,
+        &mut *(*state).stack,
         &mut (*state).heap,
         &mut (*state).clump,
     )?;
-    if b.is_null() {
-        assert!(loc.type_is_dynamic() || loc.type_is_dereferencable());
-        return Ok(ptr::null_mut());
+    match b {
+        None => {
+            assert!(loc.type_is_dynamic() || loc.type_is_dereferencable());
+            Ok(ptr::null_mut())
+        }
+        Some(b) => Ok(block_observe(b, location_offset(loc), state, constructive)),
     }
-    Ok(block_observe(
-        &mut *b,
-        location_offset(loc),
-        state,
-        constructive,
-    ))
 }
 
 pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option<&'s mut Block> {
-    let p = location_getblock(
+    location_getblock(
         loc,
         &mut state.static_memory,
-        &state.vconst,
-        state.stack,
+        &mut state.vconst,
+        &mut *state.stack,
         &mut state.heap,
         &mut state.clump,
     )
-    .unwrap();
-    if p.is_null() {
-        None
-    } else {
-        Some(&mut *p)
-    }
+    .unwrap()
 }
 
 pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
@@ -348,19 +340,20 @@ pub unsafe fn state_range_alloc(
     let b = location_getblock(
         deref,
         &mut (*state).static_memory,
-        &(*state).vconst,
-        (*state).stack,
+        &mut (*state).vconst,
+        &mut *(*state).stack,
         &mut (*state).heap,
         &mut (*state).clump,
     )
     .unwrap(); // panic rather than propagate the error - this is in the original
-    if b.is_null() {
+    let Some(b) = b else {
         return Err(Error::new("no block".to_string()));
-    }
+    };
     if ast_expr_equal(lw, up) {
         panic!();
     }
-    block_range_alloc(&mut *b, lw, up, &mut (*state).heap)
+    // XXX FIXME: b is mutably borrowed from state and now we're going to mutate the heap
+    block_range_alloc(b, lw, up, &mut (*state).heap)
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> Box<Value> {
@@ -418,13 +411,16 @@ pub unsafe fn state_range_aredeallocands(
     let b = location_getblock(
         deref,
         &mut (*state).static_memory,
-        &(*state).vconst,
-        (*state).stack,
+        &mut (*state).vconst,
+        &mut *(*state).stack,
         &mut (*state).heap,
         &mut (*state).clump,
     )
     .unwrap();
-    !b.is_null() && block_range_aredeallocands(&*b, lw, up, state)
+    match b {
+        Some(b) => block_range_aredeallocands(&*b, lw, up, state),
+        None => false,
+    }
 }
 
 pub unsafe fn state_hasgarbage(state: *mut State) -> bool {
