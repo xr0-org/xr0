@@ -5,11 +5,7 @@ use super::location::{
     location_getblock, location_offset, location_range_dealloc, location_toclump, location_toheap,
     location_tostack, location_tostatic, location_with_offset,
 };
-use super::stack::{
-    stack_copy, stack_copywithname, stack_create, stack_declare, stack_destroy, stack_getresult,
-    stack_getvariable, stack_prev, stack_references, stack_str, stack_undeclare, variable_location,
-    variable_type,
-};
+use super::stack::{variable_location, variable_type};
 use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
 use crate::ast::{
     ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
@@ -26,23 +22,28 @@ use crate::{
     Value, Variable,
 };
 
+// Note: The original had a destructor `state_destroy` which used a function
+// `static_memory_destroy` which leaked the allocation containing the static_memory value.
+#[derive(Clone)]
 pub struct State {
     pub ext: *mut Externals,
     pub vconst: VConst,
     pub static_memory: StaticMemory,
     pub clump: Clump,
-    pub stack: *mut Stack,
+    pub stack: Stack,
     pub heap: Heap,
     pub props: Props,
 }
 
 pub unsafe fn state_create(func: OwningCStr, ext: *mut Externals, result_type: &AstType) -> State {
+    let mut stack = Stack::new();
+    stack.push(func, result_type);
     State {
         ext,
         static_memory: StaticMemory::new(),
         vconst: VConst::new(),
         clump: Clump::new(),
-        stack: stack_create(func, ptr::null_mut(), result_type),
+        stack,
         heap: Heap::new(),
         props: Props::new(),
     }
@@ -54,37 +55,21 @@ pub unsafe fn state_create_withprops(
     result_type: &AstType,
     props: Props,
 ) -> State {
+    let mut stack = Stack::new();
+    stack.push(func, result_type);
     State {
         ext,
         static_memory: StaticMemory::new(),
         vconst: VConst::new(),
         clump: Clump::new(),
-        stack: stack_create(func, ptr::null_mut(), result_type),
+        stack,
         heap: Heap::new(),
         props,
     }
 }
 
-impl Drop for State {
-    fn drop(&mut self) {
-        unsafe {
-            // Note: The original used a function `static_memory_destroy` which leaked the allocation
-            // containing the static_memory value.
-            stack_destroy(self.stack);
-        }
-    }
-}
-
 pub unsafe fn state_copy(state: &State) -> State {
-    State {
-        ext: state.ext,
-        static_memory: state.static_memory.clone(),
-        vconst: state.vconst.clone(),
-        clump: state.clump.clone(),
-        stack: stack_copy(state.stack),
-        heap: state.heap.clone(),
-        props: state.props.clone(),
-    }
+    state.clone()
 }
 
 pub unsafe fn state_copywithname(state: &State, func_name: OwningCStr) -> State {
@@ -93,7 +78,7 @@ pub unsafe fn state_copywithname(state: &State, func_name: OwningCStr) -> State 
         static_memory: state.static_memory.clone(),
         vconst: state.vconst.clone(),
         clump: state.clump.clone(),
-        stack: stack_copywithname(state.stack, func_name),
+        stack: state.stack.clone_with_name(func_name),
         heap: state.heap.clone(),
         props: state.props.clone(),
     }
@@ -118,7 +103,7 @@ pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     if !clump.is_empty() {
         strbuilder_write!(b, "{clump}\n");
     }
-    let stack = stack_str((*state).stack, state);
+    let stack = (*state).stack.str(state);
     strbuilder_write!(b, "{stack}\n");
     let props = (*state).props.str("\t");
     if !props.is_empty() {
@@ -145,20 +130,15 @@ pub unsafe fn state_getprops(s: &mut State) -> &mut Props {
 }
 
 pub unsafe fn state_pushframe(state: *mut State, func: OwningCStr, ret_type: &AstType) {
-    (*state).stack = stack_create(func, (*state).stack, ret_type);
+    (*state).stack.push(func, ret_type);
 }
 
 pub unsafe fn state_popframe(state: *mut State) {
-    let old: *mut Stack = (*state).stack;
-    (*state).stack = stack_prev(old);
-    if ((*state).stack).is_null() {
-        panic!();
-    }
-    stack_destroy(old);
+    (*state).stack.pop_frame();
 }
 
 pub unsafe fn state_declare(state: *mut State, var: &AstVariable, isparam: bool) {
-    stack_declare((*state).stack, var, isparam);
+    (*state).stack.declare(var, isparam);
 }
 
 pub unsafe fn state_vconst(
@@ -211,7 +191,7 @@ pub unsafe fn state_islval(state: *mut State, v: &Value) -> bool {
     state_get(state, loc, true).unwrap();
     location_tostatic(loc, &(*state).static_memory)
         || location_toheap(loc, &mut (*state).heap)
-        || location_tostack(loc, &mut *(*state).stack)
+        || location_tostack(loc, &mut (*state).stack)
         || location_toclump(loc, &mut (*state).clump)
 }
 
@@ -237,7 +217,7 @@ pub unsafe fn state_get(
         loc,
         &mut (*state).static_memory,
         &mut (*state).vconst,
-        &mut *(*state).stack,
+        &mut (*state).stack,
         &mut (*state).heap,
         &mut (*state).clump,
     )?;
@@ -257,7 +237,7 @@ pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option
         loc,
         &mut state.static_memory,
         &mut state.vconst,
-        &mut *state.stack,
+        &mut state.stack,
         &mut state.heap,
         &mut state.clump,
     )
@@ -265,12 +245,12 @@ pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option
 }
 
 pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
-    let v = stack_getresult(&*(*state).stack);
+    let v = (*state).stack.get_result();
     state_get(state, variable_location(v), true).unwrap()
 }
 
 unsafe fn state_getresulttype(state: &State) -> &AstType {
-    let v = stack_getresult(&*state.stack);
+    let v = state.stack.get_result();
     variable_type(v)
 }
 
@@ -278,7 +258,7 @@ pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType
     if id == "return" {
         return state_getresulttype(state);
     }
-    let v: *mut Variable = stack_getvariable(state.stack, id);
+    let v: *mut Variable = state.stack.get_variable(id);
     if v.is_null() {
         panic!();
     }
@@ -291,7 +271,7 @@ pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
     // isn't a double free otherwise. (Note: in one caller, `call_setupverify`, the Value is always
     // leaked, which partially explains it. The other is `address_eval`, which I don't think is
     // always leaked.)
-    let v: *mut Variable = stack_getvariable((*state).stack, id);
+    let v: *mut Variable = (*state).stack.get_variable(id);
     if v.is_null() {
         panic!();
     }
@@ -302,7 +282,7 @@ pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
     if id == "return" {
         return state_getresult(state);
     }
-    let v: *mut Variable = stack_getvariable((*state).stack, id);
+    let v: *mut Variable = (*state).stack.get_variable(id);
     if v.is_null() {
         panic!();
     }
@@ -338,7 +318,7 @@ pub unsafe fn state_range_alloc(
         deref,
         &mut (*state).static_memory,
         &mut (*state).vconst,
-        &mut *(*state).stack,
+        &mut (*state).stack,
         &mut (*state).heap,
         &mut (*state).clump,
     )
@@ -408,7 +388,7 @@ pub unsafe fn state_range_aredeallocands(
         deref,
         &mut (*state).static_memory,
         &mut (*state).vconst,
-        &mut *(*state).stack,
+        &mut (*state).stack,
         &mut (*state).heap,
         &mut (*state).clump,
     )
@@ -424,7 +404,7 @@ pub unsafe fn state_hasgarbage(state: *mut State) -> bool {
 }
 
 pub unsafe fn state_references(s: *mut State, loc: &Location) -> bool {
-    stack_references((*s).stack, loc, s)
+    (*s).stack.references(loc, s)
 }
 
 pub fn state_eval(s: &State, e: &AstExpr) -> bool {
@@ -457,7 +437,7 @@ unsafe fn state_undeclareliterals(s: *mut State) {
 unsafe fn state_undeclarevars(s: *mut State) {
     (*s).heap.undeclare(s);
     (*s).vconst.undeclare();
-    stack_undeclare((*s).stack, s);
+    (*s).stack.undeclare(s);
 }
 
 unsafe fn state_popprops(s: *mut State) {

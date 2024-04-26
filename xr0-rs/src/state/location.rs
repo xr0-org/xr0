@@ -2,7 +2,6 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
-use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
 use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
 use crate::util::{Error, Result};
@@ -204,22 +203,22 @@ pub unsafe fn location_getblock<'s>(
     }
 }
 
-pub unsafe fn location_auto_getblock<'stack>(
-    loc: &Location,
-    s: &'stack mut Stack,
-) -> Result<&'stack mut Block> {
-    let LocationKind::Automatic { frame } = &loc.kind else {
-        panic!();
-    };
-    let Some(f) = stack_getframe(s, *frame) else {
-        return Err(Error::new("stack frame doesn't exist".to_string()));
-    };
-    Ok(stack_getblock(f, loc.block))
+pub fn location_auto_get_block_id(loc: &Location) -> libc::c_int {
+    assert!(matches!(loc.kind, LocationKind::Automatic { .. }));
+    loc.block
 }
 
-pub unsafe fn location_getstackblock<'s>(loc: &Location, s: &'s mut Stack) -> &'s mut Block {
-    assert!(matches!(loc.kind, LocationKind::Automatic { .. }));
-    stack_getblock(s, loc.block)
+pub unsafe fn location_auto_getblock<'stack>(
+    loc: &Location,
+    stack: &'stack mut Stack,
+) -> Result<&'stack mut Block> {
+    let LocationKind::Automatic { frame: id } = &loc.kind else {
+        panic!();
+    };
+    let Some(frame) = stack.get_frame(*id) else {
+        return Err(Error::new("stack frame doesn't exist".to_string()));
+    };
+    Ok(frame.get_block(loc.block))
 }
 
 pub unsafe fn location_dealloc(loc: &Location, heap: *mut Heap) -> Result<()> {

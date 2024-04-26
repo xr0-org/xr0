@@ -6,21 +6,26 @@ use crate::ast::{
 };
 use crate::object::{object_as_value, object_assign, object_isvalue, object_value_create};
 use crate::state::location::{
-    location_auto_getblock, location_copy, location_create_automatic, location_destroy,
-    location_getstackblock, location_offset, location_references,
+    location_auto_get_block_id, location_auto_getblock, location_copy, location_create_automatic,
+    location_destroy, location_offset, location_references,
 };
 use crate::state::state::state_get;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
 use crate::value::value_abstractcopy;
 use crate::{cstr, strbuilder_write, AstType, AstVariable, Location};
 
+#[derive(Clone)]
 pub struct Stack {
+    frames: Vec<StackFrame>,
+}
+
+pub struct StackFrame {
     pub name: OwningCStr,
-    pub frame: Vec<Box<Block>>,
+    // Note: This field is called `frame` in the original.
+    pub blocks: Vec<Box<Block>>,
     pub varmap: Box<Map>,
     pub result: *mut Variable,
     pub id: libc::c_int,
-    pub prev: *mut Stack,
 }
 
 pub struct Variable {
@@ -29,48 +34,7 @@ pub struct Variable {
     pub is_param: bool,
 }
 
-impl Stack {
-    pub fn new_block(&mut self) -> Box<Location> {
-        let address = self.frame.len() as libc::c_int;
-        self.frame.push(Block::new());
-        location_create_automatic(self.id, address, ast_expr_constant_create(0))
-    }
-}
-
-pub unsafe fn stack_create(
-    name: OwningCStr,
-    prev: *mut Stack,
-    return_type: &AstType,
-) -> *mut Stack {
-    let mut stack = Box::new(Stack {
-        name,
-        frame: vec![],
-        varmap: Map::new(),
-        prev,
-        id: if !prev.is_null() { (*prev).id + 1 } else { 0 },
-        result: ptr::null_mut(),
-    });
-    let v = variable_create(return_type, &mut stack, false);
-    stack.result = Box::into_raw(v);
-    Box::into_raw(stack)
-}
-
-pub unsafe fn stack_getframe(s: &mut Stack, frame: libc::c_int) -> Option<&mut Stack> {
-    assert!(frame >= 0);
-    if s.id == frame {
-        return Some(s);
-    }
-    if s.prev.is_null() {
-        return None;
-    }
-    stack_getframe(&mut *s.prev, frame)
-}
-
-pub unsafe fn stack_destroy(stack: *mut Stack) {
-    drop(Box::from_raw(stack));
-}
-
-impl Drop for Stack {
+impl Drop for StackFrame {
     fn drop(&mut self) {
         unsafe {
             let m = std::mem::replace(&mut self.varmap, Map::new());
@@ -83,29 +47,18 @@ impl Drop for Stack {
     }
 }
 
-pub unsafe fn stack_prev(s: *mut Stack) -> *mut Stack {
-    (*s).prev
-}
-
-pub unsafe fn stack_copy(stack: *mut Stack) -> *mut Stack {
-    Box::into_raw(Box::new(Stack {
-        name: (*stack).name.clone(),
-        frame: (*stack).frame.clone(),
-        varmap: varmap_copy(&(*stack).varmap),
-        id: (*stack).id,
-        result: variable_copy((*stack).result),
-        prev: if ((*stack).prev).is_null() {
-            ptr::null_mut()
-        } else {
-            stack_copy((*stack).prev)
-        },
-    }))
-}
-
-pub unsafe fn stack_copywithname(stack: *mut Stack, new_name: OwningCStr) -> *mut Stack {
-    let copy: *mut Stack = stack_copy(stack);
-    (*copy).name = new_name;
-    copy
+impl Clone for StackFrame {
+    fn clone(&self) -> Self {
+        unsafe {
+            StackFrame {
+                name: self.name.clone(),
+                blocks: self.blocks.clone(),
+                varmap: varmap_copy(&self.varmap),
+                id: self.id,
+                result: variable_copy(self.result),
+            }
+        }
+    }
 }
 
 unsafe fn varmap_copy(m: &Map) -> Box<Map> {
@@ -121,95 +74,169 @@ unsafe fn varmap_copy(m: &Map) -> Box<Map> {
 
 pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
     let mut b = strbuilder_create();
-    let m: &Map = &(*stack).varmap;
-    for (k, v) in m.pairs() {
-        let var = variable_str(v as *mut Variable, stack, state);
-        strbuilder_write!(b, "\t{}: {var}", cstr!(k));
-        b.push('\n');
-    }
-    let result = variable_str((*stack).result, stack, state);
-    strbuilder_write!(b, "\treturn: {result}\n");
-    strbuilder_write!(b, "\t");
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    let len: libc::c_int = 30 as libc::c_int;
-    while i_0 < len - 2 as libc::c_int {
-        b.push('-');
-        i_0 += 1;
-    }
-    strbuilder_write!(b, " {}\n", (*stack).name);
-    if !((*stack).prev).is_null() {
-        strbuilder_write!(b, "{}", stack_str((*stack).prev, state));
+    let n = (*stack).frames.len();
+    for i in 0..n {
+        let frame: *mut StackFrame = &mut (*stack).frames[i];
+        let m: &Map = &(*frame).varmap;
+        for (k, v) in m.pairs() {
+            let var = variable_str(v as *mut Variable, stack, state);
+            strbuilder_write!(b, "\t{}: {var}", cstr!(k));
+            b.push('\n');
+        }
+        let result = variable_str((*frame).result, stack, state);
+        strbuilder_write!(b, "\treturn: {result}\n");
+        strbuilder_write!(b, "\t");
+        let mut i_0: libc::c_int = 0 as libc::c_int;
+        let len: libc::c_int = 30 as libc::c_int;
+        while i_0 < len - 2 as libc::c_int {
+            b.push('-');
+            i_0 += 1;
+        }
+        strbuilder_write!(b, " {}\n", (*frame).name);
     }
     strbuilder_build(b)
 }
 
-pub unsafe fn stack_declare(stack: *mut Stack, var: &AstVariable, isparam: bool) {
-    let id = ast_variable_name(var);
-    if !((*stack).varmap.get(id.as_ptr())).is_null() {
-        panic!("expected varmap.get(id) to be null");
+impl Stack {
+    pub fn new() -> Self {
+        Stack { frames: vec![] }
     }
-    (*stack).varmap.set(
-        dynamic_str(id.as_ptr()),
-        Box::into_raw(variable_create(
-            ast_variable_type(var),
-            &mut *stack,
-            isparam,
-        )) as *const libc::c_void,
-    );
+
+    pub fn clone_with_name(&self, new_name: OwningCStr) -> Stack {
+        let mut copy = self.clone();
+        copy.top_mut().name = new_name;
+        copy
+    }
+
+    pub fn get_frame(&mut self, frame: libc::c_int) -> Option<&mut StackFrame> {
+        self.frames.get_mut(frame as usize)
+    }
+
+    pub fn push(&mut self, name: OwningCStr, return_type: &AstType) -> &mut StackFrame {
+        let id = self.frames.len() as libc::c_int;
+        let mut frame = StackFrame {
+            name,
+            blocks: vec![],
+            varmap: Map::new(),
+            id,
+            result: ptr::null_mut(),
+        };
+        let v = unsafe { variable_create(return_type, &mut frame, false) };
+        frame.result = Box::into_raw(v);
+        self.frames.push(frame);
+        self.frames.last_mut().unwrap()
+    }
+
+    pub fn pop_frame(&mut self) {
+        self.frames.pop();
+    }
+
+    fn top(&self) -> &StackFrame {
+        self.frames.last().unwrap()
+    }
+
+    fn top_mut(&mut self) -> &mut StackFrame {
+        self.frames.last_mut().unwrap()
+    }
+
+    pub unsafe fn references(&self, loc: &Location, state: *mut State) -> bool {
+        // Note: Original only checks the top stack frame.
+        self.top().references(loc, state)
+    }
+
+    pub unsafe fn declare(&mut self, var: &AstVariable, is_param: bool) {
+        self.top_mut().declare(var, is_param);
+    }
+
+    pub unsafe fn undeclare(&mut self, state: *mut State) {
+        self.top_mut().undeclare(state);
+    }
+
+    pub unsafe fn get_result(&self) -> &Variable {
+        self.top().get_result()
+    }
+
+    pub unsafe fn get_variable(&self, id: &str) -> *mut Variable {
+        self.top().get_variable(id)
+    }
+
+    pub unsafe fn str(&mut self, state: *mut State) -> OwningCStr {
+        stack_str(self, state)
+    }
 }
 
-pub unsafe fn stack_undeclare(stack: *mut Stack, state: *mut State) {
-    let old_result: *mut Variable = (*stack).result;
-    (*stack).result = variable_abstractcopy(old_result, state);
-    variable_destroy(old_result);
-    let m = {
-        let stack_ref = &mut *stack;
-        std::mem::replace(&mut stack_ref.varmap, Map::new())
-    };
-    for (k, v) in m.pairs() {
-        let v = v as *mut Variable;
-        if variable_isparam(v) {
-            (*stack).varmap.set(
-                dynamic_str(k),
-                variable_abstractcopy(v, state) as *const libc::c_void,
-            );
+impl StackFrame {
+    pub fn new_block(&mut self) -> Box<Location> {
+        let address = self.blocks.len() as libc::c_int;
+        self.blocks.push(Block::new());
+        location_create_automatic(self.id, address, ast_expr_constant_create(0))
+    }
+
+    pub unsafe fn declare(&mut self, var: &AstVariable, isparam: bool) {
+        let id = ast_variable_name(var);
+        if !(self.varmap.get(id.as_ptr())).is_null() {
+            panic!("expected varmap.get(id) to be null");
         }
-        variable_destroy(v);
+        let var = variable_create(ast_variable_type(var), self, isparam);
+        self.varmap.set(
+            dynamic_str(id.as_ptr()),
+            Box::into_raw(var) as *const libc::c_void,
+        );
     }
-    m.destroy();
-}
 
-pub unsafe fn stack_getresult(s: &Stack) -> &Variable {
-    &*s.result
-}
-
-pub unsafe fn stack_getvariable(s: *mut Stack, id: &str) -> *mut Variable {
-    assert_ne!(id, "return");
-    (*s).varmap.get_by_str(id) as *mut Variable
-}
-
-pub unsafe fn stack_references(s: *mut Stack, loc: &Location, state: *mut State) -> bool {
-    let result = stack_getresult(&*s);
-    if variable_references(result, loc, state) {
-        return true;
+    pub unsafe fn undeclare(&mut self, state: *mut State) {
+        let old_result: *mut Variable = self.result;
+        self.result = variable_abstractcopy(old_result, state);
+        variable_destroy(old_result);
+        let m = std::mem::replace(&mut self.varmap, Map::new());
+        for (k, v) in m.pairs() {
+            let v = v as *mut Variable;
+            if variable_isparam(v) {
+                self.varmap.set(
+                    dynamic_str(k),
+                    variable_abstractcopy(v, state) as *const libc::c_void,
+                );
+            }
+            variable_destroy(v);
+        }
+        m.destroy();
     }
-    let m = &(*s).varmap;
-    for p in m.values() {
-        let var = p as *mut Variable;
-        if variable_isparam(var) && variable_references(&*var, loc, state) {
+
+    pub unsafe fn get_result(&self) -> &Variable {
+        &*self.result
+    }
+
+    pub unsafe fn get_variable(&self, id: &str) -> *mut Variable {
+        assert_ne!(id, "return");
+        self.varmap.get_by_str(id) as *mut Variable
+    }
+
+    pub unsafe fn references(&self, loc: &Location, state: *mut State) -> bool {
+        if variable_references(&*self.result, loc, state) {
             return true;
         }
+        for p in self.varmap.values() {
+            let var = p as *mut Variable;
+            if variable_isparam(var) && variable_references(&*var, loc, state) {
+                return true;
+            }
+        }
+        false
     }
-    false
+
+    pub fn get_block(&mut self, address: libc::c_int) -> &mut Block {
+        &mut self.blocks[address as usize]
+    }
 }
 
-pub unsafe fn stack_getblock(s: &mut Stack, address: libc::c_int) -> &mut Block {
-    &mut s.frame[address as usize]
-}
-
-pub unsafe fn variable_create(type_: &AstType, stack: &mut Stack, isparam: bool) -> Box<Variable> {
-    let loc = (*stack).new_block();
-    let b = location_auto_getblock(&loc, stack).unwrap();
+pub unsafe fn variable_create(
+    type_: &AstType,
+    frame: &mut StackFrame,
+    isparam: bool,
+) -> Box<Variable> {
+    let loc = frame.new_block();
+    let block_id = location_auto_get_block_id(&loc);
+    let b = &mut frame.blocks[block_id as usize];
     b.install(object_value_create(ast_expr_constant_create(0), None));
     Box::new(Variable {
         type_: ast_type_copy(type_),
@@ -272,7 +299,7 @@ unsafe fn object_or_nothing_str(
     stack: *mut Stack,
     state: *mut State,
 ) -> OwningCStr {
-    let b = location_getstackblock(&*loc, &mut *stack);
+    let b = location_auto_getblock(&*loc, &mut *stack).unwrap();
     if let Some(obj) = b.observe(location_offset(&*loc), state, false) {
         format!("{obj}").into()
     } else {
