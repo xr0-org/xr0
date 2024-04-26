@@ -1715,10 +1715,10 @@ fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
     res
 }
 
-unsafe fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, libc::c_int> {
+fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, libc::c_int> {
     let mut indegrees = InsertionOrderMap::new();
     for (key, deps) in g {
-        if indegrees.get(CStr::from_ptr(key.as_ptr())).is_none() {
+        if indegrees.get(key.as_c_str()).is_none() {
             indegrees.insert(OwningCStr::copy(key), 0);
             for dep_key in deps {
                 if indegrees.get(dep_key.as_cstr()).is_none() {
@@ -1728,7 +1728,7 @@ unsafe fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, li
         }
     }
     for (key, count) in &mut indegrees {
-        if let Some(n_arr) = g.get(CStr::from_ptr(key.as_ptr())) {
+        if let Some(n_arr) = g.get(key.as_cstr()) {
             *count += n_arr.len() as libc::c_int;
         }
     }
