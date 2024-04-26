@@ -1756,7 +1756,7 @@ pub unsafe fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr
     while let Some(curr) = indegree_zero.pop_front() {
         order.push(curr.clone());
         for (key, v) in &g {
-            if string_arr_contains(v, curr.as_ptr()) {
+            if string_arr_contains(v, &curr) {
                 let count = indegrees.get_mut(key.as_c_str()).unwrap();
                 *count -= 1;
                 if *count == 0 {
