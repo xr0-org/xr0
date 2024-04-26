@@ -2,8 +2,6 @@ use crate::ast::*;
 use crate::parser::env::Env;
 use crate::util::{OwningCStr, SemiBox};
 
-type BoxedFunction = *mut AstFunction<'static>;
-
 pub struct Declaration {
     pub name: Option<OwningCStr>,
     pub t: Box<AstType>,
@@ -514,7 +512,7 @@ pub grammar c_parser(env: &Env) for str {
             BlockStatement { abstract_: Some(v), body: Some(c) }
         }
 
-    rule function_definition() -> BoxedFunction =
+    rule function_definition() -> Box<AstFunction<'static>> =
         K(<"axiom">) _ t:declaration_specifiers() _ decl:function_declarator() _ body:block_statement() {
             let mut t = t;
             for _ in 0..decl.ptr_valence {
@@ -525,8 +523,7 @@ pub grammar c_parser(env: &Env) for str {
                 t,
                 decl.decl.name,
                 decl.decl.params,
-                body.abstract_.unwrap_or_else(||
-                                              ast_block_create(vec![], vec![])),
+                body.abstract_.unwrap_or_else(|| ast_block_create(vec![], vec![])),
                 body.body.map(SemiBox::Owned),
             )
         } /
@@ -540,8 +537,7 @@ pub grammar c_parser(env: &Env) for str {
                 t,
                 decl.decl.name,
                 decl.decl.params,
-                body.abstract_.unwrap_or_else(||
-                                              ast_block_create(vec![], vec![])),
+                body.abstract_.unwrap_or_else(|| ast_block_create(vec![], vec![])),
                 body.body.map(SemiBox::Owned),
             )
         } /
@@ -553,8 +549,7 @@ pub grammar c_parser(env: &Env) for str {
                 ast_type_create(AstTypeBase::Void, 0),
                 decl.decl.name,
                 decl.decl.params,
-                body.abstract_.unwrap_or_else(||
-                                              ast_block_create(vec![], vec![])),
+                body.abstract_.unwrap_or_else(|| ast_block_create(vec![], vec![])),
                 body.body.map(SemiBox::Owned),
             )
         }

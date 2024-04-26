@@ -121,26 +121,24 @@ pub unsafe fn pass0(root: &mut Ast, ext: &mut Externals) {
     }
 }
 
-pub unsafe fn pass1(root: &mut Ast, ext: *mut Externals) {
+pub unsafe fn pass1(root: &mut Ast, ext: &Externals) {
     for decl in &mut root.decls {
-        if let Some(f) = ast_externdecl_as_function_ptr(decl) {
-            if !(*f).is_axiom() && !(*f).is_proto() {
+        if let Some(f) = ast_externdecl_as_function(decl) {
+            if !f.is_axiom() && !f.is_proto() {
                 if let Err(err) = ast_function_verify(f, ext) {
                     eprintln!("{}", err.msg);
                     process::exit(1);
                 }
-                vprintln!("qed {}", (*f).name());
+                vprintln!("qed {}", f.name());
             }
         }
     }
 }
 
-pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &mut Externals) {
+pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &Externals) {
     for name in order {
         let f = ext.get_func(name.as_str()).unwrap();
         if !(f.is_axiom() || f.is_proto()) {
-            // XXX FIXME: bad lifetime hack. need lifetime on Externals instead
-            let f = f as *const AstFunction as *mut AstFunction;
             if let Err(err) = ast_function_verify(f, ext) {
                 eprintln!("{}", err.msg);
                 process::exit(1);
@@ -201,9 +199,9 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
         let order = ast_topological_order(&sortfunc_cstr, &mut ext);
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
-        pass_inorder(&order, &mut ext);
+        pass_inorder(&order, &ext);
     } else {
-        pass1(&mut root, &mut ext);
+        pass1(&mut root, &ext);
     }
 
     Ok(())
