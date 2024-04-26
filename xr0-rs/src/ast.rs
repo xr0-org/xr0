@@ -1014,7 +1014,7 @@ unsafe fn alloc_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value>
 unsafe fn dealloc_process(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     let arg = ast_expr_alloc_arg(expr);
     let val = Box::into_raw(ast_expr_eval(arg, state)?);
-    state_dealloc(state, val)?;
+    state_dealloc(state, &*val)?;
     value_destroy(val);
     Ok(ptr::null_mut())
 }
@@ -1098,10 +1098,10 @@ unsafe fn verify_paramspec(
     if arg_obj.is_null() {
         panic!();
     }
-    if !object_hasvalue(param_obj) {
+    if !object_hasvalue(&*param_obj) {
         return Ok(());
     }
-    if !object_hasvalue(arg_obj) {
+    if !object_hasvalue(&*arg_obj) {
         return Err(Error::new("must be rvalue".to_string()));
     }
     verify_paramspec(
@@ -3018,7 +3018,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
     if obj.is_null() {
         panic!();
     }
-    if !object_hasvalue(obj) {
+    if !object_hasvalue(&*obj) {
         let val = Box::into_raw(state_vconst(state, t, Some(name.as_str()), true));
         object_assign(&mut *obj, val);
     }

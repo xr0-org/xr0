@@ -13,9 +13,9 @@ use crate::state::state::{
 use crate::state::State;
 use crate::util::{Error, Result};
 use crate::value::{
-    value_abstractcopy, value_as_location, value_copy, value_destroy, value_into_location,
-    value_ptr_create, value_references, value_referencesheap, value_struct_create,
-    value_struct_member, value_struct_membertype,
+    value_abstractcopy, value_as_location, value_copy, value_into_location, value_ptr_create,
+    value_references, value_referencesheap, value_struct_create, value_struct_member,
+    value_struct_membertype,
 };
 use crate::{AstExpr, AstType, Location, Value};
 
@@ -25,9 +25,10 @@ pub struct Object {
     pub offset: Box<AstExpr>,
 }
 
+#[derive(Clone)]
 pub enum ObjectKind {
     DeallocandRange(Box<Range>),
-    Value(*mut Value), // nullable
+    Value(Option<Box<Value>>),
 }
 
 #[derive(Clone)]
@@ -37,7 +38,6 @@ pub struct Range {
 }
 
 pub unsafe fn object_value_create(offset: Box<AstExpr>, v: Option<Box<Value>>) -> Box<Object> {
-    let v = v.map_or(ptr::null_mut(), Box::into_raw);
     Box::new(Object {
         kind: ObjectKind::Value(v),
         offset,
@@ -55,36 +55,8 @@ pub unsafe fn object_destroy(obj: *mut Object) {
     drop(Box::from_raw(obj));
 }
 
-impl Drop for Object {
-    fn drop(&mut self) {
-        unsafe {
-            match &self.kind {
-                ObjectKind::Value(v) => {
-                    if !(*v).is_null() {
-                        value_destroy(*v);
-                    }
-                }
-                ObjectKind::DeallocandRange(_) => {}
-            }
-        }
-    }
-}
-
 pub fn object_copy(old: &Object) -> Box<Object> {
     Box::new(old.clone())
-}
-
-impl Clone for ObjectKind {
-    fn clone(&self) -> Self {
-        match self {
-            ObjectKind::Value(v) => ObjectKind::Value(if !(*v).is_null() {
-                unsafe { Box::into_raw(value_copy(&**v)) }
-            } else {
-                ptr::null_mut()
-            }),
-            ObjectKind::DeallocandRange(range) => ObjectKind::DeallocandRange(range.clone()),
-        }
-    }
 }
 
 pub unsafe fn object_abstractcopy(old: &Object, s: *mut State) -> Box<Object> {
@@ -92,11 +64,7 @@ pub unsafe fn object_abstractcopy(old: &Object, s: *mut State) -> Box<Object> {
         ObjectKind::DeallocandRange(_) => object_copy(old),
         ObjectKind::Value(v) => object_value_create(
             old.offset.clone(),
-            if !(*v).is_null() {
-                value_abstractcopy(&**v, s)
-            } else {
-                None
-            },
+            v.as_ref().and_then(|v| value_abstractcopy(v, s)),
         ),
     }
 }
@@ -111,13 +79,8 @@ impl Display for Object {
 impl Display for ObjectKind {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            ObjectKind::Value(v) => {
-                if !v.is_null() {
-                    unsafe { write!(f, "{}", &**v) }
-                } else {
-                    Ok(())
-                }
-            }
+            ObjectKind::Value(Some(v)) => write!(f, "{v}"),
+            ObjectKind::Value(None) => Ok(()),
             ObjectKind::DeallocandRange(range) => write!(f, "{range}"),
         }
     }
@@ -125,19 +88,17 @@ impl Display for ObjectKind {
 
 pub unsafe fn object_referencesheap(obj: &Object, s: *mut State) -> bool {
     match &obj.kind {
-        ObjectKind::Value(v) => !(*v).is_null() && value_referencesheap(&**v, s),
-        _ => true,
+        ObjectKind::Value(Some(v)) => value_referencesheap(v, s),
+        ObjectKind::Value(None) => false,
+        ObjectKind::DeallocandRange(_) => true,
     }
 }
 
-pub unsafe fn object_hasvalue(obj: *mut Object) -> bool {
-    match &(*obj).kind {
-        ObjectKind::Value(v) => !(*v).is_null(),
-        _ => false,
-    }
+pub fn object_hasvalue(obj: &Object) -> bool {
+    matches!(obj.kind, ObjectKind::Value(Some(_)))
 }
 
-pub unsafe fn object_isvalue(obj: &Object) -> bool {
+pub fn object_isvalue(obj: &Object) -> bool {
     matches!(obj.kind, ObjectKind::Value(_))
 }
 
@@ -145,12 +106,15 @@ pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
     let ObjectKind::Value(v) = &(*obj).kind else {
         panic!();
     };
-    *v
+    v.as_ref().map_or(ptr::null_mut(), |boxed| {
+        &**boxed as *const Value as *mut Value
+    })
 }
 
 pub unsafe fn object_isdeallocand(obj: &Object, s: *mut State) -> bool {
     match &obj.kind {
-        ObjectKind::Value(v) => !(*v).is_null() && state_isdeallocand(s, value_as_location(&**v)),
+        ObjectKind::Value(None) => false,
+        ObjectKind::Value(Some(v)) => state_isdeallocand(s, value_as_location(v)),
         ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
     }
 }
@@ -158,16 +122,20 @@ pub unsafe fn object_isdeallocand(obj: &Object, s: *mut State) -> bool {
 pub unsafe fn object_references(obj: &Object, loc: &Location, s: *mut State) -> bool {
     match &obj.kind {
         ObjectKind::DeallocandRange(range) => range_references(range, loc, s),
-        ObjectKind::Value(v) => !(*v).is_null() && value_references(*v, loc, s),
+        ObjectKind::Value(None) => false,
+        ObjectKind::Value(Some(v)) => value_references(v, loc, s),
     }
 }
 
 pub unsafe fn object_assign(obj: &mut Object, val: *mut Value) -> *mut Error {
-    if let ObjectKind::Value(v) = &mut obj.kind {
-        *v = val;
-    } else {
+    let ObjectKind::Value(v) = &mut obj.kind else {
         panic!();
-    }
+    };
+    *v = if val.is_null() {
+        None
+    } else {
+        Some(Box::from_raw(val))
+    };
     ptr::null_mut()
 }
 
@@ -279,12 +247,13 @@ pub unsafe fn object_upto(
         return None;
     }
     if e2 {
-        let ObjectKind::Value(v) = &obj.kind else {
+        // Note: Original doesn't null-check the value here; objects can be VALUE with null value.
+        let ObjectKind::Value(Some(v)) = &obj.kind else {
             panic!();
         };
         return Some(object_value_create(
             ast_expr_copy(&obj.offset),
-            Some(value_copy(&**v)),
+            Some(value_copy(v)),
         ));
     }
 
@@ -314,13 +283,14 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
         return None;
     }
     if e1 {
-        let ObjectKind::Value(v) = &obj.kind else {
+        // Note: Original doesn't null-check the value here; objects can be VALUE with null value.
+        let ObjectKind::Value(Some(v)) = &obj.kind else {
             panic!();
         };
         ast_expr_destroy(up);
         return Some(object_value_create(
             ast_expr_copy(incl_lw),
-            Some(value_copy(&**v)),
+            Some(value_copy(&v)),
         ));
     }
     Some(object_range_create(
@@ -333,8 +303,10 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
 }
 
 pub unsafe fn object_dealloc(obj: &Object, s: *mut State) -> Result<()> {
+    // Note: Original doesn't handle the possibility of Value(None) here.
     match &obj.kind {
-        ObjectKind::Value(v) => state_dealloc(s, *v),
+        ObjectKind::Value(Some(v)) => state_dealloc(s, v),
+        ObjectKind::Value(None) => panic!(),
         ObjectKind::DeallocandRange(range) => range_dealloc(range, s),
     }
 }
@@ -387,7 +359,7 @@ pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
     // FIXME - this is clearly insane, take Range by value
     state_dealloc(
         s,
-        Box::into_raw(value_ptr_create(Box::from_raw(
+        &*Box::into_raw(value_ptr_create(Box::from_raw(
             &*r.loc as *const Location as *mut Location,
         ))),
     )

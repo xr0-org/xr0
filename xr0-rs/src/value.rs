@@ -434,8 +434,8 @@ pub unsafe fn value_as_literal(v: &Value) -> *mut AstExpr {
     Box::into_raw(ast_expr_literal_create(s.clone()))
 }
 
-pub unsafe fn value_references(v: *mut Value, loc: &Location, s: *mut State) -> bool {
-    match &(*v).kind {
+pub unsafe fn value_references(v: &Value, loc: &Location, s: *mut State) -> bool {
+    match &v.kind {
         ValueKind::DefinitePtr(vloc) => location_references(vloc, loc, s),
         ValueKind::Struct(sv) => struct_references(sv, loc, s),
         _ => false,
@@ -445,7 +445,7 @@ pub unsafe fn value_references(v: *mut Value, loc: &Location, s: *mut State) -> 
 unsafe fn struct_references(sv: &StructValue, loc: &Location, s: *mut State) -> bool {
     sv.m.values().any(|&obj| {
         let val: *mut Value = object_as_value(obj);
-        !val.is_null() && value_references(val, loc, s)
+        !val.is_null() && value_references(&*val, loc, s)
     })
 }
 
