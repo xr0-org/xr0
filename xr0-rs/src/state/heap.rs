@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, HashMap};
 
 use super::{Block, State};
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
-use crate::state::block::block_undeclare;
 use crate::state::location::location_create_dynamic;
 use crate::state::state::state_references;
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
@@ -89,10 +88,10 @@ impl Heap {
     }
 
     pub unsafe fn undeclare(&mut self, s: *mut State) {
-        // DANGER: s aliases h and `block_undeclare` actually accesses h.
-        for i in 0..self.blocks.len() {
-            if !self.blocks[i].freed {
-                block_undeclare(&mut *self.blocks[i].block, s);
+        // XXX FIXME: s aliases h and `Block::undeclare` actually accesses h.
+        for block in &mut self.blocks {
+            if !block.freed {
+                block.block.undeclare(s);
             }
         }
     }

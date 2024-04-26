@@ -5,7 +5,6 @@ use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type,
 };
 use crate::object::{object_as_value, object_assign, object_isvalue, object_value_create};
-use crate::state::block::block_observe;
 use crate::state::location::{
     location_auto_getblock, location_copy, location_create_automatic, location_destroy,
     location_getstackblock, location_offset, location_references,
@@ -281,7 +280,7 @@ unsafe fn object_or_nothing_str(
     state: *mut State,
 ) -> OwningCStr {
     let b = location_getstackblock(&*loc, &mut *stack);
-    let obj: *mut Object = block_observe(b, location_offset(&*loc), state, false);
+    let obj: *mut Object = b.observe(location_offset(&*loc), state, false);
     if !obj.is_null() {
         return OwningCStr::from(format!("{}", &*obj));
     }

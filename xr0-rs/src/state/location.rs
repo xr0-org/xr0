@@ -2,7 +2,6 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
-use crate::state::block::{block_range_aredeallocands, block_range_dealloc, block_references};
 use crate::state::stack::{stack_getblock, stack_getframe};
 use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
 use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
@@ -173,7 +172,7 @@ pub unsafe fn location_references(l1: &Location, l2: &Location, s: *mut State) -
     }
     match state_getblock(&mut *s, l1) {
         None => false,
-        Some(b) => block_references(b, l2, s),
+        Some(b) => b.references(l2, s),
     }
 }
 
@@ -242,11 +241,11 @@ pub unsafe fn location_range_dealloc(
     let Some(b) = state_getblock(&mut *state, loc) else {
         return Err(Error::new("cannot get block".to_string()));
     };
-    if !block_range_aredeallocands(b, lw, up, state) {
+    if !b.range_aredeallocands(lw, up, state) {
         println!("block: {b}");
         println!("lw: {lw}, up: {up}");
         debug_assert!(false);
         return Err(Error::new("some values not allocated".to_string()));
     }
-    block_range_dealloc(b, lw, up, state)
+    b.range_dealloc(lw, up, state)
 }

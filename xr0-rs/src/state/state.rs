@@ -1,6 +1,5 @@
 use std::ptr;
 
-use super::block::{block_observe, block_range_alloc, block_range_aredeallocands};
 use super::location::{
     location_copy, location_create_dereferencable, location_create_static, location_dealloc,
     location_getblock, location_offset, location_range_dealloc, location_toclump, location_toheap,
@@ -252,7 +251,7 @@ pub unsafe fn state_get(
             assert!(loc.type_is_dynamic() || loc.type_is_dereferencable());
             Ok(ptr::null_mut())
         }
-        Some(b) => Ok(block_observe(b, location_offset(loc), state, constructive)),
+        Some(b) => Ok(b.observe(location_offset(loc), state, constructive)),
     }
 }
 
@@ -353,7 +352,7 @@ pub unsafe fn state_range_alloc(
         panic!();
     }
     // XXX FIXME: b is mutably borrowed from state and now we're going to mutate the heap
-    block_range_alloc(b, lw, up, &mut (*state).heap)
+    b.range_alloc(lw, up, &mut (*state).heap)
 }
 
 pub unsafe fn state_alloc(state: *mut State) -> Box<Value> {
@@ -418,7 +417,7 @@ pub unsafe fn state_range_aredeallocands(
     )
     .unwrap();
     match b {
-        Some(b) => block_range_aredeallocands(&*b, lw, up, state),
+        Some(b) => b.range_aredeallocands(lw, up, state),
         None => false,
     }
 }
