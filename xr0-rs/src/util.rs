@@ -224,10 +224,10 @@ impl Error {
     }
 }
 
-pub unsafe fn string_arr_contains(arr: &[*mut libc::c_char], s: *mut libc::c_char) -> bool {
+pub unsafe fn string_arr_contains(arr: &[OwningCStr], s: *mut libc::c_char) -> bool {
     let mut i = 0;
     while i < arr.len() {
-        if strcmp(s, arr[i]) == 0 as libc::c_int {
+        if strcmp(s, arr[i].as_ptr()) == 0 as libc::c_int {
             return true;
         }
         i += 1;

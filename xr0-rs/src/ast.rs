@@ -21,8 +21,8 @@ use crate::state::state::{
 };
 use crate::state::State;
 use crate::util::{
-    dynamic_str, strbuilder_build, strbuilder_create, string_arr_contains, Error,
-    InsertionOrderMap, Map, OwningCStr, Result, SemiBox, StrBuilder,
+    strbuilder_build, strbuilder_create, string_arr_contains, Error, InsertionOrderMap, Map,
+    OwningCStr, Result, SemiBox, StrBuilder,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -1720,9 +1720,9 @@ unsafe fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, li
     for (key, deps) in g {
         if indegrees.get(CStr::from_ptr(key.as_ptr())).is_none() {
             indegrees.insert(OwningCStr::copy(key), 0);
-            for &dep_key in deps {
-                if indegrees.get(CStr::from_ptr(dep_key)).is_none() {
-                    indegrees.insert(OwningCStr::new(dynamic_str(dep_key)), 0);
+            for dep_key in deps {
+                if indegrees.get(dep_key.as_cstr()).is_none() {
+                    indegrees.insert(dep_key.clone(), 0);
                 }
             }
         }
@@ -3137,10 +3137,10 @@ unsafe fn split_path_verify(
     Ok(())
 }
 
-type FuncGraph = InsertionOrderMap<CString, Vec<*mut libc::c_char>>;
+type FuncGraph = InsertionOrderMap<CString, Vec<OwningCStr>>;
 
 unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, ext: &Externals) {
-    let mut local_dedup = Map::new();
+    let mut local_dedup = vec![];
     if !(dedup.get(fname.as_ptr())).is_null() {
         return;
     }
@@ -3158,15 +3158,15 @@ unsafe fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut Map, fname: &CStr, e
         let farr = ast_stmt_getfuncs(stmt);
 
         for func in farr {
-            if (local_dedup.get(func.as_ptr())).is_null() {
+            if !local_dedup.contains(&func) {
+                local_dedup.push(func.clone());
                 let func = func.into_ptr(); // transfer of ownership (it's going into val)
                 let f = ext
                     .get_func(CStr::from_ptr(func).to_str().unwrap())
                     .unwrap();
                 if !f.is_axiom {
-                    val.push(func);
+                    val.push(OwningCStr::new(func));
                 }
-                local_dedup.set(func, 1 as libc::c_int as *mut libc::c_void);
                 recurse_buildgraph(g, dedup, CStr::from_ptr(func), ext);
             }
         }
