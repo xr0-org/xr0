@@ -282,7 +282,7 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
         ast_expr_destroy(up);
         return Some(object_value_create(
             ast_expr_copy(incl_lw),
-            Some(value_copy(&v)),
+            Some(value_copy(v)),
         ));
     }
     Some(object_range_create(

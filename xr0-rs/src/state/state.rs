@@ -375,7 +375,7 @@ pub unsafe fn state_range_dealloc(
     let Some(arr_val) = object_as_value(&*obj) else {
         return Err(Error::new("no value".to_string()));
     };
-    let deref = value_as_location(&*arr_val);
+    let deref = value_as_location(arr_val);
     location_range_dealloc(deref, lw, up, state)
 }
 

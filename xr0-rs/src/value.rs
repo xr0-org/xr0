@@ -185,7 +185,7 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> Box<Value> {
         let field = ast_variable_name(var);
         let obj = *sv.m.get(field.as_str()).unwrap();
         if let Some(obj_value) = object_as_value(&*obj) {
-            if value_issync(&*obj_value) {
+            if value_issync(obj_value) {
                 object_assign(
                     &mut *obj,
                     Some(value_sync_create(ast_expr_member_create(
@@ -363,7 +363,7 @@ pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
 unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
     for &obj in sv.m.values() {
         if let Some(val) = object_as_value(&*obj) {
-            if value_referencesheap(&*val, s) {
+            if value_referencesheap(val, s) {
                 return true;
             }
         }

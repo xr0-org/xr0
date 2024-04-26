@@ -1080,7 +1080,7 @@ unsafe fn verify_paramspec(
     if !state_islval(arg_state, arg) {
         return Err(Error::new("must be lvalue".to_string()));
     }
-    if state_isalloc(param_state, param) as libc::c_int != 0 && !state_isalloc(arg_state, arg) {
+    if state_isalloc(param_state, param) && !state_isalloc(arg_state, arg) {
         return Err(Error::new("must be heap allocated".to_string()));
     }
     let param_obj = state_get(param_state, value_as_location(param), false)?;
