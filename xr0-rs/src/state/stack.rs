@@ -50,7 +50,7 @@ pub unsafe fn stack_create(
         id: if !prev.is_null() { (*prev).id + 1 } else { 0 },
         result: ptr::null_mut(),
     });
-    let v = variable_create(return_type, &mut *stack, false);
+    let v = variable_create(return_type, &mut stack, false);
     stack.result = Box::into_raw(v);
     Box::into_raw(stack)
 }
@@ -60,10 +60,10 @@ pub unsafe fn stack_getframe(s: &mut Stack, frame: libc::c_int) -> Option<&mut S
     if s.id == frame {
         return Some(s);
     }
-    if ((*s).prev).is_null() {
+    if s.prev.is_null() {
         return None;
     }
-    stack_getframe(&mut *(*s).prev, frame)
+    stack_getframe(&mut *s.prev, frame)
 }
 
 pub unsafe fn stack_destroy(stack: *mut Stack) {

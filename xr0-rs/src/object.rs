@@ -205,7 +205,7 @@ pub unsafe fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool
 
 pub unsafe fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     let lw: *mut AstExpr = &*obj.offset as *const AstExpr as *mut AstExpr;
-    let up: *mut AstExpr = object_upper(&*obj);
+    let up: *mut AstExpr = object_upper(obj);
     let of: *mut AstExpr = offset as *const AstExpr as *mut AstExpr;
     // Note: Original leaks the expressions to avoid double-freeing subexpressions.
     let lower_bound_expr = ast_expr_le_create(Box::from_raw(lw), Box::from_raw(of));
