@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::ffi::CStr;
 use std::fmt::{self, Display, Formatter};
 
-use crate::util::{dynamic_str, Map, OwningCStr};
+use crate::util::OwningCStr;
 
 #[derive(Clone)]
 pub enum MathExpr {
@@ -16,24 +17,29 @@ pub enum MathAtom {
     Variable(OwningCStr),
 }
 
-pub struct Tally {
-    pub map: Box<Map>,
+type Map<'a> = HashMap<&'a str, i64>;
+
+/// An integer expression of the form `v0 * k0 + v1 * k1 + ... + num`.
+pub struct Tally<'a> {
+    pub map: Map<'a>,
     pub num: libc::c_int,
 }
 
-pub unsafe fn math_eq(e1: &MathExpr, e2: &MathExpr) -> bool {
+pub fn math_eq(e1: &MathExpr, e2: &MathExpr) -> bool {
+    // Note: Inefficient implementation in the original.
     math_le(e1, e2) && math_le(e2, e1)
 }
 
-pub unsafe fn math_lt(e1: &MathExpr, e2: &MathExpr) -> bool {
+pub fn math_lt(e1: &MathExpr, e2: &MathExpr) -> bool {
+    // Note: Inefficient implementation in the original.
     math_le(e1, e2) && !math_eq(e1, e2)
 }
 
-pub unsafe fn math_gt(e1: &MathExpr, e2: &MathExpr) -> bool {
+pub fn math_gt(e1: &MathExpr, e2: &MathExpr) -> bool {
     math_lt(e2, e1)
 }
 
-pub unsafe fn math_ge(e1: &MathExpr, e2: &MathExpr) -> bool {
+pub fn math_ge(e1: &MathExpr, e2: &MathExpr) -> bool {
     math_le(e2, e1)
 }
 
@@ -47,7 +53,7 @@ fn math_expr_fromint(i: libc::c_int) -> Box<MathExpr> {
 }
 
 #[allow(dead_code)]
-unsafe fn math_expr_fromvartally(id: &CStr, num: libc::c_int) -> Box<MathExpr> {
+fn math_expr_fromvartally(id: &CStr, num: libc::c_int) -> Box<MathExpr> {
     assert_ne!(num, 0);
     if num < 0 {
         return Box::new(MathExpr::Neg(math_expr_fromvartally(id, -num)));
@@ -64,10 +70,12 @@ unsafe fn math_expr_fromvartally(id: &CStr, num: libc::c_int) -> Box<MathExpr> {
     e
 }
 
-pub unsafe fn math_le(e1: &MathExpr, e2: &MathExpr) -> bool {
+pub fn math_le(e1: &MathExpr, e2: &MathExpr) -> bool {
     let d1 = tally(e1);
     let d2 = tally(e2);
-    variable_tally_eq(d1.map, d2.map) && d1.num <= d2.num
+
+    // Note: Original used a function, `variable_tally_eq`, which was quite buggy.
+    d1.map == d2.map && d1.num <= d2.num
 }
 
 impl Display for MathExpr {
@@ -85,10 +93,7 @@ impl Display for MathExpr {
 }
 
 #[allow(dead_code)]
-unsafe fn math_expr_nullablesum(
-    e1: Option<Box<MathExpr>>,
-    e2: Option<Box<MathExpr>>,
-) -> Box<MathExpr> {
+fn math_expr_nullablesum(e1: Option<Box<MathExpr>>, e2: Option<Box<MathExpr>>) -> Box<MathExpr> {
     match (e1, e2) {
         (None, None) => math_expr_fromint(0),
         (None, Some(e2)) => e2,
@@ -97,32 +102,7 @@ unsafe fn math_expr_nullablesum(
     }
 }
 
-#[allow(dead_code)]
-pub unsafe fn math_expr_simplify(raw: &MathExpr) -> Box<MathExpr> {
-    let t = tally(raw);
-    let m = &t.map;
-    let mut expr: Option<Box<MathExpr>> = None;
-    for (k, v) in m.pairs() {
-        let v = v as isize;
-        if v != 0 {
-            expr = Some(math_expr_nullablesum(
-                expr,
-                Some(math_expr_fromvartally(
-                    CStr::from_ptr(k as *mut libc::c_char),
-                    v as libc::c_int,
-                )),
-            ));
-        }
-    }
-    let num: Option<Box<MathExpr>> = if t.num != 0 {
-        Some(math_expr_fromint(t.num))
-    } else {
-        None
-    };
-    math_expr_nullablesum(expr, num)
-}
-
-unsafe fn tally(e: &MathExpr) -> Tally {
+fn tally(e: &MathExpr) -> Tally {
     match e {
         MathExpr::Atom(a) => atom_tally(a),
         MathExpr::Sum(e1, e2) => {
@@ -137,45 +117,34 @@ unsafe fn tally(e: &MathExpr) -> Tally {
     }
 }
 
-unsafe fn map_sum(m1: Box<Map>, m2: Box<Map>) -> Box<Map> {
-    let mut m = Map::new();
-    for (k, v) in m1.pairs() {
-        m.set(dynamic_str(k), v);
+fn map_sum<'a>(mut m1: Map<'a>, m2: Map<'a>) -> Map<'a> {
+    use std::collections::hash_map::Entry;
+    for (k, v) in m2.into_iter() {
+        match m1.entry(k) {
+            Entry::Vacant(e) => {
+                e.insert(v);
+            }
+            Entry::Occupied(mut e) => {
+                let sum = *e.get() + v;
+                if sum == 0 {
+                    e.remove();
+                } else {
+                    e.insert(sum);
+                }
+            }
+        }
     }
-    for (k, v) in m2.pairs() {
-        // yolo
-        let val = (m.get(k) as isize).wrapping_add(v as isize) as *mut libc::c_void;
-        m.set(dynamic_str(k), val);
-    }
-    m2.destroy();
-    m1.destroy();
-    m
+    m1
 }
 
-unsafe fn neg_tally(e: &MathExpr) -> Tally {
+fn neg_tally(e: &MathExpr) -> Tally {
     let mut r = tally(e);
-    let m = &mut r.map;
-    for (_, v) in m.pairs_mut() {
-        let val = (*v as isize).wrapping_neg();
-        *v = val as *mut libc::c_void;
+    for v in r.map.values_mut() {
+        let val = (*v).wrapping_neg();
+        *v = val;
     }
     r.num = r.num.wrapping_neg();
     r
-}
-
-unsafe fn variable_tally_eq(m1: Box<Map>, m2: Box<Map>) -> bool {
-    // Note: Bug in the original.
-    let mut res = true;
-    for key in m1.keys() {
-        if m1.get(key) != m2.get(key) {
-            res = false;
-            break;
-        }
-    }
-    res = res && m1.len() == m2.len();
-    m2.destroy();
-    m1.destroy();
-    res
 }
 
 impl Display for MathAtom {
@@ -187,21 +156,21 @@ impl Display for MathAtom {
     }
 }
 
-unsafe fn atom_tally(a: &MathAtom) -> Tally {
+fn atom_tally(a: &MathAtom) -> Tally {
     match a {
         MathAtom::Nat(i) => Tally {
             map: Map::new(),
             num: *i as libc::c_int,
         },
         MathAtom::Variable(id) => Tally {
-            map: map_fromvar(id.clone()),
+            map: map_fromvar(id.as_str()),
             num: 0 as libc::c_int,
         },
     }
 }
 
-unsafe fn map_fromvar(id: OwningCStr) -> Box<Map> {
+fn map_fromvar(id: &str) -> Map {
     let mut m = Map::new();
-    m.set(id.into_ptr(), 1usize as *mut libc::c_void);
+    m.insert(id, 1);
     m
 }

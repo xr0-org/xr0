@@ -148,20 +148,12 @@ impl Map {
         *self.entry.offset((self.n - 1 as libc::c_int) as isize) = entry_create(key, value);
     }
 
-    pub fn len(&self) -> libc::c_int {
-        self.n
-    }
-
     fn table(&self) -> &[Entry] {
         if self.n == 0 {
             &[]
         } else {
             unsafe { std::slice::from_raw_parts(self.entry, self.n as usize) }
         }
-    }
-
-    pub fn keys(&self) -> impl Iterator<Item = *const libc::c_char> + '_ {
-        self.table().iter().map(|e| e.key as *const libc::c_char)
     }
 
     pub fn values(&self) -> impl Iterator<Item = *const libc::c_void> + '_ {
@@ -172,19 +164,6 @@ impl Map {
         self.table()
             .iter()
             .map(|e| (e.key as *const libc::c_char, e.value))
-    }
-
-    pub fn pairs_mut(
-        &mut self,
-    ) -> impl Iterator<Item = (*const libc::c_char, &'_ mut *const libc::c_void)> + '_ {
-        let table = if self.n == 0 {
-            &mut []
-        } else {
-            unsafe { std::slice::from_raw_parts_mut(self.entry, self.n as usize) }
-        };
-        table
-            .iter_mut()
-            .map(|e| (e.key as *const libc::c_char, &mut e.value))
     }
 }
 

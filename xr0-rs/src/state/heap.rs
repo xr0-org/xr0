@@ -177,7 +177,12 @@ impl VConst {
         strbuilder_build(b)
     }
 
-    pub unsafe fn eval(&self, e: &AstExpr) -> bool {
+    /// Evaluate a boolean expression. This works only for comparisons of linear polynomial integer
+    /// expressions, like `x < 0` or `x + y == z`.
+    ///
+    /// # Panics
+    /// If the expression is not of a supported form.
+    pub fn eval(&self, e: &AstExpr) -> bool {
         ast_expr_matheval(e)
     }
 }

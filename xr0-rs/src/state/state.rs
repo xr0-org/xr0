@@ -435,7 +435,7 @@ pub unsafe fn state_references(s: *mut State, loc: &Location) -> bool {
     stack_references((*s).stack, loc, s)
 }
 
-pub unsafe fn state_eval(s: &State, e: &AstExpr) -> bool {
+pub fn state_eval(s: &State, e: &AstExpr) -> bool {
     s.vconst.eval(e)
 }
 

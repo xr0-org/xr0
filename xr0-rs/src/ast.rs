@@ -408,7 +408,7 @@ unsafe fn rangeprocess_alloc(
     state_range_alloc(state, obj, lw, up)
 }
 
-pub unsafe fn ast_expr_matheval(e: &AstExpr) -> bool {
+pub fn ast_expr_matheval(e: &AstExpr) -> bool {
     match &e.kind {
         AstExprKind::Binary(binary) => {
             let e1 = math_expr(&binary.e1);
@@ -448,7 +448,7 @@ fn binary_e2(e2: &AstExpr, op: AstBinaryOp) -> Box<MathExpr> {
     }
 }
 
-unsafe fn eval_prop(e1: &MathExpr, op: AstBinaryOp, e2: &MathExpr) -> bool {
+fn eval_prop(e1: &MathExpr, op: AstBinaryOp, e2: &MathExpr) -> bool {
     match op {
         AstBinaryOp::Eq => math_eq(e1, e2),
         AstBinaryOp::Ne => !math_eq(e1, e2),
