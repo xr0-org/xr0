@@ -177,28 +177,32 @@ impl Block {
         let Some(up_index) = object_arr_index_upperincl(&self.arr, up, &*s) else {
             return Err(Error::new("upper bound not allocated".to_string()));
         };
-        let n = self.arr.len();
+
         // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`. I
         // don't know why it isn't a double free.
+        #[allow(unused_variables)]
         let upto = object_upto(&self.arr[lw_index], lw as *const AstExpr as *mut AstExpr, s);
+        #[allow(unused_variables)]
         let from = object_from(&self.arr[up_index], up, s);
-        let mut new = self.arr[..lw_index].to_vec();
-        if let Some(upto) = upto {
-            // Note: Possibly appending so that they'll be destroyed? But then self.arr is overwritten without destroying it.
-            self.arr.push(upto);
+
+        // Retain `arr[0..lw_index]`, replace the range `arr[lw_index..=up_index]` with `upto` and `from`,
+        // then retain `arr[up_index + 1..]`.
+        let mut tail = self.arr.split_off(up_index + 1);
+        for obj in self.arr.drain(lw_index..=up_index) {
+            object_dealloc(&obj, s)?;
         }
-        if let Some(from) = from {
-            self.arr.push(from);
-        }
-        for obj in self.arr.drain(up_index + 1..n) {
-            // Note: Original uses `obj` after `object_arr_append` which might invalidate it. XXX BIG point
-            // in favor of Rust.
-            new.push(obj);
-        }
-        for i in lw_index..=up_index {
-            object_dealloc(&self.arr[i], s)?;
-        }
-        self.arr = new;
+        // Note: Original pushes these to `self.arr` instead of `new` so that they are lost when
+        // `self.arr` is overwritten with `new`. Bug in original, I'm pretty sure. Interestingly,
+        // Rust would have caught this, because the original then uses a pointer to the original
+        // array `obj` after using `object_arr_append` which invalidates that pointer. This is an
+        // example of how Rust's restrictions on aliasing are actually helpful.
+        // if let Some(upto) = upto {
+        //     self.arr.push(upto);
+        // }
+        // if let Some(from) = from {
+        //     self.arr.push(from);
+        // }
+        self.arr.append(&mut tail);
         Ok(())
     }
 
