@@ -211,7 +211,7 @@ pub unsafe fn state_islval(state: *mut State, v: &Value) -> bool {
     state_get(state, loc, true).unwrap();
     location_tostatic(loc, &(*state).static_memory)
         || location_toheap(loc, &mut (*state).heap)
-        || location_tostack(loc, (*state).stack)
+        || location_tostack(loc, &mut *(*state).stack)
         || location_toclump(loc, &mut (*state).clump)
 }
 

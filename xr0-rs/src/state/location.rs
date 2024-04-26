@@ -144,13 +144,13 @@ pub fn location_tostatic(loc: &Location, sm: &StaticMemory) -> bool {
     type_equal && sm.has_block(loc.block)
 }
 
-pub unsafe fn location_toheap(loc: &Location, h: *mut Heap) -> bool {
+pub fn location_toheap(loc: &Location, h: &mut Heap) -> bool {
     let type_equal = matches!(loc.kind, LocationKind::Dynamic);
     let b = (*h).get_block(loc.block);
     type_equal && b.is_some()
 }
 
-pub unsafe fn location_tostack(loc: &Location, _s: *mut Stack) -> bool {
+pub fn location_tostack(loc: &Location, _s: &mut Stack) -> bool {
     // Note: Original adds a null check that can't fail.
     matches!(loc.kind, LocationKind::Automatic { .. })
 }
