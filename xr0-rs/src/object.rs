@@ -1,3 +1,4 @@
+use std::fmt::{self, Display, Formatter};
 use std::ptr;
 
 use crate::ast::{
@@ -10,14 +11,15 @@ use crate::state::state::{
     state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
 };
 use crate::state::State;
-use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
+use crate::util::{Error, Result};
 use crate::value::{
     value_abstractcopy, value_as_location, value_copy, value_destroy, value_into_location,
-    value_ptr_create, value_references, value_referencesheap, value_str, value_struct_create,
+    value_ptr_create, value_references, value_referencesheap, value_struct_create,
     value_struct_member, value_struct_membertype,
 };
-use crate::{strbuilder_write, AstExpr, AstType, Location, Value};
+use crate::{AstExpr, AstType, Location, Value};
 
+#[derive(Clone)]
 pub struct Object {
     pub kind: ObjectKind,
     pub offset: Box<AstExpr>,
@@ -67,25 +69,28 @@ impl Drop for Object {
     }
 }
 
-pub unsafe fn object_copy(old: *mut Object) -> Box<Object> {
-    Box::new(Object {
-        kind: match &(*old).kind {
+pub fn object_copy(old: &Object) -> Box<Object> {
+    Box::new(old.clone())
+}
+
+impl Clone for ObjectKind {
+    fn clone(&self) -> Self {
+        match self {
             ObjectKind::Value(v) => ObjectKind::Value(if !(*v).is_null() {
-                Box::into_raw(value_copy(&**v))
+                unsafe { Box::into_raw(value_copy(&**v)) }
             } else {
                 ptr::null_mut()
             }),
             ObjectKind::DeallocandRange(range) => ObjectKind::DeallocandRange(range.clone()),
-        },
-        offset: ast_expr_copy(&(*old).offset),
-    })
+        }
+    }
 }
 
-pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> Box<Object> {
-    match &(*old).kind {
+pub unsafe fn object_abstractcopy(old: &Object, s: *mut State) -> Box<Object> {
+    match &old.kind {
         ObjectKind::DeallocandRange(_) => object_copy(old),
         ObjectKind::Value(v) => object_value_create(
-            ast_expr_copy(&(*old).offset),
+            old.offset.clone(),
             if !(*v).is_null() {
                 value_abstractcopy(&**v, s).map_or(ptr::null_mut(), Box::into_raw)
             } else {
@@ -95,25 +100,25 @@ pub unsafe fn object_abstractcopy(old: *mut Object, s: *mut State) -> Box<Object
     }
 }
 
-pub unsafe fn object_str(obj: *mut Object) -> OwningCStr {
-    let mut b = strbuilder_create();
-    strbuilder_write!(b, "{{");
-    strbuilder_write!(b, "{}:", &*(*obj).offset);
-    strbuilder_write!(b, "<{}>", inner_str(obj));
-    strbuilder_write!(b, "}}");
-    strbuilder_build(b)
+impl Display for Object {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let Object { kind, offset } = self;
+        write!(f, "{{{offset}:<{kind}>}}")
+    }
 }
 
-unsafe fn inner_str(obj: *mut Object) -> OwningCStr {
-    match &(*obj).kind {
-        ObjectKind::Value(v) => {
-            if !(*v).is_null() {
-                value_str(&**v)
-            } else {
-                OwningCStr::empty()
+impl Display for ObjectKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            ObjectKind::Value(v) => {
+                if !v.is_null() {
+                    unsafe { write!(f, "{}", &**v) }
+                } else {
+                    Ok(())
+                }
             }
+            ObjectKind::DeallocandRange(range) => write!(f, "{range}"),
         }
-        ObjectKind::DeallocandRange(range) => range_str(range),
     }
 }
 
@@ -367,10 +372,11 @@ pub fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {
     Box::new(Range { size, loc })
 }
 
-pub fn range_str(r: &Range) -> OwningCStr {
-    let mut b = strbuilder_create();
-    strbuilder_write!(b, "virt:{}@{}", r.size, r.loc);
-    strbuilder_build(b)
+impl Display for Range {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Range { size, loc } = self;
+        write!(f, "virt:{size}@{loc}")
+    }
 }
 
 pub fn range_size(r: &Range) -> &AstExpr {

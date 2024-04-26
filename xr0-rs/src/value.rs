@@ -219,7 +219,7 @@ unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, *mut Obj
 
 unsafe fn copy_members(old: &HashMap<String, *mut Object>) -> HashMap<String, *mut Object> {
     old.iter()
-        .map(|(k, &v)| (k.clone(), Box::into_raw(object_copy(v))))
+        .map(|(k, &v)| (k.clone(), Box::into_raw(object_copy(&*v))))
         .collect()
 }
 
@@ -235,7 +235,7 @@ unsafe fn abstract_copy_members(
     s: *mut State,
 ) -> HashMap<String, *mut Object> {
     old.iter()
-        .map(|(k, &v)| (k.clone(), Box::into_raw(object_abstractcopy(v, s))))
+        .map(|(k, &v)| (k.clone(), Box::into_raw(object_abstractcopy(&*v, s))))
         .collect()
 }
 

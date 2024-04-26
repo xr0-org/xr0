@@ -8,8 +8,8 @@ use crate::ast::{
 use crate::object::{
     object_abstractcopy, object_arr_index, object_arr_index_upperincl, object_contig_precedes,
     object_copy, object_dealloc, object_destroy, object_from, object_isdeallocand, object_isvalue,
-    object_lower, object_range_create, object_references, object_referencesheap, object_str,
-    object_upper, object_upto, object_value_create, range_create,
+    object_lower, object_range_create, object_references, object_referencesheap, object_upper,
+    object_upto, object_value_create, range_create,
 };
 use crate::state::state::{state_alloc, state_eval};
 use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
@@ -40,7 +40,7 @@ impl Clone for Block {
                 .arr
                 .iter()
                 .copied()
-                .map(|obj| unsafe { Box::into_raw(object_copy(obj)) })
+                .map(|obj| unsafe { Box::into_raw(object_copy(&*obj)) })
                 .collect(),
         }
     }
@@ -50,8 +50,7 @@ pub unsafe fn block_str(block: &Block) -> OwningCStr {
     let mut b = strbuilder_create();
     let n = block.arr.len();
     for (i, &obj) in block.arr.iter().enumerate() {
-        let s = object_str(obj);
-        strbuilder_write!(b, "{s}{}", if i + 1 < n { ", " } else { "" });
+        strbuilder_write!(b, "{}{}", &*obj, if i + 1 < n { ", " } else { "" });
     }
     strbuilder_build(b)
 }
@@ -229,7 +228,7 @@ pub unsafe fn block_undeclare(b: *mut Block, s: *mut State) {
     let mut new = vec![];
     for &obj in &(*b).arr {
         if object_referencesheap(obj, s) {
-            new.push(Box::into_raw(object_abstractcopy(obj, s)));
+            new.push(Box::into_raw(object_abstractcopy(&*obj, s)));
         }
     }
     (*b).arr = new;
