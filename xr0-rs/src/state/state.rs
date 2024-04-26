@@ -5,7 +5,6 @@ use super::location::{
     location_getblock, location_offset, location_range_dealloc, location_toclump, location_toheap,
     location_tostack, location_tostatic, location_with_offset,
 };
-use super::stack::{variable_location, variable_type};
 use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
 use crate::ast::{
     ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
@@ -246,12 +245,11 @@ pub unsafe fn state_getblock<'s>(state: &'s mut State, loc: &Location) -> Option
 
 pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
     let v = (*state).stack.get_result();
-    state_get(state, variable_location(v), true).unwrap()
+    state_get(state, v.location(), true).unwrap()
 }
 
 unsafe fn state_getresulttype(state: &State) -> &AstType {
-    let v = state.stack.get_result();
-    variable_type(v)
+    state.stack.get_result().type_()
 }
 
 pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType {
@@ -262,7 +260,7 @@ pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType
     if v.is_null() {
         panic!();
     }
-    variable_type(&*v)
+    (*v).type_()
 }
 
 pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
@@ -275,7 +273,7 @@ pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
     if v.is_null() {
         panic!();
     }
-    value_ptr_create(location_copy(variable_location(&*v)))
+    value_ptr_create(location_copy((*v).location()))
 }
 
 pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
@@ -286,7 +284,7 @@ pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
     if v.is_null() {
         panic!();
     }
-    state_get(state, variable_location(&*v), true).unwrap()
+    state_get(state, (*v).location(), true).unwrap()
 }
 
 pub unsafe fn state_deref(

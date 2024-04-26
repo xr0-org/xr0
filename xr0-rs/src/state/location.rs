@@ -95,10 +95,6 @@ pub unsafe fn location_transfigure(loc: &Location, compare: *mut State) -> *mut 
     }
 }
 
-pub unsafe fn location_destroy(loc: *mut Location) {
-    drop(Box::from_raw(loc))
-}
-
 impl Display for Location {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.kind {

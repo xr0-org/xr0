@@ -6,8 +6,8 @@ use crate::ast::{
 };
 use crate::object::{object_as_value, object_assign, object_isvalue, object_value_create};
 use crate::state::location::{
-    location_auto_get_block_id, location_auto_getblock, location_copy, location_create_automatic,
-    location_destroy, location_offset, location_references,
+    location_auto_get_block_id, location_auto_getblock, location_create_automatic, location_offset,
+    location_references,
 };
 use crate::state::state::state_get;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
@@ -28,10 +28,11 @@ pub struct StackFrame {
     pub id: libc::c_int,
 }
 
+#[derive(Clone)]
 pub struct Variable {
-    pub type_: Box<AstType>,
-    pub loc: *mut Location,
-    pub is_param: bool,
+    type_: Box<AstType>,
+    loc: Box<Location>,
+    is_param: bool,
 }
 
 impl Drop for StackFrame {
@@ -55,7 +56,7 @@ impl Clone for StackFrame {
                 blocks: self.blocks.clone(),
                 varmap: varmap_copy(&self.varmap),
                 id: self.id,
-                result: variable_copy(self.result),
+                result: Box::into_raw(variable_copy(&*self.result)),
             }
         }
     }
@@ -66,7 +67,7 @@ unsafe fn varmap_copy(m: &Map) -> Box<Map> {
     for (k, v) in m.pairs() {
         m_copy.set(
             dynamic_str(k),
-            variable_copy(v as *mut Variable) as *const libc::c_void,
+            Box::into_raw(variable_copy(&*(v as *mut Variable))) as *const libc::c_void,
         );
     }
     m_copy
@@ -186,15 +187,15 @@ impl StackFrame {
 
     pub unsafe fn undeclare(&mut self, state: *mut State) {
         let old_result: *mut Variable = self.result;
-        self.result = variable_abstractcopy(old_result, state);
+        self.result = Box::into_raw(variable_abstractcopy(&*old_result, state));
         variable_destroy(old_result);
         let m = std::mem::replace(&mut self.varmap, Map::new());
         for (k, v) in m.pairs() {
             let v = v as *mut Variable;
-            if variable_isparam(v) {
+            if (*v).is_param() {
                 self.varmap.set(
                     dynamic_str(k),
-                    variable_abstractcopy(v, state) as *const libc::c_void,
+                    Box::into_raw(variable_abstractcopy(&*v, state)) as *const libc::c_void,
                 );
             }
             variable_destroy(v);
@@ -217,7 +218,7 @@ impl StackFrame {
         }
         for p in self.varmap.values() {
             let var = p as *mut Variable;
-            if variable_isparam(var) && variable_references(&*var, loc, state) {
+            if (*var).is_param() && variable_references(&*var, loc, state) {
                 return true;
             }
         }
@@ -241,7 +242,7 @@ pub unsafe fn variable_create(
     Box::new(Variable {
         type_: ast_type_copy(type_),
         is_param: isparam,
-        loc: Box::into_raw(loc),
+        loc,
     })
 }
 
@@ -249,27 +250,15 @@ pub unsafe fn variable_destroy(v: *mut Variable) {
     drop(Box::from_raw(v))
 }
 
-impl Drop for Variable {
-    fn drop(&mut self) {
-        unsafe {
-            location_destroy(self.loc);
-        }
-    }
+pub fn variable_copy(old: &Variable) -> Box<Variable> {
+    Box::new(old.clone())
 }
 
-pub unsafe fn variable_copy(old: *mut Variable) -> *mut Variable {
-    Box::into_raw(Box::new(Variable {
-        type_: ast_type_copy(&(*old).type_),
-        is_param: (*old).is_param,
-        loc: Box::into_raw(location_copy(&*(*old).loc)),
-    }))
-}
-
-unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Variable {
+unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> {
     let new = Box::new(Variable {
-        type_: ast_type_copy(&(*old).type_),
-        is_param: (*old).is_param,
-        loc: Box::into_raw(location_copy(&*(*old).loc)),
+        type_: old.type_.clone(),
+        is_param: old.is_param,
+        loc: old.loc.clone(),
     });
     let obj = state_get(s, &*new.loc, false).unwrap();
     if obj.is_null() {
@@ -280,7 +269,7 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
             object_assign(&mut *obj, value_abstractcopy(v, s));
         }
     }
-    Box::into_raw(new)
+    new
 }
 
 pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> OwningCStr {
@@ -288,7 +277,7 @@ pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut St
     let mut b = strbuilder_create();
     let type_ = ast_type_str(&(*var).type_);
     let isparam = if (*var).is_param { "param " } else { "" };
-    let obj_str = object_or_nothing_str((*var).loc, stack, state);
+    let obj_str = object_or_nothing_str(&mut *(*var).loc, stack, state);
     let loc = &*(*var).loc;
     strbuilder_write!(b, "{{{isparam}{type_} := {obj_str}}} @ {loc}");
     strbuilder_build(b)
@@ -307,19 +296,21 @@ unsafe fn object_or_nothing_str(
     }
 }
 
-pub unsafe fn variable_location(v: &Variable) -> &Location {
-    &*v.loc
-}
+impl Variable {
+    pub fn location(&self) -> &Location {
+        &self.loc
+    }
 
-pub unsafe fn variable_type(v: &Variable) -> &AstType {
-    &v.type_
+    pub fn type_(&self) -> &AstType {
+        &self.type_
+    }
+
+    pub fn is_param(&self) -> bool {
+        self.is_param
+    }
 }
 
 pub unsafe fn variable_references(v: &Variable, loc: &Location, s: *mut State) -> bool {
     assert!(!loc.type_is_vconst());
     location_references(&*v.loc, loc, s)
-}
-
-pub unsafe fn variable_isparam(v: *mut Variable) -> bool {
-    (*v).is_param
 }
