@@ -203,14 +203,11 @@ pub unsafe fn state_clump(state: *mut State) -> Box<Value> {
     value_ptr_create(Box::from_raw(loc))
 }
 
-pub unsafe fn state_islval(state: *mut State, v: *mut Value) -> bool {
-    if v.is_null() {
-        panic!();
-    }
-    if !value_islocation(&*v) {
+pub unsafe fn state_islval(state: *mut State, v: &Value) -> bool {
+    if !value_islocation(v) {
         return false;
     }
-    let loc = value_as_location(&*v);
+    let loc = value_as_location(v);
     state_get(state, loc, true).unwrap();
     location_tostatic(loc, &(*state).static_memory)
         || location_toheap(loc, &mut (*state).heap)
@@ -315,13 +312,13 @@ pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
 
 pub unsafe fn state_deref(
     state: *mut State,
-    ptr_val: *mut Value,
+    ptr_val: &Value,
     index: &AstExpr,
 ) -> Result<*mut Object> {
-    if value_issync(&*ptr_val) {
+    if value_issync(ptr_val) {
         return Ok(ptr::null_mut());
     }
-    let deref_base = value_as_location(&*ptr_val);
+    let deref_base = value_as_location(ptr_val);
     // Note: the original leaked this location.
     let deref = location_with_offset(deref_base, index);
     state_get(state, &deref, true)

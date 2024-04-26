@@ -641,7 +641,8 @@ unsafe fn identifier_assume(expr: &AstExpr, value: bool, s: *mut State) -> Resul
 
 unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     let arr = ast_expr_eval(ast_expr_binary_e1(expr), state)?;
-    let deref_obj = state_deref(state, Box::into_raw(arr), ast_expr_binary_e2(expr))?;
+    // Note: Original seems to leak `arr`.
+    let deref_obj = state_deref(state, &arr, ast_expr_binary_e2(expr))?;
     if deref_obj.is_null() {
         return Err(Error::new(format!(
             "undefined indirection: *({expr}) has no value"
@@ -860,7 +861,7 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LVa
         if root_val.is_null() {
             panic!();
         }
-        let obj = state_deref(state, root_val, &ast_expr_constant_create(0))?;
+        let obj = state_deref(state, &*root_val, &ast_expr_constant_create(0))?;
         return Ok(lvalue_create(t, obj));
     }
     let root_lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state)?;
@@ -876,7 +877,7 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LVa
     if root_val.is_null() {
         panic!();
     }
-    let Ok(res_obj) = state_deref(state, root_val, ast_expr_binary_e2(inner)) else {
+    let Ok(res_obj) = state_deref(state, &*root_val, ast_expr_binary_e2(inner)) else {
         // Note: Original returns null. See note above.
         panic!();
     };
@@ -1080,10 +1081,10 @@ unsafe fn verify_paramspec(
     param_state: *mut State,
     arg_state: *mut State,
 ) -> Result<()> {
-    if !state_islval(param_state, param) {
+    if !state_islval(param_state, &*param) {
         return Ok(());
     }
-    if !state_islval(arg_state, arg) {
+    if !state_islval(arg_state, &*arg) {
         return Err(Error::new("must be lvalue".to_string()));
     }
     if state_isalloc(param_state, param) as libc::c_int != 0 && !state_isalloc(arg_state, arg) {
