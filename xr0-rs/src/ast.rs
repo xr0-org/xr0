@@ -712,11 +712,10 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let root = ast_expr_member_root(expr);
     let res_val = ast_expr_eval(root, s)?;
     let field = ast_expr_member_field(expr);
-    let member: *mut Object = value_struct_member(&res_val, field.as_str());
-    if member.is_null() {
+    let Some(member) = value_struct_member(&res_val, field.as_str()) else {
         return Err(Error::new(format!("`{root}' has no field `{field}'")));
-    }
-    let Some(obj_value) = object_as_value(&*member) else {
+    };
+    let Some(obj_value) = object_as_value(member) else {
         // Note: Original would return null if obj_value is null, but almost nobody downstream handles it.
         panic!();
     };
@@ -830,13 +829,21 @@ pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Res
         panic!();
     }
     let field = ast_expr_member_field(expr);
-    let member: *mut Object =
-        object_getmember(root_obj, lvalue_type(&root_lval), field.as_str(), state);
-    if member.is_null() {
+    let Some(member) = object_getmember(
+        &mut *root_obj,
+        lvalue_type(&root_lval),
+        field.as_str(),
+        state,
+    ) else {
         return Err(Error::new("lvalue error".to_string()));
-    }
-    let t = object_getmembertype(root_obj, lvalue_type(&root_lval), field.as_str(), state);
-    Ok(lvalue_create(t, member))
+    };
+    let t = object_getmembertype(
+        &mut *root_obj,
+        lvalue_type(&root_lval),
+        field.as_str(),
+        state,
+    );
+    Ok(lvalue_create(t, member as *const Object as *mut Object))
 }
 
 pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
@@ -1235,7 +1242,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let v = ast_expr_pf_reduce(ast_expr_member_root(expr), s)?;
     let field = ast_expr_member_field(expr);
     if value_isstruct(&v) {
-        let obj: *mut Object = value_struct_member(&v, field.as_str());
+        let obj = value_struct_member(&v, field.as_str()).unwrap();
         let obj_value = object_as_value(&*obj).unwrap();
         return Ok(value_copy(obj_value));
     }

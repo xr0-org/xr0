@@ -8,10 +8,7 @@ use crate::ast::{
     ast_type_struct_complete, ast_type_struct_members, ast_variable_arr_copy, ast_variable_name,
     ast_variable_type,
 };
-use crate::object::{
-    object_abstractcopy, object_as_value, object_assign, object_copy, object_destroy,
-    object_value_create,
-};
+use crate::object::{object_abstractcopy, object_as_value, object_assign, object_value_create};
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
 use crate::state::state::{state_getext, state_vconst};
 use crate::state::State;
@@ -33,9 +30,10 @@ pub enum ValueKind {
     Struct(Box<StructValue>),
 }
 
+#[derive(Clone)]
 pub struct StructValue {
     pub members: Vec<Box<AstVariable>>,
-    pub m: HashMap<String, *mut Object>,
+    pub m: HashMap<String, Box<Object>>,
 }
 
 #[derive(Clone)]
@@ -119,17 +117,17 @@ pub unsafe fn value_struct_indefinite_create(
     if (ast_type_struct_members(t)).is_none() {
         panic!();
     }
-    let v = value_struct_create(t);
-    let ValueKind::Struct(sv) = &v.kind else {
+    let mut v = value_struct_create(t);
+    let ValueKind::Struct(sv) = &mut v.kind else {
         panic!();
     };
     for var in &sv.members {
         let field = ast_variable_name(var).as_str();
 
-        let obj: *mut Object = sv.m.get(field).copied().unwrap();
+        let obj = sv.m.get_mut(field).unwrap();
         let comment = format!("{comment}.{field}");
         object_assign(
-            &mut *obj,
+            obj,
             Some(state_vconst(
                 s,
                 ast_variable_type(var),
@@ -176,18 +174,18 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> Box<Value> {
     if !value_isstruct(&*old) {
         panic!();
     }
-    let v = value_copy(&*old);
-    let ValueKind::Struct(sv) = &v.kind else {
+    let mut v = value_copy(&*old);
+    let ValueKind::Struct(sv) = &mut v.kind else {
         panic!();
     };
 
     for var in &sv.members {
         let field = ast_variable_name(var);
-        let obj = *sv.m.get(field.as_str()).unwrap();
-        if let Some(obj_value) = object_as_value(&*obj) {
+        let obj = sv.m.get_mut(field.as_str()).unwrap();
+        if let Some(obj_value) = object_as_value(obj) {
             if value_issync(obj_value) {
                 object_assign(
-                    &mut *obj,
+                    obj,
                     Some(value_sync_create(ast_expr_member_create(
                         ast_expr_copy(root),
                         field.clone(),
@@ -203,22 +201,13 @@ pub fn value_isstruct(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Struct(_))
 }
 
-unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, *mut Object> {
+unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     let mut m = HashMap::new();
     for var in members {
         let id = ast_variable_name(var).as_str().to_string();
-        m.insert(
-            id,
-            Box::into_raw(object_value_create(ast_expr_constant_create(0), None)),
-        );
+        m.insert(id, object_value_create(ast_expr_constant_create(0), None));
     }
     m
-}
-
-unsafe fn copy_members(old: &HashMap<String, *mut Object>) -> HashMap<String, *mut Object> {
-    old.iter()
-        .map(|(k, &v)| (k.clone(), Box::into_raw(object_copy(&*v))))
-        .collect()
 }
 
 unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> Box<Value> {
@@ -229,11 +218,11 @@ unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> Box<Val
 }
 
 unsafe fn abstract_copy_members(
-    old: &HashMap<String, *mut Object>,
+    old: &HashMap<String, Box<Object>>,
     s: *mut State,
-) -> HashMap<String, *mut Object> {
+) -> HashMap<String, Box<Object>> {
     old.iter()
-        .map(|(k, &v)| (k.clone(), Box::into_raw(object_abstractcopy(&*v, s))))
+        .map(|(k, v)| (k.clone(), object_abstractcopy(v, s)))
         .collect()
 }
 
@@ -249,26 +238,15 @@ pub unsafe fn value_struct_membertype<'v>(v: &'v Value, member: &str) -> Option<
     None
 }
 
-pub unsafe fn value_struct_member(v: &Value, member: &str) -> *mut Object {
+pub unsafe fn value_struct_member<'v>(v: &'v Value, member: &str) -> Option<&'v Object> {
     let ValueKind::Struct(sv) = &v.kind else {
         panic!();
     };
-    sv.m.get(member).copied().unwrap_or(ptr::null_mut())
+    sv.m.get(member).map(|boxed| &**boxed)
 }
 
 pub unsafe fn value_copy(v: &Value) -> Box<Value> {
     Box::new(v.clone())
-}
-
-impl Clone for StructValue {
-    fn clone(&self) -> Self {
-        unsafe {
-            StructValue {
-                members: self.members.clone(),
-                m: copy_members(&self.m),
-            }
-        }
-    }
 }
 
 pub unsafe fn value_abstractcopy(v: &Value, s: *mut State) -> Option<Box<Value>> {
@@ -280,16 +258,6 @@ pub unsafe fn value_abstractcopy(v: &Value, s: *mut State) -> Option<Box<Value>>
         ValueKind::Struct(sv) => value_struct_abstractcopy(sv, s),
         _ => panic!(),
     })
-}
-
-impl Drop for StructValue {
-    fn drop(&mut self) {
-        unsafe {
-            for &p in self.m.values() {
-                object_destroy(p);
-            }
-        }
-    }
 }
 
 pub unsafe fn value_destroy(v: *mut Value) {
@@ -319,7 +287,7 @@ impl Display for StructValue {
         let n = self.members.len();
         for (i, var) in self.members.iter().enumerate() {
             let name = ast_variable_name(var).as_str();
-            let val = unsafe { object_as_value(&*self.m.get(name).copied().unwrap()) };
+            let val = object_as_value(self.m.get(name).unwrap());
             let val_str = if let Some(val) = val {
                 format!("{val}")
             } else {
@@ -361,14 +329,12 @@ pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
 }
 
 unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
-    for &obj in sv.m.values() {
-        if let Some(val) = object_as_value(&*obj) {
-            if value_referencesheap(val, s) {
-                return true;
-            }
-        }
-    }
-    false
+    sv.m.values().any(|obj| {
+        let Some(val) = object_as_value(obj) else {
+            return false;
+        };
+        value_referencesheap(val, s)
+    })
 }
 
 pub fn value_as_constant(v: &Value) -> libc::c_int {
@@ -443,8 +409,8 @@ pub unsafe fn value_references(v: &Value, loc: &Location, s: *mut State) -> bool
 }
 
 unsafe fn struct_references(sv: &StructValue, loc: &Location, s: *mut State) -> bool {
-    sv.m.values().any(|&obj| {
-        let Some(val) = object_as_value(&*obj) else {
+    sv.m.values().any(|obj| {
+        let Some(val) = object_as_value(obj) else {
             return false;
         };
         value_references(val, loc, s)

@@ -50,10 +50,6 @@ pub unsafe fn object_range_create(offset: Box<AstExpr>, r: Box<Range>) -> Box<Ob
     })
 }
 
-pub unsafe fn object_destroy(obj: *mut Object) {
-    drop(Box::from_raw(obj));
-}
-
 pub fn object_copy(old: &Object) -> Box<Object> {
     Box::new(old.clone())
 }
@@ -101,7 +97,7 @@ pub fn object_isvalue(obj: &Object) -> bool {
     matches!(obj.kind, ObjectKind::Value(_))
 }
 
-pub unsafe fn object_as_value(obj: &Object) -> Option<&Value> {
+pub fn object_as_value(obj: &Object) -> Option<&Value> {
     let ObjectKind::Value(v) = &obj.kind else {
         panic!();
     };
@@ -303,30 +299,36 @@ pub unsafe fn object_dealloc(obj: &Object, s: *mut State) -> Result<()> {
     }
 }
 
-pub unsafe fn object_getmember(
-    obj: *mut Object,
+pub unsafe fn object_getmember<'obj>(
+    obj: &'obj mut Object,
     t: &AstType,
     member: &str,
     s: *mut State,
-) -> *mut Object {
+) -> Option<&'obj Object> {
     value_struct_member(getorcreatestruct(obj, t, s), member)
 }
 
-unsafe fn getorcreatestruct(obj: *mut Object, t: &AstType, s: *mut State) -> &Value {
-    if let Some(v) = object_as_value(&*obj) {
-        return v;
+unsafe fn getorcreatestruct<'obj>(
+    obj: &'obj mut Object,
+    t: &AstType,
+    s: *mut State,
+) -> &'obj Value {
+    // XXX FIXME: very silly rust construction because of borrow checker limitation
+    if object_as_value(obj).is_some() {
+        object_as_value(obj).unwrap()
+    } else {
+        let complete = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
+        object_assign(&mut *obj, Some(value_struct_create(complete)));
+        object_as_value(&*obj).unwrap()
     }
-    let complete = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
-    object_assign(&mut *obj, Some(value_struct_create(complete)));
-    object_as_value(&*obj).unwrap()
 }
 
-pub unsafe fn object_getmembertype<'t>(
-    obj: *mut Object,
-    t: &'t AstType,
+pub unsafe fn object_getmembertype<'obj>(
+    obj: &'obj mut Object,
+    t: &AstType,
     member: &str,
     s: *mut State,
-) -> Option<&'t AstType> {
+) -> Option<&'obj AstType> {
     value_struct_membertype(getorcreatestruct(obj, t, s), member)
 }
 
