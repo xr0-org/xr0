@@ -330,11 +330,10 @@ pub unsafe fn state_range_alloc(
     lw: &AstExpr,
     up: &AstExpr,
 ) -> Result<()> {
-    let arr_val: *mut Value = object_as_value(obj);
-    if arr_val.is_null() {
+    let Some(arr_val) = object_as_value(&*obj) else {
         return Err(Error::new("no value".to_string()));
-    }
-    let deref = value_as_location(&*arr_val);
+    };
+    let deref = value_as_location(arr_val);
     let b = location_getblock(
         deref,
         &mut (*state).static_memory,
@@ -373,17 +372,17 @@ pub unsafe fn state_range_dealloc(
     lw: &AstExpr,
     up: &AstExpr,
 ) -> Result<()> {
-    let arr_val: *mut Value = object_as_value(obj);
-    if arr_val.is_null() {
+    let Some(arr_val) = object_as_value(&*obj) else {
         return Err(Error::new("no value".to_string()));
-    }
+    };
     let deref = value_as_location(&*arr_val);
     location_range_dealloc(deref, lw, up, state)
 }
 
 pub unsafe fn state_addresses_deallocand(state: *mut State, obj: *mut Object) -> bool {
-    let val: *mut Value = object_as_value(obj);
-    let loc = value_as_location(&*val);
+    // Note: Original doesn't null-check. Might not be necessary.
+    let val = object_as_value(&*obj).unwrap();
+    let loc = value_as_location(val);
     state_isdeallocand(state, loc)
 }
 
@@ -401,11 +400,10 @@ pub unsafe fn state_range_aredeallocands(
     if ast_expr_equal(lw, up) {
         return true;
     }
-    let arr_val: *mut Value = object_as_value(obj);
-    if arr_val.is_null() {
+    let Some(arr_val) = object_as_value(&*obj) else {
         return false;
-    }
-    let deref = value_as_location(&*arr_val);
+    };
+    let deref = value_as_location(arr_val);
     let b = location_getblock(
         deref,
         &mut (*state).static_memory,

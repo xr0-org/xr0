@@ -184,15 +184,16 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> Box<Value> {
     for var in &sv.members {
         let field = ast_variable_name(var);
         let obj = *sv.m.get(field.as_str()).unwrap();
-        let obj_value: *mut Value = object_as_value(obj);
-        if !obj_value.is_null() && value_issync(&*obj_value) {
-            object_assign(
-                &mut *obj,
-                Some(value_sync_create(ast_expr_member_create(
-                    ast_expr_copy(root),
-                    field.clone(),
-                ))),
-            );
+        if let Some(obj_value) = object_as_value(&*obj) {
+            if value_issync(&*obj_value) {
+                object_assign(
+                    &mut *obj,
+                    Some(value_sync_create(ast_expr_member_create(
+                        ast_expr_copy(root),
+                        field.clone(),
+                    ))),
+                );
+            }
         }
     }
     v
@@ -318,16 +319,14 @@ impl Display for StructValue {
         let n = self.members.len();
         for (i, var) in self.members.iter().enumerate() {
             let name = ast_variable_name(var).as_str();
-            unsafe {
-                let val: *mut Value = object_as_value(self.m.get(name).copied().unwrap());
-                let val_str = if !val.is_null() {
-                    format!("{}", *val)
-                } else {
-                    "".to_string()
-                };
-                let delim = if i + 1 < n { ", " } else { "" };
-                write!(f, ".{name} = <{val_str}>{delim}")?;
-            }
+            let val = unsafe { object_as_value(&*self.m.get(name).copied().unwrap()) };
+            let val_str = if let Some(val) = val {
+                format!("{val}")
+            } else {
+                "".to_string()
+            };
+            let delim = if i + 1 < n { ", " } else { "" };
+            write!(f, ".{name} = <{val_str}>{delim}")?;
         }
         write!(f, "}}")
     }
@@ -362,10 +361,11 @@ pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
 }
 
 unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
-    for &p in sv.m.values() {
-        let val: *mut Value = object_as_value(p);
-        if !val.is_null() && value_referencesheap(&*val, s) {
-            return true;
+    for &obj in sv.m.values() {
+        if let Some(val) = object_as_value(&*obj) {
+            if value_referencesheap(&*val, s) {
+                return true;
+            }
         }
     }
     false
@@ -444,8 +444,10 @@ pub unsafe fn value_references(v: &Value, loc: &Location, s: *mut State) -> bool
 
 unsafe fn struct_references(sv: &StructValue, loc: &Location, s: *mut State) -> bool {
     sv.m.values().any(|&obj| {
-        let val: *mut Value = object_as_value(obj);
-        !val.is_null() && value_references(&*val, loc, s)
+        let Some(val) = object_as_value(&*obj) else {
+            return false;
+        };
+        value_references(val, loc, s)
     })
 }
 

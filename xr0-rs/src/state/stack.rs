@@ -12,7 +12,7 @@ use crate::state::location::{
 use crate::state::state::state_get;
 use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
 use crate::value::value_abstractcopy;
-use crate::{cstr, strbuilder_write, AstType, AstVariable, Location, Value};
+use crate::{cstr, strbuilder_write, AstType, AstVariable, Location};
 
 pub struct Stack {
     pub name: OwningCStr,
@@ -249,9 +249,8 @@ unsafe fn variable_abstractcopy(old: *mut Variable, s: *mut State) -> *mut Varia
         panic!();
     }
     if object_isvalue(&*obj) {
-        let v: *mut Value = object_as_value(obj);
-        if !v.is_null() {
-            object_assign(&mut *obj, value_abstractcopy(&*v, s));
+        if let Some(v) = object_as_value(&*obj) {
+            object_assign(&mut *obj, value_abstractcopy(v, s));
         }
     }
     Box::into_raw(new)

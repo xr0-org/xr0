@@ -648,13 +648,12 @@ unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Val
             "undefined indirection: *({expr}) has no value"
         )));
     }
-    let v: *mut Value = object_as_value(deref_obj);
-    if v.is_null() {
+    let Some(v) = object_as_value(&*deref_obj) else {
         return Err(Error::new(format!(
             "undefined indirection: *({expr}) has no value"
         )));
-    }
-    Ok(value_copy(&*v))
+    };
+    Ok(value_copy(v))
 }
 
 unsafe fn hack_identifier_builtin_eval(id: &str, state: *mut State) -> Result<Box<Value>> {
@@ -700,14 +699,13 @@ unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> Result<Box<
     if obj.is_null() {
         return Err(Error::new(format!("unknown idenitfier {id}")));
     }
-    let val: *mut Value = object_as_value(obj);
-    if val.is_null() {
+    let Some(val) = object_as_value(&*obj) else {
         vprintln!("state: {}", state_str(state));
         return Err(Error::new(format!(
             "undefined memory access: {id} has no value",
         )));
-    }
-    Ok(value_copy(&*val))
+    };
+    Ok(value_copy(val))
 }
 
 unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<Box<Value>> {
@@ -718,10 +716,11 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     if member.is_null() {
         return Err(Error::new(format!("`{root}' has no field `{field}'")));
     }
-    let obj_value: *mut Value = object_as_value(member);
-    // Note: Original would return null if obj_value is null, but almost nobody downstream handles it.
-    assert!(!obj_value.is_null());
-    Ok(value_copy(&*obj_value))
+    let Some(obj_value) = object_as_value(&*member) else {
+        // Note: Original would return null if obj_value is null, but almost nobody downstream handles it.
+        panic!();
+    };
+    Ok(value_copy(obj_value))
 }
 
 unsafe fn address_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
@@ -857,11 +856,8 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LVa
             panic!();
         }
         let t = ast_type_ptr_type(lvalue_type(&root_lval));
-        let root_val: *mut Value = object_as_value(root_obj);
-        if root_val.is_null() {
-            panic!();
-        }
-        let obj = state_deref(state, &*root_val, &ast_expr_constant_create(0))?;
+        let root_val = object_as_value(&*root_obj).unwrap();
+        let obj = state_deref(state, root_val, &ast_expr_constant_create(0))?;
         return Ok(lvalue_create(t, obj));
     }
     let root_lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state)?;
@@ -873,11 +869,8 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LVa
         panic!();
     }
     let t = ast_type_ptr_type(lvalue_type(&root_lval));
-    let root_val: *mut Value = object_as_value(root_obj);
-    if root_val.is_null() {
-        panic!();
-    }
-    let Ok(res_obj) = state_deref(state, &*root_val, ast_expr_binary_e2(inner)) else {
+    let root_val = object_as_value(&*root_obj).unwrap();
+    let Ok(res_obj) = state_deref(state, root_val, ast_expr_binary_e2(inner)) else {
         // Note: Original returns null. See note above.
         panic!();
     };
@@ -1105,8 +1098,8 @@ unsafe fn verify_paramspec(
         return Err(Error::new("must be rvalue".to_string()));
     }
     verify_paramspec(
-        &*object_as_value(param_obj),
-        &*object_as_value(arg_obj),
+        object_as_value(&*param_obj).unwrap(),
+        object_as_value(&*arg_obj).unwrap(),
         param_state,
         arg_state,
     )
@@ -1243,11 +1236,8 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let field = ast_expr_member_field(expr);
     if value_isstruct(&v) {
         let obj: *mut Object = value_struct_member(&v, field.as_str());
-        let obj_value: *mut Value = object_as_value(obj);
-        if obj_value.is_null() {
-            panic!();
-        }
-        return Ok(value_copy(&*obj_value));
+        let obj_value = object_as_value(&*obj).unwrap();
+        return Ok(value_copy(obj_value));
     }
     if !value_issync(&v) {
         panic!();
@@ -3108,7 +3098,9 @@ pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result
     if obj.is_null() {
         panic!();
     }
-    Ok(object_as_value(obj))
+    // XXX FIXME: Bad: we transmute the reference into pointer and subsequently callers transmute
+    // it further into a Box. How did ownership even; we don't know.
+    Ok(object_as_value(&*obj).map_or(ptr::null_mut(), |r| r as *const Value as *mut Value))
 }
 
 unsafe fn split_path_verify(

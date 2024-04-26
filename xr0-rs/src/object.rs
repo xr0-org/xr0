@@ -1,5 +1,4 @@
 use std::fmt::{self, Display, Formatter};
-use std::ptr;
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
@@ -102,13 +101,11 @@ pub fn object_isvalue(obj: &Object) -> bool {
     matches!(obj.kind, ObjectKind::Value(_))
 }
 
-pub unsafe fn object_as_value(obj: *mut Object) -> *mut Value {
-    let ObjectKind::Value(v) = &(*obj).kind else {
+pub unsafe fn object_as_value(obj: &Object) -> Option<&Value> {
+    let ObjectKind::Value(v) = &obj.kind else {
         panic!();
     };
-    v.as_ref().map_or(ptr::null_mut(), |boxed| {
-        &**boxed as *const Value as *mut Value
-    })
+    v.as_deref()
 }
 
 pub unsafe fn object_isdeallocand(obj: &Object, s: *mut State) -> bool {
@@ -312,17 +309,16 @@ pub unsafe fn object_getmember(
     member: &str,
     s: *mut State,
 ) -> *mut Object {
-    value_struct_member(&*getorcreatestruct(obj, t, s), member)
+    value_struct_member(getorcreatestruct(obj, t, s), member)
 }
 
-unsafe fn getorcreatestruct(obj: *mut Object, t: &AstType, s: *mut State) -> *mut Value {
-    let v: *mut Value = object_as_value(obj);
-    if !v.is_null() {
+unsafe fn getorcreatestruct(obj: *mut Object, t: &AstType, s: *mut State) -> &Value {
+    if let Some(v) = object_as_value(&*obj) {
         return v;
     }
     let complete = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
     object_assign(&mut *obj, Some(value_struct_create(complete)));
-    object_as_value(&mut *obj)
+    object_as_value(&*obj).unwrap()
 }
 
 pub unsafe fn object_getmembertype<'t>(
@@ -331,7 +327,7 @@ pub unsafe fn object_getmembertype<'t>(
     member: &str,
     s: *mut State,
 ) -> Option<&'t AstType> {
-    value_struct_membertype(&*getorcreatestruct(obj, t, s), member)
+    value_struct_membertype(getorcreatestruct(obj, t, s), member)
 }
 
 pub fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {
