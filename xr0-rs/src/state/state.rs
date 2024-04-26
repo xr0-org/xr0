@@ -179,7 +179,8 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value>
     let lit = ast_expr_as_literal(expr);
     let loc: *mut Location = (*state).static_memory.check_pool(lit.as_str());
     if !loc.is_null() {
-        // FIXME this is definitely not kosher - multiple boxes can point to the same Location
+        // XXX FIXME this is definitely not kosher - can make multiple boxes point to the same
+        // Location
         return value_ptr_create(Box::from_raw(loc));
     }
     let address = (*state).static_memory.new_block();
@@ -251,7 +252,9 @@ pub unsafe fn state_get(
             assert!(loc.type_is_dynamic() || loc.type_is_dereferencable());
             Ok(ptr::null_mut())
         }
-        Some(b) => Ok(b.observe(location_offset(loc), state, constructive)),
+        Some(b) => Ok(b
+            .observe(location_offset(loc), state, constructive)
+            .map_or(ptr::null_mut(), |r| r as *const Object as *mut Object)),
     }
 }
 

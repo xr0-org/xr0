@@ -20,7 +20,8 @@ struct HeapBlock {
 
 #[derive(Clone)]
 pub struct VConst {
-    // Note: Iteration order of varmap is significant in vconst_str.
+    // Note: Iteration order of varmap is significant in vconst_str: XR0 uses string comparison to
+    // see if abstract states agree.
     pub varmap: BTreeMap<String, Box<Value>>,
     pub comment: HashMap<String, String>,
     pub persist: HashMap<String, bool>,
