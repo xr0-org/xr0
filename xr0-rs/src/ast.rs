@@ -4,8 +4,8 @@ use std::collections::VecDeque;
 use std::ffi::{CStr, CString};
 use std::fmt::{self, Display, Formatter};
 use std::process;
-use std::sync::Arc;
 use std::ptr;
+use std::sync::Arc;
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
 use crate::object::{
@@ -1751,7 +1751,7 @@ fn build_indegree_zero(
     indegree_zero
 }
 
-pub unsafe fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
+pub fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
     let mut order = vec![];
     let g = ast_function_buildgraph(fname, ext);
     // Note: Original leaks indegree_zero.
@@ -3135,19 +3135,14 @@ unsafe fn split_path_verify(
 
 type FuncGraph = InsertionOrderMap<CString, Vec<OwningCStr>>;
 
-type DedupSet<'a> = InsertionOrderMap<&'a CStr, ()>;
+type DedupSet<'a> = InsertionOrderMap<OwningCStr, ()>;
 
-unsafe fn recurse_buildgraph<'a>(
-    g: &mut FuncGraph,
-    dedup: &mut DedupSet<'a>,
-    fname: &'a CStr,
-    ext: &Externals,
-) {
+fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut DedupSet, fname: &CStr, ext: &Externals) {
     let mut local_dedup = vec![];
     if dedup.get(fname).is_some() {
         return;
     }
-    dedup.insert(fname, ());
+    dedup.insert(OwningCStr::copy(fname), ());
     let Some(f) = ext.get_func(fname.to_str().unwrap()) else {
         eprintln!("function `{}' is not declared", fname.to_string_lossy());
         process::exit(1);
@@ -3162,15 +3157,13 @@ unsafe fn recurse_buildgraph<'a>(
 
         for func in farr {
             if !local_dedup.contains(&func) {
+                // Note: The original avoids some of these string copies.
                 local_dedup.push(func.clone());
-                let func = func.into_ptr(); // transfer of ownership (it's going into val)
-                let f = ext
-                    .get_func(CStr::from_ptr(func).to_str().unwrap())
-                    .unwrap();
+                let f = ext.get_func(func.as_str()).unwrap();
                 if !f.is_axiom {
-                    val.push(OwningCStr::new(func));
+                    val.push(func.clone());
                 }
-                recurse_buildgraph(g, dedup, CStr::from_ptr(func), ext);
+                recurse_buildgraph(g, dedup, func.as_cstr(), ext);
             }
         }
     }
@@ -3237,7 +3230,7 @@ unsafe fn split_paths_absverify(
     Ok(())
 }
 
-pub unsafe fn ast_function_buildgraph(fname: &CStr, ext: &Externals) -> FuncGraph {
+pub fn ast_function_buildgraph(fname: &CStr, ext: &Externals) -> FuncGraph {
     let mut dedup = InsertionOrderMap::new();
     let mut g = InsertionOrderMap::new();
     recurse_buildgraph(&mut g, &mut dedup, fname, ext);
@@ -3380,7 +3373,7 @@ pub fn lvalue_object(l: &LValue) -> *mut Object {
     l.obj
 }
 
-pub unsafe fn ast_topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
+pub fn ast_topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
     topological_order(fname, ext)
 }
 
