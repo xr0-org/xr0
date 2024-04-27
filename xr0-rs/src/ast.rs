@@ -92,8 +92,8 @@ pub struct AssignmentExpr {
 #[derive(Clone)]
 pub struct IncDecExpr {
     operand: Box<AstExpr>,
-    inc: libc::c_int,
-    pre: libc::c_int,
+    inc: bool,
+    pre: bool,
 }
 
 #[derive(Clone)]
@@ -1282,8 +1282,8 @@ impl Display for StructMemberExpr {
 impl Display for IncDecExpr {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let root = &self.operand;
-        let op = if self.inc != 0 { "++" } else { "--" };
-        if self.pre != 0 {
+        let op = if self.inc { "++" } else { "--" };
+        if self.pre {
             write!(f, "{op}{root}")
         } else {
             write!(f, "{root}{op}")
@@ -1329,7 +1329,7 @@ pub fn ast_expr_member_root(expr: &AstExpr) -> &AstExpr {
 
 pub fn ast_expr_incdec_pre(expr: &AstExpr) -> bool {
     match &expr.kind {
-        AstExprKind::IncDec(incdec) => incdec.pre != 0,
+        AstExprKind::IncDec(incdec) => incdec.pre,
         _ => panic!(),
     }
 }
@@ -1365,7 +1365,7 @@ pub fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> Box<AstExpr> {
         ast_expr_copy(&incdec.operand),
         ast_expr_binary_create(
             ast_expr_copy(&incdec.operand),
-            if incdec.inc != 0 {
+            if incdec.inc {
                 AstBinaryOp::Addition
             } else {
                 AstBinaryOp::Subtraction
@@ -1378,8 +1378,8 @@ pub fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> Box<AstExpr> {
 pub fn ast_expr_incdec_create(root: Box<AstExpr>, inc: bool, pre: bool) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::IncDec(IncDecExpr {
         operand: root,
-        inc: inc as libc::c_int,
-        pre: pre as libc::c_int,
+        inc,
+        pre,
     }))
 }
 
