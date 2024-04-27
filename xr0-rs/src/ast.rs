@@ -2249,32 +2249,35 @@ pub fn ast_stmt_create_jump(
 }
 
 pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Result<bool> {
-    // I think this value is leaked in the original. The fact that the first if block can fail to
-    // return and flow into the second is a bit of a nightmare...
-    let v = Box::into_raw(ast_expr_pf_reduce(control, state)?);
-    if value_issync(&*v) {
-        let sync = Box::into_raw(value_into_sync(v));
+    // I think this value is leaked in the original. Possibly in the sync case part of it is used
+    // and freed.
+    let v = ast_expr_pf_reduce(control, state)?;
+    if value_issync(&v) {
+        let v_str = format!("{v}");
+        let sync = Box::into_raw(value_into_sync(Box::into_raw(v)));
         let p = state_getprops(&mut *state);
         if p.get(&*sync) {
-            return Ok(true);
+            Ok(true)
         } else if p.contradicts(&*sync) {
-            return Ok(false);
+            Ok(false)
+        } else {
+            let msg = format!("`{control}' with value `{v_str}' is undecidable");
+            Err(Error::new(msg))
         }
+    } else if value_isconstant(&v) {
+        let is_nonzero = value_as_constant(&v) != 0;
+        std::mem::forget(v);
+        Ok(is_nonzero)
+    } else if value_isint(&v) {
+        let zero = value_int_create(0);
+        let is_nonzero = !value_equal(&zero, &v);
+        std::mem::forget(v);
+        Ok(is_nonzero)
+    } else {
+        let msg = format!("`{control}' with value `{v}' is undecidable");
+        std::mem::forget(v);
+        Err(Error::new(msg))
     }
-    if value_isconstant(&*v) {
-        if value_as_constant(&*v) != 0 {
-            return Ok(true);
-        }
-        return Ok(false);
-    }
-    let zero = value_int_create(0);
-    if !value_isint(&*v) {
-        return Err(Error::new(format!(
-            "`{control}' with value `{}' is undecidable",
-            *v
-        )));
-    }
-    Ok(!value_equal(&zero, &*v))
 }
 
 fn ast_stmt_compound_sprint(compound: &AstBlock, b: &mut String) {
