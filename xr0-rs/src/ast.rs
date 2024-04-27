@@ -159,7 +159,7 @@ pub struct AstVariable {
 #[derive(Clone)]
 pub struct AstArrayType {
     pub type_: Box<AstType>,
-    pub length: libc::c_int,
+    pub length: i32,
 }
 
 #[derive(Clone)]
