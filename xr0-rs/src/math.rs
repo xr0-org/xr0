@@ -10,7 +10,7 @@ pub enum MathExpr {
 
 #[derive(Clone)]
 pub enum MathAtom {
-    Nat(libc::c_uint),
+    Nat(u32),
     Variable(String),
 }
 
@@ -19,7 +19,7 @@ type Map<'a> = HashMap<&'a str, i64>;
 /// An integer expression of the form `v0 * k0 + v1 * k1 + ... + num`.
 pub struct Tally<'a> {
     pub map: Map<'a>,
-    pub num: libc::c_int,
+    pub num: i32,
 }
 
 pub fn math_eq(e1: &MathExpr, e2: &MathExpr) -> bool {
@@ -41,16 +41,16 @@ pub fn math_ge(e1: &MathExpr, e2: &MathExpr) -> bool {
 }
 
 #[allow(dead_code)]
-fn math_expr_fromint(i: libc::c_int) -> Box<MathExpr> {
+fn math_expr_fromint(i: i32) -> Box<MathExpr> {
     Box::new(if i < 0 {
         MathExpr::Neg(math_expr_fromint(-i))
     } else {
-        MathExpr::Atom(MathAtom::Nat(i as libc::c_uint))
+        MathExpr::Atom(MathAtom::Nat(i as u32))
     })
 }
 
 #[allow(dead_code)]
-fn math_expr_fromvartally(id: &str, num: libc::c_int) -> Box<MathExpr> {
+fn math_expr_fromvartally(id: &str, num: i32) -> Box<MathExpr> {
     assert_ne!(num, 0);
     if num < 0 {
         return Box::new(MathExpr::Neg(math_expr_fromvartally(id, -num)));
@@ -157,11 +157,13 @@ fn atom_tally(a: &MathAtom) -> Tally {
     match a {
         MathAtom::Nat(i) => Tally {
             map: Map::new(),
-            num: *i as libc::c_int,
+            // Note: This cast is in the original. It can turn a large u32 into a
+            // negative i32.
+            num: *i as i32,
         },
         MathAtom::Variable(id) => Tally {
             map: map_fromvar(id.as_str()),
-            num: 0 as libc::c_int,
+            num: 0,
         },
     }
 }

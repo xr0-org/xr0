@@ -104,7 +104,7 @@ pub struct CallExpr {
 
 #[derive(Clone)]
 pub struct ConstantExpr {
-    constant: libc::c_int,
+    constant: i32,
     is_char: bool,
 }
 
@@ -425,10 +425,12 @@ fn math_expr(e: &AstExpr) -> Box<MathExpr> {
         AstExprKind::Constant(c) => {
             if c.constant < 0 {
                 MathExpr::Neg(Box::new(MathExpr::Atom(MathAtom::Nat(
-                    -c.constant as libc::c_uint,
+                    // This negation can overflow, which I think is undefined behavior in the
+                    // original. Went ahead and fixed it in passing.
+                    c.constant.wrapping_neg() as u32,
                 ))))
             } else {
-                MathExpr::Atom(MathAtom::Nat(c.constant as libc::c_uint))
+                MathExpr::Atom(MathAtom::Nat(c.constant as u32))
             }
         }
         AstExprKind::Binary(binary) => {
@@ -890,7 +892,7 @@ unsafe fn dereference_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Valu
 
 impl Display for ConstantExpr {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let constant: libc::c_int = self.constant;
+        let constant = self.constant;
         if !self.is_char {
             return write!(f, "{constant}");
         }
@@ -1143,7 +1145,7 @@ pub fn ast_expr_as_literal(expr: &AstExpr) -> &str {
     s
 }
 
-pub fn ast_expr_as_constant(expr: &AstExpr) -> libc::c_int {
+pub fn ast_expr_as_constant(expr: &AstExpr) -> i32 {
     match &expr.kind {
         AstExprKind::Constant(c) => c.constant,
         _ => panic!(),
@@ -1161,11 +1163,11 @@ unsafe fn pf_augment(v: *mut Value, call: &AstExpr, state: *mut State) -> Result
 pub fn ast_expr_constant_create_char(c: libc::c_char) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Constant(ConstantExpr {
         is_char: true,
-        constant: c as libc::c_int,
+        constant: c as i32,
     }))
 }
 
-pub fn ast_expr_constant_create(k: libc::c_int) -> Box<AstExpr> {
+pub fn ast_expr_constant_create(k: i32) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Constant(ConstantExpr {
         is_char: false,
         constant: k,

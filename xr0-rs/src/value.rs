@@ -54,7 +54,7 @@ pub struct NumberRange {
 
 #[derive(Copy, Clone)]
 pub enum NumberValue {
-    Constant(libc::c_int),
+    Constant(i32),
     Limit(bool),
 }
 
@@ -70,7 +70,7 @@ pub fn value_ptr_indefinite_create() -> Box<Value> {
     value_create(ValueKind::IndefinitePtr(number_indefinite_create()))
 }
 
-pub fn value_int_create(val: libc::c_int) -> Box<Value> {
+pub fn value_int_create(val: i32) -> Box<Value> {
     value_create(ValueKind::Int(number_single_create(val)))
 }
 
@@ -79,12 +79,12 @@ pub fn value_literal_create(lit: &str) -> Box<Value> {
 }
 
 #[allow(dead_code)]
-pub fn value_int_ne_create(not_val: libc::c_int) -> Box<Value> {
+pub fn value_int_ne_create(not_val: i32) -> Box<Value> {
     value_create(ValueKind::Int(number_ne_create(not_val)))
 }
 
 #[allow(dead_code)]
-pub fn value_int_range_create(lw: libc::c_int, excl_up: libc::c_int) -> Box<Value> {
+pub fn value_int_range_create(lw: i32, excl_up: i32) -> Box<Value> {
     value_create(ValueKind::Int(number_with_range_create(lw, excl_up)))
 }
 
@@ -332,7 +332,7 @@ unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
     })
 }
 
-pub fn value_as_constant(v: &Value) -> libc::c_int {
+pub fn value_as_constant(v: &Value) -> i32 {
     let ValueKind::Int(n) = &v.kind else {
         panic!();
     };
@@ -439,14 +439,14 @@ fn number_ranges_create(ranges: Vec<NumberRange>) -> Box<Number> {
     number_create(NumberKind::Ranges(ranges))
 }
 
-fn number_single_create(val: libc::c_int) -> Box<Number> {
+fn number_single_create(val: i32) -> Box<Number> {
     number_create(NumberKind::Ranges(number_range_arr_single_create(val)))
 }
 
-fn number_range_arr_single_create(val: libc::c_int) -> Vec<NumberRange> {
+fn number_range_arr_single_create(val: i32) -> Vec<NumberRange> {
     vec![number_range_create(
         number_value_constant_create(val),
-        number_value_constant_create(val + 1 as libc::c_int),
+        number_value_constant_create(val + 1),
     )]
 }
 
@@ -454,21 +454,21 @@ fn number_computed_create(e: Box<AstExpr>) -> Box<Number> {
     number_create(NumberKind::Computed(e))
 }
 
-fn number_range_arr_ne_create(val: libc::c_int) -> Vec<NumberRange> {
+fn number_range_arr_ne_create(val: i32) -> Vec<NumberRange> {
     vec![
         number_range_create(number_value_min_create(), number_value_constant_create(val)),
         number_range_create(
-            number_value_constant_create(val + 1 as libc::c_int),
+            number_value_constant_create(val + 1),
             number_value_max_create(),
         ),
     ]
 }
 
-fn number_ne_create(val: libc::c_int) -> Box<Number> {
+fn number_ne_create(val: i32) -> Box<Number> {
     number_ranges_create(number_range_arr_ne_create(val))
 }
 
-fn number_with_range_create(lw: libc::c_int, excl_up: libc::c_int) -> Box<Number> {
+fn number_with_range_create(lw: i32, excl_up: i32) -> Box<Number> {
     number_ranges_create(vec![number_range_create(
         number_value_constant_create(lw),
         number_value_constant_create(excl_up),
@@ -483,7 +483,7 @@ fn number_indefinite_create() -> Box<Number> {
 }
 
 #[allow(dead_code)]
-fn number_range_lw(n: &Number) -> libc::c_int {
+fn number_range_lw(n: &Number) -> i32 {
     let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
@@ -492,7 +492,7 @@ fn number_range_lw(n: &Number) -> libc::c_int {
 }
 
 #[allow(dead_code)]
-fn number_range_up(n: &Number) -> libc::c_int {
+fn number_range_up(n: &Number) -> i32 {
     let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
@@ -568,7 +568,7 @@ fn number_isconstant(n: &Number) -> bool {
     ranges.len() == 1 && number_range_issingle(&ranges[0])
 }
 
-fn number_as_constant(n: &Number) -> libc::c_int {
+fn number_as_constant(n: &Number) -> i32 {
     let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
@@ -646,14 +646,14 @@ fn number_range_equal(r1: &NumberRange, r2: &NumberRange) -> bool {
     number_value_equal(&r1.lower, &r2.lower) && number_value_equal(&r1.upper, &r2.upper)
 }
 
-fn number_range_as_constant(r: &NumberRange) -> libc::c_int {
+fn number_range_as_constant(r: &NumberRange) -> i32 {
     if !number_range_issingle(r) {
         panic!();
     }
     number_value_as_constant(r.lower)
 }
 
-fn number_value_constant_create(constant: libc::c_int) -> NumberValue {
+fn number_value_constant_create(constant: i32) -> NumberValue {
     NumberValue::Constant(constant)
 }
 
@@ -688,7 +688,7 @@ fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {
 }
 
 #[allow(dead_code)]
-fn number_value_difference(v1: &NumberValue, v2: &NumberValue) -> libc::c_int {
+fn number_value_difference(v1: &NumberValue, v2: &NumberValue) -> i32 {
     match (*v1, *v2) {
         (NumberValue::Constant(v1), NumberValue::Constant(v2)) => v1 - v2,
         _ => panic!(),
@@ -703,21 +703,21 @@ fn number_value_equal(v1: &NumberValue, v2: &NumberValue) -> bool {
     }
 }
 
-fn number_value_as_constant(v: NumberValue) -> libc::c_int {
+fn number_value_as_constant(v: NumberValue) -> i32 {
     match v {
         NumberValue::Constant(k) => k,
         _ => panic!(),
     }
 }
 
-fn number_value_le_constant(v: NumberValue, constant: libc::c_int) -> bool {
+fn number_value_le_constant(v: NumberValue, constant: i32) -> bool {
     match v {
         NumberValue::Constant(k) => k <= constant,
         NumberValue::Limit(max) => !max,
     }
 }
 
-fn constant_le_number_value(constant: libc::c_int, v: NumberValue) -> bool {
+fn constant_le_number_value(constant: i32, v: NumberValue) -> bool {
     match v {
         NumberValue::Constant(k) => constant <= k,
         NumberValue::Limit(max) => max,
