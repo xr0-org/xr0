@@ -1,11 +1,7 @@
 use std::sync::atomic::AtomicBool;
 use std::borrow::Borrow;
-use std::ffi::CStr;
 use std::fmt::{self, Debug, Display, Formatter};
-use std::mem;
 use std::ops::Deref;
-
-use libc::{free, malloc, strlen, strncpy};
 
 pub struct StrBuilder {
     s: String,
@@ -52,14 +48,6 @@ impl<'a, T> SemiBox<'a, T> {
     }
 }
 
-pub unsafe extern "C" fn dynamic_str(s: *const libc::c_char) -> *mut libc::c_char {
-    let len = strlen(s).wrapping_add(1);
-    let t: *mut libc::c_char =
-        malloc((mem::size_of::<libc::c_char>()).wrapping_mul(len)) as *mut libc::c_char;
-    strncpy(t, s, len);
-    t
-}
-
 pub fn strbuilder_create() -> StrBuilder {
     StrBuilder {
         s: String::with_capacity(100),
@@ -77,15 +65,6 @@ pub fn strbuilder_append_string(b: &mut StrBuilder, s: String) {
 impl StrBuilder {
     pub fn push(&mut self, c: char) {
         self.s.push(c);
-    }
-}
-
-impl From<String> for OwningCStr {
-    fn from(s: String) -> OwningCStr {
-        let mut v = s.into_bytes();
-        v.push(0);
-        v.shrink_to_fit();
-        unsafe { OwningCStr::new(v.leak().as_mut_ptr() as *mut libc::c_char) }
     }
 }
 
@@ -124,78 +103,6 @@ macro_rules! vprintln {
         if $crate::util::VERBOSE_MODE.load(std::sync::atomic::Ordering::Relaxed) {
             println!($($args)*);
         }
-    }
-}
-
-#[derive(Eq)]
-pub struct OwningCStr {
-    ptr: *mut libc::c_char,
-}
-
-unsafe impl Sync for OwningCStr {}
-unsafe impl Send for OwningCStr {}
-
-impl OwningCStr {
-    pub unsafe fn new(ptr: *mut libc::c_char) -> Self {
-        assert!(!ptr.is_null());
-        if let Err(err) = CStr::from_ptr(ptr).to_str() {
-            panic!("non-UTF-8 string {:?}: {err}", CStr::from_ptr(ptr));
-        }
-        OwningCStr { ptr }
-    }
-
-    pub fn as_str(&self) -> &str {
-        unsafe { CStr::from_ptr(self.ptr).to_str().unwrap() }
-    }
-
-    pub fn as_cstr(&self) -> &CStr {
-        unsafe { CStr::from_ptr(self.ptr) }
-    }
-}
-
-impl Display for OwningCStr {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-impl Debug for OwningCStr {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.as_str())
-    }
-}
-
-impl PartialEq for OwningCStr {
-    fn eq(&self, other: &OwningCStr) -> bool {
-        unsafe { CStr::from_ptr(self.ptr) == CStr::from_ptr(other.ptr) }
-    }
-}
-
-impl Drop for OwningCStr {
-    fn drop(&mut self) {
-        unsafe {
-            free(self.ptr as *mut libc::c_void);
-        }
-    }
-}
-
-impl Clone for OwningCStr {
-    fn clone(&self) -> OwningCStr {
-        OwningCStr {
-            ptr: unsafe { dynamic_str(self.ptr) },
-        }
-    }
-}
-
-impl Borrow<CStr> for OwningCStr {
-    fn borrow(&self) -> &CStr {
-        self.as_cstr()
-    }
-}
-
-impl Borrow<str> for OwningCStr {
-    fn borrow(&self) -> &str {
-        self.as_str()
     }
 }
 
