@@ -684,9 +684,6 @@ static struct error *
 call_setupverify(struct ast_function *, struct ast_expr *, struct state *state);
 
 static struct result *
-call_absexec(struct ast_expr *call, struct state *);
-
-static struct result *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	struct error *err;
@@ -774,27 +771,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 
 	return res;
 	*/
-}
-
-static struct result *
-call_absexec(struct ast_expr *expr, struct state *s)
-{
-	assert(false);
-	/*struct ast_expr *root = ast_expr_call_root(expr);*/
-	/*[> TODO: function-valued-expressions <]*/
-	/*char *name = ast_expr_as_identifier(root);*/
-
-	/*struct ast_function *f = externals_getfunc(state_getext(s), name);*/
-	/*if (!f) {*/
-		/*return result_error_create(*/
-			/*error_printf("function `%s' not found", name)*/
-		/*);*/
-	/*}*/
-	/*struct result *res = ast_function_absexec(f, s);*/
-	/*if (result_iserror(res) || result_hasvalue(res)) {*/
-		/*return res;*/
-	/*}*/
-	/*return call_arbitraryresult(expr, f, s);*/
 }
 
 static struct error *
@@ -1098,6 +1074,9 @@ static struct result *
 isdereferencable_absexec(struct ast_expr *, struct state *);
 
 static struct result *
+call_absexec(struct ast_expr *, struct state *);
+
+static struct result *
 alloc_absexec(struct ast_expr *, struct state *);
 
 struct result *
@@ -1110,16 +1089,74 @@ ast_expr_abseval(struct ast_expr *expr, struct state *state)
 		return isdereferencable_absexec(expr, state);
 	case EXPR_ALLOCATION:
 		return alloc_absexec(expr, state);
+	case EXPR_CALL:
+		return call_absexec(expr, state);
 	case EXPR_IDENTIFIER:
 	case EXPR_CONSTANT:
 	case EXPR_UNARY:
-	case EXPR_CALL:
 	case EXPR_STRUCTMEMBER:
 	case EXPR_ARBARG:
 		return ast_expr_eval(expr, state);	
 	default:
 		assert(false);
 	}
+}
+
+static struct result *
+call_absexec(struct ast_expr *expr, struct state *state)
+{
+	struct error *err;
+
+	struct ast_expr *root = ast_expr_call_root(expr);
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(root);
+
+	struct ast_function *f = externals_getfunc(state_getext(state), name);
+	if (!f) {
+		return result_error_create(error_printf("`%s' not found\n", name));
+	}
+
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **params = ast_function_params(f);
+
+	int nargs = ast_expr_call_nargs(expr);
+	if (nargs != nparams) {
+		return result_error_create(
+			error_printf(
+				"`%s' given %d arguments instead of %d\n",
+				name, nargs, nparams
+			)
+		);
+	}
+
+	struct result_arr *args = prepare_arguments(
+		nargs, ast_expr_call_args(expr),
+		nparams, params,
+		state
+	);
+
+	struct frame *call_frame = frame_call_create(
+		ast_function_name(f),
+		ast_function_abstract(f),
+		ast_function_type(f),
+		EXEC_ABSTRACT,
+		ast_expr_copy(expr),
+		f
+	);
+	state_pushframe(state, call_frame);
+
+	if ((err = prepare_parameters(nparams, params, args, name, state))) {
+		return result_error_create(err);
+	}
+
+	/* XXX: pass copy so we don't observe */
+	if ((err = call_setupverify(f, ast_expr_copy(expr), state_copy(state)))) {
+		return result_error_create(
+			error_printf("precondition failure: %w", err)
+		);
+	}
+
+	return result_value_create(NULL);
 }
 
 static struct result *

@@ -259,7 +259,6 @@ stack_atend(struct stack *s)
 struct error *
 stack_step(struct stack *s, struct state *state)
 {
-	printf("mode: %d\n", s->mode);
 	return program_exec(s->p, s->mode, state);
 }
 

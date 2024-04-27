@@ -197,16 +197,18 @@ program_stmt_process(struct program *p, enum execution_mode mode, struct state *
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	// v_printf("stmt: %s\n", ast_stmt_str(stmt));
-	if (!state_islinear(s) && ast_stmt_linearisable(stmt)) {
+	if (!state_islinear(s) && ast_stmt_linearisable(stmt) && state_execmode(s) != EXEC_SETUP) {
 		return ast_stmt_linearise(stmt, s, mode);
 	}
 	switch (mode) {
 	case EXEC_ABSTRACT:
+		printf("abstract_process\n");
 		return ast_stmt_absprocess(stmt, p->name, s);
 	case EXEC_ACTUAL:
+		printf("actual_process\n");
 		return ast_stmt_process(stmt, p->name, s);
 	case EXEC_SETUP:
-		printf("setup: \n");
+		printf("setup_process\n");
 		return ast_stmt_setupprocess(stmt, p->name, s);
 	default:
 		assert(false);

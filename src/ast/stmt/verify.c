@@ -501,7 +501,7 @@ labelled_absexec(struct ast_stmt *stmt, struct state *state)
 	struct frame *setup_frame = frame_setup_create(
 		dynamic_str("setup"),
 		b,
-		EXEC_SETUP
+		EXEC_ABSTRACT
 	);
 	state_pushframe(state, setup_frame);
 
