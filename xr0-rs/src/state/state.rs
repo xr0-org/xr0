@@ -331,15 +331,15 @@ impl State {
     pub fn alloc(&mut self) -> Box<Value> {
         value_ptr_create(self.heap.new_block())
     }
-}
 
-pub unsafe fn state_dealloc(state: *mut State, val: &Value) -> Result<()> {
-    if !value_islocation(val) {
-        return Err(Error::new(
-            "undefined free of value not pointing at heap".to_string(),
-        ));
+    pub fn dealloc(&mut self, val: &Value) -> Result<()> {
+        if !value_islocation(val) {
+            return Err(Error::new(
+                "undefined free of value not pointing at heap".to_string(),
+            ));
+        }
+        location_dealloc(value_as_location(val), &mut self.heap)
     }
-    location_dealloc(value_as_location(val), &mut (*state).heap)
 }
 
 pub unsafe fn state_range_dealloc(

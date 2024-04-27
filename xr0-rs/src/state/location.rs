@@ -217,11 +217,11 @@ pub unsafe fn location_auto_getblock<'stack>(
     Ok(frame.get_block(loc.block))
 }
 
-pub unsafe fn location_dealloc(loc: &Location, heap: *mut Heap) -> Result<()> {
+pub fn location_dealloc(loc: &Location, heap: &mut Heap) -> Result<()> {
     if !matches!(loc.kind, LocationKind::Dynamic) {
         return Err(Error::new("not heap location".to_string()));
     }
-    (*heap).dealloc_block(loc.block)
+    heap.dealloc_block(loc.block)
 }
 
 pub unsafe fn location_range_dealloc(

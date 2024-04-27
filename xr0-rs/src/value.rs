@@ -259,10 +259,6 @@ pub unsafe fn value_abstractcopy(v: &Value, s: *mut State) -> Option<Box<Value>>
     })
 }
 
-pub unsafe fn value_destroy(v: *mut Value) {
-    drop(Box::from_raw(v));
-}
-
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.kind {

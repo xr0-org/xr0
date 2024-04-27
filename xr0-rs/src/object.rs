@@ -6,7 +6,7 @@ use crate::ast::{
     ast_expr_sum_create, ast_type_struct_complete,
 };
 use crate::state::location::location_references;
-use crate::state::state::{state_dealloc, state_eval, state_getext, state_isdeallocand};
+use crate::state::state::{state_eval, state_getext, state_isdeallocand};
 use crate::state::State;
 use crate::util::Result;
 use crate::value::{
@@ -291,7 +291,7 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
 pub unsafe fn object_dealloc(obj: &Object, s: *mut State) -> Result<()> {
     // Note: Original doesn't handle the possibility of Value(None) here.
     match &obj.kind {
-        ObjectKind::Value(Some(v)) => state_dealloc(s, v),
+        ObjectKind::Value(Some(v)) => (*s).dealloc(v),
         ObjectKind::Value(None) => panic!(),
         ObjectKind::DeallocandRange(range) => range_dealloc(range, s),
     }
@@ -347,12 +347,9 @@ pub fn range_size(r: &Range) -> &AstExpr {
 
 pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
     // FIXME - this is clearly insane, take Range by value
-    state_dealloc(
-        s,
-        &*Box::into_raw(value_ptr_create(Box::from_raw(
-            &*r.loc as *const Location as *mut Location,
-        ))),
-    )
+    (*s).dealloc(&*Box::into_raw(value_ptr_create(Box::from_raw(
+        &*r.loc as *const Location as *mut Location,
+    ))))
 }
 
 pub unsafe fn range_isdeallocand(r: &Range, s: *mut State) -> bool {

@@ -13,18 +13,18 @@ use crate::object::{
 use crate::parser::LexemeMarker;
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_copywithname, state_create,
-    state_create_withprops, state_dealloc, state_declare, state_deref, state_equal, state_get,
-    state_getext, state_getloc, state_getobject, state_getobjecttype, state_getprops,
-    state_getresult, state_getvconst, state_hasgarbage, state_isalloc, state_islval,
-    state_popframe, state_pushframe, state_range_alloc, state_range_aredeallocands,
-    state_range_dealloc, state_static_init, state_str, state_vconst,
+    state_create_withprops, state_declare, state_deref, state_equal, state_get, state_getext,
+    state_getloc, state_getobject, state_getobjecttype, state_getprops, state_getresult,
+    state_getvconst, state_hasgarbage, state_isalloc, state_islval, state_popframe,
+    state_pushframe, state_range_alloc, state_range_aredeallocands, state_range_dealloc,
+    state_static_init, state_str, state_vconst,
 };
 use crate::state::State;
 use crate::util::{Error, InsertionOrderMap, Result, SemiBox};
 use crate::value::{
-    value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
-    value_int_create, value_int_indefinite_create, value_into_sync, value_isconstant, value_isint,
-    value_islocation, value_isstruct, value_issync, value_literal_create, value_pf_augment,
+    value_as_constant, value_as_location, value_as_sync, value_copy, value_equal, value_int_create,
+    value_int_indefinite_create, value_into_sync, value_isconstant, value_isint, value_islocation,
+    value_isstruct, value_issync, value_literal_create, value_pf_augment,
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr,
 };
@@ -1004,9 +1004,8 @@ unsafe fn alloc_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value>
 
 unsafe fn dealloc_process(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     let arg = ast_expr_alloc_arg(expr);
-    let val = Box::into_raw(ast_expr_eval(arg, state)?);
-    state_dealloc(state, &*val)?;
-    value_destroy(val);
+    let val = ast_expr_eval(arg, state)?;
+    (*state).dealloc(&val)?;
     Ok(ptr::null_mut())
 }
 
