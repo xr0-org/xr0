@@ -18,8 +18,7 @@ use crate::value::{
     value_ptr_create, value_sync_create,
 };
 use crate::{
-    str_write, vprintln, AstExpr, AstType, AstVariable, Externals, Location, Object, Props,
-    Value,
+    str_write, vprintln, AstExpr, AstType, AstVariable, Externals, Location, Object, Props, Value,
 };
 
 // Note: The original had a destructor `state_destroy` which used a function

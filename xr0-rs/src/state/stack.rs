@@ -263,7 +263,7 @@ unsafe fn object_or_nothing_str(
 ) -> String {
     let b = location_auto_getblock(&*loc, &mut *stack).unwrap();
     if let Some(obj) = b.observe(location_offset(&*loc), state, false) {
-        format!("{obj}").into()
+        format!("{obj}")
     } else {
         "".to_string()
     }
