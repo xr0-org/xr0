@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use std::ffi::{CStr, CString};
 use std::fmt::{self, Display, Formatter};
 use std::process;
+use std::sync::Arc;
 use std::ptr;
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
@@ -1117,7 +1118,7 @@ unsafe fn verify_paramspec(
 
 unsafe fn call_setupverify(f: &AstFunction, arg_state: *mut State) -> Result<()> {
     let fname = f.name();
-    let mut param_state = state_create(fname.clone(), state_getext(arg_state), f.rtype());
+    let mut param_state = state_create(fname.clone(), (*arg_state).externals_arc(), f.rtype());
     ast_function_initparams(f, &mut param_state)?;
     let params = f.params();
     for p in params {
@@ -2942,12 +2943,8 @@ pub unsafe fn ast_function_protostitch(f: &mut AstFunction, ext: &Externals) {
     }
 }
 
-pub unsafe fn ast_function_verify(f: &AstFunction, ext: &Externals) -> Result<()> {
-    let mut state = state_create(
-        f.name().clone(),
-        ext as *const Externals as *mut Externals,
-        f.rtype(),
-    );
+pub unsafe fn ast_function_verify(f: &AstFunction, ext: Arc<Externals>) -> Result<()> {
+    let mut state = state_create(f.name().clone(), ext, f.rtype());
     ast_function_initparams(f, &mut state)?;
     path_absverify_withstate(f, &mut state)?;
     Ok(())
@@ -3021,7 +3018,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
 unsafe fn abstract_audit(f: &AstFunction, abstract_state: *mut State) -> Result<()> {
     let mut actual_state = state_create_withprops(
         f.name().clone(),
-        state_getext(abstract_state),
+        (*abstract_state).externals_arc(),
         f.rtype(),
         (state_getprops(&mut *abstract_state)).clone(),
     );
@@ -3383,7 +3380,7 @@ pub fn lvalue_object(l: &LValue) -> *mut Object {
     l.obj
 }
 
-pub unsafe fn ast_topological_order(fname: &CStr, ext: &mut Externals) -> Vec<OwningCStr> {
+pub unsafe fn ast_topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
     topological_order(fname, ext)
 }
 

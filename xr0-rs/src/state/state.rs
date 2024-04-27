@@ -1,4 +1,5 @@
 use std::ptr;
+use std::sync::Arc;
 
 use super::location::{
     location_copy, location_create_dereferencable, location_create_static, location_dealloc,
@@ -25,7 +26,7 @@ use crate::{
 // `static_memory_destroy` which leaked the allocation containing the static_memory value.
 #[derive(Clone)]
 pub struct State {
-    pub ext: *mut Externals,
+    pub ext: Arc<Externals>,
     pub vconst: VConst,
     pub static_memory: StaticMemory,
     pub clump: Clump,
@@ -34,7 +35,7 @@ pub struct State {
     pub props: Props,
 }
 
-pub unsafe fn state_create(func: OwningCStr, ext: *mut Externals, result_type: &AstType) -> State {
+pub unsafe fn state_create(func: OwningCStr, ext: Arc<Externals>, result_type: &AstType) -> State {
     let mut stack = Stack::new();
     stack.push(func, result_type);
     State {
@@ -50,7 +51,7 @@ pub unsafe fn state_create(func: OwningCStr, ext: *mut Externals, result_type: &
 
 pub unsafe fn state_create_withprops(
     func: OwningCStr,
-    ext: *mut Externals,
+    ext: Arc<Externals>,
     result_type: &AstType,
     props: Props,
 ) -> State {
@@ -73,7 +74,7 @@ pub unsafe fn state_copy(state: &State) -> State {
 
 pub unsafe fn state_copywithname(state: &State, func_name: OwningCStr) -> State {
     State {
-        ext: state.ext,
+        ext: Arc::clone(&state.ext),
         static_memory: state.static_memory.clone(),
         vconst: state.vconst.clone(),
         clump: state.clump.clone(),
@@ -116,8 +117,14 @@ pub unsafe fn state_str(state: *mut State) -> OwningCStr {
     strbuilder_build(b)
 }
 
-pub unsafe fn state_getext(s: *mut State) -> *mut Externals {
-    (*s).ext
+pub unsafe fn state_getext(s: *mut State) -> *const Externals {
+    &*(*s).ext as _
+}
+
+impl State {
+    pub fn externals_arc(&self) -> Arc<Externals> {
+        Arc::clone(&self.ext)
+    }
 }
 
 pub unsafe fn state_getheap(s: *mut State) -> *mut Heap {

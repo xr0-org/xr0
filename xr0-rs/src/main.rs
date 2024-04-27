@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, Stdio};
+use std::sync::Arc;
 
 use clap::Parser;
 
@@ -116,28 +117,19 @@ pub unsafe fn pass0(root: Box<Ast>, ext: &mut Externals) {
     }
 }
 
-pub unsafe fn pass1(order: &[OwningCStr], ext: &Externals) {
+pub unsafe fn pass1(order: &[OwningCStr], ext: &Arc<Externals>, print: bool) {
     for name in order {
         let f = ext.get_func(name.as_str()).unwrap();
         if !f.is_axiom() && !f.is_proto() {
-            if let Err(err) = ast_function_verify(f, ext) {
+            if let Err(err) = ast_function_verify(f, Arc::clone(&ext)) {
                 eprintln!("{}", err.msg);
                 process::exit(1);
             }
-            vprintln!("qed {}", f.name());
-        }
-    }
-}
-
-pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &Externals) {
-    for name in order {
-        let f = ext.get_func(name.as_str()).unwrap();
-        if !f.is_axiom() && !f.is_proto() {
-            if let Err(err) = ast_function_verify(f, ext) {
-                eprintln!("{}", err.msg);
-                process::exit(1);
+            if print {
+                eprintln!("qed {}", f.name());
+            } else {
+                vprintln!("qed {}", f.name());
             }
-            eprintln!("qed {}", (*f).name());
         }
     }
 }
@@ -183,19 +175,20 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
     let mut ext = Externals::new();
     pass0(root, &mut ext);
 
+    let ext = Arc::new(ext);
     if let Some(sortfunc) = &c.sort {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-        let order = ast_topological_order(&sortfunc_cstr, &mut ext);
+        let order = ast_topological_order(&sortfunc_cstr, &ext);
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
     } else if let Some(sortfunc) = &c.verify {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-        let order = ast_topological_order(&sortfunc_cstr, &mut ext);
+        let order = ast_topological_order(&sortfunc_cstr, & ext);
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
-        pass_inorder(&order, &ext);
+        pass1(&order, &ext, true);
     } else {
-        pass1(ext.function_names(), &ext);
+        pass1(ext.function_names(), &ext, false);
     }
 
     Ok(())
