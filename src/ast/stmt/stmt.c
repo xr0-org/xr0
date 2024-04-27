@@ -94,6 +94,34 @@ ast_stmt_labelled_stmt(struct ast_stmt *stmt)
 	return stmt->u.labelled.stmt;
 }
 
+static struct ast_block *
+ast_stmt_to_block(struct ast_stmt *);
+
+struct ast_block *
+ast_stmt_labelled_as_block(struct ast_stmt *stmt)
+{
+	assert(ast_stmt_ispre(stmt));
+	struct ast_stmt *setup = ast_stmt_labelled_stmt(stmt);
+	switch (setup->kind) {
+	case STMT_EXPR:
+		return ast_stmt_to_block(ast_stmt_copy(setup));
+	case STMT_COMPOUND:
+		return ast_block_copy(ast_stmt_as_block(setup));
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_block *
+ast_stmt_to_block(struct ast_stmt *stmt)
+{
+	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	ast_block_append_stmt(b, stmt);
+	return b;
+}
+
+
+
 bool
 ast_stmt_ispre(struct ast_stmt *stmt)
 {

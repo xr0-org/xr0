@@ -334,6 +334,9 @@ ast_stmt_labelled_label(struct ast_stmt *);
 struct ast_stmt *
 ast_stmt_labelled_stmt(struct ast_stmt *);
 
+struct ast_block *
+ast_stmt_labelled_as_block(struct ast_stmt *);
+
 struct ast_stmt *
 ast_stmt_create_nop(struct lexememarker *);
 
@@ -449,14 +452,13 @@ ast_stmt_as_v_block(struct ast_stmt *);
 struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
 
+enum execution_mode;
+
 struct error *
-ast_stmt_linearise(struct ast_stmt *, struct state *, bool abstract);
+ast_stmt_linearise(struct ast_stmt *, struct state *, enum execution_mode);
 
 bool
 ast_stmt_linearisable(struct ast_stmt *);
-
-struct error *
-ast_stmt_process(struct ast_stmt *, char *fname, struct state *);
 
 struct preresult;
 
@@ -473,11 +475,13 @@ struct error *
 ast_stmt_exec(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *,
-	bool hack_old, bool should_setup);
+ast_stmt_process(struct ast_stmt *, char *fname, struct state *);
 
 struct error *
-ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *);
+ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *);
+
+struct error *
+ast_stmt_setupprocess(struct ast_stmt *stmt, char *fname, struct state *);
 
 struct ast_type;
 
@@ -671,9 +675,6 @@ struct error *
 ast_function_debug(struct ast_function *, struct externals *);
 
 struct result;
-
-struct error *
-ast_function_setupabsexec(struct ast_function *f, struct state *state);
 
 struct ast_externdecl;
 

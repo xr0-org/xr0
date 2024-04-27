@@ -16,7 +16,7 @@
 struct frame;
 
 struct stack {
-	bool abstract;
+	enum execution_mode mode;
 	struct program *p;
 
 	struct block_arr *memory;
@@ -35,7 +35,7 @@ struct frame {
 	char *name;
 	struct ast_block *b;
 	struct ast_type *ret_type;
-	bool abstract;
+	enum execution_mode mode;
 	enum frame_kind kind;
 	struct ast_expr *call;
 	struct ast_function *f;
@@ -59,7 +59,7 @@ stack_create(struct frame *f, struct stack *prev)
 
 	assert(f->b);
 	stack->p = program_create(f->b, f->name);
-	stack->abstract = f->abstract;
+	stack->mode = f->mode;
 	stack->memory = block_arr_create();
 
 	stack->varmap = map_create();
@@ -160,7 +160,7 @@ struct stack *
 stack_copy(struct stack *stack)
 {
 	struct stack *copy = calloc(1, sizeof(struct stack));
-	copy->abstract = stack->abstract;
+	copy->mode = stack->mode;
 	copy->p = program_copy(stack->p);
 	copy->memory = block_arr_copy(stack->memory);
 	copy->varmap = varmap_copy(stack->varmap);
@@ -244,6 +244,12 @@ stack_islinear(struct stack *s)
 	return s->kind == FRAME_INTERMEDIATE;
 }
 
+enum execution_mode
+stack_execmode(struct stack *s)
+{
+	return s->mode;
+}
+
 bool
 stack_atend(struct stack *s)
 {
@@ -253,7 +259,8 @@ stack_atend(struct stack *s)
 struct error *
 stack_step(struct stack *s, struct state *state)
 {
-	return program_exec(s->p, s->abstract, state);
+	printf("mode: %d\n", s->mode);
+	return program_exec(s->p, s->mode, state);
 }
 
 void
@@ -427,7 +434,7 @@ stack_getblock(struct stack *s, int address)
 }
 
 static struct frame *
-frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs,
+frame_create(char *n, struct ast_block *b, struct ast_type *r, enum execution_mode mode,
 		enum frame_kind kind)
 {
 	struct frame *f = malloc(sizeof(struct frame));
@@ -437,7 +444,7 @@ frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs,
 		assert(r);
 		f->ret_type = ast_type_copy(r);
 	}
-	f->abstract = abs;
+	f->mode = mode;
 	f->kind = kind;
 	f->call = NULL;
 	f->f = NULL;
@@ -445,24 +452,30 @@ frame_create(char *n, struct ast_block *b, struct ast_type *r, bool abs,
 }
 
 struct frame *
-frame_call_create(char *n, struct ast_block *b, struct ast_type *r, bool abs, struct ast_expr *call, struct ast_function *func)
+frame_call_create(char *n, struct ast_block *b, struct ast_type *r, enum execution_mode mode, struct ast_expr *call, struct ast_function *func)
 {
-	struct frame *f = frame_create(n, b, r, abs, FRAME_CALL);
+	struct frame *f = frame_create(n, b, r, mode, FRAME_CALL);
 	f->call = call;
 	f->f = func;
 	return f;
 }
 
 struct frame *
-frame_block_create(char *n, struct ast_block *b, bool abs)
+frame_setup_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, b, NULL, abs, FRAME_NESTED);
+	return frame_create(n, b, NULL, mode, FRAME_SETUP);
 }
 
 struct frame *
-frame_intermediate_create(char *n, struct ast_block *b, bool abs)
+frame_block_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, b, NULL, abs, FRAME_INTERMEDIATE);
+	return frame_create(n, b, NULL, mode, FRAME_NESTED);
+}
+
+struct frame *
+frame_intermediate_create(char *n, struct ast_block *b, enum execution_mode mode)
+{
+	return frame_create(n, b, NULL, mode, FRAME_INTERMEDIATE);
 }
 
 static struct frame *
@@ -475,7 +488,7 @@ frame_copy(struct frame *f)
 		dynamic_str(f->name),
 		ast_block_copy(f->b),
 		f->ret_type ? ast_type_copy(f->ret_type) : NULL,
-		f->abstract,
+		f->mode,
 		f->kind
 	); 
 	if (f->kind == FRAME_CALL) {

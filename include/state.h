@@ -26,8 +26,15 @@ struct value;
 
 struct state;
 
+enum execution_mode {
+	EXEC_ABSTRACT,
+	EXEC_ACTUAL,
+	EXEC_SETUP
+};
+
 enum frame_kind {
 	FRAME_NESTED,
+	FRAME_SETUP,
 	FRAME_INTERMEDIATE,
 	FRAME_CALL
 };
@@ -120,6 +127,9 @@ state_range_dealloc(struct state *, struct object *,
 bool
 state_islinear(struct state *);
 
+enum execution_mode
+state_execmode(struct state *);
+
 bool
 state_addresses_deallocand(struct state *, struct object *);
 
@@ -176,13 +186,17 @@ state_framecall(struct state *);
 /* FRAME DTO */
 
 struct frame *
-frame_call_create(char *name, struct ast_block *, struct ast_type *, bool abs, struct ast_expr *, struct ast_function *);
+frame_call_create(char *name, struct ast_block *, struct ast_type *,
+		enum execution_mode, struct ast_expr *, struct ast_function *);
 
 struct frame *
-frame_block_create(char *name, struct ast_block *, bool abs);
+frame_block_create(char *name, struct ast_block *, enum execution_mode);
 
 struct frame *
-frame_intermediate_create(char *name, struct ast_block *, bool abs);
+frame_intermediate_create(char *name, struct ast_block *, enum execution_mode);
+
+struct frame *
+frame_setup_create(char *n, struct ast_block *b, enum execution_mode);
 
 /* USED BY VALUE */
 

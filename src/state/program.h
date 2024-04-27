@@ -33,8 +33,10 @@ program_setatend(struct program *);
 bool
 program_atend(struct program *);
 
+enum execution_mode;
+
 struct error *
-program_exec(struct program *, bool abstract, struct state *);
+program_exec(struct program *, enum execution_mode, struct state *);
 
 char *
 program_loc(struct program *);

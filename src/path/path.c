@@ -309,7 +309,7 @@ path_init_abstract(struct path *p)
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
 		ast_function_type(p->f),
-		true,
+		EXEC_ABSTRACT,
 		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
 		p->f
 	);
@@ -330,7 +330,7 @@ path_init_actual(struct path *p)
 		ast_function_name(p->f),
 		ast_function_body(p->f),
 		ast_function_type(p->f),
-		false,
+		EXEC_ACTUAL,
 		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
 		p->f
 	);
@@ -343,10 +343,12 @@ path_init_actual(struct path *p)
 	if (err) {
 		return err;
 	}
-	err = ast_function_setupabsexec(p->f, p->actual);
-	if (err) {
-		return err;
-	}
+	struct frame *setup = frame_setup_create(
+		dynamic_str("setup"),
+		ast_block_copy(ast_function_abstract(p->f)),
+		EXEC_SETUP	
+	);
+	state_pushframe(p->actual, setup);
 	p->path_state = PATH_STATE_ACTUAL;
 	return NULL;
 }
