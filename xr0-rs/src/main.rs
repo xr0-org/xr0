@@ -38,31 +38,31 @@ use util::{OwningCStr, VERBOSE_MODE};
 use value::Value;
 
 #[derive(Parser)]
-pub struct Config {
+struct Config {
     #[arg(value_name = "FILE")]
-    pub infile: PathBuf,
+    infile: PathBuf,
 
     #[arg(short, default_value = "0.c")]
-    pub outfile: PathBuf,
+    outfile: PathBuf,
 
     #[arg(short = 'I', action = clap::ArgAction::Append)]
-    pub include_dirs: Vec<PathBuf>,
+    include_dirs: Vec<PathBuf>,
 
     #[arg(short, long)]
-    pub verbose: bool,
+    verbose: bool,
 
     /// Function to evaluate dependencies for.
     #[arg(short = 't', group = "sortmode")]
-    pub sort: Option<String>,
+    sort: Option<String>,
 
     #[arg(short = 'x', group = "sortmode")]
-    pub verify: Option<String>,
+    verify: Option<String>,
 
     #[arg(short = 's', long = "strip")]
-    pub strip_mode: bool,
+    strip_mode: bool,
 }
 
-pub fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String> {
+fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String> {
     let mut cmd = Command::new("cc");
     for path in include_dirs {
         cmd.arg("-I").arg(path);
@@ -91,7 +91,7 @@ pub fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String>
 }
 
 #[allow(clippy::boxed_local)]
-pub unsafe fn pass0(root: Box<Ast>, ext: &mut Externals) {
+unsafe fn pass0(root: Box<Ast>, ext: &mut Externals) {
     // Note: This clone is not in the original. The cost could be reduced by strategically changing
     // Boxes to Arcs in the AST. The cost could also probably be eliminated entirely using SemiBox
     // and giving Externals a lifetime parameter, but that's a bit much.
@@ -118,7 +118,7 @@ pub unsafe fn pass0(root: Box<Ast>, ext: &mut Externals) {
     }
 }
 
-pub unsafe fn pass1(order: &[OwningCStr], ext: &Arc<Externals>, print: bool) {
+unsafe fn pass1(order: &[OwningCStr], ext: &Arc<Externals>, print: bool) {
     for name in order {
         let f = ext.get_func(name.as_str()).unwrap();
         if !f.is_axiom() && !f.is_proto() {
@@ -160,7 +160,7 @@ unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool
     false
 }
 
-unsafe fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
+fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
     let proto_abs = proto.abstract_block();
     let def_abs = def.abstract_block();
     let abs_match = ast_block_str(proto_abs, "") == ast_block_str(def_abs, "");
@@ -239,7 +239,7 @@ fn strip(config: &Config) -> Result<(), io::Error> {
     Ok(())
 }
 
-pub fn main() {
+fn main() {
     let mut c = Config::parse();
     if let Some(value) = env::var_os("XR0_INCLUDES") {
         let path: &Path = value.as_ref();
