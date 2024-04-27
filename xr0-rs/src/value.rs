@@ -300,12 +300,13 @@ pub fn value_as_location(v: &Value) -> &Location {
     loc
 }
 
-pub unsafe fn value_into_location(v: *mut Value) -> Box<Location> {
-    let v = Box::from_raw(v);
-    let ValueKind::DefinitePtr(loc) = v.kind else {
-        panic!();
-    };
-    loc
+impl Value {
+    pub fn into_location(self) -> Box<Location> {
+        let ValueKind::DefinitePtr(loc) = self.kind else {
+            panic!();
+        };
+        loc
+    }
 }
 
 pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {

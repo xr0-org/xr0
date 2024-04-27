@@ -10,15 +10,20 @@ use crate::state::state::{state_eval, state_getext};
 use crate::state::State;
 use crate::util::Result;
 use crate::value::{
-    value_abstractcopy, value_as_location, value_copy, value_into_location, value_ptr_create,
-    value_references, value_referencesheap, value_struct_create, value_struct_member,
-    value_struct_membertype,
+    value_abstractcopy, value_as_location, value_copy, value_ptr_create, value_references,
+    value_referencesheap, value_struct_create, value_struct_member, value_struct_membertype,
 };
 use crate::{AstExpr, AstType, Location, Value};
 
+/// A span of memory within a block. This could be the whole block, a field of a struct, an element
+/// of an array, etc.
+///
+/// An object is either "value" or "range". If it's "value" then it either has a Value, or it's
+/// uninitialized.
 #[derive(Clone)]
 pub struct Object {
     pub kind: ObjectKind,
+    /// Expression for the offset of this object within the enclosing block.
     pub offset: Box<AstExpr>,
 }
 
@@ -225,13 +230,14 @@ pub unsafe fn object_upto(
     drop(prop1);
     drop(prop0);
     ast_expr_destroy(up);
-    if !e0 {
-        panic!();
-    }
+    assert!(e0, "excl_up must be decidably >= the start offset of obj");
     if e1 {
+        // `excl_up` is equal to this object's lower bound. Nothing to return.
         return None;
     }
     if e2 {
+        // `excl_up` is equal to this object's upper bound. Return everything.
+        // I'm not sure why this doesn't return `Some(obj.clone())`.
         // Note: Original doesn't null-check the value here; objects can be VALUE with null value.
         let ObjectKind::Value(Some(v)) = &obj.kind else {
             panic!();
@@ -242,14 +248,17 @@ pub unsafe fn object_upto(
         ));
     }
 
+    // `excl_up` is not decidably equal to the upper or lower bound of `obj`. In fact, we did not
+    // insist on `excl_up <= up`, so `excl_up` could be past that end.
+
     // Note: This makes one copy of `obj->offset` but also just does `Box::from_raw(lw)` which ...
-    // seems like it's take ownership of `obj->offset`, and maybe we leak `obj` to avoid a double
+    // seems like it's taking ownership of `obj->offset`, and maybe we leak `obj` to avoid a double
     // free?
     Some(object_range_create(
         ast_expr_copy(&obj.offset),
         range_create(
             ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
-            value_into_location(Box::into_raw((*s).alloc())),
+            (*s).alloc().into_location(),
         ),
     ))
 }
@@ -282,7 +291,7 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
         ast_expr_copy(incl_lw),
         range_create(
             ast_expr_difference_create(Box::from_raw(up), ast_expr_copy(incl_lw)),
-            value_into_location(Box::into_raw((*s).alloc())),
+            (*s).alloc().into_location(),
         ),
     ))
 }

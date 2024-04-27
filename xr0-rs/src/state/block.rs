@@ -56,22 +56,30 @@ impl Block {
             return Some(&self.arr[index]);
         };
         let obj = &self.arr[index];
+
         if object_isvalue(obj) {
             return Some(&self.arr[index]);
         }
+
+        // range around observand at offset
         let lw = ast_expr_copy(offset);
         let up = ast_expr_sum_create(ast_expr_copy(offset), ast_expr_constant_create(1));
+
+        // ordering makes them sequential in heap
+        let lw_ptr = Box::into_raw(lw);
         // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down. I don't
         // know why it isn't a double free.
-        let lw_ptr = Box::into_raw(lw);
         let upto = object_upto(obj, lw_ptr, s);
         let observed = object_value_create(ast_expr_copy(&*lw_ptr), Some((*s).alloc()));
         let from = object_from(obj, &up, s);
         drop(up);
         drop(Box::from_raw(lw_ptr));
 
+        // delete current struct block
+        // Note: This is going to mutate self illicitly.
         object_dealloc(obj, s).unwrap();
         self.arr.remove(index);
+
         if let Some(upto) = upto {
             self.arr.insert(index, upto);
             index += 1;
