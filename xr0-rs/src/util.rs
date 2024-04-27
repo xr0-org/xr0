@@ -66,8 +66,8 @@ pub fn strbuilder_create() -> StrBuilder {
     }
 }
 
-pub fn strbuilder_build(b: StrBuilder) -> OwningCStr {
-    b.s.into()
+pub fn strbuilder_build(b: StrBuilder) -> String {
+    b.s
 }
 
 pub fn strbuilder_append_string(b: &mut StrBuilder, s: String) {
@@ -142,32 +142,6 @@ impl OwningCStr {
             panic!("non-UTF-8 string {:?}: {err}", CStr::from_ptr(ptr));
         }
         OwningCStr { ptr }
-    }
-
-    pub fn empty() -> Self {
-        OwningCStr {
-            ptr: unsafe { dynamic_str(b"\0" as *const u8 as *const libc::c_char) },
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        unsafe { CStr::from_ptr(self.ptr).is_empty() }
-    }
-
-    pub fn copy(ptr: &CStr) -> Self {
-        unsafe { Self::new(dynamic_str(ptr.as_ptr())) }
-    }
-
-    pub fn copy_str(s: &str) -> Self {
-        let n = s.len();
-        unsafe {
-            let p = libc::calloc(n + 1, mem::size_of::<libc::c_char>());
-            assert!(!p.is_null());
-            libc::memcpy(p, s.as_bytes().as_ptr() as *const libc::c_void, n);
-            OwningCStr {
-                ptr: p as *mut libc::c_char,
-            }
-        }
     }
 
     pub fn as_str(&self) -> &str {

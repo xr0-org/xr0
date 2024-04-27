@@ -12,7 +12,7 @@ use crate::ast::{
     ast_type_vconst,
 };
 use crate::object::{object_as_value, object_assign};
-use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
+use crate::util::{strbuilder_build, strbuilder_create, Error,  Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
     value_ptr_create, value_sync_create,
@@ -35,7 +35,7 @@ pub struct State {
     pub props: Props,
 }
 
-pub unsafe fn state_create(func: OwningCStr, ext: Arc<Externals>, result_type: &AstType) -> State {
+pub unsafe fn state_create(func: String, ext: Arc<Externals>, result_type: &AstType) -> State {
     let mut stack = Stack::new();
     stack.push(func, result_type);
     State {
@@ -50,7 +50,7 @@ pub unsafe fn state_create(func: OwningCStr, ext: Arc<Externals>, result_type: &
 }
 
 pub unsafe fn state_create_withprops(
-    func: OwningCStr,
+    func: String,
     ext: Arc<Externals>,
     result_type: &AstType,
     props: Props,
@@ -72,7 +72,7 @@ pub unsafe fn state_copy(state: &State) -> State {
     state.clone()
 }
 
-pub unsafe fn state_copywithname(state: &State, func_name: OwningCStr) -> State {
+pub unsafe fn state_copywithname(state: &State, func_name: String) -> State {
     State {
         ext: Arc::clone(&state.ext),
         static_memory: state.static_memory.clone(),
@@ -84,7 +84,7 @@ pub unsafe fn state_copywithname(state: &State, func_name: OwningCStr) -> State 
     }
 }
 
-pub unsafe fn state_str(state: *mut State) -> OwningCStr {
+pub unsafe fn state_str(state: *mut State) -> String {
     let mut b = strbuilder_create();
     strbuilder_write!(b, "[[\n");
     let ext = (*(*state).ext).types_str("\t");
@@ -135,7 +135,7 @@ pub unsafe fn state_getprops(s: &mut State) -> &mut Props {
     &mut s.props
 }
 
-pub unsafe fn state_pushframe(state: *mut State, func: OwningCStr, ret_type: &AstType) {
+pub unsafe fn state_pushframe(state: *mut State, func: String, ret_type: &AstType) {
     (*state).stack.push(func, ret_type);
 }
 
@@ -163,7 +163,7 @@ pub unsafe fn state_vconst(
 
 pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value> {
     let lit = ast_expr_as_literal(expr);
-    let loc: *mut Location = (*state).static_memory.check_pool(lit.as_str());
+    let loc: *mut Location = (*state).static_memory.check_pool(lit);
     if !loc.is_null() {
         // XXX FIXME this is definitely not kosher - can make multiple boxes point to the same
         // Location
@@ -175,8 +175,8 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value>
     if obj.is_null() {
         panic!();
     }
-    object_assign(&mut *obj, Some(value_literal_create(lit.as_str())));
-    (*state).static_memory.string_pool(lit.as_str(), &loc);
+    object_assign(&mut *obj, Some(value_literal_create(lit)));
+    (*state).static_memory.string_pool(lit, &loc);
     value_ptr_create(loc)
 }
 

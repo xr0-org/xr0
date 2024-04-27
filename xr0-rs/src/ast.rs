@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use std::collections::VecDeque;
-use std::ffi::{CStr, CString};
 use std::fmt::{self, Display, Formatter};
 use std::process;
 use std::ptr;
@@ -22,8 +21,8 @@ use crate::state::state::{
 };
 use crate::state::State;
 use crate::util::{
-    strbuilder_build, strbuilder_create, Error, InsertionOrderMap, OwningCStr,
-    Result, SemiBox, StrBuilder,
+    strbuilder_build, strbuilder_create, Error, InsertionOrderMap, Result, SemiBox,
+    StrBuilder,
 };
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
@@ -115,14 +114,14 @@ pub struct ConstantExpr {
 #[derive(Clone)]
 pub struct StructMemberExpr {
     root: Box<AstExpr>,
-    member: OwningCStr,
+    member: String,
 }
 
 #[derive(Clone)]
 enum AstExprKind {
-    Identifier(OwningCStr),
+    Identifier(String),
     Constant(ConstantExpr),
-    StringLiteral(OwningCStr),
+    StringLiteral(String),
     Bracketed(Box<AstExpr>),
     Iteration,
     Call(CallExpr),
@@ -147,7 +146,7 @@ pub struct AstType {
 
 #[derive(Clone)]
 pub struct AstStructType {
-    pub tag: Option<OwningCStr>,
+    pub tag: Option<String>,
     pub members: Option<Box<Vec<Box<AstVariable>>>>,
 }
 
@@ -156,7 +155,7 @@ pub struct AstVariable {
     // Note: In the original, `name` could be null. However in most situations (almost all; an
     // exception is the parameter in `fclose(FILE *);` which has no name) this would be invalid, so
     // we end up banning it.
-    pub name: OwningCStr,
+    pub name: String,
     pub type_: Box<AstType>,
 }
 
@@ -182,7 +181,7 @@ pub enum AstTypeBase {
     Struct(AstStructType),
     Union(AstStructType),
     Enum,
-    UserDefined(OwningCStr),
+    UserDefined(String),
 }
 
 pub type AstTypeModifier = libc::c_uint;
@@ -204,7 +203,7 @@ pub struct LValue<'ast> {
 pub struct AstFunction<'ast> {
     pub is_axiom: bool,
     pub ret: Box<AstType>,
-    pub name: OwningCStr,
+    pub name: String,
     pub params: Vec<Box<AstVariable>>,
     pub abstract_: Box<AstBlock>,
     pub body: Option<SemiBox<'ast, AstBlock>>,
@@ -259,7 +258,7 @@ pub struct AstSelectionStmt {
 
 #[derive(Clone)]
 pub struct AstLabelledStmt {
-    pub label: OwningCStr,
+    pub label: String,
     pub stmt: Box<AstStmt>,
 }
 
@@ -295,7 +294,7 @@ pub struct AstExternDecl {
 
 #[derive(Clone)]
 pub struct AstTypedefDecl {
-    pub name: OwningCStr,
+    pub name: String,
     pub type_0: Box<AstType>,
 }
 
@@ -353,7 +352,7 @@ unsafe fn rangeprocess_dealloc(
 
 unsafe fn hack_base_object_from_alloc(expr: &AstExpr, state: *mut State) -> *mut Object {
     let inner = ast_expr_unary_operand(expr);
-    let i = ast_expr_identifier_create(OwningCStr::copy_str("i"));
+    let i = ast_expr_identifier_create("i".to_string());
     if !ast_expr_equal(ast_expr_binary_e2(inner), &i) {
         panic!();
     }
@@ -538,8 +537,8 @@ unsafe fn expr_isdeallocand_rangedecide(
     let acc = ast_expr_isdeallocand_assertand(expr);
     assert_eq!(ast_expr_unary_op(acc), AstUnaryOp::Dereference);
     let inner = ast_expr_unary_operand(acc);
-    let i = ast_expr_identifier_create(OwningCStr::copy_str("i"));
-    let j = ast_expr_identifier_create(OwningCStr::copy_str("j"));
+    let i = ast_expr_identifier_create("i".to_string());
+    let j = ast_expr_identifier_create("j".to_string());
     if !(ast_expr_equal(ast_expr_binary_e2(inner), &i)
         || ast_expr_equal(ast_expr_binary_e2(inner), &j))
     {
@@ -663,7 +662,7 @@ unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Val
 unsafe fn hack_identifier_builtin_eval(id: &str, state: *mut State) -> Result<Box<Value>> {
     if state_getvconst(&*state, id).is_some() || id.starts_with("ptr:") {
         return Ok(value_sync_create(ast_expr_identifier_create(
-            OwningCStr::copy_str(id),
+            id.to_string(),
         )));
     }
     Err(Error::new("not built-in".to_string()))
@@ -693,13 +692,13 @@ fn expr_to_binary(expr: &AstExpr) -> Box<AstExpr> {
 
 unsafe fn expr_identifier_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     let id = ast_expr_as_identifier(expr);
-    if let Ok(res) = hack_identifier_builtin_eval(id.as_str(), state) {
+    if let Ok(res) = hack_identifier_builtin_eval(id, state) {
         return Ok(res);
     }
-    if id.as_str().starts_with('#') {
-        return Ok(value_literal_create(id.as_str()));
+    if id.starts_with('#') {
+        return Ok(value_literal_create(id));
     }
-    let obj: *mut Object = state_getobject(state, id.as_str());
+    let obj: *mut Object = state_getobject(state, id);
     if obj.is_null() {
         return Err(Error::new(format!("unknown idenitfier {id}")));
     }
@@ -716,7 +715,7 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let root = ast_expr_member_root(expr);
     let res_val = ast_expr_eval(root, s)?;
     let field = ast_expr_member_field(expr);
-    let Some(member) = value_struct_member(&res_val, field.as_str()) else {
+    let Some(member) = value_struct_member(&res_val, field) else {
         return Err(Error::new(format!("`{root}' has no field `{field}'")));
     };
     let Some(obj_value) = object_as_value(member) else {
@@ -729,7 +728,7 @@ unsafe fn expr_structmember_eval(expr: &AstExpr, s: *mut State) -> Result<Box<Va
 unsafe fn address_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     let operand = ast_expr_unary_operand(expr);
     let id = ast_expr_as_identifier(operand);
-    Ok(state_getloc(state, id.as_str()))
+    Ok(state_getloc(state, id))
 }
 
 pub unsafe fn ast_expr_alloc_rangeprocess(
@@ -833,20 +832,11 @@ pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Res
         panic!();
     }
     let field = ast_expr_member_field(expr);
-    let Some(member) = object_getmember(
-        &mut *root_obj,
-        lvalue_type(&root_lval),
-        field.as_str(),
-        state,
-    ) else {
+    let Some(member) = object_getmember(&mut *root_obj, lvalue_type(&root_lval), field, state)
+    else {
         return Err(Error::new("lvalue error".to_string()));
     };
-    let t = object_getmembertype(
-        &mut *root_obj,
-        lvalue_type(&root_lval),
-        field.as_str(),
-        state,
-    );
+    let t = object_getmembertype(&mut *root_obj, lvalue_type(&root_lval), field, state);
     Ok(lvalue_create(t, member as *const Object as *mut Object))
 }
 
@@ -891,8 +881,8 @@ pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LVa
 pub unsafe fn expr_identifier_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
     let id = ast_expr_as_identifier(expr);
     Ok(lvalue_create(
-        Some(state_getobjecttype(&*state, id.as_str())),
-        state_getobject(state, id.as_str()),
+        Some(state_getobjecttype(&*state, id)),
+        state_getobject(state, id),
     ))
 }
 
@@ -918,14 +908,14 @@ impl Display for ConstantExpr {
 unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let Some(f) = (*state_getext(state)).get_func(name.as_str()) else {
+    let Some(f) = (*state_getext(state)).get_func(name) else {
         return Err(Error::new(format!("function `{name}' not found")));
     };
     let params = f.params();
     let rtype = f.rtype();
     let args = prepare_arguments(ast_expr_call_args(expr), params, state);
-    state_pushframe(state, name.clone(), rtype);
-    prepare_parameters(params, args, name.as_str(), state)?;
+    state_pushframe(state, name.to_string(), rtype);
+    prepare_parameters(params, args, name, state)?;
     call_setupverify(f, &mut state_copy(&*state))?;
     let mut v = call_absexec(expr, state)?;
     if !v.is_null() {
@@ -942,7 +932,7 @@ unsafe fn expr_call_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>
 unsafe fn call_absexec(expr: &AstExpr, s: *mut State) -> Result<*mut Value> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let Some(f) = (*state_getext(s)).get_func(name.as_str()) else {
+    let Some(f) = (*state_getext(s)).get_func(name) else {
         return Err(Error::new(format!("function `{name}' not found")));
     };
     let v = ast_function_absexec(f, s)?;
@@ -968,7 +958,7 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<Box<V
     let nparams = uncomputed_params.len();
     let mut computed_params = Vec::with_capacity(nparams);
     for p in uncomputed_params {
-        let param = ast_expr_identifier_create(ast_variable_name(p).clone());
+        let param = ast_expr_identifier_create(ast_variable_name(p).to_string());
         let v = Box::into_raw(ast_expr_eval(&param, s)?);
         drop(param);
         computed_params.push(if value_islocation(&*v) {
@@ -978,7 +968,7 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: *mut State) -> Result<Box<V
         });
     }
     Ok(value_sync_create(ast_expr_call_create(
-        ast_expr_identifier_create(root.clone()),
+        ast_expr_identifier_create(root.to_string()),
         computed_params,
     )))
 }
@@ -1035,7 +1025,7 @@ pub unsafe fn prepare_parameters(
         state_declare(state, param, true);
 
         let arg = res?;
-        let name = ast_expr_identifier_create(ast_variable_name(param).clone());
+        let name = ast_expr_identifier_create(ast_variable_name(param).to_string());
         let lval_lval = ast_expr_lvalue(&name, state)?;
         let obj: *mut Object = lvalue_object(&lval_lval);
         drop(name);
@@ -1118,15 +1108,15 @@ unsafe fn verify_paramspec(
 
 unsafe fn call_setupverify(f: &AstFunction, arg_state: *mut State) -> Result<()> {
     let fname = f.name();
-    let mut param_state = state_create(fname.clone(), (*arg_state).externals_arc(), f.rtype());
+    let mut param_state = state_create(fname.to_string(), (*arg_state).externals_arc(), f.rtype());
     ast_function_initparams(f, &mut param_state)?;
     let params = f.params();
     for p in params {
         let id = ast_variable_name(p);
         // Note: `param` and `arg` are deliberately leaked in the original to avoid double-freeing
         // the variable's location.
-        let param = state_getloc(&mut param_state, id.as_str());
-        let arg = state_getloc(arg_state, id.as_str());
+        let param = state_getloc(&mut param_state, id);
+        let arg = state_getloc(arg_state, id);
         if let Err(err) = verify_paramspec(&param, &arg, &mut param_state, arg_state) {
             return Err(Error::new(format!("parameter {id} of {fname} {}", err.msg)));
         }
@@ -1146,11 +1136,11 @@ pub fn ast_expr_bracketed_create(root: Box<AstExpr>) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Bracketed(root))
 }
 
-pub fn ast_expr_literal_create(s: OwningCStr) -> Box<AstExpr> {
+pub fn ast_expr_literal_create(s: String) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::StringLiteral(s))
 }
 
-pub fn ast_expr_as_literal(expr: &AstExpr) -> &OwningCStr {
+pub fn ast_expr_as_literal(expr: &AstExpr) -> &str {
     let AstExprKind::StringLiteral(s) = &expr.kind else {
         panic!()
     };
@@ -1186,7 +1176,7 @@ pub fn ast_expr_constant_create(k: libc::c_int) -> Box<AstExpr> {
     }))
 }
 
-pub fn ast_expr_as_identifier(expr: &AstExpr) -> &OwningCStr {
+pub fn ast_expr_as_identifier(expr: &AstExpr) -> &str {
     let AstExprKind::Identifier(id) = &expr.kind else {
         panic!()
     };
@@ -1201,7 +1191,7 @@ pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
     drop(Box::from_raw(expr));
 }
 
-pub fn ast_expr_identifier_create(s: OwningCStr) -> Box<AstExpr> {
+pub fn ast_expr_identifier_create(s: String) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Identifier(s))
 }
 
@@ -1237,7 +1227,7 @@ unsafe fn call_pf_reduce(e: &AstExpr, s: *mut State) -> Result<Box<Value>> {
         reduced_args.push(value_to_expr(&*Box::into_raw(val)));
     }
     Ok(value_sync_create(ast_expr_call_create(
-        ast_expr_identifier_create(root.clone()),
+        ast_expr_identifier_create(root.to_string()),
         reduced_args,
     )))
 }
@@ -1246,7 +1236,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let v = ast_expr_pf_reduce(ast_expr_member_root(expr), s)?;
     let field = ast_expr_member_field(expr);
     if value_isstruct(&v) {
-        let obj = value_struct_member(&v, field.as_str()).unwrap();
+        let obj = value_struct_member(&v, field).unwrap();
         let obj_value = object_as_value(obj).unwrap();
         return Ok(value_copy(obj_value));
     }
@@ -1255,7 +1245,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     }
     Ok(value_sync_create(ast_expr_member_create(
         value_into_sync(Box::into_raw(v)),
-        field.clone(),
+        field.to_string(),
     )))
 }
 
@@ -1327,7 +1317,7 @@ pub fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
     }
 }
 
-pub fn ast_expr_member_field(expr: &AstExpr) -> &OwningCStr {
+pub fn ast_expr_member_field(expr: &AstExpr) -> &str {
     let AstExprKind::StructMember(member) = &expr.kind else {
         panic!()
     };
@@ -1355,7 +1345,7 @@ pub fn ast_expr_incdec_root(expr: &AstExpr) -> &AstExpr {
     &incdec.operand
 }
 
-pub fn ast_expr_member_create(struct_: Box<AstExpr>, field: OwningCStr) -> Box<AstExpr> {
+pub fn ast_expr_member_create(struct_: Box<AstExpr>, field: String) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::StructMember(StructMemberExpr {
         root: struct_,
         member: field,
@@ -1625,7 +1615,7 @@ pub fn ast_expr_unary_op(expr: &AstExpr) -> AstUnaryOp {
     unary.op
 }
 
-pub fn ast_expr_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
+pub fn ast_expr_getfuncs(expr: &AstExpr) -> Vec<String> {
     match &expr.kind {
         AstExprKind::Identifier(_)
         | AstExprKind::Constant(_)
@@ -1671,15 +1661,15 @@ pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplit
 unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> Result<AstStmtSplits> {
     let root = ast_expr_call_root(expr);
     let name = ast_expr_as_identifier(root);
-    let Some(f) = (*state_getext(state)).get_func(name.as_str()) else {
+    let Some(f) = (*state_getext(state)).get_func(name) else {
         return Err(Error::new(format!("function: `{name}' not found")));
     };
     let params = f.params();
     let mut s_copy = state_copy(&*state);
     let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
     let ret_type = f.rtype();
-    state_pushframe(&mut s_copy, name.clone(), ret_type);
-    prepare_parameters(params, args, name.as_str(), &mut s_copy)?;
+    state_pushframe(&mut s_copy, name.to_string(), ret_type);
+    prepare_parameters(params, args, name, &mut s_copy)?;
     let mut conds = vec![];
     let abs = f.abstract_block();
     for var in &abs.decls {
@@ -1704,7 +1694,7 @@ unsafe fn binary_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplits> {
     })
 }
 
-fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
+fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<String> {
     let AstExprKind::Call(call) = &expr.kind else {
         panic!()
     };
@@ -1719,29 +1709,27 @@ fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<OwningCStr> {
     res
 }
 
-fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<OwningCStr, libc::c_int> {
+fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<String, libc::c_int> {
     let mut indegrees = InsertionOrderMap::new();
     for (key, deps) in g {
-        if indegrees.get(key.as_c_str()).is_none() {
-            indegrees.insert(OwningCStr::copy(key), 0);
+        if indegrees.get(key).is_none() {
+            indegrees.insert(key.to_string(), 0);
             for dep_key in deps {
-                if indegrees.get(dep_key.as_cstr()).is_none() {
-                    indegrees.insert(dep_key.clone(), 0);
+                if indegrees.get(dep_key).is_none() {
+                    indegrees.insert(dep_key.to_string(), 0);
                 }
             }
         }
     }
     for (key, count) in &mut indegrees {
-        if let Some(n_arr) = g.get(key.as_cstr()) {
+        if let Some(n_arr) = g.get(key) {
             *count += n_arr.len() as libc::c_int;
         }
     }
     indegrees
 }
 
-fn build_indegree_zero(
-    indegrees: &InsertionOrderMap<OwningCStr, libc::c_int>,
-) -> VecDeque<OwningCStr> {
+fn build_indegree_zero(indegrees: &InsertionOrderMap<String, libc::c_int>) -> VecDeque<String> {
     let mut indegree_zero = VecDeque::new();
     for (key, val) in indegrees {
         if *val == 0 {
@@ -1751,7 +1739,7 @@ fn build_indegree_zero(
     indegree_zero
 }
 
-pub fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
+pub fn topological_order(fname: &str, ext: &Externals) -> Vec<String> {
     let mut order = vec![];
     let g = ast_function_buildgraph(fname, ext);
     // Note: Original leaks indegree_zero.
@@ -1761,10 +1749,10 @@ pub fn topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
         order.push(curr.clone());
         for (key, v) in &g {
             if v.contains(&curr) {
-                let count = indegrees.get_mut(key.as_c_str()).unwrap();
+                let count = indegrees.get_mut(key).unwrap();
                 *count -= 1;
                 if *count == 0 {
-                    indegree_zero.push_back(OwningCStr::copy(key.as_c_str()));
+                    indegree_zero.push_back(key.to_string());
                 }
             }
         }
@@ -1780,7 +1768,7 @@ pub fn ast_block_create(decls: Vec<Box<AstVariable>>, stmts: Vec<Box<AstStmt>>) 
     Box::new(AstBlock { decls, stmts })
 }
 
-pub fn ast_block_str(b: &AstBlock, indent: &str) -> OwningCStr {
+pub fn ast_block_str(b: &AstBlock, indent: &str) -> String {
     let mut sb = strbuilder_create();
     for decl in &b.decls {
         let s = ast_variable_str(decl);
@@ -1922,7 +1910,7 @@ pub fn ast_stmt_isassume(stmt: &AstStmt) -> bool {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         return false;
     };
-    labelled.label.as_str() == "assume"
+    labelled.label == "assume"
 }
 
 unsafe fn stmt_installprop(stmt: &AstStmt, state: *mut State) -> Result<Preresult> {
@@ -1933,7 +1921,7 @@ pub fn ast_stmt_ispre(stmt: &AstStmt) -> bool {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         return false;
     };
-    labelled.label.as_str() == "setup"
+    labelled.label == "setup"
 }
 
 unsafe fn stmt_v_block_verify(v_block_stmt: &AstStmt, state: *mut State) -> Result<()> {
@@ -2106,7 +2094,7 @@ fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: &mut StrBuilder) {
     strbuilder_write!(*b, "for ({init} {cond} {iter}) [{abs}] {{ {body} }}");
 }
 
-pub fn ast_stmt_str(stmt: &AstStmt) -> OwningCStr {
+pub fn ast_stmt_str(stmt: &AstStmt) -> String {
     let mut b = strbuilder_create();
     match &stmt.kind {
         AstStmtKind::Labelled(_) => {
@@ -2161,7 +2149,7 @@ pub fn ast_stmt_iter_init(stmt: &AstStmt) -> &AstStmt {
     &iteration.init
 }
 
-pub fn ast_stmt_labelled_label(stmt: &AstStmt) -> &OwningCStr {
+pub fn ast_stmt_labelled_label(stmt: &AstStmt) -> &str {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         panic!()
     };
@@ -2201,7 +2189,7 @@ pub fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
 unsafe fn jump_absexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     // Note: Original leaks the expression to avoid a double free.
     let expr = ast_expr_assignment_create(
-        ast_expr_identifier_create(OwningCStr::copy_str("return")),
+        ast_expr_identifier_create("return".to_string()),
         // Note: jump_rv can be null. Error in original.
         ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap()),
     );
@@ -2410,7 +2398,7 @@ pub fn ast_stmt_sel_nest(stmt: &AstStmt) -> Option<&AstStmt> {
 
 pub fn ast_stmt_create_labelled(
     loc: Box<LexemeMarker>,
-    label: OwningCStr,
+    label: String,
     substmt: Box<AstStmt>,
 ) -> Box<AstStmt> {
     ast_stmt_create(
@@ -2484,7 +2472,7 @@ pub fn ast_stmt_as_v_block(stmt: &AstStmt) -> &AstBlock {
     block
 }
 
-pub fn ast_stmt_getfuncs(stmt: &AstStmt) -> Vec<OwningCStr> {
+pub fn ast_stmt_getfuncs(stmt: &AstStmt) -> Vec<String> {
     match &stmt.kind {
         AstStmtKind::Nop => vec![],
         AstStmtKind::Labelled(labelled) => ast_stmt_getfuncs(&labelled.stmt),
@@ -2542,7 +2530,7 @@ unsafe fn condexists(cond: &AstExpr, s: *mut State) -> bool {
     p.get(&reduced) || p.contradicts(&reduced)
 }
 
-fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Vec<OwningCStr> {
+fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Vec<String> {
     let cond_arr = ast_expr_getfuncs(&selection.cond);
     let body_arr = ast_stmt_getfuncs(&selection.body);
     let nest_arr = if let Some(nest) = &selection.nest {
@@ -2553,7 +2541,7 @@ fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Vec<OwningCStr> 
     [cond_arr, body_arr, nest_arr].concat()
 }
 
-fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Vec<OwningCStr> {
+fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Vec<String> {
     [
         ast_stmt_getfuncs(&iteration.init),
         ast_stmt_getfuncs(&iteration.cond),
@@ -2563,7 +2551,7 @@ fn ast_stmt_iteration_getfuncs(iteration: &AstIterationStmt) -> Vec<OwningCStr> 
     .concat()
 }
 
-fn ast_stmt_compound_getfuncs(block: &AstBlock) -> Vec<OwningCStr> {
+fn ast_stmt_compound_getfuncs(block: &AstBlock) -> Vec<String> {
     let mut res = vec![];
     for stmt in &block.stmts {
         res.append(&mut ast_stmt_getfuncs(stmt));
@@ -2624,13 +2612,13 @@ pub fn ast_type_create_arr(base: Box<AstType>, length: libc::c_int) -> Box<AstTy
 }
 
 pub fn ast_type_create_struct(
-    tag: Option<OwningCStr>,
+    tag: Option<String>,
     members: Option<Box<Vec<Box<AstVariable>>>>,
 ) -> Box<AstType> {
     ast_type_create(AstTypeBase::Struct(AstStructType { tag, members }), 0)
 }
 
-pub fn ast_type_create_userdef(name: OwningCStr) -> Box<AstType> {
+pub fn ast_type_create_userdef(name: String) -> Box<AstType> {
     ast_type_create(AstTypeBase::UserDefined(name), 0)
 }
 
@@ -2645,7 +2633,7 @@ pub unsafe fn ast_type_vconst(
         AstTypeBase::Pointer(_) => value_ptr_indefinite_create(),
         AstTypeBase::UserDefined(name) => ast_type_vconst(
             // Note: Original does not null-check here.
-            (*state_getext(s)).get_typedef(name.as_str()).unwrap(),
+            (*state_getext(s)).get_typedef(name).unwrap(),
             s,
             comment,
             persist,
@@ -2669,7 +2657,7 @@ pub unsafe fn ast_type_struct_complete<'a>(
     let Some(tag) = ast_type_struct_tag(t) else {
         panic!();
     };
-    ext.get_struct(tag.as_str())
+    ext.get_struct(tag)
 }
 
 pub fn ast_type_struct_members(t: &AstType) -> Option<&[Box<AstVariable>]> {
@@ -2679,18 +2667,18 @@ pub fn ast_type_struct_members(t: &AstType) -> Option<&[Box<AstVariable>]> {
     s.members.as_ref().map(|v| v.as_slice())
 }
 
-pub fn ast_type_struct_tag(t: &AstType) -> Option<&OwningCStr> {
+pub fn ast_type_struct_tag(t: &AstType) -> Option<&str> {
     let AstTypeBase::Struct(s) = &t.base else {
         panic!()
     };
-    s.tag.as_ref()
+    s.tag.as_deref()
 }
 
 pub fn ast_type_create_struct_anonym(members: Vec<Box<AstVariable>>) -> Box<AstType> {
     ast_type_create_struct(None, Some(Box::new(members)))
 }
 
-pub fn ast_type_create_struct_partial(tag: OwningCStr) -> Box<AstType> {
+pub fn ast_type_create_struct_partial(tag: String) -> Box<AstType> {
     ast_type_create_struct(Some(tag), None)
 }
 
@@ -2706,7 +2694,7 @@ pub fn ast_type_copy(t: &AstType) -> Box<AstType> {
     Box::new(t.clone())
 }
 
-pub fn ast_type_str(t: &AstType) -> OwningCStr {
+pub fn ast_type_str(t: &AstType) -> String {
     let mut b = strbuilder_create();
     strbuilder_write!(b, "{}", unsafe { mod_str(t.modifiers as libc::c_int) });
     match &t.base {
@@ -2754,7 +2742,7 @@ pub fn ast_type_str(t: &AstType) -> OwningCStr {
     strbuilder_build(b)
 }
 
-unsafe fn mod_str(mod_0: libc::c_int) -> OwningCStr {
+unsafe fn mod_str(mod_0: libc::c_int) -> String {
     let modstr: [&'static str; 7] = [
         "typedef", "extern", "static", "auto", "register", "const", "volatile",
     ];
@@ -2817,7 +2805,7 @@ pub fn ast_type_ptr_type(t: &AstType) -> Option<&AstType> {
     ptr_type.as_deref()
 }
 
-pub fn ast_variable_create(name: OwningCStr, ty: Box<AstType>) -> Box<AstVariable> {
+pub fn ast_variable_create(name: String, ty: Box<AstType>) -> Box<AstVariable> {
     // Note: In the original, this function can take a null name and create a variable with null name.
     // This is actually done for the arguments in function declarations like `void fclose(FILE*);`.
     Box::new(AstVariable { name, type_: ty })
@@ -2831,14 +2819,14 @@ pub fn ast_variable_arr_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
     v.to_vec()
 }
 
-pub fn ast_variable_str(v: &AstVariable) -> OwningCStr {
+pub fn ast_variable_str(v: &AstVariable) -> String {
     let mut b = strbuilder_create();
     let t = ast_type_str(&v.type_);
     strbuilder_write!(b, "{t} {}", v.name);
     strbuilder_build(b)
 }
 
-pub fn ast_variable_name(v: &AstVariable) -> &OwningCStr {
+pub fn ast_variable_name(v: &AstVariable) -> &str {
     &v.name
 }
 
@@ -2849,7 +2837,7 @@ pub fn ast_variable_type(v: &AstVariable) -> &AstType {
 pub fn ast_function_create(
     is_axiom: bool,
     ret: Box<AstType>,
-    name: OwningCStr,
+    name: String,
     params: Vec<Box<AstVariable>>,
     abstract_0: Box<AstBlock>,
     body: Option<SemiBox<AstBlock>>,
@@ -2869,7 +2857,7 @@ pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
 }
 
 impl<'ast> AstFunction<'ast> {
-    pub fn str(&self) -> OwningCStr {
+    pub fn str(&self) -> String {
         let mut b = strbuilder_create();
         if self.is_axiom {
             strbuilder_write!(b, "axiom ");
@@ -2893,7 +2881,7 @@ impl<'ast> AstFunction<'ast> {
         strbuilder_build(b)
     }
 
-    pub fn name(&self) -> &OwningCStr {
+    pub fn name(&self) -> &str {
         &self.name
     }
 
@@ -2938,13 +2926,13 @@ impl<'ast> AstFunction<'ast> {
 }
 
 pub unsafe fn ast_function_protostitch(f: &mut AstFunction, ext: &Externals) {
-    if let Some(proto) = ext.get_func(f.name.as_str()) {
+    if let Some(proto) = ext.get_func(&f.name) {
         f.abstract_ = proto.abstract_.clone();
     }
 }
 
 pub unsafe fn ast_function_verify(f: &AstFunction, ext: Arc<Externals>) -> Result<()> {
-    let mut state = state_create(f.name().clone(), ext, f.rtype());
+    let mut state = state_create(f.name().to_string(), ext, f.rtype());
     ast_function_initparams(f, &mut state)?;
     path_absverify_withstate(f, &mut state)?;
     Ok(())
@@ -3004,12 +2992,12 @@ unsafe fn ast_function_precondsinit(f: &AstFunction, s: *mut State) -> Result<()
 unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()> {
     let name = ast_variable_name(param);
     let t = ast_variable_type(param);
-    let obj: *mut Object = state_getobject(state, name.as_str());
+    let obj: *mut Object = state_getobject(state, name);
     if obj.is_null() {
         panic!();
     }
     if !object_hasvalue(&*obj) {
-        let val = state_vconst(state, t, Some(name.as_str()), true);
+        let val = state_vconst(state, t, Some(name), true);
         object_assign(&mut *obj, Some(val));
     }
     Ok(())
@@ -3017,7 +3005,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
 
 unsafe fn abstract_audit(f: &AstFunction, abstract_state: *mut State) -> Result<()> {
     let mut actual_state = state_create_withprops(
-        f.name().clone(),
+        f.name().to_string(),
         (*abstract_state).externals_arc(),
         f.rtype(),
         (state_getprops(&mut *abstract_state)).clone(),
@@ -3070,7 +3058,7 @@ unsafe fn path_verify(
                 );
             }
             _ => {
-                ast_stmt_process(stmt, fname.as_str(), actual_state)?;
+                ast_stmt_process(stmt, fname, actual_state)?;
                 if ast_stmt_isterminal(stmt, actual_state) {
                     break;
                 }
@@ -3118,8 +3106,8 @@ unsafe fn split_path_verify(
     // Note: Original leaks both functions to avoid triple-freeing the body.
     // We borrow instead.
     for (i, f) in paths.into_iter().enumerate() {
-        let mut actual_copy = state_copywithname(&*actual_state, (*f).name().clone());
-        let mut abstract_copy = state_copywithname(&*abstract_state, (*f).name().clone());
+        let mut actual_copy = state_copywithname(&*actual_state, (*f).name().to_string());
+        let mut abstract_copy = state_copywithname(&*abstract_state, (*f).name().to_string());
         // Note: Original leaks expression.
         let expr = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&expr, &mut actual_copy);
@@ -3133,18 +3121,18 @@ unsafe fn split_path_verify(
     Ok(())
 }
 
-type FuncGraph = InsertionOrderMap<CString, Vec<OwningCStr>>;
+type FuncGraph = InsertionOrderMap<String, Vec<String>>;
 
-type DedupSet<'a> = InsertionOrderMap<OwningCStr, ()>;
+type DedupSet<'a> = InsertionOrderMap<String, ()>;
 
-fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut DedupSet, fname: &CStr, ext: &Externals) {
+fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut DedupSet, fname: &str, ext: &Externals) {
     let mut local_dedup = vec![];
     if dedup.get(fname).is_some() {
         return;
     }
-    dedup.insert(OwningCStr::copy(fname), ());
-    let Some(f) = ext.get_func(fname.to_str().unwrap()) else {
-        eprintln!("function `{}' is not declared", fname.to_string_lossy());
+    dedup.insert(fname.to_string(), ());
+    let Some(f) = ext.get_func(fname) else {
+        eprintln!("function `{fname}' is not declared");
         process::exit(1);
     };
     if f.is_axiom {
@@ -3159,15 +3147,15 @@ fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut DedupSet, fname: &CStr, ext
             if !local_dedup.contains(&func) {
                 // Note: The original avoids some of these string copies.
                 local_dedup.push(func.clone());
-                let f = ext.get_func(func.as_str()).unwrap();
+                let f = ext.get_func(&func).unwrap();
                 if !f.is_axiom {
-                    val.push(func.clone());
+                    val.push(func.to_string());
                 }
-                recurse_buildgraph(g, dedup, func.as_cstr(), ext);
+                recurse_buildgraph(g, dedup, &func, ext);
             }
         }
     }
-    g.insert(fname.into(), val);
+    g.insert(fname.to_string(), val);
 }
 
 fn abstract_paths<'origin>(
@@ -3207,7 +3195,7 @@ unsafe fn split_path_absverify(
     for (i, f) in paths.into_iter().enumerate() {
         // Note: Original does not copy f.name here -- which should be a double free, but s_copy is
         // leaked.
-        let mut s_copy = state_copywithname(&*state, f.name().clone());
+        let mut s_copy = state_copywithname(&*state, f.name().to_string());
         // Note: Original leaks `inv` but I think accidentally.
         let inv = ast_expr_inverted_copy(cond, i == 1);
         let r = ast_expr_assume(&inv, &mut s_copy)?;
@@ -3230,14 +3218,14 @@ unsafe fn split_paths_absverify(
     Ok(())
 }
 
-pub fn ast_function_buildgraph(fname: &CStr, ext: &Externals) -> FuncGraph {
+pub fn ast_function_buildgraph(fname: &str, ext: &Externals) -> FuncGraph {
     let mut dedup = InsertionOrderMap::new();
     let mut g = InsertionOrderMap::new();
     recurse_buildgraph(&mut g, &mut dedup, fname, ext);
     g
 }
 
-fn split_name(name: &str, assumption: &AstExpr) -> OwningCStr {
+fn split_name(name: &str, assumption: &AstExpr) -> String {
     let mut b = strbuilder_create();
     strbuilder_write!(b, "{name} | {assumption}");
     strbuilder_build(b)
@@ -3304,7 +3292,7 @@ pub unsafe fn ast_externdecl_as_function(decl: &AstExternDecl) -> Option<&AstFun
     }
 }
 
-pub fn ast_decl_create(name: OwningCStr, t: Box<AstType>) -> Box<AstExternDecl> {
+pub fn ast_decl_create(name: String, t: Box<AstType>) -> Box<AstExternDecl> {
     Box::new(AstExternDecl {
         kind: if ast_type_istypedef(&t) {
             AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t })
@@ -3373,7 +3361,7 @@ pub fn lvalue_object(l: &LValue) -> *mut Object {
     l.obj
 }
 
-pub fn ast_topological_order(fname: &CStr, ext: &Externals) -> Vec<OwningCStr> {
+pub fn ast_topological_order(fname: &str, ext: &Externals) -> Vec<String> {
     topological_order(fname, ext)
 }
 

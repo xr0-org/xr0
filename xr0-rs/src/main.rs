@@ -4,7 +4,6 @@
 #![allow(clippy::box_collection)]
 
 use std::env;
-use std::ffi::CString;
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
@@ -34,7 +33,7 @@ use ext::Externals;
 use object::Object;
 use props::Props;
 use state::location::Location;
-use util::{OwningCStr, VERBOSE_MODE};
+use util::VERBOSE_MODE;
 use value::Value;
 
 #[derive(Parser)]
@@ -118,7 +117,7 @@ unsafe fn pass0(root: Box<Ast>, ext: &mut Externals) {
     }
 }
 
-unsafe fn pass1(order: &[OwningCStr], ext: &Arc<Externals>, print: bool) {
+unsafe fn pass1(order: &[String], ext: &Arc<Externals>, print: bool) {
     for name in order {
         let f = ext.get_func(name.as_str()).unwrap();
         if !f.is_axiom() && !f.is_proto() {
@@ -178,13 +177,11 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
 
     let ext = Arc::new(ext);
     if let Some(sortfunc) = &c.sort {
-        let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-        let order = ast_topological_order(&sortfunc_cstr, &ext);
+        let order = ast_topological_order(sortfunc, &ext);
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
     } else if let Some(sortfunc) = &c.verify {
-        let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
-        let order = ast_topological_order(&sortfunc_cstr, & ext);
+        let order = ast_topological_order(sortfunc, & ext);
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
         pass1(&order, &ext, true);

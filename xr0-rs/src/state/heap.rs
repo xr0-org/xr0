@@ -4,7 +4,7 @@ use super::{Block, State};
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
 use crate::state::location::location_create_dynamic;
 use crate::state::state::state_references;
-use crate::util::{strbuilder_build, strbuilder_create, Error, OwningCStr, Result};
+use crate::util::{strbuilder_build, strbuilder_create, Error, Result};
 use crate::{strbuilder_write, AstExpr, Location, Value};
 
 #[derive(Clone)]
@@ -32,7 +32,7 @@ impl Heap {
         Heap { blocks: vec![] }
     }
 
-    pub unsafe fn str(&self, indent: &str) -> OwningCStr {
+    pub unsafe fn str(&self, indent: &str) -> String {
         let mut b = strbuilder_create();
         for (i, hb) in self.blocks.iter().enumerate() {
             if !hb.freed {
@@ -121,7 +121,7 @@ impl VConst {
         }
     }
 
-    pub fn declare(&mut self, val: Box<Value>, comment: Option<&str>, persist: bool) -> OwningCStr {
+    pub fn declare(&mut self, val: Box<Value>, comment: Option<&str>, persist: bool) -> String {
         let s = self.id(persist);
         let s_string = s.to_string();
         self.varmap.insert(s_string.clone(), val);
@@ -132,7 +132,7 @@ impl VConst {
         s
     }
 
-    fn id(&mut self, persist: bool) -> OwningCStr {
+    fn id(&mut self, persist: bool) -> String {
         let npersist = self.persist.values().filter(|&&b| b).count();
         let mut b = strbuilder_create();
         if persist {
@@ -165,7 +165,7 @@ impl VConst {
         self.persist = persist;
     }
 
-    pub fn str(&self, indent: &str) -> OwningCStr {
+    pub fn str(&self, indent: &str) -> String {
         let mut b = strbuilder_create();
         for (k, val) in &self.varmap {
             strbuilder_write!(b, "{indent}{k}: {val}");

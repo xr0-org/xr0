@@ -10,7 +10,7 @@ use crate::state::location::{
     location_references,
 };
 use crate::state::state::state_get;
-use crate::util::{strbuilder_build, strbuilder_create, InsertionOrderMap, OwningCStr};
+use crate::util::{strbuilder_build, strbuilder_create, InsertionOrderMap};
 use crate::value::value_abstractcopy;
 use crate::{strbuilder_write, AstType, AstVariable, Location};
 
@@ -19,10 +19,10 @@ pub struct Stack {
     frames: Vec<StackFrame>,
 }
 
-type VarMap = InsertionOrderMap<OwningCStr, Box<Variable>>;
+type VarMap = InsertionOrderMap<String, Box<Variable>>;
 
 pub struct StackFrame {
-    pub name: OwningCStr,
+    pub name: String,
     // Note: This field is called `frame` in the original.
     pub blocks: Vec<Box<Block>>,
     pub varmap: Box<VarMap>,
@@ -59,7 +59,7 @@ impl Clone for StackFrame {
     }
 }
 
-pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
+pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> String {
     let mut b = strbuilder_create();
     let n = (*stack).frames.len();
     for i in 0..n {
@@ -89,7 +89,7 @@ impl Stack {
         Stack { frames: vec![] }
     }
 
-    pub fn clone_with_name(&self, new_name: OwningCStr) -> Stack {
+    pub fn clone_with_name(&self, new_name: String) -> Stack {
         let mut copy = self.clone();
         copy.top_mut().name = new_name;
         copy
@@ -99,7 +99,7 @@ impl Stack {
         self.frames.get_mut(frame as usize)
     }
 
-    pub fn push(&mut self, name: OwningCStr, return_type: &AstType) -> &mut StackFrame {
+    pub fn push(&mut self, name: String, return_type: &AstType) -> &mut StackFrame {
         let id = self.frames.len() as libc::c_int;
         let mut frame = StackFrame {
             name,
@@ -147,7 +147,7 @@ impl Stack {
         self.top().get_variable(id)
     }
 
-    pub unsafe fn str(&mut self, state: *mut State) -> OwningCStr {
+    pub unsafe fn str(&mut self, state: *mut State) -> String {
         stack_str(self, state)
     }
 }
@@ -161,9 +161,9 @@ impl StackFrame {
 
     pub unsafe fn declare(&mut self, var: &AstVariable, isparam: bool) {
         let id = ast_variable_name(var);
-        assert!(self.varmap.get(id.as_cstr()).is_none());
+        assert!(self.varmap.get(id).is_none());
         let var = variable_create(ast_variable_type(var), self, isparam);
-        self.varmap.insert(id.clone(), var);
+        self.varmap.insert(id.to_string(), var);
     }
 
     pub unsafe fn undeclare(&mut self, state: *mut State) {
@@ -247,7 +247,7 @@ unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> 
     new
 }
 
-pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> OwningCStr {
+pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> String {
     assert!(!(*(*var).loc).type_is_vconst());
     let mut b = strbuilder_create();
     let type_ = ast_type_str(&(*var).type_);
@@ -262,12 +262,12 @@ unsafe fn object_or_nothing_str(
     loc: *mut Location,
     stack: *mut Stack,
     state: *mut State,
-) -> OwningCStr {
+) -> String {
     let b = location_auto_getblock(&*loc, &mut *stack).unwrap();
     if let Some(obj) = b.observe(location_offset(&*loc), state, false) {
         format!("{obj}").into()
     } else {
-        OwningCStr::empty()
+        "".to_string()
     }
 }
 

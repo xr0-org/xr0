@@ -1,6 +1,6 @@
 use super::Block;
 use crate::strbuilder_write;
-use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
+use crate::util::{strbuilder_build, strbuilder_create};
 
 #[derive(Clone)]
 pub struct Clump {
@@ -12,7 +12,7 @@ impl Clump {
         Clump { blocks: vec![] }
     }
 
-    pub unsafe fn str(&self, indent: &str) -> OwningCStr {
+    pub unsafe fn str(&self, indent: &str) -> String {
         let mut b = strbuilder_create();
         for (i, block) in self.blocks.iter().enumerate() {
             strbuilder_write!(b, "{indent}{i}: {block}\n");

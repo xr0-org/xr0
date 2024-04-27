@@ -1,14 +1,14 @@
 use crate::ast::*;
 use crate::parser::env::Env;
-use crate::util::{OwningCStr, SemiBox};
+use crate::util::SemiBox;
 
 pub struct Declaration {
-    pub name: Option<OwningCStr>,
+    pub name: Option<String>,
     pub t: Box<AstType>,
 }
 
 pub struct DirectFunctionDeclarator {
-    pub name: OwningCStr,
+    pub name: String,
     pub params: Vec<Box<AstVariable>>,
 }
 
@@ -19,7 +19,7 @@ pub struct FunctionDeclarator {
 
 pub struct Declarator {
     pub ptr_valence: libc::c_int,
-    pub name: Option<OwningCStr>,
+    pub name: Option<String>,
 }
 
 struct BlockStatement {
@@ -30,8 +30,8 @@ struct BlockStatement {
 enum PostfixOp {
     ArrayAccess(Box<AstExpr>),
     Call(Vec<Box<AstExpr>>),
-    Dot(OwningCStr),
-    Arrow(OwningCStr),
+    Dot(String),
+    Arrow(String),
     Inc,
     Dec,
 }
@@ -67,10 +67,10 @@ pub grammar c_parser(env: &Env) for str {
     rule K<T>(t: rule<T>) -> T = quiet! { e:t() end_of_token() { e } }
 
     // Identifiers
-    rule identifier() -> OwningCStr =
+    rule identifier() -> String =
         n:quiet! { $(['_' | 'a'..='z' | 'A'..='Z'] ['_' | 'a'..='z' | 'A'..='Z' | '0'..='9']*) } {?
             if !env.reserved.contains(n) {
-                Ok(OwningCStr::copy_str(n))
+                Ok(n.to_string())
             } else {
                 Err("identifier")
             }
@@ -105,7 +105,7 @@ pub grammar c_parser(env: &Env) for str {
     // String literals
     rule string_literal() -> Box<AstExpr> =
         "\"" a:$(string_char()*) "\"" {
-            ast_expr_literal_create(OwningCStr::copy_str(a))
+            ast_expr_literal_create(a.to_string())
         }
 
     rule string_char() = [^ '"' | '\\' | '\n'] / "\\" [^ '\n']
@@ -242,7 +242,7 @@ pub grammar c_parser(env: &Env) for str {
     // 6.7 Declarations
     rule declaration() -> Declaration =
         t:declaration_specifiers() _ ";" {
-            let name = ast_type_struct_tag(&t).cloned();
+            let name = ast_type_struct_tag(&t).map(str::to_string);
             Declaration { name, t }
         } /
         t:declaration_specifiers() _ v:declarator() _ ";" {
@@ -301,7 +301,7 @@ pub grammar c_parser(env: &Env) for str {
         struct_or_union_specifier() /
         t:typedef_name() { ast_type_create_userdef(t) }
 
-    rule typedef_name() -> OwningCStr = i:identifier() {?
+    rule typedef_name() -> String = i:identifier() {?
         if env.is_typename(i.as_str()) {
             Ok(i)
         } else {
@@ -358,7 +358,7 @@ pub grammar c_parser(env: &Env) for str {
         name:direct_declarator() { Declarator { ptr_valence: 0, name: Some(name) } } /
         p:pointer() { Declarator { ptr_valence: p, name: None } }
 
-    rule direct_declarator() -> OwningCStr =
+    rule direct_declarator() -> String =
         // Note: declarator postfix syntax is ignored in the original
         name:identifier() direct_declarator_postfix()* { name }
 
@@ -380,11 +380,11 @@ pub grammar c_parser(env: &Env) for str {
             for _ in 0..decl.ptr_valence {
                 t = ast_type_create_ptr(t);
             }
-            let name = decl.name.unwrap_or(OwningCStr::empty());
+            let name = decl.name.unwrap_or("".to_string());
             ast_variable_create(name, t)
         } /
         t:declaration_specifiers() {
-            ast_variable_create(OwningCStr::empty(), t)
+            ast_variable_create("".to_string(), t)
         }
 
     rule type_name() -> Box<AstType> =

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use crate::ast::{ast_type_str, ast_type_struct_tag};
-use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
+use crate::util::{strbuilder_build, strbuilder_create};
 use crate::{strbuilder_write, AstFunction, AstType, AstVariable};
 
 #[derive(Default)]
 pub struct Externals {
-    func_insertion_order: Vec<OwningCStr>,
+    func_insertion_order: Vec<String>,
     func: HashMap<String, Box<AstFunction<'static>>>,
     var: HashMap<String, Box<AstVariable>>,
     typedef: HashMap<String, Box<AstType>>,
@@ -18,7 +18,7 @@ impl Externals {
         Externals::default()
     }
 
-    pub fn types_str(&self, indent: &str) -> OwningCStr {
+    pub fn types_str(&self, indent: &str) -> String {
         let mut b = strbuilder_create();
         for (k, v) in &self.typedef {
             strbuilder_write!(b, "{indent}{} {k}\n", ast_type_str(v));
@@ -30,7 +30,7 @@ impl Externals {
     }
 
     pub fn declare_func(&mut self, f: Box<AstFunction<'static>>) {
-        self.func_insertion_order.push(f.name().clone());
+        self.func_insertion_order.push(f.name().to_string());
         let id = f.name().to_string();
         self.func.insert(id, f);
     }
@@ -48,7 +48,7 @@ impl Externals {
         self.struct_.insert(id, t);
     }
 
-    pub fn function_names(&self) -> &[OwningCStr] {
+    pub fn function_names(&self) -> &[String] {
         &self.func_insertion_order
     }
 

@@ -1,5 +1,5 @@
 use crate::ast::{ast_expr_equal, ast_expr_inverted_copy};
-use crate::util::{strbuilder_build, strbuilder_create, OwningCStr};
+use crate::util::{strbuilder_build, strbuilder_create};
 use crate::{strbuilder_write, AstExpr};
 
 #[derive(Clone)]
@@ -12,9 +12,9 @@ impl Props {
         Props { props: vec![] }
     }
 
-    pub unsafe fn str(&self, indent: &str) -> OwningCStr {
+    pub unsafe fn str(&self, indent: &str) -> String {
         if self.props.is_empty() {
-            return OwningCStr::empty();
+            return "".to_string();
         }
         let mut b = strbuilder_create();
         strbuilder_write!(b, "{indent}\u{22a2} ");

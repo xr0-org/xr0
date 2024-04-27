@@ -3,8 +3,6 @@ use std::collections::HashSet;
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 
-use crate::util::OwningCStr;
-
 pub struct Env {
     source: String,
     pub reserved: HashSet<&'static str>,
@@ -74,7 +72,7 @@ impl Env {
 
     pub fn lexloc(&self, p: usize) -> Box<LexemeMarker> {
         let (file, line, column) = self.file_line_column(p);
-        let filename = OwningCStr::copy_str(&file.display().to_string());
+        let filename = file.display().to_string();
         Box::new(LexemeMarker {
             linenum: line as libc::c_int,
             column: column as libc::c_int,
@@ -170,7 +168,7 @@ fn parse_linemarker(line: &str) -> (PathBuf, usize) {
 pub struct LexemeMarker {
     pub linenum: libc::c_int,
     pub column: libc::c_int,
-    pub filename: OwningCStr,
+    pub filename: String,
     pub flags: LineMarkerFlag,
 }
 

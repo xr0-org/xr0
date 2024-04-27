@@ -12,7 +12,6 @@ use crate::object::{object_abstractcopy, object_as_value, object_assign, object_
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
 use crate::state::state::{state_getext, state_vconst};
 use crate::state::State;
-use crate::util::OwningCStr;
 use crate::{AstExpr, AstType, AstVariable, Location, Object};
 
 #[derive(Clone)]
@@ -26,7 +25,7 @@ pub enum ValueKind {
     IndefinitePtr(Box<Number>),
     DefinitePtr(Box<Location>),
     Int(Box<Number>),
-    Literal(OwningCStr),
+    Literal(String),
     Struct(Box<StructValue>),
 }
 
@@ -76,7 +75,7 @@ pub fn value_int_create(val: libc::c_int) -> Box<Value> {
 }
 
 pub fn value_literal_create(lit: &str) -> Box<Value> {
-    value_create(ValueKind::Literal(OwningCStr::copy_str(lit)))
+    value_create(ValueKind::Literal(lit.to_string()))
 }
 
 #[allow(dead_code)]
@@ -122,7 +121,7 @@ pub unsafe fn value_struct_indefinite_create(
         panic!();
     };
     for var in &sv.members {
-        let field = ast_variable_name(var).as_str();
+        let field = ast_variable_name(var);
 
         let obj = sv.m.get_mut(field).unwrap();
         let comment = format!("{comment}.{field}");
@@ -181,14 +180,14 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> Box<Value> {
 
     for var in &sv.members {
         let field = ast_variable_name(var);
-        let obj = sv.m.get_mut(field.as_str()).unwrap();
+        let obj = sv.m.get_mut(field).unwrap();
         if let Some(obj_value) = object_as_value(obj) {
             if value_issync(obj_value) {
                 object_assign(
                     obj,
                     Some(value_sync_create(ast_expr_member_create(
                         ast_expr_copy(root),
-                        field.clone(),
+                        field.to_string(),
                     ))),
                 );
             }
@@ -204,7 +203,7 @@ pub fn value_isstruct(v: &Value) -> bool {
 unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     let mut m = HashMap::new();
     for var in members {
-        let id = ast_variable_name(var).as_str().to_string();
+        let id = ast_variable_name(var).to_string();
         m.insert(id, object_value_create(ast_expr_constant_create(0), None));
     }
     m
@@ -231,7 +230,7 @@ pub unsafe fn value_struct_membertype<'v>(v: &'v Value, member: &str) -> Option<
         panic!();
     };
     for var in &sv.members {
-        if member == ast_variable_name(var).as_str() {
+        if member == ast_variable_name(var) {
             return Some(ast_variable_type(var));
         }
     }
@@ -277,8 +276,8 @@ impl Display for Value {
     }
 }
 
-pub fn value_str(v: &Value) -> OwningCStr {
-    OwningCStr::from(format!("{v}"))
+pub fn value_str(v: &Value) -> String {
+    format!("{v}")
 }
 
 impl Display for StructValue {
@@ -286,7 +285,7 @@ impl Display for StructValue {
         write!(f, "struct:{{")?;
         let n = self.members.len();
         for (i, var) in self.members.iter().enumerate() {
-            let name = ast_variable_name(var).as_str();
+            let name = ast_variable_name(var);
             let val = object_as_value(self.m.get(name).unwrap());
             let val_str = if let Some(val) = val {
                 format!("{val}")

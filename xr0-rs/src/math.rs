@@ -1,8 +1,5 @@
 use std::collections::HashMap;
-use std::ffi::CStr;
 use std::fmt::{self, Display, Formatter};
-
-use crate::util::OwningCStr;
 
 #[derive(Clone)]
 pub enum MathExpr {
@@ -14,7 +11,7 @@ pub enum MathExpr {
 #[derive(Clone)]
 pub enum MathAtom {
     Nat(libc::c_uint),
-    Variable(OwningCStr),
+    Variable(String),
 }
 
 type Map<'a> = HashMap<&'a str, i64>;
@@ -53,18 +50,18 @@ fn math_expr_fromint(i: libc::c_int) -> Box<MathExpr> {
 }
 
 #[allow(dead_code)]
-fn math_expr_fromvartally(id: &CStr, num: libc::c_int) -> Box<MathExpr> {
+fn math_expr_fromvartally(id: &str, num: libc::c_int) -> Box<MathExpr> {
     assert_ne!(num, 0);
     if num < 0 {
         return Box::new(MathExpr::Neg(math_expr_fromvartally(id, -num)));
     }
     // Note: In the original, the `id` is reused without copying. Destroying the expr would free it
     // `num` times.
-    let mut e = Box::new(MathExpr::Atom(MathAtom::Variable(OwningCStr::copy(id))));
+    let mut e = Box::new(MathExpr::Atom(MathAtom::Variable(id.to_string())));
     for _ in 0..num - 1 {
         e = Box::new(MathExpr::Sum(
             e,
-            Box::new(MathExpr::Atom(MathAtom::Variable(OwningCStr::copy(id)))),
+            Box::new(MathExpr::Atom(MathAtom::Variable(id.to_string()))),
         ));
     }
     e
