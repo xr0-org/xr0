@@ -121,6 +121,10 @@ pub unsafe fn state_getext(s: *mut State) -> *const Externals {
 }
 
 impl State {
+    pub fn ext(&self) -> &Externals {
+        &self.ext
+    }
+
     pub fn externals_arc(&self) -> Arc<Externals> {
         Arc::clone(&self.ext)
     }
@@ -146,8 +150,8 @@ pub unsafe fn state_declare(state: *mut State, var: &AstVariable, isparam: bool)
     (*state).stack.declare(var, isparam);
 }
 
-pub unsafe fn state_vconst(
-    state: *mut State,
+pub fn state_vconst(
+    state: &mut State,
     t: &AstType,
     comment: Option<&str>,
     persist: bool,
@@ -156,7 +160,7 @@ pub unsafe fn state_vconst(
     if value_isstruct(&v) {
         return v;
     }
-    let c = (*state).vconst.declare(v, comment, persist);
+    let c = state.vconst.declare(v, comment, persist);
     value_sync_create(ast_expr_identifier_create(c))
 }
 

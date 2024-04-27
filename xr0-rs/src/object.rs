@@ -34,14 +34,14 @@ pub struct Range {
     loc: Box<Location>,
 }
 
-pub unsafe fn object_value_create(offset: Box<AstExpr>, v: Option<Box<Value>>) -> Box<Object> {
+pub fn object_value_create(offset: Box<AstExpr>, v: Option<Box<Value>>) -> Box<Object> {
     Box::new(Object {
         kind: ObjectKind::Value(v),
         offset,
     })
 }
 
-pub unsafe fn object_range_create(offset: Box<AstExpr>, r: Box<Range>) -> Box<Object> {
+pub fn object_range_create(offset: Box<AstExpr>, r: Box<Range>) -> Box<Object> {
     Box::new(Object {
         kind: ObjectKind::DeallocandRange(r),
         offset,

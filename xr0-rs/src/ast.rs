@@ -773,7 +773,7 @@ pub unsafe fn ast_expr_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Val
 
 unsafe fn arbarg_eval(_expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     Ok(state_vconst(
-        state,
+        &mut *state,
         &ast_type_create_ptr(ast_type_create(AstTypeBase::Void, 0)),
         None,
         false,
@@ -2618,22 +2618,19 @@ pub fn ast_type_create_userdef(name: String) -> Box<AstType> {
     ast_type_create(AstTypeBase::UserDefined(name), 0)
 }
 
-pub unsafe fn ast_type_vconst(
-    t: &AstType,
-    s: *mut State,
-    comment: &str,
-    persist: bool,
-) -> Box<Value> {
+pub fn ast_type_vconst(t: &AstType, s: &mut State, comment: &str, persist: bool) -> Box<Value> {
     match &t.base {
         AstTypeBase::Int => value_int_indefinite_create(),
         AstTypeBase::Pointer(_) => value_ptr_indefinite_create(),
-        AstTypeBase::UserDefined(name) => ast_type_vconst(
-            // Note: Original does not null-check here.
-            (*state_getext(s)).get_typedef(name).unwrap(),
-            s,
-            comment,
-            persist,
-        ),
+        AstTypeBase::UserDefined(name) => {
+            // Note: Bumps a reference count as a lifetime hack.
+            let ext = s.externals_arc();
+            let type_ = ext.get_typedef(name).unwrap();
+            ast_type_vconst(
+                // Note: Original does not null-check here.
+                type_, s, comment, persist,
+            )
+        }
         AstTypeBase::Struct(_) => value_struct_indefinite_create(t, s, comment, persist),
         _ => panic!(),
     }
@@ -2643,10 +2640,7 @@ pub fn ast_type_isstruct(t: &AstType) -> bool {
     matches!(t.base, AstTypeBase::Struct(_))
 }
 
-pub unsafe fn ast_type_struct_complete<'a>(
-    t: &'a AstType,
-    ext: &'a Externals,
-) -> Option<&'a AstType> {
+pub fn ast_type_struct_complete<'a>(t: &'a AstType, ext: &'a Externals) -> Option<&'a AstType> {
     if ast_type_struct_members(t).is_some() {
         return Some(t);
     }
@@ -2981,7 +2975,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
         panic!();
     }
     if !object_hasvalue(&*obj) {
-        let val = state_vconst(state, t, Some(name), true);
+        let val = state_vconst(&mut *state, t, Some(name), true);
         (*obj).assign(Some(val));
     }
     Ok(())

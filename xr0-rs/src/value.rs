@@ -10,7 +10,7 @@ use crate::ast::{
 };
 use crate::object::{object_abstractcopy, object_as_value, object_value_create};
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
-use crate::state::state::{state_getext, state_vconst};
+use crate::state::state::state_vconst;
 use crate::state::State;
 use crate::{AstExpr, AstType, AstVariable, Location, Object};
 
@@ -96,7 +96,7 @@ pub fn value_sync_create(e: Box<AstExpr>) -> Box<Value> {
     value_create(ValueKind::Sync(number_computed_create(e)))
 }
 
-pub unsafe fn value_struct_create(t: &AstType) -> Box<Value> {
+pub fn value_struct_create(t: &AstType) -> Box<Value> {
     let members = ast_type_struct_members(t).expect("can't create value of incomplete type");
     value_create(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(members),
@@ -104,15 +104,15 @@ pub unsafe fn value_struct_create(t: &AstType) -> Box<Value> {
     })))
 }
 
-pub unsafe fn value_struct_indefinite_create(
-    mut t: &AstType,
-    s: *mut State,
+pub fn value_struct_indefinite_create(
+    t: &AstType,
+    s: &mut State,
     comment: &str,
     persist: bool,
 ) -> Box<Value> {
     // Note: The original doesn't null-check here. I wonder how it would handle `typedef struct foo
     // foo;`.
-    t = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
+    let t = ast_type_struct_complete(t, s.ext()).unwrap();
     if (ast_type_struct_members(t)).is_none() {
         panic!();
     }
@@ -154,7 +154,7 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
             } else {
                 // Note: Original leaked this type.
                 Box::into_raw(state_vconst(
-                    compare,
+                    &mut *compare,
                     &ast_type_create_voidptr(),
                     None,
                     false,
@@ -194,7 +194,7 @@ pub fn value_isstruct(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Struct(_))
 }
 
-unsafe fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
+fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     let mut m = HashMap::new();
     for var in members {
         let id = ast_variable_name(var).to_string();
