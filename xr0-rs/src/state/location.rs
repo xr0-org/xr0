@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
-use crate::state::state::{state_alloc, state_clump, state_get, state_getblock, state_getheap};
+use crate::state::state::{state_alloc, state_get, state_getblock, state_getheap};
 use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
 use crate::util::{Error, Result};
 use crate::{AstExpr, Value};
@@ -88,7 +88,7 @@ pub fn location_create_automatic(
 pub unsafe fn location_transfigure(loc: &Location, compare: *mut State) -> *mut Value {
     match &loc.kind {
         LocationKind::Automatic { .. } | LocationKind::Dereferencable => {
-            Box::into_raw(state_clump(compare))
+            Box::into_raw((*compare).clump())
         }
         LocationKind::Dynamic => Box::into_raw(state_alloc(compare)),
         _ => panic!(),

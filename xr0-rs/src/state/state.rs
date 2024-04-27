@@ -179,13 +179,12 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value>
     value_ptr_create(loc)
 }
 
-pub unsafe fn state_clump(state: *mut State) -> Box<Value> {
-    let address: libc::c_int = (*state).clump.new_block();
-    let loc = Box::into_raw(location_create_dereferencable(
-        address,
-        ast_expr_constant_create(0),
-    ));
-    value_ptr_create(Box::from_raw(loc))
+impl State {
+    pub fn clump(&mut self) -> Box<Value> {
+        let address = self.clump.new_block();
+        let loc = location_create_dereferencable(address, ast_expr_constant_create(0));
+        value_ptr_create(loc)
+    }
 }
 
 pub unsafe fn state_islval(state: *mut State, v: &Value) -> bool {
