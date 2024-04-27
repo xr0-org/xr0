@@ -899,7 +899,7 @@ impl Display for ConstantExpr {
         // XXX FIXME: this generates Rust character literals, should generate C syntax
         match char::try_from(constant as u32) {
             Ok(c) => write!(f, "{:?}", c),
-            _ => write!(f, "'\\x{{{:x}}}'", constant as libc::c_uint),
+            _ => write!(f, "'\\x{:02x}'", constant as u32),
         }
     }
 }
@@ -1160,7 +1160,7 @@ unsafe fn pf_augment(v: *mut Value, call: &AstExpr, state: *mut State) -> Result
     Ok(value_pf_augment(v, value_as_sync(&*Box::into_raw(res_val))))
 }
 
-pub fn ast_expr_constant_create_char(c: libc::c_char) -> Box<AstExpr> {
+pub fn ast_expr_constant_create_char(c: i8) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Constant(ConstantExpr {
         is_char: true,
         constant: c as i32,
@@ -1372,7 +1372,7 @@ pub fn ast_expr_incdec_to_assignment(expr: &AstExpr) -> Box<AstExpr> {
             } else {
                 AstBinaryOp::Subtraction
             },
-            ast_expr_constant_create(1 as libc::c_int),
+            ast_expr_constant_create(1),
         ),
     )
 }
@@ -1707,7 +1707,7 @@ fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<String> {
     res
 }
 
-fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<String, libc::c_int> {
+fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<String, usize> {
     let mut indegrees = InsertionOrderMap::new();
     for (key, deps) in g {
         if indegrees.get(key).is_none() {
@@ -1721,13 +1721,13 @@ fn calculate_indegrees(g: &FuncGraph) -> InsertionOrderMap<String, libc::c_int> 
     }
     for (key, count) in &mut indegrees {
         if let Some(n_arr) = g.get(key) {
-            *count += n_arr.len() as libc::c_int;
+            *count += n_arr.len();
         }
     }
     indegrees
 }
 
-fn build_indegree_zero(indegrees: &InsertionOrderMap<String, libc::c_int>) -> VecDeque<String> {
+fn build_indegree_zero(indegrees: &InsertionOrderMap<String, usize>) -> VecDeque<String> {
     let mut indegree_zero = VecDeque::new();
     for (key, val) in indegrees {
         if *val == 0 {
@@ -3312,21 +3312,23 @@ pub fn parse_int(s: &str) -> libc::c_int {
     s.parse().expect("parse error")
 }
 
-pub fn parse_char(s: &str) -> libc::c_char {
+pub fn parse_char(s: &str) -> i8 {
+    // Note: Original also assumes these character literals have the same numeric values on the
+    // target as in XR0, a decent bet for ASCII at least.
     assert!(s.starts_with('\'') && s.ends_with('\''));
     let s = &s[1..s.len() - 1];
     if let Some(stripped) = s.strip_prefix('\\') {
-        parse_escape(stripped) as libc::c_char
+        parse_escape(stripped)
     } else {
         s.chars().next().expect("invalid char literal") as u32 as libc::c_char
     }
 }
 
-pub fn parse_escape(c: &str) -> libc::c_int {
+pub fn parse_escape(c: &str) -> i8 {
     match c {
-        "0" => '\0' as u32 as libc::c_int,
-        "t" => '\t' as u32 as libc::c_int,
-        "n" => '\t' as u32 as libc::c_int, // Note: '\t' rather than '\n', a bug in the original.
+        "0" => 0,
+        "t" => '\t' as u32 as i8,
+        "n" => '\t' as u32 as i8, // Note: '\t' rather than '\n', a bug in the original.
         _ => {
             panic!("unrecognized char escape sequence: {:?}", c);
         }
