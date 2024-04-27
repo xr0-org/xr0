@@ -2918,16 +2918,16 @@ unsafe fn path_absverify_withstate(f: &AstFunction, state: *mut State) -> Result
     for var in &abs.decls {
         state_declare(state, var, false);
     }
-    path_absverify(f, state, 0 as libc::c_int)
+    path_absverify(f, state, 0)
 }
 
-unsafe fn path_absverify(f: &AstFunction, state: *mut State, index: libc::c_int) -> Result<()> {
+unsafe fn path_absverify(f: &AstFunction, state: *mut State, index: usize) -> Result<()> {
     let abs = f.abstract_block();
-    for i in index as usize..abs.stmts.len() {
+    for i in index..abs.stmts.len() {
         let stmt = &abs.stmts[i];
         let mut splits = ast_stmt_splits(stmt, state)?;
         if !splits.conds.is_empty() {
-            return split_paths_absverify(f, state, i as libc::c_int, &mut splits);
+            return split_paths_absverify(f, state, i, &mut splits);
         }
         if !ast_stmt_ispre(stmt) {
             ast_stmt_absexec(stmt, state, true)?;
@@ -3135,7 +3135,7 @@ fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut DedupSet, fname: &str, ext:
 
 fn abstract_paths<'origin>(
     f: &'origin AstFunction,
-    _index: libc::c_int,
+    _index: usize,
     cond: &AstExpr,
 ) -> Vec<Box<AstFunction<'origin>>> {
     let f_true = ast_function_create(
@@ -3162,7 +3162,7 @@ fn abstract_paths<'origin>(
 unsafe fn split_path_absverify(
     f: &AstFunction,
     state: *mut State,
-    index: libc::c_int,
+    index: usize,
     cond: &AstExpr,
 ) -> Result<()> {
     let paths = abstract_paths(f, index, cond);
@@ -3184,7 +3184,7 @@ unsafe fn split_path_absverify(
 unsafe fn split_paths_absverify(
     f: &AstFunction,
     state: *mut State,
-    index: libc::c_int,
+    index: usize,
     splits: *mut AstStmtSplits,
 ) -> Result<()> {
     for &cond in &(*splits).conds {
