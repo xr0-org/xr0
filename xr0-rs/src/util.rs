@@ -4,7 +4,6 @@ use std::ffi::CStr;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::mem;
 use std::ops::Deref;
-use std::ptr;
 
 use libc::{free, malloc, strlen, strncpy};
 
@@ -15,8 +14,6 @@ pub struct StrBuilder {
 #[derive(Debug, Clone)]
 pub struct Error {
     pub msg: String,
-    #[allow(dead_code)]
-    pub inner: *mut Error,
 }
 
 pub type Result<T, E = Box<Error>> = std::result::Result<T, E>;
@@ -115,7 +112,6 @@ impl Error {
     pub fn new(s: String) -> Box<Error> {
         Box::new(Error {
             msg: s,
-            inner: ptr::null_mut(),
         })
     }
 }
