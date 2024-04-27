@@ -122,7 +122,7 @@ pub unsafe fn pass1(order: &[OwningCStr], ext: &Arc<Externals>, print: bool) {
     for name in order {
         let f = ext.get_func(name.as_str()).unwrap();
         if !f.is_axiom() && !f.is_proto() {
-            if let Err(err) = ast_function_verify(f, Arc::clone(&ext)) {
+            if let Err(err) = ast_function_verify(f, Arc::clone(ext)) {
                 eprintln!("{}", err.msg);
                 process::exit(1);
             }
