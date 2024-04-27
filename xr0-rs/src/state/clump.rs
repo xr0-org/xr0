@@ -19,13 +19,13 @@ impl Clump {
         b
     }
 
-    pub fn new_block(&mut self) -> libc::c_int {
-        let address = self.blocks.len() as libc::c_int;
+    pub fn new_block(&mut self) -> usize {
+        let address = self.blocks.len();
         self.blocks.push(Block::new());
         address
     }
 
-    pub fn get_block(&mut self, address: libc::c_int) -> Option<&mut Block> {
-        self.blocks.get_mut(address as usize).map(|blk| &mut **blk)
+    pub fn get_block(&mut self, address: usize) -> Option<&mut Block> {
+        self.blocks.get_mut(address).map(|blk| &mut **blk)
     }
 }

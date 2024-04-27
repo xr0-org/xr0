@@ -154,7 +154,7 @@ impl Stack {
 
 impl StackFrame {
     pub fn new_block(&mut self) -> Box<Location> {
-        let address = self.blocks.len() as libc::c_int;
+        let address = self.blocks.len();
         self.blocks.push(Block::new());
         location_create_automatic(self.id, address, ast_expr_constant_create(0))
     }
@@ -200,8 +200,8 @@ impl StackFrame {
         false
     }
 
-    pub fn get_block(&mut self, address: libc::c_int) -> &mut Block {
-        &mut self.blocks[address as usize]
+    pub fn get_block(&mut self, address: usize) -> &mut Block {
+        &mut self.blocks[address]
     }
 }
 
@@ -212,7 +212,7 @@ pub unsafe fn variable_create(
 ) -> Box<Variable> {
     let loc = frame.new_block();
     let block_id = location_auto_get_block_id(&loc);
-    let b = &mut frame.blocks[block_id as usize];
+    let b = &mut frame.blocks[block_id];
     b.install(object_value_create(ast_expr_constant_create(0), None));
     Box::new(Variable {
         type_: ast_type_copy(type_),

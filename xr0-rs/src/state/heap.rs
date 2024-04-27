@@ -57,7 +57,7 @@ impl Heap {
     }
 
     pub fn new_block(&mut self) -> Box<Location> {
-        let address = self.blocks.len() as libc::c_int;
+        let address = self.blocks.len();
         self.blocks.push(HeapBlock {
             block: Block::new(),
             freed: false,
@@ -65,27 +65,27 @@ impl Heap {
         location_create_dynamic(address, ast_expr_constant_create(0))
     }
 
-    pub fn get_block(&mut self, address: libc::c_int) -> Option<&mut Block> {
-        if address as usize >= self.blocks.len() {
+    pub fn get_block(&mut self, address: usize) -> Option<&mut Block> {
+        if address >= self.blocks.len() {
             return None;
         }
-        let hb = &mut self.blocks[address as usize];
+        let hb = &mut self.blocks[address];
         if hb.freed {
             return None;
         }
         Some(&mut hb.block)
     }
 
-    pub fn dealloc_block(&mut self, address: libc::c_int) -> Result<()> {
-        if self.blocks[address as usize].freed {
+    pub fn dealloc_block(&mut self, address: usize) -> Result<()> {
+        if self.blocks[address].freed {
             return Err(Error::new("double free".to_string()));
         }
-        self.blocks[address as usize].freed = true;
+        self.blocks[address].freed = true;
         Ok(())
     }
 
-    pub fn block_is_freed(&self, address: libc::c_int) -> bool {
-        self.blocks[address as usize].freed
+    pub fn block_is_freed(&self, address: usize) -> bool {
+        self.blocks[address].freed
     }
 
     pub unsafe fn undeclare(&mut self, s: *mut State) {
@@ -99,7 +99,7 @@ impl Heap {
 
     pub unsafe fn referenced(&self, s: *mut State) -> bool {
         for i in 0..self.blocks.len() {
-            if !self.blocks[i].freed && !block_referenced(s, i as libc::c_int) {
+            if !self.blocks[i].freed && !block_referenced(s, i) {
                 return false;
             }
         }
@@ -107,7 +107,7 @@ impl Heap {
     }
 }
 
-unsafe fn block_referenced(s: *mut State, addr: libc::c_int) -> bool {
+unsafe fn block_referenced(s: *mut State, addr: usize) -> bool {
     let loc = location_create_dynamic(addr, ast_expr_constant_create(0));
     state_references(s, &loc)
 }

@@ -10,7 +10,7 @@ use crate::{AstExpr, Value};
 #[derive(Clone)]
 pub struct Location {
     kind: LocationKind,
-    block: libc::c_int,
+    block: usize,
     offset: Box<AstExpr>,
 }
 
@@ -41,7 +41,7 @@ impl Location {
 }
 
 #[allow(dead_code)]
-pub fn location_create_vconst(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+pub fn location_create_vconst(block: usize, offset: Box<AstExpr>) -> Box<Location> {
     Box::new(Location {
         kind: LocationKind::VConst,
         block,
@@ -49,7 +49,7 @@ pub fn location_create_vconst(block: libc::c_int, offset: Box<AstExpr>) -> Box<L
     })
 }
 
-pub fn location_create_dereferencable(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+pub fn location_create_dereferencable(block: usize, offset: Box<AstExpr>) -> Box<Location> {
     Box::new(Location {
         kind: LocationKind::Dereferencable,
         block,
@@ -57,7 +57,7 @@ pub fn location_create_dereferencable(block: libc::c_int, offset: Box<AstExpr>) 
     })
 }
 
-pub fn location_create_static(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+pub fn location_create_static(block: usize, offset: Box<AstExpr>) -> Box<Location> {
     Box::new(Location {
         kind: LocationKind::Static,
         block,
@@ -65,7 +65,7 @@ pub fn location_create_static(block: libc::c_int, offset: Box<AstExpr>) -> Box<L
     })
 }
 
-pub fn location_create_dynamic(block: libc::c_int, offset: Box<AstExpr>) -> Box<Location> {
+pub fn location_create_dynamic(block: usize, offset: Box<AstExpr>) -> Box<Location> {
     Box::new(Location {
         kind: LocationKind::Dynamic,
         block,
@@ -75,7 +75,7 @@ pub fn location_create_dynamic(block: libc::c_int, offset: Box<AstExpr>) -> Box<
 
 pub fn location_create_automatic(
     frame: libc::c_int,
-    block: libc::c_int,
+    block: usize,
     offset: Box<AstExpr>,
 ) -> Box<Location> {
     Box::new(Location {
@@ -199,7 +199,7 @@ pub fn location_getblock<'s>(
     }
 }
 
-pub fn location_auto_get_block_id(loc: &Location) -> libc::c_int {
+pub fn location_auto_get_block_id(loc: &Location) -> usize {
     assert!(matches!(loc.kind, LocationKind::Automatic { .. }));
     loc.block
 }

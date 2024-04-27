@@ -26,20 +26,18 @@ impl StaticMemory {
         b
     }
 
-    pub fn new_block(&mut self) -> libc::c_int {
-        let address = self.blocks.len() as libc::c_int;
+    pub fn new_block(&mut self) -> usize {
+        let address = self.blocks.len();
         self.blocks.push(Block::new());
         address
     }
 
-    pub fn has_block(&self, address: libc::c_int) -> bool {
-        (address as usize) < self.blocks.len()
+    pub fn has_block(&self, address: usize) -> bool {
+        address < self.blocks.len()
     }
 
-    pub fn get_block(&mut self, address: libc::c_int) -> Option<&mut Block> {
-        self.blocks
-            .get_mut(address as usize)
-            .map(|block| &mut **block)
+    pub fn get_block(&mut self, address: usize) -> Option<&mut Block> {
+        self.blocks.get_mut(address).map(|block| &mut **block)
     }
 
     /* string pooling to write one string literal to static_memory and all subsequent
