@@ -75,6 +75,10 @@ impl Stack {
 
     pub fn push(&mut self, name: String, return_type: &AstType) -> &mut StackFrame {
         let id = self.frames.len();
+        // Note: The original `stack_create` not have to manually lay out all this. Instead,
+        // `result` was initially null and it was filled in by calling `variable_create`. In Rust,
+        // it is not nullable, so we can't partially initialize the stack frame, then call a method
+        // on it to create a variable, then initialize the last field.
         let mut frame = StackFrame {
             name,
             blocks: vec![Block::new()],
