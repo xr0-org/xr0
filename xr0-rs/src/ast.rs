@@ -3291,7 +3291,7 @@ pub unsafe fn ast_externdecl_install(decl: Box<AstExternDecl>, ext: &mut Externa
     }
 }
 
-pub fn parse_int(s: &str) -> libc::c_int {
+pub fn parse_int(s: &str) -> i32 {
     s.parse().expect("parse error")
 }
 
@@ -3303,7 +3303,7 @@ pub fn parse_char(s: &str) -> i8 {
     if let Some(stripped) = s.strip_prefix('\\') {
         parse_escape(stripped)
     } else {
-        s.chars().next().expect("invalid char literal") as u32 as libc::c_char
+        s.chars().next().expect("invalid char literal") as u32 as i8
     }
 }
 
