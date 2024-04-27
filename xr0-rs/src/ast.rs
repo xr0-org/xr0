@@ -2588,7 +2588,7 @@ pub fn ast_type_create_voidptr() -> Box<AstType> {
     ast_type_create(AstTypeBase::Pointer(None), 0)
 }
 
-pub fn ast_type_create_arr(base: Box<AstType>, length: libc::c_int) -> Box<AstType> {
+pub fn ast_type_create_arr(base: Box<AstType>, length: i32) -> Box<AstType> {
     ast_type_create(
         AstTypeBase::Array(AstArrayType {
             type_: base,
