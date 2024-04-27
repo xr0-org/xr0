@@ -18,7 +18,7 @@ use crate::value::{
 };
 use crate::{
     strbuilder_write, vprintln, AstExpr, AstType, AstVariable, Externals, Location, Object, Props,
-    Value, Variable,
+    Value,
 };
 
 // Note: The original had a destructor `state_destroy` which used a function
@@ -256,11 +256,8 @@ pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType
     if id == "return" {
         return state_getresulttype(state);
     }
-    let v: *mut Variable = state.stack.get_variable(id);
-    if v.is_null() {
-        panic!();
-    }
-    (*v).type_()
+    let v = state.stack.get_variable(id).unwrap();
+    v.type_()
 }
 
 pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
@@ -269,22 +266,16 @@ pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
     // isn't a double free otherwise. (Note: in one caller, `call_setupverify`, the Value is always
     // leaked, which partially explains it. The other is `address_eval`, which I don't think is
     // always leaked.)
-    let v: *mut Variable = (*state).stack.get_variable(id);
-    if v.is_null() {
-        panic!();
-    }
-    value_ptr_create(location_copy((*v).location()))
+    let v = (*state).stack.get_variable(id).unwrap();
+    value_ptr_create(location_copy(v.location()))
 }
 
 pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
     if id == "return" {
         return state_getresult(state);
     }
-    let v: *mut Variable = (*state).stack.get_variable(id);
-    if v.is_null() {
-        panic!();
-    }
-    state_get(state, (*v).location(), true).unwrap()
+    let v = (*state).stack.get_variable(id).unwrap();
+    state_get(state, v.location(), true).unwrap()
 }
 
 pub unsafe fn state_deref(

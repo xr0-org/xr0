@@ -10,20 +10,22 @@ use crate::state::location::{
     location_references,
 };
 use crate::state::state::state_get;
-use crate::util::{dynamic_str, strbuilder_build, strbuilder_create, Map, OwningCStr};
+use crate::util::{strbuilder_build, strbuilder_create, InsertionOrderMap, OwningCStr};
 use crate::value::value_abstractcopy;
-use crate::{cstr, strbuilder_write, AstType, AstVariable, Location};
+use crate::{strbuilder_write, AstType, AstVariable, Location};
 
 #[derive(Clone)]
 pub struct Stack {
     frames: Vec<StackFrame>,
 }
 
+type VarMap = InsertionOrderMap<OwningCStr, Box<Variable>>;
+
 pub struct StackFrame {
     pub name: OwningCStr,
     // Note: This field is called `frame` in the original.
     pub blocks: Vec<Box<Block>>,
-    pub varmap: Box<Map>,
+    pub varmap: Box<VarMap>,
     pub result: *mut Variable,
     pub id: libc::c_int,
 }
@@ -38,11 +40,6 @@ pub struct Variable {
 impl Drop for StackFrame {
     fn drop(&mut self) {
         unsafe {
-            let m = std::mem::replace(&mut self.varmap, Map::new());
-            for p in m.values() {
-                variable_destroy(p as *mut Variable);
-            }
-            m.destroy();
             variable_destroy(self.result);
         }
     }
@@ -54,7 +51,7 @@ impl Clone for StackFrame {
             StackFrame {
                 name: self.name.clone(),
                 blocks: self.blocks.clone(),
-                varmap: varmap_copy(&self.varmap),
+                varmap: self.varmap.clone(),
                 id: self.id,
                 result: Box::into_raw(variable_copy(&*self.result)),
             }
@@ -62,26 +59,15 @@ impl Clone for StackFrame {
     }
 }
 
-unsafe fn varmap_copy(m: &Map) -> Box<Map> {
-    let mut m_copy = Map::new();
-    for (k, v) in m.pairs() {
-        m_copy.set(
-            dynamic_str(k),
-            Box::into_raw(variable_copy(&*(v as *mut Variable))) as *const libc::c_void,
-        );
-    }
-    m_copy
-}
-
 pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> OwningCStr {
     let mut b = strbuilder_create();
     let n = (*stack).frames.len();
     for i in 0..n {
         let frame: *mut StackFrame = &mut (*stack).frames[i];
-        let m: &Map = &(*frame).varmap;
-        for (k, v) in m.pairs() {
-            let var = variable_str(v as *mut Variable, stack, state);
-            strbuilder_write!(b, "\t{}: {var}", cstr!(k));
+        let m: &mut VarMap = &mut (*frame).varmap;
+        for (k, v) in m {
+            let var = variable_str(&mut **v, stack, state);
+            strbuilder_write!(b, "\t{k}: {var}");
             b.push('\n');
         }
         let result = variable_str((*frame).result, stack, state);
@@ -118,7 +104,7 @@ impl Stack {
         let mut frame = StackFrame {
             name,
             blocks: vec![],
-            varmap: Map::new(),
+            varmap: Box::new(VarMap::new()),
             id,
             result: ptr::null_mut(),
         };
@@ -157,7 +143,7 @@ impl Stack {
         self.top().get_result()
     }
 
-    pub unsafe fn get_variable(&self, id: &str) -> *mut Variable {
+    pub unsafe fn get_variable(&self, id: &str) -> Option<&Variable> {
         self.top().get_variable(id)
     }
 
@@ -175,50 +161,39 @@ impl StackFrame {
 
     pub unsafe fn declare(&mut self, var: &AstVariable, isparam: bool) {
         let id = ast_variable_name(var);
-        if !(self.varmap.get(id.as_ptr())).is_null() {
-            panic!("expected varmap.get(id) to be null");
-        }
+        assert!(self.varmap.get(id.as_cstr()).is_none());
         let var = variable_create(ast_variable_type(var), self, isparam);
-        self.varmap.set(
-            dynamic_str(id.as_ptr()),
-            Box::into_raw(var) as *const libc::c_void,
-        );
+        self.varmap.insert(id.clone(), var);
     }
 
     pub unsafe fn undeclare(&mut self, state: *mut State) {
         let old_result: *mut Variable = self.result;
         self.result = Box::into_raw(variable_abstractcopy(&*old_result, state));
         variable_destroy(old_result);
-        let m = std::mem::replace(&mut self.varmap, Map::new());
-        for (k, v) in m.pairs() {
-            let v = v as *mut Variable;
-            if (*v).is_param() {
-                self.varmap.set(
-                    dynamic_str(k),
-                    Box::into_raw(variable_abstractcopy(&*v, state)) as *const libc::c_void,
-                );
+        let m = std::mem::replace(&mut self.varmap, Box::new(VarMap::new()));
+        for (k, v) in &*m {
+            if v.is_param() {
+                self.varmap
+                    .insert(k.clone(), variable_abstractcopy(v, state));
             }
-            variable_destroy(v);
         }
-        m.destroy();
     }
 
     pub unsafe fn get_result(&self) -> &Variable {
         &*self.result
     }
 
-    pub unsafe fn get_variable(&self, id: &str) -> *mut Variable {
+    pub unsafe fn get_variable(&self, id: &str) -> Option<&Variable> {
         assert_ne!(id, "return");
-        self.varmap.get_by_str(id) as *mut Variable
+        self.varmap.get(id).map(|boxed| &**boxed)
     }
 
     pub unsafe fn references(&self, loc: &Location, state: *mut State) -> bool {
         if variable_references(&*self.result, loc, state) {
             return true;
         }
-        for p in self.varmap.values() {
-            let var = p as *mut Variable;
-            if (*var).is_param() && variable_references(&*var, loc, state) {
+        for (_id, var) in &*self.varmap {
+            if var.is_param() && variable_references(var, loc, state) {
                 return true;
             }
         }

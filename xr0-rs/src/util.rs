@@ -5,17 +5,7 @@ use std::mem;
 use std::ops::Deref;
 use std::ptr;
 
-use libc::{free, malloc, realloc, strcmp, strlen, strncpy};
-
-pub struct Map {
-    entry: *mut Entry,
-    n: libc::c_int,
-}
-
-struct Entry {
-    key: *mut libc::c_char,
-    value: *const libc::c_void,
-}
+use libc::{free, malloc, strlen, strncpy};
 
 pub struct StrBuilder {
     s: String,
@@ -70,101 +60,6 @@ pub unsafe extern "C" fn dynamic_str(s: *const libc::c_char) -> *mut libc::c_cha
         malloc((mem::size_of::<libc::c_char>()).wrapping_mul(len)) as *mut libc::c_char;
     strncpy(t, s, len);
     t
-}
-
-unsafe fn entry_create(key: *const libc::c_char, value: *const libc::c_void) -> Entry {
-    assert!(!key.is_null());
-    Entry {
-        key: key as *mut libc::c_char,
-        value,
-    }
-}
-
-unsafe fn entry_destroy(e: &Entry) {
-    free(e.key as *mut libc::c_void);
-}
-
-impl Map {
-    pub fn new() -> Box<Map> {
-        Box::new(Map {
-            entry: ptr::null_mut(),
-            n: 0,
-        })
-    }
-
-    #[allow(clippy::boxed_local)]
-    pub unsafe fn destroy(self: Box<Map>) {
-        let mut i: libc::c_int = 0 as libc::c_int;
-        while i < self.n {
-            entry_destroy(&*(self.entry).offset(i as isize));
-            i += 1;
-        }
-        free(self.entry as *mut libc::c_void);
-    }
-
-    unsafe fn getindex(&self, key: *const libc::c_char) -> libc::c_int {
-        if key.is_null() {
-            panic!("key is null");
-        }
-        let mut i: libc::c_int = 0 as libc::c_int;
-        while i < self.n {
-            if strcmp((*self.entry.offset(i as isize)).key, key) == 0 as libc::c_int {
-                return i;
-            }
-            i += 1;
-        }
-        -1
-    }
-
-    pub unsafe fn get_by_str(&self, key: &str) -> *mut libc::c_void {
-        for i in 0..self.n as usize {
-            if CStr::from_ptr((*self.entry.add(i)).key).to_str().unwrap() == key {
-                return (*self.entry.add(i)).value as *mut libc::c_void;
-            }
-        }
-        ptr::null_mut()
-    }
-
-    pub unsafe fn get(&self, key: *const libc::c_char) -> *mut libc::c_void {
-        let index = self.getindex(key);
-        if index != -1 {
-            return (*self.entry.offset(index as isize)).value as *mut libc::c_void;
-        }
-        ptr::null_mut()
-    }
-
-    pub unsafe fn set(&mut self, key: *const libc::c_char, value: *const libc::c_void) {
-        let index = self.getindex(key);
-        if index >= 0 {
-            (*self.entry.offset(index as isize)).value = value;
-            return;
-        }
-        self.n += 1;
-        self.entry = realloc(
-            self.entry as *mut libc::c_void,
-            (mem::size_of::<Entry>() as libc::c_ulong).wrapping_mul(self.n as libc::c_ulong)
-                as usize,
-        ) as *mut Entry;
-        *self.entry.offset((self.n - 1 as libc::c_int) as isize) = entry_create(key, value);
-    }
-
-    fn table(&self) -> &[Entry] {
-        if self.n == 0 {
-            &[]
-        } else {
-            unsafe { std::slice::from_raw_parts(self.entry, self.n as usize) }
-        }
-    }
-
-    pub fn values(&self) -> impl Iterator<Item = *const libc::c_void> + '_ {
-        self.table().iter().map(|e| e.value)
-    }
-
-    pub fn pairs(&self) -> impl Iterator<Item = (*const libc::c_char, *const libc::c_void)> + '_ {
-        self.table()
-            .iter()
-            .map(|e| (e.key as *const libc::c_char, e.value))
-    }
 }
 
 pub fn strbuilder_create() -> StrBuilder {
@@ -345,7 +240,13 @@ impl Clone for OwningCStr {
 
 impl Borrow<CStr> for OwningCStr {
     fn borrow(&self) -> &CStr {
-        unsafe { CStr::from_ptr(self.as_ptr()) }
+        self.as_cstr()
+    }
+}
+
+impl Borrow<str> for OwningCStr {
+    fn borrow(&self) -> &str {
+        self.as_str()
     }
 }
 

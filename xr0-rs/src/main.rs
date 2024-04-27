@@ -32,7 +32,6 @@ use ext::Externals;
 use object::Object;
 use props::Props;
 use state::location::Location;
-use state::stack::Variable;
 use util::{OwningCStr, VERBOSE_MODE};
 use value::Value;
 
