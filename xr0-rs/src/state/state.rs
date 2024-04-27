@@ -327,8 +327,10 @@ pub unsafe fn state_range_alloc(
     b.range_alloc(lw, up, &mut (*state).heap)
 }
 
-pub unsafe fn state_alloc(state: *mut State) -> Box<Value> {
-    value_ptr_create((*state).heap.new_block())
+impl State {
+    pub fn alloc(&mut self) -> Box<Value> {
+        value_ptr_create(self.heap.new_block())
+    }
 }
 
 pub unsafe fn state_dealloc(state: *mut State, val: &Value) -> Result<()> {

@@ -12,7 +12,7 @@ use crate::object::{
 };
 use crate::parser::LexemeMarker;
 use crate::state::state::{
-    state_addresses_deallocand, state_alloc, state_copy, state_copywithname, state_create,
+    state_addresses_deallocand, state_copy, state_copywithname, state_create,
     state_create_withprops, state_dealloc, state_declare, state_deref, state_equal, state_get,
     state_getext, state_getloc, state_getobject, state_getobjecttype, state_getprops,
     state_getresult, state_getvconst, state_hasgarbage, state_isalloc, state_islval,
@@ -996,7 +996,7 @@ unsafe fn expr_unary_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value
 
 unsafe fn alloc_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value> {
     match ast_expr_alloc_kind(expr) {
-        AstAllocKind::Alloc => Ok(Box::into_raw(state_alloc(state))),
+        AstAllocKind::Alloc => Ok(Box::into_raw((*state).alloc())),
         AstAllocKind::Dealloc => dealloc_process(expr, state),
         AstAllocKind::Clump => Ok(Box::into_raw((*state).clump())),
     }

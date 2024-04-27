@@ -6,9 +6,7 @@ use crate::ast::{
     ast_expr_sum_create, ast_type_struct_complete,
 };
 use crate::state::location::location_references;
-use crate::state::state::{
-    state_alloc, state_dealloc, state_eval, state_getext, state_isdeallocand,
-};
+use crate::state::state::{state_dealloc, state_eval, state_getext, state_isdeallocand};
 use crate::state::State;
 use crate::util::Result;
 use crate::value::{
@@ -252,7 +250,7 @@ pub unsafe fn object_upto(
         ast_expr_copy(&obj.offset),
         range_create(
             ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
-            value_into_location(Box::into_raw(state_alloc(s))),
+            value_into_location(Box::into_raw((*s).alloc())),
         ),
     ))
 }
@@ -285,7 +283,7 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
         ast_expr_copy(incl_lw),
         range_create(
             ast_expr_difference_create(Box::from_raw(up), ast_expr_copy(incl_lw)),
-            value_into_location(Box::into_raw(state_alloc(s))),
+            value_into_location(Box::into_raw((*s).alloc())),
         ),
     ))
 }

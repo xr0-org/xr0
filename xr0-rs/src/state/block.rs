@@ -11,7 +11,7 @@ use crate::object::{
     object_references, object_referencesheap, object_upper, object_upto, object_value_create,
     range_create,
 };
-use crate::state::state::{state_alloc, state_eval};
+use crate::state::state::state_eval;
 use crate::util::{Error, Result};
 use crate::{AstExpr, Location, Object};
 
@@ -68,7 +68,7 @@ impl Block {
         // know why it isn't a double free.
         let lw_ptr = Box::into_raw(lw);
         let upto = object_upto(obj, lw_ptr, s);
-        let observed = object_value_create(ast_expr_copy(&*lw_ptr), Some(state_alloc(s)));
+        let observed = object_value_create(ast_expr_copy(&*lw_ptr), Some((*s).alloc()));
         let from = object_from(obj, &up, s);
         drop(up);
         drop(Box::from_raw(lw_ptr));
