@@ -107,11 +107,11 @@ pub fn object_as_value(obj: &Object) -> Option<&Value> {
     v.as_deref()
 }
 
-pub unsafe fn object_isdeallocand(obj: &Object, s: *mut State) -> bool {
+pub fn object_isdeallocand(obj: &Object, s: &mut State) -> bool {
     match &obj.kind {
         ObjectKind::Value(None) => false,
-        ObjectKind::Value(Some(v)) => (*s).loc_is_deallocand(value_as_location(v)),
-        ObjectKind::DeallocandRange(range) => range_isdeallocand(range, &mut *s),
+        ObjectKind::Value(Some(v)) => s.loc_is_deallocand(value_as_location(v)),
+        ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
     }
 }
 
@@ -360,7 +360,7 @@ pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
     ))))
 }
 
-pub unsafe fn range_isdeallocand(r: &Range, s: &mut State) -> bool {
+pub fn range_isdeallocand(r: &Range, s: &mut State) -> bool {
     s.loc_is_deallocand(&r.loc)
 }
 
