@@ -13,12 +13,12 @@ pub struct DirectFunctionDeclarator {
 }
 
 pub struct FunctionDeclarator {
-    pub ptr_valence: libc::c_int,
+    pub ptr_valence: usize,
     pub decl: DirectFunctionDeclarator,
 }
 
 pub struct Declarator {
-    pub ptr_valence: libc::c_int,
+    pub ptr_valence: usize,
     pub name: Option<String>,
 }
 
@@ -366,8 +366,8 @@ pub grammar c_parser(env: &Env) for str {
         _ "[" _ constant_expression() _ "]" /
         _ "(" _ parameter_type_list() _ ")"
 
-    rule pointer() -> libc::c_int =
-        s:$("*"+) { s.len() as libc::c_int }
+    rule pointer() -> usize =
+        s:$("*"+) { s.len() }
 
     rule parameter_type_list() -> Vec<Box<AstVariable>> = parameter_list()
 
@@ -391,7 +391,7 @@ pub grammar c_parser(env: &Env) for str {
         t:specifier_qualifier_list() _ abstract_declarator() { t } /
         specifier_qualifier_list()
 
-    rule abstract_declarator() -> libc::c_int = pointer()
+    rule abstract_declarator() -> usize = pointer()
 
     rule statement() -> Box<AstStmt> =
         labelled_statement() /
