@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
     ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create,
-    ast_expr_sum_create, ast_type_struct_complete,
+    ast_expr_sum_create, ast_type_struct_complete, c_int,
 };
 use crate::state::location::location_references;
 use crate::state::state::{state_eval, state_getext};
@@ -197,10 +197,7 @@ pub unsafe fn object_contig_precedes(before: &Object, after: &Object, s: &State)
 pub unsafe fn object_issingular(obj: *mut Object, s: &State) -> bool {
     let lw: *mut AstExpr = &mut *(*obj).offset;
     let up: *mut AstExpr = object_upper(&*obj);
-    let lw_succ = ast_expr_sum_create(
-        Box::from_raw(lw),
-        ast_expr_constant_create(1 as libc::c_int),
-    );
+    let lw_succ = ast_expr_sum_create(Box::from_raw(lw), ast_expr_constant_create(1 as c_int));
     // Note: Original leaks the expression to avoid double-freeing subexpressions.
     // XXX FIXME: invalid use of Box - make a borrowed expr type
     let expr = ast_expr_eq_create(lw_succ, Box::from_raw(up));

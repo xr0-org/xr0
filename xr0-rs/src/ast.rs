@@ -30,6 +30,19 @@ use crate::value::{
 };
 use crate::{str_write, vprintln, Externals, Object, Value};
 
+/// Type of integer constants in C on the target platform. Currently XR0 can handle only 32-bit
+/// constants. This is also used for the length of arrays. 2 billion should be enough for anyone.
+#[allow(non_camel_case_types)]
+pub type c_int = i32;
+
+/// The unsigned type that corresponds to `c_int`.
+#[allow(non_camel_case_types)]
+pub type c_uint = u32;
+
+/// Type of `char` values in C on the target platform.
+#[allow(non_camel_case_types)]
+pub type c_char = i8;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
     Alloc,
@@ -104,7 +117,7 @@ pub struct CallExpr {
 
 #[derive(Clone)]
 pub struct ConstantExpr {
-    constant: i32,
+    constant: c_int,
     is_char: bool,
 }
 
@@ -159,7 +172,7 @@ pub struct AstVariable {
 #[derive(Clone)]
 pub struct AstArrayType {
     pub type_: Box<AstType>,
-    pub length: i32,
+    pub length: c_int,
 }
 
 #[derive(Clone)]
@@ -1145,7 +1158,7 @@ pub fn ast_expr_as_literal(expr: &AstExpr) -> &str {
     s
 }
 
-pub fn ast_expr_as_constant(expr: &AstExpr) -> i32 {
+pub fn ast_expr_as_constant(expr: &AstExpr) -> c_int {
     match &expr.kind {
         AstExprKind::Constant(c) => c.constant,
         _ => panic!(),
@@ -1160,14 +1173,14 @@ unsafe fn pf_augment(v: *mut Value, call: &AstExpr, state: *mut State) -> Result
     Ok(value_pf_augment(v, value_as_sync(&*Box::into_raw(res_val))))
 }
 
-pub fn ast_expr_constant_create_char(c: i8) -> Box<AstExpr> {
+pub fn ast_expr_constant_create_char(c: c_char) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Constant(ConstantExpr {
         is_char: true,
-        constant: c as i32,
+        constant: c as c_int,
     }))
 }
 
-pub fn ast_expr_constant_create(k: i32) -> Box<AstExpr> {
+pub fn ast_expr_constant_create(k: c_int) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Constant(ConstantExpr {
         is_char: false,
         constant: k,
@@ -2588,7 +2601,7 @@ pub fn ast_type_create_voidptr() -> Box<AstType> {
     ast_type_create(AstTypeBase::Pointer(None), 0)
 }
 
-pub fn ast_type_create_arr(base: Box<AstType>, length: i32) -> Box<AstType> {
+pub fn ast_type_create_arr(base: Box<AstType>, length: c_int) -> Box<AstType> {
     ast_type_create(
         AstTypeBase::Array(AstArrayType {
             type_: base,
@@ -3291,7 +3304,7 @@ pub unsafe fn ast_externdecl_install(decl: Box<AstExternDecl>, ext: &mut Externa
     }
 }
 
-pub fn parse_int(s: &str) -> i32 {
+pub fn parse_int(s: &str) -> c_int {
     s.parse().expect("parse error")
 }
 
