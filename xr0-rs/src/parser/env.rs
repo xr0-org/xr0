@@ -132,23 +132,23 @@ fn parse_linemarker(line: &str) -> (PathBuf, usize) {
     }
     let n = s.len() - chars.as_str().len() - 1; // -1 for closing quote
     let name = &s[..n];
-    let mut flags: libc::c_int = 0 as libc::c_int;
+    let mut flags = 0;
     c = chars.next().unwrap_or('\0');
     if c.is_whitespace() {
         while c != '\0' {
             if c.is_ascii_digit() {
                 match c {
                     '1' => {
-                        flags |= LM_FLAG_NEW_FILE as libc::c_int;
+                        flags |= LM_FLAG_NEW_FILE;
                     }
                     '2' => {
-                        flags |= LM_FLAG_RESUME_FILE as libc::c_int;
+                        flags |= LM_FLAG_RESUME_FILE;
                     }
                     '3' => {
-                        flags |= LM_FLAG_SYS_HEADER as libc::c_int;
+                        flags |= LM_FLAG_SYS_HEADER;
                     }
                     '4' => {
-                        flags |= LM_FLAG_IMPLICIT_EXTERN as libc::c_int;
+                        flags |= LM_FLAG_IMPLICIT_EXTERN;
                     }
                     _ => {
                         eprintln!("invalid flag {:?}", c);
