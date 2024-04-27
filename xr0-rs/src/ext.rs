@@ -18,7 +18,7 @@ impl Externals {
         Externals::default()
     }
 
-    pub unsafe fn types_str(&self, indent: &str) -> OwningCStr {
+    pub fn types_str(&self, indent: &str) -> OwningCStr {
         let mut b = strbuilder_create();
         for (k, v) in &self.typedef {
             strbuilder_write!(b, "{indent}{} {k}\n", ast_type_str(v));
@@ -52,15 +52,15 @@ impl Externals {
         &self.func_insertion_order
     }
 
-    pub unsafe fn get_func(&self, id: &str) -> Option<&AstFunction<'static>> {
+    pub fn get_func(&self, id: &str) -> Option<&AstFunction<'static>> {
         self.func.get(id).map(|ptr| &**ptr)
     }
 
-    pub unsafe fn get_typedef(&self, id: &str) -> Option<&AstType> {
+    pub fn get_typedef(&self, id: &str) -> Option<&AstType> {
         self.typedef.get(id).map(|p| &**p)
     }
 
-    pub unsafe fn get_struct(&self, id: &str) -> Option<&AstType> {
+    pub fn get_struct(&self, id: &str) -> Option<&AstType> {
         self.struct_.get(id).map(|p| &**p)
     }
 }
