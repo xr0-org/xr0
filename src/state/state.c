@@ -262,7 +262,6 @@ state_readregister(struct state *state)
 void
 state_writeregister(struct state *state, struct value *v)
 {
-	printf("state: %s\n", state_str(state));
 	assert(!state->reg);
 	//v_printf("writing to register: %s\n", v ? value_str(v) : "NULL");
 	state->reg = v;

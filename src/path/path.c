@@ -346,7 +346,7 @@ path_init_actual(struct path *p)
 	struct frame *setup = frame_setup_create(
 		dynamic_str("setup"),
 		ast_block_copy(ast_function_abstract(p->f)),
-		EXEC_SETUP	
+		EXEC_SETUP
 	);
 	state_pushframe(p->actual, setup);
 	p->path_state = PATH_STATE_ACTUAL;
@@ -357,6 +357,7 @@ static struct error *
 path_step_abstract(struct path *p, bool print)
 {
 	if (print) {
+		v_printf("mode:%d\n", state_execmode(p->abstract));
 		v_printf("text:\n%s\n", state_programtext(p->abstract));
 		v_printf("abstract: %s\n", state_str(p->abstract));
 	}
@@ -381,6 +382,7 @@ static struct error *
 path_step_actual(struct path *p, bool print)
 {
 	if (print) {
+		v_printf("mode:%d\n", state_execmode(p->actual));
 		v_printf("text:\n%s\n", state_programtext(p->actual));
 		v_printf("actual: %s\n", state_str(p->actual));
 	}
