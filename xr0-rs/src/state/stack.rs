@@ -73,11 +73,8 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> String {
         let result = variable_str((*frame).result, stack, state);
         str_write!(b, "\treturn: {result}\n");
         str_write!(b, "\t");
-        let mut i_0: libc::c_int = 0 as libc::c_int;
-        let len: libc::c_int = 30 as libc::c_int;
-        while i_0 < len - 2 as libc::c_int {
+        for _ in 0..28 {
             b.push('-');
-            i_0 += 1;
         }
         str_write!(b, " {}\n", (*frame).name);
     }
