@@ -74,8 +74,8 @@ impl Env {
         let (file, line, column) = self.file_line_column(p);
         let filename = file.display().to_string();
         Box::new(LexemeMarker {
-            linenum: line as libc::c_int,
-            column: column as libc::c_int,
+            linenum: line,
+            column,
             filename,
             flags: 0,
         })
@@ -166,8 +166,8 @@ fn parse_linemarker(line: &str) -> (PathBuf, usize) {
 
 #[derive(Clone)]
 pub struct LexemeMarker {
-    pub linenum: libc::c_int,
-    pub column: libc::c_int,
+    pub linenum: usize,
+    pub column: usize,
     pub filename: String,
     pub flags: LineMarkerFlags,
 }
