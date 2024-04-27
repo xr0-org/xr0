@@ -173,10 +173,6 @@ impl OwningCStr {
         unsafe { Self::new(dynamic_str(ptr.as_ptr())) }
     }
 
-    pub unsafe fn copy_char_ptr(ptr: *const libc::c_char) -> Self {
-        OwningCStr::copy(CStr::from_ptr(ptr))
-    }
-
     pub fn copy_str(s: &str) -> Self {
         let n = s.len();
         unsafe {
@@ -187,16 +183,6 @@ impl OwningCStr {
                 ptr: p as *mut libc::c_char,
             }
         }
-    }
-
-    pub fn as_ptr(&self) -> *mut libc::c_char {
-        self.ptr
-    }
-
-    pub fn into_ptr(self) -> *mut libc::c_char {
-        let p = self.ptr;
-        std::mem::forget(self);
-        p
     }
 
     pub fn as_str(&self) -> &str {
