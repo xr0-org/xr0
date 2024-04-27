@@ -21,10 +21,9 @@ use crate::state::State;
 use crate::util::{Error, InsertionOrderMap, Result, SemiBox};
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_equal, value_int_create,
-    value_int_indefinite_create, value_into_sync, value_isconstant, value_isint, value_islocation,
-    value_isstruct, value_issync, value_literal_create, value_pf_augment,
-    value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
-    value_sync_create, value_to_expr,
+    value_int_indefinite_create, value_isconstant, value_isint, value_islocation, value_isstruct,
+    value_issync, value_literal_create, value_pf_augment, value_ptr_indefinite_create, value_str,
+    value_struct_indefinite_create, value_struct_member, value_sync_create, value_to_expr,
 };
 use crate::{str_write, vprintln, Externals, Object, Value};
 
@@ -638,14 +637,14 @@ unsafe fn ast_expr_pf_reduce_assume(
     s: *mut State,
 ) -> Result<Preresult> {
     let res_val = ast_expr_pf_reduce(expr, s).unwrap();
-    irreducible_assume(&value_into_sync(Box::into_raw(res_val)), value, s)
+    irreducible_assume(&res_val.into_sync(), value, s)
 }
 
 unsafe fn identifier_assume(expr: &AstExpr, value: bool, s: *mut State) -> Result<Preresult> {
     let mut s_copy = state_copy(&*s);
     let res_val = ast_expr_eval(expr, &mut s_copy).unwrap();
     drop(s_copy);
-    irreducible_assume(&value_into_sync(Box::into_raw(res_val)), value, s)
+    irreducible_assume(&res_val.into_sync(), value, s)
 }
 
 unsafe fn binary_deref_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Value>> {
@@ -1208,7 +1207,7 @@ pub fn ast_expr_identifier_create(s: String) -> Box<AstExpr> {
 unsafe fn unary_pf_reduce(e: &AstExpr, s: *mut State) -> Result<Box<Value>> {
     let res_val = ast_expr_pf_reduce(ast_expr_unary_operand(e), s)?;
     Ok(value_sync_create(ast_expr_unary_create(
-        value_into_sync(Box::into_raw(res_val)),
+        res_val.into_sync(),
         ast_expr_unary_op(e),
     )))
 }
@@ -1254,7 +1253,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Va
         panic!();
     }
     Ok(value_sync_create(ast_expr_member_create(
-        value_into_sync(Box::into_raw(v)),
+        v.into_sync(),
         field.to_string(),
     )))
 }
@@ -2254,7 +2253,7 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Result<bool> {
     let v = ast_expr_pf_reduce(control, state)?;
     if value_issync(&v) {
         let v_str = format!("{v}");
-        let sync = Box::into_raw(value_into_sync(Box::into_raw(v)));
+        let sync = Box::into_raw(v.into_sync());
         let p = state_getprops(&mut *state);
         if p.get(&*sync) {
             Ok(true)

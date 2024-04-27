@@ -355,12 +355,13 @@ pub fn value_as_sync(v: &Value) -> &AstExpr {
     number_as_sync(n)
 }
 
-pub unsafe fn value_into_sync(v: *mut Value) -> Box<AstExpr> {
-    let v = *Box::from_raw(v);
-    let ValueKind::Sync(n) = v.kind else {
-        panic!();
-    };
-    number_into_sync(*n)
+impl Value {
+    pub unsafe fn into_sync(self) -> Box<AstExpr> {
+        let ValueKind::Sync(n) = self.kind else {
+            panic!();
+        };
+        number_into_sync(*n)
+    }
 }
 
 pub fn value_isint(v: &Value) -> bool {
