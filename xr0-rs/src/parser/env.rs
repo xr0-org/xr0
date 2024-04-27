@@ -169,14 +169,14 @@ pub struct LexemeMarker {
     pub linenum: libc::c_int,
     pub column: libc::c_int,
     pub filename: String,
-    pub flags: LineMarkerFlag,
+    pub flags: LineMarkerFlags,
 }
 
-pub type LineMarkerFlag = libc::c_uint;
-pub const LM_FLAG_IMPLICIT_EXTERN: LineMarkerFlag = 8;
-pub const LM_FLAG_SYS_HEADER: LineMarkerFlag = 4;
-pub const LM_FLAG_RESUME_FILE: LineMarkerFlag = 2;
-pub const LM_FLAG_NEW_FILE: LineMarkerFlag = 1;
+pub type LineMarkerFlags = u32;
+pub const LM_FLAG_NEW_FILE: LineMarkerFlags = 1;
+pub const LM_FLAG_RESUME_FILE: LineMarkerFlags = 2;
+pub const LM_FLAG_SYS_HEADER: LineMarkerFlags = 4;
+pub const LM_FLAG_IMPLICIT_EXTERN: LineMarkerFlags = 8;
 
 impl Display for LexemeMarker {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
