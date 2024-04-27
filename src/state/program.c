@@ -153,11 +153,10 @@ program_stmt_atend(struct program *p, struct state *s)
 }
 
 static struct error *
-program_stmt_step(struct program *p, bool abstract, 
-		struct state *s);
+program_stmt_step(struct program *, enum execution_mode, struct state *);
 
 struct error *
-program_exec(struct program *p, bool abstract, struct state *s)
+program_exec(struct program *p, enum execution_mode mode, struct state *s)
 {
 	switch (p->s) {
 	case PROGRAM_COUNTER_DECLS:
@@ -165,7 +164,7 @@ program_exec(struct program *p, bool abstract, struct state *s)
 		program_nextdecl(p);
 		return NULL;
 	case PROGRAM_COUNTER_STMTS:
-		return program_stmt_step(p, abstract, s);
+		return program_stmt_step(p, mode, s);
 	case PROGRAM_COUNTER_ATEND:
 		state_popframe(s);
 		return NULL;
@@ -175,12 +174,12 @@ program_exec(struct program *p, bool abstract, struct state *s)
 }
 
 static struct error *
-program_stmt_process(struct program *p, bool abstract, struct state *s);
+program_stmt_process(struct program *p, enum execution_mode mode, struct state *s);
 
 static struct error *
-program_stmt_step(struct program *p, bool abstract, struct state *s)
+program_stmt_step(struct program *p, enum execution_mode mode, struct state *s)
 {
-	struct error *err = program_stmt_process(p, abstract, s);
+	struct error *err = program_stmt_process(p, mode, s);
 	if (!err) {
 		program_nextstmt(p, s);
 		return NULL;
@@ -194,19 +193,24 @@ program_stmt_step(struct program *p, bool abstract, struct state *s)
 }
 
 static struct error *
-program_stmt_process(struct program *p, bool abstract, struct state *s)
+program_stmt_process(struct program *p, enum execution_mode mode, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	// v_printf("stmt: %s\n", ast_stmt_str(stmt));
 	if (!state_islinear(s) && ast_stmt_linearisable(stmt)) {
-		return ast_stmt_linearise(stmt, s, abstract);
+		return ast_stmt_linearise(stmt, s, mode);
 	}
-	if (abstract) {
-		printf("abstract\n");
-		return ast_stmt_absprocess(stmt, p->name, s, false, true);
+	switch (mode) {
+	case EXEC_ABSTRACT:
+		return ast_stmt_absprocess(stmt, p->name, s);
+	case EXEC_ACTUAL:
+		return ast_stmt_process(stmt, p->name, s);
+	case EXEC_SETUP:
+		printf("setup: \n");
+		return ast_stmt_setupprocess(stmt, p->name, s);
+	default:
+		assert(false);
 	}
-	printf("actual\n");
-	return ast_stmt_process(stmt, p->name, s);
 }
 
 char *

@@ -145,6 +145,12 @@ state_islinear(struct state *s)
 	return stack_islinear(s->stack);
 }
 
+enum execution_mode
+state_execmode(struct state *s)
+{
+	return stack_execmode(s->stack);
+}
+
 bool
 state_atend(struct state *s)
 {
