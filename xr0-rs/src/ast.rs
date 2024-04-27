@@ -1779,16 +1779,8 @@ pub fn ast_block_str(b: &AstBlock, indent: &str) -> String {
     sb
 }
 
-pub fn ast_block_ndecls(b: &AstBlock) -> libc::c_int {
-    b.decls.len() as libc::c_int
-}
-
 pub fn ast_block_decls(b: &AstBlock) -> &[Box<AstVariable>] {
     &b.decls
-}
-
-pub fn ast_block_nstmts(b: &AstBlock) -> libc::c_int {
-    b.stmts.len() as libc::c_int
 }
 
 pub fn ast_block_stmts(b: &AstBlock) -> &[Box<AstStmt>] {
@@ -1869,9 +1861,7 @@ unsafe fn sel_setupabsexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
 
 unsafe fn comp_setupabsexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     let b = ast_stmt_as_block(stmt);
-    if ast_block_ndecls(b) != 0 {
-        panic!();
-    }
+    assert_eq!(ast_block_decls(b).len(), 0);
     for stmt in &b.stmts {
         if ast_stmt_ispre(stmt) {
             stmt_setupabsexec(stmt, state)?;
@@ -1924,7 +1914,7 @@ pub fn ast_stmt_ispre(stmt: &AstStmt) -> bool {
 
 unsafe fn stmt_v_block_verify(v_block_stmt: &AstStmt, state: *mut State) -> Result<()> {
     let b = ast_stmt_as_v_block(v_block_stmt);
-    assert_eq!(ast_block_ndecls(b), 0);
+    assert_eq!(ast_block_decls(b).len(), 0);
     for stmt in &b.stmts {
         ast_stmt_verify(stmt, state)?;
     }
@@ -1954,7 +1944,7 @@ unsafe fn stmt_iter_verify(stmt: &AstStmt, state: *mut State) -> Result<()> {
     let body = ast_stmt_iter_body(stmt);
     assert!(matches!(body.kind, AstStmtKind::Compound(_)));
     let block = ast_stmt_as_block(body);
-    assert_eq!(ast_block_ndecls(block), 0);
+    assert_eq!(ast_block_decls(block).len(), 0);
     assert_eq!(block.stmts.len(), 1);
     let assertion = ast_stmt_as_expr(&block.stmts[0]);
     let lw = ast_stmt_iter_lower_bound(stmt);
@@ -1977,7 +1967,7 @@ pub unsafe fn ast_stmt_verify(stmt: &AstStmt, state: *mut State) -> Result<()> {
 
 unsafe fn stmt_compound_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     let b = ast_stmt_as_block(stmt);
-    assert_eq!(ast_block_ndecls(b), 0);
+    assert_eq!(ast_block_decls(b).len(), 0);
     for stmt in &b.stmts {
         ast_stmt_exec(stmt, state)?;
         if ast_stmt_isterminal(stmt, state) {
@@ -1998,13 +1988,12 @@ unsafe fn stmt_sel_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
 
 fn iter_neteffect(iter: &AstStmt) -> Option<Box<AstStmt>> {
     let abs = ast_stmt_iter_abstract(iter);
-    let nstmts: libc::c_int = ast_block_nstmts(abs);
+    let nstmts = ast_block_stmts(abs).len();
     if nstmts == 0 {
         return None;
     }
-    if !(ast_block_ndecls(abs) == 0 as libc::c_int && nstmts == 1 as libc::c_int) {
-        panic!();
-    }
+    assert_eq!(ast_block_decls(abs).len(), 0);
+    assert_eq!(nstmts, 1);
     // Note: Original passes NULL lexeme marker to these two constructors. In the Rust version, the
     // lexeme marker isn't nullable. It isn't worth warping the universe for this hack, so we dig
     // up with some phony locations.
@@ -2355,7 +2344,7 @@ fn hack_alloc_from_neteffect(stmt: &AstStmt) -> &AstExpr {
     let body = ast_stmt_iter_body(stmt);
     assert!(matches!(body.kind, AstStmtKind::Compound(_)));
     let block = ast_stmt_as_block(body);
-    assert_eq!(ast_block_ndecls(block), 0);
+    assert_eq!(ast_block_decls(block).len(), 0);
     assert_eq!(block.stmts.len(), 1);
     ast_stmt_as_expr(&block.stmts[0])
 }
@@ -2884,7 +2873,7 @@ impl<'ast> AstFunction<'ast> {
     }
 
     pub fn abs_is_empty(&self) -> bool {
-        ast_block_ndecls(&self.abstract_) == 0 && ast_block_nstmts(&self.abstract_) == 0
+        ast_block_decls(&self.abstract_).is_empty() && ast_block_stmts(&self.abstract_).is_empty()
     }
 
     pub fn rtype(&self) -> &AstType {
