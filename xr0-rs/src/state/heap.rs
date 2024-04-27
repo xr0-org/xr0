@@ -5,7 +5,7 @@ use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
 use crate::state::location::location_create_dynamic;
 use crate::state::state::state_references;
 use crate::util::{Error, Result};
-use crate::{strbuilder_write, AstExpr, Location, Value};
+use crate::{str_write, AstExpr, Location, Value};
 
 #[derive(Clone)]
 pub struct Heap {
@@ -36,7 +36,7 @@ impl Heap {
         let mut b = String::new();
         for (i, hb) in self.blocks.iter().enumerate() {
             if !hb.freed {
-                strbuilder_write!(
+                str_write!(
                     b,
                     "{indent}{i}: {}{}",
                     hb.block,
@@ -136,9 +136,9 @@ impl VConst {
         let npersist = self.persist.values().filter(|&&b| b).count();
         let mut b = String::new();
         if persist {
-            strbuilder_write!(b, "${npersist}");
+            str_write!(b, "${npersist}");
         } else {
-            strbuilder_write!(b, "#{}", self.varmap.len() - npersist);
+            str_write!(b, "#{}", self.varmap.len() - npersist);
         }
         b
     }
@@ -168,11 +168,11 @@ impl VConst {
     pub fn str(&self, indent: &str) -> String {
         let mut b = String::new();
         for (k, val) in &self.varmap {
-            strbuilder_write!(b, "{indent}{k}: {val}");
+            str_write!(b, "{indent}{k}: {val}");
             if let Some(comment) = self.comment.get(k) {
-                strbuilder_write!(b, "\t({comment})");
+                str_write!(b, "\t({comment})");
             }
-            strbuilder_write!(b, "\n");
+            str_write!(b, "\n");
         }
         b
     }

@@ -28,7 +28,7 @@ use crate::value::{
     value_ptr_indefinite_create, value_str, value_struct_indefinite_create, value_struct_member,
     value_sync_create, value_to_expr,
 };
-use crate::{strbuilder_write, vprintln, Externals, Object, Value};
+use crate::{str_write, vprintln, Externals, Object, Value};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AstAllocKind {
@@ -1769,11 +1769,11 @@ pub fn ast_block_str(b: &AstBlock, indent: &str) -> String {
     let mut sb = String::new();
     for decl in &b.decls {
         let s = ast_variable_str(decl);
-        strbuilder_write!(sb, "{indent}{s};\n");
+        str_write!(sb, "{indent}{s};\n");
     }
     for stmt in &b.stmts {
         let s = ast_stmt_str(stmt);
-        strbuilder_write!(sb, "{indent}{s}\n");
+        str_write!(sb, "{indent}{s}\n");
     }
     sb
 }
@@ -2061,7 +2061,7 @@ pub unsafe fn ast_stmt_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
 fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: &mut String) {
     // Note: jump.rv can be null. Error in the original.
     let rv = jump.rv.as_ref().unwrap();
-    strbuilder_write!(*b, "return {rv};\n");
+    str_write!(*b, "return {rv};\n");
 }
 
 pub fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
@@ -2088,7 +2088,7 @@ fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: &mut String) {
     let body = ast_stmt_str(&iteration.body);
     let iter = &iteration.iter;
     let abs = ast_block_str(&iteration.abstract_, "\t");
-    strbuilder_write!(*b, "for ({init} {cond} {iter}) [{abs}] {{ {body} }}");
+    str_write!(*b, "for ({init} {cond} {iter}) [{abs}] {{ {body} }}");
 }
 
 pub fn ast_stmt_str(stmt: &AstStmt) -> String {
@@ -2222,10 +2222,10 @@ fn ast_stmt_sel_sprint(stmt: &AstStmt, b: &mut String) {
     };
     let cond = &selection.cond;
     let body = ast_stmt_str(&selection.body);
-    strbuilder_write!(*b, "if ({cond}) {{ {body} }}");
+    str_write!(*b, "if ({cond}) {{ {body} }}");
     if let Some(nest_stmt) = &selection.nest {
         let nest = ast_stmt_str(nest_stmt);
-        strbuilder_write!(*b, " else {nest}");
+        str_write!(*b, " else {nest}");
     }
 }
 
@@ -2277,11 +2277,11 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Result<bool> {
 
 fn ast_stmt_compound_sprint(compound: &AstBlock, b: &mut String) {
     let s = ast_block_str(compound, "\t");
-    strbuilder_write!(*b, "{s}");
+    str_write!(*b, "{s}");
 }
 
 fn ast_stmt_expr_sprint(expr: &AstExpr, b: &mut String) {
-    strbuilder_write!(*b, "{expr};");
+    str_write!(*b, "{expr};");
 }
 
 fn ast_stmt_create(loc: Box<LexemeMarker>, kind: AstStmtKind) -> Box<AstStmt> {
@@ -2315,7 +2315,7 @@ pub fn ast_stmt_create_iter(
 }
 
 fn ast_stmt_nop_sprint(b: &mut String) {
-    strbuilder_write!(*b, ";");
+    str_write!(*b, ";");
 }
 
 pub fn ast_stmt_iter_body(stmt: &AstStmt) -> &AstStmt {
@@ -2374,7 +2374,7 @@ fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: &mut String) {
         panic!();
     };
     let s = ast_stmt_str(&labelled.stmt);
-    strbuilder_write!(*b, "{}: {s}", labelled.label);
+    str_write!(*b, "{}: {s}", labelled.label);
 }
 
 unsafe fn sel_absexec(stmt: &AstStmt, state: *mut State, should_setup: bool) -> Result<()> {
@@ -2693,7 +2693,7 @@ pub fn ast_type_copy(t: &AstType) -> Box<AstType> {
 
 pub fn ast_type_str(t: &AstType) -> String {
     let mut b = String::new();
-    strbuilder_write!(b, "{}", unsafe { mod_str(t.modifiers as libc::c_int) });
+    str_write!(b, "{}", unsafe { mod_str(t.modifiers as libc::c_int) });
     match &t.base {
         AstTypeBase::Pointer(ptr_type) => {
             ast_type_str_build_ptr(&mut b, ptr_type.as_ref().unwrap());
@@ -2705,34 +2705,34 @@ pub fn ast_type_str(t: &AstType) -> String {
             ast_type_str_build_struct(&mut b, s);
         }
         AstTypeBase::UserDefined(name) => {
-            strbuilder_write!(b, "{name}");
+            str_write!(b, "{name}");
         }
         AstTypeBase::Void => {
-            strbuilder_write!(b, "void");
+            str_write!(b, "void");
         }
         AstTypeBase::Char => {
-            strbuilder_write!(b, "char");
+            str_write!(b, "char");
         }
         AstTypeBase::Short => {
-            strbuilder_write!(b, "short");
+            str_write!(b, "short");
         }
         AstTypeBase::Int => {
-            strbuilder_write!(b, "int");
+            str_write!(b, "int");
         }
         AstTypeBase::Long => {
-            strbuilder_write!(b, "long");
+            str_write!(b, "long");
         }
         AstTypeBase::Float => {
-            strbuilder_write!(b, "float");
+            str_write!(b, "float");
         }
         AstTypeBase::Double => {
-            strbuilder_write!(b, "double");
+            str_write!(b, "double");
         }
         AstTypeBase::Signed => {
-            strbuilder_write!(b, "signed");
+            str_write!(b, "signed");
         }
         AstTypeBase::Unsigned => {
-            strbuilder_write!(b, "unsigned");
+            str_write!(b, "unsigned");
         }
         _ => panic!(),
     }
@@ -2758,7 +2758,7 @@ unsafe fn mod_str(modifiers: libc::c_int) -> String {
             let fresh11 = nmods;
             nmods -= 1;
             let space = if fresh11 != 0 { " " } else { "" };
-            strbuilder_write!(b, "{}{space}", modstr[i as usize]);
+            str_write!(b, "{}{space}", modstr[i as usize]);
         }
     }
     b
@@ -2767,29 +2767,29 @@ unsafe fn mod_str(modifiers: libc::c_int) -> String {
 fn ast_type_str_build_ptr(b: &mut String, ptr_type: &AstType) {
     let base = ast_type_str(ptr_type);
     let space: bool = !matches!(ptr_type.base, AstTypeBase::Pointer(_));
-    strbuilder_write!(*b, "{base}{}*", if space { " " } else { "" },);
+    str_write!(*b, "{base}{}*", if space { " " } else { "" },);
 }
 
 fn ast_type_str_build_arr(b: &mut String, arr: &AstArrayType) {
     let base = ast_type_str(&arr.type_);
-    strbuilder_write!(*b, "{base}[{}]", arr.length);
+    str_write!(*b, "{base}[{}]", arr.length);
 }
 
 fn ast_type_str_build_struct(b: &mut String, s: &AstStructType) {
     assert!(s.tag.is_some() || s.members.is_some());
-    strbuilder_write!(*b, "struct ");
+    str_write!(*b, "struct ");
     if let Some(tag) = &s.tag {
-        strbuilder_write!(*b, "{tag}");
+        str_write!(*b, "{tag}");
     }
     let Some(members) = s.members.as_ref() else {
         return;
     };
-    strbuilder_write!(*b, " {{ ");
+    str_write!(*b, " {{ ");
     for field in members.iter() {
         let s = ast_variable_str(field);
-        strbuilder_write!(*b, "{s}; ");
+        str_write!(*b, "{s}; ");
     }
-    strbuilder_write!(*b, "}}");
+    str_write!(*b, "}}");
 }
 
 pub fn ast_type_ptr_type(t: &AstType) -> Option<&AstType> {
@@ -2816,7 +2816,7 @@ pub fn ast_variable_arr_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
 pub fn ast_variable_str(v: &AstVariable) -> String {
     let mut b = String::new();
     let t = ast_type_str(&v.type_);
-    strbuilder_write!(b, "{t} {}", v.name);
+    str_write!(b, "{t} {}", v.name);
     b
 }
 
@@ -2854,24 +2854,24 @@ impl<'ast> AstFunction<'ast> {
     pub fn str(&self) -> String {
         let mut b = String::new();
         if self.is_axiom {
-            strbuilder_write!(b, "axiom ");
+            str_write!(b, "axiom ");
         }
-        strbuilder_write!(b, "{}\n", ast_type_str(&self.ret));
-        strbuilder_write!(b, "{}(", self.name);
+        str_write!(b, "{}\n", ast_type_str(&self.ret));
+        str_write!(b, "{}(", self.name);
         for (i, param) in self.params.iter().enumerate() {
             let v = ast_variable_str(param);
             let space = if i + 1 < self.params.len() { ", " } else { "" };
-            strbuilder_write!(b, "{v}{space}");
+            str_write!(b, "{v}{space}");
         }
         let abs = ast_block_str(&self.abstract_, "\t");
-        strbuilder_write!(b, ") ~ [\n{abs}]");
+        str_write!(b, ") ~ [\n{abs}]");
         if let Some(body) = &self.body {
             let body = ast_block_str(body, "\t");
-            strbuilder_write!(b, "{{\n{body}}}");
+            str_write!(b, "{{\n{body}}}");
         } else {
-            strbuilder_write!(b, ";");
+            str_write!(b, ";");
         }
-        strbuilder_write!(b, "\n");
+        str_write!(b, "\n");
         b
     }
 

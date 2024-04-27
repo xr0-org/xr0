@@ -45,7 +45,7 @@ impl<'a, T> SemiBox<'a, T> {
 }
 
 #[macro_export]
-macro_rules! strbuilder_write {
+macro_rules! str_write {
     ($b:expr, $($fmt:tt)+) => {{
         let buf: &mut String = &mut $b;
         *buf += &format!($($fmt)+);

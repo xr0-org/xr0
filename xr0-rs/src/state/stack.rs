@@ -12,7 +12,7 @@ use crate::state::location::{
 use crate::state::state::state_get;
 use crate::util::InsertionOrderMap;
 use crate::value::value_abstractcopy;
-use crate::{strbuilder_write, AstType, AstVariable, Location};
+use crate::{str_write, AstType, AstVariable, Location};
 
 #[derive(Clone)]
 pub struct Stack {
@@ -67,19 +67,19 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> String {
         let m: &mut VarMap = &mut (*frame).varmap;
         for (k, v) in m {
             let var = variable_str(&mut **v, stack, state);
-            strbuilder_write!(b, "\t{k}: {var}");
+            str_write!(b, "\t{k}: {var}");
             b.push('\n');
         }
         let result = variable_str((*frame).result, stack, state);
-        strbuilder_write!(b, "\treturn: {result}\n");
-        strbuilder_write!(b, "\t");
+        str_write!(b, "\treturn: {result}\n");
+        str_write!(b, "\t");
         let mut i_0: libc::c_int = 0 as libc::c_int;
         let len: libc::c_int = 30 as libc::c_int;
         while i_0 < len - 2 as libc::c_int {
             b.push('-');
             i_0 += 1;
         }
-        strbuilder_write!(b, " {}\n", (*frame).name);
+        str_write!(b, " {}\n", (*frame).name);
     }
     b
 }

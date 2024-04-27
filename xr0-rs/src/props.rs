@@ -1,5 +1,5 @@
 use crate::ast::{ast_expr_equal, ast_expr_inverted_copy};
-use crate::{strbuilder_write, AstExpr};
+use crate::{str_write, AstExpr};
 
 #[derive(Clone)]
 pub struct Props {
@@ -16,11 +16,11 @@ impl Props {
             return "".to_string();
         }
         let mut b = String::new();
-        strbuilder_write!(b, "{indent}\u{22a2} ");
+        str_write!(b, "{indent}\u{22a2} ");
         for (i, e) in self.props.iter().enumerate() {
-            strbuilder_write!(b, "{e}{}", if i + 1 < self.props.len() { ", " } else { "" },);
+            str_write!(b, "{e}{}", if i + 1 < self.props.len() { ", " } else { "" },);
         }
-        strbuilder_write!(b, "\n");
+        str_write!(b, "\n");
         b
     }
 

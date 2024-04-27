@@ -18,7 +18,7 @@ use crate::value::{
     value_ptr_create, value_sync_create,
 };
 use crate::{
-    strbuilder_write, vprintln, AstExpr, AstType, AstVariable, Externals, Location, Object, Props,
+    str_write, vprintln, AstExpr, AstType, AstVariable, Externals, Location, Object, Props,
     Value,
 };
 
@@ -86,34 +86,34 @@ pub unsafe fn state_copywithname(state: &State, func_name: String) -> State {
 
 pub unsafe fn state_str(state: *mut State) -> String {
     let mut b = String::new();
-    strbuilder_write!(b, "[[\n");
+    str_write!(b, "[[\n");
     let ext = (*(*state).ext).types_str("\t");
     if !ext.is_empty() {
-        strbuilder_write!(b, "{ext}\n");
+        str_write!(b, "{ext}\n");
     }
     let static_mem = (*state).static_memory.str("\t");
     if !static_mem.is_empty() {
-        strbuilder_write!(b, "{static_mem}\n");
+        str_write!(b, "{static_mem}\n");
     }
     let vconst = (*state).vconst.str("\t");
     if !vconst.is_empty() {
-        strbuilder_write!(b, "{vconst}\n");
+        str_write!(b, "{vconst}\n");
     }
     let clump = &(*state).clump.str("\t");
     if !clump.is_empty() {
-        strbuilder_write!(b, "{clump}\n");
+        str_write!(b, "{clump}\n");
     }
     let stack = (*state).stack.str(state);
-    strbuilder_write!(b, "{stack}\n");
+    str_write!(b, "{stack}\n");
     let props = (*state).props.str("\t");
     if !props.is_empty() {
-        strbuilder_write!(b, "{props}");
+        str_write!(b, "{props}");
     }
     let heap = (*state).heap.str("\t");
     if !heap.is_empty() {
-        strbuilder_write!(b, "\n{heap}\n");
+        str_write!(b, "\n{heap}\n");
     }
-    strbuilder_write!(b, "]]\n");
+    str_write!(b, "]]\n");
     b
 }
 

@@ -1,5 +1,5 @@
 use super::Block;
-use crate::strbuilder_write;
+use crate::str_write;
 
 #[derive(Clone)]
 pub struct Clump {
@@ -14,7 +14,7 @@ impl Clump {
     pub unsafe fn str(&self, indent: &str) -> String {
         let mut b = String::new();
         for (i, block) in self.blocks.iter().enumerate() {
-            strbuilder_write!(b, "{indent}{i}: {block}\n");
+            str_write!(b, "{indent}{i}: {block}\n");
         }
         b
     }

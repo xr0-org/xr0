@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ptr;
 
 use super::Block;
-use crate::{strbuilder_write, Location};
+use crate::{str_write, Location};
 
 #[derive(Clone)]
 pub struct StaticMemory {
@@ -21,7 +21,7 @@ impl StaticMemory {
     pub unsafe fn str(&self, indent: &str) -> String {
         let mut b = String::new();
         for (i, block) in self.blocks.iter().enumerate() {
-            strbuilder_write!(b, "{indent}{i}: {block}\n");
+            str_write!(b, "{indent}{i}: {block}\n");
         }
         b
     }
