@@ -136,7 +136,7 @@ unsafe fn pass1(order: &[String], ext: &Arc<Externals>, print: bool) {
 
 unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool {
     let mut def: Option<&AstFunction> = None;
-    let mut count: libc::c_int = 0 as libc::c_int;
+    let mut count = 0usize;
     let pname = proto.name();
     for decl in decls {
         if let Some(d) = ast_externdecl_as_function(decl) {
