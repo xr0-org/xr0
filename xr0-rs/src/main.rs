@@ -8,8 +8,8 @@ use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, Stdio};
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use clap::Parser;
 
@@ -181,7 +181,7 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
     } else if let Some(sortfunc) = &c.verify {
-        let order = ast_topological_order(sortfunc, & ext);
+        let order = ast_topological_order(sortfunc, &ext);
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
         pass1(&order, &ext, true);

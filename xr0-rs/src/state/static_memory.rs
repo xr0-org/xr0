@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::ptr;
 
 use super::Block;
-use crate::util::{strbuilder_build, strbuilder_create};
 use crate::{strbuilder_write, Location};
 
 #[derive(Clone)]
@@ -20,11 +19,11 @@ impl StaticMemory {
     }
 
     pub unsafe fn str(&self, indent: &str) -> String {
-        let mut b = strbuilder_create();
+        let mut b = String::new();
         for (i, block) in self.blocks.iter().enumerate() {
             strbuilder_write!(b, "{indent}{i}: {block}\n");
         }
-        strbuilder_build(b)
+        b
     }
 
     pub fn new_block(&mut self) -> libc::c_int {

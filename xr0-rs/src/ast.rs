@@ -20,10 +20,7 @@ use crate::state::state::{
     state_range_dealloc, state_static_init, state_str, state_vconst,
 };
 use crate::state::State;
-use crate::util::{
-    strbuilder_build, strbuilder_create, Error, InsertionOrderMap, Result, SemiBox,
-    StrBuilder,
-};
+use crate::util::{Error, InsertionOrderMap, Result, SemiBox};
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_destroy, value_equal,
     value_int_create, value_int_indefinite_create, value_into_sync, value_isconstant, value_isint,
@@ -1769,7 +1766,7 @@ pub fn ast_block_create(decls: Vec<Box<AstVariable>>, stmts: Vec<Box<AstStmt>>) 
 }
 
 pub fn ast_block_str(b: &AstBlock, indent: &str) -> String {
-    let mut sb = strbuilder_create();
+    let mut sb = String::new();
     for decl in &b.decls {
         let s = ast_variable_str(decl);
         strbuilder_write!(sb, "{indent}{s};\n");
@@ -1778,7 +1775,7 @@ pub fn ast_block_str(b: &AstBlock, indent: &str) -> String {
         let s = ast_stmt_str(stmt);
         strbuilder_write!(sb, "{indent}{s}\n");
     }
-    strbuilder_build(sb)
+    sb
 }
 
 pub fn ast_block_ndecls(b: &AstBlock) -> libc::c_int {
@@ -2061,7 +2058,7 @@ pub unsafe fn ast_stmt_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     }
 }
 
-fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: &mut StrBuilder) {
+fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: &mut String) {
     // Note: jump.rv can be null. Error in the original.
     let rv = jump.rv.as_ref().unwrap();
     strbuilder_write!(*b, "return {rv};\n");
@@ -2085,7 +2082,7 @@ pub fn ast_stmt_lexememarker(stmt: &AstStmt) -> &LexemeMarker {
     &stmt.loc
 }
 
-fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: &mut StrBuilder) {
+fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: &mut String) {
     let init = ast_stmt_str(&iteration.init);
     let cond = ast_stmt_str(&iteration.cond);
     let body = ast_stmt_str(&iteration.body);
@@ -2095,7 +2092,7 @@ fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: &mut StrBuilder) {
 }
 
 pub fn ast_stmt_str(stmt: &AstStmt) -> String {
-    let mut b = strbuilder_create();
+    let mut b = String::new();
     match &stmt.kind {
         AstStmtKind::Labelled(_) => {
             ast_stmt_labelled_sprint(stmt, &mut b);
@@ -2128,7 +2125,7 @@ pub fn ast_stmt_str(stmt: &AstStmt) -> String {
             panic!();
         }
     }
-    strbuilder_build(b)
+    b
 }
 
 fn ast_expr_copy_ifnotnull(expr: &Option<Box<AstExpr>>) -> Option<Box<AstExpr>> {
@@ -2219,7 +2216,7 @@ pub unsafe fn ast_stmt_absexec(
     }
 }
 
-fn ast_stmt_sel_sprint(stmt: &AstStmt, b: &mut StrBuilder) {
+fn ast_stmt_sel_sprint(stmt: &AstStmt, b: &mut String) {
     let AstStmtKind::Selection(selection) = &stmt.kind else {
         panic!();
     };
@@ -2278,12 +2275,12 @@ pub unsafe fn sel_decide(control: &AstExpr, state: *mut State) -> Result<bool> {
     Ok(!value_equal(&zero, &*v))
 }
 
-fn ast_stmt_compound_sprint(compound: &AstBlock, b: &mut StrBuilder) {
+fn ast_stmt_compound_sprint(compound: &AstBlock, b: &mut String) {
     let s = ast_block_str(compound, "\t");
     strbuilder_write!(*b, "{s}");
 }
 
-fn ast_stmt_expr_sprint(expr: &AstExpr, b: &mut StrBuilder) {
+fn ast_stmt_expr_sprint(expr: &AstExpr, b: &mut String) {
     strbuilder_write!(*b, "{expr};");
 }
 
@@ -2317,7 +2314,7 @@ pub fn ast_stmt_create_iter(
     )
 }
 
-fn ast_stmt_nop_sprint(b: &mut StrBuilder) {
+fn ast_stmt_nop_sprint(b: &mut String) {
     strbuilder_write!(*b, ";");
 }
 
@@ -2372,7 +2369,7 @@ pub fn ast_stmt_iter_lower_bound(stmt: &AstStmt) -> &AstExpr {
     ast_expr_assignment_rval(expr)
 }
 
-fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: &mut StrBuilder) {
+fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: &mut String) {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
         panic!();
     };
@@ -2695,7 +2692,7 @@ pub fn ast_type_copy(t: &AstType) -> Box<AstType> {
 }
 
 pub fn ast_type_str(t: &AstType) -> String {
-    let mut b = strbuilder_create();
+    let mut b = String::new();
     strbuilder_write!(b, "{}", unsafe { mod_str(t.modifiers as libc::c_int) });
     match &t.base {
         AstTypeBase::Pointer(ptr_type) => {
@@ -2739,49 +2736,46 @@ pub fn ast_type_str(t: &AstType) -> String {
         }
         _ => panic!(),
     }
-    strbuilder_build(b)
+    b
 }
 
-unsafe fn mod_str(mod_0: libc::c_int) -> String {
+unsafe fn mod_str(modifiers: libc::c_int) -> String {
     let modstr: [&'static str; 7] = [
         "typedef", "extern", "static", "auto", "register", "const", "volatile",
     ];
-    let modlen: libc::c_int = 7 as libc::c_int;
-    let mut b = strbuilder_create();
-    let mut nmods: libc::c_int = 0 as libc::c_int;
-    let mut i: libc::c_int = 0 as libc::c_int;
-    while i < modlen {
-        if (1 as libc::c_int) << i & mod_0 != 0 {
+    let modlen = 7 as libc::c_int;
+    let mut b = String::new();
+    let mut nmods = 0 as libc::c_int;
+
+    for i in 0..modlen {
+        if 1 << i & modifiers != 0 {
             nmods += 1;
         }
-        i += 1;
     }
-    let mut i_0: libc::c_int = 0 as libc::c_int;
-    while i_0 < modlen {
-        let m: libc::c_int = (1 as libc::c_int) << i_0;
-        if m & mod_0 != 0 {
+    for i in 0..modlen {
+        let m: libc::c_int = (1 as libc::c_int) << i;
+        if m & modifiers != 0 {
             let fresh11 = nmods;
             nmods -= 1;
             let space = if fresh11 != 0 { " " } else { "" };
-            strbuilder_write!(b, "{}{space}", modstr[i_0 as usize]);
+            strbuilder_write!(b, "{}{space}", modstr[i as usize]);
         }
-        i_0 += 1;
     }
-    strbuilder_build(b)
+    b
 }
 
-fn ast_type_str_build_ptr(b: &mut StrBuilder, ptr_type: &AstType) {
+fn ast_type_str_build_ptr(b: &mut String, ptr_type: &AstType) {
     let base = ast_type_str(ptr_type);
     let space: bool = !matches!(ptr_type.base, AstTypeBase::Pointer(_));
     strbuilder_write!(*b, "{base}{}*", if space { " " } else { "" },);
 }
 
-fn ast_type_str_build_arr(b: &mut StrBuilder, arr: &AstArrayType) {
+fn ast_type_str_build_arr(b: &mut String, arr: &AstArrayType) {
     let base = ast_type_str(&arr.type_);
     strbuilder_write!(*b, "{base}[{}]", arr.length);
 }
 
-fn ast_type_str_build_struct(b: &mut StrBuilder, s: &AstStructType) {
+fn ast_type_str_build_struct(b: &mut String, s: &AstStructType) {
     assert!(s.tag.is_some() || s.members.is_some());
     strbuilder_write!(*b, "struct ");
     if let Some(tag) = &s.tag {
@@ -2820,10 +2814,10 @@ pub fn ast_variable_arr_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
 }
 
 pub fn ast_variable_str(v: &AstVariable) -> String {
-    let mut b = strbuilder_create();
+    let mut b = String::new();
     let t = ast_type_str(&v.type_);
     strbuilder_write!(b, "{t} {}", v.name);
-    strbuilder_build(b)
+    b
 }
 
 pub fn ast_variable_name(v: &AstVariable) -> &str {
@@ -2858,7 +2852,7 @@ pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
 
 impl<'ast> AstFunction<'ast> {
     pub fn str(&self) -> String {
-        let mut b = strbuilder_create();
+        let mut b = String::new();
         if self.is_axiom {
             strbuilder_write!(b, "axiom ");
         }
@@ -2878,7 +2872,7 @@ impl<'ast> AstFunction<'ast> {
             strbuilder_write!(b, ";");
         }
         strbuilder_write!(b, "\n");
-        strbuilder_build(b)
+        b
     }
 
     pub fn name(&self) -> &str {
@@ -3226,9 +3220,7 @@ pub fn ast_function_buildgraph(fname: &str, ext: &Externals) -> FuncGraph {
 }
 
 fn split_name(name: &str, assumption: &AstExpr) -> String {
-    let mut b = strbuilder_create();
-    strbuilder_write!(b, "{name} | {assumption}");
-    strbuilder_build(b)
+    format!("{name} | {assumption}")
 }
 
 unsafe fn split_paths_verify(

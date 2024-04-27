@@ -4,7 +4,7 @@ use super::{Block, State};
 use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
 use crate::state::location::location_create_dynamic;
 use crate::state::state::state_references;
-use crate::util::{strbuilder_build, strbuilder_create, Error, Result};
+use crate::util::{Error, Result};
 use crate::{strbuilder_write, AstExpr, Location, Value};
 
 #[derive(Clone)]
@@ -33,7 +33,7 @@ impl Heap {
     }
 
     pub unsafe fn str(&self, indent: &str) -> String {
-        let mut b = strbuilder_create();
+        let mut b = String::new();
         for (i, hb) in self.blocks.iter().enumerate() {
             if !hb.freed {
                 strbuilder_write!(
@@ -44,7 +44,7 @@ impl Heap {
                 );
             }
         }
-        strbuilder_build(b)
+        b
     }
 
     fn print_delim(&self, start: usize) -> bool {
@@ -134,13 +134,13 @@ impl VConst {
 
     fn id(&mut self, persist: bool) -> String {
         let npersist = self.persist.values().filter(|&&b| b).count();
-        let mut b = strbuilder_create();
+        let mut b = String::new();
         if persist {
             strbuilder_write!(b, "${npersist}");
         } else {
             strbuilder_write!(b, "#{}", self.varmap.len() - npersist);
         }
-        strbuilder_build(b)
+        b
     }
 
     pub fn get(&self, id: &str) -> Option<&Value> {
@@ -166,7 +166,7 @@ impl VConst {
     }
 
     pub fn str(&self, indent: &str) -> String {
-        let mut b = strbuilder_create();
+        let mut b = String::new();
         for (k, val) in &self.varmap {
             strbuilder_write!(b, "{indent}{k}: {val}");
             if let Some(comment) = self.comment.get(k) {
@@ -174,7 +174,7 @@ impl VConst {
             }
             strbuilder_write!(b, "\n");
         }
-        strbuilder_build(b)
+        b
     }
 
     /// Evaluate a boolean expression. This works only for comparisons of linear polynomial integer

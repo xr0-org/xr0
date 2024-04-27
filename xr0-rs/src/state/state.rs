@@ -12,7 +12,7 @@ use crate::ast::{
     ast_type_vconst,
 };
 use crate::object::{object_as_value, object_assign};
-use crate::util::{strbuilder_build, strbuilder_create, Error,  Result};
+use crate::util::{Error, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
     value_ptr_create, value_sync_create,
@@ -85,7 +85,7 @@ pub unsafe fn state_copywithname(state: &State, func_name: String) -> State {
 }
 
 pub unsafe fn state_str(state: *mut State) -> String {
-    let mut b = strbuilder_create();
+    let mut b = String::new();
     strbuilder_write!(b, "[[\n");
     let ext = (*(*state).ext).types_str("\t");
     if !ext.is_empty() {
@@ -114,7 +114,7 @@ pub unsafe fn state_str(state: *mut State) -> String {
         strbuilder_write!(b, "\n{heap}\n");
     }
     strbuilder_write!(b, "]]\n");
-    strbuilder_build(b)
+    b
 }
 
 pub unsafe fn state_getext(s: *mut State) -> *const Externals {

@@ -10,7 +10,7 @@ use crate::state::location::{
     location_references,
 };
 use crate::state::state::state_get;
-use crate::util::{strbuilder_build, strbuilder_create, InsertionOrderMap};
+use crate::util::InsertionOrderMap;
 use crate::value::value_abstractcopy;
 use crate::{strbuilder_write, AstType, AstVariable, Location};
 
@@ -60,7 +60,7 @@ impl Clone for StackFrame {
 }
 
 pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> String {
-    let mut b = strbuilder_create();
+    let mut b = String::new();
     let n = (*stack).frames.len();
     for i in 0..n {
         let frame: *mut StackFrame = &mut (*stack).frames[i];
@@ -81,7 +81,7 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> String {
         }
         strbuilder_write!(b, " {}\n", (*frame).name);
     }
-    strbuilder_build(b)
+    b
 }
 
 impl Stack {
@@ -249,13 +249,11 @@ unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> 
 
 pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> String {
     assert!(!(*(*var).loc).type_is_vconst());
-    let mut b = strbuilder_create();
     let type_ = ast_type_str(&(*var).type_);
     let isparam = if (*var).is_param { "param " } else { "" };
     let obj_str = object_or_nothing_str(&mut *(*var).loc, stack, state);
     let loc = &*(*var).loc;
-    strbuilder_write!(b, "{{{isparam}{type_} := {obj_str}}} @ {loc}");
-    strbuilder_build(b)
+    format!("{{{isparam}{type_} := {obj_str}}} @ {loc}")
 }
 
 unsafe fn object_or_nothing_str(

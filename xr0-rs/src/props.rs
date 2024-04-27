@@ -1,5 +1,4 @@
 use crate::ast::{ast_expr_equal, ast_expr_inverted_copy};
-use crate::util::{strbuilder_build, strbuilder_create};
 use crate::{strbuilder_write, AstExpr};
 
 #[derive(Clone)]
@@ -16,13 +15,13 @@ impl Props {
         if self.props.is_empty() {
             return "".to_string();
         }
-        let mut b = strbuilder_create();
+        let mut b = String::new();
         strbuilder_write!(b, "{indent}\u{22a2} ");
         for (i, e) in self.props.iter().enumerate() {
             strbuilder_write!(b, "{e}{}", if i + 1 < self.props.len() { ", " } else { "" },);
         }
         strbuilder_write!(b, "\n");
-        strbuilder_build(b)
+        b
     }
 
     pub fn install(&mut self, e: Box<AstExpr>) {

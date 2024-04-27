@@ -1,11 +1,7 @@
-use std::sync::atomic::AtomicBool;
 use std::borrow::Borrow;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::Deref;
-
-pub struct StrBuilder {
-    s: String,
-}
+use std::sync::atomic::AtomicBool;
 
 #[derive(Debug, Clone)]
 pub struct Error {
@@ -48,31 +44,12 @@ impl<'a, T> SemiBox<'a, T> {
     }
 }
 
-pub fn strbuilder_create() -> StrBuilder {
-    StrBuilder {
-        s: String::with_capacity(100),
-    }
-}
-
-pub fn strbuilder_build(b: StrBuilder) -> String {
-    b.s
-}
-
-pub fn strbuilder_append_string(b: &mut StrBuilder, s: String) {
-    b.s.push_str(&s);
-}
-
-impl StrBuilder {
-    pub fn push(&mut self, c: char) {
-        self.s.push(c);
-    }
-}
-
 #[macro_export]
 macro_rules! strbuilder_write {
-    ($b:expr, $($fmt:tt)+) => {
-        $crate::util::strbuilder_append_string(&mut $b, format!($($fmt)+))
-    }
+    ($b:expr, $($fmt:tt)+) => {{
+        let buf: &mut String = &mut $b;
+        *buf += &format!($($fmt)+);
+    }}
 }
 
 #[macro_export]
@@ -89,9 +66,7 @@ macro_rules! cstr {
 
 impl Error {
     pub fn new(s: String) -> Box<Error> {
-        Box::new(Error {
-            msg: s,
-        })
+        Box::new(Error { msg: s })
     }
 }
 
