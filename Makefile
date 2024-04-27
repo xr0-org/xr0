@@ -292,6 +292,9 @@ TESTFILES = $(shell find $(TESTDIR) -name '*.0')
 test: $(RUNTEST) $(TESTFILES) $(XR0V) 
 	XR0=$(XR0V) ./tests/run
 
+.PHONY: rust
+rust: test-rust clippy fmt
+
 .PHONY: $(XR0V_RUST)
 $(XR0V_RUST):
 	(cd xr0-rs && cargo build)
@@ -299,6 +302,14 @@ $(XR0V_RUST):
 .PHONY: test-rust
 test-rust: $(XR0V_RUST)
 	XR0=$(XR0V_RUST) ./tests/run
+
+.PHONY: clippy
+clippy:
+	(cd xr0-rs && cargo clippy)
+
+.PHONY: fmt
+fmt:
+	(cd xr0-rs && cargo fmt)
 
 .PHONY: check
 check: $(XR0V)
