@@ -34,7 +34,7 @@ pub struct State {
     pub props: Props,
 }
 
-pub unsafe fn state_create(func: String, ext: Arc<Externals>, result_type: &AstType) -> State {
+pub fn state_create(func: String, ext: Arc<Externals>, result_type: &AstType) -> State {
     let mut stack = Stack::new();
     stack.push(func, result_type);
     State {
@@ -48,7 +48,7 @@ pub unsafe fn state_create(func: String, ext: Arc<Externals>, result_type: &AstT
     }
 }
 
-pub unsafe fn state_create_withprops(
+pub fn state_create_withprops(
     func: String,
     ext: Arc<Externals>,
     result_type: &AstType,

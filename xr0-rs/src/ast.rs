@@ -492,7 +492,7 @@ unsafe fn expr_binary_decide(expr: &AstExpr, state: *mut State) -> bool {
     )
 }
 
-unsafe fn value_compare(v1: &Value, op: AstBinaryOp, v2: &Value) -> bool {
+fn value_compare(v1: &Value, op: AstBinaryOp, v2: &Value) -> bool {
     match op {
         AstBinaryOp::Eq => value_equal(v1, v2),
         AstBinaryOp::Ne => !value_compare(v1, AstBinaryOp::Eq, v2),
@@ -1194,10 +1194,6 @@ pub fn ast_expr_as_identifier(expr: &AstExpr) -> &str {
 
 fn ast_expr_create(kind: AstExprKind) -> Box<AstExpr> {
     Box::new(AstExpr { kind })
-}
-
-pub unsafe fn ast_expr_destroy(expr: *mut AstExpr) {
-    drop(Box::from_raw(expr));
 }
 
 pub fn ast_expr_identifier_create(s: String) -> Box<AstExpr> {
@@ -2455,10 +2451,6 @@ unsafe fn iter_absexec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     Ok(())
 }
 
-pub unsafe fn ast_stmt_destroy(stmt: *mut AstStmt) {
-    drop(Box::from_raw(stmt));
-}
-
 pub fn ast_stmt_as_expr(stmt: &AstStmt) -> &AstExpr {
     let AstStmtKind::Expr(expr) = &stmt.kind else {
         panic!();
@@ -2835,10 +2827,6 @@ pub fn ast_function_create(
     })
 }
 
-pub unsafe fn ast_function_destroy(f: *mut AstFunction) {
-    drop(Box::from_raw(f));
-}
-
 impl<'ast> AstFunction<'ast> {
     pub fn str(&self) -> String {
         let mut b = String::new();
@@ -2908,16 +2896,18 @@ impl<'ast> AstFunction<'ast> {
     }
 }
 
-pub unsafe fn ast_function_protostitch(f: &mut AstFunction, ext: &Externals) {
+pub fn ast_function_protostitch(f: &mut AstFunction, ext: &Externals) {
     if let Some(proto) = ext.get_func(&f.name) {
         f.abstract_ = proto.abstract_.clone();
     }
 }
 
-pub unsafe fn ast_function_verify(f: &AstFunction, ext: Arc<Externals>) -> Result<()> {
-    let mut state = state_create(f.name().to_string(), ext, f.rtype());
-    ast_function_initparams(f, &mut state)?;
-    path_absverify_withstate(f, &mut state)?;
+pub fn ast_function_verify(f: &AstFunction, ext: Arc<Externals>) -> Result<()> {
+    unsafe {
+        let mut state = state_create(f.name().to_string(), ext, f.rtype());
+        ast_function_initparams(f, &mut state)?;
+        path_absverify_withstate(f, &mut state)?;
+    }
     Ok(())
 }
 
@@ -3260,9 +3250,9 @@ pub fn ast_externdecl_as_function_mut(
     }
 }
 
-pub unsafe fn ast_externdecl_as_function(decl: &AstExternDecl) -> Option<&AstFunction> {
+pub fn ast_externdecl_as_function(decl: &AstExternDecl) -> Option<&AstFunction> {
     match &decl.kind {
-        AstExternDeclKind::Function(f) => Some(&**f),
+        AstExternDeclKind::Function(f) => Some(f),
         _ => None,
     }
 }
@@ -3281,7 +3271,7 @@ pub fn ast_decl_create(name: String, t: Box<AstType>) -> Box<AstExternDecl> {
 }
 
 #[allow(clippy::boxed_local)]
-pub unsafe fn ast_externdecl_install(decl: Box<AstExternDecl>, ext: &mut Externals) {
+pub fn ast_externdecl_install(decl: Box<AstExternDecl>, ext: &mut Externals) {
     match decl.kind {
         AstExternDeclKind::Function(f) => {
             ext.declare_func(f);
@@ -3330,6 +3320,6 @@ pub fn ast_topological_order(fname: &str, ext: &Externals) -> Vec<String> {
     topological_order(fname, ext)
 }
 
-pub unsafe fn ast_protostitch(f: &mut AstFunction<'static>, ext: &Externals) {
+pub fn ast_protostitch(f: &mut AstFunction<'static>, ext: &Externals) {
     ast_function_protostitch(f, ext)
 }

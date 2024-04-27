@@ -90,7 +90,7 @@ fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String> {
 }
 
 #[allow(clippy::boxed_local)]
-unsafe fn pass0(root: Box<Ast>, ext: &mut Externals) {
+fn pass0(root: Box<Ast>, ext: &mut Externals) {
     // Note: This clone is not in the original. The cost could be reduced by strategically changing
     // Boxes to Arcs in the AST. The cost could also probably be eliminated entirely using SemiBox
     // and giving Externals a lifetime parameter, but that's a bit much.
@@ -117,7 +117,7 @@ unsafe fn pass0(root: Box<Ast>, ext: &mut Externals) {
     }
 }
 
-unsafe fn pass1(order: &[String], ext: &Arc<Externals>, print: bool) {
+fn pass1(order: &[String], ext: &Arc<Externals>, print: bool) {
     for name in order {
         let f = ext.get_func(name.as_str()).unwrap();
         if !f.is_axiom() && !f.is_proto() {
@@ -134,7 +134,7 @@ unsafe fn pass1(order: &[String], ext: &Arc<Externals>, print: bool) {
     }
 }
 
-unsafe fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool {
+fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool {
     let mut def: Option<&AstFunction> = None;
     let mut count = 0usize;
     let pname = proto.name();
@@ -167,7 +167,7 @@ fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
     abs_match || protoabs_only
 }
 
-unsafe fn verify(c: &Config) -> io::Result<()> {
+fn verify(c: &Config) -> io::Result<()> {
     let source = preprocess(&c.infile, &c.include_dirs)?;
     let root = parser::parse_translation_unit(&c.infile, &source)
         .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{err}")))?;
@@ -244,11 +244,7 @@ fn main() {
     }
 
     VERBOSE_MODE.store(c.verbose, Ordering::Relaxed);
-    let result = if c.strip_mode {
-        strip(&c)
-    } else {
-        unsafe { verify(&c) }
-    };
+    let result = if c.strip_mode { strip(&c) } else { verify(&c) };
     if let Err(err) = result {
         eprintln!("{err}");
         process::exit(1);
