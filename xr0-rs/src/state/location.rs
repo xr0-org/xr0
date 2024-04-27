@@ -21,7 +21,7 @@ enum LocationKind {
     VConst,
     Dereferencable,
     Automatic {
-        frame: libc::c_int,
+        frame: usize,
     },
     Dynamic,
 }
@@ -74,7 +74,7 @@ pub fn location_create_dynamic(block: usize, offset: Box<AstExpr>) -> Box<Locati
 }
 
 pub fn location_create_automatic(
-    frame: libc::c_int,
+    frame: usize,
     block: usize,
     offset: Box<AstExpr>,
 ) -> Box<Location> {

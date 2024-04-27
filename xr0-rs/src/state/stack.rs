@@ -27,7 +27,7 @@ pub struct StackFrame {
     pub blocks: Vec<Box<Block>>,
     pub varmap: Box<VarMap>,
     pub result: *mut Variable,
-    pub id: libc::c_int,
+    pub id: usize,
 }
 
 #[derive(Clone)]
@@ -95,12 +95,12 @@ impl Stack {
         copy
     }
 
-    pub fn get_frame(&mut self, frame: libc::c_int) -> Option<&mut StackFrame> {
-        self.frames.get_mut(frame as usize)
+    pub fn get_frame(&mut self, frame: usize) -> Option<&mut StackFrame> {
+        self.frames.get_mut(frame)
     }
 
     pub fn push(&mut self, name: String, return_type: &AstType) -> &mut StackFrame {
-        let id = self.frames.len() as libc::c_int;
+        let id = self.frames.len();
         let mut frame = StackFrame {
             name,
             blocks: vec![],
