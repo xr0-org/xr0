@@ -1,5 +1,3 @@
-use std::ptr;
-
 use super::{Block, State};
 use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type,
@@ -21,12 +19,13 @@ pub struct Stack {
 
 type VarMap = InsertionOrderMap<String, Box<Variable>>;
 
+#[derive(Clone)]
 pub struct StackFrame {
     pub name: String,
     // Note: This field is called `frame` in the original.
     pub blocks: Vec<Box<Block>>,
     pub varmap: Box<VarMap>,
-    pub result: *mut Variable,
+    pub result: Box<Variable>,
     pub id: usize,
 }
 
@@ -35,28 +34,6 @@ pub struct Variable {
     type_: Box<AstType>,
     loc: Box<Location>,
     is_param: bool,
-}
-
-impl Drop for StackFrame {
-    fn drop(&mut self) {
-        unsafe {
-            variable_destroy(self.result);
-        }
-    }
-}
-
-impl Clone for StackFrame {
-    fn clone(&self) -> Self {
-        unsafe {
-            StackFrame {
-                name: self.name.clone(),
-                blocks: self.blocks.clone(),
-                varmap: self.varmap.clone(),
-                id: self.id,
-                result: Box::into_raw(variable_copy(&*self.result)),
-            }
-        }
-    }
 }
 
 pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> String {
@@ -70,7 +47,7 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> String {
             str_write!(b, "\t{k}: {var}");
             b.push('\n');
         }
-        let result = variable_str((*frame).result, stack, state);
+        let result = variable_str(&mut *(*frame).result, stack, state);
         str_write!(b, "\treturn: {result}\n");
         str_write!(b, "\t");
         for _ in 0..28 {
@@ -100,13 +77,17 @@ impl Stack {
         let id = self.frames.len();
         let mut frame = StackFrame {
             name,
-            blocks: vec![],
+            blocks: vec![Block::new()],
             varmap: Box::new(VarMap::new()),
             id,
-            result: ptr::null_mut(),
+            result: Box::new(Variable {
+                type_: ast_type_copy(return_type),
+                loc: location_create_automatic(id, 0, ast_expr_constant_create(0)),
+                is_param: false,
+            }),
         };
-        let v = unsafe { variable_create(return_type, &mut frame, false) };
-        frame.result = Box::into_raw(v);
+        frame.blocks[0].install(object_value_create(ast_expr_constant_create(0), None));
+
         self.frames.push(frame);
         self.frames.last_mut().unwrap()
     }
@@ -164,9 +145,8 @@ impl StackFrame {
     }
 
     pub unsafe fn undeclare(&mut self, state: *mut State) {
-        let old_result: *mut Variable = self.result;
-        self.result = Box::into_raw(variable_abstractcopy(&*old_result, state));
-        variable_destroy(old_result);
+        let new_result = variable_abstractcopy(&self.result, state);
+        self.result = new_result;
         let m = std::mem::replace(&mut self.varmap, Box::new(VarMap::new()));
         for (k, v) in &*m {
             if v.is_param() {
@@ -176,8 +156,8 @@ impl StackFrame {
         }
     }
 
-    pub unsafe fn get_result(&self) -> &Variable {
-        &*self.result
+    pub fn get_result(&self) -> &Variable {
+        &self.result
     }
 
     pub unsafe fn get_variable(&self, id: &str) -> Option<&Variable> {
@@ -186,7 +166,7 @@ impl StackFrame {
     }
 
     pub unsafe fn references(&self, loc: &Location, state: *mut State) -> bool {
-        if variable_references(&*self.result, loc, state) {
+        if variable_references(&self.result, loc, state) {
             return true;
         }
         for (_id, var) in &*self.varmap {
@@ -218,14 +198,6 @@ pub unsafe fn variable_create(
     })
 }
 
-pub unsafe fn variable_destroy(v: *mut Variable) {
-    drop(Box::from_raw(v))
-}
-
-pub fn variable_copy(old: &Variable) -> Box<Variable> {
-    Box::new(old.clone())
-}
-
 unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> {
     let new = Box::new(Variable {
         type_: old.type_.clone(),
@@ -245,7 +217,7 @@ unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> 
 }
 
 pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> String {
-    assert!(!(*(*var).loc).type_is_vconst());
+    assert!(!(*var).loc.type_is_vconst());
     let type_ = ast_type_str(&(*var).type_);
     let isparam = if (*var).is_param { "param " } else { "" };
     let obj_str = object_or_nothing_str(&mut *(*var).loc, stack, state);
