@@ -24,7 +24,7 @@ mod state;
 mod value;
 
 use ast::{
-    ast_block_str, ast_externdecl_as_function, ast_externdecl_as_function_ptr,
+    ast_block_str, ast_externdecl_as_function, ast_externdecl_as_function_mut,
     ast_externdecl_install, ast_function_verify, ast_functiondecl_create, ast_protostitch,
     ast_topological_order, Ast, AstExpr, AstExternDecl, AstFunction, AstType, AstVariable,
 };
@@ -88,48 +88,43 @@ pub fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String>
     Ok(buf)
 }
 
-pub unsafe fn pass0(root: &mut Ast, ext: &mut Externals) {
-    for decl in &root.decls {
-        match ast_externdecl_as_function_ptr(decl) {
+#[allow(clippy::boxed_local)]
+pub unsafe fn pass0(root: Box<Ast>, ext: &mut Externals) {
+    // Note: This clone is not in the original. The cost could be reduced by strategically changing
+    // Boxes to Arcs in the AST. The cost could also probably be eliminated entirely using SemiBox
+    // and giving Externals a lifetime parameter, but that's a bit much.
+
+    for mut decl in root.decls.clone() {
+        match ast_externdecl_as_function_mut(&mut decl) {
             None => {
-                ast_externdecl_install(&**decl as *const AstExternDecl as *mut AstExternDecl, ext);
+                ast_externdecl_install(decl, ext);
             }
             Some(f) => {
-                if (*f).is_axiom() {
-                    ast_externdecl_install(
-                        &**decl as *const AstExternDecl as *mut AstExternDecl,
-                        ext,
-                    );
-                } else if (*f).is_proto() {
-                    if !verifyproto(&*f, &root.decls) {
+                if f.is_axiom() {
+                    ast_externdecl_install(decl, ext);
+                } else if f.is_proto() {
+                    if !verifyproto(f, &root.decls) {
                         process::exit(1);
                     }
-                    ast_externdecl_install(
-                        &**decl as *const AstExternDecl as *mut AstExternDecl,
-                        ext,
-                    );
+                    ast_externdecl_install(decl, ext);
                 } else {
-                    let stitched: *mut AstFunction = ast_protostitch(f, ext);
-                    ast_externdecl_install(
-                        Box::into_raw(ast_functiondecl_create((*stitched).copy())),
-                        ext,
-                    );
+                    ast_protostitch(f, ext);
+                    ast_externdecl_install(ast_functiondecl_create(f.copy()), ext);
                 }
             }
         }
     }
 }
 
-pub unsafe fn pass1(root: &mut Ast, ext: &Externals) {
-    for decl in &mut root.decls {
-        if let Some(f) = ast_externdecl_as_function(decl) {
-            if !f.is_axiom() && !f.is_proto() {
-                if let Err(err) = ast_function_verify(f, ext) {
-                    eprintln!("{}", err.msg);
-                    process::exit(1);
-                }
-                vprintln!("qed {}", f.name());
+pub unsafe fn pass1(order: &[OwningCStr], ext: &Externals) {
+    for name in order {
+        let f = ext.get_func(name.as_str()).unwrap();
+        if !f.is_axiom() && !f.is_proto() {
+            if let Err(err) = ast_function_verify(f, ext) {
+                eprintln!("{}", err.msg);
+                process::exit(1);
             }
+            vprintln!("qed {}", f.name());
         }
     }
 }
@@ -137,7 +132,7 @@ pub unsafe fn pass1(root: &mut Ast, ext: &Externals) {
 pub unsafe fn pass_inorder(order: &[OwningCStr], ext: &Externals) {
     for name in order {
         let f = ext.get_func(name.as_str()).unwrap();
-        if !(f.is_axiom() || f.is_proto()) {
+        if !f.is_axiom() && !f.is_proto() {
             if let Err(err) = ast_function_verify(f, ext) {
                 eprintln!("{}", err.msg);
                 process::exit(1);
@@ -182,11 +177,11 @@ unsafe fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
 
 unsafe fn verify(c: &Config) -> io::Result<()> {
     let source = preprocess(&c.infile, &c.include_dirs)?;
-    let mut root = parser::parse_translation_unit(&c.infile, &source)
+    let root = parser::parse_translation_unit(&c.infile, &source)
         .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{err}")))?;
 
     let mut ext = Externals::new();
-    pass0(&mut root, &mut ext);
+    pass0(root, &mut ext);
 
     if let Some(sortfunc) = &c.sort {
         let sortfunc_cstr = CString::new(sortfunc.clone()).unwrap();
@@ -200,7 +195,7 @@ unsafe fn verify(c: &Config) -> io::Result<()> {
         eprintln!("{}", strs.join(", "));
         pass_inorder(&order, &ext);
     } else {
-        pass1(&mut root, &ext);
+        pass1(ext.function_names(), &ext);
     }
 
     Ok(())

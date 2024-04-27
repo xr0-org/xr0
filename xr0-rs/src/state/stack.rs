@@ -235,7 +235,7 @@ unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> 
         is_param: old.is_param,
         loc: old.loc.clone(),
     });
-    let obj = state_get(s, &*new.loc, false).unwrap();
+    let obj = state_get(s, &new.loc, false).unwrap();
     if obj.is_null() {
         panic!();
     }
@@ -287,5 +287,5 @@ impl Variable {
 
 pub unsafe fn variable_references(v: &Variable, loc: &Location, s: *mut State) -> bool {
     assert!(!loc.type_is_vconst());
-    location_references(&*v.loc, loc, s)
+    location_references(&v.loc, loc, s)
 }

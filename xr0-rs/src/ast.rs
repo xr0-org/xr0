@@ -287,15 +287,18 @@ pub struct AstStmtSplits {
     pub conds: Vec<*mut AstExpr>,
 }
 
+#[derive(Clone)]
 pub struct AstExternDecl {
     pub kind: AstExternDeclKind,
 }
 
+#[derive(Clone)]
 pub struct AstTypedefDecl {
     pub name: OwningCStr,
     pub type_0: Box<AstType>,
 }
 
+#[derive(Clone)]
 pub enum AstExternDeclKind {
     Function(Box<AstFunction<'static>>),
     Variable(Box<AstVariable>),
@@ -1243,7 +1246,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Va
     let field = ast_expr_member_field(expr);
     if value_isstruct(&v) {
         let obj = value_struct_member(&v, field.as_str()).unwrap();
-        let obj_value = object_as_value(&*obj).unwrap();
+        let obj_value = object_as_value(obj).unwrap();
         return Ok(value_copy(obj_value));
     }
     if !value_issync(&v) {
@@ -2933,14 +2936,10 @@ impl<'ast> AstFunction<'ast> {
     }
 }
 
-pub unsafe fn ast_function_protostitch(
-    f: *mut AstFunction,
-    ext: *mut Externals,
-) -> *mut AstFunction {
-    if let Some(proto) = (*ext).get_func((*f).name.as_str()) {
-        (*f).abstract_ = proto.abstract_.clone();
+pub unsafe fn ast_function_protostitch(f: &mut AstFunction, ext: &Externals) {
+    if let Some(proto) = ext.get_func(f.name.as_str()) {
+        f.abstract_ = proto.abstract_.clone();
     }
-    f
 }
 
 pub unsafe fn ast_function_verify(f: &AstFunction, ext: &Externals) -> Result<()> {
@@ -3299,11 +3298,11 @@ pub fn ast_functiondecl_create(f: Box<AstFunction<'static>>) -> Box<AstExternDec
     })
 }
 
-pub fn ast_externdecl_as_function_ptr(decl: &AstExternDecl) -> Option<*mut AstFunction<'static>> {
-    match &decl.kind {
-        AstExternDeclKind::Function(f) => Some(
-            f as &AstFunction<'static> as *const AstFunction<'static> as *mut AstFunction<'static>,
-        ),
+pub fn ast_externdecl_as_function_mut(
+    decl: &mut AstExternDecl,
+) -> Option<&mut AstFunction<'static>> {
+    match &mut decl.kind {
+        AstExternDeclKind::Function(f) => Some(f),
         _ => None,
     }
 }
@@ -3328,23 +3327,21 @@ pub fn ast_decl_create(name: OwningCStr, t: Box<AstType>) -> Box<AstExternDecl> 
     })
 }
 
-pub unsafe fn ast_externdecl_install(decl: *mut AstExternDecl, ext: &mut Externals) {
-    match &mut (*decl).kind {
+#[allow(clippy::boxed_local)]
+pub unsafe fn ast_externdecl_install(decl: Box<AstExternDecl>, ext: &mut Externals) {
+    match decl.kind {
         AstExternDeclKind::Function(f) => {
-            ext.declare_func(
-                (**f).name().as_str(),
-                &**f as *const AstFunction<'static> as *mut AstFunction<'static>,
-            );
+            ext.declare_func(f);
         }
         AstExternDeclKind::Variable(v) => {
-            let variable: *mut AstVariable = &mut **v;
-            ext.declare_var(ast_variable_name(v).as_str(), variable);
+            let name = ast_variable_name(&v).to_string();
+            ext.declare_var(name, v);
         }
         AstExternDeclKind::Typedef(typedef) => {
-            ext.declare_typedef(typedef.name.as_str(), &*typedef.type_0);
+            ext.declare_typedef(typedef.name.to_string(), typedef.type_0);
         }
         AstExternDeclKind::Struct(s) => {
-            ext.declare_struct(&**s);
+            ext.declare_struct(s);
         }
     }
 }
@@ -3390,9 +3387,6 @@ pub unsafe fn ast_topological_order(fname: &CStr, ext: &mut Externals) -> Vec<Ow
     topological_order(fname, ext)
 }
 
-pub unsafe fn ast_protostitch(
-    f: *mut AstFunction<'static>,
-    ext: *mut Externals,
-) -> *mut AstFunction<'static> {
+pub unsafe fn ast_protostitch(f: &mut AstFunction<'static>, ext: &Externals) {
     ast_function_protostitch(f, ext)
 }
