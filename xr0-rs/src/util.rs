@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -130,12 +131,12 @@ pub fn string_arr_contains(arr: &[OwningCStr], s: &OwningCStr) -> bool {
     false
 }
 
-pub static mut VERBOSE_MODE: libc::c_int = 0;
+pub static VERBOSE_MODE: AtomicBool = AtomicBool::new(false);
 
 #[macro_export]
 macro_rules! vprintln {
     ( $( $args:tt )* ) => {
-        if $crate::util::VERBOSE_MODE != 0 {
+        if $crate::util::VERBOSE_MODE.load(std::sync::atomic::Ordering::Relaxed) {
             println!($($args)*);
         }
     }

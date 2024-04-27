@@ -10,6 +10,7 @@ use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, Stdio};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use clap::Parser;
 
@@ -245,9 +246,7 @@ pub fn main() {
         c.include_dirs.insert(0, path.to_path_buf());
     }
 
-    unsafe {
-        VERBOSE_MODE = c.verbose as libc::c_int;
-    }
+    VERBOSE_MODE.store(c.verbose, Ordering::Relaxed);
     let result = if c.strip_mode {
         strip(&c)
     } else {
