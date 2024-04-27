@@ -3006,31 +3006,25 @@ unsafe fn abstract_auditwithstate(
     for decl in &f.body.as_ref().unwrap().decls {
         state_declare(actual_state, decl, false);
     }
-    path_verify(f, actual_state, 0 as libc::c_int, abstract_state)
+    path_verify(f, actual_state, 0, abstract_state)
 }
 
 unsafe fn path_verify(
     f: &AstFunction,
     actual_state: *mut State,
-    index: libc::c_int,
+    index: usize,
     abstract_state: *mut State,
 ) -> Result<()> {
     let fname = f.name();
     let stmts = &f.body.as_ref().unwrap().stmts;
     #[allow(clippy::needless_range_loop)]
-    for i in index as usize..stmts.len() {
+    for i in index..stmts.len() {
         let stmt = &stmts[i];
         // splits.err is ignored in the original
         let splits = ast_stmt_splits(stmt, actual_state);
         match splits {
             Ok(mut splits) if !splits.conds.is_empty() => {
-                return split_paths_verify(
-                    f,
-                    actual_state,
-                    i as libc::c_int,
-                    &mut splits,
-                    abstract_state,
-                );
+                return split_paths_verify(f, actual_state, i, &mut splits, abstract_state);
             }
             _ => {
                 ast_stmt_process(stmt, fname, actual_state)?;
@@ -3072,7 +3066,7 @@ pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result
 unsafe fn split_path_verify(
     f: &AstFunction,
     actual_state: *mut State,
-    index: libc::c_int,
+    index: usize,
     cond: &AstExpr,
     abstract_state: *mut State,
 ) -> Result<()> {
@@ -3207,7 +3201,7 @@ fn split_name(name: &str, assumption: &AstExpr) -> String {
 unsafe fn split_paths_verify(
     f: &AstFunction,
     actual_state: *mut State,
-    index: libc::c_int,
+    index: usize,
     splits: *mut AstStmtSplits,
     abstract_state: *mut State,
 ) -> Result<()> {
@@ -3219,7 +3213,7 @@ unsafe fn split_paths_verify(
 
 fn body_paths<'origin>(
     f: &'origin AstFunction,
-    _index: libc::c_int,
+    _index: usize,
     cond: &AstExpr,
 ) -> Vec<Box<AstFunction<'origin>>> {
     let f_true = ast_function_create(
