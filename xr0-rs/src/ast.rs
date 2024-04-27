@@ -3306,7 +3306,7 @@ pub fn parse_int(s: &str) -> c_int {
     s.parse().expect("parse error")
 }
 
-pub fn parse_char(s: &str) -> i8 {
+pub fn parse_char(s: &str) -> c_char {
     // Note: Original also assumes these character literals have the same numeric values on the
     // target as in XR0, a decent bet for ASCII at least.
     assert!(s.starts_with('\'') && s.ends_with('\''));
@@ -3314,15 +3314,15 @@ pub fn parse_char(s: &str) -> i8 {
     if let Some(stripped) = s.strip_prefix('\\') {
         parse_escape(stripped)
     } else {
-        s.chars().next().expect("invalid char literal") as u32 as i8
+        s.chars().next().expect("invalid char literal") as u32 as c_char
     }
 }
 
-pub fn parse_escape(c: &str) -> i8 {
+pub fn parse_escape(c: &str) -> c_char {
     match c {
         "0" => 0,
-        "t" => '\t' as u32 as i8,
-        "n" => '\t' as u32 as i8, // Note: '\t' rather than '\n', a bug in the original.
+        "t" => '\t' as u32 as c_char,
+        "n" => '\t' as u32 as c_char, // Note: '\t' rather than '\n', a bug in the original.
         _ => {
             panic!("unrecognized char escape sequence: {:?}", c);
         }
