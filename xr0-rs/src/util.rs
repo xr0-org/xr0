@@ -147,6 +147,9 @@ pub struct OwningCStr {
     ptr: *mut libc::c_char,
 }
 
+unsafe impl Sync for OwningCStr {}
+unsafe impl Send for OwningCStr {}
+
 impl OwningCStr {
     pub unsafe fn new(ptr: *mut libc::c_char) -> Self {
         assert!(!ptr.is_null());
