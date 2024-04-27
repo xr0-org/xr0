@@ -7,9 +7,7 @@ use std::ptr;
 use std::sync::Arc;
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
-use crate::object::{
-    object_as_value, object_assign, object_getmember, object_getmembertype, object_hasvalue,
-};
+use crate::object::{object_as_value, object_getmember, object_getmembertype, object_hasvalue};
 use crate::parser::LexemeMarker;
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_copywithname, state_create,
@@ -818,7 +816,7 @@ unsafe fn expr_assign_eval(expr: &AstExpr, state: *mut State) -> Result<Box<Valu
             "undefined indirection: {lval} is not an lvalue"
         )));
     }
-    object_assign(&mut *obj, Some(value_copy(&rval_val)));
+    (*obj).assign(Some(value_copy(&rval_val)));
     Ok(rval_val)
 }
 
@@ -1039,7 +1037,7 @@ pub unsafe fn prepare_parameters(
         let obj: *mut Object = lval_lval.obj;
         drop(name);
         // Note: I think the arg is copied needlessly in the original, and one is leaked.
-        object_assign(&mut *obj, Some(value_copy(&*Box::into_raw(arg))));
+        (*obj).assign(Some(value_copy(&*Box::into_raw(arg))));
     }
     Ok(())
 }
@@ -1074,7 +1072,7 @@ unsafe fn assign_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value
     if obj.is_null() {
         return Err(Error::new("undefined indirection (lvalue)".to_string()));
     }
-    object_assign(&mut *obj, Some(value_copy(&*val)));
+    (*obj).assign(Some(value_copy(&*val)));
     Ok(val)
 }
 
@@ -2039,7 +2037,7 @@ unsafe fn stmt_jump_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
     if obj.is_null() {
         panic!();
     }
-    object_assign(&mut *obj, Some(value_copy(&rv_val)));
+    (*obj).assign(Some(value_copy(&rv_val)));
     Ok(())
 }
 
@@ -2984,7 +2982,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
     }
     if !object_hasvalue(&*obj) {
         let val = state_vconst(state, t, Some(name), true);
-        object_assign(&mut *obj, Some(val));
+        (*obj).assign(Some(val));
     }
     Ok(())
 }

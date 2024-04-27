@@ -4,7 +4,7 @@ use super::{Block, State};
 use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type,
 };
-use crate::object::{object_as_value, object_assign, object_isvalue, object_value_create};
+use crate::object::{object_as_value, object_isvalue, object_value_create};
 use crate::state::location::{
     location_auto_get_block_id, location_auto_getblock, location_create_automatic, location_offset,
     location_references,
@@ -238,7 +238,7 @@ unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> 
     }
     if object_isvalue(&*obj) {
         if let Some(v) = object_as_value(&*obj) {
-            object_assign(&mut *obj, value_abstractcopy(v, s));
+            (*obj).assign(value_abstractcopy(v, s));
         }
     }
     new

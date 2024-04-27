@@ -11,7 +11,7 @@ use crate::ast::{
     ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
     ast_type_vconst,
 };
-use crate::object::{object_as_value, object_assign};
+use crate::object::object_as_value;
 use crate::util::{Error, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
@@ -174,7 +174,7 @@ pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value>
     if obj.is_null() {
         panic!();
     }
-    object_assign(&mut *obj, Some(value_literal_create(lit)));
+    (*obj).assign(Some(value_literal_create(lit)));
     (*state).static_memory.string_pool(lit, &loc);
     value_ptr_create(loc)
 }

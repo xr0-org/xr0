@@ -8,7 +8,7 @@ use crate::ast::{
     ast_type_struct_complete, ast_type_struct_members, ast_variable_arr_copy, ast_variable_name,
     ast_variable_type,
 };
-use crate::object::{object_abstractcopy, object_as_value, object_assign, object_value_create};
+use crate::object::{object_abstractcopy, object_as_value, object_value_create};
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
 use crate::state::state::{state_getext, state_vconst};
 use crate::state::State;
@@ -125,15 +125,12 @@ pub unsafe fn value_struct_indefinite_create(
 
         let obj = sv.m.get_mut(field).unwrap();
         let comment = format!("{comment}.{field}");
-        object_assign(
-            obj,
-            Some(state_vconst(
-                s,
-                ast_variable_type(var),
-                Some(&comment),
-                persist,
-            )),
-        );
+        obj.assign(Some(state_vconst(
+            s,
+            ast_variable_type(var),
+            Some(&comment),
+            persist,
+        )));
     }
     v
 }
@@ -183,13 +180,10 @@ pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> Box<Value> {
         let obj = sv.m.get_mut(field).unwrap();
         if let Some(obj_value) = object_as_value(obj) {
             if value_issync(obj_value) {
-                object_assign(
-                    obj,
-                    Some(value_sync_create(ast_expr_member_create(
-                        ast_expr_copy(root),
-                        field.to_string(),
-                    ))),
-                );
+                obj.assign(Some(value_sync_create(ast_expr_member_create(
+                    ast_expr_copy(root),
+                    field.to_string(),
+                ))));
             }
         }
     }

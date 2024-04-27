@@ -118,11 +118,13 @@ pub unsafe fn object_references(obj: &Object, loc: &Location, s: *mut State) -> 
     }
 }
 
-pub unsafe fn object_assign(obj: &mut Object, val: Option<Box<Value>>) {
-    let ObjectKind::Value(v) = &mut obj.kind else {
-        panic!();
-    };
-    *v = val;
+impl Object {
+    pub fn assign(&mut self, val: Option<Box<Value>>) {
+        let ObjectKind::Value(v) = &mut self.kind else {
+            panic!();
+        };
+        *v = val;
+    }
 }
 
 unsafe fn object_size(obj: &Object) -> *mut AstExpr {
@@ -313,7 +315,7 @@ unsafe fn getorcreatestruct<'obj>(
         object_as_value(obj).unwrap()
     } else {
         let complete = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
-        object_assign(&mut *obj, Some(value_struct_create(complete)));
+        obj.assign(Some(value_struct_create(complete)));
         object_as_value(&*obj).unwrap()
     }
 }
