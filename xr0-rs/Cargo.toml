@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 bitflags = "2"
 clap = { version = "4", features = ["derive"] }
-libc = "0.2"
 peg = "0.8"
 
 [build-dependencies]
