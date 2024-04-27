@@ -89,7 +89,7 @@ pub grammar c_parser(env: &Env) for str {
         n:quiet! { integer_number() } { ast_expr_constant_create(n) } /
         expected!("number")
 
-    rule integer_number() -> libc::c_int =
+    rule integer_number() -> c_int =
         n:$(['1'..='9'] dec()* / "0") end_of_token() {
             parse_int(n)
         }
