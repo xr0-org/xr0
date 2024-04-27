@@ -161,16 +161,16 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
                 ))
             }
         }
-        ValueKind::DefinitePtr(loc) => location_transfigure(loc, compare),
+        ValueKind::DefinitePtr(loc) => Box::into_raw(location_transfigure(loc, &mut *compare)),
         ValueKind::IndefinitePtr(_) => panic!(),
     }
 }
 
-pub unsafe fn value_pf_augment(old: *mut Value, root: &AstExpr) -> Box<Value> {
-    if !value_isstruct(&*old) {
+pub fn value_pf_augment(old: &Value, root: &AstExpr) -> Box<Value> {
+    if !value_isstruct(old) {
         panic!();
     }
-    let mut v = value_copy(&*old);
+    let mut v = value_copy(old);
     let ValueKind::Struct(sv) = &mut v.kind else {
         panic!();
     };
@@ -219,7 +219,7 @@ unsafe fn abstract_copy_members(
         .collect()
 }
 
-pub unsafe fn value_struct_membertype<'v>(v: &'v Value, member: &str) -> Option<&'v AstType> {
+pub fn value_struct_membertype<'v>(v: &'v Value, member: &str) -> Option<&'v AstType> {
     let ValueKind::Struct(sv) = &v.kind else {
         panic!();
     };
@@ -231,14 +231,14 @@ pub unsafe fn value_struct_membertype<'v>(v: &'v Value, member: &str) -> Option<
     None
 }
 
-pub unsafe fn value_struct_member<'v>(v: &'v Value, member: &str) -> Option<&'v Object> {
+pub fn value_struct_member<'v>(v: &'v Value, member: &str) -> Option<&'v Object> {
     let ValueKind::Struct(sv) = &v.kind else {
         panic!();
     };
     sv.m.get(member).map(|boxed| &**boxed)
 }
 
-pub unsafe fn value_copy(v: &Value) -> Box<Value> {
+pub fn value_copy(v: &Value) -> Box<Value> {
     Box::new(v.clone())
 }
 

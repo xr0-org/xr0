@@ -28,11 +28,11 @@ pub struct VConst {
 }
 
 impl Heap {
-    pub unsafe fn new() -> Self {
+    pub fn new() -> Self {
         Heap { blocks: vec![] }
     }
 
-    pub unsafe fn str(&self, indent: &str) -> String {
+    pub fn str(&self, indent: &str) -> String {
         let mut b = String::new();
         for (i, hb) in self.blocks.iter().enumerate() {
             if !hb.freed {

@@ -11,7 +11,7 @@ impl Clump {
         Clump { blocks: vec![] }
     }
 
-    pub unsafe fn str(&self, indent: &str) -> String {
+    pub fn str(&self, indent: &str) -> String {
         let mut b = String::new();
         for (i, block) in self.blocks.iter().enumerate() {
             str_write!(b, "{indent}{i}: {block}\n");

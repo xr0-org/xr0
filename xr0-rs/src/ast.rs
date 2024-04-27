@@ -1166,7 +1166,10 @@ unsafe fn pf_augment(v: *mut Value, call: &AstExpr, state: *mut State) -> Result
         return Ok(value_copy(&*v));
     }
     let res_val = ast_expr_pf_reduce(call, state)?;
-    Ok(value_pf_augment(v, value_as_sync(&*Box::into_raw(res_val))))
+    Ok(value_pf_augment(
+        &*v,
+        value_as_sync(&*Box::into_raw(res_val)),
+    ))
 }
 
 pub fn ast_expr_constant_create_char(c: c_char) -> Box<AstExpr> {
