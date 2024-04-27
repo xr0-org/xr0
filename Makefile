@@ -293,7 +293,7 @@ test: $(RUNTEST) $(TESTFILES) $(XR0V)
 	XR0=$(XR0V) ./tests/run
 
 .PHONY: rust
-rust: test-rust clippy fmt
+rust: test-rust fmt clippy
 
 .PHONY: $(XR0V_RUST)
 $(XR0V_RUST):
@@ -303,13 +303,13 @@ $(XR0V_RUST):
 test-rust: $(XR0V_RUST)
 	XR0=$(XR0V_RUST) ./tests/run
 
-.PHONY: clippy
-clippy:
-	(cd xr0-rs && cargo clippy)
-
 .PHONY: fmt
 fmt:
 	(cd xr0-rs && cargo fmt)
+
+.PHONY: clippy
+clippy:
+	(cd xr0-rs && cargo clippy)
 
 .PHONY: check
 check: $(XR0V)
