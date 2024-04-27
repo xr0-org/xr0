@@ -343,7 +343,7 @@ path_init_actual(struct path *p)
 	if (err) {
 		return err;
 	}
-	struct frame *setup = frame_setup_create(
+	struct frame *setup = frame_block_create(
 		dynamic_str("setup"),
 		ast_block_copy(ast_function_abstract(p->f)),
 		EXEC_SETUP

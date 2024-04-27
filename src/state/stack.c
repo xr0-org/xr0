@@ -460,12 +460,6 @@ frame_call_create(char *n, struct ast_block *b, struct ast_type *r, enum executi
 }
 
 struct frame *
-frame_setup_create(char *n, struct ast_block *b, enum execution_mode mode)
-{
-	return frame_create(n, b, NULL, mode, FRAME_SETUP);
-}
-
-struct frame *
 frame_block_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
 	return frame_create(n, b, NULL, mode, FRAME_NESTED);
