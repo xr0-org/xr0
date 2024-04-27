@@ -60,10 +60,7 @@ impl Block {
             return Some(&self.arr[index]);
         }
         let lw = ast_expr_copy(offset);
-        let up = ast_expr_sum_create(
-            ast_expr_copy(offset),
-            ast_expr_constant_create(1 as libc::c_int),
-        );
+        let up = ast_expr_sum_create(ast_expr_copy(offset), ast_expr_constant_create(1));
         // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down. I don't
         // know why it isn't a double free.
         let lw_ptr = Box::into_raw(lw);
