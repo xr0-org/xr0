@@ -92,7 +92,7 @@ impl Block {
         self.arr.iter().any(|obj| object_references(obj, loc, s))
     }
 
-    // XXX FIXME: `b` may be an element of `heap`, verboten aliasing
+    // XXX FIXME: `self` may be an element of `heap`, verboten aliasing
     pub unsafe fn range_alloc(
         &mut self,
         lw: &AstExpr,

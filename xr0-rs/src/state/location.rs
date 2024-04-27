@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
-use crate::state::state::{state_get, state_getblock, state_getheap};
+use crate::state::state::{state_get, state_getheap};
 use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
 use crate::util::{Error, Result};
 use crate::{AstExpr, Value};
@@ -165,7 +165,7 @@ pub unsafe fn location_references(l1: &Location, l2: &Location, s: *mut State) -
     if location_equal(l1, l2) {
         return true;
     }
-    match state_getblock(&mut *s, l1) {
+    match (*s).get_block(l1) {
         None => false,
         Some(b) => b.references(l2, s),
     }
@@ -182,7 +182,7 @@ pub unsafe fn location_referencesheap(l: &Location, s: *mut State) -> bool {
     !obj.is_null() && object_referencesheap(&*obj, s)
 }
 
-pub unsafe fn location_getblock<'s>(
+pub fn location_getblock<'s>(
     loc: &Location,
     sm: &'s mut StaticMemory,
     _v: &'s mut VConst,
@@ -192,7 +192,7 @@ pub unsafe fn location_getblock<'s>(
 ) -> Result<Option<&'s mut Block>> {
     match loc.kind {
         LocationKind::Static => Ok(sm.get_block(loc.block)),
-        LocationKind::Automatic { .. } => location_auto_getblock(loc, &mut *s).map(Some),
+        LocationKind::Automatic { .. } => location_auto_getblock(loc, s).map(Some),
         LocationKind::Dynamic => Ok((*h).get_block(loc.block)),
         LocationKind::Dereferencable => Ok(c.get_block(loc.block)),
         _ => panic!(),
@@ -204,7 +204,7 @@ pub fn location_auto_get_block_id(loc: &Location) -> libc::c_int {
     loc.block
 }
 
-pub unsafe fn location_auto_getblock<'stack>(
+pub fn location_auto_getblock<'stack>(
     loc: &Location,
     stack: &'stack mut Stack,
 ) -> Result<&'stack mut Block> {
@@ -233,7 +233,7 @@ pub unsafe fn location_range_dealloc(
     if !offsetzero(loc) {
         panic!();
     }
-    let Some(b) = state_getblock(&mut *state, loc) else {
+    let Some(b) = (*state).get_block(loc) else {
         return Err(Error::new("cannot get block".to_string()));
     };
     if !b.range_aredeallocands(lw, up, state) {

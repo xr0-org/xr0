@@ -6,7 +6,7 @@ use crate::ast::{
     ast_expr_sum_create, ast_type_struct_complete,
 };
 use crate::state::location::location_references;
-use crate::state::state::{state_eval, state_getext, state_isdeallocand};
+use crate::state::state::{state_eval, state_getext};
 use crate::state::State;
 use crate::util::Result;
 use crate::value::{
@@ -105,8 +105,8 @@ pub fn object_as_value(obj: &Object) -> Option<&Value> {
 pub unsafe fn object_isdeallocand(obj: &Object, s: *mut State) -> bool {
     match &obj.kind {
         ObjectKind::Value(None) => false,
-        ObjectKind::Value(Some(v)) => state_isdeallocand(s, value_as_location(v)),
-        ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
+        ObjectKind::Value(Some(v)) => (*s).loc_is_deallocand(value_as_location(v)),
+        ObjectKind::DeallocandRange(range) => range_isdeallocand(range, &mut *s),
     }
 }
 
@@ -352,8 +352,8 @@ pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
     ))))
 }
 
-pub unsafe fn range_isdeallocand(r: &Range, s: *mut State) -> bool {
-    state_isdeallocand(s, &r.loc)
+pub unsafe fn range_isdeallocand(r: &Range, s: &mut State) -> bool {
+    s.loc_is_deallocand(&r.loc)
 }
 
 pub unsafe fn range_references(r: &Range, loc: &Location, s: *mut State) -> bool {
