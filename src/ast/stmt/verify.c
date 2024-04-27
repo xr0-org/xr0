@@ -498,7 +498,7 @@ labelled_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	assert(ast_stmt_ispre(stmt));
 	struct ast_block *b = ast_stmt_labelled_as_block(stmt);	
-	struct frame *setup_frame = frame_setup_create(
+	struct frame *setup_frame = frame_block_create(
 		dynamic_str("setup"),
 		b,
 		EXEC_ABSTRACT
