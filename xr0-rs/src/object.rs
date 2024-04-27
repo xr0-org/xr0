@@ -1,9 +1,9 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{
-    ast_expr_constant_create, ast_expr_copy, ast_expr_destroy, ast_expr_difference_create,
-    ast_expr_eq_create, ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create,
-    ast_expr_sum_create, ast_type_struct_complete, c_int,
+    ast_expr_constant_create, ast_expr_copy, ast_expr_difference_create, ast_expr_eq_create,
+    ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_sum_create,
+    ast_type_struct_complete, c_int,
 };
 use crate::state::location::location_references;
 use crate::state::state::{state_eval, state_getext};
@@ -132,10 +132,10 @@ impl Object {
     }
 }
 
-unsafe fn object_size(obj: &Object) -> *mut AstExpr {
+fn object_size(obj: &Object) -> Box<AstExpr> {
     match &obj.kind {
-        ObjectKind::Value(_) => Box::into_raw(ast_expr_constant_create(1)),
-        ObjectKind::DeallocandRange(range) => Box::into_raw(ast_expr_copy(range_size(range))),
+        ObjectKind::Value(_) => ast_expr_constant_create(1),
+        ObjectKind::DeallocandRange(range) => ast_expr_copy(range_size(range)),
     }
 }
 
@@ -144,21 +144,18 @@ pub unsafe fn object_lower(obj: &mut Object) -> *mut AstExpr {
     &mut *obj.offset
 }
 
-pub unsafe fn object_upper(obj: &Object) -> *mut AstExpr {
-    Box::into_raw(ast_expr_sum_create(
-        ast_expr_copy(&obj.offset),
-        Box::from_raw(object_size(obj)),
-    ))
+pub fn object_upper(obj: &Object) -> Box<AstExpr> {
+    ast_expr_sum_create(ast_expr_copy(&obj.offset), object_size(obj))
 }
 
 pub unsafe fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     let lw = &*obj.offset;
-    let up: *mut AstExpr = object_upper(obj);
+    let up = object_upper(obj);
     let of = offset;
     // Note: Original leaks the expressions to avoid double-freeing subexpressions.
     let e1 = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(of));
-    let e2 = ast_expr_lt_create(ast_expr_copy(of), ast_expr_copy(&*up));
-    ast_expr_destroy(up);
+    let e2 = ast_expr_lt_create(ast_expr_copy(of), ast_expr_copy(&up));
+    drop(up);
     let result = state_eval(s, &e1) && state_eval(s, &e2);
     std::mem::forget(e1);
     std::mem::forget(e2);
@@ -167,11 +164,11 @@ pub unsafe fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool
 
 pub unsafe fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     let lw: *mut AstExpr = &*obj.offset as *const AstExpr as *mut AstExpr;
-    let up: *mut AstExpr = object_upper(obj);
+    let up = object_upper(obj);
     let of: *mut AstExpr = offset as *const AstExpr as *mut AstExpr;
     // Note: Original leaks the expressions to avoid double-freeing subexpressions.
     let lower_bound_expr = ast_expr_le_create(Box::from_raw(lw), Box::from_raw(of));
-    let upper_bound_expr = ast_expr_le_create(Box::from_raw(of), Box::from_raw(up));
+    let upper_bound_expr = ast_expr_le_create(Box::from_raw(of), up);
     let result = state_eval(s, &lower_bound_expr) && state_eval(s, &upper_bound_expr);
     std::mem::forget(lower_bound_expr);
     std::mem::forget(upper_bound_expr);
@@ -181,20 +178,20 @@ pub unsafe fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &Stat
 #[allow(dead_code)]
 pub unsafe fn object_isempty(obj: *mut Object, s: &State) -> bool {
     let lw: *mut AstExpr = &mut *(*obj).offset;
-    let up: *mut AstExpr = object_upper(&*obj);
+    let up = object_upper(&*obj);
     // Note: Original leaks the expression to avoid double-freeing subexpressions.
-    let expr = ast_expr_eq_create(Box::from_raw(lw), Box::from_raw(up));
+    let expr = ast_expr_eq_create(Box::from_raw(lw), up);
     let result = state_eval(s, &expr);
     std::mem::forget(expr);
     result
 }
 
 pub unsafe fn object_contig_precedes(before: &Object, after: &Object, s: &State) -> bool {
-    let lw: *mut AstExpr = object_upper(before);
+    let lw = object_upper(before);
     let up: *mut AstExpr = &*after.offset as *const AstExpr as *mut AstExpr;
     // Note: Original leaks the expression to avoid double-freeing subexpressions.
     // XXX FIXME: invalid use of Box - make a borrowed expr type
-    let expr = ast_expr_eq_create(Box::from_raw(lw), Box::from_raw(up));
+    let expr = ast_expr_eq_create(lw, Box::from_raw(up));
     let result = state_eval(s, &expr);
     std::mem::forget(expr);
     result
@@ -203,11 +200,11 @@ pub unsafe fn object_contig_precedes(before: &Object, after: &Object, s: &State)
 #[allow(dead_code)]
 pub unsafe fn object_issingular(obj: *mut Object, s: &State) -> bool {
     let lw: *mut AstExpr = &mut *(*obj).offset;
-    let up: *mut AstExpr = object_upper(&*obj);
+    let up = object_upper(&*obj);
     let lw_succ = ast_expr_sum_create(Box::from_raw(lw), ast_expr_constant_create(1 as c_int));
     // Note: Original leaks the expression to avoid double-freeing subexpressions.
     // XXX FIXME: invalid use of Box - make a borrowed expr type
-    let expr = ast_expr_eq_create(lw_succ, Box::from_raw(up));
+    let expr = ast_expr_eq_create(lw_succ, up);
     let result = state_eval(s, &expr);
     std::mem::forget(expr);
     result
@@ -218,18 +215,17 @@ pub unsafe fn object_upto(
     excl_up: *mut AstExpr,
     s: *mut State,
 ) -> Option<Box<Object>> {
-    let lw: *mut AstExpr = &*obj.offset as *const AstExpr as *mut AstExpr;
-    let up: *mut AstExpr = object_upper(obj);
-    let prop0 = ast_expr_le_create(ast_expr_copy(&*lw), ast_expr_copy(&*excl_up));
-    let prop1 = ast_expr_eq_create(ast_expr_copy(&*lw), ast_expr_copy(&*excl_up));
-    let prop2 = ast_expr_eq_create(ast_expr_copy(&*up), ast_expr_copy(&*excl_up));
+    let lw = &obj.offset;
+    let up = object_upper(obj);
+    let prop0 = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(&*excl_up));
+    let prop1 = ast_expr_eq_create(ast_expr_copy(lw), ast_expr_copy(&*excl_up));
+    let prop2 = ast_expr_eq_create(up, ast_expr_copy(&*excl_up));
     let e0: bool = state_eval(&*s, &prop0);
     let e1: bool = state_eval(&*s, &prop1);
     let e2: bool = state_eval(&*s, &prop2);
     drop(prop2);
     drop(prop1);
     drop(prop0);
-    ast_expr_destroy(up);
     assert!(e0, "excl_up must be decidably >= the start offset of obj");
     if e1 {
         // `excl_up` is equal to this object's lower bound. Nothing to return.
@@ -257,7 +253,10 @@ pub unsafe fn object_upto(
     Some(object_range_create(
         ast_expr_copy(&obj.offset),
         range_create(
-            ast_expr_difference_create(Box::from_raw(excl_up), Box::from_raw(lw)),
+            ast_expr_difference_create(
+                Box::from_raw(excl_up),
+                Box::from_raw(&**lw as *const AstExpr as *mut AstExpr),
+            ),
             (*s).alloc().into_location(),
         ),
     ))
@@ -265,15 +264,14 @@ pub unsafe fn object_upto(
 
 pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Option<Box<Object>> {
     let lw = &obj.offset;
-    let up: *mut AstExpr = object_upper(obj);
-    let prop0 = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(&*up));
+    let up = object_upper(obj);
+    let prop0 = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(&up));
     let prop1 = ast_expr_eq_create(ast_expr_copy(incl_lw), ast_expr_copy(lw));
     let e0: bool = state_eval(&*s, &prop0);
     let e1: bool = state_eval(&*s, &prop1);
     drop(prop1);
     drop(prop0);
     if e0 {
-        ast_expr_destroy(up);
         return None;
     }
     if e1 {
@@ -281,7 +279,6 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
         let ObjectKind::Value(Some(v)) = &obj.kind else {
             panic!();
         };
-        ast_expr_destroy(up);
         return Some(object_value_create(
             ast_expr_copy(incl_lw),
             Some(value_copy(v)),
@@ -290,7 +287,7 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
     Some(object_range_create(
         ast_expr_copy(incl_lw),
         range_create(
-            ast_expr_difference_create(Box::from_raw(up), ast_expr_copy(incl_lw)),
+            ast_expr_difference_create(up, ast_expr_copy(incl_lw)),
             (*s).alloc().into_location(),
         ),
     ))

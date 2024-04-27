@@ -126,14 +126,14 @@ impl Block {
             return false;
         };
         for i in lw_index..up_index {
-            if !object_isdeallocand(&self.arr[i], s) {
+            if !object_isdeallocand(&self.arr[i], &mut *s) {
                 return false;
             }
             if !object_contig_precedes(&self.arr[i], &self.arr[i + 1], &*s) {
                 return false;
             }
         }
-        assert!(object_isdeallocand(&self.arr[up_index], s));
+        assert!(object_isdeallocand(&self.arr[up_index], &mut *s));
         true
     }
 
@@ -145,7 +145,7 @@ impl Block {
     ) -> bool {
         assert!(!self.arr.is_empty());
         let obj = &self.arr[0];
-        if !object_isdeallocand(obj, s) {
+        if !object_isdeallocand(obj, &mut *s) {
             return false;
         }
         // Note: Original leaks these outer expressions to avoid double-freeing the inner ones.
@@ -156,7 +156,7 @@ impl Block {
         );
         let same_up = ast_expr_eq_create(
             Box::from_raw(up as *const AstExpr as *mut AstExpr),
-            Box::from_raw(object_upper(obj)),
+            object_upper(obj),
         );
         let result = state_eval(&*s, &same_lw) && state_eval(&*s, &same_up);
         std::mem::forget(same_lw);
