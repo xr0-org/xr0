@@ -120,17 +120,6 @@ impl Error {
     }
 }
 
-pub fn string_arr_contains(arr: &[OwningCStr], s: &OwningCStr) -> bool {
-    let mut i = 0;
-    while i < arr.len() {
-        if arr[i] == *s {
-            return true;
-        }
-        i += 1;
-    }
-    false
-}
-
 pub static VERBOSE_MODE: AtomicBool = AtomicBool::new(false);
 
 #[macro_export]
