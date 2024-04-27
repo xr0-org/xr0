@@ -265,7 +265,7 @@ pub grammar c_parser(env: &Env) for str {
             Declaration { name: v.name, t }
         }
 
-    rule declaration_modifier() -> AstTypeModifier =
+    rule declaration_modifier() -> AstTypeModifiers =
         storage_class_specifier() /
         type_qualifier()
 
@@ -278,7 +278,7 @@ pub grammar c_parser(env: &Env) for str {
             s
         }
 
-    rule storage_class_specifier() -> AstTypeModifier =
+    rule storage_class_specifier() -> AstTypeModifiers =
         K(<"typedef">) {
             // XXX TODO
         /* XXX: typedef is not modelled as a modifier, so our only
@@ -333,7 +333,7 @@ pub grammar c_parser(env: &Env) for str {
             }
         }
 
-    rule type_qualifier() -> AstTypeModifier =
+    rule type_qualifier() -> AstTypeModifiers =
         K(<"const">) { MOD_CONST } /
         K(<"volatile">) { MOD_VOLATILE }
 

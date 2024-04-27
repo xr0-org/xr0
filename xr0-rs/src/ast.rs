@@ -137,7 +137,7 @@ enum AstExprKind {
 // were not always copied.
 #[derive(Clone)]
 pub struct AstType {
-    pub modifiers: libc::c_uint,
+    pub modifiers: AstTypeModifiers,
     pub base: AstTypeBase,
 }
 
@@ -181,14 +181,14 @@ pub enum AstTypeBase {
     UserDefined(String),
 }
 
-pub type AstTypeModifier = libc::c_uint;
-pub const MOD_TYPEDEF: AstTypeModifier = 1;
-pub const MOD_EXTERN: AstTypeModifier = 2;
-pub const MOD_STATIC: AstTypeModifier = 4;
-pub const MOD_AUTO: AstTypeModifier = 8;
-pub const MOD_REGISTER: AstTypeModifier = 16;
-pub const MOD_CONST: AstTypeModifier = 32;
-pub const MOD_VOLATILE: AstTypeModifier = 64;
+pub type AstTypeModifiers = u32;
+pub const MOD_TYPEDEF: AstTypeModifiers = 1;
+pub const MOD_EXTERN: AstTypeModifiers = 2;
+pub const MOD_STATIC: AstTypeModifiers = 4;
+pub const MOD_AUTO: AstTypeModifiers = 8;
+pub const MOD_REGISTER: AstTypeModifiers = 16;
+pub const MOD_CONST: AstTypeModifiers = 32;
+pub const MOD_VOLATILE: AstTypeModifiers = 64;
 
 // most likely this is a borrow of the type
 pub struct LValue<'ast> {
@@ -2587,7 +2587,7 @@ pub fn ast_type_ispointer(t: &AstType) -> bool {
     matches!(t.base, AstTypeBase::Pointer(_))
 }
 
-pub fn ast_type_create(base: AstTypeBase, modifiers: AstTypeModifier) -> Box<AstType> {
+pub fn ast_type_create(base: AstTypeBase, modifiers: AstTypeModifiers) -> Box<AstType> {
     Box::new(AstType { base, modifiers })
 }
 
@@ -2680,7 +2680,7 @@ pub fn ast_type_create_struct_partial(tag: String) -> Box<AstType> {
     ast_type_create_struct(Some(tag), None)
 }
 
-pub fn ast_type_mod_or(t: &mut AstType, m: AstTypeModifier) {
+pub fn ast_type_mod_or(t: &mut AstType, m: AstTypeModifiers) {
     t.modifiers |= m;
 }
 
@@ -2694,7 +2694,7 @@ pub fn ast_type_copy(t: &AstType) -> Box<AstType> {
 
 pub fn ast_type_str(t: &AstType) -> String {
     let mut b = String::new();
-    str_write!(b, "{}", unsafe { mod_str(t.modifiers as libc::c_int) });
+    str_write!(b, "{}", mod_str(t.modifiers));
     match &t.base {
         AstTypeBase::Pointer(ptr_type) => {
             ast_type_str_build_ptr(&mut b, ptr_type.as_ref().unwrap());
@@ -2740,26 +2740,17 @@ pub fn ast_type_str(t: &AstType) -> String {
     b
 }
 
-unsafe fn mod_str(modifiers: libc::c_int) -> String {
+fn mod_str(modifiers: AstTypeModifiers) -> String {
     let modstr: [&'static str; 7] = [
         "typedef", "extern", "static", "auto", "register", "const", "volatile",
     ];
-    let modlen = 7 as libc::c_int;
     let mut b = String::new();
-    let mut nmods = 0 as libc::c_int;
-
-    for i in 0..modlen {
+    for (i, name) in modstr.iter().enumerate() {
         if 1 << i & modifiers != 0 {
-            nmods += 1;
-        }
-    }
-    for i in 0..modlen {
-        let m: libc::c_int = (1 as libc::c_int) << i;
-        if m & modifiers != 0 {
-            let fresh11 = nmods;
-            nmods -= 1;
-            let space = if fresh11 != 0 { " " } else { "" };
-            str_write!(b, "{}{space}", modstr[i as usize]);
+            // Note: The original does some unnecessary work to decide whether to add a space, but
+            // the answer is always yes, add the space. This is on purpose because of how this
+            // function is used.
+            str_write!(b, "{name} ");
         }
     }
     b
