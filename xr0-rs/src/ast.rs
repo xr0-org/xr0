@@ -983,7 +983,7 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
     )))
 }
 
-pub fn ast_expr_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+pub fn ast_expr_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
     match &expr.kind {
         AstExprKind::Assignment(_) => assign_absexec(expr, state),
         AstExprKind::IsDereferencable(_) => isdereferencable_absexec(expr, state),
@@ -993,7 +993,7 @@ pub fn ast_expr_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value>
         | AstExprKind::Unary(_)
         | AstExprKind::Call(_)
         | AstExprKind::StructMember(_)
-        | AstExprKind::ArbArg => Ok(Box::into_raw(ast_expr_eval(expr, state)?)),
+        | AstExprKind::ArbArg => Ok(Some(ast_expr_eval(expr, state)?)),
         _ => panic!(),
     }
 }
@@ -1007,19 +1007,19 @@ fn expr_unary_eval(unary: &UnaryExpr, state: &mut State) -> Result<Box<Value>> {
     }
 }
 
-fn alloc_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+fn alloc_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
     match ast_expr_alloc_kind(expr) {
-        AstAllocKind::Alloc => Ok(Box::into_raw(state.alloc())),
+        AstAllocKind::Alloc => Ok(Some(state.alloc())),
         AstAllocKind::Dealloc => dealloc_process(expr, state),
-        AstAllocKind::Clump => Ok(Box::into_raw(state.clump())),
+        AstAllocKind::Clump => Ok(Some(state.clump())),
     }
 }
 
-fn dealloc_process(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+fn dealloc_process(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
     let arg = ast_expr_alloc_arg(expr);
     let val = ast_expr_eval(arg, state)?;
     state.dealloc(&val)?;
-    Ok(ptr::null_mut())
+    Ok(None)
 }
 
 // Argument `fname` is unused after removing some dead (or ill-advised) code.
@@ -1044,14 +1044,14 @@ pub fn prepare_parameters(
     Ok(())
 }
 
-fn isdereferencable_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+fn isdereferencable_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
     let p = state.props();
     unsafe {
         // XXX FIXME: This definitely isn't OK. absexec has some weird stuff going on in the original.
         // Could clone here instead.
         p.install(Box::from_raw(expr as *const AstExpr as *mut AstExpr));
     }
-    Ok(ptr::null_mut())
+    Ok(None)
 }
 
 pub fn prepare_arguments(
@@ -1063,22 +1063,19 @@ pub fn prepare_arguments(
     args.iter().map(|arg| ast_expr_eval(arg, state)).collect()
 }
 
-fn assign_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+fn assign_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
     let lval = ast_expr_assignment_lval(expr);
     let rval = ast_expr_assignment_rval(expr);
-    let val = ast_expr_absexec(rval, state)?;
-    if val.is_null() {
+    let Some(val) = ast_expr_absexec(rval, state)? else {
         debug_assert!(false);
         return Err(Error::new("undefined indirection (rvalue)".to_string()));
-    }
+    };
     let lval_res = ast_expr_lvalue(lval, state)?;
-    unsafe {
-        let Some(obj) = lval_res.obj else {
-            return Err(Error::new("undefined indirection (lvalue)".to_string()));
-        };
-        obj.assign(Some(value_copy(&*val)));
-    }
-    Ok(val)
+    let Some(obj) = lval_res.obj else {
+        return Err(Error::new("undefined indirection (lvalue)".to_string()));
+    };
+    obj.assign(Some(value_copy(&val)));
+    Ok(Some(val))
 }
 
 fn verify_paramspec(
