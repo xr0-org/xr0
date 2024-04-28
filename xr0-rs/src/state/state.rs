@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use super::location::{
     location_copy, location_create_dereferencable, location_create_static, location_dealloc,
-    location_getblock, location_offset, location_range_dealloc, location_toclump, location_toheap,
-    location_tostack, location_tostatic, location_with_offset,
+    location_getblock, location_offset, location_range_dealloc, location_toheap,
+    location_with_offset, LocationKind,
 };
 use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
 use crate::ast::{
@@ -186,16 +186,19 @@ impl State {
     }
 }
 
-pub unsafe fn state_islval(state: *mut State, v: &Value) -> bool {
+pub fn state_islval(state: &mut State, v: &Value) -> bool {
     if !value_islocation(v) {
         return false;
     }
     let loc = value_as_location(v);
-    state_get(&mut *state, loc, true).unwrap();
-    location_tostatic(loc, &(*state).static_memory)
-        || location_toheap(loc, &mut (*state).heap)
-        || location_tostack(loc, &mut (*state).stack)
-        || location_toclump(loc, &mut (*state).clump)
+    state_get(state, loc, true).unwrap();
+    match loc.kind {
+        LocationKind::Static => state.static_memory.has_block(loc.block),
+        LocationKind::VConst => false,
+        LocationKind::Dereferencable => state.clump.get_block(loc.block).is_some(),
+        LocationKind::Automatic { .. } => true,
+        LocationKind::Dynamic => state.heap.get_block(loc.block).is_some(),
+    }
 }
 
 pub unsafe fn state_isalloc(state: *mut State, v: &Value) -> bool {
@@ -211,7 +214,7 @@ pub unsafe fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Valu
     state.vconst.get(id)
 }
 
-pub unsafe fn state_get<'s>(
+pub fn state_get<'s>(
     state: &'s mut State,
     loc: &Location,
     constructive: bool,
@@ -231,8 +234,8 @@ pub unsafe fn state_get<'s>(
             Ok(None)
         }
         Some(b) => {
-            // XXX FIXME: dereferencin *state_ptr here has got to be UB in rust
-            let obj = b.observe(location_offset(loc), &mut *state_ptr, constructive);
+            // XXX FIXME: dereferencing *state_ptr here has got to be UB in rust
+            let obj = unsafe { b.observe(location_offset(loc), &mut *state_ptr, constructive) };
             Ok(obj)
         }
     }

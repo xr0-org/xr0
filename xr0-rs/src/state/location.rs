@@ -9,13 +9,13 @@ use crate::{AstExpr, Value};
 
 #[derive(Clone)]
 pub struct Location {
-    kind: LocationKind,
-    block: usize,
-    offset: Box<AstExpr>,
+    pub kind: LocationKind,
+    pub block: usize,
+    pub offset: Box<AstExpr>,
 }
 
 #[derive(Clone, PartialEq)]
-enum LocationKind {
+pub enum LocationKind {
     Static,
     #[allow(dead_code)]
     VConst,
@@ -130,25 +130,9 @@ pub fn location_with_offset(loc: &Location, offset: &AstExpr) -> Box<Location> {
     copy
 }
 
-pub fn location_tostatic(loc: &Location, sm: &StaticMemory) -> bool {
-    let type_equal = matches!(loc.kind, LocationKind::Static);
-    type_equal && sm.has_block(loc.block)
-}
-
 pub fn location_toheap(loc: &Location, h: &mut Heap) -> bool {
     let type_equal = matches!(loc.kind, LocationKind::Dynamic);
     let b = (*h).get_block(loc.block);
-    type_equal && b.is_some()
-}
-
-pub fn location_tostack(loc: &Location, _s: &mut Stack) -> bool {
-    // Note: Original adds a null check that can't fail.
-    matches!(loc.kind, LocationKind::Automatic { .. })
-}
-
-pub fn location_toclump(loc: &Location, c: &mut Clump) -> bool {
-    let type_equal = matches!(loc.kind, LocationKind::Dereferencable);
-    let b = c.get_block(loc.block);
     type_equal && b.is_some()
 }
 

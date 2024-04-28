@@ -1075,10 +1075,10 @@ unsafe fn verify_paramspec(
     param_state: *mut State,
     arg_state: *mut State,
 ) -> Result<()> {
-    if !state_islval(param_state, param) {
+    if !state_islval(&mut *param_state, param) {
         return Ok(());
     }
-    if !state_islval(arg_state, arg) {
+    if !state_islval(&mut *arg_state, arg) {
         return Err(Error::new("must be lvalue".to_string()));
     }
     if state_isalloc(param_state, param) && !state_isalloc(arg_state, arg) {
