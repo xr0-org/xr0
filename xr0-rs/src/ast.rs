@@ -1192,10 +1192,11 @@ unsafe fn binary_pf_reduce(binary: &BinaryExpr, s: *mut State) -> Result<Box<Val
     let BinaryExpr { e1, op, e2 } = binary;
     let v1 = ast_expr_pf_reduce(e1, s)?;
     let v2 = ast_expr_pf_reduce(e2, s)?;
+    // Note: Original leaked v1 and v2.
     Ok(value_sync_create(ast_expr_binary_create(
-        value_to_expr(&*Box::into_raw(v1)),
+        value_to_expr(&v1),
         *op,
-        value_to_expr(&*Box::into_raw(v2)),
+        value_to_expr(&v2),
     )))
 }
 
