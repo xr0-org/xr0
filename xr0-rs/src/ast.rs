@@ -1317,13 +1317,6 @@ pub fn ast_expr_member_root(expr: &AstExpr) -> &AstExpr {
     &member.root
 }
 
-pub fn ast_expr_incdec_root(expr: &AstExpr) -> &AstExpr {
-    let AstExprKind::IncDec(incdec) = &expr.kind else {
-        panic!();
-    };
-    &incdec.operand
-}
-
 pub fn ast_expr_member_create(struct_: Box<AstExpr>, field: String) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::StructMember(StructMemberExpr {
         root: struct_,
@@ -1360,20 +1353,6 @@ pub fn ast_expr_incdec_create(root: Box<AstExpr>, inc: bool, pre: bool) -> Box<A
         inc,
         pre,
     }))
-}
-
-pub fn ast_expr_call_args(expr: &AstExpr) -> &[Box<AstExpr>] {
-    let AstExprKind::Call(call) = &expr.kind else {
-        panic!();
-    };
-    &call.args
-}
-
-pub fn ast_expr_call_root(expr: &AstExpr) -> &AstExpr {
-    let AstExprKind::Call(call) = &expr.kind else {
-        panic!();
-    };
-    &call.fun
 }
 
 pub fn ast_expr_call_create(fun: Box<AstExpr>, args: Vec<Box<AstExpr>>) -> Box<AstExpr> {
@@ -1592,12 +1571,12 @@ pub fn ast_expr_getfuncs(expr: &AstExpr) -> Vec<String> {
 
 pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplits> {
     match &e.kind {
-        AstExprKind::Call(_) => call_splits(e, s),
-        AstExprKind::Assignment(assignment) => ast_expr_splits(&assignment.rval, s),
-        AstExprKind::Unary(_) => ast_expr_splits(ast_expr_unary_operand(e), s),
-        AstExprKind::Binary(_) => binary_splits(e, s),
-        AstExprKind::IncDec(_) => ast_expr_splits(ast_expr_incdec_root(e), s),
-        AstExprKind::StructMember(_) => ast_expr_splits(ast_expr_member_root(e), s),
+        AstExprKind::Call(call) => call_splits(call, s),
+        AstExprKind::Assignment(assign) => ast_expr_splits(&assign.rval, s),
+        AstExprKind::Unary(unary) => ast_expr_splits(&unary.arg, s),
+        AstExprKind::Binary(binary) => binary_splits(binary, s),
+        AstExprKind::IncDec(incdec) => ast_expr_splits(&incdec.operand, s),
+        AstExprKind::StructMember(sm) => ast_expr_splits(&sm.root, s),
         AstExprKind::Constant(_)
         | AstExprKind::Identifier(_)
         | AstExprKind::StringLiteral(_)
@@ -1608,15 +1587,15 @@ pub unsafe fn ast_expr_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplit
     }
 }
 
-unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> Result<AstStmtSplits> {
-    let root = ast_expr_call_root(expr);
-    let name = ast_expr_as_identifier(root);
+unsafe fn call_splits(call: &CallExpr, state: *mut State) -> Result<AstStmtSplits> {
+    let CallExpr { fun, args } = call;
+    let name = ast_expr_as_identifier(fun);
     let Some(f) = (*state_getext(state)).get_func(name) else {
         return Err(Error::new(format!("function: `{name}' not found")));
     };
     let params = f.params();
     let mut s_copy = state_copy(&*state);
-    let args = prepare_arguments(ast_expr_call_args(expr), params, &mut s_copy);
+    let args = prepare_arguments(args, params, &mut s_copy);
     let ret_type = f.rtype();
     state_pushframe(&mut s_copy, name.to_string(), ret_type);
     prepare_parameters(params, args, name, &mut s_copy)?;
@@ -1635,10 +1614,10 @@ unsafe fn call_splits(expr: &AstExpr, state: *mut State) -> Result<AstStmtSplits
     Ok(AstStmtSplits { conds })
 }
 
-unsafe fn binary_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplits> {
+unsafe fn binary_splits(binary: &BinaryExpr, s: *mut State) -> Result<AstStmtSplits> {
     // Note: s1.err and s2.err are ignored in the original.
-    let s1 = ast_expr_splits(ast_expr_binary_e1(e), s).unwrap_or_default();
-    let s2 = ast_expr_splits(ast_expr_binary_e2(e), s).unwrap_or_default();
+    let s1 = ast_expr_splits(&binary.e1, s).unwrap_or_default();
+    let s2 = ast_expr_splits(&binary.e2, s).unwrap_or_default();
     Ok(AstStmtSplits {
         conds: [s1.conds, s2.conds].concat(),
     })
