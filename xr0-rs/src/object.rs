@@ -5,13 +5,13 @@ use crate::ast::{
     ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_sum_create,
     ast_type_struct_complete, c_int,
 };
-use crate::state::location::location_references;
+use crate::state::location::{location_dealloc, location_references};
 use crate::state::state::{state_eval, state_getext};
 use crate::state::State;
 use crate::util::Result;
 use crate::value::{
-    value_abstractcopy, value_as_location, value_copy, value_ptr_create, value_references,
-    value_referencesheap, value_struct_create, value_struct_member, value_struct_membertype,
+    value_abstractcopy, value_as_location, value_copy, value_references, value_referencesheap,
+    value_struct_create, value_struct_member, value_struct_membertype,
 };
 use crate::{AstExpr, AstType, Location, Value};
 
@@ -350,10 +350,9 @@ pub fn range_size(r: &Range) -> &AstExpr {
 }
 
 pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
-    // FIXME - this is clearly insane, take Range by value
-    (*s).dealloc(&*Box::into_raw(value_ptr_create(Box::from_raw(
-        &*r.loc as *const Location as *mut Location,
-    ))))
+    // Note: The original creates a value that borrows the location from `r`, then leaks the value
+    // to avoid double-freeing the location.
+    location_dealloc(&r.loc, &mut (*s).heap)
 }
 
 pub fn range_isdeallocand(r: &Range, s: &mut State) -> bool {
