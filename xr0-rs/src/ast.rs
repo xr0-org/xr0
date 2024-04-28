@@ -363,7 +363,7 @@ fn rangeprocess_dealloc(
 ) -> Result<()> {
     unsafe {
         let obj: *mut Object = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), state);
-        state_range_dealloc(state, obj, lw, up)
+        state_range_dealloc(state, &*obj, lw, up)
     }
 }
 
@@ -417,7 +417,7 @@ fn rangeprocess_alloc(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: &mut St
     assert_ne!(alloc.kind, AstAllocKind::Dealloc);
     unsafe {
         let obj: *mut Object = hack_base_object_from_alloc(lval, state);
-        state_range_alloc(state, obj, lw, up)
+        state_range_alloc(state, &*obj, lw, up)
     }
 }
 
@@ -942,7 +942,7 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
         }
         state_popframe(&mut *state);
         if !v.is_null() {
-            return pf_augment(v, call, &mut *state);
+            return pf_augment(&*v, call, &mut *state);
         }
         eprintln!("expr_call_eval: call_absexec returned Ok(NULL)");
         panic!();
@@ -1161,15 +1161,14 @@ pub fn ast_expr_as_constant(expr: &AstExpr) -> c_int {
     }
 }
 
-unsafe fn pf_augment(v: *mut Value, call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
-    if !value_isstruct(&*v) {
-        return Ok(value_copy(&*v));
+fn pf_augment(v: &Value, call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
+    if !value_isstruct(v) {
+        return Ok(value_copy(v));
     }
     let res_val = call_pf_reduce(call, state)?;
-    Ok(value_pf_augment(
-        &*v,
-        value_as_sync(&*Box::into_raw(res_val)),
-    ))
+    let result = value_pf_augment(v, value_as_sync(&res_val));
+    std::mem::forget(res_val);
+    Ok(result)
 }
 
 pub fn ast_expr_constant_create_char(c: c_char) -> Box<AstExpr> {

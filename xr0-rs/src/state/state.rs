@@ -298,31 +298,35 @@ pub fn state_deref(state: &mut State, ptr_val: &Value, index: &AstExpr) -> Resul
         .map_err(|err| Error::new(format!("undefined indirection: {}", err.msg)))
 }
 
-pub unsafe fn state_range_alloc(
-    state: *mut State,
-    obj: *mut Object,
+pub fn state_range_alloc(
+    state: &mut State,
+    obj: &Object,
     lw: &AstExpr,
     up: &AstExpr,
 ) -> Result<()> {
-    let Some(arr_val) = object_as_value(&*obj) else {
+    let Some(arr_val) = object_as_value(obj) else {
         return Err(Error::new("no value".to_string()));
     };
     let deref = value_as_location(arr_val);
-    let b = location_getblock(
-        deref,
-        &mut (*state).static_memory,
-        &mut (*state).vconst,
-        &mut (*state).stack,
-        &mut (*state).heap,
-        &mut (*state).clump,
-    )
-    .unwrap(); // panic rather than propagate the error - this is in the original
-    let Some(b) = b else {
-        return Err(Error::new("no block".to_string()));
-    };
-    assert!(!ast_expr_equal(lw, up));
-    // XXX FIXME: b is mutably borrowed from state and now we're going to mutate the heap
-    b.range_alloc(lw, up, &mut (*state).heap)
+
+    let state: *mut State = state;
+    unsafe {
+        let b = location_getblock(
+            deref,
+            &mut (*state).static_memory,
+            &mut (*state).vconst,
+            &mut (*state).stack,
+            &mut (*state).heap,
+            &mut (*state).clump,
+        )
+        .unwrap(); // panic rather than propagate the error - this is in the original
+        let Some(b) = b else {
+            return Err(Error::new("no block".to_string()));
+        };
+        assert!(!ast_expr_equal(lw, up));
+        // XXX FIXME: b is mutably borrowed from state and now we're going to mutate the heap
+        b.range_alloc(lw, up, &mut (*state).heap)
+    }
 }
 
 impl State {
@@ -340,13 +344,13 @@ impl State {
     }
 }
 
-pub unsafe fn state_range_dealloc(
+pub fn state_range_dealloc(
     state: &mut State,
-    obj: *mut Object,
+    obj: &Object,
     lw: &AstExpr,
     up: &AstExpr,
 ) -> Result<()> {
-    let Some(arr_val) = object_as_value(&*obj) else {
+    let Some(arr_val) = object_as_value(obj) else {
         return Err(Error::new("no value".to_string()));
     };
     let deref = value_as_location(arr_val);
