@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ptr;
 
 use super::Block;
 use crate::{str_write, Location};
@@ -47,9 +46,7 @@ impl StaticMemory {
         self.pool.insert(lit.to_string(), Box::new(loc.clone()));
     }
 
-    pub unsafe fn check_pool(&self, lit: &str) -> *mut Location {
-        self.pool.get(lit).map_or(ptr::null_mut(), |boxed| {
-            &**boxed as *const Location as *mut Location
-        })
+    pub fn check_pool(&self, lit: &str) -> Option<&Location> {
+        self.pool.get(lit).map(|loc| &**loc)
     }
 }

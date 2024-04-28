@@ -164,11 +164,11 @@ pub fn state_vconst(
 }
 
 pub unsafe fn state_static_init(state: *mut State, lit: &str) -> Box<Value> {
-    let loc: *mut Location = (*state).static_memory.check_pool(lit);
-    if !loc.is_null() {
-        // XXX FIXME this is definitely not kosher - can make multiple boxes point to the same
-        // Location
-        return value_ptr_create(Box::from_raw(loc));
+    if let Some(loc) = (*state).static_memory.check_pool(lit) {
+        // Note: Original creates a value that points to this existing location. This is a
+        // double-free. When the value is destroyed, the location will be destroyed, even though it
+        // is still in the static pool.
+        return value_ptr_create(Box::new(loc.clone()));
     }
     let address = (*state).static_memory.new_block();
     let loc = location_create_static(address, ast_expr_constant_create(0));
