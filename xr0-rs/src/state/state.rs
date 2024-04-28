@@ -8,8 +8,7 @@ use super::location::{
 };
 use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
 use crate::ast::{
-    ast_expr_as_literal, ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create,
-    ast_type_vconst,
+    ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create, ast_type_vconst,
 };
 use crate::object::object_as_value;
 use crate::util::{Error, Result};
@@ -164,8 +163,7 @@ pub fn state_vconst(
     value_sync_create(ast_expr_identifier_create(c))
 }
 
-pub unsafe fn state_static_init(state: *mut State, expr: &AstExpr) -> Box<Value> {
-    let lit = ast_expr_as_literal(expr);
+pub unsafe fn state_static_init(state: *mut State, lit: &str) -> Box<Value> {
     let loc: *mut Location = (*state).static_memory.check_pool(lit);
     if !loc.is_null() {
         // XXX FIXME this is definitely not kosher - can make multiple boxes point to the same
