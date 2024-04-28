@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
-use std::ptr;
 
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_equal, ast_expr_identifier_create,
@@ -12,6 +11,7 @@ use crate::object::{object_abstractcopy, object_as_value, object_value_create};
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
 use crate::state::state::state_vconst;
 use crate::state::State;
+use crate::util::SemiBox;
 use crate::{AstExpr, AstType, AstVariable, Location, Object};
 
 #[derive(Clone)]
@@ -134,13 +134,17 @@ pub fn value_struct_indefinite_create(
 }
 
 #[allow(dead_code)]
-pub unsafe fn value_transfigure(v: *mut Value, compare: &mut State, islval: bool) -> *mut Value {
-    match &(*v).kind {
+pub unsafe fn value_transfigure<'v>(
+    v: &'v Value,
+    compare: &mut State,
+    islval: bool,
+) -> Option<SemiBox<'v, Value>> {
+    match &v.kind {
         ValueKind::Sync(_) | ValueKind::Literal(_) => {
             if islval {
-                ptr::null_mut()
+                None
             } else {
-                v
+                Some(SemiBox::Borrowed(v))
             }
         }
         ValueKind::Struct(_) => {
@@ -148,18 +152,20 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: &mut State, islval: bool
         }
         ValueKind::Int(_) => {
             if islval {
-                ptr::null_mut()
+                None
             } else {
                 // Note: Original leaked this type.
-                Box::into_raw(state_vconst(
+                Some(SemiBox::Owned(state_vconst(
                     &mut *compare,
                     &ast_type_create_voidptr(),
                     None,
                     false,
-                ))
+                )))
             }
         }
-        ValueKind::DefinitePtr(loc) => Box::into_raw(location_transfigure(loc, &mut *compare)),
+        ValueKind::DefinitePtr(loc) => {
+            Some(SemiBox::Owned(location_transfigure(loc, &mut *compare)))
+        }
         ValueKind::IndefinitePtr(_) => panic!(),
     }
 }
