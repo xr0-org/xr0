@@ -212,15 +212,15 @@ pub unsafe fn object_issingular(obj: *mut Object, s: &State) -> bool {
 /// # Panics
 ///
 /// If `excl_up` can't be proved to be `>=` the start offset of `obj`.
-pub unsafe fn object_upto(obj: &Object, excl_up: &AstExpr, s: *mut State) -> Option<Box<Object>> {
+pub fn object_upto(obj: &Object, excl_up: &AstExpr, s: &mut State) -> Option<Box<Object>> {
     let lw = &obj.offset;
     let up = object_upper(obj);
     let prop0 = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
     let prop1 = ast_expr_eq_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
     let prop2 = ast_expr_eq_create(up, ast_expr_copy(excl_up));
-    let e0: bool = state_eval(&*s, &prop0);
-    let e1: bool = state_eval(&*s, &prop1);
-    let e2: bool = state_eval(&*s, &prop2);
+    let e0: bool = state_eval(s, &prop0);
+    let e1: bool = state_eval(s, &prop1);
+    let e2: bool = state_eval(s, &prop2);
     drop(prop2);
     drop(prop1);
     drop(prop0);
@@ -245,25 +245,24 @@ pub unsafe fn object_upto(obj: &Object, excl_up: &AstExpr, s: *mut State) -> Opt
     // `excl_up` is not decidably equal to the upper or lower bound of `obj`. In fact, we did not
     // insist on `excl_up <= up`, so `excl_up` could be past that end.
 
-    // Note: This makes one copy of `obj->offset` but also just does `Box::from_raw(lw)` which ...
-    // seems like it's taking ownership of `obj->offset`, and maybe we leak `obj` to avoid a double
-    // free?
+    // Note: I think there's a double free in the original, where it creates an expression using
+    // `lw` without copying it, but `obj` owns that expr.
     Some(object_range_create(
         ast_expr_copy(&obj.offset),
         range_create(
             ast_expr_difference_create(ast_expr_copy(excl_up), ast_expr_copy(lw)),
-            (*s).alloc().into_location(),
+            s.alloc().into_location(),
         ),
     ))
 }
 
-pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Option<Box<Object>> {
+pub fn object_from(obj: &Object, incl_lw: &AstExpr, s: &mut State) -> Option<Box<Object>> {
     let lw = &obj.offset;
     let up = object_upper(obj);
     let prop0 = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(&up));
     let prop1 = ast_expr_eq_create(ast_expr_copy(incl_lw), ast_expr_copy(lw));
-    let e0: bool = state_eval(&*s, &prop0);
-    let e1: bool = state_eval(&*s, &prop1);
+    let e0: bool = state_eval(s, &prop0);
+    let e1: bool = state_eval(s, &prop1);
     drop(prop1);
     drop(prop0);
     if e0 {
@@ -283,7 +282,7 @@ pub unsafe fn object_from(obj: &Object, incl_lw: &AstExpr, s: *mut State) -> Opt
         ast_expr_copy(incl_lw),
         range_create(
             ast_expr_difference_create(up, ast_expr_copy(incl_lw)),
-            (*s).alloc().into_location(),
+            s.alloc().into_location(),
         ),
     ))
 }

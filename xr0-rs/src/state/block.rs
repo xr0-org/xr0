@@ -106,9 +106,9 @@ impl Block {
         // `upto` is then appended to `b->arr` where it may be used (although the `lw` part of it
         // has been freed) and will later be destroyed (a clear double free). Undefined behvaior,
         // but the scenario does not happen in the test suite.
-        let upto = object_upto(obj, &lw, s);
+        let upto = object_upto(obj, &lw, &mut *s);
         let observed = object_value_create(lw, Some((*s).alloc()));
-        let from = object_from(obj, &up, s);
+        let from = object_from(obj, &up, &mut *s);
         drop(up);
 
         // delete current struct block
@@ -222,9 +222,9 @@ impl Block {
         // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`.
         // It would be a double free but for a counterbug (read comments below).
         #[allow(unused_variables)]
-        let upto = object_upto(&self.arr[lw_index], lw, s);
+        let upto = object_upto(&self.arr[lw_index], lw, &mut *s);
         #[allow(unused_variables)]
-        let from = object_from(&self.arr[up_index], up, s);
+        let from = object_from(&self.arr[up_index], up, &mut *s);
 
         // Retain `arr[0..lw_index]`, replace the range `arr[lw_index..=up_index]` with `upto` and `from`,
         // then retain `arr[up_index + 1..]`.
