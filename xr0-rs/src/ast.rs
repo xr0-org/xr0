@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::process;
-use std::ptr;
 use std::sync::Arc;
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
@@ -923,32 +922,25 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
         state_pushframe(&mut *state, name.to_string(), rtype);
         prepare_parameters(params, args, name, &mut *state)?;
         call_setupverify(f, &mut state_copy(&*state))?;
-        let mut v = call_absexec(call, &mut *state)?;
-        if !v.is_null() {
-            v = Box::into_raw(value_copy(&*v));
-        }
+        let v = call_absexec(call, &mut *state)?;
         state_popframe(&mut *state);
-        if !v.is_null() {
-            return pf_augment(&*v, call, &mut *state);
-        }
-        eprintln!("expr_call_eval: call_absexec returned Ok(NULL)");
-        panic!();
+        pf_augment(&v, call, &mut *state)
     }
 }
 
-fn call_absexec(call: &CallExpr, s: &mut State) -> Result<*mut Value> {
+fn call_absexec(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
     let name = ast_expr_as_identifier(&call.fun);
     let s: *mut State = s;
     unsafe {
         let Some(f) = (*s).ext().get_func(name) else {
             return Err(Error::new(format!("function `{name}' not found")));
         };
-        let v = ast_function_absexec(f, &mut *s)?;
-        if !v.is_null() {
+        // Note: In the original, this checked for `ast_function_absexec` returning a result with
+        // null value, and in that case called `call_arbitraryresult`. However, this can't happen.
+        if let Some(v) = ast_function_absexec(f, &mut *s)? {
             return Ok(v);
         }
-        let v = call_arbitraryresult(call, f, &mut *s)?;
-        Ok(Box::into_raw(v))
+        call_arbitraryresult(call, f, &mut *s)
     }
 }
 
@@ -2924,7 +2916,7 @@ fn path_verify(
     Ok(())
 }
 
-pub fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<*mut Value> {
+pub fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<Option<Box<Value>>> {
     for decl in &f.abstract_.decls {
         state_declare(state, decl, false);
     }
@@ -2932,9 +2924,9 @@ pub fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<*mut V
         ast_stmt_absexec(stmt, state, false)?;
     }
     let obj = state_getresult(state);
-    // XXX FIXME: Bad: we transmute the reference into pointer and subsequently callers transmute
-    // it further into a Box. How did ownership even; we don't know.
-    Ok(object_as_value(obj).map_or(ptr::null_mut(), |r| r as *const Value as *mut Value))
+    // Note: In the original, this function (unlike the other absexec functions) returned a
+    // borrowed value which the caller cloned. Not a big difference.
+    Ok(object_as_value(obj).map(value_copy))
 }
 
 fn split_path_verify(
