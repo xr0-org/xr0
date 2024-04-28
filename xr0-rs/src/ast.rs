@@ -1085,19 +1085,17 @@ unsafe fn verify_paramspec(
     if state_isalloc(param_state, param) && !state_isalloc(arg_state, arg) {
         return Err(Error::new("must be heap allocated".to_string()));
     }
-    let param_obj = state_get(param_state, value_as_location(param), false)?;
-    let arg_obj = state_get(arg_state, value_as_location(arg), false)?;
-    assert!(!param_obj.is_null());
-    assert!(!arg_obj.is_null());
-    if !object_hasvalue(&*param_obj) {
+    let param_obj = state_get(&mut *param_state, value_as_location(param), false)?.unwrap();
+    let arg_obj = state_get(&mut *arg_state, value_as_location(arg), false)?.unwrap();
+    if !object_hasvalue(param_obj) {
         return Ok(());
     }
-    if !object_hasvalue(&*arg_obj) {
+    if !object_hasvalue(arg_obj) {
         return Err(Error::new("must be rvalue".to_string()));
     }
     verify_paramspec(
-        object_as_value(&*param_obj).unwrap(),
-        object_as_value(&*arg_obj).unwrap(),
+        object_as_value(param_obj).unwrap(),
+        object_as_value(arg_obj).unwrap(),
         param_state,
         arg_state,
     )

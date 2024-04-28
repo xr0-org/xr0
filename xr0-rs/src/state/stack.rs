@@ -208,11 +208,10 @@ unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> 
         is_param: old.is_param,
         loc: old.loc.clone(),
     });
-    let obj = state_get(s, &new.loc, false).unwrap();
-    assert!(!obj.is_null());
-    if object_isvalue(&*obj) {
-        if let Some(v) = object_as_value(&*obj) {
-            (*obj).assign(value_abstractcopy(v, s));
+    let obj = state_get(&mut *s, &new.loc, false).unwrap().unwrap();
+    if object_isvalue(obj) {
+        if let Some(v) = object_as_value(obj) {
+            obj.assign(value_abstractcopy(v, s));
         }
     }
     new

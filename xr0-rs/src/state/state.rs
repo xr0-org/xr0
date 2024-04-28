@@ -172,9 +172,8 @@ pub unsafe fn state_static_init(state: *mut State, lit: &str) -> Box<Value> {
     }
     let address = (*state).static_memory.new_block();
     let loc = location_create_static(address, ast_expr_constant_create(0));
-    let obj = state_get(state, &loc, true).unwrap();
-    assert!(!obj.is_null());
-    (*obj).assign(Some(value_literal_create(lit)));
+    let obj = state_get(&mut *state, &loc, true).unwrap().unwrap();
+    obj.assign(Some(value_literal_create(lit)));
     (*state).static_memory.string_pool(lit, &loc);
     value_ptr_create(loc)
 }
@@ -192,7 +191,7 @@ pub unsafe fn state_islval(state: *mut State, v: &Value) -> bool {
         return false;
     }
     let loc = value_as_location(v);
-    state_get(state, loc, true).unwrap();
+    state_get(&mut *state, loc, true).unwrap();
     location_tostatic(loc, &(*state).static_memory)
         || location_toheap(loc, &mut (*state).heap)
         || location_tostack(loc, &mut (*state).stack)
@@ -204,7 +203,7 @@ pub unsafe fn state_isalloc(state: *mut State, v: &Value) -> bool {
         return false;
     }
     let loc = value_as_location(v);
-    state_get(state, loc, true).unwrap();
+    state_get(&mut *state, loc, true).unwrap();
     location_toheap(loc, &mut (*state).heap)
 }
 
@@ -212,27 +211,30 @@ pub unsafe fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Valu
     state.vconst.get(id)
 }
 
-pub unsafe fn state_get(
-    state: *mut State,
+pub unsafe fn state_get<'s>(
+    state: &'s mut State,
     loc: &Location,
     constructive: bool,
-) -> Result<*mut Object> {
+) -> Result<Option<&'s mut Object>> {
+    let state_ptr: *mut State = state;
     let b = location_getblock(
         loc,
-        &mut (*state).static_memory,
-        &mut (*state).vconst,
-        &mut (*state).stack,
-        &mut (*state).heap,
-        &mut (*state).clump,
+        &mut state.static_memory,
+        &mut state.vconst,
+        &mut state.stack,
+        &mut state.heap,
+        &mut state.clump,
     )?;
     match b {
         None => {
             assert!(loc.type_is_dynamic() || loc.type_is_dereferencable());
-            Ok(ptr::null_mut())
+            Ok(None)
         }
-        Some(b) => Ok(b
-            .observe(location_offset(loc), state, constructive)
-            .map_or(ptr::null_mut(), |r| r as *const Object as *mut Object)),
+        Some(b) => {
+            // XXX FIXME: dereferencin *state_ptr here has got to be UB in rust
+            let obj = b.observe(location_offset(loc), &mut *state_ptr, constructive);
+            Ok(obj)
+        }
     }
 }
 
@@ -252,7 +254,9 @@ impl State {
 
 pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
     let v = (*state).stack.get_result();
-    state_get(state, v.location(), true).unwrap()
+    state_get(&mut *state, v.location(), true)
+        .unwrap()
+        .map_or(ptr::null_mut(), |obj| obj as _)
 }
 
 unsafe fn state_getresulttype(state: &State) -> &AstType {
@@ -282,7 +286,9 @@ pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
         return state_getresult(state);
     }
     let v = (*state).stack.get_variable(id).unwrap();
-    state_get(state, v.location(), true).unwrap()
+    state_get(&mut *state, v.location(), true)
+        .unwrap()
+        .map_or(ptr::null_mut(), |obj| obj as _)
 }
 
 pub unsafe fn state_deref(
@@ -296,7 +302,8 @@ pub unsafe fn state_deref(
     let deref_base = value_as_location(ptr_val);
     // Note: the original leaked this location.
     let deref = location_with_offset(deref_base, index);
-    state_get(state, &deref, true)
+    state_get(&mut *state, &deref, true)
+        .map(|opt| opt.map_or(ptr::null_mut(), |obj| obj as _))
         .map_err(|err| Error::new(format!("undefined indirection: {}", err.msg)))
 }
 

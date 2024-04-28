@@ -174,8 +174,10 @@ pub unsafe fn location_referencesheap(l: &Location, s: *mut State) -> bool {
         }
         return true;
     }
-    let obj = state_get(s, l, false).unwrap();
-    !obj.is_null() && object_referencesheap(&*obj, s)
+    let Some(obj) = state_get(&mut *s, l, false).unwrap() else {
+        return false;
+    };
+    object_referencesheap(&*obj, s)
 }
 
 pub fn location_getblock<'s>(

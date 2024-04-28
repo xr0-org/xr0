@@ -81,7 +81,7 @@ impl Block {
         offset: &AstExpr,
         s: *mut State,
         constructive: bool,
-    ) -> Option<&'b Object> {
+    ) -> Option<&'b mut Object> {
         let Some(mut index) = object_arr_index(&self.arr, offset, &*s) else {
             if !constructive {
                 return None;
@@ -89,12 +89,12 @@ impl Block {
             let obj = object_value_create(ast_expr_copy(offset), None);
             let index = self.arr.len();
             self.arr.push(obj);
-            return Some(&self.arr[index]);
+            return Some(&mut self.arr[index]);
         };
         let obj = &self.arr[index];
 
         if object_isvalue(obj) {
-            return Some(&self.arr[index]);
+            return Some(&mut self.arr[index]);
         }
 
         // range around observand at offset
@@ -127,7 +127,7 @@ impl Block {
         if let Some(from) = from {
             self.arr.insert(index, from);
         }
-        Some(&self.arr[observed_index])
+        Some(&mut self.arr[observed_index])
     }
 
     pub unsafe fn references(&self, loc: &Location, s: *mut State) -> bool {
