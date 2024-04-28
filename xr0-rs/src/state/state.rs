@@ -201,13 +201,13 @@ pub fn state_islval(state: &mut State, v: &Value) -> bool {
     }
 }
 
-pub unsafe fn state_isalloc(state: *mut State, v: &Value) -> bool {
+pub unsafe fn state_isalloc(state: &mut State, v: &Value) -> bool {
     if !value_islocation(v) {
         return false;
     }
     let loc = value_as_location(v);
-    state_get(&mut *state, loc, true).unwrap();
-    location_toheap(loc, &mut (*state).heap)
+    state_get(state, loc, true).unwrap();
+    location_toheap(loc, &mut state.heap)
 }
 
 pub unsafe fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Value> {
@@ -272,13 +272,13 @@ pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType
     v.type_()
 }
 
-pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
+pub unsafe fn state_getloc(state: &mut State, id: &str) -> Box<Value> {
     // In the original, this apparently borrows the Location representing the variable's location,
     // but then passes it to value_ptr_create without copying. We copy because I don't see how this
     // isn't a double free otherwise. (Note: in one caller, `call_setupverify`, the Value is always
     // leaked, which partially explains it. The other is `address_eval`, which I don't think is
     // always leaked.)
-    let v = (*state).stack.get_variable(id).unwrap();
+    let v = state.stack.get_variable(id).unwrap();
     value_ptr_create(location_copy(v.location()))
 }
 

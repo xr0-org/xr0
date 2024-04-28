@@ -730,7 +730,7 @@ unsafe fn expr_structmember_eval(expr: &StructMemberExpr, s: *mut State) -> Resu
 
 unsafe fn address_eval(operand: &AstExpr, state: *mut State) -> Result<Box<Value>> {
     let id = ast_expr_as_identifier(operand);
-    Ok(state_getloc(state, id))
+    Ok(state_getloc(&mut *state, id))
 }
 
 pub unsafe fn ast_expr_alloc_rangeprocess(
@@ -1072,35 +1072,33 @@ unsafe fn assign_absexec(expr: &AstExpr, state: *mut State) -> Result<*mut Value
 unsafe fn verify_paramspec(
     param: &Value,
     arg: &Value,
-    param_state: *mut State,
-    arg_state: *mut State,
+    param_state: &mut State,
+    arg_state: &mut State,
 ) -> Result<()> {
-    if !state_islval(&mut *param_state, param) {
+    if !state_islval(param_state, param) {
         return Ok(());
     }
-    if !state_islval(&mut *arg_state, arg) {
+    if !state_islval(arg_state, arg) {
         return Err(Error::new("must be lvalue".to_string()));
     }
     if state_isalloc(param_state, param) && !state_isalloc(arg_state, arg) {
         return Err(Error::new("must be heap allocated".to_string()));
     }
-    let param_obj = state_get(&mut *param_state, value_as_location(param), false)?.unwrap();
-    let arg_obj = state_get(&mut *arg_state, value_as_location(arg), false)?.unwrap();
+    let param_obj = state_get(param_state, value_as_location(param), false)?.unwrap();
+    let arg_obj = state_get(arg_state, value_as_location(arg), false)?.unwrap();
     if !object_hasvalue(param_obj) {
         return Ok(());
     }
     if !object_hasvalue(arg_obj) {
         return Err(Error::new("must be rvalue".to_string()));
     }
-    verify_paramspec(
-        object_as_value(param_obj).unwrap(),
-        object_as_value(arg_obj).unwrap(),
-        param_state,
-        arg_state,
-    )
+    // Note: Unlike the original, we copy the values to satisfy Rust alias analysis.
+    let param_val = object_as_value(param_obj).unwrap().clone();
+    let arg_val = object_as_value(arg_obj).unwrap().clone();
+    verify_paramspec(&param_val, &arg_val, param_state, arg_state)
 }
 
-unsafe fn call_setupverify(f: &AstFunction, arg_state: *mut State) -> Result<()> {
+unsafe fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
     let fname = f.name();
     let mut param_state = state_create(fname.to_string(), (*arg_state).externals_arc(), f.rtype());
     ast_function_initparams(f, &mut param_state)?;
