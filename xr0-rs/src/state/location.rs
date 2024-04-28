@@ -197,6 +197,16 @@ pub fn location_getblock<'s>(
     }
 }
 
+/// Return all three parts of the given location, which must be automatic.
+///
+/// The parts are (frame_id, block_id, offset).
+pub fn location_auto_parts(loc: &Location) -> (usize, usize, &AstExpr) {
+    let LocationKind::Automatic { frame } = &loc.kind else {
+        panic!();
+    };
+    (*frame, loc.block, &loc.offset)
+}
+
 pub fn location_auto_get_block_id(loc: &Location) -> usize {
     assert!(matches!(loc.kind, LocationKind::Automatic { .. }));
     loc.block

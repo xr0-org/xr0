@@ -49,6 +49,33 @@ impl Block {
         self.arr.push(obj);
     }
 
+    pub fn observe_read_only<'b>(&'b self, offset: &AstExpr, state: &State) -> Option<&'b Object> {
+        let index = object_arr_index(&self.arr, offset, state)?;
+        Some(&self.arr[index])
+    }
+
+    /// Returns the object at `offset` in this block.
+    ///
+    /// If there's no object at `offset`, or (due to abstractness) it's impossible to tell for sure
+    /// that `offset` is within the bounds of a particular existing object, this returns `None`,
+    /// unless `constructive` is `true`. In that case, it creates a new `Object` at that offset,
+    /// with no value. The new object is stored in this block and a reference is returned. When
+    /// `constructive` is `true`, this method never returns `None`.
+    ///
+    /// Otherwise, `offset` falls within the bounds of at least one object in this block. If the
+    /// first such object is a value object, whether or not it actually has a value, this makes no
+    /// changes and returns a reference to that object.
+    ///
+    /// Otherwise, `offset` is in a range object--that is, a region of allocated but uninitialized
+    /// memory, with no effective type. This means `self` is a heap or clump block, as all
+    /// other blocks (variables, parameters, statics, temporaries) have a static type. In this case
+    /// we punch a hole in the range, replacing it with up to three `Object`s, representing the memory
+    /// before, inside, and after `offset`, respectively. The "before" and "after" objects will be
+    /// range objects; the new one at `offset` will be a value object, but with no value assigned.
+    ///
+    /// It's unclear how this copes with vagueness in `offset`. It's also unclear why it does what
+    /// it does in the case where it punches a hole in a range object -- it's implemented (I think)
+    /// by freeing the entire block `self` and allocating a new block, which can't be right.
     pub unsafe fn observe<'b>(
         &'b mut self,
         offset: &AstExpr,
@@ -85,7 +112,8 @@ impl Block {
         drop(up);
 
         // delete current struct block
-        // XXX FIXME: This mutates self illicitly.
+        // Note: 99-program/000-matrix.x gets here, so the code is exercised; but it doesn't make
+        // sense to free the allocation as a side effect here.
         object_dealloc(obj, s).unwrap();
         self.arr.remove(index);
 

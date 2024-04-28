@@ -1,11 +1,11 @@
 use super::{Block, State};
 use crate::ast::{
     ast_expr_constant_create, ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type,
+    AstExpr,
 };
 use crate::object::{object_as_value, object_isvalue, object_value_create};
 use crate::state::location::{
-    location_auto_get_block_id, location_auto_getblock, location_create_automatic, location_offset,
-    location_references,
+    location_auto_get_block_id, location_auto_parts, location_create_automatic, location_references,
 };
 use crate::state::state::state_get;
 use crate::util::InsertionOrderMap;
@@ -41,13 +41,13 @@ pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> String {
     let n = (*stack).frames.len();
     for i in 0..n {
         let frame: *mut StackFrame = &mut (*stack).frames[i];
-        let m: &mut VarMap = &mut (*frame).varmap;
+        let m: &VarMap = &(*frame).varmap;
         for (k, v) in m {
-            let var = variable_str(&mut **v, stack, state);
+            let var = variable_str(v, &*state);
             str_write!(b, "\t{k}: {var}");
             b.push('\n');
         }
-        let result = variable_str(&mut *(*frame).result, stack, state);
+        let result = variable_str(&(*frame).result, &*state);
         str_write!(b, "\treturn: {result}\n");
         str_write!(b, "\t");
         for _ in 0..28 {
@@ -220,22 +220,23 @@ unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> 
     new
 }
 
-pub unsafe fn variable_str(var: *mut Variable, stack: *mut Stack, state: *mut State) -> String {
-    assert!(!(*var).loc.type_is_vconst());
-    let type_ = ast_type_str(&(*var).type_);
-    let isparam = if (*var).is_param { "param " } else { "" };
-    let obj_str = object_or_nothing_str(&mut *(*var).loc, stack, state);
-    let loc = &*(*var).loc;
+pub fn variable_str(var: &Variable, state: &State) -> String {
+    let (frame_id, block_id, offset) = location_auto_parts(&var.loc);
+    let type_ = ast_type_str(&var.type_);
+    let isparam = if var.is_param { "param " } else { "" };
+    let obj_str = object_or_nothing_str(state, frame_id, block_id, offset);
+    let loc = &var.loc;
     format!("{{{isparam}{type_} := {obj_str}}} @ {loc}")
 }
 
-unsafe fn object_or_nothing_str(
-    loc: *mut Location,
-    stack: *mut Stack,
-    state: *mut State,
+fn object_or_nothing_str(
+    state: &State,
+    frame_id: usize,
+    block_id: usize,
+    offset: &AstExpr,
 ) -> String {
-    let b = location_auto_getblock(&*loc, &mut *stack).unwrap();
-    if let Some(obj) = b.observe(location_offset(&*loc), state, false) {
+    let b = &state.stack.frames[frame_id].blocks[block_id];
+    if let Some(obj) = b.observe_read_only(offset, state) {
         format!("{obj}")
     } else {
         "".to_string()

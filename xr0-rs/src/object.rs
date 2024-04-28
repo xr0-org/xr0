@@ -148,8 +148,8 @@ pub fn object_upper(obj: &Object) -> Box<AstExpr> {
     ast_expr_sum_create(ast_expr_copy(&obj.offset), object_size(obj))
 }
 
-pub unsafe fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
-    let lw = &*obj.offset;
+pub fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
+    let lw = &obj.offset;
     let up = object_upper(obj);
     let of = offset;
     // Note: Original leaks the expressions to avoid double-freeing subexpressions.
@@ -363,11 +363,7 @@ pub unsafe fn range_references(r: &Range, loc: &Location, s: *mut State) -> bool
     location_references(&r.loc, loc, s)
 }
 
-pub unsafe fn object_arr_index(
-    arr: &[Box<Object>],
-    offset: &AstExpr,
-    state: &State,
-) -> Option<usize> {
+pub fn object_arr_index(arr: &[Box<Object>], offset: &AstExpr, state: &State) -> Option<usize> {
     for (i, obj) in arr.iter().enumerate() {
         if object_contains(obj, offset, state) {
             return Some(i);
