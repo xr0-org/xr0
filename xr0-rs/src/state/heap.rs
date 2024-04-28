@@ -89,7 +89,7 @@ impl Heap {
     }
 
     pub fn undeclare(&mut self, s: &mut State) {
-        // XXX FIXME: s aliases h and `Block::undeclare` actually accesses h.
+        // XXX FIXME: `s` aliases `self` and `Block::undeclare` actually accesses `self`
         for block in &mut self.blocks {
             if !block.freed {
                 block.block.undeclare(s);

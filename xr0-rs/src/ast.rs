@@ -355,14 +355,14 @@ fn expr_constant_eval(constant: &ConstantExpr, _state: &mut State) -> Result<Box
 }
 
 fn rangeprocess_dealloc(
-    dealloc: &AstExpr,
+    dealloc: &AllocExpr,
     lw: &AstExpr,
     up: &AstExpr,
     state: &mut State,
 ) -> Result<()> {
     let state: *mut State = state;
     unsafe {
-        let obj = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), &mut *state);
+        let obj = hack_base_object_from_alloc(&dealloc.arg, &mut *state);
         state_range_dealloc(&mut *state, obj, lw, up)
     }
 }
@@ -406,9 +406,13 @@ pub fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
     }
 }
 
-fn rangeprocess_alloc(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: &mut State) -> Result<()> {
-    let lval = ast_expr_assignment_lval(expr);
-    let rval = ast_expr_assignment_rval(expr);
+fn rangeprocess_alloc(
+    assign: &AssignmentExpr,
+    lw: &AstExpr,
+    up: &AstExpr,
+    state: &mut State,
+) -> Result<()> {
+    let AssignmentExpr { lval, rval } = assign;
     let AstExprKind::Allocation(alloc) = &rval.kind else {
         panic!();
     };
@@ -731,8 +735,8 @@ pub fn ast_expr_alloc_rangeprocess(
     let res_lw = value_to_expr(&lw_val);
     let res_up = value_to_expr(&up_val);
     match &alloc.kind {
-        AstExprKind::Assignment(_) => rangeprocess_alloc(alloc, &res_lw, &res_up, state),
-        AstExprKind::Allocation(_) => rangeprocess_dealloc(alloc, &res_lw, &res_up, state),
+        AstExprKind::Assignment(assign) => rangeprocess_alloc(assign, &res_lw, &res_up, state),
+        AstExprKind::Allocation(alloc) => rangeprocess_dealloc(alloc, &res_lw, &res_up, state),
         _ => panic!(),
     }
 }
@@ -969,9 +973,9 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
 
 pub fn ast_expr_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
     match &expr.kind {
-        AstExprKind::Assignment(_) => assign_absexec(expr, state),
+        AstExprKind::Assignment(assign) => assign_absexec(assign, state),
         AstExprKind::IsDereferencable(_) => isdereferencable_absexec(expr, state),
-        AstExprKind::Allocation(_) => alloc_absexec(expr, state),
+        AstExprKind::Allocation(alloc) => alloc_absexec(alloc, state),
         AstExprKind::Identifier(_)
         | AstExprKind::Constant(_)
         | AstExprKind::Unary(_)
@@ -991,17 +995,16 @@ fn expr_unary_eval(unary: &UnaryExpr, state: &mut State) -> Result<Box<Value>> {
     }
 }
 
-fn alloc_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
-    match ast_expr_alloc_kind(expr) {
+fn alloc_absexec(alloc: &AllocExpr, state: &mut State) -> Result<Option<Box<Value>>> {
+    match alloc.kind {
         AstAllocKind::Alloc => Ok(Some(state.alloc())),
-        AstAllocKind::Dealloc => dealloc_process(expr, state),
+        AstAllocKind::Dealloc => dealloc_process(alloc, state),
         AstAllocKind::Clump => Ok(Some(state.clump())),
     }
 }
 
-fn dealloc_process(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
-    let arg = ast_expr_alloc_arg(expr);
-    let val = ast_expr_eval(arg, state)?;
+fn dealloc_process(alloc: &AllocExpr, state: &mut State) -> Result<Option<Box<Value>>> {
+    let val = ast_expr_eval(&alloc.arg, state)?;
     state.dealloc(&val)?;
     Ok(None)
 }
@@ -1045,9 +1048,8 @@ pub fn prepare_arguments(
     args.iter().map(|arg| ast_expr_eval(arg, state)).collect()
 }
 
-fn assign_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
-    let lval = ast_expr_assignment_lval(expr);
-    let rval = ast_expr_assignment_rval(expr);
+fn assign_absexec(assign: &AssignmentExpr, state: &mut State) -> Result<Option<Box<Value>>> {
+    let AssignmentExpr { lval, rval } = assign;
     let Some(val) = ast_expr_absexec(rval, state)? else {
         debug_assert!(false);
         return Err(Error::new("undefined indirection (rvalue)".to_string()));
@@ -1083,7 +1085,7 @@ fn verify_paramspec(
     if !object_hasvalue(arg_obj) {
         return Err(Error::new("must be rvalue".to_string()));
     }
-    // Note: Unlike the original, we copy the values to satisfy Rust alias analysis.
+    // XXX FIXME: Unlike the original, we copy the values to satisfy Rust alias analysis.
     let param_val = object_as_value(param_obj).unwrap().clone();
     let arg_val = object_as_value(arg_obj).unwrap().clone();
     verify_paramspec(&param_val, &arg_val, param_state, arg_state)
@@ -1330,20 +1332,6 @@ pub fn ast_expr_iteration_create() -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Iteration)
 }
 
-pub fn ast_expr_alloc_kind(expr: &AstExpr) -> AstAllocKind {
-    let AstExprKind::Allocation(alloc) = &expr.kind else {
-        panic!();
-    };
-    alloc.kind
-}
-
-pub fn ast_expr_alloc_arg(expr: &AstExpr) -> &AstExpr {
-    let AstExprKind::Allocation(alloc) = &expr.kind else {
-        panic!();
-    };
-    &alloc.arg
-}
-
 pub fn ast_expr_dealloc_create(arg: Box<AstExpr>) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Allocation(AllocExpr {
         kind: AstAllocKind::Dealloc,
@@ -1386,13 +1374,6 @@ pub fn ast_expr_assignment_rval(expr: &AstExpr) -> &AstExpr {
 
 pub fn ast_expr_copy(expr: &AstExpr) -> Box<AstExpr> {
     Box::new(expr.clone())
-}
-
-pub fn ast_expr_assignment_lval(expr: &AstExpr) -> &AstExpr {
-    let AstExprKind::Assignment(assignment) = &expr.kind else {
-        panic!();
-    };
-    &assignment.lval
 }
 
 pub fn ast_expr_binary_e2(expr: &AstExpr) -> &AstExpr {
