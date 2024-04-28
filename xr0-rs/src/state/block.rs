@@ -76,13 +76,13 @@ impl Block {
     /// It's unclear how this copes with vagueness in `offset`. It's also unclear why it does what
     /// it does in the case where it punches a hole in a range object -- it's implemented (I think)
     /// by freeing the entire block `self` and allocating a new block, which can't be right.
-    pub unsafe fn observe<'b>(
+    pub fn observe<'b>(
         &'b mut self,
         offset: &AstExpr,
-        s: *mut State,
+        s: &mut State,
         constructive: bool,
     ) -> Option<&'b mut Object> {
-        let Some(mut index) = object_arr_index(&self.arr, offset, &*s) else {
+        let Some(mut index) = object_arr_index(&self.arr, offset, s) else {
             if !constructive {
                 return None;
             }
@@ -106,15 +106,15 @@ impl Block {
         // `upto` is then appended to `b->arr` where it may be used (although the `lw` part of it
         // has been freed) and will later be destroyed (a clear double free). Undefined behvaior,
         // but the scenario does not happen in the test suite.
-        let upto = object_upto(obj, &lw, &mut *s);
-        let observed = object_value_create(lw, Some((*s).alloc()));
-        let from = object_from(obj, &up, &mut *s);
+        let upto = object_upto(obj, &lw, s);
+        let observed = object_value_create(lw, Some(s.alloc()));
+        let from = object_from(obj, &up, s);
         drop(up);
 
         // delete current struct block
         // Note: 99-program/000-matrix.x gets here, so the code is exercised; but it doesn't make
         // sense to free the allocation as a side effect here.
-        object_dealloc(obj, &mut *s).unwrap();
+        object_dealloc(obj, s).unwrap();
         self.arr.remove(index);
 
         if let Some(upto) = upto {
