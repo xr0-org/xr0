@@ -298,7 +298,7 @@ pub struct Preresult {
 #[derive(Clone, Default)]
 pub struct AstStmtSplits {
     // Note: In the original this array is heap-allocated but never freed.
-    pub conds: Vec<*mut AstExpr>,
+    pub conds: Vec<Box<AstExpr>>,
 }
 
 #[derive(Clone)]
@@ -2389,7 +2389,7 @@ fn stmt_sel_splits(selection: &AstSelectionStmt, s: &mut State) -> Result<AstStm
     let conds = if condexists(&e, s) || value_isconstant(&v) {
         vec![]
     } else {
-        vec![Box::into_raw(e)]
+        vec![e]
     };
     std::mem::forget(v);
     Ok(AstStmtSplits { conds })
@@ -3047,10 +3047,8 @@ fn split_paths_absverify(
     index: usize,
     splits: &AstStmtSplits,
 ) -> Result<()> {
-    for &cond in &splits.conds {
-        unsafe {
-            split_path_absverify(f, state, index, &*cond)?;
-        }
+    for cond in &splits.conds {
+        split_path_absverify(f, state, index, cond)?;
     }
     Ok(())
 }
@@ -3073,10 +3071,8 @@ fn split_paths_verify(
     splits: &AstStmtSplits,
     abstract_state: &mut State,
 ) -> Result<()> {
-    for &cond in &splits.conds {
-        unsafe {
-            split_path_verify(f, actual_state, index, &*cond, abstract_state)?;
-        }
+    for cond in &splits.conds {
+        split_path_verify(f, actual_state, index, cond, abstract_state)?;
     }
     Ok(())
 }
