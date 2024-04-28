@@ -155,11 +155,7 @@ pub fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     // Note: Original leaks the expressions to avoid double-freeing subexpressions.
     let e1 = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(of));
     let e2 = ast_expr_lt_create(ast_expr_copy(of), ast_expr_copy(&up));
-    drop(up);
-    let result = state_eval(s, &e1) && state_eval(s, &e2);
-    std::mem::forget(e1);
-    std::mem::forget(e2);
-    result
+    state_eval(s, &e1) && state_eval(s, &e2)
 }
 
 pub unsafe fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &State) -> bool {
