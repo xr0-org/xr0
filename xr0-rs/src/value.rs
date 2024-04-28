@@ -134,7 +134,7 @@ pub fn value_struct_indefinite_create(
 }
 
 #[allow(dead_code)]
-pub unsafe fn value_transfigure<'v>(
+pub fn value_transfigure<'v>(
     v: &'v Value,
     compare: &mut State,
     islval: bool,
@@ -420,8 +420,8 @@ pub fn value_equal(v1: &Value, v2: &Value) -> bool {
 }
 
 #[allow(dead_code)]
-pub unsafe fn value_assume(v: *mut Value, value: bool) -> bool {
-    match &mut (*v).kind {
+pub fn value_assume(v: &mut Value, value: bool) -> bool {
+    match &mut v.kind {
         ValueKind::Int(n) => number_assume(n, value),
         ValueKind::IndefinitePtr(n) => number_assume(n, value),
         _ => panic!(),
