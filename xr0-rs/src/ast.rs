@@ -2799,13 +2799,6 @@ pub fn ast_function_initparams(f: &AstFunction, s: &mut State) -> Result<()> {
     Ok(())
 }
 
-// TODO: resultify
-#[derive(Clone)]
-pub struct PrecondsResult {
-    pub stmt: *mut AstStmt,
-    pub err: Option<Box<Error>>,
-}
-
 fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
     let pre_stmt = f.preconditions()?;
     if let Some(stmt) = pre_stmt {
