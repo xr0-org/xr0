@@ -15,6 +15,15 @@ use crate::state::state::state_eval;
 use crate::util::{Error, Result};
 use crate::{AstExpr, Location, Object};
 
+/// A region of memory in the heap, stack, clump, global, etc.
+///
+/// The C standard calls these "objects". Specifically, a Block is an object that is _not_ contained
+/// in some larger object (an array or struct).
+///
+/// Examples: Each global variable gets a `Block`. When verifying a function, XR0 makes a distinct
+/// Block for each parameter. When entering a block (in the `AstBlock` sense of a compound
+/// statement) a new `Block` is allocated for each local variable declared in that block. Each call
+/// to `malloc` allocates a single new `Block` for the whole allocation.
 #[derive(Clone)]
 pub struct Block {
     pub arr: Vec<Box<Object>>,
