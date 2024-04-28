@@ -703,11 +703,10 @@ unsafe fn expr_identifier_eval(id: &str, state: *mut State) -> Result<Box<Value>
     if id.starts_with('#') {
         return Ok(value_literal_create(id));
     }
-    let obj: *mut Object = state_getobject(state, id);
-    if obj.is_null() {
+    let Some(obj) = state_getobject(&mut *state, id) else {
         return Err(Error::new(format!("unknown idenitfier {id}")));
-    }
-    let Some(val) = object_as_value(&*obj) else {
+    };
+    let Some(val) = object_as_value(obj) else {
         vprintln!("state: {}", state_str(&*state));
         return Err(Error::new(format!(
             "undefined memory access: {id} has no value",
@@ -885,7 +884,7 @@ pub unsafe fn expr_unary_lvalue(unary: &UnaryExpr, state: *mut State) -> Result<
 pub unsafe fn expr_identifier_lvalue(id: &str, state: *mut State) -> Result<LValue> {
     Ok(LValue {
         t: Some(state_getobjecttype(&*state, id)),
-        obj: state_getobject(state, id),
+        obj: state_getobject(&mut *state, id).map_or(ptr::null_mut(), |obj| obj as _),
     })
 }
 
@@ -1931,9 +1930,8 @@ unsafe fn stmt_jump_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
         ast_stmt_jump_rv(stmt).expect("unsupported: return without value"),
         state,
     )?;
-    let obj: *mut Object = state_getresult(state);
-    assert!(!obj.is_null());
-    (*obj).assign(Some(value_copy(&rv_val)));
+    let obj = state_getresult(&mut *state);
+    obj.assign(Some(value_copy(&rv_val)));
     Ok(())
 }
 
@@ -2841,11 +2839,11 @@ unsafe fn ast_function_precondsinit(f: &AstFunction, s: *mut State) -> Result<()
 unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()> {
     let name = ast_variable_name(param);
     let t = ast_variable_type(param);
-    let obj: *mut Object = state_getobject(state, name);
-    assert!(!obj.is_null());
-    if !object_hasvalue(&*obj) {
+    let obj = state_getobject(&mut *state, name).unwrap();
+    if !object_hasvalue(obj) {
+        // XXX FIXME: dereferencing `state` again here definitely invalidates `obj`
         let val = state_vconst(&mut *state, t, Some(name), true);
-        (*obj).assign(Some(val));
+        obj.assign(Some(val));
     }
     Ok(())
 }
@@ -2926,11 +2924,10 @@ pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result
     for stmt in &f.abstract_.stmts {
         ast_stmt_absexec(stmt, state, false)?;
     }
-    let obj: *mut Object = state_getresult(state);
-    assert!(!obj.is_null());
+    let obj = state_getresult(&mut *state);
     // XXX FIXME: Bad: we transmute the reference into pointer and subsequently callers transmute
     // it further into a Box. How did ownership even; we don't know.
-    Ok(object_as_value(&*obj).map_or(ptr::null_mut(), |r| r as *const Value as *mut Value))
+    Ok(object_as_value(obj).map_or(ptr::null_mut(), |r| r as *const Value as *mut Value))
 }
 
 unsafe fn split_path_verify(

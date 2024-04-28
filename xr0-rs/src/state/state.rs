@@ -252,11 +252,9 @@ impl State {
     }
 }
 
-pub unsafe fn state_getresult(state: *mut State) -> *mut Object {
-    let v = (*state).stack.get_result();
-    state_get(&mut *state, v.location(), true)
-        .unwrap()
-        .map_or(ptr::null_mut(), |obj| obj as _)
+pub unsafe fn state_getresult(state: &mut State) -> &mut Object {
+    let result_loc = state.stack.get_result().location().clone();
+    state_get(&mut *state, &result_loc, true).unwrap().unwrap()
 }
 
 unsafe fn state_getresulttype(state: &State) -> &AstType {
@@ -281,14 +279,12 @@ pub unsafe fn state_getloc(state: *mut State, id: &str) -> Box<Value> {
     value_ptr_create(location_copy(v.location()))
 }
 
-pub unsafe fn state_getobject(state: *mut State, id: &str) -> *mut Object {
+pub unsafe fn state_getobject<'s>(state: &'s mut State, id: &str) -> Option<&'s mut Object> {
     if id == "return" {
-        return state_getresult(state);
+        return Some(state_getresult(state));
     }
-    let v = (*state).stack.get_variable(id).unwrap();
-    state_get(&mut *state, v.location(), true)
-        .unwrap()
-        .map_or(ptr::null_mut(), |obj| obj as _)
+    let var_loc = state.stack.get_variable(id).unwrap().location().clone();
+    state_get(&mut *state, &var_loc, true).unwrap()
 }
 
 pub unsafe fn state_deref(
