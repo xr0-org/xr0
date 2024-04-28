@@ -1130,9 +1130,7 @@ fn pf_augment(v: &Value, call: &CallExpr, state: &mut State) -> Result<Box<Value
     }
     // Note: Original leaked a result and a value here.
     let res_val = call_pf_reduce(call, state)?;
-    let result = value_pf_augment(v, value_as_sync(&res_val));
-    std::mem::forget(res_val);
-    Ok(result)
+    Ok(value_pf_augment(v, value_as_sync(&res_val)))
 }
 
 pub fn ast_expr_constant_create_char(c: c_char) -> Box<AstExpr> {
@@ -2369,6 +2367,7 @@ pub fn ast_stmt_splits(stmt: &AstStmt, s: &mut State) -> Result<AstStmtSplits> {
 
 fn stmt_sel_splits(selection: &AstSelectionStmt, s: &mut State) -> Result<AstStmtSplits> {
     // Note: The original asserts that no error occurred, rather than propagate.
+    // Note: Original leaks `v`.
     let v = ast_expr_pf_reduce(&selection.cond, s).unwrap();
     let e = value_to_expr(&v);
     let conds = if condexists(&e, s) || value_isconstant(&v) {
@@ -2376,15 +2375,13 @@ fn stmt_sel_splits(selection: &AstSelectionStmt, s: &mut State) -> Result<AstStm
     } else {
         vec![e]
     };
-    std::mem::forget(v);
     Ok(AstStmtSplits { conds })
 }
 
 fn condexists(cond: &AstExpr, s: &mut State) -> bool {
+    // Note: Original leaks `val`.
     let val = ast_expr_pf_reduce(cond, s).unwrap();
-    // Note: original doesn't free this.
     let reduced = value_to_expr(&val);
-    std::mem::forget(val);
     let p = s.props();
     p.get(&reduced) || p.contradicts(&reduced)
 }
@@ -2928,11 +2925,9 @@ fn split_path_verify(
     for (i, f) in paths.into_iter().enumerate() {
         let mut actual_copy = state_copywithname(&*actual_state, (*f).name().to_string());
         let mut abstract_copy = state_copywithname(&*abstract_state, (*f).name().to_string());
-        // Note: Original leaks expression.
+        // Note: Original leaks `expr`.
         let expr = ast_expr_inverted_copy(cond, i == 1);
-        let r = ast_expr_assume(&expr, &mut actual_copy);
-        std::mem::forget(expr);
-        let r = r?;
+        let r = ast_expr_assume(&expr, &mut actual_copy)?;
         if !r.is_contradiction {
             path_verify(&f, &mut actual_copy, index, &mut abstract_copy)?;
         }
