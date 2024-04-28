@@ -130,17 +130,12 @@ impl Block {
         Some(&mut self.arr[observed_index])
     }
 
-    pub unsafe fn references(&self, loc: &Location, s: &mut State) -> bool {
+    pub fn references(&self, loc: &Location, s: &mut State) -> bool {
         self.arr.iter().any(|obj| object_references(obj, loc, s))
     }
 
     // XXX FIXME: `self` may be an element of `heap`, verboten aliasing
-    pub unsafe fn range_alloc(
-        &mut self,
-        lw: &AstExpr,
-        up: &AstExpr,
-        heap: &mut Heap,
-    ) -> Result<()> {
+    pub fn range_alloc(&mut self, lw: &AstExpr, up: &AstExpr, heap: &mut Heap) -> Result<()> {
         assert!(self.arr.is_empty());
         self.arr.push(object_range_create(
             ast_expr_copy(lw),
@@ -152,9 +147,11 @@ impl Block {
         Ok(())
     }
 
-    pub unsafe fn range_aredeallocands(&self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> bool {
-        if self.hack_first_object_is_exactly_bounds(lw, up, s) {
-            return true;
+    pub fn range_aredeallocands(&self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> bool {
+        unsafe {
+            if self.hack_first_object_is_exactly_bounds(lw, up, s) {
+                return true;
+            }
         }
         let Some(lw_index) = object_arr_index(&self.arr, lw, s) else {
             return false;
@@ -250,7 +247,7 @@ impl Block {
         Ok(())
     }
 
-    pub unsafe fn undeclare(&mut self, s: &mut State) {
+    pub fn undeclare(&mut self, s: &mut State) {
         let mut new = vec![];
         for obj in &self.arr {
             if object_referencesheap(obj, s) {

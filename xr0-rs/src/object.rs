@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_difference_create, ast_expr_eq_create,
     ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_sum_create,
-    ast_type_struct_complete, c_int,
+    ast_type_struct_complete,
 };
 use crate::state::location::{location_dealloc, location_references};
 use crate::state::state::state_eval;
@@ -57,7 +57,7 @@ pub fn object_copy(old: &Object) -> Box<Object> {
     Box::new(old.clone())
 }
 
-pub unsafe fn object_abstractcopy(old: &Object, s: &mut State) -> Box<Object> {
+pub fn object_abstractcopy(old: &Object, s: &mut State) -> Box<Object> {
     match &old.kind {
         ObjectKind::DeallocandRange(_) => object_copy(old),
         ObjectKind::Value(v) => object_value_create(
@@ -84,7 +84,7 @@ impl Display for ObjectKind {
     }
 }
 
-pub unsafe fn object_referencesheap(obj: &Object, s: &mut State) -> bool {
+pub fn object_referencesheap(obj: &Object, s: &mut State) -> bool {
     match &obj.kind {
         ObjectKind::Value(Some(v)) => value_referencesheap(v, s),
         ObjectKind::Value(None) => false,
@@ -115,7 +115,7 @@ pub fn object_isdeallocand(obj: &Object, s: &mut State) -> bool {
     }
 }
 
-pub unsafe fn object_references(obj: &Object, loc: &Location, s: &mut State) -> bool {
+pub fn object_references(obj: &Object, loc: &Location, s: &mut State) -> bool {
     match &obj.kind {
         ObjectKind::DeallocandRange(range) => range_references(range, loc, s),
         ObjectKind::Value(None) => false,
@@ -140,7 +140,7 @@ fn object_size(obj: &Object) -> Box<AstExpr> {
 }
 
 #[allow(dead_code)]
-pub unsafe fn object_lower(obj: &mut Object) -> *mut AstExpr {
+pub fn object_lower(obj: &mut Object) -> *mut AstExpr {
     &mut *obj.offset
 }
 
@@ -158,52 +158,49 @@ pub fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     state_eval(s, &e1) && state_eval(s, &e2)
 }
 
-pub unsafe fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &State) -> bool {
+pub fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     let lw: *mut AstExpr = &*obj.offset as *const AstExpr as *mut AstExpr;
     let up = object_upper(obj);
     let of: *mut AstExpr = offset as *const AstExpr as *mut AstExpr;
-    // Note: Original leaks the expressions to avoid double-freeing subexpressions.
-    let lower_bound_expr = ast_expr_le_create(Box::from_raw(lw), Box::from_raw(of));
-    let upper_bound_expr = ast_expr_le_create(Box::from_raw(of), up);
-    let result = state_eval(s, &lower_bound_expr) && state_eval(s, &upper_bound_expr);
-    std::mem::forget(lower_bound_expr);
-    std::mem::forget(upper_bound_expr);
-    result
+    unsafe {
+        // Note: Original leaks the expressions to avoid double-freeing subexpressions.
+        let lower_bound_expr = ast_expr_le_create(Box::from_raw(lw), Box::from_raw(of));
+        let upper_bound_expr = ast_expr_le_create(Box::from_raw(of), up);
+        let result = state_eval(s, &lower_bound_expr) && state_eval(s, &upper_bound_expr);
+        std::mem::forget(lower_bound_expr);
+        std::mem::forget(upper_bound_expr);
+        result
+    }
 }
 
 #[allow(dead_code)]
-pub unsafe fn object_isempty(obj: *mut Object, s: &State) -> bool {
-    let lw: *mut AstExpr = &mut *(*obj).offset;
-    let up = object_upper(&*obj);
+pub fn object_isempty(obj: &Object, s: &State) -> bool {
+    let lw = &obj.offset;
+    let up = object_upper(obj);
     // Note: Original leaks the expression to avoid double-freeing subexpressions.
-    let expr = ast_expr_eq_create(Box::from_raw(lw), up);
-    let result = state_eval(s, &expr);
-    std::mem::forget(expr);
-    result
+    state_eval(s, &ast_expr_eq_create(ast_expr_copy(lw), up))
 }
 
-pub unsafe fn object_contig_precedes(before: &Object, after: &Object, s: &State) -> bool {
-    let lw = object_upper(before);
-    let up: *mut AstExpr = &*after.offset as *const AstExpr as *mut AstExpr;
-    // Note: Original leaks the expression to avoid double-freeing subexpressions.
-    // XXX FIXME: invalid use of Box - make a borrowed expr type
-    let expr = ast_expr_eq_create(lw, Box::from_raw(up));
-    let result = state_eval(s, &expr);
-    std::mem::forget(expr);
-    result
+pub fn object_contig_precedes(before: &Object, after: &Object, s: &State) -> bool {
+    unsafe {
+        let lw = object_upper(before);
+        let up: *mut AstExpr = &*after.offset as *const AstExpr as *mut AstExpr;
+        // Note: Original leaks the expression to avoid double-freeing subexpressions.
+        // XXX FIXME: invalid use of Box - make a borrowed expr type
+        let expr = ast_expr_eq_create(lw, Box::from_raw(up));
+        let result = state_eval(s, &expr);
+        std::mem::forget(expr);
+        result
+    }
 }
 
 #[allow(dead_code)]
-pub unsafe fn object_issingular(obj: *mut Object, s: &State) -> bool {
-    let lw: *mut AstExpr = &mut *(*obj).offset;
-    let up = object_upper(&*obj);
-    let lw_succ = ast_expr_sum_create(Box::from_raw(lw), ast_expr_constant_create(1 as c_int));
+pub fn object_issingular(obj: &Object, s: &State) -> bool {
+    let lw = &obj.offset;
+    let up = object_upper(obj);
+    let lw_succ = ast_expr_sum_create(ast_expr_copy(lw), ast_expr_constant_create(1));
     // Note: Original leaks the expression to avoid double-freeing subexpressions.
-    // XXX FIXME: invalid use of Box - make a borrowed expr type
-    let expr = ast_expr_eq_create(lw_succ, up);
-    let result = state_eval(s, &expr);
-    std::mem::forget(expr);
-    result
+    state_eval(s, &ast_expr_eq_create(lw_succ, up))
 }
 
 /// Returns an `Object` covering the slice of `obj` up to the offset (within the enclosing Block)
@@ -287,7 +284,7 @@ pub fn object_from(obj: &Object, incl_lw: &AstExpr, s: &mut State) -> Option<Box
     ))
 }
 
-pub unsafe fn object_dealloc(obj: &Object, s: &mut State) -> Result<()> {
+pub fn object_dealloc(obj: &Object, s: &mut State) -> Result<()> {
     // Note: Original doesn't handle the possibility of Value(None) here.
     match &obj.kind {
         ObjectKind::Value(Some(v)) => (*s).dealloc(v),
@@ -296,7 +293,7 @@ pub unsafe fn object_dealloc(obj: &Object, s: &mut State) -> Result<()> {
     }
 }
 
-pub unsafe fn object_getmember<'obj>(
+pub fn object_getmember<'obj>(
     obj: &'obj mut Object,
     t: &AstType,
     member: &str,
@@ -306,11 +303,7 @@ pub unsafe fn object_getmember<'obj>(
     value_struct_member(getorcreatestruct(obj, t, s), member)
 }
 
-unsafe fn getorcreatestruct<'obj>(
-    obj: &'obj mut Object,
-    t: &AstType,
-    s: &mut State,
-) -> &'obj Value {
+fn getorcreatestruct<'obj>(obj: &'obj mut Object, t: &AstType, s: &mut State) -> &'obj Value {
     // XXX FIXME: very silly rust construction because of borrow checker limitation
     if object_as_value(obj).is_some() {
         object_as_value(obj).unwrap()
@@ -321,7 +314,7 @@ unsafe fn getorcreatestruct<'obj>(
     }
 }
 
-pub unsafe fn object_getmembertype<'obj>(
+pub fn object_getmembertype<'obj>(
     obj: &'obj mut Object,
     t: &AstType,
     member: &str,
@@ -345,7 +338,7 @@ pub fn range_size(r: &Range) -> &AstExpr {
     &r.size
 }
 
-pub unsafe fn range_dealloc(r: &Range, s: &mut State) -> Result<()> {
+pub fn range_dealloc(r: &Range, s: &mut State) -> Result<()> {
     // Note: The original creates a value that borrows the location from `r`, then leaks the value
     // to avoid double-freeing the location.
     location_dealloc(&r.loc, &mut s.heap)
@@ -355,7 +348,7 @@ pub fn range_isdeallocand(r: &Range, s: &mut State) -> bool {
     s.loc_is_deallocand(&r.loc)
 }
 
-pub unsafe fn range_references(r: &Range, loc: &Location, s: &mut State) -> bool {
+pub fn range_references(r: &Range, loc: &Location, s: &mut State) -> bool {
     location_references(&r.loc, loc, s)
 }
 
@@ -368,7 +361,7 @@ pub fn object_arr_index(arr: &[Box<Object>], offset: &AstExpr, state: &State) ->
     None
 }
 
-pub unsafe fn object_arr_index_upperincl(
+pub fn object_arr_index_upperincl(
     arr: &[Box<Object>],
     offset: &AstExpr,
     state: &State,

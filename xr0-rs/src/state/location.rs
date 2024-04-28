@@ -141,7 +141,7 @@ fn location_equal(l1: &Location, l2: &Location) -> bool {
     l1.kind == l2.kind && l1.block == l2.block && ast_expr_equal(&l1.offset, &l2.offset)
 }
 
-pub unsafe fn location_references(l1: &Location, l2: &Location, s: &mut State) -> bool {
+pub fn location_references(l1: &Location, l2: &Location, s: &mut State) -> bool {
     if location_equal(l1, l2) {
         return true;
     }
@@ -154,7 +154,7 @@ pub unsafe fn location_references(l1: &Location, l2: &Location, s: &mut State) -
     }
 }
 
-pub unsafe fn location_referencesheap(l: &Location, s: &mut State) -> bool {
+pub fn location_referencesheap(l: &Location, s: &mut State) -> bool {
     if matches!(l.kind, LocationKind::Dynamic) {
         if s.heap().block_is_freed(l.block) {
             return false;
@@ -222,7 +222,7 @@ pub fn location_dealloc(loc: &Location, heap: &mut Heap) -> Result<()> {
     heap.dealloc_block(loc.block)
 }
 
-pub unsafe fn location_range_dealloc(
+pub fn location_range_dealloc(
     loc: &Location,
     lw: &AstExpr,
     up: &AstExpr,

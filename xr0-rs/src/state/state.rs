@@ -66,11 +66,11 @@ pub fn state_create_withprops(
     }
 }
 
-pub unsafe fn state_copy(state: &State) -> State {
+pub fn state_copy(state: &State) -> State {
     state.clone()
 }
 
-pub unsafe fn state_copywithname(state: &State, func_name: String) -> State {
+pub fn state_copywithname(state: &State, func_name: String) -> State {
     State {
         ext: Arc::clone(&state.ext),
         static_memory: state.static_memory.clone(),
@@ -133,15 +133,15 @@ impl State {
     }
 }
 
-pub unsafe fn state_pushframe(state: &mut State, func: String, ret_type: &AstType) {
+pub fn state_pushframe(state: &mut State, func: String, ret_type: &AstType) {
     state.stack.push(func, ret_type);
 }
 
-pub unsafe fn state_popframe(state: *mut State) {
-    (*state).stack.pop_frame();
+pub fn state_popframe(state: &mut State) {
+    state.stack.pop_frame();
 }
 
-pub unsafe fn state_declare(state: &mut State, var: &AstVariable, isparam: bool) {
+pub fn state_declare(state: &mut State, var: &AstVariable, isparam: bool) {
     state.stack.declare(var, isparam);
 }
 
@@ -159,7 +159,7 @@ pub fn state_vconst(
     value_sync_create(ast_expr_identifier_create(c))
 }
 
-pub unsafe fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
+pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
     if let Some(loc) = state.static_memory.check_pool(lit) {
         // Note: Original creates a value that points to this existing location. This is a
         // double-free. When the value is destroyed, the location will be destroyed, even though it
@@ -197,7 +197,7 @@ pub fn state_islval(state: &mut State, v: &Value) -> bool {
     }
 }
 
-pub unsafe fn state_isalloc(state: &mut State, v: &Value) -> bool {
+pub fn state_isalloc(state: &mut State, v: &Value) -> bool {
     if !value_islocation(v) {
         return false;
     }
@@ -206,7 +206,7 @@ pub unsafe fn state_isalloc(state: &mut State, v: &Value) -> bool {
     location_toheap(loc, &mut state.heap)
 }
 
-pub unsafe fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Value> {
+pub fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Value> {
     state.vconst.get(id)
 }
 
@@ -251,16 +251,16 @@ impl State {
     }
 }
 
-pub unsafe fn state_getresult(state: &mut State) -> &mut Object {
+pub fn state_getresult(state: &mut State) -> &mut Object {
     let result_loc = state.stack.get_result().location().clone();
     state_get(&mut *state, &result_loc, true).unwrap().unwrap()
 }
 
-unsafe fn state_getresulttype(state: &State) -> &AstType {
+fn state_getresulttype(state: &State) -> &AstType {
     state.stack.get_result().type_()
 }
 
-pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType {
+pub fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType {
     if id == "return" {
         return state_getresulttype(state);
     }
@@ -268,7 +268,7 @@ pub unsafe fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType
     v.type_()
 }
 
-pub unsafe fn state_getloc(state: &mut State, id: &str) -> Box<Value> {
+pub fn state_getloc(state: &mut State, id: &str) -> Box<Value> {
     // In the original, this apparently borrows the Location representing the variable's location,
     // but then passes it to value_ptr_create without copying. We copy because I don't see how this
     // isn't a double free otherwise. (Note: in one caller, `call_setupverify`, the Value is always
@@ -278,7 +278,7 @@ pub unsafe fn state_getloc(state: &mut State, id: &str) -> Box<Value> {
     value_ptr_create(location_copy(v.location()))
 }
 
-pub unsafe fn state_getobject<'s>(state: &'s mut State, id: &str) -> Option<&'s mut Object> {
+pub fn state_getobject<'s>(state: &'s mut State, id: &str) -> Option<&'s mut Object> {
     if id == "return" {
         return Some(state_getresult(state));
     }
@@ -286,11 +286,7 @@ pub unsafe fn state_getobject<'s>(state: &'s mut State, id: &str) -> Option<&'s 
     state_get(&mut *state, &var_loc, true).unwrap()
 }
 
-pub unsafe fn state_deref(
-    state: &mut State,
-    ptr_val: &Value,
-    index: &AstExpr,
-) -> Result<*mut Object> {
+pub fn state_deref(state: &mut State, ptr_val: &Value, index: &AstExpr) -> Result<*mut Object> {
     if value_issync(ptr_val) {
         return Ok(ptr::null_mut());
     }
@@ -357,9 +353,9 @@ pub unsafe fn state_range_dealloc(
     location_range_dealloc(deref, lw, up, state)
 }
 
-pub unsafe fn state_addresses_deallocand(state: &mut State, obj: *mut Object) -> bool {
+pub fn state_addresses_deallocand(state: &mut State, obj: &Object) -> bool {
     // Note: Original doesn't null-check. Might not be necessary.
-    let val = object_as_value(&*obj).unwrap();
+    let val = object_as_value(obj).unwrap();
     let loc = value_as_location(val);
     (*state).loc_is_deallocand(loc)
 }
@@ -371,16 +367,16 @@ impl State {
     }
 }
 
-pub unsafe fn state_range_aredeallocands(
+pub fn state_range_aredeallocands(
     state: &mut State,
-    obj: *mut Object,
+    obj: &Object,
     lw: &AstExpr,
     up: &AstExpr,
 ) -> bool {
     if ast_expr_equal(lw, up) {
         return true;
     }
-    let Some(arr_val) = object_as_value(&*obj) else {
+    let Some(arr_val) = object_as_value(obj) else {
         return false;
     };
     let deref = value_as_location(arr_val);
@@ -402,12 +398,12 @@ pub unsafe fn state_range_aredeallocands(
     }
 }
 
-pub unsafe fn state_hasgarbage(state: &mut State) -> bool {
+pub fn state_hasgarbage(state: &mut State) -> bool {
     let state: *mut State = state;
     unsafe { !(*state).heap.referenced(&mut *state) }
 }
 
-pub unsafe fn state_references(s: &mut State, loc: &Location) -> bool {
+pub fn state_references(s: &mut State, loc: &Location) -> bool {
     let s: *mut State = s;
     unsafe { (*s).stack.references(loc, &mut *s) }
 }
@@ -416,7 +412,7 @@ pub fn state_eval(s: &State, e: &AstExpr) -> bool {
     s.vconst.eval(e)
 }
 
-pub unsafe fn state_equal(s1: &State, s2: &State) -> bool {
+pub fn state_equal(s1: &State, s2: &State) -> bool {
     let mut s1_c = state_copy(s1);
     let mut s2_c = state_copy(s2);
     state_undeclareliterals(&mut s1_c);
@@ -435,11 +431,11 @@ pub unsafe fn state_equal(s1: &State, s2: &State) -> bool {
     equal
 }
 
-unsafe fn state_undeclareliterals(s: &mut State) {
+fn state_undeclareliterals(s: &mut State) {
     s.static_memory = StaticMemory::new();
 }
 
-unsafe fn state_undeclarevars(s: &mut State) {
+fn state_undeclarevars(s: &mut State) {
     let s: *mut State = s;
     unsafe {
         (*s).heap.undeclare(&mut *s);
@@ -448,6 +444,6 @@ unsafe fn state_undeclarevars(s: &mut State) {
     }
 }
 
-unsafe fn state_popprops(s: &mut State) {
+fn state_popprops(s: &mut State) {
     s.props = Props::new();
 }

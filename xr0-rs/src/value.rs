@@ -198,14 +198,14 @@ fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     m
 }
 
-unsafe fn value_struct_abstractcopy(old: &StructValue, s: &mut State) -> Box<Value> {
+fn value_struct_abstractcopy(old: &StructValue, s: &mut State) -> Box<Value> {
     value_create(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(&old.members),
         m: abstract_copy_members(&old.m, s),
     })))
 }
 
-unsafe fn abstract_copy_members(
+fn abstract_copy_members(
     old: &HashMap<String, Box<Object>>,
     s: &mut State,
 ) -> HashMap<String, Box<Object>> {
@@ -237,7 +237,7 @@ pub fn value_copy(v: &Value) -> Box<Value> {
     Box::new(v.clone())
 }
 
-pub unsafe fn value_abstractcopy(v: &Value, s: &mut State) -> Option<Box<Value>> {
+pub fn value_abstractcopy(v: &Value, s: &mut State) -> Option<Box<Value>> {
     if !value_referencesheap(v, s) {
         return None;
     }
@@ -304,7 +304,7 @@ impl Value {
     }
 }
 
-pub unsafe fn value_referencesheap(v: &Value, s: &mut State) -> bool {
+pub fn value_referencesheap(v: &Value, s: &mut State) -> bool {
     match &v.kind {
         ValueKind::DefinitePtr(loc) => location_referencesheap(loc, s),
         ValueKind::IndefinitePtr(_) => false,
@@ -313,7 +313,7 @@ pub unsafe fn value_referencesheap(v: &Value, s: &mut State) -> bool {
     }
 }
 
-unsafe fn struct_referencesheap(sv: &StructValue, s: &mut State) -> bool {
+fn struct_referencesheap(sv: &StructValue, s: &mut State) -> bool {
     sv.m.values().any(|obj| {
         let Some(val) = object_as_value(obj) else {
             return false;
@@ -351,7 +351,7 @@ pub fn value_as_sync(v: &Value) -> &AstExpr {
 }
 
 impl Value {
-    pub unsafe fn into_sync(self) -> Box<AstExpr> {
+    pub fn into_sync(self) -> Box<AstExpr> {
         let ValueKind::Sync(n) = self.kind else {
             panic!();
         };
@@ -363,11 +363,11 @@ pub fn value_isint(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Int(_))
 }
 
-pub unsafe fn value_to_expr(v: &Value) -> Box<AstExpr> {
+pub fn value_to_expr(v: &Value) -> Box<AstExpr> {
     match &v.kind {
         ValueKind::DefinitePtr(_) => ast_expr_identifier_create(value_str(v)),
         ValueKind::IndefinitePtr(_) => ast_expr_identifier_create(value_str(v)),
-        ValueKind::Literal(_) => ast_expr_copy(&*value_as_literal(v)),
+        ValueKind::Literal(_) => unsafe { ast_expr_copy(&*value_as_literal(v)) },
         ValueKind::Sync(n) => ast_expr_copy(number_as_sync(n)),
         ValueKind::Int(n) => number_to_expr(n),
         _ => panic!(),
@@ -379,14 +379,14 @@ pub fn value_isliteral(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Literal(_))
 }
 
-pub unsafe fn value_as_literal(v: &Value) -> *mut AstExpr {
+pub fn value_as_literal(v: &Value) -> *mut AstExpr {
     let ValueKind::Literal(s) = &v.kind else {
         panic!();
     };
     Box::into_raw(ast_expr_literal_create(s.clone()))
 }
 
-pub unsafe fn value_references(v: &Value, loc: &Location, s: &mut State) -> bool {
+pub fn value_references(v: &Value, loc: &Location, s: &mut State) -> bool {
     match &v.kind {
         ValueKind::DefinitePtr(vloc) => location_references(vloc, loc, s),
         ValueKind::Struct(sv) => struct_references(sv, loc, s),
@@ -394,7 +394,7 @@ pub unsafe fn value_references(v: &Value, loc: &Location, s: &mut State) -> bool
     }
 }
 
-unsafe fn struct_references(sv: &StructValue, loc: &Location, s: &mut State) -> bool {
+fn struct_references(sv: &StructValue, loc: &Location, s: &mut State) -> bool {
     sv.m.values().any(|obj| {
         let Some(val) = object_as_value(obj) else {
             return false;

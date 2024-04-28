@@ -347,25 +347,27 @@ impl Display for AstExpr {
     }
 }
 
-unsafe fn expr_literal_eval(literal: &str, state: &mut State) -> Result<Box<Value>> {
+fn expr_literal_eval(literal: &str, state: &mut State) -> Result<Box<Value>> {
     Ok(state_static_init(state, literal))
 }
 
-unsafe fn expr_constant_eval(constant: &ConstantExpr, _state: &mut State) -> Result<Box<Value>> {
+fn expr_constant_eval(constant: &ConstantExpr, _state: &mut State) -> Result<Box<Value>> {
     Ok(value_int_create(constant.constant))
 }
 
-unsafe fn rangeprocess_dealloc(
+fn rangeprocess_dealloc(
     dealloc: &AstExpr,
     lw: &AstExpr,
     up: &AstExpr,
     state: &mut State,
 ) -> Result<()> {
-    let obj: *mut Object = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), state);
-    state_range_dealloc(state, obj, lw, up)
+    unsafe {
+        let obj: *mut Object = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), state);
+        state_range_dealloc(state, obj, lw, up)
+    }
 }
 
-unsafe fn hack_base_object_from_alloc(expr: &AstExpr, state: &mut State) -> *mut Object {
+fn hack_base_object_from_alloc(expr: &AstExpr, state: &mut State) -> *mut Object {
     let inner = ast_expr_unary_operand(expr);
     let i = ast_expr_identifier_create("i".to_string());
     assert!(ast_expr_equal(ast_expr_binary_e2(inner), &i));
@@ -406,20 +408,17 @@ pub fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
     }
 }
 
-unsafe fn rangeprocess_alloc(
-    expr: &AstExpr,
-    lw: &AstExpr,
-    up: &AstExpr,
-    state: &mut State,
-) -> Result<()> {
+fn rangeprocess_alloc(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: &mut State) -> Result<()> {
     let lval = ast_expr_assignment_lval(expr);
     let rval = ast_expr_assignment_rval(expr);
     let AstExprKind::Allocation(alloc) = &rval.kind else {
         panic!();
     };
     assert_ne!(alloc.kind, AstAllocKind::Dealloc);
-    let obj: *mut Object = hack_base_object_from_alloc(lval, state);
-    state_range_alloc(state, obj, lw, up)
+    unsafe {
+        let obj: *mut Object = hack_base_object_from_alloc(lval, state);
+        state_range_alloc(state, obj, lw, up)
+    }
 }
 
 pub fn ast_expr_matheval(e: &AstExpr) -> bool {
@@ -476,7 +475,7 @@ fn eval_prop(e1: &MathExpr, op: AstBinaryOp, e2: &MathExpr) -> bool {
     }
 }
 
-pub unsafe fn ast_expr_decide(expr: &AstExpr, state: &mut State) -> bool {
+pub fn ast_expr_decide(expr: &AstExpr, state: &mut State) -> bool {
     match &expr.kind {
         AstExprKind::Constant(c) => c.constant != 0,
         AstExprKind::Unary(_) => expr_unary_decide(expr, state),
@@ -486,15 +485,14 @@ pub unsafe fn ast_expr_decide(expr: &AstExpr, state: &mut State) -> bool {
     }
 }
 
-unsafe fn expr_binary_decide(expr: &AstExpr, state: &mut State) -> bool {
+fn expr_binary_decide(expr: &AstExpr, state: &mut State) -> bool {
     let root = ast_expr_eval(ast_expr_binary_e1(expr), state).unwrap();
     let last = ast_expr_eval(ast_expr_binary_e2(expr), state).unwrap();
     // Note: I believe these are leaked in the original.
-    value_compare(
-        &*Box::into_raw(root),
-        ast_expr_binary_op(expr),
-        &*Box::into_raw(last),
-    )
+    let result = value_compare(&root, ast_expr_binary_op(expr), &last);
+    std::mem::forget(root);
+    std::mem::forget(last);
+    result
 }
 
 fn value_compare(v1: &Value, op: AstBinaryOp, v2: &Value) -> bool {
@@ -505,19 +503,21 @@ fn value_compare(v1: &Value, op: AstBinaryOp, v2: &Value) -> bool {
     }
 }
 
-unsafe fn expr_isdeallocand_decide(expr: &AstExpr, state: &mut State) -> bool {
-    let obj: *mut Object = hack_object_from_assertion(expr, state);
-    state_addresses_deallocand(state, obj)
+fn expr_isdeallocand_decide(expr: &AstExpr, state: &mut State) -> bool {
+    unsafe {
+        let obj: *mut Object = hack_object_from_assertion(expr, state);
+        state_addresses_deallocand(state, &*obj)
+    }
 }
 
-unsafe fn hack_object_from_assertion(expr: &AstExpr, state: &mut State) -> *mut Object {
+fn hack_object_from_assertion(expr: &AstExpr, state: &mut State) -> *mut Object {
     let assertand = ast_expr_isdeallocand_assertand(expr);
     let obj: *mut Object = ast_expr_lvalue(assertand, state).unwrap().obj;
     assert!(!obj.is_null());
     obj
 }
 
-unsafe fn expr_unary_decide(expr: &AstExpr, state: &mut State) -> bool {
+fn expr_unary_decide(expr: &AstExpr, state: &mut State) -> bool {
     let operand = ast_expr_unary_operand(expr);
     match ast_expr_unary_op(expr) {
         AstUnaryOp::Bang => !ast_expr_decide(operand, state),
@@ -525,12 +525,7 @@ unsafe fn expr_unary_decide(expr: &AstExpr, state: &mut State) -> bool {
     }
 }
 
-pub unsafe fn ast_expr_rangedecide(
-    expr: &AstExpr,
-    lw: &AstExpr,
-    up: &AstExpr,
-    state: &mut State,
-) -> bool {
+pub fn ast_expr_rangedecide(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: &mut State) -> bool {
     match &expr.kind {
         AstExprKind::Unary(_) => unary_rangedecide(expr, lw, up, state),
         AstExprKind::IsDeallocand(_) => expr_isdeallocand_rangedecide(expr, lw, up, state),
@@ -538,7 +533,7 @@ pub unsafe fn ast_expr_rangedecide(
     }
 }
 
-unsafe fn expr_isdeallocand_rangedecide(
+fn expr_isdeallocand_rangedecide(
     expr: &AstExpr,
     lw: &AstExpr,
     up: &AstExpr,
@@ -556,12 +551,14 @@ unsafe fn expr_isdeallocand_rangedecide(
     drop(j);
     drop(i);
     let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), state).unwrap();
-    let obj: *mut Object = res_lval.obj;
-    assert!(!obj.is_null());
-    state_range_aredeallocands(state, obj, lw, up)
+    unsafe {
+        let obj: *mut Object = res_lval.obj;
+        assert!(!obj.is_null());
+        state_range_aredeallocands(state, &*obj, lw, up)
+    }
 }
 
-unsafe fn unary_rangedecide(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: &mut State) -> bool {
+fn unary_rangedecide(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: &mut State) -> bool {
     let operand = ast_expr_unary_operand(expr);
     match ast_expr_unary_op(expr) {
         AstUnaryOp::Bang => !ast_expr_rangedecide(operand, lw, up, state),
@@ -569,7 +566,7 @@ unsafe fn unary_rangedecide(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: &
     }
 }
 
-pub unsafe fn ast_expr_exec(expr: &AstExpr, state: &mut State) -> Result<()> {
+pub fn ast_expr_exec(expr: &AstExpr, state: &mut State) -> Result<()> {
     // Note: Leaked in the original, I think.
     std::mem::forget(ast_expr_eval(expr, state)?);
     Ok(())
@@ -579,11 +576,11 @@ pub fn ast_expr_arbarg_create() -> Box<AstExpr> {
     ast_expr_create(AstExprKind::ArbArg)
 }
 
-pub unsafe fn ast_expr_assume(expr: &AstExpr, state: &mut State) -> Result<Preresult> {
+pub fn ast_expr_assume(expr: &AstExpr, state: &mut State) -> Result<Preresult> {
     reduce_assume(expr, true, state)
 }
 
-unsafe fn reduce_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Preresult> {
+fn reduce_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Preresult> {
     match &expr.kind {
         AstExprKind::Identifier(_) => identifier_assume(expr, value, s),
         AstExprKind::Unary(unary) => {
@@ -601,7 +598,7 @@ unsafe fn reduce_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Pr
     }
 }
 
-unsafe fn binary_assume(b: &BinaryExpr, value: bool, s: &mut State) -> Result<Preresult> {
+fn binary_assume(b: &BinaryExpr, value: bool, s: &mut State) -> Result<Preresult> {
     let v1 = ast_expr_pf_reduce(&b.e1, s).unwrap();
     let v2 = ast_expr_pf_reduce(&b.e2, s).unwrap();
     // Note: original leaks the expression.
@@ -609,12 +606,12 @@ unsafe fn binary_assume(b: &BinaryExpr, value: bool, s: &mut State) -> Result<Pr
     irreducible_assume(&expr, value, s)
 }
 
-unsafe fn irreducible_assume(e: &AstExpr, value: bool, s: &mut State) -> Result<Preresult> {
+fn irreducible_assume(e: &AstExpr, value: bool, s: &mut State) -> Result<Preresult> {
     let prop = ast_expr_inverted_copy(e, !value);
     irreducible_assume_actual(&prop, s)
 }
 
-unsafe fn irreducible_assume_actual(e: &AstExpr, s: &mut State) -> Result<Preresult> {
+fn irreducible_assume_actual(e: &AstExpr, s: &mut State) -> Result<Preresult> {
     let p = s.props();
     if p.contradicts(e) {
         return Ok(Preresult {
@@ -631,23 +628,19 @@ pub fn ast_expr_isdereferencable_create(assertand: Box<AstExpr>) -> Box<AstExpr>
     ast_expr_create(AstExprKind::IsDereferencable(assertand))
 }
 
-unsafe fn ast_expr_pf_reduce_assume(
-    expr: &AstExpr,
-    value: bool,
-    s: &mut State,
-) -> Result<Preresult> {
+fn ast_expr_pf_reduce_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Preresult> {
     let res_val = ast_expr_pf_reduce(expr, s).unwrap();
     irreducible_assume(&res_val.into_sync(), value, s)
 }
 
-unsafe fn identifier_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Preresult> {
+fn identifier_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Preresult> {
     let mut s_copy = state_copy(&*s);
     let res_val = ast_expr_eval(expr, &mut s_copy).unwrap();
     drop(s_copy);
     irreducible_assume(&res_val.into_sync(), value, s)
 }
 
-unsafe fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
+fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
     let arr = ast_expr_eval(ast_expr_binary_e1(expr), state)?;
     // Note: Original seems to leak `arr`.
     let deref_obj = state_deref(state, &arr, ast_expr_binary_e2(expr))?;
@@ -656,7 +649,7 @@ unsafe fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Val
             "undefined indirection: *({expr}) has no value"
         )));
     }
-    let Some(v) = object_as_value(&*deref_obj) else {
+    let Some(v) = (unsafe { object_as_value(&*deref_obj) }) else {
         return Err(Error::new(format!(
             "undefined indirection: *({expr}) has no value"
         )));
@@ -664,7 +657,7 @@ unsafe fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Val
     Ok(value_copy(v))
 }
 
-unsafe fn hack_identifier_builtin_eval(id: &str, state: &State) -> Result<Box<Value>> {
+fn hack_identifier_builtin_eval(id: &str, state: &State) -> Result<Box<Value>> {
     if state_getvconst(state, id).is_some() || id.starts_with("ptr:") {
         return Ok(value_sync_create(ast_expr_identifier_create(
             id.to_string(),
@@ -695,7 +688,7 @@ fn expr_to_binary(expr: &AstExpr) -> Box<AstExpr> {
     }
 }
 
-unsafe fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
+fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
     if let Ok(res) = hack_identifier_builtin_eval(id, state) {
         return Ok(res);
     }
@@ -714,7 +707,7 @@ unsafe fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>
     Ok(value_copy(val))
 }
 
-unsafe fn expr_structmember_eval(expr: &StructMemberExpr, s: &mut State) -> Result<Box<Value>> {
+fn expr_structmember_eval(expr: &StructMemberExpr, s: &mut State) -> Result<Box<Value>> {
     let StructMemberExpr { root, member } = expr;
     let res_val = ast_expr_eval(root, s)?;
     let Some(member) = value_struct_member(&res_val, member) else {
@@ -727,22 +720,24 @@ unsafe fn expr_structmember_eval(expr: &StructMemberExpr, s: &mut State) -> Resu
     Ok(value_copy(obj_value))
 }
 
-unsafe fn address_eval(operand: &AstExpr, state: &mut State) -> Result<Box<Value>> {
+fn address_eval(operand: &AstExpr, state: &mut State) -> Result<Box<Value>> {
     let id = ast_expr_as_identifier(operand);
     Ok(state_getloc(state, id))
 }
 
-pub unsafe fn ast_expr_alloc_rangeprocess(
+pub fn ast_expr_alloc_rangeprocess(
     alloc: &AstExpr,
     lw: &AstExpr,
     up: &AstExpr,
     state: &mut State,
 ) -> Result<()> {
     // Note: I think both values are leaked in the original.
-    let lw_val = Box::into_raw(ast_expr_eval(lw, state)?);
-    let up_val = Box::into_raw(ast_expr_eval(up, state)?);
-    let res_lw = value_to_expr(&*lw_val);
-    let res_up = value_to_expr(&*up_val);
+    let lw_val = ast_expr_eval(lw, state)?;
+    let up_val = ast_expr_eval(up, state)?;
+    let res_lw = value_to_expr(&lw_val);
+    let res_up = value_to_expr(&up_val);
+    std::mem::forget(lw_val);
+    std::mem::forget(up_val);
     match &alloc.kind {
         AstExprKind::Assignment(_) => rangeprocess_alloc(alloc, &res_lw, &res_up, state),
         AstExprKind::Allocation(_) => rangeprocess_dealloc(alloc, &res_lw, &res_up, state),
@@ -750,7 +745,7 @@ pub unsafe fn ast_expr_alloc_rangeprocess(
     }
 }
 
-pub unsafe fn ast_expr_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
+pub fn ast_expr_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
     match &expr.kind {
         AstExprKind::Constant(constant) => expr_constant_eval(constant, state),
         AstExprKind::StringLiteral(literal) => expr_literal_eval(literal, state),
@@ -766,7 +761,7 @@ pub unsafe fn ast_expr_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Val
     }
 }
 
-unsafe fn arbarg_eval(state: &mut State) -> Result<Box<Value>> {
+fn arbarg_eval(state: &mut State) -> Result<Box<Value>> {
     Ok(state_vconst(
         state,
         &ast_type_create_ptr(ast_type_create(AstTypeBase::Void, 0)),
@@ -775,19 +770,22 @@ unsafe fn arbarg_eval(state: &mut State) -> Result<Box<Value>> {
     ))
 }
 
-unsafe fn expr_binary_eval(binary: &BinaryExpr, state: &mut State) -> Result<Box<Value>> {
+fn expr_binary_eval(binary: &BinaryExpr, state: &mut State) -> Result<Box<Value>> {
     let BinaryExpr { op, e1, e2 } = binary;
     // Note: I think both values are leaked in the original. XXX FIXME - value_into_expr?
-    let v1 = Box::into_raw(ast_expr_eval(e1, state)?);
-    let v2 = Box::into_raw(ast_expr_eval(e2, state)?);
-    Ok(value_sync_create(ast_expr_binary_create(
-        value_to_expr(&*v1),
+    let v1 = ast_expr_eval(e1, state)?;
+    let v2 = ast_expr_eval(e2, state)?;
+    let result = value_sync_create(ast_expr_binary_create(
+        value_to_expr(&v1),
         *op,
-        value_to_expr(&*v2),
-    )))
+        value_to_expr(&v2),
+    ));
+    std::mem::forget(v1);
+    std::mem::forget(v2);
+    Ok(result)
 }
 
-unsafe fn expr_incdec_eval(incdec: &IncDecExpr, state: &mut State) -> Result<Box<Value>> {
+fn expr_incdec_eval(incdec: &IncDecExpr, state: &mut State) -> Result<Box<Value>> {
     let assign = ast_expr_incdec_to_assignment(incdec);
     if incdec.pre {
         expr_assign_eval(&assign, state)
@@ -799,21 +797,23 @@ unsafe fn expr_incdec_eval(incdec: &IncDecExpr, state: &mut State) -> Result<Box
     }
 }
 
-unsafe fn expr_assign_eval(assign: &AssignmentExpr, state: &mut State) -> Result<Box<Value>> {
+fn expr_assign_eval(assign: &AssignmentExpr, state: &mut State) -> Result<Box<Value>> {
     let AssignmentExpr { lval, rval } = assign;
     let rval_val = ast_expr_eval(rval, state)?;
     let lval_lval = ast_expr_lvalue(lval, state)?;
-    let obj: *mut Object = lval_lval.obj;
-    if obj.is_null() {
-        return Err(Error::new(format!(
-            "undefined indirection: {lval} is not an lvalue"
-        )));
+    unsafe {
+        let obj: *mut Object = lval_lval.obj;
+        if obj.is_null() {
+            return Err(Error::new(format!(
+                "undefined indirection: {lval} is not an lvalue"
+            )));
+        }
+        (*obj).assign(Some(value_copy(&rval_val)));
+        Ok(rval_val)
     }
-    (*obj).assign(Some(value_copy(&rval_val)));
-    Ok(rval_val)
 }
 
-pub unsafe fn ast_expr_lvalue<'s>(expr: &'s AstExpr, state: &'s mut State) -> Result<LValue<'s>> {
+pub fn ast_expr_lvalue<'s>(expr: &'s AstExpr, state: &'s mut State) -> Result<LValue<'s>> {
     match &expr.kind {
         AstExprKind::Identifier(id) => expr_identifier_lvalue(id, state),
         AstExprKind::Unary(unary) => expr_unary_lvalue(unary, state),
@@ -822,7 +822,7 @@ pub unsafe fn ast_expr_lvalue<'s>(expr: &'s AstExpr, state: &'s mut State) -> Re
     }
 }
 
-pub unsafe fn expr_structmember_lvalue<'s>(
+pub fn expr_structmember_lvalue<'s>(
     sm: &'s StructMemberExpr,
     state: &'s mut State,
 ) -> Result<LValue<'s>> {
@@ -846,10 +846,7 @@ pub unsafe fn expr_structmember_lvalue<'s>(
     }
 }
 
-pub unsafe fn expr_unary_lvalue<'s>(
-    unary: &'s UnaryExpr,
-    state: &'s mut State,
-) -> Result<LValue<'s>> {
+pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Result<LValue<'s>> {
     assert_eq!(unary.op, AstUnaryOp::Dereference);
     let inner = &unary.arg;
     match &inner.kind {
@@ -896,7 +893,7 @@ pub unsafe fn expr_unary_lvalue<'s>(
     }
 }
 
-pub unsafe fn expr_identifier_lvalue<'s>(id: &str, state: &'s mut State) -> Result<LValue<'s>> {
+pub fn expr_identifier_lvalue<'s>(id: &str, state: &'s mut State) -> Result<LValue<'s>> {
     let state: *mut State = state;
     unsafe {
         Ok(LValue {
@@ -906,7 +903,7 @@ pub unsafe fn expr_identifier_lvalue<'s>(id: &str, state: &'s mut State) -> Resu
     }
 }
 
-unsafe fn dereference_eval(operand: &AstExpr, state: &mut State) -> Result<Box<Value>> {
+fn dereference_eval(operand: &AstExpr, state: &mut State) -> Result<Box<Value>> {
     let binary = expr_to_binary(operand);
     binary_deref_eval(&binary, state)
 }
@@ -925,7 +922,7 @@ impl Display for ConstantExpr {
     }
 }
 
-unsafe fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
+fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
     let CallExpr { fun, args } = call;
     let name = ast_expr_as_identifier(fun);
     let state: *mut State = state;
@@ -952,7 +949,7 @@ unsafe fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value
     }
 }
 
-unsafe fn call_absexec(call: &CallExpr, s: &mut State) -> Result<*mut Value> {
+fn call_absexec(call: &CallExpr, s: &mut State) -> Result<*mut Value> {
     let name = ast_expr_as_identifier(&call.fun);
     let s: *mut State = s;
     unsafe {
@@ -968,7 +965,7 @@ unsafe fn call_absexec(call: &CallExpr, s: &mut State) -> Result<*mut Value> {
     }
 }
 
-unsafe fn call_arbitraryresult(
+fn call_arbitraryresult(
     _call: &CallExpr,
     f: &AstFunction,
     state: &mut State,
@@ -977,20 +974,21 @@ unsafe fn call_arbitraryresult(
     Ok(res)
 }
 
-unsafe fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> {
+fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> {
     let root = f.name();
     let uncomputed_params = f.params();
     let nparams = uncomputed_params.len();
     let mut computed_params = Vec::with_capacity(nparams);
     for p in uncomputed_params {
         let param = ast_expr_identifier_create(ast_variable_name(p).to_string());
-        let v = Box::into_raw(ast_expr_eval(&param, s)?);
+        let v = ast_expr_eval(&param, s)?;
         drop(param);
-        computed_params.push(if value_islocation(&*v) {
-            ast_expr_identifier_create(value_str(&*v))
+        computed_params.push(if value_islocation(&v) {
+            ast_expr_identifier_create(value_str(&v))
         } else {
-            value_to_expr(&*v)
+            value_to_expr(&v)
         });
+        std::mem::forget(v);
     }
     Ok(value_sync_create(ast_expr_call_create(
         ast_expr_identifier_create(root.to_string()),
@@ -998,7 +996,7 @@ unsafe fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<V
     )))
 }
 
-pub unsafe fn ast_expr_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+pub fn ast_expr_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
     match &expr.kind {
         AstExprKind::Assignment(_) => assign_absexec(expr, state),
         AstExprKind::IsDereferencable(_) => isdereferencable_absexec(expr, state),
@@ -1013,7 +1011,7 @@ pub unsafe fn ast_expr_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut
     }
 }
 
-unsafe fn expr_unary_eval(unary: &UnaryExpr, state: &mut State) -> Result<Box<Value>> {
+fn expr_unary_eval(unary: &UnaryExpr, state: &mut State) -> Result<Box<Value>> {
     match unary.op {
         AstUnaryOp::Dereference => dereference_eval(&unary.arg, state),
         AstUnaryOp::Address => address_eval(&unary.arg, state),
@@ -1022,7 +1020,7 @@ unsafe fn expr_unary_eval(unary: &UnaryExpr, state: &mut State) -> Result<Box<Va
     }
 }
 
-unsafe fn alloc_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+fn alloc_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
     match ast_expr_alloc_kind(expr) {
         AstAllocKind::Alloc => Ok(Box::into_raw(state.alloc())),
         AstAllocKind::Dealloc => dealloc_process(expr, state),
@@ -1030,7 +1028,7 @@ unsafe fn alloc_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value>
     }
 }
 
-unsafe fn dealloc_process(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+fn dealloc_process(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
     let arg = ast_expr_alloc_arg(expr);
     let val = ast_expr_eval(arg, state)?;
     state.dealloc(&val)?;
@@ -1038,7 +1036,7 @@ unsafe fn dealloc_process(expr: &AstExpr, state: &mut State) -> Result<*mut Valu
 }
 
 // Argument `fname` is unused after removing some dead (or ill-advised) code.
-pub unsafe fn prepare_parameters(
+pub fn prepare_parameters(
     params: &[Box<AstVariable>],
     args: Vec<Result<Box<Value>>>,
     _fname: &str,
@@ -1051,23 +1049,27 @@ pub unsafe fn prepare_parameters(
         let arg = res?;
         let name = ast_expr_identifier_create(ast_variable_name(param).to_string());
         let lval_lval = ast_expr_lvalue(&name, state)?;
-        let obj: *mut Object = lval_lval.obj;
-        drop(name);
-        // Note: I think the arg is copied needlessly in the original, and one is leaked.
-        (*obj).assign(Some(value_copy(&*Box::into_raw(arg))));
+        unsafe {
+            let obj: *mut Object = lval_lval.obj;
+            drop(name);
+            // Note: I think the arg is copied needlessly in the original, and one is leaked.
+            (*obj).assign(Some(value_copy(&*Box::into_raw(arg))));
+        }
     }
     Ok(())
 }
 
-unsafe fn isdereferencable_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+fn isdereferencable_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
     let p = state.props();
-    // XXX FIXME: This definitely isn't OK. absexec has some weird stuff going on in the original.
-    // Could clone here instead.
-    p.install(Box::from_raw(expr as *const AstExpr as *mut AstExpr));
+    unsafe {
+        // XXX FIXME: This definitely isn't OK. absexec has some weird stuff going on in the original.
+        // Could clone here instead.
+        p.install(Box::from_raw(expr as *const AstExpr as *mut AstExpr));
+    }
     Ok(ptr::null_mut())
 }
 
-pub unsafe fn prepare_arguments(
+pub fn prepare_arguments(
     args: &[Box<AstExpr>],
     params: &[Box<AstVariable>],
     state: &mut State,
@@ -1076,7 +1078,7 @@ pub unsafe fn prepare_arguments(
     args.iter().map(|arg| ast_expr_eval(arg, state)).collect()
 }
 
-unsafe fn assign_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
+fn assign_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
     let lval = ast_expr_assignment_lval(expr);
     let rval = ast_expr_assignment_rval(expr);
     let val = ast_expr_absexec(rval, state)?;
@@ -1085,15 +1087,17 @@ unsafe fn assign_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value
         return Err(Error::new("undefined indirection (rvalue)".to_string()));
     }
     let lval_res = ast_expr_lvalue(lval, state)?;
-    let obj: *mut Object = lval_res.obj;
-    if obj.is_null() {
-        return Err(Error::new("undefined indirection (lvalue)".to_string()));
+    unsafe {
+        let obj: *mut Object = lval_res.obj;
+        if obj.is_null() {
+            return Err(Error::new("undefined indirection (lvalue)".to_string()));
+        }
+        (*obj).assign(Some(value_copy(&*val)));
     }
-    (*obj).assign(Some(value_copy(&*val)));
     Ok(val)
 }
 
-unsafe fn verify_paramspec(
+fn verify_paramspec(
     param: &Value,
     arg: &Value,
     param_state: &mut State,
@@ -1122,7 +1126,7 @@ unsafe fn verify_paramspec(
     verify_paramspec(&param_val, &arg_val, param_state, arg_state)
 }
 
-unsafe fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
+fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
     let fname = f.name();
     let mut param_state = state_create(fname.to_string(), arg_state.externals_arc(), f.rtype());
     ast_function_initparams(f, &mut param_state)?;
@@ -1197,7 +1201,7 @@ pub fn ast_expr_identifier_create(s: String) -> Box<AstExpr> {
     ast_expr_create(AstExprKind::Identifier(s))
 }
 
-unsafe fn unary_pf_reduce(e: &AstExpr, s: &mut State) -> Result<Box<Value>> {
+fn unary_pf_reduce(e: &AstExpr, s: &mut State) -> Result<Box<Value>> {
     let res_val = ast_expr_pf_reduce(ast_expr_unary_operand(e), s)?;
     Ok(value_sync_create(ast_expr_unary_create(
         res_val.into_sync(),
@@ -1205,7 +1209,7 @@ unsafe fn unary_pf_reduce(e: &AstExpr, s: &mut State) -> Result<Box<Value>> {
     )))
 }
 
-unsafe fn binary_pf_reduce(binary: &BinaryExpr, s: &mut State) -> Result<Box<Value>> {
+fn binary_pf_reduce(binary: &BinaryExpr, s: &mut State) -> Result<Box<Value>> {
     let BinaryExpr { e1, op, e2 } = binary;
     let v1 = ast_expr_pf_reduce(e1, s)?;
     let v2 = ast_expr_pf_reduce(e2, s)?;
@@ -1217,7 +1221,7 @@ unsafe fn binary_pf_reduce(binary: &BinaryExpr, s: &mut State) -> Result<Box<Val
     )))
 }
 
-unsafe fn call_pf_reduce(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
+fn call_pf_reduce(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
     let CallExpr {
         fun,
         args: unreduced_args,
@@ -1226,7 +1230,8 @@ unsafe fn call_pf_reduce(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
     let mut reduced_args = Vec::with_capacity(unreduced_args.len());
     for arg in unreduced_args {
         let val = ast_expr_pf_reduce(arg, s)?;
-        reduced_args.push(value_to_expr(&*Box::into_raw(val)));
+        reduced_args.push(value_to_expr(&val));
+        std::mem::forget(val);
     }
     Ok(value_sync_create(ast_expr_call_create(
         ast_expr_identifier_create(root.to_string()),
@@ -1234,7 +1239,7 @@ unsafe fn call_pf_reduce(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
     )))
 }
 
-unsafe fn structmember_pf_reduce(sm: &StructMemberExpr, s: &mut State) -> Result<Box<Value>> {
+fn structmember_pf_reduce(sm: &StructMemberExpr, s: &mut State) -> Result<Box<Value>> {
     let StructMemberExpr { root, member } = sm;
     let v = ast_expr_pf_reduce(root, s)?;
     if value_isstruct(&v) {
@@ -1249,7 +1254,7 @@ unsafe fn structmember_pf_reduce(sm: &StructMemberExpr, s: &mut State) -> Result
     )))
 }
 
-pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: &mut State) -> Result<Box<Value>> {
+pub fn ast_expr_pf_reduce(e: &AstExpr, s: &mut State) -> Result<Box<Value>> {
     match &e.kind {
         AstExprKind::Constant(_) | AstExprKind::StringLiteral(_) | AstExprKind::Identifier(_) => {
             ast_expr_eval(e, s)
@@ -1569,7 +1574,7 @@ pub fn ast_expr_getfuncs(expr: &AstExpr) -> Vec<String> {
     }
 }
 
-pub unsafe fn ast_expr_splits(e: &AstExpr, s: &mut State) -> Result<AstStmtSplits> {
+pub fn ast_expr_splits(e: &AstExpr, s: &mut State) -> Result<AstStmtSplits> {
     match &e.kind {
         AstExprKind::Call(call) => call_splits(call, s),
         AstExprKind::Assignment(assign) => ast_expr_splits(&assign.rval, s),
@@ -1587,7 +1592,7 @@ pub unsafe fn ast_expr_splits(e: &AstExpr, s: &mut State) -> Result<AstStmtSplit
     }
 }
 
-unsafe fn call_splits(call: &CallExpr, state: &mut State) -> Result<AstStmtSplits> {
+fn call_splits(call: &CallExpr, state: &mut State) -> Result<AstStmtSplits> {
     let CallExpr { fun, args } = call;
     let name = ast_expr_as_identifier(fun);
     let Some(f) = state.ext().get_func(name) else {
@@ -1614,7 +1619,7 @@ unsafe fn call_splits(call: &CallExpr, state: &mut State) -> Result<AstStmtSplit
     Ok(AstStmtSplits { conds })
 }
 
-unsafe fn binary_splits(binary: &BinaryExpr, s: &mut State) -> Result<AstStmtSplits> {
+fn binary_splits(binary: &BinaryExpr, s: &mut State) -> Result<AstStmtSplits> {
     // Note: s1.err and s2.err are ignored in the original.
     let s1 = ast_expr_splits(&binary.e1, s).unwrap_or_default();
     let s2 = ast_expr_splits(&binary.e2, s).unwrap_or_default();
@@ -1718,7 +1723,7 @@ pub fn ast_block_stmts(b: &AstBlock) -> &[Box<AstStmt>] {
     &b.stmts
 }
 
-pub unsafe fn ast_block_isterminal(b: &AstBlock, s: &mut State) -> bool {
+pub fn ast_block_isterminal(b: &AstBlock, s: &mut State) -> bool {
     b.stmts.iter().any(|stmt| ast_stmt_isterminal(stmt, s))
 }
 
@@ -1733,7 +1738,7 @@ pub fn ast_block_preconds(b: &AstBlock) -> Result<Option<&AstStmt>> {
     Ok(None)
 }
 
-pub unsafe fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: &mut State) -> Result<()> {
+pub fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: &mut State) -> Result<()> {
     if matches!(stmt.kind, AstStmtKind::CompoundV(_)) {
         if let Err(err) = ast_stmt_verify(stmt, state) {
             let loc = ast_stmt_lexememarker(stmt);
@@ -1749,7 +1754,7 @@ pub unsafe fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: &mut State) -
 }
 
 #[allow(dead_code)]
-pub unsafe fn ast_stmt_preprocess(stmt: &AstStmt, state: &mut State) -> Result<Preresult> {
+pub fn ast_stmt_preprocess(stmt: &AstStmt, state: &mut State) -> Result<Preresult> {
     if ast_stmt_isassume(stmt) {
         return stmt_installprop(stmt, state);
     }
@@ -1765,7 +1770,7 @@ pub fn ast_stmt_labelled_stmt(stmt: &AstStmt) -> &AstStmt {
     &labelled.stmt
 }
 
-unsafe fn labelled_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
+fn labelled_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
     assert!(ast_stmt_ispre(stmt));
     let setup = ast_stmt_labelled_stmt(stmt);
     if should_setup {
@@ -1778,11 +1783,11 @@ pub fn ast_stmt_copy(stmt: &AstStmt) -> Box<AstStmt> {
     Box::new(stmt.clone())
 }
 
-unsafe fn labelled_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn labelled_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     ast_stmt_absexec(stmt, state, true)
 }
 
-unsafe fn sel_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn sel_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
     if decision {
         return stmt_setupabsexec(ast_stmt_sel_body(stmt), state);
@@ -1791,7 +1796,7 @@ unsafe fn sel_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-unsafe fn comp_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn comp_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     let b = ast_stmt_as_block(stmt);
     assert_eq!(ast_block_decls(b).len(), 0);
     for stmt in &b.stmts {
@@ -1805,7 +1810,7 @@ unsafe fn comp_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-unsafe fn stmt_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn stmt_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     match &stmt.kind {
         AstStmtKind::Expr(_) | AstStmtKind::Allocation(_) | AstStmtKind::Jump(_) => Ok(()),
         AstStmtKind::Labelled(_) => labelled_setupabsexec(stmt, state),
@@ -1815,7 +1820,7 @@ unsafe fn stmt_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     }
 }
 
-pub unsafe fn ast_stmt_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+pub fn ast_stmt_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     match stmt.kind {
         AstStmtKind::Selection(_) => stmt_setupabsexec(stmt, state),
         _ => Ok(()),
@@ -1829,7 +1834,7 @@ pub fn ast_stmt_isassume(stmt: &AstStmt) -> bool {
     labelled.label == "assume"
 }
 
-unsafe fn stmt_installprop(stmt: &AstStmt, state: &mut State) -> Result<Preresult> {
+fn stmt_installprop(stmt: &AstStmt, state: &mut State) -> Result<Preresult> {
     ast_expr_assume(ast_stmt_as_expr(ast_stmt_labelled_stmt(stmt)), state)
 }
 
@@ -1840,7 +1845,7 @@ pub fn ast_stmt_ispre(stmt: &AstStmt) -> bool {
     labelled.label == "setup"
 }
 
-unsafe fn stmt_v_block_verify(v_block_stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn stmt_v_block_verify(v_block_stmt: &AstStmt, state: &mut State) -> Result<()> {
     let b = ast_stmt_as_v_block(v_block_stmt);
     assert_eq!(ast_block_decls(b).len(), 0);
     for stmt in &b.stmts {
@@ -1849,7 +1854,7 @@ unsafe fn stmt_v_block_verify(v_block_stmt: &AstStmt, state: &mut State) -> Resu
     Ok(())
 }
 
-unsafe fn stmt_expr_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn stmt_expr_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
     let expr = ast_stmt_as_expr(stmt);
     if ast_expr_decide(expr, state) {
         Ok(())
@@ -1858,14 +1863,14 @@ unsafe fn stmt_expr_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
     }
 }
 
-unsafe fn iter_empty(stmt: &AstStmt, state: &mut State) -> bool {
+fn iter_empty(stmt: &AstStmt, state: &mut State) -> bool {
     if let Err(err) = ast_stmt_exec(ast_stmt_iter_init(stmt), state) {
         panic!("{err}");
     }
     !ast_expr_decide(ast_stmt_as_expr(ast_stmt_iter_cond(stmt)), state)
 }
 
-unsafe fn stmt_iter_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn stmt_iter_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
     if iter_empty(stmt, state) {
         return Ok(());
     }
@@ -1883,7 +1888,7 @@ unsafe fn stmt_iter_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-pub unsafe fn ast_stmt_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
+pub fn ast_stmt_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
     match &stmt.kind {
         AstStmtKind::Nop => Ok(()),
         AstStmtKind::CompoundV(_) => stmt_v_block_verify(stmt, state),
@@ -1893,7 +1898,7 @@ pub unsafe fn ast_stmt_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
     }
 }
 
-unsafe fn stmt_compound_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn stmt_compound_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     let b = ast_stmt_as_block(stmt);
     assert_eq!(ast_block_decls(b).len(), 0);
     for stmt in &b.stmts {
@@ -1905,7 +1910,7 @@ unsafe fn stmt_compound_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-unsafe fn stmt_sel_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn stmt_sel_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
     if decision {
         return ast_stmt_exec(ast_stmt_sel_body(stmt), state);
@@ -1939,14 +1944,14 @@ fn iter_neteffect(iter: &AstStmt) -> Option<Box<AstStmt>> {
     ))
 }
 
-unsafe fn stmt_iter_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn stmt_iter_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     if let Some(neteffect) = iter_neteffect(stmt) {
         ast_stmt_absexec(&neteffect, state, true)?;
     }
     Ok(())
 }
 
-unsafe fn stmt_jump_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn stmt_jump_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     // Note: jump_rv may be null. Error in original.
     let rv_val = ast_expr_eval(
         ast_stmt_jump_rv(stmt).expect("unsupported: return without value"),
@@ -1957,7 +1962,7 @@ unsafe fn stmt_jump_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-pub unsafe fn ast_stmt_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+pub fn ast_stmt_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     match &stmt.kind {
         AstStmtKind::Nop => Ok(()),
         AstStmtKind::Labelled(labelled) => ast_stmt_exec(&labelled.stmt, state),
@@ -2057,7 +2062,7 @@ pub fn ast_stmt_iter_init(stmt: &AstStmt) -> &AstStmt {
     &iteration.init
 }
 
-unsafe fn sel_isterminal(stmt: &AstStmt, s: &mut State) -> bool {
+fn sel_isterminal(stmt: &AstStmt, s: &mut State) -> bool {
     let decision = sel_decide(ast_stmt_sel_cond(stmt), s).unwrap();
     if decision {
         return ast_stmt_isterminal(ast_stmt_sel_body(stmt), s);
@@ -2065,7 +2070,7 @@ unsafe fn sel_isterminal(stmt: &AstStmt, s: &mut State) -> bool {
     false
 }
 
-unsafe fn comp_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
+fn comp_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
     let b = ast_stmt_as_block(stmt);
     for stmt in &b.stmts {
         ast_stmt_absexec(stmt, state, should_setup)?;
@@ -2087,7 +2092,7 @@ pub fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
     jump.rv.as_deref()
 }
 
-unsafe fn jump_absexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn jump_absexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     // Note: Original leaks the expression to avoid a double free.
     let expr = ast_expr_assignment_create(
         ast_expr_identifier_create("return".to_string()),
@@ -2100,11 +2105,7 @@ unsafe fn jump_absexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-pub unsafe fn ast_stmt_absexec(
-    stmt: &AstStmt,
-    state: &mut State,
-    should_setup: bool,
-) -> Result<()> {
+pub fn ast_stmt_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
     match &stmt.kind {
         AstStmtKind::Nop => Ok(()),
         AstStmtKind::Labelled(_) => labelled_absexec(stmt, state, should_setup),
@@ -2133,7 +2134,7 @@ fn ast_stmt_sel_sprint(stmt: &AstStmt, b: &mut String) {
     }
 }
 
-pub unsafe fn ast_stmt_isterminal(stmt: &AstStmt, s: &mut State) -> bool {
+pub fn ast_stmt_isterminal(stmt: &AstStmt, s: &mut State) -> bool {
     match &stmt.kind {
         AstStmtKind::Jump(jump) => jump.kind == AstJumpKind::Return,
         AstStmtKind::Compound(block) => ast_block_isterminal(block, s),
@@ -2150,22 +2151,24 @@ pub fn ast_stmt_create_jump(
     ast_stmt_create(loc, AstStmtKind::Jump(AstJumpStmt { kind, rv }))
 }
 
-pub unsafe fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
+pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
     // I think this value is leaked in the original. Possibly in the sync case part of it is used
     // and freed.
     let v = ast_expr_pf_reduce(control, state)?;
     if value_issync(&v) {
         let v_str = format!("{v}");
-        let sync = Box::into_raw(v.into_sync());
+        let sync = v.into_sync();
         let p = state.props();
-        if p.get(&*sync) {
+        let result = if p.get(&sync) {
             Ok(true)
-        } else if p.contradicts(&*sync) {
+        } else if p.contradicts(&sync) {
             Ok(false)
         } else {
             let msg = format!("`{control}' with value `{v_str}' is undecidable");
             Err(Error::new(msg))
-        }
+        };
+        std::mem::forget(sync);
+        result
     } else if value_isconstant(&v) {
         let is_nonzero = value_as_constant(&v) != 0;
         std::mem::forget(v);
@@ -2282,7 +2285,7 @@ fn ast_stmt_labelled_sprint(stmt: &AstStmt, b: &mut String) {
     str_write!(*b, "{}: {s}", labelled.label);
 }
 
-unsafe fn sel_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
+fn sel_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
     let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
     if decision {
         return ast_stmt_absexec(ast_stmt_sel_body(stmt), state, should_setup);
@@ -2348,7 +2351,7 @@ pub fn ast_stmt_iter_upper_bound(stmt: &AstStmt) -> &AstExpr {
     ast_expr_binary_e2(expr)
 }
 
-unsafe fn iter_absexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
+fn iter_absexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     let alloc = hack_alloc_from_neteffect(stmt);
     let lw = ast_stmt_iter_lower_bound(stmt);
     let up = ast_stmt_iter_upper_bound(stmt);
@@ -2388,7 +2391,7 @@ pub fn ast_stmt_getfuncs(stmt: &AstStmt) -> Vec<String> {
     }
 }
 
-pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: &mut State) -> Result<AstStmtSplits> {
+pub fn ast_stmt_splits(stmt: &AstStmt, s: &mut State) -> Result<AstStmtSplits> {
     match &stmt.kind {
         AstStmtKind::Nop => Ok(AstStmtSplits { conds: vec![] }),
         AstStmtKind::Expr(expr) => ast_expr_splits(expr, s),
@@ -2407,23 +2410,24 @@ pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: &mut State) -> Result<AstStmtSp
     }
 }
 
-unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: &mut State) -> Result<AstStmtSplits> {
+fn stmt_sel_splits(selection: &AstSelectionStmt, s: &mut State) -> Result<AstStmtSplits> {
     // Note: The original asserts that no error occurred, rather than propagate.
-    let v = Box::into_raw(ast_expr_pf_reduce(&selection.cond, s).unwrap());
-    let e = value_to_expr(&*v);
-    if condexists(&e, s) || value_isconstant(&*v) {
-        Ok(AstStmtSplits { conds: vec![] })
+    let v = ast_expr_pf_reduce(&selection.cond, s).unwrap();
+    let e = value_to_expr(&v);
+    let conds = if condexists(&e, s) || value_isconstant(&v) {
+        vec![]
     } else {
-        Ok(AstStmtSplits {
-            conds: vec![Box::into_raw(e)],
-        })
-    }
+        vec![Box::into_raw(e)]
+    };
+    std::mem::forget(v);
+    Ok(AstStmtSplits { conds })
 }
 
-unsafe fn condexists(cond: &AstExpr, s: &mut State) -> bool {
+fn condexists(cond: &AstExpr, s: &mut State) -> bool {
     let val = ast_expr_pf_reduce(cond, s).unwrap();
     // Note: original doesn't free this.
-    let reduced = value_to_expr(&*Box::into_raw(val));
+    let reduced = value_to_expr(&val);
+    std::mem::forget(val);
     let p = s.props();
     p.get(&reduced) || p.contradicts(&reduced)
 }
@@ -2799,15 +2803,13 @@ pub fn ast_function_protostitch(f: &mut AstFunction, ext: &Externals) {
 }
 
 pub fn ast_function_verify(f: &AstFunction, ext: Arc<Externals>) -> Result<()> {
-    unsafe {
-        let mut state = state_create(f.name().to_string(), ext, f.rtype());
-        ast_function_initparams(f, &mut state)?;
-        path_absverify_withstate(f, &mut state)?;
-    }
+    let mut state = state_create(f.name().to_string(), ext, f.rtype());
+    ast_function_initparams(f, &mut state)?;
+    path_absverify_withstate(f, &mut state)?;
     Ok(())
 }
 
-unsafe fn path_absverify_withstate(f: &AstFunction, state: &mut State) -> Result<()> {
+fn path_absverify_withstate(f: &AstFunction, state: &mut State) -> Result<()> {
     let abs = f.abstract_block();
     for var in &abs.decls {
         state_declare(state, var, false);
@@ -2815,13 +2817,13 @@ unsafe fn path_absverify_withstate(f: &AstFunction, state: &mut State) -> Result
     path_absverify(f, state, 0)
 }
 
-unsafe fn path_absverify(f: &AstFunction, state: &mut State, index: usize) -> Result<()> {
+fn path_absverify(f: &AstFunction, state: &mut State, index: usize) -> Result<()> {
     let abs = f.abstract_block();
     for i in index..abs.stmts.len() {
         let stmt = &abs.stmts[i];
-        let mut splits = ast_stmt_splits(stmt, state)?;
+        let splits = ast_stmt_splits(stmt, state)?;
         if !splits.conds.is_empty() {
-            return split_paths_absverify(f, state, i, &mut splits);
+            return split_paths_absverify(f, state, i, &splits);
         }
         if !ast_stmt_ispre(stmt) {
             ast_stmt_absexec(stmt, state, true)?;
@@ -2831,7 +2833,7 @@ unsafe fn path_absverify(f: &AstFunction, state: &mut State, index: usize) -> Re
     Ok(())
 }
 
-pub unsafe fn ast_function_initparams(f: &AstFunction, s: &mut State) -> Result<()> {
+pub fn ast_function_initparams(f: &AstFunction, s: &mut State) -> Result<()> {
     let params = f.params();
     for param in params {
         state_declare(s, param, true);
@@ -2850,7 +2852,7 @@ pub struct PrecondsResult {
     pub err: Option<Box<Error>>,
 }
 
-unsafe fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
+fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
     let pre_stmt = f.preconditions()?;
     if let Some(stmt) = pre_stmt {
         ast_stmt_absexec(stmt, s, true)?;
@@ -2858,7 +2860,7 @@ unsafe fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()
     Ok(())
 }
 
-unsafe fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
+fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
     let state: *mut State = state;
     unsafe {
         let name = ast_variable_name(param);
@@ -2873,7 +2875,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()
     Ok(())
 }
 
-unsafe fn abstract_audit(f: &AstFunction, abstract_state: &mut State) -> Result<()> {
+fn abstract_audit(f: &AstFunction, abstract_state: &mut State) -> Result<()> {
     let mut actual_state = state_create_withprops(
         f.name().to_string(),
         (*abstract_state).externals_arc(),
@@ -2886,14 +2888,14 @@ unsafe fn abstract_audit(f: &AstFunction, abstract_state: &mut State) -> Result<
     Ok(())
 }
 
-unsafe fn ast_function_setupabsexec(f: &AstFunction, state: &mut State) -> Result<()> {
+fn ast_function_setupabsexec(f: &AstFunction, state: &mut State) -> Result<()> {
     for stmt in &f.abstract_.stmts {
         ast_stmt_setupabsexec(stmt, state)?;
     }
     Ok(())
 }
 
-unsafe fn abstract_auditwithstate(
+fn abstract_auditwithstate(
     f: &AstFunction,
     actual_state: &mut State,
     abstract_state: &mut State,
@@ -2904,7 +2906,7 @@ unsafe fn abstract_auditwithstate(
     path_verify(f, actual_state, 0, abstract_state)
 }
 
-unsafe fn path_verify(
+fn path_verify(
     f: &AstFunction,
     actual_state: &mut State,
     index: usize,
@@ -2918,8 +2920,8 @@ unsafe fn path_verify(
         // splits.err is ignored in the original
         let splits = ast_stmt_splits(stmt, actual_state);
         match splits {
-            Ok(mut splits) if !splits.conds.is_empty() => {
-                return split_paths_verify(f, actual_state, i, &mut splits, abstract_state);
+            Ok(splits) if !splits.conds.is_empty() => {
+                return split_paths_verify(f, actual_state, i, &splits, abstract_state);
             }
             _ => {
                 ast_stmt_process(stmt, fname, actual_state)?;
@@ -2942,7 +2944,7 @@ unsafe fn path_verify(
     Ok(())
 }
 
-pub unsafe fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<*mut Value> {
+pub fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<*mut Value> {
     for decl in &f.abstract_.decls {
         state_declare(state, decl, false);
     }
@@ -2955,7 +2957,7 @@ pub unsafe fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result
     Ok(object_as_value(obj).map_or(ptr::null_mut(), |r| r as *const Value as *mut Value))
 }
 
-unsafe fn split_path_verify(
+fn split_path_verify(
     f: &AstFunction,
     actual_state: &mut State,
     index: usize,
@@ -3045,7 +3047,7 @@ fn abstract_paths<'origin>(
     vec![f_true, f_false]
 }
 
-unsafe fn split_path_absverify(
+fn split_path_absverify(
     f: &AstFunction,
     state: &mut State,
     index: usize,
@@ -3067,14 +3069,16 @@ unsafe fn split_path_absverify(
     Ok(())
 }
 
-unsafe fn split_paths_absverify(
+fn split_paths_absverify(
     f: &AstFunction,
     state: &mut State,
     index: usize,
-    splits: *mut AstStmtSplits,
+    splits: &AstStmtSplits,
 ) -> Result<()> {
-    for &cond in &(*splits).conds {
-        split_path_absverify(f, state, index, &*cond)?;
+    for &cond in &splits.conds {
+        unsafe {
+            split_path_absverify(f, state, index, &*cond)?;
+        }
     }
     Ok(())
 }
@@ -3090,15 +3094,17 @@ fn split_name(name: &str, assumption: &AstExpr) -> String {
     format!("{name} | {assumption}")
 }
 
-unsafe fn split_paths_verify(
+fn split_paths_verify(
     f: &AstFunction,
     actual_state: &mut State,
     index: usize,
-    splits: *mut AstStmtSplits,
+    splits: &AstStmtSplits,
     abstract_state: &mut State,
 ) -> Result<()> {
-    for &cond in &(*splits).conds {
-        split_path_verify(f, actual_state, index, &*cond, abstract_state)?;
+    for &cond in &splits.conds {
+        unsafe {
+            split_path_verify(f, actual_state, index, &*cond, abstract_state)?;
+        }
     }
     Ok(())
 }

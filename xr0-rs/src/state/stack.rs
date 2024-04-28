@@ -108,24 +108,24 @@ impl Stack {
         self.frames.last_mut().unwrap()
     }
 
-    pub unsafe fn references(&self, loc: &Location, state: &mut State) -> bool {
+    pub fn references(&self, loc: &Location, state: &mut State) -> bool {
         // Note: Original only checks the top stack frame.
         self.top().references(loc, state)
     }
 
-    pub unsafe fn declare(&mut self, var: &AstVariable, is_param: bool) {
+    pub fn declare(&mut self, var: &AstVariable, is_param: bool) {
         self.top_mut().declare(var, is_param);
     }
 
-    pub unsafe fn undeclare(&mut self, state: &mut State) {
+    pub fn undeclare(&mut self, state: &mut State) {
         self.top_mut().undeclare(state);
     }
 
-    pub unsafe fn get_result(&self) -> &Variable {
+    pub fn get_result(&self) -> &Variable {
         self.top().get_result()
     }
 
-    pub unsafe fn get_variable(&self, id: &str) -> Option<&Variable> {
+    pub fn get_variable(&self, id: &str) -> Option<&Variable> {
         self.top().get_variable(id)
     }
 
@@ -141,14 +141,14 @@ impl StackFrame {
         location_create_automatic(self.id, address, ast_expr_constant_create(0))
     }
 
-    pub unsafe fn declare(&mut self, var: &AstVariable, isparam: bool) {
+    pub fn declare(&mut self, var: &AstVariable, isparam: bool) {
         let id = ast_variable_name(var);
         assert!(self.varmap.get(id).is_none());
         let var = variable_create(ast_variable_type(var), self, isparam);
         self.varmap.insert(id.to_string(), var);
     }
 
-    pub unsafe fn undeclare(&mut self, state: &mut State) {
+    pub fn undeclare(&mut self, state: &mut State) {
         let new_result = variable_abstractcopy(&self.result, state);
         self.result = new_result;
         let m = std::mem::replace(&mut self.varmap, Box::new(VarMap::new()));
@@ -164,12 +164,12 @@ impl StackFrame {
         &self.result
     }
 
-    pub unsafe fn get_variable(&self, id: &str) -> Option<&Variable> {
+    pub fn get_variable(&self, id: &str) -> Option<&Variable> {
         assert_ne!(id, "return");
         self.varmap.get(id).map(|boxed| &**boxed)
     }
 
-    pub unsafe fn references(&self, loc: &Location, state: &mut State) -> bool {
+    pub fn references(&self, loc: &Location, state: &mut State) -> bool {
         if variable_references(&self.result, loc, state) {
             return true;
         }
@@ -186,11 +186,7 @@ impl StackFrame {
     }
 }
 
-pub unsafe fn variable_create(
-    type_: &AstType,
-    frame: &mut StackFrame,
-    isparam: bool,
-) -> Box<Variable> {
+pub fn variable_create(type_: &AstType, frame: &mut StackFrame, isparam: bool) -> Box<Variable> {
     let loc = frame.new_block();
     let block_id = location_auto_get_block_id(&loc);
     let b = &mut frame.blocks[block_id];
@@ -202,7 +198,7 @@ pub unsafe fn variable_create(
     })
 }
 
-unsafe fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
+fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
     let new = Box::new(Variable {
         type_: old.type_.clone(),
         is_param: old.is_param,
@@ -257,7 +253,7 @@ impl Variable {
     }
 }
 
-pub unsafe fn variable_references(v: &Variable, loc: &Location, s: &mut State) -> bool {
+pub fn variable_references(v: &Variable, loc: &Location, s: &mut State) -> bool {
     assert!(!loc.type_is_vconst());
     location_references(&v.loc, loc, s)
 }
