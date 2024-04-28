@@ -1,4 +1,3 @@
-use std::ptr;
 use std::sync::Arc;
 
 use super::location::{
@@ -286,15 +285,18 @@ pub fn state_getobject<'s>(state: &'s mut State, id: &str) -> Option<&'s mut Obj
     state_get(&mut *state, &var_loc, true).unwrap()
 }
 
-pub fn state_deref(state: &mut State, ptr_val: &Value, index: &AstExpr) -> Result<*mut Object> {
+pub fn state_deref<'s>(
+    state: &'s mut State,
+    ptr_val: &Value,
+    index: &AstExpr,
+) -> Result<Option<&'s mut Object>> {
     if value_issync(ptr_val) {
-        return Ok(ptr::null_mut());
+        return Ok(None);
     }
     let deref_base = value_as_location(ptr_val);
     // Note: the original leaked this location.
     let deref = location_with_offset(deref_base, index);
     state_get(state, &deref, true)
-        .map(|opt| opt.map_or(ptr::null_mut(), |obj| obj as _))
         .map_err(|err| Error::new(format!("undefined indirection: {}", err.msg)))
 }
 

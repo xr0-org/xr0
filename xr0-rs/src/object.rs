@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::ast::{
     ast_expr_constant_create, ast_expr_copy, ast_expr_difference_create, ast_expr_eq_create,
     ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_sum_create,
-    ast_type_struct_complete,
+    ast_type_struct_complete, ast_variable_name, ast_variable_type, LValue,
 };
 use crate::state::location::{location_dealloc, location_references};
 use crate::state::state::state_eval;
@@ -11,7 +11,7 @@ use crate::state::State;
 use crate::util::Result;
 use crate::value::{
     value_abstractcopy, value_as_location, value_copy, value_references, value_referencesheap,
-    value_struct_create, value_struct_member, value_struct_membertype,
+    value_struct_create, ValueKind,
 };
 use crate::{AstExpr, AstType, Location, Value};
 
@@ -105,6 +105,13 @@ pub fn object_as_value(obj: &Object) -> Option<&Value> {
         panic!();
     };
     v.as_deref()
+}
+
+pub fn object_as_value_mut(obj: &mut Object) -> Option<&mut Value> {
+    let ObjectKind::Value(v) = &mut obj.kind else {
+        panic!();
+    };
+    v.as_deref_mut()
 }
 
 pub fn object_isdeallocand(obj: &Object, s: &mut State) -> bool {
@@ -285,34 +292,35 @@ pub fn object_dealloc(obj: &Object, s: &mut State) -> Result<()> {
     }
 }
 
-pub fn object_getmember<'obj>(
-    obj: &'obj mut Object,
+pub fn object_member_lvalue<'s>(
+    obj: &'s mut Object,
     t: &AstType,
     member: &str,
-    s: &mut State,
-) -> Option<&'obj Object> {
-    // XXX FIXME this lifetime can't be right, should be 's
-    value_struct_member(getorcreatestruct(obj, t, s), member)
+    s: &'s mut State,
+) -> LValue<'s> {
+    let val = getorcreatestruct(obj, t, s);
+    let ValueKind::Struct(sv) = &mut val.kind else {
+        panic!();
+    };
+
+    let obj = sv.m.get_mut(member).map(|boxed| &mut **boxed);
+    let t = sv
+        .members
+        .iter()
+        .find(|var| member == ast_variable_name(var))
+        .map(|var| ast_variable_type(var));
+    LValue { t, obj }
 }
 
-fn getorcreatestruct<'obj>(obj: &'obj mut Object, t: &AstType, s: &mut State) -> &'obj Value {
+fn getorcreatestruct<'obj>(obj: &'obj mut Object, t: &AstType, s: &mut State) -> &'obj mut Value {
     // XXX FIXME: very silly rust construction because of borrow checker limitation
-    if object_as_value(obj).is_some() {
-        object_as_value(obj).unwrap()
+    if object_as_value_mut(obj).is_some() {
+        object_as_value_mut(obj).unwrap()
     } else {
         let complete = ast_type_struct_complete(t, s.ext()).unwrap();
         obj.assign(Some(value_struct_create(complete)));
-        object_as_value(&*obj).unwrap()
+        object_as_value_mut(obj).unwrap()
     }
-}
-
-pub fn object_getmembertype<'obj>(
-    obj: &'obj mut Object,
-    t: &AstType,
-    member: &str,
-    s: &mut State,
-) -> Option<&'obj AstType> {
-    value_struct_membertype(getorcreatestruct(obj, t, s), member)
 }
 
 pub fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {

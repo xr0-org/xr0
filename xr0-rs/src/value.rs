@@ -220,18 +220,6 @@ fn abstract_copy_members(
         .collect()
 }
 
-pub fn value_struct_membertype<'v>(v: &'v Value, member: &str) -> Option<&'v AstType> {
-    let ValueKind::Struct(sv) = &v.kind else {
-        panic!();
-    };
-    for var in &sv.members {
-        if member == ast_variable_name(var) {
-            return Some(ast_variable_type(var));
-        }
-    }
-    None
-}
-
 pub fn value_struct_member<'v>(v: &'v Value, member: &str) -> Option<&'v Object> {
     let ValueKind::Struct(sv) = &v.kind else {
         panic!();

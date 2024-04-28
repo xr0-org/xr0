@@ -5,7 +5,7 @@ use std::ptr;
 use std::sync::Arc;
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
-use crate::object::{object_as_value, object_getmember, object_getmembertype, object_hasvalue};
+use crate::object::{object_as_value, object_hasvalue, object_member_lvalue};
 use crate::parser::LexemeMarker;
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_copywithname, state_create,
@@ -210,7 +210,7 @@ pub const MOD_VOLATILE: AstTypeModifiers = 64;
 
 pub struct LValue<'ast> {
     pub t: Option<&'ast AstType>,
-    pub obj: *mut Object,
+    pub obj: Option<&'ast mut Object>,
 }
 
 #[derive(Clone)]
@@ -361,21 +361,20 @@ fn rangeprocess_dealloc(
     up: &AstExpr,
     state: &mut State,
 ) -> Result<()> {
+    let state: *mut State = state;
     unsafe {
-        let obj: *mut Object = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), state);
-        state_range_dealloc(state, &*obj, lw, up)
+        let obj = hack_base_object_from_alloc(ast_expr_alloc_arg(dealloc), &mut *state);
+        state_range_dealloc(&mut *state, obj, lw, up)
     }
 }
 
-fn hack_base_object_from_alloc(expr: &AstExpr, state: &mut State) -> *mut Object {
+fn hack_base_object_from_alloc<'s>(expr: &'s AstExpr, state: &'s mut State) -> &'s Object {
     let inner = ast_expr_unary_operand(expr);
     let i = ast_expr_identifier_create("i".to_string());
     assert!(ast_expr_equal(ast_expr_binary_e2(inner), &i));
     drop(i);
     let lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state).unwrap();
-    let obj: *mut Object = lval.obj;
-    assert!(!obj.is_null());
-    obj
+    lval.obj.unwrap()
 }
 
 pub fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
@@ -415,9 +414,10 @@ fn rangeprocess_alloc(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: &mut St
         panic!();
     };
     assert_ne!(alloc.kind, AstAllocKind::Dealloc);
+    let state: *mut State = state;
     unsafe {
-        let obj: *mut Object = hack_base_object_from_alloc(lval, state);
-        state_range_alloc(state, &*obj, lw, up)
+        let obj = hack_base_object_from_alloc(lval, &mut *state);
+        state_range_alloc(&mut *state, obj, lw, up)
     }
 }
 
@@ -504,17 +504,16 @@ fn value_compare(v1: &Value, op: AstBinaryOp, v2: &Value) -> bool {
 }
 
 fn expr_isdeallocand_decide(expr: &AstExpr, state: &mut State) -> bool {
+    let state: *mut State = state;
     unsafe {
-        let obj: *mut Object = hack_object_from_assertion(expr, state);
-        state_addresses_deallocand(state, &*obj)
+        let obj = hack_object_from_assertion(expr, &mut *state);
+        state_addresses_deallocand(&mut *state, obj)
     }
 }
 
-fn hack_object_from_assertion(expr: &AstExpr, state: &mut State) -> *mut Object {
+fn hack_object_from_assertion<'s>(expr: &'s AstExpr, state: &'s mut State) -> &'s Object {
     let assertand = ast_expr_isdeallocand_assertand(expr);
-    let obj: *mut Object = ast_expr_lvalue(assertand, state).unwrap().obj;
-    assert!(!obj.is_null());
-    obj
+    ast_expr_lvalue(assertand, state).unwrap().obj.unwrap()
 }
 
 fn expr_unary_decide(expr: &AstExpr, state: &mut State) -> bool {
@@ -550,11 +549,11 @@ fn expr_isdeallocand_rangedecide(
     );
     drop(j);
     drop(i);
-    let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), state).unwrap();
+    let state: *mut State = state;
     unsafe {
-        let obj: *mut Object = res_lval.obj;
-        assert!(!obj.is_null());
-        state_range_aredeallocands(state, &*obj, lw, up)
+        let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), &mut *state).unwrap();
+        let obj = res_lval.obj.unwrap();
+        state_range_aredeallocands(&mut *state, obj, lw, up)
     }
 }
 
@@ -643,13 +642,12 @@ fn identifier_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Prere
 fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
     let arr = ast_expr_eval(ast_expr_binary_e1(expr), state)?;
     // Note: Original seems to leak `arr`.
-    let deref_obj = state_deref(state, &arr, ast_expr_binary_e2(expr))?;
-    if deref_obj.is_null() {
+    let Some(deref_obj) = state_deref(state, &arr, ast_expr_binary_e2(expr))? else {
         return Err(Error::new(format!(
             "undefined indirection: *({expr}) has no value"
         )));
-    }
-    let Some(v) = (unsafe { object_as_value(&*deref_obj) }) else {
+    };
+    let Some(v) = object_as_value(deref_obj) else {
         return Err(Error::new(format!(
             "undefined indirection: *({expr}) has no value"
         )));
@@ -801,16 +799,13 @@ fn expr_assign_eval(assign: &AssignmentExpr, state: &mut State) -> Result<Box<Va
     let AssignmentExpr { lval, rval } = assign;
     let rval_val = ast_expr_eval(rval, state)?;
     let lval_lval = ast_expr_lvalue(lval, state)?;
-    unsafe {
-        let obj: *mut Object = lval_lval.obj;
-        if obj.is_null() {
-            return Err(Error::new(format!(
-                "undefined indirection: {lval} is not an lvalue"
-            )));
-        }
-        (*obj).assign(Some(value_copy(&rval_val)));
-        Ok(rval_val)
-    }
+    let Some(obj) = lval_lval.obj else {
+        return Err(Error::new(format!(
+            "undefined indirection: {lval} is not an lvalue"
+        )));
+    };
+    obj.assign(Some(value_copy(&rval_val)));
+    Ok(rval_val)
 }
 
 pub fn ast_expr_lvalue<'s>(expr: &'s AstExpr, state: &'s mut State) -> Result<LValue<'s>> {
@@ -831,18 +826,12 @@ pub fn expr_structmember_lvalue<'s>(
     unsafe {
         // Note: Original fails to check for errors.
         let root_lval = ast_expr_lvalue(root, &mut *state).unwrap();
-        let root_obj: *mut Object = root_lval.obj;
-        assert!(!root_obj.is_null());
-        let Some(member_obj) =
-            object_getmember(&mut *root_obj, root_lval.t.unwrap(), member, &mut *state)
-        else {
+        let root_obj = root_lval.obj.unwrap();
+        let lvalue = object_member_lvalue(root_obj, root_lval.t.unwrap(), member, &mut *state);
+        if lvalue.obj.is_none() {
             return Err(Error::new("lvalue error".to_string()));
-        };
-        let t = object_getmembertype(&mut *root_obj, root_lval.t.unwrap(), member, &mut *state);
-        Ok(LValue {
-            t,
-            obj: member_obj as *const Object as *mut Object,
-        })
+        }
+        Ok(lvalue)
     }
 }
 
@@ -854,15 +843,14 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
             let state: *mut State = state;
             unsafe {
                 let root_lval = ast_expr_lvalue(inner, &mut *state)?;
-                let root_obj: *mut Object = root_lval.obj;
-                if root_obj.is_null() {
+                let Some(root_obj) = root_lval.obj else {
                     // `root` freed
 
                     // Note: The original does `return (struct lvalue_res) { .lval = NULL, .err = NULL };`
                     // here but I believe every single caller dereferences lval without checking it for
                     // null, so it will crash.
                     panic!();
-                }
+                };
                 let t = ast_type_ptr_type(root_lval.t.unwrap());
                 let root_val = object_as_value(&*root_obj).unwrap();
                 let obj = state_deref(&mut *state, root_val, &ast_expr_constant_create(0))?;
@@ -873,13 +861,12 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
             let state: *mut State = state;
             unsafe {
                 let root_lval = ast_expr_lvalue(e1, &mut *state)?;
-                let root_obj: *mut Object = root_lval.obj;
-                if root_obj.is_null() {
+                let Some(root_obj) = root_lval.obj else {
                     // `root` freed
 
                     // Note: Original returns null. See note above.
                     panic!();
-                }
+                };
                 let t = ast_type_ptr_type(root_lval.t.unwrap());
                 let root_val = object_as_value(&*root_obj).unwrap();
                 let Ok(res_obj) = state_deref(&mut *state, root_val, e2) else {
@@ -898,7 +885,7 @@ pub fn expr_identifier_lvalue<'s>(id: &str, state: &'s mut State) -> Result<LVal
     unsafe {
         Ok(LValue {
             t: Some(state_getobjecttype(&*state, id)),
-            obj: state_getobject(&mut *state, id).map_or(ptr::null_mut(), |obj| obj as _),
+            obj: state_getobject(&mut *state, id),
         })
     }
 }
@@ -1049,12 +1036,10 @@ pub fn prepare_parameters(
         let arg = res?;
         let name = ast_expr_identifier_create(ast_variable_name(param).to_string());
         let lval_lval = ast_expr_lvalue(&name, state)?;
-        unsafe {
-            let obj: *mut Object = lval_lval.obj;
-            drop(name);
-            // Note: I think the arg is copied needlessly in the original, and one is leaked.
-            (*obj).assign(Some(value_copy(&*Box::into_raw(arg))));
-        }
+        let obj = lval_lval.obj.unwrap();
+        // Note: Original does not null-check `obj`.
+        // Note: I think the arg is copied needlessly in the original, and one is leaked.
+        obj.assign(Some(arg));
     }
     Ok(())
 }
@@ -1088,11 +1073,10 @@ fn assign_absexec(expr: &AstExpr, state: &mut State) -> Result<*mut Value> {
     }
     let lval_res = ast_expr_lvalue(lval, state)?;
     unsafe {
-        let obj: *mut Object = lval_res.obj;
-        if obj.is_null() {
+        let Some(obj) = lval_res.obj else {
             return Err(Error::new("undefined indirection (lvalue)".to_string()));
-        }
-        (*obj).assign(Some(value_copy(&*val)));
+        };
+        obj.assign(Some(value_copy(&*val)));
     }
     Ok(val)
 }
