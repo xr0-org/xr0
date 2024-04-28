@@ -1037,12 +1037,10 @@ pub fn prepare_parameters(
 }
 
 fn isdereferencable_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
+    // Note: In the original it's unclear why it's safe for `state.props` to assume ownership of
+    // `expr`. The way we solved the puzzle, copying is correct.
     let p = state.props();
-    unsafe {
-        // XXX FIXME: This definitely isn't OK. absexec has some weird stuff going on in the original.
-        // Could clone here instead.
-        p.install(Box::from_raw(expr as *const AstExpr as *mut AstExpr));
-    }
+        p.install(ast_expr_copy(expr));
     Ok(None)
 }
 
