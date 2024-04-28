@@ -210,16 +210,18 @@ pub unsafe fn object_issingular(obj: *mut Object, s: &State) -> bool {
     result
 }
 
-pub unsafe fn object_upto(
-    obj: &Object,
-    excl_up: *mut AstExpr,
-    s: *mut State,
-) -> Option<Box<Object>> {
+/// Returns an `Object` covering the slice of `obj` up to the offset (within the enclosing Block)
+/// given by `excl_up`; or `None` if `the slice would be empty.
+///
+/// # Panics
+///
+/// If `excl_up` can't be proved to be `>=` the start offset of `obj`.
+pub unsafe fn object_upto(obj: &Object, excl_up: &AstExpr, s: *mut State) -> Option<Box<Object>> {
     let lw = &obj.offset;
     let up = object_upper(obj);
-    let prop0 = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(&*excl_up));
-    let prop1 = ast_expr_eq_create(ast_expr_copy(lw), ast_expr_copy(&*excl_up));
-    let prop2 = ast_expr_eq_create(up, ast_expr_copy(&*excl_up));
+    let prop0 = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
+    let prop1 = ast_expr_eq_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
+    let prop2 = ast_expr_eq_create(up, ast_expr_copy(excl_up));
     let e0: bool = state_eval(&*s, &prop0);
     let e1: bool = state_eval(&*s, &prop1);
     let e2: bool = state_eval(&*s, &prop2);
@@ -253,10 +255,7 @@ pub unsafe fn object_upto(
     Some(object_range_create(
         ast_expr_copy(&obj.offset),
         range_create(
-            ast_expr_difference_create(
-                Box::from_raw(excl_up),
-                Box::from_raw(&**lw as *const AstExpr as *mut AstExpr),
-            ),
+            ast_expr_difference_create(ast_expr_copy(excl_up), ast_expr_copy(lw)),
             (*s).alloc().into_location(),
         ),
     ))

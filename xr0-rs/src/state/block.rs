@@ -75,17 +75,17 @@ impl Block {
         let up = ast_expr_sum_create(ast_expr_copy(offset), ast_expr_constant_create(1));
 
         // ordering makes them sequential in heap
-        let lw_ptr = Box::into_raw(lw);
-        // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down. I don't
-        // know why it isn't a double free.
-        let upto = object_upto(obj, lw_ptr, s);
-        let observed = object_value_create(ast_expr_copy(&*lw_ptr), Some((*s).alloc()));
+        // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down.
+        // `upto` is then appended to `b->arr` where it may be used (although the `lw` part of it
+        // has been freed) and will later be destroyed (a clear double free). Undefined behvaior,
+        // but the scenario does not happen in the test suite.
+        let upto = object_upto(obj, &lw, s);
+        let observed = object_value_create(lw, Some((*s).alloc()));
         let from = object_from(obj, &up, s);
         drop(up);
-        drop(Box::from_raw(lw_ptr));
 
         // delete current struct block
-        // Note: This is going to mutate self illicitly.
+        // XXX FIXME: This mutates self illicitly.
         object_dealloc(obj, s).unwrap();
         self.arr.remove(index);
 
@@ -191,10 +191,10 @@ impl Block {
             return Err(Error::new("upper bound not allocated".to_string()));
         };
 
-        // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`. I
-        // don't know why it isn't a double free.
+        // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`.
+        // It would be a double free but for a counterbug (read comments below).
         #[allow(unused_variables)]
-        let upto = object_upto(&self.arr[lw_index], lw as *const AstExpr as *mut AstExpr, s);
+        let upto = object_upto(&self.arr[lw_index], lw, s);
         #[allow(unused_variables)]
         let from = object_from(&self.arr[up_index], up, s);
 
@@ -204,17 +204,20 @@ impl Block {
         for obj in self.arr.drain(lw_index..=up_index) {
             object_dealloc(&obj, s)?;
         }
-        // Note: Original pushes these to `self.arr` instead of `new` so that they are lost when
-        // `self.arr` is overwritten with `new`. Bug in original, I'm pretty sure. Interestingly,
-        // Rust would have caught this, because the original then uses a pointer to the original
-        // array `obj` after using `object_arr_append` which invalidates that pointer. This is an
-        // example of how Rust's restrictions on aliasing are actually helpful.
+        // Note: Original pushes these to `self.arr` instead of `new` so that they are lost and
+        // leaked when `self.arr` is overwritten with `new`. Bug in original, I'm pretty sure.
+        // Interestingly, Rust would have caught this, because the original then uses a pointer to
+        // the original array `obj` after using `object_arr_append` which invalidates that pointer.
+        // This is an example of how Rust's restrictions on aliasing are actually helpful.
+        //
         // if let Some(upto) = upto {
         //     self.arr.push(upto);
         // }
         // if let Some(from) = from {
         //     self.arr.push(from);
         // }
+        //
+        // Note: Original assigns a new array to `b->arr` without freeing the old one, a leak.
         self.arr.append(&mut tail);
         Ok(())
     }
