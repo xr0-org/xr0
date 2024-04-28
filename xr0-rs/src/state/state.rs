@@ -82,32 +82,32 @@ pub unsafe fn state_copywithname(state: &State, func_name: String) -> State {
     }
 }
 
-pub unsafe fn state_str(state: *mut State) -> String {
+pub fn state_str(state: &State) -> String {
     let mut b = String::new();
     str_write!(b, "[[\n");
-    let ext = (*(*state).ext).types_str("\t");
+    let ext = (*state.ext).types_str("\t");
     if !ext.is_empty() {
         str_write!(b, "{ext}\n");
     }
-    let static_mem = (*state).static_memory.str("\t");
+    let static_mem = state.static_memory.str("\t");
     if !static_mem.is_empty() {
         str_write!(b, "{static_mem}\n");
     }
-    let vconst = (*state).vconst.str("\t");
+    let vconst = state.vconst.str("\t");
     if !vconst.is_empty() {
         str_write!(b, "{vconst}\n");
     }
-    let clump = &(*state).clump.str("\t");
+    let clump = state.clump.str("\t");
     if !clump.is_empty() {
         str_write!(b, "{clump}\n");
     }
-    let stack = (*state).stack.str(state);
+    let stack = state.stack.str(state);
     str_write!(b, "{stack}\n");
-    let props = (*state).props.str("\t");
+    let props = state.props.str("\t");
     if !props.is_empty() {
         str_write!(b, "{props}");
     }
-    let heap = (*state).heap.str("\t");
+    let heap = state.heap.str("\t");
     if !heap.is_empty() {
         str_write!(b, "\n{heap}\n");
     }
@@ -422,8 +422,8 @@ pub unsafe fn state_equal(s1: &State, s2: &State) -> bool {
     state_undeclarevars(&mut s2_c);
     state_popprops(&mut s1_c);
     state_popprops(&mut s2_c);
-    let str1 = state_str(&mut s1_c);
-    let str2 = state_str(&mut s2_c);
+    let str1 = state_str(&s1_c);
+    let str2 = state_str(&s2_c);
     let equal = str1 == str2;
     if !equal {
         vprintln!("actual: {str1}");

@@ -11,7 +11,7 @@ impl Props {
         Props { props: vec![] }
     }
 
-    pub unsafe fn str(&self, indent: &str) -> String {
+    pub fn str(&self, indent: &str) -> String {
         if self.props.is_empty() {
             return "".to_string();
         }

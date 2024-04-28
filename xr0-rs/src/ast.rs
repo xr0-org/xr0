@@ -717,7 +717,7 @@ unsafe fn expr_identifier_eval(id: &str, state: *mut State) -> Result<Box<Value>
         return Err(Error::new(format!("unknown idenitfier {id}")));
     }
     let Some(val) = object_as_value(&*obj) else {
-        vprintln!("state: {}", state_str(state));
+        vprintln!("state: {}", state_str(&*state));
         return Err(Error::new(format!(
             "undefined memory access: {id} has no value",
         )));
@@ -2968,7 +2968,7 @@ unsafe fn path_verify(
         }
     }
     if state_hasgarbage(actual_state) {
-        vprintln!("actual: {}", state_str(actual_state));
+        vprintln!("actual: {}", state_str(&*actual_state));
         return Err(Error::new(format!("{fname}: garbage on heap")));
     }
     let equiv: bool = state_equal(&*actual_state, &*abstract_state);

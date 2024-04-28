@@ -36,24 +36,24 @@ pub struct Variable {
     is_param: bool,
 }
 
-pub unsafe fn stack_str(stack: *mut Stack, state: *mut State) -> String {
+pub fn stack_str(stack: &Stack, state: &State) -> String {
     let mut b = String::new();
-    let n = (*stack).frames.len();
+    let n = stack.frames.len();
     for i in 0..n {
-        let frame: *mut StackFrame = &mut (*stack).frames[i];
-        let m: &VarMap = &(*frame).varmap;
+        let frame = &stack.frames[i];
+        let m: &VarMap = &frame.varmap;
         for (k, v) in m {
-            let var = variable_str(v, &*state);
+            let var = variable_str(v, state);
             str_write!(b, "\t{k}: {var}");
             b.push('\n');
         }
-        let result = variable_str(&(*frame).result, &*state);
+        let result = variable_str(&frame.result, state);
         str_write!(b, "\treturn: {result}\n");
         str_write!(b, "\t");
         for _ in 0..28 {
             b.push('-');
         }
-        str_write!(b, " {}\n", (*frame).name);
+        str_write!(b, " {}\n", frame.name);
     }
     b
 }
@@ -129,7 +129,7 @@ impl Stack {
         self.top().get_variable(id)
     }
 
-    pub unsafe fn str(&mut self, state: *mut State) -> String {
+    pub fn str(&self, state: &State) -> String {
         stack_str(self, state)
     }
 }
