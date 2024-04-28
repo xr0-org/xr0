@@ -358,10 +358,12 @@ pub fn value_isint(v: &Value) -> bool {
 }
 
 pub fn value_to_expr(v: &Value) -> Box<AstExpr> {
+    // Note: In the original, the return value from `value_as_literal` was redundantly copied and
+    // then leaked.
     match &v.kind {
         ValueKind::DefinitePtr(_) => ast_expr_identifier_create(value_str(v)),
         ValueKind::IndefinitePtr(_) => ast_expr_identifier_create(value_str(v)),
-        ValueKind::Literal(_) => unsafe { ast_expr_copy(&*value_as_literal(v)) },
+        ValueKind::Literal(_) => value_as_literal(v),
         ValueKind::Sync(n) => ast_expr_copy(number_as_sync(n)),
         ValueKind::Int(n) => number_to_expr(n),
         _ => panic!(),
@@ -373,11 +375,11 @@ pub fn value_isliteral(v: &Value) -> bool {
     matches!(v.kind, ValueKind::Literal(_))
 }
 
-pub fn value_as_literal(v: &Value) -> *mut AstExpr {
+pub fn value_as_literal(v: &Value) -> Box<AstExpr> {
     let ValueKind::Literal(s) = &v.kind else {
         panic!();
     };
-    Box::into_raw(ast_expr_literal_create(s.clone()))
+    ast_expr_literal_create(s.clone())
 }
 
 pub fn value_references(v: &Value, loc: &Location, s: &mut State) -> bool {
