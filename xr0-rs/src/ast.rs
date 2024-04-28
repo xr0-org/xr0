@@ -487,11 +487,8 @@ pub fn ast_expr_decide(expr: &AstExpr, state: &mut State) -> bool {
 fn expr_binary_decide(expr: &AstExpr, state: &mut State) -> bool {
     let root = ast_expr_eval(ast_expr_binary_e1(expr), state).unwrap();
     let last = ast_expr_eval(ast_expr_binary_e2(expr), state).unwrap();
-    // Note: I believe these are leaked in the original.
-    let result = value_compare(&root, ast_expr_binary_op(expr), &last);
-    std::mem::forget(root);
-    std::mem::forget(last);
-    result
+    // Note: `root` and `last` are leaked in the original.
+    value_compare(&root, ast_expr_binary_op(expr), &last)
 }
 
 fn value_compare(v1: &Value, op: AstBinaryOp, v2: &Value) -> bool {
@@ -565,8 +562,8 @@ fn unary_rangedecide(expr: &AstExpr, lw: &AstExpr, up: &AstExpr, state: &mut Sta
 }
 
 pub fn ast_expr_exec(expr: &AstExpr, state: &mut State) -> Result<()> {
-    // Note: Leaked in the original, I think.
-    std::mem::forget(ast_expr_eval(expr, state)?);
+    // Note: In the original, the value returned by `ast_expr_eval` is leaked.
+    ast_expr_eval(expr, state)?;
     Ok(())
 }
 
@@ -733,8 +730,6 @@ pub fn ast_expr_alloc_rangeprocess(
     let up_val = ast_expr_eval(up, state)?;
     let res_lw = value_to_expr(&lw_val);
     let res_up = value_to_expr(&up_val);
-    std::mem::forget(lw_val);
-    std::mem::forget(up_val);
     match &alloc.kind {
         AstExprKind::Assignment(_) => rangeprocess_alloc(alloc, &res_lw, &res_up, state),
         AstExprKind::Allocation(_) => rangeprocess_dealloc(alloc, &res_lw, &res_up, state),
@@ -769,7 +764,7 @@ fn arbarg_eval(state: &mut State) -> Result<Box<Value>> {
 
 fn expr_binary_eval(binary: &BinaryExpr, state: &mut State) -> Result<Box<Value>> {
     let BinaryExpr { op, e1, e2 } = binary;
-    // Note: I think both values are leaked in the original. XXX FIXME - value_into_expr?
+    // Note: Both values are leaked in the original.
     let v1 = ast_expr_eval(e1, state)?;
     let v2 = ast_expr_eval(e2, state)?;
     let result = value_sync_create(ast_expr_binary_create(
@@ -777,8 +772,6 @@ fn expr_binary_eval(binary: &BinaryExpr, state: &mut State) -> Result<Box<Value>
         *op,
         value_to_expr(&v2),
     ));
-    std::mem::forget(v1);
-    std::mem::forget(v2);
     Ok(result)
 }
 
@@ -788,8 +781,8 @@ fn expr_incdec_eval(incdec: &IncDecExpr, state: &mut State) -> Result<Box<Value>
         expr_assign_eval(&assign, state)
     } else {
         let res = ast_expr_eval(&incdec.operand, state);
-        // Note: This leak is in the original, I think. XXX FIXME
-        std::mem::forget(expr_assign_eval(&assign, state));
+        // Note: The original also ignored errors here.
+        let _ = expr_assign_eval(&assign, state);
         res
     }
 }
@@ -960,14 +953,13 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
     let mut computed_params = Vec::with_capacity(nparams);
     for p in uncomputed_params {
         let param = ast_expr_identifier_create(ast_variable_name(p).to_string());
+        // Note: The original leaked a result here.
         let v = ast_expr_eval(&param, s)?;
-        drop(param);
         computed_params.push(if value_islocation(&v) {
             ast_expr_identifier_create(value_str(&v))
         } else {
             value_to_expr(&v)
         });
-        std::mem::forget(v);
     }
     Ok(value_sync_create(ast_expr_call_create(
         ast_expr_identifier_create(root.to_string()),
@@ -1040,7 +1032,7 @@ fn isdereferencable_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<
     // Note: In the original it's unclear why it's safe for `state.props` to assume ownership of
     // `expr`. The way we solved the puzzle, copying is correct.
     let p = state.props();
-        p.install(ast_expr_copy(expr));
+    p.install(ast_expr_copy(expr));
     Ok(None)
 }
 
@@ -1136,6 +1128,7 @@ fn pf_augment(v: &Value, call: &CallExpr, state: &mut State) -> Result<Box<Value
     if !value_isstruct(v) {
         return Ok(value_copy(v));
     }
+    // Note: Original leaked a result and a value here.
     let res_val = call_pf_reduce(call, state)?;
     let result = value_pf_augment(v, value_as_sync(&res_val));
     std::mem::forget(res_val);
@@ -1199,9 +1192,9 @@ fn call_pf_reduce(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
     let root = ast_expr_as_identifier(fun);
     let mut reduced_args = Vec::with_capacity(unreduced_args.len());
     for arg in unreduced_args {
+        // Note: Original leaked a result and a value here.
         let val = ast_expr_pf_reduce(arg, s)?;
         reduced_args.push(value_to_expr(&val));
-        std::mem::forget(val);
     }
     Ok(value_sync_create(ast_expr_call_create(
         ast_expr_identifier_create(root.to_string()),
@@ -2069,9 +2062,7 @@ fn jump_absexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
         // Note: jump_rv can be null. Error in original.
         ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap()),
     );
-    let result = ast_expr_absexec(&expr, state);
-    std::mem::forget(expr);
-    result?;
+    ast_expr_absexec(&expr, state)?;
     Ok(())
 }
 
@@ -2122,36 +2113,32 @@ pub fn ast_stmt_create_jump(
 }
 
 pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
-    // I think this value is leaked in the original. Possibly in the sync case part of it is used
-    // and freed.
+    // This value is leaked in most paths through the original. In the sync case, part of it is
+    // used and freed.
     let v = ast_expr_pf_reduce(control, state)?;
     if value_issync(&v) {
+        // Note: Original leaks `sync`.
         let v_str = format!("{v}");
         let sync = v.into_sync();
         let p = state.props();
-        let result = if p.get(&sync) {
+        if p.get(&sync) {
             Ok(true)
         } else if p.contradicts(&sync) {
             Ok(false)
         } else {
-            let msg = format!("`{control}' with value `{v_str}' is undecidable");
-            Err(Error::new(msg))
-        };
-        std::mem::forget(sync);
-        result
+            Err(Error::new(format!(
+                "`{control}' with value `{v_str}' is undecidable"
+            )))
+        }
     } else if value_isconstant(&v) {
-        let is_nonzero = value_as_constant(&v) != 0;
-        std::mem::forget(v);
-        Ok(is_nonzero)
+        Ok(value_as_constant(&v) != 0)
     } else if value_isint(&v) {
         let zero = value_int_create(0);
-        let is_nonzero = !value_equal(&zero, &v);
-        std::mem::forget(v);
-        Ok(is_nonzero)
+        Ok(!value_equal(&zero, &v))
     } else {
-        let msg = format!("`{control}' with value `{v}' is undecidable");
-        std::mem::forget(v);
-        Err(Error::new(msg))
+        Err(Error::new(format!(
+            "`{control}' with value `{v}' is undecidable"
+        )))
     }
 }
 
