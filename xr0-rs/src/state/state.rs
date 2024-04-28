@@ -173,9 +173,7 @@ pub unsafe fn state_static_init(state: *mut State, lit: &str) -> Box<Value> {
     let address = (*state).static_memory.new_block();
     let loc = location_create_static(address, ast_expr_constant_create(0));
     let obj = state_get(state, &loc, true).unwrap();
-    if obj.is_null() {
-        panic!();
-    }
+    assert!(!obj.is_null());
     (*obj).assign(Some(value_literal_create(lit)));
     (*state).static_memory.string_pool(lit, &loc);
     value_ptr_create(loc)
@@ -324,9 +322,7 @@ pub unsafe fn state_range_alloc(
     let Some(b) = b else {
         return Err(Error::new("no block".to_string()));
     };
-    if ast_expr_equal(lw, up) {
-        panic!();
-    }
+    assert!(!ast_expr_equal(lw, up));
     // XXX FIXME: b is mutably borrowed from state and now we're going to mutate the heap
     b.range_alloc(lw, up, &mut (*state).heap)
 }

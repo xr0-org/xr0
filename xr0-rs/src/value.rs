@@ -113,9 +113,7 @@ pub fn value_struct_indefinite_create(
     // Note: The original doesn't null-check here. I wonder how it would handle `typedef struct foo
     // foo;`.
     let t = ast_type_struct_complete(t, s.ext()).unwrap();
-    if (ast_type_struct_members(t)).is_none() {
-        panic!();
-    }
+    assert!(ast_type_struct_members(t).is_some());
     let mut v = value_struct_create(t);
     let ValueKind::Struct(sv) = &mut v.kind else {
         panic!();
@@ -167,9 +165,6 @@ pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool
 }
 
 pub fn value_pf_augment(old: &Value, root: &AstExpr) -> Box<Value> {
-    if !value_isstruct(old) {
-        panic!();
-    }
     let mut v = value_copy(old);
     let ValueKind::Struct(sv) = &mut v.kind else {
         panic!();

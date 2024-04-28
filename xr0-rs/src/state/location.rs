@@ -124,9 +124,7 @@ pub fn location_copy(loc: &Location) -> Box<Location> {
 }
 
 pub fn location_with_offset(loc: &Location, offset: &AstExpr) -> Box<Location> {
-    if !offsetzero(loc) {
-        panic!();
-    }
+    assert!(offsetzero(loc));
     let mut copy = location_copy(loc);
     copy.offset = ast_expr_copy(offset);
     copy
@@ -238,9 +236,7 @@ pub unsafe fn location_range_dealloc(
     up: &AstExpr,
     state: *mut State,
 ) -> Result<()> {
-    if !offsetzero(loc) {
-        panic!();
-    }
+    assert!(offsetzero(loc));
     let Some(b) = (*state).get_block(loc) else {
         return Err(Error::new("cannot get block".to_string()));
     };

@@ -369,15 +369,11 @@ unsafe fn rangeprocess_dealloc(
 unsafe fn hack_base_object_from_alloc(expr: &AstExpr, state: *mut State) -> *mut Object {
     let inner = ast_expr_unary_operand(expr);
     let i = ast_expr_identifier_create("i".to_string());
-    if !ast_expr_equal(ast_expr_binary_e2(inner), &i) {
-        panic!();
-    }
+    assert!(ast_expr_equal(ast_expr_binary_e2(inner), &i));
     drop(i);
     let lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state).unwrap();
     let obj: *mut Object = lval.obj;
-    if obj.is_null() {
-        panic!();
-    }
+    assert!(!obj.is_null());
     obj
 }
 
@@ -420,7 +416,7 @@ unsafe fn rangeprocess_alloc(
     let lval = ast_expr_assignment_lval(expr);
     let rval = ast_expr_assignment_rval(expr);
     let AstExprKind::Allocation(alloc) = &rval.kind else {
-        panic!()
+        panic!();
     };
     assert_ne!(alloc.kind, AstAllocKind::Dealloc);
     let obj: *mut Object = hack_base_object_from_alloc(lval, state);
@@ -554,18 +550,15 @@ unsafe fn expr_isdeallocand_rangedecide(
     let inner = ast_expr_unary_operand(acc);
     let i = ast_expr_identifier_create("i".to_string());
     let j = ast_expr_identifier_create("j".to_string());
-    if !(ast_expr_equal(ast_expr_binary_e2(inner), &i)
-        || ast_expr_equal(ast_expr_binary_e2(inner), &j))
-    {
-        panic!();
-    }
+    assert!(
+        !!(ast_expr_equal(ast_expr_binary_e2(inner), &i)
+            || ast_expr_equal(ast_expr_binary_e2(inner), &j))
+    );
     drop(j);
     drop(i);
     let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), state).unwrap();
     let obj: *mut Object = res_lval.obj;
-    if obj.is_null() {
-        panic!();
-    }
+    assert!(!obj.is_null());
     state_range_aredeallocands(state, obj, lw, up)
 }
 
@@ -838,9 +831,7 @@ pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Res
     // Note: Original fails to check for errors.
     let root_lval = ast_expr_lvalue(root, state).unwrap();
     let root_obj: *mut Object = root_lval.obj;
-    if root_obj.is_null() {
-        panic!();
-    }
+    assert!(!root_obj.is_null());
     let field = ast_expr_member_field(expr);
     let Some(member) = object_getmember(&mut *root_obj, root_lval.t.unwrap(), field, state) else {
         return Err(Error::new("lvalue error".to_string()));
@@ -853,9 +844,7 @@ pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Res
 }
 
 pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
-    if !(ast_expr_unary_op(expr) == AstUnaryOp::Dereference) {
-        panic!();
-    }
+    assert_eq!(ast_expr_unary_op(expr), AstUnaryOp::Dereference);
     let inner = ast_expr_unary_operand(expr);
     if matches!(inner.kind, AstExprKind::Identifier(_)) {
         let root_lval = ast_expr_lvalue(inner, state)?;
@@ -1096,12 +1085,8 @@ unsafe fn verify_paramspec(
     }
     let param_obj = state_get(param_state, value_as_location(param), false)?;
     let arg_obj = state_get(arg_state, value_as_location(arg), false)?;
-    if param_obj.is_null() {
-        panic!();
-    }
-    if arg_obj.is_null() {
-        panic!();
-    }
+    assert!(!param_obj.is_null());
+    assert!(!arg_obj.is_null());
     if !object_hasvalue(&*param_obj) {
         return Ok(());
     }
@@ -1178,7 +1163,7 @@ pub fn ast_expr_constant_create(k: c_int) -> Box<AstExpr> {
 
 pub fn ast_expr_as_identifier(expr: &AstExpr) -> &str {
     let AstExprKind::Identifier(id) = &expr.kind else {
-        panic!()
+        panic!();
     };
     id
 }
@@ -1239,9 +1224,7 @@ unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Va
         let obj_value = object_as_value(obj).unwrap();
         return Ok(value_copy(obj_value));
     }
-    if !value_issync(&v) {
-        panic!();
-    }
+    assert!(value_issync(&v));
     Ok(value_sync_create(ast_expr_member_create(
         v.into_sync(),
         field.to_string(),
@@ -1318,21 +1301,21 @@ pub fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
 
 pub fn ast_expr_member_field(expr: &AstExpr) -> &str {
     let AstExprKind::StructMember(member) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &member.member
 }
 
 pub fn ast_expr_member_root(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::StructMember(member) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &member.root
 }
 
 pub fn ast_expr_incdec_root(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::IncDec(incdec) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &incdec.operand
 }
@@ -1377,14 +1360,14 @@ pub fn ast_expr_incdec_create(root: Box<AstExpr>, inc: bool, pre: bool) -> Box<A
 
 pub fn ast_expr_call_args(expr: &AstExpr) -> &[Box<AstExpr>] {
     let AstExprKind::Call(call) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &call.args
 }
 
 pub fn ast_expr_call_root(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Call(call) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &call.fun
 }
@@ -1400,14 +1383,14 @@ pub fn ast_expr_iteration_create() -> Box<AstExpr> {
 
 pub fn ast_expr_alloc_kind(expr: &AstExpr) -> AstAllocKind {
     let AstExprKind::Allocation(alloc) = &expr.kind else {
-        panic!()
+        panic!();
     };
     alloc.kind
 }
 
 pub fn ast_expr_alloc_arg(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Allocation(alloc) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &alloc.arg
 }
@@ -1440,14 +1423,14 @@ pub fn ast_expr_alloc_create(arg: Box<AstExpr>) -> Box<AstExpr> {
 
 pub fn ast_expr_isdeallocand_assertand(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::IsDeallocand(assertand) = &expr.kind else {
-        panic!()
+        panic!();
     };
     assertand
 }
 
 pub fn ast_expr_assignment_rval(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Assignment(assignment) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &assignment.rval
 }
@@ -1458,14 +1441,14 @@ pub fn ast_expr_copy(expr: &AstExpr) -> Box<AstExpr> {
 
 pub fn ast_expr_assignment_lval(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Assignment(assignment) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &assignment.lval
 }
 
 pub fn ast_expr_binary_e2(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Binary(binary) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &binary.e2
 }
@@ -1496,7 +1479,7 @@ impl Display for BinaryExpr {
 
 pub fn ast_expr_binary_e1(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Binary(binary) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &binary.e1
 }
@@ -1530,7 +1513,7 @@ pub fn ast_expr_ge_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
 
 pub fn ast_expr_binary_op(expr: &AstExpr) -> AstBinaryOp {
     let AstExprKind::Binary(binary) = &expr.kind else {
-        panic!()
+        panic!();
     };
     binary.op
 }
@@ -1566,14 +1549,14 @@ pub fn ast_expr_eq_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
 
 pub fn ast_expr_unary_operand(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Unary(unary) = &expr.kind else {
-        panic!()
+        panic!();
     };
     &unary.arg
 }
 
 pub fn ast_expr_unary_op(expr: &AstExpr) -> AstUnaryOp {
     let AstExprKind::Unary(unary) = &expr.kind else {
-        panic!()
+        panic!();
     };
     unary.op
 }
@@ -1659,11 +1642,11 @@ unsafe fn binary_splits(e: &AstExpr, s: *mut State) -> Result<AstStmtSplits> {
 
 fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<String> {
     let AstExprKind::Call(call) = &expr.kind else {
-        panic!()
+        panic!();
     };
     let mut res = vec![];
     let AstExprKind::Identifier(id) = &call.fun.kind else {
-        panic!()
+        panic!();
     };
     res.push(id.clone());
     for arg in &call.args {
@@ -1794,7 +1777,7 @@ pub unsafe fn ast_stmt_preprocess(stmt: &AstStmt, state: *mut State) -> Result<P
 
 pub fn ast_stmt_labelled_stmt(stmt: &AstStmt) -> &AstStmt {
     let AstStmtKind::Labelled(labelled) = &stmt.kind else {
-        panic!()
+        panic!();
     };
     &labelled.stmt
 }
@@ -1987,9 +1970,7 @@ unsafe fn stmt_jump_exec(stmt: &AstStmt, state: *mut State) -> Result<()> {
         state,
     )?;
     let obj: *mut Object = state_getresult(state);
-    if obj.is_null() {
-        panic!();
-    }
+    assert!(!obj.is_null());
     (*obj).assign(Some(value_copy(&rv_val)));
     Ok(())
 }
@@ -2018,14 +1999,14 @@ fn ast_stmt_jump_sprint(jump: &AstJumpStmt, b: &mut String) {
 
 pub fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
     let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!()
+        panic!();
     };
     &iteration.abstract_
 }
 
 pub fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
     let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!()
+        panic!();
     };
     &iteration.iter
 }
@@ -2082,14 +2063,14 @@ pub fn ast_stmt_str(stmt: &AstStmt) -> String {
 
 pub fn ast_stmt_iter_cond(stmt: &AstStmt) -> &AstStmt {
     let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!()
+        panic!();
     };
     &iteration.cond
 }
 
 pub fn ast_stmt_iter_init(stmt: &AstStmt) -> &AstStmt {
     let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!()
+        panic!();
     };
     &iteration.init
 }
@@ -2119,7 +2100,7 @@ pub fn ast_stmt_as_block(stmt: &AstStmt) -> &AstBlock {
 
 pub fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
     let AstStmtKind::Jump(jump) = &stmt.kind else {
-        panic!()
+        panic!();
     };
     jump.rv.as_deref()
 }
@@ -2276,9 +2257,7 @@ pub fn ast_stmt_create_sel(
     body: Box<AstStmt>,
     nest: Option<Box<AstStmt>>,
 ) -> Box<AstStmt> {
-    if isswitch {
-        panic!();
-    }
+    assert!(!isswitch);
     ast_stmt_create(
         loc,
         AstStmtKind::Selection(AstSelectionStmt {
@@ -2586,14 +2565,14 @@ pub fn ast_type_struct_complete<'a>(t: &'a AstType, ext: &'a Externals) -> Optio
 
 pub fn ast_type_struct_members(t: &AstType) -> Option<&[Box<AstVariable>]> {
     let AstTypeBase::Struct(s) = &t.base else {
-        panic!()
+        panic!();
     };
     s.members.as_ref().map(|v| v.as_slice())
 }
 
 pub fn ast_type_struct_tag(t: &AstType) -> Option<&str> {
     let AstTypeBase::Struct(s) = &t.base else {
-        panic!()
+        panic!();
     };
     s.tag.as_deref()
 }
@@ -2712,7 +2691,7 @@ fn ast_type_str_build_struct(b: &mut String, s: &AstStructType) {
 
 pub fn ast_type_ptr_type(t: &AstType) -> Option<&AstType> {
     let AstTypeBase::Pointer(ptr_type) = &t.base else {
-        panic!()
+        panic!();
     };
     ptr_type.as_deref()
 }
@@ -2901,9 +2880,7 @@ unsafe fn inititalise_param(param: &AstVariable, state: *mut State) -> Result<()
     let name = ast_variable_name(param);
     let t = ast_variable_type(param);
     let obj: *mut Object = state_getobject(state, name);
-    if obj.is_null() {
-        panic!();
-    }
+    assert!(!obj.is_null());
     if !object_hasvalue(&*obj) {
         let val = state_vconst(&mut *state, t, Some(name), true);
         (*obj).assign(Some(val));
@@ -2988,9 +2965,7 @@ pub unsafe fn ast_function_absexec(f: &AstFunction, state: *mut State) -> Result
         ast_stmt_absexec(stmt, state, false)?;
     }
     let obj: *mut Object = state_getresult(state);
-    if obj.is_null() {
-        panic!();
-    }
+    assert!(!obj.is_null());
     // XXX FIXME: Bad: we transmute the reference into pointer and subsequently callers transmute
     // it further into a Box. How did ownership even; we don't know.
     Ok(object_as_value(&*obj).map_or(ptr::null_mut(), |r| r as *const Value as *mut Value))

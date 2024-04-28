@@ -25,9 +25,7 @@ impl Props {
     }
 
     pub fn install(&mut self, e: Box<AstExpr>) {
-        if self.contradicts(&e) {
-            panic!();
-        }
+        debug_assert!(!self.contradicts(&e));
         self.props.push(e);
     }
 
