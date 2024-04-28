@@ -115,10 +115,6 @@ pub fn state_str(state: &State) -> String {
     b
 }
 
-pub unsafe fn state_getext(s: *mut State) -> *const Externals {
-    &*(*s).ext as _
-}
-
 impl State {
     pub fn ext(&self) -> &Externals {
         &self.ext
@@ -127,26 +123,26 @@ impl State {
     pub fn externals_arc(&self) -> Arc<Externals> {
         Arc::clone(&self.ext)
     }
+
+    pub fn heap(&mut self) -> &mut Heap {
+        &mut self.heap
+    }
+
+    pub fn props(&mut self) -> &mut Props {
+        &mut self.props
+    }
 }
 
-pub unsafe fn state_getheap(s: *mut State) -> *mut Heap {
-    &mut (*s).heap
-}
-
-pub unsafe fn state_getprops(s: &mut State) -> &mut Props {
-    &mut s.props
-}
-
-pub unsafe fn state_pushframe(state: *mut State, func: String, ret_type: &AstType) {
-    (*state).stack.push(func, ret_type);
+pub unsafe fn state_pushframe(state: &mut State, func: String, ret_type: &AstType) {
+    state.stack.push(func, ret_type);
 }
 
 pub unsafe fn state_popframe(state: *mut State) {
     (*state).stack.pop_frame();
 }
 
-pub unsafe fn state_declare(state: *mut State, var: &AstVariable, isparam: bool) {
-    (*state).stack.declare(var, isparam);
+pub unsafe fn state_declare(state: &mut State, var: &AstVariable, isparam: bool) {
+    state.stack.declare(var, isparam);
 }
 
 pub fn state_vconst(
@@ -163,18 +159,18 @@ pub fn state_vconst(
     value_sync_create(ast_expr_identifier_create(c))
 }
 
-pub unsafe fn state_static_init(state: *mut State, lit: &str) -> Box<Value> {
-    if let Some(loc) = (*state).static_memory.check_pool(lit) {
+pub unsafe fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
+    if let Some(loc) = state.static_memory.check_pool(lit) {
         // Note: Original creates a value that points to this existing location. This is a
         // double-free. When the value is destroyed, the location will be destroyed, even though it
         // is still in the static pool.
         return value_ptr_create(Box::new(loc.clone()));
     }
-    let address = (*state).static_memory.new_block();
+    let address = state.static_memory.new_block();
     let loc = location_create_static(address, ast_expr_constant_create(0));
-    let obj = state_get(&mut *state, &loc, true).unwrap().unwrap();
+    let obj = state_get(state, &loc, true).unwrap().unwrap();
     obj.assign(Some(value_literal_create(lit)));
-    (*state).static_memory.string_pool(lit, &loc);
+    state.static_memory.string_pool(lit, &loc);
     value_ptr_create(loc)
 }
 
@@ -291,7 +287,7 @@ pub unsafe fn state_getobject<'s>(state: &'s mut State, id: &str) -> Option<&'s 
 }
 
 pub unsafe fn state_deref(
-    state: *mut State,
+    state: &mut State,
     ptr_val: &Value,
     index: &AstExpr,
 ) -> Result<*mut Object> {
@@ -301,7 +297,7 @@ pub unsafe fn state_deref(
     let deref_base = value_as_location(ptr_val);
     // Note: the original leaked this location.
     let deref = location_with_offset(deref_base, index);
-    state_get(&mut *state, &deref, true)
+    state_get(state, &deref, true)
         .map(|opt| opt.map_or(ptr::null_mut(), |obj| obj as _))
         .map_err(|err| Error::new(format!("undefined indirection: {}", err.msg)))
 }
@@ -349,7 +345,7 @@ impl State {
 }
 
 pub unsafe fn state_range_dealloc(
-    state: *mut State,
+    state: &mut State,
     obj: *mut Object,
     lw: &AstExpr,
     up: &AstExpr,
@@ -361,7 +357,7 @@ pub unsafe fn state_range_dealloc(
     location_range_dealloc(deref, lw, up, state)
 }
 
-pub unsafe fn state_addresses_deallocand(state: *mut State, obj: *mut Object) -> bool {
+pub unsafe fn state_addresses_deallocand(state: &mut State, obj: *mut Object) -> bool {
     // Note: Original doesn't null-check. Might not be necessary.
     let val = object_as_value(&*obj).unwrap();
     let loc = value_as_location(val);
@@ -376,7 +372,7 @@ impl State {
 }
 
 pub unsafe fn state_range_aredeallocands(
-    state: *mut State,
+    state: &mut State,
     obj: *mut Object,
     lw: &AstExpr,
     up: &AstExpr,
@@ -388,27 +384,32 @@ pub unsafe fn state_range_aredeallocands(
         return false;
     };
     let deref = value_as_location(arr_val);
-    let b = location_getblock(
-        deref,
-        &mut (*state).static_memory,
-        &mut (*state).vconst,
-        &mut (*state).stack,
-        &mut (*state).heap,
-        &mut (*state).clump,
-    )
-    .unwrap();
-    match b {
-        Some(b) => b.range_aredeallocands(lw, up, state),
-        None => false,
+    let state: *mut State = state;
+    unsafe {
+        let b = location_getblock(
+            deref,
+            &mut (*state).static_memory,
+            &mut (*state).vconst,
+            &mut (*state).stack,
+            &mut (*state).heap,
+            &mut (*state).clump,
+        )
+        .unwrap();
+        match b {
+            Some(b) => b.range_aredeallocands(lw, up, &mut *state),
+            None => false,
+        }
     }
 }
 
-pub unsafe fn state_hasgarbage(state: *mut State) -> bool {
-    !(*state).heap.referenced(state)
+pub unsafe fn state_hasgarbage(state: &mut State) -> bool {
+    let state: *mut State = state;
+    unsafe { !(*state).heap.referenced(&mut *state) }
 }
 
-pub unsafe fn state_references(s: *mut State, loc: &Location) -> bool {
-    (*s).stack.references(loc, s)
+pub unsafe fn state_references(s: &mut State, loc: &Location) -> bool {
+    let s: *mut State = s;
+    unsafe { (*s).stack.references(loc, &mut *s) }
 }
 
 pub fn state_eval(s: &State, e: &AstExpr) -> bool {
@@ -434,16 +435,19 @@ pub unsafe fn state_equal(s1: &State, s2: &State) -> bool {
     equal
 }
 
-unsafe fn state_undeclareliterals(s: *mut State) {
-    (*s).static_memory = StaticMemory::new();
+unsafe fn state_undeclareliterals(s: &mut State) {
+    s.static_memory = StaticMemory::new();
 }
 
-unsafe fn state_undeclarevars(s: *mut State) {
-    (*s).heap.undeclare(s);
-    (*s).vconst.undeclare();
-    (*s).stack.undeclare(s);
+unsafe fn state_undeclarevars(s: &mut State) {
+    let s: *mut State = s;
+    unsafe {
+        (*s).heap.undeclare(&mut *s);
+        (*s).vconst.undeclare();
+        (*s).stack.undeclare(&mut *s);
+    }
 }
 
-unsafe fn state_popprops(s: *mut State) {
-    (*s).props = Props::new();
+unsafe fn state_popprops(s: &mut State) {
+    s.props = Props::new();
 }

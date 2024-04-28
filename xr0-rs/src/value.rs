@@ -134,7 +134,7 @@ pub fn value_struct_indefinite_create(
 }
 
 #[allow(dead_code)]
-pub unsafe fn value_transfigure(v: *mut Value, compare: *mut State, islval: bool) -> *mut Value {
+pub unsafe fn value_transfigure(v: *mut Value, compare: &mut State, islval: bool) -> *mut Value {
     match &(*v).kind {
         ValueKind::Sync(_) | ValueKind::Literal(_) => {
             if islval {
@@ -198,7 +198,7 @@ fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     m
 }
 
-unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> Box<Value> {
+unsafe fn value_struct_abstractcopy(old: &StructValue, s: &mut State) -> Box<Value> {
     value_create(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(&old.members),
         m: abstract_copy_members(&old.m, s),
@@ -207,7 +207,7 @@ unsafe fn value_struct_abstractcopy(old: &StructValue, s: *mut State) -> Box<Val
 
 unsafe fn abstract_copy_members(
     old: &HashMap<String, Box<Object>>,
-    s: *mut State,
+    s: &mut State,
 ) -> HashMap<String, Box<Object>> {
     old.iter()
         .map(|(k, v)| (k.clone(), object_abstractcopy(v, s)))
@@ -237,7 +237,7 @@ pub fn value_copy(v: &Value) -> Box<Value> {
     Box::new(v.clone())
 }
 
-pub unsafe fn value_abstractcopy(v: &Value, s: *mut State) -> Option<Box<Value>> {
+pub unsafe fn value_abstractcopy(v: &Value, s: &mut State) -> Option<Box<Value>> {
     if !value_referencesheap(v, s) {
         return None;
     }
@@ -304,7 +304,7 @@ impl Value {
     }
 }
 
-pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
+pub unsafe fn value_referencesheap(v: &Value, s: &mut State) -> bool {
     match &v.kind {
         ValueKind::DefinitePtr(loc) => location_referencesheap(loc, s),
         ValueKind::IndefinitePtr(_) => false,
@@ -313,7 +313,7 @@ pub unsafe fn value_referencesheap(v: &Value, s: *mut State) -> bool {
     }
 }
 
-unsafe fn struct_referencesheap(sv: &StructValue, s: *mut State) -> bool {
+unsafe fn struct_referencesheap(sv: &StructValue, s: &mut State) -> bool {
     sv.m.values().any(|obj| {
         let Some(val) = object_as_value(obj) else {
             return false;
@@ -386,7 +386,7 @@ pub unsafe fn value_as_literal(v: &Value) -> *mut AstExpr {
     Box::into_raw(ast_expr_literal_create(s.clone()))
 }
 
-pub unsafe fn value_references(v: &Value, loc: &Location, s: *mut State) -> bool {
+pub unsafe fn value_references(v: &Value, loc: &Location, s: &mut State) -> bool {
     match &v.kind {
         ValueKind::DefinitePtr(vloc) => location_references(vloc, loc, s),
         ValueKind::Struct(sv) => struct_references(sv, loc, s),
@@ -394,7 +394,7 @@ pub unsafe fn value_references(v: &Value, loc: &Location, s: *mut State) -> bool
     }
 }
 
-unsafe fn struct_references(sv: &StructValue, loc: &Location, s: *mut State) -> bool {
+unsafe fn struct_references(sv: &StructValue, loc: &Location, s: &mut State) -> bool {
     sv.m.values().any(|obj| {
         let Some(val) = object_as_value(obj) else {
             return false;

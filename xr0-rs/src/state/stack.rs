@@ -108,7 +108,7 @@ impl Stack {
         self.frames.last_mut().unwrap()
     }
 
-    pub unsafe fn references(&self, loc: &Location, state: *mut State) -> bool {
+    pub unsafe fn references(&self, loc: &Location, state: &mut State) -> bool {
         // Note: Original only checks the top stack frame.
         self.top().references(loc, state)
     }
@@ -117,7 +117,7 @@ impl Stack {
         self.top_mut().declare(var, is_param);
     }
 
-    pub unsafe fn undeclare(&mut self, state: *mut State) {
+    pub unsafe fn undeclare(&mut self, state: &mut State) {
         self.top_mut().undeclare(state);
     }
 
@@ -148,7 +148,7 @@ impl StackFrame {
         self.varmap.insert(id.to_string(), var);
     }
 
-    pub unsafe fn undeclare(&mut self, state: *mut State) {
+    pub unsafe fn undeclare(&mut self, state: &mut State) {
         let new_result = variable_abstractcopy(&self.result, state);
         self.result = new_result;
         let m = std::mem::replace(&mut self.varmap, Box::new(VarMap::new()));
@@ -169,7 +169,7 @@ impl StackFrame {
         self.varmap.get(id).map(|boxed| &**boxed)
     }
 
-    pub unsafe fn references(&self, loc: &Location, state: *mut State) -> bool {
+    pub unsafe fn references(&self, loc: &Location, state: &mut State) -> bool {
         if variable_references(&self.result, loc, state) {
             return true;
         }
@@ -202,16 +202,19 @@ pub unsafe fn variable_create(
     })
 }
 
-unsafe fn variable_abstractcopy(old: &Variable, s: *mut State) -> Box<Variable> {
+unsafe fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
     let new = Box::new(Variable {
         type_: old.type_.clone(),
         is_param: old.is_param,
         loc: old.loc.clone(),
     });
-    let obj = state_get(&mut *s, &new.loc, false).unwrap().unwrap();
-    if object_isvalue(obj) {
-        if let Some(v) = object_as_value(obj) {
-            obj.assign(value_abstractcopy(v, s));
+    let s: *mut State = s;
+    unsafe {
+        let obj = state_get(&mut *s, &new.loc, false).unwrap().unwrap();
+        if object_isvalue(obj) {
+            if let Some(v) = object_as_value(obj) {
+                obj.assign(value_abstractcopy(v, &mut *s));
+            }
         }
     }
     new
@@ -254,7 +257,7 @@ impl Variable {
     }
 }
 
-pub unsafe fn variable_references(v: &Variable, loc: &Location, s: *mut State) -> bool {
+pub unsafe fn variable_references(v: &Variable, loc: &Location, s: &mut State) -> bool {
     assert!(!loc.type_is_vconst());
     location_references(&v.loc, loc, s)
 }

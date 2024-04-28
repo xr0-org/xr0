@@ -88,7 +88,7 @@ impl Heap {
         self.blocks[address].freed
     }
 
-    pub unsafe fn undeclare(&mut self, s: *mut State) {
+    pub unsafe fn undeclare(&mut self, s: &mut State) {
         // XXX FIXME: s aliases h and `Block::undeclare` actually accesses h.
         for block in &mut self.blocks {
             if !block.freed {
@@ -97,7 +97,7 @@ impl Heap {
         }
     }
 
-    pub unsafe fn referenced(&self, s: *mut State) -> bool {
+    pub unsafe fn referenced(&self, s: &mut State) -> bool {
         for i in 0..self.blocks.len() {
             if !self.blocks[i].freed && !block_referenced(s, i) {
                 return false;
@@ -107,7 +107,7 @@ impl Heap {
     }
 }
 
-unsafe fn block_referenced(s: *mut State, addr: usize) -> bool {
+unsafe fn block_referenced(s: &mut State, addr: usize) -> bool {
     let loc = location_create_dynamic(addr, ast_expr_constant_create(0));
     state_references(s, &loc)
 }

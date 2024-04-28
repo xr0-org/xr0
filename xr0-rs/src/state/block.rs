@@ -114,7 +114,7 @@ impl Block {
         // delete current struct block
         // Note: 99-program/000-matrix.x gets here, so the code is exercised; but it doesn't make
         // sense to free the allocation as a side effect here.
-        object_dealloc(obj, s).unwrap();
+        object_dealloc(obj, &mut *s).unwrap();
         self.arr.remove(index);
 
         if let Some(upto) = upto {
@@ -130,7 +130,7 @@ impl Block {
         Some(&mut self.arr[observed_index])
     }
 
-    pub unsafe fn references(&self, loc: &Location, s: *mut State) -> bool {
+    pub unsafe fn references(&self, loc: &Location, s: &mut State) -> bool {
         self.arr.iter().any(|obj| object_references(obj, loc, s))
     }
 
@@ -152,25 +152,25 @@ impl Block {
         Ok(())
     }
 
-    pub unsafe fn range_aredeallocands(&self, lw: &AstExpr, up: &AstExpr, s: *mut State) -> bool {
+    pub unsafe fn range_aredeallocands(&self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> bool {
         if self.hack_first_object_is_exactly_bounds(lw, up, s) {
             return true;
         }
-        let Some(lw_index) = object_arr_index(&self.arr, lw, &*s) else {
+        let Some(lw_index) = object_arr_index(&self.arr, lw, s) else {
             return false;
         };
-        let Some(up_index) = object_arr_index_upperincl(&self.arr, up, &*s) else {
+        let Some(up_index) = object_arr_index_upperincl(&self.arr, up, s) else {
             return false;
         };
         for i in lw_index..up_index {
-            if !object_isdeallocand(&self.arr[i], &mut *s) {
+            if !object_isdeallocand(&self.arr[i], s) {
                 return false;
             }
-            if !object_contig_precedes(&self.arr[i], &self.arr[i + 1], &*s) {
+            if !object_contig_precedes(&self.arr[i], &self.arr[i + 1], s) {
                 return false;
             }
         }
-        assert!(object_isdeallocand(&self.arr[up_index], &mut *s));
+        assert!(object_isdeallocand(&self.arr[up_index], s));
         true
     }
 
@@ -208,7 +208,7 @@ impl Block {
         s: *mut State,
     ) -> Result<()> {
         if self.hack_first_object_is_exactly_bounds(lw, up, s) {
-            object_dealloc(&self.arr[0], s)?;
+            object_dealloc(&self.arr[0], &mut *s)?;
             self.arr.remove(0);
             return Ok(());
         }
@@ -230,7 +230,7 @@ impl Block {
         // then retain `arr[up_index + 1..]`.
         let mut tail = self.arr.split_off(up_index + 1);
         for obj in self.arr.drain(lw_index..=up_index) {
-            object_dealloc(&obj, s)?;
+            object_dealloc(&obj, &mut *s)?;
         }
         // Note: Original pushes these to `self.arr` instead of `new` so that they are lost and
         // leaked when `self.arr` is overwritten with `new`. Bug in original, I'm pretty sure.
@@ -250,7 +250,7 @@ impl Block {
         Ok(())
     }
 
-    pub unsafe fn undeclare(&mut self, s: *mut State) {
+    pub unsafe fn undeclare(&mut self, s: &mut State) {
         let mut new = vec![];
         for obj in &self.arr {
             if object_referencesheap(obj, s) {

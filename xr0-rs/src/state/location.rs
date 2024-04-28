@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
-use crate::state::state::{state_get, state_getheap};
+use crate::state::state::state_get;
 use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
 use crate::util::{Error, Result};
 use crate::{AstExpr, Value};
@@ -141,27 +141,33 @@ fn location_equal(l1: &Location, l2: &Location) -> bool {
     l1.kind == l2.kind && l1.block == l2.block && ast_expr_equal(&l1.offset, &l2.offset)
 }
 
-pub unsafe fn location_references(l1: &Location, l2: &Location, s: *mut State) -> bool {
+pub unsafe fn location_references(l1: &Location, l2: &Location, s: &mut State) -> bool {
     if location_equal(l1, l2) {
         return true;
     }
-    match (*s).get_block(l1) {
-        None => false,
-        Some(b) => b.references(l2, s),
+    let s: *mut State = s;
+    unsafe {
+        match (*s).get_block(l1) {
+            None => false,
+            Some(b) => b.references(l2, &mut *s),
+        }
     }
 }
 
-pub unsafe fn location_referencesheap(l: &Location, s: *mut State) -> bool {
+pub unsafe fn location_referencesheap(l: &Location, s: &mut State) -> bool {
     if matches!(l.kind, LocationKind::Dynamic) {
-        if (*state_getheap(s)).block_is_freed(l.block) {
+        if s.heap().block_is_freed(l.block) {
             return false;
         }
         return true;
     }
-    let Some(obj) = state_get(&mut *s, l, false).unwrap() else {
-        return false;
-    };
-    object_referencesheap(&*obj, s)
+    let s: *mut State = s;
+    unsafe {
+        let Some(obj) = state_get(&mut *s, l, false).unwrap() else {
+            return false;
+        };
+        object_referencesheap(&*obj, &mut *s)
+    }
 }
 
 pub fn location_getblock<'s>(
@@ -220,17 +226,20 @@ pub unsafe fn location_range_dealloc(
     loc: &Location,
     lw: &AstExpr,
     up: &AstExpr,
-    state: *mut State,
+    state: &mut State,
 ) -> Result<()> {
     assert!(offsetzero(loc));
-    let Some(b) = (*state).get_block(loc) else {
-        return Err(Error::new("cannot get block".to_string()));
-    };
-    if !b.range_aredeallocands(lw, up, state) {
-        println!("block: {b}");
-        println!("lw: {lw}, up: {up}");
-        debug_assert!(false);
-        return Err(Error::new("some values not allocated".to_string()));
+    let state: *mut State = state;
+    unsafe {
+        let Some(b) = (*state).get_block(loc) else {
+            return Err(Error::new("cannot get block".to_string()));
+        };
+        if !b.range_aredeallocands(lw, up, &mut *state) {
+            println!("block: {b}");
+            println!("lw: {lw}, up: {up}");
+            debug_assert!(false);
+            return Err(Error::new("some values not allocated".to_string()));
+        }
+        b.range_dealloc(lw, up, &mut *state)
     }
-    b.range_dealloc(lw, up, state)
 }

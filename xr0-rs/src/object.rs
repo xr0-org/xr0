@@ -6,7 +6,7 @@ use crate::ast::{
     ast_type_struct_complete, c_int,
 };
 use crate::state::location::{location_dealloc, location_references};
-use crate::state::state::{state_eval, state_getext};
+use crate::state::state::state_eval;
 use crate::state::State;
 use crate::util::Result;
 use crate::value::{
@@ -57,7 +57,7 @@ pub fn object_copy(old: &Object) -> Box<Object> {
     Box::new(old.clone())
 }
 
-pub unsafe fn object_abstractcopy(old: &Object, s: *mut State) -> Box<Object> {
+pub unsafe fn object_abstractcopy(old: &Object, s: &mut State) -> Box<Object> {
     match &old.kind {
         ObjectKind::DeallocandRange(_) => object_copy(old),
         ObjectKind::Value(v) => object_value_create(
@@ -84,7 +84,7 @@ impl Display for ObjectKind {
     }
 }
 
-pub unsafe fn object_referencesheap(obj: &Object, s: *mut State) -> bool {
+pub unsafe fn object_referencesheap(obj: &Object, s: &mut State) -> bool {
     match &obj.kind {
         ObjectKind::Value(Some(v)) => value_referencesheap(v, s),
         ObjectKind::Value(None) => false,
@@ -115,7 +115,7 @@ pub fn object_isdeallocand(obj: &Object, s: &mut State) -> bool {
     }
 }
 
-pub unsafe fn object_references(obj: &Object, loc: &Location, s: *mut State) -> bool {
+pub unsafe fn object_references(obj: &Object, loc: &Location, s: &mut State) -> bool {
     match &obj.kind {
         ObjectKind::DeallocandRange(range) => range_references(range, loc, s),
         ObjectKind::Value(None) => false,
@@ -287,7 +287,7 @@ pub fn object_from(obj: &Object, incl_lw: &AstExpr, s: &mut State) -> Option<Box
     ))
 }
 
-pub unsafe fn object_dealloc(obj: &Object, s: *mut State) -> Result<()> {
+pub unsafe fn object_dealloc(obj: &Object, s: &mut State) -> Result<()> {
     // Note: Original doesn't handle the possibility of Value(None) here.
     match &obj.kind {
         ObjectKind::Value(Some(v)) => (*s).dealloc(v),
@@ -300,21 +300,22 @@ pub unsafe fn object_getmember<'obj>(
     obj: &'obj mut Object,
     t: &AstType,
     member: &str,
-    s: *mut State,
+    s: &mut State,
 ) -> Option<&'obj Object> {
+    // XXX FIXME this lifetime can't be right, should be 's
     value_struct_member(getorcreatestruct(obj, t, s), member)
 }
 
 unsafe fn getorcreatestruct<'obj>(
     obj: &'obj mut Object,
     t: &AstType,
-    s: *mut State,
+    s: &mut State,
 ) -> &'obj Value {
     // XXX FIXME: very silly rust construction because of borrow checker limitation
     if object_as_value(obj).is_some() {
         object_as_value(obj).unwrap()
     } else {
-        let complete = ast_type_struct_complete(t, &*state_getext(s)).unwrap();
+        let complete = ast_type_struct_complete(t, s.ext()).unwrap();
         obj.assign(Some(value_struct_create(complete)));
         object_as_value(&*obj).unwrap()
     }
@@ -324,7 +325,7 @@ pub unsafe fn object_getmembertype<'obj>(
     obj: &'obj mut Object,
     t: &AstType,
     member: &str,
-    s: *mut State,
+    s: &mut State,
 ) -> Option<&'obj AstType> {
     value_struct_membertype(getorcreatestruct(obj, t, s), member)
 }
@@ -344,17 +345,17 @@ pub fn range_size(r: &Range) -> &AstExpr {
     &r.size
 }
 
-pub unsafe fn range_dealloc(r: &Range, s: *mut State) -> Result<()> {
+pub unsafe fn range_dealloc(r: &Range, s: &mut State) -> Result<()> {
     // Note: The original creates a value that borrows the location from `r`, then leaks the value
     // to avoid double-freeing the location.
-    location_dealloc(&r.loc, &mut (*s).heap)
+    location_dealloc(&r.loc, &mut s.heap)
 }
 
 pub fn range_isdeallocand(r: &Range, s: &mut State) -> bool {
     s.loc_is_deallocand(&r.loc)
 }
 
-pub unsafe fn range_references(r: &Range, loc: &Location, s: *mut State) -> bool {
+pub unsafe fn range_references(r: &Range, loc: &Location, s: &mut State) -> bool {
     location_references(&r.loc, loc, s)
 }
 
