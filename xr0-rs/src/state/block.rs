@@ -148,10 +148,8 @@ impl Block {
     }
 
     pub fn range_aredeallocands(&self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> bool {
-        unsafe {
-            if self.hack_first_object_is_exactly_bounds(lw, up, s) {
-                return true;
-            }
+        if self.hack_first_object_is_exactly_bounds(lw, up, s) {
+            return true;
         }
         let Some(lw_index) = object_arr_index(&self.arr, lw, s) else {
             return false;
@@ -171,31 +169,22 @@ impl Block {
         true
     }
 
-    unsafe fn hack_first_object_is_exactly_bounds(
+    fn hack_first_object_is_exactly_bounds(
         &self,
         lw: &AstExpr,
         up: &AstExpr,
-        s: *mut State,
+        s: &mut State,
     ) -> bool {
         assert!(!self.arr.is_empty());
         let obj = &self.arr[0];
-        if !object_isdeallocand(obj, &mut *s) {
+        if !object_isdeallocand(obj, s) {
             return false;
         }
-        // Note: Original leaks these outer expressions to avoid double-freeing the inner ones.
-        // XXX FIXME: invalid use of Box - make a borrowed expr type
-        let same_lw = ast_expr_eq_create(
-            Box::from_raw(lw as *const AstExpr as *mut AstExpr),
-            Box::from_raw(&*obj.offset as *const AstExpr as *mut AstExpr),
-        );
-        let same_up = ast_expr_eq_create(
-            Box::from_raw(up as *const AstExpr as *mut AstExpr),
-            object_upper(obj),
-        );
-        let result = state_eval(&*s, &same_lw) && state_eval(&*s, &same_up);
-        std::mem::forget(same_lw);
-        std::mem::forget(same_up);
-        result
+        // Note: Original does not do these copies; instead it leaks the outer expressions created
+        // here to avoid double-freeing the inner ones.
+        let same_lw = ast_expr_eq_create(ast_expr_copy(lw), ast_expr_copy(&obj.offset));
+        let same_up = ast_expr_eq_create(ast_expr_copy(up), object_upper(obj));
+        state_eval(s, &same_lw) && state_eval(s, &same_up)
     }
 
     pub unsafe fn range_dealloc(
@@ -204,7 +193,7 @@ impl Block {
         up: &AstExpr,
         s: *mut State,
     ) -> Result<()> {
-        if self.hack_first_object_is_exactly_bounds(lw, up, s) {
+        if self.hack_first_object_is_exactly_bounds(lw, up, &mut *s) {
             object_dealloc(&self.arr[0], &mut *s)?;
             self.arr.remove(0);
             return Ok(());
