@@ -1188,17 +1188,13 @@ unsafe fn unary_pf_reduce(e: &AstExpr, s: *mut State) -> Result<Box<Value>> {
     )))
 }
 
-unsafe fn binary_pf_reduce(
-    e1: &AstExpr,
-    op: AstBinaryOp,
-    e2: &AstExpr,
-    s: *mut State,
-) -> Result<Box<Value>> {
+unsafe fn binary_pf_reduce(binary: &BinaryExpr, s: *mut State) -> Result<Box<Value>> {
+    let BinaryExpr { e1, op, e2 } = binary;
     let v1 = ast_expr_pf_reduce(e1, s)?;
     let v2 = ast_expr_pf_reduce(e2, s)?;
     Ok(value_sync_create(ast_expr_binary_create(
         value_to_expr(&*Box::into_raw(v1)),
-        op,
+        *op,
         value_to_expr(&*Box::into_raw(v2)),
     )))
 }
@@ -1220,18 +1216,18 @@ unsafe fn call_pf_reduce(call: &CallExpr, s: *mut State) -> Result<Box<Value>> {
     )))
 }
 
-unsafe fn structmember_pf_reduce(expr: &AstExpr, s: *mut State) -> Result<Box<Value>> {
-    let v = ast_expr_pf_reduce(ast_expr_member_root(expr), s)?;
-    let field = ast_expr_member_field(expr);
+unsafe fn structmember_pf_reduce(sm: &StructMemberExpr, s: *mut State) -> Result<Box<Value>> {
+    let StructMemberExpr { root, member } = sm;
+    let v = ast_expr_pf_reduce(root, s)?;
     if value_isstruct(&v) {
-        let obj = value_struct_member(&v, field).unwrap();
+        let obj = value_struct_member(&v, member).unwrap();
         let obj_value = object_as_value(obj).unwrap();
         return Ok(value_copy(obj_value));
     }
     assert!(value_issync(&v));
     Ok(value_sync_create(ast_expr_member_create(
         v.into_sync(),
-        field.to_string(),
+        member.to_string(),
     )))
 }
 
@@ -1241,9 +1237,9 @@ pub unsafe fn ast_expr_pf_reduce(e: &AstExpr, s: *mut State) -> Result<Box<Value
             ast_expr_eval(e, s)
         }
         AstExprKind::Unary(_) => unary_pf_reduce(e, s),
-        AstExprKind::Binary(binary) => binary_pf_reduce(&binary.e1, binary.op, &binary.e2, s),
+        AstExprKind::Binary(binary) => binary_pf_reduce(binary, s),
         AstExprKind::Call(call) => call_pf_reduce(call, s),
-        AstExprKind::StructMember(_) => structmember_pf_reduce(e, s),
+        AstExprKind::StructMember(sm) => structmember_pf_reduce(sm, s),
         AstExprKind::Bracketed(inner) => ast_expr_pf_reduce(inner, s),
         _ => panic!(),
     }
@@ -1301,20 +1297,6 @@ pub fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
     } else {
         copy
     }
-}
-
-pub fn ast_expr_member_field(expr: &AstExpr) -> &str {
-    let AstExprKind::StructMember(member) = &expr.kind else {
-        panic!();
-    };
-    &member.member
-}
-
-pub fn ast_expr_member_root(expr: &AstExpr) -> &AstExpr {
-    let AstExprKind::StructMember(member) = &expr.kind else {
-        panic!();
-    };
-    &member.root
 }
 
 pub fn ast_expr_member_create(struct_: Box<AstExpr>, field: String) -> Box<AstExpr> {
@@ -2409,7 +2391,7 @@ pub unsafe fn ast_stmt_splits(stmt: &AstStmt, s: *mut State) -> Result<AstStmtSp
 }
 
 unsafe fn stmt_sel_splits(selection: &AstSelectionStmt, s: *mut State) -> Result<AstStmtSplits> {
-    // Note: is this unwrap in the original?
+    // Note: The original asserts that no error occurred, rather than propagate.
     let v = Box::into_raw(ast_expr_pf_reduce(&selection.cond, s).unwrap());
     let e = value_to_expr(&*v);
     if condexists(&e, s) || value_isconstant(&*v) {
