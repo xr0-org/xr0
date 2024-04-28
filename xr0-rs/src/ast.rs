@@ -607,9 +607,7 @@ unsafe fn binary_assume(b: &BinaryExpr, value: bool, s: *mut State) -> Result<Pr
     let v2 = ast_expr_pf_reduce(&b.e2, s).unwrap();
     // Note: original leaks the expression.
     let expr = ast_expr_binary_create(value_to_expr(&v1), b.op, value_to_expr(&v2));
-    let result = irreducible_assume(&expr, value, s);
-    std::mem::forget(expr);
-    result
+    irreducible_assume(&expr, value, s)
 }
 
 unsafe fn irreducible_assume(e: &AstExpr, value: bool, s: *mut State) -> Result<Preresult> {
