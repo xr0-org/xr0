@@ -147,8 +147,8 @@ fn object_size(obj: &Object) -> Box<AstExpr> {
 }
 
 #[allow(dead_code)]
-pub fn object_lower(obj: &mut Object) -> *mut AstExpr {
-    &mut *obj.offset
+pub fn object_lower(obj: &Object) -> &AstExpr {
+    &obj.offset
 }
 
 pub fn object_upper(obj: &Object) -> Box<AstExpr> {
