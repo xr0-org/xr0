@@ -152,54 +152,46 @@ pub fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     let lw = &obj.offset;
     let up = object_upper(obj);
     let of = offset;
-    // Note: Original leaks the expressions to avoid double-freeing subexpressions.
     let e1 = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(of));
     let e2 = ast_expr_lt_create(ast_expr_copy(of), ast_expr_copy(&up));
     state_eval(s, &e1) && state_eval(s, &e2)
 }
 
 pub fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &State) -> bool {
-    let lw: *mut AstExpr = &*obj.offset as *const AstExpr as *mut AstExpr;
+    let lw = &obj.offset;
     let up = object_upper(obj);
-    let of: *mut AstExpr = offset as *const AstExpr as *mut AstExpr;
-    unsafe {
-        // Note: Original leaks the expressions to avoid double-freeing subexpressions.
-        let lower_bound_expr = ast_expr_le_create(Box::from_raw(lw), Box::from_raw(of));
-        let upper_bound_expr = ast_expr_le_create(Box::from_raw(of), up);
-        let result = state_eval(s, &lower_bound_expr) && state_eval(s, &upper_bound_expr);
-        std::mem::forget(lower_bound_expr);
-        std::mem::forget(upper_bound_expr);
-        result
-    }
+    let of = offset;
+    // Note: These copies are not in the original. Original leaks the expressions to avoid
+    // double-freeing subexpressions.
+    let lower_bound_expr = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(of));
+    let upper_bound_expr = ast_expr_le_create(ast_expr_copy(of), up);
+    state_eval(s, &lower_bound_expr) && state_eval(s, &upper_bound_expr)
 }
 
 #[allow(dead_code)]
 pub fn object_isempty(obj: &Object, s: &State) -> bool {
     let lw = &obj.offset;
     let up = object_upper(obj);
-    // Note: Original leaks the expression to avoid double-freeing subexpressions.
+    // Note: Original does not make a copy of `lw`; instead it leaks the expression to avoid
+    // double-freeing subexpressions.
     state_eval(s, &ast_expr_eq_create(ast_expr_copy(lw), up))
 }
 
 pub fn object_contig_precedes(before: &Object, after: &Object, s: &State) -> bool {
-    unsafe {
-        let lw = object_upper(before);
-        let up: *mut AstExpr = &*after.offset as *const AstExpr as *mut AstExpr;
-        // Note: Original leaks the expression to avoid double-freeing subexpressions.
-        // XXX FIXME: invalid use of Box - make a borrowed expr type
-        let expr = ast_expr_eq_create(lw, Box::from_raw(up));
-        let result = state_eval(s, &expr);
-        std::mem::forget(expr);
-        result
-    }
+    let lw = object_upper(before);
+    let up = &after.offset;
+    // Note: Original does not make a copy of `up`; instead it leaks the expression to avoid
+    // double-freeing subexpressions.
+    state_eval(s, &ast_expr_eq_create(lw, ast_expr_copy(up)))
 }
 
 #[allow(dead_code)]
 pub fn object_issingular(obj: &Object, s: &State) -> bool {
     let lw = &obj.offset;
     let up = object_upper(obj);
+    // Note: Original does not make a copy of `lw`; instead it leaks the expression to avoid
+    // double-freeing subexpressions.
     let lw_succ = ast_expr_sum_create(ast_expr_copy(lw), ast_expr_constant_create(1));
-    // Note: Original leaks the expression to avoid double-freeing subexpressions.
     state_eval(s, &ast_expr_eq_create(lw_succ, up))
 }
 

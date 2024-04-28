@@ -161,13 +161,12 @@ pub fn location_referencesheap(l: &Location, s: &mut State) -> bool {
         }
         return true;
     }
-    let s: *mut State = s;
-    unsafe {
-        let Some(obj) = state_get(&mut *s, l, false).unwrap() else {
-            return false;
-        };
-        object_referencesheap(&*obj, &mut *s)
-    }
+    let Some(obj) = state_get(&mut *s, l, false).unwrap() else {
+        return false;
+    };
+    // Note: Clone is not in the original. Added here to satisfy Rust's alias analysis.
+    let obj = obj.clone();
+    object_referencesheap(&obj, &mut *s)
 }
 
 pub fn location_getblock<'s>(
