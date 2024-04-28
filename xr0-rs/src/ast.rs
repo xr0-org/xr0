@@ -819,68 +819,72 @@ unsafe fn expr_assign_eval(assign: &AssignmentExpr, state: *mut State) -> Result
 
 pub unsafe fn ast_expr_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
     match &expr.kind {
-        AstExprKind::Identifier(_) => expr_identifier_lvalue(expr, state),
-        AstExprKind::Unary(_) => expr_unary_lvalue(expr, state),
-        AstExprKind::StructMember(_) => expr_structmember_lvalue(expr, state),
+        AstExprKind::Identifier(id) => expr_identifier_lvalue(id, state),
+        AstExprKind::Unary(unary) => expr_unary_lvalue(unary, state),
+        AstExprKind::StructMember(sm) => expr_structmember_lvalue(sm, state),
         _ => panic!(),
     }
 }
 
-pub unsafe fn expr_structmember_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
-    let root = ast_expr_member_root(expr);
+pub unsafe fn expr_structmember_lvalue(sm: &StructMemberExpr, state: *mut State) -> Result<LValue> {
+    let StructMemberExpr { root, member } = sm;
     // Note: Original fails to check for errors.
     let root_lval = ast_expr_lvalue(root, state).unwrap();
     let root_obj: *mut Object = root_lval.obj;
     assert!(!root_obj.is_null());
-    let field = ast_expr_member_field(expr);
-    let Some(member) = object_getmember(&mut *root_obj, root_lval.t.unwrap(), field, state) else {
+    let Some(member_obj) = object_getmember(&mut *root_obj, root_lval.t.unwrap(), member, state)
+    else {
         return Err(Error::new("lvalue error".to_string()));
     };
-    let t = object_getmembertype(&mut *root_obj, root_lval.t.unwrap(), field, state);
+    let t = object_getmembertype(&mut *root_obj, root_lval.t.unwrap(), member, state);
     Ok(LValue {
         t,
-        obj: member as *const Object as *mut Object,
+        obj: member_obj as *const Object as *mut Object,
     })
 }
 
-pub unsafe fn expr_unary_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
-    assert_eq!(ast_expr_unary_op(expr), AstUnaryOp::Dereference);
-    let inner = ast_expr_unary_operand(expr);
-    if matches!(inner.kind, AstExprKind::Identifier(_)) {
-        let root_lval = ast_expr_lvalue(inner, state)?;
-        let root_obj: *mut Object = root_lval.obj;
-        if root_obj.is_null() {
-            // `root` freed
+pub unsafe fn expr_unary_lvalue(unary: &UnaryExpr, state: *mut State) -> Result<LValue> {
+    assert_eq!(unary.op, AstUnaryOp::Dereference);
+    let inner = &unary.arg;
+    match &inner.kind {
+        AstExprKind::Identifier(_) => {
+            let root_lval = ast_expr_lvalue(inner, state)?;
+            let root_obj: *mut Object = root_lval.obj;
+            if root_obj.is_null() {
+                // `root` freed
 
-            // Note: The original does `return (struct lvalue_res) { .lval = NULL, .err = NULL };`
-            // here but I believe every single caller dereferences lval without checking it for
-            // null, so it will crash.
-            panic!();
+                // Note: The original does `return (struct lvalue_res) { .lval = NULL, .err = NULL };`
+                // here but I believe every single caller dereferences lval without checking it for
+                // null, so it will crash.
+                panic!();
+            }
+            let t = ast_type_ptr_type(root_lval.t.unwrap());
+            let root_val = object_as_value(&*root_obj).unwrap();
+            let obj = state_deref(state, root_val, &ast_expr_constant_create(0))?;
+            Ok(LValue { t, obj })
         }
-        let t = ast_type_ptr_type(root_lval.t.unwrap());
-        let root_val = object_as_value(&*root_obj).unwrap();
-        let obj = state_deref(state, root_val, &ast_expr_constant_create(0))?;
-        return Ok(LValue { t, obj });
-    }
-    let root_lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state)?;
-    let root_obj: *mut Object = root_lval.obj;
-    if root_obj.is_null() {
-        // `root` freed
+        AstExprKind::Binary(BinaryExpr { op: _, e1, e2 }) => {
+            let root_lval = ast_expr_lvalue(e1, state)?;
+            let root_obj: *mut Object = root_lval.obj;
+            if root_obj.is_null() {
+                // `root` freed
 
-        // Note: Original returns null. See note above.
-        panic!();
+                // Note: Original returns null. See note above.
+                panic!();
+            }
+            let t = ast_type_ptr_type(root_lval.t.unwrap());
+            let root_val = object_as_value(&*root_obj).unwrap();
+            let Ok(res_obj) = state_deref(state, root_val, e2) else {
+                // Note: Original returns null. See note above.
+                panic!();
+            };
+            Ok(LValue { t, obj: res_obj })
+        }
+        _ => panic!(),
     }
-    let t = ast_type_ptr_type(root_lval.t.unwrap());
-    let root_val = object_as_value(&*root_obj).unwrap();
-    let Ok(res_obj) = state_deref(state, root_val, ast_expr_binary_e2(inner)) else {
-        // Note: Original returns null. See note above.
-        panic!();
-    };
-    Ok(LValue { t, obj: res_obj })
 }
 
-pub unsafe fn expr_identifier_lvalue(expr: &AstExpr, state: *mut State) -> Result<LValue> {
-    let id = ast_expr_as_identifier(expr);
+pub unsafe fn expr_identifier_lvalue(id: &str, state: *mut State) -> Result<LValue> {
     Ok(LValue {
         t: Some(state_getobjecttype(&*state, id)),
         obj: state_getobject(state, id),
