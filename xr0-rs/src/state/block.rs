@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use super::{Heap, State};
 use crate::ast::ast_expr_copy;
-use crate::object::{object_arr_index, object_arr_index_upperincl, object_dealloc, range_create};
+use crate::object::{object_arr_index, object_arr_index_upperincl, range_create};
 use crate::state::state::state_eval;
 use crate::util::{Error, Result};
 use crate::{AstExpr, Location, Object};
@@ -106,7 +106,7 @@ impl Block {
         // delete current struct block
         // Note: 99-program/000-matrix.x gets here, so the code is exercised; but it doesn't make
         // sense to free the allocation as a side effect here.
-        object_dealloc(obj, s).unwrap();
+        obj.dealloc(s).unwrap();
         self.arr.remove(index);
 
         if let Some(upto) = upto {
@@ -181,7 +181,7 @@ impl Block {
 
     pub fn range_dealloc(&mut self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> Result<()> {
         if self.hack_first_object_is_exactly_bounds(lw, up, s) {
-            object_dealloc(&self.arr[0], s)?;
+            self.arr[0].dealloc(s)?;
             self.arr.remove(0);
             return Ok(());
         }
@@ -203,7 +203,7 @@ impl Block {
         // then retain `arr[up_index + 1..]`.
         let mut tail = self.arr.split_off(up_index + 1);
         for obj in self.arr.drain(lw_index..=up_index) {
-            object_dealloc(&obj, s)?;
+            obj.dealloc(s)?;
         }
         // Note: Original pushes these to `self.arr` instead of `new` so that they are lost and
         // leaked when `self.arr` is overwritten with `new`. Bug in original, I'm pretty sure.

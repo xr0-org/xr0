@@ -282,14 +282,14 @@ impl Object {
             ),
         ))
     }
-}
 
-pub fn object_dealloc(obj: &Object, s: &mut State) -> Result<()> {
-    // Note: Original doesn't handle the possibility of Value(None) here.
-    match &obj.kind {
-        ObjectKind::Value(Some(v)) => (*s).dealloc(v),
-        ObjectKind::Value(None) => panic!(),
-        ObjectKind::DeallocandRange(range) => range_dealloc(range, s),
+    pub fn dealloc(&self, s: &mut State) -> Result<()> {
+        // Note: Original doesn't handle the possibility of Value(None) here.
+        match &self.kind {
+            ObjectKind::Value(Some(v)) => (*s).dealloc(v),
+            ObjectKind::Value(None) => panic!(),
+            ObjectKind::DeallocandRange(range) => range_dealloc(range, s),
+        }
     }
 }
 
