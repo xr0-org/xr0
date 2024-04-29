@@ -350,25 +350,3 @@ pub fn range_isdeallocand(r: &Range, s: &mut State) -> bool {
 pub fn range_references(r: &Range, loc: &Location, s: &mut State) -> bool {
     location_references(&r.loc, loc, s)
 }
-
-pub fn object_arr_index(arr: &[Box<Object>], offset: &AstExpr, state: &State) -> Option<usize> {
-    for (i, obj) in arr.iter().enumerate() {
-        if obj.contains(offset, state) {
-            return Some(i);
-        }
-    }
-    None
-}
-
-pub fn object_arr_index_upperincl(
-    arr: &[Box<Object>],
-    offset: &AstExpr,
-    state: &State,
-) -> Option<usize> {
-    for (i, obj) in arr.iter().enumerate() {
-        if obj.contains_upperincl(offset, state) {
-            return Some(i);
-        }
-    }
-    None
-}

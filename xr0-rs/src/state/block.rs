@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use super::{Heap, State};
 use crate::ast::ast_expr_copy;
-use crate::object::{object_arr_index, object_arr_index_upperincl, range_create};
+use crate::object::range_create;
 use crate::state::state::state_eval;
 use crate::util::{Error, Result};
 use crate::{AstExpr, Location, Object};
@@ -232,4 +232,26 @@ impl Block {
         }
         self.arr = new;
     }
+}
+
+pub fn object_arr_index(arr: &[Box<Object>], offset: &AstExpr, state: &State) -> Option<usize> {
+    for (i, obj) in arr.iter().enumerate() {
+        if obj.contains(offset, state) {
+            return Some(i);
+        }
+    }
+    None
+}
+
+pub fn object_arr_index_upperincl(
+    arr: &[Box<Object>],
+    offset: &AstExpr,
+    state: &State,
+) -> Option<usize> {
+    for (i, obj) in arr.iter().enumerate() {
+        if obj.contains_upperincl(offset, state) {
+            return Some(i);
+        }
+    }
+    None
 }
