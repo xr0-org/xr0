@@ -43,59 +43,61 @@ pub enum NumberKind {
     Computed(Box<AstExpr>),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct NumberRange {
     pub lower: NumberValue,
     pub upper: NumberValue,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum NumberValue {
     Constant(i32),
     Limit(bool),
 }
 
-fn value_create(kind: ValueKind) -> Box<Value> {
-    Box::new(Value { kind })
+impl Value {
+    fn new(kind: ValueKind) -> Box<Value> {
+        Box::new(Value { kind })
+    }
 }
 
 pub fn value_ptr_create(loc: Box<Location>) -> Box<Value> {
-    value_create(ValueKind::DefinitePtr(loc))
+    Value::new(ValueKind::DefinitePtr(loc))
 }
 
 pub fn value_ptr_indefinite_create() -> Box<Value> {
-    value_create(ValueKind::IndefinitePtr(number_indefinite_create()))
+    Value::new(ValueKind::IndefinitePtr(number_indefinite_create()))
 }
 
 pub fn value_int_create(val: i32) -> Box<Value> {
-    value_create(ValueKind::Int(number_single_create(val)))
+    Value::new(ValueKind::Int(number_single_create(val)))
 }
 
 pub fn value_literal_create(lit: &str) -> Box<Value> {
-    value_create(ValueKind::Literal(lit.to_string()))
+    Value::new(ValueKind::Literal(lit.to_string()))
 }
 
 #[allow(dead_code)]
 pub fn value_int_ne_create(not_val: i32) -> Box<Value> {
-    value_create(ValueKind::Int(number_ne_create(not_val)))
+    Value::new(ValueKind::Int(number_ne_create(not_val)))
 }
 
 #[allow(dead_code)]
 pub fn value_int_range_create(lw: i32, excl_up: i32) -> Box<Value> {
-    value_create(ValueKind::Int(number_with_range_create(lw, excl_up)))
+    Value::new(ValueKind::Int(number_with_range_create(lw, excl_up)))
 }
 
 pub fn value_int_indefinite_create() -> Box<Value> {
-    value_create(ValueKind::Int(number_indefinite_create()))
+    Value::new(ValueKind::Int(number_indefinite_create()))
 }
 
 pub fn value_sync_create(e: Box<AstExpr>) -> Box<Value> {
-    value_create(ValueKind::Sync(number_computed_create(e)))
+    Value::new(ValueKind::Sync(number_computed_create(e)))
 }
 
 pub fn value_struct_create(t: &AstType) -> Box<Value> {
     let members = ast_type_struct_members(t).expect("can't create value of incomplete type");
-    value_create(ValueKind::Struct(Box::new(StructValue {
+    Value::new(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(members),
         m: from_members(members),
     })))
@@ -202,7 +204,7 @@ fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
 }
 
 fn value_struct_abstractcopy(old: &StructValue, s: &mut State) -> Box<Value> {
-    value_create(ValueKind::Struct(Box::new(StructValue {
+    Value::new(ValueKind::Struct(Box::new(StructValue {
         members: ast_variable_arr_copy(&old.members),
         m: abstract_copy_members(&old.m, s),
     })))
@@ -429,8 +431,8 @@ fn number_single_create(val: i32) -> Box<Number> {
 
 fn number_range_arr_single_create(val: i32) -> Vec<NumberRange> {
     vec![number_range_create(
-        number_value_constant_create(val),
-        number_value_constant_create(val + 1),
+        NumberValue::Constant(val),
+        NumberValue::Constant(val + 1),
     )]
 }
 
@@ -440,11 +442,8 @@ fn number_computed_create(e: Box<AstExpr>) -> Box<Number> {
 
 fn number_range_arr_ne_create(val: i32) -> Vec<NumberRange> {
     vec![
-        number_range_create(number_value_min_create(), number_value_constant_create(val)),
-        number_range_create(
-            number_value_constant_create(val + 1),
-            number_value_max_create(),
-        ),
+        number_range_create(NumberValue::MIN, NumberValue::Constant(val)),
+        number_range_create(NumberValue::Constant(val + 1), NumberValue::MAX),
     ]
 }
 
@@ -454,34 +453,16 @@ fn number_ne_create(val: i32) -> Box<Number> {
 
 fn number_with_range_create(lw: i32, excl_up: i32) -> Box<Number> {
     number_ranges_create(vec![number_range_create(
-        number_value_constant_create(lw),
-        number_value_constant_create(excl_up),
+        NumberValue::Constant(lw),
+        NumberValue::Constant(excl_up),
     )])
 }
 
 fn number_indefinite_create() -> Box<Number> {
     number_ranges_create(vec![number_range_create(
-        number_value_min_create(),
-        number_value_max_create(),
+        NumberValue::MIN,
+        NumberValue::MAX,
     )])
-}
-
-#[allow(dead_code)]
-fn number_range_lw(n: &Number) -> i32 {
-    let NumberKind::Ranges(ranges) = &n.kind else {
-        panic!();
-    };
-    assert_eq!(ranges.len(), 1);
-    number_value_as_constant(ranges[0].lower)
-}
-
-#[allow(dead_code)]
-fn number_range_up(n: &Number) -> i32 {
-    let NumberKind::Ranges(ranges) = &n.kind else {
-        panic!();
-    };
-    assert_eq!(ranges.len(), 1);
-    number_value_as_constant(ranges[0].upper)
 }
 
 fn number_ranges_to_string(ranges: &[NumberRange]) -> String {
@@ -508,29 +489,18 @@ impl Display for Number {
 
 fn number_equal(n1: &Number, n2: &Number) -> bool {
     match (&n1.kind, &n2.kind) {
-        (NumberKind::Ranges(ranges1), NumberKind::Ranges(ranges2)) => {
-            number_ranges_equal(ranges1, ranges2)
-        }
+        (NumberKind::Ranges(ranges1), NumberKind::Ranges(ranges2)) => ranges1 == ranges2,
         (NumberKind::Computed(c1), NumberKind::Computed(c2)) => ast_expr_equal(c1, c2),
         _ => panic!(),
     }
-}
-
-fn number_ranges_equal(n1: &[NumberRange], n2: &[NumberRange]) -> bool {
-    let len = n1.len();
-    if len != n2.len() {
-        return false;
-    }
-    n1.iter()
-        .zip(n2)
-        .all(|(nr1, nr2)| number_range_equal(nr1, nr2))
 }
 
 fn number_assume(n: &mut Number, value: bool) -> bool {
     let NumberKind::Ranges(ranges) = &mut n.kind else {
         panic!();
     };
-    if !number_range_arr_canbe(ranges, value) {
+
+    if !ranges.iter().any(|range| range.can_be(value)) {
         return false;
     }
     *ranges = number_range_assumed_value(value);
@@ -549,7 +519,7 @@ fn number_isconstant(n: &Number) -> bool {
     let NumberKind::Ranges(ranges) = &n.kind else {
         panic!();
     };
-    ranges.len() == 1 && number_range_issingle(&ranges[0])
+    ranges.len() == 1 && ranges[0].is_single()
 }
 
 fn number_as_constant(n: &Number) -> i32 {
@@ -590,10 +560,6 @@ fn number_ranges_to_expr(arr: &[NumberRange]) -> Box<AstExpr> {
     AstExpr::new_constant(number_range_as_constant(&arr[0]))
 }
 
-fn number_range_arr_canbe(arr: &[NumberRange], value: bool) -> bool {
-    arr.iter().any(|range| number_range_canbe(range, value))
-}
-
 fn number_range_create(lw: NumberValue, up: NumberValue) -> NumberRange {
     NumberRange {
         lower: lw,
@@ -603,7 +569,7 @@ fn number_range_create(lw: NumberValue, up: NumberValue) -> NumberRange {
 
 impl Display for NumberRange {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if number_range_issingle(self) {
+        if self.is_single() {
             write!(f, "{}", self.lower)
         } else {
             write!(f, "{}:{}", self.lower, self.upper)
@@ -611,46 +577,31 @@ impl Display for NumberRange {
     }
 }
 
-fn number_range_canbe(r: &NumberRange, value: bool) -> bool {
-    if value {
-        if number_value_equal(&r.lower, &r.upper) {
-            return false;
+impl NumberRange {
+    fn can_be(&self, value: bool) -> bool {
+        if value {
+            if self.lower == self.upper {
+                return false;
+            }
+            number_value_le_constant(self.lower, -1) || constant_le_number_value(1, self.lower)
+        } else {
+            number_value_le_constant(self.lower, 0) && constant_le_number_value(1, self.upper)
         }
-        number_value_le_constant(r.lower, -1) || constant_le_number_value(1, r.lower)
-    } else {
-        number_value_le_constant(r.lower, 0) && constant_le_number_value(1, r.upper)
     }
-}
 
-fn number_range_issingle(r: &NumberRange) -> bool {
-    number_values_aresingle(&r.lower, &r.upper)
-}
-
-fn number_range_equal(r1: &NumberRange, r2: &NumberRange) -> bool {
-    number_value_equal(&r1.lower, &r2.lower) && number_value_equal(&r1.upper, &r2.upper)
+    fn is_single(&self) -> bool {
+        number_values_aresingle(&self.lower, &self.upper)
+    }
 }
 
 fn number_range_as_constant(r: &NumberRange) -> i32 {
-    if !number_range_issingle(r) {
+    if !r.is_single() {
         panic!();
     }
-    number_value_as_constant(r.lower)
-}
-
-fn number_value_constant_create(constant: i32) -> NumberValue {
-    NumberValue::Constant(constant)
-}
-
-fn number_value_limit_create(max: bool) -> NumberValue {
-    NumberValue::Limit(max)
-}
-
-fn number_value_min_create() -> NumberValue {
-    number_value_limit_create(false)
-}
-
-fn number_value_max_create() -> NumberValue {
-    number_value_limit_create(true)
+    match r.lower {
+        NumberValue::Constant(k) => k,
+        _ => panic!(),
+    }
 }
 
 impl Display for NumberValue {
@@ -663,33 +614,10 @@ impl Display for NumberValue {
     }
 }
 
-fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {
-    match (*v1, *v2) {
-        (NumberValue::Constant(k1), NumberValue::Constant(k2)) => k1 == k2 - 1,
-        (NumberValue::Limit(max1), NumberValue::Limit(max2)) => max1 == max2,
-        _ => panic!(),
-    }
-}
-
 #[allow(dead_code)]
 fn number_value_difference(v1: &NumberValue, v2: &NumberValue) -> i32 {
     match (*v1, *v2) {
         (NumberValue::Constant(v1), NumberValue::Constant(v2)) => v1 - v2,
-        _ => panic!(),
-    }
-}
-
-fn number_value_equal(v1: &NumberValue, v2: &NumberValue) -> bool {
-    match (*v1, *v2) {
-        (NumberValue::Constant(k1), NumberValue::Constant(k2)) => k1 == k2,
-        (NumberValue::Limit(max1), NumberValue::Limit(max2)) => max1 == max2,
-        _ => panic!(),
-    }
-}
-
-fn number_value_as_constant(v: NumberValue) -> i32 {
-    match v {
-        NumberValue::Constant(k) => k,
         _ => panic!(),
     }
 }
@@ -705,5 +633,18 @@ fn constant_le_number_value(constant: i32, v: NumberValue) -> bool {
     match v {
         NumberValue::Constant(k) => constant <= k,
         NumberValue::Limit(max) => max,
+    }
+}
+
+impl NumberValue {
+    const MIN: Self = NumberValue::Limit(false);
+    const MAX: Self = NumberValue::Limit(true);
+}
+
+fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {
+    match (*v1, *v2) {
+        (NumberValue::Constant(k1), NumberValue::Constant(k2)) => k1 == k2 - 1,
+        (NumberValue::Limit(max1), NumberValue::Limit(max2)) => max1 == max2,
+        _ => panic!(),
     }
 }
