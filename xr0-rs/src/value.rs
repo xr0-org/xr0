@@ -66,11 +66,11 @@ pub fn value_ptr_create(loc: Box<Location>) -> Box<Value> {
 }
 
 pub fn value_ptr_indefinite_create() -> Box<Value> {
-    Value::new(ValueKind::IndefinitePtr(number_indefinite_create()))
+    Value::new(ValueKind::IndefinitePtr(Number::new_indefinite()))
 }
 
 pub fn value_int_create(val: i32) -> Box<Value> {
-    Value::new(ValueKind::Int(number_single_create(val)))
+    Value::new(ValueKind::Int(Number::new_single(val)))
 }
 
 pub fn value_literal_create(lit: &str) -> Box<Value> {
@@ -79,20 +79,20 @@ pub fn value_literal_create(lit: &str) -> Box<Value> {
 
 #[allow(dead_code)]
 pub fn value_int_ne_create(not_val: i32) -> Box<Value> {
-    Value::new(ValueKind::Int(number_ne_create(not_val)))
+    Value::new(ValueKind::Int(Number::new_ne(not_val)))
 }
 
 #[allow(dead_code)]
 pub fn value_int_range_create(lw: i32, excl_up: i32) -> Box<Value> {
-    Value::new(ValueKind::Int(number_with_range_create(lw, excl_up)))
+    Value::new(ValueKind::Int(Number::new_range(lw, excl_up)))
 }
 
 pub fn value_int_indefinite_create() -> Box<Value> {
-    Value::new(ValueKind::Int(number_indefinite_create()))
+    Value::new(ValueKind::Int(Number::new_indefinite()))
 }
 
 pub fn value_sync_create(e: Box<AstExpr>) -> Box<Value> {
-    Value::new(ValueKind::Sync(number_computed_create(e)))
+    Value::new(ValueKind::Sync(Number::new_computed(e)))
 }
 
 pub fn value_struct_create(t: &AstType) -> Box<Value> {
@@ -254,10 +254,6 @@ impl Display for Value {
     }
 }
 
-pub fn value_str(v: &Value) -> String {
-    format!("{v}")
-}
-
 impl Display for StructValue {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "struct:{{")?;
@@ -360,8 +356,8 @@ pub fn value_to_expr(v: &Value) -> Box<AstExpr> {
     // Note: In the original, the return value from `value_as_literal` was redundantly copied and
     // then leaked.
     match &v.kind {
-        ValueKind::DefinitePtr(_) => AstExpr::new_identifier(value_str(v)),
-        ValueKind::IndefinitePtr(_) => AstExpr::new_identifier(value_str(v)),
+        ValueKind::DefinitePtr(_) => AstExpr::new_identifier(v.to_string()),
+        ValueKind::IndefinitePtr(_) => AstExpr::new_identifier(v.to_string()),
         ValueKind::Literal(_) => value_as_literal(v),
         ValueKind::Sync(n) => ast_expr_copy(number_as_sync(n)),
         ValueKind::Int(n) => number_to_expr(n),
@@ -417,71 +413,56 @@ pub fn value_assume(v: &mut Value, value: bool) -> bool {
     }
 }
 
-fn number_create(kind: NumberKind) -> Box<Number> {
-    Box::new(Number { kind })
-}
-
-fn number_ranges_create(ranges: Vec<NumberRange>) -> Box<Number> {
-    number_create(NumberKind::Ranges(ranges))
-}
-
-fn number_single_create(val: i32) -> Box<Number> {
-    number_create(NumberKind::Ranges(number_range_arr_single_create(val)))
-}
-
-fn number_range_arr_single_create(val: i32) -> Vec<NumberRange> {
-    vec![number_range_create(
-        NumberValue::Constant(val),
-        NumberValue::Constant(val + 1),
-    )]
-}
-
-fn number_computed_create(e: Box<AstExpr>) -> Box<Number> {
-    number_create(NumberKind::Computed(e))
-}
-
-fn number_range_arr_ne_create(val: i32) -> Vec<NumberRange> {
-    vec![
-        number_range_create(NumberValue::MIN, NumberValue::Constant(val)),
-        number_range_create(NumberValue::Constant(val + 1), NumberValue::MAX),
-    ]
-}
-
-fn number_ne_create(val: i32) -> Box<Number> {
-    number_ranges_create(number_range_arr_ne_create(val))
-}
-
-fn number_with_range_create(lw: i32, excl_up: i32) -> Box<Number> {
-    number_ranges_create(vec![number_range_create(
-        NumberValue::Constant(lw),
-        NumberValue::Constant(excl_up),
-    )])
-}
-
-fn number_indefinite_create() -> Box<Number> {
-    number_ranges_create(vec![number_range_create(
-        NumberValue::MIN,
-        NumberValue::MAX,
-    )])
-}
-
-fn number_ranges_to_string(ranges: &[NumberRange]) -> String {
-    let mut b = "{".to_string();
-    let n = ranges.len();
-    for (i, range) in ranges.iter().enumerate() {
-        b += &format!("{range}");
-        if i + 1 < n {
-            b += ", ";
-        }
+impl Number {
+    fn new(kind: NumberKind) -> Box<Number> {
+        Box::new(Number { kind })
     }
-    b.push('}');
-    b
+
+    fn from_ranges(ranges: Vec<NumberRange>) -> Box<Number> {
+        Number::new(NumberKind::Ranges(ranges))
+    }
+
+    fn new_single(val: i32) -> Box<Number> {
+        Number::from_ranges(NumberRange::arr_single_create(val))
+    }
+
+    fn new_ne(val: i32) -> Box<Number> {
+        Number::from_ranges(NumberRange::arr_ne_create(val))
+    }
+
+    fn new_range(lw: i32, excl_up: i32) -> Box<Number> {
+        Number::from_ranges(vec![number_range_create(
+            NumberValue::Constant(lw),
+            NumberValue::Constant(excl_up),
+        )])
+    }
+
+    fn new_indefinite() -> Box<Number> {
+        Number::from_ranges(vec![number_range_create(
+            NumberValue::MIN,
+            NumberValue::MAX,
+        )])
+    }
+
+    fn new_computed(e: Box<AstExpr>) -> Box<Self> {
+        Number::new(NumberKind::Computed(e))
+    }
 }
 
 impl Display for Number {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.kind {
-            NumberKind::Ranges(ranges) => write!(f, "{}", number_ranges_to_string(ranges)),
+            NumberKind::Ranges(ranges) => {
+                write!(f, "{{")?;
+                let n = ranges.len();
+                for (i, range) in ranges.iter().enumerate() {
+                    write!(f, "{range}")?;
+                    if i + 1 < n {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "}}")
+            }
             NumberKind::Computed(computation) => write!(f, "{computation}"),
         }
     }
@@ -509,9 +490,9 @@ fn number_assume(n: &mut Number, value: bool) -> bool {
 
 fn number_range_assumed_value(value: bool) -> Vec<NumberRange> {
     if value {
-        number_range_arr_ne_create(0)
+        NumberRange::arr_ne_create(0)
     } else {
-        number_range_arr_single_create(0)
+        NumberRange::arr_single_create(0)
     }
 }
 
@@ -591,6 +572,20 @@ impl NumberRange {
 
     fn is_single(&self) -> bool {
         number_values_aresingle(&self.lower, &self.upper)
+    }
+
+    fn arr_single_create(val: i32) -> Vec<NumberRange> {
+        vec![number_range_create(
+            NumberValue::Constant(val),
+            NumberValue::Constant(val + 1),
+        )]
+    }
+
+    fn arr_ne_create(val: i32) -> Vec<NumberRange> {
+        vec![
+            number_range_create(NumberValue::MIN, NumberValue::Constant(val)),
+            number_range_create(NumberValue::Constant(val + 1), NumberValue::MAX),
+        ]
     }
 }
 

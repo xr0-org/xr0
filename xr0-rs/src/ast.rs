@@ -17,7 +17,7 @@ use crate::util::{Error, InsertionOrderMap, Result, SemiBox};
 use crate::value::{
     value_as_constant, value_as_location, value_as_sync, value_copy, value_equal, value_int_create,
     value_int_indefinite_create, value_isconstant, value_isint, value_islocation, value_isstruct,
-    value_issync, value_literal_create, value_pf_augment, value_ptr_indefinite_create, value_str,
+    value_issync, value_literal_create, value_pf_augment, value_ptr_indefinite_create,
     value_struct_indefinite_create, value_struct_member, value_sync_create, value_to_expr,
 };
 use crate::{str_write, vprintln, Externals, Object, Value};
@@ -1077,7 +1077,7 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
         // Note: The original leaked a result here.
         let v = ast_expr_eval(&param, s)?;
         computed_params.push(if value_islocation(&v) {
-            AstExpr::new_identifier(value_str(&v))
+            AstExpr::new_identifier(v.to_string())
         } else {
             value_to_expr(&v)
         });
