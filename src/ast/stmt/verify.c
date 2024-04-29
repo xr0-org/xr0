@@ -726,7 +726,8 @@ sel_setupabsexec(struct ast_stmt *stmt, struct state *state)
 			*nest = ast_stmt_sel_nest(stmt);
 	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
-		assert(false); /* should always be decidable */
+		/* XXX: if error must be decidable in some other branch */
+		return NULL;
 	}
 	if (dec.decision) {
 		return ast_stmt_setupabsexec(body, state);
