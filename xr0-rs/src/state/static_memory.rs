@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use super::Block;
 use crate::{str_write, Location};
 
+// Note: The original had a destructor `static_memory_destroy` which leaked the allocation
+// containing the static_memory value.
 #[derive(Clone)]
 pub struct StaticMemory {
     pub blocks: Vec<Box<Block>>,

@@ -7,6 +7,10 @@ use crate::state::{Block, Heap, Stack, State};
 use crate::util::{Error, Result};
 use crate::{AstExpr, Value};
 
+/// An abstract memory address.
+///
+/// A `Location` is always precise as to which `Block` contains the address, but it can be abstract
+/// as to the offset within the block.
 #[derive(Clone)]
 pub struct Location {
     pub kind: LocationKind,

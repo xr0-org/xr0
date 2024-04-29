@@ -19,8 +19,12 @@ use crate::{
     str_write, vprintln, AstExpr, AstType, AstVariable, Externals, Location, Object, Props, Value,
 };
 
-// Note: The original had a destructor `state_destroy` which used a function
-// `static_memory_destroy` which leaked the allocation containing the static_memory value.
+/// The entire state of the abstract machine.
+///
+/// The state consists of three parts:
+/// - The parsed C program.
+/// - The abstract state of memory (heap, stack, and so on).
+/// - A collection of propositions that we are for the moment assuming to be true.
 #[derive(Clone)]
 pub struct State {
     pub ext: Arc<Externals>,
