@@ -192,6 +192,12 @@ ast_block_isterminal(struct ast_block *b, struct state *s)
 	return false;
 }
 
+bool
+ast_block_empty(struct ast_block *b)
+{
+	return b->ndecl == 0 && b->nstmt == 0;
+}
+
 struct preconds_result
 ast_block_preconds(struct ast_block *b)
 {

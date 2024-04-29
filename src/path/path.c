@@ -330,7 +330,7 @@ path_init_actual(struct path *p)
 		ast_function_name(p->f),
 		ast_function_body(p->f),
 		ast_function_type(p->f),
-		EXEC_ACTUAL,
+		ast_block_empty(ast_function_body(p->f)) ? EXEC_SETUP : EXEC_ACTUAL,
 		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
 		p->f
 	);

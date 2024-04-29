@@ -720,7 +720,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		EXEC_ACTUAL,
+		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_copy(expr),
 		f
 	);
@@ -738,39 +738,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	return result_value_create(NULL);
-	/*
-	struct result *res = call_absexec(expr, state);
-	if (result_iserror(res)) {
-		struct error *ct_err = error_to_return(result_as_error(res));
-		if (!ct_err) {
-			return result_error_create(
-				error_printf("\n\t%w", result_as_error(res))
-			);
-		}
-		struct object_res obj_res = state_getresult(state);
-		assert(!obj_res.err);
-		res = result_value_create(object_as_value(obj_res.obj));
-	}
-
-	/* XXX: pass copy so we don't observe
-	/* copy to preserve value through popping of frame
-	struct value *v = NULL;
-	if (result_hasvalue(res)) {
-		v = value_copy(result_as_value(res));
-	}
-
-	printf("state (post): %s\n", state_str(state));
-
-	state_unnest(state);
-	state_popframe(state);
-	/*result_arr_destroy(args);
-
-	if (v) {
-		return pf_augment(v, expr, state);
-	}
-
-	return res;
-	*/
 }
 
 static struct error *
