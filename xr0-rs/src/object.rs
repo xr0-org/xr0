@@ -291,26 +291,28 @@ impl Object {
             ObjectKind::DeallocandRange(range) => range_dealloc(range, s),
         }
     }
-}
 
-pub fn object_member_lvalue<'s>(
-    obj: &'s mut Object,
-    t: &AstType,
-    member: &str,
-    s: &'s mut State,
-) -> LValue<'s> {
-    let val = get_or_create_struct(obj, t, s);
-    let ValueKind::Struct(sv) = &mut val.kind else {
-        panic!();
-    };
+    /// Returns a field of this object. `t` gives the effective type of this access to `obj`.
+    /// `member` is the name of the field being accessed.
+    pub fn member_lvalue<'s>(
+        &'s mut self,
+        t: &AstType,
+        member: &str,
+        s: &'s mut State,
+    ) -> LValue<'s> {
+        let val = get_or_create_struct(self, t, s);
+        let ValueKind::Struct(sv) = &mut val.kind else {
+            panic!();
+        };
 
-    let obj = sv.m.get_mut(member).map(|boxed| &mut **boxed);
-    let t = sv
-        .members
-        .iter()
-        .find(|var| member == ast_variable_name(var))
-        .map(|var| ast_variable_type(var));
-    LValue { t, obj }
+        let obj = sv.m.get_mut(member).map(|boxed| &mut **boxed);
+        let t = sv
+            .members
+            .iter()
+            .find(|var| member == ast_variable_name(var))
+            .map(|var| ast_variable_type(var));
+        LValue { t, obj }
+    }
 }
 
 fn get_or_create_struct<'obj>(

@@ -4,7 +4,6 @@ use std::process;
 use std::sync::Arc;
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
-use crate::object::object_member_lvalue;
 use crate::parser::LexemeMarker;
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_copywithname, state_create,
@@ -941,7 +940,7 @@ pub fn expr_structmember_lvalue<'s>(
         // Note: Original fails to check for errors.
         let root_lval = ast_expr_lvalue(root, &mut *state).unwrap();
         let root_obj = root_lval.obj.unwrap();
-        let lvalue = object_member_lvalue(root_obj, root_lval.t.unwrap(), member, &mut *state);
+        let lvalue = root_obj.member_lvalue(root_lval.t.unwrap(), member, &mut *state);
         if lvalue.obj.is_none() {
             return Err(Error::new("lvalue error".to_string()));
         }
