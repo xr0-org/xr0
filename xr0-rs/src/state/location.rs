@@ -1,7 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_copy, ast_expr_equal};
-use crate::object::object_referencesheap;
 use crate::state::state::state_get;
 use crate::state::{Heap, State};
 use crate::util::{Error, Result};
@@ -164,9 +163,9 @@ pub fn location_referencesheap(l: &Location, s: &mut State) -> bool {
     let Some(obj) = state_get(&mut *s, l, false).unwrap() else {
         return false;
     };
-    // Note: Clone is not in the original. Added here to satisfy Rust's alias analysis.
+    // XXX FIXME: Clone is not in the original. Added here to satisfy Rust's alias analysis.
     let obj = obj.clone();
-    object_referencesheap(&obj, &mut *s)
+    obj.references_heap(&mut *s)
 }
 
 /// Return all three parts of the given location, which must be automatic.

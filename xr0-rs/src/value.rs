@@ -5,7 +5,6 @@ use crate::ast::{
     ast_expr_copy, ast_expr_equal, ast_type_create_voidptr, ast_type_struct_complete,
     ast_type_struct_members, ast_variable_arr_copy, ast_variable_name, ast_variable_type,
 };
-use crate::object::object_abstractcopy;
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
 use crate::state::state::state_vconst;
 use crate::state::State;
@@ -214,7 +213,7 @@ fn abstract_copy_members(
     s: &mut State,
 ) -> HashMap<String, Box<Object>> {
     old.iter()
-        .map(|(k, v)| (k.clone(), object_abstractcopy(v, s)))
+        .map(|(k, obj)| (k.clone(), obj.abstract_copy(s)))
         .collect()
 }
 

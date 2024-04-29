@@ -3,9 +3,8 @@ use std::fmt::{self, Display, Formatter};
 use super::{Heap, State};
 use crate::ast::ast_expr_copy;
 use crate::object::{
-    object_abstractcopy, object_arr_index, object_arr_index_upperincl, object_contig_precedes,
-    object_dealloc, object_from, object_references, object_referencesheap, object_upper,
-    object_upto, range_create,
+    object_arr_index, object_arr_index_upperincl, object_contig_precedes, object_dealloc,
+    object_from, object_upto, range_create,
 };
 use crate::state::state::state_eval;
 use crate::util::{Error, Result};
@@ -127,7 +126,7 @@ impl Block {
     }
 
     pub fn references(&self, loc: &Location, s: &mut State) -> bool {
-        self.arr.iter().any(|obj| object_references(obj, loc, s))
+        self.arr.iter().any(|obj| obj.references(loc, s))
     }
 
     // XXX FIXME: `self` may be an element of `heap`, verboten aliasing
@@ -179,7 +178,7 @@ impl Block {
         // Note: Original does not do these copies; instead it leaks the outer expressions created
         // here to avoid double-freeing the inner ones.
         let same_lw = AstExpr::new_eq(ast_expr_copy(lw), ast_expr_copy(&obj.offset));
-        let same_up = AstExpr::new_eq(ast_expr_copy(up), object_upper(obj));
+        let same_up = AstExpr::new_eq(ast_expr_copy(up), obj.end());
         state_eval(s, &same_lw) && state_eval(s, &same_up)
     }
 
@@ -230,8 +229,8 @@ impl Block {
     pub fn undeclare(&mut self, s: &mut State) {
         let mut new = vec![];
         for obj in &self.arr {
-            if object_referencesheap(obj, s) {
-                new.push(object_abstractcopy(obj, s));
+            if obj.references_heap(s) {
+                new.push(obj.abstract_copy(s));
             }
         }
         self.arr = new;

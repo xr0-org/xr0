@@ -38,6 +38,23 @@ pub struct Range {
     size: Box<AstExpr>,
 }
 
+impl Display for Object {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let Object { kind, offset } = self;
+        write!(f, "{{{offset}:<{kind}>}}")
+    }
+}
+
+impl Display for ObjectKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            ObjectKind::Value(Some(v)) => write!(f, "{v}"),
+            ObjectKind::Value(None) => Ok(()),
+            ObjectKind::DeallocandRange(range) => write!(f, "{range}"),
+        }
+    }
+}
+
 impl Object {
     pub fn with_value(offset: Box<AstExpr>, v: Option<Box<Value>>) -> Box<Object> {
         Box::new(Object {
@@ -82,83 +99,62 @@ impl Object {
             ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
         }
     }
-}
 
-pub fn object_copy(old: &Object) -> Box<Object> {
-    Box::new(old.clone())
-}
-
-pub fn object_abstractcopy(old: &Object, s: &mut State) -> Box<Object> {
-    match &old.kind {
-        ObjectKind::DeallocandRange(_) => object_copy(old),
-        ObjectKind::Value(v) => Object::with_value(
-            old.offset.clone(),
-            v.as_ref().and_then(|v| value_abstractcopy(v, s)),
-        ),
-    }
-}
-
-impl Display for Object {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let Object { kind, offset } = self;
-        write!(f, "{{{offset}:<{kind}>}}")
-    }
-}
-
-impl Display for ObjectKind {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            ObjectKind::Value(Some(v)) => write!(f, "{v}"),
-            ObjectKind::Value(None) => Ok(()),
-            ObjectKind::DeallocandRange(range) => write!(f, "{range}"),
+    pub fn abstract_copy(&self, s: &mut State) -> Box<Object> {
+        match &self.kind {
+            ObjectKind::DeallocandRange(_) => Box::new(self.clone()),
+            ObjectKind::Value(v) => Object::with_value(
+                self.offset.clone(),
+                v.as_ref().and_then(|v| value_abstractcopy(v, s)),
+            ),
         }
     }
-}
 
-pub fn object_referencesheap(obj: &Object, s: &mut State) -> bool {
-    match &obj.kind {
-        ObjectKind::Value(Some(v)) => value_referencesheap(v, s),
-        ObjectKind::Value(None) => false,
-        ObjectKind::DeallocandRange(_) => true,
+    pub fn references_heap(&self, s: &mut State) -> bool {
+        match &self.kind {
+            ObjectKind::Value(Some(v)) => value_referencesheap(v, s),
+            ObjectKind::Value(None) => false,
+            ObjectKind::DeallocandRange(_) => true,
+        }
     }
-}
 
-pub fn object_references(obj: &Object, loc: &Location, s: &mut State) -> bool {
-    match &obj.kind {
-        ObjectKind::DeallocandRange(range) => range_references(range, loc, s),
-        ObjectKind::Value(None) => false,
-        ObjectKind::Value(Some(v)) => value_references(v, loc, s),
+    pub fn references(&self, loc: &Location, s: &mut State) -> bool {
+        match &self.kind {
+            ObjectKind::DeallocandRange(range) => range_references(range, loc, s),
+            ObjectKind::Value(None) => false,
+            ObjectKind::Value(Some(v)) => value_references(v, loc, s),
+        }
     }
-}
 
-impl Object {
     pub fn assign(&mut self, val: Option<Box<Value>>) {
         let ObjectKind::Value(v) = &mut self.kind else {
             panic!();
         };
         *v = val;
     }
-}
 
-fn object_size(obj: &Object) -> Box<AstExpr> {
-    match &obj.kind {
-        ObjectKind::Value(_) => AstExpr::new_constant(1),
-        ObjectKind::DeallocandRange(range) => ast_expr_copy(range_size(range)),
+    fn size(&self) -> Box<AstExpr> {
+        match &self.kind {
+            ObjectKind::Value(_) => AstExpr::new_constant(1),
+            ObjectKind::DeallocandRange(range) => ast_expr_copy(range_size(range)),
+        }
     }
-}
 
-#[allow(dead_code)]
-pub fn object_lower(obj: &Object) -> &AstExpr {
-    &obj.offset
-}
+    /// Returns an expression for the starting offset of `self` within the enclosing block.
+    #[allow(dead_code)]
+    pub fn start(&self) -> &AstExpr {
+        &self.offset
+    }
 
-pub fn object_upper(obj: &Object) -> Box<AstExpr> {
-    AstExpr::new_sum(ast_expr_copy(&obj.offset), object_size(obj))
+    /// Returns an expression for the ending offset of `self` within the enclosing block.
+    pub fn end(&self) -> Box<AstExpr> {
+        AstExpr::new_sum(ast_expr_copy(&self.offset), self.size())
+    }
 }
 
 pub fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     let lw = &obj.offset;
-    let up = object_upper(obj);
+    let up = obj.end();
     let of = offset;
     let e1 = AstExpr::new_le(ast_expr_copy(lw), ast_expr_copy(of));
     let e2 = AstExpr::new_lt(ast_expr_copy(of), ast_expr_copy(&up));
@@ -167,7 +163,7 @@ pub fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
 
 pub fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     let lw = &obj.offset;
-    let up = object_upper(obj);
+    let up = obj.end();
     let of = offset;
     // Note: These copies are not in the original. Original leaks the expressions to avoid
     // double-freeing subexpressions.
@@ -179,14 +175,14 @@ pub fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &State) -> b
 #[allow(dead_code)]
 pub fn object_isempty(obj: &Object, s: &State) -> bool {
     let lw = &obj.offset;
-    let up = object_upper(obj);
+    let up = obj.end();
     // Note: Original does not make a copy of `lw`; instead it leaks the expression to avoid
     // double-freeing subexpressions.
     state_eval(s, &AstExpr::new_eq(ast_expr_copy(lw), up))
 }
 
 pub fn object_contig_precedes(before: &Object, after: &Object, s: &State) -> bool {
-    let lw = object_upper(before);
+    let lw = before.end();
     let up = &after.offset;
     // Note: Original does not make a copy of `up`; instead it leaks the expression to avoid
     // double-freeing subexpressions.
@@ -196,22 +192,22 @@ pub fn object_contig_precedes(before: &Object, after: &Object, s: &State) -> boo
 #[allow(dead_code)]
 pub fn object_issingular(obj: &Object, s: &State) -> bool {
     let lw = &obj.offset;
-    let up = object_upper(obj);
+    let up = obj.end();
     // Note: Original does not make a copy of `lw`; instead it leaks the expression to avoid
     // double-freeing subexpressions.
     let lw_succ = AstExpr::new_sum(ast_expr_copy(lw), AstExpr::new_constant(1));
     state_eval(s, &AstExpr::new_eq(lw_succ, up))
 }
 
-/// Returns an `Object` covering the slice of `obj` up to the offset (within the enclosing Block)
-/// given by `excl_up`; or `None` if `the slice would be empty.
+/// Returns a new `Object` covering the slice of `obj` up to the offset (within the enclosing
+/// Block) given by `excl_up`; or `None` if the slice would be empty.
 ///
 /// # Panics
 ///
 /// If `excl_up` can't be proved to be `>=` the start offset of `obj`.
 pub fn object_upto(obj: &Object, excl_up: &AstExpr, s: &mut State) -> Option<Box<Object>> {
     let lw = &obj.offset;
-    let up = object_upper(obj);
+    let up = obj.end();
     let prop0 = AstExpr::new_le(ast_expr_copy(lw), ast_expr_copy(excl_up));
     let prop1 = AstExpr::new_eq(ast_expr_copy(lw), ast_expr_copy(excl_up));
     let prop2 = AstExpr::new_eq(up, ast_expr_copy(excl_up));
@@ -253,9 +249,11 @@ pub fn object_upto(obj: &Object, excl_up: &AstExpr, s: &mut State) -> Option<Box
     ))
 }
 
+/// Returns a new `Object` covering the slice of `obj` from `incl_lw` to the end of `obj`; or
+/// `None` if the slice would be empty.
 pub fn object_from(obj: &Object, incl_lw: &AstExpr, s: &mut State) -> Option<Box<Object>> {
     let lw = &obj.offset;
-    let up = object_upper(obj);
+    let up = obj.end();
     let prop0 = AstExpr::new_ge(ast_expr_copy(incl_lw), ast_expr_copy(&up));
     let prop1 = AstExpr::new_eq(ast_expr_copy(incl_lw), ast_expr_copy(lw));
     let e0: bool = state_eval(s, &prop0);
