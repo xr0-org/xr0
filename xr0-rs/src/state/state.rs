@@ -166,7 +166,7 @@ pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
         return value_ptr_create(Box::new(loc.clone()));
     }
     let address = state.static_memory.new_block();
-    let loc = location_create_static(address, ast_expr_constant_create(0));
+    let loc = Location::new_static(address, ast_expr_constant_create(0));
     let obj = state_get(state, &loc, true).unwrap().unwrap();
     obj.assign(Some(value_literal_create(lit)));
     state.static_memory.string_pool(lit, &loc);
@@ -176,7 +176,7 @@ pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
 impl State {
     pub fn clump(&mut self) -> Box<Value> {
         let address = self.clump.new_block();
-        let loc = location_create_dereferencable(address, ast_expr_constant_create(0));
+        let loc = Location::new_dereferencable(address, ast_expr_constant_create(0));
         value_ptr_create(loc)
     }
 }

@@ -38,51 +38,47 @@ impl Location {
     pub fn type_is_vconst(&self) -> bool {
         matches!(self.kind, LocationKind::VConst)
     }
-}
 
-#[allow(dead_code)]
-pub fn location_create_vconst(block: usize, offset: Box<AstExpr>) -> Box<Location> {
-    Box::new(Location {
-        kind: LocationKind::VConst,
-        block,
-        offset,
-    })
-}
+    #[allow(dead_code)]
+    pub fn new_vconst(block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::VConst,
+            block,
+            offset,
+        })
+    }
 
-pub fn location_create_dereferencable(block: usize, offset: Box<AstExpr>) -> Box<Location> {
-    Box::new(Location {
-        kind: LocationKind::Dereferencable,
-        block,
-        offset,
-    })
-}
+    pub fn new_dereferencable(block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::Dereferencable,
+            block,
+            offset,
+        })
+    }
 
-pub fn location_create_static(block: usize, offset: Box<AstExpr>) -> Box<Location> {
-    Box::new(Location {
-        kind: LocationKind::Static,
-        block,
-        offset,
-    })
-}
+    pub fn new_static(block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::Static,
+            block,
+            offset,
+        })
+    }
 
-pub fn location_create_dynamic(block: usize, offset: Box<AstExpr>) -> Box<Location> {
-    Box::new(Location {
-        kind: LocationKind::Dynamic,
-        block,
-        offset,
-    })
-}
+    pub fn new_dynamic(block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::Dynamic,
+            block,
+            offset,
+        })
+    }
 
-pub fn location_create_automatic(
-    frame: usize,
-    block: usize,
-    offset: Box<AstExpr>,
-) -> Box<Location> {
-    Box::new(Location {
-        kind: LocationKind::Automatic { frame },
-        block,
-        offset,
-    })
+    pub fn new_automatic(frame: usize, block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::Automatic { frame },
+            block,
+            offset,
+        })
+    }
 }
 
 pub fn location_transfigure(loc: &Location, compare: &mut State) -> Box<Value> {

@@ -5,7 +5,7 @@ use crate::ast::{
 };
 use crate::object::{object_as_value, object_isvalue, object_value_create};
 use crate::state::location::{
-    location_auto_get_block_id, location_auto_parts, location_create_automatic, location_references,
+    location_auto_get_block_id, location_auto_parts, location_references,
 };
 use crate::state::state::state_get;
 use crate::util::InsertionOrderMap;
@@ -86,7 +86,7 @@ impl Stack {
             id,
             result: Box::new(Variable {
                 type_: ast_type_copy(return_type),
-                loc: location_create_automatic(id, 0, ast_expr_constant_create(0)),
+                loc: Location::new_automatic(id, 0, ast_expr_constant_create(0)),
                 is_param: false,
             }),
         };
@@ -138,7 +138,7 @@ impl StackFrame {
     pub fn new_block(&mut self) -> Box<Location> {
         let address = self.blocks.len();
         self.blocks.push(Block::new());
-        location_create_automatic(self.id, address, ast_expr_constant_create(0))
+        Location::new_automatic(self.id, address, ast_expr_constant_create(0))
     }
 
     pub fn declare(&mut self, var: &AstVariable, isparam: bool) {
