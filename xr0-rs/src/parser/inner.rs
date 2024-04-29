@@ -396,7 +396,7 @@ pub grammar c_parser(env: &Env) for str {
     rule statement() -> Box<AstStmt> =
         labelled_statement() /
         block:compound_statement() p:position!() {
-            ast_stmt_create_compound(env.lexloc(p), block)
+            AstStmt::new_compound(env.lexloc(p), block)
         } /
         expression_statement() /
         selection_statement() /
@@ -404,7 +404,7 @@ pub grammar c_parser(env: &Env) for str {
         jump_statement() /
         iteration_effect_statement() /
         v:compound_verification_statement() p:position!() {
-            ast_stmt_create_compound_v(env.lexloc(p), v)
+            AstStmt::new_compound_v(env.lexloc(p), v)
         }
 
     rule specifier_qualifier_list() -> Box<AstType> =
@@ -418,13 +418,13 @@ pub grammar c_parser(env: &Env) for str {
 
     rule labelled_statement() -> Box<AstStmt> =
         label:identifier() _ ":" _ s:statement() p:position!() {
-            ast_stmt_create_labelled(env.lexloc(p), label, s)
+            AstStmt::new_labelled(env.lexloc(p), label, s)
         } /
         K(<"case">) _ constant_expression() _ ":" _ statement() p:position!() {
-            ast_stmt_create_nop(env.lexloc(p))
+            AstStmt::new_nop(env.lexloc(p))
         } /
         K(<"default">) _ ":" _ statement() p:position!() {
-            ast_stmt_create_nop(env.lexloc(p))
+            AstStmt::new_nop(env.lexloc(p))
         }
 
     rule compound_statement() -> Box<AstBlock> =
@@ -462,20 +462,20 @@ pub grammar c_parser(env: &Env) for str {
         stmts:list1(<statement()>) { stmts }
 
     rule expression_statement() -> Box<AstStmt> =
-        ";" p:position!() { ast_stmt_create_nop(env.lexloc(p)) } /
-        e:expression() _ ";" p:position!() { ast_stmt_create_expr(env.lexloc(p), e) }
+        ";" p:position!() { AstStmt::new_nop(env.lexloc(p)) } /
+        e:expression() _ ";" p:position!() { AstStmt::new_expr(env.lexloc(p), e) }
 
     rule selection_statement() -> Box<AstStmt> =
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() p:position!() {
             let neg_cond = ast_expr_unary_create(ast_expr_copy(&cond), AstUnaryOp::Bang);
-            let else_stmt = ast_stmt_create_sel(env.lexloc(p), false, neg_cond, alt, None);
-            ast_stmt_create_sel(env.lexloc(p), false, cond, then, Some(else_stmt))
+            let else_stmt = AstStmt::new_sel(env.lexloc(p), false, neg_cond, alt, None);
+            AstStmt::new_sel(env.lexloc(p), false, cond, then, Some(else_stmt))
         } /
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() p:position!() {
-            ast_stmt_create_sel(env.lexloc(p), false, cond, then, None)
+            AstStmt::new_sel(env.lexloc(p), false, cond, then, None)
         } /
         K(<"switch">) _ "(" _ v:expression() _ ")" _ cases:statement() p:position!() {
-            ast_stmt_create_nop(env.lexloc(p))
+            AstStmt::new_nop(env.lexloc(p))
         }
 
     rule optional_compound_verification() -> Box<AstBlock> =
@@ -488,14 +488,14 @@ pub grammar c_parser(env: &Env) for str {
     rule for_iteration_statement(as_iteration_e: bool) -> Box<AstStmt> =
         K(<"for">) _ "(" _ init:expression_statement() _ cond:expression_statement() _ iter:expression() _ ")" _
         verif:optional_compound_verification() _ body:statement() p:position!() {
-            ast_stmt_create_iter(env.lexloc(p), init, cond, iter, verif, body, as_iteration_e)
+            AstStmt::new_iter(env.lexloc(p), init, cond, iter, verif, body, as_iteration_e)
         }
 
     rule iteration_statement() -> Box<AstStmt> = for_iteration_statement(false)
 
     rule jump_statement() -> Box<AstStmt> =
         K(<"return">) _ expr:expression() _ ";" p:position!() {
-            ast_stmt_create_jump(env.lexloc(p), AstJumpKind::Return, Some(expr))
+            AstStmt::new_jump(env.lexloc(p), AstJumpKind::Return, Some(expr))
         }
 
     rule block_statement() -> BlockStatement =

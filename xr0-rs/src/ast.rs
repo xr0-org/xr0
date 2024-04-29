@@ -1872,13 +1872,13 @@ fn iter_neteffect(iter: &AstStmt) -> Option<Box<AstStmt>> {
     // Note: Original passes NULL lexeme marker to these two constructors. In the Rust version, the
     // lexeme marker isn't nullable. It isn't worth warping the universe for this hack, so we dig
     // up with some phony locations.
-    Some(ast_stmt_create_iter(
+    Some(AstStmt::new_iter(
         Box::new(ast_stmt_lexememarker(iter).clone()),
         ast_stmt_copy(ast_stmt_iter_init(iter)),
         ast_stmt_copy(ast_stmt_iter_cond(iter)),
         ast_expr_copy(ast_stmt_iter_iter(iter)),
         ast_block_create(vec![], vec![]),
-        ast_stmt_create_compound(
+        AstStmt::new_compound(
             Box::new(ast_stmt_lexememarker(ast_stmt_iter_body(iter)).clone()),
             Box::new(ast_stmt_iter_abstract(iter).clone()),
         ),
@@ -2083,12 +2083,89 @@ pub fn ast_stmt_isterminal(stmt: &AstStmt, s: &mut State) -> bool {
     }
 }
 
-pub fn ast_stmt_create_jump(
-    loc: Box<LexemeMarker>,
-    kind: AstJumpKind,
-    rv: Option<Box<AstExpr>>,
-) -> Box<AstStmt> {
-    ast_stmt_create(loc, AstStmtKind::Jump(AstJumpStmt { kind, rv }))
+impl AstStmt {
+    fn new(loc: Box<LexemeMarker>, kind: AstStmtKind) -> Box<Self> {
+        Box::new(AstStmt { kind, loc })
+    }
+
+    pub fn new_nop(loc: Box<LexemeMarker>) -> Box<Self> {
+        AstStmt::new(loc, AstStmtKind::Nop)
+    }
+
+    pub fn new_labelled(loc: Box<LexemeMarker>, label: String, substmt: Box<AstStmt>) -> Box<Self> {
+        AstStmt::new(
+            loc,
+            AstStmtKind::Labelled(AstLabelledStmt {
+                label,
+                stmt: substmt,
+            }),
+        )
+    }
+
+    pub fn new_compound(loc: Box<LexemeMarker>, b: Box<AstBlock>) -> Box<Self> {
+        AstStmt::new(loc, AstStmtKind::Compound(b))
+    }
+
+    pub fn new_compound_v(loc: Box<LexemeMarker>, b: Box<AstBlock>) -> Box<Self> {
+        AstStmt::new(loc, AstStmtKind::CompoundV(b))
+    }
+
+    pub fn new_expr(loc: Box<LexemeMarker>, expr: Box<AstExpr>) -> Box<Self> {
+        AstStmt::new(loc, AstStmtKind::Expr(expr))
+    }
+
+    pub fn new_sel(
+        loc: Box<LexemeMarker>,
+        isswitch: bool,
+        cond: Box<AstExpr>,
+        body: Box<AstStmt>,
+        nest: Option<Box<AstStmt>>,
+    ) -> Box<Self> {
+        assert!(!isswitch);
+        AstStmt::new(
+            loc,
+            AstStmtKind::Selection(AstSelectionStmt {
+                isswitch,
+                cond,
+                body,
+                nest,
+            }),
+        )
+    }
+
+    pub fn new_iter(
+        loc: Box<LexemeMarker>,
+        init: Box<AstStmt>,
+        cond: Box<AstStmt>,
+        iter: Box<AstExpr>,
+        abstract_: Box<AstBlock>,
+        body: Box<AstStmt>,
+        as_iteration_e: bool,
+    ) -> Box<Self> {
+        let iter = AstIterationStmt {
+            init,
+            cond,
+            iter,
+            body,
+            abstract_,
+        };
+        AstStmt::new(
+            loc,
+            if as_iteration_e {
+                AstStmtKind::IterationE(iter)
+            } else {
+                AstStmtKind::Iteration(iter)
+            },
+        )
+    }
+
+    pub fn new_jump(
+        loc: Box<LexemeMarker>,
+        kind: AstJumpKind,
+        rv: Option<Box<AstExpr>>,
+    ) -> Box<Self> {
+        AstStmt::new(loc, AstStmtKind::Jump(AstJumpStmt { kind, rv }))
+    }
 }
 
 pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
@@ -2130,36 +2207,6 @@ fn ast_stmt_expr_sprint(expr: &AstExpr, b: &mut String) {
     str_write!(*b, "{expr};");
 }
 
-fn ast_stmt_create(loc: Box<LexemeMarker>, kind: AstStmtKind) -> Box<AstStmt> {
-    Box::new(AstStmt { kind, loc })
-}
-
-pub fn ast_stmt_create_iter(
-    loc: Box<LexemeMarker>,
-    init: Box<AstStmt>,
-    cond: Box<AstStmt>,
-    iter: Box<AstExpr>,
-    abstract_: Box<AstBlock>,
-    body: Box<AstStmt>,
-    as_iteration_e: bool,
-) -> Box<AstStmt> {
-    let iter = AstIterationStmt {
-        init,
-        cond,
-        iter,
-        body,
-        abstract_,
-    };
-    ast_stmt_create(
-        loc,
-        if as_iteration_e {
-            AstStmtKind::IterationE(iter)
-        } else {
-            AstStmtKind::Iteration(iter)
-        },
-    )
-}
-
 fn ast_stmt_nop_sprint(b: &mut String) {
     str_write!(*b, ";");
 }
@@ -2169,29 +2216,6 @@ pub fn ast_stmt_iter_body(stmt: &AstStmt) -> &AstStmt {
         panic!();
     };
     &iteration.body
-}
-
-pub fn ast_stmt_create_sel(
-    loc: Box<LexemeMarker>,
-    isswitch: bool,
-    cond: Box<AstExpr>,
-    body: Box<AstStmt>,
-    nest: Option<Box<AstStmt>>,
-) -> Box<AstStmt> {
-    assert!(!isswitch);
-    ast_stmt_create(
-        loc,
-        AstStmtKind::Selection(AstSelectionStmt {
-            isswitch,
-            cond,
-            body,
-            nest,
-        }),
-    )
-}
-
-pub fn ast_stmt_create_compound_v(loc: Box<LexemeMarker>, b: Box<AstBlock>) -> Box<AstStmt> {
-    ast_stmt_create(loc, AstStmtKind::CompoundV(b))
 }
 
 fn hack_alloc_from_neteffect(stmt: &AstStmt) -> &AstExpr {
@@ -2235,32 +2259,6 @@ pub fn ast_stmt_sel_nest(stmt: &AstStmt) -> Option<&AstStmt> {
         panic!();
     };
     selection.nest.as_deref()
-}
-
-pub fn ast_stmt_create_labelled(
-    loc: Box<LexemeMarker>,
-    label: String,
-    substmt: Box<AstStmt>,
-) -> Box<AstStmt> {
-    ast_stmt_create(
-        loc,
-        AstStmtKind::Labelled(AstLabelledStmt {
-            label,
-            stmt: substmt,
-        }),
-    )
-}
-
-pub fn ast_stmt_create_nop(loc: Box<LexemeMarker>) -> Box<AstStmt> {
-    ast_stmt_create(loc, AstStmtKind::Nop)
-}
-
-pub fn ast_stmt_create_expr(loc: Box<LexemeMarker>, expr: Box<AstExpr>) -> Box<AstStmt> {
-    ast_stmt_create(loc, AstStmtKind::Expr(expr))
-}
-
-pub fn ast_stmt_create_compound(loc: Box<LexemeMarker>, b: Box<AstBlock>) -> Box<AstStmt> {
-    ast_stmt_create(loc, AstStmtKind::Compound(b))
 }
 
 pub fn ast_stmt_sel_cond(stmt: &AstStmt) -> &AstExpr {
