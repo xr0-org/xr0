@@ -13,8 +13,9 @@ use crate::value::{
 };
 use crate::{AstExpr, AstType, Location, Value};
 
-/// A span of memory within a block. This could be the whole block, a field of a struct, an element
-/// of an array, etc.
+/// A span of memory within a block, part of the abstract state of a program. An object can be the
+/// whole block, a field of a struct, an element of an array, a span of bytes within a heap
+/// allocation that have been written to, etc.
 ///
 /// An object is either "value" or "range". If it's "value" then it either has a Value, or it's
 /// uninitialized.
@@ -33,22 +34,54 @@ pub enum ObjectKind {
 
 #[derive(Clone)]
 pub struct Range {
-    size: Box<AstExpr>,
     loc: Box<Location>,
+    size: Box<AstExpr>,
 }
 
-pub fn object_value_create(offset: Box<AstExpr>, v: Option<Box<Value>>) -> Box<Object> {
-    Box::new(Object {
-        kind: ObjectKind::Value(v),
-        offset,
-    })
-}
+impl Object {
+    pub fn with_value(offset: Box<AstExpr>, v: Option<Box<Value>>) -> Box<Object> {
+        Box::new(Object {
+            kind: ObjectKind::Value(v),
+            offset,
+        })
+    }
 
-pub fn object_range_create(offset: Box<AstExpr>, r: Box<Range>) -> Box<Object> {
-    Box::new(Object {
-        kind: ObjectKind::DeallocandRange(r),
-        offset,
-    })
+    pub fn with_range(offset: Box<AstExpr>, r: Box<Range>) -> Box<Object> {
+        Box::new(Object {
+            kind: ObjectKind::DeallocandRange(r),
+            offset,
+        })
+    }
+
+    pub fn is_value(&self) -> bool {
+        matches!(self.kind, ObjectKind::Value(_))
+    }
+
+    pub fn has_value(&self) -> bool {
+        matches!(self.kind, ObjectKind::Value(Some(_)))
+    }
+
+    pub fn as_value(&self) -> Option<&Value> {
+        let ObjectKind::Value(v) = &self.kind else {
+            panic!();
+        };
+        v.as_deref()
+    }
+
+    pub fn as_value_mut(&mut self) -> Option<&mut Value> {
+        let ObjectKind::Value(v) = &mut self.kind else {
+            panic!();
+        };
+        v.as_deref_mut()
+    }
+
+    pub fn is_deallocand(&self, s: &mut State) -> bool {
+        match &self.kind {
+            ObjectKind::Value(None) => false,
+            ObjectKind::Value(Some(v)) => s.loc_is_deallocand(value_as_location(v)),
+            ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
+        }
+    }
 }
 
 pub fn object_copy(old: &Object) -> Box<Object> {
@@ -58,7 +91,7 @@ pub fn object_copy(old: &Object) -> Box<Object> {
 pub fn object_abstractcopy(old: &Object, s: &mut State) -> Box<Object> {
     match &old.kind {
         ObjectKind::DeallocandRange(_) => object_copy(old),
-        ObjectKind::Value(v) => object_value_create(
+        ObjectKind::Value(v) => Object::with_value(
             old.offset.clone(),
             v.as_ref().and_then(|v| value_abstractcopy(v, s)),
         ),
@@ -87,36 +120,6 @@ pub fn object_referencesheap(obj: &Object, s: &mut State) -> bool {
         ObjectKind::Value(Some(v)) => value_referencesheap(v, s),
         ObjectKind::Value(None) => false,
         ObjectKind::DeallocandRange(_) => true,
-    }
-}
-
-pub fn object_hasvalue(obj: &Object) -> bool {
-    matches!(obj.kind, ObjectKind::Value(Some(_)))
-}
-
-pub fn object_isvalue(obj: &Object) -> bool {
-    matches!(obj.kind, ObjectKind::Value(_))
-}
-
-pub fn object_as_value(obj: &Object) -> Option<&Value> {
-    let ObjectKind::Value(v) = &obj.kind else {
-        panic!();
-    };
-    v.as_deref()
-}
-
-pub fn object_as_value_mut(obj: &mut Object) -> Option<&mut Value> {
-    let ObjectKind::Value(v) = &mut obj.kind else {
-        panic!();
-    };
-    v.as_deref_mut()
-}
-
-pub fn object_isdeallocand(obj: &Object, s: &mut State) -> bool {
-    match &obj.kind {
-        ObjectKind::Value(None) => false,
-        ObjectKind::Value(Some(v)) => s.loc_is_deallocand(value_as_location(v)),
-        ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
     }
 }
 
@@ -230,7 +233,7 @@ pub fn object_upto(obj: &Object, excl_up: &AstExpr, s: &mut State) -> Option<Box
         let ObjectKind::Value(Some(v)) = &obj.kind else {
             panic!();
         };
-        return Some(object_value_create(
+        return Some(Object::with_value(
             ast_expr_copy(&obj.offset),
             Some(value_copy(v)),
         ));
@@ -241,7 +244,7 @@ pub fn object_upto(obj: &Object, excl_up: &AstExpr, s: &mut State) -> Option<Box
 
     // Note: I think there's a double free in the original, where it creates an expression using
     // `lw` without copying it, but `obj` owns that expr.
-    Some(object_range_create(
+    Some(Object::with_range(
         ast_expr_copy(&obj.offset),
         range_create(
             AstExpr::new_difference(ast_expr_copy(excl_up), ast_expr_copy(lw)),
@@ -267,12 +270,12 @@ pub fn object_from(obj: &Object, incl_lw: &AstExpr, s: &mut State) -> Option<Box
         let ObjectKind::Value(Some(v)) = &obj.kind else {
             panic!();
         };
-        return Some(object_value_create(
+        return Some(Object::with_value(
             ast_expr_copy(incl_lw),
             Some(value_copy(v)),
         ));
     }
-    Some(object_range_create(
+    Some(Object::with_range(
         ast_expr_copy(incl_lw),
         range_create(
             AstExpr::new_difference(up, ast_expr_copy(incl_lw)),
@@ -296,7 +299,7 @@ pub fn object_member_lvalue<'s>(
     member: &str,
     s: &'s mut State,
 ) -> LValue<'s> {
-    let val = getorcreatestruct(obj, t, s);
+    let val = get_or_create_struct(obj, t, s);
     let ValueKind::Struct(sv) = &mut val.kind else {
         panic!();
     };
@@ -310,14 +313,18 @@ pub fn object_member_lvalue<'s>(
     LValue { t, obj }
 }
 
-fn getorcreatestruct<'obj>(obj: &'obj mut Object, t: &AstType, s: &mut State) -> &'obj mut Value {
+fn get_or_create_struct<'obj>(
+    obj: &'obj mut Object,
+    t: &AstType,
+    s: &mut State,
+) -> &'obj mut Value {
     // XXX FIXME: very silly rust construction because of borrow checker limitation
-    if object_as_value_mut(obj).is_some() {
-        object_as_value_mut(obj).unwrap()
+    if obj.as_value_mut().is_some() {
+        obj.as_value_mut().unwrap()
     } else {
         let complete = ast_type_struct_complete(t, s.ext()).unwrap();
         obj.assign(Some(value_struct_create(complete)));
-        object_as_value_mut(obj).unwrap()
+        obj.as_value_mut().unwrap()
     }
 }
 

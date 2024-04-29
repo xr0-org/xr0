@@ -1,6 +1,6 @@
 use super::{Block, State};
 use crate::ast::{ast_type_copy, ast_variable_name, ast_variable_type, AstExpr};
-use crate::object::{object_as_value, object_isvalue, object_value_create};
+use crate::object::Object;
 use crate::state::location::{
     location_auto_get_block_id, location_auto_parts, location_references,
 };
@@ -87,7 +87,7 @@ impl Stack {
                 is_param: false,
             }),
         };
-        frame.blocks[0].install(object_value_create(AstExpr::new_constant(0), None));
+        frame.blocks[0].install(Object::with_value(AstExpr::new_constant(0), None));
 
         self.frames.push(frame);
         self.frames.last_mut().unwrap()
@@ -187,7 +187,7 @@ pub fn variable_create(type_: &AstType, frame: &mut StackFrame, isparam: bool) -
     let loc = frame.new_block();
     let block_id = location_auto_get_block_id(&loc);
     let b = &mut frame.blocks[block_id];
-    b.install(object_value_create(AstExpr::new_constant(0), None));
+    b.install(Object::with_value(AstExpr::new_constant(0), None));
     Box::new(Variable {
         type_: ast_type_copy(type_),
         is_param: isparam,
@@ -204,8 +204,8 @@ fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
     let s: *mut State = s;
     unsafe {
         let obj = state_get(&mut *s, &new.loc, false).unwrap().unwrap();
-        if object_isvalue(obj) {
-            if let Some(v) = object_as_value(obj) {
+        if obj.is_value() {
+            if let Some(v) = obj.as_value() {
                 obj.assign(value_abstractcopy(v, &mut *s));
             }
         }

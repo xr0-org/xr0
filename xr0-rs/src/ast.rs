@@ -4,7 +4,7 @@ use std::process;
 use std::sync::Arc;
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
-use crate::object::{object_as_value, object_hasvalue, object_member_lvalue};
+use crate::object::object_member_lvalue;
 use crate::parser::LexemeMarker;
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_copywithname, state_create,
@@ -778,7 +778,7 @@ fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
             "undefined indirection: *({expr}) has no value"
         )));
     };
-    let Some(v) = object_as_value(deref_obj) else {
+    let Some(v) = deref_obj.as_value() else {
         return Err(Error::new(format!(
             "undefined indirection: *({expr}) has no value"
         )));
@@ -814,7 +814,7 @@ fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
     let Some(obj) = state_getobject(state, id) else {
         return Err(Error::new(format!("unknown idenitfier {id}")));
     };
-    let Some(val) = object_as_value(obj) else {
+    let Some(val) = obj.as_value() else {
         vprintln!("state: {}", state_str(state));
         return Err(Error::new(format!(
             "undefined memory access: {id} has no value",
@@ -829,7 +829,7 @@ fn expr_structmember_eval(expr: &StructMemberExpr, s: &mut State) -> Result<Box<
     let Some(member) = value_struct_member(&res_val, member) else {
         return Err(Error::new(format!("`{root}' has no field `{member}'")));
     };
-    let Some(obj_value) = object_as_value(member) else {
+    let Some(obj_value) = member.as_value() else {
         // Note: Original would return null if obj_value is null, but almost nobody downstream handles it.
         panic!();
     };
@@ -966,7 +966,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
                     panic!();
                 };
                 let t = ast_type_ptr_type(root_lval.t.unwrap());
-                let root_val = object_as_value(&*root_obj).unwrap();
+                let root_val = root_obj.as_value().unwrap();
                 let obj = state_deref(&mut *state, root_val, &AstExpr::new_constant(0))?;
                 Ok(LValue { t, obj })
             }
@@ -982,7 +982,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
                     panic!();
                 };
                 let t = ast_type_ptr_type(root_lval.t.unwrap());
-                let root_val = object_as_value(&*root_obj).unwrap();
+                let root_val = root_obj.as_value().unwrap();
                 let Ok(res_obj) = state_deref(&mut *state, root_val, e2) else {
                     // Note: Original returns null. See note above.
                     panic!();
@@ -1197,15 +1197,15 @@ fn verify_paramspec(
     }
     let param_obj = state_get(param_state, value_as_location(param), false)?.unwrap();
     let arg_obj = state_get(arg_state, value_as_location(arg), false)?.unwrap();
-    if !object_hasvalue(param_obj) {
+    if !param_obj.has_value() {
         return Ok(());
     }
-    if !object_hasvalue(arg_obj) {
+    if !arg_obj.has_value() {
         return Err(Error::new("must be rvalue".to_string()));
     }
     // XXX FIXME: Unlike the original, we copy the values to satisfy Rust alias analysis.
-    let param_val = object_as_value(param_obj).unwrap().clone();
-    let arg_val = object_as_value(arg_obj).unwrap().clone();
+    let param_val = param_obj.as_value().unwrap().clone();
+    let arg_val = arg_obj.as_value().unwrap().clone();
     verify_paramspec(&param_val, &arg_val, param_state, arg_state)
 }
 
@@ -1294,7 +1294,7 @@ fn structmember_pf_reduce(sm: &StructMemberExpr, s: &mut State) -> Result<Box<Va
     let v = ast_expr_pf_reduce(root, s)?;
     if value_isstruct(&v) {
         let obj = value_struct_member(&v, member).unwrap();
-        let obj_value = object_as_value(obj).unwrap();
+        let obj_value = obj.as_value().unwrap();
         return Ok(value_copy(obj_value));
     }
     assert!(value_issync(&v));
@@ -2757,7 +2757,7 @@ fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
         let name = ast_variable_name(param);
         let t = ast_variable_type(param);
         let obj = state_getobject(&mut *state, name).unwrap();
-        if !object_hasvalue(obj) {
+        if !obj.has_value() {
             // XXX FIXME: dereferencing `state` again here definitely invalidates `obj`
             let val = state_vconst(&mut *state, t, Some(name), true);
             obj.assign(Some(val));
@@ -2845,7 +2845,7 @@ pub fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<Option
     let obj = state_getresult(state);
     // Note: In the original, this function (unlike the other absexec functions) returned a
     // borrowed value which the caller cloned. Not a big difference.
-    Ok(object_as_value(obj).map(value_copy))
+    Ok(obj.as_value().map(value_copy))
 }
 
 fn split_path_verify(

@@ -6,7 +6,6 @@ use super::location::{
 };
 use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
 use crate::ast::{ast_expr_equal, ast_type_vconst};
-use crate::object::object_as_value;
 use crate::util::{Error, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
@@ -303,7 +302,7 @@ pub fn state_range_alloc(
     lw: &AstExpr,
     up: &AstExpr,
 ) -> Result<()> {
-    let Some(arr_val) = object_as_value(obj) else {
+    let Some(arr_val) = obj.as_value() else {
         return Err(Error::new("no value".to_string()));
     };
     let deref = value_as_location(arr_val);
@@ -341,7 +340,7 @@ pub fn state_range_dealloc(
     lw: &AstExpr,
     up: &AstExpr,
 ) -> Result<()> {
-    let Some(arr_val) = object_as_value(obj) else {
+    let Some(arr_val) = obj.as_value() else {
         return Err(Error::new("no value".to_string()));
     };
     let deref = value_as_location(arr_val);
@@ -350,7 +349,7 @@ pub fn state_range_dealloc(
 
 pub fn state_addresses_deallocand(state: &mut State, obj: &Object) -> bool {
     // Note: Original doesn't null-check.
-    let val = object_as_value(obj).unwrap();
+    let val = obj.as_value().unwrap();
     let loc = value_as_location(val);
     (*state).loc_is_deallocand(loc)
 }
@@ -371,7 +370,7 @@ pub fn state_range_aredeallocands(
     if ast_expr_equal(lw, up) {
         return true;
     }
-    let Some(arr_val) = object_as_value(obj) else {
+    let Some(arr_val) = obj.as_value() else {
         return false;
     };
     let deref = value_as_location(arr_val);

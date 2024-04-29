@@ -4,9 +4,8 @@ use super::{Heap, State};
 use crate::ast::ast_expr_copy;
 use crate::object::{
     object_abstractcopy, object_arr_index, object_arr_index_upperincl, object_contig_precedes,
-    object_dealloc, object_from, object_isdeallocand, object_isvalue, object_range_create,
-    object_references, object_referencesheap, object_upper, object_upto, object_value_create,
-    range_create,
+    object_dealloc, object_from, object_references, object_referencesheap, object_upper,
+    object_upto, range_create,
 };
 use crate::state::state::state_eval;
 use crate::util::{Error, Result};
@@ -83,14 +82,14 @@ impl Block {
             if !constructive {
                 return None;
             }
-            let obj = object_value_create(ast_expr_copy(offset), None);
+            let obj = Object::with_value(ast_expr_copy(offset), None);
             let index = self.arr.len();
             self.arr.push(obj);
             return Some(&mut self.arr[index]);
         };
         let obj = &self.arr[index];
 
-        if object_isvalue(obj) {
+        if obj.is_value() {
             return Some(&mut self.arr[index]);
         }
 
@@ -104,7 +103,7 @@ impl Block {
         // has been freed) and will later be destroyed (a clear double free). Undefined behvaior,
         // but the scenario does not happen in the test suite.
         let upto = object_upto(obj, &lw, s);
-        let observed = object_value_create(lw, Some(s.alloc()));
+        let observed = Object::with_value(lw, Some(s.alloc()));
         let from = object_from(obj, &up, s);
         drop(up);
 
@@ -134,7 +133,7 @@ impl Block {
     // XXX FIXME: `self` may be an element of `heap`, verboten aliasing
     pub fn range_alloc(&mut self, lw: &AstExpr, up: &AstExpr, heap: &mut Heap) -> Result<()> {
         assert!(self.arr.is_empty());
-        self.arr.push(object_range_create(
+        self.arr.push(Object::with_range(
             ast_expr_copy(lw),
             range_create(
                 AstExpr::new_difference(ast_expr_copy(up), ast_expr_copy(lw)),
@@ -155,14 +154,14 @@ impl Block {
             return false;
         };
         for i in lw_index..up_index {
-            if !object_isdeallocand(&self.arr[i], s) {
+            if !self.arr[i].is_deallocand(s) {
                 return false;
             }
             if !object_contig_precedes(&self.arr[i], &self.arr[i + 1], s) {
                 return false;
             }
         }
-        assert!(object_isdeallocand(&self.arr[up_index], s));
+        assert!(self.arr[up_index].is_deallocand(s));
         true
     }
 
@@ -174,7 +173,7 @@ impl Block {
     ) -> bool {
         assert!(!self.arr.is_empty());
         let obj = &self.arr[0];
-        if !object_isdeallocand(obj, s) {
+        if !obj.is_deallocand(s) {
             return false;
         }
         // Note: Original does not do these copies; instead it leaks the outer expressions created

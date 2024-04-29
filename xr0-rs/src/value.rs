@@ -5,7 +5,7 @@ use crate::ast::{
     ast_expr_copy, ast_expr_equal, ast_type_create_voidptr, ast_type_struct_complete,
     ast_type_struct_members, ast_variable_arr_copy, ast_variable_name, ast_variable_type,
 };
-use crate::object::{object_abstractcopy, object_as_value, object_value_create};
+use crate::object::object_abstractcopy;
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
 use crate::state::state::state_vconst;
 use crate::state::State;
@@ -177,7 +177,7 @@ pub fn value_pf_augment(old: &Value, root: &AstExpr) -> Box<Value> {
     for var in &sv.members {
         let field = ast_variable_name(var);
         let obj = sv.m.get_mut(field).unwrap();
-        if let Some(obj_value) = object_as_value(obj) {
+        if let Some(obj_value) = obj.as_value() {
             if value_issync(obj_value) {
                 obj.assign(Some(value_sync_create(AstExpr::new_member(
                     ast_expr_copy(root),
@@ -197,7 +197,7 @@ fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     let mut m = HashMap::new();
     for var in members {
         let id = ast_variable_name(var).to_string();
-        m.insert(id, object_value_create(AstExpr::new_constant(0), None));
+        m.insert(id, Object::with_value(AstExpr::new_constant(0), None));
     }
     m
 }
@@ -263,7 +263,7 @@ impl Display for StructValue {
         let n = self.members.len();
         for (i, var) in self.members.iter().enumerate() {
             let name = ast_variable_name(var);
-            let val = object_as_value(self.m.get(name).unwrap());
+            let val = self.m.get(name).unwrap().as_value();
             let val_str = if let Some(val) = val {
                 format!("{val}")
             } else {
@@ -307,7 +307,7 @@ pub fn value_referencesheap(v: &Value, s: &mut State) -> bool {
 
 fn struct_referencesheap(sv: &StructValue, s: &mut State) -> bool {
     sv.m.values().any(|obj| {
-        let Some(val) = object_as_value(obj) else {
+        let Some(val) = obj.as_value() else {
             return false;
         };
         value_referencesheap(val, s)
@@ -390,7 +390,7 @@ pub fn value_references(v: &Value, loc: &Location, s: &mut State) -> bool {
 
 fn struct_references(sv: &StructValue, loc: &Location, s: &mut State) -> bool {
     sv.m.values().any(|obj| {
-        let Some(val) = object_as_value(obj) else {
+        let Some(val) = obj.as_value() else {
             return false;
         };
         value_references(val, loc, s)
