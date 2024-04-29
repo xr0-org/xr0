@@ -252,7 +252,7 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
-		return NULL;
+		assert(false);
 	case STMT_COMPOUND:
 		return stmt_compound_exec(stmt, state);
 	case STMT_COMPOUND_V:
@@ -448,6 +448,35 @@ ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *state)
 {
 	/* XXX: reject undefined things for this */
 	return ast_stmt_absexec(stmt, state);
+}
+
+static struct error *
+ast_stmt_absexecnosetup(struct ast_stmt *, struct state *);
+
+struct error *
+ast_stmt_absprocessnosetup(struct ast_stmt *stmt, char *fname, struct state *state)
+{
+	/* XXX: reject undefined things for this */
+	return ast_stmt_absexecnosetup(stmt, state);
+}
+
+static struct error *
+ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *state)
+{
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_LABELLED:
+		return NULL;
+	case STMT_NOP:
+	case STMT_EXPR:
+	case STMT_SELECTION:
+	case STMT_ITERATION:
+	case STMT_COMPOUND:
+	case STMT_JUMP:
+	case STMT_REGISTER:
+		return ast_stmt_absexec(stmt, state);
+	default:
+		assert(false);
+	}
 }
 
 static struct error *
@@ -697,7 +726,7 @@ sel_setupabsexec(struct ast_stmt *stmt, struct state *state)
 			*nest = ast_stmt_sel_nest(stmt);
 	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
-		return dec.err;
+		assert(false); /* should always be decidable */
 	}
 	if (dec.decision) {
 		return ast_stmt_setupabsexec(body, state);

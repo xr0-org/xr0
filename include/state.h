@@ -28,13 +28,13 @@ struct state;
 
 enum execution_mode {
 	EXEC_ABSTRACT,
+	EXEC_ABSTRACT_NO_SETUP,
 	EXEC_ACTUAL,
 	EXEC_SETUP
 };
 
 enum frame_kind {
 	FRAME_NESTED,
-	FRAME_SETUP,
 	FRAME_INTERMEDIATE,
 	FRAME_CALL
 };

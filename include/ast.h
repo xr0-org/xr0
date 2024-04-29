@@ -290,6 +290,9 @@ struct ast_stmt **
 ast_block_stmts(struct ast_block *b);
 
 bool
+ast_block_empty(struct ast_block *b);
+
+bool
 ast_block_isterminal(struct ast_block *, struct state *);
 
 struct ast_type;
@@ -479,6 +482,9 @@ ast_stmt_process(struct ast_stmt *, char *fname, struct state *);
 
 struct error *
 ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *);
+
+struct error *
+ast_stmt_absprocessnosetup(struct ast_stmt *stmt, char *fname, struct state *);
 
 struct error *
 ast_stmt_setupprocess(struct ast_stmt *stmt, char *fname, struct state *);
