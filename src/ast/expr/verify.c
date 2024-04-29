@@ -1106,7 +1106,7 @@ call_absexec(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		EXEC_ABSTRACT,
+		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_copy(expr),
 		f
 	);
