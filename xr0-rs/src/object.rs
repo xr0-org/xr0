@@ -136,7 +136,7 @@ impl Object {
     fn size(&self) -> Box<AstExpr> {
         match &self.kind {
             ObjectKind::Value(_) => AstExpr::new_constant(1),
-            ObjectKind::DeallocandRange(range) => ast_expr_copy(range_size(range)),
+            ObjectKind::DeallocandRange(range) => ast_expr_copy(&range.size),
         }
     }
 
@@ -292,15 +292,15 @@ impl Object {
         }
     }
 
-    /// Returns a field of this object. `t` gives the effective type of this access to `obj`.
-    /// `member` is the name of the field being accessed.
+    /// Returns a field of `self`, which must be a value object. `t` is the effective type of this
+    /// access to `obj`. `member` is the name of the field being accessed.
     pub fn member_lvalue<'s>(
         &'s mut self,
         t: &AstType,
         member: &str,
         s: &'s mut State,
     ) -> LValue<'s> {
-        let val = get_or_create_struct(self, t, s);
+        let val = self.get_or_create_struct(t, s);
         let ValueKind::Struct(sv) = &mut val.kind else {
             panic!();
         };
@@ -313,25 +313,17 @@ impl Object {
             .map(|var| ast_variable_type(var));
         LValue { t, obj }
     }
-}
 
-fn get_or_create_struct<'obj>(
-    obj: &'obj mut Object,
-    t: &AstType,
-    s: &mut State,
-) -> &'obj mut Value {
-    // XXX FIXME: very silly rust construction because of borrow checker limitation
-    if obj.as_value_mut().is_some() {
-        obj.as_value_mut().unwrap()
-    } else {
-        let complete = ast_type_struct_complete(t, s.ext()).unwrap();
-        obj.assign(Some(value_struct_create(complete)));
-        obj.as_value_mut().unwrap()
+    fn get_or_create_struct<'obj>(&'obj mut self, t: &AstType, s: &mut State) -> &'obj mut Value {
+        // XXX FIXME: very silly rust construction because of borrow checker limitation
+        if self.as_value_mut().is_some() {
+            self.as_value_mut().unwrap()
+        } else {
+            let complete = ast_type_struct_complete(t, s.ext()).unwrap();
+            self.assign(Some(value_struct_create(complete)));
+            self.as_value_mut().unwrap()
+        }
     }
-}
-
-pub fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {
-    Box::new(Range { size, loc })
 }
 
 impl Display for Range {
@@ -341,8 +333,8 @@ impl Display for Range {
     }
 }
 
-pub fn range_size(r: &Range) -> &AstExpr {
-    &r.size
+pub fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {
+    Box::new(Range { size, loc })
 }
 
 pub fn range_dealloc(r: &Range, s: &mut State) -> Result<()> {
