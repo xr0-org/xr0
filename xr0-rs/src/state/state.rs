@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use super::location::{
-    location_auto_getblock, location_copy, location_create_dereferencable, location_create_static,
-    location_dealloc, location_offset, location_range_dealloc, location_toheap,
+    location_copy, location_dealloc, location_offset, location_range_dealloc, location_toheap,
     location_with_offset, LocationKind,
 };
 use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
@@ -237,12 +236,15 @@ impl State {
     pub fn get_block<'s>(&'s mut self, loc: &Location) -> Result<Option<&'s mut Block>> {
         match loc.kind {
             LocationKind::Static => Ok(self.static_memory.get_block(loc.block)),
-            LocationKind::Automatic { .. } => {
-                location_auto_getblock(loc, &mut self.stack).map(Some)
+            LocationKind::Automatic { frame } => {
+                let Some(frame) = self.stack.get_frame(frame) else {
+                    return Err(Error::new("stack frame doesn't exist".to_string()));
+                };
+                Ok(Some(frame.get_block(loc.block)))
             }
             LocationKind::Dynamic => Ok(self.heap.get_block(loc.block)),
             LocationKind::Dereferencable => Ok(self.clump.get_block(loc.block)),
-            _ => panic!(),
+            LocationKind::VConst => panic!(),
         }
     }
 }
@@ -349,7 +351,7 @@ pub fn state_range_dealloc(
 }
 
 pub fn state_addresses_deallocand(state: &mut State, obj: &Object) -> bool {
-    // Note: Original doesn't null-check. Might not be necessary.
+    // Note: Original doesn't null-check.
     let val = object_as_value(obj).unwrap();
     let loc = value_as_location(val);
     (*state).loc_is_deallocand(loc)

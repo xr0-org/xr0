@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
 use crate::state::state::state_get;
-use crate::state::{Block, Heap, Stack, State};
+use crate::state::{Heap, State};
 use crate::util::{Error, Result};
 use crate::{AstExpr, Value};
 
@@ -182,19 +182,6 @@ pub fn location_auto_parts(loc: &Location) -> (usize, usize, &AstExpr) {
 pub fn location_auto_get_block_id(loc: &Location) -> usize {
     assert!(matches!(loc.kind, LocationKind::Automatic { .. }));
     loc.block
-}
-
-pub fn location_auto_getblock<'stack>(
-    loc: &Location,
-    stack: &'stack mut Stack,
-) -> Result<&'stack mut Block> {
-    let LocationKind::Automatic { frame: id } = &loc.kind else {
-        panic!();
-    };
-    let Some(frame) = stack.get_frame(*id) else {
-        return Err(Error::new("stack frame doesn't exist".to_string()));
-    };
-    Ok(frame.get_block(loc.block))
 }
 
 pub fn location_dealloc(loc: &Location, heap: &mut Heap) -> Result<()> {
