@@ -1,5 +1,5 @@
 use super::{Block, State};
-use crate::ast::{ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type, AstExpr};
+use crate::ast::{ast_type_copy, ast_variable_name, ast_variable_type, AstExpr};
 use crate::object::{object_as_value, object_isvalue, object_value_create};
 use crate::state::location::{
     location_auto_get_block_id, location_auto_parts, location_references,
@@ -215,7 +215,7 @@ fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
 
 pub fn variable_str(var: &Variable, state: &State) -> String {
     let (frame_id, block_id, offset) = location_auto_parts(&var.loc);
-    let type_ = ast_type_str(&var.type_);
+    let type_ = &var.type_;
     let isparam = if var.is_param { "param " } else { "" };
     let obj_str = object_or_nothing_str(state, frame_id, block_id, offset);
     let loc = &var.loc;

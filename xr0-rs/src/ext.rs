@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{ast_type_str, ast_type_struct_tag};
+use crate::ast::ast_type_struct_tag;
 use crate::{str_write, AstFunction, AstType, AstVariable};
 
 #[derive(Default)]
@@ -20,10 +20,10 @@ impl Externals {
     pub fn types_str(&self, indent: &str) -> String {
         let mut b = String::new();
         for (k, v) in &self.typedef {
-            str_write!(b, "{indent}{} {k}\n", ast_type_str(v));
+            str_write!(b, "{indent}{v} {k}\n");
         }
         for v in self.struct_.values() {
-            str_write!(b, "{indent}{}\n", ast_type_str(v));
+            str_write!(b, "{indent}{v}\n");
         }
         b
     }

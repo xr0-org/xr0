@@ -1647,8 +1647,7 @@ pub fn ast_block_create(decls: Vec<Box<AstVariable>>, stmts: Vec<Box<AstStmt>>) 
 pub fn ast_block_str(b: &AstBlock, indent: &str) -> String {
     let mut sb = String::new();
     for decl in &b.decls {
-        let s = ast_variable_str(decl);
-        str_write!(sb, "{indent}{s};\n");
+        str_write!(sb, "{indent}{decl};\n");
     }
     for stmt in &b.stmts {
         let s = ast_stmt_str(stmt);
@@ -2516,52 +2515,29 @@ pub fn ast_type_copy(t: &AstType) -> Box<AstType> {
     Box::new(t.clone())
 }
 
-pub fn ast_type_str(t: &AstType) -> String {
-    let mut b = String::new();
-    str_write!(b, "{}", mod_str(t.modifiers));
-    match &t.base {
-        AstTypeBase::Pointer(ptr_type) => {
-            ast_type_str_build_ptr(&mut b, ptr_type.as_ref().unwrap());
+impl Display for AstType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", mod_str(self.modifiers))?;
+        match &self.base {
+            AstTypeBase::Pointer(Some(ptr_type)) => {
+                let space = !matches!(ptr_type.base, AstTypeBase::Pointer(_));
+                write!(f, "{ptr_type}{}*", if space { " " } else { "" })
+            }
+            AstTypeBase::Array(AstArrayType { type_, length }) => write!(f, "{type_}[{length}]"),
+            AstTypeBase::Struct(s) => write!(f, "{s}"),
+            AstTypeBase::UserDefined(name) => write!(f, "{name}"),
+            AstTypeBase::Void => write!(f, "void"),
+            AstTypeBase::Char => write!(f, "char"),
+            AstTypeBase::Short => write!(f, "short"),
+            AstTypeBase::Int => write!(f, "int"),
+            AstTypeBase::Long => write!(f, "long"),
+            AstTypeBase::Float => write!(f, "float"),
+            AstTypeBase::Double => write!(f, "double"),
+            AstTypeBase::Signed => write!(f, "signed"),
+            AstTypeBase::Unsigned => write!(f, "unsigned"),
+            AstTypeBase::Pointer(None) | AstTypeBase::Union(_) | AstTypeBase::Enum => panic!(),
         }
-        AstTypeBase::Array(arr) => {
-            ast_type_str_build_arr(&mut b, arr);
-        }
-        AstTypeBase::Struct(s) => {
-            ast_type_str_build_struct(&mut b, s);
-        }
-        AstTypeBase::UserDefined(name) => {
-            str_write!(b, "{name}");
-        }
-        AstTypeBase::Void => {
-            str_write!(b, "void");
-        }
-        AstTypeBase::Char => {
-            str_write!(b, "char");
-        }
-        AstTypeBase::Short => {
-            str_write!(b, "short");
-        }
-        AstTypeBase::Int => {
-            str_write!(b, "int");
-        }
-        AstTypeBase::Long => {
-            str_write!(b, "long");
-        }
-        AstTypeBase::Float => {
-            str_write!(b, "float");
-        }
-        AstTypeBase::Double => {
-            str_write!(b, "double");
-        }
-        AstTypeBase::Signed => {
-            str_write!(b, "signed");
-        }
-        AstTypeBase::Unsigned => {
-            str_write!(b, "unsigned");
-        }
-        _ => panic!(),
     }
-    b
 }
 
 fn mod_str(modifiers: AstTypeModifiers) -> String {
@@ -2580,32 +2556,22 @@ fn mod_str(modifiers: AstTypeModifiers) -> String {
     b
 }
 
-fn ast_type_str_build_ptr(b: &mut String, ptr_type: &AstType) {
-    let base = ast_type_str(ptr_type);
-    let space: bool = !matches!(ptr_type.base, AstTypeBase::Pointer(_));
-    str_write!(*b, "{base}{}*", if space { " " } else { "" },);
-}
-
-fn ast_type_str_build_arr(b: &mut String, arr: &AstArrayType) {
-    let base = ast_type_str(&arr.type_);
-    str_write!(*b, "{base}[{}]", arr.length);
-}
-
-fn ast_type_str_build_struct(b: &mut String, s: &AstStructType) {
-    assert!(s.tag.is_some() || s.members.is_some());
-    str_write!(*b, "struct ");
-    if let Some(tag) = &s.tag {
-        str_write!(*b, "{tag}");
+impl Display for AstStructType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        assert!(self.tag.is_some() || self.members.is_some());
+        write!(f, "struct ")?;
+        if let Some(tag) = &self.tag {
+            write!(f, "{tag}")?;
+        }
+        let Some(members) = self.members.as_ref() else {
+            return Ok(());
+        };
+        write!(f, " {{ ")?;
+        for field in members.iter() {
+            write!(f, "{field}; ")?;
+        }
+        write!(f, "}}")
     }
-    let Some(members) = s.members.as_ref() else {
-        return;
-    };
-    str_write!(*b, " {{ ");
-    for field in members.iter() {
-        let s = ast_variable_str(field);
-        str_write!(*b, "{s}; ");
-    }
-    str_write!(*b, "}}");
 }
 
 pub fn ast_type_ptr_type(t: &AstType) -> Option<&AstType> {
@@ -2625,11 +2591,11 @@ pub fn ast_variable_arr_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
     v.to_vec()
 }
 
-pub fn ast_variable_str(v: &AstVariable) -> String {
-    let mut b = String::new();
-    let t = ast_type_str(&v.type_);
-    str_write!(b, "{t} {}", v.name);
-    b
+impl Display for AstVariable {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let AstVariable { type_, name } = self;
+        write!(f, "{type_} {name}")
+    }
 }
 
 pub fn ast_variable_name(v: &AstVariable) -> &str {
@@ -2665,12 +2631,11 @@ impl<'ast> AstFunction<'ast> {
         if self.is_axiom {
             str_write!(b, "axiom ");
         }
-        str_write!(b, "{}\n", ast_type_str(&self.ret));
+        str_write!(b, "{}\n", self.ret);
         str_write!(b, "{}(", self.name);
         for (i, param) in self.params.iter().enumerate() {
-            let v = ast_variable_str(param);
             let space = if i + 1 < self.params.len() { ", " } else { "" };
-            str_write!(b, "{v}{space}");
+            str_write!(b, "{param}{space}");
         }
         let abs = ast_block_str(&self.abstract_, "\t");
         str_write!(b, ") ~ [\n{abs}]");
