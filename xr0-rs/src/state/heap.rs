@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use super::{Block, State};
-use crate::ast::{ast_expr_constant_create, ast_expr_matheval};
+use crate::ast::ast_expr_matheval;
 use crate::state::state::state_references;
 use crate::util::{Error, Result};
 use crate::{str_write, AstExpr, Location, Value};
@@ -61,7 +61,7 @@ impl Heap {
             block: Block::new(),
             freed: false,
         });
-        Location::new_dynamic(address, ast_expr_constant_create(0))
+        Location::new_dynamic(address, AstExpr::new_constant(0))
     }
 
     pub fn get_block(&mut self, address: usize) -> Option<&mut Block> {
@@ -107,7 +107,7 @@ impl Heap {
 }
 
 fn block_referenced(s: &mut State, addr: usize) -> bool {
-    let loc = Location::new_dynamic(addr, ast_expr_constant_create(0));
+    let loc = Location::new_dynamic(addr, AstExpr::new_constant(0));
     state_references(s, &loc)
 }
 

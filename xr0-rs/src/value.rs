@@ -2,10 +2,8 @@ use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{
-    ast_expr_constant_create, ast_expr_copy, ast_expr_equal, ast_expr_identifier_create,
-    ast_expr_literal_create, ast_expr_member_create, ast_type_create_voidptr,
-    ast_type_struct_complete, ast_type_struct_members, ast_variable_arr_copy, ast_variable_name,
-    ast_variable_type,
+    ast_expr_copy, ast_expr_equal, ast_type_create_voidptr, ast_type_struct_complete,
+    ast_type_struct_members, ast_variable_arr_copy, ast_variable_name, ast_variable_type,
 };
 use crate::object::{object_abstractcopy, object_as_value, object_value_create};
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
@@ -181,7 +179,7 @@ pub fn value_pf_augment(old: &Value, root: &AstExpr) -> Box<Value> {
         let obj = sv.m.get_mut(field).unwrap();
         if let Some(obj_value) = object_as_value(obj) {
             if value_issync(obj_value) {
-                obj.assign(Some(value_sync_create(ast_expr_member_create(
+                obj.assign(Some(value_sync_create(AstExpr::new_member(
                     ast_expr_copy(root),
                     field.to_string(),
                 ))));
@@ -199,7 +197,7 @@ fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     let mut m = HashMap::new();
     for var in members {
         let id = ast_variable_name(var).to_string();
-        m.insert(id, object_value_create(ast_expr_constant_create(0), None));
+        m.insert(id, object_value_create(AstExpr::new_constant(0), None));
     }
     m
 }
@@ -361,8 +359,8 @@ pub fn value_to_expr(v: &Value) -> Box<AstExpr> {
     // Note: In the original, the return value from `value_as_literal` was redundantly copied and
     // then leaked.
     match &v.kind {
-        ValueKind::DefinitePtr(_) => ast_expr_identifier_create(value_str(v)),
-        ValueKind::IndefinitePtr(_) => ast_expr_identifier_create(value_str(v)),
+        ValueKind::DefinitePtr(_) => AstExpr::new_identifier(value_str(v)),
+        ValueKind::IndefinitePtr(_) => AstExpr::new_identifier(value_str(v)),
         ValueKind::Literal(_) => value_as_literal(v),
         ValueKind::Sync(n) => ast_expr_copy(number_as_sync(n)),
         ValueKind::Int(n) => number_to_expr(n),
@@ -379,7 +377,7 @@ pub fn value_as_literal(v: &Value) -> Box<AstExpr> {
     let ValueKind::Literal(s) = &v.kind else {
         panic!();
     };
-    ast_expr_literal_create(s.clone())
+    AstExpr::new_literal(s.clone())
 }
 
 pub fn value_references(v: &Value, loc: &Location, s: &mut State) -> bool {
@@ -590,7 +588,7 @@ fn number_to_expr(n: &Number) -> Box<AstExpr> {
 
 fn number_ranges_to_expr(arr: &[NumberRange]) -> Box<AstExpr> {
     assert_eq!(arr.len(), 1);
-    ast_expr_constant_create(number_range_as_constant(&arr[0]))
+    AstExpr::new_constant(number_range_as_constant(&arr[0]))
 }
 
 fn number_range_arr_canbe(arr: &[NumberRange], value: bool) -> bool {

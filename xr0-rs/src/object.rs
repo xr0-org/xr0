@@ -1,9 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{
-    ast_expr_constant_create, ast_expr_copy, ast_expr_difference_create, ast_expr_eq_create,
-    ast_expr_ge_create, ast_expr_le_create, ast_expr_lt_create, ast_expr_sum_create,
-    ast_type_struct_complete, ast_variable_name, ast_variable_type, LValue,
+    ast_expr_copy, ast_type_struct_complete, ast_variable_name, ast_variable_type, LValue,
 };
 use crate::state::location::{location_dealloc, location_references};
 use crate::state::state::state_eval;
@@ -141,7 +139,7 @@ impl Object {
 
 fn object_size(obj: &Object) -> Box<AstExpr> {
     match &obj.kind {
-        ObjectKind::Value(_) => ast_expr_constant_create(1),
+        ObjectKind::Value(_) => AstExpr::new_constant(1),
         ObjectKind::DeallocandRange(range) => ast_expr_copy(range_size(range)),
     }
 }
@@ -152,15 +150,15 @@ pub fn object_lower(obj: &Object) -> &AstExpr {
 }
 
 pub fn object_upper(obj: &Object) -> Box<AstExpr> {
-    ast_expr_sum_create(ast_expr_copy(&obj.offset), object_size(obj))
+    AstExpr::new_sum(ast_expr_copy(&obj.offset), object_size(obj))
 }
 
 pub fn object_contains(obj: &Object, offset: &AstExpr, s: &State) -> bool {
     let lw = &obj.offset;
     let up = object_upper(obj);
     let of = offset;
-    let e1 = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(of));
-    let e2 = ast_expr_lt_create(ast_expr_copy(of), ast_expr_copy(&up));
+    let e1 = AstExpr::new_le(ast_expr_copy(lw), ast_expr_copy(of));
+    let e2 = AstExpr::new_lt(ast_expr_copy(of), ast_expr_copy(&up));
     state_eval(s, &e1) && state_eval(s, &e2)
 }
 
@@ -170,8 +168,8 @@ pub fn object_contains_upperincl(obj: &Object, offset: &AstExpr, s: &State) -> b
     let of = offset;
     // Note: These copies are not in the original. Original leaks the expressions to avoid
     // double-freeing subexpressions.
-    let lower_bound_expr = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(of));
-    let upper_bound_expr = ast_expr_le_create(ast_expr_copy(of), up);
+    let lower_bound_expr = AstExpr::new_le(ast_expr_copy(lw), ast_expr_copy(of));
+    let upper_bound_expr = AstExpr::new_le(ast_expr_copy(of), up);
     state_eval(s, &lower_bound_expr) && state_eval(s, &upper_bound_expr)
 }
 
@@ -181,7 +179,7 @@ pub fn object_isempty(obj: &Object, s: &State) -> bool {
     let up = object_upper(obj);
     // Note: Original does not make a copy of `lw`; instead it leaks the expression to avoid
     // double-freeing subexpressions.
-    state_eval(s, &ast_expr_eq_create(ast_expr_copy(lw), up))
+    state_eval(s, &AstExpr::new_eq(ast_expr_copy(lw), up))
 }
 
 pub fn object_contig_precedes(before: &Object, after: &Object, s: &State) -> bool {
@@ -189,7 +187,7 @@ pub fn object_contig_precedes(before: &Object, after: &Object, s: &State) -> boo
     let up = &after.offset;
     // Note: Original does not make a copy of `up`; instead it leaks the expression to avoid
     // double-freeing subexpressions.
-    state_eval(s, &ast_expr_eq_create(lw, ast_expr_copy(up)))
+    state_eval(s, &AstExpr::new_eq(lw, ast_expr_copy(up)))
 }
 
 #[allow(dead_code)]
@@ -198,8 +196,8 @@ pub fn object_issingular(obj: &Object, s: &State) -> bool {
     let up = object_upper(obj);
     // Note: Original does not make a copy of `lw`; instead it leaks the expression to avoid
     // double-freeing subexpressions.
-    let lw_succ = ast_expr_sum_create(ast_expr_copy(lw), ast_expr_constant_create(1));
-    state_eval(s, &ast_expr_eq_create(lw_succ, up))
+    let lw_succ = AstExpr::new_sum(ast_expr_copy(lw), AstExpr::new_constant(1));
+    state_eval(s, &AstExpr::new_eq(lw_succ, up))
 }
 
 /// Returns an `Object` covering the slice of `obj` up to the offset (within the enclosing Block)
@@ -211,9 +209,9 @@ pub fn object_issingular(obj: &Object, s: &State) -> bool {
 pub fn object_upto(obj: &Object, excl_up: &AstExpr, s: &mut State) -> Option<Box<Object>> {
     let lw = &obj.offset;
     let up = object_upper(obj);
-    let prop0 = ast_expr_le_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
-    let prop1 = ast_expr_eq_create(ast_expr_copy(lw), ast_expr_copy(excl_up));
-    let prop2 = ast_expr_eq_create(up, ast_expr_copy(excl_up));
+    let prop0 = AstExpr::new_le(ast_expr_copy(lw), ast_expr_copy(excl_up));
+    let prop1 = AstExpr::new_eq(ast_expr_copy(lw), ast_expr_copy(excl_up));
+    let prop2 = AstExpr::new_eq(up, ast_expr_copy(excl_up));
     let e0: bool = state_eval(s, &prop0);
     let e1: bool = state_eval(s, &prop1);
     let e2: bool = state_eval(s, &prop2);
@@ -246,7 +244,7 @@ pub fn object_upto(obj: &Object, excl_up: &AstExpr, s: &mut State) -> Option<Box
     Some(object_range_create(
         ast_expr_copy(&obj.offset),
         range_create(
-            ast_expr_difference_create(ast_expr_copy(excl_up), ast_expr_copy(lw)),
+            AstExpr::new_difference(ast_expr_copy(excl_up), ast_expr_copy(lw)),
             s.alloc().into_location(),
         ),
     ))
@@ -255,8 +253,8 @@ pub fn object_upto(obj: &Object, excl_up: &AstExpr, s: &mut State) -> Option<Box
 pub fn object_from(obj: &Object, incl_lw: &AstExpr, s: &mut State) -> Option<Box<Object>> {
     let lw = &obj.offset;
     let up = object_upper(obj);
-    let prop0 = ast_expr_ge_create(ast_expr_copy(incl_lw), ast_expr_copy(&up));
-    let prop1 = ast_expr_eq_create(ast_expr_copy(incl_lw), ast_expr_copy(lw));
+    let prop0 = AstExpr::new_ge(ast_expr_copy(incl_lw), ast_expr_copy(&up));
+    let prop1 = AstExpr::new_eq(ast_expr_copy(incl_lw), ast_expr_copy(lw));
     let e0: bool = state_eval(s, &prop0);
     let e1: bool = state_eval(s, &prop1);
     drop(prop1);
@@ -277,7 +275,7 @@ pub fn object_from(obj: &Object, incl_lw: &AstExpr, s: &mut State) -> Option<Box
     Some(object_range_create(
         ast_expr_copy(incl_lw),
         range_create(
-            ast_expr_difference_create(up, ast_expr_copy(incl_lw)),
+            AstExpr::new_difference(up, ast_expr_copy(incl_lw)),
             s.alloc().into_location(),
         ),
     ))

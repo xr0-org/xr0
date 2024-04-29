@@ -369,11 +369,150 @@ fn rangeprocess_dealloc(
 
 fn hack_base_object_from_alloc<'s>(expr: &'s AstExpr, state: &'s mut State) -> &'s Object {
     let inner = ast_expr_unary_operand(expr);
-    let i = ast_expr_identifier_create("i".to_string());
+    let i = AstExpr::new_identifier("i".to_string());
     assert!(ast_expr_equal(ast_expr_binary_e2(inner), &i));
     drop(i);
     let lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state).unwrap();
     lval.obj.unwrap()
+}
+
+impl AstExpr {
+    fn new(kind: AstExprKind) -> Box<AstExpr> {
+        Box::new(AstExpr { kind })
+    }
+
+    pub fn new_identifier(s: String) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Identifier(s))
+    }
+
+    pub fn new_constant(k: c_int) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Constant(ConstantExpr {
+            is_char: false,
+            constant: k,
+        }))
+    }
+
+    pub fn new_constant_char(c: c_char) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Constant(ConstantExpr {
+            is_char: true,
+            constant: c as c_int,
+        }))
+    }
+
+    pub fn new_literal(s: String) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::StringLiteral(s))
+    }
+
+    #[allow(dead_code)]
+    pub fn new_bracketed(root: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Bracketed(root))
+    }
+
+    #[allow(dead_code)]
+    pub fn new_iteration() -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Iteration)
+    }
+
+    pub fn new_call(fun: Box<AstExpr>, args: Vec<Box<AstExpr>>) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Call(CallExpr { fun, args }))
+    }
+
+    pub fn new_incdec(root: Box<AstExpr>, inc: bool, pre: bool) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::IncDec(IncDecExpr {
+            operand: root,
+            inc,
+            pre,
+        }))
+    }
+
+    pub fn new_member(struct_: Box<AstExpr>, field: String) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::StructMember(StructMemberExpr {
+            root: struct_,
+            member: field,
+        }))
+    }
+
+    pub fn new_unary(root: Box<AstExpr>, op: AstUnaryOp) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Unary(UnaryExpr { op, arg: root }))
+    }
+
+    pub fn new_binary(e1: Box<AstExpr>, op: AstBinaryOp, e2: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Binary(BinaryExpr { e1, op, e2 }))
+    }
+
+    pub fn new_eq(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new_binary(e1, AstBinaryOp::Eq, e2)
+    }
+
+    #[allow(dead_code)]
+    pub fn new_ne(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new_binary(e1, AstBinaryOp::Ne, e2)
+    }
+
+    pub fn new_lt(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new_binary(e1, AstBinaryOp::Lt, e2)
+    }
+
+    #[allow(dead_code)]
+    pub fn new_gt(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new_binary(e1, AstBinaryOp::Gt, e2)
+    }
+
+    pub fn new_le(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new_binary(e1, AstBinaryOp::Le, e2)
+    }
+
+    pub fn new_ge(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new_binary(e1, AstBinaryOp::Ge, e2)
+    }
+
+    pub fn new_sum(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new_binary(e1, AstBinaryOp::Addition, e2)
+    }
+
+    pub fn new_difference(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new_binary(e1, AstBinaryOp::Subtraction, e2)
+    }
+
+    pub fn new_assignment(root: Box<AstExpr>, value: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Assignment(AssignmentExpr {
+            lval: root,
+            rval: value,
+        }))
+    }
+
+    pub fn new_isdeallocand(assertand: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::IsDeallocand(assertand))
+    }
+
+    pub fn new_isdereferencable(assertand: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::IsDereferencable(assertand))
+    }
+
+    pub fn new_arbarg() -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::ArbArg)
+    }
+
+    pub fn new_alloc(arg: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Allocation(AllocExpr {
+            kind: AstAllocKind::Alloc,
+            arg,
+        }))
+    }
+
+    pub fn new_dealloc(arg: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Allocation(AllocExpr {
+            kind: AstAllocKind::Dealloc,
+            arg,
+        }))
+    }
+
+    pub fn new_clump(arg: Box<AstExpr>) -> Box<AstExpr> {
+        AstExpr::new(AstExprKind::Allocation(AllocExpr {
+            kind: AstAllocKind::Clump,
+            arg,
+        }))
+    }
 }
 
 pub fn ast_expr_equal(e1: &AstExpr, e2: &AstExpr) -> bool {
@@ -541,8 +680,8 @@ fn expr_isdeallocand_rangedecide(
     let acc = ast_expr_isdeallocand_assertand(expr);
     assert_eq!(ast_expr_unary_op(acc), AstUnaryOp::Dereference);
     let inner = ast_expr_unary_operand(acc);
-    let i = ast_expr_identifier_create("i".to_string());
-    let j = ast_expr_identifier_create("j".to_string());
+    let i = AstExpr::new_identifier("i".to_string());
+    let j = AstExpr::new_identifier("j".to_string());
     assert!(
         !!(ast_expr_equal(ast_expr_binary_e2(inner), &i)
             || ast_expr_equal(ast_expr_binary_e2(inner), &j))
@@ -571,10 +710,6 @@ pub fn ast_expr_exec(expr: &AstExpr, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-pub fn ast_expr_arbarg_create() -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::ArbArg)
-}
-
 pub fn ast_expr_assume(expr: &AstExpr, state: &mut State) -> Result<Preresult> {
     reduce_assume(expr, true, state)
 }
@@ -601,7 +736,7 @@ fn binary_assume(b: &BinaryExpr, value: bool, s: &mut State) -> Result<Preresult
     let v1 = ast_expr_pf_reduce(&b.e1, s).unwrap();
     let v2 = ast_expr_pf_reduce(&b.e2, s).unwrap();
     // Note: original leaks the expression.
-    let expr = ast_expr_binary_create(value_to_expr(&v1), b.op, value_to_expr(&v2));
+    let expr = AstExpr::new_binary(value_to_expr(&v1), b.op, value_to_expr(&v2));
     irreducible_assume(&expr, value, s)
 }
 
@@ -621,10 +756,6 @@ fn irreducible_assume_actual(e: &AstExpr, s: &mut State) -> Result<Preresult> {
     Ok(Preresult {
         is_contradiction: false,
     })
-}
-
-pub fn ast_expr_isdereferencable_create(assertand: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::IsDereferencable(assertand))
 }
 
 fn ast_expr_pf_reduce_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Preresult> {
@@ -657,31 +788,18 @@ fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
 
 fn hack_identifier_builtin_eval(id: &str, state: &State) -> Result<Box<Value>> {
     if state_getvconst(state, id).is_some() || id.starts_with("ptr:") {
-        return Ok(value_sync_create(ast_expr_identifier_create(
-            id.to_string(),
-        )));
+        return Ok(value_sync_create(AstExpr::new_identifier(id.to_string())));
     }
     Err(Error::new("not built-in".to_string()))
-}
-
-pub fn ast_expr_isdeallocand_create(assertand: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::IsDeallocand(assertand))
-}
-
-pub fn ast_expr_assignment_create(root: Box<AstExpr>, value: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Assignment(AssignmentExpr {
-        lval: root,
-        rval: value,
-    }))
 }
 
 fn expr_to_binary(expr: &AstExpr) -> Box<AstExpr> {
     match &expr.kind {
         AstExprKind::Binary(_) => ast_expr_copy(expr),
-        _ => ast_expr_binary_create(
+        _ => AstExpr::new_binary(
             ast_expr_copy(expr),
             AstBinaryOp::Addition,
-            ast_expr_constant_create(0),
+            AstExpr::new_constant(0),
         ),
     }
 }
@@ -771,7 +889,7 @@ fn expr_binary_eval(binary: &BinaryExpr, state: &mut State) -> Result<Box<Value>
     // Note: Both values are leaked in the original.
     let v1 = ast_expr_eval(e1, state)?;
     let v2 = ast_expr_eval(e2, state)?;
-    let result = value_sync_create(ast_expr_binary_create(
+    let result = value_sync_create(AstExpr::new_binary(
         value_to_expr(&v1),
         *op,
         value_to_expr(&v2),
@@ -849,7 +967,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
                 };
                 let t = ast_type_ptr_type(root_lval.t.unwrap());
                 let root_val = object_as_value(&*root_obj).unwrap();
-                let obj = state_deref(&mut *state, root_val, &ast_expr_constant_create(0))?;
+                let obj = state_deref(&mut *state, root_val, &AstExpr::new_constant(0))?;
                 Ok(LValue { t, obj })
             }
         }
@@ -956,17 +1074,17 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
     let nparams = uncomputed_params.len();
     let mut computed_params = Vec::with_capacity(nparams);
     for p in uncomputed_params {
-        let param = ast_expr_identifier_create(ast_variable_name(p).to_string());
+        let param = AstExpr::new_identifier(ast_variable_name(p).to_string());
         // Note: The original leaked a result here.
         let v = ast_expr_eval(&param, s)?;
         computed_params.push(if value_islocation(&v) {
-            ast_expr_identifier_create(value_str(&v))
+            AstExpr::new_identifier(value_str(&v))
         } else {
             value_to_expr(&v)
         });
     }
-    Ok(value_sync_create(ast_expr_call_create(
-        ast_expr_identifier_create(root.to_string()),
+    Ok(value_sync_create(AstExpr::new_call(
+        AstExpr::new_identifier(root.to_string()),
         computed_params,
     )))
 }
@@ -1021,7 +1139,7 @@ pub fn prepare_parameters(
         state_declare(state, param, true);
 
         let arg = res?;
-        let name = ast_expr_identifier_create(ast_variable_name(param).to_string());
+        let name = AstExpr::new_identifier(ast_variable_name(param).to_string());
         let lval_lval = ast_expr_lvalue(&name, state)?;
         let obj = lval_lval.obj.unwrap();
         // Note: Original does not null-check `obj`.
@@ -1110,15 +1228,6 @@ fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
     Ok(())
 }
 
-#[allow(dead_code)]
-pub fn ast_expr_bracketed_create(root: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Bracketed(root))
-}
-
-pub fn ast_expr_literal_create(s: String) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::StringLiteral(s))
-}
-
 pub fn ast_expr_as_constant(expr: &AstExpr) -> c_int {
     match &expr.kind {
         AstExprKind::Constant(c) => c.constant,
@@ -1135,20 +1244,6 @@ fn pf_augment(v: &Value, call: &CallExpr, state: &mut State) -> Result<Box<Value
     Ok(value_pf_augment(v, value_as_sync(&res_val)))
 }
 
-pub fn ast_expr_constant_create_char(c: c_char) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Constant(ConstantExpr {
-        is_char: true,
-        constant: c as c_int,
-    }))
-}
-
-pub fn ast_expr_constant_create(k: c_int) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Constant(ConstantExpr {
-        is_char: false,
-        constant: k,
-    }))
-}
-
 pub fn ast_expr_as_identifier(expr: &AstExpr) -> &str {
     let AstExprKind::Identifier(id) = &expr.kind else {
         panic!();
@@ -1156,17 +1251,9 @@ pub fn ast_expr_as_identifier(expr: &AstExpr) -> &str {
     id
 }
 
-fn ast_expr_create(kind: AstExprKind) -> Box<AstExpr> {
-    Box::new(AstExpr { kind })
-}
-
-pub fn ast_expr_identifier_create(s: String) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Identifier(s))
-}
-
 fn unary_pf_reduce(e: &AstExpr, s: &mut State) -> Result<Box<Value>> {
     let res_val = ast_expr_pf_reduce(ast_expr_unary_operand(e), s)?;
-    Ok(value_sync_create(ast_expr_unary_create(
+    Ok(value_sync_create(AstExpr::new_unary(
         res_val.into_sync(),
         ast_expr_unary_op(e),
     )))
@@ -1177,7 +1264,7 @@ fn binary_pf_reduce(binary: &BinaryExpr, s: &mut State) -> Result<Box<Value>> {
     let v1 = ast_expr_pf_reduce(e1, s)?;
     let v2 = ast_expr_pf_reduce(e2, s)?;
     // Note: Original leaked v1 and v2.
-    Ok(value_sync_create(ast_expr_binary_create(
+    Ok(value_sync_create(AstExpr::new_binary(
         value_to_expr(&v1),
         *op,
         value_to_expr(&v2),
@@ -1196,8 +1283,8 @@ fn call_pf_reduce(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
         let val = ast_expr_pf_reduce(arg, s)?;
         reduced_args.push(value_to_expr(&val));
     }
-    Ok(value_sync_create(ast_expr_call_create(
-        ast_expr_identifier_create(root.to_string()),
+    Ok(value_sync_create(AstExpr::new_call(
+        AstExpr::new_identifier(root.to_string()),
         reduced_args,
     )))
 }
@@ -1211,7 +1298,7 @@ fn structmember_pf_reduce(sm: &StructMemberExpr, s: &mut State) -> Result<Box<Va
         return Ok(value_copy(obj_value));
     }
     assert!(value_issync(&v));
-    Ok(value_sync_create(ast_expr_member_create(
+    Ok(value_sync_create(AstExpr::new_member(
         v.into_sync(),
         member.to_string(),
     )))
@@ -1279,64 +1366,25 @@ impl Display for CallExpr {
 pub fn ast_expr_inverted_copy(expr: &AstExpr, invert: bool) -> Box<AstExpr> {
     let copy = ast_expr_copy(expr);
     if invert {
-        ast_expr_unary_create(copy, AstUnaryOp::Bang)
+        AstExpr::new_unary(copy, AstUnaryOp::Bang)
     } else {
         copy
     }
 }
 
-pub fn ast_expr_member_create(struct_: Box<AstExpr>, field: String) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::StructMember(StructMemberExpr {
-        root: struct_,
-        member: field,
-    }))
-}
-
-pub fn ast_expr_binary_create(e1: Box<AstExpr>, op: AstBinaryOp, e2: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Binary(BinaryExpr { e1, op, e2 }))
-}
-
-pub fn ast_expr_unary_create(root: Box<AstExpr>, op: AstUnaryOp) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Unary(UnaryExpr { op, arg: root }))
-}
-
 pub fn ast_expr_incdec_to_assignment(incdec: &IncDecExpr) -> AssignmentExpr {
     AssignmentExpr {
         lval: ast_expr_copy(&incdec.operand),
-        rval: ast_expr_binary_create(
+        rval: AstExpr::new_binary(
             ast_expr_copy(&incdec.operand),
             if incdec.inc {
                 AstBinaryOp::Addition
             } else {
                 AstBinaryOp::Subtraction
             },
-            ast_expr_constant_create(1),
+            AstExpr::new_constant(1),
         ),
     }
-}
-
-pub fn ast_expr_incdec_create(root: Box<AstExpr>, inc: bool, pre: bool) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::IncDec(IncDecExpr {
-        operand: root,
-        inc,
-        pre,
-    }))
-}
-
-pub fn ast_expr_call_create(fun: Box<AstExpr>, args: Vec<Box<AstExpr>>) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Call(CallExpr { fun, args }))
-}
-
-#[allow(dead_code)]
-pub fn ast_expr_iteration_create() -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Iteration)
-}
-
-pub fn ast_expr_dealloc_create(arg: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Allocation(AllocExpr {
-        kind: AstAllocKind::Dealloc,
-        arg,
-    }))
 }
 
 impl Display for AllocExpr {
@@ -1349,13 +1397,6 @@ impl Display for AllocExpr {
         };
         write!(f, ".{kw} {arg};")
     }
-}
-
-pub fn ast_expr_alloc_create(arg: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Allocation(AllocExpr {
-        kind: AstAllocKind::Alloc,
-        arg,
-    }))
 }
 
 pub fn ast_expr_isdeallocand_assertand(expr: &AstExpr) -> &AstExpr {
@@ -1414,14 +1455,6 @@ pub fn ast_expr_binary_e1(expr: &AstExpr) -> &AstExpr {
     &binary.e1
 }
 
-pub fn ast_expr_difference_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_binary_create(e1, AstBinaryOp::Subtraction, e2)
-}
-
-pub fn ast_expr_sum_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_binary_create(e1, AstBinaryOp::Addition, e2)
-}
-
 impl Display for UnaryExpr {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let UnaryExpr { op, arg } = self;
@@ -1437,44 +1470,11 @@ impl Display for UnaryExpr {
     }
 }
 
-pub fn ast_expr_ge_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_binary_create(e1, AstBinaryOp::Ge, e2)
-}
-
 pub fn ast_expr_binary_op(expr: &AstExpr) -> AstBinaryOp {
     let AstExprKind::Binary(binary) = &expr.kind else {
         panic!();
     };
     binary.op
-}
-
-pub fn ast_expr_le_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_binary_create(e1, AstBinaryOp::Le, e2)
-}
-
-pub fn ast_expr_clump_create(arg: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_create(AstExprKind::Allocation(AllocExpr {
-        kind: AstAllocKind::Clump,
-        arg,
-    }))
-}
-
-#[allow(dead_code)]
-pub fn ast_expr_gt_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_binary_create(e1, AstBinaryOp::Gt, e2)
-}
-
-pub fn ast_expr_lt_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_binary_create(e1, AstBinaryOp::Lt, e2)
-}
-
-#[allow(dead_code)]
-pub fn ast_expr_ne_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_binary_create(e1, AstBinaryOp::Ne, e2)
-}
-
-pub fn ast_expr_eq_create(e1: Box<AstExpr>, e2: Box<AstExpr>) -> Box<AstExpr> {
-    ast_expr_binary_create(e1, AstBinaryOp::Eq, e2)
 }
 
 pub fn ast_expr_unary_operand(expr: &AstExpr) -> &AstExpr {
@@ -2036,8 +2036,8 @@ pub fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
 
 fn jump_absexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     // Note: Original leaks the expression to avoid a double free.
-    let expr = ast_expr_assignment_create(
-        ast_expr_identifier_create("return".to_string()),
+    let expr = AstExpr::new_assignment(
+        AstExpr::new_identifier("return".to_string()),
         // Note: jump_rv can be null. Error in original.
         ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap()),
     );

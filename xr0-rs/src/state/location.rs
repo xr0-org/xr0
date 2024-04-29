@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
+use crate::ast::{ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
 use crate::state::state::state_get;
 use crate::state::{Heap, State};
@@ -111,7 +111,7 @@ impl Display for Location {
 }
 
 fn offsetzero(loc: &Location) -> bool {
-    let zero = ast_expr_constant_create(0);
+    let zero = AstExpr::new_constant(0);
     ast_expr_equal(&loc.offset, &zero)
 }
 

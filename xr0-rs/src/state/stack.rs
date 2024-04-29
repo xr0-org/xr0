@@ -1,8 +1,5 @@
 use super::{Block, State};
-use crate::ast::{
-    ast_expr_constant_create, ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type,
-    AstExpr,
-};
+use crate::ast::{ast_type_copy, ast_type_str, ast_variable_name, ast_variable_type, AstExpr};
 use crate::object::{object_as_value, object_isvalue, object_value_create};
 use crate::state::location::{
     location_auto_get_block_id, location_auto_parts, location_references,
@@ -86,11 +83,11 @@ impl Stack {
             id,
             result: Box::new(Variable {
                 type_: ast_type_copy(return_type),
-                loc: Location::new_automatic(id, 0, ast_expr_constant_create(0)),
+                loc: Location::new_automatic(id, 0, AstExpr::new_constant(0)),
                 is_param: false,
             }),
         };
-        frame.blocks[0].install(object_value_create(ast_expr_constant_create(0), None));
+        frame.blocks[0].install(object_value_create(AstExpr::new_constant(0), None));
 
         self.frames.push(frame);
         self.frames.last_mut().unwrap()
@@ -138,7 +135,7 @@ impl StackFrame {
     pub fn new_block(&mut self) -> Box<Location> {
         let address = self.blocks.len();
         self.blocks.push(Block::new());
-        Location::new_automatic(self.id, address, ast_expr_constant_create(0))
+        Location::new_automatic(self.id, address, AstExpr::new_constant(0))
     }
 
     pub fn declare(&mut self, var: &AstVariable, isparam: bool) {
@@ -190,7 +187,7 @@ pub fn variable_create(type_: &AstType, frame: &mut StackFrame, isparam: bool) -
     let loc = frame.new_block();
     let block_id = location_auto_get_block_id(&loc);
     let b = &mut frame.blocks[block_id];
-    b.install(object_value_create(ast_expr_constant_create(0), None));
+    b.install(object_value_create(AstExpr::new_constant(0), None));
     Box::new(Variable {
         type_: ast_type_copy(type_),
         is_param: isparam,

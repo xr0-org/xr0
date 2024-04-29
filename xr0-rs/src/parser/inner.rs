@@ -86,7 +86,7 @@ pub grammar c_parser(env: &Env) for str {
         numeric_constant() / character_constant()
 
     rule numeric_constant() -> Box<AstExpr> =
-        n:quiet! { integer_number() } { ast_expr_constant_create(n) } /
+        n:quiet! { integer_number() } { AstExpr::new_constant(n) } /
         expected!("number")
 
     rule integer_number() -> c_int =
@@ -96,7 +96,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule character_constant() -> Box<AstExpr> =
         c:quiet! { $("'" character()+ "'") } {
-            ast_expr_constant_create_char(parse_char(c))
+            AstExpr::new_constant_char(parse_char(c))
         } /
         expected!("character")
 
@@ -105,7 +105,7 @@ pub grammar c_parser(env: &Env) for str {
     // String literals
     rule string_literal() -> Box<AstExpr> =
         "\"" a:$(string_char()*) "\"" {
-            ast_expr_literal_create(a.to_string())
+            AstExpr::new_literal(a.to_string())
         }
 
     rule string_char() = [^ '"' | '\\' | '\n'] / "\\" [^ '\n']
@@ -113,10 +113,10 @@ pub grammar c_parser(env: &Env) for str {
     // 6.5.1 Primary expression
     rule primary_expression() -> Box<AstExpr> =
         a:identifier() {
-            ast_expr_identifier_create(a)
+            AstExpr::new_identifier(a)
         } /
         "$" {
-            ast_expr_arbarg_create()
+            AstExpr::new_arbarg()
         } /
         constant() /
         string_literal() /
@@ -129,28 +129,28 @@ pub grammar c_parser(env: &Env) for str {
             for op in ops {
                 a = match op {
                     PostfixOp::ArrayAccess(i) =>
-                        ast_expr_unary_create(
-                            ast_expr_binary_create(a, AstBinaryOp::Addition, i),
+                        AstExpr::new_unary(
+                            AstExpr::new_binary(a, AstBinaryOp::Addition, i),
                             AstUnaryOp::Dereference,
                         ),
                     PostfixOp::Call(args) =>
-                        ast_expr_call_create(a, args),
+                        AstExpr::new_call(a, args),
                     PostfixOp::Dot(name) =>
-                        ast_expr_member_create(a, name),
+                        AstExpr::new_member(a, name),
                     PostfixOp::Arrow(name) =>
-                        ast_expr_member_create(
-                            ast_expr_unary_create(
-                                ast_expr_binary_create(
+                        AstExpr::new_member(
+                            AstExpr::new_unary(
+                                AstExpr::new_binary(
                                     a,
                                     AstBinaryOp::Addition,
-                                    ast_expr_constant_create(0)
+                                    AstExpr::new_constant(0)
                                 ),
                                 AstUnaryOp::Dereference
                             ),
                             name,
                         ),
-                    PostfixOp::Inc => ast_expr_incdec_create(a, true, false),
-                    PostfixOp::Dec => ast_expr_incdec_create(a, false, false),
+                    PostfixOp::Inc => AstExpr::new_incdec(a, true, false),
+                    PostfixOp::Dec => AstExpr::new_incdec(a, false, false),
                 };
             }
             a
@@ -167,25 +167,25 @@ pub grammar c_parser(env: &Env) for str {
         _ "--" { PostfixOp::Dec }
 
     rule allocation_expression() -> Box<AstExpr> =
-        ".malloc" _ "(" a:expression() ")" { ast_expr_alloc_create(a) } /
-        ".free" _ "(" a:expression() ")" { ast_expr_dealloc_create(a) } /
-        ".clump" _ "(" a:expression() ")" { ast_expr_clump_create(a) }
+        ".malloc" _ "(" a:expression() ")" { AstExpr::new_alloc(a) } /
+        ".free" _ "(" a:expression() ")" { AstExpr::new_dealloc(a) } /
+        ".clump" _ "(" a:expression() ")" { AstExpr::new_clump(a) }
 
     rule argument_expression_list() -> Vec<Box<AstExpr>> =
         args:cs1(<assignment_expression()>) { args }
 
     rule isdeallocand_expression() -> Box<AstExpr> =
         postfix_expression() /
-        "@" _ a:isdeallocand_expression() { ast_expr_isdeallocand_create(a) } /
-        "$" _ a:isdeallocand_expression() { ast_expr_isdereferencable_create(a) }
+        "@" _ a:isdeallocand_expression() { AstExpr::new_isdeallocand(a) } /
+        "$" _ a:isdeallocand_expression() { AstExpr::new_isdereferencable(a) }
 
     // 6.5.3 Unary operators
     rule unary_expression() -> Box<AstExpr> =
         isdeallocand_expression() /
-        "++" _ a:unary_expression() { ast_expr_incdec_create(a, true, true) } /
-        "--" _ a:unary_expression() { ast_expr_incdec_create(a, false, true) } /
-        op:unary_operator() _ e:cast_expression() { ast_expr_unary_create(e, op) } /
-        "sizeof" _ "(" _ ty:type_name() _ ")" { ast_expr_constant_create(1) /* XXX */ }
+        "++" _ a:unary_expression() { AstExpr::new_incdec(a, true, true) } /
+        "--" _ a:unary_expression() { AstExpr::new_incdec(a, false, true) } /
+        op:unary_operator() _ e:cast_expression() { AstExpr::new_unary(e, op) } /
+        "sizeof" _ "(" _ ty:type_name() _ ")" { AstExpr::new_constant(1) /* XXX */ }
 
     rule unary_operator() -> AstUnaryOp =
         "&" !"&" { AstUnaryOp::Address } /
@@ -204,16 +204,16 @@ pub grammar c_parser(env: &Env) for str {
         --
         x:(@) _ "&&" _ y:@ { x }
         --
-        x:(@) _ "==" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Eq, y) }
-        x:(@) _ "!=" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Ne, y) }
+        x:(@) _ "==" _ y:@ { AstExpr::new_binary(x, AstBinaryOp::Eq, y) }
+        x:(@) _ "!=" _ y:@ { AstExpr::new_binary(x, AstBinaryOp::Ne, y) }
         --
-        x:(@) _ "<" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Lt, y) }
-        x:(@) _ ">" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Gt, y) }
-        x:(@) _ "<=" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Le, y) }
-        x:(@) _ ">=" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Ge, y) }
+        x:(@) _ "<" _ y:@ { AstExpr::new_binary(x, AstBinaryOp::Lt, y) }
+        x:(@) _ ">" _ y:@ { AstExpr::new_binary(x, AstBinaryOp::Gt, y) }
+        x:(@) _ "<=" _ y:@ { AstExpr::new_binary(x, AstBinaryOp::Le, y) }
+        x:(@) _ ">=" _ y:@ { AstExpr::new_binary(x, AstBinaryOp::Ge, y) }
         --
-        x:(@) _ "+" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Addition, y) }
-        x:(@) _ "-" _ y:@ { ast_expr_binary_create(x, AstBinaryOp::Subtraction, y) }
+        x:(@) _ "+" _ y:@ { AstExpr::new_binary(x, AstBinaryOp::Addition, y) }
+        x:(@) _ "-" _ y:@ { AstExpr::new_binary(x, AstBinaryOp::Subtraction, y) }
         --
         x:(@) _ "*" _ y:@ { x }
         x:(@) _ "/" _ y:@ { x }
@@ -227,7 +227,7 @@ pub grammar c_parser(env: &Env) for str {
     // 6.5.16 Assignment operators
     rule assignment_expression() -> Box<AstExpr> =
         a:unary_expression() _ assignment_operator() _ b:assignment_expression() {
-            ast_expr_assignment_create(a, b)
+            AstExpr::new_assignment(a, b)
         } /
         conditional_expression()
 
@@ -467,7 +467,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule selection_statement() -> Box<AstStmt> =
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() p:position!() {
-            let neg_cond = ast_expr_unary_create(ast_expr_copy(&cond), AstUnaryOp::Bang);
+            let neg_cond = AstExpr::new_unary(ast_expr_copy(&cond), AstUnaryOp::Bang);
             let else_stmt = AstStmt::new_sel(env.lexloc(p), false, neg_cond, alt, None);
             AstStmt::new_sel(env.lexloc(p), false, cond, then, Some(else_stmt))
         } /

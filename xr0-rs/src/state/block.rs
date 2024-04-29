@@ -1,10 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use super::{Heap, State};
-use crate::ast::{
-    ast_expr_constant_create, ast_expr_copy, ast_expr_difference_create, ast_expr_eq_create,
-    ast_expr_sum_create,
-};
+use crate::ast::ast_expr_copy;
 use crate::object::{
     object_abstractcopy, object_arr_index, object_arr_index_upperincl, object_contig_precedes,
     object_dealloc, object_from, object_isdeallocand, object_isvalue, object_range_create,
@@ -99,7 +96,7 @@ impl Block {
 
         // range around observand at offset
         let lw = ast_expr_copy(offset);
-        let up = ast_expr_sum_create(ast_expr_copy(offset), ast_expr_constant_create(1));
+        let up = AstExpr::new_sum(ast_expr_copy(offset), AstExpr::new_constant(1));
 
         // ordering makes them sequential in heap
         // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down.
@@ -140,7 +137,7 @@ impl Block {
         self.arr.push(object_range_create(
             ast_expr_copy(lw),
             range_create(
-                ast_expr_difference_create(ast_expr_copy(up), ast_expr_copy(lw)),
+                AstExpr::new_difference(ast_expr_copy(up), ast_expr_copy(lw)),
                 heap.new_block(),
             ),
         ));
@@ -182,8 +179,8 @@ impl Block {
         }
         // Note: Original does not do these copies; instead it leaks the outer expressions created
         // here to avoid double-freeing the inner ones.
-        let same_lw = ast_expr_eq_create(ast_expr_copy(lw), ast_expr_copy(&obj.offset));
-        let same_up = ast_expr_eq_create(ast_expr_copy(up), object_upper(obj));
+        let same_lw = AstExpr::new_eq(ast_expr_copy(lw), ast_expr_copy(&obj.offset));
+        let same_up = AstExpr::new_eq(ast_expr_copy(up), object_upper(obj));
         state_eval(s, &same_lw) && state_eval(s, &same_up)
     }
 

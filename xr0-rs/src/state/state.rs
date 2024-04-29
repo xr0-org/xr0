@@ -5,9 +5,7 @@ use super::location::{
     location_with_offset, LocationKind,
 };
 use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
-use crate::ast::{
-    ast_expr_constant_create, ast_expr_equal, ast_expr_identifier_create, ast_type_vconst,
-};
+use crate::ast::{ast_expr_equal, ast_type_vconst};
 use crate::object::object_as_value;
 use crate::util::{Error, Result};
 use crate::value::{
@@ -158,7 +156,7 @@ pub fn state_vconst(
         return v;
     }
     let c = state.vconst.declare(v, comment, persist);
-    value_sync_create(ast_expr_identifier_create(c))
+    value_sync_create(AstExpr::new_identifier(c))
 }
 
 pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
@@ -169,7 +167,7 @@ pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
         return value_ptr_create(Box::new(loc.clone()));
     }
     let address = state.static_memory.new_block();
-    let loc = Location::new_static(address, ast_expr_constant_create(0));
+    let loc = Location::new_static(address, AstExpr::new_constant(0));
     let obj = state_get(state, &loc, true).unwrap().unwrap();
     obj.assign(Some(value_literal_create(lit)));
     state.static_memory.string_pool(lit, &loc);
@@ -179,7 +177,7 @@ pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
 impl State {
     pub fn clump(&mut self) -> Box<Value> {
         let address = self.clump.new_block();
-        let loc = Location::new_dereferencable(address, ast_expr_constant_create(0));
+        let loc = Location::new_dereferencable(address, AstExpr::new_constant(0));
         value_ptr_create(loc)
     }
 }
