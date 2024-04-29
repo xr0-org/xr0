@@ -2,10 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use super::{Heap, State};
 use crate::ast::ast_expr_copy;
-use crate::object::{
-    object_arr_index, object_arr_index_upperincl, object_contig_precedes, object_dealloc,
-    object_from, object_upto, range_create,
-};
+use crate::object::{object_arr_index, object_arr_index_upperincl, object_dealloc, range_create};
 use crate::state::state::state_eval;
 use crate::util::{Error, Result};
 use crate::{AstExpr, Location, Object};
@@ -101,9 +98,9 @@ impl Block {
         // `upto` is then appended to `b->arr` where it may be used (although the `lw` part of it
         // has been freed) and will later be destroyed (a clear double free). Undefined behvaior,
         // but the scenario does not happen in the test suite.
-        let upto = object_upto(obj, &lw, s);
+        let upto = obj.slice_upto(&lw, s);
         let observed = Object::with_value(lw, Some(s.alloc()));
-        let from = object_from(obj, &up, s);
+        let from = obj.slice_from(&up, s);
         drop(up);
 
         // delete current struct block
@@ -156,7 +153,7 @@ impl Block {
             if !self.arr[i].is_deallocand(s) {
                 return false;
             }
-            if !object_contig_precedes(&self.arr[i], &self.arr[i + 1], s) {
+            if !self.arr[i].contig_precedes(&self.arr[i + 1], s) {
                 return false;
             }
         }
@@ -198,9 +195,9 @@ impl Block {
         // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`.
         // It would be a double free but for a counterbug (read comments below).
         #[allow(unused_variables)]
-        let upto = object_upto(&self.arr[lw_index], lw, s);
+        let upto = self.arr[lw_index].slice_upto(lw, s);
         #[allow(unused_variables)]
-        let from = object_from(&self.arr[up_index], up, s);
+        let from = self.arr[up_index].slice_from(up, s);
 
         // Retain `arr[0..lw_index]`, replace the range `arr[lw_index..=up_index]` with `upto` and `from`,
         // then retain `arr[up_index + 1..]`.
