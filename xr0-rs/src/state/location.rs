@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::ast::{ast_expr_constant_create, ast_expr_copy, ast_expr_equal};
 use crate::object::object_referencesheap;
 use crate::state::state::state_get;
-use crate::state::{Block, Clump, Heap, Stack, State, StaticMemory, VConst};
+use crate::state::{Block, Heap, Stack, State};
 use crate::util::{Error, Result};
 use crate::{AstExpr, Value};
 
@@ -147,7 +147,7 @@ pub fn location_references(l1: &Location, l2: &Location, s: &mut State) -> bool 
     }
     let s: *mut State = s;
     unsafe {
-        match (*s).get_block(l1) {
+        match (*s).get_block(l1).unwrap() {
             None => false,
             Some(b) => b.references(l2, &mut *s),
         }
@@ -167,23 +167,6 @@ pub fn location_referencesheap(l: &Location, s: &mut State) -> bool {
     // Note: Clone is not in the original. Added here to satisfy Rust's alias analysis.
     let obj = obj.clone();
     object_referencesheap(&obj, &mut *s)
-}
-
-pub fn location_getblock<'s>(
-    loc: &Location,
-    sm: &'s mut StaticMemory,
-    _v: &'s mut VConst,
-    s: &'s mut Stack,
-    h: &'s mut Heap,
-    c: &'s mut Clump,
-) -> Result<Option<&'s mut Block>> {
-    match loc.kind {
-        LocationKind::Static => Ok(sm.get_block(loc.block)),
-        LocationKind::Automatic { .. } => location_auto_getblock(loc, s).map(Some),
-        LocationKind::Dynamic => Ok((*h).get_block(loc.block)),
-        LocationKind::Dereferencable => Ok(c.get_block(loc.block)),
-        _ => panic!(),
-    }
 }
 
 /// Return all three parts of the given location, which must be automatic.
@@ -230,7 +213,7 @@ pub fn location_range_dealloc(
     assert!(offsetzero(loc));
     let state: *mut State = state;
     unsafe {
-        let Some(b) = (*state).get_block(loc) else {
+        let Some(b) = (*state).get_block(loc).unwrap() else {
             return Err(Error::new("cannot get block".to_string()));
         };
         if !b.range_aredeallocands(lw, up, &mut *state) {
