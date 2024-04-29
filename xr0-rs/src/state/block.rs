@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use super::{Heap, State};
 use crate::ast::ast_expr_copy;
-use crate::object::range_create;
+use crate::object::Range;
 use crate::state::state::state_eval;
 use crate::util::{Error, Result};
 use crate::{AstExpr, Location, Object};
@@ -131,7 +131,7 @@ impl Block {
         assert!(self.arr.is_empty());
         self.arr.push(Object::with_range(
             ast_expr_copy(lw),
-            range_create(
+            Range::new(
                 AstExpr::new_difference(ast_expr_copy(up), ast_expr_copy(lw)),
                 heap.new_block(),
             ),

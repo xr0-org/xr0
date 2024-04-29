@@ -96,7 +96,7 @@ impl Object {
         match &self.kind {
             ObjectKind::Value(None) => false,
             ObjectKind::Value(Some(v)) => s.loc_is_deallocand(value_as_location(v)),
-            ObjectKind::DeallocandRange(range) => range_isdeallocand(range, s),
+            ObjectKind::DeallocandRange(range) => range.is_deallocand(s),
         }
     }
 
@@ -120,7 +120,7 @@ impl Object {
 
     pub fn references(&self, loc: &Location, s: &mut State) -> bool {
         match &self.kind {
-            ObjectKind::DeallocandRange(range) => range_references(range, loc, s),
+            ObjectKind::DeallocandRange(range) => range.references(loc, s),
             ObjectKind::Value(None) => false,
             ObjectKind::Value(Some(v)) => value_references(v, loc, s),
         }
@@ -242,7 +242,7 @@ impl Object {
         // `lw` without copying it, but `self` owns that expr.
         Some(Object::with_range(
             ast_expr_copy(&self.offset),
-            range_create(
+            Range::new(
                 AstExpr::new_difference(ast_expr_copy(excl_up), ast_expr_copy(lw)),
                 s.alloc().into_location(),
             ),
@@ -276,7 +276,7 @@ impl Object {
         }
         Some(Object::with_range(
             ast_expr_copy(incl_lw),
-            range_create(
+            Range::new(
                 AstExpr::new_difference(up, ast_expr_copy(incl_lw)),
                 s.alloc().into_location(),
             ),
@@ -286,9 +286,9 @@ impl Object {
     pub fn dealloc(&self, s: &mut State) -> Result<()> {
         // Note: Original doesn't handle the possibility of Value(None) here.
         match &self.kind {
-            ObjectKind::Value(Some(v)) => (*s).dealloc(v),
+            ObjectKind::Value(Some(v)) => s.dealloc(v),
             ObjectKind::Value(None) => panic!(),
-            ObjectKind::DeallocandRange(range) => range_dealloc(range, s),
+            ObjectKind::DeallocandRange(range) => range.dealloc(s),
         }
     }
 
@@ -333,20 +333,22 @@ impl Display for Range {
     }
 }
 
-pub fn range_create(size: Box<AstExpr>, loc: Box<Location>) -> Box<Range> {
-    Box::new(Range { size, loc })
-}
+impl Range {
+    pub fn new(size: Box<AstExpr>, loc: Box<Location>) -> Box<Self> {
+        Box::new(Range { size, loc })
+    }
 
-pub fn range_dealloc(r: &Range, s: &mut State) -> Result<()> {
-    // Note: The original creates a value that borrows the location from `r`, then leaks the value
-    // to avoid double-freeing the location.
-    location_dealloc(&r.loc, &mut s.heap)
-}
+    pub fn dealloc(&self, s: &mut State) -> Result<()> {
+        // Note: The original creates a value that borrows the location from `r`, then leaks the value
+        // to avoid double-freeing the location.
+        location_dealloc(&self.loc, &mut s.heap)
+    }
 
-pub fn range_isdeallocand(r: &Range, s: &mut State) -> bool {
-    s.loc_is_deallocand(&r.loc)
-}
+    fn is_deallocand(&self, s: &mut State) -> bool {
+        s.loc_is_deallocand(&self.loc)
+    }
 
-pub fn range_references(r: &Range, loc: &Location, s: &mut State) -> bool {
-    location_references(&r.loc, loc, s)
+    fn references(&self, loc: &Location, s: &mut State) -> bool {
+        location_references(&self.loc, loc, s)
+    }
 }
