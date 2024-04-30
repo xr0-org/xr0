@@ -2,9 +2,9 @@ use super::{
     ast_block_create, ast_block_decls, ast_block_stmts, ast_expr_abseval,
     ast_expr_alloc_rangeprocess, ast_expr_assume, ast_expr_copy, ast_expr_decide, ast_expr_eval,
     ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide, ast_stmt_as_block, ast_stmt_as_expr,
-    ast_stmt_as_v_block, ast_stmt_copy, ast_stmt_isassume, ast_stmt_ispre, ast_stmt_isterminal,
+    ast_stmt_copy, ast_stmt_isassume, ast_stmt_ispre, ast_stmt_isterminal,
     ast_stmt_iter_lower_bound, ast_stmt_iter_upper_bound, ast_stmt_jump_rv, ast_stmt_labelled_stmt,
-    ast_stmt_lexememarker, state_getresult, value_copy, AstExpr, AstIterationStmt,
+    ast_stmt_lexememarker, state_getresult, value_copy, AstBlock, AstExpr, AstIterationStmt,
     AstSelectionStmt, AstStmt, AstStmtKind, Error, Preresult, Result, State, KEYWORD_RETURN,
 };
 use crate::parser::LexemeMarker;
@@ -44,16 +44,15 @@ fn stmt_installprop(stmt: &AstStmt, state: &mut State) -> Result<Preresult> {
 pub fn ast_stmt_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
     match &stmt.kind {
         AstStmtKind::Nop => Ok(()),
-        AstStmtKind::CompoundV(_) => stmt_v_block_verify(stmt, state),
+        AstStmtKind::CompoundV(block) => stmt_v_block_verify(block, state),
         AstStmtKind::Expr(_) => stmt_expr_verify(stmt, state),
         AstStmtKind::Iteration(iter) => stmt_iter_verify(iter, state),
         _ => panic!(),
     }
 }
 
-fn stmt_v_block_verify(v_block_stmt: &AstStmt, state: &mut State) -> Result<()> {
-    let b = ast_stmt_as_v_block(v_block_stmt);
-    assert_eq!(ast_block_decls(b).len(), 0);
+fn stmt_v_block_verify(b: &AstBlock, state: &mut State) -> Result<()> {
+    assert_eq!(b.decls.len(), 0);
     for stmt in &b.stmts {
         ast_stmt_verify(stmt, state)?;
     }

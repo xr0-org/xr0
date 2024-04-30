@@ -313,13 +313,6 @@ pub fn ast_stmt_str(stmt: &AstStmt) -> String {
     b
 }
 
-pub fn ast_stmt_as_v_block(stmt: &AstStmt) -> &AstBlock {
-    let AstStmtKind::CompoundV(block) = &stmt.kind else {
-        panic!();
-    };
-    block
-}
-
 pub fn ast_stmt_as_expr(stmt: &AstStmt) -> &AstExpr {
     let AstStmtKind::Expr(expr) = &stmt.kind else {
         panic!();
