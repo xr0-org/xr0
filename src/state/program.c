@@ -202,6 +202,7 @@ program_stmt_process(struct program *p, enum execution_mode mode, struct state *
 	}
 	switch (mode) {
 	case EXEC_ABSTRACT:
+	case EXEC_SETUP:
 		printf("abstract_process\n");
 		return ast_stmt_absprocess(stmt, p->name, s);
 	case EXEC_ACTUAL:
