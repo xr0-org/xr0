@@ -1046,7 +1046,7 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
 
         /* XXX: pass copy so we don't observe */
         call_setupverify(f, &mut state_copy(&*state))
-            .map_err(|err| err.wrap(format!("`{name}`' precondition failure\n\t")))?;
+            .map_err(|err| err.wrap(format!("`{name}' precondition failure\n\t")))?;
         let v = call_absexec(call, &mut *state).map_err(|err| err.wrap(format!("\n\t")))?;
         state_popframe(&mut *state);
         pf_augment(&v, call, &mut *state)
