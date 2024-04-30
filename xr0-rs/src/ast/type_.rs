@@ -1,6 +1,9 @@
 use std::fmt::{self, Display, Formatter};
 
-use super::*;
+use super::{
+    c_int, str_write, value_int_indefinite_create, value_ptr_indefinite_create,
+    value_struct_indefinite_create, AstVariable, Externals, State, Value,
+};
 
 // Note: In the original, `ast_type_copy` would not always copy modifiers.
 #[derive(Clone)]

@@ -1,4 +1,12 @@
-use super::*;
+use super::{
+    ast_expr_as_identifier, ast_expr_binary_e1, ast_expr_binary_e2, ast_expr_binary_op,
+    ast_expr_copy, ast_expr_equal, ast_expr_incdec_to_assignment, ast_expr_inverted_copy,
+    ast_expr_isdeallocand_assertand, ast_expr_unary_op, ast_expr_unary_operand,
+    ast_function_absexec, ast_function_initparams, ast_type_create, ast_type_create_ptr,
+    ast_type_ptr_type, AllocExpr, AssignmentExpr, AstAllocKind, AstBinaryOp, AstExpr, AstExprKind,
+    AstFunction, AstType, AstTypeBase, AstUnaryOp, AstVariable, BinaryExpr, CallExpr, ConstantExpr,
+    IncDecExpr, StructMemberExpr, UnaryExpr,
+};
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_get,
     state_getloc, state_getobject, state_getobjecttype, state_getvconst, state_isalloc,
@@ -13,6 +21,16 @@ use crate::value::{
     value_sync_create, value_to_expr,
 };
 use crate::{vprintln, Object, Value};
+
+pub struct LValue<'ast> {
+    pub t: &'ast AstType,
+    pub obj: Option<&'ast mut Object>,
+}
+
+#[derive(Clone)]
+pub struct Preresult {
+    pub is_contradiction: bool,
+}
 
 pub fn ast_expr_decide(expr: &AstExpr, state: &mut State) -> bool {
     match &expr.kind {

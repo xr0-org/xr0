@@ -6,7 +6,7 @@ use crate::value::{
     value_copy, value_int_indefinite_create, value_ptr_indefinite_create,
     value_struct_indefinite_create,
 };
-use crate::{str_write, Externals, Object, Value};
+use crate::{str_write, Externals, Value};
 
 mod block;
 mod expr;
@@ -34,7 +34,7 @@ pub use expr::{
 };
 pub use expr_verify::{
     ast_expr_abseval, ast_expr_alloc_rangeprocess, ast_expr_assume, ast_expr_decide, ast_expr_eval,
-    ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide,
+    ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide, LValue, Preresult,
 };
 pub use extern_decl::{
     ast_decl_create, ast_externdecl_as_function, ast_externdecl_as_function_mut,
@@ -64,16 +64,6 @@ pub use type_::{
     MOD_VOLATILE,
 };
 pub use variable::AstVariable;
-
-pub struct LValue<'ast> {
-    pub t: &'ast AstType,
-    pub obj: Option<&'ast mut Object>,
-}
-
-#[derive(Clone)]
-pub struct Preresult {
-    pub is_contradiction: bool,
-}
 
 pub struct Ast {
     pub decls: Vec<Box<AstExternDecl>>,
