@@ -451,39 +451,7 @@ ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *state)
 }
 
 static struct error *
-ast_stmt_absexecnosetup(struct ast_stmt *, struct state *);
-
-struct error *
-ast_stmt_absprocessnosetup(struct ast_stmt *stmt, char *fname, struct state *state)
-{
-	/* XXX: reject undefined things for this */
-	return ast_stmt_absexecnosetup(stmt, state);
-}
-
-static struct error *
-ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *state)
-{
-	switch (ast_stmt_kind(stmt)) {
-	case STMT_LABELLED:
-		return NULL;
-	case STMT_NOP:
-	case STMT_EXPR:
-	case STMT_SELECTION:
-	case STMT_ITERATION:
-	case STMT_COMPOUND:
-	case STMT_JUMP:
-	case STMT_REGISTER:
-		return ast_stmt_absexec(stmt, state);
-	default:
-		assert(false);
-	}
-}
-
-static struct error *
 expr_absexec(struct ast_expr *expr, struct state *state);
-
-static struct error *
-labelled_absexec(struct ast_stmt *stmt, struct state *);
 
 static struct error *
 sel_absexec(struct ast_stmt *stmt, struct state *);
@@ -502,9 +470,8 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
-		return NULL;
 	case STMT_LABELLED:
-		return labelled_absexec(stmt, state);
+		return NULL;
 	case STMT_EXPR:
 		return expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
@@ -520,21 +487,6 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	default:
 		assert(false);
 	}
-}
-
-static struct error *
-labelled_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	assert(ast_stmt_ispre(stmt));
-	struct ast_block *b = ast_stmt_labelled_as_block(stmt);	
-	struct frame *setup_frame = frame_block_create(
-		dynamic_str("setup"),
-		b,
-		EXEC_ABSTRACT
-	);
-	state_pushframe(state, setup_frame);
-
-	return NULL;
 }
 
 static struct error *
@@ -663,63 +615,50 @@ jump_absexec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
-ast_stmt_setupabsexec(struct ast_stmt *, struct state *);
+labelled_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
+
+static struct error *
+sel_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
+
+static struct error *
+comp_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
 
 struct error *
-ast_stmt_setupprocess(struct ast_stmt *stmt, char *fname, struct state *state)
-{
-	/* XXX: reject undefined things for this */
-	return ast_stmt_setupabsexec(stmt, state);
-}
-
-static struct error *
-labelled_setupabsexec(struct ast_stmt *, struct state *);
-
-static struct error *
-sel_setupabsexec(struct ast_stmt *, struct state *);
-
-static struct error *
-comp_setupabsexec(struct ast_stmt *, struct state *);
-
-static struct error *
-ast_stmt_setupabsexec(struct ast_stmt *stmt, struct state *state)
-{
+ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups) {
 	switch (ast_stmt_kind(stmt)) {	
-	case STMT_NOP:
-	case STMT_EXPR:
-	case STMT_ALLOCATION:
-	case STMT_ITERATION: /* XXX */
 	case STMT_JUMP:
 	case STMT_REGISTER:
+	case STMT_EXPR:
 		return NULL;
 	case STMT_LABELLED:
-		return labelled_setupabsexec(stmt, state);
+		return labelled_buildsetup(stmt, state, setups);
 	case STMT_SELECTION:
-		return sel_setupabsexec(stmt, state);
+		return sel_buildsetup(stmt, state, setups);
 	case STMT_COMPOUND:
-		return comp_setupabsexec(stmt, state);
+		return comp_buildsetup(stmt, state, setups);
 	default:
 		assert(false);
 	}
 }
 
 static struct error *
-labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
+labelled_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
 {
-	/* XXX: dedupe the execution of setups */
-	struct ast_stmt *lstmt = ast_stmt_labelled_stmt(stmt);
-	if (ast_stmt_kind(lstmt) == STMT_SELECTION) {
-		return error_printf("setup preconditions must be decidable");
-	}
-	struct error *err = ast_stmt_absexec(lstmt, state);
-	if (err) {
-		return err;
+	struct ast_block *b = ast_stmt_labelled_as_block(stmt);
+	assert(ast_block_ndecls(b) == 0);
+	int nstmts = ast_block_nstmts(b);
+	struct ast_stmt **stmts = ast_block_stmts(b);
+	for (int i = 0; i < nstmts; i++) {
+		if (ast_stmt_kind(stmts[i]) == STMT_SELECTION) {
+			return error_printf("setup preconditions must be decidable");
+		}
+		ast_block_append_stmt(setups, ast_stmt_copy(stmts[i]));	
 	}
 	return NULL;
 }
 
 static struct error *
-sel_setupabsexec(struct ast_stmt *stmt, struct state *state)
+sel_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
@@ -730,30 +669,24 @@ sel_setupabsexec(struct ast_stmt *stmt, struct state *state)
 		return NULL;
 	}
 	if (dec.decision) {
-		return ast_stmt_setupabsexec(body, state);
+		return ast_stmt_buildsetup(body, state, setups);
 	} else if (nest) {
-		return ast_stmt_setupabsexec(nest, state);
+		return ast_stmt_buildsetup(nest, state, setups);
 	}
 	return NULL;
 }
 
 static struct error *
-comp_setupabsexec(struct ast_stmt *stmt, struct state *state)
+comp_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
 {
-	struct error *err;
 	struct ast_block *b = ast_stmt_as_block(stmt);
-	assert(ast_block_ndecls(b) == 0);
-	int nstmt = ast_block_nstmts(b);
+	int nstmts = ast_block_nstmts(b);
 	struct ast_stmt **stmts = ast_block_stmts(b);
-	for (int i = 0; i < nstmt; i++) {
-		if (ast_stmt_ispre(stmts[i])) {
-			if ((err = ast_stmt_setupabsexec(stmts[i], state))) {
-				return err;
-			}
-			if (ast_stmt_isterminal(stmts[i], state)) {
-				break;
-			}
+	for (int i = 0; i < nstmts; i++) {
+		struct error *err = ast_stmt_buildsetup(stmts[i], state, setups);
+		if (err) {
+			return err;
 		}
-	}
+	}	
 	return NULL;
 }

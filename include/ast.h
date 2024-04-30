@@ -308,12 +308,12 @@ void
 ast_block_append_stmt(struct ast_block *, struct ast_stmt *);
 
 struct preconds_result {
-	struct ast_stmt *stmt;
+	struct ast_block *b;
 	struct error *err;
 };
 
 struct preconds_result
-ast_block_preconds(struct ast_block *b);
+ast_block_setups(struct ast_block *b, struct state *);
 
 struct ast_stmt;
 
@@ -484,10 +484,7 @@ struct error *
 ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *);
 
 struct error *
-ast_stmt_absprocessnosetup(struct ast_stmt *stmt, char *fname, struct state *);
-
-struct error *
-ast_stmt_setupprocess(struct ast_stmt *stmt, char *fname, struct state *);
+ast_stmt_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
 
 struct ast_type;
 
@@ -662,14 +659,11 @@ ast_function_nparams(struct ast_function *f);
 struct ast_variable **
 ast_function_params(struct ast_function *f);
 
-struct preconds_result
-ast_function_preconditions(struct ast_function *f);
-
 struct error *
 ast_function_initparams(struct ast_function *, struct state *);
 
 struct error *
-ast_function_precondsinit(struct ast_function *, struct state *);
+ast_function_initsetup(struct ast_function *, struct state *);
 
 struct externals;
 struct error;

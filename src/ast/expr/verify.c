@@ -720,7 +720,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		EXEC_ABSTRACT_NO_SETUP,
+		EXEC_ABSTRACT,
 		ast_expr_copy(expr),
 		f
 	);
@@ -765,9 +765,12 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	if ((err = ast_function_initparams(f, param_state))) {
 		return err;
 	}
-	if ((err = ast_function_precondsinit(f, param_state))) {
-		return err;
+	if ((err = ast_function_initsetup(f, param_state))) {
+		assert(false);
 	}
+
+	printf("param_state: %s\n", state_str(param_state));
+	printf("arg_state: %s\n", state_str(arg_state));
 
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **param = ast_function_params(f);
@@ -1106,7 +1109,7 @@ call_absexec(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		EXEC_ABSTRACT_NO_SETUP,
+		EXEC_ABSTRACT,
 		ast_expr_copy(expr),
 		f
 	);

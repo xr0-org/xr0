@@ -198,25 +198,6 @@ ast_block_empty(struct ast_block *b)
 	return b->ndecl == 0 && b->nstmt == 0;
 }
 
-struct preconds_result
-ast_block_preconds(struct ast_block *b)
-{
-	int n = ast_block_nstmts(b);
-	struct ast_stmt **stmt = ast_block_stmts(b);
-	for (int i = 0; i < n; i++) {
-		/* XXX: either enforce one pre block or concat */
-		if (ast_stmt_ispre(stmt[i])) {
-			struct ast_stmt *preconds = ast_stmt_labelled_stmt(stmt[i]);
-			struct error *err = ast_stmt_preconds_validate(preconds);
-			if (err) {
-				return (struct preconds_result) { .stmt = NULL, .err = err };
-			}
-			return (struct preconds_result) { .stmt = preconds, .err = NULL };
-		}
-	}
-	return (struct preconds_result) { .stmt = NULL, .err = NULL };
-}
-
 void
 block_append_decl(struct ast_block *b, struct ast_variable *v)
 {
@@ -229,6 +210,21 @@ ast_block_append_stmt(struct ast_block *b, struct ast_stmt *v)
 {
 	b->stmt = realloc(b->stmt, sizeof(struct ast_stmt *) * ++b->nstmt);
 	b->stmt[b->nstmt-1] = v;
+}
+
+struct preconds_result
+ast_block_setups(struct ast_block *abs, struct state *state)
+{
+	struct ast_block *setups = ast_block_create(NULL, 0, NULL, 0);
+	int nstmts = ast_block_nstmts(abs);
+	struct ast_stmt **stmts = ast_block_stmts(abs);
+	for (int i = 0; i < nstmts; i++) {
+		struct error *err = ast_stmt_buildsetup(stmts[i], state, setups);		
+		if (err) {
+			return (struct preconds_result) { .b = NULL, .err = err };
+		}
+	}
+	return (struct preconds_result) { .b = setups, .err = NULL };
 }
 
 static char *

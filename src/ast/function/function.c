@@ -191,13 +191,6 @@ ast_function_params(struct ast_function *f)
 	return f->param;
 }
 
-struct preconds_result
-ast_function_preconditions(struct ast_function *f)
-{
-	/* XXX: should we allow multiple pre tags */
-	return ast_block_preconds(ast_function_abstract(f));	
-}
-
 struct ast_function *
 ast_function_protostitch(struct ast_function *f, struct externals *ext)
 {
@@ -320,29 +313,23 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 }
 
 struct error *
-ast_function_precondsinit(struct ast_function *f, struct state *s)
+ast_function_initsetup(struct ast_function *f, struct state *s)
 {
-	struct preconds_result pre = ast_function_preconditions(f);
+	struct preconds_result pre = ast_block_setups(ast_function_abstract(f), s);
+	printf("preconds: %s\n", ast_block_str(pre.b, "\t"));
 	if (pre.err) {
 		return pre.err;
 	}
-	if (!pre.stmt) {
+	if (!pre.b) {
 		return NULL;
 	}
-	struct error *err = ast_stmt_absprocess(
-		pre.stmt, ast_function_name(f), s
+	struct frame *setupframe = frame_block_create(
+		"setup",
+		pre.b,
+		EXEC_SETUP
 	);
-	if (err) {
-		struct lexememarker *loc = ast_stmt_lexememarker(pre.stmt); 
-		assert(loc);
-		char *m = lexememarker_str(loc);
-		struct error *e = error_printf(
-			"%s:%s: %w", 
-			m, ast_function_name(f), err
-		);
-		free(m);
-		return e;
-	}
+	state_pushframe(s, setupframe);
+	state_initsetup(s, state_frameid(s));
 	return NULL;
 }
 
@@ -366,26 +353,6 @@ inititalise_param(struct ast_variable *param, struct state *state)
 		/* variables that aren't talked about by the preconditions */
 		struct value *val = state_vconst(state, t, dynamic_str(name), true);
 		object_assign(res.obj, val);
-	}
-	return NULL;
-}
-
-
-struct error *
-ast_function_setupabsexec(struct ast_function *f, struct state *state)
-{
-	struct error *err;
-	int nstmts = ast_block_nstmts(f->abstract);
-	struct ast_stmt **stmt = ast_block_stmts(f->abstract);
-	for (int i = 0; i < nstmts; i++) {
-		if ((err = ast_stmt_setupabsexec(stmt[i], state))) {
-			struct lexememarker *loc = ast_stmt_lexememarker(stmt[i]); 
-			assert(loc);
-			char *m = lexememarker_str(loc);
-			struct error *e = error_printf("%s %w", m, err);
-			free(m);
-			return e;
-		}
 	}
 	return NULL;
 }
