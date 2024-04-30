@@ -74,7 +74,7 @@ do
 		else
 			printf "$fail"
                 	echo "=== ACTUAL"
-                	echo -- "$output"
+                	echo "$output"
                 	echo
                 	echo "expected no output"
                         echo
