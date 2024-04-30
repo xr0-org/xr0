@@ -264,56 +264,15 @@ fn ast_stmt_sel_sprint(stmt: &AstStmt, b: &mut String) {
     }
 }
 
-pub fn ast_stmt_iter_init(stmt: &AstStmt) -> &AstStmt {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    &iteration.init
-}
-
-pub fn ast_stmt_iter_cond(stmt: &AstStmt) -> &AstStmt {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    &iteration.cond
-}
-
-pub fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    &iteration.iter
-}
-
-pub fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    &iteration.abstract_
-}
-
-pub fn ast_stmt_iter_body(stmt: &AstStmt) -> &AstStmt {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    &iteration.body
-}
-
-pub fn ast_stmt_iter_lower_bound(stmt: &AstStmt) -> &AstExpr {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    let AstStmtKind::Expr(expr) = &iteration.init.kind else {
+pub fn ast_stmt_iter_lower_bound(iter: &AstIterationStmt) -> &AstExpr {
+    let AstStmtKind::Expr(expr) = &iter.init.kind else {
         panic!();
     };
     ast_expr_assignment_rval(expr)
 }
 
-pub fn ast_stmt_iter_upper_bound(stmt: &AstStmt) -> &AstExpr {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    let AstStmtKind::Expr(expr) = &iteration.cond.kind else {
+pub fn ast_stmt_iter_upper_bound(iter: &AstIterationStmt) -> &AstExpr {
+    let AstStmtKind::Expr(expr) = &iter.cond.kind else {
         panic!();
     };
     ast_expr_binary_e2(expr)

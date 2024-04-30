@@ -2,15 +2,13 @@ use super::{
     ast_block_create, ast_block_decls, ast_block_stmts, ast_expr_abseval,
     ast_expr_alloc_rangeprocess, ast_expr_assume, ast_expr_copy, ast_expr_decide, ast_expr_eval,
     ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide, ast_stmt_as_block, ast_stmt_as_expr,
-    ast_stmt_as_v_block, ast_stmt_copy, ast_stmt_ispre, ast_stmt_isterminal,
-    ast_stmt_iter_abstract, ast_stmt_iter_body, ast_stmt_iter_cond, ast_stmt_iter_init,
-    ast_stmt_iter_iter, ast_stmt_iter_lower_bound, ast_stmt_iter_upper_bound, ast_stmt_jump_rv,
-    ast_stmt_labelled_stmt, ast_stmt_lexememarker, ast_stmt_sel_body, ast_stmt_sel_cond,
-    ast_stmt_sel_nest, state_getresult, value_copy, AstExpr, AstStmt, AstStmtKind, Error,
-    Preresult, Result, State, KEYWORD_RETURN,
+    ast_stmt_as_v_block, ast_stmt_copy, ast_stmt_isassume, ast_stmt_ispre, ast_stmt_isterminal,
+    ast_stmt_iter_lower_bound, ast_stmt_iter_upper_bound, ast_stmt_jump_rv, ast_stmt_labelled_stmt,
+    ast_stmt_lexememarker, ast_stmt_sel_body, ast_stmt_sel_cond, ast_stmt_sel_nest,
+    state_getresult, value_copy, AstExpr, AstIterationStmt, AstStmt, AstStmtKind, Error, Preresult,
+    Result, State, KEYWORD_RETURN,
 };
-
-use super::stmt::ast_stmt_isassume;
+use crate::parser::LexemeMarker;
 use crate::value::{
     value_as_constant, value_as_sync, value_equal, value_int_create, value_isconstant, value_isint,
     value_issync, value_to_expr,
@@ -49,7 +47,7 @@ pub fn ast_stmt_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
         AstStmtKind::Nop => Ok(()),
         AstStmtKind::CompoundV(_) => stmt_v_block_verify(stmt, state),
         AstStmtKind::Expr(_) => stmt_expr_verify(stmt, state),
-        AstStmtKind::Iteration(_) => stmt_iter_verify(stmt, state),
+        AstStmtKind::Iteration(iter) => stmt_iter_verify(iter, state),
         _ => panic!(),
     }
 }
@@ -72,29 +70,29 @@ fn stmt_expr_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
     }
 }
 
-fn stmt_iter_verify(stmt: &AstStmt, state: &mut State) -> Result<()> {
-    if iter_empty(stmt, state) {
+fn stmt_iter_verify(iter: &AstIterationStmt, state: &mut State) -> Result<()> {
+    if iter_empty(iter, state) {
         return Ok(());
     }
-    let body = ast_stmt_iter_body(stmt);
+    let body = &iter.body;
     assert!(matches!(body.kind, AstStmtKind::Compound(_)));
     let block = ast_stmt_as_block(body);
     assert_eq!(ast_block_decls(block).len(), 0);
     assert_eq!(block.stmts.len(), 1);
     let assertion = ast_stmt_as_expr(&block.stmts[0]);
-    let lw = ast_stmt_iter_lower_bound(stmt);
-    let up = ast_stmt_iter_upper_bound(stmt);
+    let lw = ast_stmt_iter_lower_bound(iter);
+    let up = ast_stmt_iter_upper_bound(iter);
     if !ast_expr_rangedecide(assertion, lw, up, state) {
         return Err(Error::new("could not verify".to_string()));
     }
     Ok(())
 }
 
-fn iter_empty(stmt: &AstStmt, state: &mut State) -> bool {
-    if let Err(err) = ast_stmt_exec(ast_stmt_iter_init(stmt), state) {
+fn iter_empty(iter: &AstIterationStmt, state: &mut State) -> bool {
+    if let Err(err) = ast_stmt_exec(&iter.init, state) {
         panic!("{err}");
     }
-    !ast_expr_decide(ast_stmt_as_expr(ast_stmt_iter_cond(stmt)), state)
+    !ast_expr_decide(ast_stmt_as_expr(&iter.cond), state)
 }
 
 pub fn ast_stmt_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
@@ -105,7 +103,7 @@ pub fn ast_stmt_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
         AstStmtKind::CompoundV(_) => Ok(()),
         AstStmtKind::Expr(expr) => ast_expr_exec(expr, state),
         AstStmtKind::Selection(_) => stmt_sel_exec(stmt, state),
-        AstStmtKind::Iteration(_) => stmt_iter_exec(stmt, state),
+        AstStmtKind::Iteration(iter) => stmt_iter_exec(&stmt.loc, iter, state),
         AstStmtKind::Jump(_) => stmt_jump_exec(stmt, state),
         _ => {
             panic!();
@@ -134,15 +132,15 @@ fn stmt_sel_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-fn stmt_iter_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
-    if let Some(neteffect) = iter_neteffect(stmt) {
+fn stmt_iter_exec(loc: &LexemeMarker, iter: &AstIterationStmt, state: &mut State) -> Result<()> {
+    if let Some(neteffect) = iter_neteffect(loc, iter) {
         ast_stmt_absexec(&neteffect, state, true)?;
     }
     Ok(())
 }
 
-fn iter_neteffect(iter: &AstStmt) -> Option<Box<AstStmt>> {
-    let abs = ast_stmt_iter_abstract(iter);
+fn iter_neteffect(loc: &LexemeMarker, iter: &AstIterationStmt) -> Option<Box<AstStmt>> {
+    let abs = &iter.abstract_;
     let nstmts = ast_block_stmts(abs).len();
     if nstmts == 0 {
         return None;
@@ -153,14 +151,14 @@ fn iter_neteffect(iter: &AstStmt) -> Option<Box<AstStmt>> {
     // lexeme marker isn't nullable. It isn't worth warping the universe for this hack, so we dig
     // up with some phony locations.
     Some(AstStmt::new_iter(
-        Box::new(ast_stmt_lexememarker(iter).clone()),
-        ast_stmt_copy(ast_stmt_iter_init(iter)),
-        ast_stmt_copy(ast_stmt_iter_cond(iter)),
-        ast_expr_copy(ast_stmt_iter_iter(iter)),
+        Box::new(loc.clone()),
+        ast_stmt_copy(&iter.init),
+        ast_stmt_copy(&iter.cond),
+        ast_expr_copy(&iter.iter),
         ast_block_create(vec![], vec![]),
         AstStmt::new_compound(
-            Box::new(ast_stmt_lexememarker(ast_stmt_iter_body(iter)).clone()),
-            Box::new(ast_stmt_iter_abstract(iter).clone()),
+            Box::new(ast_stmt_lexememarker(&iter.body).clone()),
+            iter.abstract_.clone(),
         ),
         false,
     ))
@@ -196,7 +194,7 @@ pub fn ast_stmt_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -
             Ok(())
         }
         AstStmtKind::Selection(_) => sel_absexec(stmt, state, should_setup),
-        AstStmtKind::Iteration(_) => iter_absexec(stmt, state),
+        AstStmtKind::Iteration(iter) => iter_absexec(iter, state),
         AstStmtKind::Compound(_) => comp_absexec(stmt, state, should_setup),
         AstStmtKind::Jump(_) => jump_absexec(stmt, state),
         _ => panic!(),
@@ -248,16 +246,16 @@ pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
     Ok(!value_equal(&zero, &v))
 }
 
-fn iter_absexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
-    let alloc = hack_alloc_from_neteffect(stmt);
-    let lw = ast_stmt_iter_lower_bound(stmt);
-    let up = ast_stmt_iter_upper_bound(stmt);
+fn iter_absexec(iter: &AstIterationStmt, state: &mut State) -> Result<()> {
+    let alloc = hack_alloc_from_neteffect(iter);
+    let lw = ast_stmt_iter_lower_bound(iter);
+    let up = ast_stmt_iter_upper_bound(iter);
     ast_expr_alloc_rangeprocess(alloc, lw, up, state)?;
     Ok(())
 }
 
-fn hack_alloc_from_neteffect(stmt: &AstStmt) -> &AstExpr {
-    let body = ast_stmt_iter_body(stmt);
+fn hack_alloc_from_neteffect(iter: &AstIterationStmt) -> &AstExpr {
+    let body = &iter.body;
     assert!(matches!(body.kind, AstStmtKind::Compound(_)));
     let block = ast_stmt_as_block(body);
     assert_eq!(ast_block_decls(block).len(), 0);
