@@ -1,17 +1,19 @@
-use std::sync::Arc;
 use std::process;
+use std::sync::Arc;
 
 use super::{
-    ast_block_preconds, ast_block_str, ast_stmt_absprocess, ast_stmt_ispre, ast_stmt_isterminal,
-    ast_stmt_process, ast_stmt_setupabsexec, AstBlock, AstExpr, AstStmt, AstType, AstVariable,
-    ast_expr_inverted_copy, ast_expr_assume, ast_stmt_getfuncs, FuncGraph, ast_type_copy,
+    ast_block_preconds, ast_block_str, ast_expr_assume, ast_expr_inverted_copy,
+    ast_stmt_absprocess, ast_stmt_getfuncs, ast_stmt_ispre, ast_stmt_isterminal, ast_stmt_process,
+    ast_stmt_setupabsexec, ast_type_copy, AstBlock, AstExpr, AstStmt, AstType, AstVariable,
+    FuncGraph,
 };
 use crate::state::state::{
-    state_copy, state_create, state_create_withprops, state_declare, state_equal, state_getobject,
-    state_hasgarbage, state_str, state_vconst, State, state_copywithname, state_getresult,
+    state_copy, state_copywithname, state_create, state_create_withprops, state_declare,
+    state_equal, state_getobject, state_getresult, state_hasgarbage, state_str, state_vconst,
+    State,
 };
-use crate::value::{Value, value_copy};
-use crate::util::{Error, Result, SemiBox, InsertionOrderMap};
+use crate::util::{Error, InsertionOrderMap, Result, SemiBox};
+use crate::value::{value_copy, Value};
 use crate::{str_write, vprintln, Externals};
 
 #[derive(Clone)]

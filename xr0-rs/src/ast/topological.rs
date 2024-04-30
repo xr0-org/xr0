@@ -1,10 +1,9 @@
 use std::collections::VecDeque;
 use std::process;
 
+use super::ast_function_buildgraph;
 use crate::util::InsertionOrderMap;
 use crate::Externals;
-
-use super::*;
 
 pub type FuncGraph = InsertionOrderMap<String, Vec<String>>;
 

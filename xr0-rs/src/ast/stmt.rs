@@ -260,6 +260,34 @@ fn ast_stmt_sel_sprint(stmt: &AstStmt, b: &mut String) {
     }
 }
 
+pub fn ast_stmt_iter_init(stmt: &AstStmt) -> &AstStmt {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
+        panic!();
+    };
+    &iteration.init
+}
+
+pub fn ast_stmt_iter_cond(stmt: &AstStmt) -> &AstStmt {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
+        panic!();
+    };
+    &iteration.cond
+}
+
+pub fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
+        panic!();
+    };
+    &iteration.iter
+}
+
+pub fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
+    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
+        panic!();
+    };
+    &iteration.abstract_
+}
+
 pub fn ast_stmt_iter_body(stmt: &AstStmt) -> &AstStmt {
     let AstStmtKind::Iteration(iteration) = &stmt.kind else {
         panic!();

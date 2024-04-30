@@ -11,12 +11,13 @@ use crate::{str_write, Externals, Object, Value};
 mod block;
 mod expr;
 mod expr_verify;
+mod extern_decl;
+mod function;
 mod stmt;
 mod stmt_verify;
 mod topological;
 mod type_;
 mod variable;
-mod function;
 
 pub use block::{
     ast_block_create, ast_block_decls, ast_block_isterminal, ast_block_preconds, ast_block_stmts,
@@ -34,9 +35,18 @@ pub use expr_verify::{
     ast_expr_abseval, ast_expr_alloc_rangeprocess, ast_expr_assume, ast_expr_decide, ast_expr_eval,
     ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide,
 };
+pub use extern_decl::{
+    ast_decl_create, ast_externdecl_as_function, ast_externdecl_as_function_mut,
+    ast_externdecl_install, ast_functiondecl_create, AstExternDecl, AstTypedefDecl,
+};
+pub use function::{
+    ast_function_absexec, ast_function_buildgraph, ast_function_create, ast_function_initparams,
+    ast_function_protostitch, ast_function_verify, AstFunction,
+};
 pub use stmt::{
     ast_stmt_as_expr, ast_stmt_as_v_block, ast_stmt_copy, ast_stmt_getfuncs, ast_stmt_ispre,
-    ast_stmt_isterminal, ast_stmt_iter_body, ast_stmt_iter_lower_bound, ast_stmt_iter_upper_bound,
+    ast_stmt_isterminal, ast_stmt_iter_abstract, ast_stmt_iter_body, ast_stmt_iter_cond,
+    ast_stmt_iter_init, ast_stmt_iter_iter, ast_stmt_iter_lower_bound, ast_stmt_iter_upper_bound,
     ast_stmt_jump_rv, ast_stmt_labelled_stmt, ast_stmt_lexememarker, ast_stmt_sel_body,
     ast_stmt_sel_cond, ast_stmt_sel_nest, ast_stmt_str, AstJumpKind, AstStmt, AstStmtKind,
 };
@@ -52,7 +62,6 @@ pub use type_::{
     MOD_VOLATILE,
 };
 pub use variable::AstVariable;
-pub use function::{AstFunction, ast_function_create};
 
 pub struct LValue<'ast> {
     pub t: &'ast AstType,
@@ -64,55 +73,8 @@ pub struct Preresult {
     pub is_contradiction: bool,
 }
 
-#[derive(Clone)]
-pub struct AstExternDecl {
-    pub kind: AstExternDeclKind,
-}
-
-#[derive(Clone)]
-pub struct AstTypedefDecl {
-    pub name: String,
-    pub type_0: Box<AstType>,
-}
-
-#[derive(Clone)]
-pub enum AstExternDeclKind {
-    Function(Box<AstFunction<'static>>),
-    Variable(Box<AstVariable>),
-    Typedef(AstTypedefDecl),
-    Struct(Box<AstType>),
-}
-
 pub struct Ast {
     pub decls: Vec<Box<AstExternDecl>>,
-}
-
-pub fn ast_stmt_iter_abstract(stmt: &AstStmt) -> &AstBlock {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    &iteration.abstract_
-}
-
-pub fn ast_stmt_iter_iter(stmt: &AstStmt) -> &AstExpr {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    &iteration.iter
-}
-
-pub fn ast_stmt_iter_cond(stmt: &AstStmt) -> &AstStmt {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    &iteration.cond
-}
-
-pub fn ast_stmt_iter_init(stmt: &AstStmt) -> &AstStmt {
-    let AstStmtKind::Iteration(iteration) = &stmt.kind else {
-        panic!();
-    };
-    &iteration.init
 }
 
 pub fn ast_stmt_as_block(stmt: &AstStmt) -> &AstBlock {
@@ -123,60 +85,6 @@ pub fn ast_stmt_as_block(stmt: &AstStmt) -> &AstBlock {
 }
 
 pub const KEYWORD_RETURN: &str = "return";
-
-pub fn ast_functiondecl_create(f: Box<AstFunction<'static>>) -> Box<AstExternDecl> {
-    Box::new(AstExternDecl {
-        kind: AstExternDeclKind::Function(f),
-    })
-}
-
-pub fn ast_externdecl_as_function_mut(
-    decl: &mut AstExternDecl,
-) -> Option<&mut AstFunction<'static>> {
-    match &mut decl.kind {
-        AstExternDeclKind::Function(f) => Some(f),
-        _ => None,
-    }
-}
-
-pub fn ast_externdecl_as_function(decl: &AstExternDecl) -> Option<&AstFunction> {
-    match &decl.kind {
-        AstExternDeclKind::Function(f) => Some(f),
-        _ => None,
-    }
-}
-
-pub fn ast_decl_create(name: String, t: Box<AstType>) -> Box<AstExternDecl> {
-    Box::new(AstExternDecl {
-        kind: if ast_type_istypedef(&t) {
-            AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t })
-        } else if ast_type_isstruct(&t) {
-            assert!(ast_type_struct_tag(&t).is_some());
-            AstExternDeclKind::Struct(t)
-        } else {
-            AstExternDeclKind::Variable(AstVariable::new(name, t))
-        },
-    })
-}
-
-#[allow(clippy::boxed_local)]
-pub fn ast_externdecl_install(decl: Box<AstExternDecl>, ext: &mut Externals) {
-    match decl.kind {
-        AstExternDeclKind::Function(f) => {
-            ext.declare_func(f);
-        }
-        AstExternDeclKind::Variable(v) => {
-            let name = v.name.clone();
-            ext.declare_var(name, v);
-        }
-        AstExternDeclKind::Typedef(typedef) => {
-            ext.declare_typedef(typedef.name.to_string(), typedef.type_0);
-        }
-        AstExternDeclKind::Struct(s) => {
-            ext.declare_struct(s);
-        }
-    }
-}
 
 pub fn parse_int(s: &str) -> c_int {
     s.parse().expect("parse error")
