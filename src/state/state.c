@@ -286,6 +286,15 @@ state_initsetup(struct state *s, int frameid)
 	}
 }
 
+enum execution_mode
+state_next_execmode(struct state *s)
+{
+	if (stack_execmode(s->stack) == EXEC_ABSTRACT) {
+		return EXEC_ABSTRACT;
+	}
+	return EXEC_ABSTRACT_NO_SETUP;
+}
+
 struct error *
 state_stacktrace(struct state *s, struct error *err)
 {

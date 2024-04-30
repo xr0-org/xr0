@@ -451,7 +451,39 @@ ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *state)
 }
 
 static struct error *
-expr_absexec(struct ast_expr *expr, struct state *state);
+ast_stmt_absexecnosetup(struct ast_stmt *, struct state *);
+
+struct error *
+ast_stmt_absprocess_nosetup(struct ast_stmt *stmt, char *fname, struct state *state)
+{
+	/* XXX: reject undefined things for this */
+	return ast_stmt_absexecnosetup(stmt, state);
+}
+
+static struct error *
+ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *state)
+{
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_LABELLED:
+		return NULL;
+	case STMT_NOP:
+	case STMT_EXPR:
+	case STMT_SELECTION:
+	case STMT_ITERATION:
+	case STMT_COMPOUND:
+	case STMT_JUMP:
+	case STMT_REGISTER:
+		return ast_stmt_absexec(stmt, state);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+labelled_absexec(struct ast_stmt *, struct state *);
+
+static struct error *
+expr_absexec(struct ast_expr *, struct state *);
 
 static struct error *
 sel_absexec(struct ast_stmt *stmt, struct state *);
@@ -470,8 +502,9 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
-	case STMT_LABELLED:
 		return NULL;
+	case STMT_LABELLED:
+		return labelled_absexec(stmt, state);
 	case STMT_EXPR:
 		return expr_absexec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
@@ -487,6 +520,21 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 	default:
 		assert(false);
 	}
+}
+
+static struct error *
+labelled_absexec(struct ast_stmt *stmt, struct state *state)
+{
+	assert(ast_stmt_ispre(stmt));
+	struct ast_block *b = ast_stmt_labelled_as_block(stmt);	
+	struct frame *setup_frame = frame_block_create(
+		dynamic_str("setup"),
+		b,
+		state_next_execmode(state)
+	);
+	state_pushframe(state, setup_frame);
+
+	return NULL;
 }
 
 static struct error *
@@ -591,7 +639,7 @@ comp_absexec(struct ast_stmt *stmt, struct state *state)
 	struct frame *block_frame = frame_block_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
-		EXEC_ABSTRACT
+		state_next_execmode(state)
 	);
 	state_pushframe(state, block_frame);
 	return NULL;
@@ -667,10 +715,12 @@ sel_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *set
 			*nest = ast_stmt_sel_nest(stmt);
 	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
+		printf("dec error %s\n", error_str(dec.err));
 		/* XXX: if error must be decidable in some other branch */
 		return NULL;
 	}
 	if (dec.decision) {
+		printf("build in");
 		return ast_stmt_buildsetup(body, state, setups);
 	} else if (nest) {
 		return ast_stmt_buildsetup(nest, state, setups);

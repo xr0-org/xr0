@@ -720,7 +720,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		EXEC_ABSTRACT,
+		state_next_execmode(state),
 		ast_expr_copy(expr),
 		f
 	);
@@ -754,7 +754,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 		fname,
 		ast_function_abstract(f),
 		ast_function_type(f),
-		EXEC_ABSTRACT,
+		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_copy(call),
 		f
 	);
@@ -1109,7 +1109,7 @@ call_absexec(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		EXEC_ABSTRACT,
+		state_next_execmode(state),
 		ast_expr_copy(expr),
 		f
 	);
