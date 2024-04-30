@@ -27,10 +27,11 @@ pub use block::{
 pub use expr::{
     ast_expr_as_identifier, ast_expr_assignment_rval, ast_expr_binary_e1, ast_expr_binary_e2,
     ast_expr_binary_op, ast_expr_copy, ast_expr_equal, ast_expr_getfuncs,
-    ast_expr_incdec_to_assignment, ast_expr_inverted_copy, ast_expr_isdeallocand_assertand,
-    ast_expr_matheval, ast_expr_unary_op, ast_expr_unary_operand, c_char, c_int, c_uint, AllocExpr,
-    AssignmentExpr, AstAllocKind, AstBinaryOp, AstExpr, AstExprKind, AstUnaryOp, BinaryExpr,
-    CallExpr, ConstantExpr, IncDecExpr, StructMemberExpr, UnaryExpr,
+    ast_expr_incdec_to_assignment, ast_expr_inverted_copy, ast_expr_is_not,
+    ast_expr_isdeallocand_assertand, ast_expr_matheval, ast_expr_unary_op, ast_expr_unary_operand,
+    c_char, c_int, c_uint, AllocExpr, AssignmentExpr, AstAllocKind, AstBinaryOp, AstExpr,
+    AstExprKind, AstUnaryOp, BinaryExpr, CallExpr, ConstantExpr, IncDecExpr, StructMemberExpr,
+    UnaryExpr,
 };
 pub use expr_verify::{
     ast_expr_abseval, ast_expr_alloc_rangeprocess, ast_expr_assume, ast_expr_decide, ast_expr_eval,

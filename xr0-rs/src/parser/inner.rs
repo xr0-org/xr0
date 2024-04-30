@@ -467,15 +467,13 @@ pub grammar c_parser(env: &Env) for str {
 
     rule selection_statement() -> Box<AstStmt> =
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() _ K(<"else">) _ alt:statement() p:position!() {
-            let neg_cond = AstExpr::new_unary(ast_expr_copy(&cond), AstUnaryOp::Bang);
-            let else_stmt = AstStmt::new_sel(env.lexloc(p), false, neg_cond, alt, None);
-            AstStmt::new_sel(env.lexloc(p), false, cond, then, Some(else_stmt))
+            AstStmt::new_sel(env.lexloc(p), false, cond, then, Some(alt))
         } /
         K(<"if">) _ "(" _ cond:expression() _ ")" _ then:statement() p:position!() {
             AstStmt::new_sel(env.lexloc(p), false, cond, then, None)
         } /
         K(<"switch">) _ "(" _ v:expression() _ ")" _ cases:statement() p:position!() {
-            AstStmt::new_nop(env.lexloc(p))
+            panic!()
         }
 
     rule optional_compound_verification() -> Box<AstBlock> =

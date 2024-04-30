@@ -483,6 +483,17 @@ pub fn ast_expr_unary_operand(expr: &AstExpr) -> &AstExpr {
     &unary.arg
 }
 
+//=ast_expr_isnot
+pub fn ast_expr_is_not(expr: &AstExpr) -> bool {
+    matches!(
+        expr.kind,
+        AstExprKind::Unary(UnaryExpr {
+            op: AstUnaryOp::Bang,
+            ..
+        })
+    )
+}
+
 pub fn ast_expr_binary_e1(expr: &AstExpr) -> &AstExpr {
     let AstExprKind::Binary(binary) = &expr.kind else {
         panic!();

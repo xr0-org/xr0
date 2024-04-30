@@ -122,12 +122,14 @@ fn stmt_compound_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
 }
 
 fn stmt_sel_exec(sel: &AstSelectionStmt, state: &mut State) -> Result<()> {
-    let decision = sel_decide(&sel.cond, state)?;
-    if decision {
-        return ast_stmt_exec(&sel.body, state);
+    if sel_decide(&sel.cond, state)? {
+        ast_stmt_exec(&sel.body, state)
+    } else if let Some(nest) = &sel.nest {
+        ast_stmt_exec(nest, state)
+    } else {
+        assert!(sel.nest.is_none());
+        Ok(())
     }
-    assert!(sel.nest.is_none());
-    Ok(())
 }
 
 fn stmt_iter_exec(loc: &LexemeMarker, iter: &AstIterationStmt, state: &mut State) -> Result<()> {
@@ -214,12 +216,14 @@ fn expr_absexec(expr: &AstExpr, state: &mut State) -> Result<()> {
 }
 
 fn sel_absexec(sel: &AstSelectionStmt, state: &mut State, should_setup: bool) -> Result<()> {
-    let decision = sel_decide(&sel.cond, state)?;
-    if decision {
-        return ast_stmt_absexec(&sel.body, state, should_setup);
+    if sel_decide(&sel.cond, state)? {
+        ast_stmt_absexec(&sel.body, state, should_setup)
+    } else if let Some(nest) = &sel.nest {
+        ast_stmt_absexec(nest, state, should_setup)
+    } else {
+        assert!(sel.nest.is_none());
+        Ok(())
     }
-    assert!(sel.nest.is_none());
-    Ok(())
 }
 
 pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
@@ -303,12 +307,14 @@ fn labelled_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
 }
 
 fn sel_setupabsexec(sel: &AstSelectionStmt, state: &mut State) -> Result<()> {
-    let decision = sel_decide(&sel.cond, state)?;
-    if decision {
-        return stmt_setupabsexec(&sel.body, state);
+    if sel_decide(&sel.cond, state)? {
+        stmt_setupabsexec(&sel.body, state)
+    } else if let Some(nest) = &sel.nest {
+        stmt_setupabsexec(nest, state)
+    } else {
+        assert!(sel.nest.is_none());
+        Ok(())
     }
-    assert!(sel.nest.is_none());
-    Ok(())
 }
 
 fn comp_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {

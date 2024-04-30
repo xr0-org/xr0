@@ -745,17 +745,9 @@ selection_statement
 	: IF '(' expression ')' statement
 		{ $$ = ast_stmt_create_sel(lexloc(), false, $3, $5, NULL); }
 	| IF '(' expression ')' statement ELSE statement
-		{
-			struct ast_expr *neg_cond = ast_expr_unary_create(
-				ast_expr_copy($3), UNARY_OP_BANG
-			);
-			struct ast_stmt *_else = ast_stmt_create_sel(
-				lexloc(), false, neg_cond, $7, NULL
-			); 
-			$$ = ast_stmt_create_sel(lexloc(), false, $3, $5, _else);
-		}
+		{ $$ = ast_stmt_create_sel(lexloc(), false, $3, $5, $7); }
 	| SWITCH '(' expression ')' statement
-		{ $$ = ast_stmt_create_nop(lexloc()); }
+		{ assert(false); }
 	;
 
 for_some

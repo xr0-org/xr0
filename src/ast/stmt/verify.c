@@ -216,14 +216,18 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
+	struct ast_stmt *body = ast_stmt_sel_body(stmt),
+			*nest = ast_stmt_sel_nest(stmt);
+	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
 		return dec.err;
 	}
 	if (dec.decision) {
-		return ast_stmt_exec(ast_stmt_sel_body(stmt), state);
+		return ast_stmt_exec(body, state);
+	} else if (nest) {
+		return ast_stmt_exec(nest, state);
 	}
-	assert(!ast_stmt_sel_nest(stmt));
 	return NULL;
 }
 
@@ -388,14 +392,18 @@ expr_absexec(struct ast_expr *expr, struct state *state)
 static struct error *
 sel_absexec(struct ast_stmt *stmt, struct state *state, bool should_setup)
 {
-	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
+	struct ast_stmt *body = ast_stmt_sel_body(stmt),
+			*nest = ast_stmt_sel_nest(stmt);
+	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
 		return dec.err;
 	}
 	if (dec.decision) {
-		return ast_stmt_absexec(ast_stmt_sel_body(stmt), state, should_setup);
+		return ast_stmt_absexec(body, state, should_setup);
+	} else if (nest) {
+		return ast_stmt_absexec(nest, state, should_setup);
 	}
-	assert(!ast_stmt_sel_nest(stmt));
 	return NULL;
 }
 
@@ -547,14 +555,18 @@ labelled_setupabsexec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 sel_setupabsexec(struct ast_stmt *stmt, struct state *state)
 {
-	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), state);
+	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
+	struct ast_stmt *body = ast_stmt_sel_body(stmt),
+			*nest = ast_stmt_sel_nest(stmt);
+	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
 		return dec.err;
 	}
 	if (dec.decision) {
-		return stmt_setupabsexec(ast_stmt_sel_body(stmt), state);
+		return stmt_setupabsexec(body, state);
+	} else if (nest) {
+		return stmt_setupabsexec(nest, state);
 	}
-	assert(!ast_stmt_sel_nest(stmt));
 	return NULL;
 }
 

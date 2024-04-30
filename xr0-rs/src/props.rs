@@ -1,4 +1,4 @@
-use crate::ast::{ast_expr_equal, ast_expr_inverted_copy};
+use crate::ast::{ast_expr_equal, ast_expr_inverted_copy, ast_expr_is_not};
 use crate::{str_write, AstExpr};
 
 #[derive(Clone)]
@@ -30,6 +30,11 @@ impl Props {
     }
 
     pub fn get(&mut self, e: &AstExpr) -> bool {
+        // XXX: hack for shallow not conditions, fix in TODO
+        if ast_expr_is_not(e) {
+            return !self.contradicts(e);
+        }
+        // TODO: logical comparison
         self.props.iter().any(|prop| ast_expr_equal(e, prop))
     }
 
