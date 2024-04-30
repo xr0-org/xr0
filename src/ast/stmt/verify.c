@@ -526,6 +526,10 @@ static struct error *
 labelled_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	assert(ast_stmt_ispre(stmt));
+	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
+	if (ast_stmt_kind(inner) == STMT_SELECTION) {
+		return error_printf("setup preconditions must be decidable");
+	}
 	struct ast_block *b = ast_stmt_labelled_as_block(stmt);	
 	struct frame *setup_frame = frame_block_create(
 		dynamic_str("setup"),
