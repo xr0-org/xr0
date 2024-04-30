@@ -4,16 +4,13 @@
 struct program;
 
 struct program *
-program_create(struct ast_block *, char *name);
+program_create(struct ast_block *);
 
 struct program *
 program_copy(struct program *);
 
 void
 program_destroy(struct program *);
-
-char *
-program_name(struct program *);
 
 char *
 program_str(struct program *);
@@ -23,9 +20,6 @@ program_index(struct program *);
 
 char *
 program_render(struct program *);
-
-void
-program_changename(struct program *, char *);
 
 void
 program_setatend(struct program *);
