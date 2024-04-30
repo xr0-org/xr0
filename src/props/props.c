@@ -82,7 +82,7 @@ props_get(struct props *p, struct ast_expr *e)
 		if (ast_expr_equal(e, p->prop[i])) {
 			return true;
 		}
-	}
+	}	
 	return false;
 }
 

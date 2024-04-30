@@ -682,6 +682,7 @@ ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block
 	case STMT_JUMP:
 	case STMT_REGISTER:
 	case STMT_EXPR:
+	case STMT_ITERATION:
 		return NULL;
 	case STMT_LABELLED:
 		return labelled_buildsetup(stmt, state, setups);
