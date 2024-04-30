@@ -626,6 +626,7 @@ comp_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
 struct error *
 ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups) {
 	switch (ast_stmt_kind(stmt)) {	
+	case STMT_NOP:
 	case STMT_JUMP:
 	case STMT_REGISTER:
 	case STMT_EXPR:
@@ -637,6 +638,7 @@ ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block
 	case STMT_COMPOUND:
 		return comp_buildsetup(stmt, state, setups);
 	default:
+		printf("stmt: %s\n", ast_stmt_str(stmt));
 		assert(false);
 	}
 }

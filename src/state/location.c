@@ -228,6 +228,9 @@ location_toheap(struct location *loc, struct heap *h)
 bool
 location_tostack(struct location *loc, struct stack *s)
 {
+	if (loc->type != LOCATION_AUTOMATIC) {
+		return false;
+	}
 	bool type_equal = loc->type == LOCATION_AUTOMATIC;
 	/* XXX: should probably check that frame is greater than current frame */
 	struct stack *frame = stack_getframe(s, loc->u.frame);
