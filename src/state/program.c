@@ -15,7 +15,6 @@ struct program {
 		PROGRAM_COUNTER_STMTS,
 		PROGRAM_COUNTER_ATEND,
 	} s;
-	char *name;
 	int index;
 };
 
@@ -23,13 +22,12 @@ static enum program_state
 program_state_init(struct ast_block *);
 
 struct program *
-program_create(struct ast_block *b, char *name)
+program_create(struct ast_block *b)
 {
 	struct program *p = malloc(sizeof(struct program));
 	p->b = b;
 	p->s = program_state_init(b);
 	p->index = 0;
-	p->name = dynamic_str(name);
 	return p;
 }
 
@@ -53,14 +51,13 @@ void
 program_destroy(struct program *p)
 {
 	/* no ownership of block */
-	free(p->name);
 	free(p);
 }
 
 struct program *
 program_copy(struct program *old)
 {
-	struct program *new = program_create(old->b, old->name);
+	struct program *new = program_create(old->b);
 	new->s = old->s;
 	new->index = old->index;
 	return new;
@@ -98,19 +95,6 @@ program_render(struct program *p)
 		assert(false);
 	}
 	return strbuilder_build(b);
-}
-
-char *
-program_name(struct program *p)
-{
-	return p->name;
-}
-
-void
-program_changename(struct program *p, char *new_name)
-{
-	free(p->name);
-	p->name = dynamic_str(new_name);
 }
 
 bool
@@ -196,20 +180,17 @@ static struct error *
 program_stmt_process(struct program *p, enum execution_mode mode, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	v_printf("stmt: %s\n", ast_stmt_str(stmt));
 	if (!state_islinear(s) && ast_stmt_linearisable(stmt)) {
 		return ast_stmt_linearise(stmt, s, mode);
 	}
 	switch (mode) {
 	case EXEC_ABSTRACT:
-		return ast_stmt_absprocess(stmt, p->name, s);
+		return ast_stmt_absprocess(stmt, s);
 	case EXEC_ABSTRACT_NO_SETUP:
 	case EXEC_SETUP:
-		printf("abstract_process_nosetup\n");
-		return ast_stmt_absprocess_nosetup(stmt, p->name, s);
+		return ast_stmt_absprocess_nosetup(stmt, s);
 	case EXEC_ACTUAL:
-		printf("actual_process\n");
-		return ast_stmt_process(stmt, p->name, s);
+		return ast_stmt_process(stmt, s);
 	default:
 		assert(false);
 	}

@@ -115,7 +115,7 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 }
 
 struct error *
-ast_stmt_process(struct ast_stmt *stmt, char *fname, struct state *state)
+ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 {
 	struct error *err;
 
@@ -444,7 +444,7 @@ hack_default_values(struct state *state)
 }
 
 struct error *
-ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *state)
+ast_stmt_absprocess(struct ast_stmt *stmt, struct state *state)
 {
 	/* XXX: reject undefined things for this */
 	return ast_stmt_absexec(stmt, state);
@@ -454,7 +454,7 @@ static struct error *
 ast_stmt_absexecnosetup(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_absprocess_nosetup(struct ast_stmt *stmt, char *fname, struct state *state)
+ast_stmt_absprocess_nosetup(struct ast_stmt *stmt, struct state *state)
 {
 	/* XXX: reject undefined things for this */
 	return ast_stmt_absexecnosetup(stmt, state);

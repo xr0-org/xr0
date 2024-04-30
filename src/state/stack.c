@@ -16,16 +16,14 @@
 struct frame;
 
 struct stack {
-	enum execution_mode mode;
-	struct program *p;
-
-	struct block_arr *memory;
-
-	/* lvalues of blocks in frame */
-	struct map *varmap;
-
 	int id;
+	struct program *p;
+	struct block_arr *memory;
+	struct map *varmap;		/* lvalues of blocks in frame */
 	struct stack *prev;
+
+	char *name;
+	enum execution_mode mode;
 	enum frame_kind kind;
 	struct ast_expr *call;
 	struct ast_function *f;
@@ -58,17 +56,15 @@ stack_create(struct frame *f, struct stack *prev)
 	assert(stack);
 
 	assert(f->b);
-	stack->p = program_create(f->b, f->name);
-	stack->mode = f->mode;
+	stack->p = program_create(f->b);
 	stack->memory = block_arr_create();
-
 	stack->varmap = map_create();
-
 	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
 
+	stack->name = f->name;
+	stack->mode = f->mode;
 	stack->kind = f->kind;
-
 	if (stack->kind == FRAME_CALL) {
 		stack->call = f->call;
 		stack->f = f->f;
@@ -193,7 +189,7 @@ rename_lowestframe(struct stack *s, char *new_name)
 	if (s->prev) {
 		rename_lowestframe(s->prev, new_name);
 	} else {
-		program_changename(s->p, new_name);
+		s->name = new_name;
 	}
 }
 
@@ -229,7 +225,7 @@ stack_str(struct stack *stack, struct state *state)
 	for (int i = 0, len = 30; i < len-2; i++ ) {
 		strbuilder_putc(b, '-');
 	}
-	strbuilder_printf(b, " %s\n", program_name(stack->p));
+	strbuilder_printf(b, " %s\n", stack->name);
 	if (stack->prev) {
 		char *prev = stack_str(stack->prev, state);
 		strbuilder_printf(b, prev);
@@ -350,7 +346,7 @@ stack_trace(struct stack *s, struct error *err)
 static char *
 stack_propername(struct stack *s)
 {
-	return s->kind == FRAME_CALL ? program_name(s->p) : stack_propername(s->prev);
+	return s->kind == FRAME_CALL ? s->name : stack_propername(s->prev);
 }
 
 static char *
