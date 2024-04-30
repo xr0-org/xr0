@@ -310,7 +310,8 @@ impl Object {
             .members
             .iter()
             .find(|var| member == ast_variable_name(var))
-            .map(|var| ast_variable_type(var));
+            .map(|var| ast_variable_type(var))
+            .unwrap();
         LValue { t, obj }
     }
 

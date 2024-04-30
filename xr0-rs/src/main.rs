@@ -117,19 +117,15 @@ fn pass0(root: Box<Ast>, ext: &mut Externals) {
     }
 }
 
-fn pass1(order: &[String], ext: &Arc<Externals>, print: bool) {
+fn pass1(order: &[String], ext: &Arc<Externals>) {
     for name in order {
         let f = ext.get_func(name.as_str()).unwrap();
         if !f.is_axiom() && !f.is_proto() {
             if let Err(err) = ast_function_verify(f, Arc::clone(ext)) {
-                eprintln!("{}", err.msg);
+                eprintln!("{err}");
                 process::exit(1);
             }
-            if print {
-                eprintln!("qed {}", f.name());
-            } else {
-                vprintln!("qed {}", f.name());
-            }
+            vprintln!("qed {}", f.name());
         }
     }
 }
@@ -184,9 +180,9 @@ fn verify(c: &Config) -> io::Result<()> {
         let order = ast_topological_order(sortfunc, &ext);
         let strs: Vec<&str> = order.iter().map(|f| f.as_str()).collect();
         eprintln!("{}", strs.join(", "));
-        pass1(&order, &ext, true);
+        pass1(&order, &ext);
     } else {
-        pass1(ext.function_names(), &ext, false);
+        pass1(ext.function_names(), &ext);
     }
 
     Ok(())

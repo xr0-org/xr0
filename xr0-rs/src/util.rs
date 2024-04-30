@@ -3,16 +3,73 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::Deref;
 use std::sync::atomic::AtomicBool;
 
-#[derive(Debug, Clone)]
+use crate::ast::AstExpr;
+
+#[derive(Debug)]
 pub struct Error {
-    pub msg: String,
+    kind: ErrorKind,
+    inner: Option<Box<Error>>,
+}
+
+#[derive(Clone)]
+pub enum ErrorKind {
+    Custom(String),
+    UndecideableCond(Box<AstExpr>),
 }
 
 pub type Result<T, E = Box<Error>> = std::result::Result<T, E>;
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", self.msg)
+        match &self.kind {
+            ErrorKind::Custom(msg) => write!(f, "{msg}"),
+            ErrorKind::UndecideableCond(_) => write!(f, "undecideable condition"),
+        }
+    }
+}
+
+impl Error {
+    pub fn new(s: String) -> Box<Error> {
+        Box::new(Error {
+            kind: ErrorKind::Custom(s),
+            inner: None,
+        })
+    }
+
+    pub fn undecideable_cond(expr: Box<AstExpr>) -> Box<Error> {
+        Box::new(Error {
+            kind: ErrorKind::UndecideableCond(expr),
+            inner: None,
+        })
+    }
+
+    /// If `self` or any inner error is an UndecidebleCond error, returns the condition.
+    /// Otherwise returns `Err(self)`.
+    pub fn to_undecideable_cond(self) -> Result<Box<AstExpr>> {
+        match self.kind {
+            ErrorKind::UndecideableCond(cond) => Ok(cond),
+            kind => match self.inner {
+                None => Err(Box::new(Error { kind, inner: None })),
+                Some(inner) => inner.to_undecideable_cond().map_err(|inner| {
+                    Box::new(Error {
+                        kind,
+                        inner: Some(inner),
+                    })
+                }),
+            },
+        }
+    }
+}
+
+impl Debug for ErrorKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            ErrorKind::Custom(msg) => f.debug_tuple("ErrorKind::Custom").field(msg).finish(),
+            ErrorKind::UndecideableCond(cond) => f
+                .debug_tuple("ErrorKind::UndecideableCond")
+                .field(&format!("{cond}"))
+                .finish(),
+        }
     }
 }
 
@@ -62,12 +119,6 @@ macro_rules! cstr {
             std::ffi::CStr::from_ptr(c).to_string_lossy()
         }
     }};
-}
-
-impl Error {
-    pub fn new(s: String) -> Box<Error> {
-        Box::new(Error { msg: s })
-    }
 }
 
 pub static VERBOSE_MODE: AtomicBool = AtomicBool::new(false);

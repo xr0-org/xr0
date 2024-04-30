@@ -102,8 +102,10 @@ location_transfigure(struct location *loc, struct state *compare)
 void
 location_destroy(struct location *loc)
 {
-	ast_expr_destroy(loc->offset);
-	free(loc);
+	if (loc->type != LOCATION_STATIC) {
+		ast_expr_destroy(loc->offset);
+		free(loc);
+	}
 }
 
 static bool
@@ -292,7 +294,7 @@ location_getblock(struct location *loc, struct static_memory *sm, struct vconst 
 	switch (loc->type) {
 	case LOCATION_STATIC:
 		return (struct block_res) {
-			.b = static_memory_getblock( sm, loc->block),
+			.b = static_memory_getblock(sm, loc->block),
 			.err = NULL
 		};
 	case LOCATION_AUTOMATIC:
@@ -319,7 +321,7 @@ location_auto_getblock(struct location *loc, struct stack *s)
 	if (!f) {
 		return (struct block_res) {
 			.b = NULL,
-			.err = error_create("stack frame doesn't exist")
+			.err = error_printf("stack frame doesn't exist")
 		};
 	}
 	return (struct block_res) {
@@ -339,7 +341,7 @@ struct error *
 location_dealloc(struct location *loc, struct heap *heap)
 {
 	if (loc->type != LOCATION_DYNAMIC) {
-		return error_create("not heap location");
+		return error_printf("not heap location");
 	}
 	return heap_deallocblock(heap, loc->block);
 }
@@ -353,14 +355,14 @@ location_range_dealloc(struct location *loc, struct ast_expr *lw,
 
 	struct block *b = state_getblock(state, loc);
 	if (!b) {
-		return error_create("cannot get block");
+		return error_printf("cannot get block");
 	}
 
 	if (!block_range_aredeallocands(b, lw, up, state)) {
 		printf("block: %s\n", block_str(b));
 		printf("lw: %s, up: %s\n", ast_expr_str(lw), ast_expr_str(up));
 		assert(false);
-		return error_create("some values not allocated");
+		return error_printf("some values not allocated");
 	}
 
 	return block_range_dealloc(b, lw, up, state);

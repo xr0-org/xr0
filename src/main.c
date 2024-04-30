@@ -243,7 +243,7 @@ pass1(struct ast *root, struct externals *ext)
 		assert(ast_function_abstract(f));
 
 		if ((err = ast_function_verify(f, ext))) {
-			fprintf(stderr, "%s\n", err->msg);
+			fprintf(stderr, "%s\n", error_str(err));
 			exit(EXIT_FAILURE);
 		}
 		v_printf("qed %s\n", ast_function_name(f));
@@ -265,10 +265,10 @@ pass_inorder(struct string_arr *order, struct externals *ext)
 		assert(ast_function_abstract(f));
 
 		if ((err = ast_function_verify(f, ext))) {
-			fprintf(stderr, "%s\n", err->msg);
+			fprintf(stderr, "%s\n", error_str(err));
 			exit(EXIT_FAILURE);
 		}
-		fprintf(stderr, "qed %s\n", ast_function_name(f));
+		v_printf("qed %s\n", ast_function_name(f));
 	}
 }
 

@@ -711,13 +711,13 @@ ast_expr_alloc_str_build(struct ast_expr *expr, struct strbuilder *b)
 
 	switch (expr->u.alloc.kind) {
 	case ALLOC:
-		strbuilder_printf(b, ".%s %s;", "malloc", arg);
+		strbuilder_printf(b, ".%s(%s)", "malloc", arg);
 		break;
 	case DEALLOC:
-		strbuilder_printf(b, ".%s %s;", "free", arg);
+		strbuilder_printf(b, ".%s(%s)", "free", arg);
 		break;
 	case CLUMP:
-		strbuilder_printf(b, ".%s %s;", "clump", arg);
+		strbuilder_printf(b, ".%s(%s)", "clump", arg);
 		break;
 	default:
 		assert(false);
@@ -738,8 +738,6 @@ ast_expr_alloc_kind(struct ast_expr *expr)
 	assert(expr->kind == EXPR_ALLOCATION);
 	return expr->u.alloc.kind;
 }
-
-
 
 void
 ast_expr_destroy(struct ast_expr *expr)
@@ -1078,127 +1076,6 @@ ast_expr_getfuncs(struct ast_expr *expr)
 	default:
 		assert(false);
 	}
-}
-
-static struct ast_stmt_splits
-call_splits(struct ast_expr *, struct state *);
-
-static struct ast_stmt_splits
-binary_splits(struct ast_expr *, struct state *);
-
-struct ast_stmt_splits
-ast_expr_splits(struct ast_expr *e, struct state *s)
-{
-	switch (ast_expr_kind(e)) {
-	case EXPR_CALL:
-		return call_splits(e, s);
-	case EXPR_ASSIGNMENT:
-		return ast_expr_splits(ast_expr_assignment_rval(e), s);
-	case EXPR_UNARY:
-		return ast_expr_splits(ast_expr_unary_operand(e), s);
-	case EXPR_BINARY:
-		return binary_splits(e, s);
-	case EXPR_INCDEC:
-		return ast_expr_splits(ast_expr_incdec_root(e), s);
-	case EXPR_STRUCTMEMBER:
-		return ast_expr_splits(ast_expr_member_root(e), s);
-	case EXPR_CONSTANT:
-	case EXPR_IDENTIFIER:
-	case EXPR_STRING_LITERAL:
-	case EXPR_ARBARG:
-	case EXPR_ISDEREFERENCABLE:
-	case EXPR_ALLOCATION:
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = NULL };
-	default:
-		assert(false);
-	}
-}
-
-static struct ast_stmt_splits
-call_splits(struct ast_expr *expr, struct state *state)
-{
-	struct error *err;
-
-	struct ast_expr *root = ast_expr_call_root(expr);
-	/* TODO: function-valued-expressions */
-	char *name = ast_expr_as_identifier(root);
-
-	struct ast_function *f = externals_getfunc(state_getext(state), name);
-	if (!f) {
-		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "function: `%s' not found", name);
-		err = error_create(strbuilder_build(b));
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = err };
-	}
-
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **params = ast_function_params(f);
-
-	struct state *s_copy = state_copy(state);
-	struct result_arr *args = prepare_arguments(
-		ast_expr_call_nargs(expr),
-		ast_expr_call_args(expr),
-		nparams, params, s_copy
-	);
-
-	struct ast_type *ret_type = ast_function_type(f);
-	state_pushframe(s_copy, dynamic_str(name), ret_type);
-
-	if ((err = prepare_parameters( nparams, params, args, name, s_copy))) {
-		/* Sometimes a param is uninitialised e.g. 
-		 *
-		 * 	int c;
-		 * 	scanf("%d", &c);
-		 *
-		 * */
-		return (struct ast_stmt_splits) { .n = 0, .cond = NULL, .err = err };
-	} 
-	int n = 0;
-	struct ast_expr **cond = NULL;
-
-	struct ast_block *abs = ast_function_abstract(f);
-
-	int ndecls = ast_block_ndecls(abs);
-	if (ndecls) {
-		struct ast_variable **var = ast_block_decls(abs);
-		for (int i = 0; i < ndecls; i++) {
-			state_declare(s_copy, var[i], false);
-		}
-	}
-
-	int nstmts = ast_block_nstmts(abs);
-	struct ast_stmt **stmt = ast_block_stmts(abs);
-	for (int i = 0; i < nstmts; i++) {
-		struct ast_stmt_splits splits = ast_stmt_splits(stmt[i], s_copy);
-		for (int j = 0; j < splits.n; j++) {
-			cond = realloc(cond, sizeof(struct ast_expr *) * ++n);
-			cond[n-1] = splits.cond[j];
-		}
-		/* XXX: for assignment statements and, well, spare us */
-	}
-
-	state_popframe(s_copy);
-	result_arr_destroy(args);
-
-	return (struct ast_stmt_splits) { .n = n, .cond = cond, .err = NULL };
-}
-
-static struct ast_stmt_splits
-binary_splits(struct ast_expr *e, struct state *s)
-{
-	struct ast_stmt_splits s1 = ast_expr_splits(ast_expr_binary_e1(e), s),
-			       s2 = ast_expr_splits(ast_expr_binary_e2(e), s);
-
-	int n = s1.n + s2.n;
-	struct ast_expr **cond = malloc(sizeof(struct ast_expr *) * n);
-	for (int i = 0; i < s1.n; i++) {
-		cond[i] = s1.cond[i];
-	}
-	for (int i = 0; i < s2.n; i++) {
-		cond[i+s1.n] = s2.cond[i];
-	}
-
-	return (struct ast_stmt_splits) { .n = n, .cond = cond, .err = NULL };
 }
 
 static struct string_arr *

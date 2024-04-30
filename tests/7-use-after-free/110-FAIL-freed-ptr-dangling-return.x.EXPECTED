@@ -1,1 +1,1 @@
-7-use-after-free/110-FAIL-freed-ptr-dangling-return.x:21:8:main: cannot exec statement: undefined indirection: *(i+0) has no value
+7-use-after-free/110-FAIL-freed-ptr-dangling-return.x:21:8:main: undefined indirection: *(i+0) has no value

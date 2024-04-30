@@ -176,32 +176,6 @@ strbuilder_putc(struct strbuilder *b, char c)
 	strbuilder_printf(b, "%c", c);
 }
 
-struct error *
-error_create(char *s)
-{
-	struct error *err = calloc(1, sizeof(struct error));
-	err->msg = s;
-	return err;
-}
-
-struct error *
-error_prepend(struct error* e, char *prefix)
-{
-	int new_len = strlen(prefix) + strlen(e->msg) + 1 + 1;
-	char *new_msg = (char *) malloc(new_len);
-
-	/* prepend prefix */
-	strcpy(new_msg, prefix);
-	/* concat original msg */
-	strcat(new_msg, e->msg);
-	/* add newline character */
-	strcat(new_msg, "\n");
-
-	free(e);
-
-	return error_create(new_msg);
-}
-
 /* string_arr */
 
 struct string_arr *
@@ -313,7 +287,143 @@ v_printf(char *fmt, ...)
 	}
 	va_list ap;
 	va_start(ap, fmt);
-	int r = vprintf(fmt, ap);
+	int r = vfprintf(stderr, fmt, ap);
 	va_end(ap);
 	return r;
+}
+
+struct error {
+	enum error_type {
+		ERROR_PRINTF,
+		ERROR_UNDECIDEABLE_COND,
+	} type;
+	union error_contents {
+		char *printf;
+		struct ast_expr *undecidable_cond;
+	} contents;
+	struct error *inner;
+};
+
+static struct error *
+error_to(struct error *err, enum error_type t)
+{
+	if (err->type == t) {
+		return err;
+	}
+	if (err->inner) {
+		return error_to(err->inner, t);
+	}
+	return NULL;
+}
+
+static char *
+findnextfmt(char **start);
+
+static struct error *
+error_nest(struct error *outer, struct error *inner)
+{
+	if (!outer->inner) {
+		outer->inner = inner;
+		return outer;
+	}
+	return error_nest(outer->inner, inner);
+}
+
+struct error *
+error_printf(char *fmt, ...)
+{
+	char *otherfmt;
+	struct error *inner;
+
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_PRINTF;
+
+	struct strbuilder *b = strbuilder_create();
+	va_list ap;
+	va_start(ap, fmt);
+	for (char *p = fmt; *p; p++) {
+		if (*p != '%') {
+			strbuilder_putc(b, *p);
+			continue;
+		}
+		/* ⊢ *p == '%' */
+		switch (*++p) {
+		case 'w':
+			inner = va_arg(ap, struct error *);
+			strbuilder_printf(
+				b, "%s", error_str(inner)
+			);
+			err = error_nest(err, inner);
+			break;
+		default:
+			otherfmt = findnextfmt(&p);
+			strbuilder_vprintf(b, otherfmt, ap);
+			free(otherfmt);
+			p--; /* prepare for increment */
+			break;
+		}
+	}
+	char *s = strbuilder_build(b);
+	va_end(ap);
+
+	err->contents.printf = s;
+	return err;
+}
+
+static char *
+findnextfmt(char **p)
+{
+	char *start = *p;
+
+	char *s = start;
+	for (; *s && *s != '%'; s++) {}
+	/* s is '\0' or '%' */
+	int len = s - start;
+	*p = s;
+	char *output = malloc(sizeof(char) * (len + 2));
+	*output = '%';
+	strncpy(output + 1, start, len);
+	*(output + len + 1) = '\0';
+	return output;
+}
+
+struct error *
+error_undecideable_cond(struct ast_expr *cond)
+{
+	assert(cond);
+
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_UNDECIDEABLE_COND;
+	err->contents.undecidable_cond = cond;
+	return err;
+}
+
+struct error *
+error_to_undecideable_cond(struct error *err)
+{
+	return error_to(err, ERROR_UNDECIDEABLE_COND);
+}
+
+struct ast_expr *
+error_get_undecideable_cond(struct error *err)
+{
+	assert(err->type == ERROR_UNDECIDEABLE_COND);
+	return err->contents.undecidable_cond;
+}
+
+char *
+error_str(struct error *err)
+{
+	char *error_type_str[] = {
+		[ERROR_UNDECIDEABLE_COND] = "undecideable condition"
+	};
+
+	switch (err->type) {
+	case ERROR_PRINTF:
+		return dynamic_str(err->contents.printf);
+	case ERROR_UNDECIDEABLE_COND:
+		return dynamic_str(error_type_str[err->type]);
+	default:
+		assert(false);
+	}
 }

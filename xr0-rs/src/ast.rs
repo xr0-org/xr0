@@ -186,7 +186,7 @@ pub enum AstTypeBase {
     Signed,
     #[allow(dead_code)]
     Unsigned,
-    Pointer(Option<Box<AstType>>),
+    Pointer(Box<AstType>),
     #[allow(dead_code)]
     Array(AstArrayType),
     Struct(AstStructType),
@@ -207,7 +207,7 @@ pub const MOD_CONST: AstTypeModifiers = 32;
 pub const MOD_VOLATILE: AstTypeModifiers = 64;
 
 pub struct LValue<'ast> {
-    pub t: Option<&'ast AstType>,
+    pub t: &'ast AstType,
     pub obj: Option<&'ast mut Object>,
 }
 
@@ -292,12 +292,6 @@ pub enum AstStmtKind {
 #[derive(Clone)]
 pub struct Preresult {
     pub is_contradiction: bool,
-}
-
-#[derive(Clone, Default)]
-pub struct AstStmtSplits {
-    // Note: In the original this array is heap-allocated but never freed.
-    pub conds: Vec<Box<AstExpr>>,
 }
 
 #[derive(Clone)]
@@ -807,16 +801,17 @@ fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
     if let Ok(res) = hack_identifier_builtin_eval(id, state) {
         return Ok(res);
     }
+
+    /* XXX */
     if id.starts_with('#') {
         return Ok(value_literal_create(id));
     }
-    let Some(obj) = state_getobject(state, id) else {
-        return Err(Error::new(format!("unknown idenitfier {id}")));
-    };
+    // Note: Original does not null-check `obj` when there is not an error.
+    let obj = state_getobject(state, id)?.unwrap();
     let Some(val) = obj.as_value() else {
         vprintln!("state: {}", state_str(state));
         return Err(Error::new(format!(
-            "undefined memory access: {id} has no value",
+            "undefined memory access: `{id}' has no value",
         )));
     };
     Ok(value_copy(val))
@@ -870,7 +865,11 @@ pub fn ast_expr_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
         AstExprKind::IncDec(incdec) => expr_incdec_eval(incdec, state),
         AstExprKind::Binary(binary) => expr_binary_eval(binary, state),
         AstExprKind::ArbArg => arbarg_eval(state),
-        _ => panic!(),
+        AstExprKind::Bracketed(_)
+        | AstExprKind::Iteration
+        | AstExprKind::IsDeallocand(_)
+        | AstExprKind::IsDereferencable(_)
+        | AstExprKind::Allocation(_) => panic!("unsupported expression for eval: `{expr}'"),
     }
 }
 
@@ -937,12 +936,11 @@ pub fn expr_structmember_lvalue<'s>(
     let StructMemberExpr { root, member } = sm;
     let state: *mut State = state;
     unsafe {
-        // Note: Original fails to check for errors.
-        let root_lval = ast_expr_lvalue(root, &mut *state).unwrap();
+        let root_lval = ast_expr_lvalue(root, &mut *state)?;
         let root_obj = root_lval.obj.unwrap();
-        let lvalue = root_obj.member_lvalue(root_lval.t.unwrap(), member, &mut *state);
+        let lvalue = root_obj.member_lvalue(root_lval.t, member, &mut *state);
         if lvalue.obj.is_none() {
-            return Err(Error::new("lvalue error".to_string()));
+            return Err(Error::new(format!("`{root}' has no field `{member}'")));
         }
         Ok(lvalue)
     }
@@ -964,7 +962,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
                     // null, so it will crash.
                     panic!();
                 };
-                let t = ast_type_ptr_type(root_lval.t.unwrap());
+                let t = ast_type_ptr_type(root_lval.t);
                 let root_val = root_obj.as_value().unwrap();
                 let obj = state_deref(&mut *state, root_val, &AstExpr::new_constant(0))?;
                 Ok(LValue { t, obj })
@@ -980,7 +978,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
                     // Note: Original returns null. See note above.
                     panic!();
                 };
-                let t = ast_type_ptr_type(root_lval.t.unwrap());
+                let t = ast_type_ptr_type(root_lval.t);
                 let root_val = root_obj.as_value().unwrap();
                 let Ok(res_obj) = state_deref(&mut *state, root_val, e2) else {
                     // Note: Original returns null. See note above.
@@ -996,9 +994,10 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
 pub fn expr_identifier_lvalue<'s>(id: &str, state: &'s mut State) -> Result<LValue<'s>> {
     let state: *mut State = state;
     unsafe {
+        let obj = state_getobject(&mut *state, id)?;
         Ok(LValue {
-            t: Some(state_getobjecttype(&*state, id)),
-            obj: state_getobject(&mut *state, id),
+            t: state_getobjecttype(&*state, id),
+            obj,
         })
     }
 }
@@ -1028,15 +1027,27 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
     let state: *mut State = state;
     unsafe {
         let Some(f) = (*state).ext().get_func(name) else {
-            return Err(Error::new(format!("function `{name}' not found")));
+            return Err(Error::new(format!("`{name}' not found")));
         };
         let params = f.params();
         let rtype = f.rtype();
+
+        if args.len() != params.len() {
+            return Err(Error::new(format!(
+                "`{name}' given {} arguments instead of {}",
+                args.len(),
+                params.len()
+            )));
+        }
+
         let args = prepare_arguments(args, params, &mut *state);
         state_pushframe(&mut *state, name.to_string(), rtype);
         prepare_parameters(params, args, name, &mut *state)?;
-        call_setupverify(f, &mut state_copy(&*state))?;
-        let v = call_absexec(call, &mut *state)?;
+
+        /* XXX: pass copy so we don't observe */
+        call_setupverify(f, &mut state_copy(&*state))
+            .map_err(|err| Error::new(format!("`{name}`' precondition failure\n\t{err}")))?;
+        let v = call_absexec(call, &mut *state).map_err(|err| Error::new(format!("\n\t{err}")))?;
         state_popframe(&mut *state);
         pf_augment(&v, call, &mut *state)
     }
@@ -1088,7 +1099,7 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
     )))
 }
 
-pub fn ast_expr_absexec(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
+pub fn ast_expr_abseval(expr: &AstExpr, state: &mut State) -> Result<Option<Box<Value>>> {
     match &expr.kind {
         AstExprKind::Assignment(assign) => assign_absexec(assign, state),
         AstExprKind::IsDereferencable(_) => isdereferencable_absexec(expr, state),
@@ -1167,7 +1178,7 @@ pub fn prepare_arguments(
 
 fn assign_absexec(assign: &AssignmentExpr, state: &mut State) -> Result<Option<Box<Value>>> {
     let AssignmentExpr { lval, rval } = assign;
-    let Some(val) = ast_expr_absexec(rval, state)? else {
+    let Some(val) = ast_expr_abseval(rval, state)? else {
         debug_assert!(false);
         return Err(Error::new("undefined indirection (rvalue)".to_string()));
     };
@@ -1220,7 +1231,7 @@ fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
         let param = state_getloc(&mut param_state, id);
         let arg = state_getloc(arg_state, id);
         if let Err(err) = verify_paramspec(&param, &arg, &mut param_state, arg_state) {
-            return Err(Error::new(format!("parameter {id} of {fname} {}", err.msg)));
+            return Err(Error::new(format!("parameter `{id}' of `{fname}' {err}")));
         }
     }
     // Note: Original leaks the state.
@@ -1394,7 +1405,7 @@ impl Display for AllocExpr {
             AstAllocKind::Dealloc => "free",
             AstAllocKind::Clump => "clump",
         };
-        write!(f, ".{kw} {arg};")
+        write!(f, ".{kw}({arg})")
     }
 }
 
@@ -1515,60 +1526,6 @@ pub fn ast_expr_getfuncs(expr: &AstExpr) -> Vec<String> {
     }
 }
 
-pub fn ast_expr_splits(e: &AstExpr, s: &mut State) -> Result<AstStmtSplits> {
-    match &e.kind {
-        AstExprKind::Call(call) => call_splits(call, s),
-        AstExprKind::Assignment(assign) => ast_expr_splits(&assign.rval, s),
-        AstExprKind::Unary(unary) => ast_expr_splits(&unary.arg, s),
-        AstExprKind::Binary(binary) => binary_splits(binary, s),
-        AstExprKind::IncDec(incdec) => ast_expr_splits(&incdec.operand, s),
-        AstExprKind::StructMember(sm) => ast_expr_splits(&sm.root, s),
-        AstExprKind::Constant(_)
-        | AstExprKind::Identifier(_)
-        | AstExprKind::StringLiteral(_)
-        | AstExprKind::ArbArg
-        | AstExprKind::IsDereferencable(_)
-        | AstExprKind::Allocation(_) => Ok(AstStmtSplits { conds: vec![] }),
-        _ => panic!(),
-    }
-}
-
-fn call_splits(call: &CallExpr, state: &mut State) -> Result<AstStmtSplits> {
-    let CallExpr { fun, args } = call;
-    let name = ast_expr_as_identifier(fun);
-    let Some(f) = state.ext().get_func(name) else {
-        return Err(Error::new(format!("function: `{name}' not found")));
-    };
-    let params = f.params();
-    let mut s_copy = state_copy(&*state);
-    let args = prepare_arguments(args, params, &mut s_copy);
-    let ret_type = f.rtype();
-    state_pushframe(&mut s_copy, name.to_string(), ret_type);
-    prepare_parameters(params, args, name, &mut s_copy)?;
-    let mut conds = vec![];
-    let abs = f.abstract_block();
-    for var in &abs.decls {
-        state_declare(&mut s_copy, var, false);
-    }
-    for stmt in &abs.stmts {
-        // Note: errors ignored in the original!
-        let mut splits = ast_stmt_splits(stmt, &mut s_copy).unwrap_or_default();
-        conds.append(&mut splits.conds);
-    }
-    state_popframe(&mut s_copy);
-    // Note: Original leaks s_copy
-    Ok(AstStmtSplits { conds })
-}
-
-fn binary_splits(binary: &BinaryExpr, s: &mut State) -> Result<AstStmtSplits> {
-    // Note: s1.err and s2.err are ignored in the original.
-    let s1 = ast_expr_splits(&binary.e1, s).unwrap_or_default();
-    let s2 = ast_expr_splits(&binary.e2, s).unwrap_or_default();
-    Ok(AstStmtSplits {
-        conds: [s1.conds, s2.conds].concat(),
-    })
-}
-
 fn ast_expr_call_getfuncs(expr: &AstExpr) -> Vec<String> {
     let AstExprKind::Call(call) = &expr.kind else {
         panic!();
@@ -1682,12 +1639,12 @@ pub fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: &mut State) -> Resul
     if matches!(stmt.kind, AstStmtKind::CompoundV(_)) {
         if let Err(err) = ast_stmt_verify(stmt, state) {
             let loc = ast_stmt_lexememarker(stmt);
-            return Err(Error::new(format!("{loc}: {}", err.msg)));
+            return Err(Error::new(format!("{loc}: {err}")));
         }
     }
     if let Err(err) = ast_stmt_exec(stmt, state) {
         let loc = ast_stmt_lexememarker(stmt);
-        let err_msg = format!("{loc}:{fname}: cannot exec statement: {}", err.msg);
+        let err_msg = format!("{loc}:{fname}: {err}");
         return Err(Error::new(err_msg));
     }
     Ok(())
@@ -1716,6 +1673,11 @@ fn labelled_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Re
     if should_setup {
         ast_stmt_absexec(setup, state, should_setup)?;
     }
+    Ok(())
+}
+
+fn expr_absexec(expr: &AstExpr, state: &mut State) -> Result<()> {
+    ast_expr_abseval(expr, state)?;
     Ok(())
 }
 
@@ -1897,9 +1859,19 @@ fn stmt_jump_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
         ast_stmt_jump_rv(stmt).expect("unsupported: return without value"),
         state,
     )?;
-    let obj = state_getresult(state);
+    let obj = state_getresult(state).unwrap().unwrap();
     obj.assign(Some(value_copy(&rv_val)));
     Ok(())
+}
+
+fn ast_stmt_absprocess(
+    stmt: &AstStmt,
+    fname: &str,
+    state: &mut State,
+    should_setup: bool,
+) -> Result<()> {
+    ast_stmt_absexec(stmt, state, should_setup)
+        .map_err(|err| Error::new(format!("{}:{fname}: {err}", stmt.loc)))
 }
 
 pub fn ast_stmt_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
@@ -2032,15 +2004,18 @@ pub fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
     jump.rv.as_deref()
 }
 
+pub const KEYWORD_RETURN: &str = "return";
+
 fn jump_absexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
-    // Note: Original leaks the expression to avoid a double free.
-    let expr = AstExpr::new_assignment(
-        AstExpr::new_identifier("return".to_string()),
-        // Note: jump_rv can be null. Error in original.
-        ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap()),
-    );
-    ast_expr_absexec(&expr, state)?;
-    Ok(())
+    // Note: Original leaks the expression to avoid a double free. We copy instead.
+    expr_absexec(
+        &AstExpr::new_assignment(
+            AstExpr::new_identifier(KEYWORD_RETURN.to_string()),
+            // Note: jump_rv can be null. Error in original.
+            ast_expr_copy(ast_stmt_jump_rv(stmt).unwrap()),
+        ),
+        state,
+    )
 }
 
 pub fn ast_stmt_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
@@ -2048,7 +2023,7 @@ pub fn ast_stmt_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -
         AstStmtKind::Nop => Ok(()),
         AstStmtKind::Labelled(_) => labelled_absexec(stmt, state, should_setup),
         AstStmtKind::Expr(_) => {
-            let _ = ast_expr_absexec(ast_stmt_as_expr(stmt), state)?;
+            expr_absexec(ast_stmt_as_expr(stmt), state)?;
             Ok(())
         }
         AstStmtKind::Selection(_) => sel_absexec(stmt, state, should_setup),
@@ -2167,33 +2142,29 @@ impl AstStmt {
 }
 
 pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
-    // This value is leaked in most paths through the original. In the sync case, part of it is
-    // used and freed.
+    eprintln!("sel_decide(control: {control}");
+    eprintln!("----");
+    eprintln!("{}", state_str(state));
+    eprintln!("----");
+    // Note: This value is leaked in the original.
     let v = ast_expr_pf_reduce(control, state)?;
     if value_issync(&v) {
-        // Note: Original leaks `sync`.
-        let v_str = format!("{v}");
-        let sync = v.into_sync();
+        let sync = value_as_sync(&v);
         let p = state.props();
-        if p.get(&sync) {
-            Ok(true)
-        } else if p.contradicts(&sync) {
-            Ok(false)
-        } else {
-            Err(Error::new(format!(
-                "`{control}' with value `{v_str}' is undecidable"
-            )))
+        if p.get(sync) {
+            return Ok(true);
+        } else if p.contradicts(sync) {
+            return Ok(false);
         }
-    } else if value_isconstant(&v) {
-        Ok(value_as_constant(&v) != 0)
-    } else if value_isint(&v) {
-        let zero = value_int_create(0);
-        Ok(!value_equal(&zero, &v))
-    } else {
-        Err(Error::new(format!(
-            "`{control}' with value `{v}' is undecidable"
-        )))
     }
+    if value_isconstant(&v) {
+        return Ok(value_as_constant(&v) != 0);
+    }
+    let zero = value_int_create(0);
+    if !value_isint(&v) {
+        return Err(Error::undecideable_cond(value_to_expr(&v)))
+    }
+    Ok(!value_equal(&zero, &v))
 }
 
 fn ast_stmt_compound_sprint(compound: &AstBlock, b: &mut String) {
@@ -2323,46 +2294,6 @@ pub fn ast_stmt_getfuncs(stmt: &AstStmt) -> Vec<String> {
     }
 }
 
-pub fn ast_stmt_splits(stmt: &AstStmt, s: &mut State) -> Result<AstStmtSplits> {
-    match &stmt.kind {
-        AstStmtKind::Nop => Ok(AstStmtSplits { conds: vec![] }),
-        AstStmtKind::Expr(expr) => ast_expr_splits(expr, s),
-        AstStmtKind::Selection(selection) => stmt_sel_splits(selection, s),
-        AstStmtKind::Jump(jump) => {
-            if let Some(rv) = &jump.rv {
-                return ast_expr_splits(rv, s);
-            }
-            Ok(AstStmtSplits { conds: vec![] })
-        }
-        AstStmtKind::Labelled(labelled) => ast_stmt_splits(&labelled.stmt, s),
-        AstStmtKind::Iteration(_) | AstStmtKind::Compound(_) | AstStmtKind::CompoundV(_) => {
-            Ok(AstStmtSplits { conds: vec![] })
-        }
-        _ => panic!(),
-    }
-}
-
-fn stmt_sel_splits(selection: &AstSelectionStmt, s: &mut State) -> Result<AstStmtSplits> {
-    // Note: The original asserts that no error occurred, rather than propagate.
-    // Note: Original leaks `v`.
-    let v = ast_expr_pf_reduce(&selection.cond, s).unwrap();
-    let e = value_to_expr(&v);
-    let conds = if condexists(&e, s) || value_isconstant(&v) {
-        vec![]
-    } else {
-        vec![e]
-    };
-    Ok(AstStmtSplits { conds })
-}
-
-fn condexists(cond: &AstExpr, s: &mut State) -> bool {
-    // Note: Original leaks `val`.
-    let val = ast_expr_pf_reduce(cond, s).unwrap();
-    let reduced = value_to_expr(&val);
-    let p = s.props();
-    p.get(&reduced) || p.contradicts(&reduced)
-}
-
 fn ast_stmt_selection_getfuncs(selection: &AstSelectionStmt) -> Vec<String> {
     let cond_arr = ast_expr_getfuncs(&selection.cond);
     let body_arr = ast_stmt_getfuncs(&selection.body);
@@ -2419,11 +2350,11 @@ pub fn ast_type_create(base: AstTypeBase, modifiers: AstTypeModifiers) -> Box<As
 }
 
 pub fn ast_type_create_ptr(referent: Box<AstType>) -> Box<AstType> {
-    ast_type_create(AstTypeBase::Pointer(Some(referent)), 0)
+    ast_type_create(AstTypeBase::Pointer(referent), 0)
 }
 
 pub fn ast_type_create_voidptr() -> Box<AstType> {
-    ast_type_create(AstTypeBase::Pointer(None), 0)
+    ast_type_create(AstTypeBase::Pointer(ast_type_create(AstTypeBase::Void, 0)), 0)
 }
 
 #[allow(dead_code)]
@@ -2518,7 +2449,7 @@ impl Display for AstType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", mod_str(self.modifiers))?;
         match &self.base {
-            AstTypeBase::Pointer(Some(ptr_type)) => {
+            AstTypeBase::Pointer(ptr_type) => {
                 let space = !matches!(ptr_type.base, AstTypeBase::Pointer(_));
                 write!(f, "{ptr_type}{}*", if space { " " } else { "" })
             }
@@ -2534,7 +2465,7 @@ impl Display for AstType {
             AstTypeBase::Double => write!(f, "double"),
             AstTypeBase::Signed => write!(f, "signed"),
             AstTypeBase::Unsigned => write!(f, "unsigned"),
-            AstTypeBase::Pointer(None) | AstTypeBase::Union(_) | AstTypeBase::Enum => panic!(),
+            AstTypeBase::Union(_) | AstTypeBase::Enum => panic!(),
         }
     }
 }
@@ -2573,11 +2504,11 @@ impl Display for AstStructType {
     }
 }
 
-pub fn ast_type_ptr_type(t: &AstType) -> Option<&AstType> {
+pub fn ast_type_ptr_type(t: &AstType) -> &AstType {
     let AstTypeBase::Pointer(ptr_type) = &t.base else {
         panic!();
     };
-    ptr_type.as_deref()
+    ptr_type
 }
 
 pub fn ast_variable_create(name: String, ty: Box<AstType>) -> Box<AstVariable> {
@@ -2715,17 +2646,22 @@ fn path_absverify_withstate(f: &AstFunction, state: &mut State) -> Result<()> {
 }
 
 fn path_absverify(f: &AstFunction, state: &mut State, index: usize) -> Result<()> {
+    let fname = f.name();
     let abs = f.abstract_block();
     for i in index..abs.stmts.len() {
         let stmt = &abs.stmts[i];
-        let splits = ast_stmt_splits(stmt, state)?;
-        if !splits.conds.is_empty() {
-            return split_paths_absverify(f, state, i, &splits);
+        if ast_stmt_ispre(stmt) {
+            continue;
         }
-        if !ast_stmt_ispre(stmt) {
-            ast_stmt_absexec(stmt, state, true)?;
+
+        let mut prestate = state_copy(state);
+        if let Err(err) = ast_stmt_absprocess(stmt, fname, state, true) {
+            let uc = err.to_undecideable_cond()?;
+            return split_path_absverify(f, &mut prestate, i, &uc);
         }
     }
+
+    // TODO: verify that `result' is of the same type as f->result
     abstract_audit(f, state)?;
     Ok(())
 }
@@ -2745,7 +2681,8 @@ pub fn ast_function_initparams(f: &AstFunction, s: &mut State) -> Result<()> {
 fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
     let pre_stmt = f.preconditions()?;
     if let Some(stmt) = pre_stmt {
-        ast_stmt_absexec(stmt, s, true)?;
+        ast_stmt_absprocess(stmt, f.name(), s, true)
+            .map_err(|err| Error::new(format!("{}:{}: {err}", stmt.loc, f.name())))?;
     }
     Ok(())
 }
@@ -2755,7 +2692,7 @@ fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
     unsafe {
         let name = ast_variable_name(param);
         let t = ast_variable_type(param);
-        let obj = state_getobject(&mut *state, name).unwrap();
+        let obj = state_getobject(&mut *state, name).unwrap().unwrap();
         if !obj.has_value() {
             // XXX FIXME: dereferencing `state` again here definitely invalidates `obj`
             let val = state_vconst(&mut *state, t, Some(name), true);
@@ -2807,18 +2744,13 @@ fn path_verify(
     #[allow(clippy::needless_range_loop)]
     for i in index..stmts.len() {
         let stmt = &stmts[i];
-        // splits.err is ignored in the original
-        let splits = ast_stmt_splits(stmt, actual_state);
-        match splits {
-            Ok(splits) if !splits.conds.is_empty() => {
-                return split_paths_verify(f, actual_state, i, &splits, abstract_state);
-            }
-            _ => {
-                ast_stmt_process(stmt, fname, actual_state)?;
-                if ast_stmt_isterminal(stmt, actual_state) {
-                    break;
-                }
-            }
+        let mut prestate = state_copy(actual_state);
+        if let Err(err) = ast_stmt_process(stmt, fname, actual_state) {
+            let uc = err.to_undecideable_cond()?;
+            return split_path_verify(f, &mut prestate, i, &uc, abstract_state);
+        }
+        if ast_stmt_isterminal(stmt, actual_state) {
+            break;
         }
     }
     if state_hasgarbage(actual_state) {
@@ -2838,10 +2770,11 @@ pub fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<Option
     for decl in &f.abstract_.decls {
         state_declare(state, decl, false);
     }
+    let fname = f.name();
     for stmt in &f.abstract_.stmts {
-        ast_stmt_absexec(stmt, state, false)?;
+        ast_stmt_absprocess(stmt, fname, state, false)?;
     }
-    let obj = state_getresult(state);
+    let obj = state_getresult(state).unwrap().unwrap();
     // Note: In the original, this function (unlike the other absexec functions) returned a
     // borrowed value which the caller cloned. Not a big difference.
     Ok(obj.as_value().map(value_copy))
@@ -2957,18 +2890,6 @@ fn split_path_absverify(
     Ok(())
 }
 
-fn split_paths_absverify(
-    f: &AstFunction,
-    state: &mut State,
-    index: usize,
-    splits: &AstStmtSplits,
-) -> Result<()> {
-    for cond in &splits.conds {
-        split_path_absverify(f, state, index, cond)?;
-    }
-    Ok(())
-}
-
 pub fn ast_function_buildgraph(fname: &str, ext: &Externals) -> FuncGraph {
     let mut dedup = InsertionOrderMap::new();
     let mut g = InsertionOrderMap::new();
@@ -2978,19 +2899,6 @@ pub fn ast_function_buildgraph(fname: &str, ext: &Externals) -> FuncGraph {
 
 fn split_name(name: &str, assumption: &AstExpr) -> String {
     format!("{name} | {assumption}")
-}
-
-fn split_paths_verify(
-    f: &AstFunction,
-    actual_state: &mut State,
-    index: usize,
-    splits: &AstStmtSplits,
-    abstract_state: &mut State,
-) -> Result<()> {
-    for cond in &splits.conds {
-        split_path_verify(f, actual_state, index, cond, abstract_state)?;
-    }
-    Ok(())
 }
 
 fn body_paths<'origin>(

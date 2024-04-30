@@ -1,1 +1,2 @@
-0-basic/140-FAIL-sync-free.x:6:9:unit: cannot exec statement: undefined free of value not pointing at heap
+0-basic/140-FAIL-sync-free.x:6:9:unit: 
+	stdlib.h:10:31:free: undefined free of value not pointing at heap

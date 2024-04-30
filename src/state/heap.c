@@ -125,7 +125,7 @@ heap_deallocblock(struct heap *h, int address)
 	assert(address < block_arr_nblocks(h->blocks));
 
 	if (h->freed[address]) {
-		return error_create("double free");
+		return error_printf("double free");
 	}
 	h->freed[address] = true;
 	return NULL;

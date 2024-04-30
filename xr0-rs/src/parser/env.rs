@@ -161,7 +161,15 @@ fn parse_linemarker(line: &str) -> (PathBuf, usize) {
     }
     let _ = flags;
 
-    (PathBuf::from(name), linenum)
+    (PathBuf::from(strip_iflibx(name)), linenum)
+}
+
+fn strip_iflibx(filename: &str) -> &str {
+    const XR0_INCLUDES_SEGMENT: &str = "libx/";
+    match filename.split_once(XR0_INCLUDES_SEGMENT) {
+        Some((_before, after)) => after,
+        None => filename,
+    }
 }
 
 #[derive(Clone)]

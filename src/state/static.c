@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <assert.h>
@@ -68,7 +69,6 @@ pool_copy(struct map *p)
 		);
 	}
 	return pcopy;
-
 }
 
 int

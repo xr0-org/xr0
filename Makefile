@@ -186,22 +186,22 @@ lex-gen:
 
 lex-leaks: $(XR0V)
 	$(VALGRIND) --leak-check=full \
-		$(XR0V) -I libx tests/3-program/100-lex/parse.x
+		$(XR0V) -I libx tests/99-program/100-lex/parse.x
 
 lex-verbose: $(XR0V) 
 	$(VALGRIND) --num-callers=30 \
-		$(XR0V) -I libx tests/3-program/100-lex/parse.x
+		$(XR0V) -I libx -v tests/99-program/100-lex/parse.x
 
 matrix: $(XR0V)
-	$(VALGRIND) $(XR0V) -I libx tests/3-program/000-matrix.x
+	$(VALGRIND) $(XR0V) -I libx tests/99-program/000-matrix.x
 
 matrix-leaks: $(XR0V)
 	$(VALGRIND) --leak-check=full \
-		$(XR0V) -I libx tests/3-program/000-matrix.x
+		$(XR0V) -I libx tests/99-program/000-matrix.x
 
 matrix-verbose: $(XR0V) 
 	$(VALGRIND) --num-callers=30 \
-		$(XR0V) -I libx tests/3-program/000-matrix.x
+		$(XR0V) -I libx tests/99-program/000-matrix.x
 
 LIBC_RLIB = xr0-deps/target/debug/deps/liblibc-7b7b9cd53da27782.rlib
 

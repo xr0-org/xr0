@@ -5,7 +5,7 @@ use super::location::{
     location_with_offset, LocationKind,
 };
 use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
-use crate::ast::{ast_expr_equal, ast_type_vconst};
+use crate::ast::{ast_expr_equal, ast_type_vconst, KEYWORD_RETURN};
 use crate::util::{Error, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
@@ -101,7 +101,9 @@ pub fn state_str(state: &State) -> String {
         str_write!(b, "{clump}\n");
     }
     let stack = state.stack.str(state);
-    str_write!(b, "{stack}\n");
+    if !stack.is_empty() {
+        str_write!(b, "{stack}\n");
+    }
     let props = state.props.str("\t");
     if !props.is_empty() {
         str_write!(b, "{props}");
@@ -209,6 +211,12 @@ pub fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Value> {
     state.vconst.get(id)
 }
 
+/// Gets the object at the given location `loc`.
+///
+/// On success, this returns a mutable reference to the `Object`. If the block designated by `loc`
+/// doesn't exist, this returns Ok(None). (That seems suspicious to me; I'm not sure why it should
+/// not be an assertion failure. -jorendorff) If the block refers to a stack frame that doesn't
+/// exist, this returns an error. (Same. -jorendorff)
 pub fn state_get<'s>(
     state: &'s mut State,
     loc: &Location,
@@ -218,7 +226,10 @@ pub fn state_get<'s>(
     let b = state.get_block(loc)?;
     match b {
         None => {
-            assert!(loc.type_is_dynamic() || loc.type_is_dereferencable());
+            assert!(matches!(
+                loc.kind,
+                LocationKind::Dynamic | LocationKind::Dereferencable | LocationKind::Static
+            ));
             Ok(None)
         }
         Some(b) => {
@@ -246,9 +257,9 @@ impl State {
     }
 }
 
-pub fn state_getresult(state: &mut State) -> &mut Object {
+pub fn state_getresult(state: &mut State) -> Result<Option<&mut Object>> {
     let result_loc = state.stack.get_result().location().clone();
-    state_get(&mut *state, &result_loc, true).unwrap().unwrap()
+    state_get(&mut *state, &result_loc, true)
 }
 
 fn state_getresulttype(state: &State) -> &AstType {
@@ -273,12 +284,15 @@ pub fn state_getloc(state: &mut State, id: &str) -> Box<Value> {
     value_ptr_create(location_copy(v.location()))
 }
 
-pub fn state_getobject<'s>(state: &'s mut State, id: &str) -> Option<&'s mut Object> {
-    if id == "return" {
-        return Some(state_getresult(state));
+pub fn state_getobject<'s>(state: &'s mut State, id: &str) -> Result<Option<&'s mut Object>> {
+    if id == KEYWORD_RETURN {
+        return state_getresult(state);
     }
-    let var_loc = state.stack.get_variable(id).unwrap().location().clone();
-    state_get(&mut *state, &var_loc, true).unwrap()
+    let Some(v) = state.stack.get_variable(id) else {
+        return Err(Error::new(format!("unknown variable `{id}'")));
+    };
+    let var_loc = v.location().clone();
+    state_get(state, &var_loc, true)
 }
 
 pub fn state_deref<'s>(
@@ -293,7 +307,7 @@ pub fn state_deref<'s>(
     // Note: the original leaked this location.
     let deref = location_with_offset(deref_base, index);
     state_get(state, &deref, true)
-        .map_err(|err| Error::new(format!("undefined indirection: {}", err.msg)))
+        .map_err(|err| Error::new(format!("undefined indirection: {err}")))
 }
 
 pub fn state_range_alloc(

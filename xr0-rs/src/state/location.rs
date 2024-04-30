@@ -34,10 +34,6 @@ impl Location {
         matches!(self.kind, LocationKind::Dynamic)
     }
 
-    pub fn type_is_dereferencable(&self) -> bool {
-        matches!(self.kind, LocationKind::Dereferencable)
-    }
-
     pub fn type_is_vconst(&self) -> bool {
         matches!(self.kind, LocationKind::VConst)
     }
