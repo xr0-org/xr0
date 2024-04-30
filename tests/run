@@ -29,41 +29,41 @@ do
 	folder=$(dirname "$f")
 
 	printf "%-${length}s ..." "$f"
-        set +e
+	set +e
 	if [ "$folder" == *"$topological_folder"* ]
 	then
 		if [[ "$f" == *"verification"* ]]
 		then
-			#printf '\n%s' "$XR0 -x main -I $libx -v $f 2>&1 >/dev/null"
+			command="$XR0 -x main -I $libx -v $f 2>&1 >/dev/null"
 			output=$($XR0 -x main -I $libx -v $f 2>&1 >/dev/null)
 		else
-			#printf '\n%s' "$XR0 -t main -I $libx $f 2>&1 >/dev/null"
+			command="$XR0 -t main -I $libx $f 2>&1 >/dev/null"
 			output=$($XR0 -t main -I $libx $f 2>&1 >/dev/null)
 		fi
 	else 
-		#printf '\n%s' "$XR0 -I $libx $f 2>&1 >/dev/null"
+		command="$XR0 -I $libx $f 2>&1 >/dev/null"
 		output=$($XR0 -I $libx $f 2>&1 >/dev/null)
 	fi
-        set -e
+	set -e
 
 	# cases where we have an expected output to compare with
 	if [[ "$f" == *"${fail_prefix}"* || "$folder" == *"$topological_folder"* ]]
 	then
 		expected_file="${f}.${expected_suffix}"
 		
-		echo "$output" | diff - $expected_file
-		if [[ $? -eq 0 ]]
+		if echo "$output" | diff - $expected_file
 		then
 			npass=$((npass+1))
 			printf "$pass"
 		else
 			printf "$fail"
-                	echo "=== ACTUAL"
-                	echo "$output"
-                	echo
-                	echo "=== EXPECTED"
-                	echo "$expected_output"
-                        echo
+			echo "=== ACTUAL"
+			echo "$output"
+			echo
+			echo "=== EXPECTED"
+			cat "$expected_file"
+			echo
+			echo "run this test: $command"
 		fi
 	else
 		# silence is golden
@@ -73,11 +73,11 @@ do
 			printf "$pass"
 		else
 			printf "$fail"
-                	echo "=== ACTUAL"
-                	echo "$output"
-                	echo
-                	echo "expected no output"
-                        echo
+			echo "=== ACTUAL"
+			echo "$output"
+			echo
+			echo "expected no output"
+			echo "run this test: $command"
 		fi
 	fi
 done
