@@ -1047,7 +1047,7 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
         /* XXX: pass copy so we don't observe */
         call_setupverify(f, &mut state_copy(&*state))
             .map_err(|err| err.wrap(format!("`{name}' precondition failure\n\t")))?;
-        let v = call_absexec(call, &mut *state).map_err(|err| err.wrap(format!("\n\t")))?;
+        let v = call_absexec(call, &mut *state).map_err(|err| err.wrap("\n\t".to_string()))?;
         state_popframe(&mut *state);
         pf_augment(&v, call, &mut *state)
     }
@@ -1636,17 +1636,15 @@ pub fn ast_block_preconds(b: &AstBlock) -> Result<Option<&AstStmt>> {
 
 pub fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: &mut State) -> Result<()> {
     if matches!(stmt.kind, AstStmtKind::CompoundV(_)) {
-        ast_stmt_verify(stmt, state)
-            .map_err(|err| {
-                let loc = ast_stmt_lexememarker(stmt);
-                err.wrap(format!("{loc}: "))
-            })?;
-    }
-    ast_stmt_exec(stmt, state)
-        .map_err(|err| {
+        ast_stmt_verify(stmt, state).map_err(|err| {
             let loc = ast_stmt_lexememarker(stmt);
-            err.wrap(format!("{loc}:{fname}: "))
+            err.wrap(format!("{loc}: "))
         })?;
+    }
+    ast_stmt_exec(stmt, state).map_err(|err| {
+        let loc = ast_stmt_lexememarker(stmt);
+        err.wrap(format!("{loc}:{fname}: "))
+    })?;
     Ok(())
 }
 
@@ -2159,7 +2157,7 @@ pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
     }
     let zero = value_int_create(0);
     if !value_isint(&v) {
-        return Err(Error::undecideable_cond(value_to_expr(&v)))
+        return Err(Error::undecideable_cond(value_to_expr(&v)));
     }
     Ok(!value_equal(&zero, &v))
 }
@@ -2351,7 +2349,10 @@ pub fn ast_type_create_ptr(referent: Box<AstType>) -> Box<AstType> {
 }
 
 pub fn ast_type_create_voidptr() -> Box<AstType> {
-    ast_type_create(AstTypeBase::Pointer(ast_type_create(AstTypeBase::Void, 0)), 0)
+    ast_type_create(
+        AstTypeBase::Pointer(ast_type_create(AstTypeBase::Void, 0)),
+        0,
+    )
 }
 
 #[allow(dead_code)]
@@ -2653,7 +2654,7 @@ fn path_absverify(f: &AstFunction, state: &mut State, index: usize) -> Result<()
 
         let mut prestate = state_copy(state);
         if let Err(err) = ast_stmt_absprocess(stmt, fname, state, true) {
-            let uc = err.to_undecideable_cond()?;
+            let uc = err.try_into_undecideable_cond()?;
             return split_path_absverify(f, &mut prestate, i, &uc);
         }
     }
@@ -2743,7 +2744,7 @@ fn path_verify(
         let stmt = &stmts[i];
         let mut prestate = state_copy(actual_state);
         if let Err(err) = ast_stmt_process(stmt, fname, actual_state) {
-            let uc = err.to_undecideable_cond()?;
+            let uc = err.try_into_undecideable_cond()?;
             return split_path_verify(f, &mut prestate, i, &uc, abstract_state);
         }
         if ast_stmt_isterminal(stmt, actual_state) {

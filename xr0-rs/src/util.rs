@@ -52,12 +52,12 @@ impl Error {
 
     /// If `self` or any inner error is an UndecidebleCond error, returns the condition.
     /// Otherwise returns `Err(self)`.
-    pub fn to_undecideable_cond(self) -> Result<Box<AstExpr>> {
+    pub fn try_into_undecideable_cond(self) -> Result<Box<AstExpr>> {
         match self.kind {
             ErrorKind::UndecideableCond(cond) => Ok(cond),
             kind => match self.inner {
                 None => Err(Box::new(Error { kind, inner: None })),
-                Some(inner) => inner.to_undecideable_cond().map_err(|inner| {
+                Some(inner) => inner.try_into_undecideable_cond().map_err(|inner| {
                     Box::new(Error {
                         kind,
                         inner: Some(inner),
@@ -134,7 +134,7 @@ pub static VERBOSE_MODE: AtomicBool = AtomicBool::new(false);
 macro_rules! vprintln {
     ( $( $args:tt )* ) => {
         if $crate::util::VERBOSE_MODE.load(std::sync::atomic::Ordering::Relaxed) {
-            println!($($args)*);
+            eprintln!($($args)*);
         }
     }
 }
