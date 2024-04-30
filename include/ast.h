@@ -484,6 +484,9 @@ struct error *
 ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *);
 
 struct error *
+ast_stmt_absprocess_nosetup(struct ast_stmt *stmt, char *fname, struct state *);
+
+struct error *
 ast_stmt_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
 
 struct ast_type;

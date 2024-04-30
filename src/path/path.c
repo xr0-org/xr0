@@ -319,9 +319,6 @@ path_init_abstract(struct path *p)
 	if ((err = ast_function_initparams(p->f, p->abstract))) {
 		return err;
 	}
-	if ((err = ast_function_initsetup(p->f, p->abstract))) {
-		return err;
-	}	
 	state_clearregister(p->abstract);
 	p->path_state = PATH_STATE_ABSTRACT;
 	return NULL;

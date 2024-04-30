@@ -28,6 +28,7 @@ struct state;
 
 enum execution_mode {
 	EXEC_ABSTRACT,
+	EXEC_ABSTRACT_NO_SETUP,
 	EXEC_ACTUAL,
 	EXEC_SETUP
 };
@@ -174,6 +175,9 @@ state_clearregister(struct state *);
 
 void
 state_initsetup(struct state *s, int frameid);
+
+enum execution_mode
+state_next_execmode(struct state *s);
 
 struct error *
 state_stacktrace(struct state *, struct error *);
