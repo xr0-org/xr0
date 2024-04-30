@@ -217,38 +217,17 @@ pub fn ast_stmt_isterminal(stmt: &AstStmt, s: &mut State) -> bool {
     match &stmt.kind {
         AstStmtKind::Jump(jump) => jump.kind == AstJumpKind::Return,
         AstStmtKind::Compound(block) => ast_block_isterminal(block, s),
-        AstStmtKind::Selection(_) => sel_isterminal(stmt, s),
+        AstStmtKind::Selection(sel) => sel_isterminal(sel, s),
         _ => false,
     }
 }
 
-fn sel_isterminal(stmt: &AstStmt, s: &mut State) -> bool {
-    let decision = sel_decide(ast_stmt_sel_cond(stmt), s).unwrap();
+fn sel_isterminal(sel: &AstSelectionStmt, s: &mut State) -> bool {
+    let decision = sel_decide(&sel.cond, s).unwrap();
     if decision {
-        return ast_stmt_isterminal(ast_stmt_sel_body(stmt), s);
+        return ast_stmt_isterminal(&sel.body, s);
     }
     false
-}
-
-pub fn ast_stmt_sel_cond(stmt: &AstStmt) -> &AstExpr {
-    let AstStmtKind::Selection(selection) = &stmt.kind else {
-        panic!();
-    };
-    &selection.cond
-}
-
-pub fn ast_stmt_sel_body(stmt: &AstStmt) -> &AstStmt {
-    let AstStmtKind::Selection(selection) = &stmt.kind else {
-        panic!();
-    };
-    &selection.body
-}
-
-pub fn ast_stmt_sel_nest(stmt: &AstStmt) -> Option<&AstStmt> {
-    let AstStmtKind::Selection(selection) = &stmt.kind else {
-        panic!();
-    };
-    selection.nest.as_deref()
 }
 
 fn ast_stmt_sel_sprint(stmt: &AstStmt, b: &mut String) {
@@ -403,6 +382,7 @@ pub fn ast_stmt_preconds_validate(stmt: &AstStmt) -> Result<()> {
         _ => panic!(),
     }
 }
+
 fn preconds_selection_verify(stmt: &AstStmt) -> Result<()> {
     let l = ast_stmt_lexememarker(stmt);
     Err(Error::new(format!(

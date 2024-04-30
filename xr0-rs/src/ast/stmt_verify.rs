@@ -4,9 +4,8 @@ use super::{
     ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide, ast_stmt_as_block, ast_stmt_as_expr,
     ast_stmt_as_v_block, ast_stmt_copy, ast_stmt_isassume, ast_stmt_ispre, ast_stmt_isterminal,
     ast_stmt_iter_lower_bound, ast_stmt_iter_upper_bound, ast_stmt_jump_rv, ast_stmt_labelled_stmt,
-    ast_stmt_lexememarker, ast_stmt_sel_body, ast_stmt_sel_cond, ast_stmt_sel_nest,
-    state_getresult, value_copy, AstExpr, AstIterationStmt, AstStmt, AstStmtKind, Error, Preresult,
-    Result, State, KEYWORD_RETURN,
+    ast_stmt_lexememarker, state_getresult, value_copy, AstExpr, AstIterationStmt,
+    AstSelectionStmt, AstStmt, AstStmtKind, Error, Preresult, Result, State, KEYWORD_RETURN,
 };
 use crate::parser::LexemeMarker;
 use crate::value::{
@@ -102,7 +101,7 @@ pub fn ast_stmt_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
         AstStmtKind::Compound(_) => stmt_compound_exec(stmt, state),
         AstStmtKind::CompoundV(_) => Ok(()),
         AstStmtKind::Expr(expr) => ast_expr_exec(expr, state),
-        AstStmtKind::Selection(_) => stmt_sel_exec(stmt, state),
+        AstStmtKind::Selection(sel) => stmt_sel_exec(sel, state),
         AstStmtKind::Iteration(iter) => stmt_iter_exec(&stmt.loc, iter, state),
         AstStmtKind::Jump(_) => stmt_jump_exec(stmt, state),
         _ => {
@@ -123,12 +122,12 @@ fn stmt_compound_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-fn stmt_sel_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
-    let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
+fn stmt_sel_exec(sel: &AstSelectionStmt, state: &mut State) -> Result<()> {
+    let decision = sel_decide(&sel.cond, state)?;
     if decision {
-        return ast_stmt_exec(ast_stmt_sel_body(stmt), state);
+        return ast_stmt_exec(&sel.body, state);
     }
-    assert!(ast_stmt_sel_nest(stmt).is_none());
+    assert!(sel.nest.is_none());
     Ok(())
 }
 
@@ -193,7 +192,7 @@ pub fn ast_stmt_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -
             expr_absexec(ast_stmt_as_expr(stmt), state)?;
             Ok(())
         }
-        AstStmtKind::Selection(_) => sel_absexec(stmt, state, should_setup),
+        AstStmtKind::Selection(sel) => sel_absexec(sel, state, should_setup),
         AstStmtKind::Iteration(iter) => iter_absexec(iter, state),
         AstStmtKind::Compound(_) => comp_absexec(stmt, state, should_setup),
         AstStmtKind::Jump(_) => jump_absexec(stmt, state),
@@ -215,12 +214,12 @@ fn expr_absexec(expr: &AstExpr, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-fn sel_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
-    let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
+fn sel_absexec(sel: &AstSelectionStmt, state: &mut State, should_setup: bool) -> Result<()> {
+    let decision = sel_decide(&sel.cond, state)?;
     if decision {
-        return ast_stmt_absexec(ast_stmt_sel_body(stmt), state, should_setup);
+        return ast_stmt_absexec(&sel.body, state, should_setup);
     }
-    assert!(ast_stmt_sel_nest(stmt).is_none());
+    assert!(sel.nest.is_none());
     Ok(())
 }
 
@@ -294,7 +293,7 @@ fn stmt_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     match &stmt.kind {
         AstStmtKind::Expr(_) | AstStmtKind::Allocation(_) | AstStmtKind::Jump(_) => Ok(()),
         AstStmtKind::Labelled(_) => labelled_setupabsexec(stmt, state),
-        AstStmtKind::Selection(_) => sel_setupabsexec(stmt, state),
+        AstStmtKind::Selection(sel) => sel_setupabsexec(sel, state),
         AstStmtKind::Compound(_) => comp_setupabsexec(stmt, state),
         _ => panic!(),
     }
@@ -304,12 +303,12 @@ fn labelled_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     ast_stmt_absexec(stmt, state, true)
 }
 
-fn sel_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
-    let decision = sel_decide(ast_stmt_sel_cond(stmt), state)?;
+fn sel_setupabsexec(sel: &AstSelectionStmt, state: &mut State) -> Result<()> {
+    let decision = sel_decide(&sel.cond, state)?;
     if decision {
-        return stmt_setupabsexec(ast_stmt_sel_body(stmt), state);
+        return stmt_setupabsexec(&sel.body, state);
     }
-    assert!(ast_stmt_sel_nest(stmt).is_none());
+    assert!(sel.nest.is_none());
     Ok(())
 }
 
