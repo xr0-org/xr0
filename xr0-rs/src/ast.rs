@@ -13,6 +13,7 @@ mod expr;
 mod expr_verify;
 mod extern_decl;
 mod function;
+mod literals;
 mod stmt;
 mod stmt_verify;
 mod topological;
@@ -43,6 +44,7 @@ pub use function::{
     ast_function_absexec, ast_function_buildgraph, ast_function_create, ast_function_initparams,
     ast_function_protostitch, ast_function_verify, AstFunction,
 };
+pub use literals::{parse_char, parse_escape, parse_int};
 pub use stmt::{
     ast_stmt_as_expr, ast_stmt_as_v_block, ast_stmt_copy, ast_stmt_getfuncs, ast_stmt_ispre,
     ast_stmt_isterminal, ast_stmt_iter_abstract, ast_stmt_iter_body, ast_stmt_iter_cond,
@@ -85,33 +87,6 @@ pub fn ast_stmt_as_block(stmt: &AstStmt) -> &AstBlock {
 }
 
 pub const KEYWORD_RETURN: &str = "return";
-
-pub fn parse_int(s: &str) -> c_int {
-    s.parse().expect("parse error")
-}
-
-pub fn parse_char(s: &str) -> c_char {
-    // Note: Original also assumes these character literals have the same numeric values on the
-    // target as in XR0, a decent bet for ASCII at least.
-    assert!(s.starts_with('\'') && s.ends_with('\''));
-    let s = &s[1..s.len() - 1];
-    if let Some(stripped) = s.strip_prefix('\\') {
-        parse_escape(stripped)
-    } else {
-        s.chars().next().expect("invalid char literal") as u32 as c_char
-    }
-}
-
-pub fn parse_escape(c: &str) -> c_char {
-    match c {
-        "0" => 0,
-        "t" => '\t' as u32 as c_char,
-        "n" => '\t' as u32 as c_char, // Note: '\t' rather than '\n', a bug in the original.
-        _ => {
-            panic!("unrecognized char escape sequence: {:?}", c);
-        }
-    }
-}
 
 pub fn ast_topological_order(fname: &str, ext: &Externals) -> Vec<String> {
     topological_order(fname, ext)
