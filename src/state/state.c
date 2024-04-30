@@ -163,7 +163,6 @@ state_step(struct state *s)
 	return stack_step(s->stack, s);
 }
 
-
 struct externals *
 state_getext(struct state *s)
 {
@@ -272,6 +271,19 @@ state_clearregister(struct state *state)
 {
 	/* XXX: used after initing the actual state */
 	state->reg = NULL;
+}
+
+void
+state_initsetup(struct state *s, int frameid)
+{
+	struct error *err;
+	
+	assert(state_execmode(s) == EXEC_SETUP);
+	while (!(state_atend(s) && state_frameid(s) == frameid)) {
+		if ((err = state_step(s))) {
+			assert(false);
+		}
+	}
 }
 
 struct error *

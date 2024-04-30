@@ -304,6 +304,8 @@ path_next_actual(struct path *p)
 static struct error *
 path_init_abstract(struct path *p)
 {
+	struct error *err;
+
 	v_printf("init abstract state\n");
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
@@ -314,10 +316,13 @@ path_init_abstract(struct path *p)
 		p->f
 	);
 	p->abstract = state_create(f, p->ext);
-	struct error *err = ast_function_initparams(p->f, p->abstract);
-	if (err) {
+	if ((err = ast_function_initparams(p->f, p->abstract))) {
 		return err;
 	}
+	if ((err = ast_function_initsetup(p->f, p->abstract))) {
+		return err;
+	}	
+	state_clearregister(p->abstract);
 	p->path_state = PATH_STATE_ABSTRACT;
 	return NULL;
 }
@@ -325,13 +330,15 @@ path_init_abstract(struct path *p)
 static struct error *
 path_init_actual(struct path *p)
 {
+	struct error *err;
 	v_printf("init actual state\n");
+	/* if body empty just apply setup */
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_body(p->f),
 		ast_function_type(p->f),
-		ast_block_empty(ast_function_body(p->f)) ? EXEC_SETUP : EXEC_ACTUAL,
-		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
+		EXEC_ACTUAL,
+		ast_expr_identifier_create(dynamic_str("base act")), /* xxx */
 		p->f
 	);
 	p->actual = state_create_withprops(
@@ -339,16 +346,14 @@ path_init_actual(struct path *p)
 		p->ext,
 		state_getprops(p->abstract)
 	);
-	struct error *err = ast_function_initparams(p->f, p->actual);
-	if (err) {
+	if ((err = ast_function_initparams(p->f, p->actual))) {
 		return err;
 	}
-	struct frame *setup = frame_block_create(
-		dynamic_str("setup"),
-		ast_block_copy(ast_function_abstract(p->f)),
-		EXEC_SETUP
-	);
-	state_pushframe(p->actual, setup);
+	if ((err = ast_function_initsetup(p->f, p->actual))) {
+		return err;
+	}
+	state_clearregister(p->actual);
+	printf("actual (aftersetup): %s\n", state_str(p->actual));
 	p->path_state = PATH_STATE_ACTUAL;
 	return NULL;
 }
