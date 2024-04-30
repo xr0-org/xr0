@@ -156,8 +156,8 @@ fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool {
 }
 
 fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
-    let proto_abs = proto.abstract_block();
-    let def_abs = def.abstract_block();
+    let proto_abs = &proto.abstract_;
+    let def_abs = &def.abstract_;
     let abs_match = ast_block_str(proto_abs, "") == ast_block_str(def_abs, "");
     let protoabs_only = def.abs_is_empty();
     abs_match || protoabs_only
