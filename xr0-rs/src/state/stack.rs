@@ -1,5 +1,5 @@
 use super::{Block, State};
-use crate::ast::{ast_type_copy, ast_variable_name, ast_variable_type, AstExpr};
+use crate::ast::{ast_type_copy, AstExpr};
 use crate::object::Object;
 use crate::state::location::{
     location_auto_get_block_id, location_auto_parts, location_references,
@@ -139,9 +139,9 @@ impl StackFrame {
     }
 
     pub fn declare(&mut self, var: &AstVariable, isparam: bool) {
-        let id = ast_variable_name(var);
+        let id = &var.name;
         assert!(self.varmap.get(id).is_none());
-        let var = variable_create(ast_variable_type(var), self, isparam);
+        let var = variable_create(&var.type_, self, isparam);
         self.varmap.insert(id.to_string(), var);
     }
 

@@ -223,3 +223,10 @@ pub fn ast_type_istypedef(t: &AstType) -> bool {
 pub fn ast_type_copy(t: &AstType) -> Box<AstType> {
     Box::new(t.clone())
 }
+
+pub fn ast_type_ptr_type(t: &AstType) -> &AstType {
+    let AstTypeBase::Pointer(ptr_type) = &t.base else {
+        panic!();
+    };
+    ptr_type
+}

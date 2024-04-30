@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{
     ast_expr_copy, ast_expr_equal, ast_type_create_voidptr, ast_type_struct_complete,
-    ast_type_struct_members, ast_variable_arr_copy, ast_variable_name, ast_variable_type,
+    ast_type_struct_members,
 };
 use crate::state::location::{location_references, location_referencesheap, location_transfigure};
 use crate::state::state::state_vconst;
@@ -98,7 +98,7 @@ pub fn value_sync_create(e: Box<AstExpr>) -> Box<Value> {
 pub fn value_struct_create(t: &AstType) -> Box<Value> {
     let members = ast_type_struct_members(t).expect("can't create value of incomplete type");
     Value::new(ValueKind::Struct(Box::new(StructValue {
-        members: ast_variable_arr_copy(members),
+        members: members.to_vec(),
         m: from_members(members),
     })))
 }
@@ -118,16 +118,11 @@ pub fn value_struct_indefinite_create(
         panic!();
     };
     for var in &sv.members {
-        let field = ast_variable_name(var);
+        let field = &var.name;
 
         let obj = sv.m.get_mut(field).unwrap();
         let comment = format!("{comment}.{field}");
-        obj.assign(Some(state_vconst(
-            s,
-            ast_variable_type(var),
-            Some(&comment),
-            persist,
-        )));
+        obj.assign(Some(state_vconst(s, &var.type_, Some(&comment), persist)));
     }
     v
 }
@@ -176,7 +171,7 @@ pub fn value_pf_augment(old: &Value, root: &AstExpr) -> Box<Value> {
     };
 
     for var in &sv.members {
-        let field = ast_variable_name(var);
+        let field = &var.name;
         let obj = sv.m.get_mut(field).unwrap();
         if let Some(obj_value) = obj.as_value() {
             if value_issync(obj_value) {
@@ -197,7 +192,7 @@ pub fn value_isstruct(v: &Value) -> bool {
 fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     let mut m = HashMap::new();
     for var in members {
-        let id = ast_variable_name(var).to_string();
+        let id = var.name.clone();
         m.insert(id, Object::with_value(AstExpr::new_constant(0), None));
     }
     m
@@ -205,7 +200,7 @@ fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
 
 fn value_struct_abstractcopy(old: &StructValue, s: &mut State) -> Box<Value> {
     Value::new(ValueKind::Struct(Box::new(StructValue {
-        members: ast_variable_arr_copy(&old.members),
+        members: old.members.clone(),
         m: abstract_copy_members(&old.m, s),
     })))
 }
@@ -259,7 +254,7 @@ impl Display for StructValue {
         write!(f, "struct:{{")?;
         let n = self.members.len();
         for (i, var) in self.members.iter().enumerate() {
-            let name = ast_variable_name(var);
+            let name = &var.name;
             let val = self.m.get(name).unwrap().as_value();
             let val_str = if let Some(val) = val {
                 format!("{val}")

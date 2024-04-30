@@ -39,7 +39,7 @@ enum PostfixOp {
 fn variable_array_from_decl_vec(decls: Vec<Declaration>) -> Vec<Box<AstVariable>> {
     decls
         .into_iter()
-        .map(|decl| ast_variable_create(decl.name.unwrap(), decl.t))
+        .map(|decl| AstVariable::new(decl.name.unwrap(), decl.t))
         .collect()
 }
 
@@ -327,7 +327,7 @@ pub grammar c_parser(env: &Env) for str {
     rule struct_declaration() -> Box<AstVariable> =
         d:declaration() {?
             if let Some(name) = d.name {
-                Ok(ast_variable_create(name, d.t))
+                Ok(AstVariable::new(name, d.t))
             } else {
                 Err("variable with no name")
             }
@@ -381,10 +381,10 @@ pub grammar c_parser(env: &Env) for str {
                 t = ast_type_create_ptr(t);
             }
             let name = decl.name.unwrap_or("".to_string());
-            ast_variable_create(name, t)
+            AstVariable::new(name, t)
         } /
         t:declaration_specifiers() {
-            ast_variable_create("".to_string(), t)
+            AstVariable::new("".to_string(), t)
         }
 
     rule type_name() -> Box<AstType> =

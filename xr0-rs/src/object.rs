@@ -1,8 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::ast::{
-    ast_expr_copy, ast_type_struct_complete, ast_variable_name, ast_variable_type, LValue,
-};
+use crate::ast::{ast_expr_copy, ast_type_struct_complete, LValue};
 use crate::state::location::{location_dealloc, location_references};
 use crate::state::state::state_eval;
 use crate::state::State;
@@ -309,8 +307,8 @@ impl Object {
         let t = sv
             .members
             .iter()
-            .find(|var| member == ast_variable_name(var))
-            .map(|var| ast_variable_type(var))
+            .find(|var| member == var.name)
+            .map(|var| &var.type_)
             .unwrap();
         LValue { t, obj }
     }

@@ -1,4 +1,3 @@
-use std::fmt::{self, Display, Formatter};
 use std::process;
 use std::sync::Arc;
 
@@ -22,6 +21,7 @@ mod stmt;
 mod stmt_verify;
 mod topological;
 mod type_;
+mod variable;
 
 pub use block::{
     ast_block_create, ast_block_decls, ast_block_isterminal, ast_block_preconds, ast_block_stmts,
@@ -51,19 +51,12 @@ pub use type_::{
     ast_type_copy, ast_type_create, ast_type_create_arr, ast_type_create_ptr,
     ast_type_create_struct, ast_type_create_struct_anonym, ast_type_create_struct_partial,
     ast_type_create_userdef, ast_type_create_voidptr, ast_type_isstruct, ast_type_istypedef,
-    ast_type_mod_or, ast_type_struct_complete, ast_type_struct_members, ast_type_struct_tag,
-    ast_type_vconst, AstArrayType, AstStructType, AstType, AstTypeBase, AstTypeModifiers, MOD_AUTO,
-    MOD_CONST, MOD_EXTERN, MOD_REGISTER, MOD_STATIC, MOD_TYPEDEF, MOD_VOLATILE,
+    ast_type_mod_or, ast_type_ptr_type, ast_type_struct_complete, ast_type_struct_members,
+    ast_type_struct_tag, ast_type_vconst, AstArrayType, AstStructType, AstType, AstTypeBase,
+    AstTypeModifiers, MOD_AUTO, MOD_CONST, MOD_EXTERN, MOD_REGISTER, MOD_STATIC, MOD_TYPEDEF,
+    MOD_VOLATILE,
 };
-
-#[derive(Clone)]
-pub struct AstVariable {
-    // Note: In the original, `name` could be null. However in most situations (almost all; an
-    // exception is the parameter in `fclose(FILE *);` which has no name) this would be invalid, so
-    // we end up banning it.
-    pub name: String,
-    pub type_: Box<AstType>,
-}
+pub use variable::AstVariable;
 
 pub struct LValue<'ast> {
     pub t: &'ast AstType,
@@ -144,38 +137,6 @@ pub fn ast_stmt_as_block(stmt: &AstStmt) -> &AstBlock {
 }
 
 pub const KEYWORD_RETURN: &str = "return";
-
-pub fn ast_type_ptr_type(t: &AstType) -> &AstType {
-    let AstTypeBase::Pointer(ptr_type) = &t.base else {
-        panic!();
-    };
-    ptr_type
-}
-
-pub fn ast_variable_create(name: String, ty: Box<AstType>) -> Box<AstVariable> {
-    // Note: In the original, this function can take a null name and create a variable with null name.
-    // This is actually done for the arguments in function declarations like `void fclose(FILE*);`.
-    Box::new(AstVariable { name, type_: ty })
-}
-
-pub fn ast_variable_arr_copy(v: &[Box<AstVariable>]) -> Vec<Box<AstVariable>> {
-    v.to_vec()
-}
-
-impl Display for AstVariable {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let AstVariable { type_, name } = self;
-        write!(f, "{type_} {name}")
-    }
-}
-
-pub fn ast_variable_name(v: &AstVariable) -> &str {
-    &v.name
-}
-
-pub fn ast_variable_type(v: &AstVariable) -> &AstType {
-    &v.type_
-}
 
 pub fn ast_function_create(
     is_axiom: bool,
@@ -331,8 +292,8 @@ fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
 fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
     let state: *mut State = state;
     unsafe {
-        let name = ast_variable_name(param);
-        let t = ast_variable_type(param);
+        let name = &param.name;
+        let t = &param.type_;
         let obj = state_getobject(&mut *state, name).unwrap().unwrap();
         if !obj.has_value() {
             // XXX FIXME: dereferencing `state` again here definitely invalidates `obj`
@@ -490,7 +451,7 @@ fn abstract_paths<'origin>(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_str(), cond),
-        ast_variable_arr_copy(&f.params),
+        f.params.clone(),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
@@ -500,7 +461,7 @@ fn abstract_paths<'origin>(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_str(), &inv_assumption),
-        ast_variable_arr_copy(&f.params),
+        f.params.clone(),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
@@ -549,7 +510,7 @@ fn body_paths<'origin>(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_str(), cond),
-        ast_variable_arr_copy(&f.params),
+        f.params.clone(),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
@@ -559,7 +520,7 @@ fn body_paths<'origin>(
         f.is_axiom,
         ast_type_copy(&f.ret),
         split_name(f.name.as_str(), &inv_assumption),
-        ast_variable_arr_copy(&f.params),
+        f.params.clone(),
         f.abstract_.clone(),
         f.body.as_ref().map(|body| body.reborrow()),
     );
@@ -596,7 +557,7 @@ pub fn ast_decl_create(name: String, t: Box<AstType>) -> Box<AstExternDecl> {
             assert!(ast_type_struct_tag(&t).is_some());
             AstExternDeclKind::Struct(t)
         } else {
-            AstExternDeclKind::Variable(ast_variable_create(name, t))
+            AstExternDeclKind::Variable(AstVariable::new(name, t))
         },
     })
 }
@@ -608,7 +569,7 @@ pub fn ast_externdecl_install(decl: Box<AstExternDecl>, ext: &mut Externals) {
             ext.declare_func(f);
         }
         AstExternDeclKind::Variable(v) => {
-            let name = ast_variable_name(&v).to_string();
+            let name = v.name.clone();
             ext.declare_var(name, v);
         }
         AstExternDeclKind::Typedef(typedef) => {

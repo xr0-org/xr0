@@ -418,7 +418,7 @@ fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
     ast_function_initparams(f, &mut param_state)?;
     let params = f.params();
     for p in params {
-        let id = ast_variable_name(p);
+        let id = &p.name;
         // Note: `param` and `arg` are deliberately leaked in the original to avoid double-freeing
         // the variable's location.
         let param = state_getloc(&mut param_state, id);
@@ -483,7 +483,7 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
     let nparams = uncomputed_params.len();
     let mut computed_params = Vec::with_capacity(nparams);
     for p in uncomputed_params {
-        let param = AstExpr::new_identifier(ast_variable_name(p).to_string());
+        let param = AstExpr::new_identifier(p.name.clone());
         // Note: The original leaked a result here.
         let v = ast_expr_eval(&param, s)?;
         computed_params.push(if value_islocation(&v) {
@@ -520,7 +520,7 @@ pub fn prepare_parameters(
         state_declare(state, param, true);
 
         let arg = res?;
-        let name = AstExpr::new_identifier(ast_variable_name(param).to_string());
+        let name = AstExpr::new_identifier(param.name.clone());
         let lval_lval = ast_expr_lvalue(&name, state)?;
         let obj = lval_lval.obj.unwrap();
         // Note: Original does not null-check `obj`.
