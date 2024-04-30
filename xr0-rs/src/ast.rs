@@ -1046,8 +1046,8 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
 
         /* XXX: pass copy so we don't observe */
         call_setupverify(f, &mut state_copy(&*state))
-            .map_err(|err| Error::new(format!("`{name}`' precondition failure\n\t{err}")))?;
-        let v = call_absexec(call, &mut *state).map_err(|err| Error::new(format!("\n\t{err}")))?;
+            .map_err(|err| err.wrap(format!("`{name}`' precondition failure\n\t")))?;
+        let v = call_absexec(call, &mut *state).map_err(|err| err.wrap(format!("\n\t")))?;
         state_popframe(&mut *state);
         pf_augment(&v, call, &mut *state)
     }
@@ -1230,9 +1230,8 @@ fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
         // the variable's location.
         let param = state_getloc(&mut param_state, id);
         let arg = state_getloc(arg_state, id);
-        if let Err(err) = verify_paramspec(&param, &arg, &mut param_state, arg_state) {
-            return Err(Error::new(format!("parameter `{id}' of `{fname}' {err}")));
-        }
+        verify_paramspec(&param, &arg, &mut param_state, arg_state)
+            .map_err(|err| err.wrap(format!("parameter `{id}' of `{fname}' ")))?;
     }
     // Note: Original leaks the state.
     Ok(())
@@ -1637,16 +1636,17 @@ pub fn ast_block_preconds(b: &AstBlock) -> Result<Option<&AstStmt>> {
 
 pub fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: &mut State) -> Result<()> {
     if matches!(stmt.kind, AstStmtKind::CompoundV(_)) {
-        if let Err(err) = ast_stmt_verify(stmt, state) {
+        ast_stmt_verify(stmt, state)
+            .map_err(|err| {
+                let loc = ast_stmt_lexememarker(stmt);
+                err.wrap(format!("{loc}: "))
+            })?;
+    }
+    ast_stmt_exec(stmt, state)
+        .map_err(|err| {
             let loc = ast_stmt_lexememarker(stmt);
-            return Err(Error::new(format!("{loc}: {err}")));
-        }
-    }
-    if let Err(err) = ast_stmt_exec(stmt, state) {
-        let loc = ast_stmt_lexememarker(stmt);
-        let err_msg = format!("{loc}:{fname}: {err}");
-        return Err(Error::new(err_msg));
-    }
+            err.wrap(format!("{loc}:{fname}: "))
+        })?;
     Ok(())
 }
 
@@ -1871,7 +1871,7 @@ fn ast_stmt_absprocess(
     should_setup: bool,
 ) -> Result<()> {
     ast_stmt_absexec(stmt, state, should_setup)
-        .map_err(|err| Error::new(format!("{}:{fname}: {err}", stmt.loc)))
+        .map_err(|err| err.wrap(format!("{}:{fname}: ", stmt.loc)))
 }
 
 pub fn ast_stmt_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
@@ -2141,11 +2141,8 @@ impl AstStmt {
     }
 }
 
+#[allow(unreachable_code)]
 pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
-    eprintln!("sel_decide(control: {control}");
-    eprintln!("----");
-    eprintln!("{}", state_str(state));
-    eprintln!("----");
     // Note: This value is leaked in the original.
     let v = ast_expr_pf_reduce(control, state)?;
     if value_issync(&v) {
@@ -2682,7 +2679,7 @@ fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
     let pre_stmt = f.preconditions()?;
     if let Some(stmt) = pre_stmt {
         ast_stmt_absprocess(stmt, f.name(), s, true)
-            .map_err(|err| Error::new(format!("{}:{}: {err}", stmt.loc, f.name())))?;
+            .map_err(|err| err.wrap(format!("{}:{} ", stmt.loc, f.name())))?;
     }
     Ok(())
 }

@@ -43,6 +43,13 @@ impl Error {
         })
     }
 
+    pub fn wrap(self: Box<Self>, msg: String) -> Box<Error> {
+        Box::new(Error {
+            kind: ErrorKind::Custom(format!("{msg}{self}")),
+            inner: Some(self),
+        })
+    }
+
     /// If `self` or any inner error is an UndecidebleCond error, returns the condition.
     /// Otherwise returns `Err(self)`.
     pub fn to_undecideable_cond(self) -> Result<Box<AstExpr>> {
