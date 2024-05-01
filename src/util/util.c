@@ -310,6 +310,7 @@ struct error {
 		ERROR_PRINTF,
 		ERROR_UNDECIDEABLE_COND,
 		ERROR_RETURN,
+		ERROR_FRAME,
 	} type;
 	union error_contents {
 		char *printf;
@@ -441,12 +442,27 @@ error_to_return(struct error *err)
 	return error_to(err, ERROR_RETURN);
 }
 
+struct error *
+error_frame()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_FRAME;
+	return err;
+}
+
+struct error *
+error_to_frame(struct error *err)
+{
+	return error_to(err, ERROR_FRAME);
+}
+
 char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
 		[ERROR_UNDECIDEABLE_COND] = "undecideable condition",
 		[ERROR_RETURN] = "returned",
+		[ERROR_FRAME] = "frame pushed",
 	};
 
 	switch (err->type) {
@@ -454,6 +470,7 @@ error_str(struct error *err)
 		return dynamic_str(err->contents.printf);
 	case ERROR_UNDECIDEABLE_COND:
 	case ERROR_RETURN:
+	case ERROR_FRAME:
 		return dynamic_str(error_type_str[err->type]);
 	default:
 		assert(false);

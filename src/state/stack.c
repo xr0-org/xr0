@@ -37,6 +37,7 @@ struct frame {
 	enum frame_kind kind;
 	struct ast_expr *call;
 	struct ast_function *f;
+	bool advance;
 };
 
 struct location *
@@ -259,6 +260,12 @@ stack_step(struct stack *s, struct state *state)
 }
 
 void
+stack_nextstmt(struct stack *s, struct state *state)
+{
+	program_nextstmt(s->p, state);
+}
+
+void
 stack_declare(struct stack *stack, struct ast_variable *var, bool isparam)
 {
 	char *id = ast_variable_name(var);
@@ -443,6 +450,7 @@ frame_create(char *n, struct ast_block *b, struct ast_type *r, enum execution_mo
 	f->kind = kind;
 	f->call = NULL;
 	f->f = NULL;
+	f->advance = true;
 	return f;
 }
 
@@ -462,9 +470,23 @@ frame_block_create(char *n, struct ast_block *b, enum execution_mode mode)
 }
 
 struct frame *
+frame_setup_create(char *n, struct ast_block *b, enum execution_mode mode)
+{
+	struct frame* f = frame_create(n, b, NULL, mode, FRAME_NESTED);
+	f->advance = false;
+	return f;
+}
+
+struct frame *
 frame_intermediate_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
 	return frame_create(n, b, NULL, mode, FRAME_INTERMEDIATE);
+}
+
+bool
+frame_advance(struct frame *f)
+{
+	return f->advance;
 }
 
 static struct frame *
@@ -484,6 +506,7 @@ frame_copy(struct frame *f)
 		copy->f = ast_function_copy(f->f);
 		copy->call = ast_expr_copy(f->call);
 	}
+	copy->advance = f->advance;
 	return copy;
 }
 

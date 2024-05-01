@@ -18,6 +18,9 @@ program_str(struct program *);
 int
 program_index(struct program *);
 
+void
+program_nextstmt(struct program *, struct state *);
+
 char *
 program_render(struct program *);
 

@@ -323,7 +323,7 @@ ast_function_initsetup(struct ast_function *f, struct state *s)
 	if (!pre.b) {
 		return NULL;
 	}
-	struct frame *setupframe = frame_block_create(
+	struct frame *setupframe = frame_setup_create(
 		"setup",
 		pre.b,
 		EXEC_SETUP
