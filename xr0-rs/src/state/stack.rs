@@ -249,12 +249,11 @@ fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
     });
     let s: *mut State = s;
     unsafe {
-        // Unsafe because abstractcopy requires mut state, in turn because referencesheap reqiures
-        // the same. Find out if that can be made non-mut.
+        // Unsafe because we fetch obj, copy v, then write to obj.
         let obj = (*s).get_mut(&new.loc, false).unwrap().unwrap();
         if obj.is_value() {
             if let Some(v) = obj.as_value() {
-                obj.assign(value_abstractcopy(v, &mut *s));
+                obj.assign(value_abstractcopy(v, &*s));
             }
         }
     }

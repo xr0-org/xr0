@@ -198,7 +198,7 @@ fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     m
 }
 
-fn value_struct_abstractcopy(old: &StructValue, s: &mut State) -> Box<Value> {
+fn value_struct_abstractcopy(old: &StructValue, s: &State) -> Box<Value> {
     Value::new(ValueKind::Struct(Box::new(StructValue {
         members: old.members.clone(),
         m: abstract_copy_members(&old.m, s),
@@ -207,7 +207,7 @@ fn value_struct_abstractcopy(old: &StructValue, s: &mut State) -> Box<Value> {
 
 fn abstract_copy_members(
     old: &HashMap<String, Box<Object>>,
-    s: &mut State,
+    s: &State,
 ) -> HashMap<String, Box<Object>> {
     old.iter()
         .map(|(k, obj)| (k.clone(), obj.abstract_copy(s)))
@@ -225,7 +225,7 @@ pub fn value_copy(v: &Value) -> Box<Value> {
     Box::new(v.clone())
 }
 
-pub fn value_abstractcopy(v: &Value, s: &mut State) -> Option<Box<Value>> {
+pub fn value_abstractcopy(v: &Value, s: &State) -> Option<Box<Value>> {
     if !value_referencesheap(v, s) {
         return None;
     }

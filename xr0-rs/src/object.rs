@@ -98,7 +98,7 @@ impl Object {
         }
     }
 
-    pub fn abstract_copy(&self, s: &mut State) -> Box<Object> {
+    pub fn abstract_copy(&self, s: &State) -> Box<Object> {
         match &self.kind {
             ObjectKind::DeallocandRange(_) => Box::new(self.clone()),
             ObjectKind::Value(v) => Object::with_value(
