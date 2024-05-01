@@ -386,48 +386,42 @@ fn expr_structmember_eval(expr: &StructMemberExpr, s: &mut State) -> Result<Box<
 fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
     let CallExpr { fun, args } = call;
     let name = ast_expr_as_identifier(fun);
-    let state: *mut State = state;
-    unsafe {
-        let Some(f) = (*state).ext().get_func(name) else {
-            return Err(Error::new(format!("`{name}' not found")));
-        };
-        let params = f.params();
+    let Some(f) = (*state).ext().get_func(name) else {
+        return Err(Error::new(format!("`{name}' not found")));
+    };
+    let params = f.params();
 
-        if args.len() != params.len() {
-            return Err(Error::new(format!(
-                "`{name}' given {} arguments instead of {}",
-                args.len(),
-                params.len()
-            )));
-        }
-
-        let args = prepare_arguments(args, params, &mut *state);
-        state_pushframe(&mut *state, f.name.clone(), &f.abstract_, f.rtype(), true);
-        prepare_parameters(params, args, name, &mut *state)?;
-
-        /* XXX: pass copy so we don't observe */
-        call_setupverify(f, &mut state_copy(&*state))
-            .map_err(|err| err.wrap(format!("`{name}' precondition failure\n\t")))?;
-        let v = call_absexec(call, &mut *state).map_err(|err| err.wrap("\n\t".to_string()))?;
-        state_popframe(&mut *state);
-        pf_augment(&v, call, &mut *state)
+    if args.len() != params.len() {
+        return Err(Error::new(format!(
+            "`{name}' given {} arguments instead of {}",
+            args.len(),
+            params.len()
+        )));
     }
+
+    let args = prepare_arguments(args, params, &mut *state);
+    state_pushframe(&mut *state, f.name.clone(), &f.abstract_, f.rtype(), true);
+    prepare_parameters(params, args, name, &mut *state)?;
+
+    /* XXX: pass copy so we don't observe */
+    call_setupverify(f, &mut state_copy(&*state))
+        .map_err(|err| err.wrap(format!("`{name}' precondition failure\n\t")))?;
+    let v = call_absexec(call, &mut *state).map_err(|err| err.wrap("\n\t".to_string()))?;
+    state_popframe(&mut *state);
+    pf_augment(&v, call, &mut *state)
 }
 
 fn call_absexec(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
     let name = ast_expr_as_identifier(&call.fun);
-    let s: *mut State = s;
-    unsafe {
-        let Some(f) = (*s).ext().get_func(name) else {
-            return Err(Error::new(format!("function `{name}' not found")));
-        };
-        // Note: In the original, this checked for `ast_function_absexec` returning a result with
-        // null value, and in that case called `call_arbitraryresult`. However, this can't happen.
-        if let Some(v) = ast_function_absexec(f, &mut *s)? {
-            return Ok(v);
-        }
-        call_arbitraryresult(call, f, &mut *s)
+    let Some(f) = s.ext().get_func(name) else {
+        return Err(Error::new(format!("function `{name}' not found")));
+    };
+    // Note: In the original, this checked for `ast_function_absexec` returning a result with
+    // null value, and in that case called `call_arbitraryresult`. However, this can't happen.
+    if let Some(v) = ast_function_absexec(f, s)? {
+        return Ok(v);
     }
+    call_arbitraryresult(call, f, s)
 }
 
 fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
