@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use super::{Heap, State};
+use super::State;
 use crate::ast::ast_expr_copy;
 use crate::object::Range;
 use crate::state::state::state_eval;
@@ -128,14 +128,25 @@ impl Block {
         self.arr.iter().any(|obj| obj.references(loc, s))
     }
 
-    // XXX FIXME: inherently UB: `self` may be an element of `heap`, verboten aliasing
-    pub fn range_alloc(&mut self, lw: &AstExpr, up: &AstExpr, heap: &mut Heap) -> Result<()> {
+    /// Fill bytes `lw..up` of this block with a single new range object. `self` must be a
+    /// completely uninitialized allocation.
+    ///
+    //=block_range_alloc
+    pub fn range_alloc(
+        &mut self,
+        lw: &AstExpr,
+        up: &AstExpr,
+        new_block: Box<Location>,
+    ) -> Result<()> {
+        // Implementation note: Original took the heap as a parameter. To make Rust happy,
+        // the caller must give us the location of a new block instead.
+        // XXX: confirm is single object that has never been assigned to
         assert!(self.arr.is_empty());
         self.arr.push(Object::with_range(
             ast_expr_copy(lw),
             Range::new(
                 AstExpr::new_difference(ast_expr_copy(up), ast_expr_copy(lw)),
-                heap.new_block(),
+                new_block,
             ),
         ));
         Ok(())

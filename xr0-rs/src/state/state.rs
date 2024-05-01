@@ -352,17 +352,13 @@ pub fn state_range_alloc(
     };
     let deref = value_as_location(arr_val);
 
-    let state: *mut State = state;
-    unsafe {
-        // Unsafe because `range_alloc` is inherently UB, taking likely aliasing mut
-        // references as args `self` and `heap`
-        let b = (*state).get_block_mut(deref).unwrap(); // panic rather than propagate the error - this is in the original
-        let Some(b) = b else {
-            return Err(Error::new("no block".to_string()));
-        };
-        assert!(!ast_expr_equal(lw, up));
-        b.range_alloc(lw, up, &mut (*state).heap)
-    }
+    let new_block = state.heap.new_block();
+    let b = state.get_block_mut(deref).unwrap(); // panic rather than propagate the error - this is in the original
+    let Some(b) = b else {
+        return Err(Error::new("no block".to_string()));
+    };
+    assert!(!ast_expr_equal(lw, up));
+    b.range_alloc(lw, up, new_block)
 }
 
 impl<'a> State<'a> {
