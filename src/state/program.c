@@ -29,6 +29,7 @@ program_create(struct ast_block *b)
 	p->b = b;
 	p->s = program_state_init(b);
 	p->index = 0;
+	p->loc = NULL;
 	return p;
 }
 
