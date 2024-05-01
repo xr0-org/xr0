@@ -87,7 +87,11 @@ impl<'a> Stack<'a> {
         copy
     }
 
-    pub fn get_frame(&mut self, frame: usize) -> Option<&mut StackFrame<'a>> {
+    pub fn get_frame(&self, frame: usize) -> Option<&StackFrame<'a>> {
+        self.frames.get(frame)
+    }
+
+    pub fn get_frame_mut(&mut self, frame: usize) -> Option<&mut StackFrame<'a>> {
         self.frames.get_mut(frame)
     }
 
@@ -215,7 +219,11 @@ impl<'a> StackFrame<'a> {
         false
     }
 
-    pub fn get_block(&mut self, address: usize) -> &mut Block {
+    pub fn get_block(&self, address: usize) -> &Block {
+        &self.blocks[address]
+    }
+
+    pub fn get_block_mut(&mut self, address: usize) -> &mut Block {
         &mut self.blocks[address]
     }
 }

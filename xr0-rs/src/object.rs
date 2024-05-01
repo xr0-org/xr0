@@ -90,7 +90,7 @@ impl Object {
         v.as_deref_mut()
     }
 
-    pub fn is_deallocand(&self, s: &mut State) -> bool {
+    pub fn is_deallocand(&self, s: &State) -> bool {
         match &self.kind {
             ObjectKind::Value(None) => false,
             ObjectKind::Value(Some(v)) => s.loc_is_deallocand(value_as_location(v)),
@@ -343,7 +343,7 @@ impl Range {
         location_dealloc(&self.loc, &mut s.heap)
     }
 
-    fn is_deallocand(&self, s: &mut State) -> bool {
+    fn is_deallocand(&self, s: &State) -> bool {
         s.loc_is_deallocand(&self.loc)
     }
 

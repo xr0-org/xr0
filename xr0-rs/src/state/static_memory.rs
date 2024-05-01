@@ -38,7 +38,11 @@ impl StaticMemory {
         address < self.blocks.len()
     }
 
-    pub fn get_block(&mut self, address: usize) -> Option<&mut Block> {
+    pub fn get_block(&self, address: usize) -> Option<&Block> {
+        self.blocks.get(address).map(|block| &**block)
+    }
+
+    pub fn get_block_mut(&mut self, address: usize) -> Option<&mut Block> {
         self.blocks.get_mut(address).map(|block| &mut **block)
     }
 

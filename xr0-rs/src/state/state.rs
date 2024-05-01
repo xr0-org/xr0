@@ -186,9 +186,9 @@ pub fn state_islval(state: &mut State, v: &Value) -> bool {
     match loc.kind {
         LocationKind::Static => state.static_memory.has_block(loc.block),
         LocationKind::VConst => false,
-        LocationKind::Dereferencable => state.clump.get_block(loc.block).is_some(),
+        LocationKind::Dereferencable => state.clump.get_block_mut(loc.block).is_some(),
         LocationKind::Automatic { .. } => true,
-        LocationKind::Dynamic => state.heap.get_block(loc.block).is_some(),
+        LocationKind::Dynamic => state.heap.get_block_mut(loc.block).is_some(),
     }
 }
 
@@ -217,7 +217,7 @@ pub fn state_get<'s>(
     constructive: bool,
 ) -> Result<Option<&'s mut Object>> {
     let state_ptr: *mut State = state;
-    let b = state.get_block(loc)?;
+    let b = state.get_block_mut(loc)?;
     match b {
         None => {
             assert!(matches!(
@@ -235,7 +235,7 @@ pub fn state_get<'s>(
 }
 
 impl<'a> State<'a> {
-    pub fn get_block<'s>(&'s mut self, loc: &Location) -> Result<Option<&'s mut Block>> {
+    pub fn get_block<'s>(&'s self, loc: &Location) -> Result<Option<&'s Block>> {
         match loc.kind {
             LocationKind::Static => Ok(self.static_memory.get_block(loc.block)),
             LocationKind::Automatic { frame } => {
@@ -246,6 +246,21 @@ impl<'a> State<'a> {
             }
             LocationKind::Dynamic => Ok(self.heap.get_block(loc.block)),
             LocationKind::Dereferencable => Ok(self.clump.get_block(loc.block)),
+            LocationKind::VConst => panic!(),
+        }
+    }
+
+    pub fn get_block_mut<'s>(&'s mut self, loc: &Location) -> Result<Option<&'s mut Block>> {
+        match loc.kind {
+            LocationKind::Static => Ok(self.static_memory.get_block_mut(loc.block)),
+            LocationKind::Automatic { frame } => {
+                let Some(frame) = self.stack.get_frame_mut(frame) else {
+                    return Err(Error::new("stack frame doesn't exist".to_string()));
+                };
+                Ok(Some(frame.get_block_mut(loc.block)))
+            }
+            LocationKind::Dynamic => Ok(self.heap.get_block_mut(loc.block)),
+            LocationKind::Dereferencable => Ok(self.clump.get_block_mut(loc.block)),
             LocationKind::VConst => panic!(),
         }
     }
@@ -317,7 +332,7 @@ pub fn state_range_alloc(
 
     let state: *mut State = state;
     unsafe {
-        let b = (*state).get_block(deref).unwrap(); // panic rather than propagate the error - this is in the original
+        let b = (*state).get_block_mut(deref).unwrap(); // panic rather than propagate the error - this is in the original
         let Some(b) = b else {
             return Err(Error::new("no block".to_string()));
         };
@@ -363,7 +378,7 @@ pub fn state_addresses_deallocand(state: &mut State, obj: &Object) -> bool {
 }
 
 impl<'a> State<'a> {
-    pub fn loc_is_deallocand(&mut self, loc: &Location) -> bool {
+    pub fn loc_is_deallocand(&self, loc: &Location) -> bool {
         let b = self.get_block(loc).unwrap();
         loc.type_is_dynamic() && b.is_some()
     }
@@ -384,7 +399,7 @@ pub fn state_range_aredeallocands(
     let deref = value_as_location(arr_val);
     let state: *mut State = state;
     unsafe {
-        match (*state).get_block(deref).unwrap() {
+        match (*state).get_block_mut(deref).unwrap() {
             Some(b) => b.range_aredeallocands(lw, up, &mut *state),
             None => false,
         }

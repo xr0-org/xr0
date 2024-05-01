@@ -26,7 +26,11 @@ impl Clump {
         address
     }
 
-    pub fn get_block(&mut self, address: usize) -> Option<&mut Block> {
+    pub fn get_block(&self, address: usize) -> Option<&Block> {
+        self.blocks.get(address).map(|blk| &**blk)
+    }
+
+    pub fn get_block_mut(&mut self, address: usize) -> Option<&mut Block> {
         self.blocks.get_mut(address).map(|blk| &mut **blk)
     }
 }

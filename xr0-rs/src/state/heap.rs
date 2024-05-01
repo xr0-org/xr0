@@ -65,7 +65,18 @@ impl Heap {
         Location::new_dynamic(address, AstExpr::new_constant(0))
     }
 
-    pub fn get_block(&mut self, address: usize) -> Option<&mut Block> {
+    pub fn get_block(&self, address: usize) -> Option<&Block> {
+        if address >= self.blocks.len() {
+            return None;
+        }
+        let hb = &self.blocks[address];
+        if hb.freed {
+            return None;
+        }
+        Some(&hb.block)
+    }
+
+    pub fn get_block_mut(&mut self, address: usize) -> Option<&mut Block> {
         if address >= self.blocks.len() {
             return None;
         }
