@@ -149,19 +149,18 @@ pub fn location_references(l1: &Location, l2: &Location, s: &mut State) -> bool 
     }
 }
 
-pub fn location_referencesheap(l: &Location, s: &mut State) -> bool {
+pub fn location_referencesheap(l: &Location, s: &State) -> bool {
     if matches!(l.kind, LocationKind::Dynamic) {
-        if s.heap().block_is_freed(l.block) {
+        if s.heap.block_is_freed(l.block) {
             return false;
         }
         return true;
     }
-    let Some(obj) = s.get_mut(l, false).unwrap() else {
+    let Some(obj) = s.get(l).unwrap() else {
         return false;
     };
     // XXX FIXME: Clone is not in the original. Added here to satisfy Rust's alias analysis.
-    let obj = obj.clone();
-    obj.references_heap(&mut *s)
+    obj.references_heap(s)
 }
 
 /// Return all three parts of the given location, which must be automatic.

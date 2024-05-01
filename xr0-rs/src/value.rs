@@ -288,7 +288,7 @@ impl Value {
     }
 }
 
-pub fn value_referencesheap(v: &Value, s: &mut State) -> bool {
+pub fn value_referencesheap(v: &Value, s: &State) -> bool {
     match &v.kind {
         ValueKind::DefinitePtr(loc) => location_referencesheap(loc, s),
         ValueKind::IndefinitePtr(_) => false,
@@ -297,7 +297,7 @@ pub fn value_referencesheap(v: &Value, s: &mut State) -> bool {
     }
 }
 
-fn struct_referencesheap(sv: &StructValue, s: &mut State) -> bool {
+fn struct_referencesheap(sv: &StructValue, s: &State) -> bool {
     sv.m.values().any(|obj| {
         let Some(val) = obj.as_value() else {
             return false;

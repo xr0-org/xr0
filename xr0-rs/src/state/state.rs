@@ -114,10 +114,6 @@ impl<'a> State<'a> {
         self.ext
     }
 
-    pub fn heap(&mut self) -> &mut Heap {
-        &mut self.heap
-    }
-
     pub fn props(&mut self) -> &mut Props {
         &mut self.props
     }
@@ -208,7 +204,6 @@ pub fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Value> {
 
 impl<'a> State<'a> {
     //=state_get (non-mut variation)
-    #[allow(dead_code)]
     pub fn get<'s>(&'s self, loc: &Location) -> Result<Option<&'s Object>> {
         Ok(self
             .get_block(loc)?

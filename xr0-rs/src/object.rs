@@ -108,7 +108,7 @@ impl Object {
         }
     }
 
-    pub fn references_heap(&self, s: &mut State) -> bool {
+    pub fn references_heap(&self, s: &State) -> bool {
         match &self.kind {
             ObjectKind::Value(Some(v)) => value_referencesheap(v, s),
             ObjectKind::Value(None) => false,
