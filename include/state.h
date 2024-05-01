@@ -204,9 +204,6 @@ frame_setup_create(char *name, struct ast_block *, enum execution_mode);
 struct frame *
 frame_intermediate_create(char *name, struct ast_block *, enum execution_mode);
 
-bool
-frame_advance(struct frame *f);
-
 /* USED BY VALUE */
 
 struct location;

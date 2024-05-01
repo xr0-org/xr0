@@ -19,7 +19,7 @@ int
 program_index(struct program *);
 
 void
-program_nextstmt(struct program *, struct state *);
+program_storeloc(struct program *);
 
 char *
 program_render(struct program *);

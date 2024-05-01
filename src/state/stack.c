@@ -260,9 +260,9 @@ stack_step(struct stack *s, struct state *state)
 }
 
 void
-stack_nextstmt(struct stack *s, struct state *state)
+stack_storeloc(struct stack *s)
 {
-	program_nextstmt(s->p, state);
+	program_storeloc(s->p);
 }
 
 void

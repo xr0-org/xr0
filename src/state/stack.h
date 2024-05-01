@@ -66,6 +66,9 @@ void
 stack_popprep(struct stack *, struct state *);
 
 void
+stack_storeloc(struct stack *);
+
+void
 stack_declare(struct stack *, struct ast_variable *var, bool isparam);
 
 void

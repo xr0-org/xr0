@@ -202,9 +202,7 @@ state_frameid(struct state *s)
 void
 state_pushframe(struct state *state, struct frame *f)
 {
-	if (frame_advance(f)) {
-		stack_nextstmt(state->stack, state);
-	}
+	stack_storeloc(state->stack);
 	state->stack = stack_create(f, state->stack);
 }
 
