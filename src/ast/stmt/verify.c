@@ -44,7 +44,7 @@ ast_stmt_linearise(struct ast_stmt *stmt, struct state *state,
 		dynamic_str("inter"), b, mode
 	);
 	state_pushframe(state, inter_frame);
-	return NULL;
+	return error_frame();
 }
 
 static struct error *
@@ -283,7 +283,7 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 		EXEC_ACTUAL
 	);
 	state_pushframe(state, block_frame);
-	return NULL;
+	return error_frame();
 }
 
 /* stmt_sel_exec */
@@ -537,8 +537,7 @@ labelled_absexec(struct ast_stmt *stmt, struct state *state)
 		state_next_execmode(state)
 	);
 	state_pushframe(state, setup_frame);
-
-	return NULL;
+	return error_frame();
 }
 
 static struct error *
@@ -646,7 +645,7 @@ comp_absexec(struct ast_stmt *stmt, struct state *state)
 		state_next_execmode(state)
 	);
 	state_pushframe(state, block_frame);
-	return NULL;
+	return error_frame();
 }
 
 static struct error *

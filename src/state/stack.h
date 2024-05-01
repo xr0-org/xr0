@@ -56,6 +56,9 @@ stack_atend(struct stack *);
 struct error *
 stack_step(struct stack *, struct state *);
 
+void
+stack_nextstmt(struct stack *s, struct state *state);
+
 struct stack *
 stack_prev(struct stack *);
 

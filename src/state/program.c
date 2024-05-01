@@ -119,7 +119,7 @@ program_nextdecl(struct program *p)
 static bool
 program_stmt_atend(struct program *, struct state *);
 
-static void
+void
 program_nextstmt(struct program *p, struct state *s)
 {
 	assert(p->s == PROGRAM_COUNTER_STMTS);
@@ -166,6 +166,10 @@ program_stmt_step(struct program *p, enum execution_mode mode, struct state *s)
 	struct error *err = program_stmt_process(p, mode, s);
 	if (!err) {
 		program_nextstmt(p, s);
+		return NULL;
+	}
+	struct error *frame_err = error_to_frame(err);
+	if (frame_err) {
 		return NULL;
 	}
 	struct error *return_err = error_to_return(err);
