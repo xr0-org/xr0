@@ -27,6 +27,7 @@ pub struct VConst {
 }
 
 impl Heap {
+    //=heap_create
     pub fn new() -> Self {
         Heap { blocks: vec![] }
     }
@@ -112,6 +113,7 @@ fn block_referenced(s: &mut State, addr: usize) -> bool {
 }
 
 impl VConst {
+    //=vconst_create
     pub fn new() -> VConst {
         VConst {
             varmap: BTreeMap::new(),

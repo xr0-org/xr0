@@ -43,7 +43,7 @@ pub use extern_decl::{
 };
 pub use function::{
     ast_function_absexec, ast_function_buildgraph, ast_function_create, ast_function_initparams,
-    ast_function_protostitch, ast_function_verify, AstFunction,
+    ast_function_protostitch, ast_function_setupabsexec, ast_function_verify, AstFunction,
 };
 pub use literals::{parse_char, parse_escape, parse_int};
 pub use stmt::{

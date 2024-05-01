@@ -12,8 +12,33 @@
 #include "value.h"
 #include "util.h"
 
+struct program_counter;
+
+static struct program_counter *
+program_counter_create(struct ast_block *, char *name);
+
+static struct program_counter *
+program_counter_copy(struct program_counter *);
+
+static void
+program_counter_destroy(struct program_counter *);
+
+static char *
+program_counter_name(struct program_counter *);
+
+static void
+program_counter_changename(struct program_counter *, char *);
+
+static bool
+program_counter_atend(struct program_counter *);
+
+static struct error *
+program_counter_exec(struct program_counter *, bool abstract, struct state *);
+
 struct stack {
-	char *name;
+	struct program_counter *pc;
+	bool abstract;
+
 	struct block_arr *frame;
 
 	/* lvalues of blocks in frame */
@@ -35,12 +60,15 @@ stack_newblock(struct stack *stack)
 }
 
 struct stack *
-stack_create(char *name, struct stack *prev, struct ast_type *return_type)
+stack_create(char *name, struct ast_block *b, struct ast_type *ret_type,
+		bool abstract, struct stack *prev)
 {
 	struct stack *stack = calloc(1, sizeof(struct stack));
 	assert(stack);
 
-	stack->name = name;
+	assert(b);
+	stack->pc = program_counter_create(b, name);
+	stack->abstract = abstract;
 	stack->frame = block_arr_create();
 
 	stack->varmap = map_create();
@@ -48,13 +76,14 @@ stack_create(char *name, struct stack *prev, struct ast_type *return_type)
 	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
 
-	stack->result = variable_create(return_type, stack, false);
+	stack->result = variable_create(ret_type, stack, false);
 
 	return stack;
 }
 
 struct stack *
-stack_getframe(struct stack *s, int frame) {
+stack_getframe(struct stack *s, int frame)
+{
 	assert(s);
 	assert(frame >= 0);
 
@@ -80,6 +109,7 @@ stack_destroy(struct stack *stack)
 
 	variable_destroy(stack->result);
 
+	program_counter_destroy(stack->pc);
 	free(stack);
 }
 
@@ -96,7 +126,8 @@ struct stack *
 stack_copy(struct stack *stack)
 {
 	struct stack *copy = calloc(1, sizeof(struct stack));
-	copy->name = dynamic_str(stack->name);
+	copy->abstract = stack->abstract;
+	copy->pc = program_counter_copy(stack->pc);
 	copy->frame = block_arr_copy(stack->frame);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->id = stack->id;
@@ -111,8 +142,7 @@ struct stack *
 stack_copywithname(struct stack *stack, char *new_name)
 {
 	struct stack *copy = stack_copy(stack);
-	free(copy->name);
-	copy->name = new_name;
+	program_counter_changename(copy->pc, new_name);
 	return copy;
 }
 
@@ -151,13 +181,25 @@ stack_str(struct stack *stack, struct state *state)
 	for (int i = 0, len = 30; i < len-2; i++ ) {
 		strbuilder_putc(b, '-');
 	}
-	strbuilder_printf(b, " %s\n", stack->name);
+	strbuilder_printf(b, " %s\n", program_counter_name(stack->pc));
 	if (stack->prev) {
 		char *prev = stack_str(stack->prev, state);
 		strbuilder_printf(b, prev);
 		free(prev);
 	}
 	return strbuilder_build(b);
+}
+
+bool
+stack_atend(struct stack *s)
+{
+	return !s->prev && program_counter_atend(s->pc);
+}
+
+struct error *
+stack_step(struct stack *s, struct state *state)
+{
+	return program_counter_exec(s->pc, s->abstract, state);
 }
 
 void
@@ -368,4 +410,160 @@ bool
 variable_isparam(struct variable *v)
 {
 	return v->isparam;
+}
+
+
+struct program_counter {
+	struct ast_block *b;
+	enum program_counter_state {
+		PROGRAM_COUNTER_DECLS,
+		PROGRAM_COUNTER_STMTS,
+		PROGRAM_COUNTER_ATEND,
+	} s;
+	char *name;
+	int index;
+};
+
+static enum program_counter_state
+program_counter_state_init(struct ast_block *);
+
+struct program_counter *
+program_counter_create(struct ast_block *b, char *name)
+{
+	struct program_counter *pc = malloc(sizeof(struct program_counter));
+	pc->b = b;
+	pc->s = program_counter_state_init(b);
+	pc->index = 0;
+	pc->name = dynamic_str(name);
+	return pc;
+}
+
+static enum program_counter_state
+program_counter_state_init(struct ast_block *b)
+{
+	return ast_block_ndecls(b)
+		? PROGRAM_COUNTER_DECLS
+		: ast_block_nstmts(b)
+		? PROGRAM_COUNTER_STMTS
+		: PROGRAM_COUNTER_ATEND;
+}
+
+static void
+program_counter_destroy(struct program_counter *pc)
+{
+	/* no ownership of block */
+	free(pc->name);
+	free(pc);
+}
+
+static struct program_counter *
+program_counter_copy(struct program_counter *old)
+{
+	struct program_counter *new = program_counter_create(old->b, old->name);
+	new->s = old->s;
+	new->index = old->index;
+	return new;
+}
+
+static char *
+program_counter_name(struct program_counter *pc)
+{
+	return pc->name;
+}
+
+static void
+program_counter_changename(struct program_counter *pc, char *new_name)
+{
+	free(pc->name);
+	pc->name = dynamic_str(new_name);
+}
+
+static bool
+program_counter_atend(struct program_counter *pc)
+{
+	return pc->s == PROGRAM_COUNTER_ATEND;
+}
+
+static void
+program_counter_nextdecl(struct program_counter *pc)
+{
+	assert(pc->s == PROGRAM_COUNTER_DECLS);
+
+	if (++pc->index >= ast_block_ndecls(pc->b)) {
+		pc->s = ast_block_nstmts(pc->b)
+			? PROGRAM_COUNTER_STMTS
+			: PROGRAM_COUNTER_ATEND;
+		pc->index = 0;
+	}
+}
+
+static bool
+program_counter_stmt_atend(struct program_counter *, struct state *);
+
+static void
+program_counter_nextstmt(struct program_counter *pc, struct state *s)
+{
+	assert(pc->s == PROGRAM_COUNTER_STMTS);
+
+	if (program_counter_stmt_atend(pc, s)) {
+		pc->s = PROGRAM_COUNTER_ATEND;
+	}
+}
+
+static bool
+program_counter_stmt_atend(struct program_counter *pc, struct state *s)
+{
+	return ast_stmt_isterminal(ast_block_stmts(pc->b)[pc->index], s)
+		|| ++pc->index >= ast_block_nstmts(pc->b);
+}
+
+
+static struct error *
+program_counter_stmt_step(struct program_counter *pc, bool abstract, 
+		struct state *s);
+
+static struct error *
+program_counter_exec(struct program_counter *pc, bool abstract, struct state *s)
+{
+	switch (pc->s) {
+	case PROGRAM_COUNTER_DECLS:
+		state_declare(s, ast_block_decls(pc->b)[pc->index], false);
+		program_counter_nextdecl(pc);
+		return NULL;
+	case PROGRAM_COUNTER_STMTS:
+		return program_counter_stmt_step(pc, abstract, s);
+	case PROGRAM_COUNTER_ATEND:
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+program_counter_stmt_process(struct program_counter *pc, bool abstract, 
+		struct state *s);
+
+static struct error *
+program_counter_stmt_step(struct program_counter *pc, bool abstract, 
+		struct state *s)
+{
+	struct error *err = program_counter_stmt_process(pc, abstract, s);
+	if (err) {
+		return err;
+	}
+	program_counter_nextstmt(pc, s);
+	return NULL;
+}
+
+static struct error *
+program_counter_stmt_process(struct program_counter *pc, bool abstract, 
+		struct state *s)
+{
+	struct ast_stmt *stmt = ast_block_stmts(pc->b)[pc->index];
+	if (abstract) {
+		if (ast_stmt_ispre(stmt)) {
+			return NULL;
+		}
+		return ast_stmt_absprocess(stmt, pc->name, s, true);
+	}
+	return ast_stmt_process(stmt, pc->name, s);
 }

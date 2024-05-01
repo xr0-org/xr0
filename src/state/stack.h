@@ -7,7 +7,8 @@
 struct stack;
 
 struct stack *
-stack_create(char *name, struct stack *prev, struct ast_type *ret_type);
+stack_create(char *name, struct ast_block *, struct ast_type *ret_type,
+		bool abstract, struct stack *prev);
 
 struct stack *
 stack_getframe(struct stack *s, int frame);
@@ -26,6 +27,12 @@ stack_copywithname(struct stack *, char *new_name);
 
 char *
 stack_str(struct stack *, struct state *);
+
+bool
+stack_atend(struct stack *);
+
+struct error *
+stack_step(struct stack *, struct state *);
 
 struct stack *
 stack_prev(struct stack *);

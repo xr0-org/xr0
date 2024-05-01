@@ -12,6 +12,7 @@ pub struct StaticMemory {
 }
 
 impl StaticMemory {
+    //=static_memory_create
     pub fn new() -> Self {
         StaticMemory {
             blocks: vec![],

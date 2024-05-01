@@ -1,24 +1,29 @@
 use super::{Block, State};
-use crate::ast::{ast_type_copy, AstExpr};
+use crate::ast::{
+    ast_stmt_absprocess, ast_stmt_ispre, ast_stmt_isterminal, ast_stmt_process, ast_type_copy,
+    AstBlock, AstExpr,
+};
 use crate::object::Object;
 use crate::state::location::{
     location_auto_get_block_id, location_auto_parts, location_references,
 };
-use crate::state::state::state_get;
-use crate::util::InsertionOrderMap;
+use crate::state::state::{state_declare, state_get};
+use crate::util::{InsertionOrderMap, Result};
 use crate::value::value_abstractcopy;
 use crate::{str_write, AstType, AstVariable, Location};
 
 #[derive(Clone)]
-pub struct Stack {
-    frames: Vec<StackFrame>,
+pub struct Stack<'a> {
+    pub(super) frames: Vec<StackFrame<'a>>,
 }
 
 type VarMap = InsertionOrderMap<String, Box<Variable>>;
 
 #[derive(Clone)]
-pub struct StackFrame {
-    pub name: String,
+pub struct StackFrame<'a> {
+    pub pc: Box<ProgramCounter<'a>>,
+    pub abstract_: bool,
+
     // Note: This field is called `frame` in the original.
     pub blocks: Vec<Box<Block>>,
     pub varmap: Box<VarMap>,
@@ -31,6 +36,21 @@ pub struct Variable {
     type_: Box<AstType>,
     loc: Box<Location>,
     is_param: bool,
+}
+
+#[derive(Clone)]
+pub struct ProgramCounter<'a> {
+    b: &'a AstBlock,
+    s: ProgramCounterState,
+    name: String,
+    index: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProgramCounterState {
+    Decls,
+    Stmts,
+    AtEnd,
 }
 
 pub fn stack_str(stack: &Stack, state: &State) -> String {
@@ -50,39 +70,47 @@ pub fn stack_str(stack: &Stack, state: &State) -> String {
         for _ in 0..28 {
             b.push('-');
         }
-        str_write!(b, " {}\n", frame.name);
+        str_write!(b, " {}\n", frame.pc.name);
     }
     b
 }
 
-impl Stack {
+impl<'a> Stack<'a> {
     pub fn new() -> Self {
         Stack { frames: vec![] }
     }
 
-    pub fn clone_with_name(&self, new_name: String) -> Stack {
+    //=stack_copywithname
+    pub fn clone_with_name(&self, new_name: String) -> Stack<'a> {
         let mut copy = self.clone();
-        copy.top_mut().name = new_name;
+        copy.top_mut().pc.name = new_name;
         copy
     }
 
-    pub fn get_frame(&mut self, frame: usize) -> Option<&mut StackFrame> {
+    pub fn get_frame(&mut self, frame: usize) -> Option<&mut StackFrame<'a>> {
         self.frames.get_mut(frame)
     }
 
-    pub fn push(&mut self, name: String, return_type: &AstType) -> &mut StackFrame {
+    pub fn push(
+        &mut self,
+        name: String,
+        b: &'a AstBlock,
+        ret_type: &AstType,
+        abstract_: bool,
+    ) -> &mut StackFrame<'a> {
         let id = self.frames.len();
-        // Note: The original `stack_create` not have to manually lay out all this. Instead,
-        // `result` was initially null and it was filled in by calling `variable_create`. In Rust,
-        // it is not nullable, so we can't partially initialize the stack frame, then call a method
-        // on it to create a variable, then initialize the last field.
+        // Note: The original `stack_create` does not manually lay all this out. Instead, `result`
+        // was initially null and it was filled in by calling `variable_create`. In Rust, it is not
+        // nullable, so we can't partially initialize the stack frame, then call a method on it to
+        // create a variable, then initialize the last field.
         let mut frame = StackFrame {
-            name,
+            pc: ProgramCounter::new(b, &name),
+            abstract_,
             blocks: vec![Block::new()],
             varmap: Box::new(VarMap::new()),
             id,
             result: Box::new(Variable {
-                type_: ast_type_copy(return_type),
+                type_: ast_type_copy(ret_type),
                 loc: Location::new_automatic(id, 0, AstExpr::new_constant(0)),
                 is_param: false,
             }),
@@ -97,11 +125,11 @@ impl Stack {
         self.frames.pop();
     }
 
-    fn top(&self) -> &StackFrame {
+    pub fn top(&self) -> &StackFrame<'a> {
         self.frames.last().unwrap()
     }
 
-    fn top_mut(&mut self) -> &mut StackFrame {
+    fn top_mut(&mut self) -> &mut StackFrame<'a> {
         self.frames.last_mut().unwrap()
     }
 
@@ -129,9 +157,18 @@ impl Stack {
     pub fn str(&self, state: &State) -> String {
         stack_str(self, state)
     }
+
+    //=stack_atend
+    pub fn at_end(&self) -> bool {
+        self.frames.len() == 1 && self.frames[0].pc.at_end()
+    }
 }
 
-impl StackFrame {
+impl<'a> StackFrame<'a> {
+    pub fn name(&self) -> &str {
+        &self.pc.name
+    }
+
     pub fn new_block(&mut self) -> Box<Location> {
         let address = self.blocks.len();
         self.blocks.push(Block::new());
@@ -253,4 +290,94 @@ impl Variable {
 pub fn variable_references(v: &Variable, loc: &Location, s: &mut State) -> bool {
     assert!(!loc.type_is_vconst());
     location_references(&v.loc, loc, s)
+}
+
+impl<'a> ProgramCounter<'a> {
+    //=program_counter_create
+    fn new(b: &'a AstBlock, name: &str) -> Box<Self> {
+        Box::new(ProgramCounter {
+            b,
+            s: ProgramCounter::state_init(b),
+            index: 0,
+            name: name.to_string(),
+        })
+    }
+
+    //=program_counter_state_init
+    fn state_init(b: &'a AstBlock) -> ProgramCounterState {
+        if !b.decls.is_empty() {
+            ProgramCounterState::Decls
+        } else if !b.stmts.is_empty() {
+            ProgramCounterState::Stmts
+        } else {
+            ProgramCounterState::AtEnd
+        }
+    }
+
+    //=program_counter_atend
+    pub fn at_end(&self) -> bool {
+        self.s == ProgramCounterState::AtEnd
+    }
+
+    //=program_counter_nextdecl
+    pub fn next_decl(&mut self) {
+        assert_eq!(self.s, ProgramCounterState::Decls);
+
+        self.index += 1;
+        if self.index >= self.b.decls.len() {
+            self.s = if !self.b.stmts.is_empty() {
+                ProgramCounterState::Stmts
+            } else {
+                ProgramCounterState::AtEnd
+            };
+            self.index = 0;
+        }
+    }
+
+    //=program_counter_stmt_atend
+    fn stmt_at_end(s: &mut State) -> bool {
+        let pc = &mut s.stack.frames.last_mut().unwrap().pc;
+        let stmt = &pc.b.stmts[pc.index];
+        ast_stmt_isterminal(stmt, s) || {
+            let pc = &mut s.stack.frames.last_mut().unwrap().pc;
+            pc.index += 1;
+            pc.index >= pc.b.stmts.len()
+        }
+    }
+
+    //=program_counter_exec
+    pub fn exec(s: &mut State) -> Result<()> {
+        let frame = s.stack.frames.last_mut().unwrap();
+        let abstract_ = frame.abstract_;
+        let pc = &mut frame.pc;
+        match pc.s {
+            ProgramCounterState::Decls => {
+                let decl = &pc.b.decls[pc.index];
+                state_declare(s, decl, false);
+                s.stack.frames.last_mut().unwrap().pc.next_decl();
+                Ok(())
+            }
+            ProgramCounterState::Stmts => {
+                //=program_counter_stmt_step
+                //=program_counter_stmt_process
+                let stmt = &pc.b.stmts[pc.index];
+                if abstract_ {
+                    if !ast_stmt_ispre(stmt) {
+                        ast_stmt_absprocess(stmt, s, true)?;
+                    }
+                } else {
+                    let name = pc.name.clone();
+                    ast_stmt_process(stmt, &name, s)?
+                }
+
+                //=program_counter_nextstmt
+                if Self::stmt_at_end(s) {
+                    let pc = &mut s.stack.frames.last_mut().unwrap().pc;
+                    pc.s = ProgramCounterState::AtEnd;
+                }
+                Ok(())
+            }
+            ProgramCounterState::AtEnd => panic!(),
+        }
+    }
 }

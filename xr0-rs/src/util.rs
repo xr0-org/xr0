@@ -99,15 +99,6 @@ impl<'a, T> Deref for SemiBox<'a, T> {
     }
 }
 
-impl<'a, T> SemiBox<'a, T> {
-    pub fn reborrow<'parent>(self: &'parent SemiBox<'a, T>) -> SemiBox<'parent, T> {
-        match self {
-            SemiBox::Owned(b) => SemiBox::Borrowed(&**b),
-            SemiBox::Borrowed(r) => SemiBox::Borrowed(r),
-        }
-    }
-}
-
 #[macro_export]
 macro_rules! str_write {
     ($b:expr, $($fmt:tt)+) => {{

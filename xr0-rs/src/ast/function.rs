@@ -1,20 +1,14 @@
 use std::process;
-use std::sync::Arc;
 
 use super::{
-    ast_block_preconds, ast_block_str, ast_expr_assume, ast_expr_inverted_copy,
-    ast_stmt_absprocess, ast_stmt_getfuncs, ast_stmt_ispre, ast_stmt_isterminal, ast_stmt_process,
-    ast_stmt_setupabsexec, ast_type_copy, AstBlock, AstExpr, AstStmt, AstType, AstVariable,
-    FuncGraph,
+    ast_block_preconds, ast_block_str, ast_stmt_absprocess, ast_stmt_getfuncs,
+    ast_stmt_setupabsexec, AstBlock, AstStmt, AstType, AstVariable, FuncGraph,
 };
-use crate::state::state::{
-    state_copy, state_copywithname, state_create, state_create_withprops, state_declare,
-    state_equal, state_getobject, state_getresult, state_hasgarbage, state_str, state_vconst,
-    State,
-};
-use crate::util::{Error, InsertionOrderMap, Result, SemiBox};
+use crate::path::Path;
+use crate::state::state::{state_declare, state_getobject, state_getresult, state_vconst, State};
+use crate::util::{InsertionOrderMap, Result, SemiBox};
 use crate::value::{value_copy, Value};
-use crate::{str_write, vprintln, Externals};
+use crate::{str_write, Externals};
 
 #[derive(Clone)]
 pub struct AstFunction<'ast> {
@@ -126,38 +120,11 @@ pub fn ast_function_protostitch(f: &mut AstFunction, ext: &Externals) {
     }
 }
 
-pub fn ast_function_verify(f: &AstFunction, ext: Arc<Externals>) -> Result<()> {
-    let mut state = state_create(f.name().to_string(), ext, f.rtype());
-    ast_function_initparams(f, &mut state)?;
-    path_absverify_withstate(f, &mut state)?;
-    Ok(())
-}
-
-fn path_absverify_withstate(f: &AstFunction, state: &mut State) -> Result<()> {
-    for var in &f.abstract_.decls {
-        state_declare(state, var, false);
+pub fn ast_function_verify(f: &AstFunction, ext: &Externals) -> Result<()> {
+    let mut path = Path::new(f, f.name.clone(), ext);
+    while !path.at_end() {
+        path.step()?;
     }
-    path_absverify(f, state, 0)
-}
-
-fn path_absverify(f: &AstFunction, state: &mut State, index: usize) -> Result<()> {
-    let fname = f.name();
-    let abs = &f.abstract_;
-    for i in index..abs.stmts.len() {
-        let stmt = &abs.stmts[i];
-        if ast_stmt_ispre(stmt) {
-            continue;
-        }
-
-        let mut prestate = state_copy(state);
-        if let Err(err) = ast_stmt_absprocess(stmt, fname, state, true) {
-            let uc = err.try_into_undecideable_cond()?;
-            return split_path_absverify(f, &mut prestate, i, &uc);
-        }
-    }
-
-    // TODO: verify that `result' is of the same type as f->result
-    abstract_audit(f, state)?;
     Ok(())
 }
 
@@ -176,7 +143,7 @@ pub fn ast_function_initparams(f: &AstFunction, s: &mut State) -> Result<()> {
 fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
     let pre_stmt = f.preconditions()?;
     if let Some(stmt) = pre_stmt {
-        ast_stmt_absprocess(stmt, f.name(), s, true)
+        ast_stmt_absprocess(stmt, s, true)
             .map_err(|err| err.wrap(format!("{}:{} ", stmt.loc, f.name())))?;
     }
     Ok(())
@@ -197,113 +164,9 @@ fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-fn abstract_audit(f: &AstFunction, abstract_state: &mut State) -> Result<()> {
-    let mut actual_state = state_create_withprops(
-        f.name().to_string(),
-        (*abstract_state).externals_arc(),
-        f.rtype(),
-        abstract_state.props().clone(),
-    );
-    ast_function_initparams(f, &mut actual_state).unwrap();
-    ast_function_setupabsexec(f, &mut actual_state)?;
-    abstract_auditwithstate(f, &mut actual_state, abstract_state)?;
-    Ok(())
-}
-
-fn ast_function_setupabsexec(f: &AstFunction, state: &mut State) -> Result<()> {
+pub fn ast_function_setupabsexec(f: &AstFunction, state: &mut State) -> Result<()> {
     for stmt in &f.abstract_.stmts {
         ast_stmt_setupabsexec(stmt, state)?;
-    }
-    Ok(())
-}
-
-fn abstract_auditwithstate(
-    f: &AstFunction,
-    actual_state: &mut State,
-    abstract_state: &mut State,
-) -> Result<()> {
-    for decl in &f.body.as_ref().unwrap().decls {
-        state_declare(actual_state, decl, false);
-    }
-    path_verify(f, actual_state, 0, abstract_state)
-}
-
-fn split_path_absverify(
-    f: &AstFunction,
-    state: &mut State,
-    index: usize,
-    cond: &AstExpr,
-) -> Result<()> {
-    let paths = abstract_paths(f, index, cond);
-    assert_eq!(paths.len(), 2);
-    for (i, f) in paths.into_iter().enumerate() {
-        // Note: Original does not copy f.name here -- which should be a double free, but s_copy is
-        // leaked.
-        let mut s_copy = state_copywithname(&*state, f.name().to_string());
-        // Note: Original leaks `inv` but I think accidentally.
-        let inv = ast_expr_inverted_copy(cond, i == 1);
-        let r = ast_expr_assume(&inv, &mut s_copy)?;
-        if !r.is_contradiction {
-            path_absverify(&f, &mut s_copy, index)?;
-        }
-    }
-    Ok(())
-}
-
-fn path_verify(
-    f: &AstFunction,
-    actual_state: &mut State,
-    index: usize,
-    abstract_state: &mut State,
-) -> Result<()> {
-    let fname = f.name();
-    let stmts = &f.body.as_ref().unwrap().stmts;
-    #[allow(clippy::needless_range_loop)]
-    for i in index..stmts.len() {
-        let stmt = &stmts[i];
-        let mut prestate = state_copy(actual_state);
-        if let Err(err) = ast_stmt_process(stmt, fname, actual_state) {
-            let uc = err.try_into_undecideable_cond()?;
-            return split_path_verify(f, &mut prestate, i, &uc, abstract_state);
-        }
-        if ast_stmt_isterminal(stmt, actual_state) {
-            break;
-        }
-    }
-    if state_hasgarbage(actual_state) {
-        vprintln!("actual: {}", state_str(&*actual_state));
-        return Err(Error::new(format!("{fname}: garbage on heap")));
-    }
-    let equiv: bool = state_equal(&*actual_state, &*abstract_state);
-    if !equiv {
-        return Err(Error::new(format!(
-            "{fname}: actual and abstract states differ",
-        )));
-    }
-    Ok(())
-}
-
-fn split_path_verify(
-    f: &AstFunction,
-    actual_state: &mut State,
-    index: usize,
-    cond: &AstExpr,
-    abstract_state: &mut State,
-) -> Result<()> {
-    let paths = body_paths(f, index, cond);
-    assert_eq!(paths.len(), 2);
-    // Note: Original leaks both functions to avoid triple-freeing the body.
-    // We borrow instead.
-    for (i, f) in paths.into_iter().enumerate() {
-        let mut actual_copy = state_copywithname(actual_state, f.name().to_string());
-        let mut abstract_copy = state_copywithname(abstract_state, f.name().to_string());
-        // Note: Original leaks `expr`.
-        let expr = ast_expr_inverted_copy(cond, i == 1);
-        let r = ast_expr_assume(&expr, &mut actual_copy)?;
-        if !r.is_contradiction {
-            path_verify(&f, &mut actual_copy, index, &mut abstract_copy)?;
-        }
-        // Note: Original leaks both state copies.
     }
     Ok(())
 }
@@ -312,9 +175,8 @@ pub fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<Option
     for decl in &f.abstract_.decls {
         state_declare(state, decl, false);
     }
-    let fname = f.name();
     for stmt in &f.abstract_.stmts {
-        ast_stmt_absprocess(stmt, fname, state, false)?;
+        ast_stmt_absprocess(stmt, state, false)?;
     }
     let obj = state_getresult(state).unwrap().unwrap();
     // Note: In the original, this function (unlike the other absexec functions) returned a
@@ -362,60 +224,4 @@ fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut DedupSet, fname: &str, ext:
         }
     }
     g.insert(fname.to_string(), val);
-}
-
-fn abstract_paths<'origin>(
-    f: &'origin AstFunction,
-    _index: usize,
-    cond: &AstExpr,
-) -> Vec<Box<AstFunction<'origin>>> {
-    let f_true = ast_function_create(
-        f.is_axiom,
-        ast_type_copy(&f.ret),
-        split_name(f.name.as_str(), cond),
-        f.params.clone(),
-        f.abstract_.clone(),
-        f.body.as_ref().map(|body| body.reborrow()),
-    );
-    // Note: Original leaks inv_assumption, but I think unintentionally.
-    let inv_assumption = ast_expr_inverted_copy(cond, true);
-    let f_false = ast_function_create(
-        f.is_axiom,
-        ast_type_copy(&f.ret),
-        split_name(f.name.as_str(), &inv_assumption),
-        f.params.clone(),
-        f.abstract_.clone(),
-        f.body.as_ref().map(|body| body.reborrow()),
-    );
-    vec![f_true, f_false]
-}
-
-fn body_paths<'origin>(
-    f: &'origin AstFunction,
-    _index: usize,
-    cond: &AstExpr,
-) -> Vec<Box<AstFunction<'origin>>> {
-    let f_true = ast_function_create(
-        f.is_axiom,
-        ast_type_copy(&f.ret),
-        split_name(f.name.as_str(), cond),
-        f.params.clone(),
-        f.abstract_.clone(),
-        f.body.as_ref().map(|body| body.reborrow()),
-    );
-    // Note: Original leaks `inv_assumption` but I think accidentally.
-    let inv_assumption = ast_expr_inverted_copy(cond, true);
-    let f_false = ast_function_create(
-        f.is_axiom,
-        ast_type_copy(&f.ret),
-        split_name(f.name.as_str(), &inv_assumption),
-        f.params.clone(),
-        f.abstract_.clone(),
-        f.body.as_ref().map(|body| body.reborrow()),
-    );
-    vec![f_true, f_false]
-}
-
-fn split_name(name: &str, assumption: &AstExpr) -> String {
-    format!("{name} | {assumption}")
 }

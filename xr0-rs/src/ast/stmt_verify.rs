@@ -175,14 +175,9 @@ fn stmt_jump_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-pub fn ast_stmt_absprocess(
-    stmt: &AstStmt,
-    fname: &str,
-    state: &mut State,
-    should_setup: bool,
-) -> Result<()> {
+pub fn ast_stmt_absprocess(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {
     ast_stmt_absexec(stmt, state, should_setup)
-        .map_err(|err| err.wrap(format!("{}:{fname}: ", stmt.loc)))
+        .map_err(|err| err.wrap(format!("{}:{}: ", stmt.loc, state.fname())))
 }
 
 pub fn ast_stmt_absexec(stmt: &AstStmt, state: &mut State, should_setup: bool) -> Result<()> {

@@ -6,6 +6,7 @@
 #define KEYWORD_RETURN "return"
 
 /* ast */
+struct ast_function;
 struct ast_type;
 struct ast_variable;
 struct ast_expr;
@@ -25,10 +26,12 @@ struct value;
 struct state;
 
 struct state *
-state_create(char *func, struct externals *, struct ast_type *result_type);
+state_create(char *name, struct ast_block *, struct ast_type *result_type,
+		bool abstract, struct externals *);
 
 struct state *
-state_create_withprops(char *func, struct externals *, struct ast_type *result_type,
+state_create_withprops(char *name, struct ast_block *,
+		struct ast_type *result_type, bool abstract, struct externals *,
 		struct props *props);
 
 struct state *
@@ -43,6 +46,12 @@ state_destroy(struct state *state);
 char *
 state_str(struct state *);
 
+bool
+state_atend(struct state *);
+
+struct error *
+state_step(struct state *);
+
 struct externals *
 state_getext(struct state *);
 
@@ -53,10 +62,12 @@ struct heap *
 state_getheap(struct state *);
 
 void
-state_pushframe(struct state *, char *func, struct ast_type *ret_type);
+state_pushframe(struct state *, char *name, struct ast_block *b,
+		struct ast_type *, bool abstract);
 
 void
 state_popframe(struct state *);
+
 
 void
 state_declare(struct state *, struct ast_variable *var, bool isparam);

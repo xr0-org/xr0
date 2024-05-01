@@ -7,6 +7,7 @@ pub struct Clump {
 }
 
 impl Clump {
+    //=clump_create
     pub fn new() -> Self {
         Clump { blocks: vec![] }
     }

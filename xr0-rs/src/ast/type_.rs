@@ -166,8 +166,7 @@ pub fn ast_type_vconst(t: &AstType, s: &mut State, comment: &str, persist: bool)
         AstTypeBase::Int => value_int_indefinite_create(),
         AstTypeBase::Pointer(_) => value_ptr_indefinite_create(),
         AstTypeBase::UserDefined(name) => {
-            // Note: Bumps a reference count as a lifetime hack.
-            let ext = s.externals_arc();
+            let ext = s.ext();
             let type_ = ext.get_typedef(name).unwrap();
             ast_type_vconst(
                 // Note: Original does not null-check here.

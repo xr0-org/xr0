@@ -317,7 +317,6 @@ ast_stmt_absprocess(struct ast_stmt *stmt, char *fname, struct state *state,
 	assert(loc);
 	char *m = lexememarker_str(loc);
 	struct error *e = error_printf("%s:%s: %w", m, fname, err);
-	free(m);
 	return e;
 }
 

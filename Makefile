@@ -41,7 +41,7 @@ LOCATION_OBJ = $(BUILD_DIR)/location.o
 BLOCK_OBJ = $(BUILD_DIR)/block.o
 EXT_OBJ = $(BUILD_DIR)/ext.o
 PROPS_OBJ = $(BUILD_DIR)/props.o
-#PATH_OBJ = $(BUILD_DIR)/path.o
+PATH_OBJ = $(BUILD_DIR)/path.o
 OBJECT_OBJ = $(BUILD_DIR)/object.o
 VALUE_OBJ = $(BUILD_DIR)/value.o
 MATH_OBJ = $(BUILD_DIR)/math.o
@@ -72,8 +72,7 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 		$(STATIC_OBJ) \
 		$(EXT_OBJ) \
 		$(PROPS_OBJ) \
-		$(NULL)
-
+		$(PATH_OBJ)
 
 OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
@@ -128,9 +127,9 @@ $(PROPS_OBJ): $(PROPS_DIR)/props.c
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(PROPS_DIR)/props.c
 
-# $(PATH_OBJ): $(PATH_DIR)/path.c
-# 	@printf 'CC\t$@\n'
-# 	@$(CC) $(CFLAGS) -o $@ -c $(PATH_DIR)/path.c
+$(PATH_OBJ): $(PATH_DIR)/path.c
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(PATH_DIR)/path.c
 
 $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'

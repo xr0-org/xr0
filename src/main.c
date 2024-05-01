@@ -14,6 +14,7 @@
 #include "state.h"
 #include "util.h"
 #include "verify.h"
+
 /* XXX */
 #define INCLUDE_ENVVAR		"XR0_INCLUDES"
 #define OUTPUT_PATH		"0.c"

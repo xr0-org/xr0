@@ -382,6 +382,7 @@ fn expr_structmember_eval(expr: &StructMemberExpr, s: &mut State) -> Result<Box<
     };
     Ok(value_copy(obj_value))
 }
+
 fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
     let CallExpr { fun, args } = call;
     let name = ast_expr_as_identifier(fun);
@@ -391,7 +392,6 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
             return Err(Error::new(format!("`{name}' not found")));
         };
         let params = f.params();
-        let rtype = f.rtype();
 
         if args.len() != params.len() {
             return Err(Error::new(format!(
@@ -402,7 +402,7 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
         }
 
         let args = prepare_arguments(args, params, &mut *state);
-        state_pushframe(&mut *state, name.to_string(), rtype);
+        state_pushframe(&mut *state, f.name.clone(), &f.abstract_, f.rtype(), true);
         prepare_parameters(params, args, name, &mut *state)?;
 
         /* XXX: pass copy so we don't observe */
@@ -432,7 +432,13 @@ fn call_absexec(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
 
 fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
     let fname = f.name();
-    let mut param_state = state_create(fname.to_string(), arg_state.externals_arc(), f.rtype());
+    let mut param_state = state_create(
+        fname.to_string(),
+        &f.abstract_,
+        f.rtype(),
+        true,
+        arg_state.ext(),
+    );
     ast_function_initparams(f, &mut param_state)?;
     let params = f.params();
     for p in params {

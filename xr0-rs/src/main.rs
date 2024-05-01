@@ -20,6 +20,7 @@ mod ext;
 mod math;
 mod object;
 mod parser;
+mod path;
 mod props;
 mod state;
 mod value;
@@ -117,11 +118,11 @@ fn pass0(root: Box<Ast>, ext: &mut Externals) {
     }
 }
 
-fn pass1(order: &[String], ext: &Arc<Externals>) {
+fn pass1(order: &[String], ext: &Externals) {
     for name in order {
         let f = ext.get_func(name.as_str()).unwrap();
         if !f.is_axiom() && !f.is_proto() {
-            if let Err(err) = ast_function_verify(f, Arc::clone(ext)) {
+            if let Err(err) = ast_function_verify(f, ext) {
                 eprintln!("{err}");
                 process::exit(1);
             }

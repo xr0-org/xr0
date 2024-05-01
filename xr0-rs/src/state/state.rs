@@ -1,19 +1,17 @@
-use std::sync::Arc;
-
 use super::location::{
     location_copy, location_dealloc, location_offset, location_range_dealloc, location_toheap,
     location_with_offset, LocationKind,
 };
-use super::{Block, Clump, Heap, Stack, StaticMemory, VConst};
-use crate::ast::{ast_expr_equal, ast_type_vconst, KEYWORD_RETURN};
+use super::{Block, Clump, Heap, ProgramCounter, Stack, StaticMemory, VConst};
+use crate::ast::{
+    ast_expr_equal, ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, KEYWORD_RETURN,
+};
 use crate::util::{Error, Result};
 use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
     value_ptr_create, value_sync_create,
 };
-use crate::{
-    str_write, vprintln, AstExpr, AstType, AstVariable, Externals, Location, Object, Props, Value,
-};
+use crate::{str_write, vprintln, Externals, Location, Object, Props, Value};
 
 /// The entire state of the abstract machine.
 ///
@@ -22,20 +20,26 @@ use crate::{
 /// - The abstract state of memory (heap, stack, and so on).
 /// - A collection of propositions that we are for the moment assuming to be true.
 #[derive(Clone)]
-pub struct State {
-    pub ext: Arc<Externals>,
+pub struct State<'a> {
+    pub ext: &'a Externals,
     pub vconst: VConst,
     pub static_memory: StaticMemory,
     pub clump: Clump,
-    pub stack: Stack,
+    pub stack: Stack<'a>,
     pub heap: Heap,
     pub props: Props,
 }
 
-pub fn state_create(func: String, ext: Arc<Externals>, result_type: &AstType) -> State {
+pub fn state_create<'a>(
+    name: String,
+    block: &'a AstBlock,
+    ret_type: &AstType,
+    abstract_: bool,
+    ext: &'a Externals,
+) -> Box<State<'a>> {
     let mut stack = Stack::new();
-    stack.push(func, result_type);
-    State {
+    stack.push(name, block, ret_type, abstract_);
+    Box::new(State {
         ext,
         static_memory: StaticMemory::new(),
         vconst: VConst::new(),
@@ -43,42 +47,30 @@ pub fn state_create(func: String, ext: Arc<Externals>, result_type: &AstType) ->
         stack,
         heap: Heap::new(),
         props: Props::new(),
-    }
+    })
 }
 
-pub fn state_create_withprops(
-    func: String,
-    ext: Arc<Externals>,
-    result_type: &AstType,
+pub fn state_create_withprops<'a>(
+    name: String,
+    block: &'a AstBlock,
+    ret_type: &'a AstType,
+    abstract_: bool,
+    ext: &'a Externals,
     props: Props,
-) -> State {
-    let mut stack = Stack::new();
-    stack.push(func, result_type);
-    State {
-        ext,
-        static_memory: StaticMemory::new(),
-        vconst: VConst::new(),
-        clump: Clump::new(),
-        stack,
-        heap: Heap::new(),
-        props,
-    }
+) -> Box<State<'a>> {
+    let mut stack = state_create(name, block, ret_type, abstract_, ext);
+    stack.props = props;
+    stack
 }
 
-pub fn state_copy(state: &State) -> State {
-    state.clone()
+pub fn state_copy<'a>(state: &State<'a>) -> Box<State<'a>> {
+    Box::new(state.clone())
 }
 
-pub fn state_copywithname(state: &State, func_name: String) -> State {
-    State {
-        ext: Arc::clone(&state.ext),
-        static_memory: state.static_memory.clone(),
-        vconst: state.vconst.clone(),
-        clump: state.clump.clone(),
-        stack: state.stack.clone_with_name(func_name),
-        heap: state.heap.clone(),
-        props: state.props.clone(),
-    }
+pub fn state_copywithname<'a>(state: &State<'a>, func_name: String) -> Box<State<'a>> {
+    let mut copy = state_copy(state);
+    copy.stack = state.stack.clone_with_name(func_name);
+    copy
 }
 
 pub fn state_str(state: &State) -> String {
@@ -116,13 +108,9 @@ pub fn state_str(state: &State) -> String {
     b
 }
 
-impl State {
-    pub fn ext(&self) -> &Externals {
-        &self.ext
-    }
-
-    pub fn externals_arc(&self) -> Arc<Externals> {
-        Arc::clone(&self.ext)
+impl<'a> State<'a> {
+    pub fn ext(&self) -> &'a Externals {
+        self.ext
     }
 
     pub fn heap(&mut self) -> &mut Heap {
@@ -134,8 +122,14 @@ impl State {
     }
 }
 
-pub fn state_pushframe(state: &mut State, func: String, ret_type: &AstType) {
-    state.stack.push(func, ret_type);
+pub fn state_pushframe<'a>(
+    state: &mut State<'a>,
+    name: String,
+    b: &'a AstBlock,
+    t: &AstType,
+    abstract_: bool,
+) {
+    state.stack.push(name, b, t, abstract_);
 }
 
 pub fn state_popframe(state: &mut State) {
@@ -175,7 +169,7 @@ pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
     value_ptr_create(loc)
 }
 
-impl State {
+impl<'a> State<'a> {
     pub fn clump(&mut self) -> Box<Value> {
         let address = self.clump.new_block();
         let loc = Location::new_dereferencable(address, AstExpr::new_constant(0));
@@ -240,7 +234,7 @@ pub fn state_get<'s>(
     }
 }
 
-impl State {
+impl<'a> State<'a> {
     pub fn get_block<'s>(&'s mut self, loc: &Location) -> Result<Option<&'s mut Block>> {
         match loc.kind {
             LocationKind::Static => Ok(self.static_memory.get_block(loc.block)),
@@ -257,12 +251,12 @@ impl State {
     }
 }
 
-pub fn state_getresult(state: &mut State) -> Result<Option<&mut Object>> {
+pub fn state_getresult<'s>(state: &'s mut State) -> Result<Option<&'s mut Object>> {
     let result_loc = state.stack.get_result().location().clone();
     state_get(&mut *state, &result_loc, true)
 }
 
-fn state_getresulttype(state: &State) -> &AstType {
+fn state_getresulttype<'s>(state: &'s State) -> &'s AstType {
     state.stack.get_result().type_()
 }
 
@@ -333,7 +327,7 @@ pub fn state_range_alloc(
     }
 }
 
-impl State {
+impl<'a> State<'a> {
     pub fn alloc(&mut self) -> Box<Value> {
         value_ptr_create(self.heap.new_block())
     }
@@ -368,7 +362,7 @@ pub fn state_addresses_deallocand(state: &mut State, obj: &Object) -> bool {
     (*state).loc_is_deallocand(loc)
 }
 
-impl State {
+impl<'a> State<'a> {
     pub fn loc_is_deallocand(&mut self, loc: &Location) -> bool {
         let b = self.get_block(loc).unwrap();
         loc.type_is_dynamic() && b.is_some()
@@ -424,8 +418,8 @@ pub fn state_equal(s1: &State, s2: &State) -> bool {
     let str2 = state_str(&s2_c);
     let equal = str1 == str2;
     if !equal {
-        vprintln!("actual: {str1}");
         vprintln!("abstract: {str2}");
+        vprintln!("actual: {str1}");
     }
     equal
 }
@@ -445,4 +439,21 @@ fn state_undeclarevars(s: &mut State) {
 
 fn state_popprops(s: &mut State) {
     s.props = Props::new();
+}
+
+impl<'a> State<'a> {
+    //=state_atend
+    pub fn at_end(&self) -> bool {
+        self.stack.at_end()
+    }
+
+    //=stack_step
+    pub fn step(&mut self) -> Result<()> {
+        ProgramCounter::exec(self)
+    }
+
+    /// Name of the function currently on top of the stack.
+    pub fn fname(&self) -> &str {
+        self.stack.top().name()
+    }
 }
