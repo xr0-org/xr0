@@ -11,7 +11,7 @@ use crate::state::state::{
     state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_getloc,
     state_getobject, state_getvconst, state_isalloc, state_islval, state_popframe, state_pushframe,
     state_range_alloc, state_range_aredeallocands, state_range_dealloc, state_static_init,
-    state_str, state_vconst,
+    state_vconst,
 };
 use crate::state::State;
 use crate::util::{Error, Result};
@@ -20,7 +20,7 @@ use crate::value::{
     value_isstruct, value_issync, value_literal_create, value_pf_augment, value_struct_member,
     value_sync_create, value_to_expr,
 };
-use crate::{vprintln, Object, Value};
+use crate::{Object, Value};
 
 pub struct LValue<'ast> {
     pub t: &'ast AstType,
@@ -312,7 +312,6 @@ fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
     // Note: Original does not null-check `obj` when there is not an error.
     let obj = state_getobject(state, id)?.unwrap();
     let Some(val) = obj.as_value() else {
-        vprintln!("state: {}", state_str(state));
         return Err(Error::new(format!(
             "undefined memory access: `{id}' has no value",
         )));

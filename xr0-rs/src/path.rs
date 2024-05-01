@@ -8,7 +8,7 @@ use crate::state::state::{
 };
 use crate::state::State;
 use crate::util::{Error, Result};
-use crate::vprintln;
+use crate::vprint;
 use crate::Externals;
 
 // Note: In the original the destructor asserts that `path_atend(p)` and leaks both states and any
@@ -176,7 +176,7 @@ impl<'a> Path<'a> {
     fn audit(&mut self) -> Result<()> {
         let actual = self.actual.as_mut().unwrap();
         if state_hasgarbage(actual) {
-            vprintln!("actual: {}", state_str(actual));
+            vprint!("actual: {}", state_str(actual));
             return Err(Error::new(format!("{}: garbage on heap", self.f.name)));
         }
         if !state_equal(actual, self.abstract_.as_ref().unwrap()) {

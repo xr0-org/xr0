@@ -130,6 +130,15 @@ macro_rules! vprintln {
     }
 }
 
+#[macro_export]
+macro_rules! vprint {
+    ( $( $args:tt )* ) => {
+        if $crate::util::VERBOSE_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+            eprint!($($args)*);
+        }
+    }
+}
+
 /// Map that keeps entries in insertion order.
 /// Implemented as an alist for now.
 #[derive(Clone)]

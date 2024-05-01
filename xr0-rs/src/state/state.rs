@@ -12,7 +12,7 @@ use crate::value::{
     value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
     value_ptr_create, value_sync_create,
 };
-use crate::{str_write, vprintln, Externals, Location, Object, Props, Value};
+use crate::{str_write, vprint, Externals, Location, Object, Props, Value};
 
 /// The entire state of the abstract machine.
 ///
@@ -450,8 +450,8 @@ pub fn state_equal(s1: &State, s2: &State) -> bool {
     let str2 = state_str(&s2_c);
     let equal = str1 == str2;
     if !equal {
-        vprintln!("abstract: {str2}");
-        vprintln!("actual: {str1}");
+        vprint!("abstract: {str2}");
+        vprint!("actual: {str1}");
     }
     equal
 }
