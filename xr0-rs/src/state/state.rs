@@ -164,7 +164,7 @@ pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
     }
     let address = state.static_memory.new_block();
     let loc = Location::new_static(address, AstExpr::new_constant(0));
-    let obj = state_get(state, &loc, true).unwrap().unwrap();
+    let obj = state.get_mut(&loc, true).unwrap().unwrap();
     obj.assign(Some(value_literal_create(lit)));
     state.static_memory.string_pool(lit, &loc);
     value_ptr_create(loc)
@@ -183,7 +183,7 @@ pub fn state_islval(state: &mut State, v: &Value) -> bool {
         return false;
     }
     let loc = value_as_location(v);
-    state_get(state, loc, true).unwrap();
+    state.get_mut(loc, true).unwrap();
     match loc.kind {
         LocationKind::Static => state.static_memory.has_block(loc.block),
         LocationKind::VConst => false,
@@ -198,7 +198,7 @@ pub fn state_isalloc(state: &mut State, v: &Value) -> bool {
         return false;
     }
     let loc = value_as_location(v);
-    state_get(state, loc, true).unwrap();
+    state.get_mut(loc, true).unwrap();
     location_toheap(loc, &mut state.heap)
 }
 
@@ -206,36 +206,46 @@ pub fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Value> {
     state.vconst.get(id)
 }
 
-/// Gets the object at the given location `loc`.
-///
-/// On success, this returns a mutable reference to the `Object`. If the block designated by `loc`
-/// doesn't exist, this returns Ok(None). (That seems suspicious to me; I'm not sure why it should
-/// not be an assertion failure. -jorendorff) If the block refers to a stack frame that doesn't
-/// exist, this returns an error. (Same. -jorendorff)
-pub fn state_get<'s>(
-    state: &'s mut State,
-    loc: &Location,
-    constructive: bool,
-) -> Result<Option<&'s mut Object>> {
-    let state_ptr: *mut State = state;
-    let b = state.get_block_mut(loc)?;
-    match b {
-        None => {
-            assert!(matches!(
-                loc.kind,
-                LocationKind::Dynamic | LocationKind::Dereferencable | LocationKind::Static
-            ));
-            Ok(None)
-        }
-        Some(b) => unsafe {
+impl<'a> State<'a> {
+    //=state_get (non-mut variation)
+    #[allow(dead_code)]
+    pub fn get<'s>(&'s self, loc: &Location) -> Result<Option<&'s Object>> {
+        Ok(self
+            .get_block(loc)?
+            .and_then(|b| b.observe_read_only(&loc.offset, self)))
+    }
+
+    /// Gets the object at the given location `loc`.
+    ///
+    /// On success, this returns a mutable reference to the `Object`. If the block designated by
+    /// `loc` doesn't exist, this returns Ok(None). (That seems suspicious to me; it means we're
+    /// chasing a dangling pointer which we should not do. I'm not sure why it should not be an
+    /// assertion failure. -jorendorff) If the block refers to a stack frame that doesn't exist,
+    /// this returns an error. (Same. -jorendorff)
+    //=state_get
+    pub fn get_mut<'s>(
+        &'s mut self,
+        loc: &Location,
+        constructive: bool,
+    ) -> Result<Option<&'s mut Object>> {
+        let state_ptr: *mut State = self;
+        unsafe {
             // Unsafe because Block::observe is inherently unsafe since the state presumably
             // contains the block.
-            Ok(b.observe(location_offset(loc), &mut *state_ptr, constructive))
-        },
+            let b = (*state_ptr).get_block_mut(loc)?;
+            match b {
+                None => {
+                    assert!(matches!(
+                        loc.kind,
+                        LocationKind::Dynamic | LocationKind::Dereferencable | LocationKind::Static
+                    ));
+                    Ok(None)
+                }
+                Some(b) => Ok(b.observe(location_offset(loc), &mut *state_ptr, constructive)),
+            }
+        }
     }
-}
 
-impl<'a> State<'a> {
     pub fn get_block<'s>(&'s self, loc: &Location) -> Result<Option<&'s Block>> {
         match loc.kind {
             LocationKind::Static => Ok(self.static_memory.get_block(loc.block)),
@@ -269,7 +279,7 @@ impl<'a> State<'a> {
 
 pub fn state_getresult<'s>(state: &'s mut State) -> Result<Option<&'s mut Object>> {
     let result_loc = state.stack.get_result().location().clone();
-    state_get(&mut *state, &result_loc, true)
+    state.get_mut(&result_loc, true)
 }
 
 fn state_getresulttype<'s>(state: &'s State) -> &'s AstType {
@@ -317,7 +327,7 @@ pub fn state_getobject<'s>(state: &'s mut State, id: &str) -> Result<Option<&'s 
         return Err(Error::new(format!("unknown variable `{id}'")));
     };
     let var_loc = v.location().clone();
-    state_get(state, &var_loc, true)
+    state.get_mut(&var_loc, true)
 }
 
 pub fn state_deref<'s>(
@@ -331,7 +341,8 @@ pub fn state_deref<'s>(
     let deref_base = value_as_location(ptr_val);
     // Note: the original leaked this location.
     let deref = location_with_offset(deref_base, index);
-    state_get(state, &deref, true)
+    state
+        .get_mut(&deref, true)
         .map_err(|err| Error::new(format!("undefined indirection: {err}")))
 }
 

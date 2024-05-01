@@ -1,7 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_copy, ast_expr_equal};
-use crate::state::state::state_get;
 use crate::state::{Heap, State};
 use crate::util::{Error, Result};
 use crate::{AstExpr, Value};
@@ -157,7 +156,7 @@ pub fn location_referencesheap(l: &Location, s: &mut State) -> bool {
         }
         return true;
     }
-    let Some(obj) = state_get(&mut *s, l, false).unwrap() else {
+    let Some(obj) = s.get_mut(l, false).unwrap() else {
         return false;
     };
     // XXX FIXME: Clone is not in the original. Added here to satisfy Rust's alias analysis.

@@ -8,10 +8,10 @@ use super::{
     IncDecExpr, StructMemberExpr, UnaryExpr,
 };
 use crate::state::state::{
-    state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_get,
-    state_getloc, state_getobject, state_getvconst, state_isalloc, state_islval, state_popframe,
-    state_pushframe, state_range_alloc, state_range_aredeallocands, state_range_dealloc,
-    state_static_init, state_str, state_vconst,
+    state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_getloc,
+    state_getobject, state_getvconst, state_isalloc, state_islval, state_popframe, state_pushframe,
+    state_range_alloc, state_range_aredeallocands, state_range_dealloc, state_static_init,
+    state_str, state_vconst,
 };
 use crate::state::State;
 use crate::util::{Error, Result};
@@ -468,8 +468,10 @@ fn verify_paramspec(
     if state_isalloc(param_state, param) && !state_isalloc(arg_state, arg) {
         return Err(Error::new("must be heap allocated".to_string()));
     }
-    let param_obj = state_get(param_state, value_as_location(param), false)?.unwrap();
-    let arg_obj = state_get(arg_state, value_as_location(arg), false)?.unwrap();
+    let param_obj = param_state
+        .get_mut(value_as_location(param), false)?
+        .unwrap();
+    let arg_obj = arg_state.get_mut(value_as_location(arg), false)?.unwrap();
     if !param_obj.has_value() {
         return Ok(());
     }
