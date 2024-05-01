@@ -137,6 +137,7 @@ impl<'a> Stack<'a> {
         self.frames.last_mut().unwrap()
     }
 
+    // XXX FIXME: inherently UB API
     pub fn references(&self, loc: &Location, state: &mut State) -> bool {
         // Note: Original only checks the top stack frame.
         self.top().references(loc, state)
@@ -248,6 +249,8 @@ fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
     });
     let s: *mut State = s;
     unsafe {
+        // Unsafe because abstractcopy requires mut state, in turn because referencesheap reqiures
+        // the same. Find out if that can be made non-mut.
         let obj = state_get(&mut *s, &new.loc, false).unwrap().unwrap();
         if obj.is_value() {
             if let Some(v) = obj.as_value() {

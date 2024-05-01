@@ -68,6 +68,8 @@ impl Block {
     /// It's unclear how this copes with vagueness in `offset`. It's also unclear why it does what
     /// it does in the case where it punches a hole in a range object -- it's implemented (I think)
     /// by freeing the entire block `self` and allocating a new block, which can't be right.
+    ///
+    /// XXX FIXME inherently unsafe API since `*s` probably owns `*self`.
     pub fn observe<'b>(
         &'b mut self,
         offset: &AstExpr,
@@ -126,7 +128,7 @@ impl Block {
         self.arr.iter().any(|obj| obj.references(loc, s))
     }
 
-    // XXX FIXME: `self` may be an element of `heap`, verboten aliasing
+    // XXX FIXME: inherently UB: `self` may be an element of `heap`, verboten aliasing
     pub fn range_alloc(&mut self, lw: &AstExpr, up: &AstExpr, heap: &mut Heap) -> Result<()> {
         assert!(self.arr.is_empty());
         self.arr.push(Object::with_range(
@@ -139,7 +141,7 @@ impl Block {
         Ok(())
     }
 
-    pub fn range_aredeallocands(&self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> bool {
+    pub fn range_aredeallocands(&self, lw: &AstExpr, up: &AstExpr, s: &State) -> bool {
         if self.hack_first_object_is_exactly_bounds(lw, up, s) {
             return true;
         }
@@ -161,12 +163,7 @@ impl Block {
         true
     }
 
-    fn hack_first_object_is_exactly_bounds(
-        &self,
-        lw: &AstExpr,
-        up: &AstExpr,
-        s: &mut State,
-    ) -> bool {
+    fn hack_first_object_is_exactly_bounds(&self, lw: &AstExpr, up: &AstExpr, s: &State) -> bool {
         assert!(!self.arr.is_empty());
         let obj = &self.arr[0];
         if !obj.is_deallocand(s) {

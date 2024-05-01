@@ -4,7 +4,8 @@ use super::location::{
 };
 use super::{Block, Clump, Heap, ProgramCounter, Stack, StaticMemory, VConst};
 use crate::ast::{
-    ast_expr_equal, ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, KEYWORD_RETURN,
+    ast_expr_equal, ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue,
+    KEYWORD_RETURN,
 };
 use crate::util::{Error, Result};
 use crate::value::{
@@ -226,11 +227,11 @@ pub fn state_get<'s>(
             ));
             Ok(None)
         }
-        Some(b) => {
-            // XXX FIXME: dereferencing *state_ptr here has got to be UB in rust
-            let obj = unsafe { b.observe(location_offset(loc), &mut *state_ptr, constructive) };
-            Ok(obj)
-        }
+        Some(b) => unsafe {
+            // Unsafe because Block::observe is inherently unsafe since the state presumably
+            // contains the block.
+            Ok(b.observe(location_offset(loc), &mut *state_ptr, constructive))
+        },
     }
 }
 
@@ -275,8 +276,23 @@ fn state_getresulttype<'s>(state: &'s State) -> &'s AstType {
     state.stack.get_result().type_()
 }
 
+impl<'a> State<'a> {
+    pub fn identifier_lvalue<'s>(&'s mut self, id: &str) -> Result<LValue<'s>> {
+        let state: *mut State = self;
+        unsafe {
+            // Unsafe because we fetch references to two pieces of information. Need a single State
+            // method that fetches both. Underneath all this is Block::observe.
+            let obj = state_getobject(&mut *state, id)?;
+            Ok(LValue {
+                t: state_getobjecttype(&*state, id),
+                obj,
+            })
+        }
+    }
+}
+
 pub fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType {
-    if id == "return" {
+    if id == KEYWORD_RETURN {
         return state_getresulttype(state);
     }
     let v = state.stack.get_variable(id).unwrap();
@@ -332,12 +348,13 @@ pub fn state_range_alloc(
 
     let state: *mut State = state;
     unsafe {
+        // Unsafe because `range_alloc` is inherently UB, taking likely aliasing mut
+        // references as args `self` and `heap`
         let b = (*state).get_block_mut(deref).unwrap(); // panic rather than propagate the error - this is in the original
         let Some(b) = b else {
             return Err(Error::new("no block".to_string()));
         };
         assert!(!ast_expr_equal(lw, up));
-        // XXX FIXME: b is mutably borrowed from state and now we're going to mutate the heap
         b.range_alloc(lw, up, &mut (*state).heap)
     }
 }
@@ -370,11 +387,11 @@ pub fn state_range_dealloc(
     location_range_dealloc(deref, lw, up, state)
 }
 
-pub fn state_addresses_deallocand(state: &mut State, obj: &Object) -> bool {
+pub fn state_addresses_deallocand(state: &State, obj: &Object) -> bool {
     // Note: Original doesn't null-check.
     let val = obj.as_value().unwrap();
     let loc = value_as_location(val);
-    (*state).loc_is_deallocand(loc)
+    state.loc_is_deallocand(loc)
 }
 
 impl<'a> State<'a> {
@@ -384,12 +401,7 @@ impl<'a> State<'a> {
     }
 }
 
-pub fn state_range_aredeallocands(
-    state: &mut State,
-    obj: &Object,
-    lw: &AstExpr,
-    up: &AstExpr,
-) -> bool {
+pub fn state_range_aredeallocands(state: &State, obj: &Object, lw: &AstExpr, up: &AstExpr) -> bool {
     if ast_expr_equal(lw, up) {
         return true;
     }
@@ -397,22 +409,21 @@ pub fn state_range_aredeallocands(
         return false;
     };
     let deref = value_as_location(arr_val);
-    let state: *mut State = state;
-    unsafe {
-        match (*state).get_block_mut(deref).unwrap() {
-            Some(b) => b.range_aredeallocands(lw, up, &mut *state),
-            None => false,
-        }
+    match state.get_block(deref).unwrap() {
+        Some(b) => b.range_aredeallocands(lw, up, state),
+        None => false,
     }
 }
 
 pub fn state_hasgarbage(state: &mut State) -> bool {
     let state: *mut State = state;
+    // Unsafe to call inherently UB API.
     unsafe { !(*state).heap.referenced(&mut *state) }
 }
 
 pub fn state_references(s: &mut State, loc: &Location) -> bool {
     let s: *mut State = s;
+    // Unsafe to call inherently UB API
     unsafe { (*s).stack.references(loc, &mut *s) }
 }
 
@@ -446,6 +457,7 @@ fn state_undeclareliterals(s: &mut State) {
 fn state_undeclarevars(s: &mut State) {
     let s: *mut State = s;
     unsafe {
+        // Unsafe because uses inherently UB APIs.
         (*s).heap.undeclare(&mut *s);
         (*s).vconst.undeclare();
         (*s).stack.undeclare(&mut *s);

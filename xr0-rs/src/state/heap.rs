@@ -99,8 +99,9 @@ impl Heap {
         self.blocks[address].freed
     }
 
+    // XXX FIXME: inherently UB API
+    // `s` aliases `self` and `Block::undeclare` actually accesses `self`
     pub fn undeclare(&mut self, s: &mut State) {
-        // XXX FIXME: `s` aliases `self` and `Block::undeclare` actually accesses `self`
         for block in &mut self.blocks {
             if !block.freed {
                 block.block.undeclare(s);
@@ -108,6 +109,7 @@ impl Heap {
         }
     }
 
+    // XXX FIXME: inherently UB API because `self` aliases mut `s`.
     pub fn referenced(&self, s: &mut State) -> bool {
         for i in 0..self.blocks.len() {
             if !self.blocks[i].freed && !block_referenced(s, i) {

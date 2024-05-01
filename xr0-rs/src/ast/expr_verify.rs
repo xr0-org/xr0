@@ -9,9 +9,9 @@ use super::{
 };
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_get,
-    state_getloc, state_getobject, state_getobjecttype, state_getvconst, state_isalloc,
-    state_islval, state_popframe, state_pushframe, state_range_alloc, state_range_aredeallocands,
-    state_range_dealloc, state_static_init, state_str, state_vconst,
+    state_getloc, state_getobject, state_getvconst, state_isalloc, state_islval, state_popframe,
+    state_pushframe, state_range_alloc, state_range_aredeallocands, state_range_dealloc,
+    state_static_init, state_str, state_vconst,
 };
 use crate::state::State;
 use crate::util::{Error, Result};
@@ -85,9 +85,11 @@ fn expr_isdeallocand_rangedecide(
     drop(i);
     let state: *mut State = state;
     unsafe {
+        // Unsafe because LValue requires &mut State. Could be made safe if we had a matching
+        // non-mut LValue, I think.
         let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), &mut *state).unwrap();
         let obj = res_lval.obj.unwrap();
-        state_range_aredeallocands(&mut *state, obj, lw, up)
+        state_range_aredeallocands(&*state, obj, lw, up)
     }
 }
 
@@ -123,6 +125,8 @@ fn rangeprocess_alloc(
     let state: *mut State = state;
     unsafe {
         let obj = hack_base_object_from_alloc(lval, &mut *state);
+        // Inherently unsafe API aliasing `state` and `obj`. Likely we could fix it by making the
+        // function take a location instead, which we can copy outside of `state`.
         state_range_alloc(&mut *state, obj, lw, up)
     }
 }
@@ -136,6 +140,7 @@ fn rangeprocess_dealloc(
     let state: *mut State = state;
     unsafe {
         let obj = hack_base_object_from_alloc(&dealloc.arg, &mut *state);
+        // Identical safety situation to `rangeprocess_alloc` above.
         state_range_dealloc(&mut *state, obj, lw, up)
     }
 }
@@ -165,14 +170,7 @@ pub fn ast_expr_lvalue<'s>(expr: &'s AstExpr, state: &'s mut State) -> Result<LV
 }
 
 pub fn expr_identifier_lvalue<'s>(id: &str, state: &'s mut State) -> Result<LValue<'s>> {
-    let state: *mut State = state;
-    unsafe {
-        let obj = state_getobject(&mut *state, id)?;
-        Ok(LValue {
-            t: state_getobjecttype(&*state, id),
-            obj,
-        })
-    }
+    state.identifier_lvalue(id)
 }
 
 pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Result<LValue<'s>> {
@@ -184,6 +182,10 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
         AstExprKind::Identifier(_) => {
             let state: *mut State = state;
             unsafe {
+                // Unsafe becaues we first evaluate `inner`, producing a Value that borrows from
+                // `state`; then call inherently unsafe API `state_deref` passing both that value
+                // and the state. Can probably fix by copying a Location.
+
                 let root_lval = ast_expr_lvalue(inner, &mut *state)?;
                 let Some(root_obj) = root_lval.obj else {
                     // `root` freed
@@ -202,6 +204,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
         AstExprKind::Binary(BinaryExpr { op: _, e1, e2 }) => {
             let state: *mut State = state;
             unsafe {
+                // Unsafe for similar reasons as above.
                 let root_lval = ast_expr_lvalue(e1, &mut *state)?;
                 let Some(root_obj) = root_lval.obj else {
                     // `root` freed
@@ -229,6 +232,7 @@ pub fn expr_structmember_lvalue<'s>(
     let StructMemberExpr { root, member } = sm;
     let state: *mut State = state;
     unsafe {
+        // Unsafe because it fetches one thing, then uses it to fetch another. Copy a location.
         let root_lval = ast_expr_lvalue(root, &mut *state)?;
         let root_obj = root_lval.obj.unwrap();
         let lvalue = root_obj.member_lvalue(root_lval.t, member, &mut *state);
@@ -247,8 +251,9 @@ fn hack_object_from_assertion<'s>(expr: &'s AstExpr, state: &'s mut State) -> &'
 fn expr_isdeallocand_decide(expr: &AstExpr, state: &mut State) -> bool {
     let state: *mut State = state;
     unsafe {
+        // Unsafe because `hack_object_from_assertion` wants `state` mutably. LValue mutability.
         let obj = hack_object_from_assertion(expr, &mut *state);
-        state_addresses_deallocand(&mut *state, obj)
+        state_addresses_deallocand(&*state, obj)
     }
 }
 

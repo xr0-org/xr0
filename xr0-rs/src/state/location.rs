@@ -142,7 +142,8 @@ pub fn location_references(l1: &Location, l2: &Location, s: &mut State) -> bool 
     }
     let s: *mut State = s;
     unsafe {
-        match (*s).get_block_mut(l1).unwrap() {
+        // Unsafe because Block::references takes a mut ref to state. Not sure if that's necessary.
+        match (*s).get_block(l1).unwrap() {
             None => false,
             Some(b) => b.references(l2, &mut *s),
         }
@@ -195,10 +196,11 @@ pub fn location_range_dealloc(
     assert!(offsetzero(loc));
     let state: *mut State = state;
     unsafe {
+        // Unsafe because `range_dealloc` has an inherently unsafe API.
         let Some(b) = (*state).get_block_mut(loc).unwrap() else {
             return Err(Error::new("cannot get block".to_string()));
         };
-        if !b.range_aredeallocands(lw, up, &mut *state) {
+        if !b.range_aredeallocands(lw, up, &*state) {
             println!("block: {b}");
             println!("lw: {lw}, up: {up}");
             debug_assert!(false);

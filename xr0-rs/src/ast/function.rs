@@ -152,6 +152,8 @@ fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
 fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
     let state: *mut State = state;
     unsafe {
+        // Unsafe because we fetch a mut ref to an object, then ues `state_vconst` which mutates
+        // state, then assign the resulting value to the object. Two things.
         let name = &param.name;
         let t = &param.type_;
         let obj = state_getobject(&mut *state, name).unwrap().unwrap();
