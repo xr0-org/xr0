@@ -737,7 +737,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		);
 	}
 
-	return result_error_create(error_frame());
+	return result_value_create(NULL);
 }
 
 static struct error *
@@ -1126,7 +1126,7 @@ call_absexec(struct ast_expr *expr, struct state *state)
 		);
 	}
 
-	return result_error_create(error_frame());
+	return result_value_create(NULL);
 }
 
 static struct result *

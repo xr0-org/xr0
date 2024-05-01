@@ -16,6 +16,7 @@ struct program {
 		PROGRAM_COUNTER_ATEND,
 	} s;
 	int index;
+	struct lexememarker *loc;
 };
 
 static enum program_state
@@ -35,6 +36,14 @@ void
 program_setatend(struct program *p)
 {
 	p->s = PROGRAM_COUNTER_ATEND;
+}
+
+void
+program_storeloc(struct program *p)
+{
+	if (ast_block_nstmts(p->b) > 0) {
+		p->loc = ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index]);
+	}
 }
 
 static enum program_state
@@ -119,7 +128,7 @@ program_nextdecl(struct program *p)
 static bool
 program_stmt_atend(struct program *, struct state *);
 
-void
+static void
 program_nextstmt(struct program *p, struct state *s)
 {
 	assert(p->s == PROGRAM_COUNTER_STMTS);
@@ -168,10 +177,6 @@ program_stmt_step(struct program *p, enum execution_mode mode, struct state *s)
 		program_nextstmt(p, s);
 		return NULL;
 	}
-	struct error *frame_err = error_to_frame(err);
-	if (frame_err) {
-		return NULL;
-	}
 	struct error *return_err = error_to_return(err);
 	if (return_err) {
 		state_return(s);
@@ -203,6 +208,9 @@ program_stmt_process(struct program *p, enum execution_mode mode, struct state *
 char *
 program_loc(struct program *p)
 {
+	if (p->loc) {
+		return lexememarker_str(p->loc);
+	}
 	switch (p->s) {
 	case PROGRAM_COUNTER_STMTS:
 		return lexememarker_str(
