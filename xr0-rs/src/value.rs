@@ -5,7 +5,7 @@ use crate::ast::{
     ast_expr_copy, ast_expr_equal, ast_type_create_voidptr, ast_type_struct_complete,
     ast_type_struct_members,
 };
-use crate::state::location::{location_references, location_referencesheap, location_transfigure};
+use crate::state::location::{location_references, location_referencesheap};
 use crate::state::state::state_vconst;
 use crate::state::State;
 use crate::util::SemiBox;
@@ -157,9 +157,7 @@ pub fn value_transfigure<'v>(
                 )))
             }
         }
-        ValueKind::DefinitePtr(loc) => {
-            Some(SemiBox::Owned(location_transfigure(loc, &mut *compare)))
-        }
+        ValueKind::DefinitePtr(loc) => Some(SemiBox::Owned(loc.transfigure(compare))),
         ValueKind::IndefinitePtr(_) => panic!(),
     }
 }

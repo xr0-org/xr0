@@ -1,6 +1,5 @@
 use super::location::{
-    location_copy, location_dealloc, location_offset, location_range_dealloc, location_toheap,
-    location_with_offset, LocationKind,
+    location_copy, location_dealloc, location_range_dealloc, location_toheap, LocationKind,
 };
 use super::{Block, Clump, Heap, ProgramCounter, Stack, StaticMemory, VConst};
 use crate::ast::{
@@ -236,7 +235,7 @@ impl<'a> State<'a> {
                     ));
                     Ok(None)
                 }
-                Some(b) => Ok(b.observe(location_offset(loc), &mut *state_ptr, constructive)),
+                Some(b) => Ok(b.observe(&loc.offset, &mut *state_ptr, constructive)),
             }
         }
     }
@@ -335,7 +334,7 @@ pub fn state_deref<'s>(
     }
     let deref_base = value_as_location(ptr_val);
     // Note: the original leaked this location.
-    let deref = location_with_offset(deref_base, index);
+    let deref = deref_base.with_offset(index);
     state
         .get_mut(&deref, true)
         .map_err(|err| Error::new(format!("undefined indirection: {err}")))

@@ -28,65 +28,7 @@ pub enum LocationKind {
     Dynamic,
 }
 
-impl Location {
-    pub fn type_is_dynamic(&self) -> bool {
-        matches!(self.kind, LocationKind::Dynamic)
-    }
-
-    pub fn type_is_vconst(&self) -> bool {
-        matches!(self.kind, LocationKind::VConst)
-    }
-
-    #[allow(dead_code)]
-    pub fn new_vconst(block: usize, offset: Box<AstExpr>) -> Box<Location> {
-        Box::new(Location {
-            kind: LocationKind::VConst,
-            block,
-            offset,
-        })
-    }
-
-    pub fn new_dereferencable(block: usize, offset: Box<AstExpr>) -> Box<Location> {
-        Box::new(Location {
-            kind: LocationKind::Dereferencable,
-            block,
-            offset,
-        })
-    }
-
-    pub fn new_static(block: usize, offset: Box<AstExpr>) -> Box<Location> {
-        Box::new(Location {
-            kind: LocationKind::Static,
-            block,
-            offset,
-        })
-    }
-
-    pub fn new_dynamic(block: usize, offset: Box<AstExpr>) -> Box<Location> {
-        Box::new(Location {
-            kind: LocationKind::Dynamic,
-            block,
-            offset,
-        })
-    }
-
-    pub fn new_automatic(frame: usize, block: usize, offset: Box<AstExpr>) -> Box<Location> {
-        Box::new(Location {
-            kind: LocationKind::Automatic { frame },
-            block,
-            offset,
-        })
-    }
-}
-
-pub fn location_transfigure(loc: &Location, compare: &mut State) -> Box<Value> {
-    match &loc.kind {
-        LocationKind::Automatic { .. } | LocationKind::Dereferencable => (*compare).clump(),
-        LocationKind::Dynamic => (*compare).alloc(),
-        _ => panic!(),
-    }
-}
-
+//=location_str
 impl Display for Location {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.kind {
@@ -104,24 +46,86 @@ impl Display for Location {
     }
 }
 
+impl Location {
+    pub fn type_is_dynamic(&self) -> bool {
+        matches!(self.kind, LocationKind::Dynamic)
+    }
+
+    pub fn type_is_vconst(&self) -> bool {
+        matches!(self.kind, LocationKind::VConst)
+    }
+
+    //=location_create_vconst
+    #[allow(dead_code)]
+    pub fn new_vconst(block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::VConst,
+            block,
+            offset,
+        })
+    }
+
+    //=location_create_dereferencable
+    pub fn new_dereferencable(block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::Dereferencable,
+            block,
+            offset,
+        })
+    }
+
+    //=location_create_static
+    pub fn new_static(block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::Static,
+            block,
+            offset,
+        })
+    }
+
+    //=location_create_dynamic
+    pub fn new_dynamic(block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::Dynamic,
+            block,
+            offset,
+        })
+    }
+
+    //=location_create_automatic
+    pub fn new_automatic(frame: usize, block: usize, offset: Box<AstExpr>) -> Box<Location> {
+        Box::new(Location {
+            kind: LocationKind::Automatic { frame },
+            block,
+            offset,
+        })
+    }
+
+    //=location_transfigure
+    pub fn transfigure(&self, compare: &mut State) -> Box<Value> {
+        match &self.kind {
+            LocationKind::Automatic { .. } | LocationKind::Dereferencable => compare.clump(),
+            LocationKind::Dynamic => compare.alloc(),
+            _ => panic!(),
+        }
+    }
+
+    //=location_with_offset
+    pub fn with_offset(&self, offset: &AstExpr) -> Box<Location> {
+        assert!(offsetzero(self));
+        let mut copy = location_copy(self);
+        copy.offset = ast_expr_copy(offset);
+        copy
+    }
+}
+
 fn offsetzero(loc: &Location) -> bool {
     let zero = AstExpr::new_constant(0);
     ast_expr_equal(&loc.offset, &zero)
 }
 
-pub fn location_offset(loc: &Location) -> &AstExpr {
-    &loc.offset
-}
-
 pub fn location_copy(loc: &Location) -> Box<Location> {
     Box::new(loc.clone())
-}
-
-pub fn location_with_offset(loc: &Location, offset: &AstExpr) -> Box<Location> {
-    assert!(offsetzero(loc));
-    let mut copy = location_copy(loc);
-    copy.offset = ast_expr_copy(offset);
-    copy
 }
 
 pub fn location_toheap(loc: &Location, h: &mut Heap) -> bool {
