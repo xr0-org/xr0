@@ -21,6 +21,7 @@ pub struct Block {
     pub arr: Vec<Box<Object>>,
 }
 
+//=block_str
 impl Display for Block {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let n = self.arr.len();
@@ -32,10 +33,12 @@ impl Display for Block {
 }
 
 impl Block {
+    //=block_create
     pub fn new() -> Box<Block> {
         Box::new(Block { arr: vec![] })
     }
 
+    //=block_install
     pub fn install(&mut self, obj: Box<Object>) {
         assert!(self.arr.is_empty());
         self.arr.push(obj);
@@ -70,6 +73,7 @@ impl Block {
     /// by freeing the entire block `self` and allocating a new block, which can't be right.
     ///
     /// XXX FIXME inherently unsafe API since `*s` probably owns `*self`.
+    //=block_observe
     pub fn observe<'b>(
         &'b mut self,
         offset: &AstExpr,
@@ -124,6 +128,7 @@ impl Block {
         Some(&mut self.arr[observed_index])
     }
 
+    //=block_references
     pub fn references(&self, loc: &Location, s: &mut State) -> bool {
         self.arr.iter().any(|obj| obj.references(loc, s))
     }
@@ -152,6 +157,7 @@ impl Block {
         Ok(())
     }
 
+    //=block_range_aredeallocands
     pub fn range_aredeallocands(&self, lw: &AstExpr, up: &AstExpr, s: &State) -> bool {
         if self.hack_first_object_is_exactly_bounds(lw, up, s) {
             return true;
@@ -187,6 +193,7 @@ impl Block {
         state_eval(s, &same_lw) && state_eval(s, &same_up)
     }
 
+    //=block_range_dealloc
     pub fn range_dealloc(&mut self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> Result<()> {
         if self.hack_first_object_is_exactly_bounds(lw, up, s) {
             self.arr[0].dealloc(s)?;
@@ -231,6 +238,7 @@ impl Block {
         Ok(())
     }
 
+    //=block_undeclare
     pub fn undeclare(&mut self, s: &mut State) {
         let mut new = vec![];
         for obj in &self.arr {
