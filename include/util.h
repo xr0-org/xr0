@@ -115,4 +115,19 @@ error_get_undecideable_cond(struct error *);
 char *
 error_str(struct error *);
 
+
+struct circuitbreaker;
+
+struct circuitbreaker *
+circuitbreaker_create();
+
+struct circuitbreaker *
+circuitbreaker_copy(struct circuitbreaker *);
+
+void
+circuitbreaker_destroy(struct circuitbreaker *);
+
+bool
+circuitbreaker_append(struct circuitbreaker *, void *);
+
 #endif

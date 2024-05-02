@@ -147,10 +147,16 @@ char *
 location_str(struct location *);
 
 bool
-location_references(struct location *l1, struct location *l2, struct state *);
+location_references(struct location *l1, struct location *l2, struct state *,
+		struct circuitbreaker *cb);
+
+struct circuitbreaker;
+
+struct circuitbreaker;
 
 bool
-location_referencesheap(struct location *, struct state *);
+location_referencesheap(struct location *, struct state *,
+		struct circuitbreaker *);
 
 struct value *
 location_transfigure(struct location *, struct state *compare);

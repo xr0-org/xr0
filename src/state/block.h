@@ -31,8 +31,11 @@ block_observe(struct block *, struct ast_expr *offset, struct state *,
 
 struct location;
 
+struct circuitbreaker;
+
 bool
-block_references(struct block *, struct location *, struct state *);
+block_references(struct block *, struct location *, struct state *,
+		struct circuitbreaker *);
 
 struct error *
 block_range_alloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,

@@ -39,10 +39,13 @@ object_isdeallocand(struct object *, struct state *);
 struct location;
 
 bool
-object_references(struct object *, struct location *, struct state *);
+object_references(struct object *, struct location *, struct state *,
+		struct circuitbreaker *);
+
+struct circuitbreaker;
 
 bool
-object_referencesheap(struct object *, struct state *);
+object_referencesheap(struct object *, struct state *, struct circuitbreaker *);
 
 bool
 object_hasvalue(struct object *);

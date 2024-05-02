@@ -57,10 +57,10 @@ value_ptr_indefinite_create()
 	return v;
 }
 
-static bool
-ptr_referencesheap(struct value *v, struct state *s)
+bool
+ptr_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
 {
-	return !v->ptr.isindefinite && location_referencesheap(v->ptr.loc, s);
+	return !v->ptr.isindefinite && location_referencesheap(v->ptr.loc, s, cb);
 }
 
 struct number *
@@ -423,13 +423,13 @@ value_struct_member(struct value *v, char *member)
 	return map_get(v->_struct.m, member);
 }
 
-static bool
-struct_referencesheap(struct value *v, struct state *s)
+bool
+struct_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
 {
 	struct map *m = v->_struct.m;
 	for (int i = 0; i < m->n; i++) {
 		struct value *val = object_as_value((struct object *) m->entry[i].value);
-		if (val && value_referencesheap(val, s)) {
+		if (val && value_referencesheap(val, s, cb)) {
 			return true;
 		}
 	}
@@ -490,10 +490,14 @@ value_copy(struct value *v)
 	}
 }
 
+static bool
+referencesheap_withcb(struct value *, struct state *);
+
+
 struct value *
 value_abstractcopy(struct value *v, struct state *s)
 {
-	if (!value_referencesheap(v, s)) {
+	if (!referencesheap_withcb(v, s)) {
 		return NULL;
 	}
 	switch (v->type) {
@@ -504,6 +508,15 @@ value_abstractcopy(struct value *v, struct state *s)
 	default:
 		assert(false);
 	}
+}
+
+static bool
+referencesheap_withcb(struct value *v, struct state *s)
+{
+	struct circuitbreaker *cb = circuitbreaker_create();
+	bool ans = value_referencesheap(v, s, cb);
+	circuitbreaker_destroy(cb);
+	return ans;
 }
 
 void
@@ -580,13 +593,13 @@ value_as_location(struct value *v)
 }
 
 bool
-value_referencesheap(struct value *v, struct state *s)
+value_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
 {
 	switch (v->type) {
 	case VALUE_PTR:
-		return ptr_referencesheap(v, s);
+		return ptr_referencesheap(v, s, cb);
 	case VALUE_STRUCT:
-		return struct_referencesheap(v, s);
+		return struct_referencesheap(v, s, cb);
 	default:
 		return false;
 	}
@@ -684,16 +697,18 @@ value_type(struct value *v)
 }
 
 static bool
-struct_references(struct value *v, struct location *loc, struct state *s);
+struct_references(struct value *v, struct location *loc, struct state *s,
+		struct circuitbreaker *);
 
 bool
-value_references(struct value *v, struct location *loc, struct state *s)
+value_references(struct value *v, struct location *loc, struct state *s,
+		struct circuitbreaker *cb)
 {
 	switch (v->type) {
 	case VALUE_PTR:
-		return !v->ptr.isindefinite && location_references(v->ptr.loc, loc, s);
+		return !v->ptr.isindefinite && location_references(v->ptr.loc, loc, s, cb);
 	case VALUE_STRUCT:
-		return struct_references(v, loc, s);
+		return struct_references(v, loc, s, cb);
 	default:
 		/* other kinds of values cannot reference */
 		return false;
@@ -701,14 +716,15 @@ value_references(struct value *v, struct location *loc, struct state *s)
 }
 
 static bool
-struct_references(struct value *v, struct location *loc, struct state *s)
+struct_references(struct value *v, struct location *loc, struct state *s,
+		struct circuitbreaker *cb)
 {
 	struct map *m = v->_struct.m;
 	for (int i = 0; i < m->n; i++) {
 		struct value *val = object_as_value(
 			(struct object *) m->entry[i].value
 		);
-		if (val && value_references(val, loc, s)) {
+		if (val && value_references(val, loc, s, cb)) {
 			return true;
 		}
 	}

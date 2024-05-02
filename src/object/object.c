@@ -28,7 +28,8 @@ bool
 range_isdeallocand(struct range *, struct state *);
 
 bool
-range_references(struct range *, struct location *, struct state *);
+range_references(struct range *, struct location *, struct state *,
+		struct circuitbreaker *cb);
 
 
 struct object {
@@ -152,13 +153,21 @@ inner_str(struct object *obj)
 }
 
 bool
-object_referencesheap(struct object *obj, struct state *s)
+object_referencesheap(struct object *obj, struct state *s,
+		struct circuitbreaker *cb)
 {
+	if (!circuitbreaker_append(cb, obj)) {
+		/* already analysed */
+		return false;
+	}
 	if (!object_isvalue(obj)) {
 		/* TODO: do we need to exclude the case of ranges on stack? */
 		return true;
 	}
-	return obj->value && value_referencesheap(obj->value, s);
+	struct circuitbreaker *copy = circuitbreaker_copy(cb);
+	bool ans = obj->value && value_referencesheap(obj->value, s, copy);
+	circuitbreaker_destroy(copy);
+	return ans;
 }
 
 bool
@@ -198,16 +207,24 @@ object_isdeallocand(struct object *obj, struct state *s)
 }
 
 bool
-object_references(struct object *obj, struct location *loc, struct state *s)
+object_references(struct object *obj, struct location *loc, struct state *s,
+		struct circuitbreaker *cb)
 {
+	if (!circuitbreaker_append(cb, obj)) {
+		/* already handled */
+		return false;
+	}
 	if (obj->type == OBJECT_DEALLOCAND_RANGE) {
-		return range_references(obj->range, loc, s);
+		return range_references(obj->range, loc, s, cb);
 	}
 
 	assert(obj->type == OBJECT_VALUE);
 
+	struct circuitbreaker *copy = circuitbreaker_copy(cb);
 	struct value *v = object_as_value(obj);
-	return v ? value_references(v, loc, s) : false;
+	bool ans = v ? value_references(v, loc, s, copy) : false;
+	circuitbreaker_destroy(copy);
+	return ans;
 }
 
 struct error *
@@ -588,9 +605,10 @@ range_isdeallocand(struct range *r, struct state *s)
 }
 
 bool
-range_references(struct range *r, struct location *loc, struct state *s)
+range_references(struct range *r, struct location *loc, struct state *s,
+		struct circuitbreaker *cb)
 {
-	return location_references(r->loc, loc, s);
+	return location_references(r->loc, loc, s, cb);
 }
 
 

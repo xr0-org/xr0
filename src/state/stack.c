@@ -403,7 +403,10 @@ variable_references(struct variable *v, struct location *loc, struct state *s)
 {
 	assert(location_type(loc) != LOCATION_VCONST);
 
-	return location_references(v->loc, loc, s);
+	struct circuitbreaker *cb = circuitbreaker_create();
+	bool ans = location_references(v->loc, loc, s, cb);
+	circuitbreaker_destroy(cb);
+	return ans;
 }
 
 bool

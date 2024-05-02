@@ -116,12 +116,13 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 }
 
 bool
-block_references(struct block *b, struct location *loc, struct state *s)
+block_references(struct block *b, struct location *loc, struct state *s,
+		struct circuitbreaker *cb)
 {
 	int n = object_arr_nobjects(b->arr);
 	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
-		if (object_references(obj[i], loc, s)) {
+		if (object_references(obj[i], loc, s, cb)) {
 			return true;
 		}
 	}
@@ -273,9 +274,11 @@ block_undeclare(struct block *b, struct state *s)
 	struct object **object = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
 		struct object *obj = object[i];
-		if (object_referencesheap(obj, s)) {
+		struct circuitbreaker *cb = circuitbreaker_create();
+		if (object_referencesheap(obj, s, cb)) {
 			object_arr_append(new, object_abstractcopy(obj, s));
 		}
+		circuitbreaker_destroy(cb);
 	}
 	object_arr_destroy(b->arr);
 

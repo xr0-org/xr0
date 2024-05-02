@@ -86,8 +86,10 @@ value_islocation(struct value *);
 struct location *
 value_as_location(struct value *);
 
+struct circuitbreaker;
+
 bool
-value_referencesheap(struct value *, struct state *);
+value_referencesheap(struct value *, struct state *, struct circuitbreaker *);
 
 bool
 value_isconstant(struct value *v);
@@ -111,7 +113,8 @@ struct ast_expr *
 value_as_literal(struct value *v);
 
 bool
-value_references(struct value *, struct location *, struct state *);
+value_references(struct value *, struct location *, struct state *,
+		struct circuitbreaker *);
 
 enum ast_binary_operator;
 

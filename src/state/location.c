@@ -251,14 +251,15 @@ location_equal(struct location *l1, struct location *l2)
 }
 
 bool
-location_references(struct location *l1, struct location *l2, struct state *s)
+location_references(struct location *l1, struct location *l2, struct state *s,
+		struct circuitbreaker *cb)
 {
 	if (location_equal(l1, l2)) {
 		return true;
 	}
 
 	struct block *b = state_getblock(s, l1);
-	return b && block_references(b, l2, s);
+	return b && block_references(b, l2, s, cb);
 }
 
 bool
@@ -268,7 +269,7 @@ location_isauto(struct location *loc)
 }
 
 bool
-location_referencesheap(struct location *l, struct state *s)
+location_referencesheap(struct location *l, struct state *s, struct circuitbreaker *cb)
 {
 	if (l->type == LOCATION_DYNAMIC) {
 		if (heap_blockisfreed(state_getheap(s), l->block)) {
@@ -280,7 +281,7 @@ location_referencesheap(struct location *l, struct state *s)
 	if (res.err) {
 		assert(false);
 	}
-	return res.obj && object_referencesheap(res.obj, s);
+	return res.obj && object_referencesheap(res.obj, s, cb);
 }
 
 static struct block_res

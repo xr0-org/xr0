@@ -72,7 +72,7 @@ bool
 location_toclump(struct location *, struct clump *);
 
 bool
-location_referencesheap(struct location *, struct state *);
+location_referencesheap(struct location *, struct state *, struct circuitbreaker *);
 
 enum location_type
 location_type(struct location *loc);
@@ -91,7 +91,8 @@ bool
 location_equal(struct location *loc1, struct location *loc2);
 
 bool
-location_references(struct location *loc1, struct location *loc2, struct state *);
+location_references(struct location *loc1, struct location *loc2, struct state *,
+		struct circuitbreaker *cb);
 
 struct static_memory;
 
