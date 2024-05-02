@@ -12,6 +12,7 @@ impl Clump {
         Clump { blocks: vec![] }
     }
 
+    //=clump_str
     pub fn str(&self, indent: &str) -> String {
         let mut b = String::new();
         for (i, block) in self.blocks.iter().enumerate() {
@@ -20,16 +21,19 @@ impl Clump {
         b
     }
 
+    //=clump_newblock
     pub fn new_block(&mut self) -> usize {
         let address = self.blocks.len();
         self.blocks.push(Block::new());
         address
     }
 
+    //=clump_getblock (non-mut version)
     pub fn get_block(&self, address: usize) -> Option<&Block> {
         self.blocks.get(address).map(|blk| &**blk)
     }
 
+    //=clump_getblock
     pub fn get_block_mut(&mut self, address: usize) -> Option<&mut Block> {
         self.blocks.get_mut(address).map(|blk| &mut **blk)
     }

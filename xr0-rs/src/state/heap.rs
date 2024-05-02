@@ -32,6 +32,7 @@ impl Heap {
         Heap { blocks: vec![] }
     }
 
+    //=heap_str
     pub fn str(&self, indent: &str) -> String {
         let mut b = String::new();
         for (i, hb) in self.blocks.iter().enumerate() {
@@ -47,6 +48,7 @@ impl Heap {
         b
     }
 
+    //=printdelim
     fn print_delim(&self, start: usize) -> bool {
         for i in start + 1..self.blocks.len() {
             if !self.blocks[i].freed {
@@ -56,6 +58,7 @@ impl Heap {
         false
     }
 
+    //=heap_newblock
     pub fn new_block(&mut self) -> Box<Location> {
         let address = self.blocks.len();
         self.blocks.push(HeapBlock {
@@ -65,6 +68,7 @@ impl Heap {
         Location::new_dynamic(address, AstExpr::new_constant(0))
     }
 
+    //=heap_getblock (non-mut version)
     pub fn get_block(&self, address: usize) -> Option<&Block> {
         if address >= self.blocks.len() {
             return None;
@@ -76,6 +80,7 @@ impl Heap {
         Some(&hb.block)
     }
 
+    //=heap_getblock
     pub fn get_block_mut(&mut self, address: usize) -> Option<&mut Block> {
         if address >= self.blocks.len() {
             return None;
@@ -87,6 +92,7 @@ impl Heap {
         Some(&mut hb.block)
     }
 
+    //=heap_deallocblock
     pub fn dealloc_block(&mut self, address: usize) -> Result<()> {
         if self.blocks[address].freed {
             return Err(Error::new("double free".to_string()));
@@ -95,12 +101,14 @@ impl Heap {
         Ok(())
     }
 
+    //=heap_blockisfreed
     pub fn block_is_freed(&self, address: usize) -> bool {
         self.blocks[address].freed
     }
 
     // XXX FIXME: inherently UB API
     // `s` aliases `self` and `Block::undeclare` actually accesses `self`
+    //=heap_undeclare
     pub fn undeclare(&mut self, s: &mut State) {
         for block in &mut self.blocks {
             if !block.freed {
@@ -110,6 +118,7 @@ impl Heap {
     }
 
     // XXX FIXME: inherently UB API because `self` aliases mut `s`.
+    //=heap_referenced
     pub fn referenced(&self, s: &mut State) -> bool {
         for i in 0..self.blocks.len() {
             if !self.blocks[i].freed && !block_referenced(s, i) {
@@ -135,6 +144,7 @@ impl VConst {
         }
     }
 
+    //=vconst_declare
     pub fn declare(&mut self, val: Box<Value>, comment: Option<&str>, persist: bool) -> String {
         let s = self.id(persist);
         let s_string = s.to_string();
@@ -146,6 +156,7 @@ impl VConst {
         s
     }
 
+    //=vconst_id
     fn id(&mut self, persist: bool) -> String {
         let npersist = self.persist.values().filter(|&&b| b).count();
         let mut b = String::new();
@@ -157,10 +168,12 @@ impl VConst {
         b
     }
 
+    //=vconst_get
     pub fn get(&self, id: &str) -> Option<&Value> {
         self.varmap.get(id).map(|boxed| &**boxed)
     }
 
+    //=vconst_undeclare
     pub fn undeclare(&mut self) {
         let mut varmap = BTreeMap::new();
         let mut comment = HashMap::new();
@@ -179,6 +192,7 @@ impl VConst {
         self.persist = persist;
     }
 
+    //=vconst_tsr
     pub fn str(&self, indent: &str) -> String {
         let mut b = String::new();
         for (k, val) in &self.varmap {
@@ -196,6 +210,7 @@ impl VConst {
     ///
     /// # Panics
     /// If the expression is not of a supported form.
+    //=vconst_eval
     pub fn eval(&self, e: &AstExpr) -> bool {
         ast_expr_matheval(e)
     }
