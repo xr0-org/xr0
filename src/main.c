@@ -321,7 +321,9 @@ proto_defisvalid(struct ast_function *proto, struct ast_function *def)
 	struct ast_block *proto_abs = ast_function_abstract(proto),
 			 *def_abs = ast_function_abstract(def);
 
-	bool abs_match = strcmp(ast_block_str(proto_abs, ""), ast_block_str(def_abs, "")) == 0,
+	/* XXX: the indent level must be >= to get around an assert in
+	 * ast_block_str. this check should be made more accessible */
+	bool abs_match = strcmp(ast_block_str(proto_abs, 1), ast_block_str(def_abs, 1)) == 0,
 	     protoabs_only = proto_abs && ast_function_absisempty(def); 
 	if (abs_match || protoabs_only) {
 		return true;

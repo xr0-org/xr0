@@ -102,9 +102,10 @@ ast_stmt_isassume(struct ast_stmt *stmt)
 }
 
 static void
-ast_stmt_labelled_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+ast_stmt_labelled_sprint(struct ast_stmt *stmt, int indent_level,
+		struct strbuilder *b)
 {
-	char *s = ast_stmt_str(stmt->u.labelled.stmt);
+	char *s = ast_stmt_str(stmt->u.labelled.stmt, indent_level);
 	strbuilder_printf(b, "%s: %s", stmt->u.labelled.label, s);
 	free(s);
 }
@@ -153,17 +154,36 @@ ast_stmt_create_compound(struct lexememarker *loc, struct ast_block *b)
 struct ast_block *
 ast_stmt_as_block(struct ast_stmt *stmt)
 {
-	assert(stmt->kind == STMT_COMPOUND);
+	assert(stmt->kind == STMT_COMPOUND || stmt->kind == STMT_COMPOUND_V);
 	return stmt->u.compound;
 }
 
 static void
-ast_stmt_compound_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+ast_stmt_compound_sprint(struct ast_stmt *stmt, int indent_level,
+		struct strbuilder *b)
 {
-	assert(stmt->kind == STMT_COMPOUND || stmt->kind == STMT_COMPOUND_V);
-	char *s = ast_block_str(stmt->u.compound, "\t");
+	assert(stmt->kind == STMT_COMPOUND);
+	char *s = ast_block_str(stmt->u.compound, indent_level);
 	strbuilder_printf(b, s);
 	free(s);
+}
+
+static void
+ast_stmt_compound_v_sprint(struct ast_stmt *stmt, int indent_level,
+		struct strbuilder *sb)
+{
+	struct ast_block *b = ast_stmt_as_block(stmt);
+
+	/* special case for nice print */
+	if (ast_block_ndecls(b) == 0 && ast_block_nstmts(b) == 1) {
+		char *s = ast_stmt_str(ast_block_stmts(b)[0], 0);
+		strbuilder_printf(sb, "~ [ %s ]", s);
+		free(s);
+	} else {
+		char *s = ast_block_absstr(stmt->u.compound, indent_level);
+		strbuilder_printf(sb, "~ %s", s);
+		free(s);
+	}
 }
 
 struct ast_stmt *
@@ -275,22 +295,21 @@ ast_stmt_sel_nest(struct ast_stmt *stmt)
 }
 
 static void
-ast_stmt_sel_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+ast_stmt_sel_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_SELECTION);
 	char *cond	= ast_expr_str(stmt->u.selection.cond),
-	     *body	= ast_stmt_str(stmt->u.selection.body);
+	     *body	= ast_stmt_str(stmt->u.selection.body, indent_level);
 
-	/* XXX: we only support simple IF for now */
 	strbuilder_printf(
 		b,
-		"if (%s) { %s }",
+		"if (%s) %s",
 		cond, body
 	);
 
 	struct ast_stmt *nest_stmt = stmt->u.selection.nest;
 	if (nest_stmt) {
-		char *nest = ast_stmt_str(nest_stmt);
+		char *nest = ast_stmt_str(nest_stmt, indent_level);
 		strbuilder_printf(
 			b,
 			" else %s",
@@ -382,20 +401,20 @@ ast_stmt_copy_iter(struct ast_stmt *stmt)
 }
 
 static void
-ast_stmt_iter_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_ITERATION);
-	char *init = ast_stmt_str(stmt->u.iteration.init),
-	     *cond = ast_stmt_str(stmt->u.iteration.cond),
-	     *body = ast_stmt_str(stmt->u.iteration.body),
+	char *init = ast_stmt_str(stmt->u.iteration.init, indent_level),
+	     *cond = ast_stmt_str(stmt->u.iteration.cond, indent_level),
+	     *body = ast_stmt_str(stmt->u.iteration.body, indent_level),
 	     *iter = ast_expr_str(stmt->u.iteration.iter);
 
 	char *abs = stmt->u.iteration.abstract ?
-		ast_block_str(stmt->u.iteration.abstract, "\t") : "";
+		ast_block_absstr(stmt->u.iteration.abstract, indent_level) : "";
 
 	strbuilder_printf(
 		b,
-		"for (%s %s %s) [%s] { %s }",
+		"for (%s %s %s) ~ %s%s",
 		init, cond, iter, abs, body
 	);
 
@@ -412,11 +431,11 @@ ast_stmt_create_iter_e(struct ast_stmt *stmt)
 }
 
 static void
-ast_stmt_iter_e_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+ast_stmt_iter_e_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_ITERATION_E);
 	stmt->kind = STMT_ITERATION;
-	char *s = ast_stmt_str(stmt);
+	char *s = ast_stmt_str(stmt, indent_level);
 	stmt->kind = STMT_ITERATION_E;
 	strbuilder_printf(b, ".%s", s);
 	free(s);
@@ -430,7 +449,7 @@ ast_stmt_jump_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 
 	strbuilder_printf(
 		b,
-		"return %s;\n",
+		"return %s;",
 		rv
 	);
 
@@ -545,13 +564,13 @@ ast_stmt_copy(struct ast_stmt *stmt)
 }
 
 char *
-ast_stmt_str(struct ast_stmt *stmt)
+ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 {
 	assert(stmt);
 	struct strbuilder *b = strbuilder_create();
 	switch (stmt->kind) {
 	case STMT_LABELLED:
-		ast_stmt_labelled_sprint(stmt, b);
+		ast_stmt_labelled_sprint(stmt, indent_level, b);
 		break;
 	case STMT_NOP:
 		ast_stmt_nop_sprint(stmt, b);
@@ -560,19 +579,19 @@ ast_stmt_str(struct ast_stmt *stmt)
 		ast_stmt_expr_sprint(stmt, b);
 		break;
 	case STMT_COMPOUND:
-		ast_stmt_compound_sprint(stmt, b);
+		ast_stmt_compound_sprint(stmt, indent_level, b);
 		break;
 	case STMT_COMPOUND_V:
-		ast_stmt_compound_sprint(stmt, b);
+		ast_stmt_compound_v_sprint(stmt, indent_level, b);
 		break;
 	case STMT_SELECTION:
-		ast_stmt_sel_sprint(stmt, b);
+		ast_stmt_sel_sprint(stmt, indent_level, b);
 		break;
 	case STMT_ITERATION:
-		ast_stmt_iter_sprint(stmt, b);
+		ast_stmt_iter_sprint(stmt, indent_level, b);
 		break;
 	case STMT_ITERATION_E:
-		ast_stmt_iter_e_sprint(stmt, b);
+		ast_stmt_iter_e_sprint(stmt, indent_level, b);
 		break;
 	case STMT_JUMP:
 		ast_stmt_jump_sprint(stmt, b);

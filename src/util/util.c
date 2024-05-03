@@ -16,6 +16,19 @@ dynamic_str(const char *s)
 	return t;
 }
 
+char *
+indentation(int level)
+{
+	assert(level >= 0);
+	char *s = malloc(sizeof(char) * level + 1);
+	for (int i = 0; i < level; i++) {
+		s[i] = INDENT_CHAR;
+	}
+	s[level] = '\0';
+	return s;
+}
+
+
 static struct entry
 entry_create(const char *key, const void *value)
 {

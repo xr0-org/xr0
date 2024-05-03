@@ -86,12 +86,12 @@ ast_function_str(struct ast_function *f)
 		strbuilder_printf(b, "%s%s", v, space);
 		free(v);
 	}
-	char *abs = ast_block_str(f->abstract, "\t");
-	strbuilder_printf(b, ") ~ [\n%s]", abs);
+	char *abs = ast_block_absstr(f->abstract, 1);
+	strbuilder_printf(b, ") ~ %s", abs);
 	free(abs);
 	if (f->body) {
-		char *body = ast_block_str(f->body, "\t");
-		strbuilder_printf(b, "{\n%s}", body);
+		char *body = ast_block_str(f->body, 1);
+		strbuilder_printf(b, "%s", body);
 		free(body);
 	} else {
 		strbuilder_printf(b, ";");

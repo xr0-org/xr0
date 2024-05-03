@@ -1,4 +1,4 @@
-# Xr0 - C But Safe
+# Xr0 – C But Safe
 
 Xr0 is a verifier for C that aims to guarantee the safety of C programs at
 compile time. It will eliminate common pitfalls such as use-after-frees, double

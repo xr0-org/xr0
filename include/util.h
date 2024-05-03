@@ -9,6 +9,11 @@
 char *
 dynamic_str(const char *);
 
+#define INDENT_CHAR '\t'
+
+char *
+indentation(int level);
+
 
 /* XXX: We know. */
 struct map {

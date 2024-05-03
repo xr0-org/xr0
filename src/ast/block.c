@@ -87,21 +87,44 @@ copy_stmt_arr(int len, struct ast_stmt **stmt)
 	return new;
 }
 
-char *
-ast_block_str(struct ast_block *b, char *indent)
+static char *
+ast_block_str_div(struct ast_block *b, int indent_level, char divst, char divend)
 {
+	assert(indent_level > 0);
+
+	char *indent = indentation(indent_level),
+	     *previndent = indentation(indent_level-1);
+
 	struct strbuilder *sb = strbuilder_create();
+	strbuilder_printf(sb, "%c\n", divst);
 	for (int i = 0; i < b->ndecl; i++) {
 		char *s = ast_variable_str(b->decl[i]);
 		strbuilder_printf(sb, "%s%s;\n", indent, s);
 		free(s);
 	}
 	for (int i = 0; i < b->nstmt; i++) {
-		char *s = ast_stmt_str(b->stmt[i]);
+		char *s = ast_stmt_str(b->stmt[i], indent_level+1);
 		strbuilder_printf(sb, "%s%s\n", indent, s);
 		free(s);
 	}
+	strbuilder_printf(sb, "%s%c", previndent, divend);
+
+	free(previndent);
+	free(indent);
+
 	return strbuilder_build(sb);
+}
+
+char *
+ast_block_str(struct ast_block *b, int indent)
+{
+	return ast_block_str_div(b, indent, '{', '}');
+}
+
+char *
+ast_block_absstr(struct ast_block *b, int indent)
+{
+	return ast_block_str_div(b, indent, '[', ']');
 }
 
 int

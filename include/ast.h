@@ -242,7 +242,10 @@ void
 ast_block_destroy(struct ast_block *);
 
 char *
-ast_block_str(struct ast_block *, char *indent);
+ast_block_str(struct ast_block *, int indent_level);
+
+char *
+ast_block_absstr(struct ast_block *b, int indent_level);
 
 struct ast_block *
 ast_block_copy(struct ast_block *b);
@@ -377,7 +380,7 @@ struct ast_stmt *
 ast_stmt_copy(struct ast_stmt *);
 
 char *
-ast_stmt_str(struct ast_stmt *);
+ast_stmt_str(struct ast_stmt *, int indent_level);
 
 bool
 ast_stmt_equal(struct ast_stmt *, struct ast_stmt *);
