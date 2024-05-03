@@ -133,7 +133,7 @@ impl Block {
     }
 
     //=block_references
-    pub fn references(&self, loc: &Location, s: &mut State) -> bool {
+    pub fn references(&self, loc: &Location, s: &State) -> bool {
         self.arr.iter().any(|obj| obj.references(loc, s))
     }
 

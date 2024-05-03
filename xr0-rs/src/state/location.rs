@@ -139,17 +139,13 @@ fn location_equal(l1: &Location, l2: &Location) -> bool {
     l1.kind == l2.kind && l1.block == l2.block && ast_expr_equal(&l1.offset, &l2.offset)
 }
 
-pub fn location_references(l1: &Location, l2: &Location, s: &mut State) -> bool {
+pub fn location_references(l1: &Location, l2: &Location, s: &State) -> bool {
     if location_equal(l1, l2) {
         return true;
     }
-    let s: *mut State = s;
-    unsafe {
-        // Unsafe because Block::references takes a mut ref to state. Not sure if that's necessary.
-        match (*s).get_block(l1).unwrap() {
-            None => false,
-            Some(b) => b.references(l2, &mut *s),
-        }
+    match (*s).get_block(l1).unwrap() {
+        None => false,
+        Some(b) => b.references(l2, s),
     }
 }
 

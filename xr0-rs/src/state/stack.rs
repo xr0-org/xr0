@@ -208,7 +208,7 @@ impl<'a> StackFrame<'a> {
         self.varmap.get(id).map(|boxed| &**boxed)
     }
 
-    pub fn references(&self, loc: &Location, state: &mut State) -> bool {
+    pub fn references(&self, loc: &Location, state: &State) -> bool {
         if variable_references(&self.result, loc, state) {
             return true;
         }
@@ -297,7 +297,7 @@ impl Variable {
     }
 }
 
-pub fn variable_references(v: &Variable, loc: &Location, s: &mut State) -> bool {
+pub fn variable_references(v: &Variable, loc: &Location, s: &State) -> bool {
     assert!(!loc.type_is_vconst());
     location_references(&v.loc, loc, s)
 }

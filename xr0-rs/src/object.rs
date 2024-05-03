@@ -116,7 +116,7 @@ impl Object {
         }
     }
 
-    pub fn references(&self, loc: &Location, s: &mut State) -> bool {
+    pub fn references(&self, loc: &Location, s: &State) -> bool {
         match &self.kind {
             ObjectKind::DeallocandRange(range) => range.references(loc, s),
             ObjectKind::Value(None) => false,
@@ -347,7 +347,7 @@ impl Range {
         s.loc_is_deallocand(&self.loc)
     }
 
-    fn references(&self, loc: &Location, s: &mut State) -> bool {
+    fn references(&self, loc: &Location, s: &State) -> bool {
         location_references(&self.loc, loc, s)
     }
 }

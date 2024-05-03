@@ -370,7 +370,7 @@ pub fn value_as_literal(v: &Value) -> Box<AstExpr> {
     AstExpr::new_literal(s.clone())
 }
 
-pub fn value_references(v: &Value, loc: &Location, s: &mut State) -> bool {
+pub fn value_references(v: &Value, loc: &Location, s: &State) -> bool {
     match &v.kind {
         ValueKind::DefinitePtr(vloc) => location_references(vloc, loc, s),
         ValueKind::Struct(sv) => struct_references(sv, loc, s),
@@ -378,7 +378,7 @@ pub fn value_references(v: &Value, loc: &Location, s: &mut State) -> bool {
     }
 }
 
-fn struct_references(sv: &StructValue, loc: &Location, s: &mut State) -> bool {
+fn struct_references(sv: &StructValue, loc: &Location, s: &State) -> bool {
     sv.m.values().any(|obj| {
         let Some(val) = obj.as_value() else {
             return false;
