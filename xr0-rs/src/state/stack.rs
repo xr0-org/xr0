@@ -146,8 +146,27 @@ impl<'a> Stack<'a> {
         self.top_mut().declare(var, is_param);
     }
 
-    pub fn undeclare(&mut self, state: &mut State) {
-        self.top_mut().undeclare(state);
+    //=stack_undeclare
+    pub fn undeclare(state: &mut State) {
+        unsafe {
+            let state: *mut State = state;
+            // Unsafe because passing both this variable and `&mut *state` is UB since `state` owns
+            // the variable. Could fix by swapping the variable out first, I think.
+            let new_result = variable_abstractcopy(&(*state).stack.top().result, &mut *state);
+            (*state).stack.top_mut().result = new_result;
+        }
+
+        // Note: the extra empty box is not in the original. It's necessary to move the varmap out
+        // of State before Rust will let us use `variable_abstractcopy` in safe code.
+        let m = std::mem::replace(&mut state.stack.top_mut().varmap, Box::new(VarMap::new()));
+
+        let mut new_map = Box::new(VarMap::new());
+        for (k, v) in &*m {
+            if v.is_param() {
+                new_map.insert(k.clone(), variable_abstractcopy(v, &mut *state));
+            }
+        }
+        state.stack.top_mut().varmap = new_map;
     }
 
     pub fn get_result(&self) -> &Variable {
@@ -184,18 +203,6 @@ impl<'a> StackFrame<'a> {
         assert!(self.varmap.get(id).is_none());
         let var = variable_create(&var.type_, self, isparam);
         self.varmap.insert(id.to_string(), var);
-    }
-
-    pub fn undeclare(&mut self, state: &mut State) {
-        let new_result = variable_abstractcopy(&self.result, state);
-        self.result = new_result;
-        let m = std::mem::replace(&mut self.varmap, Box::new(VarMap::new()));
-        for (k, v) in &*m {
-            if v.is_param() {
-                self.varmap
-                    .insert(k.clone(), variable_abstractcopy(v, state));
-            }
-        }
     }
 
     pub fn get_result(&self) -> &Variable {

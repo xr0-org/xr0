@@ -106,13 +106,18 @@ impl Heap {
         self.blocks[address].freed
     }
 
-    // XXX FIXME: inherently UB API
-    // `s` aliases `self` and `Block::undeclare` actually accesses `self`
     //=heap_undeclare
-    pub fn undeclare(&mut self, s: &mut State) {
-        for block in &mut self.blocks {
-            if !block.freed {
-                block.block.undeclare(s);
+    pub fn undeclare(s: &mut State) {
+        for i in 0..s.heap.blocks.len() {
+            if !s.heap.blocks[i].freed {
+                //=block_undeclare
+                let mut new = vec![];
+                for obj in &s.heap.blocks[i].block.arr {
+                    if obj.references_heap(s) {
+                        new.push(obj.abstract_copy(s));
+                    }
+                }
+                s.heap.blocks[i].block.arr = new;
             }
         }
     }

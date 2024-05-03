@@ -439,13 +439,9 @@ fn state_undeclareliterals(s: &mut State) {
 }
 
 fn state_undeclarevars(s: &mut State) {
-    let s: *mut State = s;
-    unsafe {
-        // Unsafe because uses inherently UB APIs.
-        (*s).heap.undeclare(&mut *s);
-        (*s).vconst.undeclare();
-        (*s).stack.undeclare(&mut *s);
-    }
+    Heap::undeclare(s);
+    s.vconst.undeclare();
+    Stack::undeclare(s);
 }
 
 fn state_popprops(s: &mut State) {

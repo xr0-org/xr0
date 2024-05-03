@@ -242,17 +242,6 @@ impl Block {
         self.arr.append(&mut tail);
         Ok(())
     }
-
-    //=block_undeclare
-    pub fn undeclare(&mut self, s: &mut State) {
-        let mut new = vec![];
-        for obj in &self.arr {
-            if obj.references_heap(s) {
-                new.push(obj.abstract_copy(s));
-            }
-        }
-        self.arr = new;
-    }
 }
 
 pub fn object_arr_index(arr: &[Box<Object>], offset: &AstExpr, state: &State) -> Option<usize> {
