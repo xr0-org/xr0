@@ -136,7 +136,7 @@ fn rangeprocess_alloc(
     let state: *mut State = state;
     unsafe {
         let obj = hack_base_object_from_alloc(lval, &mut *state);
-        // Inherently unsafe API aliasing `state` and `obj`. Likely we could fix it by making the
+        // Inherently UB API aliasing `state` and `obj`. Likely we could fix it by making the
         // function take a location instead, which we can copy outside of `state`.
         state_range_alloc(&mut *state, obj, lw, up)
     }
@@ -191,46 +191,57 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
         // XXX: expr for args (scanf()) in function not of form `*(ptr+offset)
         // for some reason
         AstExprKind::Identifier(_) => {
-            let state: *mut State = state;
-            unsafe {
-                // Unsafe becaues we first evaluate `inner`, producing a Value that borrows from
-                // `state`; then call inherently unsafe API `state_deref` passing both that value
-                // and the state. Can probably fix by copying a Location.
+            let (t, root_val) = {
+                let state: *mut State = state;
+                unsafe {
+                    // Unsafe because we borrow `t` from `state`, then mutate `*state`, then return `t`.
+                    let root_lval = ast_expr_lvalue(inner, &mut *state)?;
+                    let Some(root_obj) = root_lval.obj else {
+                        // `root` freed
 
-                let root_lval = ast_expr_lvalue(inner, &mut *state)?;
-                let Some(root_obj) = root_lval.obj else {
-                    // `root` freed
+                        // Note: The original does `return (struct lvalue_res) { .lval = NULL, .err = NULL };`
+                        // here but I believe every single caller dereferences lval without checking it for
+                        // null, so it will crash.
+                        panic!();
+                    };
+                    let t = ast_type_ptr_type(root_lval.t);
+                    // Note: Clone in the next line is not in the original. We are using unsafe
+                    // pointers, so Rust can't check lifetimes, but we need to copy the value out
+                    // of `*root_obj` to make it outlive our borrow of that object; and so that in
+                    // the call to state_deref below, we do not use both the mut reference to
+                    // `state` and a non-mut reference to a `Value` that `state` owns.
+                    let root_val = root_obj.as_value().unwrap().clone();
+                    (t, root_val)
+                }
+            };
 
-                    // Note: The original does `return (struct lvalue_res) { .lval = NULL, .err = NULL };`
-                    // here but I believe every single caller dereferences lval without checking it for
-                    // null, so it will crash.
-                    panic!();
-                };
-                let t = ast_type_ptr_type(root_lval.t);
-                let root_val = root_obj.as_value().unwrap();
-                let obj = state_deref(&mut *state, root_val, &AstExpr::new_constant(0))?;
-                Ok(LValue { t, obj })
-            }
+            let obj = state_deref(state, &root_val, &AstExpr::new_constant(0))?;
+            Ok(LValue { t, obj })
         }
         AstExprKind::Binary(BinaryExpr { op: _, e1, e2 }) => {
-            let state: *mut State = state;
-            unsafe {
-                // Unsafe for similar reasons as above.
-                let root_lval = ast_expr_lvalue(e1, &mut *state)?;
-                let Some(root_obj) = root_lval.obj else {
-                    // `root` freed
+            let (t, root_val) = {
+                let state: *mut State = state;
+                unsafe {
+                    // Unsafe for same reason as above.
+                    let root_lval = ast_expr_lvalue(e1, &mut *state)?;
+                    let Some(root_obj) = root_lval.obj else {
+                        // `root` freed
 
-                    // Note: Original returns null. See note above.
-                    panic!();
-                };
-                let t = ast_type_ptr_type(root_lval.t);
-                let root_val = root_obj.as_value().unwrap();
-                let Ok(res_obj) = state_deref(&mut *state, root_val, e2) else {
-                    // Note: Original returns null. See note above.
-                    panic!();
-                };
-                Ok(LValue { t, obj: res_obj })
-            }
+                        // Note: Original returns null. See note above.
+                        panic!();
+                    };
+                    let t = ast_type_ptr_type(root_lval.t);
+                    // Note: Clone on the next line is not in the original; see note in the
+                    // Identifier case above.
+                    let root_val = root_obj.as_value().unwrap().clone();
+                    (t, root_val)
+                }
+            };
+            let Ok(res_obj) = state_deref(&mut *state, &root_val, e2) else {
+                // Note: Original returns null. See note above.
+                panic!();
+            };
+            Ok(LValue { t, obj: res_obj })
         }
         _ => panic!(),
     }

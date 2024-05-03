@@ -194,7 +194,7 @@ pub fn location_range_dealloc(
     assert!(offsetzero(loc));
     let state: *mut State = state;
     unsafe {
-        // Unsafe because `range_dealloc` has an inherently unsafe API.
+        // Unsafe because `range_dealloc` has an inherently UB API.
         let Some(b) = (*state).get_block_mut(loc).unwrap() else {
             return Err(Error::new("cannot get block".to_string()));
         };

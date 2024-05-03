@@ -248,7 +248,7 @@ fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
     });
     let s: *mut State = s;
     unsafe {
-        // Unsafe because we fetch obj, copy v, then write to obj.
+        // Unsafe because we fetch obj, copy v, then write to obj. Could fix with an extra copy.
         let obj = (*s).get_mut(&new.loc, false).unwrap().unwrap();
         if obj.is_value() {
             if let Some(v) = obj.as_value() {

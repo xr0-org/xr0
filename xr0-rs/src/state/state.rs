@@ -224,8 +224,7 @@ impl<'a> State<'a> {
     ) -> Result<Option<&'s mut Object>> {
         let state_ptr: *mut State = self;
         unsafe {
-            // Unsafe because Block::observe is inherently unsafe since the state presumably
-            // contains the block.
+            // Unsafe because Block::observe is inherently UB when the state contains the block.
             let b = (*state_ptr).get_block_mut(loc)?;
             match b {
                 None => {
@@ -340,6 +339,7 @@ pub fn state_deref<'s>(
         .map_err(|err| Error::new(format!("undefined indirection: {err}")))
 }
 
+// XXX FIXME - Inherently UB function: mut aliasing: state contains obj
 pub fn state_range_alloc(
     state: &mut State,
     obj: &Object,
@@ -375,6 +375,7 @@ impl<'a> State<'a> {
     }
 }
 
+// XXX FIXME - Inherently UB function: mut aliasing: state contains obj
 pub fn state_range_dealloc(
     state: &mut State,
     obj: &Object,

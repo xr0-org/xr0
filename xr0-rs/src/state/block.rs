@@ -76,7 +76,7 @@ impl Block {
     /// it does in the case where it punches a hole in a range object -- it's implemented (I think)
     /// by freeing the entire block `self` and allocating a new block, which can't be right.
     ///
-    /// XXX FIXME inherently unsafe API since `*s` probably owns `*self`.
+    /// XXX FIXME inherently UB function: mut aliasing: `*s` owns `*self`.
     //=block_observe
     pub fn observe<'b>(
         &'b mut self,
@@ -198,6 +198,7 @@ impl Block {
     }
 
     //=block_range_dealloc
+    // XXX FIXME: Inherently UB function: mut aliasing: `*s` contains `*self`.
     pub fn range_dealloc(&mut self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> Result<()> {
         if self.hack_first_object_is_exactly_bounds(lw, up, s) {
             self.arr[0].dealloc(s)?;
