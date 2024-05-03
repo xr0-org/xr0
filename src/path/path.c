@@ -20,11 +20,69 @@ struct path {
 		PATH_STATE_ATEND,
 	} path_state;
 	struct state *abstract, *actual;
-	struct path *p_true, *p_false;
+	
+	int branch_index;
+	struct path_arr *paths;
 
 	struct ast_function *f;
 	struct externals *ext;
 };
+
+struct path_arr {
+	int n;
+	struct path **paths;
+};
+
+static struct path_arr *
+path_arr_create()
+{
+	struct path_arr *arr = calloc(1, sizeof(struct path_arr));
+	assert(arr);
+	return arr;
+}
+
+static void
+path_arr_destroy(struct path_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		path_destroy(arr->paths[i]);
+	}
+	free(arr->paths);
+	free(arr);
+}
+
+static struct path **
+path_arr_s(struct path_arr *arr)
+{
+	return arr->paths;
+}
+
+static int
+path_arr_n(struct path_arr *arr)
+{
+	return arr->n;
+}
+
+static int
+path_arr_append(struct path_arr *arr, struct path *p)
+{
+	arr->paths = realloc(arr->paths, sizeof(struct path_arr) * ++arr->n);
+	assert(arr->paths);
+	int loc = arr->n-1;
+	arr->paths[loc] = p;
+	return loc;
+}
+
+static bool
+path_arr_atend(struct path_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		if (!path_atend(arr->paths[i])) {
+			return false;	
+		}
+	}
+	return true;
+}
 
 struct path *
 path_create(struct ast_function *f, struct externals *ext)
@@ -32,6 +90,7 @@ path_create(struct ast_function *f, struct externals *ext)
 	struct path *p = calloc(1, sizeof(struct path));
 	p->f = ast_function_copy(f);
 	p->ext = ext;
+	p->paths = path_arr_create();
 	p->path_state = PATH_STATE_UNINIT;
 	return p;
 }
@@ -53,12 +112,22 @@ path_copywithcond(struct path *old, struct ast_expr *cond);
 static void
 path_split(struct path *p, struct ast_expr *cond)
 {
-	p->p_true = path_copywithcond(p, cond);
-	p->p_false = path_copywithcond(p, ast_expr_inverted_copy(cond, true));
+	path_arr_append(p->paths, path_copywithcond(p, cond));
+	path_arr_append(p->paths, path_copywithcond(p, ast_expr_inverted_copy(cond, true)));
 	/* TODO: destroy abstract and actual */
 	p->abstract = NULL;
 	p->actual = NULL;
 	p->path_state = PATH_STATE_SPLIT;
+}
+
+static void
+path_nextbranch(struct path *p)
+{
+	assert(p->paths->n >= 2);
+	int index = p->branch_index;
+	if (index < p->paths->n - 1) {
+		p->branch_index++;	
+	}
 }
 
 static struct ast_function *
@@ -134,7 +203,7 @@ path_atend(struct path *p)
 {
 	switch (p->path_state) {
 	case PATH_STATE_SPLIT:
-		return path_atend(p->p_true) && path_atend(p->p_false);
+		return path_arr_atend(p->paths);
 	case PATH_STATE_ATEND:
 		return true;
 	default:
@@ -188,6 +257,9 @@ path_next_abstract(struct path *);
 static struct error *
 path_next_actual(struct path *);
 
+static struct error *
+path_next_split(struct path *);
+
 struct error *
 path_next(struct path *p)
 {
@@ -200,6 +272,11 @@ path_next(struct path *p)
 		return path_step(p);
 	case PATH_STATE_ACTUAL:
 		return path_next_actual(p);
+	case PATH_STATE_AUDIT:
+		return path_audit(p);
+	case PATH_STATE_SPLIT:
+		return path_next_split(p);
+	case PATH_STATE_ATEND:
 	default:
 		assert(false);
 	}
@@ -225,6 +302,33 @@ path_next_abstract(struct path *p)
 		}
 	}
 	return NULL;
+}
+
+static struct error *
+branch_next(struct path *parent, struct path *branch);
+
+static struct error *
+path_next_split(struct path *p)
+{
+	assert(!path_arr_atend(p->paths));
+	struct path_arr *p_arr = p->paths;
+	struct error *err = branch_next(p, p_arr->paths[p->branch_index]);
+	if (err) {
+		return err;
+	}
+	return NULL;
+}
+
+static struct error *
+branch_next(struct path *parent, struct path *branch)
+{
+	v_printf("branch: %d\n", parent->branch_index);
+	if (path_atend(branch)) {
+		path_nextbranch(parent);
+		return NULL;
+	}
+	return path_next(branch);
+
 }
 
 static bool
@@ -429,24 +533,29 @@ path_audit(struct path *p)
 }
 
 static struct error *
-path_trystep(struct path *p);
+branch_step(struct path *parent, struct path *branch);
 
 static struct error *
 path_step_split(struct path *p)
 {
-	v_printf("stepping through split\n");
 	/* path_atend holds this invariant whenever this function is called */ 
-	assert(!path_atend(p->p_true) || !path_atend(p->p_false));
+	assert(!path_arr_atend(p->paths));
 
-	struct error *err = path_trystep(p->p_true);
+	struct path_arr *p_arr = p->paths;
+	struct error *err = branch_step(p, p_arr->paths[p->branch_index]);
 	if (err) {
 		return err;
 	}
-	return path_trystep(p->p_false);
+	return NULL;	
 }
 
 static struct error *
-path_trystep(struct path *p)
+branch_step(struct path *parent, struct path *branch)
 {
-	return path_atend(p) ? NULL : path_step(p);
+	v_printf("branch: %d\n", parent->branch_index);
+	if (path_atend(branch)) {
+		path_nextbranch(parent);
+		return NULL;
+	}
+	return path_step(branch);
 }
