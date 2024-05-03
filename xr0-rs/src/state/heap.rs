@@ -117,7 +117,6 @@ impl Heap {
         }
     }
 
-    // XXX FIXME: inherently UB API because `self` aliases mut `s`.
     //=heap_referenced
     pub fn referenced(&self, s: &State) -> bool {
         for (i, block) in self.blocks.iter().enumerate() {
