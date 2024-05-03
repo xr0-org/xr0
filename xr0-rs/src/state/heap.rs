@@ -119,9 +119,9 @@ impl Heap {
 
     // XXX FIXME: inherently UB API because `self` aliases mut `s`.
     //=heap_referenced
-    pub fn referenced(&self, s: &mut State) -> bool {
-        for i in 0..self.blocks.len() {
-            if !self.blocks[i].freed && !block_referenced(s, i) {
+    pub fn referenced(&self, s: &State) -> bool {
+        for (i, block) in self.blocks.iter().enumerate() {
+            if !block.freed && !block_referenced(s, i) {
                 return false;
             }
         }
@@ -129,7 +129,7 @@ impl Heap {
     }
 }
 
-fn block_referenced(s: &mut State, addr: usize) -> bool {
+fn block_referenced(s: &State, addr: usize) -> bool {
     let loc = Location::new_dynamic(addr, AstExpr::new_constant(0));
     state_references(s, &loc)
 }

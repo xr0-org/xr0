@@ -137,8 +137,7 @@ impl<'a> Stack<'a> {
         self.frames.last_mut().unwrap()
     }
 
-    // XXX FIXME: inherently UB API
-    pub fn references(&self, loc: &Location, state: &mut State) -> bool {
+    pub fn references(&self, loc: &Location, state: &State) -> bool {
         // Note: Original only checks the top stack frame.
         self.top().references(loc, state)
     }

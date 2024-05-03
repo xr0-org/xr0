@@ -402,16 +402,12 @@ impl<'a> State<'a> {
     }
 }
 
-pub fn state_hasgarbage(state: &mut State) -> bool {
-    let state: *mut State = state;
-    // Unsafe to call inherently UB API.
-    unsafe { !(*state).heap.referenced(&mut *state) }
+pub fn state_hasgarbage(state: &State) -> bool {
+    !state.heap.referenced(state)
 }
 
-pub fn state_references(s: &mut State, loc: &Location) -> bool {
-    let s: *mut State = s;
-    // Unsafe to call inherently UB API
-    unsafe { (*s).stack.references(loc, &mut *s) }
+pub fn state_references(s: &State, loc: &Location) -> bool {
+    s.stack.references(loc, s)
 }
 
 pub fn state_eval(s: &State, e: &AstExpr) -> bool {
