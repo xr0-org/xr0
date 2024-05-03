@@ -724,7 +724,6 @@ sel_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *set
 		return NULL;
 	}
 	if (dec.decision) {
-		printf("build in");
 		return ast_stmt_buildsetup(body, state, setups);
 	} else if (nest) {
 		return ast_stmt_buildsetup(nest, state, setups);
