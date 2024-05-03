@@ -402,20 +402,6 @@ impl<'a> State<'a> {
     }
 }
 
-pub fn state_range_aredeallocands(state: &State, obj: &Object, lw: &AstExpr, up: &AstExpr) -> bool {
-    if ast_expr_equal(lw, up) {
-        return true;
-    }
-    let Some(arr_val) = obj.as_value() else {
-        return false;
-    };
-    let deref = value_as_location(arr_val);
-    match state.get_block(deref).unwrap() {
-        Some(b) => b.range_aredeallocands(lw, up, state),
-        None => false,
-    }
-}
-
 pub fn state_hasgarbage(state: &mut State) -> bool {
     let state: *mut State = state;
     // Unsafe to call inherently UB API.

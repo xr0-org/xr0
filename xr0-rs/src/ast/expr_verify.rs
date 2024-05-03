@@ -10,8 +10,7 @@ use super::{
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_getloc,
     state_getobject, state_getvconst, state_isalloc, state_islval, state_popframe, state_pushframe,
-    state_range_alloc, state_range_aredeallocands, state_range_dealloc, state_static_init,
-    state_vconst,
+    state_range_alloc, state_range_dealloc, state_static_init, state_vconst,
 };
 use crate::state::State;
 use crate::util::{Error, Result};
@@ -83,14 +82,26 @@ fn expr_isdeallocand_rangedecide(
     );
     drop(j);
     drop(i);
-    let state: *mut State = state;
-    unsafe {
-        // Unsafe because LValue requires &mut State. Could be made safe if we had a matching
-        // non-mut LValue, I think.
-        let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), &mut *state).unwrap();
-        let obj = res_lval.obj.unwrap();
-        state_range_aredeallocands(&*state, obj, lw, up)
+
+    // `inner.e1` is a pointer; get its value as a Location.
+    //
+    // Note: The code looks at `acc.e1` instead of `inner.e1`, a bug in the original. `acc` is
+    // treated both as a unary expression and as a binary expression. Therefore this function must
+    // currently be dead code.
+    let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), &mut *state).unwrap();
+    if ast_expr_equal(lw, up) {
+        return true;
     }
+    let obj = res_lval.obj.unwrap();
+    let Some(arr_val) = obj.as_value() else {
+        return false;
+    };
+    let deref = crate::state::location::location_copy(value_as_location(arr_val));
+
+    let Some(b) = state.get_block(&deref).unwrap() else {
+        return false;
+    };
+    b.range_aredeallocands(lw, up, state)
 }
 
 pub fn ast_expr_alloc_rangeprocess(
