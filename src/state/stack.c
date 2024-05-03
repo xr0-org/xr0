@@ -165,6 +165,7 @@ stack_copy(struct stack *stack)
 	if (stack->prev) {
 		copy->prev = stack_copy(stack->prev);
 	}
+	copy->name = dynamic_str(stack->name);
 	copy->kind = stack->kind;
 	if (stack->kind == FRAME_CALL) {
 		copy->call = ast_expr_copy(stack->call);
