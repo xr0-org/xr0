@@ -148,13 +148,11 @@ impl<'a> Stack<'a> {
 
     //=stack_undeclare
     pub fn undeclare(state: &mut State) {
-        unsafe {
-            let state: *mut State = state;
-            // Unsafe because passing both this variable and `&mut *state` is UB since `state` owns
-            // the variable. Could fix by swapping the variable out first, I think.
-            let new_result = variable_abstractcopy(&(*state).stack.top().result, &mut *state);
-            (*state).stack.top_mut().result = new_result;
-        }
+        // Note: The clone here is not in the original. Necessary to convince Rust that
+        // variable_abstractcopy's mut use of state will not invalidate it.
+        let old_result = state.stack.top().result.clone();
+        let new_result = variable_abstractcopy(&old_result, state);
+        state.stack.top_mut().result = new_result;
 
         // Note: the extra empty box is not in the original. It's necessary to move the varmap out
         // of State before Rust will let us use `variable_abstractcopy` in safe code.
