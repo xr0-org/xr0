@@ -7,10 +7,11 @@ use super::{
     AstFunction, AstType, AstTypeBase, AstUnaryOp, AstVariable, BinaryExpr, CallExpr, ConstantExpr,
     IncDecExpr, StructMemberExpr, UnaryExpr,
 };
+use crate::state::location::{location_copy, location_range_dealloc};
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_getloc,
     state_getobject, state_getvconst, state_isalloc, state_islval, state_popframe, state_pushframe,
-    state_range_alloc, state_range_dealloc, state_static_init, state_vconst,
+    state_range_alloc, state_static_init, state_vconst,
 };
 use crate::state::State;
 use crate::util::{Error, Result};
@@ -148,14 +149,18 @@ fn rangeprocess_dealloc(
     up: &AstExpr,
     state: &mut State,
 ) -> Result<()> {
-    let state: *mut State = state;
-    unsafe {
-        let obj = hack_base_object_from_alloc(&dealloc.arg, &mut *state);
-        // Identical safety situation to `rangeprocess_alloc` above.
-        state_range_dealloc(&mut *state, obj, lw, up)
-    }
+    let obj = hack_base_object_from_alloc(&dealloc.arg, state);
+
+    //=state_range_dealloc
+    let Some(arr_val) = obj.as_value() else {
+        return Err(Error::new("no value".to_string()));
+    };
+    // Note: This location_copy is not in the original. Needed for Rust safety.
+    let deref = location_copy(value_as_location(arr_val));
+    location_range_dealloc(&deref, lw, up, state)
 }
 
+/// Given `expr` of the form `*(p+i)`, return the object storing the variable `p`.
 fn hack_base_object_from_alloc<'s>(expr: &'s AstExpr, state: &'s mut State) -> &'s Object {
     let inner = ast_expr_unary_operand(expr);
     let i = AstExpr::new_identifier("i".to_string());
