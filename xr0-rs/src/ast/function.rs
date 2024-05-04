@@ -7,7 +7,7 @@ use super::{
 use crate::path::Path;
 use crate::state::state::{state_declare, state_getobject, state_getresult, state_vconst, State};
 use crate::util::{InsertionOrderMap, Result, SemiBox};
-use crate::value::{value_copy, Value};
+use crate::value::Value;
 use crate::{str_write, Externals};
 
 #[derive(Clone)]
@@ -183,7 +183,7 @@ pub fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<Option
     let obj = state_getresult(state).unwrap().unwrap();
     // Note: In the original, this function (unlike the other absexec functions) returned a
     // borrowed value which the caller cloned. Not a big difference.
-    Ok(obj.as_value().map(value_copy))
+    Ok(obj.as_value().map(Value::copy))
 }
 
 pub fn ast_function_buildgraph(fname: &str, ext: &Externals) -> FuncGraph {

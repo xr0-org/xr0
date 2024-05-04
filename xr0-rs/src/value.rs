@@ -55,6 +55,38 @@ pub enum NumberValue {
     Limit(bool),
 }
 
+impl Display for Value {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match &self.kind {
+            ValueKind::Sync(n) => write!(f, "comp:{n}"),
+            ValueKind::DefinitePtr(loc) => write!(f, "ptr:{loc}"),
+            ValueKind::IndefinitePtr(n) => write!(f, "ptr:{n}"),
+            ValueKind::Int(n) => write!(f, "int:{n}"),
+            ValueKind::Literal(s) => write!(f, "\"{s}\""),
+            ValueKind::Struct(sv) => write!(f, "{sv}"),
+        }
+    }
+}
+
+impl Display for StructValue {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "struct:{{")?;
+        let n = self.members.len();
+        for (i, var) in self.members.iter().enumerate() {
+            let name = &var.name;
+            let val = self.m.get(name).unwrap().as_value();
+            let val_str = if let Some(val) = val {
+                format!("{val}")
+            } else {
+                "".to_string()
+            };
+            let delim = if i + 1 < n { ", " } else { "" };
+            write!(f, ".{name} = <{val_str}>{delim}")?;
+        }
+        write!(f, "}}")
+    }
+}
+
 impl Value {
     fn new(kind: ValueKind) -> Box<Value> {
         Box::new(Value { kind })
@@ -135,66 +167,94 @@ impl Value {
         }
         v
     }
-}
 
-#[allow(dead_code)]
-pub fn value_transfigure<'v>(
-    v: &'v Value,
-    compare: &mut State,
-    islval: bool,
-) -> Option<SemiBox<'v, Value>> {
-    match &v.kind {
-        ValueKind::Sync(_) | ValueKind::Literal(_) => {
-            if islval {
-                None
-            } else {
-                Some(SemiBox::Borrowed(v))
+    //=value_transfigure
+    #[allow(dead_code)]
+    pub fn transfigure<'v>(
+        &'v self,
+        compare: &mut State,
+        islval: bool,
+    ) -> Option<SemiBox<'v, Value>> {
+        match &self.kind {
+            ValueKind::Sync(_) | ValueKind::Literal(_) => {
+                if islval {
+                    None
+                } else {
+                    Some(SemiBox::Borrowed(self))
+                }
             }
+            ValueKind::Struct(_) => {
+                panic!();
+            }
+            ValueKind::Int(_) => {
+                if islval {
+                    None
+                } else {
+                    // Note: Original leaked this type.
+                    Some(SemiBox::Owned(state_vconst(
+                        &mut *compare,
+                        &ast_type_create_voidptr(),
+                        None,
+                        false,
+                    )))
+                }
+            }
+            ValueKind::DefinitePtr(loc) => Some(SemiBox::Owned(loc.transfigure(compare))),
+            ValueKind::IndefinitePtr(_) => panic!(),
         }
-        ValueKind::Struct(_) => {
+    }
+
+    //=value_pf_augment
+    pub fn pf_augment(&self, root: &AstExpr) -> Box<Value> {
+        let mut v = Value::copy(self);
+        let ValueKind::Struct(sv) = &mut v.kind else {
             panic!();
-        }
-        ValueKind::Int(_) => {
-            if islval {
-                None
-            } else {
-                // Note: Original leaked this type.
-                Some(SemiBox::Owned(state_vconst(
-                    &mut *compare,
-                    &ast_type_create_voidptr(),
-                    None,
-                    false,
-                )))
+        };
+
+        for var in &sv.members {
+            let field = &var.name;
+            let obj = sv.m.get_mut(field).unwrap();
+            if let Some(obj_value) = obj.as_value() {
+                if value_issync(obj_value) {
+                    obj.assign(Some(Value::new_sync(AstExpr::new_member(
+                        ast_expr_copy(root),
+                        field.to_string(),
+                    ))));
+                }
             }
         }
-        ValueKind::DefinitePtr(loc) => Some(SemiBox::Owned(loc.transfigure(compare))),
-        ValueKind::IndefinitePtr(_) => panic!(),
+        v
     }
-}
 
-pub fn value_pf_augment(old: &Value, root: &AstExpr) -> Box<Value> {
-    let mut v = value_copy(old);
-    let ValueKind::Struct(sv) = &mut v.kind else {
-        panic!();
-    };
+    //=value_is_struct
+    pub fn is_struct(&self) -> bool {
+        matches!(self.kind, ValueKind::Struct(_))
+    }
 
-    for var in &sv.members {
-        let field = &var.name;
-        let obj = sv.m.get_mut(field).unwrap();
-        if let Some(obj_value) = obj.as_value() {
-            if value_issync(obj_value) {
-                obj.assign(Some(Value::new_sync(AstExpr::new_member(
-                    ast_expr_copy(root),
-                    field.to_string(),
-                ))));
-            }
+    //=value_struct_member
+    pub fn struct_member<'v>(&'v self, member: &str) -> Option<&'v Object> {
+        let ValueKind::Struct(sv) = &self.kind else {
+            panic!();
+        };
+        sv.m.get(member).map(|boxed| &**boxed)
+    }
+
+    //=value_copy
+    pub fn copy(v: &Value) -> Box<Value> {
+        Box::new(v.clone())
+    }
+
+    //=value_abstractcopy
+    pub fn abstract_copy(&self, s: &State) -> Option<Box<Value>> {
+        if !value_referencesheap(self, s) {
+            return None;
         }
+        Some(match &self.kind {
+            ValueKind::IndefinitePtr(_) | ValueKind::DefinitePtr(_) => Value::copy(self),
+            ValueKind::Struct(sv) => sv.abstract_copy(s),
+            _ => panic!(),
+        })
     }
-    v
-}
-
-pub fn value_isstruct(v: &Value) -> bool {
-    matches!(v.kind, ValueKind::Struct(_))
 }
 
 fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
@@ -206,88 +266,35 @@ fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
     m
 }
 
-fn value_struct_abstractcopy(old: &StructValue, s: &State) -> Box<Value> {
-    Value::new(ValueKind::Struct(Box::new(StructValue {
-        members: old.members.clone(),
-        m: abstract_copy_members(&old.m, s),
-    })))
-}
-
-fn abstract_copy_members(
-    old: &HashMap<String, Box<Object>>,
-    s: &State,
-) -> HashMap<String, Box<Object>> {
-    old.iter()
-        .map(|(k, obj)| (k.clone(), obj.abstract_copy(s)))
-        .collect()
-}
-
-pub fn value_struct_member<'v>(v: &'v Value, member: &str) -> Option<&'v Object> {
-    let ValueKind::Struct(sv) = &v.kind else {
-        panic!();
-    };
-    sv.m.get(member).map(|boxed| &**boxed)
-}
-
-pub fn value_copy(v: &Value) -> Box<Value> {
-    Box::new(v.clone())
-}
-
-pub fn value_abstractcopy(v: &Value, s: &State) -> Option<Box<Value>> {
-    if !value_referencesheap(v, s) {
-        return None;
+impl StructValue {
+    //=value_struct_abstractcopy
+    fn abstract_copy(&self, s: &State) -> Box<Value> {
+        Value::new(ValueKind::Struct(Box::new(StructValue {
+            members: self.members.clone(),
+            //=abstract_copy_members
+            m: self
+                .m
+                .iter()
+                .map(|(k, obj)| (k.clone(), obj.abstract_copy(s)))
+                .collect(),
+        })))
     }
-    Some(match &v.kind {
-        ValueKind::IndefinitePtr(_) | ValueKind::DefinitePtr(_) => value_copy(v),
-        ValueKind::Struct(sv) => value_struct_abstractcopy(sv, s),
-        _ => panic!(),
-    })
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match &self.kind {
-            ValueKind::Sync(n) => write!(f, "comp:{n}"),
-            ValueKind::DefinitePtr(loc) => write!(f, "ptr:{loc}"),
-            ValueKind::IndefinitePtr(n) => write!(f, "ptr:{n}"),
-            ValueKind::Int(n) => write!(f, "int:{n}"),
-            ValueKind::Literal(s) => write!(f, "\"{s}\""),
-            ValueKind::Struct(sv) => write!(f, "{sv}"),
-        }
-    }
-}
-
-impl Display for StructValue {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "struct:{{")?;
-        let n = self.members.len();
-        for (i, var) in self.members.iter().enumerate() {
-            let name = &var.name;
-            let val = self.m.get(name).unwrap().as_value();
-            let val_str = if let Some(val) = val {
-                format!("{val}")
-            } else {
-                "".to_string()
-            };
-            let delim = if i + 1 < n { ", " } else { "" };
-            write!(f, ".{name} = <{val_str}>{delim}")?;
-        }
-        write!(f, "}}")
-    }
-}
-
-pub fn value_islocation(v: &Value) -> bool {
-    matches!(v.kind, ValueKind::DefinitePtr(_))
-}
-
-pub fn value_as_location(v: &Value) -> &Location {
-    let ValueKind::DefinitePtr(loc) = &v.kind else {
-        panic!();
-    };
-    loc
 }
 
 impl Value {
+    //=value_islocation
+    pub fn is_location(&self) -> bool {
+        matches!(self.kind, ValueKind::DefinitePtr(_))
+    }
+
+    //=value_as_location
+    pub fn as_location(&self) -> &Location {
+        let ValueKind::DefinitePtr(loc) = &self.kind else {
+            panic!();
+        };
+        loc
+    }
+
     pub fn into_location(self) -> Box<Location> {
         let ValueKind::DefinitePtr(loc) = self.kind else {
             panic!();

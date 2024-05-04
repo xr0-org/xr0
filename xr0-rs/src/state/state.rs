@@ -4,7 +4,7 @@ use crate::ast::{
     ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN,
 };
 use crate::util::{Error, Result};
-use crate::value::{value_as_location, value_islocation, value_isstruct, value_issync};
+use crate::value::value_issync;
 use crate::{str_write, vprint, Externals, Location, Object, Props, Value};
 
 /// The entire state of the abstract machine.
@@ -137,7 +137,7 @@ pub fn state_vconst(
     persist: bool,
 ) -> Box<Value> {
     let v = ast_type_vconst(t, state, comment.unwrap_or(""), persist);
-    if value_isstruct(&v) {
+    if v.is_struct() {
         return v;
     }
     let c = state.vconst.declare(v, comment, persist);
@@ -168,10 +168,10 @@ impl<'a> State<'a> {
 }
 
 pub fn state_islval(state: &mut State, v: &Value) -> bool {
-    if !value_islocation(v) {
+    if !v.is_location() {
         return false;
     }
-    let loc = value_as_location(v);
+    let loc = v.as_location();
     state.get_mut(loc, true).unwrap();
     match loc.kind {
         LocationKind::Static => state.static_memory.has_block(loc.block),
@@ -183,10 +183,10 @@ pub fn state_islval(state: &mut State, v: &Value) -> bool {
 }
 
 pub fn state_isalloc(state: &mut State, v: &Value) -> bool {
-    if !value_islocation(v) {
+    if !v.is_location() {
         return false;
     }
-    let loc = value_as_location(v);
+    let loc = v.as_location();
     state.get_mut(loc, true).unwrap();
     location_toheap(loc, &mut state.heap)
 }
@@ -325,7 +325,7 @@ pub fn state_deref<'s>(
     if value_issync(ptr_val) {
         return Ok(None);
     }
-    let deref_base = value_as_location(ptr_val);
+    let deref_base = ptr_val.as_location();
     // Note: the original leaked this location.
     let deref = deref_base.with_offset(index);
     state
@@ -339,19 +339,19 @@ impl<'a> State<'a> {
     }
 
     pub fn dealloc(&mut self, val: &Value) -> Result<()> {
-        if !value_islocation(val) {
+        if !val.is_location() {
             return Err(Error::new(
                 "undefined free of value not pointing at heap".to_string(),
             ));
         }
-        location_dealloc(value_as_location(val), &mut self.heap)
+        location_dealloc(val.as_location(), &mut self.heap)
     }
 }
 
 pub fn state_addresses_deallocand(state: &State, obj: &Object) -> bool {
     // Note: Original doesn't null-check.
     let val = obj.as_value().unwrap();
-    let loc = value_as_location(val);
+    let loc = val.as_location();
     state.loc_is_deallocand(loc)
 }
 

@@ -9,7 +9,6 @@ use crate::state::location::{
 };
 use crate::state::state::state_declare;
 use crate::util::{InsertionOrderMap, Result};
-use crate::value::value_abstractcopy;
 use crate::{str_write, AstType, AstVariable, Location};
 
 #[derive(Clone)]
@@ -255,11 +254,11 @@ fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
     let obj = s.get(&new.loc).unwrap().unwrap();
     if obj.is_value() {
         if let Some(v) = obj.as_value() {
-            let v = value_abstractcopy(v, &*s);
+            let v = v.abstract_copy(s);
             // Note: The repeated "get" on the next line is not in the original. Rust requires it
             // to upgrade from our non-mut reference to a mut reference. (If we asked for a mut
             // reference the first time, it would be invalidated by the use of `s` in
-            // `value_abstractcopy`.)
+            // `Value::abstract_copy`.)
             let obj = s.get_mut(&new.loc, false).unwrap().unwrap();
             obj.assign(v);
         }

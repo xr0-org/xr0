@@ -4,8 +4,8 @@ use super::{
     ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide, ast_stmt_as_block, ast_stmt_as_expr,
     ast_stmt_copy, ast_stmt_isassume, ast_stmt_ispre, ast_stmt_isterminal,
     ast_stmt_iter_lower_bound, ast_stmt_iter_upper_bound, ast_stmt_jump_rv, ast_stmt_labelled_stmt,
-    ast_stmt_lexememarker, state_getresult, value_copy, AstBlock, AstExpr, AstIterationStmt,
-    AstSelectionStmt, AstStmt, AstStmtKind, Error, Preresult, Result, State, KEYWORD_RETURN,
+    ast_stmt_lexememarker, state_getresult, AstBlock, AstExpr, AstIterationStmt, AstSelectionStmt,
+    AstStmt, AstStmtKind, Error, Preresult, Result, State, KEYWORD_RETURN,
 };
 use crate::parser::LexemeMarker;
 use crate::value::{
@@ -171,7 +171,7 @@ fn stmt_jump_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
         state,
     )?;
     let obj = state_getresult(state).unwrap().unwrap();
-    obj.assign(Some(value_copy(&rv_val)));
+    obj.assign(Some(Value::copy(&rv_val)));
     Ok(())
 }
 

@@ -5,10 +5,7 @@ use crate::state::location::{location_dealloc, location_references};
 use crate::state::state::state_eval;
 use crate::state::State;
 use crate::util::Result;
-use crate::value::{
-    value_abstractcopy, value_as_location, value_copy, value_references, value_referencesheap,
-    ValueKind,
-};
+use crate::value::{value_references, value_referencesheap, ValueKind};
 use crate::{AstExpr, AstType, Location, Value};
 
 /// A span of memory within a block, part of the abstract state of a program. An object can be the
@@ -93,7 +90,7 @@ impl Object {
     pub fn is_deallocand(&self, s: &State) -> bool {
         match &self.kind {
             ObjectKind::Value(None) => false,
-            ObjectKind::Value(Some(v)) => s.loc_is_deallocand(value_as_location(v)),
+            ObjectKind::Value(Some(v)) => s.loc_is_deallocand(v.as_location()),
             ObjectKind::DeallocandRange(range) => range.is_deallocand(s),
         }
     }
@@ -103,7 +100,7 @@ impl Object {
             ObjectKind::DeallocandRange(_) => Box::new(self.clone()),
             ObjectKind::Value(v) => Object::with_value(
                 self.offset.clone(),
-                v.as_ref().and_then(|v| value_abstractcopy(v, s)),
+                v.as_ref().and_then(|v| v.abstract_copy(s)),
             ),
         }
     }
@@ -229,7 +226,7 @@ impl Object {
             };
             return Some(Object::with_value(
                 ast_expr_copy(&self.offset),
-                Some(value_copy(v)),
+                Some(Value::copy(v)),
             ));
         }
 
@@ -269,7 +266,7 @@ impl Object {
             };
             return Some(Object::with_value(
                 ast_expr_copy(incl_lw),
-                Some(value_copy(v)),
+                Some(Value::copy(v)),
             ));
         }
         Some(Object::with_range(

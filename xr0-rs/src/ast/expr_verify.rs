@@ -15,10 +15,7 @@ use crate::state::state::{
 };
 use crate::state::State;
 use crate::util::{Error, Result};
-use crate::value::{
-    value_as_location, value_as_sync, value_copy, value_equal, value_islocation, value_isstruct,
-    value_issync, value_pf_augment, value_struct_member, value_to_expr,
-};
+use crate::value::{value_as_sync, value_equal, value_issync, value_to_expr};
 use crate::{Object, Value};
 
 pub struct LValue<'ast> {
@@ -96,7 +93,7 @@ fn expr_isdeallocand_rangedecide(
     let Some(arr_val) = obj.as_value() else {
         return false;
     };
-    let deref = crate::state::location::location_copy(value_as_location(arr_val));
+    let deref = crate::state::location::location_copy(arr_val.as_location());
 
     let Some(b) = state.get_block(&deref).unwrap() else {
         return false;
@@ -141,7 +138,7 @@ fn rangeprocess_alloc(
     };
     // Note: This `location_copy` is not in the original. Needed for Rust safety, since Rust
     // doesn't know that `new_block` and `get_block_mut` won't invalidate it (but they won't).
-    let deref = location_copy(value_as_location(arr_val));
+    let deref = location_copy(arr_val.as_location());
 
     let new_block = state.heap.new_block();
     let b = state.get_block_mut(&deref).unwrap(); // panic rather than propagate the error - this is in the original
@@ -165,7 +162,7 @@ fn rangeprocess_dealloc(
         return Err(Error::new("no value".to_string()));
     };
     // Note: This location_copy is not in the original. Needed for Rust safety.
-    let deref = location_copy(value_as_location(arr_val));
+    let deref = location_copy(arr_val.as_location());
     location_range_dealloc(&deref, lw, up, state)
 }
 
@@ -355,7 +352,7 @@ fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
             "undefined memory access: `{id}' has no value",
         )));
     };
-    Ok(value_copy(val))
+    Ok(Value::copy(val))
 }
 
 fn hack_identifier_builtin_eval(id: &str, state: &State) -> Result<Box<Value>> {
@@ -405,7 +402,7 @@ fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
             "undefined indirection: *({expr}) has no value"
         )));
     };
-    Ok(value_copy(v))
+    Ok(Value::copy(v))
 }
 
 fn address_eval(operand: &AstExpr, state: &mut State) -> Result<Box<Value>> {
@@ -416,14 +413,14 @@ fn address_eval(operand: &AstExpr, state: &mut State) -> Result<Box<Value>> {
 fn expr_structmember_eval(expr: &StructMemberExpr, s: &mut State) -> Result<Box<Value>> {
     let StructMemberExpr { root, member } = expr;
     let res_val = ast_expr_eval(root, s)?;
-    let Some(member) = value_struct_member(&res_val, member) else {
+    let Some(member) = res_val.struct_member(member) else {
         return Err(Error::new(format!("`{root}' has no field `{member}'")));
     };
     let Some(obj_value) = member.as_value() else {
         // Note: Original would return null if obj_value is null, but almost nobody downstream handles it.
         panic!();
     };
-    Ok(value_copy(obj_value))
+    Ok(Value::copy(obj_value))
 }
 
 fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
@@ -506,10 +503,8 @@ fn verify_paramspec(
     if state_isalloc(param_state, param) && !state_isalloc(arg_state, arg) {
         return Err(Error::new("must be heap allocated".to_string()));
     }
-    let param_obj = param_state
-        .get_mut(value_as_location(param), false)?
-        .unwrap();
-    let arg_obj = arg_state.get_mut(value_as_location(arg), false)?.unwrap();
+    let param_obj = param_state.get_mut(param.as_location(), false)?.unwrap();
+    let arg_obj = arg_state.get_mut(arg.as_location(), false)?.unwrap();
     if !param_obj.has_value() {
         return Ok(());
     }
@@ -523,12 +518,12 @@ fn verify_paramspec(
 }
 
 fn pf_augment(v: &Value, call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
-    if !value_isstruct(v) {
-        return Ok(value_copy(v));
+    if !v.is_struct() {
+        return Ok(Value::copy(v));
     }
     // Note: Original leaked a result and a value here.
     let res_val = call_pf_reduce(call, state)?;
-    Ok(value_pf_augment(v, value_as_sync(&res_val)))
+    Ok(v.pf_augment(value_as_sync(&res_val)))
 }
 
 fn call_arbitraryresult(
@@ -549,7 +544,7 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
         let param = AstExpr::new_identifier(p.name.clone());
         // Note: The original leaked a result here.
         let v = ast_expr_eval(&param, s)?;
-        computed_params.push(if value_islocation(&v) {
+        computed_params.push(if v.is_location() {
             AstExpr::new_identifier(v.to_string())
         } else {
             value_to_expr(&v)
@@ -602,7 +597,7 @@ fn expr_assign_eval(assign: &AssignmentExpr, state: &mut State) -> Result<Box<Va
             "undefined indirection: {lval} is not an lvalue"
         )));
     };
-    obj.assign(Some(value_copy(&rval_val)));
+    obj.assign(Some(Value::copy(&rval_val)));
     Ok(rval_val)
 }
 
@@ -679,7 +674,7 @@ fn assign_absexec(assign: &AssignmentExpr, state: &mut State) -> Result<Option<B
     let Some(obj) = lval_res.obj else {
         return Err(Error::new("undefined indirection (lvalue)".to_string()));
     };
-    obj.assign(Some(value_copy(&val)));
+    obj.assign(Some(Value::copy(&val)));
     Ok(Some(val))
 }
 
@@ -781,10 +776,10 @@ fn call_pf_reduce(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
 fn structmember_pf_reduce(sm: &StructMemberExpr, s: &mut State) -> Result<Box<Value>> {
     let StructMemberExpr { root, member } = sm;
     let v = ast_expr_pf_reduce(root, s)?;
-    if value_isstruct(&v) {
-        let obj = value_struct_member(&v, member).unwrap();
+    if v.is_struct() {
+        let obj = v.struct_member(member).unwrap();
         let obj_value = obj.as_value().unwrap();
-        return Ok(value_copy(obj_value));
+        return Ok(Value::copy(obj_value));
     }
     assert!(value_issync(&v));
     Ok(Value::new_sync(AstExpr::new_member(
