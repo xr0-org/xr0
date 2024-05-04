@@ -87,6 +87,35 @@ impl Display for StructValue {
     }
 }
 
+impl Display for Number {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match &self.kind {
+            NumberKind::Ranges(ranges) => {
+                write!(f, "{{")?;
+                let n = ranges.len();
+                for (i, range) in ranges.iter().enumerate() {
+                    write!(f, "{range}")?;
+                    if i + 1 < n {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            NumberKind::Computed(computation) => write!(f, "{computation}"),
+        }
+    }
+}
+
+impl Display for NumberRange {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        if self.is_single() {
+            write!(f, "{}", self.lower)
+        } else {
+            write!(f, "{}:{}", self.lower, self.upper)
+        }
+    }
+}
+
 impl Value {
     fn new(kind: ValueKind) -> Box<Value> {
         Box::new(Value { kind })
@@ -298,25 +327,18 @@ impl Value {
     }
 
     //=value_isconstant
-    pub fn is_constant(&self) -> bool {
-        match &self.kind {
-            ValueKind::Int(n) => number_isconstant(n),
-            _ => false,
-        }
-    }
-
     //=value_as_constant
-    pub fn as_constant(&self) -> i32 {
+    pub fn as_constant(&self) -> Option<i32> {
         let ValueKind::Int(n) = &self.kind else {
-            panic!();
+            return None;
         };
-        number_as_constant(n)
+        n.as_constant()
     }
 
     //=value_issync
     pub fn is_sync(&self) -> bool {
         match &self.kind {
-            ValueKind::Sync(n) => number_issync(n),
+            ValueKind::Sync(n) => n.is_sync(),
             _ => false,
         }
     }
@@ -326,14 +348,14 @@ impl Value {
         let ValueKind::Sync(n) = &self.kind else {
             panic!();
         };
-        number_as_sync(n)
+        n.as_sync()
     }
 
     pub fn into_sync(self) -> Box<AstExpr> {
         let ValueKind::Sync(n) = self.kind else {
             panic!();
         };
-        number_into_sync(*n)
+        n.into_sync()
     }
 
     //=value_isint
@@ -349,8 +371,8 @@ impl Value {
             ValueKind::DefinitePtr(_) => AstExpr::new_identifier(self.to_string()),
             ValueKind::IndefinitePtr(_) => AstExpr::new_identifier(self.to_string()),
             ValueKind::Literal(s) => AstExpr::new_literal(s.clone()),
-            ValueKind::Sync(n) => ast_expr_copy(number_as_sync(n)),
-            ValueKind::Int(n) => number_to_expr(n),
+            ValueKind::Sync(n) => ast_expr_copy(n.as_sync()),
+            ValueKind::Int(n) => n.to_expr(),
             _ => panic!(),
         }
     }
@@ -369,7 +391,7 @@ impl Value {
         match (&v1.kind, &v2.kind) {
             (ValueKind::Literal(s1), ValueKind::Literal(s2)) => s1 == s2,
             (ValueKind::Sync(n1), ValueKind::Sync(n2))
-            | (ValueKind::Int(n1), ValueKind::Int(n2)) => number_equal(n1, n2),
+            | (ValueKind::Int(n1), ValueKind::Int(n2)) => Number::equal(n1, n2),
             _ => panic!(),
         }
     }
@@ -378,8 +400,8 @@ impl Value {
     #[allow(dead_code)]
     pub fn value_assume(&mut self, value: bool) -> bool {
         match &mut self.kind {
-            ValueKind::Int(n) => number_assume(n, value),
-            ValueKind::IndefinitePtr(n) => number_assume(n, value),
+            ValueKind::Int(n) => n.assume(value),
+            ValueKind::IndefinitePtr(n) => n.assume(value),
             _ => panic!(),
         }
     }
@@ -438,131 +460,107 @@ impl Number {
     }
 
     fn new_range(lw: i32, excl_up: i32) -> Box<Number> {
-        Number::from_ranges(vec![number_range_create(
+        Number::from_ranges(vec![NumberRange::new(
             NumberValue::Constant(lw),
             NumberValue::Constant(excl_up),
         )])
     }
 
     fn new_indefinite() -> Box<Number> {
-        Number::from_ranges(vec![number_range_create(
-            NumberValue::MIN,
-            NumberValue::MAX,
-        )])
+        Number::from_ranges(vec![NumberRange::new(NumberValue::MIN, NumberValue::MAX)])
     }
 
     fn new_computed(e: Box<AstExpr>) -> Box<Self> {
         Number::new(NumberKind::Computed(e))
     }
-}
 
-impl Display for Number {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    //=number_equal
+    fn equal(n1: &Number, n2: &Number) -> bool {
+        match (&n1.kind, &n2.kind) {
+            (NumberKind::Ranges(ranges1), NumberKind::Ranges(ranges2)) => ranges1 == ranges2,
+            (NumberKind::Computed(c1), NumberKind::Computed(c2)) => ast_expr_equal(c1, c2),
+            _ => panic!(),
+        }
+    }
+
+    //=number_assume
+    #[allow(dead_code)]
+    fn assume(&mut self, value: bool) -> bool {
+        let NumberKind::Ranges(ranges) = &mut self.kind else {
+            panic!();
+        };
+
+        if !ranges.iter().any(|range| range.can_be(value)) {
+            return false;
+        }
+        *ranges = NumberRange::assumed_value(value);
+        true
+    }
+
+    //=number_isconstant
+    //=number_as_constant
+    fn as_constant(&self) -> Option<i32> {
+        let NumberKind::Ranges(ranges) = &self.kind else {
+            return None;
+        };
+        if ranges.len() == 1 && ranges[0].is_single() {
+            Some(ranges[0].as_constant())
+        } else {
+            None
+        }
+    }
+
+    //=number_issync
+    fn is_sync(&self) -> bool {
+        matches!(self.kind, NumberKind::Computed(_))
+    }
+
+    //=number_as_sync
+    fn as_sync(&self) -> &AstExpr {
+        let NumberKind::Computed(computation) = &self.kind else {
+            panic!();
+        };
+        computation
+    }
+
+    fn into_sync(self) -> Box<AstExpr> {
+        let NumberKind::Computed(computation) = self.kind else {
+            panic!();
+        };
+        computation
+    }
+
+    //=number_to_expr
+    fn to_expr(&self) -> Box<AstExpr> {
         match &self.kind {
-            NumberKind::Ranges(ranges) => {
-                write!(f, "{{")?;
-                let n = ranges.len();
-                for (i, range) in ranges.iter().enumerate() {
-                    write!(f, "{range}")?;
-                    if i + 1 < n {
-                        write!(f, ", ")?;
-                    }
-                }
-                write!(f, "}}")
-            }
-            NumberKind::Computed(computation) => write!(f, "{computation}"),
+            NumberKind::Ranges(ranges) => number_ranges_to_expr(ranges),
+            NumberKind::Computed(computation) => ast_expr_copy(computation),
         }
     }
 }
 
-fn number_equal(n1: &Number, n2: &Number) -> bool {
-    match (&n1.kind, &n2.kind) {
-        (NumberKind::Ranges(ranges1), NumberKind::Ranges(ranges2)) => ranges1 == ranges2,
-        (NumberKind::Computed(c1), NumberKind::Computed(c2)) => ast_expr_equal(c1, c2),
-        _ => panic!(),
+impl NumberRange {
+    //=number_range_assumed_value
+    fn assumed_value(value: bool) -> Vec<NumberRange> {
+        if value {
+            NumberRange::arr_ne_create(0)
+        } else {
+            NumberRange::arr_single_create(0)
+        }
     }
-}
 
-fn number_assume(n: &mut Number, value: bool) -> bool {
-    let NumberKind::Ranges(ranges) = &mut n.kind else {
-        panic!();
-    };
-
-    if !ranges.iter().any(|range| range.can_be(value)) {
-        return false;
-    }
-    *ranges = number_range_assumed_value(value);
-    true
-}
-
-fn number_range_assumed_value(value: bool) -> Vec<NumberRange> {
-    if value {
-        NumberRange::arr_ne_create(0)
-    } else {
-        NumberRange::arr_single_create(0)
-    }
-}
-
-fn number_isconstant(n: &Number) -> bool {
-    let NumberKind::Ranges(ranges) = &n.kind else {
-        panic!();
-    };
-    ranges.len() == 1 && ranges[0].is_single()
-}
-
-fn number_as_constant(n: &Number) -> i32 {
-    let NumberKind::Ranges(ranges) = &n.kind else {
-        panic!();
-    };
-    assert_eq!(ranges.len(), 1);
-    number_range_as_constant(&ranges[0])
-}
-
-fn number_issync(n: &Number) -> bool {
-    matches!(n.kind, NumberKind::Computed(_))
-}
-
-fn number_as_sync(n: &Number) -> &AstExpr {
-    let NumberKind::Computed(computation) = &n.kind else {
-        panic!();
-    };
-    computation
-}
-
-fn number_into_sync(n: Number) -> Box<AstExpr> {
-    let NumberKind::Computed(computation) = n.kind else {
-        panic!();
-    };
-    computation
-}
-
-fn number_to_expr(n: &Number) -> Box<AstExpr> {
-    match &n.kind {
-        NumberKind::Ranges(ranges) => number_ranges_to_expr(ranges),
-        NumberKind::Computed(computation) => ast_expr_copy(computation),
+    //=number_range_create
+    fn new(lw: NumberValue, up: NumberValue) -> NumberRange {
+        NumberRange {
+            lower: lw,
+            upper: up,
+        }
     }
 }
 
 fn number_ranges_to_expr(arr: &[NumberRange]) -> Box<AstExpr> {
     assert_eq!(arr.len(), 1);
-    AstExpr::new_constant(number_range_as_constant(&arr[0]))
-}
-
-fn number_range_create(lw: NumberValue, up: NumberValue) -> NumberRange {
-    NumberRange {
-        lower: lw,
-        upper: up,
-    }
-}
-
-impl Display for NumberRange {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if self.is_single() {
-            write!(f, "{}", self.lower)
-        } else {
-            write!(f, "{}:{}", self.lower, self.upper)
-        }
-    }
+    AstExpr::new_constant(arr[0].as_constant())
 }
 
 impl NumberRange {
@@ -582,7 +580,8 @@ impl NumberRange {
     }
 
     fn arr_single_create(val: i32) -> Vec<NumberRange> {
-        vec![number_range_create(
+        // Note: possibility of overflow ignored in original.
+        vec![NumberRange::new(
             NumberValue::Constant(val),
             NumberValue::Constant(val + 1),
         )]
@@ -590,19 +589,20 @@ impl NumberRange {
 
     fn arr_ne_create(val: i32) -> Vec<NumberRange> {
         vec![
-            number_range_create(NumberValue::MIN, NumberValue::Constant(val)),
-            number_range_create(NumberValue::Constant(val + 1), NumberValue::MAX),
+            NumberRange::new(NumberValue::MIN, NumberValue::Constant(val)),
+            NumberRange::new(NumberValue::Constant(val + 1), NumberValue::MAX),
         ]
     }
-}
 
-fn number_range_as_constant(r: &NumberRange) -> i32 {
-    if !r.is_single() {
-        panic!();
-    }
-    match r.lower {
-        NumberValue::Constant(k) => k,
-        _ => panic!(),
+    //=number_range_as_constant
+    fn as_constant(&self) -> i32 {
+        if !self.is_single() {
+            panic!();
+        }
+        match self.lower {
+            NumberValue::Constant(k) => k,
+            _ => panic!(),
+        }
     }
 }
 

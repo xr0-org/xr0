@@ -230,8 +230,8 @@ pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
             return Ok(false);
         }
     }
-    if v.is_constant() {
-        return Ok(v.as_constant() != 0);
+    if let Some(k) = v.as_constant() {
+        return Ok(k != 0);
     }
     let zero = Value::new_int(0);
     if !v.is_int() {
