@@ -159,7 +159,6 @@ pub fn location_referencesheap(l: &Location, s: &State) -> bool {
     let Some(obj) = s.get(l).unwrap() else {
         return false;
     };
-    // XXX FIXME: Clone is not in the original. Added here to satisfy Rust's alias analysis.
     obj.references_heap(s)
 }
 

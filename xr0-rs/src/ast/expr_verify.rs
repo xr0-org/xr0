@@ -209,7 +209,10 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
             let (t, root_val) = {
                 let state: *mut State = state;
                 unsafe {
-                    // Unsafe because we borrow `t` from `state`, then mutate `*state`, then return `t`.
+                    // Unsafe because we borrow `t` from `state`, then mutate `*state`, then return
+                    // `t`. Could fix by making `LValue::t` a semibox and copying `t`. A more
+                    // satisfying solution would be to hash-cons all types (for that matter, all AST
+                    // nodes) and never have to copy them.
                     let root_lval = ast_expr_lvalue(inner, &mut *state)?;
                     let Some(root_obj) = root_lval.obj else {
                         // `root` freed
@@ -514,7 +517,7 @@ fn verify_paramspec(
     if !arg_obj.has_value() {
         return Err(Error::new("must be rvalue".to_string()));
     }
-    // XXX FIXME: Unlike the original, we copy the values to satisfy Rust alias analysis.
+    // Note: Unlike the original, we copy the values to satisfy Rust alias analysis.
     let param_val = param_obj.as_value().unwrap().clone();
     let arg_val = arg_obj.as_value().unwrap().clone();
     verify_paramspec(&param_val, &arg_val, param_state, arg_state)
