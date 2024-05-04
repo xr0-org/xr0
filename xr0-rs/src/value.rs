@@ -116,6 +116,16 @@ impl Display for NumberRange {
     }
 }
 
+impl Display for NumberValue {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            NumberValue::Constant(k) => write!(f, "{k}"),
+            NumberValue::Limit(true) => write!(f, "MAX"),
+            NumberValue::Limit(false) => write!(f, "MIN"),
+        }
+    }
+}
+
 impl Value {
     fn new(kind: ValueKind) -> Box<Value> {
         Box::new(Value { kind })
@@ -606,21 +616,16 @@ impl NumberRange {
     }
 }
 
-impl Display for NumberValue {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            NumberValue::Constant(k) => write!(f, "{k}"),
-            NumberValue::Limit(true) => write!(f, "MAX"),
-            NumberValue::Limit(false) => write!(f, "MIN"),
-        }
-    }
-}
+impl NumberValue {
+    const MIN: Self = NumberValue::Limit(false);
+    const MAX: Self = NumberValue::Limit(true);
 
-#[allow(dead_code)]
-fn number_value_difference(v1: &NumberValue, v2: &NumberValue) -> i32 {
-    match (*v1, *v2) {
-        (NumberValue::Constant(v1), NumberValue::Constant(v2)) => v1 - v2,
-        _ => panic!(),
+    #[allow(dead_code)]
+    fn difference(v1: &NumberValue, v2: &NumberValue) -> i32 {
+        match (*v1, *v2) {
+            (NumberValue::Constant(v1), NumberValue::Constant(v2)) => v1 - v2,
+            _ => panic!(),
+        }
     }
 }
 
@@ -636,11 +641,6 @@ fn constant_le_number_value(constant: i32, v: NumberValue) -> bool {
         NumberValue::Constant(k) => constant <= k,
         NumberValue::Limit(max) => max,
     }
-}
-
-impl NumberValue {
-    const MIN: Self = NumberValue::Limit(false);
-    const MAX: Self = NumberValue::Limit(true);
 }
 
 fn number_values_aresingle(v1: &NumberValue, v2: &NumberValue) -> bool {
