@@ -215,7 +215,7 @@ impl Value {
             let field = &var.name;
             let obj = sv.m.get_mut(field).unwrap();
             if let Some(obj_value) = obj.as_value() {
-                if value_issync(obj_value) {
+                if obj_value.is_sync() {
                     obj.assign(Some(Value::new_sync(AstExpr::new_member(
                         ast_expr_copy(root),
                         field.to_string(),
@@ -246,7 +246,7 @@ impl Value {
 
     //=value_abstractcopy
     pub fn abstract_copy(&self, s: &State) -> Option<Box<Value>> {
-        if !value_referencesheap(self, s) {
+        if !self.references_heap(s) {
             return None;
         }
         Some(match &self.kind {
@@ -264,21 +264,6 @@ fn from_members(members: &[Box<AstVariable>]) -> HashMap<String, Box<Object>> {
         m.insert(id, Object::with_value(AstExpr::new_constant(0), None));
     }
     m
-}
-
-impl StructValue {
-    //=value_struct_abstractcopy
-    fn abstract_copy(&self, s: &State) -> Box<Value> {
-        Value::new(ValueKind::Struct(Box::new(StructValue {
-            members: self.members.clone(),
-            //=abstract_copy_members
-            m: self
-                .m
-                .iter()
-                .map(|(k, obj)| (k.clone(), obj.abstract_copy(s)))
-                .collect(),
-        })))
-    }
 }
 
 impl Value {
@@ -301,97 +286,107 @@ impl Value {
         };
         loc
     }
-}
 
-pub fn value_referencesheap(v: &Value, s: &State) -> bool {
-    match &v.kind {
-        ValueKind::DefinitePtr(loc) => location_referencesheap(loc, s),
-        ValueKind::IndefinitePtr(_) => false,
-        ValueKind::Struct(sv) => struct_referencesheap(sv, s),
-        _ => false,
+    //=value_referencesheap
+    pub fn references_heap(&self, s: &State) -> bool {
+        match &self.kind {
+            ValueKind::DefinitePtr(loc) => location_referencesheap(loc, s),
+            ValueKind::IndefinitePtr(_) => false,
+            ValueKind::Struct(sv) => sv.references_heap(s),
+            _ => false,
+        }
     }
-}
 
-fn struct_referencesheap(sv: &StructValue, s: &State) -> bool {
-    sv.m.values().any(|obj| {
-        let Some(val) = obj.as_value() else {
-            return false;
+    //=value_isconstant
+    pub fn is_constant(&self) -> bool {
+        match &self.kind {
+            ValueKind::Int(n) => number_isconstant(n),
+            _ => false,
+        }
+    }
+
+    //=value_as_constant
+    pub fn as_constant(&self) -> i32 {
+        let ValueKind::Int(n) = &self.kind else {
+            panic!();
         };
-        value_referencesheap(val, s)
-    })
-}
-
-pub fn value_as_constant(v: &Value) -> i32 {
-    let ValueKind::Int(n) = &v.kind else {
-        panic!();
-    };
-    number_as_constant(n)
-}
-
-pub fn value_isconstant(v: &Value) -> bool {
-    match &v.kind {
-        ValueKind::Int(n) => number_isconstant(n),
-        _ => false,
+        number_as_constant(n)
     }
-}
 
-pub fn value_issync(v: &Value) -> bool {
-    match &v.kind {
-        ValueKind::Sync(n) => number_issync(n),
-        _ => false,
+    //=value_issync
+    pub fn is_sync(&self) -> bool {
+        match &self.kind {
+            ValueKind::Sync(n) => number_issync(n),
+            _ => false,
+        }
     }
-}
 
-pub fn value_as_sync(v: &Value) -> &AstExpr {
-    let ValueKind::Sync(n) = &v.kind else {
-        panic!();
-    };
-    number_as_sync(n)
-}
+    //=value_as_sync
+    pub fn as_sync(&self) -> &AstExpr {
+        let ValueKind::Sync(n) = &self.kind else {
+            panic!();
+        };
+        number_as_sync(n)
+    }
 
-impl Value {
     pub fn into_sync(self) -> Box<AstExpr> {
         let ValueKind::Sync(n) = self.kind else {
             panic!();
         };
         number_into_sync(*n)
     }
-}
 
-pub fn value_isint(v: &Value) -> bool {
-    matches!(v.kind, ValueKind::Int(_))
-}
+    //=value_isint
+    pub fn is_int(&self) -> bool {
+        matches!(self.kind, ValueKind::Int(_))
+    }
 
-pub fn value_to_expr(v: &Value) -> Box<AstExpr> {
-    // Note: In the original, the return value from `value_as_literal` was redundantly copied and
-    // then leaked.
-    match &v.kind {
-        ValueKind::DefinitePtr(_) => AstExpr::new_identifier(v.to_string()),
-        ValueKind::IndefinitePtr(_) => AstExpr::new_identifier(v.to_string()),
-        ValueKind::Literal(_) => value_as_literal(v),
-        ValueKind::Sync(n) => ast_expr_copy(number_as_sync(n)),
-        ValueKind::Int(n) => number_to_expr(n),
-        _ => panic!(),
+    //=value_to_expr
+    pub fn to_expr(&self) -> Box<AstExpr> {
+        // Note: In the original, the return value from `value_as_literal` was redundantly copied and
+        // then leaked.
+        match &self.kind {
+            ValueKind::DefinitePtr(_) => AstExpr::new_identifier(self.to_string()),
+            ValueKind::IndefinitePtr(_) => AstExpr::new_identifier(self.to_string()),
+            ValueKind::Literal(s) => AstExpr::new_literal(s.clone()),
+            ValueKind::Sync(n) => ast_expr_copy(number_as_sync(n)),
+            ValueKind::Int(n) => number_to_expr(n),
+            _ => panic!(),
+        }
+    }
+
+    //=value_references
+    pub fn references(&self, loc: &Location, s: &State) -> bool {
+        match &self.kind {
+            ValueKind::DefinitePtr(vloc) => location_references(vloc, loc, s),
+            ValueKind::Struct(sv) => struct_references(sv, loc, s),
+            _ => false,
+        }
     }
 }
 
-#[allow(dead_code)]
-pub fn value_isliteral(v: &Value) -> bool {
-    matches!(v.kind, ValueKind::Literal(_))
-}
+impl StructValue {
+    //=value_struct_abstractcopy
+    fn abstract_copy(&self, s: &State) -> Box<Value> {
+        Value::new(ValueKind::Struct(Box::new(StructValue {
+            members: self.members.clone(),
+            //=abstract_copy_members
+            m: self
+                .m
+                .iter()
+                .map(|(k, obj)| (k.clone(), obj.abstract_copy(s)))
+                .collect(),
+        })))
+    }
 
-pub fn value_as_literal(v: &Value) -> Box<AstExpr> {
-    let ValueKind::Literal(s) = &v.kind else {
-        panic!();
-    };
-    AstExpr::new_literal(s.clone())
-}
-
-pub fn value_references(v: &Value, loc: &Location, s: &State) -> bool {
-    match &v.kind {
-        ValueKind::DefinitePtr(vloc) => location_references(vloc, loc, s),
-        ValueKind::Struct(sv) => struct_references(sv, loc, s),
-        _ => false,
+    //=struct_referencesheap
+    fn references_heap(&self, s: &State) -> bool {
+        self.m.values().any(|obj| {
+            let Some(val) = obj.as_value() else {
+                return false;
+            };
+            val.references_heap(s)
+        })
     }
 }
 
@@ -400,7 +395,7 @@ fn struct_references(sv: &StructValue, loc: &Location, s: &State) -> bool {
         let Some(val) = obj.as_value() else {
             return false;
         };
-        value_references(val, loc, s)
+        val.references(loc, s)
     })
 }
 

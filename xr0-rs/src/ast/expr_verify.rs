@@ -15,7 +15,7 @@ use crate::state::state::{
 };
 use crate::state::State;
 use crate::util::{Error, Result};
-use crate::value::{value_as_sync, value_equal, value_issync, value_to_expr};
+use crate::value::value_equal;
 use crate::{Object, Value};
 
 pub struct LValue<'ast> {
@@ -110,8 +110,8 @@ pub fn ast_expr_alloc_rangeprocess(
     // Note: I think both values are leaked in the original.
     let lw_val = ast_expr_eval(lw, state)?;
     let up_val = ast_expr_eval(up, state)?;
-    let res_lw = value_to_expr(&lw_val);
-    let res_up = value_to_expr(&up_val);
+    let res_lw = lw_val.to_expr();
+    let res_up = up_val.to_expr();
     match &alloc.kind {
         AstExprKind::Assignment(assign) => rangeprocess_alloc(assign, &res_lw, &res_up, state),
         AstExprKind::Allocation(alloc) => rangeprocess_dealloc(alloc, &res_lw, &res_up, state),
@@ -523,7 +523,7 @@ fn pf_augment(v: &Value, call: &CallExpr, state: &mut State) -> Result<Box<Value
     }
     // Note: Original leaked a result and a value here.
     let res_val = call_pf_reduce(call, state)?;
-    Ok(v.pf_augment(value_as_sync(&res_val)))
+    Ok(v.pf_augment(res_val.as_sync()))
 }
 
 fn call_arbitraryresult(
@@ -547,7 +547,7 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
         computed_params.push(if v.is_location() {
             AstExpr::new_identifier(v.to_string())
         } else {
-            value_to_expr(&v)
+            v.to_expr()
         });
     }
     Ok(Value::new_sync(AstExpr::new_call(
@@ -618,11 +618,7 @@ fn expr_binary_eval(binary: &BinaryExpr, state: &mut State) -> Result<Box<Value>
     // Note: Both values are leaked in the original.
     let v1 = ast_expr_eval(e1, state)?;
     let v2 = ast_expr_eval(e2, state)?;
-    let result = Value::new_sync(AstExpr::new_binary(
-        value_to_expr(&v1),
-        *op,
-        value_to_expr(&v2),
-    ));
+    let result = Value::new_sync(AstExpr::new_binary(v1.to_expr(), *op, v2.to_expr()));
     Ok(result)
 }
 
@@ -749,9 +745,9 @@ fn binary_pf_reduce(binary: &BinaryExpr, s: &mut State) -> Result<Box<Value>> {
     let v2 = ast_expr_pf_reduce(e2, s)?;
     // Note: Original leaked v1 and v2.
     Ok(Value::new_sync(AstExpr::new_binary(
-        value_to_expr(&v1),
+        v1.to_expr(),
         *op,
-        value_to_expr(&v2),
+        v2.to_expr(),
     )))
 }
 
@@ -765,7 +761,7 @@ fn call_pf_reduce(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
     for arg in unreduced_args {
         // Note: Original leaked a result and a value here.
         let val = ast_expr_pf_reduce(arg, s)?;
-        reduced_args.push(value_to_expr(&val));
+        reduced_args.push(val.to_expr());
     }
     Ok(Value::new_sync(AstExpr::new_call(
         AstExpr::new_identifier(root.to_string()),
@@ -781,7 +777,7 @@ fn structmember_pf_reduce(sm: &StructMemberExpr, s: &mut State) -> Result<Box<Va
         let obj_value = obj.as_value().unwrap();
         return Ok(Value::copy(obj_value));
     }
-    assert!(value_issync(&v));
+    assert!(v.is_sync());
     Ok(Value::new_sync(AstExpr::new_member(
         v.into_sync(),
         member.to_string(),
@@ -810,6 +806,6 @@ fn binary_assume(b: &BinaryExpr, value: bool, s: &mut State) -> Result<Preresult
     let v1 = ast_expr_pf_reduce(&b.e1, s).unwrap();
     let v2 = ast_expr_pf_reduce(&b.e2, s).unwrap();
     // Note: original leaks the expression.
-    let expr = AstExpr::new_binary(value_to_expr(&v1), b.op, value_to_expr(&v2));
+    let expr = AstExpr::new_binary(v1.to_expr(), b.op, v2.to_expr());
     irreducible_assume(&expr, value, s)
 }

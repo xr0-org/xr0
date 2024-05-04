@@ -5,7 +5,7 @@ use crate::state::location::{location_dealloc, location_references};
 use crate::state::state::state_eval;
 use crate::state::State;
 use crate::util::Result;
-use crate::value::{value_references, value_referencesheap, ValueKind};
+use crate::value::ValueKind;
 use crate::{AstExpr, AstType, Location, Value};
 
 /// A span of memory within a block, part of the abstract state of a program. An object can be the
@@ -107,7 +107,7 @@ impl Object {
 
     pub fn references_heap(&self, s: &State) -> bool {
         match &self.kind {
-            ObjectKind::Value(Some(v)) => value_referencesheap(v, s),
+            ObjectKind::Value(Some(v)) => v.references_heap(s),
             ObjectKind::Value(None) => false,
             ObjectKind::DeallocandRange(_) => true,
         }
@@ -117,7 +117,7 @@ impl Object {
         match &self.kind {
             ObjectKind::DeallocandRange(range) => range.references(loc, s),
             ObjectKind::Value(None) => false,
-            ObjectKind::Value(Some(v)) => value_references(v, loc, s),
+            ObjectKind::Value(Some(v)) => v.references(loc, s),
         }
     }
 

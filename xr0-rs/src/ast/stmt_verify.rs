@@ -8,10 +8,7 @@ use super::{
     AstStmt, AstStmtKind, Error, Preresult, Result, State, KEYWORD_RETURN,
 };
 use crate::parser::LexemeMarker;
-use crate::value::{
-    value_as_constant, value_as_sync, value_equal, value_isconstant, value_isint, value_issync,
-    value_to_expr, Value,
-};
+use crate::value::{value_equal, Value};
 
 pub fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: &mut State) -> Result<()> {
     if matches!(stmt.kind, AstStmtKind::CompoundV(_)) {
@@ -224,8 +221,8 @@ fn sel_absexec(sel: &AstSelectionStmt, state: &mut State, should_setup: bool) ->
 pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
     // Note: This value is leaked in the original.
     let v = ast_expr_pf_reduce(control, state)?;
-    if value_issync(&v) {
-        let sync = value_as_sync(&v);
+    if v.is_sync() {
+        let sync = v.as_sync();
         let p = state.props();
         if p.get(sync) {
             return Ok(true);
@@ -233,12 +230,12 @@ pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
             return Ok(false);
         }
     }
-    if value_isconstant(&v) {
-        return Ok(value_as_constant(&v) != 0);
+    if v.is_constant() {
+        return Ok(v.as_constant() != 0);
     }
     let zero = Value::new_int(0);
-    if !value_isint(&v) {
-        return Err(Error::undecideable_cond(value_to_expr(&v)));
+    if !v.is_int() {
+        return Err(Error::undecideable_cond(v.to_expr()));
     }
     Ok(!value_equal(&zero, &v))
 }

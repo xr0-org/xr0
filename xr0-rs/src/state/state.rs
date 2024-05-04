@@ -4,7 +4,6 @@ use crate::ast::{
     ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN,
 };
 use crate::util::{Error, Result};
-use crate::value::value_issync;
 use crate::{str_write, vprint, Externals, Location, Object, Props, Value};
 
 /// The entire state of the abstract machine.
@@ -322,7 +321,7 @@ pub fn state_deref<'s>(
     ptr_val: &Value,
     index: &AstExpr,
 ) -> Result<Option<&'s mut Object>> {
-    if value_issync(ptr_val) {
+    if ptr_val.is_sync() {
         return Ok(None);
     }
     let deref_base = ptr_val.as_location();
