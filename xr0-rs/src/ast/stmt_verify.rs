@@ -8,7 +8,7 @@ use super::{
     AstStmt, AstStmtKind, Error, Preresult, Result, State, KEYWORD_RETURN,
 };
 use crate::parser::LexemeMarker;
-use crate::value::{value_equal, Value};
+use crate::Value;
 
 pub fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: &mut State) -> Result<()> {
     if matches!(stmt.kind, AstStmtKind::CompoundV(_)) {
@@ -237,7 +237,7 @@ pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
     if !v.is_int() {
         return Err(Error::undecideable_cond(v.to_expr()));
     }
-    Ok(!value_equal(&zero, &v))
+    Ok(!Value::equal(&zero, &v))
 }
 
 fn iter_absexec(iter: &AstIterationStmt, state: &mut State) -> Result<()> {

@@ -359,8 +359,28 @@ impl Value {
     pub fn references(&self, loc: &Location, s: &State) -> bool {
         match &self.kind {
             ValueKind::DefinitePtr(vloc) => location_references(vloc, loc, s),
-            ValueKind::Struct(sv) => struct_references(sv, loc, s),
+            ValueKind::Struct(sv) => sv.references(loc, s),
             _ => false,
+        }
+    }
+
+    //=value_equal
+    pub fn equal(v1: &Value, v2: &Value) -> bool {
+        match (&v1.kind, &v2.kind) {
+            (ValueKind::Literal(s1), ValueKind::Literal(s2)) => s1 == s2,
+            (ValueKind::Sync(n1), ValueKind::Sync(n2))
+            | (ValueKind::Int(n1), ValueKind::Int(n2)) => number_equal(n1, n2),
+            _ => panic!(),
+        }
+    }
+
+    //=value_assume
+    #[allow(dead_code)]
+    pub fn value_assume(&mut self, value: bool) -> bool {
+        match &mut self.kind {
+            ValueKind::Int(n) => number_assume(n, value),
+            ValueKind::IndefinitePtr(n) => number_assume(n, value),
+            _ => panic!(),
         }
     }
 }
@@ -388,33 +408,15 @@ impl StructValue {
             val.references_heap(s)
         })
     }
-}
 
-fn struct_references(sv: &StructValue, loc: &Location, s: &State) -> bool {
-    sv.m.values().any(|obj| {
-        let Some(val) = obj.as_value() else {
-            return false;
-        };
-        val.references(loc, s)
-    })
-}
-
-pub fn value_equal(v1: &Value, v2: &Value) -> bool {
-    match (&v1.kind, &v2.kind) {
-        (ValueKind::Literal(s1), ValueKind::Literal(s2)) => s1 == s2,
-        (ValueKind::Sync(n1), ValueKind::Sync(n2)) | (ValueKind::Int(n1), ValueKind::Int(n2)) => {
-            number_equal(n1, n2)
-        }
-        _ => panic!(),
-    }
-}
-
-#[allow(dead_code)]
-pub fn value_assume(v: &mut Value, value: bool) -> bool {
-    match &mut v.kind {
-        ValueKind::Int(n) => number_assume(n, value),
-        ValueKind::IndefinitePtr(n) => number_assume(n, value),
-        _ => panic!(),
+    //=struct_references
+    fn references(&self, loc: &Location, s: &State) -> bool {
+        self.m.values().any(|obj| {
+            let Some(val) = obj.as_value() else {
+                return false;
+            };
+            val.references(loc, s)
+        })
     }
 }
 

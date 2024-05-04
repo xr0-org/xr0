@@ -15,7 +15,6 @@ use crate::state::state::{
 };
 use crate::state::State;
 use crate::util::{Error, Result};
-use crate::value::value_equal;
 use crate::{Object, Value};
 
 pub struct LValue<'ast> {
@@ -302,7 +301,7 @@ fn expr_binary_decide(expr: &AstExpr, state: &mut State) -> bool {
 
 fn value_compare(v1: &Value, op: AstBinaryOp, v2: &Value) -> bool {
     match op {
-        AstBinaryOp::Eq => value_equal(v1, v2),
+        AstBinaryOp::Eq => Value::equal(v1, v2),
         AstBinaryOp::Ne => !value_compare(v1, AstBinaryOp::Eq, v2),
         _ => panic!(),
     }
