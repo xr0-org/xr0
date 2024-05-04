@@ -9,8 +9,8 @@ use super::{
 };
 use crate::parser::LexemeMarker;
 use crate::value::{
-    value_as_constant, value_as_sync, value_equal, value_int_create, value_isconstant, value_isint,
-    value_issync, value_to_expr,
+    value_as_constant, value_as_sync, value_equal, value_isconstant, value_isint, value_issync,
+    value_to_expr, Value,
 };
 
 pub fn ast_stmt_process(stmt: &AstStmt, fname: &str, state: &mut State) -> Result<()> {
@@ -236,7 +236,7 @@ pub fn sel_decide(control: &AstExpr, state: &mut State) -> Result<bool> {
     if value_isconstant(&v) {
         return Ok(value_as_constant(&v) != 0);
     }
-    let zero = value_int_create(0);
+    let zero = Value::new_int(0);
     if !value_isint(&v) {
         return Err(Error::undecideable_cond(value_to_expr(&v)));
     }

@@ -1,9 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use super::{
-    c_int, str_write, value_int_indefinite_create, value_ptr_indefinite_create,
-    value_struct_indefinite_create, AstVariable, Externals, State, Value,
-};
+use super::{c_int, str_write, AstVariable, Externals, State, Value};
 
 // Note: In the original, `ast_type_copy` would not always copy modifiers.
 #[derive(Clone)]
@@ -163,8 +160,8 @@ pub fn ast_type_create_userdef(name: String) -> Box<AstType> {
 
 pub fn ast_type_vconst(t: &AstType, s: &mut State, comment: &str, persist: bool) -> Box<Value> {
     match &t.base {
-        AstTypeBase::Int => value_int_indefinite_create(),
-        AstTypeBase::Pointer(_) => value_ptr_indefinite_create(),
+        AstTypeBase::Int => Value::new_int_indefinite(),
+        AstTypeBase::Pointer(_) => Value::new_ptr_indefinite(),
         AstTypeBase::UserDefined(name) => {
             let ext = s.ext();
             let type_ = ext.get_typedef(name).unwrap();
@@ -173,7 +170,7 @@ pub fn ast_type_vconst(t: &AstType, s: &mut State, comment: &str, persist: bool)
                 type_, s, comment, persist,
             )
         }
-        AstTypeBase::Struct(_) => value_struct_indefinite_create(t, s, comment, persist),
+        AstTypeBase::Struct(_) => Value::new_struct_indefinite(t, s, comment, persist),
         _ => panic!(),
     }
 }

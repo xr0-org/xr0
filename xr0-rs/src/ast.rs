@@ -2,10 +2,7 @@ use crate::parser::LexemeMarker;
 use crate::state::state::state_getresult;
 use crate::state::State;
 use crate::util::{Error, Result};
-use crate::value::{
-    value_copy, value_int_indefinite_create, value_ptr_indefinite_create,
-    value_struct_indefinite_create,
-};
+use crate::value::value_copy;
 use crate::{str_write, Externals, Value};
 
 mod block;

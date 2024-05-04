@@ -16,9 +16,8 @@ use crate::state::state::{
 use crate::state::State;
 use crate::util::{Error, Result};
 use crate::value::{
-    value_as_location, value_as_sync, value_copy, value_equal, value_int_create, value_islocation,
-    value_isstruct, value_issync, value_literal_create, value_pf_augment, value_struct_member,
-    value_sync_create, value_to_expr,
+    value_as_location, value_as_sync, value_copy, value_equal, value_islocation, value_isstruct,
+    value_issync, value_pf_augment, value_struct_member, value_to_expr,
 };
 use crate::{Object, Value};
 
@@ -337,7 +336,7 @@ fn expr_literal_eval(literal: &str, state: &mut State) -> Result<Box<Value>> {
 }
 
 fn expr_constant_eval(constant: &ConstantExpr, _state: &mut State) -> Result<Box<Value>> {
-    Ok(value_int_create(constant.constant))
+    Ok(Value::new_int(constant.constant))
 }
 
 fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
@@ -347,7 +346,7 @@ fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
 
     /* XXX */
     if id.starts_with('#') {
-        return Ok(value_literal_create(id));
+        return Ok(Value::new_literal(id));
     }
     // Note: Original does not null-check `obj` when there is not an error.
     let obj = state_getobject(state, id)?.unwrap();
@@ -361,7 +360,7 @@ fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
 
 fn hack_identifier_builtin_eval(id: &str, state: &State) -> Result<Box<Value>> {
     if state_getvconst(state, id).is_some() || id.starts_with("ptr:") {
-        return Ok(value_sync_create(AstExpr::new_identifier(id.to_string())));
+        return Ok(Value::new_sync(AstExpr::new_identifier(id.to_string())));
     }
     Err(Error::new("not built-in".to_string()))
 }
@@ -372,7 +371,7 @@ fn expr_unary_eval(unary: &UnaryExpr, state: &mut State) -> Result<Box<Value>> {
         AstUnaryOp::Address => address_eval(&unary.arg, state),
         // XXX: hack because we stmt_exec pre as a preproces to verify
         // constructors, this breaks any preconditions like: pre: !(p == 0)
-        AstUnaryOp::Bang => Ok(value_literal_create("hack")),
+        AstUnaryOp::Bang => Ok(Value::new_literal("hack")),
         _ => panic!(),
     }
 }
@@ -556,7 +555,7 @@ fn call_to_computed_value(f: &AstFunction, s: &mut State) -> Result<Box<Value>> 
             value_to_expr(&v)
         });
     }
-    Ok(value_sync_create(AstExpr::new_call(
+    Ok(Value::new_sync(AstExpr::new_call(
         AstExpr::new_identifier(root.to_string()),
         computed_params,
     )))
@@ -624,7 +623,7 @@ fn expr_binary_eval(binary: &BinaryExpr, state: &mut State) -> Result<Box<Value>
     // Note: Both values are leaked in the original.
     let v1 = ast_expr_eval(e1, state)?;
     let v2 = ast_expr_eval(e2, state)?;
-    let result = value_sync_create(AstExpr::new_binary(
+    let result = Value::new_sync(AstExpr::new_binary(
         value_to_expr(&v1),
         *op,
         value_to_expr(&v2),
@@ -743,7 +742,7 @@ pub fn ast_expr_pf_reduce(e: &AstExpr, s: &mut State) -> Result<Box<Value>> {
 
 fn unary_pf_reduce(e: &AstExpr, s: &mut State) -> Result<Box<Value>> {
     let res_val = ast_expr_pf_reduce(ast_expr_unary_operand(e), s)?;
-    Ok(value_sync_create(AstExpr::new_unary(
+    Ok(Value::new_sync(AstExpr::new_unary(
         res_val.into_sync(),
         ast_expr_unary_op(e),
     )))
@@ -754,7 +753,7 @@ fn binary_pf_reduce(binary: &BinaryExpr, s: &mut State) -> Result<Box<Value>> {
     let v1 = ast_expr_pf_reduce(e1, s)?;
     let v2 = ast_expr_pf_reduce(e2, s)?;
     // Note: Original leaked v1 and v2.
-    Ok(value_sync_create(AstExpr::new_binary(
+    Ok(Value::new_sync(AstExpr::new_binary(
         value_to_expr(&v1),
         *op,
         value_to_expr(&v2),
@@ -773,7 +772,7 @@ fn call_pf_reduce(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
         let val = ast_expr_pf_reduce(arg, s)?;
         reduced_args.push(value_to_expr(&val));
     }
-    Ok(value_sync_create(AstExpr::new_call(
+    Ok(Value::new_sync(AstExpr::new_call(
         AstExpr::new_identifier(root.to_string()),
         reduced_args,
     )))
@@ -788,7 +787,7 @@ fn structmember_pf_reduce(sm: &StructMemberExpr, s: &mut State) -> Result<Box<Va
         return Ok(value_copy(obj_value));
     }
     assert!(value_issync(&v));
-    Ok(value_sync_create(AstExpr::new_member(
+    Ok(Value::new_sync(AstExpr::new_member(
         v.into_sync(),
         member.to_string(),
     )))

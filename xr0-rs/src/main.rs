@@ -1,5 +1,4 @@
 #![deny(warnings)]
-#![allow(clippy::missing_safety_doc)]
 #![allow(clippy::vec_box)]
 #![allow(clippy::box_collection)]
 

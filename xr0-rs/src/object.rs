@@ -7,7 +7,7 @@ use crate::state::State;
 use crate::util::Result;
 use crate::value::{
     value_abstractcopy, value_as_location, value_copy, value_references, value_referencesheap,
-    value_struct_create, ValueKind,
+    ValueKind,
 };
 use crate::{AstExpr, AstType, Location, Value};
 
@@ -319,7 +319,7 @@ impl Object {
             self.as_value_mut().unwrap()
         } else {
             let complete = ast_type_struct_complete(t, s.ext()).unwrap();
-            self.assign(Some(value_struct_create(complete)));
+            self.assign(Some(Value::new_struct(complete)));
             self.as_value_mut().unwrap()
         }
     }

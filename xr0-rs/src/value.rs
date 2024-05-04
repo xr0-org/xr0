@@ -59,72 +59,82 @@ impl Value {
     fn new(kind: ValueKind) -> Box<Value> {
         Box::new(Value { kind })
     }
-}
 
-pub fn value_ptr_create(loc: Box<Location>) -> Box<Value> {
-    Value::new(ValueKind::DefinitePtr(loc))
-}
-
-pub fn value_ptr_indefinite_create() -> Box<Value> {
-    Value::new(ValueKind::IndefinitePtr(Number::new_indefinite()))
-}
-
-pub fn value_int_create(val: i32) -> Box<Value> {
-    Value::new(ValueKind::Int(Number::new_single(val)))
-}
-
-pub fn value_literal_create(lit: &str) -> Box<Value> {
-    Value::new(ValueKind::Literal(lit.to_string()))
-}
-
-#[allow(dead_code)]
-pub fn value_int_ne_create(not_val: i32) -> Box<Value> {
-    Value::new(ValueKind::Int(Number::new_ne(not_val)))
-}
-
-#[allow(dead_code)]
-pub fn value_int_range_create(lw: i32, excl_up: i32) -> Box<Value> {
-    Value::new(ValueKind::Int(Number::new_range(lw, excl_up)))
-}
-
-pub fn value_int_indefinite_create() -> Box<Value> {
-    Value::new(ValueKind::Int(Number::new_indefinite()))
-}
-
-pub fn value_sync_create(e: Box<AstExpr>) -> Box<Value> {
-    Value::new(ValueKind::Sync(Number::new_computed(e)))
-}
-
-pub fn value_struct_create(t: &AstType) -> Box<Value> {
-    let members = ast_type_struct_members(t).expect("can't create value of incomplete type");
-    Value::new(ValueKind::Struct(Box::new(StructValue {
-        members: members.to_vec(),
-        m: from_members(members),
-    })))
-}
-
-pub fn value_struct_indefinite_create(
-    t: &AstType,
-    s: &mut State,
-    comment: &str,
-    persist: bool,
-) -> Box<Value> {
-    // Note: The original doesn't null-check here. I wonder how it would handle `typedef struct foo
-    // foo;`.
-    let t = ast_type_struct_complete(t, s.ext()).unwrap();
-    assert!(ast_type_struct_members(t).is_some());
-    let mut v = value_struct_create(t);
-    let ValueKind::Struct(sv) = &mut v.kind else {
-        panic!();
-    };
-    for var in &sv.members {
-        let field = &var.name;
-
-        let obj = sv.m.get_mut(field).unwrap();
-        let comment = format!("{comment}.{field}");
-        obj.assign(Some(state_vconst(s, &var.type_, Some(&comment), persist)));
+    //=value_ptr_create
+    pub fn new_ptr(loc: Box<Location>) -> Box<Value> {
+        Value::new(ValueKind::DefinitePtr(loc))
     }
-    v
+
+    //=value_ptr_indefinite_create
+    pub fn new_ptr_indefinite() -> Box<Value> {
+        Value::new(ValueKind::IndefinitePtr(Number::new_indefinite()))
+    }
+
+    //=value_int_create
+    pub fn new_int(val: i32) -> Box<Value> {
+        Value::new(ValueKind::Int(Number::new_single(val)))
+    }
+
+    //=value_literal_create
+    pub fn new_literal(lit: &str) -> Box<Value> {
+        Value::new(ValueKind::Literal(lit.to_string()))
+    }
+
+    //=value_int_ne_create
+    #[allow(dead_code)]
+    pub fn new_int_ne(not_val: i32) -> Box<Value> {
+        Value::new(ValueKind::Int(Number::new_ne(not_val)))
+    }
+
+    //=value_int_range_create
+    #[allow(dead_code)]
+    pub fn new_int_range(lw: i32, excl_up: i32) -> Box<Value> {
+        Value::new(ValueKind::Int(Number::new_range(lw, excl_up)))
+    }
+
+    //=value_int_indefinite_create
+    pub fn new_int_indefinite() -> Box<Value> {
+        Value::new(ValueKind::Int(Number::new_indefinite()))
+    }
+
+    //=value_sync_create
+    pub fn new_sync(e: Box<AstExpr>) -> Box<Value> {
+        Value::new(ValueKind::Sync(Number::new_computed(e)))
+    }
+
+    //=value_struct_create
+    pub fn new_struct(t: &AstType) -> Box<Value> {
+        let members = ast_type_struct_members(t).expect("can't create value of incomplete type");
+        Value::new(ValueKind::Struct(Box::new(StructValue {
+            members: members.to_vec(),
+            m: from_members(members),
+        })))
+    }
+
+    //=value_struct_indefinite_create
+    pub fn new_struct_indefinite(
+        t: &AstType,
+        s: &mut State,
+        comment: &str,
+        persist: bool,
+    ) -> Box<Value> {
+        // Note: The original doesn't null-check here. I wonder how it would handle `typedef struct foo
+        // foo;`.
+        let t = ast_type_struct_complete(t, s.ext()).unwrap();
+        assert!(ast_type_struct_members(t).is_some());
+        let mut v = Value::new_struct(t);
+        let ValueKind::Struct(sv) = &mut v.kind else {
+            panic!();
+        };
+        for var in &sv.members {
+            let field = &var.name;
+
+            let obj = sv.m.get_mut(field).unwrap();
+            let comment = format!("{comment}.{field}");
+            obj.assign(Some(state_vconst(s, &var.type_, Some(&comment), persist)));
+        }
+        v
+    }
 }
 
 #[allow(dead_code)]
@@ -173,7 +183,7 @@ pub fn value_pf_augment(old: &Value, root: &AstExpr) -> Box<Value> {
         let obj = sv.m.get_mut(field).unwrap();
         if let Some(obj_value) = obj.as_value() {
             if value_issync(obj_value) {
-                obj.assign(Some(value_sync_create(AstExpr::new_member(
+                obj.assign(Some(Value::new_sync(AstExpr::new_member(
                     ast_expr_copy(root),
                     field.to_string(),
                 ))));

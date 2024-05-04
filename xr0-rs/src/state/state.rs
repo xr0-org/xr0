@@ -4,10 +4,7 @@ use crate::ast::{
     ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN,
 };
 use crate::util::{Error, Result};
-use crate::value::{
-    value_as_location, value_islocation, value_isstruct, value_issync, value_literal_create,
-    value_ptr_create, value_sync_create,
-};
+use crate::value::{value_as_location, value_islocation, value_isstruct, value_issync};
 use crate::{str_write, vprint, Externals, Location, Object, Props, Value};
 
 /// The entire state of the abstract machine.
@@ -144,7 +141,7 @@ pub fn state_vconst(
         return v;
     }
     let c = state.vconst.declare(v, comment, persist);
-    value_sync_create(AstExpr::new_identifier(c))
+    Value::new_sync(AstExpr::new_identifier(c))
 }
 
 pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
@@ -152,21 +149,21 @@ pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
         // Note: Original creates a value that points to this existing location. This is a
         // double-free. When the value is destroyed, the location will be destroyed, even though it
         // is still in the static pool.
-        return value_ptr_create(Box::new(loc.clone()));
+        return Value::new_ptr(Box::new(loc.clone()));
     }
     let address = state.static_memory.new_block();
     let loc = Location::new_static(address, AstExpr::new_constant(0));
     let obj = state.get_mut(&loc, true).unwrap().unwrap();
-    obj.assign(Some(value_literal_create(lit)));
+    obj.assign(Some(Value::new_literal(lit)));
     state.static_memory.string_pool(lit, &loc);
-    value_ptr_create(loc)
+    Value::new_ptr(loc)
 }
 
 impl<'a> State<'a> {
     pub fn clump(&mut self) -> Box<Value> {
         let address = self.clump.new_block();
         let loc = Location::new_dereferencable(address, AstExpr::new_constant(0));
-        value_ptr_create(loc)
+        Value::new_ptr(loc)
     }
 }
 
@@ -306,7 +303,7 @@ pub fn state_getloc(state: &mut State, id: &str) -> Box<Value> {
     // leaked, which partially explains it. The other is `address_eval`, which I don't think is
     // always leaked.)
     let v = state.stack.get_variable(id).unwrap();
-    value_ptr_create(location_copy(v.location()))
+    Value::new_ptr(location_copy(v.location()))
 }
 
 pub fn state_getobject<'s>(state: &'s mut State, id: &str) -> Result<Option<&'s mut Object>> {
@@ -338,7 +335,7 @@ pub fn state_deref<'s>(
 
 impl<'a> State<'a> {
     pub fn alloc(&mut self) -> Box<Value> {
-        value_ptr_create(self.heap.new_block())
+        Value::new_ptr(self.heap.new_block())
     }
 
     pub fn dealloc(&mut self, val: &Value) -> Result<()> {
