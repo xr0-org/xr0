@@ -11,7 +11,7 @@ use crate::state::location::{location_copy, location_range_dealloc};
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_getloc,
     state_getobject, state_getvconst, state_isalloc, state_islval, state_popframe, state_pushframe,
-    state_range_alloc, state_static_init, state_vconst,
+    state_static_init, state_vconst,
 };
 use crate::state::State;
 use crate::util::{Error, Result};
@@ -134,13 +134,23 @@ fn rangeprocess_alloc(
         panic!();
     };
     assert_ne!(alloc.kind, AstAllocKind::Dealloc);
-    let state: *mut State = state;
-    unsafe {
-        let obj = hack_base_object_from_alloc(lval, &mut *state);
-        // Inherently UB API aliasing `state` and `obj`. Likely we could fix it by making the
-        // function take a location instead, which we can copy outside of `state`.
-        state_range_alloc(&mut *state, obj, lw, up)
-    }
+
+    let obj = hack_base_object_from_alloc(lval, &mut *state);
+    //=state_range_alloc
+    let Some(arr_val) = obj.as_value() else {
+        return Err(Error::new("no value".to_string()));
+    };
+    // Note: This `location_copy` is not in the original. Needed for Rust safety, since Rust
+    // doesn't know that `new_block` and `get_block_mut` won't invalidate it (but they won't).
+    let deref = location_copy(value_as_location(arr_val));
+
+    let new_block = state.heap.new_block();
+    let b = state.get_block_mut(&deref).unwrap(); // panic rather than propagate the error - this is in the original
+    let Some(b) = b else {
+        return Err(Error::new("no block".to_string()));
+    };
+    assert!(!ast_expr_equal(lw, up));
+    b.range_alloc(lw, up, new_block)
 }
 
 fn rangeprocess_dealloc(

@@ -1,8 +1,7 @@
 use super::location::{location_copy, location_dealloc, location_toheap, LocationKind};
 use super::{Block, Clump, Heap, ProgramCounter, Stack, StaticMemory, VConst};
 use crate::ast::{
-    ast_expr_equal, ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue,
-    KEYWORD_RETURN,
+    ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN,
 };
 use crate::util::{Error, Result};
 use crate::value::{
@@ -335,27 +334,6 @@ pub fn state_deref<'s>(
     state
         .get_mut(&deref, true)
         .map_err(|err| Error::new(format!("undefined indirection: {err}")))
-}
-
-// XXX FIXME - Inherently UB function: mut aliasing: state contains obj
-pub fn state_range_alloc(
-    state: &mut State,
-    obj: &Object,
-    lw: &AstExpr,
-    up: &AstExpr,
-) -> Result<()> {
-    let Some(arr_val) = obj.as_value() else {
-        return Err(Error::new("no value".to_string()));
-    };
-    let deref = value_as_location(arr_val);
-
-    let new_block = state.heap.new_block();
-    let b = state.get_block_mut(deref).unwrap(); // panic rather than propagate the error - this is in the original
-    let Some(b) = b else {
-        return Err(Error::new("no block".to_string()));
-    };
-    assert!(!ast_expr_equal(lw, up));
-    b.range_alloc(lw, up, new_block)
 }
 
 impl<'a> State<'a> {
