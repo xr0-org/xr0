@@ -91,9 +91,9 @@ fn preprocess(infile: &Path, include_dirs: &[PathBuf]) -> io::Result<String> {
 
 #[allow(clippy::boxed_local)]
 fn pass0(root: Box<Ast>, ext: &mut Externals) {
-    // Note: This clone is not in the original. The cost could be reduced by strategically changing
-    // Boxes to Arcs in the AST. The cost could also probably be eliminated entirely using SemiBox
-    // and giving Externals a lifetime parameter, but that's a bit much.
+    // Rust note: This clone is not in the original. The cost could be reduced by strategically
+    // changing Boxes to Arcs in the AST. The cost could also probably be eliminated entirely using
+    // SemiBox and giving Externals a lifetime parameter, but that's a bit much.
 
     for mut decl in root.decls.clone() {
         match ast_externdecl_as_function_mut(&mut decl) {

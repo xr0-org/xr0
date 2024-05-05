@@ -260,8 +260,9 @@ impl<'a> State<'a> {
                 return Ok(None);
             }
 
-            // Note: Repeat the block lookup, now with a mut reference. Not in the original. Using
-            // non-mut references until now was necessary to convince Rust the above code was safe.
+            // Rust note: Repeat the block lookup, now with a mut reference. Not in the original.
+            // Using non-mut references until now was necessary to convince Rust the above code was
+            // safe.
             let b = self.get_block_mut(loc).unwrap().unwrap();
             let obj = Object::with_value(ast_expr_copy(offset), None);
             let index = b.arr.len();
@@ -286,9 +287,9 @@ impl<'a> State<'a> {
         // has been freed) and will later be destroyed (a clear double free). Undefined behvaior,
         // but the scenario does not happen in the test suite.
         //
-        // Note: Original does not clone obj here, but it's the easiest way to convince Rust that
-        // allocating new heap blocks (which requires a mutable reference to State) doesn't
-        // invalidate `obj` (which refers to an object owned by `*state`).
+        // Rust note: Clone obj to convince Rust that allocating new heap blocks (which
+        // requires a mutable reference to State) doesn't invalidate `obj` (which refers to an
+        // object owned by `*state`). Not in the original, of course.
         let obj = obj.clone();
         let upto = obj.slice_upto(&lw, self);
         let observed = Object::with_value(lw, Some(self.alloc()));
@@ -372,11 +373,11 @@ pub fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType {
 }
 
 pub fn state_getloc(state: &mut State, id: &str) -> Box<Value> {
-    // In the original, this apparently borrows the Location representing the variable's location,
-    // but then passes it to value_ptr_create without copying. We copy because I don't see how this
-    // isn't a double free otherwise. (Note: in one caller, `call_setupverify`, the Value is always
-    // leaked, which partially explains it. The other is `address_eval`, which I don't think is
-    // always leaked.)
+    // Note: In the original, this apparently borrows the Location representing the variable's
+    // location, but then passes it to value_ptr_create without copying. We copy because I don't
+    // see how this isn't a double free otherwise. (In one caller, `call_setupverify`, the Value is
+    // always leaked, which partially explains it. The other is `address_eval`, which I don't think
+    // is always leaked.)
     let v = state.stack.get_variable(id).unwrap();
     Value::new_ptr(location_copy(v.location()))
 }
@@ -486,7 +487,7 @@ impl<'a> State<'a> {
     ) -> Result<()> {
         let b = self.get_block(loc).unwrap().unwrap();
         if b.hack_first_object_is_exactly_bounds(lw, up, self) {
-            // Note: Object cloned for Rust's benefit. Not in the original.
+            // Rust note: Object cloned for Rust's benefit. Not in the original.
             let obj = b.arr[0].clone();
             self.dealloc_object(&obj)?;
             let b = self.get_block_mut(loc).unwrap().unwrap();
@@ -502,7 +503,7 @@ impl<'a> State<'a> {
 
         // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`.
         // It would be a double free but for a counterbug (read comments below).
-        // Note: Objects cloned for Rust's benefit. Not in the original.
+        // Rust note: Objects cloned for Rust's benefit. Not in the original.
         let lw_obj = b.arr[lw_index].clone();
         let up_obj = b.arr[up_index].clone();
         #[allow(unused_variables)]
@@ -512,7 +513,7 @@ impl<'a> State<'a> {
 
         // Retain `arr[0..lw_index]`, replace the range `arr[lw_index..=up_index]` with `upto` and `from`,
         // then retain `arr[up_index + 1..]`.
-        // Note: Block lookup repeated for Rust's benefit. Not in the original.
+        // Rust note: Block lookup repeated for Rust's benefit. Not in the original.
         let b = self.get_block_mut(loc).unwrap().unwrap();
         let mut tail = b.arr.split_off(up_index + 1);
         let objects_to_free = b.arr.split_off(lw_index);
@@ -524,7 +525,7 @@ impl<'a> State<'a> {
         // leaked when `b.arr` is overwritten with `new`. Bug in original, I'm pretty sure.
         // Interestingly, Rust would have caught this, because the original then uses a pointer to
         // the original array `obj` after using `object_arr_append` which invalidates that pointer.
-        // This is an example of how Rust's restrictions on aliasing are actually helpful.
+        // This is an example of how Rust's restrictions on aliasing can be helpful actually!
         //
         // if let Some(upto) = upto {
         //     b.arr.push(upto);
@@ -534,7 +535,7 @@ impl<'a> State<'a> {
         // }
         //
         // Note: Original assigns a new array to `b->arr` without freeing the old one, a leak.
-        // Note: Block lookup repeated for Rust's benefit. Not in the original.
+        // Rust note: Block lookup repeated for Rust's benefit. Not in the original.
         let b = self.get_block_mut(loc).unwrap().unwrap();
         b.arr.append(&mut tail);
         Ok(())

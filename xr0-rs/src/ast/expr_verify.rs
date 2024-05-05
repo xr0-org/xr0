@@ -135,8 +135,8 @@ fn rangeprocess_alloc(
     let Some(arr_val) = obj.as_value() else {
         return Err(Error::new("no value".to_string()));
     };
-    // Note: This `location_copy` is not in the original. Needed for Rust safety, since Rust
-    // doesn't know that `new_block` and `get_block_mut` won't invalidate it (but they won't).
+    // Rust note: This `location_copy` is for Rust's benefit. Not in the original. Rust doesn't
+    // know that `new_block` and `get_block_mut` won't invalidate the location (but they won't).
     let deref = location_copy(arr_val.as_location());
 
     let new_block = state.heap.new_block();
@@ -160,7 +160,7 @@ fn rangeprocess_dealloc(
     let Some(arr_val) = obj.as_value() else {
         return Err(Error::new("no value".to_string()));
     };
-    // Note: This location_copy is not in the original. Needed for Rust safety.
+    // Rust note: This location_copy is not in the original. Needed for Rust safety.
     let deref = location_copy(arr_val.as_location());
     state.dealloc_location_range(&deref, lw, up)
 }
@@ -210,7 +210,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
                 // null, so it will crash.
                 panic!();
             };
-            // Note: Clones in the next two lines are not in the original. They're for Rust's
+            // Rust note: Clones in the next two lines are not in the original. They're for Rust's
             // benefit.
             let t = SemiBox::Owned(Box::new(ast_type_ptr_type(&root_lval.t).clone()));
             let root_val = root_obj.as_value().unwrap().clone();
@@ -226,7 +226,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
                 // Note: Original returns null. See note above.
                 panic!();
             };
-            // Note: Clones in the next two lines are not in the original. They're for Rust's
+            // Rust note: Clones in the next two lines are not in the original. They're for Rust's
             // benefit.
             let t = SemiBox::Owned(Box::new(ast_type_ptr_type(&root_lval.t).clone()));
             let root_val = root_obj.as_value().unwrap().clone();
@@ -267,7 +267,7 @@ fn expr_isdeallocand_decide(expr: &AstExpr, state: &mut State) -> bool {
     //=state_addresses_deallocand
     // Note: Original doesn't null-check.
     let val = obj.as_value().unwrap();
-    // Note: Clone added for Rust's benefit. Not in the original.
+    // Rust note: Clone added for Rust's benefit. Not in the original.
     let loc = val.as_location().clone();
     state.loc_is_deallocand(&loc)
 }
@@ -396,7 +396,8 @@ fn expr_structmember_eval(expr: &StructMemberExpr, s: &mut State) -> Result<Box<
         return Err(Error::new(format!("`{root}' has no field `{member}'")));
     };
     let Some(obj_value) = member.as_value() else {
-        // Note: Original would return null if obj_value is null, but almost nobody downstream handles it.
+        // Note: Original would return null if obj_value is null, but almost nobody downstream
+        // handles it.
         panic!();
     };
     Ok(Value::copy(obj_value))
@@ -490,7 +491,7 @@ fn verify_paramspec(
     if !arg_obj.has_value() {
         return Err(Error::new("must be rvalue".to_string()));
     }
-    // Note: Unlike the original, we copy the values to satisfy Rust alias analysis.
+    // Rust note: Unlike the original, we copy the values to satisfy Rust alias analysis.
     let param_val = param_obj.as_value().unwrap().clone();
     let arg_val = arg_obj.as_value().unwrap().clone();
     verify_paramspec(&param_val, &arg_val, param_state, arg_state)
@@ -784,7 +785,7 @@ fn irreducible_assume_actual(e: &AstExpr, s: &mut State) -> Result<Preresult> {
 fn binary_assume(b: &BinaryExpr, value: bool, s: &mut State) -> Result<Preresult> {
     let v1 = ast_expr_pf_reduce(&b.e1, s).unwrap();
     let v2 = ast_expr_pf_reduce(&b.e2, s).unwrap();
-    // Note: original leaks the expression.
+    // Note: Original leaked the expression.
     let expr = AstExpr::new_binary(v1.to_expr(), b.op, v2.to_expr());
     irreducible_assume(&expr, value, s)
 }

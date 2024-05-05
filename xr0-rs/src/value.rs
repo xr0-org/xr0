@@ -590,7 +590,7 @@ impl NumberRange {
     }
 
     fn arr_single_create(val: i32) -> Vec<NumberRange> {
-        // Note: possibility of overflow ignored in original.
+        // Note: Possibility of overflow ignored in original.
         vec![NumberRange::new(
             NumberValue::Constant(val),
             NumberValue::Constant(val + 1),

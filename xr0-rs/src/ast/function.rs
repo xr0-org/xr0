@@ -154,7 +154,7 @@ fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
     let obj = state_getobject(state, name).unwrap().unwrap();
     if !obj.has_value() {
         let val = state_vconst(state, type_, Some(name), true);
-        // Note: Repeated lookup here for Rust's benefit. Not in the original.
+        // Rust note: Repeated lookup here for Rust's benefit. Not in the original.
         let obj = state_getobject(state, name).unwrap().unwrap();
         obj.assign(Some(val));
     }
@@ -210,7 +210,7 @@ fn recurse_buildgraph(g: &mut FuncGraph, dedup: &mut DedupSet, fname: &str, ext:
 
         for func in farr {
             if !local_dedup.contains(&func) {
-                // Note: The original avoids some of these string copies.
+                // Rust note: The original avoids some of these string copies.
                 local_dedup.push(func.clone());
                 let f = ext.get_func(&func).unwrap();
                 if !f.is_axiom {

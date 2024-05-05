@@ -102,10 +102,10 @@ impl<'a> Stack<'a> {
         abstract_: bool,
     ) -> &mut StackFrame<'a> {
         let id = self.frames.len();
-        // Note: The original `stack_create` does not manually lay all this out. Instead, `result`
-        // was initially null and it was filled in by calling `variable_create`. In Rust, it is not
-        // nullable, so we can't partially initialize the stack frame, then call a method on it to
-        // create a variable, then initialize the last field.
+        // Rust note: The original `stack_create` does not manually lay all this out. Instead,
+        // `result` was initially null and it was filled in by calling `variable_create`. In Rust,
+        // it is not nullable, so we can't partially initialize the stack frame, then call a method
+        // on it to create a variable, then initialize the last field.
         let mut frame = StackFrame {
             pc: ProgramCounter::new(b, &name),
             abstract_,
@@ -147,14 +147,14 @@ impl<'a> Stack<'a> {
 
     //=stack_undeclare
     pub fn undeclare(state: &mut State) {
-        // Note: The clone here is not in the original. Necessary to convince Rust that
+        // Rust note: The clone here is not in the original. Necessary to convince Rust that
         // variable_abstractcopy's mut use of state will not invalidate it.
         let old_result = state.stack.top().result.clone();
         let new_result = variable_abstractcopy(&old_result, state);
         state.stack.top_mut().result = new_result;
 
-        // Note: the extra empty box is not in the original. It's necessary to move the varmap out
-        // of State before Rust will let us use `variable_abstractcopy` in safe code.
+        // Rust note: the extra empty box is not in the original. It's necessary to move the varmap
+        // out of State before Rust will let us use `variable_abstractcopy` in safe code.
         let m = std::mem::replace(&mut state.stack.top_mut().varmap, Box::new(VarMap::new()));
 
         let mut new_map = Box::new(VarMap::new());
@@ -255,10 +255,9 @@ fn variable_abstractcopy(old: &Variable, s: &mut State) -> Box<Variable> {
     if obj.is_value() {
         if let Some(v) = obj.as_value() {
             let v = v.abstract_copy(s);
-            // Note: The repeated "get" on the next line is not in the original. Rust requires it
-            // to upgrade from our non-mut reference to a mut reference. (If we asked for a mut
-            // reference the first time, it would be invalidated by the use of `s` in
-            // `Value::abstract_copy`.)
+            // Rust note: Repeated "get" on the next line for Rust's benefit, not in the original.
+            // (If we asked for a mut reference the first time, it would be invalidated by the use
+            // of `s` in `Value::abstract_copy`.)
             let obj = s.get_mut(&new.loc, false).unwrap().unwrap();
             obj.assign(v);
         }

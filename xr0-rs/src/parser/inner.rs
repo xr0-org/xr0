@@ -359,7 +359,7 @@ pub grammar c_parser(env: &Env) for str {
         p:pointer() { Declarator { ptr_valence: p, name: None } }
 
     rule direct_declarator() -> String =
-        // Note: declarator postfix syntax is ignored in the original
+        // Note: Declarator postfix syntax is ignored in the original
         name:identifier() direct_declarator_postfix()* { name }
 
     rule direct_declarator_postfix() =
@@ -410,7 +410,7 @@ pub grammar c_parser(env: &Env) for str {
     rule specifier_qualifier_list() -> Box<AstType> =
         q:type_specifier() _ specifier_qualifier_list() { q } /
         q:type_specifier() { q } /
-        // Note: original is I guess UB? type confusion
+        // Note: Original is I guess UB? Seems like type confusion.
         type_qualifier() _ t:specifier_qualifier_list() { t } /
         type_qualifier() {
             ast_type_create(AstTypeBase::Int, 0)
@@ -539,7 +539,7 @@ pub grammar c_parser(env: &Env) for str {
                 body.body.map(SemiBox::Owned),
             )
         } /
-        // Note: this was in the original. surely shouldn't be allowed, and implicit return type
+        // Note: This was in the original. Surely shouldn't be allowed, and implicit return type
         // should be int if it is allowed.
         decl:function_declarator() _ body:block_statement() {
             ast_function_create(

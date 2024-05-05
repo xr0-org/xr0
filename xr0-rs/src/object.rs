@@ -221,7 +221,9 @@ impl Object {
         if e2 {
             // `excl_up` is equal to this object's upper bound. Return everything.
             // I'm not sure why this doesn't return `Some(Box::new(self.clone()))`.
-            // Note: Original doesn't null-check the value here; objects can be VALUE with null value.
+            //
+            // Note: Original doesn't null-check the value here; objects can be "isvalue" but not
+            // "hasvalue".
             let ObjectKind::Value(Some(v)) = &self.kind else {
                 panic!();
             };
@@ -260,7 +262,9 @@ impl Object {
             return None;
         }
         if e1 {
-            // Note: Original doesn't null-check the value here; objects can be VALUE with null value.
+            // Note: Original doesn't null-check the value here; objects can be "isvalue" but not
+            // "hasvalue".
+            //
             // I'm not sure why this doesn't return Some(Box::new(self.clone())).
             let ObjectKind::Value(Some(v)) = &self.kind else {
                 panic!();
@@ -306,7 +310,7 @@ impl Object {
         }
     }
 
-    // Note: Original took the whole state as an argument. Narrowed for Rust's benefit.
+    // Rust note: Original took the whole state as an argument. Narrowed for Rust's benefit.
     //=getorcreatestruct
     fn get_or_create_struct<'obj>(&'obj mut self, t: &AstType, ext: &Externals) -> &'obj mut Value {
         // XXX FIXME: very silly rust construction because of borrow checker limitation
