@@ -1,7 +1,8 @@
+use super::block::object_arr_index;
 use super::location::{location_copy, location_toheap, LocationKind};
 use super::{Block, Clump, Heap, ProgramCounter, Stack, StaticMemory, VConst};
 use crate::ast::{
-    ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN,
+    ast_expr_copy, ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN,
 };
 use crate::object::{ObjectKind, Range};
 use crate::util::{Error, Result};
@@ -228,9 +229,88 @@ impl<'a> State<'a> {
                     ));
                     Ok(None)
                 }
-                Some(b) => Ok(b.observe(&loc.offset, &mut *state_ptr, constructive)),
+                Some(b) => Ok((*state_ptr).observe(&loc.offset, b, constructive)),
             }
         }
+    }
+
+    /// Returns the object at `offset` in this block.
+    ///
+    /// If there's no object at `offset`, or (due to abstractness) it's impossible to tell for sure
+    /// that `offset` is within the bounds of a particular existing object, this returns `None`,
+    /// unless `constructive` is `true`. In that case, it creates a new `Object` at that offset,
+    /// with no value. The new object is stored in this block and a reference is returned. When
+    /// `constructive` is `true`, this method never returns `None`.
+    ///
+    /// Otherwise, `offset` falls within the bounds of at least one object in this block. If the
+    /// first such object is a value object, whether or not it actually has a value, this makes no
+    /// changes and returns a reference to that object.
+    ///
+    /// Otherwise, `offset` is in a range object--that is, a region of allocated but uninitialized
+    /// memory, with no effective type. This means `self` is a heap or clump block, as all
+    /// other blocks (variables, parameters, statics, temporaries) have a static type. In this case
+    /// we punch a hole in the range, replacing it with up to three `Object`s, representing the memory
+    /// before, inside, and after `offset`, respectively. The "before" and "after" objects will be
+    /// range objects; the new one at `offset` will be a value object, but with no value assigned.
+    ///
+    /// It's unclear how this copes with vagueness in `offset`. It's also unclear why it does what
+    /// it does in the case where it punches a hole in a range object -- it's implemented (I think)
+    /// by freeing the entire block `self` and allocating a new block, which can't be right.
+    ///
+    /// XXX FIXME inherently UB function: mut aliasing: `*self` owns `*b`.
+    //=block_observe
+    pub fn observe<'b>(
+        &mut self,
+        offset: &AstExpr,
+        b: &'b mut Block,
+        constructive: bool,
+    ) -> Option<&'b mut Object> {
+        let Some(mut index) = object_arr_index(&b.arr, offset, self) else {
+            if !constructive {
+                return None;
+            }
+            let obj = Object::with_value(ast_expr_copy(offset), None);
+            let index = b.arr.len();
+            b.arr.push(obj);
+            return Some(&mut b.arr[index]);
+        };
+        let obj = &b.arr[index];
+
+        if obj.is_value() {
+            return Some(&mut b.arr[index]);
+        }
+
+        // range around observand at offset
+        let lw = ast_expr_copy(offset);
+        let up = AstExpr::new_sum(ast_expr_copy(offset), AstExpr::new_constant(1));
+
+        // ordering makes them sequential in heap
+        // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down.
+        // `upto` is then appended to `b->arr` where it may be used (although the `lw` part of it
+        // has been freed) and will later be destroyed (a clear double free). Undefined behvaior,
+        // but the scenario does not happen in the test suite.
+        let upto = obj.slice_upto(&lw, self);
+        let observed = Object::with_value(lw, Some(self.alloc()));
+        let from = obj.slice_from(&up, self);
+        drop(up);
+
+        // delete current struct block
+        // Note: 99-program/000-matrix.x gets here, so the code is exercised; but it doesn't make
+        // sense to free the allocation as a side effect here.
+        self.dealloc_object(obj).unwrap();
+        b.arr.remove(index);
+
+        if let Some(upto) = upto {
+            b.arr.insert(index, upto);
+            index += 1;
+        }
+        let observed_index = index;
+        b.arr.insert(index, observed);
+        index += 1;
+        if let Some(from) = from {
+            b.arr.insert(index, from);
+        }
+        Some(&mut b.arr[observed_index])
     }
 
     pub fn get_block<'s>(&'s self, loc: &Location) -> Result<Option<&'s Block>> {
