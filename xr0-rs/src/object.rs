@@ -4,6 +4,7 @@ use crate::ast::{ast_expr_copy, ast_type_struct_complete, LValue};
 use crate::state::location::location_references;
 use crate::state::state::state_eval;
 use crate::state::State;
+use crate::util::SemiBox;
 use crate::value::ValueKind;
 use crate::{AstExpr, AstType, Location, Value};
 
@@ -297,7 +298,10 @@ impl Object {
             .find(|var| member == var.name)
             .map(|var| &var.type_)
             .unwrap();
-        LValue { t, obj }
+        LValue {
+            t: SemiBox::Borrowed(t),
+            obj,
+        }
     }
 
     fn get_or_create_struct<'obj>(&'obj mut self, t: &AstType, s: &mut State) -> &'obj mut Value {

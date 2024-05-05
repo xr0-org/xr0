@@ -14,11 +14,11 @@ use crate::state::state::{
     state_static_init, state_vconst,
 };
 use crate::state::State;
-use crate::util::{Error, Result};
+use crate::util::{Error, Result, SemiBox};
 use crate::{Object, Value};
 
 pub struct LValue<'ast> {
-    pub t: &'ast AstType,
+    pub t: SemiBox<'ast, AstType>,
     pub obj: Option<&'ast mut Object>,
 }
 
@@ -201,55 +201,35 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
         // XXX: expr for args (scanf()) in function not of form `*(ptr+offset)
         // for some reason
         AstExprKind::Identifier(_) => {
-            let (t, root_val) = {
-                let state: *mut State = state;
-                unsafe {
-                    // Unsafe because we borrow `t` from `state`, then mutate `*state`, then return
-                    // `t`. Could fix by making `LValue::t` a semibox and copying `t`. A more
-                    // satisfying solution would be to hash-cons all types (for that matter, all AST
-                    // nodes) and never have to copy them.
-                    let root_lval = ast_expr_lvalue(inner, &mut *state)?;
-                    let Some(root_obj) = root_lval.obj else {
-                        // `root` freed
+            let root_lval = ast_expr_lvalue(inner, state)?;
+            let Some(root_obj) = root_lval.obj else {
+                // `root` freed
 
-                        // Note: The original does `return (struct lvalue_res) { .lval = NULL, .err = NULL };`
-                        // here but I believe every single caller dereferences lval without checking it for
-                        // null, so it will crash.
-                        panic!();
-                    };
-                    let t = ast_type_ptr_type(root_lval.t);
-                    // Note: Clone in the next line is not in the original. We are using unsafe
-                    // pointers, so Rust can't check lifetimes, but we need to copy the value out
-                    // of `*root_obj` to make it outlive our borrow of that object; and so that in
-                    // the call to state_deref below, we do not use both the mut reference to
-                    // `state` and a non-mut reference to a `Value` that `state` owns.
-                    let root_val = root_obj.as_value().unwrap().clone();
-                    (t, root_val)
-                }
+                // Note: The original does `return (struct lvalue_res) { .lval = NULL, .err = NULL };`
+                // here but I believe every single caller dereferences lval without checking it for
+                // null, so it will crash.
+                panic!();
             };
+            // Note: Clones in the next two lines are not in the original. They're for Rust's
+            // benefit.
+            let t = SemiBox::Owned(Box::new(ast_type_ptr_type(&root_lval.t).clone()));
+            let root_val = root_obj.as_value().unwrap().clone();
 
             let obj = state_deref(state, &root_val, &AstExpr::new_constant(0))?;
             Ok(LValue { t, obj })
         }
         AstExprKind::Binary(BinaryExpr { op: _, e1, e2 }) => {
-            let (t, root_val) = {
-                let state: *mut State = state;
-                unsafe {
-                    // Unsafe for same reason as above.
-                    let root_lval = ast_expr_lvalue(e1, &mut *state)?;
-                    let Some(root_obj) = root_lval.obj else {
-                        // `root` freed
+            let root_lval = ast_expr_lvalue(e1, state)?;
+            let Some(root_obj) = root_lval.obj else {
+                // `root` freed
 
-                        // Note: Original returns null. See note above.
-                        panic!();
-                    };
-                    let t = ast_type_ptr_type(root_lval.t);
-                    // Note: Clone on the next line is not in the original; see note in the
-                    // Identifier case above.
-                    let root_val = root_obj.as_value().unwrap().clone();
-                    (t, root_val)
-                }
+                // Note: Original returns null. See note above.
+                panic!();
             };
+            // Note: Clones in the next two lines are not in the original. They're for Rust's
+            // benefit.
+            let t = SemiBox::Owned(Box::new(ast_type_ptr_type(&root_lval.t).clone()));
+            let root_val = root_obj.as_value().unwrap().clone();
             let Ok(res_obj) = state_deref(&mut *state, &root_val, e2) else {
                 // Note: Original returns null. See note above.
                 panic!();
@@ -270,7 +250,7 @@ pub fn expr_structmember_lvalue<'s>(
         // Unsafe because it fetches one thing, then uses it to fetch another. Copy a location.
         let root_lval = ast_expr_lvalue(root, &mut *state)?;
         let root_obj = root_lval.obj.unwrap();
-        let lvalue = root_obj.member_lvalue(root_lval.t, member, &mut *state);
+        let lvalue = root_obj.member_lvalue(&root_lval.t, member, &mut *state);
         if lvalue.obj.is_none() {
             return Err(Error::new(format!("`{root}' has no field `{member}'")));
         }

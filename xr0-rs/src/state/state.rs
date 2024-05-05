@@ -5,7 +5,7 @@ use crate::ast::{
     ast_expr_copy, ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN,
 };
 use crate::object::{ObjectKind, Range};
-use crate::util::{Error, Result};
+use crate::util::{Error, Result, SemiBox};
 use crate::{str_write, vprint, Externals, Location, Object, Props, Value};
 
 /// The entire state of the abstract machine.
@@ -363,7 +363,7 @@ impl<'a> State<'a> {
             // method that fetches both. Underneath all this is Block::observe.
             let obj = state_getobject(&mut *state, id)?;
             Ok(LValue {
-                t: state_getobjecttype(&*state, id),
+                t: SemiBox::Borrowed(state_getobjecttype(&*state, id)),
                 obj,
             })
         }
