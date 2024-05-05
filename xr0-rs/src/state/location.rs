@@ -177,13 +177,6 @@ pub fn location_auto_get_block_id(loc: &Location) -> usize {
     loc.block
 }
 
-pub fn location_dealloc(loc: &Location, heap: &mut Heap) -> Result<()> {
-    if !matches!(loc.kind, LocationKind::Dynamic) {
-        return Err(Error::new("not heap location".to_string()));
-    }
-    heap.dealloc_block(loc.block)
-}
-
 pub fn location_range_dealloc(
     loc: &Location,
     lw: &AstExpr,

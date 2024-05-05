@@ -1,10 +1,9 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_copy, ast_type_struct_complete, LValue};
-use crate::state::location::{location_dealloc, location_references};
+use crate::state::location::location_references;
 use crate::state::state::state_eval;
 use crate::state::State;
-use crate::util::Result;
 use crate::value::ValueKind;
 use crate::{AstExpr, AstType, Location, Value};
 
@@ -278,15 +277,6 @@ impl Object {
         ))
     }
 
-    pub fn dealloc(&self, s: &mut State) -> Result<()> {
-        // Note: Original doesn't handle the possibility of Value(None) here.
-        match &self.kind {
-            ObjectKind::Value(Some(v)) => s.dealloc(v),
-            ObjectKind::Value(None) => panic!(),
-            ObjectKind::DeallocandRange(range) => range.dealloc(s),
-        }
-    }
-
     /// Returns a field of `self`, which must be a value object. `t` is the effective type of this
     /// access to `obj`. `member` is the name of the field being accessed.
     pub fn member_lvalue<'s>(
@@ -334,10 +324,8 @@ impl Range {
         Box::new(Range { size, loc })
     }
 
-    pub fn dealloc(&self, s: &mut State) -> Result<()> {
-        // Note: The original creates a value that borrows the location from `r`, then leaks the value
-        // to avoid double-freeing the location.
-        location_dealloc(&self.loc, &mut s.heap)
+    pub fn loc(&self) -> &Location {
+        &self.loc
     }
 
     fn is_deallocand(&self, s: &State) -> bool {

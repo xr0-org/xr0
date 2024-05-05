@@ -116,7 +116,7 @@ impl Block {
         // delete current struct block
         // Note: 99-program/000-matrix.x gets here, so the code is exercised; but it doesn't make
         // sense to free the allocation as a side effect here.
-        obj.dealloc(s).unwrap();
+        s.dealloc_object(obj).unwrap();
         self.arr.remove(index);
 
         if let Some(upto) = upto {
@@ -201,7 +201,7 @@ impl Block {
     // XXX FIXME: Inherently UB function: mut aliasing: `*s` contains `*self`.
     pub fn range_dealloc(&mut self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> Result<()> {
         if self.hack_first_object_is_exactly_bounds(lw, up, s) {
-            self.arr[0].dealloc(s)?;
+            s.dealloc_object(&self.arr[0])?;
             self.arr.remove(0);
             return Ok(());
         }
@@ -223,7 +223,7 @@ impl Block {
         // then retain `arr[up_index + 1..]`.
         let mut tail = self.arr.split_off(up_index + 1);
         for obj in self.arr.drain(lw_index..=up_index) {
-            obj.dealloc(s)?;
+            s.dealloc_object(&obj)?;
         }
         // Note: Original pushes these to `self.arr` instead of `new` so that they are lost and
         // leaked when `self.arr` is overwritten with `new`. Bug in original, I'm pretty sure.

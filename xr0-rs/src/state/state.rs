@@ -1,8 +1,9 @@
-use super::location::{location_copy, location_dealloc, location_toheap, LocationKind};
+use super::location::{location_copy, location_toheap, LocationKind};
 use super::{Block, Clump, Heap, ProgramCounter, Stack, StaticMemory, VConst};
 use crate::ast::{
     ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN,
 };
+use crate::object::{ObjectKind, Range};
 use crate::util::{Error, Result};
 use crate::{str_write, vprint, Externals, Location, Object, Props, Value};
 
@@ -333,17 +334,50 @@ pub fn state_deref<'s>(
 }
 
 impl<'a> State<'a> {
+    //=state_alloc
     pub fn alloc(&mut self) -> Box<Value> {
         Value::new_ptr(self.heap.new_block())
     }
 
+    //=state_dealloc
     pub fn dealloc(&mut self, val: &Value) -> Result<()> {
         if !val.is_location() {
             return Err(Error::new(
                 "undefined free of value not pointing at heap".to_string(),
             ));
         }
-        location_dealloc(val.as_location(), &mut self.heap)
+        self.dealloc_location(val.as_location())
+    }
+
+    //=location_dealloc
+    fn dealloc_location(&mut self, loc: &Location) -> Result<()> {
+        if !matches!(loc.kind, LocationKind::Dynamic) {
+            return Err(Error::new("not heap location".to_string()));
+        }
+        self.heap.dealloc_block(loc.block)
+    }
+
+    /// Deallocate a block of memory. This function has two modes. If `obj` has a value and the
+    /// value is a pointer to a heap allocation, this deallocates that heap allocation. If it has
+    /// any other value, it's an error. Otherwise `obj` is a range object and this deallocates that
+    /// range. (I wonder if this shouldn't be two different functions.)
+    ///
+    /// # Panics
+    /// If `obj` is an uninitialized variable.
+    pub fn dealloc_object(&mut self, obj: &Object) -> Result<()> {
+        // Note: Original doesn't handle the possibility of Value(None) here.
+        match &obj.kind {
+            ObjectKind::Value(Some(v)) => self.dealloc(v),
+            ObjectKind::Value(None) => panic!(),
+            ObjectKind::DeallocandRange(range) => self.dealloc_range(range),
+        }
+    }
+
+    //=range_dealloc
+    fn dealloc_range(&mut self, range: &Range) -> Result<()> {
+        // Note: The original creates a value that borrows the location from `r`, then leaks the value
+        // to avoid double-freeing the location.
+        self.dealloc_location(range.loc())
     }
 }
 
