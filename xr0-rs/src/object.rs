@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_copy, ast_type_struct_complete, LValue};
+use crate::ext::Externals;
 use crate::state::location::location_references;
 use crate::state::state::state_eval;
 use crate::state::State;
@@ -280,13 +281,14 @@ impl Object {
 
     /// Returns a field of `self`, which must be a value object. `t` is the effective type of this
     /// access to `obj`. `member` is the name of the field being accessed.
+    //=expr_structmember_lvalue (partial)
     pub fn member_lvalue<'s>(
         &'s mut self,
         t: &AstType,
         member: &str,
-        s: &'s mut State,
+        ext: &'s Externals,
     ) -> LValue<'s> {
-        let val = self.get_or_create_struct(t, s);
+        let val = self.get_or_create_struct(t, ext);
         let ValueKind::Struct(sv) = &mut val.kind else {
             panic!();
         };
@@ -304,12 +306,14 @@ impl Object {
         }
     }
 
-    fn get_or_create_struct<'obj>(&'obj mut self, t: &AstType, s: &mut State) -> &'obj mut Value {
+    // Note: Original took the whole state as an argument. Narrowed for Rust's benefit.
+    //=getorcreatestruct
+    fn get_or_create_struct<'obj>(&'obj mut self, t: &AstType, ext: &Externals) -> &'obj mut Value {
         // XXX FIXME: very silly rust construction because of borrow checker limitation
         if self.as_value_mut().is_some() {
             self.as_value_mut().unwrap()
         } else {
-            let complete = ast_type_struct_complete(t, s.ext()).unwrap();
+            let complete = ast_type_struct_complete(t, ext).unwrap();
             self.assign(Some(Value::new_struct(complete)));
             self.as_value_mut().unwrap()
         }

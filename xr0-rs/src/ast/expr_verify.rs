@@ -245,17 +245,15 @@ pub fn expr_structmember_lvalue<'s>(
     state: &'s mut State,
 ) -> Result<LValue<'s>> {
     let StructMemberExpr { root, member } = sm;
-    let state: *mut State = state;
-    unsafe {
-        // Unsafe because it fetches one thing, then uses it to fetch another. Copy a location.
-        let root_lval = ast_expr_lvalue(root, &mut *state)?;
-        let root_obj = root_lval.obj.unwrap();
-        let lvalue = root_obj.member_lvalue(&root_lval.t, member, &mut *state);
-        if lvalue.obj.is_none() {
-            return Err(Error::new(format!("`{root}' has no field `{member}'")));
-        }
-        Ok(lvalue)
+    let ext = state.ext();
+
+    let root_lval = ast_expr_lvalue(root, state)?;
+    let root_obj = root_lval.obj.unwrap();
+    let lvalue = root_obj.member_lvalue(&root_lval.t, member, ext);
+    if lvalue.obj.is_none() {
+        return Err(Error::new(format!("`{root}' has no field `{member}'")));
     }
+    Ok(lvalue)
 }
 
 fn hack_object_from_assertion<'s>(expr: &'s AstExpr, state: &'s mut State) -> &'s Object {
