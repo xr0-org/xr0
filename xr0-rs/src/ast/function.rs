@@ -150,18 +150,13 @@ fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
 }
 
 fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
-    let state: *mut State = state;
-    unsafe {
-        // Unsafe because we fetch a mut ref to an object, then use `state_vconst` which mutates
-        // state, then assign the resulting value to the object.
-        let name = &param.name;
-        let t = &param.type_;
-        let obj = state_getobject(&mut *state, name).unwrap().unwrap();
-        if !obj.has_value() {
-            // XXX FIXME: dereferencing `state` again here definitely invalidates `obj`
-            let val = state_vconst(&mut *state, t, Some(name), true);
-            obj.assign(Some(val));
-        }
+    let AstVariable { name, type_ } = param;
+    let obj = state_getobject(state, name).unwrap().unwrap();
+    if !obj.has_value() {
+        let val = state_vconst(state, type_, Some(name), true);
+        // Note: Repeated lookup here for Rust's benefit. Not in the original.
+        let obj = state_getobject(state, name).unwrap().unwrap();
+        obj.assign(Some(val));
     }
     Ok(())
 }
