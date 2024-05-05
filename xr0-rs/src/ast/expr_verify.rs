@@ -9,8 +9,8 @@ use super::{
 };
 use crate::state::location::location_copy;
 use crate::state::state::{
-    state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_getloc,
-    state_getobject, state_getvconst, state_isalloc, state_islval, state_popframe, state_pushframe,
+    state_copy, state_create, state_declare, state_deref, state_getloc, state_getobject,
+    state_getvconst, state_isalloc, state_islval, state_popframe, state_pushframe,
     state_static_init, state_vconst,
 };
 use crate::state::State;
@@ -262,12 +262,14 @@ fn hack_object_from_assertion<'s>(expr: &'s AstExpr, state: &'s mut State) -> &'
 }
 
 fn expr_isdeallocand_decide(expr: &AstExpr, state: &mut State) -> bool {
-    let state: *mut State = state;
-    unsafe {
-        // Unsafe because `hack_object_from_assertion` wants `state` mutably. LValue mutability.
-        let obj = hack_object_from_assertion(expr, &mut *state);
-        state_addresses_deallocand(&*state, obj)
-    }
+    let obj = hack_object_from_assertion(expr, state);
+
+    //=state_addresses_deallocand
+    // Note: Original doesn't null-check.
+    let val = obj.as_value().unwrap();
+    // Note: Clone added for Rust's benefit. Not in the original.
+    let loc = val.as_location().clone();
+    state.loc_is_deallocand(&loc)
 }
 
 fn expr_binary_decide(expr: &AstExpr, state: &mut State) -> bool {

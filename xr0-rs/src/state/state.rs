@@ -541,13 +541,6 @@ impl<'a> State<'a> {
     }
 }
 
-pub fn state_addresses_deallocand(state: &State, obj: &Object) -> bool {
-    // Note: Original doesn't null-check.
-    let val = obj.as_value().unwrap();
-    let loc = val.as_location();
-    state.loc_is_deallocand(loc)
-}
-
 impl<'a> State<'a> {
     pub fn loc_is_deallocand(&self, loc: &Location) -> bool {
         let b = self.get_block(loc).unwrap();
