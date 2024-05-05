@@ -2,7 +2,6 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_copy, ast_expr_equal};
 use crate::state::{Heap, State};
-use crate::util::{Error, Result};
 use crate::{AstExpr, Value};
 
 /// An abstract memory address.
@@ -39,7 +38,7 @@ impl Display for Location {
             _ => panic!(),
         }
         write!(f, "{}", self.block)?;
-        if !offsetzero(self) {
+        if !self.offset_is_zero() {
             write!(f, "+{}", self.offset)?;
         }
         Ok(())
@@ -112,16 +111,17 @@ impl Location {
 
     //=location_with_offset
     pub fn with_offset(&self, offset: &AstExpr) -> Box<Location> {
-        assert!(offsetzero(self));
+        assert!(self.offset_is_zero());
         let mut copy = location_copy(self);
         copy.offset = ast_expr_copy(offset);
         copy
     }
-}
 
-fn offsetzero(loc: &Location) -> bool {
-    let zero = AstExpr::new_constant(0);
-    ast_expr_equal(&loc.offset, &zero)
+    //=offsetzero
+    pub fn offset_is_zero(&self) -> bool {
+        let zero = AstExpr::new_constant(0);
+        ast_expr_equal(&self.offset, &zero)
+    }
 }
 
 pub fn location_copy(loc: &Location) -> Box<Location> {
@@ -175,27 +175,4 @@ pub fn location_auto_parts(loc: &Location) -> (usize, usize, &AstExpr) {
 pub fn location_auto_get_block_id(loc: &Location) -> usize {
     assert!(matches!(loc.kind, LocationKind::Automatic { .. }));
     loc.block
-}
-
-pub fn location_range_dealloc(
-    loc: &Location,
-    lw: &AstExpr,
-    up: &AstExpr,
-    state: &mut State,
-) -> Result<()> {
-    assert!(offsetzero(loc));
-    let state: *mut State = state;
-    unsafe {
-        // Unsafe because `range_dealloc` has an inherently UB API.
-        let Some(b) = (*state).get_block_mut(loc).unwrap() else {
-            return Err(Error::new("cannot get block".to_string()));
-        };
-        if !b.range_aredeallocands(lw, up, &*state) {
-            println!("block: {b}");
-            println!("lw: {lw}, up: {up}");
-            debug_assert!(false);
-            return Err(Error::new("some values not allocated".to_string()));
-        }
-        b.range_dealloc(lw, up, &mut *state)
-    }
 }

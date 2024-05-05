@@ -1,4 +1,4 @@
-use super::block::object_arr_index;
+use super::block::{object_arr_index, object_arr_index_upperincl};
 use super::location::{location_copy, location_toheap, LocationKind};
 use super::{Block, Clump, Heap, ProgramCounter, Stack, StaticMemory, VConst};
 use crate::ast::{
@@ -460,6 +460,91 @@ impl<'a> State<'a> {
         // Note: The original creates a value that borrows the location from `r`, then leaks the value
         // to avoid double-freeing the location.
         self.dealloc_location(range.loc())
+    }
+
+    //=location_range_dealloc
+    pub fn dealloc_location_range(
+        &mut self,
+        loc: &Location,
+        lw: &AstExpr,
+        up: &AstExpr,
+    ) -> Result<()> {
+        assert!(loc.offset_is_zero());
+
+        let Some(b) = self.get_block(loc).unwrap() else {
+            return Err(Error::new("cannot get block".to_string()));
+        };
+        if !b.range_aredeallocands(lw, up, self) {
+            println!("block: {b}");
+            println!("lw: {lw}, up: {up}");
+            debug_assert!(false);
+            return Err(Error::new("some values not allocated".to_string()));
+        }
+
+        self.dealloc_block_range(loc, lw, up)
+    }
+
+    //=block_range_dealloc
+    pub fn dealloc_block_range(
+        &mut self,
+        loc: &Location,
+        lw: &AstExpr,
+        up: &AstExpr,
+    ) -> Result<()> {
+        let b = self.get_block(loc).unwrap().unwrap();
+        if b.hack_first_object_is_exactly_bounds(lw, up, self) {
+            // Note: Object cloned for Rust's benefit. Not in the original.
+            let obj = b.arr[0].clone();
+            self.dealloc_object(&obj)?;
+            let b = self.get_block_mut(loc).unwrap().unwrap();
+            b.arr.remove(0);
+            return Ok(());
+        }
+        let Some(lw_index) = object_arr_index(&b.arr, lw, self) else {
+            return Err(Error::new("lower bound not allocated".to_string()));
+        };
+        let Some(up_index) = object_arr_index_upperincl(&b.arr, up, self) else {
+            return Err(Error::new("upper bound not allocated".to_string()));
+        };
+
+        // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`.
+        // It would be a double free but for a counterbug (read comments below).
+        // Note: Objects cloned for Rust's benefit. Not in the original.
+        let lw_obj = b.arr[lw_index].clone();
+        let up_obj = b.arr[up_index].clone();
+        #[allow(unused_variables)]
+        let upto = lw_obj.slice_upto(lw, self);
+        #[allow(unused_variables)]
+        let from = up_obj.slice_from(up, self);
+
+        // Retain `arr[0..lw_index]`, replace the range `arr[lw_index..=up_index]` with `upto` and `from`,
+        // then retain `arr[up_index + 1..]`.
+        // Note: Block lookup repeated for Rust's benefit. Not in the original.
+        let b = self.get_block_mut(loc).unwrap().unwrap();
+        let mut tail = b.arr.split_off(up_index + 1);
+        let objects_to_free = b.arr.split_off(lw_index);
+        for obj in objects_to_free {
+            self.dealloc_object(&obj)?;
+        }
+
+        // Note: Original pushes these to `b.arr` instead of `new` so that they are lost and
+        // leaked when `b.arr` is overwritten with `new`. Bug in original, I'm pretty sure.
+        // Interestingly, Rust would have caught this, because the original then uses a pointer to
+        // the original array `obj` after using `object_arr_append` which invalidates that pointer.
+        // This is an example of how Rust's restrictions on aliasing are actually helpful.
+        //
+        // if let Some(upto) = upto {
+        //     b.arr.push(upto);
+        // }
+        // if let Some(from) = from {
+        //     b.arr.push(from);
+        // }
+        //
+        // Note: Original assigns a new array to `b->arr` without freeing the old one, a leak.
+        // Note: Block lookup repeated for Rust's benefit. Not in the original.
+        let b = self.get_block_mut(loc).unwrap().unwrap();
+        b.arr.append(&mut tail);
+        Ok(())
     }
 }
 

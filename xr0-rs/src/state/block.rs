@@ -4,7 +4,7 @@ use super::State;
 use crate::ast::ast_expr_copy;
 use crate::object::Range;
 use crate::state::state::state_eval;
-use crate::util::{Error, Result};
+use crate::util::Result;
 use crate::{AstExpr, Location, Object};
 
 /// A region of memory in the heap, stack, clump, global, etc.
@@ -105,7 +105,12 @@ impl Block {
         true
     }
 
-    fn hack_first_object_is_exactly_bounds(&self, lw: &AstExpr, up: &AstExpr, s: &State) -> bool {
+    pub(crate) fn hack_first_object_is_exactly_bounds(
+        &self,
+        lw: &AstExpr,
+        up: &AstExpr,
+        s: &State,
+    ) -> bool {
         assert!(!self.arr.is_empty());
         let obj = &self.arr[0];
         if !obj.is_deallocand(s) {
@@ -116,52 +121,6 @@ impl Block {
         let same_lw = AstExpr::new_eq(ast_expr_copy(lw), ast_expr_copy(&obj.offset));
         let same_up = AstExpr::new_eq(ast_expr_copy(up), obj.end());
         state_eval(s, &same_lw) && state_eval(s, &same_up)
-    }
-
-    //=block_range_dealloc
-    // XXX FIXME: Inherently UB function: mut aliasing: `*s` contains `*self`.
-    pub fn range_dealloc(&mut self, lw: &AstExpr, up: &AstExpr, s: &mut State) -> Result<()> {
-        if self.hack_first_object_is_exactly_bounds(lw, up, s) {
-            s.dealloc_object(&self.arr[0])?;
-            self.arr.remove(0);
-            return Ok(());
-        }
-        let Some(lw_index) = object_arr_index(&self.arr, lw, s) else {
-            return Err(Error::new("lower bound not allocated".to_string()));
-        };
-        let Some(up_index) = object_arr_index_upperincl(&self.arr, up, s) else {
-            return Err(Error::new("upper bound not allocated".to_string()));
-        };
-
-        // Note: Original stores `lw` in `upto` but then the caller presumably also destroys `lw`.
-        // It would be a double free but for a counterbug (read comments below).
-        #[allow(unused_variables)]
-        let upto = self.arr[lw_index].slice_upto(lw, s);
-        #[allow(unused_variables)]
-        let from = self.arr[up_index].slice_from(up, s);
-
-        // Retain `arr[0..lw_index]`, replace the range `arr[lw_index..=up_index]` with `upto` and `from`,
-        // then retain `arr[up_index + 1..]`.
-        let mut tail = self.arr.split_off(up_index + 1);
-        for obj in self.arr.drain(lw_index..=up_index) {
-            s.dealloc_object(&obj)?;
-        }
-        // Note: Original pushes these to `self.arr` instead of `new` so that they are lost and
-        // leaked when `self.arr` is overwritten with `new`. Bug in original, I'm pretty sure.
-        // Interestingly, Rust would have caught this, because the original then uses a pointer to
-        // the original array `obj` after using `object_arr_append` which invalidates that pointer.
-        // This is an example of how Rust's restrictions on aliasing are actually helpful.
-        //
-        // if let Some(upto) = upto {
-        //     self.arr.push(upto);
-        // }
-        // if let Some(from) = from {
-        //     self.arr.push(from);
-        // }
-        //
-        // Note: Original assigns a new array to `b->arr` without freeing the old one, a leak.
-        self.arr.append(&mut tail);
-        Ok(())
     }
 }
 

@@ -7,7 +7,7 @@ use super::{
     AstFunction, AstType, AstTypeBase, AstUnaryOp, AstVariable, BinaryExpr, CallExpr, ConstantExpr,
     IncDecExpr, StructMemberExpr, UnaryExpr,
 };
-use crate::state::location::{location_copy, location_range_dealloc};
+use crate::state::location::location_copy;
 use crate::state::state::{
     state_addresses_deallocand, state_copy, state_create, state_declare, state_deref, state_getloc,
     state_getobject, state_getvconst, state_isalloc, state_islval, state_popframe, state_pushframe,
@@ -162,7 +162,7 @@ fn rangeprocess_dealloc(
     };
     // Note: This location_copy is not in the original. Needed for Rust safety.
     let deref = location_copy(arr_val.as_location());
-    location_range_dealloc(&deref, lw, up, state)
+    state.dealloc_location_range(&deref, lw, up)
 }
 
 /// Given `expr` of the form `*(p+i)`, return the object storing the variable `p`.
