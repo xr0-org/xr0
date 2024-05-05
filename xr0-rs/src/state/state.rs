@@ -206,78 +206,73 @@ impl<'a> State<'a> {
 
     /// Gets the object at the given location `loc`.
     ///
-    /// On success, this returns a mutable reference to the `Object`. If the block designated by
-    /// `loc` doesn't exist, this returns Ok(None). (That seems suspicious to me; it means we're
-    /// chasing a dangling pointer which we should not do. I'm not sure why it should not be an
-    /// assertion failure. -jorendorff) If the block refers to a stack frame that doesn't exist,
-    /// this returns an error. (Same. -jorendorff)
+    /// On success, this returns a mutable reference to the `Object`. In detail:
+    ///
+    /// - If `loc` points to a variable, parameter, string literal, or any other existing value
+    ///   object (whether it "has a value" or not), this changes nothing and returns a reference to
+    ///   the existing object.
+    ///
+    /// - If `loc` points to some offset within an existing value object, I think this likewise
+    ///   returns a reference to that object, although it should probably be an error.
+    ///
+    /// - If `loc` points at or into a range object--that is, a region of allocated but
+    ///   uninitialized memory, with no type, this means `self` is a heap or clump block, as all
+    ///   other blocks have a static type. In this case we punch a hole in the range, replacing it
+    ///   with up to three `Object`s, representing the memory before, at, and after `offset`,
+    ///   respectively. The "before" and "after" objects will be range objects; the new one at
+    ///   `offset` will be a value object, but with no value assigned. See text below.
+    ///
+    /// - If `loc` points to some offset into an existing block, but there is no object at that
+    ///   offset, or due to indefiniteness in `loc` it's impossible to tell for sure that it points
+    ///   within the bounds of any particular existing object, this returns `Ok(None)`, unless
+    ///   `constructive` is `true`. In that case, it creates a new `Object` at that offset, with no
+    ///   value. The new object is stored in the block and a reference is returned. See text below.
+    ///
+    /// - If the block designated by `loc` doesn't exist, this returns `Ok(None)`. (That seems
+    ///   suspicious to me; it means we're chasing a dangling pointer which we should not do. I'm
+    ///   not sure why it should not be an assertion failure. -jorendorff) If the block refers to a
+    ///   stack frame that doesn't exist, this returns an error. (Same. -jorendorff)
+    ///
+    /// The reason this method creates new `Object`s is so that the caller can set the type and
+    /// value of the object, if it's carrying out a write to previously uninitialized heap/clump
+    /// memory.
+    ///
+    /// However, the exact behavior in that case seems sketchy -- it appears to free the entire
+    /// block and allocate a new one, which can't be right.
     //=state_get
     pub fn get_mut<'s>(
         &'s mut self,
         loc: &Location,
         constructive: bool,
     ) -> Result<Option<&'s mut Object>> {
-        let state_ptr: *mut State = self;
-        unsafe {
-            // Unsafe because Block::observe is inherently UB when the state contains the block.
-            let b = (*state_ptr).get_block_mut(loc)?;
-            match b {
-                None => {
-                    assert!(matches!(
-                        loc.kind,
-                        LocationKind::Dynamic | LocationKind::Dereferencable | LocationKind::Static
-                    ));
-                    Ok(None)
-                }
-                Some(b) => Ok((*state_ptr).observe(&loc.offset, b, constructive)),
-            }
-        }
-    }
+        let Some(b) = self.get_block(loc)? else {
+            assert!(matches!(
+                loc.kind,
+                LocationKind::Dynamic | LocationKind::Dereferencable | LocationKind::Static
+            ));
+            return Ok(None);
+        };
 
-    /// Returns the object at `offset` in this block.
-    ///
-    /// If there's no object at `offset`, or (due to abstractness) it's impossible to tell for sure
-    /// that `offset` is within the bounds of a particular existing object, this returns `None`,
-    /// unless `constructive` is `true`. In that case, it creates a new `Object` at that offset,
-    /// with no value. The new object is stored in this block and a reference is returned. When
-    /// `constructive` is `true`, this method never returns `None`.
-    ///
-    /// Otherwise, `offset` falls within the bounds of at least one object in this block. If the
-    /// first such object is a value object, whether or not it actually has a value, this makes no
-    /// changes and returns a reference to that object.
-    ///
-    /// Otherwise, `offset` is in a range object--that is, a region of allocated but uninitialized
-    /// memory, with no effective type. This means `self` is a heap or clump block, as all
-    /// other blocks (variables, parameters, statics, temporaries) have a static type. In this case
-    /// we punch a hole in the range, replacing it with up to three `Object`s, representing the memory
-    /// before, inside, and after `offset`, respectively. The "before" and "after" objects will be
-    /// range objects; the new one at `offset` will be a value object, but with no value assigned.
-    ///
-    /// It's unclear how this copes with vagueness in `offset`. It's also unclear why it does what
-    /// it does in the case where it punches a hole in a range object -- it's implemented (I think)
-    /// by freeing the entire block `self` and allocating a new block, which can't be right.
-    ///
-    /// XXX FIXME inherently UB function: mut aliasing: `*self` owns `*b`.
-    //=block_observe
-    pub fn observe<'b>(
-        &mut self,
-        offset: &AstExpr,
-        b: &'b mut Block,
-        constructive: bool,
-    ) -> Option<&'b mut Object> {
+        //=block_observe
+        let offset = &loc.offset;
         let Some(mut index) = object_arr_index(&b.arr, offset, self) else {
             if !constructive {
-                return None;
+                return Ok(None);
             }
+
+            // Note: Repeat the block lookup, now with a mut reference. Not in the original. Using
+            // non-mut references until now was necessary to convince Rust the above code was safe.
+            let b = self.get_block_mut(loc).unwrap().unwrap();
             let obj = Object::with_value(ast_expr_copy(offset), None);
             let index = b.arr.len();
             b.arr.push(obj);
-            return Some(&mut b.arr[index]);
+            return Ok(Some(&mut b.arr[index]));
         };
-        let obj = &b.arr[index];
 
+        let obj = &b.arr[index];
         if obj.is_value() {
-            return Some(&mut b.arr[index]);
+            let b = self.get_block_mut(loc).unwrap().unwrap();
+            return Ok(Some(&mut b.arr[index]));
         }
 
         // range around observand at offset
@@ -285,10 +280,16 @@ impl<'a> State<'a> {
         let up = AstExpr::new_sum(ast_expr_copy(offset), AstExpr::new_constant(1));
 
         // ordering makes them sequential in heap
+        //
         // Note: Original stores `lw` in `upto` but then also destroys `lw` a few lines down.
         // `upto` is then appended to `b->arr` where it may be used (although the `lw` part of it
         // has been freed) and will later be destroyed (a clear double free). Undefined behvaior,
         // but the scenario does not happen in the test suite.
+        //
+        // Note: Original does not clone obj here, but it's the easiest way to convince Rust that
+        // allocating new heap blocks (which requires a mutable reference to State) doesn't
+        // invalidate `obj` (which refers to an object owned by `*state`).
+        let obj = obj.clone();
         let upto = obj.slice_upto(&lw, self);
         let observed = Object::with_value(lw, Some(self.alloc()));
         let from = obj.slice_from(&up, self);
@@ -297,7 +298,8 @@ impl<'a> State<'a> {
         // delete current struct block
         // Note: 99-program/000-matrix.x gets here, so the code is exercised; but it doesn't make
         // sense to free the allocation as a side effect here.
-        self.dealloc_object(obj).unwrap();
+        self.dealloc_object(&obj).unwrap();
+        let b = self.get_block_mut(loc).unwrap().unwrap();
         b.arr.remove(index);
 
         if let Some(upto) = upto {
@@ -310,7 +312,7 @@ impl<'a> State<'a> {
         if let Some(from) = from {
             b.arr.insert(index, from);
         }
-        Some(&mut b.arr[observed_index])
+        Ok(Some(&mut b.arr[observed_index]))
     }
 
     pub fn get_block<'s>(&'s self, loc: &Location) -> Result<Option<&'s Block>> {
