@@ -357,16 +357,9 @@ fn state_getresulttype<'s>(state: &'s State) -> &'s AstType {
 
 impl<'a> State<'a> {
     pub fn identifier_lvalue<'s>(&'s mut self, id: &str) -> Result<LValue<'s>> {
-        let state: *mut State = self;
-        unsafe {
-            // Unsafe because we fetch references to two pieces of information. Need a single State
-            // method that fetches both. Underneath all this is Block::observe.
-            let obj = state_getobject(&mut *state, id)?;
-            Ok(LValue {
-                t: SemiBox::Borrowed(state_getobjecttype(&*state, id)),
-                obj,
-            })
-        }
+        let t = SemiBox::Owned(Box::new(state_getobjecttype(self, id).clone()));
+        let obj = state_getobject(self, id)?;
+        Ok(LValue { t, obj })
     }
 }
 
