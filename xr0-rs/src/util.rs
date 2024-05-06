@@ -107,18 +107,6 @@ macro_rules! str_write {
     }}
 }
 
-#[macro_export]
-macro_rules! cstr {
-    ($c:expr) => {{
-        let c = $c;
-        if c.is_null() {
-            std::borrow::Cow::Borrowed("(null)")
-        } else {
-            std::ffi::CStr::from_ptr(c).to_string_lossy()
-        }
-    }};
-}
-
 pub static VERBOSE_MODE: AtomicBool = AtomicBool::new(false);
 
 #[macro_export]
@@ -140,7 +128,7 @@ macro_rules! vprint {
 }
 
 /// Map that keeps entries in insertion order.
-/// Implemented as an alist for now.
+/// Implemented as an alist.
 #[derive(Clone)]
 pub struct InsertionOrderMap<K, V> {
     items: Vec<(K, V)>,
