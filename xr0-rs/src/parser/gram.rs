@@ -553,10 +553,10 @@ pub grammar c_parser(env: &Env) for str {
         }
 
     rule external_declaration() -> Box<AstExternDecl> =
-        f:function_definition() { ast_functiondecl_create(f) } /
+        f:function_definition() { AstExternDecl::new_function(f) } /
         d:declaration() {?
             if let Some(name) = d.name {
-                Ok(ast_decl_create(name, d.t))
+                Ok(AstExternDecl::new(name, d.t))
             } else {
                 Err("global declaration with no name")
             }

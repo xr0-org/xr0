@@ -33,10 +33,7 @@ pub use expr_verify::{
     ast_expr_abseval, ast_expr_alloc_rangeprocess, ast_expr_assume, ast_expr_decide, ast_expr_eval,
     ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide, LValue, Preresult,
 };
-pub use extern_decl::{
-    ast_decl_create, ast_externdecl_as_function, ast_externdecl_as_function_mut,
-    ast_externdecl_install, ast_functiondecl_create, AstExternDecl, AstTypedefDecl,
-};
+pub use extern_decl::{AstExternDecl, AstExternDeclKind, AstTypedefDecl};
 pub use function::{
     ast_function_absexec, ast_function_buildgraph, ast_function_create, ast_function_initparams,
     ast_function_protostitch, ast_function_setupabsexec, ast_function_verify, AstFunction,

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::ast::{AstExternDecl, AstExternDeclKind};
 use crate::{str_write, AstFunction, AstType, AstVariable};
 
 #[derive(Default)]
@@ -60,5 +61,25 @@ impl Externals {
 
     pub fn get_struct(&self, id: &str) -> Option<&AstType> {
         self.struct_.get(id).map(|p| &**p)
+    }
+
+    //=ast_externdecl_install
+    #[allow(clippy::boxed_local)]
+    pub fn add(&mut self, decl: Box<AstExternDecl>) {
+        match decl.kind {
+            AstExternDeclKind::Function(f) => {
+                self.declare_func(f);
+            }
+            AstExternDeclKind::Variable(v) => {
+                let name = v.name.clone();
+                self.declare_var(name, v);
+            }
+            AstExternDeclKind::Typedef(typedef) => {
+                self.declare_typedef(typedef.name.to_string(), typedef.type_0);
+            }
+            AstExternDeclKind::Struct(s) => {
+                self.declare_struct(s);
+            }
+        }
     }
 }

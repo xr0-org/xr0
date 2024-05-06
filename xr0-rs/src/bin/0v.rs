@@ -13,9 +13,8 @@ use std::sync::Arc;
 use clap::Parser;
 
 use xr0::ast::{
-    ast_block_str, ast_externdecl_as_function, ast_externdecl_as_function_mut,
-    ast_externdecl_install, ast_function_verify, ast_functiondecl_create, ast_protostitch,
-    ast_topological_order, Ast, AstExternDecl, AstFunction,
+    ast_block_str, ast_function_verify, ast_protostitch, ast_topological_order, Ast, AstExternDecl,
+    AstFunction,
 };
 use xr0::util::VERBOSE_MODE;
 use xr0::{parser, vprintln, Externals};
@@ -80,21 +79,21 @@ fn pass0(root: Box<Ast>, ext: &mut Externals) {
     // SemiBox and giving Externals a lifetime parameter, but that's a bit much.
 
     for mut decl in root.decls.clone() {
-        match ast_externdecl_as_function_mut(&mut decl) {
+        match decl.as_function_mut() {
             None => {
-                ast_externdecl_install(decl, ext);
+                ext.add(decl);
             }
             Some(f) => {
                 if f.is_axiom() {
-                    ast_externdecl_install(decl, ext);
+                    ext.add(decl);
                 } else if f.is_proto() {
                     if !verifyproto(f, &root.decls) {
                         process::exit(1);
                     }
-                    ast_externdecl_install(decl, ext);
+                    ext.add(decl);
                 } else {
                     ast_protostitch(f, ext);
-                    ast_externdecl_install(ast_functiondecl_create(f.copy()), ext);
+                    ext.add(AstExternDecl::new_function(f.copy()));
                 }
             }
         }
@@ -119,7 +118,7 @@ fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool {
     let mut count = 0usize;
     let pname = proto.name();
     for decl in decls {
-        if let Some(d) = ast_externdecl_as_function(decl) {
+        if let Some(d) = decl.as_function() {
             if !d.is_axiom() && !d.is_proto() && pname == d.name() {
                 def = Some(d);
                 count += 1;
