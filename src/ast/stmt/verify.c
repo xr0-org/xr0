@@ -690,7 +690,6 @@ ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block
 	case STMT_COMPOUND:
 		return comp_buildsetup(stmt, state, setups);
 	default:
-		printf("stmt: %s\n", ast_stmt_str(stmt));
 		assert(false);
 	}
 }
