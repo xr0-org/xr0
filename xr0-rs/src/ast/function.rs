@@ -101,7 +101,7 @@ pub fn ast_function_create(
     ret: Box<AstType>,
     name: String,
     params: Vec<Box<AstVariable>>,
-    abstract_0: Box<AstBlock>,
+    abstract_: Box<AstBlock>,
     body: Option<SemiBox<AstBlock>>,
 ) -> Box<AstFunction> {
     Box::new(AstFunction {
@@ -109,7 +109,7 @@ pub fn ast_function_create(
         ret,
         name,
         params,
-        abstract_: abstract_0,
+        abstract_,
         body,
     })
 }

@@ -75,7 +75,7 @@ impl Externals {
                 self.declare_var(name, v);
             }
             AstExternDeclKind::Typedef(typedef) => {
-                self.declare_typedef(typedef.name.to_string(), typedef.type_0);
+                self.declare_typedef(typedef.name.to_string(), typedef.type_);
             }
             AstExternDeclKind::Struct(s) => {
                 self.declare_struct(s);

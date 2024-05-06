@@ -16,7 +16,7 @@ pub enum AstExternDeclKind {
 #[derive(Clone)]
 pub struct AstTypedefDecl {
     pub name: String,
-    pub type_0: Box<AstType>,
+    pub type_: Box<AstType>,
 }
 
 impl AstExternDecl {
@@ -46,7 +46,7 @@ impl AstExternDecl {
     pub fn new(name: String, t: Box<AstType>) -> Box<AstExternDecl> {
         Box::new(AstExternDecl {
             kind: if t.is_typedef() {
-                AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t })
+                AstExternDeclKind::Typedef(AstTypedefDecl { name, type_: t })
             } else if t.is_struct() {
                 assert!(t.struct_tag().is_some());
                 AstExternDeclKind::Struct(t)
