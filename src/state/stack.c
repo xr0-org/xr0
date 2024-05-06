@@ -217,10 +217,14 @@ stack_str(struct stack *stack, struct state *state)
 	struct map *m = stack->varmap;
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
-		char *var = variable_str((struct variable *) e.value, stack, state);
-		strbuilder_printf(b, "\t%s: %s", e.key, var);
-		free(var);
-		strbuilder_putc(b, '\n');
+		struct variable *v = (struct variable *) e.value;
+		char *s = variable_str(v, stack, state);
+		strbuilder_printf(b, "\t%d: %s (%s", i, s, e.key);
+		if (variable_isparam(v)) {
+			strbuilder_printf(b, ", π");
+		}
+		strbuilder_printf(b, ")\n");
+		free(s);
 	}
 	strbuilder_printf(b, "\t");
 	/* TODO: fix length of line */
@@ -615,12 +619,9 @@ variable_str(struct variable *var, struct stack *stack, struct state *state)
 
 	struct strbuilder *b = strbuilder_create();
 	char *type = ast_type_str(var->type);
-	char *loc = location_str(var->loc);
-	char *isparam = var->isparam ? "param " : "";
 	char *obj_str = object_or_nothing_str(var->loc, stack, state);
-	strbuilder_printf(b, "{%s%s := %s} @ %s", isparam, type, obj_str, loc);
+	strbuilder_printf(b, "{%s := %s}", type, obj_str);
 	free(obj_str);
-	free(loc);
 	free(type);
 	return strbuilder_build(b);
 }

@@ -104,16 +104,16 @@ state_str(struct state *state)
 		strbuilder_printf(b, "static:\n%s\n", static_mem);
 	}
 	free(static_mem);
-	char *props = props_str(state->props, "\t");
-	if (strlen(props) > 0) {
-		strbuilder_printf(b, "assume:\n%s\n", props);
-	}
-	free(props);
 	char *vconst = vconst_str(state->vconst, "\t");
 	if (strlen(vconst) > 0) {
 		strbuilder_printf(b, "rconst:\n%s\n", vconst);
 	}
 	free(vconst);
+	char *props = props_str(state->props, "\t");
+	if (strlen(props) > 0) {
+		strbuilder_printf(b, "assume:\n%s\n", props);
+	}
+	free(props);
 	char *clump = clump_str(state->clump, "\t");
 	if (strlen(clump) > 0) {
 		strbuilder_printf(b, "clump:\n%s\n", clump);
