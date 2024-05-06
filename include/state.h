@@ -30,7 +30,8 @@ enum execution_mode {
 	EXEC_ABSTRACT,
 	EXEC_ABSTRACT_NO_SETUP,
 	EXEC_ACTUAL,
-	EXEC_SETUP
+	EXEC_SETUP,
+	EXEC_VERIFY
 };
 
 enum frame_kind {

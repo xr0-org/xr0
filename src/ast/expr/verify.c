@@ -1522,6 +1522,7 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 {
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
+	case EXPR_ISDEALLOCAND:
 	case EXPR_IDENTIFIER:
 	case EXPR_STRING_LITERAL:
 	case EXPR_ARBARG:

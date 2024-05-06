@@ -119,11 +119,6 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 {
 	struct error *err;
 
-	if (ast_stmt_kind(stmt) == STMT_COMPOUND_V) {
-		if ((err = ast_stmt_verify(stmt, state))) {
-			return err;
-		}
-	}
 	if (ast_stmt_ispre(stmt)) {
 		return NULL;
 	}
@@ -134,9 +129,6 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 }
 
 /* stmt_verify */
-
-static struct error *
-stmt_v_block_verify(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
 stmt_expr_verify(struct ast_stmt *stmt, struct state *state);
@@ -150,8 +142,8 @@ ast_stmt_verify(struct ast_stmt *stmt, struct state *state)
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
-	case STMT_COMPOUND_V:
-		return stmt_v_block_verify(stmt, state);
+	case STMT_REGISTER:
+		return ast_stmt_exec(stmt, state);
 	case STMT_EXPR:
 		return stmt_expr_verify(stmt, state);
 	case STMT_ITERATION:
@@ -159,22 +151,6 @@ ast_stmt_verify(struct ast_stmt *stmt, struct state *state)
 	default:
 		assert(false);
 	}
-}
-
-static struct error *
-stmt_v_block_verify(struct ast_stmt *v_block_stmt, struct state *state)
-{
-	struct ast_block *b = ast_stmt_as_v_block(v_block_stmt);
-	assert(ast_block_ndecls(b) == 0); /* C89: declarations at beginning of function */
-	int nstmts = ast_block_nstmts(b);
-	struct ast_stmt **stmt = ast_block_stmts(b);
-	for (int i = 0; i < nstmts; i++) {
-		struct error *err = ast_stmt_verify(stmt[i], state);
-		if (err) {
-			return err;
-		}
-	}
-	return NULL;
 }
 
 /* stmt_expr_verify */
@@ -231,6 +207,9 @@ iter_empty(struct ast_stmt *stmt, struct state *state)
 /* stmt_exec */
 
 static struct error *
+stmt_compoundv_exec(struct ast_stmt *stmt, struct state *state);
+
+static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
@@ -256,7 +235,7 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 	case STMT_COMPOUND:
 		return stmt_compound_exec(stmt, state);
 	case STMT_COMPOUND_V:
-		return NULL;
+		return stmt_compoundv_exec(stmt, state);
 	case STMT_EXPR:
 		return ast_expr_exec(ast_stmt_as_expr(stmt), state);
 	case STMT_SELECTION:
@@ -272,7 +251,17 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 	}
 }
 
-/* stmt_compound_exec */
+static struct error *
+stmt_compoundv_exec(struct ast_stmt *stmt, struct state *state)
+{
+	struct frame *block_frame = frame_block_create(
+		dynamic_str("verification block"),
+		ast_stmt_as_block(stmt),
+		EXEC_VERIFY
+	);
+	state_pushframe(state, block_frame);
+	return NULL;
+}
 
 static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
