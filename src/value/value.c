@@ -745,6 +745,7 @@ values_comparable(struct value *v1, struct value *v2)
 bool
 value_equal(struct value *v1, struct value *v2)
 {
+	assert(v1 && v2);
 	assert(v1->type == v2->type);
 
 	switch (v1->type) {

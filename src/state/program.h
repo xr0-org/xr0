@@ -30,6 +30,9 @@ program_setatend(struct program *);
 bool
 program_atend(struct program *);
 
+struct ast_expr *
+program_prevcall(struct program *);
+
 enum execution_mode;
 
 struct error *

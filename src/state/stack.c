@@ -120,9 +120,14 @@ stack_return(struct stack *s)
 struct ast_expr *
 stack_framecall(struct stack *s)
 {
-	if (s->kind == FRAME_CALL) {
+	switch (s->kind) {
+	case FRAME_CALL:
 		assert(s->call);
 		return s->call;
+	case FRAME_INTERMEDIATE:
+		return program_prevcall(s->p);
+	default:
+		assert(false);
 	}
 	return NULL;
 }

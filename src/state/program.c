@@ -77,7 +77,7 @@ char *
 program_str(struct program *p)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "%s\n", ast_block_str(p->b, "\t"));
+	strbuilder_printf(b, "%s\n", ast_block_str(p->b, 1));
 	return strbuilder_build(b);
 }
 
@@ -111,6 +111,14 @@ bool
 program_atend(struct program *p)
 {
 	return p->s == PROGRAM_COUNTER_ATEND;
+}
+
+struct ast_expr *
+program_prevcall(struct program *p)
+{
+	assert(p->s == PROGRAM_COUNTER_STMTS);
+	struct ast_stmt *c = ast_block_stmts(p->b)[p->index-1];
+	return ast_expr_copy(ast_stmt_register_call(c));
 }
 
 static void
