@@ -12,29 +12,13 @@ use std::sync::Arc;
 
 use clap::Parser;
 
-mod util;
-
-mod ast;
-mod ext;
-mod math;
-mod object;
-mod parser;
-mod path;
-mod props;
-mod state;
-mod value;
-
-use ast::{
+use xr0::ast::{
     ast_block_str, ast_externdecl_as_function, ast_externdecl_as_function_mut,
     ast_externdecl_install, ast_function_verify, ast_functiondecl_create, ast_protostitch,
-    ast_topological_order, Ast, AstExpr, AstExternDecl, AstFunction, AstType, AstVariable,
+    ast_topological_order, Ast, AstExternDecl, AstFunction,
 };
-use ext::Externals;
-use object::Object;
-use props::Props;
-use state::location::Location;
-use util::VERBOSE_MODE;
-use value::Value;
+use xr0::util::VERBOSE_MODE;
+use xr0::{parser, vprintln, Externals};
 
 #[derive(Parser)]
 struct Config {

@@ -27,7 +27,7 @@ MATH_DIR = $(SRC_0V_DIR)/math
 # executable
 XR0V = $(BIN_DIR)/0v
 
-XR0V_RUST = xr0-rs/target/debug/xr0
+XR0V_RUST = xr0-rs/target/debug/0v
 
 # build artifacts
 MAIN_0V_OBJ = $(BUILD_DIR)/0v.o
