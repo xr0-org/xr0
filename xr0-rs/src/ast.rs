@@ -16,10 +16,7 @@ mod topological;
 mod type_;
 mod variable;
 
-pub use block::{
-    ast_block_create, ast_block_decls, ast_block_isterminal, ast_block_preconds, ast_block_stmts,
-    ast_block_str, AstBlock,
-};
+pub use block::AstBlock;
 pub use expr::{
     ast_expr_as_identifier, ast_expr_assignment_rval, ast_expr_binary_e1, ast_expr_binary_e2,
     ast_expr_binary_op, ast_expr_copy, ast_expr_equal, ast_expr_getfuncs,

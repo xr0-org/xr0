@@ -1,7 +1,6 @@
 use super::{
-    ast_block_isterminal, ast_block_str, ast_expr_assignment_rval, ast_expr_binary_e2,
-    ast_expr_getfuncs, sel_decide, str_write, AstAllocKind, AstBlock, AstExpr, Error, LexemeMarker,
-    Result, State,
+    ast_expr_assignment_rval, ast_expr_binary_e2, ast_expr_getfuncs, sel_decide, str_write,
+    AstAllocKind, AstBlock, AstExpr, Error, LexemeMarker, Result, State,
 };
 
 // Note: In the original, `ast_stmt_copy` did not handle allocation statements.
@@ -202,7 +201,7 @@ fn ast_stmt_expr_sprint(expr: &AstExpr, b: &mut String) {
 }
 
 fn ast_stmt_compound_sprint(compound: &AstBlock, b: &mut String) {
-    let s = ast_block_str(compound, "\t");
+    let s = compound.str("\t");
     str_write!(*b, "{s}");
 }
 
@@ -216,7 +215,7 @@ pub fn ast_stmt_jump_rv(stmt: &AstStmt) -> Option<&AstExpr> {
 pub fn ast_stmt_isterminal(stmt: &AstStmt, s: &mut State) -> bool {
     match &stmt.kind {
         AstStmtKind::Jump(jump) => jump.kind == AstJumpKind::Return,
-        AstStmtKind::Compound(block) => ast_block_isterminal(block, s),
+        AstStmtKind::Compound(block) => block.is_terminal(s),
         AstStmtKind::Selection(sel) => sel_isterminal(sel, s),
         _ => false,
     }
@@ -262,7 +261,7 @@ fn ast_stmt_iter_sprint(iteration: &AstIterationStmt, b: &mut String) {
     let cond = ast_stmt_str(&iteration.cond);
     let body = ast_stmt_str(&iteration.body);
     let iter = &iteration.iter;
-    let abs = ast_block_str(&iteration.abstract_, "\t");
+    let abs = iteration.abstract_.str("\t");
     str_write!(*b, "for ({init} {cond} {iter}) [{abs}] {{ {body} }}");
 }
 

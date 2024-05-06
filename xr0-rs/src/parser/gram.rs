@@ -432,16 +432,16 @@ pub grammar c_parser(env: &Env) for str {
 
     rule block() -> Box<AstBlock> =
         d:declaration_list() _ s:statement_list() {
-            ast_block_create(d, s)
+            AstBlock::new(d, s)
         } /
         d:declaration_list() {
-            ast_block_create(d, vec![])
+            AstBlock::new(d, vec![])
         } /
         s:statement_list() {
-            ast_block_create(vec![], s)
+            AstBlock::new(vec![], s)
         } /
         /* empty */ {
-            ast_block_create(vec![], vec![])
+            AstBlock::new(vec![], vec![])
         }
 
     rule iteration_effect_statement() -> Box<AstStmt> =
@@ -449,7 +449,7 @@ pub grammar c_parser(env: &Env) for str {
 
     rule compound_verification_statement() -> Box<AstBlock> =
         "~" _ "[" _ "]" {
-            ast_block_create(vec![], vec![])
+            AstBlock::new(vec![], vec![])
         } /
         "~" _ "[" _ b:block() _ "]" {
             b
@@ -479,7 +479,7 @@ pub grammar c_parser(env: &Env) for str {
     rule optional_compound_verification() -> Box<AstBlock> =
         vs:compound_verification_statement()? {
             vs.unwrap_or_else(|| {
-                ast_block_create(vec![], vec![])
+                AstBlock::new(vec![], vec![])
             })
         }
 
@@ -521,7 +521,7 @@ pub grammar c_parser(env: &Env) for str {
                 t,
                 decl.decl.name,
                 decl.decl.params,
-                body.abstract_.unwrap_or_else(|| ast_block_create(vec![], vec![])),
+                body.abstract_.unwrap_or_else(|| AstBlock::new(vec![], vec![])),
                 body.body.map(SemiBox::Owned),
             )
         } /
@@ -535,7 +535,7 @@ pub grammar c_parser(env: &Env) for str {
                 t,
                 decl.decl.name,
                 decl.decl.params,
-                body.abstract_.unwrap_or_else(|| ast_block_create(vec![], vec![])),
+                body.abstract_.unwrap_or_else(|| AstBlock::new(vec![], vec![])),
                 body.body.map(SemiBox::Owned),
             )
         } /
@@ -547,7 +547,7 @@ pub grammar c_parser(env: &Env) for str {
                 AstType::new(AstTypeBase::Void, 0),
                 decl.decl.name,
                 decl.decl.params,
-                body.abstract_.unwrap_or_else(|| ast_block_create(vec![], vec![])),
+                body.abstract_.unwrap_or_else(|| AstBlock::new(vec![], vec![])),
                 body.body.map(SemiBox::Owned),
             )
         }

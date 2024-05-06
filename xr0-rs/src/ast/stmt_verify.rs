@@ -1,8 +1,7 @@
 use super::{
-    ast_block_create, ast_block_decls, ast_block_stmts, ast_expr_abseval,
-    ast_expr_alloc_rangeprocess, ast_expr_assume, ast_expr_copy, ast_expr_decide, ast_expr_eval,
-    ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide, ast_stmt_as_block, ast_stmt_as_expr,
-    ast_stmt_copy, ast_stmt_isassume, ast_stmt_ispre, ast_stmt_isterminal,
+    ast_expr_abseval, ast_expr_alloc_rangeprocess, ast_expr_assume, ast_expr_copy, ast_expr_decide,
+    ast_expr_eval, ast_expr_exec, ast_expr_pf_reduce, ast_expr_rangedecide, ast_stmt_as_block,
+    ast_stmt_as_expr, ast_stmt_copy, ast_stmt_isassume, ast_stmt_ispre, ast_stmt_isterminal,
     ast_stmt_iter_lower_bound, ast_stmt_iter_upper_bound, ast_stmt_jump_rv, ast_stmt_labelled_stmt,
     ast_stmt_lexememarker, state_getresult, AstBlock, AstExpr, AstIterationStmt, AstSelectionStmt,
     AstStmt, AstStmtKind, Error, Preresult, Result, State, KEYWORD_RETURN,
@@ -72,7 +71,7 @@ fn stmt_iter_verify(iter: &AstIterationStmt, state: &mut State) -> Result<()> {
     let body = &iter.body;
     assert!(matches!(body.kind, AstStmtKind::Compound(_)));
     let block = ast_stmt_as_block(body);
-    assert_eq!(ast_block_decls(block).len(), 0);
+    assert_eq!(block.decls.len(), 0);
     assert_eq!(block.stmts.len(), 1);
     let assertion = ast_stmt_as_expr(&block.stmts[0]);
     let lw = ast_stmt_iter_lower_bound(iter);
@@ -108,7 +107,7 @@ pub fn ast_stmt_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
 
 fn stmt_compound_exec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     let b = ast_stmt_as_block(stmt);
-    assert_eq!(ast_block_decls(b).len(), 0);
+    assert_eq!(b.decls.len(), 0);
     for stmt in &b.stmts {
         ast_stmt_exec(stmt, state)?;
         if ast_stmt_isterminal(stmt, state) {
@@ -138,11 +137,11 @@ fn stmt_iter_exec(loc: &LexemeMarker, iter: &AstIterationStmt, state: &mut State
 
 fn iter_neteffect(loc: &LexemeMarker, iter: &AstIterationStmt) -> Option<Box<AstStmt>> {
     let abs = &iter.abstract_;
-    let nstmts = ast_block_stmts(abs).len();
+    let nstmts = abs.stmts.len();
     if nstmts == 0 {
         return None;
     }
-    assert_eq!(ast_block_decls(abs).len(), 0);
+    assert_eq!(abs.decls.len(), 0);
     assert_eq!(nstmts, 1);
     // Note: Original passes NULL lexeme marker to these two constructors. In the Rust version, the
     // lexeme marker isn't nullable. It isn't worth warping the universe for this hack, so we dig
@@ -152,7 +151,7 @@ fn iter_neteffect(loc: &LexemeMarker, iter: &AstIterationStmt) -> Option<Box<Ast
         ast_stmt_copy(&iter.init),
         ast_stmt_copy(&iter.cond),
         ast_expr_copy(&iter.iter),
-        ast_block_create(vec![], vec![]),
+        AstBlock::new(vec![], vec![]),
         AstStmt::new_compound(
             Box::new(ast_stmt_lexememarker(&iter.body).clone()),
             iter.abstract_.clone(),
@@ -252,7 +251,7 @@ fn hack_alloc_from_neteffect(iter: &AstIterationStmt) -> &AstExpr {
     let body = &iter.body;
     assert!(matches!(body.kind, AstStmtKind::Compound(_)));
     let block = ast_stmt_as_block(body);
-    assert_eq!(ast_block_decls(block).len(), 0);
+    assert_eq!(block.decls.len(), 0);
     assert_eq!(block.stmts.len(), 1);
     ast_stmt_as_expr(&block.stmts[0])
 }
@@ -311,7 +310,7 @@ fn sel_setupabsexec(sel: &AstSelectionStmt, state: &mut State) -> Result<()> {
 
 fn comp_setupabsexec(stmt: &AstStmt, state: &mut State) -> Result<()> {
     let b = ast_stmt_as_block(stmt);
-    assert_eq!(ast_block_decls(b).len(), 0);
+    assert_eq!(b.decls.len(), 0);
     for stmt in &b.stmts {
         if ast_stmt_ispre(stmt) {
             stmt_setupabsexec(stmt, state)?;

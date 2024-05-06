@@ -13,8 +13,7 @@ use std::sync::Arc;
 use clap::Parser;
 
 use xr0::ast::{
-    ast_block_str, ast_function_verify, ast_protostitch, ast_topological_order, Ast, AstExternDecl,
-    AstFunction,
+    ast_function_verify, ast_protostitch, ast_topological_order, Ast, AstExternDecl, AstFunction,
 };
 use xr0::util::VERBOSE_MODE;
 use xr0::{parser, vprintln, Externals};
@@ -141,7 +140,7 @@ fn verifyproto(proto: &AstFunction, decls: &[Box<AstExternDecl>]) -> bool {
 fn proto_defisvalid(proto: &AstFunction, def: &AstFunction) -> bool {
     let proto_abs = &proto.abstract_;
     let def_abs = &def.abstract_;
-    let abs_match = ast_block_str(proto_abs, "") == ast_block_str(def_abs, "");
+    let abs_match = proto_abs.str("") == def_abs.str("");
     let protoabs_only = def.abs_is_empty();
     abs_match || protoabs_only
 }

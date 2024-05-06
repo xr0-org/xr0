@@ -1,8 +1,8 @@
 use std::process;
 
 use super::{
-    ast_block_preconds, ast_block_str, ast_stmt_absprocess, ast_stmt_getfuncs,
-    ast_stmt_setupabsexec, AstBlock, AstStmt, AstType, AstVariable, FuncGraph,
+    ast_stmt_absprocess, ast_stmt_getfuncs, ast_stmt_setupabsexec, AstBlock, AstStmt, AstType,
+    AstVariable, FuncGraph,
 };
 use crate::path::Path;
 use crate::state::state::{state_declare, state_getobject, state_getresult, state_vconst, State};
@@ -34,10 +34,10 @@ impl<'ast> AstFunction<'ast> {
             let space = if i + 1 < self.params.len() { ", " } else { "" };
             str_write!(b, "{param}{space}");
         }
-        let abs = ast_block_str(&self.abstract_, "\t");
+        let abs = self.abstract_.str("\t");
         str_write!(b, ") ~ [\n{abs}]");
         if let Some(body) = &self.body {
-            let body = ast_block_str(body, "\t");
+            let body = body.str("\t");
             str_write!(b, "{{\n{body}}}");
         } else {
             str_write!(b, ";");
@@ -92,7 +92,7 @@ impl<'ast> AstFunction<'ast> {
 
     //=ast_function_preconditions
     pub fn preconditions(&self) -> Result<Option<&AstStmt>> {
-        ast_block_preconds(&self.abstract_)
+        self.abstract_.preconds()
     }
 }
 
