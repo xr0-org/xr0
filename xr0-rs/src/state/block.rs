@@ -13,12 +13,12 @@ use crate::{AstExpr, Location, Object};
 /// maximal contiguous chunk that could be copied using `memcpy`: an allocation, in a sense that
 /// includes more than just heap allocation.
 ///
-/// Examples: Each global variable gets a `Block`. When verifying a function, XR0 makes a distinct
+/// Examples: Each global variable gets a `Block`. When verifying a function, Xr0 makes a distinct
 /// Block for each parameter. When entering a block (in the `AstBlock` sense of a compound
 /// statement) a new `Block` is allocated for each local variable declared in that block. Each call
 /// to `malloc` allocates a single new `Block` for the whole allocation.
 ///
-/// But I think XR0 also allocates separate Blocks for regions inside a `malloc` allocation and
+/// But I think Xr0 also allocates separate Blocks for regions inside a `malloc` allocation and
 /// maybe struct fields.
 #[derive(Clone)]
 pub struct Block {

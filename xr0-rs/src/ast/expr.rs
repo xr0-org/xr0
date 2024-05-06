@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::math::{math_eq, math_ge, math_gt, math_le, math_lt, MathAtom, MathExpr};
 
-/// Type of integer constants in C on the target platform. Currently XR0 can handle only 32-bit
+/// Type of integer constants in C on the target platform. Currently Xr0 can handle only 32-bit
 /// constants. This is also used for the length of arrays. 2 billion should be enough for anyone.
 #[allow(non_camel_case_types)]
 pub type c_int = i32;
