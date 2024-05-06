@@ -121,41 +121,56 @@ fn mod_str(modifiers: AstTypeModifiers) -> String {
     b
 }
 
-pub fn ast_type_create(base: AstTypeBase, modifiers: AstTypeModifiers) -> Box<AstType> {
-    Box::new(AstType { base, modifiers })
-}
+impl AstType {
+    //=ast_type_create
+    pub fn new(base: AstTypeBase, modifiers: AstTypeModifiers) -> Box<AstType> {
+        Box::new(AstType { base, modifiers })
+    }
 
-pub fn ast_type_create_ptr(referent: Box<AstType>) -> Box<AstType> {
-    ast_type_create(AstTypeBase::Pointer(referent), 0)
-}
+    //=ast_type_create_ptr
+    pub fn new_ptr(referent: Box<AstType>) -> Box<AstType> {
+        AstType::new(AstTypeBase::Pointer(referent), 0)
+    }
 
-pub fn ast_type_create_voidptr() -> Box<AstType> {
-    ast_type_create(
-        AstTypeBase::Pointer(ast_type_create(AstTypeBase::Void, 0)),
-        0,
-    )
-}
+    //=ast_type_create_voidptr
+    pub fn new_voidptr() -> Box<AstType> {
+        AstType::new(AstTypeBase::Pointer(AstType::new(AstTypeBase::Void, 0)), 0)
+    }
 
-#[allow(dead_code)]
-pub fn ast_type_create_arr(base: Box<AstType>, length: c_int) -> Box<AstType> {
-    ast_type_create(
-        AstTypeBase::Array(AstArrayType {
-            type_: base,
-            length,
-        }),
-        0,
-    )
-}
+    //=ast_type_create_arr
+    #[allow(dead_code)]
+    pub fn new_arr(base: Box<AstType>, length: c_int) -> Box<AstType> {
+        AstType::new(
+            AstTypeBase::Array(AstArrayType {
+                type_: base,
+                length,
+            }),
+            0,
+        )
+    }
 
-pub fn ast_type_create_struct(
-    tag: Option<String>,
-    members: Option<Box<Vec<Box<AstVariable>>>>,
-) -> Box<AstType> {
-    ast_type_create(AstTypeBase::Struct(AstStructType { tag, members }), 0)
-}
+    //=ast_type_create_struct
+    pub fn new_struct(
+        tag: Option<String>,
+        members: Option<Box<Vec<Box<AstVariable>>>>,
+    ) -> Box<AstType> {
+        AstType::new(AstTypeBase::Struct(AstStructType { tag, members }), 0)
+    }
 
-pub fn ast_type_create_userdef(name: String) -> Box<AstType> {
-    ast_type_create(AstTypeBase::UserDefined(name), 0)
+    //=ast_type_create_userdef
+    pub fn new_userdef(name: String) -> Box<AstType> {
+        AstType::new(AstTypeBase::UserDefined(name), 0)
+    }
+
+    //=ast_type_create_struct_anonym
+    pub fn new_struct_anonym(members: Vec<Box<AstVariable>>) -> Box<AstType> {
+        AstType::new_struct(None, Some(Box::new(members)))
+    }
+
+    //=ast_type_create_struct_partial
+    pub fn new_struct_partial(tag: String) -> Box<AstType> {
+        AstType::new_struct(Some(tag), None)
+    }
 }
 
 pub fn ast_type_vconst(t: &AstType, s: &mut State, comment: &str, persist: bool) -> Box<Value> {
@@ -201,14 +216,6 @@ pub fn ast_type_struct_tag(t: &AstType) -> Option<&str> {
         panic!();
     };
     s.tag.as_deref()
-}
-
-pub fn ast_type_create_struct_anonym(members: Vec<Box<AstVariable>>) -> Box<AstType> {
-    ast_type_create_struct(None, Some(Box::new(members)))
-}
-
-pub fn ast_type_create_struct_partial(tag: String) -> Box<AstType> {
-    ast_type_create_struct(Some(tag), None)
 }
 
 pub fn ast_type_mod_or(t: &mut AstType, m: AstTypeModifiers) {

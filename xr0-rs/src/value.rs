@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{
-    ast_expr_copy, ast_expr_equal, ast_type_create_voidptr, ast_type_struct_complete,
-    ast_type_struct_members,
+    ast_expr_copy, ast_expr_equal, ast_type_struct_complete, ast_type_struct_members,
 };
 use crate::state::location::{location_references, location_referencesheap};
 use crate::state::state::state_vconst;
@@ -232,7 +231,7 @@ impl Value {
                     // Note: Original leaked this type.
                     Some(SemiBox::Owned(state_vconst(
                         &mut *compare,
-                        &ast_type_create_voidptr(),
+                        &AstType::new_voidptr(),
                         None,
                         false,
                     )))

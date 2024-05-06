@@ -2,10 +2,9 @@ use super::{
     ast_expr_as_identifier, ast_expr_binary_e1, ast_expr_binary_e2, ast_expr_binary_op,
     ast_expr_copy, ast_expr_equal, ast_expr_incdec_to_assignment, ast_expr_inverted_copy,
     ast_expr_isdeallocand_assertand, ast_expr_unary_op, ast_expr_unary_operand,
-    ast_function_absexec, ast_function_initparams, ast_type_create, ast_type_create_ptr,
-    ast_type_ptr_type, AllocExpr, AssignmentExpr, AstAllocKind, AstBinaryOp, AstExpr, AstExprKind,
-    AstFunction, AstType, AstTypeBase, AstUnaryOp, AstVariable, BinaryExpr, CallExpr, ConstantExpr,
-    IncDecExpr, StructMemberExpr, UnaryExpr,
+    ast_function_absexec, ast_function_initparams, ast_type_ptr_type, AllocExpr, AssignmentExpr,
+    AstAllocKind, AstBinaryOp, AstExpr, AstExprKind, AstFunction, AstType, AstTypeBase, AstUnaryOp,
+    AstVariable, BinaryExpr, CallExpr, ConstantExpr, IncDecExpr, StructMemberExpr, UnaryExpr,
 };
 use crate::state::location::location_copy;
 use crate::state::state::{
@@ -605,7 +604,7 @@ fn expr_binary_eval(binary: &BinaryExpr, state: &mut State) -> Result<Box<Value>
 fn arbarg_eval(state: &mut State) -> Result<Box<Value>> {
     Ok(state_vconst(
         state,
-        &ast_type_create_ptr(ast_type_create(AstTypeBase::Void, 0)),
+        &AstType::new_ptr(AstType::new(AstTypeBase::Void, 0)),
         None,
         false,
     ))

@@ -250,7 +250,7 @@ pub grammar c_parser(env: &Env) for str {
 
             let mut t = t;
             for _ in 0..v.ptr_valence {
-                t = ast_type_create_ptr(t);
+                t = AstType::new_ptr(t);
             }
             if is_typedef {
                 // Note: I think the original doesn't check for null here, so you can probably
@@ -295,11 +295,11 @@ pub grammar c_parser(env: &Env) for str {
         K(<"register">) { MOD_REGISTER }
 
     rule type_specifier() -> Box<AstType> =
-        K(<"void">) { ast_type_create(AstTypeBase::Void, 0) } /
-        K(<"char">) { ast_type_create(AstTypeBase::Char, 0) } /
-        K(<"int">) { ast_type_create(AstTypeBase::Int, 0) } /
+        K(<"void">) { AstType::new(AstTypeBase::Void, 0) } /
+        K(<"char">) { AstType::new(AstTypeBase::Char, 0) } /
+        K(<"int">) { AstType::new(AstTypeBase::Int, 0) } /
         struct_or_union_specifier() /
-        t:typedef_name() { ast_type_create_userdef(t) }
+        t:typedef_name() { AstType::new_userdef(t) }
 
     rule typedef_name() -> String = i:identifier() {?
         if env.is_typename(i.as_str()) {
@@ -312,13 +312,13 @@ pub grammar c_parser(env: &Env) for str {
     // note: unions are unsupported in the original
     rule struct_or_union_specifier() -> Box<AstType> =
         "struct" _ tag:identifier() _ "{" _ fields:struct_declaration_list() _ "}" {
-            ast_type_create_struct(Some(tag), Some(Box::new(fields)))
+            AstType::new_struct(Some(tag), Some(Box::new(fields)))
         } /
         "struct" _ "{" _ fields:struct_declaration_list() _ "}" {
-            ast_type_create_struct_anonym(fields)
+            AstType::new_struct_anonym(fields)
         } /
         "struct" _ tag:identifier() {
-            ast_type_create_struct_partial(tag)
+            AstType::new_struct_partial(tag)
         }
 
     rule struct_declaration_list() -> Vec<Box<AstVariable>> =
@@ -378,7 +378,7 @@ pub grammar c_parser(env: &Env) for str {
         t:declaration_specifiers() _ decl:declarator() {
             let mut t = t;
             for _ in 0..decl.ptr_valence {
-                t = ast_type_create_ptr(t);
+                t = AstType::new_ptr(t);
             }
             let name = decl.name.unwrap_or("".to_string());
             AstVariable::new(name, t)
@@ -413,7 +413,7 @@ pub grammar c_parser(env: &Env) for str {
         // Note: Original is I guess UB? Seems like type confusion.
         type_qualifier() _ t:specifier_qualifier_list() { t } /
         type_qualifier() {
-            ast_type_create(AstTypeBase::Int, 0)
+            AstType::new(AstTypeBase::Int, 0)
         }
 
     rule labelled_statement() -> Box<AstStmt> =
@@ -514,7 +514,7 @@ pub grammar c_parser(env: &Env) for str {
         K(<"axiom">) _ t:declaration_specifiers() _ decl:function_declarator() _ body:block_statement() {
             let mut t = t;
             for _ in 0..decl.ptr_valence {
-                t = ast_type_create_ptr(t);
+                t = AstType::new_ptr(t);
             }
             ast_function_create(
                 true,
@@ -528,7 +528,7 @@ pub grammar c_parser(env: &Env) for str {
         t:declaration_specifiers() _ decl:function_declarator() _ body:block_statement() {
             let mut t = t;
             for _ in 0..decl.ptr_valence {
-                t = ast_type_create_ptr(t);
+                t = AstType::new_ptr(t);
             }
             ast_function_create(
                 false,
@@ -544,7 +544,7 @@ pub grammar c_parser(env: &Env) for str {
         decl:function_declarator() _ body:block_statement() {
             ast_function_create(
                 false,
-                ast_type_create(AstTypeBase::Void, 0),
+                AstType::new(AstTypeBase::Void, 0),
                 decl.decl.name,
                 decl.decl.params,
                 body.abstract_.unwrap_or_else(|| ast_block_create(vec![], vec![])),

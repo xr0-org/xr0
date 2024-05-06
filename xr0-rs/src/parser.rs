@@ -3,7 +3,7 @@ use std::path::Path;
 use crate::ast::Ast;
 
 mod env;
-mod inner;
+mod gram;
 
 use env::Env;
 pub use env::LexemeMarker;
@@ -13,5 +13,5 @@ pub fn parse_translation_unit(
     source: &str,
 ) -> Result<Box<Ast>, peg::error::ParseError<peg::str::LineCol>> {
     let env = Env::new(filename, source);
-    inner::c_parser::translation_unit(source, &env)
+    gram::c_parser::translation_unit(source, &env)
 }
