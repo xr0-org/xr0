@@ -543,10 +543,8 @@ state_equal(struct state *s1, struct state *s2)
 {
 	struct state *s1_c = state_copy(s1),
 		     *s2_c = state_copy(s2);
-	state_undeclareliterals(s1_c);
-	state_undeclareliterals(s2_c);
-	state_undeclarevars(s1_c);
-	state_undeclarevars(s2_c);
+	/*state_undeclarevars(s1_c);*/
+	/*state_undeclarevars(s2_c);*/
 	state_popprops(s1_c);
 	state_popprops(s2_c);
 

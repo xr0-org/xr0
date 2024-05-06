@@ -269,13 +269,13 @@ stack_references(struct stack *s, struct location *loc, struct state *state)
 		return true;
 	}
 
-	struct map *m = s->varmap;
-	for (int i = 0; i < m->n; i++) {
-		struct variable *var = (struct variable *) m->entry[i].value;
-		if (variable_isparam(var) && variable_references(var, loc, state)) {
-			return true;
-		}
-	}
+	/*struct map *m = s->varmap;*/
+	/*for (int i = 0; i < m->n; i++) {*/
+		/*struct variable *var = (struct variable *) m->entry[i].value;*/
+		/*if (variable_isparam(var) && variable_references(var, loc, state)) {*/
+			/*return true;*/
+		/*}*/
+	/*}*/
 
 	return false;
 }
