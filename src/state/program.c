@@ -210,7 +210,7 @@ program_stmt_process(struct program *p, enum execution_mode mode, struct state *
 	case EXEC_ACTUAL:
 		return ast_stmt_process(stmt, s);
 	case EXEC_VERIFY:
-		return ast_stmt_verify(stmt, s);
+		return ast_stmt_verify(stmt, state_copy(s));
 	default:
 		assert(false);
 	}
