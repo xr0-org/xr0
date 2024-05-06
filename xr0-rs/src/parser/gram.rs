@@ -242,7 +242,7 @@ pub grammar c_parser(env: &Env) for str {
     // 6.7 Declarations
     rule declaration() -> Declaration =
         t:declaration_specifiers() _ ";" {
-            let name = ast_type_struct_tag(&t).map(str::to_string);
+            let name = t.struct_tag().map(str::to_string);
             Declaration { name, t }
         } /
         t:declaration_specifiers() _ v:declarator() _ ";" {
@@ -274,7 +274,7 @@ pub grammar c_parser(env: &Env) for str {
         type_specifier() _ t:declaration_specifiers() { t } /
         m:declaration_modifier() _ s:declaration_specifiers() {
             let mut s = s;
-            ast_type_mod_or(&mut s, m);
+            s.mod_or(m);
             s
         }
 

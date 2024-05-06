@@ -2,9 +2,9 @@ use super::{
     ast_expr_as_identifier, ast_expr_binary_e1, ast_expr_binary_e2, ast_expr_binary_op,
     ast_expr_copy, ast_expr_equal, ast_expr_incdec_to_assignment, ast_expr_inverted_copy,
     ast_expr_isdeallocand_assertand, ast_expr_unary_op, ast_expr_unary_operand,
-    ast_function_absexec, ast_function_initparams, ast_type_ptr_type, AllocExpr, AssignmentExpr,
-    AstAllocKind, AstBinaryOp, AstExpr, AstExprKind, AstFunction, AstType, AstTypeBase, AstUnaryOp,
-    AstVariable, BinaryExpr, CallExpr, ConstantExpr, IncDecExpr, StructMemberExpr, UnaryExpr,
+    ast_function_absexec, ast_function_initparams, AllocExpr, AssignmentExpr, AstAllocKind,
+    AstBinaryOp, AstExpr, AstExprKind, AstFunction, AstType, AstTypeBase, AstUnaryOp, AstVariable,
+    BinaryExpr, CallExpr, ConstantExpr, IncDecExpr, StructMemberExpr, UnaryExpr,
 };
 use crate::state::location::location_copy;
 use crate::state::state::{
@@ -211,7 +211,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
             };
             // Rust note: Clones in the next two lines are not in the original. They're for Rust's
             // benefit.
-            let t = SemiBox::Owned(Box::new(ast_type_ptr_type(&root_lval.t).clone()));
+            let t = SemiBox::Owned(Box::new(root_lval.t.ptr_type().clone()));
             let root_val = root_obj.as_value().unwrap().clone();
 
             let obj = state_deref(state, &root_val, &AstExpr::new_constant(0))?;
@@ -227,7 +227,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
             };
             // Rust note: Clones in the next two lines are not in the original. They're for Rust's
             // benefit.
-            let t = SemiBox::Owned(Box::new(ast_type_ptr_type(&root_lval.t).clone()));
+            let t = SemiBox::Owned(Box::new(root_lval.t.ptr_type().clone()));
             let root_val = root_obj.as_value().unwrap().clone();
             let Ok(res_obj) = state_deref(&mut *state, &root_val, e2) else {
                 // Note: Original returns null. See note above.

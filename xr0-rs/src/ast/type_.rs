@@ -171,68 +171,70 @@ impl AstType {
     pub fn new_struct_partial(tag: String) -> Box<AstType> {
         AstType::new_struct(Some(tag), None)
     }
-}
 
-pub fn ast_type_vconst(t: &AstType, s: &mut State, comment: &str, persist: bool) -> Box<Value> {
-    match &t.base {
-        AstTypeBase::Int => Value::new_int_indefinite(),
-        AstTypeBase::Pointer(_) => Value::new_ptr_indefinite(),
-        AstTypeBase::UserDefined(name) => {
-            let ext = s.ext();
-            let type_ = ext.get_typedef(name).unwrap();
-            ast_type_vconst(
-                // Note: Original does not null-check here.
-                type_, s, comment, persist,
-            )
+    //=ast_type_vconst
+    pub fn vconst(&self, s: &mut State, comment: &str, persist: bool) -> Box<Value> {
+        match &self.base {
+            AstTypeBase::Int => Value::new_int_indefinite(),
+            AstTypeBase::Pointer(_) => Value::new_ptr_indefinite(),
+            AstTypeBase::UserDefined(name) => {
+                let ext = s.ext();
+                let type_ = ext.get_typedef(name).unwrap();
+                type_.vconst(
+                    // Note: Original does not null-check here.
+                    s, comment, persist,
+                )
+            }
+            AstTypeBase::Struct(_) => Value::new_struct_indefinite(self, s, comment, persist),
+            _ => panic!(),
         }
-        AstTypeBase::Struct(_) => Value::new_struct_indefinite(t, s, comment, persist),
-        _ => panic!(),
     }
-}
 
-pub fn ast_type_isstruct(t: &AstType) -> bool {
-    matches!(t.base, AstTypeBase::Struct(_))
-}
-
-pub fn ast_type_struct_complete<'a>(t: &'a AstType, ext: &'a Externals) -> Option<&'a AstType> {
-    if ast_type_struct_members(t).is_some() {
-        return Some(t);
+    //=ast_type_isstruct
+    pub fn is_struct(&self) -> bool {
+        matches!(self.base, AstTypeBase::Struct(_))
     }
-    let Some(tag) = ast_type_struct_tag(t) else {
-        panic!();
-    };
-    ext.get_struct(tag)
-}
 
-pub fn ast_type_struct_members(t: &AstType) -> Option<&[Box<AstVariable>]> {
-    let AstTypeBase::Struct(s) = &t.base else {
-        panic!();
-    };
-    s.members.as_ref().map(|v| v.as_slice())
-}
+    //=ast_type_struct_complete
+    pub fn struct_complete<'a>(&'a self, ext: &'a Externals) -> Option<&'a AstType> {
+        if self.struct_members().is_some() {
+            return Some(self);
+        }
+        let tag = self.struct_tag().unwrap();
+        ext.get_struct(tag)
+    }
 
-pub fn ast_type_struct_tag(t: &AstType) -> Option<&str> {
-    let AstTypeBase::Struct(s) = &t.base else {
-        panic!();
-    };
-    s.tag.as_deref()
-}
+    //=ast_type_struct_members
+    pub fn struct_members(&self) -> Option<&[Box<AstVariable>]> {
+        let AstTypeBase::Struct(s) = &self.base else {
+            panic!();
+        };
+        s.members.as_ref().map(|v| v.as_slice())
+    }
 
-pub fn ast_type_mod_or(t: &mut AstType, m: AstTypeModifiers) {
-    t.modifiers |= m;
-}
+    //=ast_type_struct_tag
+    pub fn struct_tag(&self) -> Option<&str> {
+        let AstTypeBase::Struct(s) = &self.base else {
+            panic!();
+        };
+        s.tag.as_deref()
+    }
 
-pub fn ast_type_istypedef(t: &AstType) -> bool {
-    t.modifiers & MOD_TYPEDEF != 0
-}
+    //=ast_type_mod_or
+    pub fn mod_or(&mut self, m: AstTypeModifiers) {
+        self.modifiers |= m;
+    }
 
-pub fn ast_type_copy(t: &AstType) -> Box<AstType> {
-    Box::new(t.clone())
-}
+    //=ast_type_istypedef
+    pub fn is_typedef(&self) -> bool {
+        self.modifiers & MOD_TYPEDEF != 0
+    }
 
-pub fn ast_type_ptr_type(t: &AstType) -> &AstType {
-    let AstTypeBase::Pointer(ptr_type) = &t.base else {
-        panic!();
-    };
-    ptr_type
+    //=ast_type_ptr_type
+    pub fn ptr_type(&self) -> &AstType {
+        let AstTypeBase::Pointer(ptr_type) = &self.base else {
+            panic!();
+        };
+        ptr_type
+    }
 }

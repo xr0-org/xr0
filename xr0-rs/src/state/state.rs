@@ -1,9 +1,7 @@
 use super::block::{object_arr_index, object_arr_index_upperincl};
 use super::location::{location_copy, location_toheap, LocationKind};
 use super::{Block, Clump, Heap, ProgramCounter, Stack, StaticMemory, VConst};
-use crate::ast::{
-    ast_expr_copy, ast_type_vconst, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN,
-};
+use crate::ast::{ast_expr_copy, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN};
 use crate::object::{ObjectKind, Range};
 use crate::util::{Error, Result, SemiBox};
 use crate::{str_write, vprint, Externals, Location, Object, Props, Value};
@@ -137,7 +135,7 @@ pub fn state_vconst(
     comment: Option<&str>,
     persist: bool,
 ) -> Box<Value> {
-    let v = ast_type_vconst(t, state, comment.unwrap_or(""), persist);
+    let v = t.vconst(state, comment.unwrap_or(""), persist);
     if v.is_struct() {
         return v;
     }

@@ -51,8 +51,6 @@ pub use stmt::{
 pub use stmt_verify::{ast_stmt_absprocess, ast_stmt_process, ast_stmt_setupabsexec, sel_decide};
 pub use topological::{topological_order, FuncGraph};
 pub use type_::{
-    ast_type_copy, ast_type_isstruct, ast_type_istypedef, ast_type_mod_or, ast_type_ptr_type,
-    ast_type_struct_complete, ast_type_struct_members, ast_type_struct_tag, ast_type_vconst,
     AstArrayType, AstStructType, AstType, AstTypeBase, AstTypeModifiers, MOD_AUTO, MOD_CONST,
     MOD_EXTERN, MOD_REGISTER, MOD_STATIC, MOD_TYPEDEF, MOD_VOLATILE,
 };

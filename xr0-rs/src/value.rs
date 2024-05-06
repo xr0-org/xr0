@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 
-use crate::ast::{
-    ast_expr_copy, ast_expr_equal, ast_type_struct_complete, ast_type_struct_members,
-};
+use crate::ast::{ast_expr_copy, ast_expr_equal};
 use crate::state::location::{location_references, location_referencesheap};
 use crate::state::state::state_vconst;
 use crate::state::State;
@@ -174,7 +172,9 @@ impl Value {
 
     //=value_struct_create
     pub fn new_struct(t: &AstType) -> Box<Value> {
-        let members = ast_type_struct_members(t).expect("can't create value of incomplete type");
+        let members = t
+            .struct_members()
+            .expect("can't create value of incomplete type");
         Value::new(ValueKind::Struct(Box::new(StructValue {
             members: members.to_vec(),
             m: from_members(members),
@@ -190,8 +190,8 @@ impl Value {
     ) -> Box<Value> {
         // Note: The original doesn't null-check here. I wonder how it would handle `typedef struct foo
         // foo;`.
-        let t = ast_type_struct_complete(t, s.ext()).unwrap();
-        assert!(ast_type_struct_members(t).is_some());
+        let t = t.struct_complete(s.ext()).unwrap();
+        assert!(t.struct_members().is_some());
         let mut v = Value::new_struct(t);
         let ValueKind::Struct(sv) = &mut v.kind else {
             panic!();

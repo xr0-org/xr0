@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::ast::ast_type_struct_tag;
 use crate::{str_write, AstFunction, AstType, AstVariable};
 
 #[derive(Default)]
@@ -43,7 +42,7 @@ impl Externals {
     }
 
     pub fn declare_struct(&mut self, t: Box<AstType>) {
-        let id = ast_type_struct_tag(&t).unwrap().to_string();
+        let id = t.struct_tag().unwrap().to_string();
         self.struct_.insert(id, t);
     }
 

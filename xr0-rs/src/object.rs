@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::ast::{ast_expr_copy, ast_type_struct_complete, LValue};
+use crate::ast::{ast_expr_copy, LValue};
 use crate::ext::Externals;
 use crate::state::location::location_references;
 use crate::state::state::state_eval;
@@ -317,7 +317,7 @@ impl Object {
         if self.as_value_mut().is_some() {
             self.as_value_mut().unwrap()
         } else {
-            let complete = ast_type_struct_complete(t, ext).unwrap();
+            let complete = t.struct_complete(ext).unwrap();
             self.assign(Some(Value::new_struct(complete)));
             self.as_value_mut().unwrap()
         }

@@ -1,6 +1,4 @@
-use super::{
-    ast_type_isstruct, ast_type_istypedef, ast_type_struct_tag, AstFunction, AstType, AstVariable,
-};
+use super::{AstFunction, AstType, AstVariable};
 
 use crate::Externals;
 
@@ -47,10 +45,10 @@ pub fn ast_externdecl_as_function_mut(
 
 pub fn ast_decl_create(name: String, t: Box<AstType>) -> Box<AstExternDecl> {
     Box::new(AstExternDecl {
-        kind: if ast_type_istypedef(&t) {
+        kind: if t.is_typedef() {
             AstExternDeclKind::Typedef(AstTypedefDecl { name, type_0: t })
-        } else if ast_type_isstruct(&t) {
-            assert!(ast_type_struct_tag(&t).is_some());
+        } else if t.is_struct() {
+            assert!(t.struct_tag().is_some());
             AstExternDeclKind::Struct(t)
         } else {
             AstExternDeclKind::Variable(AstVariable::new(name, t))

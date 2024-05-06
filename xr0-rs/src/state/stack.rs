@@ -1,7 +1,6 @@
 use super::{Block, State};
 use crate::ast::{
-    ast_stmt_absprocess, ast_stmt_ispre, ast_stmt_isterminal, ast_stmt_process, ast_type_copy,
-    AstBlock, AstExpr,
+    ast_stmt_absprocess, ast_stmt_ispre, ast_stmt_isterminal, ast_stmt_process, AstBlock, AstExpr,
 };
 use crate::object::Object;
 use crate::state::location::{
@@ -113,7 +112,7 @@ impl<'a> Stack<'a> {
             varmap: Box::new(VarMap::new()),
             id,
             result: Box::new(Variable {
-                type_: ast_type_copy(ret_type),
+                type_: Box::new(ret_type.clone()),
                 loc: Location::new_automatic(id, 0, AstExpr::new_constant(0)),
                 is_param: false,
             }),
@@ -238,7 +237,7 @@ pub fn variable_create(type_: &AstType, frame: &mut StackFrame, isparam: bool) -
     let b = &mut frame.blocks[block_id];
     b.install(Object::with_value(AstExpr::new_constant(0), None));
     Box::new(Variable {
-        type_: ast_type_copy(type_),
+        type_: Box::new(type_.clone()),
         is_param: isparam,
         loc,
     })
