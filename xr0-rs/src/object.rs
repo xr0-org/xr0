@@ -313,14 +313,11 @@ impl Object {
     // Rust note: Original took the whole state as an argument. Narrowed for Rust's benefit.
     //=getorcreatestruct
     fn get_or_create_struct<'obj>(&'obj mut self, t: &AstType, ext: &Externals) -> &'obj mut Value {
-        // XXX FIXME: very silly rust construction because of borrow checker limitation
-        if self.as_value_mut().is_some() {
-            self.as_value_mut().unwrap()
-        } else {
+        if !self.has_value() {
             let complete = t.struct_complete(ext).unwrap();
             self.assign(Some(Value::new_struct(complete)));
-            self.as_value_mut().unwrap()
         }
+        self.as_value_mut().unwrap()
     }
 }
 

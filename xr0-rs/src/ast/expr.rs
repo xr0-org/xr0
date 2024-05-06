@@ -129,7 +129,8 @@ impl Display for AstExpr {
         match &self.kind {
             AstExprKind::Identifier(id) => write!(f, "{id}"),
             AstExprKind::Constant(constant) => write!(f, "{constant}"),
-            AstExprKind::StringLiteral(s) => write!(f, "{s:?}"), // XXX FIXME: this may depart from C syntax
+            // Note: The original also doesn't escape newlines and such in the string.
+            AstExprKind::StringLiteral(s) => write!(f, "\"{s}\""),
             AstExprKind::Bracketed(inner) => write!(f, "({inner})"),
             AstExprKind::Call(call) => write!(f, "{call}"),
             AstExprKind::IncDec(incdec) => write!(f, "{incdec}"),
@@ -153,11 +154,30 @@ impl Display for ConstantExpr {
         if !self.is_char {
             return write!(f, "{constant}");
         }
-        // XXX FIXME: this generates Rust character literals, should generate C syntax
-        match char::try_from(constant as u32) {
-            Ok(c) => write!(f, "{:?}", c),
-            _ => write!(f, "'\\x{:02x}'", constant as u32),
+        match constant as u8 {
+            b'\n' | b'\t' | 11 | 8 | 12 | 7 | b'\\' | b'?' | b'\'' | b'\"' | 0 => {
+                write!(f, "'{}'", escape_str(constant as c_char))
+            }
+            _ => write!(f, "'{}'", constant as u8 as char),
         }
+    }
+}
+
+fn escape_str(c: c_char) -> &'static str {
+    match c as u8 {
+        b'\n' => "\\n",
+        b'\t' => "\\t",
+        11 => "\\v",
+        8 => "\\b",
+        12 => "\\f",
+        7 => "\\a",
+        b'\\' => "\\\\",
+        b'?' => "\\?", // Note: The original escapes '?', presumably a mistake.
+        b'\'' => "\\'",
+        b'\"' => "\\\"",
+        // TODO: handle octal and hex escapes
+        0 => "\\0",
+        _ => panic!(),
     }
 }
 
