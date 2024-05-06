@@ -413,7 +413,8 @@ stack_references(struct stack *s, struct location *loc, struct state *state)
 {
 	/* TODO: check globals */
 	struct value *result = state_popregister(state);
-	if (result && value_references(result, loc, state)) {
+	struct circuitbreaker *c = circuitbreaker_create();
+	if (result && value_references(result, loc, state, c)) {
 		return true;
 	}
 
