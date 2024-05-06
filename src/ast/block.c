@@ -143,7 +143,7 @@ ast_block_render(struct ast_block *b, int index, bool indecls)
 		free(s);
 	}
 	for (int i = 0; i < b->nstmt; i++) {
-		char *s = ast_stmt_str(b->stmt[i], 1);
+		char *s = ast_stmt_str(b->stmt[i], 2);
 		if (i == index && !indecls) {
 			strbuilder_printf(sb, "-->\t%s\n", s);
 		} else {

@@ -248,6 +248,27 @@ stack_execmode(struct stack *s)
 	return s->mode;
 }
 
+char *
+execution_mode_str(enum execution_mode m)
+{
+	char *str[] = {
+		[EXEC_ABSTRACT]			= "abstract (setup)",
+		[EXEC_ABSTRACT_NO_SETUP]	= "abstract (no setup)",
+		[EXEC_ACTUAL]			= "actual",
+		[EXEC_SETUP]			= "setup",
+	};
+	switch (m) {
+	case EXEC_ABSTRACT:
+	case EXEC_ABSTRACT_NO_SETUP:
+	case EXEC_ACTUAL:
+	case EXEC_SETUP:
+		return dynamic_str(str[m]);
+	default:
+		assert(false);
+	}
+
+}
+
 bool
 stack_atend(struct stack *s)
 {

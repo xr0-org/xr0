@@ -463,9 +463,11 @@ static struct error *
 path_step_abstract(struct path *p, bool print)
 {
 	if (print) {
-		v_printf("mode:%d\n", state_execmode(p->abstract));
+		char *mode = execution_mode_str(state_execmode(p->abstract)); 
+		v_printf("[%s]\n", mode);
+		free(mode);
 		v_printf("text:\n%s\n", state_programtext(p->abstract));
-		v_printf("abstract: %s\n", state_str(p->abstract));
+		v_printf("%s\n", state_str(p->abstract));
 	}
 	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
@@ -488,9 +490,11 @@ static struct error *
 path_step_actual(struct path *p, bool print)
 {
 	if (print) {
-		v_printf("mode:%d\n", state_execmode(p->actual));
+		char *mode = execution_mode_str(state_execmode(p->actual)); 
+		v_printf("[%s]\n", mode);
+		free(mode);
 		v_printf("text:\n%s\n", state_programtext(p->actual));
-		v_printf("actual: %s\n", state_str(p->actual));
+		v_printf("%s\n", state_str(p->actual));
 	}
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;

@@ -128,14 +128,14 @@ char *
 object_str(struct object *obj)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "{");
+	/*strbuilder_printf(b, "{");*/
 	char *offset = ast_expr_str(obj->offset);
-	strbuilder_printf(b, "%s:", offset);
+	/*strbuilder_printf(b, "%s:", offset);*/
 	free(offset);
 	char *inner = inner_str(obj);
 	strbuilder_printf(b, "<%s>", inner);
 	free(inner);
-	strbuilder_printf(b, "}");
+	/*strbuilder_printf(b, "}");*/
 	return strbuilder_build(b);
 }
 

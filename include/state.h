@@ -33,6 +33,9 @@ enum execution_mode {
 	EXEC_SETUP
 };
 
+char *
+execution_mode_str(enum execution_mode);
+
 enum frame_kind {
 	FRAME_NESTED,
 	FRAME_INTERMEDIATE,

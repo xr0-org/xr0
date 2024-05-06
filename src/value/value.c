@@ -468,7 +468,7 @@ value_int_sprint(struct value *v, struct strbuilder *b)
 void
 value_sync_sprint(struct value *v, struct strbuilder *b)
 {
-	strbuilder_printf(b, "comp:%s", number_str(v->n));
+	strbuilder_printf(b, "rconst:%s", number_str(v->n));
 }
 
 struct value *

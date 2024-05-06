@@ -431,6 +431,9 @@ ast_expr_isnot(struct ast_expr *expr)
 		ast_expr_unary_op(expr) == UNARY_OP_BANG;
 }
 
+static bool
+unary_needsbrak(struct ast_expr *);
+
 static void
 ast_expr_unary_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
@@ -447,8 +450,40 @@ ast_expr_unary_str_build(struct ast_expr *expr, struct strbuilder *b)
 	};
 
 	char *root = ast_expr_str(expr->root);
-	strbuilder_printf(b, "%c(%s)", opchar[op], root);
+	if (unary_needsbrak(expr->root)) {
+		strbuilder_printf(b, "%c(%s)", opchar[op], root);
+	} else {
+		strbuilder_printf(b, "%c%s", opchar[op], root);
+	}
 	free(root);
+}
+
+static bool
+unary_needsbrak(struct ast_expr *e)
+{
+	switch (e->kind) {
+	case EXPR_IDENTIFIER:
+	case EXPR_CONSTANT:
+	case EXPR_STRING_LITERAL:
+	case EXPR_BRACKETED:
+	case EXPR_CALL:
+	case EXPR_INCDEC:
+	case EXPR_STRUCTMEMBER:
+		return false;
+
+	case EXPR_UNARY:
+		return true;
+
+	case EXPR_ITERATION:
+	case EXPR_BINARY:
+	case EXPR_ASSIGNMENT:
+	case EXPR_ISDEALLOCAND:
+	case EXPR_ISDEREFERENCABLE:
+	case EXPR_ARBARG:
+	case EXPR_ALLOCATION:
+	default:
+		assert(false);
+	}
 }
 
 struct ast_expr *
