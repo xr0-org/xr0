@@ -117,7 +117,6 @@ sortconfig_create(enum sortmode mode, char *sortfunc)
 		return (struct sortconfig) {
 			.mode = mode, .sortfunc = sortfunc,
 		};
-
 	case SORTMODE_SORT:
 	case SORTMODE_VERIFY:
 		if (!sortfunc) {
@@ -256,7 +255,6 @@ pass1(struct ast *root, struct externals *ext, bool debug)
 			fprintf(stderr, "%s\n", error_str(err));
 			exit(EXIT_FAILURE);
 		}
-		
 		v_printf("qed %s\n", ast_function_name(f));
 	}
 }
@@ -366,10 +364,15 @@ strip(struct config *c);
 int
 main(int argc, char *argv[])
 {
-	extern int VERBOSE_MODE;
+	extern int LOG_LEVEL;
 
 	struct config c = parse_config(argc, argv);
-	VERBOSE_MODE = c.verbose;
+	if (c.verbose) {
+		LOG_LEVEL = LOG_INFO;
+	}
+	if (c.debug) {
+		LOG_LEVEL = LOG_INFO;
+	}
 
 	switch (c.mode) {
 	case EXECMODE_VERIFY:

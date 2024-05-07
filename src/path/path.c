@@ -322,13 +322,12 @@ path_next_split(struct path *p)
 static struct error *
 branch_next(struct path *parent, struct path *branch)
 {
-	v_printf("branch: %d\n", parent->branch_index);
+	d_printf("branch: %d\n", parent->branch_index);
 	if (path_atend(branch)) {
 		path_nextbranch(parent);
 		return NULL;
 	}
 	return path_next(branch);
-
 }
 
 static bool
@@ -410,7 +409,7 @@ path_init_abstract(struct path *p)
 {
 	struct error *err;
 
-	v_printf("init abstract state\n");
+	d_printf("init abstract state\n");
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
@@ -432,7 +431,7 @@ static struct error *
 path_init_actual(struct path *p)
 {
 	struct error *err;
-	v_printf("init actual state\n");
+	d_printf("init actual state\n");
 	/* if body empty just apply setup */
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
@@ -463,9 +462,9 @@ static struct error *
 path_step_abstract(struct path *p, bool print)
 {
 	if (print) {
-		v_printf("mode:%d\n", state_execmode(p->abstract));
-		v_printf("text:\n%s\n", state_programtext(p->abstract));
-		v_printf("abstract: %s\n", state_str(p->abstract));
+		d_printf("mode:%d\n", state_execmode(p->abstract));
+		d_printf("text:\n%s\n", state_programtext(p->abstract));
+		d_printf("abstract: %s\n", state_str(p->abstract));
 	}
 	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
@@ -488,9 +487,9 @@ static struct error *
 path_step_actual(struct path *p, bool print)
 {
 	if (print) {
-		v_printf("mode:%d\n", state_execmode(p->actual));
-		v_printf("text:\n%s\n", state_programtext(p->actual));
-		v_printf("actual: %s\n", state_str(p->actual));
+		d_printf("mode:%d\n", state_execmode(p->actual));
+		d_printf("text:\n%s\n", state_programtext(p->actual));
+		d_printf("actual: %s\n", state_str(p->actual));
 	}
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
@@ -512,10 +511,9 @@ path_step_actual(struct path *p, bool print)
 static struct error *
 path_audit(struct path *p)
 {
-	v_printf("audit\n");
-
+	d_printf("audit\n");
 	if (state_hasgarbage(p->actual)) {
-		v_printf("actual: %s", state_str(p->actual));
+		d_printf("actual: %s", state_str(p->actual));
 		return error_printf(
 			"%s: garbage on heap", ast_function_name(p->f)
 		);
@@ -552,7 +550,7 @@ path_step_split(struct path *p)
 static struct error *
 branch_step(struct path *parent, struct path *branch)
 {
-	v_printf("branch: %d\n", parent->branch_index);
+	d_printf("branch: %d\n", parent->branch_index);
 	if (path_atend(branch)) {
 		path_nextbranch(parent);
 		return NULL;

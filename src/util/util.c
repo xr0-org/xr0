@@ -288,14 +288,27 @@ string_arr_str(struct string_arr *string_arr)
 	return strbuilder_build(b);
 }
 
-int VERBOSE_MODE;
+enum loglevel LOG_LEVEL;
 
+/* d_printf: Print if Xr0 is in debug mode. */
+int
+d_printf(char *fmt, ...)
+{
+	if (LOG_LEVEL != LOG_DEBUG) {
+		return 0;
+	}
+	va_list ap;
+	va_start(ap, fmt);
+	int r = vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	return r;
+}
 
 /* v_printf: Print if Xr0 is in verbose mode. */
 int
 v_printf(char *fmt, ...)
 {
-	if (!VERBOSE_MODE) {
+	if (LOG_LEVEL != LOG_INFO) {
 		return 0;
 	}
 	va_list ap;

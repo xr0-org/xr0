@@ -95,11 +95,18 @@ strbuilder_build(struct strbuilder *b);
 char *
 strbuilder_preview(struct strbuilder *b);
 
+enum loglevel {
+	LOG_NONE	= 1 << 0,
+	LOG_INFO	= 1 << 1,
+	LOG_DEBUG	= 1 << 2
+};
+
+int
+d_printf(char *fmt, ...);
 
 /* v_printf: Print if Xr0 is in verbose mode. */
 int
 v_printf(char *fmt, ...);
-
 
 struct error;
 
