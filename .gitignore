@@ -9,4 +9,3 @@ a.out
 *.tab.[ch]
 *.output
 *-preproc.[c0]
-xr0-rs/target
