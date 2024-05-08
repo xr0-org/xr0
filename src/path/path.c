@@ -453,7 +453,6 @@ path_init_actual(struct path *p)
 		return err;
 	}
 	state_clearregister(p->actual);
-	printf("actual (aftersetup): %s\n", state_str(p->actual));
 	p->path_state = PATH_STATE_ACTUAL;
 	return NULL;
 }

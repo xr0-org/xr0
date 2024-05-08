@@ -769,9 +769,6 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 		assert(false);
 	}
 
-	printf("param_state: %s\n", state_str(param_state));
-	printf("arg_state: %s\n", state_str(arg_state));
-
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **param = ast_function_params(f);
 
