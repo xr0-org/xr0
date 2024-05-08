@@ -158,7 +158,7 @@ impl<'a> Stack<'a> {
         let mut new_map = Box::new(VarMap::new());
         for (k, v) in &*m {
             if v.is_param() {
-                new_map.insert(k.clone(), variable_abstractcopy(v, &mut *state));
+                new_map.insert(k.clone(), variable_abstractcopy(v, state));
             }
         }
         state.stack.top_mut().varmap = new_map;

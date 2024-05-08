@@ -76,7 +76,7 @@ fn expr_isdeallocand_rangedecide(
     // Note: The code looks at `acc.e1` instead of `inner.e1`, a bug in the original. `acc` is
     // treated both as a unary expression and as a binary expression. Therefore this function must
     // currently be dead code.
-    let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), &mut *state).unwrap();
+    let res_lval = ast_expr_lvalue(ast_expr_binary_e1(acc), state).unwrap();
     if ast_expr_equal(lw, up) {
         return true;
     }
@@ -122,7 +122,7 @@ fn rangeprocess_alloc(
     };
     assert_ne!(alloc.kind, AstAllocKind::Dealloc);
 
-    let obj = hack_base_object_from_alloc(lval, &mut *state);
+    let obj = hack_base_object_from_alloc(lval, state);
     //=state_range_alloc
     let Some(arr_val) = obj.as_value() else {
         return Err(Error::new("no value".to_string()));
@@ -410,16 +410,16 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
         )));
     }
 
-    let args = prepare_arguments(args, params, &mut *state);
+    let args = prepare_arguments(args, params, state);
     state.push_frame(f.name.clone(), &f.abstract_, f.rtype(), true);
-    prepare_parameters(params, args, name, &mut *state)?;
+    prepare_parameters(params, args, name, state)?;
 
     /* XXX: pass copy so we don't observe */
     call_setupverify(f, &mut state.clone())
         .map_err(|err| err.wrap(format!("`{name}' precondition failure\n\t")))?;
-    let v = call_absexec(call, &mut *state).map_err(|err| err.wrap("\n\t".to_string()))?;
+    let v = call_absexec(call, state).map_err(|err| err.wrap("\n\t".to_string()))?;
     state.pop_frame();
-    pf_augment(&v, call, &mut *state)
+    pf_augment(&v, call, state)
 }
 
 fn call_absexec(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
