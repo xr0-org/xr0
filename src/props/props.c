@@ -77,10 +77,6 @@ props_install(struct props *p, struct ast_expr *e)
 bool
 props_get(struct props *p, struct ast_expr *e)
 {
-	/* XXX: hack for shallow not conditions, fix in TODO */
-	if (ast_expr_isnot(e)) {
-		return !props_contradicts(p, e);
-	}
 	for (int i = 0; i < p->n; i++) {
 		/* TODO: logical comparison */
 		if (ast_expr_equal(e, p->prop[i])) {

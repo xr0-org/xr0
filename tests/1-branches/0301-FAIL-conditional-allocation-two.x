@@ -1,3 +1,8 @@
+/* 
+ * thanks to jorendorff
+ * https://github.com/xr0-org/xr0/issues/50
+ */
+
 #include <stdlib.h>
 
 void *
