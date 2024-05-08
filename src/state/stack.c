@@ -210,22 +210,38 @@ varmap_copy(struct map *m)
 	return m_copy;
 }
 
+static struct string_arr *
+var_strs(struct stack *, struct state *);
+
+static int
+maxlenorzero(struct string_arr *);
+
 char *
 stack_str(struct stack *stack, struct state *state)
 {
 	struct strbuilder *b = strbuilder_create();
 	struct map *m = stack->varmap;
+	struct string_arr *var_str_arr = var_strs(stack, state);
+	int var_str_max = maxlenorzero(var_str_arr);
+	assert(string_arr_n(var_str_arr) == m->n);
+	char **var_str = string_arr_s(var_str_arr);
+
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
 		struct variable *v = (struct variable *) e.value;
-		char *s = variable_str(v, stack, state);
-		strbuilder_printf(b, "\t%d: %s (%s", i, s, e.key);
+		strbuilder_printf(
+			b, 
+			"\t%d: %-*s (%s",
+			i,
+			var_str_max, var_str[i],
+			e.key
+		);
 		if (variable_isparam(v)) {
 			strbuilder_printf(b, ", π");
 		}
 		strbuilder_printf(b, ")\n");
-		free(s);
 	}
+	string_arr_destroy(var_str_arr);
 	strbuilder_printf(b, "\t");
 	/* TODO: fix length of line */
 	for (int i = 0, len = 30; i < len-2; i++ ) {
@@ -238,6 +254,40 @@ stack_str(struct stack *stack, struct state *state)
 		free(prev);
 	}
 	return strbuilder_build(b);
+}
+
+
+static struct string_arr *
+var_strs(struct stack *stack, struct state *state)
+{
+	struct string_arr *arr = string_arr_create();
+	struct map *m = stack->varmap;
+	for (int i = 0; i < m->n; i++) {
+		string_arr_append(
+			arr,
+			variable_str(
+				(struct variable *) m->entry[i].value,
+				stack,
+				state
+			)
+		);
+	}
+	return arr;
+}
+
+static int
+maxlenorzero(struct string_arr *arr)
+{
+	int n = string_arr_n(arr);
+	char **s = string_arr_s(arr);
+	int max = 0;
+	for (int i = 0; i < n; i++) {
+		int len = strlen(s[i]);
+		if (len > max) {
+			max = len;
+		}
+	}
+	return max;
 }
 
 bool
