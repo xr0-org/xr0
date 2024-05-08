@@ -193,6 +193,15 @@ impl<K, V> InsertionOrderMap<K, V> {
     }
 }
 
+impl<K, V> IntoIterator for InsertionOrderMap<K, V> {
+    type IntoIter = std::vec::IntoIter<(K, V)>;
+    type Item = (K, V);
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
 impl<'a, K, V> IntoIterator for &'a InsertionOrderMap<K, V> {
     type IntoIter = Iter<'a, K, V>;
     type Item = (&'a K, &'a V);

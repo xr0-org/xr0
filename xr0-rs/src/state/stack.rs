@@ -23,7 +23,7 @@ pub struct StackFrame<'a> {
 
     // Note: This field is called `frame` in the original.
     pub blocks: Vec<Box<Block>>,
-    pub varmap: Box<VarMap>,
+    pub varmap: VarMap,
     pub result: Box<Variable>,
     pub id: usize,
 }
@@ -55,8 +55,7 @@ pub fn stack_str(stack: &Stack, state: &State) -> String {
     let n = stack.frames.len();
     for i in 0..n {
         let frame = &stack.frames[i];
-        let m: &VarMap = &frame.varmap;
-        for (k, v) in m {
+        for (k, v) in &frame.varmap {
             let var = variable_str(v, state);
             str_write!(b, "\t{k}: {var}");
             b.push('\n');
@@ -108,7 +107,7 @@ impl<'a> Stack<'a> {
             pc: ProgramCounter::new(b, &name),
             abstract_,
             blocks: vec![Block::new()],
-            varmap: Box::new(VarMap::new()),
+            varmap: VarMap::new(),
             id,
             result: Box::new(Variable {
                 type_: Box::new(ret_type.clone()),
@@ -151,14 +150,14 @@ impl<'a> Stack<'a> {
         let new_result = variable_abstractcopy(&old_result, state);
         state.stack.top_mut().result = new_result;
 
-        // Rust note: the extra empty box is not in the original. It's necessary to move the varmap
-        // out of State before Rust will let us use `variable_abstractcopy` in safe code.
-        let m = std::mem::replace(&mut state.stack.top_mut().varmap, Box::new(VarMap::new()));
+        // Rust note: Rust won't let us call `variable_abstractcopy` (which mutates `state`) while
+        // iterating the varmap in-place. So swap it out first.
+        let m = std::mem::replace(&mut state.stack.top_mut().varmap, VarMap::new());
 
-        let mut new_map = Box::new(VarMap::new());
-        for (k, v) in &*m {
+        let mut new_map = VarMap::new();
+        for (k, v) in m {
             if v.is_param() {
-                new_map.insert(k.clone(), variable_abstractcopy(v, state));
+                new_map.insert(k, variable_abstractcopy(&v, state));
             }
         }
         state.stack.top_mut().varmap = new_map;
@@ -213,7 +212,7 @@ impl<'a> StackFrame<'a> {
         if variable_references(&self.result, loc, state) {
             return true;
         }
-        for (_id, var) in &*self.varmap {
+        for (_id, var) in &self.varmap {
             if var.is_param() && variable_references(var, loc, state) {
                 return true;
             }
