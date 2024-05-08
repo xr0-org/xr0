@@ -26,16 +26,17 @@ do
 	folder=$(dirname "$f")
 
 	printf "%-${length}s ..." "$f"
+	tempfile="${f}.temp"
 	if [ "$folder" == *"$topological_folder"* ]
 	then
 		if [[ "$f" == *"verification"* ]]
 		then
-			output=$($XR0 -x main -I $libx -v $f 2>&1 >/dev/null)
+			output=$($XR0 -x main -I $libx -v $f > "$tempfile" 2>&1)
 		else
-			output=$($XR0 -t main -I $libx $f 2>&1 >/dev/null)
+			output=$($XR0 -t main -I $libx $f > "$tempfile" 2>&1)
 		fi
 	else 
-		output=$($XR0 -I $libx $f 2>&1 >/dev/null)
+		output=$($XR0 -I $libx $f > "$tempfile" 2>&1)
 	fi
 
 	# cases where we have an expected output to compare with
@@ -43,8 +44,9 @@ do
 	then
 		expected_file="${f}.${expected_suffix}"
 		
-		echo "$output" | diff - $expected_file
-		if [[ $? -eq 0 ]]
+		output_file=$(<$tempfile)
+		echo "$output_file" | diff - $expected_file
+		if diff -q "$tempfile" "$expected_file" >/dev/null;
 		then
 			npass=$((npass+1))
 			printf "$pass"
@@ -59,6 +61,8 @@ do
 			printf "$pass"
 		fi
 	fi
+
+	rm $tempfile
 done
 
 nfail=$((ntests-npass))
