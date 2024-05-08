@@ -70,8 +70,6 @@ fn expr_isdeallocand_rangedecide(
         !!(ast_expr_equal(ast_expr_binary_e2(inner), &i)
             || ast_expr_equal(ast_expr_binary_e2(inner), &j))
     );
-    drop(j);
-    drop(i);
 
     // `inner.e1` is a pointer; get its value as a Location.
     //
@@ -164,7 +162,6 @@ fn hack_base_object_from_alloc<'s>(expr: &'s AstExpr, state: &'s mut State) -> &
     let inner = ast_expr_unary_operand(expr);
     let i = AstExpr::new_identifier("i".to_string());
     assert!(ast_expr_equal(ast_expr_binary_e2(inner), &i));
-    drop(i);
     let lval = ast_expr_lvalue(ast_expr_binary_e1(inner), state).unwrap();
     lval.obj.unwrap()
 }

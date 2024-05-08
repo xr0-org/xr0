@@ -288,7 +288,6 @@ impl<'a> State<'a> {
         let upto = obj.slice_upto(&lw, self);
         let observed = Object::with_value(lw, Some(self.alloc()));
         let from = obj.slice_from(&up, self);
-        drop(up);
 
         // delete current struct block
         // Note: 99-program/000-matrix.x gets here, so the code is exercised; but it doesn't make

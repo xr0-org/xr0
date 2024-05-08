@@ -206,9 +206,6 @@ impl Object {
         let e0: bool = s.eval(&prop0);
         let e1: bool = s.eval(&prop1);
         let e2: bool = s.eval(&prop2);
-        drop(prop2);
-        drop(prop1);
-        drop(prop0);
         assert!(e0, "excl_up must be decidably >= the start offset of self");
         if e1 {
             // `excl_up` is equal to this object's lower bound. Nothing to return.
@@ -252,8 +249,6 @@ impl Object {
         let prop1 = AstExpr::new_eq(ast_expr_copy(incl_lw), ast_expr_copy(lw));
         let e0: bool = s.eval(&prop0);
         let e1: bool = s.eval(&prop1);
-        drop(prop1);
-        drop(prop0);
         if e0 {
             return None;
         }
