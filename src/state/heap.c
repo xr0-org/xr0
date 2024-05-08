@@ -256,7 +256,7 @@ vconst_declare(struct vconst *v, struct value *val, char *comment, bool persist)
 	if (comment) {
 		map_set(v->comment, dynamic_str(s), comment);
 	}
-	map_set(v->persist, dynamic_str(s), (void *) (size_t) persist);
+	map_set(v->persist, dynamic_str(s), (void *) persist);
 
 	return s;
 }

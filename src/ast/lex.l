@@ -163,7 +163,12 @@ comment()
 	}
 }
 
-struct lexememarker marker;
+struct lexememarker marker = (struct lexememarker) {
+	.linenum = 0,
+	.column = 0,
+	.filename = NULL,
+	.flags = 0,
+};
 
 struct lexememarker *
 lexloc()

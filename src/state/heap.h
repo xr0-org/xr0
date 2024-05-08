@@ -9,7 +9,7 @@ struct heap *
 heap_create();
 
 void
-heap_destroy(struct heap *);
+heap_destroy();
 
 struct heap *
 heap_copy(struct heap *);

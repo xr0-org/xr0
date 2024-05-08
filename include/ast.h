@@ -5,34 +5,6 @@
 
 #include "util.h"
 
-enum ast_alloc_kind {
-	ALLOC		= 1 << 0,
-	DEALLOC		= 1 << 1,
-	CLUMP		= 1 << 2,
-};
-
-enum ast_unary_operator {
-	UNARY_OP_ADDRESS		= 1 << 0,
-	UNARY_OP_DEREFERENCE		= 1 << 1,
-	UNARY_OP_POSITIVE		= 1 << 2,
-	UNARY_OP_NEGATIVE		= 1 << 3,
-	UNARY_OP_ONES_COMPLEMENT	= 1 << 4,
-	UNARY_OP_BANG			= 1 << 5,
-};
-
-enum ast_binary_operator {
-	BINARY_OP_EQ	= 1 << 0,
-	BINARY_OP_NE	= 1 << 1,
-
-	BINARY_OP_LT	= 1 << 2,
-	BINARY_OP_GT	= 1 << 3,
-	BINARY_OP_LE	= 1 << 4,
-	BINARY_OP_GE	= 1 << 5,
-
-	BINARY_OP_ADDITION	= 1 << 6,
-	BINARY_OP_SUBTRACTION	= 1 << 7,
-};
-
 struct ast_expr;
 
 struct ast_expr *
@@ -100,6 +72,8 @@ ast_expr_member_root(struct ast_expr *);
 
 char *
 ast_expr_member_field(struct ast_expr *);
+
+enum ast_unary_operator;
 
 struct ast_expr *
 ast_expr_unary_create(struct ast_expr *, enum ast_unary_operator);
@@ -507,29 +481,6 @@ ast_type_str(struct ast_type *);
 
 struct ast_type *
 ast_type_copy(struct ast_type *t);
-
-enum ast_type_base { /* base type */
-	/* variable type */
-	TYPE_VOID,
-	TYPE_CHAR,
-	TYPE_SHORT,
-	TYPE_INT,
-	TYPE_LONG,
-	TYPE_FLOAT,
-	TYPE_DOUBLE,
-	TYPE_SIGNED,
-	TYPE_UNSIGNED,
-	TYPE_POINTER,
-	TYPE_ARRAY,
-
-	/* composite */
-	TYPE_STRUCT,
-	TYPE_UNION,
-	TYPE_ENUM,
-
-	/* derivative */
-	TYPE_USERDEF,
-};
 
 enum ast_type_base
 ast_type_base(struct ast_type *t);

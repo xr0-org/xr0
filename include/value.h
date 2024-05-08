@@ -113,6 +113,8 @@ value_as_literal(struct value *v);
 bool
 value_references(struct value *, struct location *, struct state *);
 
+enum ast_binary_operator;
+
 bool
 values_comparable(struct value *v1, struct value *v2);
 
