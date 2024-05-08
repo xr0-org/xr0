@@ -1,5 +1,4 @@
 use crate::parser::LexemeMarker;
-use crate::state::state::state_getresult;
 use crate::state::State;
 use crate::util::{Error, Result};
 use crate::{str_write, Externals, Value};

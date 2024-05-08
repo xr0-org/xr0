@@ -5,7 +5,7 @@ use super::{
     AstVariable, FuncGraph,
 };
 use crate::path::Path;
-use crate::state::state::{state_declare, state_getobject, state_getresult, state_vconst, State};
+use crate::state::state::State;
 use crate::util::{InsertionOrderMap, Result, SemiBox};
 use crate::value::Value;
 use crate::{str_write, Externals};
@@ -131,7 +131,7 @@ pub fn ast_function_verify(f: &AstFunction, ext: &Externals) -> Result<()> {
 pub fn ast_function_initparams(f: &AstFunction, s: &mut State) -> Result<()> {
     let params = f.params();
     for param in params {
-        state_declare(s, param, true);
+        s.declare(param, true);
     }
     ast_function_precondsinit(f, s)?;
     for param in params {
@@ -151,11 +151,11 @@ fn ast_function_precondsinit(f: &AstFunction, s: &mut State) -> Result<()> {
 
 fn inititalise_param(param: &AstVariable, state: &mut State) -> Result<()> {
     let AstVariable { name, type_ } = param;
-    let obj = state_getobject(state, name).unwrap().unwrap();
+    let obj = state.get_object(name).unwrap().unwrap();
     if !obj.has_value() {
-        let val = state_vconst(state, type_, Some(name), true);
+        let val = state.vconst(type_, Some(name), true);
         // Rust note: Repeated lookup here for Rust's benefit. Not in the original.
-        let obj = state_getobject(state, name).unwrap().unwrap();
+        let obj = state.get_object(name).unwrap().unwrap();
         obj.assign(Some(val));
     }
     Ok(())
@@ -170,12 +170,12 @@ pub fn ast_function_setupabsexec(f: &AstFunction, state: &mut State) -> Result<(
 
 pub fn ast_function_absexec(f: &AstFunction, state: &mut State) -> Result<Option<Box<Value>>> {
     for decl in &f.abstract_.decls {
-        state_declare(state, decl, false);
+        state.declare(decl, false);
     }
     for stmt in &f.abstract_.stmts {
         ast_stmt_absprocess(stmt, state, false)?;
     }
-    let obj = state_getresult(state).unwrap().unwrap();
+    let obj = state.result_mut().unwrap().unwrap();
     // Note: In the original, this function (unlike the other absexec functions) returned a
     // borrowed value which the caller cloned. Not a big difference.
     Ok(obj.as_value().map(Value::copy))

@@ -2,10 +2,6 @@ use crate::ast::{
     ast_expr_assume, ast_expr_inverted_copy, ast_function_initparams, ast_function_setupabsexec,
     AstExpr, AstFunction,
 };
-use crate::state::state::{
-    state_copywithname, state_create, state_create_withprops, state_equal, state_hasgarbage,
-    state_str,
-};
 use crate::state::State;
 use crate::util::{Error, Result};
 use crate::vprint;
@@ -69,16 +65,28 @@ impl<'a> Path<'a> {
         p.path_state = self.path_state;
         match self.path_state {
             PathState::Abstract => {
-                let state = state_copywithname(self.abstract_.as_ref().unwrap(), p.name.clone());
+                let state = self
+                    .abstract_
+                    .as_ref()
+                    .unwrap()
+                    .clone_with_name(p.name.clone());
                 p.abstract_ = Some(state);
                 if !state_assume(p.abstract_.as_mut().unwrap(), &cond) {
                     p.path_state = PathState::AtEnd;
                 }
             }
             PathState::Actual => {
-                let state = state_copywithname(self.abstract_.as_ref().unwrap(), p.name.clone());
+                let state = self
+                    .abstract_
+                    .as_ref()
+                    .unwrap()
+                    .clone_with_name(p.name.clone());
                 p.abstract_ = Some(state);
-                let state = state_copywithname(self.actual.as_ref().unwrap(), p.name.clone());
+                let state = self
+                    .actual
+                    .as_ref()
+                    .unwrap()
+                    .clone_with_name(p.name.clone());
                 p.actual = Some(state);
                 if !state_assume(p.actual.as_mut().unwrap(), &cond) {
                     p.path_state = PathState::AtEnd;
@@ -115,7 +123,7 @@ impl<'a> Path<'a> {
 
     //=path_init_abstract
     fn init_abstract(&mut self) -> Result<()> {
-        self.abstract_ = Some(state_create(
+        self.abstract_ = Some(State::new(
             self.name.clone(),
             &self.f.abstract_,
             &self.f.ret,
@@ -130,7 +138,7 @@ impl<'a> Path<'a> {
     //=path_init_actual
     fn init_actual(&mut self) -> Result<()> {
         let abstract_ = self.abstract_.as_ref().unwrap();
-        self.actual = Some(state_create_withprops(
+        self.actual = Some(State::with_props(
             self.name.clone(),
             self.f.body.as_ref().unwrap(),
             &self.f.ret,
@@ -175,12 +183,12 @@ impl<'a> Path<'a> {
     //=path_audit
     fn audit(&mut self) -> Result<()> {
         let actual = self.actual.as_mut().unwrap();
-        if state_hasgarbage(actual) {
-            vprint!("actual: {}", state_str(actual));
+        if actual.has_garbage() {
+            vprint!("actual: {actual}");
             return Err(Error::new(format!("{}: garbage on heap", self.f.name)));
         }
-        if !state_equal(actual, self.abstract_.as_ref().unwrap()) {
-            /* unequal states are printed by state_equal so that the user
+        if !actual.equals(self.abstract_.as_ref().unwrap()) {
+            /* unequal states are printed by State::equals so that the user
              * can see the states with undeclared vars */
             return Err(Error::new(format!(
                 "{}: actual and abstract states differ",

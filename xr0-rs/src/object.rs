@@ -3,7 +3,6 @@ use std::fmt::{self, Display, Formatter};
 use crate::ast::{ast_expr_copy, LValue};
 use crate::ext::Externals;
 use crate::state::location::location_references;
-use crate::state::state::state_eval;
 use crate::state::State;
 use crate::util::SemiBox;
 use crate::value::ValueKind;
@@ -153,7 +152,7 @@ impl Object {
         let of = offset;
         let e1 = AstExpr::new_le(ast_expr_copy(lw), ast_expr_copy(of));
         let e2 = AstExpr::new_lt(ast_expr_copy(of), ast_expr_copy(&up));
-        state_eval(s, &e1) && state_eval(s, &e2)
+        s.eval(&e1) && s.eval(&e2)
     }
 
     pub fn contains_upperincl(&self, offset: &AstExpr, s: &State) -> bool {
@@ -164,7 +163,7 @@ impl Object {
         // double-freeing subexpressions.
         let lower_bound_expr = AstExpr::new_le(ast_expr_copy(lw), ast_expr_copy(of));
         let upper_bound_expr = AstExpr::new_le(ast_expr_copy(of), up);
-        state_eval(s, &lower_bound_expr) && state_eval(s, &upper_bound_expr)
+        s.eval(&lower_bound_expr) && s.eval(&upper_bound_expr)
     }
 
     #[allow(dead_code)]
@@ -173,16 +172,13 @@ impl Object {
         let up = self.end();
         // Note: Original does not make a copy of `lw`; instead it leaks the expression to avoid
         // double-freeing subexpressions.
-        state_eval(s, &AstExpr::new_eq(ast_expr_copy(lw), up))
+        s.eval(&AstExpr::new_eq(ast_expr_copy(lw), up))
     }
 
     pub fn contig_precedes(&self, after: &Object, s: &State) -> bool {
         // Note: Original does not make a copy of `after.offset`; instead it leaks the eq
         // expression to avoid double-freeing subexpressions.
-        state_eval(
-            s,
-            &AstExpr::new_eq(self.end(), ast_expr_copy(&after.offset)),
-        )
+        s.eval(&AstExpr::new_eq(self.end(), ast_expr_copy(&after.offset)))
     }
 
     #[allow(dead_code)]
@@ -192,7 +188,7 @@ impl Object {
         // Note: Original does not make a copy of `lw`; instead it leaks the expression to avoid
         // double-freeing subexpressions.
         let lw_succ = AstExpr::new_sum(ast_expr_copy(lw), AstExpr::new_constant(1));
-        state_eval(s, &AstExpr::new_eq(lw_succ, up))
+        s.eval(&AstExpr::new_eq(lw_succ, up))
     }
 
     /// Returns a new `Object` covering the slice of `self` up to the offset (within the enclosing
@@ -207,9 +203,9 @@ impl Object {
         let prop0 = AstExpr::new_le(ast_expr_copy(lw), ast_expr_copy(excl_up));
         let prop1 = AstExpr::new_eq(ast_expr_copy(lw), ast_expr_copy(excl_up));
         let prop2 = AstExpr::new_eq(up, ast_expr_copy(excl_up));
-        let e0: bool = state_eval(s, &prop0);
-        let e1: bool = state_eval(s, &prop1);
-        let e2: bool = state_eval(s, &prop2);
+        let e0: bool = s.eval(&prop0);
+        let e1: bool = s.eval(&prop1);
+        let e2: bool = s.eval(&prop2);
         drop(prop2);
         drop(prop1);
         drop(prop0);
@@ -254,8 +250,8 @@ impl Object {
         let up = self.end();
         let prop0 = AstExpr::new_ge(ast_expr_copy(incl_lw), ast_expr_copy(&up));
         let prop1 = AstExpr::new_eq(ast_expr_copy(incl_lw), ast_expr_copy(lw));
-        let e0: bool = state_eval(s, &prop0);
-        let e1: bool = state_eval(s, &prop1);
+        let e0: bool = s.eval(&prop0);
+        let e1: bool = s.eval(&prop1);
         drop(prop1);
         drop(prop0);
         if e0 {

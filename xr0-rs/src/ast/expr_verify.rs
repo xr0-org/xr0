@@ -7,11 +7,6 @@ use super::{
     BinaryExpr, CallExpr, ConstantExpr, IncDecExpr, StructMemberExpr, UnaryExpr,
 };
 use crate::state::location::location_copy;
-use crate::state::state::{
-    state_copy, state_create, state_declare, state_deref, state_getloc, state_getobject,
-    state_getvconst, state_isalloc, state_islval, state_popframe, state_pushframe,
-    state_static_init, state_vconst,
-};
 use crate::state::State;
 use crate::util::{Error, Result, SemiBox};
 use crate::{Object, Value};
@@ -214,7 +209,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
             let t = SemiBox::Owned(Box::new(root_lval.t.ptr_type().clone()));
             let root_val = root_obj.as_value().unwrap().clone();
 
-            let obj = state_deref(state, &root_val, &AstExpr::new_constant(0))?;
+            let obj = state.deref(&root_val, &AstExpr::new_constant(0))?;
             Ok(LValue { t, obj })
         }
         AstExprKind::Binary(BinaryExpr { op: _, e1, e2 }) => {
@@ -229,7 +224,7 @@ pub fn expr_unary_lvalue<'s>(unary: &'s UnaryExpr, state: &'s mut State) -> Resu
             // benefit.
             let t = SemiBox::Owned(Box::new(root_lval.t.ptr_type().clone()));
             let root_val = root_obj.as_value().unwrap().clone();
-            let Ok(res_obj) = state_deref(&mut *state, &root_val, e2) else {
+            let Ok(res_obj) = state.deref(&root_val, e2) else {
                 // Note: Original returns null. See note above.
                 panic!();
             };
@@ -307,7 +302,7 @@ pub fn ast_expr_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
 }
 
 fn expr_literal_eval(literal: &str, state: &mut State) -> Result<Box<Value>> {
-    Ok(state_static_init(state, literal))
+    Ok(state.static_init(literal))
 }
 
 fn expr_constant_eval(constant: &ConstantExpr, _state: &mut State) -> Result<Box<Value>> {
@@ -324,7 +319,7 @@ fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
         return Ok(Value::new_literal(id));
     }
     // Note: Original does not null-check `obj` when there is not an error.
-    let obj = state_getobject(state, id)?.unwrap();
+    let obj = state.get_object(id)?.unwrap();
     let Some(val) = obj.as_value() else {
         return Err(Error::new(format!(
             "undefined memory access: `{id}' has no value",
@@ -334,7 +329,7 @@ fn expr_identifier_eval(id: &str, state: &mut State) -> Result<Box<Value>> {
 }
 
 fn hack_identifier_builtin_eval(id: &str, state: &State) -> Result<Box<Value>> {
-    if state_getvconst(state, id).is_some() || id.starts_with("ptr:") {
+    if state.get_vconst(id).is_some() || id.starts_with("ptr:") {
         return Ok(Value::new_sync(AstExpr::new_identifier(id.to_string())));
     }
     Err(Error::new("not built-in".to_string()))
@@ -370,7 +365,7 @@ fn expr_to_binary(expr: &AstExpr) -> Box<AstExpr> {
 fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
     let arr = ast_expr_eval(ast_expr_binary_e1(expr), state)?;
     // Note: Original seems to leak `arr`.
-    let Some(deref_obj) = state_deref(state, &arr, ast_expr_binary_e2(expr))? else {
+    let Some(deref_obj) = state.deref(&arr, ast_expr_binary_e2(expr))? else {
         return Err(Error::new(format!(
             "undefined indirection: *({expr}) has no value"
         )));
@@ -385,7 +380,7 @@ fn binary_deref_eval(expr: &AstExpr, state: &mut State) -> Result<Box<Value>> {
 
 fn address_eval(operand: &AstExpr, state: &mut State) -> Result<Box<Value>> {
     let id = ast_expr_as_identifier(operand);
-    Ok(state_getloc(state, id))
+    Ok(state.get_loc(id))
 }
 
 fn expr_structmember_eval(expr: &StructMemberExpr, s: &mut State) -> Result<Box<Value>> {
@@ -419,14 +414,14 @@ fn expr_call_eval(call: &CallExpr, state: &mut State) -> Result<Box<Value>> {
     }
 
     let args = prepare_arguments(args, params, &mut *state);
-    state_pushframe(&mut *state, f.name.clone(), &f.abstract_, f.rtype(), true);
+    state.push_frame(f.name.clone(), &f.abstract_, f.rtype(), true);
     prepare_parameters(params, args, name, &mut *state)?;
 
     /* XXX: pass copy so we don't observe */
-    call_setupverify(f, &mut state_copy(&*state))
+    call_setupverify(f, &mut state.clone())
         .map_err(|err| err.wrap(format!("`{name}' precondition failure\n\t")))?;
     let v = call_absexec(call, &mut *state).map_err(|err| err.wrap("\n\t".to_string()))?;
-    state_popframe(&mut *state);
+    state.pop_frame();
     pf_augment(&v, call, &mut *state)
 }
 
@@ -445,7 +440,7 @@ fn call_absexec(call: &CallExpr, s: &mut State) -> Result<Box<Value>> {
 
 fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
     let fname = f.name();
-    let mut param_state = state_create(
+    let mut param_state = State::new(
         fname.to_string(),
         &f.abstract_,
         f.rtype(),
@@ -458,8 +453,8 @@ fn call_setupverify(f: &AstFunction, arg_state: &mut State) -> Result<()> {
         let id = &p.name;
         // Note: `param` and `arg` are deliberately leaked in the original to avoid double-freeing
         // the variable's location.
-        let param = state_getloc(&mut param_state, id);
-        let arg = state_getloc(arg_state, id);
+        let param = param_state.get_loc(id);
+        let arg = arg_state.get_loc(id);
         verify_paramspec(&param, &arg, &mut param_state, arg_state)
             .map_err(|err| err.wrap(format!("parameter `{id}' of `{fname}' ")))?;
     }
@@ -473,13 +468,13 @@ fn verify_paramspec(
     param_state: &mut State,
     arg_state: &mut State,
 ) -> Result<()> {
-    if !state_islval(param_state, param) {
+    if !param_state.is_lval(param) {
         return Ok(());
     }
-    if !state_islval(arg_state, arg) {
+    if !arg_state.is_lval(arg) {
         return Err(Error::new("must be lvalue".to_string()));
     }
-    if state_isalloc(param_state, param) && !state_isalloc(arg_state, arg) {
+    if param_state.is_alloc(param) && !arg_state.is_alloc(arg) {
         return Err(Error::new("must be heap allocated".to_string()));
     }
     let param_obj = param_state.get_mut(param.as_location(), false)?.unwrap();
@@ -554,7 +549,7 @@ pub fn prepare_parameters(
 ) -> Result<()> {
     assert_eq!(params.len(), args.len());
     for (param, res) in params.iter().zip(args) {
-        state_declare(state, param, true);
+        state.declare(param, true);
 
         let arg = res?;
         let name = AstExpr::new_identifier(param.name.clone());
@@ -602,8 +597,7 @@ fn expr_binary_eval(binary: &BinaryExpr, state: &mut State) -> Result<Box<Value>
 }
 
 fn arbarg_eval(state: &mut State) -> Result<Box<Value>> {
-    Ok(state_vconst(
-        state,
+    Ok(state.vconst(
         &AstType::new_ptr(AstType::new(AstTypeBase::Void, 0)),
         None,
         false,
@@ -684,9 +678,8 @@ fn reduce_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Preresult
 }
 
 fn identifier_assume(expr: &AstExpr, value: bool, s: &mut State) -> Result<Preresult> {
-    let mut s_copy = state_copy(&*s);
+    let mut s_copy = s.clone();
     let res_val = ast_expr_eval(expr, &mut s_copy).unwrap();
-    drop(s_copy);
     irreducible_assume(&res_val.into_sync(), value, s)
 }
 

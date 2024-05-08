@@ -1,10 +1,12 @@
+use std::fmt::{self, Display, Formatter};
+
 use super::block::{object_arr_index, object_arr_index_upperincl};
 use super::location::{location_copy, location_toheap, LocationKind};
 use super::{Block, Clump, Heap, ProgramCounter, Stack, StaticMemory, VConst};
 use crate::ast::{ast_expr_copy, AstBlock, AstExpr, AstType, AstVariable, LValue, KEYWORD_RETURN};
 use crate::object::{ObjectKind, Range};
 use crate::util::{Error, Result, SemiBox};
-use crate::{str_write, vprint, Externals, Location, Object, Props, Value};
+use crate::{vprint, Externals, Location, Object, Props, Value};
 
 /// The entire state of the abstract machine.
 ///
@@ -23,85 +25,84 @@ pub struct State<'a> {
     pub props: Props,
 }
 
-pub fn state_create<'a>(
-    name: String,
-    block: &'a AstBlock,
-    ret_type: &AstType,
-    abstract_: bool,
-    ext: &'a Externals,
-) -> Box<State<'a>> {
-    let mut stack = Stack::new();
-    stack.push(name, block, ret_type, abstract_);
-    Box::new(State {
-        ext,
-        static_memory: StaticMemory::new(),
-        vconst: VConst::new(),
-        clump: Clump::new(),
-        stack,
-        heap: Heap::new(),
-        props: Props::new(),
-    })
-}
-
-pub fn state_create_withprops<'a>(
-    name: String,
-    block: &'a AstBlock,
-    ret_type: &'a AstType,
-    abstract_: bool,
-    ext: &'a Externals,
-    props: Props,
-) -> Box<State<'a>> {
-    let mut stack = state_create(name, block, ret_type, abstract_, ext);
-    stack.props = props;
-    stack
-}
-
-pub fn state_copy<'a>(state: &State<'a>) -> Box<State<'a>> {
-    Box::new(state.clone())
-}
-
-pub fn state_copywithname<'a>(state: &State<'a>, func_name: String) -> Box<State<'a>> {
-    let mut copy = state_copy(state);
-    copy.stack = state.stack.clone_with_name(func_name);
-    copy
-}
-
-pub fn state_str(state: &State) -> String {
-    let mut b = String::new();
-    str_write!(b, "[[\n");
-    let ext = (*state.ext).types_str("\t");
-    if !ext.is_empty() {
-        str_write!(b, "{ext}\n");
+impl<'a> Display for State<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        writeln!(f, "[[")?;
+        let ext = self.ext.types_str("\t");
+        if !ext.is_empty() {
+            writeln!(f, "{ext}")?;
+        }
+        let static_mem = self.static_memory.str("\t");
+        if !static_mem.is_empty() {
+            writeln!(f, "{static_mem}")?;
+        }
+        let vconst = self.vconst.str("\t");
+        if !vconst.is_empty() {
+            writeln!(f, "{vconst}")?;
+        }
+        let clump = self.clump.str("\t");
+        if !clump.is_empty() {
+            writeln!(f, "{clump}")?;
+        }
+        let stack = self.stack.str(self);
+        if !stack.is_empty() {
+            writeln!(f, "{stack}")?;
+        }
+        let props = self.props.str("\t");
+        if !props.is_empty() {
+            write!(f, "{props}")?;
+        }
+        let heap = self.heap.str("\t");
+        if !heap.is_empty() {
+            writeln!(f, "\n{heap}")?;
+        }
+        writeln!(f, "]]")
     }
-    let static_mem = state.static_memory.str("\t");
-    if !static_mem.is_empty() {
-        str_write!(b, "{static_mem}\n");
-    }
-    let vconst = state.vconst.str("\t");
-    if !vconst.is_empty() {
-        str_write!(b, "{vconst}\n");
-    }
-    let clump = state.clump.str("\t");
-    if !clump.is_empty() {
-        str_write!(b, "{clump}\n");
-    }
-    let stack = state.stack.str(state);
-    if !stack.is_empty() {
-        str_write!(b, "{stack}\n");
-    }
-    let props = state.props.str("\t");
-    if !props.is_empty() {
-        str_write!(b, "{props}");
-    }
-    let heap = state.heap.str("\t");
-    if !heap.is_empty() {
-        str_write!(b, "\n{heap}\n");
-    }
-    str_write!(b, "]]\n");
-    b
 }
 
 impl<'a> State<'a> {
+    //=state_create
+    pub fn new(
+        name: String,
+        block: &'a AstBlock,
+        ret_type: &AstType,
+        abstract_: bool,
+        ext: &'a Externals,
+    ) -> Box<State<'a>> {
+        let mut stack = Stack::new();
+        stack.push(name, block, ret_type, abstract_);
+        Box::new(State {
+            ext,
+            static_memory: StaticMemory::new(),
+            vconst: VConst::new(),
+            clump: Clump::new(),
+            stack,
+            heap: Heap::new(),
+            props: Props::new(),
+        })
+    }
+
+    //=state_create_withprops
+    pub fn with_props(
+        name: String,
+        block: &'a AstBlock,
+        ret_type: &'a AstType,
+        abstract_: bool,
+        ext: &'a Externals,
+        props: Props,
+    ) -> Box<State<'a>> {
+        let mut stack = State::new(name, block, ret_type, abstract_, ext);
+        stack.props = props;
+        stack
+    }
+
+    //=state_copywithname
+    pub fn clone_with_name(&self, func_name: String) -> Box<State<'a>> {
+        let mut copy = Box::new(self.clone());
+        copy.stack = self.stack.clone_with_name(func_name);
+        copy
+    }
+
     pub fn ext(&self) -> &'a Externals {
         self.ext
     }
@@ -109,92 +110,87 @@ impl<'a> State<'a> {
     pub fn props(&mut self) -> &mut Props {
         &mut self.props
     }
-}
 
-pub fn state_pushframe<'a>(
-    state: &mut State<'a>,
-    name: String,
-    b: &'a AstBlock,
-    t: &AstType,
-    abstract_: bool,
-) {
-    state.stack.push(name, b, t, abstract_);
-}
-
-pub fn state_popframe(state: &mut State) {
-    state.stack.pop_frame();
-}
-
-pub fn state_declare(state: &mut State, var: &AstVariable, isparam: bool) {
-    state.stack.declare(var, isparam);
-}
-
-pub fn state_vconst(
-    state: &mut State,
-    t: &AstType,
-    comment: Option<&str>,
-    persist: bool,
-) -> Box<Value> {
-    let v = t.vconst(state, comment.unwrap_or(""), persist);
-    if v.is_struct() {
-        return v;
+    //=state_pushframe
+    pub fn push_frame(&mut self, name: String, b: &'a AstBlock, t: &AstType, abstract_: bool) {
+        self.stack.push(name, b, t, abstract_);
     }
-    let c = state.vconst.declare(v, comment, persist);
-    Value::new_sync(AstExpr::new_identifier(c))
-}
 
-pub fn state_static_init(state: &mut State, lit: &str) -> Box<Value> {
-    if let Some(loc) = state.static_memory.check_pool(lit) {
-        // Note: Original creates a value that points to this existing location. This is a
-        // double-free. When the value is destroyed, the location will be destroyed, even though it
-        // is still in the static pool.
-        return Value::new_ptr(Box::new(loc.clone()));
+    //=state_popframe
+    pub fn pop_frame(&mut self) {
+        self.stack.pop_frame();
     }
-    let address = state.static_memory.new_block();
-    let loc = Location::new_static(address, AstExpr::new_constant(0));
-    let obj = state.get_mut(&loc, true).unwrap().unwrap();
-    obj.assign(Some(Value::new_literal(lit)));
-    state.static_memory.string_pool(lit, &loc);
-    Value::new_ptr(loc)
-}
 
-impl<'a> State<'a> {
+    //=state_declare
+    pub fn declare(&mut self, var: &AstVariable, isparam: bool) {
+        self.stack.declare(var, isparam);
+    }
+
+    //=state_vconst
+    pub fn vconst(&mut self, t: &AstType, comment: Option<&str>, persist: bool) -> Box<Value> {
+        let v = t.vconst(self, comment.unwrap_or(""), persist);
+        if v.is_struct() {
+            return v;
+        }
+        let c = self.vconst.declare(v, comment, persist);
+        Value::new_sync(AstExpr::new_identifier(c))
+    }
+
+    //=state_static_init
+    pub fn static_init(&mut self, lit: &str) -> Box<Value> {
+        if let Some(loc) = self.static_memory.check_pool(lit) {
+            // Note: Original creates a value that points to this existing location. This is a
+            // double-free. When the value is destroyed, the location will be destroyed, even though it
+            // is still in the static pool.
+            return Value::new_ptr(Box::new(loc.clone()));
+        }
+        let address = self.static_memory.new_block();
+        let loc = Location::new_static(address, AstExpr::new_constant(0));
+        let obj = self.get_mut(&loc, true).unwrap().unwrap();
+        obj.assign(Some(Value::new_literal(lit)));
+        self.static_memory.string_pool(lit, &loc);
+        Value::new_ptr(loc)
+    }
+
+    //=state_clump
     pub fn clump(&mut self) -> Box<Value> {
+        // XXX: should type be associated with blocks for type checking when we assign?
         let address = self.clump.new_block();
         let loc = Location::new_dereferencable(address, AstExpr::new_constant(0));
         Value::new_ptr(loc)
     }
-}
 
-pub fn state_islval(state: &mut State, v: &Value) -> bool {
-    if !v.is_location() {
-        return false;
+    //=state_islval
+    pub fn is_lval(&mut self, v: &Value) -> bool {
+        if !v.is_location() {
+            return false;
+        }
+        let loc = v.as_location();
+        self.get_mut(loc, true).unwrap(); // put object there
+        match loc.kind {
+            LocationKind::Static => self.static_memory.has_block(loc.block),
+            LocationKind::VConst => false,
+            LocationKind::Dereferencable => self.clump.get_block_mut(loc.block).is_some(),
+            LocationKind::Automatic { .. } => true,
+            LocationKind::Dynamic => self.heap.get_block_mut(loc.block).is_some(),
+        }
     }
-    let loc = v.as_location();
-    state.get_mut(loc, true).unwrap();
-    match loc.kind {
-        LocationKind::Static => state.static_memory.has_block(loc.block),
-        LocationKind::VConst => false,
-        LocationKind::Dereferencable => state.clump.get_block_mut(loc.block).is_some(),
-        LocationKind::Automatic { .. } => true,
-        LocationKind::Dynamic => state.heap.get_block_mut(loc.block).is_some(),
+
+    //=state_isalloc
+    pub fn is_alloc(&mut self, v: &Value) -> bool {
+        if !v.is_location() {
+            return false;
+        }
+        let loc = v.as_location();
+        self.get_mut(loc, true).unwrap(); // put object there
+        location_toheap(loc, &mut self.heap)
     }
-}
 
-pub fn state_isalloc(state: &mut State, v: &Value) -> bool {
-    if !v.is_location() {
-        return false;
+    //=state_getvconst
+    pub fn get_vconst<'s>(&'s self, id: &str) -> Option<&'s Value> {
+        self.vconst.get(id)
     }
-    let loc = v.as_location();
-    state.get_mut(loc, true).unwrap();
-    location_toheap(loc, &mut state.heap)
-}
 
-pub fn state_getvconst<'s>(state: &'s State, id: &str) -> Option<&'s Value> {
-    state.vconst.get(id)
-}
-
-impl<'a> State<'a> {
     //=state_get (non-mut variation)
     pub fn get<'s>(&'s self, loc: &Location) -> Result<Option<&'s Object>> {
         Ok(self
@@ -343,71 +339,72 @@ impl<'a> State<'a> {
             LocationKind::VConst => panic!(),
         }
     }
-}
 
-pub fn state_getresult<'s>(state: &'s mut State) -> Result<Option<&'s mut Object>> {
-    let result_loc = state.stack.get_result().location().clone();
-    state.get_mut(&result_loc, true)
-}
+    //=state_getresult
+    pub fn result_mut(&mut self) -> Result<Option<&mut Object>> {
+        let result_loc = self.stack.get_result().location().clone();
+        self.get_mut(&result_loc, true)
+    }
 
-fn state_getresulttype<'s>(state: &'s State) -> &'s AstType {
-    state.stack.get_result().type_()
-}
+    //=state_getresulttype
+    fn result_type(&self) -> &AstType {
+        self.stack.get_result().type_()
+    }
 
-impl<'a> State<'a> {
     pub fn identifier_lvalue<'s>(&'s mut self, id: &str) -> Result<LValue<'s>> {
-        let t = SemiBox::Owned(Box::new(state_getobjecttype(self, id).clone()));
-        let obj = state_getobject(self, id)?;
+        let t = SemiBox::Owned(Box::new(self.object_type(id).clone()));
+        let obj = self.get_object(id)?;
         Ok(LValue { t, obj })
     }
-}
 
-pub fn state_getobjecttype<'s>(state: &'s State, id: &str) -> &'s AstType {
-    if id == KEYWORD_RETURN {
-        return state_getresulttype(state);
+    //=state_getobjecttype
+    pub fn object_type<'s>(&'s self, id: &str) -> &'s AstType {
+        if id == KEYWORD_RETURN {
+            return self.result_type();
+        }
+        let v = self.stack.get_variable(id).unwrap();
+        v.type_()
     }
-    let v = state.stack.get_variable(id).unwrap();
-    v.type_()
-}
 
-pub fn state_getloc(state: &mut State, id: &str) -> Box<Value> {
-    // Note: In the original, this apparently borrows the Location representing the variable's
-    // location, but then passes it to value_ptr_create without copying. We copy because I don't
-    // see how this isn't a double free otherwise. (In one caller, `call_setupverify`, the Value is
-    // always leaked, which partially explains it. The other is `address_eval`, which I don't think
-    // is always leaked.)
-    let v = state.stack.get_variable(id).unwrap();
-    Value::new_ptr(location_copy(v.location()))
-}
-
-pub fn state_getobject<'s>(state: &'s mut State, id: &str) -> Result<Option<&'s mut Object>> {
-    if id == KEYWORD_RETURN {
-        return state_getresult(state);
+    //=state_getloc
+    pub fn get_loc(&mut self, id: &str) -> Box<Value> {
+        // Note: In the original, this apparently borrows the Location representing the variable's
+        // location, but then passes it to value_ptr_create without copying. We copy because I don't
+        // see how this isn't a double free otherwise. (In one caller, `call_setupverify`, the Value is
+        // always leaked, which partially explains it. The other is `address_eval`, which I don't think
+        // is always leaked.)
+        let v = self.stack.get_variable(id).unwrap();
+        Value::new_ptr(location_copy(v.location()))
     }
-    let Some(v) = state.stack.get_variable(id) else {
-        return Err(Error::new(format!("unknown variable `{id}'")));
-    };
-    let var_loc = v.location().clone();
-    state.get_mut(&var_loc, true)
-}
 
-pub fn state_deref<'s>(
-    state: &'s mut State,
-    ptr_val: &Value,
-    index: &AstExpr,
-) -> Result<Option<&'s mut Object>> {
-    if ptr_val.is_sync() {
-        return Ok(None);
+    //=state_getobject
+    pub fn get_object<'s>(&'s mut self, id: &str) -> Result<Option<&'s mut Object>> {
+        if id == KEYWORD_RETURN {
+            return self.result_mut();
+        }
+        let Some(v) = self.stack.get_variable(id) else {
+            return Err(Error::new(format!("unknown variable `{id}'")));
+        };
+        let var_loc = v.location().clone();
+        self.get_mut(&var_loc, true)
     }
-    let deref_base = ptr_val.as_location();
-    // Note: the original leaked this location.
-    let deref = deref_base.with_offset(index);
-    state
-        .get_mut(&deref, true)
-        .map_err(|err| Error::new(format!("undefined indirection: {err}")))
-}
 
-impl<'a> State<'a> {
+    //=state_deref
+    pub fn deref<'s>(
+        &'s mut self,
+        ptr_val: &Value,
+        index: &AstExpr,
+    ) -> Result<Option<&'s mut Object>> {
+        if ptr_val.is_sync() {
+            return Ok(None);
+        }
+        let deref_base = ptr_val.as_location();
+        // Note: the original leaked this location.
+        let deref = deref_base.with_offset(index);
+        self.get_mut(&deref, true)
+            .map_err(|err| Error::new(format!("undefined indirection: {err}")))
+    }
+
     //=state_alloc
     pub fn alloc(&mut self) -> Box<Value> {
         Value::new_ptr(self.heap.new_block())
@@ -438,6 +435,7 @@ impl<'a> State<'a> {
     ///
     /// # Panics
     /// If `obj` is an uninitialized variable.
+    //=object_dealloc
     pub fn dealloc_object(&mut self, obj: &Object) -> Result<()> {
         // Note: Original doesn't handle the possibility of Value(None) here.
         match &obj.kind {
@@ -538,61 +536,64 @@ impl<'a> State<'a> {
         b.arr.append(&mut tail);
         Ok(())
     }
-}
 
-impl<'a> State<'a> {
     pub fn loc_is_deallocand(&self, loc: &Location) -> bool {
         let b = self.get_block(loc).unwrap();
         loc.type_is_dynamic() && b.is_some()
     }
-}
 
-pub fn state_hasgarbage(state: &State) -> bool {
-    !state.heap.referenced(state)
-}
-
-pub fn state_references(s: &State, loc: &Location) -> bool {
-    s.stack.references(loc, s)
-}
-
-pub fn state_eval(s: &State, e: &AstExpr) -> bool {
-    s.vconst.eval(e)
-}
-
-pub fn state_equal(s1: &State, s2: &State) -> bool {
-    let mut s1_c = state_copy(s1);
-    let mut s2_c = state_copy(s2);
-    state_undeclareliterals(&mut s1_c);
-    state_undeclareliterals(&mut s2_c);
-    state_undeclarevars(&mut s1_c);
-    state_undeclarevars(&mut s2_c);
-    state_popprops(&mut s1_c);
-    state_popprops(&mut s2_c);
-    let str1 = state_str(&s1_c);
-    let str2 = state_str(&s2_c);
-    let equal = str1 == str2;
-    if !equal {
-        vprint!("abstract: {str2}");
-        vprint!("actual: {str1}");
+    //=state_hasgarbage
+    pub fn has_garbage(&self) -> bool {
+        !self.heap.referenced(self)
     }
-    equal
-}
 
-fn state_undeclareliterals(s: &mut State) {
-    s.static_memory = StaticMemory::new();
-}
+    //=state_references
+    pub fn references(&self, loc: &Location) -> bool {
+        self.stack.references(loc, self)
+    }
 
-fn state_undeclarevars(s: &mut State) {
-    Heap::undeclare(s);
-    s.vconst.undeclare();
-    Stack::undeclare(s);
-}
+    //=state_eval
+    pub fn eval(&self, e: &AstExpr) -> bool {
+        self.vconst.eval(e)
+    }
 
-fn state_popprops(s: &mut State) {
-    s.props = Props::new();
-}
+    //=state_equal
+    pub fn equals(&self, s2: &State) -> bool {
+        let mut s1_c = self.clone();
+        let mut s2_c = s2.clone();
+        s1_c.undeclare_literals();
+        s2_c.undeclare_literals();
+        s1_c.undeclare_vars();
+        s2_c.undeclare_vars();
+        s1_c.pop_props();
+        s2_c.pop_props();
+        let str1 = format!("{s1_c}");
+        let str2 = format!("{s2_c}");
+        let equal = str1 == str2;
+        if !equal {
+            vprint!("abstract: {str2}");
+            vprint!("actual: {str1}");
+        }
+        equal
+    }
 
-impl<'a> State<'a> {
+    //=state_undeclareliterals
+    fn undeclare_literals(&mut self) {
+        self.static_memory = StaticMemory::new();
+    }
+
+    //=state_undeclarevars
+    fn undeclare_vars(&mut self) {
+        Heap::undeclare(self);
+        self.vconst.undeclare();
+        Stack::undeclare(self);
+    }
+
+    //=state_popprops
+    fn pop_props(&mut self) {
+        self.props = Props::new();
+    }
+
     //=state_atend
     pub fn at_end(&self) -> bool {
         self.stack.at_end()

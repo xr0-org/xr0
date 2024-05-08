@@ -3,7 +3,6 @@ use std::fmt::{self, Display, Formatter};
 use super::State;
 use crate::ast::ast_expr_copy;
 use crate::object::Range;
-use crate::state::state::state_eval;
 use crate::util::Result;
 use crate::{AstExpr, Location, Object};
 
@@ -120,7 +119,7 @@ impl Block {
         // here to avoid double-freeing the inner ones.
         let same_lw = AstExpr::new_eq(ast_expr_copy(lw), ast_expr_copy(&obj.offset));
         let same_up = AstExpr::new_eq(ast_expr_copy(up), obj.end());
-        state_eval(s, &same_lw) && state_eval(s, &same_up)
+        s.eval(&same_lw) && s.eval(&same_up)
     }
 }
 

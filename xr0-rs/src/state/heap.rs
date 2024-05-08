@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, HashMap};
 
 use super::{Block, State};
 use crate::ast::ast_expr_matheval;
-use crate::state::state::state_references;
 use crate::util::{Error, Result};
 use crate::{str_write, AstExpr, Location, Value};
 
@@ -135,7 +134,7 @@ impl Heap {
 
 fn block_referenced(s: &State, addr: usize) -> bool {
     let loc = Location::new_dynamic(addr, AstExpr::new_constant(0));
-    state_references(s, &loc)
+    s.references(&loc)
 }
 
 impl VConst {

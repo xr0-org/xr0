@@ -3,7 +3,6 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ast_expr_copy, ast_expr_equal};
 use crate::state::location::{location_references, location_referencesheap};
-use crate::state::state::state_vconst;
 use crate::state::State;
 use crate::util::SemiBox;
 use crate::{AstExpr, AstType, AstVariable, Location, Object};
@@ -201,7 +200,7 @@ impl Value {
 
             let obj = sv.m.get_mut(field).unwrap();
             let comment = format!("{comment}.{field}");
-            obj.assign(Some(state_vconst(s, &var.type_, Some(&comment), persist)));
+            obj.assign(Some(s.vconst(&var.type_, Some(&comment), persist)));
         }
         v
     }
@@ -229,8 +228,7 @@ impl Value {
                     None
                 } else {
                     // Note: Original leaked this type.
-                    Some(SemiBox::Owned(state_vconst(
-                        &mut *compare,
+                    Some(SemiBox::Owned(compare.vconst(
                         &AstType::new_voidptr(),
                         None,
                         false,

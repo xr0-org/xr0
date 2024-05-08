@@ -6,7 +6,6 @@ use crate::object::Object;
 use crate::state::location::{
     location_auto_get_block_id, location_auto_parts, location_references,
 };
-use crate::state::state::state_declare;
 use crate::util::{InsertionOrderMap, Result};
 use crate::{str_write, AstType, AstVariable, Location};
 
@@ -368,7 +367,7 @@ impl<'a> ProgramCounter<'a> {
         match pc.s {
             ProgramCounterState::Decls => {
                 let decl = &pc.b.decls[pc.index];
-                state_declare(s, decl, false);
+                s.declare(decl, false);
                 s.stack.frames.last_mut().unwrap().pc.next_decl();
                 Ok(())
             }
