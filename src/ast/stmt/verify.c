@@ -707,8 +707,8 @@ sel_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *set
 			*nest = ast_stmt_sel_nest(stmt);
 	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
-		printf("dec error %s\n", error_str(dec.err));
-		/* XXX: if error must be decidable in some other branch */
+		v_printf("setup branch decision error: %s\n", error_str(dec.err));
+		/* XXX: if error is `undecidable', must be decidable in some other branch */
 		return NULL;
 	}
 	if (dec.decision) {
