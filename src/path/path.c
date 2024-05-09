@@ -461,7 +461,7 @@ static struct error *
 path_step_abstract(struct path *p, bool print)
 {
 	if (print) {
-		d_printf("mode:%d\n", state_execmode(p->abstract));
+		d_printf("mode:%s\n", state_execmode_str(state_execmode(p->abstract)));
 		d_printf("text:\n%s\n", state_programtext(p->abstract));
 		d_printf("%s\n", state_str(p->abstract));
 	}
@@ -486,7 +486,7 @@ static struct error *
 path_step_actual(struct path *p, bool print)
 {
 	if (print) {
-		d_printf("mode:%d\n", state_execmode(p->actual));
+		d_printf("mode:%s\n", state_execmode_str(state_execmode(p->actual)));
 		d_printf("text:\n%s\n", state_programtext(p->actual));
 		d_printf("actual: %s\n", state_str(p->actual));
 	}

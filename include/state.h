@@ -128,6 +128,9 @@ state_range_dealloc(struct state *, struct object *,
 bool
 state_islinear(struct state *);
 
+char *
+state_execmode_str(enum execution_mode);
+
 enum execution_mode
 state_execmode(struct state *);
 

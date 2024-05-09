@@ -94,50 +94,39 @@ char *
 state_str(struct state *state)
 {
 	struct strbuilder *b = strbuilder_create();
-	char *ext = externals_types_str(state->ext, "\t");
-	if (strlen(ext) > 0) {
-		strbuilder_printf(b, "%s\n", ext);
+	char *context = externals_types_str(state->ext, "\t");
+	if (strlen(context) > 0) {
+		strbuilder_printf(b, "context:\n%s\n", context);
 	}
-	free(ext);
-	strbuilder_printf(
-		b,
-		"context:\n\t{<type> := {%s}}\n\n",
-		state->reg ? value_str(state->reg) : "empty"
-	);
+	free(context);
 	char *static_mem = static_memory_str(state->static_memory, "\t");
 	if (strlen(static_mem) > 0) {
-		strbuilder_printf(b, "static_memory:\n");
-		strbuilder_printf(b, "%s\n", static_mem);
+		strbuilder_printf(b, "static:\n%s\n", static_mem);
 	}
 	free(static_mem);
 	char *vconst = vconst_str(state->vconst, "\t");
 	if (strlen(vconst) > 0) {
-		strbuilder_printf(b, "rconst:\n");
-		strbuilder_printf(b, "%s\n", vconst);
+		strbuilder_printf(b, "rconst:\n%s\n", vconst);
 	}
 	free(vconst);
+	char *props = props_str(state->props, "\t");
+	if (strlen(props) > 0) {
+		strbuilder_printf(b, "assume:\n%s\n", props);
+	}
+	free(props);
 	char *clump = clump_str(state->clump, "\t");
 	if (strlen(clump) > 0) {
-		strbuilder_printf(b, "clump:\n");
-		strbuilder_printf(b, "%s\n", clump);
+		strbuilder_printf(b, "clump:\n%s\n", clump);
 	}
 	free(clump);
 	char *stack = stack_str(state->stack, state);
 	if (strlen(stack) > 0) {
-		strbuilder_printf(b, "stack:\n");
-		strbuilder_printf(b, "%s\n", stack);
+		strbuilder_printf(b, "stack:\n%s\n", stack);
 	}
-	free(stack);
-	char *props = props_str(state->props, "\t");
-	if (strlen(props) > 0) {
-		strbuilder_printf(b, "propositions:\n");
-		strbuilder_printf(b, "%s", props);
-	}
-	free(props);
+	free(stack);	
 	char *heap = heap_str(state->heap, "\t");
 	if (strlen(heap) > 0) {
-		strbuilder_printf(b, "heap:\n");
-		strbuilder_printf(b, "\n%s\n", heap);
+		strbuilder_printf(b, "heap:\n%s\n", heap);
 	}
 	free(heap);
 	return strbuilder_build(b);
@@ -147,6 +136,28 @@ bool
 state_islinear(struct state *s)
 {
 	return stack_islinear(s->stack);
+}
+
+char *
+state_execmode_str(enum execution_mode m)
+{
+	char *execmode_type_str[] = {
+		[EXEC_ABSTRACT] 		= "ABSTRACT",
+		[EXEC_ABSTRACT_NO_SETUP] 	= "INTERNAL",
+		[EXEC_SETUP]			= "INTERNAL",
+		[EXEC_ACTUAL]			= "ACTUAL",
+		[EXEC_VERIFY]			= "VERIFY",
+	};
+	switch (m) {
+	case EXEC_ABSTRACT:
+	case EXEC_ABSTRACT_NO_SETUP:
+	case EXEC_SETUP:
+	case EXEC_ACTUAL:
+	case EXEC_VERIFY:
+		return dynamic_str(execmode_type_str[m]);
+	default:
+		assert(false);
+	}
 }
 
 enum execution_mode
