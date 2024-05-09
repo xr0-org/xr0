@@ -48,7 +48,6 @@ externals_types_str(struct externals *ext, char *indent)
 		free(type);
 	}
 
-
 	return strbuilder_build(b);
 }
 
