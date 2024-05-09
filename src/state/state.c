@@ -101,7 +101,7 @@ state_str(struct state *state)
 	free(ext);
 	strbuilder_printf(
 		b,
-		"context:\n{<type> := {%s}}\n\n",
+		"context:\n\t{<type> := {%s}}\n\n",
 		state->reg ? value_str(state->reg) : "empty"
 	);
 	char *static_mem = static_memory_str(state->static_memory, "\t");
@@ -112,7 +112,7 @@ state_str(struct state *state)
 	free(static_mem);
 	char *vconst = vconst_str(state->vconst, "\t");
 	if (strlen(vconst) > 0) {
-		strbuilder_printf(b, "runtime_constants:\n");
+		strbuilder_printf(b, "rconst:\n");
 		strbuilder_printf(b, "%s\n", vconst);
 	}
 	free(vconst);
