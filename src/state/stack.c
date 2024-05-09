@@ -650,15 +650,11 @@ char *
 variable_str(struct variable *var, struct stack *stack, struct state *state)
 {
 	assert(location_type(var->loc) != LOCATION_VCONST);
-
 	struct strbuilder *b = strbuilder_create();
 	char *type = ast_type_str(var->type);
-	char *loc = location_str(var->loc);
-	char *isparam = var->isparam ? "param " : "";
 	char *obj_str = object_or_nothing_str(var->loc, stack, state);
-	strbuilder_printf(b, "{%s%s := %s} @ %s", isparam, type, obj_str, loc);
+	strbuilder_printf(b, "{%s := %s}", type, obj_str);
 	free(obj_str);
-	free(loc);
 	free(type);
 	return strbuilder_build(b);
 }
