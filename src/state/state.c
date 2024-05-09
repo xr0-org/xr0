@@ -94,7 +94,6 @@ char *
 state_str(struct state *state)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "[[\n");
 	char *ext = externals_types_str(state->ext, "\t");
 	if (strlen(ext) > 0) {
 		strbuilder_printf(b, "%s\n", ext);
@@ -102,40 +101,45 @@ state_str(struct state *state)
 	free(ext);
 	strbuilder_printf(
 		b,
-		"\treturn: {<type> := {%s}}\n\n",
+		"context:\n{<type> := {%s}}\n\n",
 		state->reg ? value_str(state->reg) : "empty"
 	);
 	char *static_mem = static_memory_str(state->static_memory, "\t");
 	if (strlen(static_mem) > 0) {
+		strbuilder_printf(b, "static_memory:\n");
 		strbuilder_printf(b, "%s\n", static_mem);
 	}
 	free(static_mem);
 	char *vconst = vconst_str(state->vconst, "\t");
 	if (strlen(vconst) > 0) {
+		strbuilder_printf(b, "runtime_constants:\n");
 		strbuilder_printf(b, "%s\n", vconst);
 	}
 	free(vconst);
 	char *clump = clump_str(state->clump, "\t");
 	if (strlen(clump) > 0) {
+		strbuilder_printf(b, "clump:\n");
 		strbuilder_printf(b, "%s\n", clump);
 	}
 	free(clump);
 	char *stack = stack_str(state->stack, state);
 	if (strlen(stack) > 0) {
+		strbuilder_printf(b, "stack:\n");
 		strbuilder_printf(b, "%s\n", stack);
 	}
 	free(stack);
 	char *props = props_str(state->props, "\t");
 	if (strlen(props) > 0) {
+		strbuilder_printf(b, "propositions:\n");
 		strbuilder_printf(b, "%s", props);
 	}
 	free(props);
 	char *heap = heap_str(state->heap, "\t");
 	if (strlen(heap) > 0) {
+		strbuilder_printf(b, "heap:\n");
 		strbuilder_printf(b, "\n%s\n", heap);
 	}
 	free(heap);
-	strbuilder_printf(b, "]]\n");
 	return strbuilder_build(b);
 }
 
