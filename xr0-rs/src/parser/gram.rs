@@ -279,16 +279,7 @@ pub grammar c_parser(env: &Env) for str {
         }
 
     rule storage_class_specifier() -> AstTypeModifiers =
-        K(<"typedef">) {
-            // XXX TODO
-        /* XXX: typedef is not modelled as a modifier, so our only
-         * concern is to prepare the lexer to return the next string it
-         * sees as a TYPE_NAME, so that in the type_specifier beneath
-         * the fact that this is a typedef will be captured */
-            //env.installclass = IC_TYPE;
-            // XXX probably handle this in the enclosing rule instead
-            MOD_TYPEDEF
-        } /
+        K(<"typedef">) { MOD_TYPEDEF } /
         K(<"extern">) { MOD_EXTERN } /
         K(<"static">) { MOD_STATIC } /
         K(<"auto">) { MOD_AUTO } /
