@@ -27,6 +27,8 @@ MATH_DIR = $(SRC_0V_DIR)/math
 # executable
 XR0V = $(BIN_DIR)/0v
 
+XR0V_RUST = xr0-rs/target/debug/0v
+
 # build artifacts
 MAIN_0V_OBJ = $(BUILD_DIR)/0v.o
 
@@ -207,14 +209,37 @@ RUNTEST = $(TESTDIR)/run
 TESTFILES = $(shell find $(TESTDIR) -name '*.0')
 
 test: $(RUNTEST) $(TESTFILES) $(XR0V) 
-	@./tests/run
+	XR0=$(XR0V) ./tests/run
 
-check: $(RUNTEST) $(TESTFILES) $(XR0V)
+.PHONY: check
+check: $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
-check-verbose: $(RUNTEST) $(TESTFILES) $(XR0V)
+.PHONY: check-verbose
+check-verbose: $(XR0V)
 	$(VALGRIND) --num-callers=30 \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
+.PHONY: rust
+rust: test-rust fmt clippy
+
+.PHONY: $(XR0V_RUST)
+$(XR0V_RUST):
+	(cd xr0-rs && cargo build)
+
+.PHONY: test-rust
+test-rust: $(XR0V_RUST)
+	XR0=$(XR0V_RUST) ./tests/run
+
+.PHONY: fmt
+fmt:
+	(cd xr0-rs && cargo fmt)
+
+.PHONY: clippy
+clippy:
+	(cd xr0-rs && cargo clippy)
+
+.PHONY: clean
 clean:
+	@(cd xr0-rs && cargo clean)
 	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(OBJECTS) $(XR0_OBJECTS)
