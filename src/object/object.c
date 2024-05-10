@@ -468,7 +468,7 @@ getorcreatestruct(struct object *obj, struct ast_type *t, struct state *s)
 		return v;
 	}
 	struct ast_type *complete = ast_type_struct_complete(t, state_getext(s));
-	assert(complete);
+	a_printf(complete, "%s is incomplete\n", ast_type_str(t));
 	v = value_struct_create(complete);
 	object_assign(obj, v);
 	return v;

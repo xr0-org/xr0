@@ -108,6 +108,9 @@ d_printf(char *fmt, ...);
 int
 v_printf(char *fmt, ...);
 
+/* a_printf: assert and print as appropriate if there is an error. */
+#define a_printf(expr, ...) if (!expr) { fprintf(stderr, __VA_ARGS__); assert(false); }
+
 struct error;
 
 struct error *
