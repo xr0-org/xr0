@@ -25,4 +25,7 @@ path_step(struct path *);
 struct error *
 path_next(struct path *);
 
+char *
+path_str(struct path *);
+
 #endif

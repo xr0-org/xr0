@@ -64,8 +64,7 @@ program_destroy(struct program *p)
 	free(p);
 }
 
-struct program *
-program_copy(struct program *old)
+struct program * program_copy(struct program *old)
 {
 	struct program *new = program_create(old->b);
 	new->s = old->s;
@@ -155,10 +154,10 @@ program_stmt_atend(struct program *p, struct state *s)
 }
 
 static struct error *
-program_stmt_step(struct program *, enum execution_mode, struct state *);
+program_stmt_step(struct program *, struct state *);
 
 struct error *
-program_exec(struct program *p, enum execution_mode mode, struct state *s)
+program_step(struct program *p, struct state *s)
 {
 	switch (p->s) {
 	case PROGRAM_COUNTER_DECLS:
@@ -166,7 +165,7 @@ program_exec(struct program *p, enum execution_mode mode, struct state *s)
 		program_nextdecl(p);
 		return NULL;
 	case PROGRAM_COUNTER_STMTS:
-		return program_stmt_step(p, mode, s);
+		return program_stmt_step(p, s);
 	case PROGRAM_COUNTER_ATEND:
 		state_popframe(s);
 		return NULL;
@@ -176,12 +175,12 @@ program_exec(struct program *p, enum execution_mode mode, struct state *s)
 }
 
 static struct error *
-program_stmt_process(struct program *p, enum execution_mode mode, struct state *s);
+program_stmt_process(struct program *p, struct state *s);
 
 static struct error *
-program_stmt_step(struct program *p, enum execution_mode mode, struct state *s)
+program_stmt_step(struct program *p, struct state *s)
 {
-	struct error *err = program_stmt_process(p, mode, s);
+	struct error *err = program_stmt_process(p, s);
 	if (!err) {
 		program_nextstmt(p, s);
 		return NULL;
@@ -195,13 +194,13 @@ program_stmt_step(struct program *p, enum execution_mode mode, struct state *s)
 }
 
 static struct error *
-program_stmt_process(struct program *p, enum execution_mode mode, struct state *s)
+program_stmt_process(struct program *p, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	if (!state_islinear(s) && ast_stmt_linearisable(stmt)) {
-		return ast_stmt_linearise(stmt, s, mode);
+		return ast_stmt_linearise(stmt, s);
 	}
-	switch (mode) {
+	switch (state_execmode(s)) {
 	case EXEC_ABSTRACT:
 		return ast_stmt_absprocess(stmt, s);
 	case EXEC_ABSTRACT_NO_SETUP:
@@ -214,6 +213,37 @@ program_stmt_process(struct program *p, enum execution_mode mode, struct state *
 	default:
 		assert(false);
 	}
+}
+
+static struct error *
+program_stmt_next(struct program *, struct state *);
+
+struct error *
+program_next(struct program *p, struct state *s)
+{
+	switch (p->s) {
+	case PROGRAM_COUNTER_STMTS:
+		return program_stmt_next(p, s);
+	case PROGRAM_COUNTER_ATEND:
+		return program_step(p, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+program_stmt_next(struct program *p, struct state *s)
+{
+	int og_frame = state_frameid(s);
+	do {
+		struct error *err = state_step(s);			
+		if (err) {
+			return err;
+		}
+	} while (state_frameid(s) != og_frame);
+
+
+	return NULL;
 }
 
 char *

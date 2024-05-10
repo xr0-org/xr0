@@ -710,8 +710,13 @@ object_arr_remove(struct object_arr *arr, int index)
 	for (int i = index; i < arr->n-1; i++) {
 		arr->object[i] = arr->object[i+1];
 	}
-	arr->object = realloc(arr->object, sizeof(struct alloc *) * --arr->n);
-	assert(arr->object || !arr->n);
+	if (arr->n == 1) {
+		--arr->n;
+		free(arr->object[0]);
+	} else {
+		arr->object = realloc(arr->object, sizeof(struct object *) * --arr->n);
+		assert(arr->object || !arr->n);
+	}
 }
 
 int

@@ -458,7 +458,7 @@ ast_stmt_as_expr(struct ast_stmt *);
 enum execution_mode;
 
 struct error *
-ast_stmt_linearise(struct ast_stmt *, struct state *, enum execution_mode);
+ast_stmt_linearise(struct ast_stmt *, struct state *);
 
 bool
 ast_stmt_linearisable(struct ast_stmt *);

@@ -289,19 +289,7 @@ path_continue(struct path *, enum path_state og_state, int og_frame,
 static struct error *
 path_next_abstract(struct path *p)
 {
-	struct error *err;
-
-	int og_frame = state_frameid(p->abstract);
-	int og_index = state_programindex(p->abstract);
-	if ((err = path_step(p))) {
-		return err;
-	}
-	while (path_continue(p, PATH_STATE_ABSTRACT, og_frame, og_index)) {
-		if ((err = path_step_abstract(p, false))) {
-			return err;
-		}
-	}
-	return NULL;
+	return state_next(p->abstract);
 }
 
 static struct error *
@@ -389,19 +377,7 @@ path_insamestmt(struct path *p, enum path_state og_state, int og_frame, int og_i
 static struct error *
 path_next_actual(struct path *p)
 {
-	struct error *err;
-
-	int og_frame = state_frameid(p->actual);
-	int og_index = state_programindex(p->actual);
-	if ((err = path_step(p))) {
-		return err;
-	}
-	while (path_continue(p, PATH_STATE_ACTUAL, og_frame, og_index)) {
-		if ((err = path_step_actual(p, false))) {
-			return err;
-		}
-	}
-	return NULL;
+	return state_next(p->actual);	
 }
 
 static struct error *
@@ -409,7 +385,6 @@ path_init_abstract(struct path *p)
 {
 	struct error *err;
 
-	d_printf("init abstract state\n");
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
@@ -431,7 +406,6 @@ static struct error *
 path_init_actual(struct path *p)
 {
 	struct error *err;
-	d_printf("init actual state\n");
 	/* if body empty just apply setup */
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
@@ -459,12 +433,7 @@ path_init_actual(struct path *p)
 
 static struct error *
 path_step_abstract(struct path *p, bool print)
-{
-	if (print) {
-		d_printf("mode:%s\n", state_execmode_str(state_execmode(p->abstract)));
-		d_printf("text:\n%s\n", state_programtext(p->abstract));
-		d_printf("%s\n", state_str(p->abstract));
-	}
+{	
 	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
 		return path_step(p);
@@ -484,12 +453,7 @@ path_step_abstract(struct path *p, bool print)
 
 static struct error *
 path_step_actual(struct path *p, bool print)
-{
-	if (print) {
-		d_printf("mode:%s\n", state_execmode_str(state_execmode(p->actual)));
-		d_printf("text:\n%s\n", state_programtext(p->actual));
-		d_printf("actual: %s\n", state_str(p->actual));
-	}
+{	
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
 		return path_step(p);
@@ -510,9 +474,8 @@ path_step_actual(struct path *p, bool print)
 static struct error *
 path_audit(struct path *p)
 {
-	d_printf("audit\n");
 	if (state_hasgarbage(p->actual)) {
-		d_printf("actual: %s", state_str(p->actual));
+		v_printf("actual: %s", state_str(p->actual));
 		return error_printf(
 			"%s: garbage on heap", ast_function_name(p->f)
 		);
@@ -555,4 +518,56 @@ branch_step(struct path *parent, struct path *branch)
 		return NULL;
 	}
 	return path_step(branch);
+}
+
+char *
+path_abstract_str(struct path *);
+
+char *
+path_actual_str(struct path *);
+
+char *
+path_str(struct path *p)
+{
+	switch (p->path_state) {
+	case PATH_STATE_UNINIT:
+		return dynamic_str("init abstract state");
+	case PATH_STATE_ABSTRACT:
+		return path_abstract_str(p);
+	case PATH_STATE_HALFWAY:
+		return dynamic_str("init actual state");
+	case PATH_STATE_ACTUAL:
+		return path_actual_str(p);
+	case PATH_STATE_AUDIT:
+		return dynamic_str("audit");
+	case PATH_STATE_SPLIT:
+		return dynamic_str("split");
+	case PATH_STATE_ATEND:
+	default:
+		assert(false);
+	}
+}
+
+char *
+path_abstract_str(struct path *p)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(
+		b, "mode: %s\n", state_execmode_str(state_execmode(p->abstract))
+	);
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->abstract));
+	strbuilder_printf(b, "%s\n", state_str(p->abstract));
+	return strbuilder_build(b);
+}
+
+char *
+path_actual_str(struct path *p)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(
+		b, "mode: %s\n", state_execmode_str(state_execmode(p->actual))
+	);
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
+	strbuilder_printf(b, "%s\n", state_str(p->actual));
+	return strbuilder_build(b);
 }

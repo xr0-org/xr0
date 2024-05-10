@@ -316,7 +316,13 @@ stack_atend(struct stack *s)
 struct error *
 stack_step(struct stack *s, struct state *state)
 {
-	return program_exec(s->p, s->mode, state);
+	return program_step(s->p, state);
+}
+
+struct error *
+stack_next(struct stack *s, struct state *state)
+{
+	return program_next(s->p, state);
 }
 
 void

@@ -29,8 +29,7 @@ ast_stmt_linearise_proper(struct ast_stmt *, struct ast_block *, struct lexemema
 		struct state *);
 
 struct error *
-ast_stmt_linearise(struct ast_stmt *stmt, struct state *state,
-		enum execution_mode mode)
+ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 {
 	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
 	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
@@ -41,7 +40,7 @@ ast_stmt_linearise(struct ast_stmt *stmt, struct state *state,
 		return err;
 	}
 	struct frame *inter_frame = frame_intermediate_create(
-		dynamic_str("inter"), b, mode
+		dynamic_str("inter"), b, state_execmode(state)
 	);
 	state_pushframe(state, inter_frame);
 	return NULL;
@@ -707,7 +706,7 @@ sel_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *set
 			*nest = ast_stmt_sel_nest(stmt);
 	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
-		v_printf("setup branch decision error: %s\n", error_str(dec.err));
+		// v_printf("setup branch decision error: %s\n", error_str(dec.err));
 		/* XXX: if error is `undecidable', must be decidable in some other branch */
 		return NULL;
 	}

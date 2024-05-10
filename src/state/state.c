@@ -178,6 +178,12 @@ state_step(struct state *s)
 	return stack_step(s->stack, s);
 }
 
+struct error *
+state_next(struct state *s)
+{
+	return stack_next(s->stack, s);
+}
+
 struct externals *
 state_getext(struct state *s)
 {

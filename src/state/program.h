@@ -36,7 +36,10 @@ program_prevcall(struct program *);
 enum execution_mode;
 
 struct error *
-program_exec(struct program *, enum execution_mode, struct state *);
+program_step(struct program *, struct state *);
+
+struct error *
+program_next(struct program *, struct state *);
 
 char *
 program_loc(struct program *);

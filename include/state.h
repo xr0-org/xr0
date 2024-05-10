@@ -66,6 +66,9 @@ state_atend(struct state *);
 struct error *
 state_step(struct state *);
 
+struct error *
+state_next(struct state *);
+
 struct externals *
 state_getext(struct state *);
 
