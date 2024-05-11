@@ -120,7 +120,18 @@ ast_stmt_to_block(struct ast_stmt *stmt)
 	return b;
 }
 
-
+struct ast_stmt *
+ast_stmt_as_compound(struct ast_stmt *stmt)
+{
+	if (stmt->kind == STMT_COMPOUND) {
+		return stmt;
+	}
+	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	ast_block_append_stmt(b, stmt);
+	return ast_stmt_create_compound(
+		lexememarker_copy(ast_stmt_lexememarker(stmt)), b
+	);
+}
 
 bool
 ast_stmt_ispre(struct ast_stmt *stmt)

@@ -393,6 +393,9 @@ ast_stmt_create_iter_e(struct ast_stmt *iter_stmt);
 struct ast_stmt *
 ast_stmt_create_compound(struct lexememarker *, struct ast_block *);
 
+struct ast_stmt *
+ast_stmt_as_compound(struct ast_stmt *);
+
 struct ast_block *
 ast_stmt_as_block(struct ast_stmt *);
 

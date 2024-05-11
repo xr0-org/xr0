@@ -743,9 +743,11 @@ expression_statement
 
 selection_statement
 	: IF '(' expression ')' statement
-		{ $$ = ast_stmt_create_sel(lexloc(), false, $3, $5, NULL); }
+		{ $$ = ast_stmt_create_sel(lexloc(), false, $3, ast_stmt_as_compound($5), NULL); }
 	| IF '(' expression ')' statement ELSE statement
-		{ $$ = ast_stmt_create_sel(lexloc(), false, $3, $5, $7); }
+		{ $$ = ast_stmt_create_sel(
+			lexloc(), false, $3, ast_stmt_as_compound($5), ast_stmt_as_compound($7)
+		); }
 	| SWITCH '(' expression ')' statement
 		{ assert(false); }
 	;
