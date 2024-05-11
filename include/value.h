@@ -46,6 +46,9 @@ int
 value_int_up(struct value *);
 
 struct value *
+value_bang(struct value *);
+
+struct value *
 value_sync_create(struct ast_expr *);
 
 struct value *

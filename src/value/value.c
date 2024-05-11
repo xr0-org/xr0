@@ -146,6 +146,20 @@ value_int_ne_create(int not_val)
 	return v;
 }
 
+static struct value *
+value_sync_bang(struct value *);
+
+struct value *
+value_bang(struct value *v)
+{
+	switch (v->type) {
+	case VALUE_SYNC:
+		return value_sync_bang(v);
+	default:
+		assert(false);
+	}
+}
+
 struct number *
 number_with_range_create(int lw, int excl_up);
 
@@ -202,6 +216,19 @@ value_sync_create(struct ast_expr *e)
 	assert(v);
 	v->type = VALUE_SYNC;
 	v->n = number_computed_create(e);
+	return v;
+}
+
+static struct number *
+number_computed_bang(struct number *);
+
+static struct value *
+value_sync_bang(struct value *orig)
+{
+	struct value *v = malloc(sizeof(struct value));
+	assert(v);
+	v->type = VALUE_SYNC;
+	v->n = number_computed_bang(orig->n);
 	return v;
 }
 
@@ -825,6 +852,16 @@ number_computed_create(struct ast_expr *e)
 	num->computation = e;
 	return num;
 }
+
+static struct number *
+number_computed_bang(struct number *orig)
+{
+	struct number *num = calloc(1, sizeof(struct number));
+	num->type = NUMBER_COMPUTED;
+	num->computation = ast_expr_inverted_copy(orig->computation, true);
+	return num;
+}
+
 
 struct number_value *
 number_value_min_create();
