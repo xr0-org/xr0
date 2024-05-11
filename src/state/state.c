@@ -104,6 +104,11 @@ state_str(struct state *state)
 		strbuilder_printf(b, "static:\n%s\n", static_mem);
 	}
 	free(static_mem);
+	if (state->reg) {
+		char *ret = value_str(state->reg);
+		strbuilder_printf(b, "return: <%s>\n\n", ret);
+		free(ret);
+	}
 	char *vconst = vconst_str(state->vconst, "\t");
 	if (strlen(vconst) > 0) {
 		strbuilder_printf(b, "rconst:\n%s\n", vconst);
@@ -673,8 +678,8 @@ state_equal(struct state *s1, struct state *s2)
 	     *str2 = state_str(s2_c);
 	bool equal = strcmp(str1, str2) == 0;
 	if (!equal) {
-		v_printf("abstract: %s", str2);
-		v_printf("actual: %s", str1);
+		v_printf("abstract:\n%s\n", str2);
+		v_printf("actual:\n%s\n", str1);
 	}
 	free(str2);
 	free(str1);
