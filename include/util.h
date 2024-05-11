@@ -39,10 +39,7 @@ map_set(struct map *, const char *key, const void *value);
 
 /* XXX: string_arr: to be macro */
 
-struct string_arr {
-	int n;
-	char **s;
-};
+struct string_arr;
 
 struct string_arr *
 string_arr_create();
@@ -71,6 +68,25 @@ string_arr_contains(struct string_arr *, char *s);
 char *
 string_arr_str(struct string_arr *);
 
+struct int_arr;
+
+struct int_arr *
+int_arr_create();
+
+void
+int_arr_destroy();
+
+int *
+int_arr_arr(struct int_arr *);
+
+int
+int_arr_len(struct int_arr *);
+
+void
+int_arr_append(struct int_arr *, int);
+
+void
+int_arr_appendrange(struct int_arr *arr, struct int_arr *arr2);
 
 struct strbuilder;
 

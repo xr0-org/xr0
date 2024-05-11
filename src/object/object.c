@@ -9,28 +9,33 @@
 #include "util.h"
 #include "value.h"
 
-struct range *
+static struct range *
 range_copy(struct range *);
 
-void
+static void
 range_destroy(struct range *);
 
-char *
+static char *
 range_str(struct range *);
 
-struct ast_expr *
+static struct ast_expr *
 range_size(struct range *);
 
-struct error *
+static struct error *
 range_dealloc(struct range *r, struct state *s);
 
-bool
+static bool
 range_isdeallocand(struct range *, struct state *);
 
-bool
+static bool
 range_references(struct range *, struct location *, struct state *,
 		struct circuitbreaker *cb);
 
+static struct range * 
+range_permuteheaplocs(struct range *, struct permutation *);
+
+static struct int_arr *
+range_deriveorder(struct range *, struct circuitbreaker *, struct state *);
 
 struct object {
 	enum object_type {
@@ -64,6 +69,42 @@ object_range_create(struct ast_expr *offset, struct range *r)
 	obj->range = r;
 	obj->type = OBJECT_DEALLOCAND_RANGE;
 	return obj;
+}
+
+struct int_arr *
+object_deriveorder(struct object *obj, struct circuitbreaker *cb, struct state *s)
+{
+	switch (obj->type) {
+	case OBJECT_VALUE:
+		return obj->value
+			? value_deriveorder(obj->value, cb, s)
+			: int_arr_create();
+	case OBJECT_DEALLOCAND_RANGE:
+		return range_deriveorder(obj->range, cb, s);
+	default:
+		assert(false);
+	}
+}
+
+struct object *
+object_permuteheaplocs(struct object *old, struct permutation *p)
+{
+	struct object *new = malloc(sizeof(struct object));
+	new->offset = ast_expr_copy(old->offset);
+	new->type = old->type;
+	switch (old->type) {
+	case OBJECT_VALUE:
+		new->value = old->value
+			? value_permuteheaplocs(old->value, p)
+			: NULL;
+		break;
+	case OBJECT_DEALLOCAND_RANGE:
+		new->range = range_permuteheaplocs(old->range, p);
+		break;
+	default:
+		assert(false);
+	}
+	return new;
 }
 
 void
@@ -564,6 +605,18 @@ struct range *
 range_copy(struct range *r)
 {
 	return range_create(ast_expr_copy(r->size), location_copy(r->loc));
+}
+
+static struct range * 
+range_permuteheaplocs(struct range *r, struct permutation *p)
+{
+	assert(false);
+}
+
+static struct int_arr *
+range_deriveorder(struct range *r, struct circuitbreaker *cb, struct state *s)
+{
+	assert(false);
 }
 
 void

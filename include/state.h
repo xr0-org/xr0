@@ -239,6 +239,14 @@ location_referencesheap(struct location *, struct state *,
 struct value *
 location_transfigure(struct location *, struct state *compare);
 
+struct int_arr *
+location_deriveorder(struct location *, struct circuitbreaker *, struct state *);
+
+struct permutation;
+
+struct location *
+location_permuteheap(struct location *loc, struct permutation *p);
+
 struct object_res {
 	struct object *obj;
 	struct error *err;
@@ -246,7 +254,6 @@ struct object_res {
 
 struct object_res
 state_get(struct state *state, struct location *loc, bool constructive);
-
 
 /* USED BY OBJECT */
 

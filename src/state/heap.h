@@ -17,6 +17,16 @@ heap_copy(struct heap *);
 char *
 heap_str(struct heap *, char *indent);
 
+struct permutation;
+
+struct permutation *
+heap_transposezero(struct heap *, int block);
+
+struct heap *
+heap_permute(struct heap *, struct permutation *p);
+
+struct location_arr;
+
 struct ast_expr;
 
 struct block_arr *

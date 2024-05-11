@@ -32,6 +32,53 @@ struct value {
 		} _struct;
 	};
 }; 
+
+static struct int_arr *
+struct_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s);
+
+struct int_arr *
+value_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
+{
+	switch (v->type) {
+	case VALUE_SYNC:
+	case VALUE_INT:
+	case VALUE_LITERAL:
+		return int_arr_create();
+	case VALUE_PTR:
+		if (v->ptr.isindefinite) {
+			return int_arr_create();
+		}
+		return location_deriveorder(v->ptr.loc, cb, s);
+	case VALUE_STRUCT:
+		return struct_deriveorder(v, cb, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct value *
+struct_permuteheaplocs(struct value *, struct permutation *);
+
+struct value *
+value_permuteheaplocs(struct value *v, struct permutation *p)
+{
+	switch (v->type) {
+	case VALUE_SYNC:
+	case VALUE_INT:
+	case VALUE_LITERAL:
+		return value_copy(v);
+	case VALUE_PTR:
+		if (v->ptr.isindefinite) {
+			return value_copy(v);
+		}
+		return value_ptr_create(location_permuteheap(v->ptr.loc, p));
+	case VALUE_STRUCT:
+		return struct_permuteheaplocs(v, p);
+	default:
+		assert(false);
+	}
+}
+
 struct value *
 value_ptr_create(struct location *loc)
 {
@@ -398,6 +445,51 @@ copymembers(struct map *old)
 		map_set(new, dynamic_str(e.key), object_copy((struct object *) e.value));
 	}
 	return new;
+}
+
+
+static struct map *
+permutemembers(struct map *old, struct permutation *);
+
+static struct value *
+struct_permuteheaplocs(struct value *old, struct permutation *p)
+{
+	struct value *new = malloc(sizeof(struct value));
+	assert(new);
+	new->type = VALUE_STRUCT;
+	new->_struct.members = ast_variable_arr_copy(old->_struct.members);
+	new->_struct.m = permutemembers(old->_struct.m, p);
+	return new;
+}
+
+static struct map *
+permutemembers(struct map *old, struct permutation *p)
+{
+	struct map *new = map_create();
+	for (int i = 0; i < old->n; i++) {
+		struct entry e = old->entry[i];
+		map_set(
+			new, dynamic_str(e.key),
+			object_permuteheaplocs((struct object *) e.value, p)
+		);
+	}
+	return new;
+}
+
+static struct int_arr *
+struct_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
+{
+	struct int_arr *arr = int_arr_create();
+	struct map *m = v->_struct.m;
+	for (int i = 0; i < m->n; i++) {
+		int_arr_appendrange(
+			arr,
+			object_deriveorder(
+				(struct object *) m->entry[i].value, cb, s
+			)
+		);
+	}
+	return arr;
 }
 
 static struct map *

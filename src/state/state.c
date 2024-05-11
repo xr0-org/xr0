@@ -104,6 +104,11 @@ state_str(struct state *state)
 		strbuilder_printf(b, "static:\n%s\n", static_mem);
 	}
 	free(static_mem);
+	if (state->reg) {
+		char *ret = value_str(state->reg);
+		strbuilder_printf(b, "return: <%s>\n\n", ret);
+		free(ret);
+	}
 	char *vconst = vconst_str(state->vconst, "\t");
 	if (strlen(vconst) > 0) {
 		strbuilder_printf(b, "rconst:\n%s\n", vconst);
@@ -644,6 +649,33 @@ state_eval(struct state *s, struct ast_expr *e)
 }
 
 static void
+state_normalise(struct state *s);
+
+bool
+state_equal(struct state *s1, struct state *s2)
+{
+	struct state *s1_c = state_copy(s1),
+		     *s2_c = state_copy(s2);
+	state_normalise(s1_c);
+	state_normalise(s2_c);
+
+	char *str1 = state_str(s1_c),
+	     *str2 = state_str(s2_c);
+	bool equal = strcmp(str1, str2) == 0;
+	if (!equal) {
+		v_printf("actual:\n%s", str1);
+		v_printf("abstract:\n%s", str2);
+	}
+	free(str2);
+	free(str1);
+
+	state_destroy(s2_c);
+	state_destroy(s1_c);
+
+	return equal;
+}
+
+static void
 state_undeclareliterals(struct state *s);
 
 static void
@@ -655,34 +687,35 @@ state_popprops(struct state *s);
 void
 state_unnest(struct state *s);
 
-bool
-state_equal(struct state *s1, struct state *s2)
+static void
+state_permuteheap(struct state *, struct int_arr *);
+
+static void
+state_normalise(struct state *s)
 {
-	struct state *s1_c = state_copy(s1),
-		     *s2_c = state_copy(s2);
-	state_unnest(s1_c);
-	state_unnest(s2_c);
-	state_undeclareliterals(s1_c);
-	state_undeclareliterals(s2_c);
-	state_undeclarevars(s1_c);
-	state_undeclarevars(s2_c);
-	state_popprops(s1_c);
-	state_popprops(s2_c);
-
-	char *str1 = state_str(s1_c),
-	     *str2 = state_str(s2_c);
-	bool equal = strcmp(str1, str2) == 0;
-	if (!equal) {
-		v_printf("abstract: %s", str2);
-		v_printf("actual: %s", str1);
+	state_unnest(s);
+	state_undeclareliterals(s);
+	state_undeclarevars(s);
+	state_popprops(s);
+	if (s->reg) {
+		struct circuitbreaker *cb = circuitbreaker_create();
+		struct int_arr *arr = value_deriveorder(s->reg, cb, s);
+		circuitbreaker_destroy(cb);
+		state_permuteheap(s, arr);
 	}
-	free(str2);
-	free(str1);
+}
 
-	state_destroy(s2_c);
-	state_destroy(s1_c);
 
-	return equal;
+static void
+state_permuteheap(struct state *s, struct int_arr *arr)
+{
+	/* XXX: only permuting heap and return register; clump later */
+	assert(s->reg);
+
+	struct permutation *p = permutation_create(arr);
+	s->heap = heap_permute(s->heap, p);
+	s->reg = value_permuteheaplocs(s->reg, p);
+	permutation_destroy(p);
 }
 
 static void

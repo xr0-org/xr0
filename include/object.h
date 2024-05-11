@@ -19,6 +19,20 @@ object_copy(struct object *old);
 struct object *
 object_abstractcopy(struct object *old, struct state *s);
 
+struct int_arr;
+
+struct circuitbreaker;
+
+struct state;
+
+struct int_arr *
+object_deriveorder(struct object *, struct circuitbreaker *, struct state *);
+
+struct permutation;
+
+struct object *
+object_permuteheaplocs(struct object *, struct permutation *);
+
 void
 object_destroy(struct object *);
 
@@ -42,7 +56,6 @@ bool
 object_references(struct object *, struct location *, struct state *,
 		struct circuitbreaker *);
 
-struct circuitbreaker;
 
 bool
 object_referencesheap(struct object *, struct state *, struct circuitbreaker *);

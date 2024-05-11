@@ -99,6 +99,47 @@ location_transfigure(struct location *loc, struct state *compare)
 	}
 }
 
+struct location *
+location_permuteheap(struct location *loc, struct permutation *p)
+{
+	assert(loc->type == LOCATION_DYNAMIC);
+	return location_create_dynamic(
+		permutation_applyinverse(p, loc->block), ast_expr_copy(loc->offset)
+	);
+}
+
+static bool
+shouldderiveorder(struct location *, struct circuitbreaker *, struct state *);
+
+struct int_arr *
+location_deriveorder(struct location *loc, struct circuitbreaker *cb,
+		struct state *s)
+{
+	struct int_arr *arr = int_arr_create();
+	if (shouldderiveorder(loc, cb, s)) {
+		if (loc->type == LOCATION_DYNAMIC) {
+			int_arr_append(arr, loc->block);
+		}
+		struct object_res res = state_get(s, loc, false);
+		assert(!res.err);
+		if (res.obj) {
+			int_arr_appendrange(arr, object_deriveorder(res.obj, cb, s));
+		}
+	}
+	return arr;
+}
+
+static bool
+shouldderiveorder(struct location *loc, struct circuitbreaker *cb,
+		struct state *s)
+{
+	bool onheap_and_freed =
+		(loc->type == LOCATION_DYNAMIC
+		 && heap_blockisfreed(state_getheap(s), loc->block));
+
+	return circuitbreaker_append(cb, loc) && !onheap_and_freed;
+}
+
 void
 location_destroy(struct location *loc)
 {
@@ -371,4 +412,47 @@ location_range_dealloc(struct location *loc, struct ast_expr *lw,
 	}
 
 	return block_range_dealloc(b, lw, up, state);
+}
+
+struct location_arr {
+	int n;
+	struct location **loc;
+};
+
+struct location_arr *
+location_arr_create()
+{
+	struct location_arr *arr = calloc(1, sizeof(struct location_arr));
+	assert(arr);
+	return arr;
+}
+
+void
+location_arr_destroy(struct location_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		location_destroy(arr->loc[i]);
+	}
+	free(arr);
+}
+
+struct location **
+location_arr_loc(struct location_arr *arr)
+{
+	return arr->loc;
+}
+
+int
+location_arr_n(struct location_arr *arr)
+{
+	return arr->n;
+}
+
+void
+location_arr_append(struct location_arr *arr, struct location *loc)
+{
+	arr->loc = realloc(arr->loc, sizeof(struct location *) * ++arr->n);
+	assert(arr->loc);
+	int n = arr->n-1;
+	arr->loc[n] = loc;
 }

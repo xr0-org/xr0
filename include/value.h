@@ -15,6 +15,16 @@ struct value;
 
 struct location;
 
+struct permutation;
+
+struct int_arr;
+
+struct int_arr *
+value_deriveorder(struct value *, struct circuitbreaker *, struct state *);
+
+struct value *
+value_permuteheaplocs(struct value *, struct permutation *);
+
 struct value *
 value_ptr_create(struct location *loc);
 
