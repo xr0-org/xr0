@@ -239,6 +239,11 @@ location_referencesheap(struct location *, struct state *,
 struct value *
 location_transfigure(struct location *, struct state *compare);
 
+struct permutation;
+
+struct location *
+location_permuteheap(struct location *loc, struct permutation *p);
+
 struct object_res {
 	struct object *obj;
 	struct error *err;

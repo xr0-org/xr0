@@ -189,7 +189,10 @@ strbuilder_putc(struct strbuilder *b, char c)
 	strbuilder_printf(b, "%c", c);
 }
 
-/* string_arr */
+struct string_arr {
+	int n;
+	char **s;
+};
 
 struct string_arr *
 string_arr_create()
@@ -225,7 +228,7 @@ string_arr_n(struct string_arr *arr)
 int
 string_arr_append(struct string_arr *arr, char *s)
 {
-	arr->s = realloc(arr->s, sizeof(struct string_arr) * ++arr->n);
+	arr->s = realloc(arr->s, sizeof(char *) * ++arr->n);
 	assert(arr->s);
 	int loc = arr->n-1;
 	arr->s[loc] = s;
@@ -287,6 +290,49 @@ string_arr_str(struct string_arr *string_arr)
 	}
 	return strbuilder_build(b);
 }
+
+
+struct int_arr {
+	int len;
+	int *arr;
+};
+
+struct int_arr *
+int_arr_create()
+{
+	struct int_arr *arr = calloc(1, sizeof(struct int_arr));
+	assert(arr);
+	return arr;
+}
+
+void
+int_arr_destroy(struct int_arr *arr)
+{
+	free(arr->arr);
+	free(arr);
+}
+
+int *
+int_arr_arr(struct int_arr *arr)
+{
+	return arr->arr;
+}
+
+int
+int_arr_len(struct int_arr *arr)
+{
+	return arr->len;
+}
+
+void
+int_arr_append(struct int_arr *arr, int num)
+{
+	arr->arr = realloc(arr->arr, sizeof(int *) * ++arr->len);
+	assert(arr->arr);
+	int loc = arr->len-1;
+	arr->arr[loc] = num;
+}
+
 
 enum loglevel LOG_LEVEL;
 

@@ -15,6 +15,11 @@ struct value;
 
 struct location;
 
+struct permutation;
+
+struct value *
+value_permuteheaplocs(struct value *, struct permutation *);
+
 struct value *
 value_ptr_create(struct location *loc);
 

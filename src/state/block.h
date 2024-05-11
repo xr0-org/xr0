@@ -54,6 +54,11 @@ block_range_dealloc(struct block *, struct ast_expr *lw, struct ast_expr *up,
 void
 block_undeclare(struct block *, struct state *);
 
+struct permutation;
+
+struct block *
+block_permuteheaplocs(struct block *, struct permutation *);
+
 struct block_arr;
 
 struct block_arr *
@@ -77,5 +82,23 @@ block_arr_append(struct block_arr *, struct block *);
 
 void
 block_arr_delete(struct block_arr *, int address);
+
+
+struct permutation;
+
+struct permutation *
+permutation_transpose(int len, int x, int y);
+
+struct permutation *
+permutation_concat(struct permutation *, struct permutation *);
+
+void
+permutation_destroy(struct permutation *);
+
+char *
+permutation_str(struct permutation *);
+
+int
+permutation_apply(struct permutation *, int);
 
 #endif

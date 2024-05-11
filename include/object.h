@@ -19,6 +19,11 @@ object_copy(struct object *old);
 struct object *
 object_abstractcopy(struct object *old, struct state *s);
 
+struct permutation;
+
+struct object *
+object_permuteheaplocs(struct object *, struct permutation *);
+
 void
 object_destroy(struct object *);
 

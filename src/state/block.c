@@ -39,6 +39,21 @@ block_copy(struct block *old)
 	return new;
 }
 
+struct block *
+block_permuteheaplocs(struct block *old, struct permutation *p)
+{
+	struct block *new = malloc(sizeof(struct block));
+	new->arr = object_arr_create();
+
+	struct object **obj = object_arr_objects(old->arr);
+	int n = object_arr_nobjects(old->arr);
+	for (int i = 0; i < n; i++) {
+		object_arr_append(new->arr, object_permuteheaplocs(obj[i], p));
+	}
+
+	return new;
+}
+
 char *
 block_str(struct block *block)
 {
@@ -346,4 +361,60 @@ void
 block_arr_delete(struct block_arr *arr, int address)
 {
 	assert(false);
+}
+
+
+struct permutation {
+	struct int_arr *arr;
+};
+
+struct permutation *
+permutation_transpose(int len, int x, int y)
+{
+	assert(x < len && y < len);
+
+	struct permutation *p = malloc(sizeof(struct permutation));
+	p->arr = int_arr_create();
+	for (int i = 0; i < len; i++) {
+		if (i == x) {
+			int_arr_append(p->arr, y);
+		} else if (i == y) {
+			int_arr_append(p->arr, x);
+		} else {
+			int_arr_append(p->arr, i);
+		}
+	}
+	return p;
+}
+
+struct permutation *
+permutation_concat(struct permutation *, struct permutation *);
+
+void
+permutation_destroy(struct permutation *p)
+{
+	int_arr_destroy(p->arr);
+	free(p);
+}
+
+int
+permutation_apply(struct permutation *p, int i)
+{
+	assert(i < int_arr_len(p->arr));
+	return int_arr_arr(p->arr)[i];
+}
+
+char *
+permutation_str(struct permutation *p)
+{
+	int len = int_arr_len(p->arr);
+	int *arr = int_arr_arr(p->arr);
+
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "[");
+	for (int i = 0; i < len; i++) {
+		strbuilder_printf(b, "%d->%d%s", i, arr[i], i+1<len ? " " : "");
+	}
+	strbuilder_printf(b, "]");
+	return strbuilder_build(b);
 }

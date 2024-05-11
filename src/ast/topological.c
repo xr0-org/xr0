@@ -26,7 +26,7 @@ topological_order(char *fname, struct externals *ext)
 	struct map *indegrees = calculate_indegrees(g);
 	struct string_arr *indegree_zero = build_indegree_zero(indegrees);
 	/* while there are nodes of indegree zero */
-	while (indegree_zero->n > 0) {
+	while (string_arr_n(indegree_zero) > 0) {
 		/* add one node with indegree zero to ordered */
 		char *curr = string_arr_deque(indegree_zero);
 		string_arr_append(order, curr);
@@ -46,7 +46,7 @@ topological_order(char *fname, struct externals *ext)
 	}
 
 	/* no more nodes with incoming edges */
-	if (order->n != indegrees->n) {
+	if (string_arr_n(order) != indegrees->n) {
 		/* TODO: pass up error */
 		fprintf(stderr, "cycle detected in graph\n");
 		exit(EXIT_FAILURE);
@@ -71,8 +71,8 @@ calculate_indegrees(struct map *g)
 			continue;
 		}
 		map_set(indegrees, dynamic_str(e.key), dynamic_int(0));
-		for (int j = 0; j < deps->n; j++) {
-			char *dep_key = deps->s[j]; 
+		for (int j = 0; j < string_arr_n(deps); j++) {
+			char *dep_key = string_arr_s(deps)[j]; 
 			if (map_get(indegrees, dep_key) != NULL) {
 				continue;
 			}		
@@ -86,7 +86,7 @@ calculate_indegrees(struct map *g)
 		if (!n_arr) {
 			continue;
 		}
-		for (int j = 0; j < n_arr->n; j++) {
+		for (int j = 0; j < string_arr_n(n_arr); j++) {
 			int *count = (int *) map_get(indegrees, e.key);
 			*count = *count + 1; /* XXX */
 		}

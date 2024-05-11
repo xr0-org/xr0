@@ -94,6 +94,11 @@ bool
 location_references(struct location *loc1, struct location *loc2, struct state *,
 		struct circuitbreaker *cb);
 
+struct permutation;
+
+struct permutation *
+location_heaptransposezero(struct location *, struct heap *); 
+
 struct static_memory;
 
 struct vconst;
@@ -124,5 +129,22 @@ location_dealloc(struct location *, struct heap *);
 struct error *
 location_range_dealloc(struct location *loc, struct ast_expr *lw,
 		struct ast_expr *up, struct state *);
+
+struct location_arr;
+
+struct location_arr *
+location_arr_create();
+
+void
+location_arr_destroy();
+
+struct location **
+location_arr_loc(struct location_arr *);
+
+int
+location_arr_n(struct location_arr *);
+
+void
+location_arr_append(struct location_arr *, struct location *);
 
 #endif
