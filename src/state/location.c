@@ -108,6 +108,38 @@ location_permuteheap(struct location *loc, struct permutation *p)
 	);
 }
 
+static bool
+shouldderiveorder(struct location *, struct circuitbreaker *, struct state *);
+
+struct int_arr *
+location_deriveorder(struct location *loc, struct circuitbreaker *cb,
+		struct state *s)
+{
+	struct int_arr *arr = int_arr_create();
+	if (shouldderiveorder(loc, cb, s)) {
+		if (loc->type == LOCATION_DYNAMIC) {
+			int_arr_append(arr, loc->block);
+		}
+		struct object_res res = state_get(s, loc, false);
+		assert(!res.err);
+		if (res.obj) {
+			int_arr_appendrange(arr, object_deriveorder(res.obj, cb, s));
+		}
+	}
+	return arr;
+}
+
+static bool
+shouldderiveorder(struct location *loc, struct circuitbreaker *cb,
+		struct state *s)
+{
+	bool onheap_and_freed =
+		(loc->type == LOCATION_DYNAMIC
+		 && heap_blockisfreed(state_getheap(s), loc->block));
+
+	return circuitbreaker_append(cb, loc) && !onheap_and_freed;
+}
+
 void
 location_destroy(struct location *loc)
 {
@@ -381,14 +413,6 @@ location_range_dealloc(struct location *loc, struct ast_expr *lw,
 
 	return block_range_dealloc(b, lw, up, state);
 }
-
-struct permutation *
-location_heaptransposezero(struct location *loc, struct heap *h)
-{
-	assert(loc->type == LOCATION_DYNAMIC);
-	return heap_transposezero(h, loc->block);
-}
-
 
 struct location_arr {
 	int n;

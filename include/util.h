@@ -85,6 +85,9 @@ int_arr_len(struct int_arr *);
 void
 int_arr_append(struct int_arr *, int);
 
+void
+int_arr_appendrange(struct int_arr *arr, struct int_arr *arr2);
+
 struct strbuilder;
 
 struct strbuilder *

@@ -87,10 +87,13 @@ block_arr_delete(struct block_arr *, int address);
 struct permutation;
 
 struct permutation *
-permutation_transpose(int len, int x, int y);
+permutation_create(struct int_arr *);
 
 struct permutation *
-permutation_concat(struct permutation *, struct permutation *);
+permutation_inverse_create(struct int_arr *);
+
+struct permutation *
+permutation_copy(struct permutation *);
 
 void
 permutation_destroy(struct permutation *);

@@ -663,8 +663,8 @@ state_equal(struct state *s1, struct state *s2)
 	     *str2 = state_str(s2_c);
 	bool equal = strcmp(str1, str2) == 0;
 	if (!equal) {
-		v_printf("abstract:\n%s", str2);
 		v_printf("actual:\n%s", str1);
+		v_printf("abstract:\n%s", str2);
 	}
 	free(str2);
 	free(str1);
@@ -688,7 +688,7 @@ void
 state_unnest(struct state *s);
 
 static void
-state_permuteheap(struct state *, struct permutation *);
+state_permuteheap(struct state *, struct int_arr *);
 
 static void
 state_normalise(struct state *s)
@@ -697,27 +697,29 @@ state_normalise(struct state *s)
 	state_undeclareliterals(s);
 	state_undeclarevars(s);
 	state_popprops(s);
-	if (s->reg && value_islocation(s->reg)) {
-		struct location *loc = value_as_location(s->reg);
-		if (location_toheap(loc, s->heap)) {
-			struct permutation *p = location_heaptransposezero(
-				loc, s->heap
-			);
-			state_permuteheap(s, p);
-			permutation_destroy(p);
-		}
+	if (s->reg) {
+		struct circuitbreaker *cb = circuitbreaker_create();
+		struct int_arr *arr = value_deriveorder(s->reg, cb, s);
+		circuitbreaker_destroy(cb);
+		state_permuteheap(s, arr);
 	}
 }
 
 
 static void
-state_permuteheap(struct state *s, struct permutation *p)
+state_permuteheap(struct state *s, struct int_arr *arr)
 {
 	/* XXX: only permuting heap and return register; clump later */
 	assert(s->reg);
 
-	s->heap = heap_permute(s->heap, p);
-	s->reg = value_permuteheaplocs(s->reg, p);
+	struct permutation *p_heap = permutation_create(arr),
+			   *p_rest = permutation_inverse_create(arr);
+
+	s->heap = heap_permute(s->heap, p_heap, p_rest);
+	s->reg = value_permuteheaplocs(s->reg, p_rest);
+
+	permutation_destroy(p_rest);
+	permutation_destroy(p_heap);
 }
 
 static void

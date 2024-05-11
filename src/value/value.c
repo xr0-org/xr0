@@ -33,6 +33,29 @@ struct value {
 	};
 }; 
 
+static struct int_arr *
+struct_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s);
+
+struct int_arr *
+value_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
+{
+	switch (v->type) {
+	case VALUE_SYNC:
+	case VALUE_INT:
+	case VALUE_LITERAL:
+		return int_arr_create();
+	case VALUE_PTR:
+		if (v->ptr.isindefinite) {
+			return int_arr_create();
+		}
+		return location_deriveorder(v->ptr.loc, cb, s);
+	case VALUE_STRUCT:
+		return struct_deriveorder(v, cb, s);
+	default:
+		assert(false);
+	}
+}
+
 static struct value *
 struct_permuteheaplocs(struct value *, struct permutation *);
 
@@ -52,7 +75,6 @@ value_permuteheaplocs(struct value *v, struct permutation *p)
 	case VALUE_STRUCT:
 		return struct_permuteheaplocs(v, p);
 	default:
-		printf("v: %s\n", value_str(v));
 		assert(false);
 	}
 }
@@ -452,6 +474,22 @@ permutemembers(struct map *old, struct permutation *p)
 		);
 	}
 	return new;
+}
+
+static struct int_arr *
+struct_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
+{
+	struct int_arr *arr = int_arr_create();
+	struct map *m = v->_struct.m;
+	for (int i = 0; i < m->n; i++) {
+		int_arr_appendrange(
+			arr,
+			object_deriveorder(
+				(struct object *) m->entry[i].value, cb, s
+			)
+		);
+	}
+	return arr;
 }
 
 static struct map *

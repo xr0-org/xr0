@@ -333,6 +333,16 @@ int_arr_append(struct int_arr *arr, int num)
 	arr->arr[loc] = num;
 }
 
+void
+int_arr_appendrange(struct int_arr *arr, struct int_arr *arr2)
+{
+	int len = int_arr_len(arr2);
+	int *arr2_arr = int_arr_arr(arr2);
+	for (int i = 0; i < len; i++) {
+		int_arr_append(arr, arr2_arr[i]);
+	}
+}
+
 
 enum loglevel LOG_LEVEL;
 

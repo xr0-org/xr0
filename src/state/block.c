@@ -369,26 +369,47 @@ struct permutation {
 };
 
 struct permutation *
-permutation_transpose(int len, int x, int y)
+permutation_create(struct int_arr *arr)
 {
-	assert(x < len && y < len);
+	struct permutation *p = malloc(sizeof(struct permutation));
+	p->arr = arr;
+	return p;
+}
+
+struct permutation *
+permutation_inverse_create(struct int_arr *arr)
+{
+	/* 1, 2, 0 should give 0->2, 1->0, 2->1 */
+	/* 1->0, 2->1, 0->2 */
+
+	int len = int_arr_len(arr);
+	int *order = int_arr_arr(arr);
+
+	int *map = malloc(sizeof(int) * len);
+	for (long i = 0; i < len; i++) {
+		map[order[i]] = i;
+	}
 
 	struct permutation *p = malloc(sizeof(struct permutation));
 	p->arr = int_arr_create();
 	for (int i = 0; i < len; i++) {
-		if (i == x) {
-			int_arr_append(p->arr, y);
-		} else if (i == y) {
-			int_arr_append(p->arr, x);
-		} else {
-			int_arr_append(p->arr, i);
-		}
+		int_arr_append(p->arr, map[i]);
 	}
 	return p;
 }
 
 struct permutation *
-permutation_concat(struct permutation *, struct permutation *);
+permutation_copy(struct permutation *old)
+{
+	struct permutation *new = malloc(sizeof(struct permutation));
+	new->arr = int_arr_create();
+	int *old_arr = int_arr_arr(old->arr);
+	int old_len = int_arr_len(old->arr);
+	for (int i = 0; i < old_len; i++) {
+		int_arr_append(new->arr, old_arr[i]);
+	}
+	return new;
+}
 
 void
 permutation_destroy(struct permutation *p)

@@ -34,6 +34,9 @@ range_references(struct range *, struct location *, struct state *,
 static struct range * 
 range_permuteheaplocs(struct range *, struct permutation *);
 
+static struct int_arr *
+range_deriveorder(struct range *, struct circuitbreaker *, struct state *);
+
 struct object {
 	enum object_type {
 		OBJECT_VALUE, OBJECT_DEALLOCAND_RANGE,
@@ -66,6 +69,21 @@ object_range_create(struct ast_expr *offset, struct range *r)
 	obj->range = r;
 	obj->type = OBJECT_DEALLOCAND_RANGE;
 	return obj;
+}
+
+struct int_arr *
+object_deriveorder(struct object *obj, struct circuitbreaker *cb, struct state *s)
+{
+	switch (obj->type) {
+	case OBJECT_VALUE:
+		return obj->value
+			? value_deriveorder(obj->value, cb, s)
+			: int_arr_create();
+	case OBJECT_DEALLOCAND_RANGE:
+		return range_deriveorder(obj->range, cb, s);
+	default:
+		assert(false);
+	}
 }
 
 struct object *
@@ -591,6 +609,12 @@ range_copy(struct range *r)
 
 static struct range * 
 range_permuteheaplocs(struct range *r, struct permutation *p)
+{
+	assert(false);
+}
+
+static struct int_arr *
+range_deriveorder(struct range *r, struct circuitbreaker *cb, struct state *s)
 {
 	assert(false);
 }
