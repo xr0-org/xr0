@@ -104,4 +104,7 @@ permutation_str(struct permutation *);
 int
 permutation_apply(struct permutation *, int);
 
+int
+permutation_applyinverse(struct permutation *, int);
+
 #endif

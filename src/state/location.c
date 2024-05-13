@@ -104,7 +104,7 @@ location_permuteheap(struct location *loc, struct permutation *p)
 {
 	assert(loc->type == LOCATION_DYNAMIC);
 	return location_create_dynamic(
-		permutation_apply(p, loc->block), ast_expr_copy(loc->offset)
+		permutation_applyinverse(p, loc->block), ast_expr_copy(loc->offset)
 	);
 }
 

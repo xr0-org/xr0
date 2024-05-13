@@ -86,8 +86,7 @@ printdelim(struct heap *h, int start)
 
 
 struct heap *
-heap_permute(struct heap *old, struct permutation *p_heap,
-		struct permutation *p_rest)
+heap_permute(struct heap *old, struct permutation *p)
 {
 	struct heap *new = malloc(sizeof(struct heap));
 	int n = block_arr_nblocks(old->blocks);
@@ -95,10 +94,10 @@ heap_permute(struct heap *old, struct permutation *p_heap,
 	new->blocks = block_arr_create();
 	new->freed = malloc(sizeof(bool) * n);
 	for (int i = 0; i < n; i++) {
-		int perm_i = permutation_apply(p_heap, i);
+		int perm_i = permutation_apply(p, i);
 		new->freed[i] = old->freed[perm_i];
 		block_arr_append(
-			new->blocks, block_permuteheaplocs(b[perm_i], p_rest)
+			new->blocks, block_permuteheaplocs(b[perm_i], p)
 		);
 	}
 	return new;

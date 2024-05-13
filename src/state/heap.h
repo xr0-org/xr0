@@ -23,7 +23,7 @@ struct permutation *
 heap_transposezero(struct heap *, int block);
 
 struct heap *
-heap_permute(struct heap *, struct permutation *p_heap, struct permutation *p_rest);
+heap_permute(struct heap *, struct permutation *p);
 
 struct location_arr;
 

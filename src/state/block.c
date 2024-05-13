@@ -377,28 +377,6 @@ permutation_create(struct int_arr *arr)
 }
 
 struct permutation *
-permutation_inverse_create(struct int_arr *arr)
-{
-	/* 1, 2, 0 should give 0->2, 1->0, 2->1 */
-	/* 1->0, 2->1, 0->2 */
-
-	int len = int_arr_len(arr);
-	int *order = int_arr_arr(arr);
-
-	int *map = malloc(sizeof(int) * len);
-	for (long i = 0; i < len; i++) {
-		map[order[i]] = i;
-	}
-
-	struct permutation *p = malloc(sizeof(struct permutation));
-	p->arr = int_arr_create();
-	for (int i = 0; i < len; i++) {
-		int_arr_append(p->arr, map[i]);
-	}
-	return p;
-}
-
-struct permutation *
 permutation_copy(struct permutation *old)
 {
 	struct permutation *new = malloc(sizeof(struct permutation));
@@ -423,6 +401,20 @@ permutation_apply(struct permutation *p, int i)
 {
 	assert(i < int_arr_len(p->arr));
 	return int_arr_arr(p->arr)[i];
+}
+
+int
+permutation_applyinverse(struct permutation *p, int i)
+{
+	int len = int_arr_len(p->arr);
+	int *perm = int_arr_arr(p->arr);
+	assert(i < len);
+	for (int j = 0; j < len; j++) {
+		if (perm[j] == i) {
+			return j;
+		}
+	}
+	assert(false);
 }
 
 char *

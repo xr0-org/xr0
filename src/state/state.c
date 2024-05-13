@@ -712,14 +712,10 @@ state_permuteheap(struct state *s, struct int_arr *arr)
 	/* XXX: only permuting heap and return register; clump later */
 	assert(s->reg);
 
-	struct permutation *p_heap = permutation_create(arr),
-			   *p_rest = permutation_inverse_create(arr);
-
-	s->heap = heap_permute(s->heap, p_heap, p_rest);
-	s->reg = value_permuteheaplocs(s->reg, p_rest);
-
-	permutation_destroy(p_rest);
-	permutation_destroy(p_heap);
+	struct permutation *p = permutation_create(arr);
+	s->heap = heap_permute(s->heap, p);
+	s->reg = value_permuteheaplocs(s->reg, p);
+	permutation_destroy(p);
 }
 
 static void
