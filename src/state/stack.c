@@ -301,6 +301,18 @@ stack_islinear(struct stack *s)
 	return s->kind == FRAME_INTERMEDIATE;
 }
 
+bool
+stack_insetup(struct stack *s)
+{	
+	if (s->kind == FRAME_SETUP) {
+		return true;
+	}
+	if (s->prev == NULL) {
+		return false;
+	}
+	return stack_insetup(s->prev);
+}
+
 enum execution_mode
 stack_execmode(struct stack *s)
 {
@@ -473,27 +485,6 @@ stack_popprep(struct stack *s, struct state *state)
 	}
 }
 
-bool
-stack_references(struct stack *s, struct location *loc, struct state *state)
-{
-	/* TODO: check globals */
-	struct value *result = state_popregister(state);
-	struct circuitbreaker *c = circuitbreaker_create();
-	if (result && value_references(result, loc, state, c)) {
-		return true;
-	}
-
-	struct map *m = s->varmap;
-	for (int i = 0; i < m->n; i++) {
-		struct variable *var = (struct variable *) m->entry[i].value;
-		if (variable_isparam(var) && variable_references(var, loc, state)) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
 struct block *
 stack_getblock(struct stack *s, int address)
 {
@@ -539,7 +530,7 @@ frame_block_create(char *n, struct ast_block *b, enum execution_mode mode)
 struct frame *
 frame_setup_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	struct frame* f = frame_create(n, b, NULL, mode, FRAME_NESTED);
+	struct frame* f = frame_create(n, b, NULL, mode, FRAME_SETUP);
 	f->advance = false;
 	return f;
 }
@@ -695,7 +686,7 @@ variable_references(struct variable *v, struct location *loc, struct state *s)
 	assert(location_type(loc) != LOCATION_VCONST);
 
 	struct circuitbreaker *cb = circuitbreaker_create();
-	bool ans = location_references(v->loc, loc, s, cb);
+	bool ans = location_referencescaller(v->loc, loc, s, cb);
 	circuitbreaker_destroy(cb);
 	return ans;
 }

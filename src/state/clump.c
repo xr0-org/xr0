@@ -51,7 +51,7 @@ clump_copy(struct clump *c)
 int
 clump_newblock(struct clump *c)
 {
-	int address = block_arr_append(c->blocks, block_create());
+	int address = block_arr_append(c->blocks, block_callercreate());
 
 	int n = block_arr_nblocks(c->blocks);
 	assert(n > 0);
@@ -66,4 +66,29 @@ clump_getblock(struct clump *c, int address)
 		return NULL;
 	}
 	return block_arr_blocks(c->blocks)[address];
+}
+
+static bool
+block_referenceswithcb(struct block *, struct location *, struct state *);
+
+bool
+clump_callerreferences(struct clump *c, struct location *loc, struct state *s)
+{
+	int n = block_arr_nblocks(c->blocks);
+	struct block **arr = block_arr_blocks(c->blocks);	
+	for (int i = 0; i < n; i++) {
+		if (block_referenceswithcb(arr[i], loc, s)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool
+block_referenceswithcb(struct block *b, struct location *loc, struct state *s)
+{
+	struct circuitbreaker *cb = circuitbreaker_create();
+	bool ref = block_references(b, loc, s, cb);	
+	circuitbreaker_destroy(cb);
+	return ref;
 }

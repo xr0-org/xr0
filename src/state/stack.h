@@ -80,6 +80,9 @@ stack_undeclare(struct stack *stack, struct state *state);
 bool
 stack_isnested(struct stack *);
 
+bool
+stack_insetup(struct stack *);
+
 struct error *
 stack_trace(struct stack *, struct error *);
 
@@ -88,9 +91,6 @@ stack_getvarmap(struct stack *);
 
 struct variable *
 stack_getvariable(struct stack *s, char *id);
-
-bool
-stack_references(struct stack *s, struct location *loc, struct state *state);
 
 struct ast_expr;
 

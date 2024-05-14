@@ -6,6 +6,9 @@ struct block;
 struct block *
 block_create();
 
+struct block *
+block_callercreate();
+
 void
 block_destroy(struct block *);
 
@@ -36,6 +39,9 @@ struct circuitbreaker;
 bool
 block_references(struct block *, struct location *, struct state *,
 		struct circuitbreaker *);
+
+bool
+block_iscaller(struct block *);
 
 struct error *
 block_range_alloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,

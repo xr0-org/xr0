@@ -25,4 +25,7 @@ struct block;
 struct block *
 clump_getblock(struct clump *c, int address);
 
+bool
+clump_callerreferences(struct clump *, struct location *, struct state *);
+
 #endif

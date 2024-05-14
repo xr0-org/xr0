@@ -14,6 +14,7 @@
 
 struct block {
 	struct object_arr *arr;
+	bool caller;
 };
 
 struct block *
@@ -21,6 +22,16 @@ block_create()
 {
 	struct block *b = malloc(sizeof(struct block));
 	b->arr = object_arr_create();
+	b->caller = false;
+	return b;
+}
+
+struct block *
+block_callercreate()
+{
+	struct block *b = malloc(sizeof(struct block));
+	b->arr = object_arr_create();
+	b->caller = true;
 	return b;
 }
 
@@ -36,6 +47,7 @@ block_copy(struct block *old)
 {
 	struct block *new = malloc(sizeof(struct block));
 	new->arr = object_arr_copy(old->arr);
+	new->caller = old->caller;
 	return new;
 }
 
@@ -44,6 +56,7 @@ block_permuteheaplocs(struct block *old, struct permutation *p)
 {
 	struct block *new = malloc(sizeof(struct block));
 	new->arr = object_arr_create();
+	new->caller = old->caller;
 
 	struct object **obj = object_arr_objects(old->arr);
 	int n = object_arr_nobjects(old->arr);
@@ -144,6 +157,12 @@ block_references(struct block *b, struct location *loc, struct state *s,
 	return false;
 }
 
+bool
+block_iscaller(struct block *b)
+{
+	return b->caller;
+}
+
 struct error *
 block_range_alloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
 		struct heap *heap)
@@ -160,7 +179,9 @@ block_range_alloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
 					ast_expr_copy(up),
 					ast_expr_copy(lw)
 				),
-				heap_newblock(heap)
+				b->caller
+					? heap_newcallerblock(heap)
+					: heap_newblock(heap)
 			)
 		)
 	);

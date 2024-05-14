@@ -33,7 +33,10 @@ struct block_arr *
 heap_blocks(struct heap *);
 
 struct location *
-heap_newblock(struct heap *h);
+heap_newblock(struct heap *);
+
+struct location *
+heap_newcallerblock(struct heap *);
 
 struct block; 
 
@@ -52,6 +55,8 @@ heap_deallocblock(struct heap *h, int block);
 void
 heap_undeclare(struct heap *, struct state *);
 
+void
+heap_fillorder(struct heap *, struct int_arr *);
 
 /* TODO: extract to own file */
 

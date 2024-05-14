@@ -143,6 +143,12 @@ state_islinear(struct state *s)
 	return stack_islinear(s->stack);
 }
 
+static bool
+state_insetup(struct state *s)
+{
+	return stack_insetup(s->stack);	
+}
+
 char *
 state_execmode_str(enum execution_mode m)
 {
@@ -558,6 +564,9 @@ state_range_alloc(struct state *state, struct object *obj,
 struct value *
 state_alloc(struct state *state)
 {
+	if (state_insetup(state)) {
+		return value_ptr_create(heap_newcallerblock(state->heap));
+	}
 	return value_ptr_create(heap_newblock(state->heap));
 }
 
@@ -637,9 +646,18 @@ state_location_destroy(struct location *loc)
 }
 
 bool
-state_references(struct state *s, struct location *loc)
+state_returnreferences(struct state *s, struct location *loc)
 {
-	return stack_references(s->stack, loc, s);
+	struct circuitbreaker *c = circuitbreaker_create();
+	bool refs = s->reg && value_references(s->reg, loc, s, c);
+	circuitbreaker_destroy(c);
+	return refs;
+}
+
+bool
+state_callerreferences(struct state *s, struct location *loc)
+{
+	return clump_callerreferences(s->clump, loc, s);
 }
 
 bool
@@ -690,6 +708,9 @@ state_unnest(struct state *s);
 static void
 state_permuteheap(struct state *, struct int_arr *);
 
+static struct int_arr *
+deriveorder(struct state *s);
+
 static void
 state_normalise(struct state *s)
 {
@@ -698,13 +719,19 @@ state_normalise(struct state *s)
 	state_undeclarevars(s);
 	state_popprops(s);
 	if (s->reg) {
-		struct circuitbreaker *cb = circuitbreaker_create();
-		struct int_arr *arr = value_deriveorder(s->reg, cb, s);
-		circuitbreaker_destroy(cb);
-		state_permuteheap(s, arr);
+		state_permuteheap(s, deriveorder(s));
 	}
 }
 
+static struct int_arr *
+deriveorder(struct state *s)
+{
+	struct circuitbreaker *cb = circuitbreaker_create();
+	struct int_arr *arr = value_deriveorder(s->reg, cb, s);
+	circuitbreaker_destroy(cb);
+	heap_fillorder(s->heap, arr);
+	return arr;
+}
 
 static void
 state_permuteheap(struct state *s, struct int_arr *arr)
