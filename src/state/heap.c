@@ -16,7 +16,7 @@
 
 struct heap {
 	struct block_arr *blocks;
-	bool *freed; /* array of same length as blocks */
+	bool *freed;  /* array of same length as blocks */
 };
 
 struct heap *
@@ -65,7 +65,7 @@ heap_str(struct heap *h, char *indent)
 			continue;
 		}
 		char *block = block_str(arr[i]);
-		strbuilder_printf(b, "%s%d: %s%s", indent, i, block,
+		strbuilder_printf(b, "%s%d: %s %s%s", indent, i, block,
 			printdelim(h, i) ? "\n" : "");
 		free(block);
 	}
@@ -83,7 +83,6 @@ printdelim(struct heap *h, int start)
 	}
 	return false;
 }
-
 
 struct heap *
 heap_permute(struct heap *old, struct permutation *p)
@@ -119,7 +118,20 @@ heap_newblock(struct heap *h)
 	assert(n > 0);
 	h->freed = realloc(h->freed, sizeof(bool) * n);
 	h->freed[address] = false;
-		
+	return location_create_dynamic(
+		address, ast_expr_constant_create(0)
+	);
+}
+
+struct location *
+heap_newcallerblock(struct heap *h)
+{
+	int address = block_arr_append(h->blocks, block_callercreate());
+
+	int n = block_arr_nblocks(h->blocks);
+	assert(n > 0);
+	h->freed = realloc(h->freed, sizeof(bool) * n);
+	h->freed[address] = false;
 	return location_create_dynamic(
 		address, ast_expr_constant_create(0)
 	);
@@ -175,7 +187,8 @@ heap_referenced(struct heap *h, struct state *s)
 {
 	int n = block_arr_nblocks(h->blocks);
 	for (int i = 0; i < n; i++) {
-		if (!h->freed[i] && !block_referenced(s, i)) {
+		struct block *b = block_arr_blocks(h->blocks)[i];
+		if (!h->freed[i] && !block_iscaller(b) && !block_referenced(s, i)) {
 			return false;
 		}
 	}
@@ -188,9 +201,13 @@ block_referenced(struct state *s, int addr)
 	struct location *loc = location_create_dynamic(
 		addr, ast_expr_constant_create(0)
 	);
-	bool referenced = state_references(s, loc); 
+	bool return_references = state_returnreferences(s, loc);
+	if (!return_references) {
+		return state_callerreferences(s, loc);
+	}
+	
 	location_destroy(loc);
-	return referenced;
+	return true;	
 }
 
 

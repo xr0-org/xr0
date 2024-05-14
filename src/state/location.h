@@ -91,6 +91,10 @@ bool
 location_equal(struct location *loc1, struct location *loc2);
 
 bool
+location_referencescaller(struct location *l1, struct location *l2, struct state *s,
+		struct circuitbreaker *cb);
+
+bool
 location_references(struct location *loc1, struct location *loc2, struct state *,
 		struct circuitbreaker *cb);
 

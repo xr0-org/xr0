@@ -296,6 +296,18 @@ location_equal(struct location *l1, struct location *l2)
 }
 
 bool
+location_referencescaller(struct location *l1, struct location *l2, struct state *s,
+		struct circuitbreaker *cb)
+{
+	if (location_equal(l1, l2)) {
+		return true;
+	}
+
+	struct block *b = state_getblock(s, l1);
+	return b && block_iscaller(b) && block_references(b, l2, s, cb);
+}
+
+bool
 location_references(struct location *l1, struct location *l2, struct state *s,
 		struct circuitbreaker *cb)
 {

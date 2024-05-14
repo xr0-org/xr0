@@ -14,6 +14,7 @@
 
 struct block {
 	struct object_arr *arr;
+	bool caller;
 };
 
 struct block *
@@ -21,6 +22,16 @@ block_create()
 {
 	struct block *b = malloc(sizeof(struct block));
 	b->arr = object_arr_create();
+	b->caller = false;
+	return b;
+}
+
+struct block *
+block_callercreate()
+{
+	struct block *b = malloc(sizeof(struct block));
+	b->arr = object_arr_create();
+	b->caller = true;
 	return b;
 }
 
@@ -142,6 +153,12 @@ block_references(struct block *b, struct location *loc, struct state *s,
 		}
 	}
 	return false;
+}
+
+bool
+block_iscaller(struct block *b)
+{
+	return b->caller;
 }
 
 struct error *

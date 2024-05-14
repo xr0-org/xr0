@@ -37,7 +37,8 @@ enum execution_mode {
 enum frame_kind {
 	FRAME_NESTED,
 	FRAME_INTERMEDIATE,
-	FRAME_CALL
+	FRAME_CALL,
+	FRAME_SETUP
 };
 
 struct frame;
@@ -195,6 +196,13 @@ state_return(struct state *);
 struct ast_expr *
 state_framecall(struct state *);
 
+struct location;
+
+bool
+state_returnreferences(struct state *, struct location *);
+
+bool
+state_callerreferences(struct state *, struct location *);
 
 /* FRAME DTO */
 
@@ -213,8 +221,6 @@ frame_intermediate_create(char *name, struct ast_block *, enum execution_mode);
 
 /* USED BY VALUE */
 
-struct location;
-
 struct location *
 location_copy(struct location *);
 
@@ -227,10 +233,6 @@ location_str(struct location *);
 bool
 location_references(struct location *l1, struct location *l2, struct state *,
 		struct circuitbreaker *cb);
-
-struct circuitbreaker;
-
-struct circuitbreaker;
 
 bool
 location_referencesheap(struct location *, struct state *,

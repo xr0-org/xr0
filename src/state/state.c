@@ -143,6 +143,12 @@ state_islinear(struct state *s)
 	return stack_islinear(s->stack);
 }
 
+static bool
+state_insetup(struct state *s)
+{
+	return stack_insetup(s->stack);	
+}
+
 char *
 state_execmode_str(enum execution_mode m)
 {
@@ -558,6 +564,9 @@ state_range_alloc(struct state *state, struct object *obj,
 struct value *
 state_alloc(struct state *state)
 {
+	if (state_insetup(state)) {
+		return value_ptr_create(heap_newcallerblock(state->heap));
+	}
 	return value_ptr_create(heap_newblock(state->heap));
 }
 
@@ -637,9 +646,15 @@ state_location_destroy(struct location *loc)
 }
 
 bool
-state_references(struct state *s, struct location *loc)
+state_returnreferences(struct state *s, struct location *loc)
 {
-	return stack_references(s->stack, loc, s);
+	return stack_returnreferences(s->stack, loc, s);
+}
+
+bool
+state_callerreferences(struct state *s, struct location *loc)
+{
+	return stack_callerreferences(s->stack, loc, s);
 }
 
 bool
