@@ -67,3 +67,28 @@ clump_getblock(struct clump *c, int address)
 	}
 	return block_arr_blocks(c->blocks)[address];
 }
+
+static bool
+block_referenceswithcb(struct block *, struct location *, struct state *);
+
+bool
+clump_callerreferences(struct clump *c, struct location *loc, struct state *s)
+{
+	int n = block_arr_nblocks(c->blocks);
+	struct block **arr = block_arr_blocks(c->blocks);	
+	for (int i = 0; i < n; i++) {
+		if (block_referenceswithcb(arr[i], loc, s)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool
+block_referenceswithcb(struct block *b, struct location *loc, struct state *s)
+{
+	struct circuitbreaker *cb = circuitbreaker_create();
+	bool ref = block_references(b, loc, s, cb);	
+	circuitbreaker_destroy(cb);
+	return ref;
+}

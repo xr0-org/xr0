@@ -303,12 +303,12 @@ stack_islinear(struct stack *s)
 
 bool
 stack_insetup(struct stack *s)
-{
-	if (s->prev == NULL) {
-		return false;
-	}
+{	
 	if (s->kind == FRAME_SETUP) {
 		return true;
+	}
+	if (s->prev == NULL) {
+		return false;
 	}
 	return stack_insetup(s->prev);
 }
@@ -483,31 +483,6 @@ stack_popprep(struct stack *s, struct state *state)
 			);
 		}
 	}
-}
-
-bool
-stack_returnreferences(struct stack *s, struct location *loc, struct state *state)
-{
-	/* TODO: check globals */
-	struct value *result = state_popregister(state);
-	struct circuitbreaker *c = circuitbreaker_create();
-	if (result && value_references(result, loc, state, c)) {
-		return true;
-	}
-	return false;
-}
-
-bool
-stack_callerreferences(struct stack *s, struct location *loc, struct state *state)
-{
-	struct map *m = s->varmap;
-	for (int i = 0; i < m->n; i++) {
-		struct variable *var = (struct variable *) m->entry[i].value;
-		if (variable_isparam(var) && variable_references(var, loc, state)) {
-			return true;
-		}
-	}
-	return false;
 }
 
 struct block *

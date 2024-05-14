@@ -102,6 +102,23 @@ heap_permute(struct heap *old, struct permutation *p)
 	return new;
 }
 
+struct int_arr *
+heap_deriveorder(struct heap *h, struct circuitbreaker *cb, struct state *s)
+{
+	struct int_arr *derived = int_arr_create();
+
+	int n = block_arr_nblocks(h->blocks);
+	struct block **b = block_arr_blocks(h->blocks);
+	for (int i = 0; i < n; i++) {
+		struct location *loc = location_create_dynamic(
+			i, ast_expr_constant_create(0)
+		);
+		int_arr_appendrange(derived, location_deriveorder(loc, cb, s));	
+		location_destroy(loc);
+	}
+	return derived;
+}
+
 struct block_arr *
 heap_blocks(struct heap *h)
 {

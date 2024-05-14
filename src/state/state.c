@@ -648,13 +648,16 @@ state_location_destroy(struct location *loc)
 bool
 state_returnreferences(struct state *s, struct location *loc)
 {
-	return stack_returnreferences(s->stack, loc, s);
+	struct circuitbreaker *c = circuitbreaker_create();
+	bool refs = s->reg && value_references(s->reg, loc, s, c);
+	circuitbreaker_destroy(c);
+	return refs;
 }
 
 bool
 state_callerreferences(struct state *s, struct location *loc)
 {
-	return stack_callerreferences(s->stack, loc, s);
+	return clump_callerreferences(s->clump, loc, s);
 }
 
 bool
@@ -705,6 +708,9 @@ state_unnest(struct state *s);
 static void
 state_permuteheap(struct state *, struct int_arr *);
 
+static struct int_arr *
+deriveorder(struct state *s);
+
 static void
 state_normalise(struct state *s)
 {
@@ -713,13 +719,20 @@ state_normalise(struct state *s)
 	state_undeclarevars(s);
 	state_popprops(s);
 	if (s->reg) {
-		struct circuitbreaker *cb = circuitbreaker_create();
-		struct int_arr *arr = value_deriveorder(s->reg, cb, s);
-		circuitbreaker_destroy(cb);
-		state_permuteheap(s, arr);
+		state_permuteheap(s, deriveorder(s));
 	}
 }
 
+static struct int_arr *
+deriveorder(struct state *s)
+{
+	struct circuitbreaker *cb = circuitbreaker_create();
+	struct int_arr *arr = value_deriveorder(s->reg, cb, s);
+	struct int_arr *derived = heap_deriveorder(s->heap, cb, s);
+	int_arr_appendrange(arr, derived);
+	circuitbreaker_destroy(cb);
+	return arr;
+}
 
 static void
 state_permuteheap(struct state *s, struct int_arr *arr)

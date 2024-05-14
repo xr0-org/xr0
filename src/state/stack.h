@@ -92,13 +92,6 @@ stack_getvarmap(struct stack *);
 struct variable *
 stack_getvariable(struct stack *s, char *id);
 
-bool
-stack_returnreferences(struct stack *, struct location *, struct state *);
-
-bool
-stack_callerreferences(struct stack *, struct location *, struct state *);
-
-
 struct ast_expr;
 
 struct block *

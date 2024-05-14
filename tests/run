@@ -54,7 +54,7 @@ do
 		fi
 	else
 		# silence is golden
-		if [[ $output -eq 0 ]] 
+		if [[ $(cat $tempfile) -eq 0 ]] 
 		then
 			npass=$((npass+1))
 			printf "$pass"
