@@ -7,7 +7,7 @@ char *
 breakpoint_list();
 
 struct error *
-breakpoint_set(struct breakpoint);
+breakpoint_set(char *filename, int linenum);
 
 struct error *
 breakpoint_delete(int id);
