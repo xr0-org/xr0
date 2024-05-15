@@ -728,9 +728,8 @@ deriveorder(struct state *s)
 {
 	struct circuitbreaker *cb = circuitbreaker_create();
 	struct int_arr *arr = value_deriveorder(s->reg, cb, s);
-	struct int_arr *derived = heap_deriveorder(s->heap, cb, s);
-	int_arr_appendrange(arr, derived);
 	circuitbreaker_destroy(cb);
+	heap_fillorder(s->heap, arr);
 	return arr;
 }
 

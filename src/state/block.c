@@ -47,6 +47,7 @@ block_copy(struct block *old)
 {
 	struct block *new = malloc(sizeof(struct block));
 	new->arr = object_arr_copy(old->arr);
+	new->caller = old->caller;
 	return new;
 }
 
@@ -55,6 +56,7 @@ block_permuteheaplocs(struct block *old, struct permutation *p)
 {
 	struct block *new = malloc(sizeof(struct block));
 	new->arr = object_arr_create();
+	new->caller = old->caller;
 
 	struct object **obj = object_arr_objects(old->arr);
 	int n = object_arr_nobjects(old->arr);
@@ -177,7 +179,9 @@ block_range_alloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
 					ast_expr_copy(up),
 					ast_expr_copy(lw)
 				),
-				heap_newblock(heap)
+				b->caller
+					? heap_newcallerblock(heap)
+					: heap_newblock(heap)
 			)
 		)
 	);

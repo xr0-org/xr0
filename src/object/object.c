@@ -610,7 +610,9 @@ range_copy(struct range *r)
 static struct range * 
 range_permuteheaplocs(struct range *r, struct permutation *p)
 {
-	assert(false);
+	return range_create(
+		ast_expr_copy(r->size), location_permuteheap(r->loc, p)
+	);
 }
 
 static struct int_arr *

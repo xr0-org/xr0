@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <string.h>
 #include "ast.h"
 #include "block.h"
 #include "heap.h"
@@ -65,8 +66,14 @@ heap_str(struct heap *h, char *indent)
 			continue;
 		}
 		char *block = block_str(arr[i]);
-		strbuilder_printf(b, "%s%d: %s %s%s", indent, i, block,
-			printdelim(h, i) ? "\n" : "");
+		strbuilder_printf(
+			b, "%s%d: %s%s",
+			indent, i, (block_iscaller(arr[i]) ? "(c) " : ""),
+			block
+		);
+		if (printdelim(h, i)) {
+			strbuilder_printf(b, "\n");
+		}
 		free(block);
 	}
 	return strbuilder_build(b);
@@ -102,21 +109,38 @@ heap_permute(struct heap *old, struct permutation *p)
 	return new;
 }
 
-struct int_arr *
-heap_deriveorder(struct heap *h, struct circuitbreaker *cb, struct state *s)
-{
-	struct int_arr *derived = int_arr_create();
+/* foundmap: return int map of the given size with the values in the array set
+ * to 1, and all the others to 0. */
+static int *
+foundmap(struct int_arr *, int size);
 
+void
+heap_fillorder(struct heap *h, struct int_arr *arr)
+{
 	int n = block_arr_nblocks(h->blocks);
 	struct block **b = block_arr_blocks(h->blocks);
+	int *found = foundmap(arr, n);
 	for (int i = 0; i < n; i++) {
-		struct location *loc = location_create_dynamic(
-			i, ast_expr_constant_create(0)
-		);
-		int_arr_appendrange(derived, location_deriveorder(loc, cb, s));	
-		location_destroy(loc);
+		if (!found[i]) {
+			int_arr_append(arr, i);
+		}
 	}
-	return derived;
+	free(found);
+}
+
+static int *
+foundmap(struct int_arr *arr, int size)
+{
+	int arr_len = int_arr_len(arr);
+	int *arr_v = int_arr_arr(arr);
+	assert(arr_len <= size);
+
+	int *m = calloc(size, sizeof(int));
+	for (int i = 0; i < arr_len; i++) {
+		assert(arr_v[i] < size);
+		m[arr_v[i]] = 1;
+	}
+	return m;
 }
 
 struct block_arr *

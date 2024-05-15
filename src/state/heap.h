@@ -55,8 +55,8 @@ heap_deallocblock(struct heap *h, int block);
 void
 heap_undeclare(struct heap *, struct state *);
 
-struct int_arr *
-heap_deriveorder(struct heap *, struct circuitbreaker *, struct state *);
+void
+heap_fillorder(struct heap *, struct int_arr *);
 
 /* TODO: extract to own file */
 
