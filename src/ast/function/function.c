@@ -366,6 +366,7 @@ process_commandwithargs(char *cmd, char *args)
 	if (command_isbreak(cmd)) {
 		return command_break(args_tk);	
 	}
+	assert(false);
 }
 
 static bool

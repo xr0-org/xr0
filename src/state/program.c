@@ -168,7 +168,9 @@ program_step(struct program *p, struct state *s)
 	case PROGRAM_COUNTER_STMTS:
 		return program_stmt_step(p, s);
 	case PROGRAM_COUNTER_ATEND:
-		state_popframe(s);
+		if (state_frameid(s) != 0) {
+			state_popframe(s);
+		}
 		return NULL;
 	default:
 		assert(false);

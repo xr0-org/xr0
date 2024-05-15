@@ -27,14 +27,14 @@ char *
 breakpoint_list()
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "Num\tType\tEnb\tWhat\n");
+	strbuilder_printf(b, "Num\tType\tEnabled\tWhat\n");
 	for (int i = 0; i < breakpoint_count; i++) {
 		struct breakpoint bp = breakpoints[i];
 		strbuilder_printf(
 			b,
-			"%d\tbreakpoint\t%s\t%s\n",
+			"%d\tbreak\t%s\t%s\n",
 			i,
-			bp.enabled ? "y" : "n",
+			bp.enabled ? dynamic_str("y") : dynamic_str("n"),
 			breakpoint_str(bp)
 		);
 	}
@@ -59,9 +59,8 @@ struct error *
 breakpoint_set(char *filename, int linenumber)
 {
 	struct breakpoint bp = (struct breakpoint) {
-		.filename = filename, .linenumber = linenumber
+		.enabled = true, .filename = filename, .linenumber = linenumber
 	};
-	printf("bp: %s\n", breakpoint_str(bp));
 	if (breakpoint_count > MAX_BREAKPOINTS) {
 		return error_printf("Maximum number of breakpoints reached\n");
 	}
