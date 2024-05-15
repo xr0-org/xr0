@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "ast.h"
 #include "lex.h"
@@ -16,6 +17,7 @@
 #include "stmt/stmt.h"
 #include "ext.h"
 #include "util.h"
+#include "breakpoint.h"
 
 struct ast_function {
 	bool isaxiom;
@@ -235,7 +237,7 @@ ast_function_debug(struct ast_function *f, struct externals *ext)
 	return NULL;
 }
 
-enum command {
+enum command_kind {
 	COMMAND_STEP,
 	COMMAND_NEXT,
 	COMMAND_BREAKPOINT_SET,
@@ -243,20 +245,52 @@ enum command {
 	COMMAND_QUIT,
 };
 
-static enum command
+struct command {
+	enum command_kind kind;
+	struct string_arr *args;
+};
+
+static struct command *
+command_create(enum command_kind kind)
+{
+	struct command *cmd = malloc(sizeof(struct command));	
+	cmd->kind = kind;
+	cmd->args = string_arr_create();
+	return cmd;
+}
+
+static struct command *
+command_create_withargs(enum command_kind kind, struct string_arr *args)
+{
+	struct command *cmd = malloc(sizeof(struct command));	
+	cmd->kind = kind;
+	cmd->args = args;
+	return cmd;
+}
+
+static void
+command_destroy(struct command *cmd)
+{
+	string_arr_destroy(cmd->args);
+	free(cmd);
+}
+
+static struct command *
 getcmd();
 
 static struct error *
 next(struct path *p)
 {
 	printf("(0db) ");
-	switch (getcmd()) {
+	struct command *cmd = getcmd();
+	printf("bps:\n%s\n", breakpoint_list());
+	switch (cmd->kind) {
 	case COMMAND_STEP:
 		return path_step(p);
 	case COMMAND_NEXT:
 		return path_next(p);
 	case COMMAND_BREAKPOINT_SET:
-		return path_setbreakpoint(p);
+		return NULL;
 	case COMMAND_CONTINUE:
 		return path_continue(p);
 	case COMMAND_QUIT:
@@ -266,40 +300,182 @@ next(struct path *p)
 	}
 }
 
-#define LINELEN 1000
+static struct error *
+setbreakpoint(struct command *cmd)
+{
+	char *filename = dynamic_str(string_arr_s(cmd->args)[0]);
+	int linenum = atoi(string_arr_s(cmd->args)[1]);
+	struct error *err = breakpoint_set(filename, linenum);	
+	if (err) {
+		assert(false);
+	}
+	return NULL;
+}
 
-static enum command
+#define MAX_COMMANDLEN 100
+#define MAX_LINELEN 1000
+#define MAX_ARGSLEN 100
+
+static struct command *
+process_commandwithargs(char *cmd, char *args);
+
+static struct command *
+process_command(char *cmd);
+
+static struct command *
 getcmd()
 {
-	char line[LINELEN];
-	if (!fgets(line, LINELEN, stdin)) {
+	char line[MAX_LINELEN];
+	char cmd[MAX_COMMANDLEN];
+	char args[MAX_ARGSLEN];
+	if (!fgets(line, MAX_LINELEN, stdin)) {
 		fprintf(stderr, "error: cannot read\n");
 		return getcmd();
 	}
-	if (strlen(line) != 2) {
-		fprintf(stderr, "input must be single char\n");
+	char *space = strchr(line, ' ');
+	if (space != NULL) {
+		*space = '\0';
+		strcpy(cmd, line);
+		strcpy(args, space+1);
+		args[strcspn(args, "\n")] = '\0';
+		return process_commandwithargs(cmd, args);
+	} else {
+		strcpy(cmd, line);
+		cmd[strcspn(cmd, "\n")] = '\0';
+		return process_command(cmd);
+	}	
+}
+
+static bool
+command_isbreak(char *cmd);
+
+static struct command *
+command_break(struct string_arr *args);
+
+static struct string_arr *
+args_tokenise(char *args);
+
+static struct command *
+process_commandwithargs(char *cmd, char *args)
+{
+	struct string_arr *args_tk = args_tokenise(args);
+	if (args_tk == NULL) {
+		fprintf(stderr, "invalid command args: %s\n", args);
 		return getcmd();
 	}
-	if (line[1] != '\n') {
-		fprintf(stderr, "input must be end with newline\n");
+	if (command_isbreak(cmd)) {
+		return command_break(args_tk);	
+	}
+}
+
+static bool
+command_isbreak(char *cmd)
+{
+	return strcmp(cmd, "b") == 0 || strcmp(cmd, "break") == 0;
+}
+
+static struct string_arr *
+break_argsplit(char *arg);
+
+static struct command *
+command_break(struct string_arr *args)
+{
+	if (string_arr_n(args) != 1) {
+		fprintf(stderr, "`break' expects single argument\n");
 		return getcmd();
 	}
-	switch (*line) {
-	case 's':
-		return COMMAND_STEP;
-	case 'n':
-		return COMMAND_NEXT;
-	case 'q':
-		return COMMAND_QUIT;
-	case 'b':
-		return COMMAND_BREAKPOINT_SET;
-	case 'c':
-		return COMMAND_CONTINUE;
-	default:
-		fprintf(stderr, "unknown command `%c'", *line);
+	struct string_arr *split = break_argsplit(string_arr_s(args)[0]);
+	if (split == NULL) {
+		fprintf(stderr, "`break' expects argument format <filename>:<linenum>\n");
+		return getcmd();
+	}
+	char *filename = dynamic_str(string_arr_s(split)[0]);
+	int linenum = atoi(string_arr_s(split)[1]);
+	struct error *err = breakpoint_set(filename, linenum);
+	if (err) {
+		fprintf(stderr, "could not set breakpoint: %s", error_str(err));
+		return getcmd();
+	}
+	return command_create(COMMAND_BREAKPOINT_SET);
+}
+
+static struct string_arr *
+break_argsplit(char *arg)
+{
+	struct string_arr *split = string_arr_create();
+
+	char fname[MAX_ARGSLEN];
+	char linenum[MAX_ARGSLEN];
+	char *colon = strchr(arg, ':');
+	if (colon == NULL) {
+		return NULL;
+	} else {
+		*colon = '\0';
+		strcpy(fname, arg);
+		strcpy(linenum, colon+1);
+		linenum[strcspn(linenum, "\n")] = '\0';
+	}
+	string_arr_append(split, dynamic_str(fname));
+	string_arr_append(split, dynamic_str(linenum));
+	return split;
+}
+
+static struct string_arr *
+args_tokenise(char *args)
+{
+	struct string_arr *arg_arr = string_arr_create();
+	char *token;
+	token = strtok(args, " ");
+	while (token != NULL) {
+		string_arr_append(arg_arr, dynamic_str(token));	
+		token = strtok(NULL, " ");
+	}
+	return arg_arr;
+}
+
+static bool
+command_isstep(char *cmd);
+
+static bool
+command_isnext(char *cmd);
+
+static bool
+command_isquit(char *cmd);
+
+static struct command *
+process_command(char *cmd)
+{
+	if (command_isstep(cmd)) {
+		return command_create(COMMAND_STEP);
+	} else if (command_isnext(cmd)) {
+		return command_create(COMMAND_NEXT);
+	} else if (command_isquit(cmd)) {
+		return command_create(COMMAND_QUIT);
+	} else {
+		fprintf(stderr, "unknown command `%s'\n", cmd);
 		return getcmd();
 	}
 }
+
+static bool
+command_isstep(char *cmd)
+{
+	return strcmp(cmd, "s") == 0 || strcmp(cmd, "step") == 0;
+}
+
+static bool
+command_isnext(char *cmd)
+{
+	return strcmp(cmd, "n") == 0 || strcmp(cmd, "next") == 0;
+}
+
+static bool
+command_isquit(char *cmd)
+{
+	return strcmp(cmd, "q") == 0 || strcmp(cmd, "quit") == 0;
+}
+
+
 
 static struct error *
 inititalise_param(struct ast_variable *v, struct state *);

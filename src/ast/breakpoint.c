@@ -56,8 +56,12 @@ static int
 breakpoint_exists(struct breakpoint);
 
 struct error *
-breakpoints_set(struct breakpoint bp)
+breakpoint_set(char *filename, int linenumber)
 {
+	struct breakpoint bp = (struct breakpoint) {
+		.filename = filename, .linenumber = linenumber
+	};
+	printf("bp: %s\n", breakpoint_str(bp));
 	if (breakpoint_count > MAX_BREAKPOINTS) {
 		return error_printf("Maximum number of breakpoints reached\n");
 	}
@@ -68,6 +72,7 @@ breakpoints_set(struct breakpoint bp)
 		);
 	}
 	breakpoints[breakpoint_count] = bp;
+	breakpoint_count++;
 	return NULL;
 }
 
