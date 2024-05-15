@@ -17,6 +17,12 @@ struct lexememarker {
 struct lexememarker *
 lexloc();
 
+int
+lexememarker_linenum(struct lexememarker *);
+
+char *
+lexememarker_filename(struct lexememarker *);
+
 struct lexememarker *
 lexememarker_copy(struct lexememarker *);
 

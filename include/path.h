@@ -25,6 +25,12 @@ path_step(struct path *);
 struct error *
 path_next(struct path *);
 
+struct error *
+path_setbreakpoint(struct path *);
+
+struct error *
+path_continue(struct path *);
+
 char *
 path_str(struct path *);
 

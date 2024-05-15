@@ -282,10 +282,6 @@ path_next(struct path *p)
 	}
 }
 
-static bool
-path_continue(struct path *, enum path_state og_state, int og_frame,
-		int og_index);
-
 static struct error *
 path_next_abstract(struct path *p)
 {
@@ -329,62 +325,6 @@ branch_next(struct path *parent, struct path *branch)
 		return NULL;
 	}
 	return path_next(branch);
-}
-
-static bool
-path_insamestate(struct path *, enum path_state og_state);
-
-static bool
-path_inlowerframe(struct path *p, enum path_state og_state, int og_frameid);
-
-static bool
-path_insamestmt(struct path *p, enum path_state og_state, int og_frameid,
-		int og_program_index);
-
-static bool
-path_continue(struct path *p, enum path_state og_state, int og_frame,
-		int og_index)
-{
-	return path_insamestate(p, og_state) &&
-		(path_inlowerframe(p, og_state, og_frame) ||
-		path_insamestmt(p, og_state, og_frame, og_index));
-}
-
-static bool
-path_insamestate(struct path *p, enum path_state og_state)
-{
-	return p->path_state == og_state;
-}
-
-static bool
-path_inlowerframe(struct path *p, enum path_state og_state, int og_frame)
-{
-	switch (og_state) {
-	case PATH_STATE_ABSTRACT:
-		return og_frame < state_frameid(p->abstract);
-	case PATH_STATE_ACTUAL:
-		return og_frame < state_frameid(p->actual);
-	default:
-		assert(false);
-	}
-}
-
-static bool
-path_insamestmt(struct path *p, enum path_state og_state, int og_frame, int og_index)
-{
-	struct state *s;
-	switch (og_state) {
-	case PATH_STATE_ABSTRACT:
-		s = p->abstract;
-		break;
-	case PATH_STATE_ACTUAL:
-		s = p->actual;
-		break;
-	default:
-		assert(false);
-	}
-	return og_frame == state_frameid(s) &&
-		og_index == state_programindex(s);
 }
 
 static struct error *
@@ -544,6 +484,18 @@ branch_step(struct path *parent, struct path *branch)
 		return NULL;
 	}
 	return path_step(branch);
+}
+
+struct error *
+path_setbreakpoint(struct path *p)
+{
+	assert(false);
+}
+
+struct error *
+path_continue(struct path *p)
+{
+	assert(false);
 }
 
 char *

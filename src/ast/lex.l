@@ -366,6 +366,18 @@ lexememarker_destroy(struct lexememarker *loc)
 	free(loc);
 }
 
+int
+lexememarker_linenum(struct lexememarker *loc)
+{
+	return loc->linenum;
+}
+
+char *
+lexememarker_filename(struct lexememarker *loc)
+{
+	return loc->filename;
+}
+
 char *
 lexememarker_str(struct lexememarker *loc)
 {

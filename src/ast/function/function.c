@@ -238,6 +238,8 @@ ast_function_debug(struct ast_function *f, struct externals *ext)
 enum command {
 	COMMAND_STEP,
 	COMMAND_NEXT,
+	COMMAND_BREAKPOINT_SET,
+	COMMAND_CONTINUE,
 	COMMAND_QUIT,
 };
 
@@ -253,6 +255,10 @@ next(struct path *p)
 		return path_step(p);
 	case COMMAND_NEXT:
 		return path_next(p);
+	case COMMAND_BREAKPOINT_SET:
+		return path_setbreakpoint(p);
+	case COMMAND_CONTINUE:
+		return path_continue(p);
 	case COMMAND_QUIT:
 		exit(0);
 	default:
@@ -285,6 +291,10 @@ getcmd()
 		return COMMAND_NEXT;
 	case 'q':
 		return COMMAND_QUIT;
+	case 'b':
+		return COMMAND_BREAKPOINT_SET;
+	case 'c':
+		return COMMAND_CONTINUE;
 	default:
 		fprintf(stderr, "unknown command `%c'", *line);
 		return getcmd();

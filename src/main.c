@@ -25,7 +25,6 @@
 #define ERROR_NO_INPUT		"must provide input as string"
 #define ERROR_NO_SORTFUNC	"supply function to `-t' flag to evaluate dependencies for"
 
-
 int
 yyparse();
 

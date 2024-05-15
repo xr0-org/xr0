@@ -64,7 +64,8 @@ program_destroy(struct program *p)
 	free(p);
 }
 
-struct program * program_copy(struct program *old)
+struct program *
+program_copy(struct program *old)
 {
 	struct program *new = program_create(old->b);
 	new->s = old->s;
