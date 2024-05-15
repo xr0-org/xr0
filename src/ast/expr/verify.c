@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ast.h"
+#include "breakpoint.h"
 #include "expr.h"
 #include "ext.h"
 #include "intern.h"
@@ -1082,6 +1083,8 @@ ast_expr_abseval(struct ast_expr *expr, struct state *state)
 static struct result *
 call_absexec(struct ast_expr *expr, struct state *state)
 {
+	breakpoint_reset();
+
 	struct error *err;
 
 	struct ast_expr *root = ast_expr_call_root(expr);

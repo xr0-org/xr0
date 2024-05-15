@@ -138,6 +138,9 @@ state_execmode_str(enum execution_mode);
 enum execution_mode
 state_execmode(struct state *);
 
+struct lexememarker *
+state_lexememarker(struct state *);
+
 bool
 state_addresses_deallocand(struct state *, struct object *);
 

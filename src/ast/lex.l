@@ -351,7 +351,8 @@ strip_iflibx(char *filename)
 
 struct lexememarker *
 lexememarker_copy(struct lexememarker *loc)
-{ return lexememarker_create(
+{
+	return lexememarker_create(
 		loc->linenum,
 		loc->column,
 		dynamic_str(loc->filename),
@@ -364,6 +365,18 @@ lexememarker_destroy(struct lexememarker *loc)
 {
 	free(loc->filename);
 	free(loc);
+}
+
+int
+lexememarker_linenum(struct lexememarker *loc)
+{
+	return loc->linenum;
+}
+
+char *
+lexememarker_filename(struct lexememarker *loc)
+{
+	return loc->filename;
 }
 
 char *

@@ -45,6 +45,8 @@ OBJECT_OBJ = $(BUILD_DIR)/object.o
 VALUE_OBJ = $(BUILD_DIR)/value.o
 MATH_OBJ = $(BUILD_DIR)/math.o
 
+BREAKPOINT_OBJ = $(BUILD_DIR)/breakpoint.o
+
 AST_OBJ = $(BUILD_DIR)/ast.o
 LEX_OBJ = $(BUILD_DIR)/lex.o
 UTIL_OBJ = $(BUILD_DIR)/util.o
@@ -59,7 +61,8 @@ XR0_OBJECTS = $(AST_OBJ) \
 	      $(GRAM_OBJ) \
 	      $(STATE_OBJ) \
 	      $(UTIL_OBJ) \
-	      $(MATH_OBJ)
+	      $(MATH_OBJ) \
+	      $(BREAKPOINT_OBJ)
 
 STATE_OBJECTS = $(VALUE_OBJ) \
 		$(LOCATION_OBJ) \
@@ -135,9 +138,13 @@ $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/stack.c
 
-$(PROGRAM_OBJ): $(STATE_DIR)/program.c
+$(PROGRAM_OBJ): $(STATE_DIR)/program.c $(BREAKPOINT_OBJ)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/program.c
+
+$(BREAKPOINT_OBJ): $(AST_DIR)/breakpoint.c
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -o $@ -c $(AST_DIR)/breakpoint.c
 
 $(HEAP_OBJ): $(STATE_DIR)/heap.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'

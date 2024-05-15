@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "ast.h"
+#include "breakpoint.h"
 #include "lex.h"
 #include "program.h"
 #include "state.h"
@@ -64,7 +65,8 @@ program_destroy(struct program *p)
 	free(p);
 }
 
-struct program * program_copy(struct program *old)
+struct program *
+program_copy(struct program *old)
 {
 	struct program *new = program_create(old->b);
 	new->s = old->s;
@@ -167,7 +169,9 @@ program_step(struct program *p, struct state *s)
 	case PROGRAM_COUNTER_STMTS:
 		return program_stmt_step(p, s);
 	case PROGRAM_COUNTER_ATEND:
-		state_popframe(s);
+		if (state_frameid(s) != 0) {
+			state_popframe(s);
+		}
 		return NULL;
 	default:
 		assert(false);
@@ -262,6 +266,20 @@ program_loc(struct program *p)
 		return lexememarker_str(
 			ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index-1])
 		);
+	default:
+		assert(false);
+	}
+}
+
+struct lexememarker *
+program_lexememarker(struct program *p)
+{
+	switch (p->s) {
+	case PROGRAM_COUNTER_STMTS:
+		return ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index]);
+	case PROGRAM_COUNTER_DECLS:
+	case PROGRAM_COUNTER_ATEND:
+		return NULL;
 	default:
 		assert(false);
 	}

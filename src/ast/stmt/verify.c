@@ -611,8 +611,7 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 	if ((err = ast_expr_alloc_rangeprocess(alloc, lw, up, state))) {
 		return err;
 	}
-	return NULL;
-}
+	return NULL; }
 
 static struct ast_expr *
 hack_alloc_from_neteffect(struct ast_stmt *stmt)
