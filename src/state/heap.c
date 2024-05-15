@@ -68,7 +68,7 @@ heap_str(struct heap *h, char *indent)
 		char *block = block_str(arr[i]);
 		strbuilder_printf(
 			b, "%s%d: %s%s",
-			indent, i, (block_iscaller(arr[i]) ? "(c) " : ""),
+			indent, i, (block_iscaller(arr[i]) ? "" : ""),
 			block
 		);
 		if (printdelim(h, i)) {
