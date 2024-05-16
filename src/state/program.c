@@ -222,10 +222,11 @@ struct error *
 program_next(struct program *p, struct state *s)
 {
 	switch (p->s) {
-	case PROGRAM_COUNTER_STMTS:
-		return program_stmt_next(p, s);
+	case PROGRAM_COUNTER_DECLS:
 	case PROGRAM_COUNTER_ATEND:
 		return program_step(p, s);
+	case PROGRAM_COUNTER_STMTS:
+		return program_stmt_next(p, s);	
 	default:
 		assert(false);
 	}
@@ -236,12 +237,11 @@ program_stmt_next(struct program *p, struct state *s)
 {
 	int og_frame = state_frameid(s);
 	do {
-		struct error *err = state_step(s);			
+		struct error *err = state_step(s);
 		if (err) {
 			return err;
 		}
 	} while (state_frameid(s) != og_frame);
-
 
 	return NULL;
 }

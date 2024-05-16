@@ -289,7 +289,20 @@ path_continue(struct path *, enum path_state og_state, int og_frame,
 static struct error *
 path_next_abstract(struct path *p)
 {
-	return state_next(p->abstract);
+	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
+		p->path_state = PATH_STATE_HALFWAY;
+		return path_step(p);
+	}
+	struct error *err = state_next(p->abstract);
+	if (!err) {
+		return NULL;
+	}
+	struct error *uc_err = error_to_undecideable_cond(err);
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
+	}
+	return state_stacktrace(p->abstract, err);
 }
 
 static struct error *
@@ -377,7 +390,20 @@ path_insamestmt(struct path *p, enum path_state og_state, int og_frame, int og_i
 static struct error *
 path_next_actual(struct path *p)
 {
-	return state_next(p->actual);	
+	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
+		p->path_state = PATH_STATE_AUDIT;
+		return path_step(p);
+	}
+	struct error *err = state_next(p->actual);
+	if (!err) {
+		return NULL;
+	}
+	struct error *uc_err = error_to_undecideable_cond(err);
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
+	}
+	return state_stacktrace(p->actual, err);
 }
 
 static struct error *
@@ -527,22 +553,26 @@ char *
 path_actual_str(struct path *);
 
 char *
+path_split_str(struct path *);
+
+char *
 path_str(struct path *p)
 {
 	switch (p->path_state) {
 	case PATH_STATE_UNINIT:
-		return dynamic_str("init abstract state");
+		return dynamic_str("path init abstract state");
 	case PATH_STATE_ABSTRACT:
 		return path_abstract_str(p);
 	case PATH_STATE_HALFWAY:
-		return dynamic_str("init actual state");
+		return dynamic_str("path init actual state");
 	case PATH_STATE_ACTUAL:
 		return path_actual_str(p);
 	case PATH_STATE_AUDIT:
-		return dynamic_str("audit");
+		return dynamic_str("path audit");
 	case PATH_STATE_SPLIT:
-		return dynamic_str("split");
+		return path_split_str(p);
 	case PATH_STATE_ATEND:
+		return dynamic_str("path at end");
 	default:
 		assert(false);
 	}
@@ -570,4 +600,11 @@ path_actual_str(struct path *p)
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
 	strbuilder_printf(b, "%s\n", state_str(p->actual));
 	return strbuilder_build(b);
+}
+
+char *
+path_split_str(struct path *p)
+{
+	struct path *branch = p->paths->paths[p->branch_index];
+	return path_str(branch);
 }
