@@ -289,7 +289,20 @@ path_continue(struct path *, enum path_state og_state, int og_frame,
 static struct error *
 path_next_abstract(struct path *p)
 {
-	return state_next(p->abstract);
+	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
+		p->path_state = PATH_STATE_HALFWAY;
+		return path_step(p);
+	}
+	struct error *err = state_next(p->abstract);
+	if (!err) {
+		return NULL;
+	}
+	struct error *uc_err = error_to_undecideable_cond(err);
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
+	}
+	return state_stacktrace(p->abstract, err);
 }
 
 static struct error *
@@ -377,7 +390,20 @@ path_insamestmt(struct path *p, enum path_state og_state, int og_frame, int og_i
 static struct error *
 path_next_actual(struct path *p)
 {
-	return state_next(p->actual);	
+	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
+		p->path_state = PATH_STATE_AUDIT;
+		return path_step(p);
+	}
+	struct error *err = state_next(p->actual);
+	if (!err) {
+		return NULL;
+	}
+	struct error *uc_err = error_to_undecideable_cond(err);
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
+	}
+	return state_stacktrace(p->actual, err);
 }
 
 static struct error *
