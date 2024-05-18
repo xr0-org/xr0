@@ -240,9 +240,10 @@ ast_function_debug(struct ast_function *f, struct externals *ext)
 enum command_kind {
 	COMMAND_STEP,
 	COMMAND_NEXT,
-	COMMAND_BREAKPOINT_SET,
 	COMMAND_CONTINUE,
 	COMMAND_QUIT,
+	COMMAND_BREAKPOINT_SET,
+	COMMAND_BREAKPOINT_LIST,
 };
 
 struct command {
@@ -283,18 +284,18 @@ next(struct path *p)
 {
 	printf("(0db) ");
 	struct command *cmd = getcmd();
-	printf("bps:\n%s\n", breakpoint_list());
 	switch (cmd->kind) {
 	case COMMAND_STEP:
 		return path_step(p);
 	case COMMAND_NEXT:
-		return path_next(p);
-	case COMMAND_BREAKPOINT_SET:
-		return NULL;
+		return path_next(p);	
 	case COMMAND_CONTINUE:
 		return path_continue(p);
 	case COMMAND_QUIT:
 		exit(0);
+	case COMMAND_BREAKPOINT_SET:
+	case COMMAND_BREAKPOINT_LIST:
+		return NULL;
 	default:
 		assert(false);
 	}
@@ -317,10 +318,10 @@ setbreakpoint(struct command *cmd)
 #define MAX_ARGSLEN 100
 
 static struct command *
-process_commandwithargs(char *cmd, char *args);
+process_command(char *cmd);
 
 static struct command *
-process_command(char *cmd);
+process_commandwithargs(char *cmd, char *args);
 
 static struct command *
 getcmd()
@@ -333,105 +334,19 @@ getcmd()
 		return getcmd();
 	}
 	char *space = strchr(line, ' ');
-	if (space != NULL) {
+	if (space == NULL) {
+		/* ⊢ command no args */
+		strcpy(cmd, line);
+		cmd[strcspn(cmd, "\n")] = '\0';
+		return process_command(cmd);
+	} else {
+		/* ⊢ command with args */
 		*space = '\0';
 		strcpy(cmd, line);
 		strcpy(args, space+1);
 		args[strcspn(args, "\n")] = '\0';
-		return process_commandwithargs(cmd, args);
-	} else {
-		strcpy(cmd, line);
-		cmd[strcspn(cmd, "\n")] = '\0';
-		return process_command(cmd);
-	}	
-}
-
-static bool
-command_isbreak(char *cmd);
-
-static struct command *
-command_break(struct string_arr *args);
-
-static struct string_arr *
-args_tokenise(char *args);
-
-static struct command *
-process_commandwithargs(char *cmd, char *args)
-{
-	struct string_arr *args_tk = args_tokenise(args);
-	if (args_tk == NULL) {
-		fprintf(stderr, "invalid command args: %s\n", args);
-		return getcmd();
+		return process_commandwithargs(cmd, args);	
 	}
-	if (command_isbreak(cmd)) {
-		return command_break(args_tk);	
-	}
-	assert(false);
-}
-
-static bool
-command_isbreak(char *cmd)
-{
-	return strcmp(cmd, "b") == 0 || strcmp(cmd, "break") == 0;
-}
-
-static struct string_arr *
-break_argsplit(char *arg);
-
-static struct command *
-command_break(struct string_arr *args)
-{
-	if (string_arr_n(args) != 1) {
-		fprintf(stderr, "`break' expects single argument\n");
-		return getcmd();
-	}
-	struct string_arr *split = break_argsplit(string_arr_s(args)[0]);
-	if (split == NULL) {
-		fprintf(stderr, "`break' expects argument format <filename>:<linenum>\n");
-		return getcmd();
-	}
-	char *filename = dynamic_str(string_arr_s(split)[0]);
-	int linenum = atoi(string_arr_s(split)[1]);
-	struct error *err = breakpoint_set(filename, linenum);
-	if (err) {
-		fprintf(stderr, "could not set breakpoint: %s", error_str(err));
-		return getcmd();
-	}
-	return command_create(COMMAND_BREAKPOINT_SET);
-}
-
-static struct string_arr *
-break_argsplit(char *arg)
-{
-	struct string_arr *split = string_arr_create();
-
-	char fname[MAX_ARGSLEN];
-	char linenum[MAX_ARGSLEN];
-	char *colon = strchr(arg, ':');
-	if (colon == NULL) {
-		return NULL;
-	} else {
-		*colon = '\0';
-		strcpy(fname, arg);
-		strcpy(linenum, colon+1);
-		linenum[strcspn(linenum, "\n")] = '\0';
-	}
-	string_arr_append(split, dynamic_str(fname));
-	string_arr_append(split, dynamic_str(linenum));
-	return split;
-}
-
-static struct string_arr *
-args_tokenise(char *args)
-{
-	struct string_arr *arg_arr = string_arr_create();
-	char *token;
-	token = strtok(args, " ");
-	while (token != NULL) {
-		string_arr_append(arg_arr, dynamic_str(token));	
-		token = strtok(NULL, " ");
-	}
-	return arg_arr;
 }
 
 static bool
@@ -476,7 +391,147 @@ command_isquit(char *cmd)
 	return strcmp(cmd, "q") == 0 || strcmp(cmd, "quit") == 0;
 }
 
+static struct string_arr *
+args_tokenise(char *args);
 
+static bool
+command_isbreak(char *cmd);
+
+static struct command *
+command_break(struct string_arr *args);
+
+static struct command *
+process_commandwithargs(char *cmd, char *args)
+{
+	printf("command: %s\nargs: %s\n", cmd, args);
+	struct string_arr *args_tk = args_tokenise(args);
+	if (args_tk == NULL) {
+		fprintf(stderr, "invalid command args: %s\n", args);
+		return getcmd();
+	}
+	if (command_isbreak(cmd)) {
+		return command_break(args_tk);	
+	}
+	assert(false);
+}
+
+static struct string_arr *
+args_tokenise(char *args)
+{
+	printf("args_tokenuse: %s\n", args);
+	struct string_arr *arg_arr = string_arr_create();
+	char *token;
+	token = strtok(args, " ");
+	while (token != NULL) {
+		string_arr_append(arg_arr, dynamic_str(token));	
+		token = strtok(NULL, " ");
+	}
+	return arg_arr;
+}
+
+static bool
+command_isbreak(char *cmd)
+{
+	return strcmp(cmd, "b") == 0 || strcmp(cmd, "break") == 0;
+}
+
+static bool
+break_argisset(char *arg);
+
+static bool
+break_argislist(char *arg);
+
+static struct command *
+break_set(char *arg);
+
+static struct command *
+break_list();
+
+static struct command *
+command_break(struct string_arr *args)
+{
+	if (string_arr_n(args) != 1) {
+		fprintf(stderr, "`break' expects single argument\n");
+		return getcmd();
+	}
+	char *arg = string_arr_s(args)[0];
+	if (break_argisset(arg)) {
+		return break_set(arg);
+	} else if (break_argislist(arg)) {
+		return break_list();
+	} else {
+		fprintf(stderr, "`break' recieved unknown argument\n");
+		return getcmd();
+	}
+}
+
+static bool
+break_argisset(char *arg)
+{
+	char *pos = strchr(arg, ':');
+	if (pos != NULL) {
+		int index = pos - arg;
+		if (index > 0 && index < strlen(arg) - 1) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool
+break_argislist(char *arg)
+{
+	return strcmp(arg, "list") == 0;
+}
+
+static struct string_arr *
+break_argsplit(char *arg);
+
+static struct command *
+break_set(char *arg)
+{
+	struct string_arr *split = break_argsplit(arg);
+	if (split == NULL) {
+		fprintf(stderr, "`break' expects argument format <filename>:<linenum>\n");
+		return getcmd();
+	}
+	char *filename = dynamic_str(string_arr_s(split)[0]);
+	int linenum = atoi(string_arr_s(split)[1]);
+	struct error *err = breakpoint_set(filename, linenum);
+	if (err) {
+		fprintf(stderr, "could not set breakpoint: %s", error_str(err));
+		return getcmd();
+	}
+	return command_create(COMMAND_BREAKPOINT_SET);
+}
+
+static struct string_arr *
+break_argsplit(char *arg)
+{
+	struct string_arr *split = string_arr_create();
+
+	char fname[MAX_ARGSLEN];
+	char linenum[MAX_ARGSLEN];
+	char *colon = strchr(arg, ':');
+	if (colon == NULL) {
+		return NULL;
+	} else {
+		*colon = '\0';
+		strcpy(fname, arg);
+		strcpy(linenum, colon+1);
+		linenum[strcspn(linenum, "\n")] = '\0';
+	}
+	string_arr_append(split, dynamic_str(fname));
+	string_arr_append(split, dynamic_str(linenum));
+	return split;
+}
+
+static struct command *
+break_list()
+{
+	printf("%s\n", breakpoint_list());
+	return getcmd();
+}
 
 static struct error *
 inititalise_param(struct ast_variable *v, struct state *);
@@ -491,7 +546,6 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 	for (int i = 0; i < nparams; i++) {
 		state_declare(s, params[i], true);
 	}
-
 	for (int i = 0; i < nparams; i++) {
 		if ((err = inititalise_param(params[i], s))) {
 			return err;
