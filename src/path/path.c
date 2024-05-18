@@ -553,22 +553,26 @@ char *
 path_actual_str(struct path *);
 
 char *
+path_split_str(struct path *);
+
+char *
 path_str(struct path *p)
 {
 	switch (p->path_state) {
 	case PATH_STATE_UNINIT:
-		return dynamic_str("init abstract state");
+		return dynamic_str("path init abstract state");
 	case PATH_STATE_ABSTRACT:
 		return path_abstract_str(p);
 	case PATH_STATE_HALFWAY:
-		return dynamic_str("init actual state");
+		return dynamic_str("path init actual state");
 	case PATH_STATE_ACTUAL:
 		return path_actual_str(p);
 	case PATH_STATE_AUDIT:
-		return dynamic_str("audit");
+		return dynamic_str("path audit");
 	case PATH_STATE_SPLIT:
-		return dynamic_str("split");
+		return path_split_str(p);
 	case PATH_STATE_ATEND:
+		return dynamic_str("path at end");
 	default:
 		assert(false);
 	}
@@ -596,4 +600,11 @@ path_actual_str(struct path *p)
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
 	strbuilder_printf(b, "%s\n", state_str(p->actual));
 	return strbuilder_build(b);
+}
+
+char *
+path_split_str(struct path *p)
+{
+	struct path *branch = p->paths->paths[p->branch_index];
+	return path_str(branch);
 }
