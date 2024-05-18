@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "ast.h"
+#include "breakpoint.h"
 #include "lex.h"
 #include "program.h"
 #include "state.h"
@@ -200,6 +201,9 @@ static struct error *
 program_stmt_process(struct program *p, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
+	if (breakpoint_shouldbreak(ast_stmt_lexememarker(stmt))) {
+		return NULL;
+	}
 	if (!state_islinear(s) && ast_stmt_linearisable(stmt)) {
 		return ast_stmt_linearise(stmt, s);
 	}

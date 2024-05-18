@@ -403,7 +403,6 @@ command_break(struct string_arr *args);
 static struct command *
 process_commandwithargs(char *cmd, char *args)
 {
-	printf("command: %s\nargs: %s\n", cmd, args);
 	struct string_arr *args_tk = args_tokenise(args);
 	if (args_tk == NULL) {
 		fprintf(stderr, "invalid command args: %s\n", args);
@@ -418,7 +417,6 @@ process_commandwithargs(char *cmd, char *args)
 static struct string_arr *
 args_tokenise(char *args)
 {
-	printf("args_tokenuse: %s\n", args);
 	struct string_arr *arg_arr = string_arr_create();
 	char *token;
 	token = strtok(args, " ");

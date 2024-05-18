@@ -4,6 +4,7 @@
 #include<stdbool.h>
 #include<assert.h>
 
+#include "breakpoint.h"
 #include "util.h"
 #include "lex.h"
 

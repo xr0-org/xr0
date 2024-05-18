@@ -72,8 +72,7 @@ void
 result_destroy(struct result *res)
 {
 	assert(!res->err);
-	if (res->val) {
-		value_destroy(res->val);
+	if (res->val) { value_destroy(res->val);
 	}
 	free(res);
 }
