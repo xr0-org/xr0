@@ -16,6 +16,9 @@ path_create(struct ast_function *, struct externals *);
 void
 path_destroy(struct path *);
 
+char *
+path_str(struct path *);
+
 bool
 path_atend(struct path *);
 
@@ -28,10 +31,7 @@ path_next(struct path *);
 struct error *
 path_setbreakpoint(struct path *);
 
-struct error *
-path_continue(struct path *);
-
-char *
-path_str(struct path *);
+struct lexememarker *
+path_lexememarker(struct path *);
 
 #endif

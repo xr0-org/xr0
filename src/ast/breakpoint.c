@@ -93,8 +93,7 @@ breakpoint_exists(struct breakpoint bp)
 static bool
 breakpoint_equal(struct breakpoint bp1, struct breakpoint bp2)
 {
-	return strcmp(bp1.filename, bp2.filename) == 0 &&
-		bp1.linenumber == bp2.linenumber;
+	return bp1.linenumber == bp2.linenumber;
 }
 
 struct error *
@@ -110,11 +109,11 @@ breakpoint_delete(int id)
 bool
 breakpoint_shouldbreak(struct lexememarker *loc)
 {
-	char *fname = lexememarker_filename(loc);
+	//char *fname = lexememarker_filename(loc);
 	int linenum = lexememarker_linenum(loc);
 
 	struct breakpoint bp = (struct breakpoint) {
-		.filename = fname, .linenumber = linenum,
+		.filename = "placeholder", .linenumber = linenum,
 	};
 	int index = breakpoint_exists(bp);
 	if (index == -1) {

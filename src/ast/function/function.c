@@ -220,7 +220,7 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 }
 
 static struct error *
-next(struct path *);
+next_command(struct path *);
 
 struct error *
 ast_function_debug(struct ast_function *f, struct externals *ext)
@@ -228,7 +228,7 @@ ast_function_debug(struct ast_function *f, struct externals *ext)
 	struct path *path = path_create(f, ext);
 	while (!path_atend(path)) {
 		d_printf("%s\n", path_str(path));
-		struct error *err = next(path);
+		struct error *err = next_command(path);
 		if (err) {
 			return err;
 		}
@@ -280,7 +280,10 @@ static struct command *
 getcmd();
 
 static struct error *
-next(struct path *p)
+command_continue(struct path *);
+
+static struct error *
+next_command(struct path *p)
 {
 	printf("(0db) ");
 	struct command *cmd = getcmd();
@@ -290,7 +293,7 @@ next(struct path *p)
 	case COMMAND_NEXT:
 		return path_next(p);	
 	case COMMAND_CONTINUE:
-		return path_continue(p);
+		return command_continue(p);
 	case COMMAND_QUIT:
 		exit(0);
 	case COMMAND_BREAKPOINT_SET:
@@ -302,16 +305,23 @@ next(struct path *p)
 }
 
 static struct error *
-setbreakpoint(struct command *cmd)
+command_continue(struct path *p)
 {
-	char *filename = dynamic_str(string_arr_s(cmd->args)[0]);
-	int linenum = atoi(string_arr_s(cmd->args)[1]);
-	struct error *err = breakpoint_set(filename, linenum);	
-	if (err) {
-		assert(false);
+	while (!path_atend(p)) {
+		struct lexememarker *loc = path_lexememarker(p);
+		if (loc) {
+			printf("loc: %s\n", lexememarker_str(loc));
+		}
+		if (loc && breakpoint_shouldbreak(loc)) {
+			return NULL;
+		}
+		path_step(p);
 	}
 	return NULL;
 }
+
+
+/* getcmd() */
 
 #define MAX_COMMANDLEN 100
 #define MAX_LINELEN 1000
@@ -356,6 +366,9 @@ static bool
 command_isnext(char *cmd);
 
 static bool
+command_iscontinue(char *cmd);
+
+static bool
 command_isquit(char *cmd);
 
 static struct command *
@@ -365,6 +378,8 @@ process_command(char *cmd)
 		return command_create(COMMAND_STEP);
 	} else if (command_isnext(cmd)) {
 		return command_create(COMMAND_NEXT);
+	} else if (command_iscontinue(cmd)){
+		return command_create(COMMAND_CONTINUE);
 	} else if (command_isquit(cmd)) {
 		return command_create(COMMAND_QUIT);
 	} else {
@@ -383,6 +398,12 @@ static bool
 command_isnext(char *cmd)
 {
 	return strcmp(cmd, "n") == 0 || strcmp(cmd, "next") == 0;
+}
+
+static bool
+command_iscontinue(char *cmd)
+{
+	return strcmp(cmd, "c") == 0 || strcmp(cmd, "continue") == 0;
 }
 
 static bool

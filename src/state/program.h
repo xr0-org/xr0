@@ -44,4 +44,7 @@ program_next(struct program *, struct state *);
 char *
 program_loc(struct program *);
 
+struct lexememarker *
+program_lexememarker(struct program *);
+
 #endif

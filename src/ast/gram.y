@@ -110,6 +110,7 @@ variable_array_create(struct ast_variable *v)
 	struct ast_expr *expr;
 	struct ast_externdecl *externdecl;
 	struct ast_function *function;
+	struct lexememarker *lexememarker;
 	struct ast_stmt *statement;
 	struct ast_type *type;
 	struct ast_variable *variable;
@@ -177,6 +178,7 @@ variable_array_create(struct ast_variable *v)
 %type <statement> statement expression_statement selection_statement jump_statement 
 %type <statement> labelled_statement iteration_statement for_iteration_statement
 %type <statement> iteration_effect_statement
+%type <lexememarker> selection_statement_if
 %type <stmt_array> statement_list
 %type <string> identifier direct_declarator
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
@@ -742,14 +744,17 @@ expression_statement
 	;
 
 selection_statement
-	: IF '(' expression ')' statement
-		{ $$ = ast_stmt_create_sel(lexloc(), false, $3, ast_stmt_as_compound($5), NULL); }
-	| IF '(' expression ')' statement ELSE statement
-		{ $$ = ast_stmt_create_sel(
-			lexloc(), false, $3, ast_stmt_as_compound($5), ast_stmt_as_compound($7)
-		); }
+	: selection_statement_if '(' expression ')' statement
+		{ $$ = ast_stmt_create_sel($1, false, $3, ast_stmt_as_compound($5), NULL); }
+	| selection_statement_if '(' expression ')' statement ELSE statement
+		{ $$ = ast_stmt_create_sel($1, false, $3, ast_stmt_as_compound($5), ast_stmt_as_compound($7));
+		}
 	| SWITCH '(' expression ')' statement
 		{ assert(false); }
+	;
+
+selection_statement_if
+	: IF { $$ = lexloc(); }
 	;
 
 for_some

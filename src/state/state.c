@@ -177,6 +177,12 @@ state_execmode(struct state *s)
 	return stack_execmode(s->stack);
 }
 
+struct lexememarker *
+state_lexememarker(struct state *s)
+{
+	return stack_lexememarker(s->stack);
+}
+
 bool
 state_atend(struct state *s)
 {

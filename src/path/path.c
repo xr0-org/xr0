@@ -548,11 +548,32 @@ branch_next(struct path *parent, struct path *branch)
 	return path_next(branch);
 }
 
+static struct lexememarker *
+path_split_lexememarker(struct path *);
 
-/* path_continue */
-
-struct error *
-path_continue(struct path *p)
+struct lexememarker *
+path_lexememarker(struct path *p)
 {
-	assert(false);
+	switch (p->path_state) {
+	case PATH_STATE_ACTUAL:
+		return state_lexememarker(p->actual);
+	case PATH_STATE_ABSTRACT:
+		return state_lexememarker(p->abstract);
+	case PATH_STATE_SPLIT:
+		return path_split_lexememarker(p);
+	case PATH_STATE_UNINIT:
+	case PATH_STATE_HALFWAY:
+	case PATH_STATE_AUDIT:
+	case PATH_STATE_ATEND:
+		return NULL;
+	default:
+		assert(false);
+	}
+}
+
+static struct lexememarker *
+path_split_lexememarker(struct path *p)
+{
+	struct path *branch = p->paths->paths[p->branch_index];
+	return path_lexememarker(branch);
 }

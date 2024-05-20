@@ -186,6 +186,7 @@ program_stmt_step(struct program *p, struct state *s)
 {
 	struct error *err = program_stmt_process(p, s);
 	if (!err) {
+		printf("curr loc: %s\n", lexememarker_str(ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index])));
 		program_nextstmt(p, s);
 		return NULL;
 	}
@@ -201,9 +202,6 @@ static struct error *
 program_stmt_process(struct program *p, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	if (breakpoint_shouldbreak(ast_stmt_lexememarker(stmt))) {
-		return NULL;
-	}
 	if (!state_islinear(s) && ast_stmt_linearisable(stmt)) {
 		return ast_stmt_linearise(stmt, s);
 	}
@@ -269,6 +267,20 @@ program_loc(struct program *p)
 		return lexememarker_str(
 			ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index-1])
 		);
+	default:
+		assert(false);
+	}
+}
+
+struct lexememarker *
+program_lexememarker(struct program *p)
+{
+	switch (p->s) {
+	case PROGRAM_COUNTER_STMTS:
+		return ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index]);
+	case PROGRAM_COUNTER_DECLS:
+	case PROGRAM_COUNTER_ATEND:
+		return NULL;
 	default:
 		assert(false);
 	}

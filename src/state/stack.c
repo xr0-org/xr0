@@ -319,6 +319,12 @@ stack_execmode(struct stack *s)
 	return s->mode;
 }
 
+struct lexememarker *
+stack_lexememarker(struct stack *s)
+{
+	return program_lexememarker(s->p);
+}
+
 bool
 stack_atend(struct stack *s)
 {
