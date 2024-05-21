@@ -555,10 +555,10 @@ struct lexememarker *
 path_lexememarker(struct path *p)
 {
 	switch (p->path_state) {
-	case PATH_STATE_ACTUAL:
-		return state_lexememarker(p->actual);
 	case PATH_STATE_ABSTRACT:
 		return state_lexememarker(p->abstract);
+	case PATH_STATE_ACTUAL:
+		return state_lexememarker(p->actual);	
 	case PATH_STATE_SPLIT:
 		return path_split_lexememarker(p);
 	case PATH_STATE_UNINIT:

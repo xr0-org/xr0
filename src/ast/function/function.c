@@ -308,11 +308,11 @@ static struct error *
 command_continue(struct path *p)
 {
 	while (!path_atend(p)) {
+		path_step(p);
 		struct lexememarker *loc = path_lexememarker(p);
 		if (loc && breakpoint_shouldbreak(loc)) {
 			return NULL;
 		}
-		path_step(p);
 	}
 	return NULL;
 }

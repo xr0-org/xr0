@@ -14,6 +14,7 @@
 
 struct breakpoint {
 	bool enabled;
+	bool reached;
 	char *filename;
 	int linenumber;
 };
@@ -28,14 +29,14 @@ char *
 breakpoint_list()
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "Num\tType\tEnabled\tWhat\n");
+	strbuilder_printf(b, "Num\tType\tEnabled\tReached\tWhat\n");
 	for (int i = 0; i < breakpoint_count; i++) {
 		struct breakpoint bp = breakpoints[i];
-		strbuilder_printf(
-			b,
-			"%d\tbreak\t%s\t%s\n",
+		strbuilder_printf( b,
+			"%d\tbreak\t%s\t%s\t%s\n",
 			i,
 			bp.enabled ? dynamic_str("y") : dynamic_str("n"),
+			bp.reached ? dynamic_str("y") : dynamic_str("n"),
 			breakpoint_str(bp)
 		);
 	}
@@ -83,7 +84,8 @@ static int
 breakpoint_exists(struct breakpoint bp)
 {
 	for (int i = 0; i < breakpoint_count; i++) {
-		if (breakpoint_equal(bp, breakpoints[i])) {
+		if (breakpoint_equal(bp, breakpoints[i]) && !breakpoints[i].reached) {
+			breakpoints[i].reached = true;
 			return i;
 		}
 	}
@@ -113,7 +115,7 @@ breakpoint_shouldbreak(struct lexememarker *loc)
 	int linenum = lexememarker_linenum(loc);
 
 	struct breakpoint bp = (struct breakpoint) {
-		.filename = "placeholder", .linenumber = linenum,
+		.filename = "", .linenumber = linenum,
 	};
 	int index = breakpoint_exists(bp);
 	if (index == -1) {

@@ -34,4 +34,7 @@ path_setbreakpoint(struct path *);
 struct lexememarker *
 path_lexememarker(struct path *);
 
+int
+path_frameid(struct path *);
+
 #endif
