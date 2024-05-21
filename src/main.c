@@ -41,6 +41,7 @@ struct config {
 	char *sortfunc;
 	enum sortmode sortmode;
 	bool debug;
+	bool preproc; /* skip preprocessing phase when this is true */
 };
 
 static struct string_arr *
@@ -60,11 +61,12 @@ parse_config(int argc, char *argv[])
 	enum execmode mode = EXECMODE_VERIFY;
 	bool verbose = false;
 	bool debug = false;
+	bool preproc = true;
 	struct sortconfig sortconf = sortconfig_create(SORTMODE_NONE, "");
 	struct string_arr *includedirs = default_includes();
 	char *outfile = OUTPUT_PATH;
 	int opt;
-	while ((opt = getopt(argc, argv, "vso:t:x:I:d")) != -1) {
+	while ((opt = getopt(argc, argv, "vsFo:t:x:I:d")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
@@ -77,6 +79,9 @@ parse_config(int argc, char *argv[])
 			break;
 		case 's':
 			mode = EXECMODE_STRIP;
+			break;
+		case 'F':
+			preproc = false;
 			break;
 		case 't':
 			sortconf = sortconfig_create(SORTMODE_SORT, optarg);
@@ -104,7 +109,8 @@ parse_config(int argc, char *argv[])
 		.verbose	= verbose,
 		.sortmode	= sortconf.mode,
 		.sortfunc	= sortconf.sortfunc,
-		.debug		= debug
+		.debug		= debug,
+		.preproc	= preproc,
 	};
 }
 
@@ -194,6 +200,22 @@ preprocess(char *infile, struct string_arr *includedirs)
 	rewind(tmp);
 	return tmp;
 }
+
+FILE *
+preparefile(struct config *c)
+{
+	if (c->preproc) {
+		return preprocess(c->infile, c->includedirs);
+	}
+	FILE *f = fopen(c->infile, "r");
+	if (!f) {
+		fprintf(stderr, "cannot open file\n");
+		exit(EXIT_FAILURE);
+	}
+	return f;
+}
+
+struct ast *root;
 
 static bool
 verifyproto(struct ast_function *f, int n, struct ast_externdecl **decl);
@@ -420,7 +442,7 @@ verify(struct config *c)
 {
 	/* preprocess */
 	extern FILE *yyin;
-	yyin = preprocess(c->infile, c->includedirs);
+	yyin = preparefile(c);
 
 	/* lex and parse */
 	LEX_START_TOKEN = START_AST;

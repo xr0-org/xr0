@@ -1,5 +1,4 @@
 # commands
-CC = gcc -g -Wreturn-type -std=gnu11
 CFLAGS = -I include -Wall
 VALGRIND = valgrind --fullpath-after=`pwd`/src/
 LEX = lex
@@ -139,7 +138,7 @@ $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 
 $(PROGRAM_OBJ): $(STATE_DIR)/program.c $(BREAKPOINT_OBJ)
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/program.c
+	$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/program.c
 
 $(BREAKPOINT_OBJ): $(AST_DIR)/breakpoint.c
 	@printf 'CC\t$@\n'
