@@ -276,6 +276,9 @@ command_destroy(struct command *cmd)
 	free(cmd);
 }
 
+
+bool should_continue = false;
+
 static struct command *
 getcmd();
 
@@ -285,6 +288,10 @@ command_continue(struct path *);
 static struct error *
 next_command(struct path *p)
 {
+	if (should_continue) {
+		should_continue = false;
+		return command_continue(p);
+	}
 	printf("(0db) ");
 	struct command *cmd = getcmd();
 	switch (cmd->kind) {
@@ -304,6 +311,7 @@ next_command(struct path *p)
 	}
 }
 
+
 static struct error *
 command_continue(struct path *p)
 {
@@ -317,6 +325,7 @@ command_continue(struct path *p)
 			return NULL;
 		}
 	}
+	should_continue = true;
 	return NULL;
 }
 
