@@ -186,7 +186,6 @@ program_stmt_step(struct program *p, struct state *s)
 {
 	struct error *err = program_stmt_process(p, s);
 	if (!err) {
-		printf("curr loc: %s\n", lexememarker_str(ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index])));
 		program_nextstmt(p, s);
 		return NULL;
 	}

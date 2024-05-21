@@ -309,9 +309,6 @@ command_continue(struct path *p)
 {
 	while (!path_atend(p)) {
 		struct lexememarker *loc = path_lexememarker(p);
-		if (loc) {
-			printf("loc: %s\n", lexememarker_str(loc));
-		}
 		if (loc && breakpoint_shouldbreak(loc)) {
 			return NULL;
 		}
