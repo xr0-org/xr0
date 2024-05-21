@@ -123,3 +123,11 @@ breakpoint_shouldbreak(struct lexememarker *loc)
 	}
 	return true;
 }
+
+void
+breakpoint_reset()
+{
+	for (int i = 0; i < breakpoint_count; i++) {
+		breakpoints[i].reached = false;
+	}
+}
