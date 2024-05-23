@@ -26,12 +26,11 @@ small.
 Reach out via email to
 [Claude](mailto:betz@xr0.dev) or
 [Amisi](mailto:a@xr0.dev) or DM us on the
-[Xr0 Zulip](https://xr0.zulipchat.com/login) if you're interested in this.
+[Xr0 Discord](https://discord.com/invite/yfx69tbhxQ) if you're interested in this.
 
 We are currently not accepting pull requests due to the early stage of Xr0.
 However, if you have a serious proposal for how we can improve Xr0 you can
 [make an issue](https://github.com/xr0-org/xr0/issues/new) to explain it.
-
 
 ## License
 

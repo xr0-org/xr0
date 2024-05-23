@@ -106,7 +106,7 @@ state_str(struct state *state)
 	free(static_mem);
 	if (state->reg) {
 		char *ret = value_str(state->reg);
-		strbuilder_printf(b, "return: <%s>\n\n", ret);
+		strbuilder_printf(b, "return:\t<%s>\n\n", ret);
 		free(ret);
 	}
 	char *vconst = vconst_str(state->vconst, "\t");
@@ -143,7 +143,7 @@ state_islinear(struct state *s)
 	return stack_islinear(s->stack);
 }
 
-static bool
+bool
 state_insetup(struct state *s)
 {
 	return stack_insetup(s->stack);	

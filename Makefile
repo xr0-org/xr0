@@ -2,7 +2,6 @@
 CC = gcc -g -Wreturn-type -std=gnu11
 CFLAGS = -I include -Wall
 VALGRIND = valgrind --fullpath-after=`pwd`/src/
-
 LEX = lex
 YACC = bison -yvd
 
@@ -184,9 +183,10 @@ $(AST_OBJ): $(AST_DIR)/ast.c \
 	$(AST_DIR)/type/type.h \
 	$(AST_DIR)/literals.h \
 	$(AST_DIR)/function/function.h \
-	$(MATH_OBJ)
+	$(MATH_OBJ) \
+	$(GRAM_OBJ)
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -I $(AST_DIR) -o $@ -c $(AST_DIR)/ast.c
+	@$(CC) $(CFLAGS) -I $(BUILD_DIR) -I $(AST_DIR) -o $@ -c $(AST_DIR)/ast.c
 
 $(MATH_OBJ): $(MATH_DIR)/math.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'

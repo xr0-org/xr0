@@ -195,8 +195,6 @@ preprocess(char *infile, struct string_arr *includedirs)
 	return tmp;
 }
 
-struct ast *root;
-
 static bool
 verifyproto(struct ast_function *f, int n, struct ast_externdecl **decl);
 
@@ -232,6 +230,9 @@ pass0(struct ast *root, struct externals *ext)
 	}
 }
 
+static void
+debugger_summary();
+
 static struct error *
 handle_debug(struct ast_function *, struct externals *, bool debug);
 
@@ -239,6 +240,10 @@ void
 pass1(struct ast *root, struct externals *ext, bool debug)
 {
 	struct error *err;
+	if (debug) {
+		debugger_summary();
+	}
+
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
 		if (!ast_externdecl_isfunction(decl)) {
@@ -256,6 +261,29 @@ pass1(struct ast *root, struct externals *ext, bool debug)
 		}
 		v_printf("qed %s\n", ast_function_name(f));
 	}
+}
+
+static void
+debugger_summary()
+{
+	d_printf("0db: The Xr0 Static Debugger for C\n");
+	d_printf("Copyright (C) 2024 Xr0\n");
+	d_printf("License Apache 2.0\n\n");
+
+	d_printf("A static debugger is the compile-time analogue of\n");
+	d_printf("runtime debuggers like GDB. Runtime debuggers\n");
+	d_printf("require you to execute a program in order to\n");
+	d_printf("analyse it, but 0db shows line-by-line the state\n");
+	d_printf("of a C program on the basis of the semantics of\n");
+	d_printf("the language alone.\n\n");
+
+	d_printf("This matters because at runtime we interact with a\n");
+	d_printf("very tiny subset of a program’s possible\n");
+	d_printf("behaviours. In the state supplied by 0db you see\n");
+	d_printf("at once what applies to all possible executions\n");
+	d_printf("of a program.\n\n");
+
+	d_printf("For help, type \"help\".\n\n\n");
 }
 
 static struct error *
@@ -354,6 +382,10 @@ proto_defisvalid(struct ast_function *proto, struct ast_function *def)
 	return false;
 }
 
+struct ast *root;
+
+int LEX_START_TOKEN;
+
 static int
 verify(struct config *c);
 
@@ -391,6 +423,7 @@ verify(struct config *c)
 	yyin = preprocess(c->infile, c->includedirs);
 
 	/* lex and parse */
+	LEX_START_TOKEN = START_AST;
 	lex_begin();
 	yyparse();
 	yylex_destroy();

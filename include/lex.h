@@ -32,6 +32,7 @@ lexememarker_destroy(struct lexememarker *);
 char *
 lexememarker_str(struct lexememarker *);
 
+extern struct ast_expr *YACC_PARSED_EXPR;
 extern struct ast *root;
 extern struct map *table;
 
