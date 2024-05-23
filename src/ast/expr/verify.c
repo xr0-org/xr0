@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ast.h"
+#include "lex.h"
 #include "breakpoint.h"
 #include "expr.h"
 #include "ext.h"
@@ -1083,8 +1084,6 @@ ast_expr_abseval(struct ast_expr *expr, struct state *state)
 static struct result *
 call_absexec(struct ast_expr *expr, struct state *state)
 {
-	breakpoint_reset();
-
 	struct error *err;
 
 	struct ast_expr *root = ast_expr_call_root(expr);
@@ -1530,6 +1529,7 @@ struct ast_expr *
 ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 		struct ast_block *b, struct state *s) 
 {
+	struct lexememarker *loc_nobreak = lexememarker_copy_unbreakable(loc);
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 	case EXPR_ISDEALLOCAND:
@@ -1538,21 +1538,21 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	case EXPR_ARBARG:
 		return expr;
 	case EXPR_UNARY:
-		return unary_geninstr(expr, loc, b, s);	
+		return unary_geninstr(expr, loc_nobreak, b, s);	
 	case EXPR_BINARY:
-		return binary_geninstr(expr, loc, b, s);
+		return binary_geninstr(expr, loc_nobreak, b, s);
 	case EXPR_INCDEC:
-		return incdec_geninstr(expr, loc, b, s);
+		return incdec_geninstr(expr, loc_nobreak, b, s);
 	case EXPR_ALLOCATION:
-		return alloc_geninstr(expr, loc, b, s);	
+		return alloc_geninstr(expr, loc_nobreak, b, s);	
 	case EXPR_ASSIGNMENT:
-		return assign_geninstr(expr, loc, b, s);
+		return assign_geninstr(expr, loc_nobreak, b, s);
 	case EXPR_CALL:
-		return call_geninstr(expr, loc, b, s);
+		return call_geninstr(expr, loc_nobreak, b, s);
 	case EXPR_STRUCTMEMBER:
-		return structmember_geninstr(expr, loc, b, s);
+		return structmember_geninstr(expr, loc_nobreak, b, s);
 	case EXPR_BRACKETED:
-		return bracketed_geninstr(expr, loc, b, s);
+		return bracketed_geninstr(expr, loc_nobreak, b, s);
 	default:
 		printf("expr: %s\n", ast_expr_str(expr));
 		assert(false);

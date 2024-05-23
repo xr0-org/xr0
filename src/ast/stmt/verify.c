@@ -31,7 +31,7 @@ ast_stmt_linearise_proper(struct ast_stmt *, struct ast_block *, struct lexemema
 struct error *
 ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 {
-	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
+	struct lexememarker *loc = lexememarker_copy_unbreakable(ast_stmt_lexememarker(stmt));
 	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
 	struct error *err = ast_stmt_linearise_proper(
 		stmt, b, lexememarker_copy(loc), state
@@ -126,6 +126,7 @@ ast_stmt_process(struct ast_stmt *stmt, struct state *state)
 	}
 	return NULL;
 }
+
 
 /* stmt_verify */
 

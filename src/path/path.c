@@ -350,8 +350,6 @@ split_name(char *name, struct ast_expr *assumption)
 	return strbuilder_build(b);
 }
 
-
-
 static struct error *
 path_init_actual(struct path *p)
 {

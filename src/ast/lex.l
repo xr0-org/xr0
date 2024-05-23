@@ -7,6 +7,7 @@ IS			(u|U|l|L)*
 
 %{
 #include <stdio.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <assert.h>
 #include "lex.h"
@@ -330,9 +331,9 @@ lexememarker_create(int linenum, int column, char *filename,
 	loc->column = column;
 	loc->filename = strip_iflibx(filename);
 	loc->flags = flags;
+	loc->breakable = true;
 	return loc;
 }
-
 static char *
 strip_iflibx(char *filename)
 {
@@ -360,6 +361,19 @@ lexememarker_copy(struct lexememarker *loc)
 	);
 }
 
+struct lexememarker *
+lexememarker_copy_unbreakable(struct lexememarker *loc)
+{
+	struct lexememarker *copy = lexememarker_create(
+		loc->linenum,
+		loc->column,
+		dynamic_str(loc->filename),
+		loc->flags
+	);
+	copy->breakable = false;
+	return copy;
+}
+
 void
 lexememarker_destroy(struct lexememarker *loc)
 {
@@ -377,6 +391,12 @@ char *
 lexememarker_filename(struct lexememarker *loc)
 {
 	return loc->filename;
+}
+
+bool
+lexememarker_breakable(struct lexememarker *loc)
+{
+	return loc->breakable;
 }
 
 char *

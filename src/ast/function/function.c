@@ -329,7 +329,6 @@ command_continue(struct path *p)
 	return NULL;
 }
 
-
 /* getcmd() */
 
 #define MAX_COMMANDLEN 100
@@ -441,7 +440,7 @@ process_commandwithargs(char *cmd, char *args)
 	if (command_isbreak(cmd)) {
 		return command_break(args_tk);	
 	}
-	assert(false);
+	return getcmd();
 }
 
 static struct string_arr *

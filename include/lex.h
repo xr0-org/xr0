@@ -12,6 +12,7 @@ struct lexememarker {
 		LM_FLAG_SYS_HEADER	= 1 << 2,
 		LM_FLAG_IMPLICIT_EXTERN	= 1 << 3,
 	} flags;
+	bool breakable;
 };
 
 struct lexememarker *
@@ -23,8 +24,14 @@ lexememarker_linenum(struct lexememarker *);
 char *
 lexememarker_filename(struct lexememarker *);
 
+bool
+lexememarker_breakable(struct lexememarker *);
+
 struct lexememarker *
 lexememarker_copy(struct lexememarker *);
+
+struct lexememarker *
+lexememarker_copy_unbreakable(struct lexememarker *);
 
 void
 lexememarker_destroy(struct lexememarker *);

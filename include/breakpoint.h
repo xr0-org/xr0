@@ -17,7 +17,4 @@ struct lexememarker;
 bool
 breakpoint_shouldbreak(struct lexememarker *);
 
-void
-breakpoint_reset();
-
 #endif
