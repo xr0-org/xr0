@@ -100,7 +100,7 @@ variable_array_create(struct ast_variable *v)
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR SOME GOTO CONTINUE BREAK RETURN
 %token TK_ALLOC TK_DEALLOC TK_CLUMP
 
-%start translation_unit
+%token START_AST START_STMT
 
 %union {
 	char *string;
@@ -187,7 +187,16 @@ variable_array_create(struct ast_variable *v)
 %type <variable> parameter_declaration struct_declaration
 %type <variable_array> declaration_list parameter_list parameter_type_list
 %type <variable_array> struct_declaration_list
+
+%start start
+
 %%
+
+start
+	: START_AST translation_unit
+	| START_STMT statement
+		{ YACC_PARSED_STMT = $2; }
+	;
 
 primary_expression
 	: identifier

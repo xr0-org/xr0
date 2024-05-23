@@ -548,6 +548,36 @@ branch_next(struct path *parent, struct path *branch)
 	return path_next(branch);
 }
 
+struct error *
+path_split_verify(struct path *, struct ast_stmt *);
+
+struct error *
+path_verify(struct path *p, struct ast_stmt *stmt)
+{
+	switch(p->path_state) {
+	case PATH_STATE_ABSTRACT:
+		return ast_stmt_verify(stmt, p->abstract);
+	case PATH_STATE_ACTUAL:
+		return ast_stmt_verify(stmt, p->actual);	
+	case PATH_STATE_SPLIT:
+		return path_split_verify(p, stmt);
+	case PATH_STATE_UNINIT:
+	case PATH_STATE_HALFWAY:
+	case PATH_STATE_AUDIT:
+	case PATH_STATE_ATEND:
+		return NULL;
+	default:
+		assert(false);
+	}
+}
+
+struct error *
+path_split_verify(struct path *p, struct ast_stmt *stmt)
+{
+	struct path *branch = p->paths->paths[p->branch_index];
+	return path_verify(branch, stmt);
+}
+
 static struct lexememarker *
 path_split_lexememarker(struct path *);
 

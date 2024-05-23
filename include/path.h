@@ -29,6 +29,9 @@ struct error *
 path_next(struct path *);
 
 struct error *
+path_verify(struct path *, struct ast_stmt *);
+
+struct error *
 path_setbreakpoint(struct path *);
 
 struct lexememarker *

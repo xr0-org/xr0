@@ -28,6 +28,17 @@ check_type();
 %}
 
 %%
+
+%{
+	extern int LEX_START_TOKEN;
+	if (LEX_START_TOKEN) {
+		int t = LEX_START_TOKEN;
+		LEX_START_TOKEN = 0;
+		return t;
+	}
+%}
+
+
 "#"			{ preproc(); }
 "/*"			{ comment(); }
 ".malloc"		{ count(); return(TK_ALLOC); }

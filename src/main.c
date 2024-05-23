@@ -195,8 +195,6 @@ preprocess(char *infile, struct string_arr *includedirs)
 	return tmp;
 }
 
-struct ast *root;
-
 static bool
 verifyproto(struct ast_function *f, int n, struct ast_externdecl **decl);
 
@@ -354,6 +352,10 @@ proto_defisvalid(struct ast_function *proto, struct ast_function *def)
 	return false;
 }
 
+struct ast *root;
+
+int LEX_START_TOKEN;
+
 static int
 verify(struct config *c);
 
@@ -391,6 +393,7 @@ verify(struct config *c)
 	yyin = preprocess(c->infile, c->includedirs);
 
 	/* lex and parse */
+	LEX_START_TOKEN = START_AST;
 	lex_begin();
 	yyparse();
 	yylex_destroy();

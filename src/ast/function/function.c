@@ -4,6 +4,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "gram_util.h"
+#include "gram.tab.h"
 #include "ast.h"
 #include "lex.h"
 #include "function.h"
@@ -241,6 +243,7 @@ enum command_kind {
 	COMMAND_STEP,
 	COMMAND_NEXT,
 	COMMAND_CONTINUE,
+	COMMAND_VERIFY,
 	COMMAND_QUIT,
 	COMMAND_BREAKPOINT_SET,
 	COMMAND_BREAKPOINT_LIST,
@@ -285,6 +288,9 @@ getcmd();
 static struct error *
 command_continue(struct path *);
 
+static struct ast_stmt *
+command_arg_tostmt(struct command *);
+
 static struct error *
 next_command(struct path *p)
 {
@@ -298,6 +304,8 @@ next_command(struct path *p)
 		return path_step(p);
 	case COMMAND_NEXT:
 		return path_next(p);	
+	case COMMAND_VERIFY:
+		return path_verify(p, command_arg_tostmt(cmd));
 	case COMMAND_CONTINUE:
 		return command_continue(p);
 	case COMMAND_QUIT:
@@ -326,6 +334,37 @@ command_continue(struct path *p)
 	}
 	should_continue = true;
 	return NULL;
+}
+
+struct ast_stmt *YACC_PARSED_STMT;
+
+static struct ast_stmt *
+command_arg_tostmt(struct command *c)
+{
+	printf("%s\n", string_arr_s(c->args)[0]);
+
+	/* preprocess */
+
+	extern FILE *yyin;
+	extern int LEX_START_TOKEN;
+
+	char *str = string_arr_s(c->args)[0];
+	yyin = fmemopen(str, strlen(str), "r"); // Open the buffer for read/write
+	if (!yyin) {
+		fprintf(stderr, "error opening memory file\n");
+		exit(EXIT_FAILURE);
+	}
+
+	/* lex and parse */
+	LEX_START_TOKEN = START_STMT;
+	lex_begin();
+	yyparse();
+	yylex_destroy();
+	lex_finish();
+
+	printf("parsed stmt: %s\n", ast_stmt_str(YACC_PARSED_STMT, 0));
+
+	assert(false);
 }
 
 
@@ -430,6 +469,12 @@ command_isbreak(char *cmd);
 static struct command *
 command_break(struct string_arr *args);
 
+static bool
+command_isverify(char *cmd);
+
+static struct command *
+command_verify(struct string_arr *args);
+
 static struct command *
 process_commandwithargs(char *cmd, char *args)
 {
@@ -440,6 +485,8 @@ process_commandwithargs(char *cmd, char *args)
 	}
 	if (command_isbreak(cmd)) {
 		return command_break(args_tk);	
+	} else if (command_isverify(cmd)) {
+		return command_verify(args_tk);
 	}
 	assert(false);
 }
@@ -554,6 +601,20 @@ break_argsplit(char *arg)
 	string_arr_append(split, dynamic_str(fname));
 	string_arr_append(split, dynamic_str(linenum));
 	return split;
+}
+
+
+static bool
+command_isverify(char *cmd)
+{
+	return strcmp(cmd, "v") == 0 || strcmp(cmd, "verify") == 0;
+}
+
+static struct command *
+command_verify(struct string_arr *args)
+{
+	assert(string_arr_n(args) == 1);
+	return command_create_withargs(COMMAND_VERIFY, args);
 }
 
 static struct command *
