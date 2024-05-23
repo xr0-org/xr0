@@ -15,7 +15,7 @@
 struct breakpoint {
 	bool enabled;
 	bool reached;
-	char *filename;
+	// char *filename;
 	int linenumber;
 };
 
@@ -48,7 +48,7 @@ breakpoint_str(struct breakpoint bp)
 {
 	if (bp.enabled) {
 		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "%s:%d", bp.filename, bp.linenumber);
+		strbuilder_printf(b, "%d", bp.linenumber);
 		return strbuilder_build(b);
 	}
 	return dynamic_str("");
@@ -61,7 +61,7 @@ struct error *
 breakpoint_set(char *filename, int linenumber)
 {
 	struct breakpoint bp = (struct breakpoint) {
-		.enabled = true, .filename = filename, .linenumber = linenumber
+		.enabled = true, .linenumber = linenumber
 	};
 	if (breakpoint_count > MAX_BREAKPOINTS) {
 		return error_printf("Maximum number of breakpoints reached\n");
@@ -111,11 +111,11 @@ breakpoint_delete(int id)
 bool
 breakpoint_shouldbreak(struct lexememarker *loc)
 {
-	//char *fname = lexememarker_filename(loc);
+	// char *fname = lexememarker_filename(loc);
 	int linenum = lexememarker_linenum(loc);
 
 	struct breakpoint bp = (struct breakpoint) {
-		.filename = "", .linenumber = linenum,
+		.linenumber = linenum,
 	};
 	int index = breakpoint_exists(bp);
 	if (index == -1) {

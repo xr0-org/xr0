@@ -493,17 +493,25 @@ command_break(struct string_arr *args)
 	}
 }
 
+
+static bool
+isint(const char *str) {
+	if (str == NULL || *str == '\0') {
+		return false;
+	}
+	while (*str) {
+		if (!isdigit(*str)) {
+			return false;
+		}
+		str++;
+	}
+	return true;
+}
+
 static bool
 break_argisset(char *arg)
 {
-	char *pos = strchr(arg, ':');
-	if (pos != NULL) {
-		int index = pos - arg;
-		if (index > 0 && index < strlen(arg) - 1) {
-			return true;
-		}
-	}
-	return false;
+	return isint(arg);
 }
 
 static bool
@@ -518,14 +526,8 @@ break_argsplit(char *arg);
 static struct command *
 break_set(char *arg)
 {
-	struct string_arr *split = break_argsplit(arg);
-	if (split == NULL) {
-		fprintf(stderr, "`break' expects argument format <filename>:<linenum>\n");
-		return getcmd();
-	}
-	char *filename = dynamic_str(string_arr_s(split)[0]);
-	int linenum = atoi(string_arr_s(split)[1]);
-	struct error *err = breakpoint_set(filename, linenum);
+	int linenum = atoi(arg);
+	struct error *err = breakpoint_set("", linenum);
 	if (err) {
 		fprintf(stderr, "could not set breakpoint: %s", error_str(err));
 		return getcmd();
