@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <string.h>
 
+#include "gram_util.h"
+#include "gram.tab.h"
 #include "ast.h"
 #include "command.h"
 #include "ext.h"

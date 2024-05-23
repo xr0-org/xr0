@@ -1,0 +1,1 @@
+emmake make && emcc -s ASYNCIFY -sEXPORTED_RUNTIME_METHODS=FS,callMain -sEXIT_RUNTIME -o ~/projects/xr0.dev/web/static/js/0v.mjs build/*.o --js-library=/Users/amisi/projects/xr0.dev/web/static/js/emscripten-pty.js
