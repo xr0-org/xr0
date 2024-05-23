@@ -1,6 +1,5 @@
 # commands
-CC = gcc -I include -g
-CFLAGS = -std=gnu11 -Werror -Wreturn-type -Wall
+CFLAGS = -g -I include -std=gnu11 -Werror -Wreturn-type -Wall
 VALGRIND = valgrind --fullpath-after=`pwd`/src/
 LEX = lex
 YACC = bison -yvd
@@ -134,7 +133,7 @@ $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 
 $(PROGRAM_OBJ): $(STATE_DIR)/program.c $(BREAKPOINT_OBJ)
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/program.c
+	$(CC) $(CFLAGS) -o $@ -c $(STATE_DIR)/program.c
 
 $(BREAKPOINT_OBJ): $(AST_DIR)/breakpoint.c
 	@printf 'CC\t$@\n'
