@@ -20,6 +20,9 @@ static bool
 expr_unary_decide(struct ast_expr *expr, struct state *state);
 
 static bool
+expr_identifier_decide(struct ast_expr *expr, struct state *state);
+
+static bool
 expr_isdeallocand_decide(struct ast_expr *expr, struct state *state);
 
 static bool
@@ -31,6 +34,8 @@ ast_expr_decide(struct ast_expr *expr, struct state *state)
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
 		return (bool) ast_expr_as_constant(expr);
+	case EXPR_IDENTIFIER:
+		return expr_identifier_decide(expr, state);
 	case EXPR_UNARY:
 		return expr_unary_decide(expr, state);
 	case EXPR_ISDEALLOCAND:
@@ -52,6 +57,17 @@ expr_unary_decide(struct ast_expr *expr, struct state *state)
 	default:
 		assert(false);
 	}
+}
+
+static bool
+expr_identifier_decide(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *prop = ast_expr_binary_create(
+		ast_expr_copy(expr), BINARY_OP_NE, ast_expr_constant_create(0)
+	);
+	bool res = ast_expr_decide(prop, state);
+	ast_expr_destroy(prop);
+	return res;
 }
 
 static bool

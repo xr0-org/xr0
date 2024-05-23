@@ -29,14 +29,13 @@ char *
 breakpoint_list()
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "Num\tType\tEnabled\tReached\tWhat\n");
+	strbuilder_printf(b, "Num\tType\tEnabled\tLine\n");
 	for (int i = 0; i < breakpoint_count; i++) {
 		struct breakpoint bp = breakpoints[i];
 		strbuilder_printf( b,
-			"%d\tbreak\t%s\t%s\t%s\n",
+			"%d\tbreak\t%s\t%s\n",
 			i,
 			bp.enabled ? dynamic_str("y") : dynamic_str("n"),
-			bp.reached ? dynamic_str("y") : dynamic_str("n"),
 			breakpoint_str(bp)
 		);
 	}
