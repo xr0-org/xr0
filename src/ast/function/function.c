@@ -292,7 +292,6 @@ next_command(struct path *p)
 		should_continue = false;
 		return command_continue(p);
 	}
-	printf("(0db) ");
 	struct command *cmd = getcmd();
 	switch (cmd->kind) {
 	case COMMAND_STEP:
@@ -345,6 +344,7 @@ process_commandwithargs(char *cmd, char *args);
 static struct command *
 getcmd()
 {
+	printf("(0db) ");
 	char line[MAX_LINELEN];
 	char cmd[MAX_COMMANDLEN];
 	char args[MAX_ARGSLEN];
@@ -488,7 +488,7 @@ command_break(struct string_arr *args)
 	} else if (break_argislist(arg)) {
 		return break_list();
 	} else {
-		fprintf(stderr, "`break' recieved unknown argument\n");
+		fprintf(stderr, "`break' received unknown argument\n");
 		return getcmd();
 	}
 }
