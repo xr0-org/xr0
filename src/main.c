@@ -283,7 +283,7 @@ debugger_summary()
 	d_printf("at once what applies to all possible executions\n");
 	d_printf("of a program.\n\n");
 
-	d_printf("For help, type \"help\".\n");
+	d_printf("For help, type \"help\".\n\n\n");
 }
 
 static struct error *

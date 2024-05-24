@@ -287,9 +287,6 @@ static struct command *
 getcmd();
 
 static struct error *
-command_help_exec();
-
-static struct error *
 command_continue_exec(struct path *);
 
 static struct error *
@@ -324,12 +321,6 @@ next_command(struct path *p)
 	default:
 		assert(false);
 	}
-}
-
-static struct error *
-command_help_exec()
-{
-	return NULL;
 }
 
 static struct error *
