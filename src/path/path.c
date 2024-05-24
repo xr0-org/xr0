@@ -131,7 +131,7 @@ path_abstract_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(
-		b, "mode: %s\n", state_execmode_str(state_execmode(p->abstract))
+		b, "phase: %s\n", state_execmode_str(state_execmode(p->abstract))
 	);
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->abstract));
 	strbuilder_printf(b, "%s\n", state_str(p->abstract));
@@ -143,7 +143,7 @@ path_actual_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(
-		b, "mode: %s\n", state_execmode_str(state_execmode(p->actual))
+		b, "phase: %s\n", state_execmode_str(state_execmode(p->actual))
 	);
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
 	strbuilder_printf(b, "%s\n", state_str(p->actual));
