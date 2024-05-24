@@ -240,6 +240,7 @@ ast_function_debug(struct ast_function *f, struct externals *ext)
 }
 
 enum command_kind {
+	COMMAND_HELP,
 	COMMAND_STEP,
 	COMMAND_NEXT,
 	COMMAND_CONTINUE,
@@ -286,6 +287,9 @@ static struct command *
 getcmd();
 
 static struct error *
+command_help_exec();
+
+static struct error *
 command_continue_exec(struct path *);
 
 static struct error *
@@ -303,6 +307,8 @@ next_command(struct path *p)
 	}
 	struct command *cmd = getcmd();
 	switch (cmd->kind) {
+	case COMMAND_HELP:
+		return command_help_exec();
 	case COMMAND_STEP:
 		return path_step(p);
 	case COMMAND_NEXT:
@@ -319,6 +325,18 @@ next_command(struct path *p)
 	default:
 		assert(false);
 	}
+}
+
+static struct error *
+command_help_exec()
+{
+	d_printf("List of possible commands:\n");
+	d_printf("step -- Step through the program operation by operation\n");
+	d_printf("next -- Step through the program line by line skipping over nested operations\n");
+	d_printf("break -- Set breakpoint to stop on\n");
+	d_printf("continue -- Step until reaching a breakpoint, error, undecidable condition or end of the program\n");
+	d_printf("quit -- End the debugging session\n\n");
+	return NULL;
 }
 
 static struct error *
@@ -416,6 +434,9 @@ getcmd()
 }
 
 static bool
+command_ishelp(char *cmd);
+
+static bool
 command_isstep(char *cmd);
 
 static bool
@@ -430,7 +451,9 @@ command_isquit(char *cmd);
 static struct command *
 process_command(char *cmd)
 {
-	if (command_isstep(cmd)) {
+	if (command_ishelp(cmd)) {
+		return command_create(COMMAND_HELP);
+	} else if (command_isstep(cmd)) {
 		return command_create(COMMAND_STEP);
 	} else if (command_isnext(cmd)) {
 		return command_create(COMMAND_NEXT);
@@ -442,6 +465,12 @@ process_command(char *cmd)
 		d_printf("unknown command `%s'\n", cmd);
 		return getcmd();
 	}
+}
+
+static bool
+command_ishelp(char *cmd)
+{
+	return strcmp(cmd, "h") == 0 || strcmp(cmd, "help") == 0;
 }
 
 static bool

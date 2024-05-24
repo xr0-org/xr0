@@ -296,7 +296,7 @@ debugger_summary()
 	d_printf("at once what applies to all possible executions\n");
 	d_printf("of a program.\n\n");
 
-	d_printf("Commencing static debugging...\n\n");
+	d_printf("For help, type \"help\".\n");
 }
 
 void
