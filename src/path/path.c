@@ -130,8 +130,9 @@ char *
 path_abstract_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
+	bool insetup = state_insetup(p->abstract);
 	strbuilder_printf(
-		b, "phase: %s\n", state_execmode_str(state_execmode(p->abstract))
+		b, "phase: %s\n", insetup ? "SETUP (ABSTRACT)" : state_execmode_str(state_execmode(p->abstract))
 	);
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->abstract));
 	strbuilder_printf(b, "%s\n", state_str(p->abstract));
@@ -142,8 +143,9 @@ char *
 path_actual_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
+	bool insetup = state_insetup(p->actual);
 	strbuilder_printf(
-		b, "phase: %s\n", state_execmode_str(state_execmode(p->actual))
+		b, "phase: %s\n", insetup ? "SETUP (ACTUAL)" : state_execmode_str(state_execmode(p->actual))
 	);
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
 	strbuilder_printf(b, "%s\n", state_str(p->actual));
@@ -349,8 +351,6 @@ split_name(char *name, struct ast_expr *assumption)
 	free(assumption_str);
 	return strbuilder_build(b);
 }
-
-
 
 static struct error *
 path_init_actual(struct path *p)

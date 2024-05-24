@@ -184,6 +184,9 @@ state_writeregister(struct state *, struct value *);
 void
 state_clearregister(struct state *);
 
+bool
+state_insetup(struct state *);
+
 void
 state_initsetup(struct state *s, int frameid);
 

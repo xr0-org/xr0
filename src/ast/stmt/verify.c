@@ -521,7 +521,7 @@ labelled_absexec(struct ast_stmt *stmt, struct state *state)
 		return error_printf("setup preconditions must be decidable");
 	}
 	struct ast_block *b = ast_stmt_labelled_as_block(stmt);	
-	struct frame *setup_frame = frame_block_create(
+	struct frame *setup_frame = frame_setup_create(
 		dynamic_str("setup"),
 		b,
 		state_next_execmode(state)

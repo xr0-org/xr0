@@ -143,7 +143,7 @@ state_islinear(struct state *s)
 	return stack_islinear(s->stack);
 }
 
-static bool
+bool
 state_insetup(struct state *s)
 {
 	return stack_insetup(s->stack);	
