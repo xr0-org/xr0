@@ -398,8 +398,8 @@ getcmd()
 	char cmd[MAX_COMMANDLEN];
 	char args[MAX_ARGSLEN];
 	if (!fgets(line, MAX_LINELEN, stdin)) {
-		fprintf(stderr, "error: cannot read\n");
-		return getcmd();
+		fprintf(stderr, "error: cannot read line\n");
+		exit(EXIT_FAILURE);
 	}
 	char *space = strchr(line, ' ');
 	if (space == NULL) {
@@ -593,7 +593,7 @@ command_help_step()
 	d_printf("Step through program, unlike the conventional stepping in a debugger\n");
 	d_printf("like gdb, this is a step with respect to Xr0's internal evaluation of\n");
 	d_printf("the program rather than over a line in the program text\n");
-	d_printf("Usage: step, s\n");
+	d_printf("Usage: step, s\n\n");
 }
 
 static void
@@ -602,7 +602,7 @@ command_help_next()
 	d_printf("Step through program with respect to the lines in the program text, this\n");
 	d_printf("might execute several steps internally to end up at the state for the next\n");
 	d_printf("line in the program text\n");
-	d_printf("Usage: next, n\n");
+	d_printf("Usage: next, n\n\n");
 }
 
 static void
@@ -610,15 +610,19 @@ command_help_continue()
 {
 	d_printf("Steps through program until a breakpoint, an error, an undecidable condition\n");
 	d_printf("or the program end is reached\n");
-	d_printf("Usage: continue, c\n");
+	d_printf("Usage: continue, c\n\n");
 }
 
 static void
 command_help_break()
 {
-	d_printf("Set breakpoints to stop on when running continue.\n");
-	d_printf("Usage: break [LINE_NUMBER], b [LINE_NUMBER]\n");
-	d_printf("Note: A current limitation is that breakpoints can only be set on statements.\n");
+	d_printf("list -- list all breakpoints\n");
+	d_printf("Usage: break list, b list\n\n");
+
+	d_printf("set -- set breakpoints to stop on when running continue.\n");
+	d_printf("Usage: break [LINE_NUMBER], b [LINE_NUMBER]\n\n");
+
+	d_printf("Note: A current limitation is that breakpoints can only be set on statements.\n\n");
 }
 
 static void
