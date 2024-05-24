@@ -307,8 +307,6 @@ next_command(struct path *p)
 	}
 	struct command *cmd = getcmd();
 	switch (cmd->kind) {
-	case COMMAND_HELP:
-		return command_help_exec();
 	case COMMAND_STEP:
 		return path_step(p);
 	case COMMAND_NEXT:
@@ -319,6 +317,7 @@ next_command(struct path *p)
 		return command_continue_exec(p);
 	case COMMAND_QUIT:
 		exit(0);
+	case COMMAND_HELP:
 	case COMMAND_BREAKPOINT_SET:
 	case COMMAND_BREAKPOINT_LIST:
 		return NULL;
@@ -330,12 +329,7 @@ next_command(struct path *p)
 static struct error *
 command_help_exec()
 {
-	d_printf("List of possible commands:\n");
-	d_printf("step -- Step through the program operation by operation\n");
-	d_printf("next -- Step through the program line by line skipping over nested operations\n");
-	d_printf("break -- Set breakpoint to stop on\n");
-	d_printf("continue -- Step until reaching a breakpoint, error, undecidable condition or end of the program\n");
-	d_printf("quit -- End the debugging session\n\n");
+
 	return NULL;
 }
 
@@ -433,6 +427,9 @@ getcmd()
 	}
 }
 
+static struct command *
+command_create_help();
+
 static bool
 command_ishelp(char *cmd);
 
@@ -452,7 +449,7 @@ static struct command *
 process_command(char *cmd)
 {
 	if (command_ishelp(cmd)) {
-		return command_create(COMMAND_HELP);
+		return command_create_help(COMMAND_HELP);
 	} else if (command_isstep(cmd)) {
 		return command_create(COMMAND_STEP);
 	} else if (command_isnext(cmd)) {
@@ -471,6 +468,18 @@ static bool
 command_ishelp(char *cmd)
 {
 	return strcmp(cmd, "h") == 0 || strcmp(cmd, "help") == 0;
+}
+
+static struct command *
+command_create_help()
+{
+	d_printf("List of possible commands:\n");
+	d_printf("step -- Step through the program operation by operation\n");
+	d_printf("next -- Step through the program line by line skipping over nested operations\n");
+	d_printf("break -- Set breakpoint to stop on\n");
+	d_printf("continue -- Step until reaching a breakpoint, error, undecidable condition or end of the program\n");
+	d_printf("quit -- End the debugging session\n\n");
+	return command_create(COMMAND_HELP);
 }
 
 static bool
@@ -500,6 +509,9 @@ command_isquit(char *cmd)
 static struct string_arr *
 args_tokenise(char *args);
 
+static struct command *
+command_help(struct string_arr *args);
+
 static bool
 command_isbreak(char *cmd);
 
@@ -520,7 +532,9 @@ process_commandwithargs(char *cmd, char *args)
 		fprintf(stderr, "invalid command args: %s\n", args);
 		return getcmd();
 	}
-	if (command_isbreak(cmd)) {
+	if (command_ishelp(cmd)) {
+		return command_help(args_tk);
+	} else if (command_isbreak(cmd)) {
 		return command_break(args_tk);	
 	} else if (command_isverify(cmd)) {
 		return command_verify(args_tk);
@@ -541,6 +555,87 @@ args_tokenise(char *args)
 		token = strtok(NULL, " ");
 	}
 	return arg_arr;
+}
+
+static void
+command_help_step();
+
+static void
+command_help_next();
+
+static void
+command_help_continue();
+
+static void
+command_help_break();
+
+static void
+command_help_quit();
+
+static struct command *
+command_help(struct string_arr *args)
+{
+	if (string_arr_n(args) != 1) {
+		d_printf("`help' expects single argument\n");
+		return getcmd();
+	}
+	char *arg = string_arr_s(args)[0];
+	if (command_isstep(arg)) {
+		command_help_step();
+	} else if (command_isnext(arg)) {
+		command_help_next();
+	} else if (command_iscontinue(arg)) {
+		command_help_continue();
+	} else if (command_isbreak(arg)) {
+		command_help_break();
+	} else if (command_isquit(arg)) {
+		command_help_quit();
+	} else {
+		d_printf("`help' received unknown argument\n");
+		return getcmd();
+	}
+	return command_create(COMMAND_HELP);
+}
+
+static void
+command_help_step()
+{
+	d_printf("Step through program, unlike the conventional stepping in a debugger\n");
+	d_printf("like gdb, this is a step with respect to Xr0's internal evaluation of\n");
+	d_printf("the program rather than over a line in the program text\n");
+	d_printf("Usage: step, s\n");
+}
+
+static void
+command_help_next()
+{
+	d_printf("Step through program with respect to the lines in the program text, this\n");
+	d_printf("might execute several steps internally to end up at the state for the next\n");
+	d_printf("line in the program text\n");
+	d_printf("Usage: next, n\n");
+}
+
+static void
+command_help_continue()
+{
+	d_printf("Steps through program until a breakpoint, an error, an undecidable condition\n");
+	d_printf("or the program end is reached\n");
+	d_printf("Usage: continue, c\n");
+}
+
+static void
+command_help_break()
+{
+	d_printf("Set breakpoints to stop on when running continue.\n");
+	d_printf("Usage: break [LINE_NUMBER], b [LINE_NUMBER]\n");
+	d_printf("Note: A current limitation is that breakpoints can only be set on statements.\n");
+}
+
+static void
+command_help_quit()
+{
+	d_printf("Quit the debugging session.\n");
+	d_printf("Usage: quit, q\n");
 }
 
 static bool
@@ -578,7 +673,6 @@ command_break(struct string_arr *args)
 		return getcmd();
 	}
 }
-
 
 static bool
 isint(const char *str) {
@@ -640,7 +734,6 @@ break_argsplit(char *arg)
 	string_arr_append(split, dynamic_str(linenum));
 	return split;
 }
-
 
 static bool
 command_isverify(char *cmd)
