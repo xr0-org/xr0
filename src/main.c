@@ -256,11 +256,15 @@ pass1(struct ast *root, struct externals *ext, bool debug)
 	}
 }
 
+static void
+debugger_summary();
+
 static struct error *
 handle_debug(struct ast_function *f, struct externals *ext, bool debug)
 {
 	struct error *err;
 	if (debug) {
+		debugger_summary();	
 		if ((err = ast_function_debug(f, ext))) {
 			return err;	
 		}
@@ -270,6 +274,29 @@ handle_debug(struct ast_function *f, struct externals *ext, bool debug)
 		}
 	}
 	return NULL;
+}
+
+static void
+debugger_summary()
+{
+	d_printf("(0db) The Xr0 Static Debugger for C\n");
+	d_printf("Copyright (C) 2024 Xr0\n");
+	d_printf("License Apache 2.0\n\n");
+
+	d_printf("A static debugger is the compile-time analogue of\n");
+	d_printf("runtime debuggers like GDB. Runtime debuggers\n");
+	d_printf("require you to execute a program in order to\n");
+	d_printf("analyse it, but 0db shows line-by-line the state\n");
+	d_printf("of a C program on the basis of the semantics of\n");
+	d_printf("the language alone.\n\n");
+
+	d_printf("This matters because at runtime we interact with a\n");
+	d_printf("very tiny subset of a program’s possible\n");
+	d_printf("behaviours. In the state supplied by 0db you see\n");
+	d_printf("at once what applies to all possible executions\n");
+	d_printf("of a program.\n\n");
+
+	d_printf("Commencing static debugging...\n\n");
 }
 
 void
