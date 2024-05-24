@@ -286,7 +286,10 @@ static struct command *
 getcmd();
 
 static struct error *
-command_continue(struct path *);
+command_continue_exec(struct path *);
+
+static struct error *
+command_verify_exec(struct path *, struct command *);
 
 static struct ast_expr *
 command_arg_toexpr(struct command *);
@@ -296,7 +299,7 @@ next_command(struct path *p)
 {
 	if (should_continue) {
 		should_continue = false;
-		return command_continue(p);
+		return command_continue_exec(p);
 	}
 	struct command *cmd = getcmd();
 	switch (cmd->kind) {
@@ -305,9 +308,9 @@ next_command(struct path *p)
 	case COMMAND_NEXT:
 		return path_next(p);	
 	case COMMAND_VERIFY:
-		return path_verify(p, command_arg_toexpr(cmd));
+		return command_verify_exec(p, cmd);
 	case COMMAND_CONTINUE:
-		return command_continue(p);
+		return command_continue_exec(p);
 	case COMMAND_QUIT:
 		exit(0);
 	case COMMAND_BREAKPOINT_SET:
@@ -318,9 +321,8 @@ next_command(struct path *p)
 	}
 }
 
-
 static struct error *
-command_continue(struct path *p)
+command_continue_exec(struct path *p)
 {
 	while (!path_atend(p)) {
 		struct error *err = path_step(p);
@@ -333,6 +335,18 @@ command_continue(struct path *p)
 		}
 	}
 	should_continue = true;
+	return NULL;
+}
+
+static struct error *
+command_verify_exec(struct path *p, struct command *cmd)
+{
+	struct error *err = path_verify(p, command_arg_toexpr(cmd));
+	if (err) {
+		d_printf("false: %s\n", error_str(err));
+	} else {
+		d_printf("true\n");
+	}
 	return NULL;
 }
 
@@ -356,7 +370,7 @@ command_arg_toexpr(struct command *c)
 	lex_begin();
 	yyparse();
 	yylex_destroy();
-	lex_finish();
+	/* lex_finish(); */
 
 	return ast_expr_copy(YACC_PARSED_EXPR);
 }
@@ -570,8 +584,7 @@ break_set(char *arg)
 	int linenum = atoi(arg);
 	struct error *err = breakpoint_set("", linenum);
 	if (err) {
-		fprintf(stderr, "could not set breakpoint: %s", error_str(err));
-		return getcmd();
+		d_printf("could not set breakpoint: %s", error_str(err));
 	}
 	return command_create(COMMAND_BREAKPOINT_SET);
 }
@@ -614,8 +627,8 @@ command_verify(struct string_arr *args)
 static struct command *
 break_list()
 {
-	printf("%s\n", breakpoint_list());
-	return getcmd();
+	d_printf("%s\n", breakpoint_list());
+	return command_create(COMMAND_BREAKPOINT_LIST);
 }
 
 static struct error *
