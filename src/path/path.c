@@ -255,7 +255,7 @@ path_step_abstract(struct path *p, bool print)
 {	
 	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
-		return path_step(p);
+		return NULL;
 	}
 
 	struct error *err = state_step(p->abstract);
@@ -386,7 +386,7 @@ path_step_actual(struct path *p, bool print)
 {	
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
-		return path_step(p);
+		return NULL;
 	}
 
 	struct error *err = state_step(p->actual);
@@ -442,7 +442,7 @@ path_step_split(struct path *p)
 static struct error *
 branch_step(struct path *parent, struct path *branch)
 {
-	d_printf("branch: %d\n", parent->branch_index);
+	v_printf("branch: %d\n", parent->branch_index);
 	if (path_atend(branch)) {
 		path_nextbranch(parent);
 		return NULL;
@@ -489,7 +489,7 @@ path_next_abstract(struct path *p)
 {
 	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
 		p->path_state = PATH_STATE_HALFWAY;
-		return path_step(p);
+		return NULL;
 	}
 	struct error *err = state_next(p->abstract);
 	if (!err) {
@@ -508,7 +508,7 @@ path_next_actual(struct path *p)
 {
 	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
 		p->path_state = PATH_STATE_AUDIT;
-		return path_step(p);
+		return NULL;
 	}
 	struct error *err = state_next(p->actual);
 	if (!err) {
@@ -540,7 +540,7 @@ path_next_split(struct path *p)
 static struct error *
 branch_next(struct path *parent, struct path *branch)
 {
-	d_printf("branch: %d\n", parent->branch_index);
+	v_printf("branch: %d\n", parent->branch_index);
 	if (path_atend(branch)) {
 		path_nextbranch(parent);
 		return NULL;
