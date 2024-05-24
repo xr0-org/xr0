@@ -170,6 +170,8 @@ iter_empty(struct ast_stmt *stmt, struct state *state);
 static struct error *
 stmt_iter_verify(struct ast_stmt *stmt, struct state *state)
 {
+	assert(false);
+
 	/* check for empty sets */
 	if (iter_empty(stmt, state)) {
 		return NULL;

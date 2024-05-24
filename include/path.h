@@ -29,7 +29,7 @@ struct error *
 path_next(struct path *);
 
 struct error *
-path_verify(struct path *, struct ast_stmt *);
+path_verify(struct path *, struct ast_expr *);
 
 struct error *
 path_setbreakpoint(struct path *);

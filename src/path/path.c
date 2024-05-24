@@ -548,19 +548,19 @@ branch_next(struct path *parent, struct path *branch)
 	return path_next(branch);
 }
 
-struct error *
-path_split_verify(struct path *, struct ast_stmt *);
+static struct error *
+path_split_verify(struct path *, struct ast_expr *);
 
 struct error *
-path_verify(struct path *p, struct ast_stmt *stmt)
+path_verify(struct path *p, struct ast_expr *expr)
 {
 	switch(p->path_state) {
 	case PATH_STATE_ABSTRACT:
-		return ast_stmt_verify(stmt, p->abstract);
+		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->abstract);
 	case PATH_STATE_ACTUAL:
-		return ast_stmt_verify(stmt, p->actual);	
+		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->actual);	
 	case PATH_STATE_SPLIT:
-		return path_split_verify(p, stmt);
+		return path_split_verify(p, expr);
 	case PATH_STATE_UNINIT:
 	case PATH_STATE_HALFWAY:
 	case PATH_STATE_AUDIT:
@@ -571,11 +571,11 @@ path_verify(struct path *p, struct ast_stmt *stmt)
 	}
 }
 
-struct error *
-path_split_verify(struct path *p, struct ast_stmt *stmt)
+static struct error *
+path_split_verify(struct path *p, struct ast_expr *expr)
 {
 	struct path *branch = p->paths->paths[p->branch_index];
-	return path_verify(branch, stmt);
+	return path_verify(branch, expr);
 }
 
 static struct lexememarker *

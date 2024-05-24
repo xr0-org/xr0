@@ -288,8 +288,8 @@ getcmd();
 static struct error *
 command_continue(struct path *);
 
-static struct ast_stmt *
-command_arg_tostmt(struct command *);
+static struct ast_expr *
+command_arg_toexpr(struct command *);
 
 static struct error *
 next_command(struct path *p)
@@ -305,7 +305,7 @@ next_command(struct path *p)
 	case COMMAND_NEXT:
 		return path_next(p);	
 	case COMMAND_VERIFY:
-		return path_verify(p, command_arg_tostmt(cmd));
+		return path_verify(p, command_arg_toexpr(cmd));
 	case COMMAND_CONTINUE:
 		return command_continue(p);
 	case COMMAND_QUIT:
@@ -336,15 +336,11 @@ command_continue(struct path *p)
 	return NULL;
 }
 
-struct ast_stmt *YACC_PARSED_STMT;
+struct ast_expr *YACC_PARSED_EXPR;
 
-static struct ast_stmt *
-command_arg_tostmt(struct command *c)
+static struct ast_expr *
+command_arg_toexpr(struct command *c)
 {
-	printf("%s\n", string_arr_s(c->args)[0]);
-
-	/* preprocess */
-
 	extern FILE *yyin;
 	extern int LEX_START_TOKEN;
 
@@ -356,15 +352,13 @@ command_arg_tostmt(struct command *c)
 	}
 
 	/* lex and parse */
-	LEX_START_TOKEN = START_STMT;
+	LEX_START_TOKEN = START_EXPR;
 	lex_begin();
 	yyparse();
 	yylex_destroy();
 	lex_finish();
 
-	printf("parsed stmt: %s\n", ast_stmt_str(YACC_PARSED_STMT, 0));
-
-	assert(false);
+	return ast_expr_copy(YACC_PARSED_EXPR);
 }
 
 
