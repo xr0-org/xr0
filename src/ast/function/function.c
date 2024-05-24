@@ -329,7 +329,6 @@ next_command(struct path *p)
 static struct error *
 command_help_exec()
 {
-
 	return NULL;
 }
 

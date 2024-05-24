@@ -230,6 +230,9 @@ pass0(struct ast *root, struct externals *ext)
 	}
 }
 
+static void
+debugger_summary();
+
 static struct error *
 handle_debug(struct ast_function *, struct externals *, bool debug);
 
@@ -237,6 +240,10 @@ void
 pass1(struct ast *root, struct externals *ext, bool debug)
 {
 	struct error *err;
+	if (debug) {
+		debugger_summary();
+	}
+
 	for (int i = 0; i < root->n; i++) {
 		struct ast_externdecl *decl = root->decl[i];
 		if (!ast_externdecl_isfunction(decl)) {
@@ -254,26 +261,6 @@ pass1(struct ast *root, struct externals *ext, bool debug)
 		}
 		v_printf("qed %s\n", ast_function_name(f));
 	}
-}
-
-static void
-debugger_summary();
-
-static struct error *
-handle_debug(struct ast_function *f, struct externals *ext, bool debug)
-{
-	struct error *err;
-	if (debug) {
-		debugger_summary();	
-		if ((err = ast_function_debug(f, ext))) {
-			return err;	
-		}
-	} else {
-		if ((err = ast_function_verify(f, ext))) {
-			return err;
-		}
-	}
-	return NULL;
 }
 
 static void
@@ -297,6 +284,22 @@ debugger_summary()
 	d_printf("of a program.\n\n");
 
 	d_printf("For help, type \"help\".\n");
+}
+
+static struct error *
+handle_debug(struct ast_function *f, struct externals *ext, bool debug)
+{
+	struct error *err;
+	if (debug) {
+		if ((err = ast_function_debug(f, ext))) {
+			return err;	
+		}
+	} else {
+		if ((err = ast_function_verify(f, ext))) {
+			return err;
+		}
+	}
+	return NULL;
 }
 
 void
