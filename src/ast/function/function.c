@@ -439,7 +439,7 @@ process_command(char *cmd)
 	} else if (command_isquit(cmd)) {
 		return command_create(COMMAND_QUIT);
 	} else {
-		fprintf(stderr, "unknown command `%s'\n", cmd);
+		d_printf("unknown command `%s'\n", cmd);
 		return getcmd();
 	}
 }
@@ -495,8 +495,10 @@ process_commandwithargs(char *cmd, char *args)
 		return command_break(args_tk);	
 	} else if (command_isverify(cmd)) {
 		return command_verify(args_tk);
+	} else {
+		d_printf("unknown command `%s'\n", cmd);
+		return getcmd();
 	}
-	assert(false);
 }
 
 static struct string_arr *
