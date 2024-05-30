@@ -44,6 +44,7 @@ OBJECT_OBJ = $(BUILD_DIR)/object.o
 VALUE_OBJ = $(BUILD_DIR)/value.o
 MATH_OBJ = $(BUILD_DIR)/math.o
 
+COMMAND_OBJ = $(BUILD_DIR)/command.o
 BREAKPOINT_OBJ = $(BUILD_DIR)/breakpoint.o
 
 AST_OBJ = $(BUILD_DIR)/ast.o
@@ -61,7 +62,8 @@ XR0_OBJECTS = $(AST_OBJ) \
 	      $(STATE_OBJ) \
 	      $(UTIL_OBJ) \
 	      $(MATH_OBJ) \
-	      $(BREAKPOINT_OBJ)
+	      $(BREAKPOINT_OBJ) \
+	      $(COMMAND_OBJ)
 
 STATE_OBJECTS = $(VALUE_OBJ) \
 		$(LOCATION_OBJ) \
@@ -176,6 +178,10 @@ $(LOCATION_OBJ): $(STATE_DIR)/location.c $(UTIL_OBJ)
 $(UTIL_OBJ): $(UTIL_DIR)/util.c $(BUILD_DIR)
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(UTIL_DIR)/util.c
+
+$(COMMAND_OBJ): $(AST_DIR)/command.c $(BUILD_DIR) $(GRAM_OBJ)
+	@printf 'CC\t$@\n'
+	@$(CC) $(CFLAGS) -I $(BUILD_DIR) -o $@ -c $(AST_DIR)/command.c
 
 $(AST_OBJ): $(AST_DIR)/ast.c \
 	$(AST_DIR)/topological.h \

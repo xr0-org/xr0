@@ -118,7 +118,6 @@ void
 heap_fillorder(struct heap *h, struct int_arr *arr)
 {
 	int n = block_arr_nblocks(h->blocks);
-	struct block **b = block_arr_blocks(h->blocks);
 	int *found = foundmap(arr, n);
 	for (int i = 0; i < n; i++) {
 		if (!found[i]) {

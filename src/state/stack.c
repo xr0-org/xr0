@@ -553,33 +553,11 @@ frame_advance(struct frame *f)
 	return f->advance;
 }
 
-static struct frame *
-frame_copy(struct frame *f)
-{
-	if (f->kind == FRAME_CALL) {
-		assert(f->ret_type);
-	}
-	struct frame *copy = frame_create(
-		dynamic_str(f->name),
-		ast_block_copy(f->b),
-		f->ret_type ? ast_type_copy(f->ret_type) : NULL,
-		f->mode,
-		f->kind
-	); 
-	if (f->kind == FRAME_CALL) {
-		copy->f = ast_function_copy(f->f);
-		copy->call = ast_expr_copy(f->call);
-	}
-	copy->advance = f->advance;
-	return copy;
-}
-
 static void
 frame_destroy(struct frame *f)
 {
 	assert(false);
 }
-
 
 struct variable {
 	struct ast_type *type;

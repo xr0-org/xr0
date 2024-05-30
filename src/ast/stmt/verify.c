@@ -72,6 +72,9 @@ expr_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		b,
 		state
 	);
+	if (expr) {
+		ast_expr_destroy(expr);
+	}
 	return NULL;
 }
 
