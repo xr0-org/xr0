@@ -2,34 +2,12 @@
 #define XR0_AST_RESULT_H
 #include <stdbool.h>
 
-struct value;
 struct error;
 
-struct result;
-
-struct result *
-result_error_create(struct error *err);
-
-struct result *
-result_value_create(struct value *val);
-
-void
-result_destroy(struct result *);
-
-bool
-result_iserror(struct result *);
-
-struct error *
-result_as_error(struct result *);
-
-struct value *
-result_as_value(struct result *);
-
-bool
-result_hasvalue(struct result *);
-
-struct object;
 struct ast_type;
+struct object;
+
+struct lvalue;
 
 struct lvalue *
 lvalue_create(struct ast_type *, struct object *);
@@ -42,6 +20,22 @@ lvalue_type(struct lvalue *);
 
 struct object *
 lvalue_object(struct lvalue *);
+
+struct value;
+
+struct rvalue;
+
+struct rvalue *
+rvalue_create(struct ast_type *, struct value *);
+
+void
+rvalue_destroy(struct rvalue *);
+
+struct ast_type *
+rvalue_type(struct rvalue *);
+
+struct value *
+rvalue_value(struct rvalue *);
 
 struct preresult;
 
@@ -69,27 +63,8 @@ preresult_as_error(struct preresult *);
 bool
 preresult_iscontradiction(struct preresult *);
 
-struct iresult;
-
-struct iresult *
-iresult_error_create(struct error *err);
-
-struct iresult *
-iresult_expr_create(struct ast_expr *val);
-
-void
-iresult_destroy(struct iresult *);
-
-bool
-iresult_iserror(struct iresult *);
-
-struct error *
-iresult_as_error(struct iresult *);
-
-struct ast_expr *
-iresult_as_expr(struct iresult *);
-
-bool
-iresult_hasexpr(struct iresult *);
+DECLARE_RESULT_TYPE(struct ast_expr *, expr, iresult)
+DECLARE_RESULT_TYPE(struct lvalue *, lvalue, l_res)
+DECLARE_RESULT_TYPE(struct rvalue *, rvalue, r_res)
 
 #endif

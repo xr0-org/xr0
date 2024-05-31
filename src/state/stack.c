@@ -41,9 +41,9 @@ struct frame {
 };
 
 struct location *
-stack_newblock(struct stack *stack)
+stack_newblock(struct stack *stack, int size)
 {
-	int address = block_arr_append(stack->memory, block_create());
+	int address = block_arr_append(stack->memory, block_create(size));
 	struct location *loc = location_create_automatic(
 		stack->id, address, ast_expr_constant_create(0)
 	);
@@ -234,17 +234,19 @@ stack_str(struct stack *stack, struct state *state)
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
 		struct variable *v = (struct variable *) e.value;
+		char *decl = ast_type_strwithvar(variable_type(v), e.key);
 		strbuilder_printf(
 			b, 
 			"\t%d: %-*s (%s",
 			i,
 			var_str_max, var_str[i],
-			e.key
+			decl
 		);
 		if (variable_isparam(v)) {
 			strbuilder_printf(b, ", π");
 		}
 		strbuilder_printf(b, ")\n");
+		free(decl);
 	}
 	string_arr_destroy(var_str_arr);
 	strbuilder_printf(b, "\t");
@@ -268,14 +270,12 @@ var_strs(struct stack *stack, struct state *state)
 	struct string_arr *arr = string_arr_create();
 	struct map *m = stack->varmap;
 	for (int i = 0; i < m->n; i++) {
-		string_arr_append(
-			arr,
-			variable_str(
-				(struct variable *) m->entry[i].value,
-				stack,
-				state
-			)
+		struct block *b = location_getstackblock(
+			variable_location((struct variable *) m->entry[i].value),
+			stack
 		);
+		assert(b);
+		string_arr_append(arr, block_str(b));
 	}
 	return arr;
 }
@@ -553,12 +553,6 @@ frame_advance(struct frame *f)
 	return f->advance;
 }
 
-static void
-frame_destroy(struct frame *f)
-{
-	assert(false);
-}
-
 struct variable {
 	struct ast_type *type;
 	struct location *loc;
@@ -573,14 +567,10 @@ variable_create(struct ast_type *type, struct stack *stack, bool isparam)
 	v->type = ast_type_copy(type);
 	v->isparam = isparam;
 
-	/* create block with uninitialised object at offset 0 */
-	v->loc = stack_newblock(stack);
-	struct block_res res = location_getblock(v->loc, NULL, NULL, stack, NULL, NULL);
-	if (res.err) {
-		assert(false);
-	}
-	assert(res.b);
-	block_install(res.b, object_value_create(ast_expr_constant_create(0), NULL));
+	v->loc = stack_newblock(stack, ast_type_size(type));
+	struct block_res *res = location_getblock(v->loc, NULL, NULL, stack, NULL, NULL);
+	struct block *b = block_res_as_block(res);
+	assert(b);
 
 	return v;
 }
@@ -610,46 +600,16 @@ variable_abstractcopy(struct variable *old, struct state *s)
 	new->type = ast_type_copy(old->type);
 	new->isparam = old->isparam;
 	new->loc = location_copy(old->loc);
-	struct object_res res = state_get(s, new->loc, false);
-	if (res.err) {
-		assert(false);
-	}
-	assert(res.obj);
-	if (object_isvalue(res.obj)) {
-		struct value *v = object_as_value(res.obj);
+	struct object_res *res = state_get(s, new->loc, false);
+	struct object *obj = object_res_as_object(res);
+	assert(obj);
+	if (object_isvalue(obj)) {
+		struct value *v = object_as_value(obj);
 		if (v) {
-			object_assign(res.obj, value_abstractcopy(v, s));
+			object_assign(obj, value_abstractcopy(v, s));
 		}
 	}
 	return new;
-}
-
-static char *
-object_or_nothing_str(struct location *loc, struct stack *stack, struct state *state);
-
-char *
-variable_str(struct variable *var, struct stack *stack, struct state *state)
-{
-	assert(location_type(var->loc) != LOCATION_VCONST);
-	struct strbuilder *b = strbuilder_create();
-	char *type = ast_type_str(var->type);
-	char *obj_str = object_or_nothing_str(var->loc, stack, state);
-	strbuilder_printf(b, "{%s := %s}", type, obj_str);
-	free(obj_str);
-	free(type);
-	return strbuilder_build(b);
-}
-
-static char *
-object_or_nothing_str(struct location *loc, struct stack *stack, struct state *state)
-{
-	struct block *b = location_getstackblock(loc, stack);
-	assert(b);
-	struct object *obj = block_observe(b, location_offset(loc), state, false);
-	if (obj) {
-		return object_str(obj);
-	}
-	return dynamic_str("");
 }
 
 struct location *

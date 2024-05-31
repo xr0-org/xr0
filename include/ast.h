@@ -22,6 +22,9 @@ ast_expr_constant_create_char(char);
 int
 ast_expr_as_constant(struct ast_expr *expr);
 
+bool
+ast_expr_isconstant(struct ast_expr *);
+
 char *
 ast_expr_as_literal(struct ast_expr *);
 
@@ -118,6 +121,9 @@ struct ast_expr *
 ast_expr_sum_create(struct ast_expr *, struct ast_expr *);
 
 struct ast_expr *
+ast_expr_product_create(struct ast_expr *, struct ast_expr *);
+
+struct ast_expr *
 ast_expr_difference_create(struct ast_expr *, struct ast_expr *);
 
 struct ast_expr *
@@ -194,6 +200,11 @@ struct math_state;
 bool
 ast_expr_matheval(struct ast_expr *e);
 
+DECLARE_RESULT_TYPE(int, int, intresult)
+
+struct intresult *
+ast_expr_consteval(struct ast_expr *);
+
 bool
 ast_expr_decide(struct ast_expr *, struct state *);
 
@@ -204,6 +215,8 @@ ast_expr_rangedecide(struct ast_expr *, struct ast_expr *lw,
 struct error *
 ast_expr_exec(struct ast_expr *, struct state *);
 
+struct r_res;
+struct l_res;
 struct preresult;
 
 struct preresult *
@@ -212,30 +225,23 @@ ast_expr_assume(struct ast_expr *, struct state *);
 void
 ast_expr_varinfomap(struct map *, struct ast_expr *, struct state *s);
 
-struct lvalue;
-
-struct lvalue_res {
-	struct lvalue *lval;
-	struct error *err;
-};
-
-struct lvalue_res
+struct l_res *
 ast_expr_lvalue(struct ast_expr *, struct state *);
 
-struct result *
+struct r_res *
 ast_expr_eval(struct ast_expr *, struct state *);
 
-struct result *
+struct r_res *
 ast_expr_abseval(struct ast_expr *, struct state *);
 
 /* ast_expr_pf_reduce: Reduce an expression to "parameter form", in which its
  * only primitives are constants and parameters (vconsts). */
-struct result *
+struct r_res *
 ast_expr_pf_reduce(struct ast_expr *, struct state *);
 
 struct value;
 
-struct result *
+struct r_res *
 ast_expr_pf_augment(struct value *, struct ast_expr *, struct state *);
 
 struct ast_function;
@@ -495,14 +501,14 @@ ast_stmt_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
 struct ast_type;
 
 /* TODO: allow modifiers for pointer, array and typedef types */
-bool
-ast_type_isint(struct ast_type *type);
-
-bool
-ast_type_ispointer(struct ast_type *type);
+struct ast_type *
+ast_type_create_int();
 
 struct ast_type *
 ast_type_create_ptr(struct ast_type *type);
+
+struct ast_type *
+ast_type_create_char();
 
 struct ast_type *
 ast_type_create_void();
@@ -512,6 +518,12 @@ ast_type_create_voidptr();
 
 struct ast_type *
 ast_type_create_arr(struct ast_type *type, int length);
+
+bool
+ast_type_isarr(struct ast_type *type);
+
+struct ast_type *
+ast_type_arr_type(struct ast_type *);
 
 struct ast_variable_arr;
 
@@ -525,6 +537,9 @@ ast_type_struct_complete(struct ast_type *t, struct externals *ext);
 
 struct ast_variable_arr *
 ast_type_struct_members(struct ast_type *t);
+
+struct ast_type *
+ast_type_struct_membertype(struct ast_type *t, char *field, struct externals *);
 
 char *
 ast_type_struct_tag(struct ast_type *t);
@@ -547,6 +562,9 @@ ast_type_istypedef(struct ast_type *);
 bool
 ast_type_isvoid(struct ast_type *);
 
+struct ast_type *
+ast_type_create_range(struct ast_expr *lw, struct ast_expr *up_nonincl);
+
 struct externals;
 
 struct value *
@@ -558,6 +576,9 @@ ast_type_destroy(struct ast_type *);
 char *
 ast_type_str(struct ast_type *);
 
+char *
+ast_type_strwithvar(struct ast_type *, char *var);
+
 struct ast_type *
 ast_type_copy(struct ast_type *t);
 
@@ -566,6 +587,12 @@ ast_type_base(struct ast_type *t);
 
 struct ast_type *
 ast_type_ptr_type(struct ast_type *t);
+
+int
+ast_type_size(struct ast_type *);
+
+struct ast_type *
+ast_type_deref(struct ast_type *);
 
 struct ast_variable_arr;
 
@@ -679,8 +706,6 @@ ast_function_verify(struct ast_function *, struct externals *);
 
 struct error *
 ast_function_debug(struct ast_function *, struct externals *);
-
-struct result;
 
 struct ast_externdecl;
 

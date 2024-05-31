@@ -15,23 +15,26 @@
 struct block {
 	struct object_arr *arr;
 	bool caller;
+	int size;
 };
 
 struct block *
-block_create()
+block_create(int size)
 {
 	struct block *b = malloc(sizeof(struct block));
 	b->arr = object_arr_create();
 	b->caller = false;
+	b->size = size;
 	return b;
 }
 
 struct block *
-block_callercreate()
+block_callercreate(int size)
 {
 	struct block *b = malloc(sizeof(struct block));
 	b->arr = object_arr_create();
 	b->caller = true;
+	b->size = size;
 	return b;
 }
 
@@ -48,6 +51,7 @@ block_copy(struct block *old)
 	struct block *new = malloc(sizeof(struct block));
 	new->arr = object_arr_copy(old->arr);
 	new->caller = old->caller;
+	new->size = old->size;
 	return new;
 }
 
@@ -57,6 +61,7 @@ block_permuteheaplocs(struct block *old, struct permutation *p)
 	struct block *new = malloc(sizeof(struct block));
 	new->arr = object_arr_create();
 	new->caller = old->caller;
+	new->size = old->size;
 
 	struct object **obj = object_arr_objects(old->arr);
 	int n = object_arr_nobjects(old->arr);
@@ -73,9 +78,10 @@ block_str(struct block *block)
 	struct strbuilder *b = strbuilder_create();
 	struct object **obj = object_arr_objects(block->arr);
 	int n = object_arr_nobjects(block->arr);
+	strbuilder_printf(b, "|%d| ", block->size);
 	for (int i = 0; i < n; i++) {
 		char *s = object_str(obj[i]);
-		strbuilder_printf(b, "%s%s", s, (i + 1 < n) ? ", " : "");
+		strbuilder_printf(b, "%s%s", s, (i + 1 < n) ? " " : "");
 		free(s);
 	}
 	return strbuilder_build(b);
@@ -89,26 +95,40 @@ block_install(struct block *b, struct object *obj)
 	object_arr_append(b->arr, obj);
 }
 
-struct object *
+struct object_res *
 block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		bool constructive)
 {
+	struct intresult *offseteval = ast_expr_consteval(offset);
+	if (!intresult_iserror(offseteval)) {
+		int of = intresult_as_int(offseteval);
+		if (of < 0 || of >= b->size) {
+			return object_res_error_create(
+				error_printf("out of bounds")
+			);
+		}
+		offset = ast_expr_constant_create(of);
+	}
+	intresult_destroy(offseteval);
+
 	int index = object_arr_index(b->arr, offset, s);
 	if (index == -1) {
 		if (!constructive) {
-			return NULL;
+			return object_res_error_create(
+				error_block_observe_noobj()
+			);
 		}
 		struct object *obj = object_value_create(
 			ast_expr_copy(offset), NULL
 		);
 		object_arr_append(b->arr, obj);
-		return obj;
+		return object_res_object_create(obj);
 	}
 
 	struct object *obj = object_arr_objects(b->arr)[index];
 
 	if (object_isvalue(obj)) {
-		return obj;
+		return object_res_object_create(obj);
 	}
 
 	/* range around observand at offset */
@@ -120,8 +140,10 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
  
 	/* ordering makes them sequential in heap */
 	struct object *upto = object_upto(obj, lw, s);
-	struct object *observed = 
-		object_value_create(ast_expr_copy(lw), state_alloc(s));
+	struct object *observed = object_value_create(
+		ast_expr_copy(lw),
+		value_ptr_create(state_alloc(s, 1))
+	);
 	struct object *from = object_from(obj, up, s);
 
 	ast_expr_destroy(up);
@@ -140,7 +162,7 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		object_arr_insert(b->arr, index, from);
 	}
 
-	return observed;
+	return object_res_object_create(observed);
 }
 
 bool
@@ -180,8 +202,8 @@ block_range_alloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
 					ast_expr_copy(lw)
 				),
 				b->caller
-					? heap_newcallerblock(heap)
-					: heap_newblock(heap)
+					? heap_newcallerblock(heap, 1)
+					: heap_newblock(heap, 1)
 			)
 		)
 	);
@@ -384,6 +406,7 @@ block_arr_delete(struct block_arr *arr, int address)
 	assert(false);
 }
 
+DEFINE_RESULT_TYPE(struct block *, block, block_destroy, block_res)
 
 struct permutation {
 	struct int_arr *arr;

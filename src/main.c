@@ -278,7 +278,7 @@ debugger_summary()
 	d_printf("the language alone.\n\n");
 
 	d_printf("This matters because at runtime we interact with a\n");
-	d_printf("very tiny subset of a program’s possible\n");
+	d_printf("very tiny subset of a program's possible\n");
 	d_printf("behaviours. In the state supplied by 0db you see\n");
 	d_printf("at once what applies to all possible executions\n");
 	d_printf("of a program.\n\n");

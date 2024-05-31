@@ -23,19 +23,23 @@ struct ast_type {
 			struct ast_variable_arr *members;
 		} structunion;
 		char *userdef;
+		struct {
+			struct ast_expr *lw, *up_nonincl;
+		} range;
 	};
 };
 
 bool
-ast_type_isint(struct ast_type *t)
+ast_type_isarr(struct ast_type *t)
 {
-	return t->base == TYPE_INT;
+	return t->base == TYPE_ARRAY;
 }
 
-bool
-ast_type_ispointer(struct ast_type *t)
+struct ast_type *
+ast_type_arr_type(struct ast_type *t)
 {
-	return t->base == TYPE_POINTER;
+	assert(ast_type_isarr(t));
+	return t->arr.type;
 }
 
 bool
@@ -55,12 +59,24 @@ ast_type_create(enum ast_type_base base, enum ast_type_modifier mod)
 }
 
 struct ast_type *
+ast_type_create_int()
+{
+	return ast_type_create(TYPE_INT, 0);
+}
+
+struct ast_type *
 ast_type_create_ptr(struct ast_type *ref)
 {
 	assert(ref);
 	struct ast_type *t = ast_type_create(TYPE_POINTER, 0);
 	t->ptr_type = ref;
 	return t;
+}
+
+struct ast_type *
+ast_type_create_char()
+{
+	return ast_type_create(TYPE_CHAR, 0);
 }
 
 struct ast_type *
@@ -111,7 +127,7 @@ ast_type_vconst(struct ast_type *t, struct state *s, char *comment, bool persist
 	case TYPE_INT:
 		return value_int_indefinite_create();
 	case TYPE_POINTER:
-		return value_ptr_indefinite_create();
+		return value_ptr_indefinite_create(t->ptr_type);
 	case TYPE_USERDEF:
 		return ast_type_vconst(
 			externals_gettypedef(state_getext(s), t->userdef), s, comment, persist
@@ -148,6 +164,21 @@ ast_type_struct_members(struct ast_type *t)
 	return t->structunion.members;
 }
 
+struct ast_type *
+ast_type_struct_membertype(struct ast_type *t, char *field, struct externals *ext)
+{
+	struct ast_type *complete = ast_type_struct_complete(t, ext);
+	struct ast_variable_arr *arr = complete->structunion.members;
+	int n = ast_variable_arr_n(arr);
+	struct ast_variable **v = ast_variable_arr_v(arr);
+	for (int i = 0; i < n; i++) {
+		if (strcmp(ast_variable_name(v[i]), field) == 0) {
+			return ast_variable_type(v[i]);
+		}
+	}
+	assert(false);
+}
+
 char *
 ast_type_struct_tag(struct ast_type *t)
 {
@@ -181,6 +212,33 @@ ast_type_copy_struct(struct ast_type *old)
 		? ast_variable_arr_copy(old->structunion.members)
 		: NULL;
 	return new;
+}
+
+struct ast_type *
+ast_type_create_range(struct ast_expr *lw, struct ast_expr *up_nonincl)
+{
+	struct ast_type *t = ast_type_create(TYPE_RANGE, 0);
+	t->range.lw = lw;
+	t->range.up_nonincl = up_nonincl;
+	return t;
+}
+
+static struct ast_expr *
+copyornull(struct ast_expr *);
+
+struct ast_type *
+ast_type_copy_range(struct ast_type *old)
+{	
+	assert(old->base == TYPE_RANGE);
+	return ast_type_create_range(
+		copyornull(old->range.lw), copyornull(old->range.up_nonincl)
+	);
+}
+
+static struct ast_expr *
+copyornull(struct ast_expr *e)
+{
+	return e ? ast_expr_copy(e) : NULL;
 }
 
 void
@@ -236,6 +294,9 @@ ast_type_copy(struct ast_type *t)
 	case TYPE_CHAR:
 		return ast_type_create(t->base, t->mod);
 
+	case TYPE_RANGE:
+		return ast_type_copy_range(t);
+
 	default:
 		assert(false);
 	}
@@ -253,21 +314,23 @@ ast_type_str_build_struct(struct strbuilder *b, struct ast_type *t);
 static char *
 mod_str(int mod);
 
+const char *type_basestr[] = {
+	[TYPE_VOID]	= "void",
+	[TYPE_CHAR]	= "char",
+	[TYPE_SHORT]	= "short",
+	[TYPE_INT]	= "int",
+	[TYPE_LONG]	= "long",
+	[TYPE_FLOAT]	= "float",
+	[TYPE_DOUBLE]	= "double",
+	[TYPE_SIGNED]	= "signed",
+	[TYPE_UNSIGNED]	= "unsigned",
+	[TYPE_RANGE]	= "range",
+};
+
 char *
 ast_type_str(struct ast_type *t)
 {
 	assert(t);
-	const char *basestr[] = {
-		[TYPE_VOID]	= "void",
-		[TYPE_CHAR]	= "char",
-		[TYPE_SHORT]	= "short",
-		[TYPE_INT]	= "int",
-		[TYPE_LONG]	= "long",
-		[TYPE_FLOAT]	= "float",
-		[TYPE_DOUBLE]	= "double",
-		[TYPE_SIGNED]	= "signed",
-		[TYPE_UNSIGNED]	= "unsigned",
-	};
 	struct strbuilder *b = strbuilder_create();
 	char *mod = mod_str(t->mod);
 	strbuilder_printf(b, "%s", mod);
@@ -286,7 +349,7 @@ ast_type_str(struct ast_type *t)
 		strbuilder_printf(b, "%s", t->userdef);
 		break;
 	default:
-		strbuilder_printf(b, basestr[t->base]);
+		strbuilder_printf(b, type_basestr[t->base]);
 		break;
 	}
 	return strbuilder_build(b);
@@ -370,6 +433,17 @@ ast_type_str_build_struct(struct strbuilder *b, struct ast_type *t)
 	strbuilder_printf(b, "}");
 }
 
+char *
+ast_type_strwithvar(struct ast_type *t, char *var)
+{
+	/* TODO: make print with normal C syntax */
+	struct strbuilder *b = strbuilder_create();
+	char *s = ast_type_str(t);
+	strbuilder_printf(b, "%s %s", s, var);
+	free(s);
+	return strbuilder_build(b);
+}
+
 enum ast_type_base
 ast_type_base(struct ast_type *t)
 {
@@ -381,4 +455,41 @@ ast_type_ptr_type(struct ast_type *t)
 {
 	assert(t->base == TYPE_POINTER);
 	return t->ptr_type;
+}
+
+int
+ast_type_size(struct ast_type *t)
+{
+	/* XXX: simplistic sizing until we study the alignment rules more
+	 * closely */
+
+	switch (t->base) {
+	case TYPE_VOID:
+	case TYPE_CHAR:
+	case TYPE_INT:
+	case TYPE_POINTER:
+		return 1;
+
+	case TYPE_ARRAY:
+		return t->arr.length * ast_type_size(t->arr.type);
+
+	case TYPE_STRUCT:
+	case TYPE_USERDEF:
+		return 1;
+	default:
+		assert(false);
+	}
+}
+
+struct ast_type *
+ast_type_deref(struct ast_type *t)
+{
+	switch (t->base) {
+	case TYPE_POINTER:
+		return t->ptr_type;
+	case TYPE_ARRAY:
+		return t->arr.type;
+	default:
+		assert(false);
+	}
 }

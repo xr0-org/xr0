@@ -1,0 +1,1 @@
+10-bounds/000-FAIL-constant.x:8:10: undefined indirection: out of bounds (foo)

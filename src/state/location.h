@@ -30,9 +30,6 @@ location_create_dynamic(int block, struct ast_expr *offset);
 struct location *
 location_create_automatic(int frame, int block, struct ast_expr *offset);
 
-struct value *
-location_transfigure(struct location *, struct state *compare);
-
 void
 location_setframe(struct location *loc, int frame);
 
@@ -80,8 +77,8 @@ location_type(struct location *loc);
 struct ast_expr *
 location_offset(struct location *loc);
 
-struct location *
-location_with_offset(struct location *loc, struct ast_expr *offset);
+void
+location_setoffset(struct location *loc, struct ast_expr *offset);
 
 struct heap;
 
@@ -115,12 +112,7 @@ struct object;
 
 struct block;
 
-struct block_res {
-	struct block *b;
-	struct error *err;
-};
-
-struct block_res
+struct block_res *
 location_getblock(struct location *, struct static_memory *, struct vconst *, struct stack *,
 		struct heap *, struct clump *);
 

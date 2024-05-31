@@ -64,8 +64,9 @@ struct ast_expr {
 				BINARY_OP_LE	= 1 << 4,
 				BINARY_OP_GE	= 1 << 5,
 
-				BINARY_OP_ADDITION	= 1 << 6,
-				BINARY_OP_SUBTRACTION	= 1 << 7,
+				BINARY_OP_ADDITION		= 1 << 6,
+				BINARY_OP_SUBTRACTION		= 1 << 7,
+				BINARY_OP_MULTIPLICATION	= 1 << 8,
 			} op;
 			struct ast_expr *e1, *e2;
 		} binary;
@@ -90,29 +91,41 @@ ast_expr_binary_op(struct ast_expr *);
 struct ast_stmt_splits
 ast_expr_splits(struct ast_expr *, struct state *);
 
-struct result_arr {
+struct r_res_arr {
 	int n;
-	struct result **res;
+	struct r_res **res;
 };
 
-struct result_arr *
+struct r_res_arr *
 result_arr_create();
 
 void
-result_arr_destroy(struct result_arr *arr);
+result_arr_destroy(struct r_res_arr *arr);
 
 void
-result_arr_append(struct result_arr *arr, struct result *res);
+result_arr_append(struct r_res_arr *arr, struct r_res *res);
 
-struct result_arr *
+struct r_res_arr *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 		struct ast_variable **param, struct state *state);
 
 struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
-		struct result_arr *args, char *fname, struct state *state);
+		struct r_res_arr *args, char *fname, struct state *state);
 
 struct string_arr *
 ast_expr_getfuncs(struct ast_expr *);
+
+struct ast_type;
+struct ast_declaration;
+
+char *
+ast_declaration_name(struct ast_declaration *);
+
+struct ast_type *
+ast_declaration_type(struct ast_declaration *);
+
+struct ast_declaration *
+ast_expr_declare(struct ast_expr *, struct ast_type *base);
 
 #endif

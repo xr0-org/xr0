@@ -1,5 +1,5 @@
 # commands
-CC = gcc -g -Wreturn-type -std=gnu11
+CC = gcc -g -Werror -Wreturn-type -std=gnu11
 CFLAGS = -I include -Wall
 VALGRIND = valgrind --fullpath-after=`pwd`/src/
 LEX = lex

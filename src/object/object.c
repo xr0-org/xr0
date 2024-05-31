@@ -424,11 +424,12 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 			ast_expr_copy(obj->offset), value_copy(obj->value)
 		);
 	}
+	struct ast_expr *diff = ast_expr_difference_create(excl_up, lw);
 	return object_range_create(
 		ast_expr_copy(obj->offset),
 		range_create(
-			ast_expr_difference_create(excl_up, lw),
-			value_as_location(state_alloc(s))
+			diff,
+			state_alloc(s, ast_expr_as_constant(diff))
 		)
 	);
 }
@@ -465,14 +466,12 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 			value_copy(obj->value)
 		);
 	}
+	struct ast_expr *diff = ast_expr_difference_create(up, ast_expr_copy(incl_lw));
 	return object_range_create(
 		ast_expr_copy(incl_lw),
 		range_create(
-			ast_expr_difference_create(
-				up,
-				ast_expr_copy(incl_lw)
-			),
-			value_as_location(state_alloc(s))
+			diff,
+			state_alloc(s, ast_expr_as_constant(diff))
 		)
 	);
 }
@@ -483,7 +482,8 @@ object_dealloc(struct object *obj, struct state *s)
 {
 	switch (obj->type) {
 	case OBJECT_VALUE:
-		return state_dealloc(s, obj->value);
+		assert(obj->value);
+		return state_dealloc(s, value_as_location(obj->value));
 	case OBJECT_DEALLOCAND_RANGE:
 		return range_dealloc(obj->range, s);
 	default:
@@ -528,7 +528,6 @@ struct object_result {
 	struct object *val;
 	struct error *err;
 };
-
 
 struct object_result *
 object_result_error_create(struct error *err)
@@ -650,7 +649,7 @@ range_size(struct range *r)
 struct error *
 range_dealloc(struct range *r, struct state *s)
 {
-	return state_dealloc(s, value_ptr_create(r->loc));
+	return state_dealloc(s, r->loc);
 }
 
 bool
@@ -785,3 +784,5 @@ object_arr_objects(struct object_arr *arr)
 {
 	return arr->object;
 }
+
+DEFINE_RESULT_TYPE(struct object *, object, object_destroy, object_res)

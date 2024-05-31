@@ -141,4 +141,6 @@ object_arr_append(struct object_arr *arr, struct object *obj);
 void
 object_arr_remove(struct object_arr *arr, int index);
 
+DECLARE_RESULT_TYPE(struct object *, object, object_res)
+
 #endif

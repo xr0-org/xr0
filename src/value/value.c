@@ -9,7 +9,13 @@
 #include "value.h"
 
 struct value {
-	enum value_type type;
+	enum value_type {
+		VALUE_SYNC,
+		VALUE_PTR,
+		VALUE_INT,
+		VALUE_LITERAL,
+		VALUE_STRUCT,
+	} type;
 	union {
 		struct {
 			bool isindefinite;
@@ -146,6 +152,12 @@ value_int_create(int val)
 	return v;
 }
 
+int
+value_isint(struct value *v)
+{
+	return v->type = VALUE_INT;
+}
+
 struct value *
 value_literal_create(char *lit)
 {
@@ -154,30 +166,6 @@ value_literal_create(char *lit)
 	v->type = VALUE_LITERAL;
 	v->s = dynamic_str(lit);
 	return v;
-}
-
-struct value *
-value_transfigure(struct value *v, struct state *compare, bool islval)
-{
-	switch (v->type) {
-	case VALUE_SYNC:
-	case VALUE_LITERAL:
-		return islval ? NULL: v;
-	case VALUE_STRUCT:
-		assert(false);
-	case VALUE_INT:
-		return islval ? NULL: state_vconst(
-			compare,
-			/* XXX: we will investigate type conversions later */
-			ast_type_create_voidptr(),
-			NULL,
-			false
-		);
-	case VALUE_PTR:
-		return location_transfigure(value_as_location(v), compare);
-	default:
-		assert(false);
-	}
 }
 
 struct number *
@@ -806,12 +794,6 @@ value_as_literal(struct value *v)
 {
 	assert(v->type == VALUE_LITERAL);
 	return ast_expr_literal_create(v->s);
-}
-
-enum value_type
-value_type(struct value *v)
-{
-	return v->type;
 }
 
 static bool

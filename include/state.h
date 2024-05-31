@@ -100,26 +100,28 @@ state_unnest(struct state *);
 void
 state_declare(struct state *, struct ast_variable *var, bool isparam);
 
-struct object_res
+struct object_res *
 state_getresult(struct state *);
 
-struct object_res
+struct object_res *
 state_getobject(struct state *, char *id);
 
 struct ast_type *
-state_getobjecttype(struct state *, char *id);
+state_getvariabletype(struct state *, char *id);
 
 struct value *
 state_getloc(struct state *state, char *id);
 
-struct object_res
-state_deref(struct state *, struct value *ptr, struct ast_expr *index);
+struct object_res *
+state_deref(struct state *, struct value *ptr);
 
-struct value *
-state_alloc(struct state *);
+struct location;
+
+struct location *
+state_alloc(struct state *, int size);
 
 struct error *
-state_dealloc(struct state *, struct value *);
+state_dealloc(struct state *, struct location *);
 
 struct error *
 state_range_alloc(struct state *, struct object *,
@@ -202,8 +204,6 @@ state_return(struct state *);
 struct ast_expr *
 state_framecall(struct state *);
 
-struct location;
-
 bool
 state_returnreferences(struct state *, struct location *);
 
@@ -244,8 +244,11 @@ bool
 location_referencesheap(struct location *, struct state *,
 		struct circuitbreaker *);
 
-struct value *
-location_transfigure(struct location *, struct state *compare);
+struct ast_expr *
+location_offset(struct location *loc);
+
+void
+location_setoffset(struct location *loc, struct ast_expr *offset);
 
 struct int_arr *
 location_deriveorder(struct location *, struct circuitbreaker *, struct state *);
@@ -255,12 +258,7 @@ struct permutation;
 struct location *
 location_permuteheap(struct location *loc, struct permutation *p);
 
-struct object_res {
-	struct object *obj;
-	struct error *err;
-};
-
-struct object_res
+struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive);
 
 /* USED BY OBJECT */

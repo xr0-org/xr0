@@ -150,9 +150,9 @@ heap_blocks(struct heap *h)
 }
 
 struct location *
-heap_newblock(struct heap *h)
+heap_newblock(struct heap *h, int size)
 {
-	int address = block_arr_append(h->blocks, block_create());
+	int address = block_arr_append(h->blocks, block_create(size));
 
 	int n = block_arr_nblocks(h->blocks);
 	assert(n > 0);
@@ -164,9 +164,9 @@ heap_newblock(struct heap *h)
 }
 
 struct location *
-heap_newcallerblock(struct heap *h)
+heap_newcallerblock(struct heap *h, int size)
 {
-	int address = block_arr_append(h->blocks, block_callercreate());
+	int address = block_arr_append(h->blocks, block_callercreate(size));
 
 	int n = block_arr_nblocks(h->blocks);
 	assert(n > 0);
@@ -420,6 +420,7 @@ vconst_str(struct vconst *v, char *indent)
 	}
 	return strbuilder_build(b);
 }
+
 bool
 vconst_eval(struct vconst *v, struct ast_expr *e)
 {

@@ -149,6 +149,24 @@ error_return();
 struct error *
 error_to_return(struct error *);
 
+struct error *
+error_block_observe_noobj();
+
+struct error *
+error_to_block_observe_noobj(struct error *);
+
+struct error *
+error_state_get_no_block();
+
+struct error *
+error_to_state_get_no_block(struct error *err);
+
+struct error *
+error_state_deref_rconst();
+
+struct error *
+error_to_state_deref_rconst(struct error *err);
+
 char *
 error_str(struct error *);
 
@@ -166,5 +184,99 @@ circuitbreaker_destroy(struct circuitbreaker *);
 
 bool
 circuitbreaker_append(struct circuitbreaker *, void *);
+
+#define DECLARE_RESULT_TYPE(TYPE, VNAME, RTNAME) \
+struct RTNAME;\
+\
+struct RTNAME * \
+RTNAME##_error_create(struct error *err);\
+\
+struct RTNAME * \
+RTNAME##_##VNAME##_create(TYPE val);\
+\
+void \
+RTNAME##_destroy(struct RTNAME *res);\
+\
+bool \
+RTNAME##_iserror(struct RTNAME *res);\
+\
+struct error * \
+RTNAME##_as_error(struct RTNAME *res);\
+\
+TYPE \
+RTNAME##_as_##VNAME(struct RTNAME *res);\
+\
+bool \
+RTNAME##_has##VNAME(struct RTNAME *res);\
+\
+void \
+RTNAME##_errorignore(struct RTNAME *res);
+
+#define DEFINE_RESULT_TYPE(TYPE, VNAME, DESTRUCT, RTNAME) \
+struct RTNAME { \
+    TYPE val; \
+    struct error *err; \
+}; \
+\
+struct RTNAME * \
+RTNAME##_error_create(struct error *err) \
+{ \
+    assert(err); \
+    struct RTNAME *r = malloc(sizeof(struct RTNAME)); \
+    r->val = (TYPE) 0; \
+    r->err = err; \
+    return r; \
+} \
+\
+struct RTNAME * \
+RTNAME##_##VNAME##_create(TYPE val) \
+{ \
+    struct RTNAME *r = malloc(sizeof(struct RTNAME)); \
+    r->val = val; \
+    r->err = NULL; \
+    return r; \
+} \
+\
+void \
+RTNAME##_destroy(struct RTNAME *res) \
+{ \
+    assert(!res->err); \
+    if (res->val) { DESTRUCT(res->val); } \
+    free(res); \
+} \
+\
+bool \
+RTNAME##_iserror(struct RTNAME *res) \
+{ \
+    return res->err; \
+} \
+\
+struct error * \
+RTNAME##_as_error(struct RTNAME *res) \
+{ \
+    assert(res->err); \
+    return res->err; \
+} \
+\
+TYPE \
+RTNAME##_as_##VNAME(struct RTNAME *res) \
+{ \
+    assert(!res->err); \
+    return res->val; \
+} \
+\
+bool \
+RTNAME##_has##VNAME(struct RTNAME *res) \
+{ \
+    assert(!RTNAME##_iserror(res)); \
+    return res->val; /* implicit cast */ \
+}\
+\
+void \
+RTNAME##_errorignore(struct RTNAME *res) \
+{ \
+    assert(RTNAME##_iserror(res)); \
+    res->err = NULL; \
+}
 
 #endif

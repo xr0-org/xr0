@@ -279,9 +279,9 @@ inititalise_param(struct ast_variable *param, struct state *state)
 	char *name = ast_variable_name(param);
 	struct ast_type *t = ast_variable_type(param);
 
-	struct object_res res = state_getobject(state, name);
-	assert(!res.err);
-	if (object_hasvalue(res.obj)) {
+	struct object_res *res = state_getobject(state, name);
+	struct object *obj = object_res_as_object(res);
+	if (object_hasvalue(obj)) {
 		/* must on the clump or heap */
 		//struct value *val = object_as_value(obj);	
 		//struct location *loc = value_as_location(val);
@@ -292,7 +292,7 @@ inititalise_param(struct ast_variable *param, struct state *state)
 	} else {
 		/* variables that aren't talked about by the preconditions */
 		struct value *val = state_vconst(state, t, dynamic_str(name), true);
-		object_assign(res.obj, val);
+		object_assign(obj, val);
 	}
 	return NULL;
 }

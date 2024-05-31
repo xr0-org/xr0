@@ -1,0 +1,1 @@
+07-use-after-free/101-FAIL-rvalue-use-after-free.x:12:8: undefined indirection: *(p) is not an lvalue (func)

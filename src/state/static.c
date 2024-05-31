@@ -74,7 +74,7 @@ pool_copy(struct map *p)
 int
 static_memory_newblock(struct static_memory *sm)
 {
-	int address = block_arr_append(sm->blocks, block_create());
+	int address = block_arr_append(sm->blocks, block_create(1));
 
 	int n = block_arr_nblocks(sm->blocks);
 	assert(n > 0);

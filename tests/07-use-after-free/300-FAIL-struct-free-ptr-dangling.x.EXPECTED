@@ -1,0 +1,2 @@
+stdio.h:18:39: precondition failure: parameter `s' of `puts' must be lvalue (puts)
+	07-use-after-free/300-FAIL-struct-free-ptr-dangling.x:45:18 (create_report)

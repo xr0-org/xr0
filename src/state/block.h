@@ -4,10 +4,10 @@
 struct block;
 
 struct block *
-block_create();
+block_create(int size);
 
 struct block *
-block_callercreate();
+block_callercreate(int size);
 
 void
 block_destroy(struct block *);
@@ -27,8 +27,9 @@ void
 block_install(struct block *, struct object *);
 
 struct state;
+struct object_res;
 
-struct object *
+struct object_res *
 block_observe(struct block *, struct ast_expr *offset, struct state *,
 		bool constructive);
 
@@ -89,6 +90,7 @@ block_arr_append(struct block_arr *, struct block *);
 void
 block_arr_delete(struct block_arr *, int address);
 
+DECLARE_RESULT_TYPE(struct block *, block, block_res)
 
 struct permutation;
 

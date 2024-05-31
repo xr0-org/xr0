@@ -1,0 +1,1 @@
+08-uninitialised-memory/001-FAIL-uninitialised-memory-rval.x:7:8: undefined memory access: `p' has no value (undefined_memory1)

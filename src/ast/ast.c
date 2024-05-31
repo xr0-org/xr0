@@ -43,68 +43,6 @@ ast_append(struct ast *node, struct ast_externdecl *decl)
 	return node;
 }
 
-struct result {
-	struct value *val;
-	struct error *err;
-};
-
-struct result *
-result_error_create(struct error *err)
-{
-	assert(err);
-
-	struct result *r = malloc(sizeof(struct result));
-	r->val = NULL;
-	r->err = err;
-	return r;
-}
-
-struct result *
-result_value_create(struct value *val)
-{
-	struct result *r = malloc(sizeof(struct result));
-	r->val = val;
-	r->err = NULL;
-	return r;
-}
-
-void
-result_destroy(struct result *res)
-{
-	assert(!res->err);
-	if (res->val) { value_destroy(res->val);
-	}
-	free(res);
-}
-
-bool
-result_iserror(struct result *res)
-{
-	return res->err;
-}
-
-struct error *
-result_as_error(struct result *res)
-{
-	assert(res->err);
-	return res->err;
-}
-
-struct value *
-result_as_value(struct result *res)
-{
-	assert(!res->err);
-	return res->val;
-}
-
-bool
-result_hasvalue(struct result *res)
-{
-	assert(!result_iserror(res));
-	return res->val; /* implicit cast */
-}
-
-
 struct lvalue {
 	struct ast_type *t;
 	struct object *obj;
@@ -113,6 +51,8 @@ struct lvalue {
 struct lvalue *
 lvalue_create(struct ast_type *t, struct object *obj)
 {
+	assert(t && obj);
+
 	struct lvalue *l = malloc(sizeof(struct lvalue));
 	l->t = t;
 	l->obj = obj;
@@ -122,21 +62,64 @@ lvalue_create(struct ast_type *t, struct object *obj)
 void
 lvalue_destroy(struct lvalue *l)
 {
+	/* does not destroy object because it belongs to state */
+	assert(l);
 	ast_type_destroy(l->t);
-	object_destroy(l->obj);
 	free(l);
 }
 
 struct ast_type *
 lvalue_type(struct lvalue *l)
 {
+	assert(l);
 	return l->t;
 }
 
 struct object *
 lvalue_object(struct lvalue *l)
 {
+	assert(l);
 	return l->obj;
+}
+
+struct rvalue {
+	struct ast_type *t;
+	struct value *v;
+};
+
+struct rvalue *
+rvalue_create(struct ast_type *t, struct value *v)
+{
+	assert(t && v);
+
+	struct rvalue *r = malloc(sizeof(struct rvalue));
+	r->t = t;
+	r->v = v;
+	return r;
+}
+
+void
+rvalue_destroy(struct rvalue *r)
+{
+	assert(r);
+
+	ast_type_destroy(r->t);
+	value_destroy(r->v);
+	free(r);
+}
+
+struct ast_type *
+rvalue_type(struct rvalue *r)
+{
+	assert(r);
+	return r->t;
+}
+
+struct value *
+rvalue_value(struct rvalue *r)
+{
+	assert(r);
+	return r->v;
 }
 
 struct preresult {
@@ -202,68 +185,6 @@ preresult_iscontradiction(struct preresult *r)
 	return r->iscontradiction;
 }
 
-struct iresult {
-	struct ast_expr *val;
-	struct error *err;
-};
-
-struct iresult *
-iresult_error_create(struct error *err)
-{
-	assert(err);
-
-	struct iresult *r = malloc(sizeof(struct iresult));
-	r->val = NULL;
-	r->err = err;
-	return r;
-}
-
-struct iresult *
-iresult_expr_create(struct ast_expr *val)
-{
-	struct iresult *r = malloc(sizeof(struct iresult));
-	r->val = val;
-	r->err = NULL;
-	return r;
-}
-
-void
-iresult_destroy(struct iresult *res)
-{
-	assert(!res->err);
-	if (res->val) {
-		ast_expr_destroy(res->val);
-	}
-	free(res);
-}
-
-bool
-iresult_iserror(struct iresult *res)
-{
-	return res->err;
-}
-
-struct error *
-iresult_as_error(struct iresult *res)
-{
-	assert(res->err);
-	return res->err;
-}
-
-struct ast_expr *
-iresult_as_expr(struct iresult *res)
-{
-	assert(!res->err);
-	return res->val;
-}
-
-bool
-iresult_hasexpr(struct iresult *res)
-{
-	assert(!iresult_iserror(res));
-	return res->val; /* implicit cast */
-}
-
 struct string_arr *
 ast_topological_order(char *fname, struct externals *ext)
 {
@@ -275,3 +196,7 @@ ast_protostitch(struct ast_function *f, struct externals *ext)
 {
 	return ast_function_protostitch(f, ext);
 }
+
+DEFINE_RESULT_TYPE(struct ast_expr *, expr, ast_expr_destroy, iresult)
+DEFINE_RESULT_TYPE(struct lvalue *, lvalue, lvalue_destroy, l_res)
+DEFINE_RESULT_TYPE(struct rvalue *, rvalue, rvalue_destroy, r_res)

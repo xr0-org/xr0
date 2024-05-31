@@ -379,6 +379,11 @@ struct error {
 		ERROR_PRINTF,
 		ERROR_UNDECIDEABLE_COND,
 		ERROR_RETURN,
+
+		ERROR_BLOCK_OBSERVE_NOOBJ,
+
+		ERROR_STATE_GET_NOBLOCK,
+		ERROR_STATE_DEREF_RCONST,
 	} type;
 	union error_contents {
 		char *printf;
@@ -510,12 +515,59 @@ error_to_return(struct error *err)
 	return error_to(err, ERROR_RETURN);
 }
 
+struct error *
+error_block_observe_noobj()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_BLOCK_OBSERVE_NOOBJ;
+	return err;
+}
+
+struct error *
+error_to_block_observe_noobj(struct error *err)
+{
+	return error_to(err, ERROR_BLOCK_OBSERVE_NOOBJ);
+}
+
+struct error *
+error_state_get_no_block()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_STATE_GET_NOBLOCK;
+	return err;
+}
+
+struct error *
+error_to_state_get_no_block(struct error *err)
+{
+	return error_to(err, ERROR_STATE_GET_NOBLOCK);
+}
+
+struct error *
+error_state_deref_rconst()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_STATE_DEREF_RCONST;
+	return err;
+}
+
+struct error *
+error_to_state_deref_rconst(struct error *err)
+{
+	return error_to(err, ERROR_STATE_DEREF_RCONST);
+}
+
 char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
-		[ERROR_UNDECIDEABLE_COND] = "undecideable condition",
-		[ERROR_RETURN] = "returned",
+		[ERROR_UNDECIDEABLE_COND]	= "undecideable condition",
+		[ERROR_RETURN]			= "returned",
+
+		[ERROR_BLOCK_OBSERVE_NOOBJ]	= "block_observe no object",
+
+		[ERROR_STATE_GET_NOBLOCK]	= "state_get no block",
+		[ERROR_STATE_DEREF_RCONST]	= "state_deref rconst",
 	};
 
 	switch (err->type) {
@@ -523,6 +575,9 @@ error_str(struct error *err)
 		return dynamic_str(err->contents.printf);
 	case ERROR_UNDECIDEABLE_COND:
 	case ERROR_RETURN:
+	case ERROR_BLOCK_OBSERVE_NOOBJ:
+	case ERROR_STATE_GET_NOBLOCK:
+	case ERROR_STATE_DEREF_RCONST:
 		return dynamic_str(error_type_str[err->type]);
 	default:
 		assert(false);

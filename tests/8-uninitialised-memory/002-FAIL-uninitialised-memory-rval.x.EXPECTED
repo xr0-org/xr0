@@ -1,1 +1,0 @@
-8-uninitialised-memory/002-FAIL-uninitialised-memory-rval.x:9:8: undefined indirection: *(q+0) has no value (undefined_memory2)

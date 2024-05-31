@@ -90,6 +90,7 @@ path_destroy(struct path *p)
 
 	/*state_destroy(p->abstract);*/
 	/*state_destroy(p->actual);*/
+	path_arr_destroy(p->paths);
 	ast_function_destroy(p->f);
 	free(p);
 }

@@ -3,14 +3,6 @@
 
 #include <stdbool.h>
 
-enum value_type {
-	VALUE_SYNC,
-	VALUE_PTR,
-	VALUE_INT,
-	VALUE_LITERAL,
-	VALUE_STRUCT,
-};
-
 struct value;
 
 struct location;
@@ -19,11 +11,15 @@ struct permutation;
 
 struct int_arr;
 
+struct ast_type;
+
 struct int_arr *
 value_deriveorder(struct value *, struct circuitbreaker *, struct state *);
 
 struct value *
 value_permuteheaplocs(struct value *, struct permutation *);
+
+struct ast_type;
 
 struct value *
 value_ptr_create(struct location *loc);
@@ -33,6 +29,9 @@ value_ptr_indefinite_create();
 
 struct value *
 value_int_create(int val);
+
+int
+value_isint(struct value *v);
 
 struct value *
 value_literal_create(char *);
@@ -45,9 +44,6 @@ value_int_ne_create(int not_val);
 
 struct value *
 value_int_range_create(int lw, int excl_up);
-
-struct value *
-value_transfigure(struct value *, struct state *compare, bool islval);
 
 int
 value_int_lw(struct value *);
@@ -91,9 +87,6 @@ value_destroy(struct value *);
 
 char *
 value_str(struct value *);
-
-enum value_type
-value_type(struct value *);
 
 bool
 value_islocation(struct value *);

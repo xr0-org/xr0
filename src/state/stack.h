@@ -30,7 +30,7 @@ int
 stack_id(struct stack *);
 
 struct location *
-stack_newblock(struct stack *);
+stack_newblock(struct stack *, int size);
 
 void
 stack_destroy(struct stack *);
@@ -117,9 +117,6 @@ variable_destroy(struct variable *);
 
 struct variable *
 variable_copy(struct variable *);
-
-char *
-variable_str(struct variable *var, struct stack *, struct state *);
 
 struct location *
 variable_location(struct variable *);

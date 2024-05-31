@@ -113,6 +113,14 @@ ast_expr_as_constant(struct ast_expr *expr)
 	return expr->u.constant.constant;
 }
 
+bool
+ast_expr_isconstant(struct ast_expr *expr)
+{
+	return expr->kind == EXPR_CONSTANT;
+}
+
+
+
 struct ast_expr *
 ast_expr_literal_create(char *s)
 {
@@ -183,18 +191,21 @@ ast_expr_call_create(struct ast_expr *root, int narg, struct ast_expr **arg)
 struct ast_expr *
 ast_expr_call_root(struct ast_expr *expr)
 {
+	assert(expr->kind == EXPR_CALL);
 	return expr->root;
 }
 
 int
 ast_expr_call_nargs(struct ast_expr *expr)
 {
+	assert(expr->kind == EXPR_CALL);
 	return expr->u.call.n;
 }
 
 struct ast_expr **
 ast_expr_call_args(struct ast_expr *expr)
 {
+	assert(expr->kind == EXPR_CALL);
 	return expr->u.call.arg;
 }
 
@@ -333,43 +344,11 @@ ast_expr_member_field(struct ast_expr *expr)
 }
 
 static void
-ast_expr_member_deref_str_build(struct ast_expr *root, char *member,
-		struct strbuilder *b);
-
-static void
 ast_expr_member_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
-	struct ast_expr *root = expr->root;
-
-	if (root->kind == EXPR_UNARY) {
-		return ast_expr_member_deref_str_build(root, expr->u.string, b);
-	}
-
-	char *r = ast_expr_str(root);
+	char *r = ast_expr_str(expr->root);
 	strbuilder_printf(b, "%s.%s", r, expr->u.string);
 	free(r);
-}
-
-static void
-ast_expr_member_deref_str_build(struct ast_expr *root, char *member,
-		struct strbuilder *b)
-{
-	assert(ast_expr_unary_op(root) == UNARY_OP_DEREFERENCE);
-
-	struct ast_expr *inner = ast_expr_unary_operand(root); /* e1+e2 */
-	struct ast_expr *e1 = ast_expr_binary_e1(inner),
-			*e2 = ast_expr_binary_e2(inner);
-
-	char *left = ast_expr_str(e1);
-	if (e2->kind == EXPR_CONSTANT && ast_expr_as_constant(e2) == 0) { 
-		strbuilder_printf(b, "%s->%s", left, member);
-	} else {
-		char *index = ast_expr_str(e2);
-		strbuilder_printf(b, "%s[%s].%s", left, index, member);
-		free(index);
-	}
-	free(left);
-
 }
 
 struct ast_expr *
@@ -506,6 +485,12 @@ ast_expr_sum_create(struct ast_expr *e1, struct ast_expr *e2)
 }
 
 struct ast_expr *
+ast_expr_product_create(struct ast_expr *e1, struct ast_expr *e2)
+{
+	return ast_expr_binary_create(e1, BINARY_OP_MULTIPLICATION, e2);
+}
+
+struct ast_expr *
 ast_expr_difference_create(struct ast_expr *e1, struct ast_expr *e2)
 {
 	return ast_expr_binary_create(e1, BINARY_OP_SUBTRACTION, e2);
@@ -547,16 +532,17 @@ static void
 ast_expr_binary_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
 	const char *opstr[] = {
-		[BINARY_OP_EQ]		= "==",
-		[BINARY_OP_NE]		= "!=",
+		[BINARY_OP_EQ]			= "==",
+		[BINARY_OP_NE]			= "!=",
 
-		[BINARY_OP_LT]		= "<",
-		[BINARY_OP_GT]		= ">",
-		[BINARY_OP_LE]		= "<=",
-		[BINARY_OP_GE]		= ">=",
+		[BINARY_OP_LT]			= "<",
+		[BINARY_OP_GT]			= ">",
+		[BINARY_OP_LE]			= "<=",
+		[BINARY_OP_GE]			= ">=",
 
-		[BINARY_OP_ADDITION]	= "+",
-		[BINARY_OP_SUBTRACTION]	= "-",
+		[BINARY_OP_ADDITION]		= "+",
+		[BINARY_OP_SUBTRACTION]		= "-",
+		[BINARY_OP_MULTIPLICATION]	= "*",
 	};
 	char *e1 = ast_expr_str(expr->u.binary.e1),
 	     *e2 = ast_expr_str(expr->u.binary.e2);
@@ -695,7 +681,7 @@ ast_expr_clump_create(struct ast_expr *arg)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_ALLOCATION;
-	expr->u.alloc.kind= CLUMP;
+	expr->u.alloc.kind = CLUMP;
 	expr->u.alloc.arg = arg;
 	return expr;
 }
@@ -1074,6 +1060,55 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 	}
 }
 
+void
+nulldestruct(int x) { /* do nothing */ }
+
+DEFINE_RESULT_TYPE(int, int, nulldestruct, intresult)
+
+static struct intresult *
+binary_consteval(struct ast_expr *);
+
+struct intresult *
+ast_expr_consteval(struct ast_expr *e)
+{
+	switch (e->kind) {
+	case EXPR_CONSTANT:
+		return intresult_int_create(ast_expr_as_constant(e));
+	case EXPR_BINARY:
+		return binary_consteval(e);
+	default:
+		assert(false);
+	}
+}
+
+static struct intresult *
+binary_consteval(struct ast_expr *e)
+{
+	struct intresult *r1 = ast_expr_consteval(ast_expr_binary_e1(e)),
+			 *r2 = ast_expr_consteval(ast_expr_binary_e2(e));
+	if (intresult_iserror(r1)) {
+		return r1;
+	}
+	if (intresult_iserror(r2)) {
+		return r2;
+	}
+	int ans1 = intresult_as_int(r1),
+	    ans2 = intresult_as_int(r2);
+	intresult_destroy(r2);
+	intresult_destroy(r1);
+
+	switch (ast_expr_binary_op(e)) {
+	case BINARY_OP_ADDITION:
+		return intresult_int_create(ans1+ans2);
+	case BINARY_OP_SUBTRACTION:
+		return intresult_int_create(ans1-ans2);
+	case BINARY_OP_MULTIPLICATION:
+		return intresult_int_create(ans1*ans2);
+	default:
+		assert(false);
+	}
+}
+
 static struct string_arr *
 ast_expr_call_getfuncs(struct ast_expr *expr);
 
@@ -1125,6 +1160,90 @@ ast_expr_call_getfuncs(struct ast_expr *expr)
 		/* XXX: leaks */
 	}
 	return res;
+}
+
+struct ast_declaration {
+	char *name;
+	struct ast_type *type;
+};
+
+static struct ast_declaration *
+ast_declaration_create(char *name, struct ast_type *type)
+{
+	struct ast_declaration *decl = malloc(sizeof(struct ast_declaration));
+	decl->name = name;
+	decl->type = type;
+	return decl;
+}
+
+char *
+ast_declaration_name(struct ast_declaration *decl)
+{
+	return decl->name;
+}
+
+struct ast_type *
+ast_declaration_type(struct ast_declaration *decl)
+{
+	return decl->type;
+}
+
+static struct ast_declaration *
+unary_declare(struct ast_expr *, struct ast_type *base);
+
+struct ast_declaration *
+ast_expr_declare(struct ast_expr *expr, struct ast_type *base)
+{
+	switch (expr->kind) {
+	case EXPR_IDENTIFIER: /* base */
+		return ast_declaration_create(
+			ast_expr_as_identifier(expr), base
+		);
+	case EXPR_UNARY:
+		return unary_declare(expr, base);
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_declaration *
+arr_declare(struct ast_expr *, struct ast_type *base);
+
+static struct ast_declaration *
+unary_declare(struct ast_expr *expr, struct ast_type *base)
+{
+	assert(ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE);
+
+	struct ast_expr *operand = ast_expr_unary_operand(expr);
+	switch (operand->kind) {
+	case EXPR_BINARY: /* inner+size */
+		return arr_declare(operand, base);
+	default: /* inner */
+		return ast_expr_declare(operand, ast_type_create_ptr(base));
+	}
+}
+
+static struct ast_declaration *
+arr_declare(struct ast_expr *expr, struct ast_type *base)
+{
+	assert(ast_expr_binary_op(expr) == BINARY_OP_ADDITION);
+
+	struct ast_expr *e1 = ast_expr_binary_e1(expr),
+			*e2 = ast_expr_binary_e2(expr);
+
+	a_printf(
+		ast_expr_isconstant(e2),
+		"compound constant expressions not yet supported\n"
+	);
+
+	return ast_expr_declare(
+		e1,
+		ast_type_create_arr(
+			base,
+			ast_expr_as_constant(e2)
+		)
+	);
+
 }
 
 #include "verify.c"

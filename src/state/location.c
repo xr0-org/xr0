@@ -85,20 +85,6 @@ location_create_automatic(int frame, int block, struct ast_expr *offset)
 	return loc;
 }
 
-struct value *
-location_transfigure(struct location *loc, struct state *compare)
-{
-	switch (loc->type) {
-	case LOCATION_AUTOMATIC:
-	case LOCATION_DEREFERENCABLE:
-		return state_clump(compare);
-	case LOCATION_DYNAMIC:
-		return state_alloc(compare);
-	default:
-		assert(false);
-	}
-}
-
 struct location *
 location_permuteheap(struct location *loc, struct permutation *p)
 {
@@ -120,10 +106,16 @@ location_deriveorder(struct location *loc, struct circuitbreaker *cb,
 		if (loc->type == LOCATION_DYNAMIC) {
 			int_arr_append(arr, loc->block);
 		}
-		struct object_res res = state_get(s, loc, false);
-		assert(!res.err);
-		if (res.obj) {
-			int_arr_appendrange(arr, object_deriveorder(res.obj, cb, s));
+		struct object_res *res = state_get(s, loc, false);
+		if (object_res_iserror(res)) {
+			struct error *err = object_res_as_error(res);
+			if (error_to_block_observe_noobj(err)) {
+				object_res_errorignore(res);
+			}
+		}
+		struct object *obj = object_res_as_object(res);
+		if (obj) {
+			int_arr_appendrange(arr, object_deriveorder(obj, cb, s));
 		}
 	}
 	return arr;
@@ -237,17 +229,10 @@ location_copy(struct location *loc)
 	}
 }
 
-struct location *
-location_with_offset(struct location *loc, struct ast_expr *offset)
+void
+location_setoffset(struct location *loc, struct ast_expr *offset)
 {
-	/* TODO: arithemtically recompute offset */
-	assert(offsetzero(loc));
-
-	struct location *copy = location_copy(loc);
-	copy->offset = ast_expr_copy(offset);
-
-	/* XXX: leaks */
-	return copy;
+	loc->offset = offset;
 }
 
 bool
@@ -334,58 +319,51 @@ location_referencesheap(struct location *l, struct state *s, struct circuitbreak
 		}
 		return true;
 	}
-	struct object_res res = state_get(s, l, false);
-	if (res.err) {
-		assert(false);
+	struct object_res *res = state_get(s, l, false);
+	if (object_res_iserror(res)) {
+		struct error *err = object_res_as_error(res);
+		if (error_to_block_observe_noobj(err)) {
+			object_res_errorignore(res);
+		}
 	}
-	return res.obj && object_referencesheap(res.obj, s, cb);
+	struct object *obj = object_res_as_object(res);
+	return obj && object_referencesheap(obj, s, cb);
 }
 
-static struct block_res
+static struct block_res *
 location_auto_getblock(struct location *, struct stack *);
 
-struct block_res
+struct block_res *
 location_getblock(struct location *loc, struct static_memory *sm, struct vconst *v, struct stack *s,
 		struct heap *h, struct clump *c)
 {
 	assert(s);
 	switch (loc->type) {
 	case LOCATION_STATIC:
-		return (struct block_res) {
-			.b = static_memory_getblock(sm, loc->block),
-			.err = NULL
-		};
+		return block_res_block_create(
+			static_memory_getblock(sm, loc->block)
+		);
 	case LOCATION_AUTOMATIC:
 		return location_auto_getblock(loc, s);	
 	case LOCATION_DYNAMIC:
-		return (struct block_res) {
-			.b = heap_getblock(h, loc->block),
-			.err = NULL
-		};
+		return block_res_block_create(heap_getblock(h, loc->block));
 	case LOCATION_DEREFERENCABLE:
-		return (struct block_res) {
-			.b = clump_getblock(c, loc->block),
-			.err = NULL
-		};
+		return block_res_block_create(clump_getblock(c, loc->block));
 	default:
 		assert(false);
 	}
 }
 
-static struct block_res
+static struct block_res *
 location_auto_getblock(struct location *loc, struct stack *s)
 {
 	struct stack *f = stack_getframe(s, loc->u.frame);
 	if (!f) {
-		return (struct block_res) {
-			.b = NULL,
-			.err = error_printf("stack frame doesn't exist")
-		};
+		return block_res_error_create(
+			error_printf("stack frame doesn't exist")
+		);
 	}
-	return (struct block_res) {
-		.b = stack_getblock(f, loc->block),
-		.err = NULL
-	};
+	return block_res_block_create(stack_getblock(f, loc->block));
 }
 
 struct block *

@@ -1,2 +1,0 @@
-stdlib.h:10:31: double free (free)
-	0-basic/130-FAIL-double-free.x:10:9 (unit)

@@ -134,11 +134,6 @@ variable_array_create(struct ast_variable *v)
 		struct direct_function_declarator decl;
 	} function_declarator;
 
-	struct declarator {
-		int ptr_valence;
-		char *name;
-	} declarator;
-
 	struct declaration {
 		char *name;
 		struct ast_type *t;
@@ -157,8 +152,7 @@ variable_array_create(struct ast_variable *v)
 %type <block_statement> block_statement
 %type <binary_operator> equality_operator relational_operator
 %type <boolean> struct_or_union
-%type <declaration> declaration
-%type <declarator> declarator init_declarator init_declarator_list
+%type <declaration> declaration 
 %type <direct_function_declarator> direct_function_declarator
 
 %type <expr> expression assignment_expression conditional_expression unary_expression
@@ -167,20 +161,22 @@ variable_array_create(struct ast_variable *v)
 %type <expr> exclusive_or_expression and_expression equality_expression
 %type <expr> relational_expression shift_expression additive_expression
 %type <expr> multiplicative_expression cast_expression
-%type <expr> allocation_expression isdeallocand_expression
+%type <expr> allocation_expression isdeallocand_expression constant_expression
+%type <expr> declarator init_declarator init_declarator_list
+%type <expr> direct_declarator
 
 %type <expr_array> argument_expression_list
 
 %type <externdecl> external_declaration
 %type <function> function_definition
 %type <function_declarator> function_declarator
-%type <integer> pointer
+%type <integer> pointer abstract_declarator 
+%type <lexememarker> selection_statement_if
 %type <statement> statement expression_statement selection_statement jump_statement 
 %type <statement> labelled_statement iteration_statement for_iteration_statement
 %type <statement> iteration_effect_statement
-%type <lexememarker> selection_statement_if
 %type <stmt_array> statement_list
-%type <string> identifier direct_declarator
+%type <string> identifier
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
 %type <type_modifier> declaration_modifier storage_class_specifier type_qualifier
 %type <unary_operator> unary_operator
@@ -238,14 +234,7 @@ postfix_expression
 		{ $$ = ast_expr_member_create($1, $3); }
 	| postfix_expression PTR_OP identifier {
 		$$ = ast_expr_member_create(
-			ast_expr_unary_create(
-				ast_expr_binary_create(
-					$1,
-					BINARY_OP_ADDITION,
-					ast_expr_constant_create(0)
-				),
-				UNARY_OP_DEREFERENCE
-			),
+			ast_expr_unary_create($1, UNARY_OP_DEREFERENCE),
 			$3
 		);
 	}
@@ -406,11 +395,13 @@ expression
 	;
 
 constant_expression
+	/* XXX: not evaluating compile-time constant expressions for now */ 
 	: conditional_expression
 	;
 
 declaration
 	: declaration_specifiers ';' {
+		/* XXX */
 		char *name = ast_type_struct_tag($1);
 		assert(name);
 		$$ = (struct declaration) {
@@ -419,13 +410,10 @@ declaration
 		};
 	}
 	| declaration_specifiers init_declarator_list ';' {
-		for (int i = 0; i < $2.ptr_valence; i++) {
-			assert($1);
-			$1 = ast_type_create_ptr($1);
-		}
+		struct ast_declaration *decl = ast_expr_declare($2, $1);
 		$$ = (struct declaration) {
-			.name	= $2.name,
-			.t	= $1,
+			.name	= ast_declaration_name(decl),
+			.t	= ast_declaration_type(decl),
 		};
 	}
 	;
@@ -436,7 +424,9 @@ declaration_modifier
 	;
 
 declaration_specifiers
-	: type_specifier
+	: type_specifier {
+		$$ = $1;
+	}
 	| type_specifier declaration_specifiers {
 		$$ = $2;
 	}
@@ -586,17 +576,28 @@ direct_function_declarator
 	;
 
 declarator
-	: pointer direct_declarator	{ $$ = (struct declarator) { $1, $2 }; }
-	| direct_declarator		{ $$ = (struct declarator) { 0, $1 }; }
-	| pointer			{ $$ = (struct declarator) { $1, NULL}; }
+	: pointer direct_declarator {
+		$$ = $2;
+		for (int i = 0; i < $1; i++) {
+			$$ = ast_expr_unary_create($$, UNARY_OP_DEREFERENCE);
+		}
+	}
+	| direct_declarator
 	;
 
 direct_declarator
-	: identifier	/* XXX */
-	/*| '(' declarator ')'*/
-	| direct_declarator '[' constant_expression ']'
+	: identifier 
+		{ $$ = ast_expr_identifier_create($1); }
+	| '(' declarator ')'
+		{ $$ = $2; }
+	| direct_declarator '[' constant_expression ']' {
+		$$ = ast_expr_unary_create(
+			ast_expr_binary_create($1, BINARY_OP_ADDITION, $3),
+			UNARY_OP_DEREFERENCE
+		);
+	}
 	/*| direct_declarator '[' ']'*/
-	| direct_declarator '(' parameter_type_list ')'
+	/*| direct_declarator '(' parameter_type_list ')'*/
 	/*| direct_declarator '(' identifier_list ')'*/
 	/*| direct_declarator '(' ')'*/
 	;
@@ -629,13 +630,18 @@ parameter_list
 
 parameter_declaration
 	: declaration_specifiers declarator {
-		for (int i = 0; i < $2.ptr_valence; i++) {
-			assert($1);
+		struct ast_declaration *decl = ast_expr_declare($2, $1);
+		$$ = ast_variable_create(
+			ast_declaration_name(decl),
+			ast_declaration_type(decl)
+		);
+	}
+	| declaration_specifiers abstract_declarator {
+		for (int i = 0; i < $2; i++) {
 			$1 = ast_type_create_ptr($1);
 		}
-		$$ = ast_variable_create($2.name, $1);
+		$$ = ast_variable_create(NULL, $1);
 	}
-	/*| declaration_specifiers abstract_declarator*/
 	| declaration_specifiers {
 		$$ = ast_variable_create(dynamic_str(""), $1);
 	}
@@ -652,7 +658,8 @@ type_name
 	;
 
 abstract_declarator
-	: pointer
+	: pointer 
+	;
 	/*| direct_abstract_declarator*/
 	/*| pointer direct_abstract_declarator*/
 	/*;*/

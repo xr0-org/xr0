@@ -1,2 +1,0 @@
-6-preconditions/102-FAIL-need-clump-lval-freed-ptr.x:5:22: precondition failure: parameter `x' of `func' must be lvalue (func)
-	6-preconditions/102-FAIL-need-clump-lval-freed-ptr.x:16:9 (main)

@@ -352,31 +352,38 @@ state_framecall(struct state *s)
 	return stack_framecall(s->stack);
 }
 
+static struct location *
+allocstatic(char *lit, struct state *);
+
 struct value *
 state_static_init(struct state *state, struct ast_expr *expr)
 {
 	char *lit = ast_expr_as_literal(expr);
+	struct location *loc = allocstatic(lit, state);
+	return value_ptr_create(loc);
+}
+
+static struct location *
+allocstatic(char *lit, struct state *state)
+{
 	struct location *loc = static_memory_checkpool(state->static_memory, lit);
 	if (loc) {
-		return value_ptr_create(loc);
+		return loc;
 	}
+
 	int address = static_memory_newblock(state->static_memory);
 	loc = location_create_static(
 		address,
 		ast_expr_constant_create(0)
 	);
-	struct object_res res = state_get(state, loc, true);
-	if (res.err) {
-		assert(false);
-	}
-	if (!res.obj) {
-		assert(false);
-	}
-	object_assign(res.obj, value_literal_create(dynamic_str(lit)));
-
+	struct object_res *res = state_get(state, loc, true);
+	assert(object_res_hasobject(res));
+	object_assign(
+		object_res_as_object(res),
+		value_literal_create(dynamic_str(lit))
+	);
 	static_memory_stringpool(state->static_memory, lit, loc);
-	
-	return value_ptr_create(loc);
+	return loc;
 }
 
 struct value *
@@ -400,9 +407,13 @@ state_islval(struct state *state, struct value *v)
 		return false;
 	}
 	struct location *loc = value_as_location(v);
-	struct object_res res= state_get(state, loc, true); /* put object there */
-	if (res.err) {
-		assert(false);
+	struct object_res *res = state_get(state, loc, true); /* put object there */
+	if (object_res_iserror(res)) {
+		struct error *err = object_res_as_error(res);
+		assert(
+			error_to_block_observe_noobj(err)
+			|| error_to_state_get_no_block(err)
+		);
 	}
 	return location_tostatic(loc, state->static_memory) ||
 		location_toheap(loc, state->heap) ||
@@ -418,8 +429,8 @@ state_isalloc(struct state *state, struct value *v)
 		return false;
 	}
 	struct location *loc = value_as_location(v);
-	struct object_res res = state_get(state, loc, true); /* put object there */
-	if (res.err) {
+	struct object_res *res = state_get(state, loc, true); /* put object there */
+	if (object_res_iserror(res)) {
 		assert(false);
 	}
 	return location_toheap(loc, state->heap);
@@ -431,27 +442,31 @@ state_getvconst(struct state *state, char *id)
 	return vconst_get(state->vconst, id);
 }
 
-struct object_res
+struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive)
 {
-	struct block_res res = location_getblock(
+	struct block_res *res = location_getblock(
 		loc, state->static_memory, state->vconst, state->stack, state->heap, state->clump
 	);
-	if (res.err) {
-		return (struct object_res) { .obj = NULL, .err = res.err };
+	if (block_res_iserror(res)) {
+		return object_res_error_create(block_res_as_error(res));
 	}
-	if (!res.b) {
+	if (!block_res_hasblock(res)) {
 		switch (location_type(loc)) {
 		case LOCATION_DYNAMIC:
 		case LOCATION_DEREFERENCABLE:
 		case LOCATION_STATIC:
-			return (struct object_res) { .obj = NULL, .err = NULL };
+			return object_res_error_create(
+				error_state_get_no_block()
+			);
 		default:
 			assert(false);
 		}
 	}
-	struct object *obj = block_observe(res.b, location_offset(loc), state, constructive);
-	return (struct object_res) { .obj = obj, .err = NULL };
+	return block_observe(
+		block_res_as_block(res),
+		location_offset(loc), state, constructive
+	);
 }
 
 void
@@ -463,17 +478,14 @@ state_blockinstall(struct block *b, struct object *obj)
 struct block *
 state_getblock(struct state *state, struct location *loc)
 {
-	struct block_res res = location_getblock(
+	struct block_res *res = location_getblock(
 		loc, state->static_memory, state->vconst, state->stack, state->heap, state->clump
 	);
-	if (res.err) {
-		assert(false);
-	}
-	return res.b;
+	return block_res_as_block(res);
 }
 
 struct ast_type *
-state_getobjecttype(struct state *state, char *id)
+state_getvariabletype(struct state *state, char *id)
 {
 	if (strcmp(id, KEYWORD_RETURN) == 0) {
 		assert(false);
@@ -495,7 +507,7 @@ state_getloc(struct state *state, char *id)
 	return value_ptr_create(variable_location(v));
 }
 
-struct object_res
+struct object_res *
 state_getobject(struct state *state, char *id)
 {
 	if (strcmp(id, KEYWORD_RETURN) == 0) {
@@ -505,33 +517,36 @@ state_getobject(struct state *state, char *id)
 
 	struct variable *v = stack_getvariable(state->stack, id);
 	if (!v) {
-		return (struct object_res) {
-			.err = error_printf("unknown variable `%s'", id)
-		};
+		return object_res_error_create(
+			error_printf("unknown variable `%s'", id)
+		);
 	}
 
 	return state_get(state, variable_location(v), true);
 }
 
-struct object_res
-state_deref(struct state *state, struct value *ptr_val, struct ast_expr *index)
+struct object_res *
+state_deref(struct state *state, struct value *ptr_val)
 {
 	if (value_issync(ptr_val)) {
-		return (struct object_res) { .obj = NULL, .err = NULL};
+		return object_res_error_create(error_state_deref_rconst());
 	}
-	struct location *deref_base = value_as_location(ptr_val);
-	assert(deref_base);
+	struct location *deref = value_as_location(ptr_val);
+	assert(deref);
 
 	/* `*(ptr+offset)` */
-	struct location *deref = location_with_offset(deref_base, index);
-	struct object_res res = state_get(state, deref, true);
-	if (res.err) {
-		return (struct object_res) {
-			.obj = NULL,
-			.err = error_printf(
-				"undefined indirection: %s", error_str(res.err)
-			)
-		};
+	struct object_res *res = state_get(state, deref, true);
+	if (object_res_iserror(res)) {
+		struct error *err = object_res_as_error(res);
+		if (!error_to_state_get_no_block(err)) {
+			return object_res_error_create(
+				error_printf(
+					"undefined indirection: %s",
+					error_str(err)
+				)
+			);
+		}
+		object_res_errorignore(res);
 	}
 	/*location_destroy(deref);*/
 	return res;
@@ -550,13 +565,10 @@ state_range_alloc(struct state *state, struct object *obj,
 	/* assume pointer */
 	struct location *deref = value_as_location(arr_val);
 
-	struct block_res res = location_getblock(
+	struct block_res *res = location_getblock(
 		deref, state->static_memory, state->vconst, state->stack, state->heap, state->clump
 	);
-	if (res.err) {
-		assert(false);
-	}
-	if (!res.b) {
+	if (!block_res_hasblock(res)) {
 		return error_printf("no block");
 	}
 
@@ -564,25 +576,22 @@ state_range_alloc(struct state *state, struct object *obj,
 	assert(!ast_expr_equal(lw, up));
 
 	/* virtual block to represents range of values allocated */
-	return block_range_alloc(res.b, lw, up, state->heap);
+	return block_range_alloc(block_res_as_block(res), lw, up, state->heap);
 }
 
-struct value *
-state_alloc(struct state *state)
+struct location *
+state_alloc(struct state *state, int size)
 {
 	if (state_insetup(state)) {
-		return value_ptr_create(heap_newcallerblock(state->heap));
+		return heap_newcallerblock(state->heap, size);
 	}
-	return value_ptr_create(heap_newblock(state->heap));
+	return heap_newblock(state->heap, size);
 }
 
 struct error *
-state_dealloc(struct state *state, struct value *val)
+state_dealloc(struct state *state, struct location *loc)
 {
-	if (!value_islocation(val)) {
-		return error_printf("undefined free of value not pointing at heap");
-	}
-	return location_dealloc(value_as_location(val), state->heap);
+	return location_dealloc(loc, state->heap);
 }
 
 struct error *
@@ -630,13 +639,11 @@ state_range_aredeallocands(struct state *state, struct object *obj,
 	}
 	struct location *deref = value_as_location(arr_val);
 	
-	struct block_res res = location_getblock(
+	struct block_res *res = location_getblock(
 		deref, state->static_memory, state->vconst, state->stack, state->heap, state->clump
 	);
-	if (res.err) {
-		assert(false);
-	}
-	return (bool) res.b && block_range_aredeallocands(res.b, lw, up, state);
+	struct block *b = block_res_as_block(res);
+	return (bool) b && block_range_aredeallocands(b, lw, up, state);
 }
 
 bool

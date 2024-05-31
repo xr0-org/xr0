@@ -1,0 +1,1 @@
+07-use-after-free/210-FAIL-stack-frame-pop-dangling-assign.x:27:8: undefined indirection: stack frame doesn't exist (main)

@@ -33,10 +33,10 @@ struct block_arr *
 heap_blocks(struct heap *);
 
 struct location *
-heap_newblock(struct heap *);
+heap_newblock(struct heap *, int size);
 
 struct location *
-heap_newcallerblock(struct heap *);
+heap_newcallerblock(struct heap *, int size);
 
 struct block; 
 

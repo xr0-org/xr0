@@ -1,2 +1,0 @@
-8-uninitialised-memory/004-FAIL-uninitialised-memory-rval.x:3:10: undefined memory access: `i' has no value (func)
-	8-uninitialised-memory/004-FAIL-uninitialised-memory-rval.x:12:9 (main)

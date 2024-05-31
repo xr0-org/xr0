@@ -1,0 +1,1 @@
+10-bounds/010-FAIL-constant-malloc.x:13:10: undefined indirection: out of bounds (foo)
