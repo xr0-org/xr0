@@ -35,6 +35,12 @@ ast_type_isarr(struct ast_type *t)
 	return t->base == TYPE_ARRAY;
 }
 
+bool
+ast_type_isptr(struct ast_type *t)
+{
+	return t->base == TYPE_POINTER;
+}
+
 struct ast_type *
 ast_type_arr_type(struct ast_type *t)
 {

@@ -88,6 +88,9 @@ value_destroy(struct value *);
 char *
 value_str(struct value *);
 
+char *
+value_type_str(struct value *);
+
 bool
 value_islocation(struct value *);
 
@@ -135,6 +138,27 @@ value_equal(struct value *v1, struct value *v2);
 /* value_assume: Returns false if contradiction encountered. */
 bool
 value_assume(struct value *, bool value);
+
+DECLARE_RESULT_TYPE(struct value *, value, value_res)
+
+struct value_arr;
+
+struct value_arr *
+value_arr_create();
+
+void
+value_arr_destroy(struct value_arr *arr);
+
+void
+value_arr_append(struct value_arr *arr, struct value *res);
+
+int
+value_arr_len(struct value_arr *arr);
+
+struct value **
+value_arr_v(struct value_arr *arr);
+
+DECLARE_RESULT_TYPE(struct value_arr *, arr, value_arr_res)
 
 enum number_value_type {
 	NUMBER_VALUE_CONSTANT,

@@ -1063,7 +1063,7 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 void
 nulldestruct(int x) { /* do nothing */ }
 
-DEFINE_RESULT_TYPE(int, int, nulldestruct, intresult)
+DEFINE_RESULT_TYPE(int, int, nulldestruct, intresult, true)
 
 static struct intresult *
 binary_consteval(struct ast_expr *);

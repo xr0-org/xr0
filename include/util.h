@@ -125,7 +125,7 @@ int
 v_printf(char *fmt, ...);
 
 /* a_printf: assert and print as appropriate if there is an error. */
-#define a_printf(expr, ...) if (!expr) { fprintf(stderr, __VA_ARGS__); assert(false); }
+#define a_printf(expr, ...) if (!(expr)) { fprintf(stderr, __VA_ARGS__); assert(expr); }
 
 struct error;
 
@@ -186,97 +186,117 @@ bool
 circuitbreaker_append(struct circuitbreaker *, void *);
 
 #define DECLARE_RESULT_TYPE(TYPE, VNAME, RTNAME) \
-struct RTNAME;\
+struct RTNAME; \
 \
 struct RTNAME * \
-RTNAME##_error_create(struct error *err);\
+RTNAME##_error_create(struct error *err); \
 \
 struct RTNAME * \
-RTNAME##_##VNAME##_create(TYPE val);\
+RTNAME##_empty_create(); \
+\
+struct RTNAME * \
+RTNAME##_##VNAME##_create(TYPE val); \
 \
 void \
-RTNAME##_destroy(struct RTNAME *res);\
+RTNAME##_destroy(struct RTNAME *res); \
 \
 bool \
-RTNAME##_iserror(struct RTNAME *res);\
+RTNAME##_iserror(struct RTNAME *res); \
 \
 struct error * \
-RTNAME##_as_error(struct RTNAME *res);\
-\
-TYPE \
-RTNAME##_as_##VNAME(struct RTNAME *res);\
+RTNAME##_as_error(struct RTNAME *res); \
 \
 bool \
-RTNAME##_has##VNAME(struct RTNAME *res);\
+RTNAME##_has##VNAME(struct RTNAME *res); \
+\
+TYPE \
+RTNAME##_as_##VNAME(struct RTNAME *res); \
 \
 void \
 RTNAME##_errorignore(struct RTNAME *res);
 
-#define DEFINE_RESULT_TYPE(TYPE, VNAME, DESTRUCT, RTNAME) \
+#define DEFINE_RESULT_TYPE(TYPE, VNAME, DESTRUCT, RTNAME, CANBENULL) \
 struct RTNAME { \
-    TYPE val; \
-    struct error *err; \
+	/* if err is set it's an error.\
+	 * if CANBENULL we look at hasvalue then val.
+	 * otherwise we proceed to val directly. */ \
+	struct error *err; \
+	bool hasvalue; \
+	TYPE val; \
 }; \
 \
 struct RTNAME * \
 RTNAME##_error_create(struct error *err) \
 { \
-    assert(err); \
-    struct RTNAME *r = malloc(sizeof(struct RTNAME)); \
-    r->val = (TYPE) 0; \
-    r->err = err; \
-    return r; \
+	assert(err); \
+	struct RTNAME *r = malloc(sizeof(struct RTNAME)); \
+	r->hasvalue = false; \
+	r->val = (TYPE) 0; \
+	r->err = err; \
+	return r; \
+} \
+\
+struct RTNAME * \
+RTNAME##_empty_create() \
+{ \
+	struct RTNAME *r = malloc(sizeof(struct RTNAME)); \
+	r->hasvalue = false; \
+	r->val = (TYPE) 0; \
+	r->err = NULL; \
+	return r; \
 } \
 \
 struct RTNAME * \
 RTNAME##_##VNAME##_create(TYPE val) \
 { \
-    struct RTNAME *r = malloc(sizeof(struct RTNAME)); \
-    r->val = val; \
-    r->err = NULL; \
-    return r; \
+	a_printf(CANBENULL || val, "NULL value for struct %s\n", #RTNAME); \
+	struct RTNAME *r = malloc(sizeof(struct RTNAME)); \
+	r->hasvalue = true; \
+	r->val = val; \
+	r->err = NULL; \
+	return r; \
 } \
 \
 void \
 RTNAME##_destroy(struct RTNAME *res) \
 { \
-    assert(!res->err); \
-    if (res->val) { DESTRUCT(res->val); } \
-    free(res); \
+	assert(!res->err); \
+	if (res->hasvalue) { DESTRUCT(res->val); } \
+	free(res); \
 } \
 \
 bool \
 RTNAME##_iserror(struct RTNAME *res) \
 { \
-    return res->err; \
+	return res->err; \
 } \
 \
 struct error * \
 RTNAME##_as_error(struct RTNAME *res) \
 { \
-    assert(res->err); \
-    return res->err; \
-} \
-\
-TYPE \
-RTNAME##_as_##VNAME(struct RTNAME *res) \
-{ \
-    assert(!res->err); \
-    return res->val; \
+	assert(RTNAME##_iserror(res)); \
+	return res->err; \
 } \
 \
 bool \
 RTNAME##_has##VNAME(struct RTNAME *res) \
 { \
-    assert(!RTNAME##_iserror(res)); \
-    return res->val; /* implicit cast */ \
-}\
+	assert(!RTNAME##_iserror(res)); \
+	return res->hasvalue; \
+} \
+\
+TYPE \
+RTNAME##_as_##VNAME(struct RTNAME *res) \
+{ \
+	assert(RTNAME##_has##VNAME(res)); \
+	return res->val; \
+} \
 \
 void \
 RTNAME##_errorignore(struct RTNAME *res) \
 { \
-    assert(RTNAME##_iserror(res)); \
-    res->err = NULL; \
+	assert(RTNAME##_iserror(res)); \
+	res->err = NULL; \
 }
 
 #endif

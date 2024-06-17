@@ -785,4 +785,4 @@ object_arr_objects(struct object_arr *arr)
 	return arr->object;
 }
 
-DEFINE_RESULT_TYPE(struct object *, object, object_destroy, object_res)
+DEFINE_RESULT_TYPE(struct object *, object, object_destroy, object_res, false)

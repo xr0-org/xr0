@@ -406,7 +406,7 @@ block_arr_delete(struct block_arr *arr, int address)
 	assert(false);
 }
 
-DEFINE_RESULT_TYPE(struct block *, block, block_destroy, block_res)
+DEFINE_RESULT_TYPE(struct block *, block, block_destroy, block_res, false)
 
 struct permutation {
 	struct int_arr *arr;

@@ -159,7 +159,7 @@ heap_newblock(struct heap *h, int size)
 	h->freed = realloc(h->freed, sizeof(bool) * n);
 	h->freed[address] = false;
 	return location_create_dynamic(
-		address, ast_expr_constant_create(0)
+		address, offset_create(ast_expr_constant_create(0))
 	);
 }
 
@@ -173,7 +173,7 @@ heap_newcallerblock(struct heap *h, int size)
 	h->freed = realloc(h->freed, sizeof(bool) * n);
 	h->freed[address] = false;
 	return location_create_dynamic(
-		address, ast_expr_constant_create(0)
+		address, offset_create(ast_expr_constant_create(0))
 	);
 }
 
@@ -239,7 +239,7 @@ static bool
 block_referenced(struct state *s, int addr)
 {
 	struct location *loc = location_create_dynamic(
-		addr, ast_expr_constant_create(0)
+		addr, offset_create(ast_expr_constant_create(0))
 	);
 	bool return_references = state_returnreferences(s, loc);
 	if (!return_references) {

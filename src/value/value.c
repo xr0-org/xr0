@@ -684,6 +684,19 @@ value_str(struct value *v)
 	return strbuilder_build(b);
 }
 
+char *
+value_type_str(struct value *v)
+{
+	char *value_type_str[] = {
+		[VALUE_SYNC] = "rconst",
+		[VALUE_PTR] = "ptr",
+		[VALUE_INT] = "int",
+		[VALUE_LITERAL] = "literal",
+		[VALUE_STRUCT] = "struct",
+	};
+	return dynamic_str(value_type_str[v->type]);
+}
+
 bool
 value_islocation(struct value *v)
 {
@@ -795,6 +808,50 @@ value_as_literal(struct value *v)
 	assert(v->type == VALUE_LITERAL);
 	return ast_expr_literal_create(v->s);
 }
+
+DEFINE_RESULT_TYPE(struct value *, value, value_destroy, value_res, false)
+
+struct value_arr {
+	int n;
+	struct value **v;
+};
+
+struct value_arr *
+value_arr_create()
+{
+	return calloc(1, sizeof(struct value_arr));
+}
+
+void
+value_arr_destroy(struct value_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		value_destroy(arr->v[i]);
+	}
+	free(arr);
+}
+
+void
+value_arr_append(struct value_arr *arr, struct value *v)
+{
+	arr->v = realloc(arr->v, sizeof(struct value *) * ++arr->n);
+	arr->v[arr->n-1] = v;
+}
+
+int
+value_arr_len(struct value_arr *arr)
+{
+	return arr->n;
+}
+
+struct value **
+value_arr_v(struct value_arr *arr)
+{
+	return arr->v;
+}
+
+DEFINE_RESULT_TYPE(struct value_arr *, arr, value_arr_destroy, value_arr_res, false)
+
 
 static bool
 struct_references(struct value *v, struct location *loc, struct state *s,

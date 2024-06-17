@@ -91,27 +91,16 @@ ast_expr_binary_op(struct ast_expr *);
 struct ast_stmt_splits
 ast_expr_splits(struct ast_expr *, struct state *);
 
-struct r_res_arr {
-	int n;
-	struct r_res **res;
-};
+struct value_arr;
+struct value_arr_res;
 
-struct r_res_arr *
-result_arr_create();
-
-void
-result_arr_destroy(struct r_res_arr *arr);
-
-void
-result_arr_append(struct r_res_arr *arr, struct r_res *res);
-
-struct r_res_arr *
+struct value_arr_res *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 		struct ast_variable **param, struct state *state);
 
 struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
-		struct r_res_arr *args, char *fname, struct state *state);
+		struct value_arr *args, char *fname, struct state *state);
 
 struct string_arr *
 ast_expr_getfuncs(struct ast_expr *);

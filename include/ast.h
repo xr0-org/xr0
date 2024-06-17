@@ -215,8 +215,7 @@ ast_expr_rangedecide(struct ast_expr *, struct ast_expr *lw,
 struct error *
 ast_expr_exec(struct ast_expr *, struct state *);
 
-struct r_res;
-struct l_res;
+struct e_res;
 struct preresult;
 
 struct preresult *
@@ -225,23 +224,20 @@ ast_expr_assume(struct ast_expr *, struct state *);
 void
 ast_expr_varinfomap(struct map *, struct ast_expr *, struct state *s);
 
-struct l_res *
-ast_expr_lvalue(struct ast_expr *, struct state *);
-
-struct r_res *
+struct e_res *
 ast_expr_eval(struct ast_expr *, struct state *);
 
-struct r_res *
+struct e_res *
 ast_expr_abseval(struct ast_expr *, struct state *);
 
 /* ast_expr_pf_reduce: Reduce an expression to "parameter form", in which its
  * only primitives are constants and parameters (vconsts). */
-struct r_res *
+struct e_res *
 ast_expr_pf_reduce(struct ast_expr *, struct state *);
 
 struct value;
 
-struct r_res *
+struct e_res *
 ast_expr_pf_augment(struct value *, struct ast_expr *, struct state *);
 
 struct ast_function;
@@ -518,7 +514,10 @@ struct ast_type *
 ast_type_create_arr(struct ast_type *type, int length);
 
 bool
-ast_type_isarr(struct ast_type *type);
+ast_type_isarr(struct ast_type *);
+
+bool
+ast_type_isptr(struct ast_type *);
 
 struct ast_type *
 ast_type_arr_type(struct ast_type *);

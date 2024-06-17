@@ -374,7 +374,7 @@ allocstatic(char *lit, struct state *state)
 	int address = static_memory_newblock(state->static_memory);
 	loc = location_create_static(
 		address,
-		ast_expr_constant_create(0)
+		offset_create(ast_expr_constant_create(0))
 	);
 	struct object_res *res = state_get(state, loc, true);
 	assert(object_res_hasobject(res));
@@ -394,7 +394,7 @@ state_clump(struct state *state)
 	int address = clump_newblock(state->clump);
 	struct location *loc = location_create_dereferencable(
 		address,
-		ast_expr_constant_create(0)
+		offset_create(ast_expr_constant_create(0))
 	);
 	return value_ptr_create(loc);
 }
@@ -446,7 +446,12 @@ struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive)
 {
 	struct block_res *res = location_getblock(
-		loc, state->static_memory, state->vconst, state->stack, state->heap, state->clump
+		loc,
+		state->static_memory,
+		state->vconst,
+		state->stack,
+		state->heap,
+		state->clump
 	);
 	if (block_res_iserror(res)) {
 		return object_res_error_create(block_res_as_error(res));
@@ -463,10 +468,31 @@ state_get(struct state *state, struct location *loc, bool constructive)
 			assert(false);
 		}
 	}
-	return block_observe(
+
+	struct offset *of = location_offset(loc);
+	struct ast_expr *base_offset = offset_offset(of);
+	struct object_res *obj_res = block_observe(
 		block_res_as_block(res),
-		location_offset(loc), state, constructive
+		base_offset, state, constructive
 	);
+	char *structmember = offset_member(of);
+	if (!structmember) {
+		return obj_res;
+	}
+
+	struct ast_type *t = offset_membertype(of);
+	struct object *root_obj = object_res_as_object(obj_res);
+	struct object *member = object_getmember(root_obj, t, structmember, state
+	);
+	if (!member) {
+		char *type_str = ast_type_str(t);
+		struct error *e = error_printf(
+			"`%s' has no member `%s'", type_str, structmember
+		);
+		free(type_str);
+		return object_res_error_create(e);
+	}
+	return object_res_object_create(member);
 }
 
 void
@@ -498,13 +524,12 @@ state_getvariabletype(struct state *state, char *id)
 	return variable_type(v);
 }
 
-struct value *
+struct location *
 state_getloc(struct state *state, char *id)
 {
 	struct variable *v = stack_getvariable(state->stack, id);
 	assert(v);
-
-	return value_ptr_create(variable_location(v));
+	return variable_location(v);
 }
 
 struct object_res *

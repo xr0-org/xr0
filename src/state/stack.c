@@ -45,7 +45,7 @@ stack_newblock(struct stack *stack, int size)
 {
 	int address = block_arr_append(stack->memory, block_create(size));
 	struct location *loc = location_create_automatic(
-		stack->id, address, ast_expr_constant_create(0)
+		stack->id, address, offset_create(ast_expr_constant_create(0))
 	);
 	return loc;
 }

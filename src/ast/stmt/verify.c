@@ -374,14 +374,17 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 
 	if (rv) {
-		struct r_res *res = ast_expr_eval(rv, state);
-		if (r_res_iserror(res)) {
-			return r_res_as_error(res);
+		struct e_res *res = ast_expr_eval(rv, state);
+		if (e_res_iserror(res)) {
+			return e_res_as_error(res);
 		}
-		if (r_res_hasrvalue(res)) {
-			state_writeregister(
-				state, rvalue_value(r_res_as_rvalue(res))
+		if (e_res_haseval(res)) {
+			struct value *v = value_copy(
+				value_res_as_value(
+					eval_to_value(e_res_as_eval(res), state)
+				)
 			);
+			state_writeregister(state, v);
 		}
 	}
 	return error_return();
@@ -407,50 +410,48 @@ stmt_register_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 register_call_exec(struct ast_expr *call, struct state *state)
 {
-	struct r_res *res = ast_expr_abseval(call, state);
-	if (r_res_iserror(res)) {
-		return r_res_as_error(res);
+	struct e_res *res = ast_expr_abseval(call, state);
+	if (e_res_iserror(res)) {
+		return e_res_as_error(res);
 	}
 	return NULL;
 }
 
-static struct r_res *
+static struct e_res *
 hack_default_values(struct state *);
 
 static struct error *
 register_mov_exec(struct ast_variable *temp, struct state *state)
 {
 	state_declare(state, temp, false);
-
-	struct r_res *res = hack_default_values(state);
-	if (r_res_iserror(res)) {
-		return r_res_as_error(res);
-	}
-	struct rvalue *rval = r_res_as_rvalue(res);
-
 	struct ast_expr *name = ast_expr_identifier_create(
 		dynamic_str(ast_variable_name(temp))
 	);
-	struct l_res *lval_res = ast_expr_lvalue(name, state);
-	if (l_res_iserror(lval_res)) {
-		return l_res_as_error(lval_res);
+	struct e_res *l_res = ast_expr_eval(name, state);
+	if (e_res_iserror(l_res)) {
+		return e_res_as_error(l_res);
 	}
-	struct object *obj = lvalue_object(l_res_as_lvalue(lval_res));
-	if (rval) {
-		object_assign(obj, rvalue_value(rval));
-	} else {
-		object_assign(obj, NULL);
+	struct object *obj = object_res_as_object(
+		state_get(state, eval_as_lval(e_res_as_eval(l_res)), true)
+	);
+
+	struct e_res *r_res = hack_default_values(state);
+	if (e_res_iserror(r_res)) {
+		return e_res_as_error(r_res);
+	}
+	if (e_res_haseval(r_res)) {
+		object_assign(obj, eval_as_rval(e_res_as_eval(r_res)));
 	}
 	return NULL;
 }
 
-static struct r_res *
+static struct e_res *
 hack_default_values(struct state *state)
 {
 	struct ast_expr *expr = state_framecall(state);
 	struct value *v = state_popregister(state);
 	if (!v) {
-		return r_res_rvalue_create(NULL);
+		return e_res_empty_create();
 	}
 	return ast_expr_pf_augment(v, expr, state);
 }
@@ -558,9 +559,9 @@ labelled_absexec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 expr_absexec(struct ast_expr *expr, struct state *state)
 {
-	struct r_res *res = ast_expr_abseval(expr, state);
-	if (r_res_iserror(res)) {
-		return r_res_as_error(res);
+	struct e_res *res = ast_expr_abseval(expr, state);
+	if (e_res_iserror(res)) {
+		return e_res_as_error(res);
 	}
 	return NULL;
 }
@@ -586,13 +587,15 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 struct decision
 sel_decide(struct ast_expr *control, struct state *state)
 {
-	struct r_res *res = ast_expr_pf_reduce(control, state);
-	if (r_res_iserror(res)) {
-		return (struct decision) { .err = r_res_as_error(res) };
+	struct e_res *res = ast_expr_pf_reduce(control, state);
+	if (e_res_iserror(res)) {
+		return (struct decision) { .err = e_res_as_error(res) };
 	}
-	assert(r_res_hasrvalue(res)); /* TODO: user error */
+	assert(e_res_haseval(res)); /* TODO: user error */
 
-	struct value *v = rvalue_value(r_res_as_rvalue(res));
+	struct value *v = value_res_as_value(
+		eval_to_value(e_res_as_eval(res), state)
+	);
 	if (value_issync(v)) {
 		struct ast_expr *sync = value_as_sync(v);
 		struct props *p = state_getprops(state);
@@ -668,14 +671,17 @@ jump_absexec(struct ast_stmt *stmt, struct state *state)
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 
 	if (rv) {
-		struct r_res *res = ast_expr_abseval(rv, state);
-		if (r_res_iserror(res)) {
-			return r_res_as_error(res);
+		struct e_res *res = ast_expr_abseval(rv, state);
+		if (e_res_iserror(res)) {
+			return e_res_as_error(res);
 		}
-		if (r_res_hasrvalue(res)) {
-			state_writeregister(
-				state, rvalue_value(r_res_as_rvalue(res))
+		if (e_res_haseval(res)) {
+			struct value *v = value_copy(
+				value_res_as_value(
+					eval_to_value(e_res_as_eval(res), state)
+				)
 			);
+			state_writeregister(state, v);
 		}
 	}
 	return error_return();

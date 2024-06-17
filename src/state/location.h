@@ -13,22 +13,23 @@ enum location_type {
 	LOCATION_DYNAMIC,
 };
 
+struct offset;
 struct location;
 
 struct location *
-location_create_static(int block, struct ast_expr *offset);
+location_create_static(int block, struct offset *offset);
 
 struct location *
-location_create_vconst(int block, struct ast_expr *offset);
+location_create_vconst(int block, struct offset *offset);
 
 struct location *
-location_create_dereferencable(int block, struct ast_expr *offset);
+location_create_dereferencable(int block, struct offset *offset);
 
 struct location *
-location_create_dynamic(int block, struct ast_expr *offset);
+location_create_dynamic(int block, struct offset *offset);
 
 struct location *
-location_create_automatic(int frame, int block, struct ast_expr *offset);
+location_create_automatic(int frame, int block, struct offset *offset);
 
 void
 location_setframe(struct location *loc, int frame);
@@ -74,11 +75,11 @@ location_referencesheap(struct location *, struct state *, struct circuitbreaker
 enum location_type
 location_type(struct location *loc);
 
-struct ast_expr *
+struct offset *
 location_offset(struct location *loc);
 
 void
-location_setoffset(struct location *loc, struct ast_expr *offset);
+location_setoffset(struct location *loc, struct offset *offset);
 
 struct heap;
 
@@ -142,5 +143,36 @@ location_arr_n(struct location_arr *);
 
 void
 location_arr_append(struct location_arr *, struct location *);
+
+
+struct offset;
+struct ast_type;
+
+struct offset *
+offset_create(struct ast_expr *o);
+
+struct offset *
+offset_create_member(struct offset *o, char *member, struct ast_type *membertype);
+
+struct offset *
+offset_copy(struct offset *);
+
+void
+offset_destroy(struct offset *);
+
+char *
+offset_str(struct offset *);
+
+struct ast_expr *
+offset_as_expr(struct offset *);
+
+struct ast_expr *
+offset_offset(struct offset *);
+
+char *
+offset_member(struct offset *);
+
+struct ast_type *
+offset_membertype(struct offset *);
 
 #endif

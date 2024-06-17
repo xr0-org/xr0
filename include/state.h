@@ -109,7 +109,7 @@ state_getobject(struct state *, char *id);
 struct ast_type *
 state_getvariabletype(struct state *, char *id);
 
-struct value *
+struct location *
 state_getloc(struct state *state, char *id);
 
 struct object_res *
@@ -244,11 +244,22 @@ bool
 location_referencesheap(struct location *, struct state *,
 		struct circuitbreaker *);
 
+struct offset;
+
+struct offset *
+offset_create(struct ast_expr *offset);
+
+struct offset *
+offset_create_member(struct offset *o, char *member, struct ast_type *membertype);
+
 struct ast_expr *
+offset_as_expr(struct offset *);
+
+struct offset *
 location_offset(struct location *loc);
 
 void
-location_setoffset(struct location *loc, struct ast_expr *offset);
+location_setoffset(struct location *loc, struct offset *offset);
 
 struct int_arr *
 location_deriveorder(struct location *, struct circuitbreaker *, struct state *);

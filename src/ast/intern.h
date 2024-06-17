@@ -5,37 +5,49 @@
 struct error;
 
 struct ast_type;
-struct object;
-
-struct lvalue;
-
-struct lvalue *
-lvalue_create(struct ast_type *, struct object *);
-
-void
-lvalue_destroy(struct lvalue *);
-
-struct ast_type *
-lvalue_type(struct lvalue *);
-
-struct object *
-lvalue_object(struct lvalue *);
-
+struct location;
 struct value;
 
-struct rvalue;
+struct eval;
 
-struct rvalue *
-rvalue_create(struct ast_type *, struct value *);
+struct eval *
+eval_lval_create(struct ast_type *, struct location *);
+
+struct eval *
+eval_rval_create(struct ast_type *, struct value *);
 
 void
-rvalue_destroy(struct rvalue *);
+eval_destroy(struct eval *);
+
+char *
+eval_str(struct eval *);
 
 struct ast_type *
-rvalue_type(struct rvalue *);
+eval_type(struct eval *);
+
+bool
+eval_islval(struct eval *);
+
+struct location *
+eval_as_lval(struct eval *);
+
+bool
+eval_isrval(struct eval *);
 
 struct value *
-rvalue_value(struct rvalue *);
+eval_as_rval(struct eval *);
+
+struct state;
+
+struct value_res;
+
+struct value_res *
+eval_to_value(struct eval *, struct state *);
+
+struct object_res;
+
+struct object_res *
+eval_to_object(struct eval *, struct state *, bool constructive);
 
 struct preresult;
 
@@ -64,7 +76,6 @@ bool
 preresult_iscontradiction(struct preresult *);
 
 DECLARE_RESULT_TYPE(struct ast_expr *, expr, iresult)
-DECLARE_RESULT_TYPE(struct lvalue *, lvalue, l_res)
-DECLARE_RESULT_TYPE(struct rvalue *, rvalue, r_res)
+DECLARE_RESULT_TYPE(struct eval *, eval, e_res)
 
 #endif
