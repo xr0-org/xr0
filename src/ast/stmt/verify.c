@@ -35,10 +35,6 @@ ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
-decl_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
-		struct state *);
-
-static struct error *
 expr_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
@@ -55,8 +51,6 @@ ast_stmt_linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
-	case STMT_DECLARATION:
-		return decl_linearise(stmt, b, loc, state);
 	case STMT_EXPR:
 		return expr_linearise(stmt, b, loc, state);
 	case STMT_JUMP:
@@ -66,14 +60,6 @@ ast_stmt_linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 	default:
 		assert(false);
 	}
-}
-
-static struct error *
-decl_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
-		struct state *state)
-{
-	ast_block_append_stmt(b, stmt);
-	return NULL;
 }
 
 static struct error *
@@ -492,6 +478,7 @@ ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *state)
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_LABELLED:
 		return NULL;
+	case STMT_DECLARATION:
 	case STMT_NOP:
 	case STMT_EXPR:
 	case STMT_SELECTION:
@@ -527,6 +514,8 @@ static struct error *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_DECLARATION:
+		return stmt_decl_exec(stmt, state);
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
@@ -704,6 +693,7 @@ comp_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
 struct error *
 ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups) {
 	switch (ast_stmt_kind(stmt)) {	
+	case STMT_DECLARATION:
 	case STMT_NOP:
 	case STMT_JUMP:
 	case STMT_REGISTER:

@@ -89,6 +89,14 @@ ast_stmt_declaration_var(struct ast_stmt *stmt)
 	return stmt->u.declaration.var;
 }
 
+static void
+ast_stmt_declaration_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+{
+	char *s = ast_variable_str(stmt->u.declaration.var);
+	strbuilder_printf(b, "%s", s);
+	free(s);
+}
+
 bool
 ast_stmt_isdecl(struct ast_stmt *stmt)
 {
@@ -598,6 +606,12 @@ void
 ast_stmt_destroy(struct ast_stmt *stmt)
 {
 	switch (stmt->kind) {
+	case STMT_DECLARATION:
+		ast_variable_destroy(stmt->u.declaration.var);
+		if (stmt->u.declaration.val) {
+			ast_expr_destroy(stmt->u.declaration.val);
+		}
+		break;
 	case STMT_LABELLED:
 		free(stmt->u.labelled.label);
 		ast_stmt_destroy(stmt->u.labelled.stmt);
@@ -711,6 +725,9 @@ ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 	assert(stmt);
 	struct strbuilder *b = strbuilder_create();
 	switch (stmt->kind) {
+	case STMT_DECLARATION:
+		ast_stmt_declaration_sprint(stmt, b);
+		break;
 	case STMT_LABELLED:
 		ast_stmt_labelled_sprint(stmt, indent_level, b);
 		break;
@@ -768,6 +785,7 @@ bool
 ast_stmt_linearisable(struct ast_stmt *stmt)
 {
 	switch (stmt->kind) {
+	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
 	case STMT_NOP:
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
