@@ -12,7 +12,6 @@
 struct program {
 	struct ast_block *b;
 	enum program_state {
-		PROGRAM_COUNTER_DECLS,
 		PROGRAM_COUNTER_STMTS,
 		PROGRAM_COUNTER_ATEND,
 	} s;
@@ -51,11 +50,7 @@ program_storeloc(struct program *p)
 static enum program_state
 program_state_init(struct ast_block *b)
 {
-	return ast_block_ndecls(b)
-		? PROGRAM_COUNTER_DECLS
-		: ast_block_nstmts(b)
-		? PROGRAM_COUNTER_STMTS
-		: PROGRAM_COUNTER_ATEND;
+	return ast_block_nstmts(b) ? PROGRAM_COUNTER_STMTS : PROGRAM_COUNTER_ATEND;
 }
 
 void
@@ -93,11 +88,8 @@ program_render(struct program *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	switch (p->s) {
-	case PROGRAM_COUNTER_DECLS:
-		strbuilder_printf(b, "%s", ast_block_render(p->b, p->index, true));
-		break;
 	case PROGRAM_COUNTER_STMTS:
-		strbuilder_printf(b, "%s", ast_block_render(p->b, p->index, false));
+		strbuilder_printf(b, "%s", ast_block_render(p->b, p->index));
 		break;
 	case PROGRAM_COUNTER_ATEND:
 		strbuilder_printf(b, "\t<end of frame>\n");
@@ -120,19 +112,6 @@ program_prevcall(struct program *p)
 	assert(p->s == PROGRAM_COUNTER_STMTS);
 	struct ast_stmt *c = ast_block_stmts(p->b)[p->index-1];
 	return ast_expr_copy(ast_stmt_register_call(c));
-}
-
-static void
-program_nextdecl(struct program *p)
-{
-	assert(p->s == PROGRAM_COUNTER_DECLS);
-
-	if (++p->index >= ast_block_ndecls(p->b)) {
-		p->s = ast_block_nstmts(p->b)
-			? PROGRAM_COUNTER_STMTS
-			: PROGRAM_COUNTER_ATEND;
-		p->index = 0;
-	}
 }
 
 static bool
@@ -162,10 +141,6 @@ struct error *
 program_step(struct program *p, struct state *s)
 {
 	switch (p->s) {
-	case PROGRAM_COUNTER_DECLS:
-		state_declare(s, ast_block_decls(p->b)[p->index], false);
-		program_nextdecl(p);
-		return NULL;
 	case PROGRAM_COUNTER_STMTS:
 		return program_stmt_step(p, s);
 	case PROGRAM_COUNTER_ATEND:
@@ -226,7 +201,6 @@ struct error *
 program_next(struct program *p, struct state *s)
 {
 	switch (p->s) {
-	case PROGRAM_COUNTER_DECLS:
 	case PROGRAM_COUNTER_ATEND:
 		return program_step(p, s);
 	case PROGRAM_COUNTER_STMTS:
@@ -277,7 +251,6 @@ program_lexememarker(struct program *p)
 	switch (p->s) {
 	case PROGRAM_COUNTER_STMTS:
 		return ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index]);
-	case PROGRAM_COUNTER_DECLS:
 	case PROGRAM_COUNTER_ATEND:
 		return NULL;
 	default:

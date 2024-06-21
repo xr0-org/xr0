@@ -17,6 +17,10 @@ struct ast_stmt {
 	enum ast_stmt_kind kind;
 	union {
 		struct {
+			struct ast_variable *var;
+			struct ast_expr *val;
+		} declaration;
+		struct {
 			char *label;
 			struct ast_stmt *stmt;
 		} labelled;
@@ -68,6 +72,38 @@ ast_stmt_create(struct lexememarker *loc)
 }
 
 struct ast_stmt *
+ast_stmt_create_declaration(struct lexememarker *loc, struct ast_variable *var,
+		struct ast_expr *val)
+{
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_DECLARATION;
+	stmt->u.declaration.var = var;
+	stmt->u.declaration.val = val;
+	return stmt;
+}
+
+struct ast_variable *
+ast_stmt_declaration_var(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_DECLARATION);
+	return stmt->u.declaration.var;
+}
+
+static void
+ast_stmt_declaration_sprint(struct ast_stmt *stmt, struct strbuilder *b)
+{
+	char *s = ast_variable_str(stmt->u.declaration.var);
+	strbuilder_printf(b, "%s", s);
+	free(s);
+}
+
+bool
+ast_stmt_isdecl(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_DECLARATION;
+}
+
+struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *loc, char *label,
 		struct ast_stmt *substmt)
 {
@@ -115,7 +151,7 @@ ast_stmt_labelled_as_block(struct ast_stmt *stmt)
 static struct ast_block *
 ast_stmt_to_block(struct ast_stmt *stmt)
 {
-	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	struct ast_block *b = ast_block_create(NULL, 0);
 	ast_block_append_stmt(b, stmt);
 	return b;
 }
@@ -126,7 +162,7 @@ ast_stmt_as_compound(struct ast_stmt *stmt)
 	if (stmt->kind == STMT_COMPOUND) {
 		return stmt;
 	}
-	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	struct ast_block *b = ast_block_create(NULL, 0);
 	ast_block_append_stmt(b, stmt);
 	return ast_stmt_create_compound(
 		lexememarker_copy(ast_stmt_lexememarker(stmt)), b
@@ -221,7 +257,7 @@ ast_stmt_compound_v_sprint(struct ast_stmt *stmt, int indent_level,
 	struct ast_block *b = ast_stmt_as_block(stmt);
 
 	/* special case for nice print */
-	if (ast_block_ndecls(b) == 0 && ast_block_nstmts(b) == 1) {
+	if (ast_block_nstmts(b) == 1) {
 		char *s = ast_stmt_str(ast_block_stmts(b)[0], 0);
 		strbuilder_printf(sb, "~ [ %s ]", s);
 		free(s);
@@ -570,6 +606,12 @@ void
 ast_stmt_destroy(struct ast_stmt *stmt)
 {
 	switch (stmt->kind) {
+	case STMT_DECLARATION:
+		ast_variable_destroy(stmt->u.declaration.var);
+		if (stmt->u.declaration.val) {
+			ast_expr_destroy(stmt->u.declaration.val);
+		}
+		break;
 	case STMT_LABELLED:
 		free(stmt->u.labelled.label);
 		ast_stmt_destroy(stmt->u.labelled.stmt);
@@ -618,6 +660,12 @@ ast_stmt_copy(struct ast_stmt *stmt)
 		? lexememarker_copy(stmt->loc)
 		: NULL;
 	switch (stmt->kind) {
+	case STMT_DECLARATION:
+		return ast_stmt_create_declaration(
+			loc,
+			ast_variable_copy(stmt->u.declaration.var),
+			stmt->u.declaration.val ? ast_expr_copy(stmt->u.declaration.val) : NULL
+		);
 	case STMT_LABELLED:
 		return ast_stmt_create_labelled(
 			loc,
@@ -677,6 +725,9 @@ ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 	assert(stmt);
 	struct strbuilder *b = strbuilder_create();
 	switch (stmt->kind) {
+	case STMT_DECLARATION:
+		ast_stmt_declaration_sprint(stmt, b);
+		break;
 	case STMT_LABELLED:
 		ast_stmt_labelled_sprint(stmt, indent_level, b);
 		break;
@@ -734,6 +785,7 @@ bool
 ast_stmt_linearisable(struct ast_stmt *stmt)
 {
 	switch (stmt->kind) {
+	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
 	case STMT_NOP:
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
@@ -782,6 +834,7 @@ struct string_arr *
 ast_stmt_getfuncs(struct ast_stmt *stmt)
 {
 	switch (stmt->kind) {
+	case STMT_DECLARATION: /* XXX: update when adding initalisation */
 	case STMT_NOP:
 		return string_arr_create();
 	case STMT_LABELLED:

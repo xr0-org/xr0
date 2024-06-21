@@ -50,6 +50,15 @@ stmt_array_append(struct stmt_array *arr, struct ast_stmt *v)
 	return *arr;
 }
 
+struct stmt_array
+stmt_array_concat(struct stmt_array *arr1, struct stmt_array *arr2)
+{
+	for (int i = 0; i < arr2->n; i++) {
+		stmt_array_append(arr1, ast_stmt_copy(arr2->stmt[i]));
+	}
+	return *arr1;
+}
+
 struct expr_array
 expr_array_create(struct ast_expr *v)
 {
@@ -175,13 +184,13 @@ variable_array_create(struct ast_variable *v)
 %type <statement> statement expression_statement selection_statement jump_statement 
 %type <statement> labelled_statement iteration_statement for_iteration_statement
 %type <statement> iteration_effect_statement
-%type <stmt_array> statement_list
+%type <stmt_array> statement_list declaration_list
 %type <string> identifier
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
 %type <type_modifier> declaration_modifier storage_class_specifier type_qualifier
 %type <unary_operator> unary_operator
 %type <variable> parameter_declaration struct_declaration
-%type <variable_array> declaration_list parameter_list parameter_type_list
+%type <variable_array> parameter_list parameter_type_list
 %type <variable_array> struct_declaration_list
 
 %start start
@@ -715,19 +724,18 @@ compound_statement
 	;
 
 block
-	: /* empty */
-		{ $$ = ast_block_create(NULL, 0, NULL, 0); }
-	| statement_list
-		{ $$ = ast_block_create(NULL, 0, $1.stmt, $1.n); }
+	: /* empty */ {
+		$$ = ast_block_create(NULL, 0);
+	}
+	| statement_list {
+		$$ = ast_block_create($1.stmt, $1.n);
+	}
 	| declaration_list {
-		$$ = ast_block_create(
-			ast_variable_arr_v($1), ast_variable_arr_n($1), NULL, 0
-		);
+		$$ = ast_block_create($1.stmt, $1.n);
 	}
 	| declaration_list statement_list {
-		$$ = ast_block_create(
-			ast_variable_arr_v($1), ast_variable_arr_n($1), $2.stmt, $2.n
-		);
+		struct stmt_array new = stmt_array_concat(&$1, &$2);
+		$$ = ast_block_create(new.stmt, new.n);
 	}
 	;
 
@@ -736,15 +744,22 @@ iteration_effect_statement
 		{ $$ = $2; }
 
 compound_verification_statement
-	: '~' '[' ']'		{ $$ = ast_block_create(NULL, 0, NULL, 0); }
+	: '~' '[' ']'		{ $$ = ast_block_create(NULL, 0); }
 	| '~' '[' block ']'	{ $$ = $3; }
 	;
 
 declaration_list
-	: declaration
-		{ $$ = variable_array_create(ast_variable_create($1.name, $1.t)); }
-	| declaration_list declaration
-		{ $$ = variable_array_append($1, ast_variable_create($2.name, $2.t)); }
+	: declaration {
+		$$ = stmt_array_create(
+			ast_stmt_create_declaration(lexloc(), ast_variable_create($1.name, $1.t), NULL)
+		);
+	}
+	| declaration_list declaration {
+		$$ = stmt_array_append(
+			&$1,
+			ast_stmt_create_declaration(lexloc(), ast_variable_create($2.name, $2.t), NULL)
+		);
+	}
 	;
 
 statement_list
@@ -779,7 +794,7 @@ for_some
 	;
 
 optional_compound_verification
-	: /* empty */ { $$ = ast_block_create(NULL, 0, NULL, 0); }
+	: /* empty */ { $$ = ast_block_create(NULL, 0); }
 	| compound_verification_statement
 	;
 
@@ -864,7 +879,7 @@ function_definition
 			$3.decl.name,
 			$3.decl.n,
 			$3.decl.param,
-			$4.abstract ? $4.abstract : ast_block_create(NULL, 0, NULL, 0),
+			$4.abstract ? $4.abstract : ast_block_create(NULL, 0),
 			$4.body
 		);
 	}
@@ -879,7 +894,7 @@ function_definition
 			$2.decl.name,
 			$2.decl.n,
 			$2.decl.param,
-			$3.abstract ? $3.abstract : ast_block_create(NULL, 0, NULL, 0),
+			$3.abstract ? $3.abstract : ast_block_create(NULL, 0),
 			$3.body
 		);
 	}
@@ -890,7 +905,7 @@ function_definition
 			$1.decl.name,
 			$1.decl.n,
 			$1.decl.param,
-			$2.abstract ? $2.abstract : ast_block_create(NULL, 0, NULL, 0),
+			$2.abstract ? $2.abstract : ast_block_create(NULL, 0),
 			$2.body
 		);
 	}

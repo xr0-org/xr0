@@ -5,16 +5,17 @@
 
 enum ast_stmt_kind {
 	STMT_NOP		= 1 << 0,
-	STMT_LABELLED		= 1 << 1,
-	STMT_COMPOUND		= 1 << 2,
-	STMT_COMPOUND_V		= 1 << 3,
-	STMT_EXPR		= 1 << 4,
-	STMT_SELECTION		= 1 << 5,
-	STMT_ITERATION		= 1 << 6,
-	STMT_ITERATION_E	= 1 << 7,
-	STMT_JUMP		= 1 << 8,
-	STMT_ALLOCATION		= 1 << 9,
-	STMT_REGISTER		= 1 << 10,
+	STMT_DECLARATION	= 1 << 1,
+	STMT_LABELLED		= 2 << 2,
+	STMT_COMPOUND		= 2 << 3,
+	STMT_COMPOUND_V		= 2 << 4,
+	STMT_EXPR		= 2 << 5,
+	STMT_SELECTION		= 2 << 6,
+	STMT_ITERATION		= 2 << 7,
+	STMT_ITERATION_E	= 2 << 8,
+	STMT_JUMP		= 2 << 9,
+	STMT_ALLOCATION		= 2 << 10,
+	STMT_REGISTER		= 2 << 11,
 };
 
 enum ast_stmt_kind

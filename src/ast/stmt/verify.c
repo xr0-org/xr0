@@ -13,18 +13,6 @@
 #include "value.h"
 
 static struct error *
-expr_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
-		struct state *);
-
-static struct error *
-jump_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
-		struct state *);
-
-static struct error *
-selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
-		struct state *);
-
-static struct error *
 ast_stmt_linearise_proper(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
@@ -32,7 +20,7 @@ struct error *
 ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 {
 	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
-	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	struct ast_block *b = ast_block_create(NULL, 0);
 	struct error *err = ast_stmt_linearise_proper(
 		stmt, b, lexememarker_copy(loc), state
 	);
@@ -45,6 +33,18 @@ ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 	state_pushframe(state, inter_frame);
 	return NULL;
 }
+
+static struct error *
+expr_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
+
+static struct error *
+jump_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
+
+static struct error *
+selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
 
 static struct error *
 ast_stmt_linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
@@ -183,9 +183,9 @@ stmt_iter_verify(struct ast_stmt *stmt, struct state *state)
 	/* neteffect is an iter statement */
 	struct ast_stmt *body = ast_stmt_iter_body(stmt);
 	assert(ast_stmt_kind(body) == STMT_COMPOUND);
-	struct ast_block *block = ast_stmt_as_block(body);
-	assert(ast_block_ndecls(block) == 0 && ast_block_nstmts(block) == 1);
-	struct ast_expr *assertion = ast_stmt_as_expr(ast_block_stmts(block)[0]);
+	struct ast_block *b = ast_stmt_as_block(body);
+	assert(ast_block_nstmts(b) == 1 && !ast_stmt_isdecl(ast_block_stmts(b)[0]));
+	struct ast_expr *assertion = ast_stmt_as_expr(ast_block_stmts(b)[0]);
 
 	/* we're currently discarding analysis of `offset` and relying on the
 	 * bounds (lw, up beneath) alone */
@@ -211,27 +211,32 @@ iter_empty(struct ast_stmt *stmt, struct state *state)
 /* stmt_exec */
 
 static struct error *
-stmt_compoundv_exec(struct ast_stmt *stmt, struct state *state);
+stmt_decl_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_compound_exec(struct ast_stmt *stmt, struct state *state);
+stmt_compoundv_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_sel_exec(struct ast_stmt *stmt, struct state *state);
+stmt_compound_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_iter_exec(struct ast_stmt *stmt, struct state *state);
+stmt_sel_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_jump_exec(struct ast_stmt *stmt, struct state *state);
+stmt_iter_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_register_exec(struct ast_stmt *stmt, struct state *state);
+stmt_jump_exec(struct ast_stmt *, struct state *);
+
+static struct error *
+stmt_register_exec(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_DECLARATION:
+		return stmt_decl_exec(stmt, state);
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
@@ -253,6 +258,14 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 	default:
 		assert(false);
 	}
+}
+
+static struct error *
+stmt_decl_exec(struct ast_stmt *stmt, struct state *state)
+{
+	/* TODO: add initialisation */
+	state_declare(state, ast_stmt_declaration_var(stmt), false);
+	return NULL;
 }
 
 static struct error *
@@ -341,14 +354,14 @@ iter_neteffect(struct ast_stmt *iter)
 		return NULL;
 	}
 
-	assert(ast_block_ndecls(abs) == 0 && nstmts == 1);
+	assert(nstmts == 1 && !ast_stmt_isdecl(ast_block_stmts(abs)[0]));
 
 	return ast_stmt_create_iter(
 		NULL,
 		ast_stmt_copy(ast_stmt_iter_init(iter)),
 		ast_stmt_copy(ast_stmt_iter_cond(iter)),
 		ast_expr_copy(ast_stmt_iter_iter(iter)),
-		ast_block_create(NULL, 0, NULL, 0),
+		ast_block_create(NULL, 0),
 		ast_stmt_create_compound(
 			NULL, ast_block_copy(ast_stmt_iter_abstract(iter))
 		)
@@ -465,6 +478,7 @@ ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *state)
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_LABELLED:
 		return NULL;
+	case STMT_DECLARATION:
 	case STMT_NOP:
 	case STMT_EXPR:
 	case STMT_SELECTION:
@@ -500,6 +514,8 @@ static struct error *
 ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_DECLARATION:
+		return stmt_decl_exec(stmt, state);
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
@@ -630,7 +646,7 @@ hack_alloc_from_neteffect(struct ast_stmt *stmt)
 	struct ast_stmt *body = ast_stmt_iter_body(stmt);
 	assert(ast_stmt_kind(body) == STMT_COMPOUND);
 	struct ast_block *block = ast_stmt_as_block(body);
-	assert(ast_block_ndecls(block) == 0 && ast_block_nstmts(block) == 1);
+	assert(ast_block_nstmts(block) == 1 && !ast_stmt_isdecl(ast_block_stmts(block)[0]));
 	return ast_stmt_as_expr(ast_block_stmts(block)[0]);
 }
 
@@ -677,6 +693,7 @@ comp_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
 struct error *
 ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups) {
 	switch (ast_stmt_kind(stmt)) {	
+	case STMT_DECLARATION:
 	case STMT_NOP:
 	case STMT_JUMP:
 	case STMT_REGISTER:
@@ -698,7 +715,7 @@ static struct error *
 labelled_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
 {
 	struct ast_block *b = ast_stmt_labelled_as_block(stmt);
-	assert(ast_block_ndecls(b) == 0);
+	/* XXX: assert no declarations */
 	int nstmts = ast_block_nstmts(b);
 	struct ast_stmt **stmts = ast_block_stmts(b);
 	for (int i = 0; i < nstmts; i++) {

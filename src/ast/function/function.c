@@ -153,7 +153,7 @@ ast_function_isvoid(struct ast_function *f)
 bool
 ast_function_absisempty(struct ast_function *f)
 {
-	return ast_block_ndecls(f->abstract) == 0 && ast_block_nstmts(f->abstract) == 0;
+	return ast_block_nstmts(f->abstract) == 0;
 }
 
 struct ast_type *
