@@ -715,7 +715,7 @@ static struct error *
 labelled_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
 {
 	struct ast_block *b = ast_stmt_labelled_as_block(stmt);
-	assert(ast_block_nstmts(b) == 1 && !ast_stmt_isdecl(ast_block_stmts(b)[0]));
+	/* XXX: assert no declarations */
 	int nstmts = ast_block_nstmts(b);
 	struct ast_stmt **stmts = ast_block_stmts(b);
 	for (int i = 0; i < nstmts; i++) {

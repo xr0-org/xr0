@@ -834,6 +834,7 @@ struct string_arr *
 ast_stmt_getfuncs(struct ast_stmt *stmt)
 {
 	switch (stmt->kind) {
+	case STMT_DECLARATION: /* XXX: update when adding initalisation */
 	case STMT_NOP:
 		return string_arr_create();
 	case STMT_LABELLED:
