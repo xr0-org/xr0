@@ -263,10 +263,7 @@ struct ast_block;
 struct ast_variable;
 
 struct ast_block *
-ast_block_create(
-	struct ast_variable **decl, int ndecl, 
-	struct ast_stmt **stmt, int nstmt
-);
+ast_block_create(struct ast_stmt **stmt, int nstmt);
 
 void
 ast_block_destroy(struct ast_block *);
@@ -308,9 +305,6 @@ ast_block_call_create(struct ast_block *, struct lexememarker *,
 	struct ast_type *, struct ast_expr *);
 
 void
-ast_block_append_decl(struct ast_block *, struct ast_variable *);
-
-void
 ast_block_append_stmt(struct ast_block *, struct ast_stmt *);
 
 struct preconds_result {
@@ -327,6 +321,10 @@ struct lexememarker;
 
 struct lexememarker *
 ast_stmt_lexememarker(struct ast_stmt *);
+
+struct ast_stmt *
+ast_stmt_create_declaration(struct lexememarker *, struct ast_variable *,
+	struct ast_expr *);
 
 struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *, char *label, struct ast_stmt *);

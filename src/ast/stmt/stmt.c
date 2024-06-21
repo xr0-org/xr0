@@ -17,6 +17,10 @@ struct ast_stmt {
 	enum ast_stmt_kind kind;
 	union {
 		struct {
+			struct ast_variable *var;
+			struct ast_expr *val;
+		} declaration;
+		struct {
 			char *label;
 			struct ast_stmt *stmt;
 		} labelled;
@@ -68,6 +72,17 @@ ast_stmt_create(struct lexememarker *loc)
 }
 
 struct ast_stmt *
+ast_stmt_create_declaration(struct lexememarker *loc, struct ast_variable *var,
+		struct ast_expr *val)
+{
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_DECLARATION;
+	stmt->u.declaration.var = var;
+	stmt->u.declaration.val = val;
+	return stmt;
+}
+
+struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *loc, char *label,
 		struct ast_stmt *substmt)
 {
@@ -115,7 +130,7 @@ ast_stmt_labelled_as_block(struct ast_stmt *stmt)
 static struct ast_block *
 ast_stmt_to_block(struct ast_stmt *stmt)
 {
-	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	struct ast_block *b = ast_block_create(NULL, 0);
 	ast_block_append_stmt(b, stmt);
 	return b;
 }
@@ -126,7 +141,7 @@ ast_stmt_as_compound(struct ast_stmt *stmt)
 	if (stmt->kind == STMT_COMPOUND) {
 		return stmt;
 	}
-	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	struct ast_block *b = ast_block_create(NULL, 0);
 	ast_block_append_stmt(b, stmt);
 	return ast_stmt_create_compound(
 		lexememarker_copy(ast_stmt_lexememarker(stmt)), b

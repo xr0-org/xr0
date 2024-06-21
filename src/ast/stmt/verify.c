@@ -32,7 +32,7 @@ struct error *
 ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
 {
 	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
-	struct ast_block *b = ast_block_create(NULL, 0, NULL, 0);
+	struct ast_block *b = ast_block_create(NULL, 0);
 	struct error *err = ast_stmt_linearise_proper(
 		stmt, b, lexememarker_copy(loc), state
 	);
@@ -348,7 +348,7 @@ iter_neteffect(struct ast_stmt *iter)
 		ast_stmt_copy(ast_stmt_iter_init(iter)),
 		ast_stmt_copy(ast_stmt_iter_cond(iter)),
 		ast_expr_copy(ast_stmt_iter_iter(iter)),
-		ast_block_create(NULL, 0, NULL, 0),
+		ast_block_create(NULL, 0),
 		ast_stmt_create_compound(
 			NULL, ast_block_copy(ast_stmt_iter_abstract(iter))
 		)
