@@ -275,16 +275,10 @@ char *
 ast_block_absstr(struct ast_block *b, int indent_level);
 
 char *
-ast_block_render(struct ast_block *, int index, bool indecls);
+ast_block_render(struct ast_block *, int index);
 
 struct ast_block *
 ast_block_copy(struct ast_block *b);
-
-int
-ast_block_ndecls(struct ast_block *b);
-
-struct ast_variable **
-ast_block_decls(struct ast_block *b);
 
 int
 ast_block_nstmts(struct ast_block *b);
@@ -325,6 +319,9 @@ ast_stmt_lexememarker(struct ast_stmt *);
 struct ast_stmt *
 ast_stmt_create_declaration(struct lexememarker *, struct ast_variable *,
 	struct ast_expr *);
+
+bool
+ast_stmt_isdecl(struct ast_stmt *);
 
 struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *, char *label, struct ast_stmt *);

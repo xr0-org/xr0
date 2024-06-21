@@ -82,6 +82,19 @@ ast_stmt_create_declaration(struct lexememarker *loc, struct ast_variable *var,
 	return stmt;
 }
 
+struct ast_variable *
+ast_stmt_declaration_var(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_DECLARATION);
+	return stmt->u.declaration.var;
+}
+
+bool
+ast_stmt_isdecl(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_DECLARATION;
+}
+
 struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *loc, char *label,
 		struct ast_stmt *substmt)
@@ -236,7 +249,7 @@ ast_stmt_compound_v_sprint(struct ast_stmt *stmt, int indent_level,
 	struct ast_block *b = ast_stmt_as_block(stmt);
 
 	/* special case for nice print */
-	if (ast_block_ndecls(b) == 0 && ast_block_nstmts(b) == 1) {
+	if (ast_block_nstmts(b) == 1) {
 		char *s = ast_stmt_str(ast_block_stmts(b)[0], 0);
 		strbuilder_printf(sb, "~ [ %s ]", s);
 		free(s);
@@ -633,6 +646,12 @@ ast_stmt_copy(struct ast_stmt *stmt)
 		? lexememarker_copy(stmt->loc)
 		: NULL;
 	switch (stmt->kind) {
+	case STMT_DECLARATION:
+		return ast_stmt_create_declaration(
+			loc,
+			ast_variable_copy(stmt->u.declaration.var),
+			stmt->u.declaration.val ? ast_expr_copy(stmt->u.declaration.val) : NULL
+		);
 	case STMT_LABELLED:
 		return ast_stmt_create_labelled(
 			loc,
