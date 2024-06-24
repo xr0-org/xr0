@@ -11,6 +11,7 @@
 #include "state.h"
 #include "stmt/stmt.h"
 #include "util.h"
+#include "value.h"
 
 static struct ast_expr *
 ast_expr_create()
@@ -418,7 +419,7 @@ ast_expr_isverifiable(struct ast_expr *expr)
 	case EXPR_INCDEC:
 	case EXPR_CALL:
 	case EXPR_ASSIGNMENT:
-	case EXPR_ARBARG:
+	case EXPR_RANGE:
 		return false;
 	case EXPR_BINARY:
 		return ast_expr_isverifiable(ast_expr_binary_e1(expr)) &&
@@ -562,6 +563,9 @@ ast_expr_destroy_binary(struct ast_expr *expr)
 static struct math_expr *
 math_expr(struct ast_expr *);
 
+static char *
+atomicstr(struct ast_expr *);
+
 static void
 ast_expr_binary_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
@@ -578,11 +582,47 @@ ast_expr_binary_str_build(struct ast_expr *expr, struct strbuilder *b)
 		[BINARY_OP_SUBTRACTION]		= "-",
 		[BINARY_OP_MULTIPLICATION]	= "*",
 	};
-	char *e1 = ast_expr_str(expr->u.binary.e1),
-	     *e2 = ast_expr_str(expr->u.binary.e2);
+	char *e1 = atomicstr(expr->u.binary.e1),
+	     *e2 = atomicstr(expr->u.binary.e2);
 	strbuilder_printf(b, "%s%s%s", e1, opstr[expr->u.binary.op], e2);
 	free(e1);
 	free(e2);
+}
+
+static bool
+isatomic(struct ast_expr *);
+
+static char *
+atomicstr(struct ast_expr *e)
+{
+	if (isatomic(e)) {
+		return ast_expr_str(e);
+	}
+	struct strbuilder *b = strbuilder_create();
+	char *s = ast_expr_str(e);
+	strbuilder_printf(b, "(%s)", s);
+	free(s);
+	return strbuilder_build(b);
+}
+
+static bool
+isatomic(struct ast_expr *e)
+{
+	switch (e->kind) {
+	case EXPR_IDENTIFIER:
+	case EXPR_CONSTANT:
+	case EXPR_BRACKETED:
+	case EXPR_CALL:
+	case EXPR_INCDEC:
+	case EXPR_STRUCTMEMBER:
+	case EXPR_UNARY:
+		return true;
+	case EXPR_BINARY:
+	case EXPR_ASSIGNMENT:
+		return false;
+	default:
+		assert(false);
+	}
 }
 
 struct ast_expr *
@@ -653,22 +693,79 @@ ast_expr_isdeallocand_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
-ast_expr_arbarg_create(char *key)
+ast_expr_range_create(char *key, struct ast_expr *lw, struct ast_expr *up)
 {
-	assert(key);
+	assert(key && lw && up);
 
 	struct ast_expr *expr = ast_expr_create();
-	expr->kind = EXPR_ARBARG;
-	expr->u.arbarg_key = key;
+	expr->kind = EXPR_RANGE;
+	expr->u.range.key = key;
+	expr->u.range.lw = lw;
+	expr->u.range.up = up;
+	return expr;
+}
+
+static void
+ast_expr_range_str_build(struct ast_expr *expr, struct strbuilder *b)
+{
+	char *lw = ast_expr_str(expr->u.range.lw),
+	     *up = ast_expr_str(expr->u.range.up);
+	strbuilder_printf(b, "$%s[%s?%s]", expr->u.range.key, lw, up);
+	free(up);
+	free(lw);
+}
+
+struct ast_expr *
+ast_expr_rangemin_create()
+{
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_RANGEBOUND;
+	expr->u.ismax = false;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_rangemax_create()
+{
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_RANGEBOUND;
+	expr->u.ismax = true;
 	return expr;
 }
 
 char *
-ast_expr_arbarg_key(struct ast_expr *expr)
+ast_expr_range_key(struct ast_expr *expr)
 {
-	assert(expr->kind == EXPR_ARBARG);
-	return expr->u.arbarg_key;
+	assert(expr->kind == EXPR_RANGE);
+	return expr->u.range.key;
 }
+
+struct ast_expr *
+ast_expr_range_lw(struct ast_expr *e)
+{
+	assert(e->kind == EXPR_RANGE);
+	return e->u.range.lw;
+}
+
+struct ast_expr *
+ast_expr_range_up(struct ast_expr *e)
+{
+	assert(e->kind == EXPR_RANGE);
+	return e->u.range.up;
+}
+
+bool
+ast_expr_israngemin(struct ast_expr *e)
+{
+	return e->kind == EXPR_RANGEBOUND && !e->u.ismax;
+}
+
+bool
+ast_expr_israngemax(struct ast_expr *e)
+{
+	return e->kind == EXPR_RANGEBOUND && e->u.ismax;
+}
+
 
 struct ast_expr *
 ast_expr_alloc_create(struct ast_expr *arg)
@@ -804,8 +901,16 @@ ast_expr_destroy(struct ast_expr *expr)
 	case EXPR_ISDEALLOCAND:
 		ast_expr_destroy(expr->root);
 		break;
-	case EXPR_ARBARG:
-		free(expr->u.arbarg_key);
+	case EXPR_RANGE:
+		free(expr->u.range.key);
+		if (expr->u.range.lw) {
+			ast_expr_destroy(expr->u.range.lw);
+		}
+		if (expr->u.range.up) {
+			ast_expr_destroy(expr->u.range.up);
+		}
+		break;
+	case EXPR_RANGEBOUND:
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_destroy(expr->u.alloc.arg);
@@ -854,8 +959,11 @@ ast_expr_str(struct ast_expr *expr)
 	case EXPR_ISDEALLOCAND:
 		ast_expr_isdeallocand_str_build(expr, b);
 		break;
-	case EXPR_ARBARG:
-		strbuilder_printf(b, "$%s", expr->u.arbarg_key);
+	case EXPR_RANGE:
+		ast_expr_range_str_build(expr, b);
+		break;
+	case EXPR_RANGEBOUND:
+		strbuilder_printf(b, expr->u.ismax ? "MAX" : "MIN");
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_alloc_str_build(expr, b);
@@ -914,8 +1022,16 @@ ast_expr_copy(struct ast_expr *expr)
 		return ast_expr_isdeallocand_create(
 			ast_expr_copy(expr->root)
 		);
-	case EXPR_ARBARG:
-		return ast_expr_arbarg_create(dynamic_str(expr->u.arbarg_key));
+	case EXPR_RANGE:
+		return ast_expr_range_create(
+			dynamic_str(expr->u.range.key),
+			ast_expr_copy(expr->u.range.lw),
+			ast_expr_copy(expr->u.range.up)
+		);
+	case EXPR_RANGEBOUND:
+		return expr->u.ismax
+			? ast_expr_rangemax_create()
+			: ast_expr_rangemin_create();
 	case EXPR_ALLOCATION:
 		return ast_expr_alloc_copy(expr);
 	default:
@@ -1066,57 +1182,178 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 	}
 }
 
-static void
-nulldestruct(int x) { /* do nothing */ }
+struct tagval {
+	char *tag;
+	struct value *v;
+};
 
-DEFINE_RESULT_TYPE(int, int, nulldestruct, intresult, true)
+static struct tagval *
+tagval_value_create(struct value *v)
+{
+	struct tagval *tv = malloc(sizeof(struct tagval));
+	tv->tag = NULL;
+	tv->v = v;
+	return tv;
+}
 
-static struct intresult *
-binary_consteval(struct ast_expr *);
+static struct tagval *
+tagval_tagged_create(struct value *v, char *tag)
+{
+	assert(tag);
 
-struct intresult *
-ast_expr_consteval(struct ast_expr *e)
+	struct tagval *tv = malloc(sizeof(struct tagval));
+	tv->tag = tag;
+	tv->v = v;
+	return tv;
+}
+
+bool
+tagval_hastag(struct tagval *tv)
+{
+	return tv->tag;
+}
+
+char *
+tagval_tag(struct tagval *tv)
+{
+	assert(tagval_hastag(tv));
+	return tv->tag;
+}
+
+struct value *
+tagval_value(struct tagval *tv)
+{
+	return tv->v;
+}
+
+void
+tagval_destroy(struct tagval *tv)
+{
+	if (tv->tag) {
+		free(tv->tag);
+	}
+	value_destroy(tv->v);
+	free(tv);
+}
+
+DEFINE_RESULT_TYPE(struct tagval *, tagval, tagval_destroy, tagval_res, false)
+
+static struct tagval_res *
+binary_rangeeval(struct ast_expr *, struct state *);
+
+struct tagval_res *
+ast_expr_rangeeval(struct ast_expr *e, struct state *s)
 {
 	switch (e->kind) {
 	case EXPR_CONSTANT:
-		return intresult_int_create(ast_expr_as_constant(e));
+		return tagval_res_tagval_create(
+			tagval_value_create(
+				value_int_create(ast_expr_as_constant(e))
+			)
+		);
+	case EXPR_IDENTIFIER:
+		return tagval_res_tagval_create(
+			tagval_tagged_create(
+				state_getrconst(s, ast_expr_as_identifier(e)),
+				dynamic_str(ast_expr_as_identifier(e))
+			)
+		);
 	case EXPR_BINARY:
-		return binary_consteval(e);
+		return binary_rangeeval(e, s);
 	default:
 		assert(false);
 	}
 }
 
-static struct intresult *
-binary_consteval(struct ast_expr *e)
-{
-	struct intresult *r1 = ast_expr_consteval(ast_expr_binary_e1(e)),
-			 *r2 = ast_expr_consteval(ast_expr_binary_e2(e));
-	if (intresult_iserror(r1)) {
-		return r1;
-	}
-	if (intresult_iserror(r2)) {
-		return r2;
-	}
-	int ans1 = intresult_as_int(r1),
-	    ans2 = intresult_as_int(r2);
-	intresult_destroy(r2);
-	intresult_destroy(r1);
+static struct tagval_res *
+binary_rangeeval_actual(struct tagval *, enum ast_binary_operator,
+		struct tagval *);
 
-	switch (ast_expr_binary_op(e)) {
+static struct tagval_res *
+binary_rangeeval(struct ast_expr *e, struct state *s)
+{
+	struct tagval_res *vres1 = ast_expr_rangeeval(ast_expr_binary_e1(e), s),
+			  *vres2 = ast_expr_rangeeval(ast_expr_binary_e2(e), s);
+	if (tagval_res_iserror(vres1)) {
+		return vres1;
+	}
+	if (tagval_res_iserror(vres2)) {
+		return vres2;
+	}
+	return binary_rangeeval_actual(
+		tagval_res_as_tagval(vres1),
+		ast_expr_binary_op(e),
+		tagval_res_as_tagval(vres2)
+	);
+}
+
+static struct value *
+binary_rangeeval_norm(struct value *, enum ast_binary_operator, int);
+
+static struct tagval *
+addtagifpresent(struct value *v, struct tagval *);
+
+static struct tagval_res *
+binary_rangeeval_actual(struct tagval *tv1, enum ast_binary_operator op,
+		struct tagval *tv2)
+{
+	struct value *v1 = tagval_value(tv1),
+		     *v2 = tagval_value(tv2);
+	if (!value_isconstant(v2)) {
+		if (!value_isconstant(v1)){ 
+			return tagval_res_error_create(
+				error_printf("one must be constant")
+			); 
+		}
+		return binary_rangeeval_actual(tv2, op, tv1);
+	}
+	/* ⊢ value_isconstant(v2) */
+	return tagval_res_tagval_create(
+		addtagifpresent(
+			binary_rangeeval_norm(v1, op, value_as_constant(v2)),
+			tv1
+		)
+	);
+}
+
+static struct value *
+binary_rangeeval_norm(struct value *v, enum ast_binary_operator op, int c)
+{
+	int lw = value_int_lw(v),
+	    up = value_int_up(v);
+	assert(c >= 0);
+
+	switch (op) {
 	case BINARY_OP_ADDITION:
-		return intresult_int_create(ans1+ans2);
+		return value_int_range_create(lw+c, up+c);
 	case BINARY_OP_SUBTRACTION:
-		return intresult_int_create(ans1-ans2);
+		return value_int_range_create(lw-c, up-c);
 	case BINARY_OP_MULTIPLICATION:
-		return intresult_int_create(ans1*ans2);
+		if (!value_isconstant(v)) {
+			/* XXX: cannot multiply ranges without modulo-ranges */
+			assert(c == 1);
+			return v;
+		}
+		/* ⊢ lw == value_as_constant(v) */
+		return value_int_create(lw*c);
 	default:
 		assert(false);
 	}
+}
+
+static struct tagval *
+addtagifpresent(struct value *v, struct tagval *tv)
+{
+	return tagval_hastag(tv)
+		? tagval_tagged_create(v, tagval_tag(tv))
+		: tagval_value_create(v);
 }
 
 static struct string_arr *
-ast_expr_call_getfuncs(struct ast_expr *expr);
+ast_expr_range_getfuncs(struct ast_expr *);
+
+static struct string_arr *
+ast_expr_call_getfuncs(struct ast_expr *);
 
 struct string_arr *
 ast_expr_getfuncs(struct ast_expr *expr)
@@ -1127,8 +1364,10 @@ ast_expr_getfuncs(struct ast_expr *expr)
 	case EXPR_STRING_LITERAL:
 	case EXPR_STRUCTMEMBER:
 	case EXPR_ISDEALLOCAND:
-	case EXPR_ARBARG:
-		return string_arr_create();	
+	case EXPR_RANGEBOUND:
+		return string_arr_create();
+	case EXPR_RANGE:
+		return ast_expr_range_getfuncs(expr);
 	case EXPR_CALL:
 		return ast_expr_call_getfuncs(expr);
 	case EXPR_BRACKETED:
@@ -1164,6 +1403,17 @@ ast_expr_call_getfuncs(struct ast_expr *expr)
 		);	
 		/* XXX: leaks */
 	}
+	return res;
+}
+
+static struct string_arr *
+ast_expr_range_getfuncs(struct ast_expr *expr)
+{
+	struct string_arr *res = string_arr_create();
+	struct string_arr *lw = ast_expr_getfuncs(expr->u.range.lw),
+			  *up = ast_expr_getfuncs(expr->u.range.up);
+	string_arr_concat(res, lw);
+	string_arr_concat(res, up);
 	return res;
 }
 

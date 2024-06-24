@@ -37,7 +37,7 @@ struct value *
 value_literal_create(char *);
 
 struct value *
-value_int_rconst_create();
+value_int_rconst_create(struct ast_expr *range);
 
 struct value *
 value_int_ne_create(int not_val);
@@ -55,7 +55,7 @@ struct value *
 value_bang(struct value *);
 
 struct value *
-value_sync_create(struct ast_expr *);
+value_rconst_create(struct ast_expr *);
 
 struct value *
 value_struct_create(struct ast_type *);
@@ -115,7 +115,7 @@ bool
 value_issync(struct value *v);
 
 struct ast_expr *
-value_as_sync(struct value *v);
+value_as_rconst(struct value *v);
 
 struct ast_expr *
 value_to_expr(struct value *);
@@ -135,17 +135,44 @@ enum ast_binary_operator;
 DECLARE_RESULT_TYPE(bool, bool, bool_res)
 
 struct bool_res *
-value_decide(struct value *, struct state *);
+value_equal(struct value *lhs, struct value *rhs, struct state *);
 
-bool
-values_comparable(struct value *v1, struct value *v2);
+struct number;
 
+/* value_splitassume: Returns false if contradiction encountered. */
 bool
-value_equal(struct value *v1, struct value *v2);
+value_splitassume(struct value *, struct number *);
 
-/* value_assume: Returns false if contradiction encountered. */
-bool
-value_assume(struct value *, bool value);
+struct number_arr;
+
+struct splitinstruct;
+
+struct splitinstruct *
+splitinstruct_create(char *rconst, struct number_arr *splits);
+
+char *
+splitinstruct_rconst(struct splitinstruct *);
+
+struct number_arr *
+splitinstruct_splits(struct splitinstruct *);
+
+struct number_arr;
+
+struct number_arr *
+number_arr_create();
+
+void
+number_arr_destroy(struct number_arr *);
+
+void
+number_arr_append(struct number_arr *, struct number *);
+
+struct number **
+number_arr_num(struct number_arr *);
+
+int
+number_arr_len(struct number_arr *);
+
 
 DECLARE_RESULT_TYPE(struct value *, value, value_res)
 

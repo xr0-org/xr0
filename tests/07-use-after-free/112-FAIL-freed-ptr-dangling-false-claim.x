@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 int *
-func() ~ [ return $; ]	/* ERROR: */
+func() ~ [ return [?]; ]	/* ERROR: */
 {
 	int *p;
 	p = malloc(1);

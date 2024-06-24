@@ -9,43 +9,9 @@
 #include "util.h"
 #include "value.h"
 
-static struct range *
-range_copy(struct range *);
-
-static void
-range_destroy(struct range *);
-
-static char *
-range_str(struct range *);
-
-static struct ast_expr *
-range_size(struct range *);
-
-static struct error *
-range_dealloc(struct range *r, struct state *s);
-
-static bool
-range_isdeallocand(struct range *, struct state *);
-
-static bool
-range_references(struct range *, struct location *, struct state *,
-		struct circuitbreaker *cb);
-
-static struct range * 
-range_permuteheaplocs(struct range *, struct permutation *);
-
-static struct int_arr *
-range_deriveorder(struct range *, struct circuitbreaker *, struct state *);
-
 struct object {
-	enum object_type {
-		OBJECT_VALUE, OBJECT_DEALLOCAND_RANGE,
-	} type;
 	struct ast_expr *offset;
-	union {
-		struct range *range;
-		struct value *value;
-	};
+	struct value *value;
 };
 
 struct object *
@@ -55,35 +21,15 @@ object_value_create(struct ast_expr *offset, struct value *v)
 	assert(obj);
 	obj->offset = offset;
 	obj->value = v;
-	obj->type = OBJECT_VALUE;
-	return obj;
-}
-
-struct object *
-object_range_create(struct ast_expr *offset, struct range *r)
-{
-	assert(r);
-	struct object *obj = malloc(sizeof(struct object));
-	assert(obj);
-	obj->offset = offset;
-	obj->range = r;
-	obj->type = OBJECT_DEALLOCAND_RANGE;
 	return obj;
 }
 
 struct int_arr *
 object_deriveorder(struct object *obj, struct circuitbreaker *cb, struct state *s)
 {
-	switch (obj->type) {
-	case OBJECT_VALUE:
-		return obj->value
-			? value_deriveorder(obj->value, cb, s)
-			: int_arr_create();
-	case OBJECT_DEALLOCAND_RANGE:
-		return range_deriveorder(obj->range, cb, s);
-	default:
-		assert(false);
-	}
+	return obj->value
+		? value_deriveorder(obj->value, cb, s)
+		: int_arr_create();
 }
 
 struct object *
@@ -91,36 +37,17 @@ object_permuteheaplocs(struct object *old, struct permutation *p)
 {
 	struct object *new = malloc(sizeof(struct object));
 	new->offset = ast_expr_copy(old->offset);
-	new->type = old->type;
-	switch (old->type) {
-	case OBJECT_VALUE:
-		new->value = old->value
-			? value_permuteheaplocs(old->value, p)
-			: NULL;
-		break;
-	case OBJECT_DEALLOCAND_RANGE:
-		new->range = range_permuteheaplocs(old->range, p);
-		break;
-	default:
-		assert(false);
-	}
+	new->value = old->value
+		? value_permuteheaplocs(old->value, p)
+		: NULL;
 	return new;
 }
 
 void
 object_destroy(struct object *obj)
 {
-	switch (obj->type) {
-	case OBJECT_VALUE:
-		if (obj->value) {
-			value_destroy(obj->value);
-		}
-		break;
-	case OBJECT_DEALLOCAND_RANGE:
-		range_destroy(obj->range);
-		break;
-	default:
-		assert(false);
+	if (obj->value) {
+		value_destroy(obj->value);
 	}
 	ast_expr_destroy(obj->offset);
 	free(obj);
@@ -131,35 +58,17 @@ object_copy(struct object *old)
 {
 	struct object *new = malloc(sizeof(struct object));
 	new->offset = ast_expr_copy(old->offset);
-	new->type = old->type;
-	switch (old->type) {
-	case OBJECT_VALUE:
-		new->value = old->value ?  value_copy(old->value) : NULL;
-		break;
-	case OBJECT_DEALLOCAND_RANGE:
-		new->range = range_copy(old->range);
-		break;
-	default:
-		assert(false);
-	}
+	new->value = old->value ?  value_copy(old->value) : NULL;
 	return new;
 }
 
 struct object *
 object_abstractcopy(struct object *old, struct state *s)
 {
-	switch (old->type) {
-	case OBJECT_DEALLOCAND_RANGE:
-		/* TODO: reset observations */
-		return object_copy(old);
-	case OBJECT_VALUE:
-		return object_value_create(
-			ast_expr_copy(old->offset),
-			old->value ? value_abstractcopy(old->value, s) : NULL
-		);
-	default:
-		assert(false);
-	}
+	return object_value_create(
+		ast_expr_copy(old->offset),
+		old->value ? value_abstractcopy(old->value, s) : NULL
+	);
 }
 
 static char *
@@ -183,14 +92,7 @@ object_str(struct object *obj)
 static char *
 inner_str(struct object *obj)
 {
-	switch (obj->type) {
-	case OBJECT_VALUE:
-		return obj->value ? value_str(obj->value) : dynamic_str("");
-	case OBJECT_DEALLOCAND_RANGE:
-		return range_str(obj->range);
-	default:
-		assert(false);
-	}
+	return obj->value ? value_str(obj->value) : dynamic_str("");
 }
 
 bool
@@ -201,7 +103,7 @@ object_referencesheap(struct object *obj, struct state *s,
 		/* already analysed */
 		return false;
 	}
-	if (!object_isvalue(obj)) {
+	if (!object_hasvalue(obj)) {
 		/* TODO: do we need to exclude the case of ranges on stack? */
 		return true;
 	}
@@ -214,37 +116,20 @@ object_referencesheap(struct object *obj, struct state *s,
 bool
 object_hasvalue(struct object *obj)
 {
-	if (object_isvalue(obj)) {
-		return obj->value;
-	}
-	return false;
-}
-
-bool
-object_isvalue(struct object *obj)
-{
-	return obj->type == OBJECT_VALUE;
+	return obj->value;
 }
 
 struct value *
 object_as_value(struct object *obj)
 {
-	assert(obj->type == OBJECT_VALUE);
-
+	assert(obj->value);
 	return obj->value;
 }
 
 bool
 object_isdeallocand(struct object *obj, struct state *s)
 {
-	switch (obj->type) {
-	case OBJECT_VALUE:
-		return obj->value && state_isdeallocand(s, value_as_location(obj->value));
-	case OBJECT_DEALLOCAND_RANGE:
-		return range_isdeallocand(obj->range, s);
-	default:
-		assert(false);
-	}
+	return obj->value && state_isdeallocand(s, value_as_location(obj->value));
 }
 
 bool
@@ -255,11 +140,6 @@ object_references(struct object *obj, struct location *loc, struct state *s,
 		/* already handled */
 		return false;
 	}
-	if (obj->type == OBJECT_DEALLOCAND_RANGE) {
-		return range_references(obj->range, loc, s, cb);
-	}
-
-	assert(obj->type == OBJECT_VALUE);
 
 	struct circuitbreaker *copy = circuitbreaker_copy(cb);
 	struct value *v = object_as_value(obj);
@@ -271,8 +151,6 @@ object_references(struct object *obj, struct location *loc, struct state *s,
 struct error *
 object_assign(struct object *obj, struct value *val)
 {
-	assert(obj->type == OBJECT_VALUE);
-
 	/* XXX: check that if val has offset it's within range and return error
 	 * potentially */
 
@@ -283,15 +161,7 @@ object_assign(struct object *obj, struct value *val)
 static struct ast_expr *
 object_size(struct object *obj)
 {
-	switch (obj->type) {
-	case OBJECT_VALUE:
-		/* TODO: derive properly from value type */
-		return ast_expr_constant_create(1);
-	case OBJECT_DEALLOCAND_RANGE:
-		return ast_expr_copy(range_size(obj->range));
-	default:
-		assert(false);
-	}
+	return ast_expr_constant_create(1);
 }
 
 struct ast_expr *
@@ -419,19 +289,12 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 	}
 
 	if (e2) {
-		assert(obj->type == OBJECT_VALUE);
 		return object_value_create(
 			ast_expr_copy(obj->offset), value_copy(obj->value)
 		);
 	}
-	struct ast_expr *diff = ast_expr_difference_create(excl_up, lw);
-	return object_range_create(
-		ast_expr_copy(obj->offset),
-		range_create(
-			diff,
-			state_alloc(s, ast_expr_as_constant(diff))
-		)
-	);
+	assert(false);
+	/* XXX: previously created range here */
 }
 
 struct object *
@@ -459,36 +322,22 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 	}
 
 	if (e1) {
-		assert(obj->type == OBJECT_VALUE);
 		ast_expr_destroy(up);
 		return object_value_create(
 			ast_expr_copy(incl_lw),
 			value_copy(obj->value)
 		);
 	}
-	struct ast_expr *diff = ast_expr_difference_create(up, ast_expr_copy(incl_lw));
-	return object_range_create(
-		ast_expr_copy(incl_lw),
-		range_create(
-			diff,
-			state_alloc(s, ast_expr_as_constant(diff))
-		)
-	);
+	assert(false);
+	/* XXX: previously created range here */
 }
 
 
 struct error *
 object_dealloc(struct object *obj, struct state *s)
 {
-	switch (obj->type) {
-	case OBJECT_VALUE:
-		assert(obj->value);
-		return state_dealloc(s, value_as_location(obj->value));
-	case OBJECT_DEALLOCAND_RANGE:
-		return range_dealloc(obj->range, s);
-	default:
-		assert(false);
-	}
+	assert(obj->value);
+	return state_dealloc(s, value_as_location(obj->value));
 }
 
 static struct value *
@@ -504,13 +353,12 @@ object_getmember(struct object *obj, struct ast_type *t, char *member,
 static struct value *
 getorcreatestruct(struct object *obj, struct ast_type *t, struct state *s)
 {
-	struct value *v = object_as_value(obj);
-	if (v) {
-		return v;
+	if (object_hasvalue(obj)) {
+		return object_as_value(obj);
 	}
 	struct ast_type *complete = ast_type_struct_complete(t, state_getext(s));
 	a_printf(complete, "%s is incomplete\n", ast_type_str(t));
-	v = value_struct_create(complete);
+	struct value *v = value_struct_create(complete);
 	object_assign(obj, v);
 	return v;
 }
@@ -584,85 +432,6 @@ object_result_hasvalue(struct object_result *res)
 {
 	assert(!object_result_iserror(res));
 	return res->val; /* implicit cast */
-}
-
-struct range {
-	struct ast_expr *size;
-	struct location *loc;
-};
-
-struct range *
-range_create(struct ast_expr *size, struct location *loc)
-{
-	struct range *r = malloc(sizeof(struct range));
-	r->size = size;
-	r->loc = loc;
-	return r;
-}
-
-struct range *
-range_copy(struct range *r)
-{
-	return range_create(ast_expr_copy(r->size), location_copy(r->loc));
-}
-
-static struct range * 
-range_permuteheaplocs(struct range *r, struct permutation *p)
-{
-	return range_create(
-		ast_expr_copy(r->size), location_permuteheap(r->loc, p)
-	);
-}
-
-static struct int_arr *
-range_deriveorder(struct range *r, struct circuitbreaker *cb, struct state *s)
-{
-	assert(false);
-}
-
-void
-range_destroy(struct range *r)
-{
-	ast_expr_destroy(r->size);
-	location_destroy(r->loc);
-	free(r);
-}
-
-char *
-range_str(struct range *r)
-{
-	struct strbuilder *b = strbuilder_create();
-	char *size = ast_expr_str(r->size);
-	char *loc = location_str(r->loc);
-	strbuilder_printf(b, "virt:%s@%s", size, loc);
-	free(loc);
-	free(size);
-	return strbuilder_build(b);
-}
-
-struct ast_expr *
-range_size(struct range *r)
-{
-	return r->size;
-}
-
-struct error *
-range_dealloc(struct range *r, struct state *s)
-{
-	return state_dealloc(s, r->loc);
-}
-
-bool
-range_isdeallocand(struct range *r, struct state *s)
-{
-	return state_isdeallocand(s, r->loc);
-}
-
-bool
-range_references(struct range *r, struct location *loc, struct state *s,
-		struct circuitbreaker *cb)
-{
-	return location_references(r->loc, loc, s, cb);
 }
 
 

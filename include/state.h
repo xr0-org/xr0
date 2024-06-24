@@ -47,10 +47,12 @@ struct state *
 state_create(struct frame *, struct externals *);
 
 void
-state_setvconsts(struct state *new, struct state *old);
+state_setrconsts(struct state *new, struct state *old);
+
+struct number;
 
 bool
-state_assume(struct state *, struct ast_expr *cond);
+state_assume(struct state *, char *rconst, struct number *split);
 
 struct state *
 state_copy(struct state *);
@@ -109,6 +111,9 @@ state_declare(struct state *, struct ast_variable *var, bool isparam);
 struct object_res *
 state_getresult(struct state *);
 
+bool
+state_isparam(struct state *, char *id);
+
 struct object_res *
 state_getobject(struct state *, char *id);
 
@@ -133,14 +138,6 @@ state_alloc(struct state *, int size);
 struct error *
 state_dealloc(struct state *, struct location *);
 
-struct error *
-state_range_alloc(struct state *, struct object *,
-		struct ast_expr *lw, struct ast_expr *up);
-
-struct error *
-state_range_dealloc(struct state *, struct object *,
-		struct ast_expr *lw, struct ast_expr *up);
-
 bool
 state_islinear(struct state *);
 
@@ -156,15 +153,13 @@ state_lexememarker(struct state *);
 bool
 state_addresses_deallocand(struct state *, struct object *);
 
-bool
-state_range_aredeallocands(struct state *, struct object *,
-		struct ast_expr *lw, struct ast_expr *up);
+struct value *
+state_rconst(struct state *, struct ast_type *, struct ast_expr *range,
+		char *key, bool persist);
 
 struct value *
-state_vconst(struct state *, struct ast_type *, char *key, bool persist);
-
-struct value *
-state_vconstnokey(struct state *, struct ast_type *, bool persist);
+state_rconstnokey(struct state *, struct ast_type *, struct ast_expr *range,
+		bool persist);
 
 struct value *
 state_static_init(struct state *, struct ast_expr *);
@@ -179,7 +174,7 @@ bool
 state_isalloc(struct state *, struct value *);
 
 struct value *
-state_getvconst(struct state *, char *id);
+state_getrconst(struct state *, char *id);
 
 bool
 state_hasgarbage(struct state *);

@@ -963,11 +963,11 @@ sel_setupmodulate(struct ast_stmt *stmt, struct state *s)
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
-	struct decision dec = sel_decide(cond, s);
-	if (dec.err) {
-		return ast_stmt_res_error_create(dec.err);
+	struct bool_res *res = ast_expr_decide(cond, s);
+	if (bool_res_iserror(res)) {
+		return ast_stmt_res_error_create(bool_res_as_error(res));
 	}
-	if (dec.decision) {
+	if (bool_res_as_bool(res)) {
 		return ast_stmt_setupmodulate(body, s);
 	} else if (nest) {
 		return ast_stmt_setupmodulate(nest, s);

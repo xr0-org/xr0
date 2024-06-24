@@ -25,9 +25,6 @@ struct ast_type {
 			struct ast_variable_arr *members;
 		} structunion;
 		char *userdef;
-		struct {
-			struct ast_expr *lw, *up_nonincl;
-		} range;
 	};
 };
 
@@ -129,37 +126,47 @@ ast_type_create_userdef(char *name)
 }
 
 struct value *
-ast_type_vconst(struct ast_type *t, struct state *s, char *key, bool persist)
+ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
+		char *key, bool persist)
 {
 	switch (t->base) {
 	case TYPE_INT:
+		assert(range);
+		return value_int_rconst_create(range);
 	case TYPE_POINTER:
 		/* no key in the value except for structs */
-		return ast_type_vconstnokey(t, s, persist);
+		assert(range);
+		return ast_type_rconstnokey(t, s, range, persist);
 	case TYPE_USERDEF:
-		return ast_type_vconst(
-			externals_gettypedef(state_getext(s), t->userdef),
-			s, key, persist
+		return ast_type_rconst(
+			externals_gettypedef(state_getext(s), t->userdef), s,
+			range, key, persist
 		);
 	case TYPE_STRUCT:
+		/* XXX: struct has no range? */
 		return value_struct_rconst_create(t, s, key, persist);
+	case TYPE_RANGE:
+		assert(range);
+		return value_int_rconst_create(range);
 	default:
 		assert(false);
 	}
 }
 
 struct value *
-ast_type_vconstnokey(struct ast_type *t, struct state *s, bool persist)
+ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range,
+		bool persist)
 {
 	switch (t->base) {
 	case TYPE_INT:
-		return value_int_rconst_create();
+		assert(range);
+		return value_int_rconst_create(range);
 	case TYPE_POINTER:
 		return value_ptr_rconst_create(t->ptr_type);
 	case TYPE_USERDEF:
-		return ast_type_vconstnokey(
+		return ast_type_rconstnokey(
 			externals_gettypedef(state_getext(s), t->userdef),
-			s, persist
+			s, range, persist
 		);
 	case TYPE_STRUCT:
 		return value_struct_rconstnokey_create(t, s, persist);
@@ -180,7 +187,11 @@ ast_type_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
 	switch (t->base) {
 	case TYPE_INT:
 	case TYPE_POINTER:
-		return ast_expr_arbarg_create(namedseq_next(seq));
+		return ast_expr_range_create(
+			namedseq_next(seq),
+			ast_expr_rangemin_create(),
+			ast_expr_rangemax_create()
+		);
 	case TYPE_USERDEF:
 		/* TODO: cast to userdef */
 		return ast_type_rconstgeninstr(
@@ -323,30 +334,9 @@ ast_type_copy_struct(struct ast_type *old)
 }
 
 struct ast_type *
-ast_type_create_range(struct ast_expr *lw, struct ast_expr *up_nonincl)
+ast_type_create_range()
 {
-	struct ast_type *t = ast_type_create(TYPE_RANGE, 0);
-	t->range.lw = lw;
-	t->range.up_nonincl = up_nonincl;
-	return t;
-}
-
-static struct ast_expr *
-copyornull(struct ast_expr *);
-
-struct ast_type *
-ast_type_copy_range(struct ast_type *old)
-{	
-	assert(old->base == TYPE_RANGE);
-	return ast_type_create_range(
-		copyornull(old->range.lw), copyornull(old->range.up_nonincl)
-	);
-}
-
-static struct ast_expr *
-copyornull(struct ast_expr *e)
-{
-	return e ? ast_expr_copy(e) : NULL;
+	return ast_type_create(TYPE_RANGE, 0);
 }
 
 void
@@ -403,7 +393,7 @@ ast_type_copy(struct ast_type *t)
 		return ast_type_create(t->base, t->mod);
 
 	case TYPE_RANGE:
-		return ast_type_copy_range(t);
+		return ast_type_create_range();
 
 	default:
 		assert(false);

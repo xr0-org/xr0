@@ -37,15 +37,13 @@ fclose(FILE *stream);
 
 /* XXX: provisionally rigid for preconditions example */
 axiom char *
-sprintf(char *buf, char *format, int *arg) ~ [
-	*buf = $;
-];
+sprintf(char *buf, char *format, int *arg) ~ [ *buf = [?]; ];
 
 /* XXX: provisionally rigid for preconditions example */
 axiom int
 scanf(char *format, int *arg) ~ [
 	/* since there's a sideeffect here for arg, we need to characterise it */
-	*arg = $;
+	*arg = [?];
 ];
 
 #endif

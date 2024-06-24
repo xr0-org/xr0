@@ -3,8 +3,8 @@ struct tuple { int x; int y; };
 struct tuple
 tuple_create() ~ [
 	struct tuple t;
-	t.x = $;
-	t.y = $;
+	t.x = [?];
+	t.y = [?];
 	return t;
 ];
 

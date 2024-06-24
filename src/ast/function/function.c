@@ -315,7 +315,14 @@ inititalise_param(struct ast_variable *param, struct state *state)
 		//);
 	} else {
 		/* variables that aren't talked about by the preconditions */
-		struct value *val = state_vconst(state, t, dynamic_str(name), true);
+		struct ast_expr *r = ast_expr_range_create(
+			dynamic_str(name),
+			ast_expr_rangemin_create(),
+			ast_expr_rangemax_create()
+		);
+		struct value *val = state_rconst(
+			state, t, r, dynamic_str(name), true
+		);
 		object_assign(obj, val);
 	}
 	return NULL;

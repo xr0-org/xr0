@@ -1,7 +1,6 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
-struct range;
 struct value;
 struct object;
 
@@ -9,9 +8,6 @@ struct ast_expr;
 
 struct object *
 object_value_create(struct ast_expr *offset, struct value *);
-
-struct object *
-object_range_create(struct ast_expr *offset, struct range *);
 
 struct object *
 object_copy(struct object *old);
@@ -63,9 +59,6 @@ object_referencesheap(struct object *, struct state *, struct circuitbreaker *);
 bool
 object_hasvalue(struct object *);
 
-bool
-object_isvalue(struct object *);
-
 struct value *
 object_as_value(struct object *);
 
@@ -99,10 +92,6 @@ object_getmembertype(struct object *obj, struct ast_type *t, char *member,
 
 struct error *
 object_dealloc(struct object *, struct state *);
-
-
-struct range *
-range_create(struct ast_expr *size, struct location *loc);
 
 
 struct heap;

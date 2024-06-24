@@ -73,8 +73,8 @@ expr_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		b,
 		state
 	);
-	if (expr) {
-		ast_expr_destroy(expr);
+	if (expr) { /* XXX: ensure all cases return an expression */
+		ast_block_append_stmt(b, ast_stmt_create_expr(loc, expr));
 	}
 	return NULL;
 }
@@ -187,9 +187,16 @@ stmt_expr_verify(struct ast_stmt *stmt, struct state *state)
 {
 	struct ast_expr *expr = ast_stmt_as_expr(stmt);
 	if (!ast_expr_isverifiable(expr)) {
-		return error_printf("cannot verify complex expressions: `%s'", ast_expr_str(expr));
+		return error_printf(
+			"cannot verify complex expressions: `%s'",
+			ast_expr_str(expr)
+		);
 	}
-	if (ast_expr_decide(expr, state)) {
+	struct bool_res *res = ast_expr_decide(expr, state);
+	if (bool_res_iserror(res)) {
+		return bool_res_as_error(res);
+	}
+	if (bool_res_as_bool(res)) {
 		return NULL;
 	}
 	return error_printf("cannot verify statement");
@@ -316,11 +323,11 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
 
-	struct decision dec = sel_decide(cond, state);
-	if (dec.err) {
-		return dec.err;
+	struct bool_res *res = ast_expr_decide(cond, state);
+	if (bool_res_iserror(res)) {
+		return bool_res_as_error(res);
 	}
-	if (dec.decision) {
+	if (bool_res_as_bool(res)) {
 		return ast_stmt_exec(body, state);
 	} else if (nest) {
 		return ast_stmt_exec(nest, state);
@@ -562,11 +569,11 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
-	struct decision dec = sel_decide(cond, state);
-	if (dec.err) {
-		return dec.err;
+	struct bool_res *res = ast_expr_decide(cond, state);
+	if (bool_res_iserror(res)) {
+		return bool_res_as_error(res);
 	}
-	if (dec.decision) {
+	if (bool_res_as_bool(res)) {
 		return ast_stmt_absexec(body, state);
 	} else if (nest) {
 		return ast_stmt_absexec(nest, state);
@@ -574,54 +581,10 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 	return NULL;
 }
 
-struct decision
-sel_decide(struct ast_expr *control, struct state *state)
-{
-	struct e_res *res = ast_expr_eval(control, state);
-	if (e_res_iserror(res)) {
-		return (struct decision) { .err = e_res_as_error(res) };
-	}
-	assert(e_res_haseval(res)); /* TODO: user error */
-
-	struct value *v = value_res_as_value(
-		eval_to_value(e_res_as_eval(res), state)
-	);
-	struct bool_res *dec_res = value_decide(v, state);
-	if (bool_res_iserror(dec_res)) {
-		return (struct decision) { .err = bool_res_as_error(dec_res) };
-	}
-	return (struct decision) {
-		.decision	= bool_res_as_bool(dec_res),
-		.err		= NULL,
-	};
-}
-
-static struct ast_expr *
-hack_alloc_from_neteffect(struct ast_stmt *);
-
 static struct error *
 iter_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	struct error *err;
-
-	struct ast_expr *alloc = hack_alloc_from_neteffect(stmt),
-			*lw = ast_stmt_iter_lower_bound(stmt),
-			*up = ast_stmt_iter_upper_bound(stmt);
-
-	if ((err = ast_expr_alloc_rangeprocess(alloc, lw, up, state))) {
-		return err;
-	}
-	return NULL;
-}
-
-static struct ast_expr *
-hack_alloc_from_neteffect(struct ast_stmt *stmt)
-{
-	struct ast_stmt *body = ast_stmt_iter_body(stmt);
-	assert(ast_stmt_kind(body) == STMT_COMPOUND);
-	struct ast_block *block = ast_stmt_as_block(body);
-	assert(ast_block_nstmts(block) == 1 && !ast_stmt_isdecl(ast_block_stmts(block)[0]));
-	return ast_stmt_as_expr(ast_block_stmts(block)[0]);
+	assert(false);
 }
 
 static struct error *
@@ -726,11 +689,11 @@ sel_pushsetup(struct ast_stmt *stmt, struct state *state)
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
-	struct decision dec = sel_decide(cond, state);
-	if (dec.err) {
-		return dec.err;
+	struct bool_res *res = ast_expr_decide(cond, state);
+	if (bool_res_iserror(res)) {
+		return bool_res_as_error(res);
 	}
-	if (dec.decision) {
+	if (bool_res_as_bool(res)) {
 		return ast_stmt_pushsetup(body, state);
 	} else if (nest) {
 		return ast_stmt_pushsetup(nest, state);

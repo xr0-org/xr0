@@ -15,9 +15,9 @@ struct lexer *
 parse(char *input) ~ [
 	struct lexer *l;
 	l = lexer_create(
-		$, $,
-		$, malloc(1),
-		$, malloc(1)
+		[?], [?],
+		[?], malloc(1),
+		[?], malloc(1)
 	);
 	return l;
 ];
@@ -26,9 +26,9 @@ void
 lexer_destroy(struct lexer *l) ~ [
 	setup: {
 		l = lexer_create(
-			$, $,
-			$, malloc(1),
-			$, malloc(1)
+			[?], [?],
+			[?], malloc(1),
+			[?], malloc(1)
 		);
 	}
 	.free(l->pattern);
@@ -41,8 +41,8 @@ lexer_print(struct lexer *l) ~ [
 	setup: {
 		l = lexer_create(
 			.clump(1), .clump(1),
-			$, .malloc(1),
-			$, .malloc(1)
+			[?], .malloc(1),
+			[?], .malloc(1)
 		);
 	}
 ];
@@ -208,11 +208,11 @@ struct rulesresult {
 struct rulesresult
 parse_rules(char *pos) ~ [
 	struct rulesresult res;
-	res.token = $; /* TODO: put in else block */
+	res.token = [?]; /* TODO: put in else block */
 	if (count_tokens(pos)) {
 		res.token = .malloc(sizeof(struct token));
 	}
-	res.pos = $;
+	res.pos = [?];
 	return res;
 ];
 
@@ -331,11 +331,11 @@ struct stringresult
 parse_defsraw(char *input) ~ [
 	struct stringresult res;
 
-	res.s = $;
+	res.s = [?];
 	if (beginsdefs(input)) {
 		res.s = .malloc(1);
 	}
-	res.pos = $;
+	res.pos = [?];
 	return res;
 ];
 
@@ -348,12 +348,12 @@ struct patternet {
 struct patternet
 parse_defsproper(char *input) ~ [
 	struct patternet res;
-	res.pattern = $; /* TODO: put in else block */
+	res.pattern = [?]; /* TODO: put in else block */
 	if (count_patterns(input)) {
 		res.pattern = .malloc(1);
 	}
-	res.npat = $;
-	res.pos = $;
+	res.npat = [?];
+	res.pos = [?];
 	return res;
 ];
 
@@ -442,11 +442,11 @@ struct patternpos {
 struct patternpos
 parse_defs_n(char *pos, int npat) ~ [
 	struct patternpos res;
-	res.p = $; /* TODO: put in else block */
+	res.p = [?]; /* TODO: put in else block */
 	if (npat) {
 		res.p = .malloc(1);
 	}
-	res.pos = $;
+	res.pos = [?];
 	return res;
 ];
 
@@ -563,11 +563,11 @@ struct tokenpos {
 struct tokenpos
 parse_rules_n(char *pos, int ntok) ~ [
 	struct tokenpos tpos;
-	tpos.t = $; /* TODO: put in else block */
+	tpos.t = [?]; /* TODO: put in else block */
 	if (ntok) {
 		tpos.t = .malloc(1);
 	}
-	tpos.pos = $;
+	tpos.pos = [?];
 	return tpos;
 ];
 
@@ -592,8 +592,8 @@ struct tokenresult {
 struct tokenresult
 parse_token(char *pos) ~ [
 	struct tokenresult tres;
-	tres.tk = token_create($, malloc($), malloc($));
-	tres.pos = $;
+	tres.tk = token_create([?], malloc([?]), malloc([?]));
+	tres.pos = [?];
 	return tres;
 ];
 
@@ -646,8 +646,8 @@ struct tknameresult
 parse_name(char *pos) ~ [
 	struct tknameresult res;
 	res.name = .malloc(1);
-	res.isliteral = $;
-	res.pos = $;
+	res.isliteral = [?];
+	res.pos = [?];
 	return res;
 ];
 
@@ -655,7 +655,7 @@ struct stringresult
 parse_action(char *input) ~ [
 	struct stringresult res;
 	res.s = .malloc(1);
-	res.pos = $;
+	res.pos = [?];
 	return res;
 ];
 

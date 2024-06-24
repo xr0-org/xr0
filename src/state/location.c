@@ -24,7 +24,7 @@ struct location {
 };
 
 struct location *
-location_create_vconst(int block, struct offset *offset)
+location_create_rconst(int block, struct offset *offset)
 {
 	struct location *loc = malloc(sizeof(struct location));
 	assert(loc);
@@ -199,7 +199,7 @@ location_copy(struct location *loc)
 			loc->block, offset_copy(loc->offset)
 		);
 	case LOCATION_VCONST:
-		return location_create_vconst(
+		return location_create_rconst(
 			loc->block, offset_copy(loc->offset)
 		);
 	case LOCATION_DEREFERENCABLE:
@@ -331,7 +331,7 @@ block_res_or_empty(struct block *);
 
 struct block_res *
 location_getblock(struct location *loc, struct static_memory *sm,
-		struct vconst *v, struct stack *s, struct heap *h,
+		struct rconst *v, struct stack *s, struct heap *h,
 		struct clump *c)
 {
 	assert(s);
@@ -383,28 +383,6 @@ location_dealloc(struct location *loc, struct heap *heap)
 		return error_printf("not heap location");
 	}
 	return heap_deallocblock(heap, loc->block);
-}
-
-struct error *
-location_range_dealloc(struct location *loc, struct ast_expr *lw,
-		struct ast_expr *up, struct state *state)
-{
-	/* TODO: adjust lw, up by loc->offset for nonzero cases */
-	assert(offset_zero(loc->offset));
-
-	struct block *b = state_getblock(state, loc);
-	if (!b) {
-		return error_printf("cannot get block");
-	}
-
-	if (!block_range_aredeallocands(b, lw, up, state)) {
-		printf("block: %s\n", block_str(b));
-		printf("lw: %s, up: %s\n", ast_expr_str(lw), ast_expr_str(up));
-		assert(false);
-		return error_printf("some values not allocated");
-	}
-
-	return block_range_dealloc(b, lw, up, state);
 }
 
 DEFINE_RESULT_TYPE(struct location *, loc, location_destroy, loc_res, false)

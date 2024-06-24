@@ -3,7 +3,7 @@ snapshot_and_change(int *arg) ~ [
 	int j;
 	setup: {
 		arg = .clump(sizeof(int));
-		*arg = $;
+		*arg = [?];
 	}
 	j = *arg;
 	*arg = 3;
@@ -20,7 +20,7 @@ modify(int *p, int *q) ~ [
 	int i;
 	setup: {
 		p = .clump(sizeof(int));
-		*p = $;
+		*p = [?];
 		q = .clump(sizeof(int));
 	};
 	*q = 2;

@@ -184,6 +184,7 @@ variable_array_create(struct ast_variable *v)
 %type <expr> exclusive_or_expression and_expression equality_expression
 %type <expr> relational_expression shift_expression additive_expression
 %type <expr> multiplicative_expression cast_expression
+%type <expr> range_expression range_operand
 %type <expr> allocation_expression isdeallocand_expression constant_expression
 %type <expr> declarator init_declarator initializer
 %type <expr> direct_declarator
@@ -221,8 +222,6 @@ start
 primary_expression
 	: identifier
 		{ $$ = ast_expr_identifier_create($1); }
-	| ARB_ARG
-		{ $$ = ast_expr_arbarg_create(getrconstkey()); }
 	| CONSTANT
 		{ $$ = ast_expr_constant_create(parse_int(yytext)); } /* XXX */
 	| CHAR_LITERAL
@@ -310,11 +309,27 @@ cast_expression
 	/*| '(' type_name ')' cast_expression*/
 	;
 
-multiplicative_expression
+range_expression
 	: cast_expression
-	| multiplicative_expression '*' cast_expression
-	| multiplicative_expression '/' cast_expression
-	/*| multiplicative_expression '%' cast_expression*/
+	| '[' range_operand '?' range_operand ']' {
+		$$ = ast_expr_range_create(
+			getrconstkey(),
+			$2 ? $2 : ast_expr_rangemin_create(),
+			$4 ? $4 : ast_expr_rangemax_create()
+		);
+	}
+	;
+
+range_operand
+	: cast_expression
+	| /* empty */		{ $$ = NULL; }
+	;
+
+multiplicative_expression
+	: range_expression
+	| multiplicative_expression '*' range_expression
+	| multiplicative_expression '/' range_expression
+	| multiplicative_expression '%' range_expression
 	;
 
 additive_expression
@@ -382,7 +397,7 @@ logical_or_expression
 
 conditional_expression
 	: logical_or_expression
-	/*| logical_or_expression '?' expression ':' conditional_expression*/
+	| logical_or_expression '?' expression ':' conditional_expression
 	;
 
 assignment_expression

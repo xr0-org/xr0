@@ -28,8 +28,9 @@ struct ast_expr {
 		EXPR_ASSIGNMENT		= 1 << 10,
 
 		EXPR_ISDEALLOCAND	= 1 << 11,
-		EXPR_ARBARG		= 1 << 12,
-		EXPR_ALLOCATION		= 1 << 13,
+		EXPR_RANGE		= 1 << 12,
+		EXPR_RANGEBOUND		= 1 << 13,
+		EXPR_ALLOCATION		= 1 << 14,
 	} kind;
 	struct ast_expr *root;
 	union {
@@ -71,10 +72,14 @@ struct ast_expr {
 		} binary;
 		struct ast_expr *assignment_value;
 		struct {
+			char *key;
+			struct ast_expr *lw, *up;
+		} range;
+		bool ismax;
+		struct {
 			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
 		} alloc;
-		char *arbarg_key;
 	} u;
 };
 

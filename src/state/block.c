@@ -99,17 +99,35 @@ struct object_res *
 block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		bool constructive)
 {
-	struct intresult *offseteval = ast_expr_consteval(offset);
-	if (!intresult_iserror(offseteval)) {
-		int of = intresult_as_int(offseteval);
-		if (of < 0 || of >= b->size) {
-			return object_res_error_create(
-				error_printf("out of bounds")
-			);
-		}
-		offset = ast_expr_constant_create(of);
+	struct tagval_res *res = ast_expr_rangeeval(offset, s);
+	if (tagval_res_iserror(res)) {
+		return object_res_error_create(tagval_res_as_error(res));
 	}
-	intresult_destroy(offseteval);
+	struct tagval *tv = tagval_res_as_tagval(res);
+
+	struct value *range = tagval_value(tv);
+	int lw = value_int_lw(range),
+	    up = value_int_up(range);
+	if (lw < 0 || b->size < up) {
+		return object_res_error_create(
+			error_printf("out of bounds")
+		);
+	}
+
+	if (!value_isconstant(range)) {
+		assert(tagval_hastag(tv));
+		struct number_arr *splits = number_arr_create();
+		for (int i = lw; i < up; i++) {
+			number_arr_append(splits, number_single_create(i));
+		}
+		return object_res_error_create(
+			error_undecideable_cond(
+				splitinstruct_create(tagval_tag(tv), splits)
+			)
+		);
+	}
+
+	offset = ast_expr_constant_create(value_as_constant(range));
 
 	int index = object_arr_index(b->arr, offset, s);
 	if (index == -1) {
@@ -125,44 +143,7 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		return object_res_object_create(obj);
 	}
 
-	struct object *obj = object_arr_objects(b->arr)[index];
-
-	if (object_isvalue(obj)) {
-		return object_res_object_create(obj);
-	}
-
-	/* range around observand at offset */
-	struct ast_expr *lw = ast_expr_copy(offset);
-	struct ast_expr *up = ast_expr_sum_create(
-		ast_expr_copy(offset),
-		ast_expr_constant_create(1)
-	);
- 
-	/* ordering makes them sequential in heap */
-	struct object *upto = object_upto(obj, lw, s);
-	struct object *observed = object_value_create(
-		ast_expr_copy(lw),
-		value_ptr_create(state_alloc(s, 1))
-	);
-	struct object *from = object_from(obj, up, s);
-
-	ast_expr_destroy(up);
-	ast_expr_destroy(lw);
-
-	/* delete current struct block */
-	struct error *err = object_dealloc(obj, s);
-	assert(!err);
-	object_arr_remove(b->arr, index);
-
-	if (upto) {
-		object_arr_insert(b->arr, index++, upto);
-	}
-	object_arr_insert(b->arr, index++, observed);
-	if (from) {
-		object_arr_insert(b->arr, index, from);
-	}
-
-	return object_res_object_create(observed);
+	return object_res_object_create(object_arr_objects(b->arr)[index]);
 }
 
 bool
@@ -183,144 +164,6 @@ bool
 block_iscaller(struct block *b)
 {
 	return b->caller;
-}
-
-struct error *
-block_range_alloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
-		struct heap *heap)
-{
-	/* XXX: confirm is single object that has never been assigned to  */
-	assert(object_arr_nobjects(b->arr) == 0);
-
-	object_arr_append(
-		b->arr,
-		object_range_create(
-			ast_expr_copy(lw),
-			range_create(
-				ast_expr_difference_create(
-					ast_expr_copy(up),
-					ast_expr_copy(lw)
-				),
-				b->caller
-					? heap_newcallerblock(heap, 1)
-					: heap_newblock(heap, 1)
-			)
-		)
-	);
-
-	return NULL;
-}
-
-static bool
-hack_first_object_is_exactly_bounds(struct block *b, struct ast_expr *lw,
-		struct ast_expr *up, struct state *s);
-
-bool
-block_range_aredeallocands(struct block *b, struct ast_expr *lw, struct ast_expr *up,
-		struct state *s)
-{
-	if (hack_first_object_is_exactly_bounds(b, lw, up, s)) {
-		return true;
-	}
-
-	int lw_index = object_arr_index(b->arr, lw, s);
-	if (lw_index == -1) {
-		return false;
-	}
-
-	int up_index = object_arr_index_upperincl(b->arr, up, s);
-	if (up_index == -1) {
-		return false;
-	}
-	
-	struct object **obj = object_arr_objects(b->arr);
-	for (int i = lw_index; i < up_index; i++) {
-		if (!object_isdeallocand(obj[i], s)) {
-			return false;
-		}
-		if (!object_contig_precedes(obj[i], obj[i+1], s)) {
-			return false;
-		}
-	}
-	/* XXX: do we need to check above that obj[i+1] is a deallocand? */
-	assert(object_isdeallocand(obj[up_index], s));
-	return true;
-}
-
-static bool
-hack_first_object_is_exactly_bounds(struct block *b, struct ast_expr *lw,
-		struct ast_expr *up, struct state *s)
-{
-	if (object_arr_nobjects(b->arr) == 0) {
-		return false;
-	}
-
-	struct object *obj = object_arr_objects(b->arr)[0];
-
-	if (!object_isdeallocand(obj, s)) {
-		return false;
-	}
-
-	struct ast_expr *same_lw = ast_expr_eq_create(lw, object_lower(obj)),
-			*same_up = ast_expr_eq_create(up, object_upper(obj));
-
-	return state_eval(s, same_lw) && state_eval(s, same_up);
-}
-
-struct error *
-block_range_dealloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
-		struct state *s)
-{
-	if (hack_first_object_is_exactly_bounds(b, lw, up, s)) {
-		struct error *err = object_dealloc(object_arr_objects(b->arr)[0], s);
-		if (err) {
-			return err;
-		}
-		object_arr_remove(b->arr, 0);
-		return NULL;
-	}
-
-	int lw_index = object_arr_index(b->arr, lw, s);
-	if (lw_index == -1) {
-		return error_printf("lower bound not allocated");
-	}
-
-	int up_index = object_arr_index_upperincl(b->arr, up, s);
-	if (up_index == -1) {
-		return error_printf("upper bound not allocated");
-	}
-
-	int n = object_arr_nobjects(b->arr);
-	struct object **obj = object_arr_objects(b->arr);
-
-	struct object *upto = object_upto(obj[lw_index], lw, s),
-		      *from = object_from(obj[up_index], up, s);
-
-	struct object_arr *new = object_arr_create();
-
-	for (int i = 0; i < lw_index; i++) {
-		object_arr_append(new, obj[i]);
-	}
-	if (upto) {
-		object_arr_append(b->arr, upto);
-	}
-	if (from) {
-		object_arr_append(b->arr, from);
-	}
-	for (int i = up_index+1; i < n; i++) {
-		object_arr_append(new, obj[i]);
-	}
-
-	for (int i = lw_index; i <= up_index; i++) {
-		struct error *err = object_dealloc(obj[i], s);
-		if (err) {
-			return err;
-		}
-	}
-
-	b->arr = new;
-
-	return NULL;
 }
 
 void

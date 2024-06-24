@@ -391,7 +391,7 @@ struct error {
 	} type;
 	union error_contents {
 		char *printf;
-		struct ast_expr *undecidable_cond;
+		struct splitinstruct *split;
 	} contents;
 	struct error *inner;
 };
@@ -482,13 +482,11 @@ findnextfmt(char **p)
 }
 
 struct error *
-error_undecideable_cond(struct ast_expr *cond)
+error_undecideable_cond(struct splitinstruct *split)
 {
-	assert(cond);
-
 	struct error *err = calloc(1, sizeof(struct error));
 	err->type = ERROR_UNDECIDEABLE_COND;
-	err->contents.undecidable_cond = cond;
+	err->contents.split = split;
 	return err;
 }
 
@@ -498,11 +496,11 @@ error_to_undecideable_cond(struct error *err)
 	return error_to(err, ERROR_UNDECIDEABLE_COND);
 }
 
-struct ast_expr *
-error_get_undecideable_cond(struct error *err)
+struct splitinstruct *
+error_get_splitinstruct(struct error *err)
 {
 	assert(err->type == ERROR_UNDECIDEABLE_COND);
-	return err->contents.undecidable_cond;
+	return err->contents.split;
 }
 
 struct error *

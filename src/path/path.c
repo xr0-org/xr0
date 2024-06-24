@@ -291,7 +291,7 @@ path_init_abstract(struct path *p)
 }
 
 static void
-path_split(struct path *p, struct ast_expr *cond);
+path_split(struct path *p, struct splitinstruct *);
 
 static struct error *
 path_step_abstract(struct path *p)
@@ -307,20 +307,25 @@ path_step_abstract(struct path *p)
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
 	if (uc_err) {
-		path_split(p, error_get_undecideable_cond(uc_err));
+		path_split(p, error_get_splitinstruct(uc_err));
 		return NULL;
 	}
 	return state_stacktrace(p->abstract, err);
 }
 
 static struct path *
-path_copywithcond(struct path *old, struct ast_expr *cond);
+path_copywithcond(struct path *old, char *rconst, struct number *);
 
 static void
-path_split(struct path *p, struct ast_expr *cond)
+path_split(struct path *p, struct splitinstruct *inst)
 {
-	path_arr_append(p->paths, path_copywithcond(p, cond));
-	path_arr_append(p->paths, path_copywithcond(p, ast_expr_inverted_copy(cond, true)));
+	char *rconst = splitinstruct_rconst(inst);
+	struct number_arr *splits = splitinstruct_splits(inst);
+	int n = number_arr_len(splits);
+	struct number **split = number_arr_num(splits);
+	for (int i = 0; i < n; i++) {
+		path_arr_append(p->paths, path_copywithcond(p, rconst, split[i]));
+	}
 	/* TODO: destroy abstract and actual */
 	p->abstract = NULL;
 	p->actual = NULL;
@@ -328,19 +333,21 @@ path_split(struct path *p, struct ast_expr *cond)
 }
 
 static struct ast_function *
-copy_withcondname(struct ast_function *, struct ast_expr *cond); 
+copy_withcondname(struct ast_function *, char *rconst, struct number *split); 
 
 static struct path *
-path_copywithcond(struct path *old, struct ast_expr *cond)
+path_copywithcond(struct path *old, char *rconst, struct number *split)
 {
-	struct path *p = path_create(copy_withcondname(old->f, cond), old->ext);
+	struct path *p = path_create(
+		copy_withcondname(old->f, rconst, split), old->ext
+	);
 	char *fname = ast_function_name(p->f);
 	p->path_state = old->path_state;
 	switch (old->path_state) {
 	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
 		p->abstract = state_copywithname(old->abstract, fname);
-		if (!state_assume(p->abstract, cond)) {
+		if (!state_assume(p->abstract, rconst, split)) {
 			p->path_state = PATH_STATE_ATEND;
 		}
 		break;
@@ -348,10 +355,10 @@ path_copywithcond(struct path *old, struct ast_expr *cond)
 	case PATH_STATE_ACTUAL:
 		p->abstract = state_copywithname(old->abstract, fname);
 		p->actual = state_copywithname(old->actual, fname);
-		if (!state_assume(p->actual, cond)) {
+		if (!state_assume(p->actual, rconst, split)) {
 			p->path_state = PATH_STATE_ATEND;
 		}
-		state_assume(p->abstract, cond);
+		state_assume(p->abstract, rconst, split);
 		break;
 	default:
 		assert(false);
@@ -360,23 +367,23 @@ path_copywithcond(struct path *old, struct ast_expr *cond)
 }
 
 static char *
-split_name(char *name, struct ast_expr *cond);
+split_name(char *name, char *rconst, struct number *split);
 
 static struct ast_function *
-copy_withcondname(struct ast_function *old, struct ast_expr *cond)
+copy_withcondname(struct ast_function *old, char *rconst, struct number *split)
 {
 	struct ast_function *f = ast_function_copy(old);
-	ast_function_setname(f, split_name(ast_function_name(f), cond));
+	ast_function_setname(f, split_name(ast_function_name(f), rconst, split));
 	return f;
 }
 
 static char *
-split_name(char *name, struct ast_expr *assumption)
+split_name(char *name, char *rconst, struct number *split)
 {
 	struct strbuilder *b = strbuilder_create();
-	char *assumption_str = ast_expr_str(assumption);
-	strbuilder_printf(b, "%s | %s", name, assumption_str);
-	free(assumption_str);
+	char *split_str = number_str(split);
+	strbuilder_printf(b, "%s | %s ∈ %s", name, rconst, split_str);
+	free(split_str);
 	return strbuilder_build(b);
 }
 
@@ -394,7 +401,7 @@ path_step_setupabstract(struct path *p)
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
 	if (uc_err) {
-		path_split(p, error_get_undecideable_cond(uc_err));
+		path_split(p, error_get_splitinstruct(uc_err));
 		return NULL;
 	}
 	return state_stacktrace(p->abstract, err);
@@ -418,7 +425,7 @@ path_init_actual(struct path *p)
 	if ((err = ast_function_initparams(p->f, p->actual))) {
 		return err;
 	}
-	state_setvconsts(p->actual, p->abstract);
+	state_setrconsts(p->actual, p->abstract);
 	struct frame *setupframe = frame_setup_create(
 		"setup",
 		ast_function_abstract(p->f),
@@ -443,7 +450,7 @@ path_step_actual(struct path *p)
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
 	if (uc_err) {
-		path_split(p, error_get_undecideable_cond(uc_err));
+		path_split(p, error_get_splitinstruct(uc_err));
 		return NULL;
 	}
 	return state_stacktrace(p->actual, err);
@@ -463,7 +470,7 @@ path_step_setupactual(struct path *p)
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
 	if (uc_err) {
-		path_split(p, error_get_undecideable_cond(uc_err));
+		path_split(p, error_get_splitinstruct(uc_err));
 		return NULL;
 	}
 	return state_stacktrace(p->actual, err);
@@ -575,7 +582,7 @@ path_next_abstract(struct path *p)
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
 	if (uc_err) {
-		path_split(p, error_get_undecideable_cond(uc_err));
+		path_split(p, error_get_splitinstruct(uc_err));
 		return NULL;
 	}
 	return state_stacktrace(p->abstract, err);
@@ -594,7 +601,7 @@ path_next_actual(struct path *p)
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
 	if (uc_err) {
-		path_split(p, error_get_undecideable_cond(uc_err));
+		path_split(p, error_get_splitinstruct(uc_err));
 		return NULL;
 	}
 	return state_stacktrace(p->actual, err);
@@ -613,7 +620,7 @@ path_next_setupabstract(struct path *p)
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
 	if (uc_err) {
-		path_split(p, error_get_undecideable_cond(uc_err));
+		path_split(p, error_get_splitinstruct(uc_err));
 		return NULL;
 	}
 	return state_stacktrace(p->abstract, err);
@@ -633,7 +640,7 @@ path_next_setupactual(struct path *p)
 	}
 	struct error *uc_err = error_to_undecideable_cond(err);
 	if (uc_err) {
-		path_split(p, error_get_undecideable_cond(uc_err));
+		path_split(p, error_get_splitinstruct(uc_err));
 		return NULL;
 	}
 	return state_stacktrace(p->actual, err);

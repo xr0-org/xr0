@@ -623,7 +623,7 @@ variable_abstractcopy(struct variable *old, struct state *s)
 	struct object_res *res = state_get(s, new->loc, false);
 	struct object *obj = object_res_as_object(res);
 	assert(obj);
-	if (object_isvalue(obj)) {
+	if (object_hasvalue(obj)) {
 		struct value *v = object_as_value(obj);
 		if (v) {
 			object_assign(obj, value_abstractcopy(v, s));

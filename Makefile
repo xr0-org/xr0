@@ -1,6 +1,6 @@
 # commands
-CC = gcc -g -Werror -Wreturn-type -std=gnu11
-CFLAGS = -I include -Wall
+CC = gcc -I include -g
+CFLAGS = -std=gnu11 -Werror -Wreturn-type -Wall
 VALGRIND = valgrind --fullpath-after=`pwd`/src/
 LEX = lex
 YACC = bison -yvd
@@ -210,13 +210,16 @@ $(GRAM_TAB_C) $(GRAM_TAB_H): $(AST_DIR)/gram.y $(BUILD_DIR)
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
 
-$(BUILD_DIR):
+$(BUILD_DIR): tags
 	@mkdir -p $(BUILD_DIR)
 
 # tests
 TESTDIR = tests
 RUNTEST = $(TESTDIR)/run
 TESTFILES = $(shell find $(TESTDIR) -name '*.0')
+
+tags:
+	@ctags -R .
 
 test: $(RUNTEST) $(TESTFILES) $(XR0V) 
 	@./tests/run

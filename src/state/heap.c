@@ -253,16 +253,16 @@ block_referenced(struct state *s, int addr)
 
 /* TODO: extract to own file */
 
-struct vconst {
+struct rconst {
 	struct map *varmap;
 	struct map *keymap;
 	struct map *persist;
 };
 
-struct vconst *
-vconst_create()
+struct rconst *
+rconst_create()
 {
-	struct vconst *v = malloc(sizeof(struct vconst));
+	struct rconst *v = malloc(sizeof(struct rconst));
 	v->varmap = map_create();
 	v->keymap = map_create();
 	v->persist = map_create();
@@ -270,7 +270,7 @@ vconst_create()
 }
 
 void
-vconst_destroy(struct vconst *v)
+rconst_destroy(struct rconst *v)
 {
 	struct map *m = v->varmap;
 	for (int i = 0; i < m->n; i++) {
@@ -282,10 +282,10 @@ vconst_destroy(struct vconst *v)
 	free(v);
 }
 
-struct vconst *
-vconst_copy(struct vconst *old)
+struct rconst *
+rconst_copy(struct rconst *old)
 {
-	struct vconst *new = vconst_create();
+	struct rconst *new = rconst_create();
 	struct map *m = old->varmap;
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
@@ -318,13 +318,13 @@ vconst_copy(struct vconst *old)
 }
 
 static char *
-vconst_id(struct map *varmap, struct map *persistmap, bool persist);
+rconst_id(struct map *varmap, struct map *persistmap, bool persist);
 
 char *
-vconst_declarenokey(struct vconst *v, struct value *val, bool persist)
+rconst_declarenokey(struct rconst *v, struct value *val, bool persist)
 {
 	struct map *m = v->varmap;
-	char *s = vconst_id(m, v->persist, persist);
+	char *s = rconst_id(m, v->persist, persist);
 	map_set(m, dynamic_str(s), val);
 	map_set(v->persist, dynamic_str(s), (void *) persist);
 	return s;
@@ -334,7 +334,7 @@ static int
 count_true(struct map *m);
 
 static char *
-vconst_id(struct map *varmap, struct map *persistmap, bool persist)
+rconst_id(struct map *varmap, struct map *persistmap, bool persist)
 {
 	int npersist = count_true(persistmap),
 	    nnonpersist = varmap->n - npersist;
@@ -360,22 +360,22 @@ count_true(struct map *m)
 }
 
 char *
-vconst_declare(struct vconst *v, struct value *val, char *key, bool persist)
+rconst_declare(struct rconst *v, struct value *val, char *key, bool persist)
 {
-	char *s = vconst_declarenokey(v, val, persist);
+	char *s = rconst_declarenokey(v, val, persist);
 	assert(key);
 	map_set(v->keymap, dynamic_str(s), dynamic_str(key));
 	return s;
 }
 
 struct value *
-vconst_get(struct vconst *v, char *id)
+rconst_get(struct rconst *v, char *id)
 {
 	return map_get(v->varmap, id);
 }
 
 char *
-vconst_getidbykey(struct vconst *v, char *key)
+rconst_getidbykey(struct rconst *v, char *key)
 {
 	/* XXX */
 	struct map *m = v->keymap;
@@ -391,7 +391,7 @@ vconst_getidbykey(struct vconst *v, char *key)
 }
 
 void
-vconst_undeclare(struct vconst *v)
+rconst_undeclare(struct rconst *v)
 {
 	struct map *varmap = map_create(),
 		   *keymap = map_create(),
@@ -418,7 +418,7 @@ vconst_undeclare(struct vconst *v)
 }
 
 char *
-vconst_str(struct vconst *v, char *indent)
+rconst_str(struct rconst *v, char *indent)
 {
 	struct strbuilder *b = strbuilder_create();
 	struct map *m = v->varmap;
@@ -437,7 +437,7 @@ vconst_str(struct vconst *v, char *indent)
 }
 
 bool
-vconst_eval(struct vconst *v, struct ast_expr *e)
+rconst_eval(struct rconst *v, struct ast_expr *e)
 {
 	return ast_expr_matheval(e);
 }

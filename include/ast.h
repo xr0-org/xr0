@@ -163,10 +163,28 @@ bool
 ast_expr_isverifiable(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_arbarg_create(char *key);
+ast_expr_range_create(char *key, struct ast_expr *lw, struct ast_expr *up);
 
 char *
-ast_expr_arbarg_key(struct ast_expr *);
+ast_expr_range_key(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_range_lw(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_range_up(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_rangemin_create();
+
+struct ast_expr *
+ast_expr_rangemax_create();
+
+bool
+ast_expr_israngemin(struct ast_expr *);
+
+bool
+ast_expr_israngemax(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_alloc_create(struct ast_expr *);
@@ -188,10 +206,6 @@ ast_expr_alloc_kind_create(struct ast_expr *arg, enum ast_alloc_kind);
 
 struct state;
 
-struct error *
-ast_expr_alloc_rangeprocess(struct ast_expr *expr, struct ast_expr *lw,
-	struct ast_expr *up, struct state *);
-
 void
 ast_expr_destroy(struct ast_expr *);
 
@@ -209,17 +223,30 @@ struct math_state;
 bool
 ast_expr_matheval(struct ast_expr *e);
 
-DECLARE_RESULT_TYPE(int, int, intresult)
 
-struct intresult *
-ast_expr_consteval(struct ast_expr *);
+struct tagval;
 
 bool
+tagval_hastag(struct tagval *);
+
+char *
+tagval_tag(struct tagval *);
+
+struct value *
+tagval_value(struct tagval *);
+
+void
+tagval_destroy(struct tagval *);
+
+DECLARE_RESULT_TYPE(struct tagval *, tagval, tagval_res)
+
+struct tagval_res *
+ast_expr_rangeeval(struct ast_expr *, struct state *);
+
+struct bool_res;
+
+struct bool_res *
 ast_expr_decide(struct ast_expr *, struct state *);
-
-bool
-ast_expr_rangedecide(struct ast_expr *, struct ast_expr *lw,
-		struct ast_expr *up, struct state *);
 
 struct error *
 ast_expr_exec(struct ast_expr *, struct state *);
@@ -232,9 +259,6 @@ preresult_iserror(struct preresult *);
 
 bool
 preresult_iscontradiction(struct preresult *);
-
-struct preresult *
-ast_expr_assume(struct ast_expr *, struct state *);
 
 void
 ast_expr_varinfomap(struct map *, struct ast_expr *, struct state *s);
@@ -566,15 +590,17 @@ bool
 ast_type_isvoid(struct ast_type *);
 
 struct ast_type *
-ast_type_create_range(struct ast_expr *lw, struct ast_expr *up_nonincl);
+ast_type_create_range();
 
 struct externals;
 
 struct value *
-ast_type_vconst(struct ast_type *, struct state *s, char *key, bool persist);
+ast_type_rconst(struct ast_type *, struct state *s, struct ast_expr *range,
+	char *key, bool persist);
 
 struct value *
-ast_type_vconstnokey(struct ast_type *, struct state *s, bool persist);
+ast_type_rconstnokey(struct ast_type *, struct state *s, struct ast_expr *range,
+	bool persist);
 
 void
 ast_type_destroy(struct ast_type *);

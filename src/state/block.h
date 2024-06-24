@@ -44,19 +44,7 @@ block_references(struct block *, struct location *, struct state *,
 bool
 block_iscaller(struct block *);
 
-struct error *
-block_range_alloc(struct block *b, struct ast_expr *lw, struct ast_expr *up,
-		struct heap *heap);
-
 struct state;
-
-bool
-block_range_aredeallocands(struct block *, struct ast_expr *lw, struct ast_expr *up,
-		struct state *);
-
-struct error *
-block_range_dealloc(struct block *, struct ast_expr *lw, struct ast_expr *up,
-		struct state *);
 
 void
 block_undeclare(struct block *, struct state *);

@@ -34,10 +34,6 @@ struct error;
 
 struct state;
 
-/* TODO: change to more regular tuple */
-struct decision { bool decision; struct error *err; }
-sel_decide(struct ast_expr *control, struct state *state);
-
 struct error *
 ast_stmt_precondsinit(struct ast_stmt *, struct state *);
 

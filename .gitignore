@@ -9,3 +9,4 @@ a.out
 *.tab.[ch]
 *.output
 *-preproc.[c0]
+tags
