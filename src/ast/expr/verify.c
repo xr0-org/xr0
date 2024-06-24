@@ -324,7 +324,7 @@ static struct e_res *
 expr_binary_eval(struct ast_expr *expr, struct state *state);
 
 static struct e_res *
-arbarg_eval(struct ast_expr *expr, struct state *state);
+range_eval(struct ast_expr *expr, struct state *state);
 
 struct e_res *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
@@ -348,8 +348,8 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 		return expr_incdec_eval(expr, state);
 	case EXPR_BINARY:
 		return expr_binary_eval(expr, state);
-	case EXPR_ARBARG:
-		return arbarg_eval(expr, state);
+	case EXPR_RANGE:
+		return range_eval(expr, state);
 	case EXPR_BRACKETED:
 		return ast_expr_eval(ast_expr_bracketed_root(expr), state);
 	default:
@@ -1063,7 +1063,7 @@ value_binary_eval(struct eval *rv1, enum ast_binary_operator op,
 }
 
 static struct e_res *
-arbarg_eval(struct ast_expr *expr, struct state *state)
+range_eval(struct ast_expr *expr, struct state *state)
 {
 	return e_res_eval_create(
 		eval_rval_create(
@@ -1108,7 +1108,7 @@ ast_expr_abseval(struct ast_expr *expr, struct state *state)
 	case EXPR_CONSTANT:
 	case EXPR_UNARY:
 	case EXPR_STRUCTMEMBER:
-	case EXPR_ARBARG:
+	case EXPR_RANGE:
 		return ast_expr_eval(expr, state);	
 	default:
 		assert(false);
@@ -1626,6 +1626,10 @@ want:
  */
 
 static struct ast_expr *
+range_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+static struct ast_expr *
 unary_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
 		struct state *);
 
@@ -1666,8 +1670,10 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	case EXPR_ISDEALLOCAND:
 	case EXPR_IDENTIFIER:
 	case EXPR_STRING_LITERAL:
-	case EXPR_ARBARG:
+	case EXPR_RANGEBOUND:
 		return expr;
+	case EXPR_RANGE:
+		return range_geninstr(expr, loc, b, s);
 	case EXPR_UNARY:
 		return unary_geninstr(expr, loc, b, s);	
 	case EXPR_BINARY:
@@ -1687,6 +1693,19 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	default:
 		assert(false);
 	}
+}
+
+static struct ast_expr *
+range_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+		struct state *s)
+{
+	struct ast_expr *gen_lw = ast_expr_geninstr(
+		ast_expr_range_lw(expr), loc, b, s
+	);
+	struct ast_expr *gen_up = ast_expr_geninstr(
+		ast_expr_range_lw(expr), loc, b, s
+	);
+	return ast_expr_range_create(gen_lw, gen_up);
 }
 
 static struct ast_expr *

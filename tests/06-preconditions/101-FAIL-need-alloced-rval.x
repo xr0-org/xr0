@@ -4,7 +4,7 @@ int
 func(int *x) ~ [ 
 	setup: {
 		x = .malloc(1);
-		*x = $;
+		*x = [?];
 	}
 	return *x;
 ]{

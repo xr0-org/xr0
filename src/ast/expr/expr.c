@@ -649,11 +649,55 @@ ast_expr_isdereferencable_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
-ast_expr_arbarg_create()
+ast_expr_range_create(struct ast_expr *lw, struct ast_expr *up)
+{
+	assert(lw && up);
+
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_RANGE;
+	expr->u.range.lw = lw;
+	expr->u.range.up = up;
+	return expr;
+}
+
+static void
+ast_expr_range_str_build(struct ast_expr *expr, struct strbuilder *b)
+{
+	char *lw = ast_expr_str(expr->u.range.lw),
+	     *up = ast_expr_str(expr->u.range.up);
+	strbuilder_printf(b, "[%s?%s]", lw, up);
+	free(up);
+	free(lw);
+}
+
+struct ast_expr *
+ast_expr_rangemin_create()
 {
 	struct ast_expr *expr = ast_expr_create();
-	expr->kind = EXPR_ARBARG;
+	expr->kind = EXPR_RANGEBOUND;
+	expr->u.ismax = false;
 	return expr;
+}
+
+struct ast_expr *
+ast_expr_rangemax_create()
+{
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_RANGEBOUND;
+	expr->u.ismax = true;
+	return expr;
+}
+
+struct ast_expr *
+ast_expr_range_lw(struct ast_expr *e)
+{
+	return e->u.range.lw;
+}
+
+struct ast_expr *
+ast_expr_range_up(struct ast_expr *e)
+{
+	return e->u.range.up;
 }
 
 struct ast_expr *
@@ -793,7 +837,15 @@ ast_expr_destroy(struct ast_expr *expr)
 	case EXPR_ISDEREFERENCABLE:
 		ast_expr_destroy(expr->root);
 		break;
-	case EXPR_ARBARG:
+	case EXPR_RANGE:
+		if (expr->u.range.lw) {
+			ast_expr_destroy(expr->u.range.lw);
+		}
+		if (expr->u.range.up) {
+			ast_expr_destroy(expr->u.range.up);
+		}
+		break;
+	case EXPR_RANGEBOUND:
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_destroy(expr->u.alloc.arg);
@@ -845,8 +897,11 @@ ast_expr_str(struct ast_expr *expr)
 	case EXPR_ISDEREFERENCABLE:
 		ast_expr_isdereferencable_str_build(expr, b);
 		break;
-	case EXPR_ARBARG:
-		strbuilder_putc(b, '$');
+	case EXPR_RANGE:
+		ast_expr_range_str_build(expr, b);
+		break;
+	case EXPR_RANGEBOUND:
+		strbuilder_printf(b, expr->u.ismax ? "MAX" : "MIN");
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_alloc_str_build(expr, b);
@@ -908,8 +963,15 @@ ast_expr_copy(struct ast_expr *expr)
 		return ast_expr_isdereferencable_create(
 			ast_expr_copy(expr->root)
 		);
-	case EXPR_ARBARG:
-		return ast_expr_arbarg_create();
+	case EXPR_RANGE:
+		return ast_expr_range_create(
+			ast_expr_copy(expr->u.range.lw),
+			ast_expr_copy(expr->u.range.up)
+		);
+	case EXPR_RANGEBOUND:
+		return expr->u.ismax
+			? ast_expr_rangemax_create()
+			: ast_expr_rangemin_create();
 	case EXPR_ALLOCATION:
 		return ast_expr_alloc_copy(expr);
 	default:
@@ -1110,7 +1172,10 @@ binary_consteval(struct ast_expr *e)
 }
 
 static struct string_arr *
-ast_expr_call_getfuncs(struct ast_expr *expr);
+ast_expr_range_getfuncs(struct ast_expr *);
+
+static struct string_arr *
+ast_expr_call_getfuncs(struct ast_expr *);
 
 struct string_arr *
 ast_expr_getfuncs(struct ast_expr *expr)
@@ -1122,8 +1187,8 @@ ast_expr_getfuncs(struct ast_expr *expr)
 	case EXPR_STRUCTMEMBER:
 	case EXPR_ISDEALLOCAND:
 	case EXPR_ISDEREFERENCABLE:
-	case EXPR_ARBARG:
-		return string_arr_create();	
+	case EXPR_RANGE:
+		return ast_expr_range_getfuncs(expr);
 	case EXPR_CALL:
 		return ast_expr_call_getfuncs(expr);
 	case EXPR_BRACKETED:
@@ -1159,6 +1224,15 @@ ast_expr_call_getfuncs(struct ast_expr *expr)
 		);	
 		/* XXX: leaks */
 	}
+	return res;
+}
+
+static struct string_arr *
+ast_expr_range_getfuncs(struct ast_expr *expr)
+{
+	struct string_arr *res = string_arr_create();
+	string_arr_concat(res, ast_expr_getfuncs(expr->u.range.lw));
+	string_arr_concat(res, ast_expr_getfuncs(expr->u.range.up));
 	return res;
 }
 
