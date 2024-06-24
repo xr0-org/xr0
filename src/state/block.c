@@ -100,15 +100,17 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		bool constructive)
 {
 	struct intresult *offseteval = ast_expr_consteval(offset);
-	if (!intresult_iserror(offseteval)) {
-		int of = intresult_as_int(offseteval);
-		if (of < 0 || of >= b->size) {
-			return object_res_error_create(
-				error_printf("out of bounds")
-			);
-		}
-		offset = ast_expr_constant_create(of);
+	if (intresult_iserror(offseteval)) {
+		assert(false);
 	}
+
+	int of = intresult_as_int(offseteval);
+	if (of < 0 || of >= b->size) {
+		return object_res_error_create(
+			error_printf("out of bounds")
+		);
+	}
+	offset = ast_expr_constant_create(of);
 	intresult_destroy(offseteval);
 
 	int index = object_arr_index(b->arr, offset, s);
