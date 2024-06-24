@@ -2,7 +2,7 @@ void
 assign(int *q) ~ [
 	setup: {
 		q = .clump(sizeof(int));
-		*q = $;
+		*q = [?];
 	}
 ] {
 	int p;

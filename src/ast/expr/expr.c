@@ -1187,6 +1187,8 @@ ast_expr_getfuncs(struct ast_expr *expr)
 	case EXPR_STRUCTMEMBER:
 	case EXPR_ISDEALLOCAND:
 	case EXPR_ISDEREFERENCABLE:
+	case EXPR_RANGEBOUND:
+		return string_arr_create();
 	case EXPR_RANGE:
 		return ast_expr_range_getfuncs(expr);
 	case EXPR_CALL:
@@ -1231,8 +1233,10 @@ static struct string_arr *
 ast_expr_range_getfuncs(struct ast_expr *expr)
 {
 	struct string_arr *res = string_arr_create();
-	string_arr_concat(res, ast_expr_getfuncs(expr->u.range.lw));
-	string_arr_concat(res, ast_expr_getfuncs(expr->u.range.up));
+	struct string_arr *lw = ast_expr_getfuncs(expr->u.range.lw),
+			  *up = ast_expr_getfuncs(expr->u.range.up);
+	string_arr_concat(res, lw);
+	string_arr_concat(res, up);
 	return res;
 }
 
