@@ -39,7 +39,7 @@ void
 matrix_destroy(struct matrix *m) ~ [
 	int i;
 
-	setup: m = matrix_create($, $);
+	setup: m = matrix_create([?], [?]);
 
 	for (i = 0; i < m->rows; i++) {
 		.free(m->data[i]);
@@ -62,8 +62,8 @@ matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 	struct matrix *sum;
 
 	setup: {
-		m1 = matrix_create($, $);
-		m2 = matrix_create($, $);
+		m1 = matrix_create([?], [?]);
+		m2 = matrix_create([?], [?]);
 	}
 
 	sum = .malloc(sizeof(struct matrix *));
@@ -91,7 +91,7 @@ matrix_add(struct matrix *m1, struct matrix *m2) ~ [
 
 void
 matrix_print(struct matrix *m) ~ [
-	setup: m = matrix_create($, $);
+	setup: m = matrix_create([?], [?]);
 ] {
 	int i; int j; int digit;
 
