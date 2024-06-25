@@ -929,6 +929,9 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	if (e_res_iserror(l_res)) {
 		return e_res_error_create(e_res_as_error(l_res));
 	}
+	printf("%s\n", state_str(state));
+	printf("expr: %s\n", ast_expr_str(expr));
+	printf("eval (lval): %s\n", eval_str(e_res_as_eval(l_res)));
 	struct object_res *obj_res = eval_to_object(
 		e_res_as_eval(l_res), state, true
 	);
@@ -1065,6 +1068,9 @@ value_binary_eval(struct eval *rv1, enum ast_binary_operator op,
 static struct e_res *
 range_eval(struct ast_expr *expr, struct state *state)
 {
+	printf("%s\n", state_str(state));
+	printf("range: %s\n", ast_expr_str(expr));
+	assert(false);
 	return e_res_eval_create(
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */
@@ -1703,7 +1709,7 @@ range_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block
 		ast_expr_range_lw(expr), loc, b, s
 	);
 	struct ast_expr *gen_up = ast_expr_geninstr(
-		ast_expr_range_lw(expr), loc, b, s
+		ast_expr_range_up(expr), loc, b, s
 	);
 	return ast_expr_range_create(gen_lw, gen_up);
 }
