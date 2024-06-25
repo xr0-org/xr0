@@ -103,6 +103,9 @@ state_declare(struct state *, struct ast_variable *var, bool isparam);
 struct object_res *
 state_getresult(struct state *);
 
+bool
+state_isparam(struct state *, char *id);
+
 struct object_res *
 state_getobject(struct state *, char *id);
 

@@ -1074,11 +1074,10 @@ range_eval(struct ast_expr *expr, struct state *state)
 	return e_res_eval_create(
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */
-			ast_type_create_range(NULL, NULL),
+			ast_type_create_range(),
 			state_vconst(
 				state,
-				/* XXX: we will investigate type conversions later */
-				ast_type_create_ptr(ast_type_create(TYPE_VOID, 0)),
+				ast_type_create_range(),
 				NULL,
 				false
 			)

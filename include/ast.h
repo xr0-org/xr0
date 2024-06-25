@@ -572,7 +572,7 @@ bool
 ast_type_isvoid(struct ast_type *);
 
 struct ast_type *
-ast_type_create_range(struct ast_expr *lw, struct ast_expr *up_nonincl);
+ast_type_create_range();
 
 struct externals;
 

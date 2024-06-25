@@ -23,9 +23,6 @@ struct ast_type {
 			struct ast_variable_arr *members;
 		} structunion;
 		char *userdef;
-		struct {
-			struct ast_expr *lw, *up_nonincl;
-		} range;
 	};
 };
 
@@ -221,30 +218,9 @@ ast_type_copy_struct(struct ast_type *old)
 }
 
 struct ast_type *
-ast_type_create_range(struct ast_expr *lw, struct ast_expr *up_nonincl)
+ast_type_create_range()
 {
-	struct ast_type *t = ast_type_create(TYPE_RANGE, 0);
-	t->range.lw = lw;
-	t->range.up_nonincl = up_nonincl;
-	return t;
-}
-
-static struct ast_expr *
-copyornull(struct ast_expr *);
-
-struct ast_type *
-ast_type_copy_range(struct ast_type *old)
-{	
-	assert(old->base == TYPE_RANGE);
-	return ast_type_create_range(
-		copyornull(old->range.lw), copyornull(old->range.up_nonincl)
-	);
-}
-
-static struct ast_expr *
-copyornull(struct ast_expr *e)
-{
-	return e ? ast_expr_copy(e) : NULL;
+	return ast_type_create(TYPE_RANGE, 0);
 }
 
 void
@@ -301,7 +277,7 @@ ast_type_copy(struct ast_type *t)
 		return ast_type_create(t->base, t->mod);
 
 	case TYPE_RANGE:
-		return ast_type_copy_range(t);
+		return ast_type_create_range();
 
 	default:
 		assert(false);

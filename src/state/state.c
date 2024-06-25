@@ -524,6 +524,14 @@ state_getvariabletype(struct state *state, char *id)
 	return variable_type(v);
 }
 
+bool
+state_isparam(struct state *state, char *id)
+{
+	struct variable *v = stack_getvariable(state->stack, id);
+	assert(v);
+	return variable_isparam(v);
+}
+
 struct location *
 state_getloc(struct state *state, char *id)
 {
