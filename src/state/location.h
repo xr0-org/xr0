@@ -20,7 +20,7 @@ struct location *
 location_create_static(int block, struct offset *offset);
 
 struct location *
-location_create_vconst(int block, struct offset *offset);
+location_create_rconst(int block, struct offset *offset);
 
 struct location *
 location_create_dereferencable(int block, struct offset *offset);
@@ -103,7 +103,7 @@ location_heaptransposezero(struct location *, struct heap *);
 
 struct static_memory;
 
-struct vconst;
+struct rconst;
 
 struct clump;
 
@@ -114,7 +114,7 @@ struct object;
 struct block;
 
 struct block_res *
-location_getblock(struct location *, struct static_memory *, struct vconst *, struct stack *,
+location_getblock(struct location *, struct static_memory *, struct rconst *, struct stack *,
 		struct heap *, struct clump *);
 
 struct block *

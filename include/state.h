@@ -154,7 +154,7 @@ state_range_aredeallocands(struct state *, struct object *,
 		struct ast_expr *lw, struct ast_expr *up);
 
 struct value *
-state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
+state_rconst(struct state *, struct ast_type *, char *comment, bool persist);
 
 struct value *
 state_static_init(struct state *, struct ast_expr *);
@@ -169,7 +169,7 @@ bool
 state_isalloc(struct state *, struct value *);
 
 struct value *
-state_getvconst(struct state *, char *id);
+state_getrconst(struct state *, char *id);
 
 bool
 state_hasgarbage(struct state *);

@@ -329,7 +329,7 @@ value_struct_indefinite_create(struct ast_type *t, struct state *s,
 		strbuilder_printf(b, "%s.%s", comment, field);
 		object_assign(
 			obj,
-			state_vconst(
+			state_rconst(
 				s,
 				ast_variable_type(var[i]),
 				strbuilder_build(b), /* comment */

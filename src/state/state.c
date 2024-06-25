@@ -20,7 +20,7 @@
 
 struct state {
 	struct externals *ext;
-	struct vconst *vconst;
+	struct rconst *rconst;
 	struct static_memory *static_memory;
 	struct clump *clump;
 	struct stack *stack;
@@ -36,7 +36,7 @@ state_create(struct frame *f, struct externals *ext)
 	assert(state);
 	state->ext = ext;
 	state->static_memory = static_memory_create();
-	state->vconst = vconst_create();
+	state->rconst = rconst_create();
 	state->clump = clump_create();
 	state->stack = stack_create(f, NULL);
 	state->heap = heap_create();
@@ -57,7 +57,7 @@ state_create_withprops(struct frame *f, struct externals *ext,
 void
 state_destroy(struct state *state)
 {
-	/* vconst_destroy(state->vconst); */
+	/* rconst_destroy(state->rconst); */
 	static_memory_destroy(state->static_memory);
 	clump_destroy(state->clump);
 	stack_destroy(state->stack);
@@ -73,7 +73,7 @@ state_copy(struct state *state)
 	assert(copy);
 	copy->ext = state->ext;
 	copy->static_memory = static_memory_copy(state->static_memory);
-	copy->vconst = vconst_copy(state->vconst);
+	copy->rconst = rconst_copy(state->rconst);
 	copy->clump = clump_copy(state->clump);
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
@@ -109,11 +109,11 @@ state_str(struct state *state)
 		strbuilder_printf(b, "return:\t<%s>\n\n", ret);
 		free(ret);
 	}
-	char *vconst = vconst_str(state->vconst, "\t");
-	if (strlen(vconst) > 0) {
-		strbuilder_printf(b, "rconst:\n%s\n", vconst);
+	char *rconst = rconst_str(state->rconst, "\t");
+	if (strlen(rconst) > 0) {
+		strbuilder_printf(b, "rconst:\n%s\n", rconst);
 	}
-	free(vconst);
+	free(rconst);
 	char *props = props_str(state->props, "\t");
 	if (strlen(props) > 0) {
 		strbuilder_printf(b, "assume:\n%s\n", props);
@@ -263,14 +263,14 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 }
 
 struct value *
-state_vconst(struct state *state, struct ast_type *t, char *comment, bool persist)
+state_rconst(struct state *state, struct ast_type *t, char *comment, bool persist)
 {
-	struct value *v = ast_type_vconst(t, state, comment, persist);
+	struct value *v = ast_type_rconst(t, state, comment, persist);
 	if (value_isstruct(v)) {
 		return v;
 	}
-	char *c = vconst_declare(
-		state->vconst, v,
+	char *c = rconst_declare(
+		state->rconst, v,
 		comment, persist
 	);
 	return value_sync_create(ast_expr_identifier_create(c));
@@ -437,9 +437,9 @@ state_isalloc(struct state *state, struct value *v)
 }
 
 struct value *
-state_getvconst(struct state *state, char *id)
+state_getrconst(struct state *state, char *id)
 {
-	return vconst_get(state->vconst, id);
+	return rconst_get(state->rconst, id);
 }
 
 struct object_res *
@@ -448,7 +448,7 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	struct block_res *res = location_getblock(
 		loc,
 		state->static_memory,
-		state->vconst,
+		state->rconst,
 		state->stack,
 		state->heap,
 		state->clump
@@ -505,7 +505,7 @@ struct block *
 state_getblock(struct state *state, struct location *loc)
 {
 	struct block_res *res = location_getblock(
-		loc, state->static_memory, state->vconst, state->stack, state->heap, state->clump
+		loc, state->static_memory, state->rconst, state->stack, state->heap, state->clump
 	);
 	return block_res_as_block(res);
 }
@@ -599,7 +599,7 @@ state_range_alloc(struct state *state, struct object *obj,
 	struct location *deref = value_as_location(arr_val);
 
 	struct block_res *res = location_getblock(
-		deref, state->static_memory, state->vconst, state->stack, state->heap, state->clump
+		deref, state->static_memory, state->rconst, state->stack, state->heap, state->clump
 	);
 	if (!block_res_hasblock(res)) {
 		return error_printf("no block");
@@ -673,7 +673,7 @@ state_range_aredeallocands(struct state *state, struct object *obj,
 	struct location *deref = value_as_location(arr_val);
 	
 	struct block_res *res = location_getblock(
-		deref, state->static_memory, state->vconst, state->stack, state->heap, state->clump
+		deref, state->static_memory, state->rconst, state->stack, state->heap, state->clump
 	);
 	struct block *b = block_res_as_block(res);
 	return (bool) b && block_range_aredeallocands(b, lw, up, state);
@@ -709,7 +709,7 @@ state_callerreferences(struct state *s, struct location *loc)
 bool
 state_eval(struct state *s, struct ast_expr *e)
 {
-	return vconst_eval(s->vconst, e);
+	return rconst_eval(s->rconst, e);
 }
 
 static void
@@ -803,7 +803,7 @@ static void
 state_undeclarevars(struct state *s)
 {	
 	heap_undeclare(s->heap, s);
-	vconst_undeclare(s->vconst);
+	rconst_undeclare(s->rconst);
 	struct value *v = state_readregister(s);
 	if (v) {
 		/* XXX: avoid state_writeregister assert */

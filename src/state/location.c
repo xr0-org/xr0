@@ -24,7 +24,7 @@ struct location {
 };
 
 struct location *
-location_create_vconst(int block, struct offset *offset)
+location_create_rconst(int block, struct offset *offset)
 {
 	struct location *loc = malloc(sizeof(struct location));
 	assert(loc);
@@ -199,7 +199,7 @@ location_copy(struct location *loc)
 			loc->block, offset_copy(loc->offset)
 		);
 	case LOCATION_VCONST:
-		return location_create_vconst(
+		return location_create_rconst(
 			loc->block, offset_copy(loc->offset)
 		);
 	case LOCATION_DEREFERENCABLE:
@@ -331,7 +331,7 @@ block_res_or_empty(struct block *);
 
 struct block_res *
 location_getblock(struct location *loc, struct static_memory *sm,
-		struct vconst *v, struct stack *s, struct heap *h,
+		struct rconst *v, struct stack *s, struct heap *h,
 		struct clump *c)
 {
 	assert(s);

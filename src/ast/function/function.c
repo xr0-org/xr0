@@ -291,7 +291,7 @@ inititalise_param(struct ast_variable *param, struct state *state)
 		//);
 	} else {
 		/* variables that aren't talked about by the preconditions */
-		struct value *val = state_vconst(state, t, dynamic_str(name), true);
+		struct value *val = state_rconst(state, t, dynamic_str(name), true);
 		object_assign(obj, val);
 	}
 	return NULL;

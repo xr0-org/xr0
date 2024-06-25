@@ -418,8 +418,8 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 static struct e_res *
 hack_identifier_builtin_eval(char *id, struct state *state)
 {
-	if (state_getvconst(state, id) || strncmp(id, "ptr:", 4) == 0) {
-		/* TODO set type from vconsts */
+	if (state_getrconst(state, id) || strncmp(id, "ptr:", 4) == 0) {
+		/* TODO set type from rconsts */
 		return e_res_eval_create(
 			eval_rval_create(
 				ast_type_create_voidptr(),
@@ -1075,7 +1075,7 @@ range_eval(struct ast_expr *expr, struct state *state)
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */
 			ast_type_create_range(),
-			state_vconst(
+			state_rconst(
 				state,
 				ast_type_create_range(),
 				NULL,

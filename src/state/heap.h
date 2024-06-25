@@ -60,30 +60,30 @@ heap_fillorder(struct heap *, struct int_arr *);
 
 /* TODO: extract to own file */
 
-struct vconst;
+struct rconst;
 
-struct vconst *
-vconst_create();
+struct rconst *
+rconst_create();
 
-struct vconst *
-vconst_copy(struct vconst *);
+struct rconst *
+rconst_copy(struct rconst *);
 
 void
-vconst_destroy(struct vconst *);
+rconst_destroy(struct rconst *);
 
 char *
-vconst_str(struct vconst *, char *indent);
+rconst_str(struct rconst *, char *indent);
 
 char *
-vconst_declare(struct vconst *, struct value *, char *comment, bool persist);
+rconst_declare(struct rconst *, struct value *, char *comment, bool persist);
 
 struct value *
-vconst_get(struct vconst *, char *id);
+rconst_get(struct rconst *, char *id);
 
 void
-vconst_undeclare(struct vconst *);
+rconst_undeclare(struct rconst *);
 
 bool
-vconst_eval(struct vconst *, struct ast_expr *);
+rconst_eval(struct rconst *, struct ast_expr *);
 
 #endif

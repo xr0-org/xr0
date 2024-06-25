@@ -243,7 +243,7 @@ struct e_res *
 ast_expr_abseval(struct ast_expr *, struct state *);
 
 /* ast_expr_pf_reduce: Reduce an expression to "parameter form", in which its
- * only primitives are constants and parameters (vconsts). */
+ * only primitives are constants and parameters (rconsts). */
 struct e_res *
 ast_expr_pf_reduce(struct ast_expr *, struct state *);
 
@@ -577,7 +577,7 @@ ast_type_create_range();
 struct externals;
 
 struct value *
-ast_type_vconst(struct ast_type *, struct state *s, char *comment, bool persist);
+ast_type_rconst(struct ast_type *, struct state *s, char *comment, bool persist);
 
 void
 ast_type_destroy(struct ast_type *);
