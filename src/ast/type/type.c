@@ -133,7 +133,8 @@ ast_type_rconst(struct ast_type *t, struct state *s, char *comment, bool persist
 		return value_ptr_indefinite_create(t->ptr_type);
 	case TYPE_USERDEF:
 		return ast_type_rconst(
-			externals_gettypedef(state_getext(s), t->userdef), s, comment, persist
+			externals_gettypedef(state_getext(s), t->userdef), s,
+			comment, persist
 		);
 	case TYPE_STRUCT:
 		return value_struct_indefinite_create(t, s, comment, persist);
