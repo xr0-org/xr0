@@ -10,7 +10,7 @@
 
 struct value {
 	enum value_type {
-		VALUE_SYNC,
+		VALUE_RCONST,
 		VALUE_PTR,
 		VALUE_INT,
 		VALUE_LITERAL,
@@ -46,7 +46,7 @@ struct int_arr *
 value_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
 {
 	switch (v->type) {
-	case VALUE_SYNC:
+	case VALUE_RCONST:
 	case VALUE_INT:
 	case VALUE_LITERAL:
 		return int_arr_create();
@@ -69,7 +69,7 @@ struct value *
 value_permuteheaplocs(struct value *v, struct permutation *p)
 {
 	switch (v->type) {
-	case VALUE_SYNC:
+	case VALUE_RCONST:
 	case VALUE_INT:
 	case VALUE_LITERAL:
 		return value_copy(v);
@@ -182,14 +182,14 @@ value_int_ne_create(int not_val)
 }
 
 static struct value *
-value_sync_bang(struct value *);
+value_rconst_bang(struct value *);
 
 struct value *
 value_bang(struct value *v)
 {
 	switch (v->type) {
-	case VALUE_SYNC:
-		return value_sync_bang(v);
+	case VALUE_RCONST:
+		return value_rconst_bang(v);
 	default:
 		assert(false);
 	}
@@ -245,11 +245,11 @@ struct number *
 number_computed_create(struct ast_expr *);
 
 struct value *
-value_sync_create(struct ast_expr *e)
+value_rconst_create(struct ast_expr *e)
 {	
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
-	v->type = VALUE_SYNC;
+	v->type = VALUE_RCONST;
 	v->n = number_computed_create(e);
 	return v;
 }
@@ -258,23 +258,23 @@ static struct number *
 number_computed_bang(struct number *);
 
 static struct value *
-value_sync_bang(struct value *orig)
+value_rconst_bang(struct value *orig)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
-	v->type = VALUE_SYNC;
+	v->type = VALUE_RCONST;
 	v->n = number_computed_bang(orig->n);
 	return v;
 }
 
 struct value *
-value_sync_copy(struct value *old)
+value_rconst_copy(struct value *old)
 {
-	assert(old->type == VALUE_SYNC);
+	assert(old->type == VALUE_RCONST);
 
 	struct value *new = malloc(sizeof(struct value));
 	assert(new);
-	new->type = VALUE_SYNC;
+	new->type = VALUE_RCONST;
 	new->n = number_copy(old->n);
 
 	return new;
@@ -362,7 +362,7 @@ value_pf_augment(struct value *old, struct ast_expr *root)
 		}
 		object_assign(
 			obj,
-			value_sync_create(
+			value_rconst_create(
 				ast_expr_member_create(
 					ast_expr_copy(root), dynamic_str(field)
 				)
@@ -571,7 +571,7 @@ value_int_sprint(struct value *v, struct strbuilder *b)
 }
 
 void
-value_sync_sprint(struct value *v, struct strbuilder *b)
+value_rconst_sprint(struct value *v, struct strbuilder *b)
 {
 	strbuilder_printf(b, "rconst:%s", number_str(v->n));
 }
@@ -581,8 +581,8 @@ value_copy(struct value *v)
 {
 	assert(v);
 	switch (v->type) {
-	case VALUE_SYNC:
-		return value_sync_copy(v);
+	case VALUE_RCONST:
+		return value_rconst_copy(v);
 	case VALUE_PTR:
 		return value_ptr_copy(v);
 	case VALUE_INT:
@@ -629,7 +629,7 @@ void
 value_destroy(struct value *v)
 {
 	switch (v->type) {
-	case VALUE_SYNC:
+	case VALUE_RCONST:
 		number_destroy(v->n);
 		break;
 	case VALUE_PTR:
@@ -663,8 +663,8 @@ value_str(struct value *v)
 {
 	struct strbuilder *b = strbuilder_create();
 	switch (v->type) {
-	case VALUE_SYNC:
-		value_sync_sprint(v, b);
+	case VALUE_RCONST:
+		value_rconst_sprint(v, b);
 		break;
 	case VALUE_PTR:
 		value_ptr_sprint(v, b);
@@ -688,7 +688,7 @@ char *
 value_type_str(struct value *v)
 {
 	char *value_type_str[] = {
-		[VALUE_SYNC] = "rconst",
+		[VALUE_RCONST] = "rconst",
 		[VALUE_PTR] = "ptr",
 		[VALUE_INT] = "int",
 		[VALUE_LITERAL] = "literal",
@@ -756,7 +756,7 @@ number_issync(struct number *n);
 bool
 value_issync(struct value *v)
 {
-	if (v->type != VALUE_SYNC) {
+	if (v->type != VALUE_RCONST) {
 		return false;
 	}
 	return number_issync(v->n);
@@ -766,9 +766,9 @@ struct ast_expr *
 number_as_sync(struct number *n);
 
 struct ast_expr *
-value_as_sync(struct value *v)
+value_as_rconst(struct value *v)
 {
-	assert(v->type == VALUE_SYNC);
+	assert(v->type == VALUE_RCONST);
 	return number_as_sync(v->n);
 }
 
@@ -783,8 +783,8 @@ value_to_expr(struct value *v)
 		return ast_expr_identifier_create(value_str(v));
 	case VALUE_LITERAL:
 		return ast_expr_copy(value_as_literal(v));
-	case VALUE_SYNC:
-		return ast_expr_copy(value_as_sync(v));
+	case VALUE_RCONST:
+		return ast_expr_copy(value_as_rconst(v));
 	case VALUE_INT:
 		return number_to_expr(v->n);
 	default:
@@ -908,7 +908,7 @@ value_equal(struct value *v1, struct value *v2)
 	case VALUE_LITERAL:
 		return strcmp(v1->s, v2->s) == 0;
 	case VALUE_INT:
-	case VALUE_SYNC:
+	case VALUE_RCONST:
 		return number_equal(v1->n, v2->n);
 	default:
 		assert(false);

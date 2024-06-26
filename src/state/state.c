@@ -273,7 +273,7 @@ state_rconst(struct state *state, struct ast_type *t, char *comment, bool persis
 		state->rconst, v,
 		comment, persist
 	);
-	return value_sync_create(ast_expr_identifier_create(c));
+	return value_rconst_create(ast_expr_identifier_create(c));
 }
 
 struct value *

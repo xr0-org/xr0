@@ -55,7 +55,7 @@ struct value *
 value_bang(struct value *);
 
 struct value *
-value_sync_create(struct ast_expr *);
+value_rconst_create(struct ast_expr *);
 
 struct value *
 value_struct_create(struct ast_type *);
@@ -112,7 +112,7 @@ bool
 value_issync(struct value *v);
 
 struct ast_expr *
-value_as_sync(struct value *v);
+value_as_rconst(struct value *v);
 
 struct ast_expr *
 value_to_expr(struct value *);

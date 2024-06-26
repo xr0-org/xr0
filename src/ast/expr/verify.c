@@ -423,7 +423,7 @@ hack_identifier_builtin_eval(char *id, struct state *state)
 		return e_res_eval_create(
 			eval_rval_create(
 				ast_type_create_voidptr(),
-				value_sync_create(
+				value_rconst_create(
 					ast_expr_identifier_create(dynamic_str(id))
 				)
 			)
@@ -768,7 +768,7 @@ ast_expr_pf_augment(struct value *v, struct ast_expr *expr,
 	return e_res_eval_create(
 		eval_rval_create(
 			eval_type(eval),
-			value_pf_augment(v, value_as_sync(eval_as_rval(eval)))
+			value_pf_augment(v, value_as_rconst(eval_as_rval(eval)))
 		)
 	);
 }
@@ -848,7 +848,7 @@ call_to_computed_value(struct ast_function *f, struct state *s)
 	return e_res_eval_create(
 		eval_rval_create(
 			ast_type_copy(ast_function_type(f)),
-			value_sync_create(
+			value_rconst_create(
 				ast_expr_call_create(
 					ast_expr_identifier_create(dynamic_str(root)),
 					nparams, computed_param
@@ -1057,7 +1057,7 @@ value_binary_eval(struct eval *rv1, enum ast_binary_operator op,
 		return e_res_eval_create(eval_rval_create(t1, v));
 	}
 	/* TODO: check t1, t2 are compatible */
-	struct value *v = value_sync_create(
+	struct value *v = value_rconst_create(
 		ast_expr_binary_create(
 			value_to_expr(v1), op, value_to_expr(v2)
 		)
@@ -1384,7 +1384,7 @@ identifier_assume(struct ast_expr *expr, bool value, struct state *s)
 	state_destroy(s_copy);
 
 	struct value *res_v = eval_as_rval(e_res_as_eval(res));
-	return irreducible_assume(value_as_sync(res_v), value, s);
+	return irreducible_assume(value_as_rconst(res_v), value, s);
 }
 
 static struct preresult *
@@ -1395,7 +1395,7 @@ ast_expr_pf_reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 	assert(!e_res_iserror(res) && e_res_haseval(res));
 
 	struct value *res_v = eval_as_rval(e_res_as_eval(res));
-	return irreducible_assume(value_as_sync(res_v), value, s);
+	return irreducible_assume(value_as_rconst(res_v), value, s);
 }
 
 static struct e_res *
@@ -1453,9 +1453,9 @@ unary_pf_reduce(struct ast_expr *e, struct state *s)
 	return e_res_eval_create(
 		eval_rval_create(
 			eval_type(eval),
-			value_sync_create(
+			value_rconst_create(
 				ast_expr_unary_create(
-					value_as_sync(v),
+					value_as_rconst(v),
 					ast_expr_unary_op(e)
 				)
 			)
@@ -1484,7 +1484,7 @@ binary_pf_reduce(struct ast_expr *e1, enum ast_binary_operator op,
 	return e_res_eval_create(
 		eval_rval_create(
 			eval_type(rv1), /* TODO: compare types */
-			value_sync_create(
+			value_rconst_create(
 				ast_expr_binary_create(
 					value_to_expr(v1),
 					op,
@@ -1520,7 +1520,7 @@ call_pf_reduce(struct ast_expr *e, struct state *s)
 		);
 		reduced_arg[i] = ast_expr_copy(value_to_expr(v));
 	}
-	struct value *v = value_sync_create(
+	struct value *v = value_rconst_create(
 		ast_expr_call_create(
 			ast_expr_identifier_create(dynamic_str(name)),
 			nargs, reduced_arg
@@ -1561,9 +1561,9 @@ structmember_pf_reduce(struct ast_expr *expr, struct state *s)
 	return e_res_eval_create(
 		eval_rval_create(
 			ast_type_copy(t),
-			value_sync_create(
+			value_rconst_create(
 				ast_expr_member_create(
-					value_as_sync(v),
+					value_as_rconst(v),
 					dynamic_str(field)
 				)
 			)

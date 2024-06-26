@@ -597,7 +597,7 @@ sel_decide(struct ast_expr *control, struct state *state)
 		eval_to_value(e_res_as_eval(res), state)
 	);
 	if (value_issync(v)) {
-		struct ast_expr *sync = value_as_sync(v);
+		struct ast_expr *sync = value_as_rconst(v);
 		struct props *p = state_getprops(state);
 		if (props_get(p, sync)) {
 			return (struct decision) { .decision = true, .err = NULL };
