@@ -120,7 +120,7 @@ variable_array_create(struct ast_variable *v)
 	struct ast_externdecl *externdecl;
 	struct ast_function *function;
 	struct lexememarker *lexememarker;
-	struct ast_stmt *statement;
+	struct ast_stmt *stmt;
 	struct ast_type *type;
 	struct ast_variable *variable;
 
@@ -143,11 +143,6 @@ variable_array_create(struct ast_variable *v)
 		struct direct_function_declarator decl;
 	} function_declarator;
 
-	struct declaration {
-		char *name;
-		struct ast_type *t;
-	} declaration;
-
 	int binary_operator;
 	int integer;
 	int type_modifier;
@@ -161,7 +156,6 @@ variable_array_create(struct ast_variable *v)
 %type <block_statement> block_statement
 %type <binary_operator> equality_operator relational_operator
 %type <boolean> struct_or_union
-%type <declaration> declaration 
 %type <direct_function_declarator> direct_function_declarator
 
 %type <expr> expression assignment_expression conditional_expression unary_expression
@@ -181,9 +175,10 @@ variable_array_create(struct ast_variable *v)
 %type <function_declarator> function_declarator
 %type <integer> pointer abstract_declarator 
 %type <lexememarker> selection_statement_if
-%type <statement> statement expression_statement selection_statement jump_statement 
-%type <statement> labelled_statement iteration_statement for_iteration_statement
-%type <statement> iteration_effect_statement
+%type <stmt> statement expression_statement selection_statement jump_statement 
+%type <stmt> labelled_statement iteration_statement for_iteration_statement
+%type <stmt> iteration_effect_statement
+%type <stmt> declaration 
 %type <stmt_array> statement_list declaration_list
 %type <string> identifier
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
@@ -413,17 +408,22 @@ declaration
 		/* XXX */
 		char *name = ast_type_struct_tag($1);
 		assert(name);
-		$$ = (struct declaration) {
-			.name	= name,
-			.t	= $1,
-		};
+		$$ = ast_stmt_create_declaration(
+			lexloc(),
+			ast_variable_create(name, $1),
+			NULL
+		);
 	}
 	| declaration_specifiers init_declarator_list ';' {
 		struct ast_declaration *decl = ast_expr_declare($2, $1);
-		$$ = (struct declaration) {
-			.name	= ast_declaration_name(decl),
-			.t	= ast_declaration_type(decl),
-		};
+		$$ = ast_stmt_create_declaration(
+			lexloc(),
+			ast_variable_create(
+				ast_declaration_name(decl),
+				ast_declaration_type(decl)
+			),
+			NULL
+		);
 	}
 	;
 
@@ -452,7 +452,7 @@ init_declarator_list
 
 init_declarator
 	: declarator
-	/*| declarator '=' initializer*/
+	| declarator '=' initializer
 	;
 
 storage_class_specifier
@@ -508,7 +508,7 @@ struct_declaration_list
 struct_declaration
 	/*: specifier_qualifier_list struct_declarator_list ';'*/
 	: declaration /* XXX: added temporarily */
-		{ $$ = ast_variable_create($1.name, $1.t); }
+		{ $$ = ast_stmt_declaration_var($1); }
 	;
 
 specifier_qualifier_list
@@ -685,11 +685,11 @@ abstract_declarator
 	/*| direct_abstract_declarator '(' parameter_type_list ')'*/
 	/*;*/
 
-/*initializer*/
-	/*: assignment_expression*/
+initializer
+	: assignment_expression
 	/*| '{' initializer_list '}'*/
 	/*| '{' initializer_list ',' '}'*/
-	/*;*/
+	;
 
 /*initializer_list*/
 	/*: initializer*/
@@ -750,15 +750,10 @@ compound_verification_statement
 
 declaration_list
 	: declaration {
-		$$ = stmt_array_create(
-			ast_stmt_create_declaration(lexloc(), ast_variable_create($1.name, $1.t), NULL)
-		);
+		$$ = stmt_array_create($1);
 	}
 	| declaration_list declaration {
-		$$ = stmt_array_append(
-			&$1,
-			ast_stmt_create_declaration(lexloc(), ast_variable_create($2.name, $2.t), NULL)
-		);
+		$$ = stmt_array_append(&$1, $2);
 	}
 	;
 
@@ -833,7 +828,10 @@ translation_unit
 
 external_declaration
 	: function_definition	{ $$ = ast_functiondecl_create($1); }
-	| declaration		{ $$ = ast_decl_create($1.name, $1.t); }
+	| declaration		{
+		struct ast_variable *v = ast_stmt_declaration_var($1);
+		$$ = ast_decl_create(ast_variable_name(v), ast_variable_type(v));
+	}
 	;
 
 block_statement
