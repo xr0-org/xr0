@@ -274,10 +274,12 @@ expr_binary_decide(struct ast_expr *expr, struct state *state)
 
 	assert(!e_res_iserror(root) && !e_res_iserror(last));
 
+	struct value_res *v1 = eval_to_value(e_res_as_eval(root), state),
+			 *v2 = eval_to_value(e_res_as_eval(last), state);
 	return value_compare(
-		eval_as_rval(e_res_as_eval(root)),
+		value_res_as_value(v1),
 		ast_expr_binary_op(expr),
-		eval_as_rval(e_res_as_eval(last))
+		value_res_as_value(v2)
 	);
 }
 

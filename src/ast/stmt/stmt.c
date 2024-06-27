@@ -17,8 +17,7 @@ struct ast_stmt {
 	enum ast_stmt_kind kind;
 	union {
 		struct {
-			struct ast_variable *var;
-			struct ast_expr *val;
+			struct ast_variable_arr *vars;
 		} declaration;
 		struct {
 			char *label;
@@ -72,29 +71,31 @@ ast_stmt_create(struct lexememarker *loc)
 }
 
 struct ast_stmt *
-ast_stmt_create_declaration(struct lexememarker *loc, struct ast_variable *var,
-		struct ast_expr *val)
+ast_stmt_create_declaration(struct lexememarker *loc, struct ast_variable_arr *vars)
 {
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_DECLARATION;
-	stmt->u.declaration.var = var;
-	stmt->u.declaration.val = val;
+	stmt->u.declaration.vars = vars;
 	return stmt;
 }
 
-struct ast_variable *
-ast_stmt_declaration_var(struct ast_stmt *stmt)
+struct ast_variable_arr *
+ast_stmt_declaration_vars(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_DECLARATION);
-	return stmt->u.declaration.var;
+	return stmt->u.declaration.vars;
 }
 
 static void
 ast_stmt_declaration_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
-	char *s = ast_variable_str(stmt->u.declaration.var);
-	strbuilder_printf(b, "%s", s);
-	free(s);
+	struct ast_variable_arr *vars = stmt->u.declaration.vars;
+	for (int i = 0; i < ast_variable_arr_n(vars); i++) {
+		struct ast_variable **v = ast_variable_arr_v(vars);
+		char *s = ast_variable_str(v[i]);
+		strbuilder_printf(b, "%s", s);
+		free(s);
+	}
 }
 
 bool
@@ -607,9 +608,10 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 {
 	switch (stmt->kind) {
 	case STMT_DECLARATION:
-		ast_variable_destroy(stmt->u.declaration.var);
-		if (stmt->u.declaration.val) {
-			ast_expr_destroy(stmt->u.declaration.val);
+		for (int i = 0; i < ast_variable_arr_n(stmt->u.declaration.vars); i++) {
+			ast_variable_destroy(
+				ast_variable_arr_v(stmt->u.declaration.vars)[i]
+			);
 		}
 		break;
 	case STMT_LABELLED:
@@ -663,8 +665,7 @@ ast_stmt_copy(struct ast_stmt *stmt)
 	case STMT_DECLARATION:
 		return ast_stmt_create_declaration(
 			loc,
-			ast_variable_copy(stmt->u.declaration.var),
-			stmt->u.declaration.val ? ast_expr_copy(stmt->u.declaration.val) : NULL
+			ast_variable_arr_copy(stmt->u.declaration.vars)
 		);
 	case STMT_LABELLED:
 		return ast_stmt_create_labelled(

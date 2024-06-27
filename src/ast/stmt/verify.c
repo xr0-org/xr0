@@ -261,10 +261,31 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
+decl_init(struct ast_variable *, struct state *);
+
+static struct error *
 stmt_decl_exec(struct ast_stmt *stmt, struct state *state)
 {
 	/* TODO: add initialisation */
-	state_declare(state, ast_stmt_declaration_var(stmt), false);
+	struct ast_variable_arr *vars = ast_stmt_declaration_vars(stmt);
+	for (int i = 0; i < ast_variable_arr_n(vars); i++) {
+		struct ast_variable *v = ast_variable_arr_v(vars)[i];
+		state_declare(state, v, false);
+		decl_init(v, state);	
+	}
+	return NULL;
+}
+
+static struct error *
+decl_init(struct ast_variable *v, struct state *s)
+{
+	if (ast_variable_init(v)) {
+		struct ast_expr *assign = ast_expr_assignment_create(
+			ast_expr_identifier_create(ast_variable_name(v)),
+			ast_variable_init(v)
+		);
+		return ast_expr_exec(assign, s);
+	}
 	return NULL;
 }
 

@@ -507,7 +507,10 @@ state_getblock(struct state *state, struct location *loc)
 	struct block_res *res = location_getblock(
 		loc, state->static_memory, state->vconst, state->stack, state->heap, state->clump
 	);
-	return block_res_as_block(res);
+	if (block_res_hasblock(res)) {
+		return block_res_as_block(res);
+	}
+	return NULL;
 }
 
 struct ast_type *

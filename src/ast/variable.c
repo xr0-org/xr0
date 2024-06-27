@@ -8,6 +8,7 @@
 struct ast_variable {
 	char *name;
 	struct ast_type *type;
+	struct ast_expr *init;	/* optional */
 };
 
 struct ast_variable *
@@ -16,7 +17,21 @@ ast_variable_create(char *name, struct ast_type *type)
 	struct ast_variable *v = malloc(sizeof(struct ast_variable));
 	v->name = name;
 	v->type = type;
+	v->init = NULL;
 	return v;
+}
+
+void
+ast_variable_setinit(struct ast_variable *v, struct ast_expr *e)
+{
+	assert(!v->init);
+	v->init = e;
+}
+
+struct ast_expr *
+ast_variable_init(struct ast_variable *v)
+{
+	return v->init;
 }
 
 void
@@ -31,9 +46,13 @@ struct ast_variable *
 ast_variable_copy(struct ast_variable *v)
 {
 	assert(v);
-	return ast_variable_create(
+	struct ast_variable *copy = ast_variable_create(
 		dynamic_str(v->name), ast_type_copy(v->type)
 	);
+	if (v->init) { 
+		copy->init = ast_expr_copy(v->init);
+	}
+	return copy;
 }
 
 struct ast_variable **

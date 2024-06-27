@@ -117,4 +117,10 @@ ast_declaration_type(struct ast_declaration *);
 struct ast_declaration *
 ast_expr_declare(struct ast_expr *, struct ast_type *base);
 
+struct ast_expr *
+ast_expr_declarator(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_initialiser(struct ast_expr *);
+
 #endif
