@@ -1246,4 +1246,32 @@ arr_declare(struct ast_expr *expr, struct ast_type *base)
 
 }
 
+struct ast_expr *
+ast_expr_declarator(struct ast_expr *expr)
+{
+	switch (expr->kind) {
+	case EXPR_IDENTIFIER:
+	case EXPR_UNARY:
+		return expr;
+	case EXPR_ASSIGNMENT:
+		return ast_expr_assignment_lval(expr);
+	default:
+		assert(false);
+	}
+}
+
+struct ast_expr *
+ast_expr_initialiser(struct ast_expr *expr)
+{
+	switch (expr->kind) {
+	case EXPR_IDENTIFIER:
+	case EXPR_UNARY:
+		return NULL;
+	case EXPR_ASSIGNMENT:
+		return ast_expr_assignment_rval(expr);
+	default:
+		assert(false);
+	}
+}
+
 #include "verify.c"

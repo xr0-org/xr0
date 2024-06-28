@@ -610,12 +610,18 @@ struct ast_variable **
 ast_variable_arr_v(struct ast_variable_arr *);
 
 struct ast_variable_arr *
-ast_variable_arr_copy(struct ast_variable_arr *arr);
+ast_variable_arr_copy(struct ast_variable_arr *);
 
 struct ast_variable;
 
 struct ast_variable *
-ast_variable_create(char *name, struct ast_type *type);
+ast_variable_create(char *name, struct ast_type *);
+
+void
+ast_variable_setinit(struct ast_variable *, struct ast_expr *);
+
+struct ast_expr *
+ast_variable_init(struct ast_variable *);
 
 void
 ast_variable_destroy(struct ast_variable *);

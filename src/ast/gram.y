@@ -165,7 +165,7 @@ variable_array_create(struct ast_variable *v)
 %type <expr> relational_expression shift_expression additive_expression
 %type <expr> multiplicative_expression cast_expression
 %type <expr> allocation_expression isdeallocand_expression constant_expression
-%type <expr> declarator init_declarator
+%type <expr> declarator init_declarator initializer
 %type <expr> direct_declarator
 
 %type <expr_array> argument_expression_list init_declarator_list
@@ -419,12 +419,14 @@ declaration
 		struct ast_variable_arr *vars = ast_variable_arr_create();
 		for (int i = 0; i < expr_arr.n; i++) {
 			struct ast_declaration *decl = ast_expr_declare(
-				expr_arr.expr[i], $1
+				ast_expr_declarator(expr_arr.expr[i]), $1
 			);
-			ast_variable_arr_append(vars, ast_variable_create(
+			struct ast_variable *v = ast_variable_create(
 				dynamic_str(ast_declaration_name(decl)),
 				ast_type_copy(ast_declaration_type(decl))
-			));
+			);
+			ast_variable_setinit(v, ast_expr_initialiser(expr_arr.expr[i]));
+			ast_variable_arr_append(vars, v);
 		}
 		assert(ast_variable_arr_n(vars) > 0);
 		$$ = vars;
@@ -460,7 +462,9 @@ init_declarator_list
 
 init_declarator
 	: declarator
-	| declarator '=' initializer
+	| declarator '=' initializer {
+		$$ = ast_expr_assignment_create($1, $3);	
+	}
 	;
 
 storage_class_specifier
