@@ -264,7 +264,10 @@ static struct error *
 stmt_decl_exec(struct ast_stmt *stmt, struct state *state)
 {
 	/* TODO: add initialisation */
-	state_declare(state, ast_stmt_declaration_var(stmt), false);
+	struct ast_variable_arr *vars = ast_stmt_declaration_vars(stmt);
+	for (int i = 0; i < ast_variable_arr_n(vars); i++) {
+		state_declare(state, ast_variable_arr_v(vars)[i], false);
+	}
 	return NULL;
 }
 

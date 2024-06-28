@@ -312,12 +312,13 @@ struct lexememarker;
 struct lexememarker *
 ast_stmt_lexememarker(struct ast_stmt *);
 
-struct ast_stmt *
-ast_stmt_create_declaration(struct lexememarker *, struct ast_variable *,
-	struct ast_expr *);
+struct ast_variable_arr;
 
-struct ast_variable *
-ast_stmt_declaration_var(struct ast_stmt *);
+struct ast_stmt *
+ast_stmt_create_declaration(struct lexememarker *, struct ast_variable_arr *);
+
+struct ast_variable_arr *
+ast_stmt_declaration_vars(struct ast_stmt *);
 
 bool
 ast_stmt_isdecl(struct ast_stmt *);

@@ -60,20 +60,20 @@ stmt_array_concat(struct stmt_array *arr1, struct stmt_array *arr2)
 }
 
 struct expr_array
-expr_array_create(struct ast_expr *v)
+expr_array_create(struct ast_expr *e)
 {
 	struct expr_array arr = (struct expr_array) {
 		.n 	= 1, 
 		.expr	= malloc(sizeof(struct ast_expr *)),
 	};
-	arr.expr[0] = v;
+	arr.expr[0] = e;
 	return arr;
 }
 
 struct expr_array
-expr_array_append(struct expr_array *arr, struct ast_expr *v) {
+expr_array_append(struct expr_array *arr, struct ast_expr *e) {
 	arr->expr = realloc(arr->expr, sizeof(struct ast_expr *) * ++arr->n);
-	arr->expr[arr->n-1] = v;
+	arr->expr[arr->n-1] = e;
 	return *arr;
 }
 
@@ -165,10 +165,10 @@ variable_array_create(struct ast_variable *v)
 %type <expr> relational_expression shift_expression additive_expression
 %type <expr> multiplicative_expression cast_expression
 %type <expr> allocation_expression isdeallocand_expression constant_expression
-%type <expr> declarator init_declarator init_declarator_list
+%type <expr> declarator init_declarator
 %type <expr> direct_declarator
 
-%type <expr_array> argument_expression_list
+%type <expr_array> argument_expression_list init_declarator_list
 
 %type <externdecl> external_declaration
 %type <function> function_definition
@@ -178,7 +178,6 @@ variable_array_create(struct ast_variable *v)
 %type <stmt> statement expression_statement selection_statement jump_statement 
 %type <stmt> labelled_statement iteration_statement for_iteration_statement
 %type <stmt> iteration_effect_statement
-%type <stmt> declaration 
 %type <stmt_array> statement_list declaration_list
 %type <string> identifier
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
@@ -187,6 +186,7 @@ variable_array_create(struct ast_variable *v)
 %type <variable> parameter_declaration struct_declaration
 %type <variable_array> parameter_list parameter_type_list
 %type <variable_array> struct_declaration_list
+%type <variable_array> declaration
 
 %start start
 
@@ -408,22 +408,25 @@ declaration
 		/* XXX */
 		char *name = ast_type_struct_tag($1);
 		assert(name);
-		$$ = ast_stmt_create_declaration(
-			lexloc(),
-			ast_variable_create(name, $1),
-			NULL
+		struct ast_variable_arr *vars = ast_variable_arr_create();
+		ast_variable_arr_append(
+			vars, ast_variable_create(name, $1)
 		);
+		$$ = vars;
 	}
 	| declaration_specifiers init_declarator_list ';' {
-		struct ast_declaration *decl = ast_expr_declare($2, $1);
-		$$ = ast_stmt_create_declaration(
-			lexloc(),
-			ast_variable_create(
-				ast_declaration_name(decl),
-				ast_declaration_type(decl)
-			),
-			NULL
-		);
+		struct expr_array expr_arr = $2; 
+		struct ast_variable_arr *vars = ast_variable_arr_create();
+		for (int i = 0; i < expr_arr.n; i++) {
+			struct ast_declaration *decl = ast_expr_declare(
+				expr_arr.expr[i], $1
+			);
+			ast_variable_arr_append(vars, ast_variable_create(
+				ast_declaration_name(decl), ast_declaration_type(decl)
+			));
+		}
+		assert(ast_variable_arr_n(vars) > 0);
+		$$ = vars;
 	}
 	;
 
@@ -446,8 +449,12 @@ declaration_specifiers
 	;
 
 init_declarator_list
-	: init_declarator
-	| init_declarator_list ',' init_declarator
+	: init_declarator {
+		$$ = expr_array_create($1);
+	}
+	| init_declarator_list ',' init_declarator {
+		$$ = expr_array_append(&$1, $3);
+	}
 	;
 
 init_declarator
@@ -507,8 +514,10 @@ struct_declaration_list
 
 struct_declaration
 	/*: specifier_qualifier_list struct_declarator_list ';'*/
-	: declaration /* XXX: added temporarily */
-		{ $$ = ast_stmt_declaration_var($1); }
+	: declaration /* XXX: added temporarily */ {
+		assert(ast_variable_arr_n($1) == 1);
+		$$ = ast_variable_arr_v($1)[0];
+	}
 	;
 
 specifier_qualifier_list
@@ -750,10 +759,10 @@ compound_verification_statement
 
 declaration_list
 	: declaration {
-		$$ = stmt_array_create($1);
+		$$ = stmt_array_create(ast_stmt_create_declaration(lexloc(), $1));
 	}
 	| declaration_list declaration {
-		$$ = stmt_array_append(&$1, $2);
+		$$ = stmt_array_append(&$1, ast_stmt_create_declaration(lexloc(), $2));
 	}
 	;
 
@@ -829,7 +838,8 @@ translation_unit
 external_declaration
 	: function_definition	{ $$ = ast_functiondecl_create($1); }
 	| declaration		{
-		struct ast_variable *v = ast_stmt_declaration_var($1);
+		assert(ast_variable_arr_n($1) == 1);
+		struct ast_variable *v = ast_variable_arr_v($1)[0];
 		$$ = ast_decl_create(ast_variable_name(v), ast_variable_type(v));
 	}
 	;
