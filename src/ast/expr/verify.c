@@ -274,10 +274,12 @@ expr_binary_decide(struct ast_expr *expr, struct state *state)
 
 	assert(!e_res_iserror(root) && !e_res_iserror(last));
 
+	struct value_res *v1 = eval_to_value(e_res_as_eval(root), state),
+			 *v2 = eval_to_value(e_res_as_eval(last), state);
 	return value_compare(
-		eval_as_rval(e_res_as_eval(root)),
+		value_res_as_value(v1),
 		ast_expr_binary_op(expr),
-		eval_as_rval(e_res_as_eval(last))
+		value_res_as_value(v2)
 	);
 }
 
@@ -1705,7 +1707,11 @@ binary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_bloc
 {
 	struct ast_expr *gen_e1 = ast_expr_geninstr(ast_expr_binary_e1(expr), loc, b, s),
 			*gen_e2 = ast_expr_geninstr(ast_expr_binary_e2(expr), loc, b, s);
-	return ast_expr_binary_create(gen_e1, ast_expr_binary_op(expr), gen_e2);
+	struct ast_expr *gen = ast_expr_binary_create(
+		gen_e1, ast_expr_binary_op(expr), gen_e2
+	);
+	ast_block_append_stmt(b, ast_stmt_create_expr(loc, gen));
+	return gen;
 }
 
 static struct ast_expr *

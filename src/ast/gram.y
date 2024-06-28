@@ -410,7 +410,7 @@ declaration
 		assert(name);
 		struct ast_variable_arr *vars = ast_variable_arr_create();
 		ast_variable_arr_append(
-			vars, ast_variable_create(name, $1)
+			vars, ast_variable_create(dynamic_str(name), ast_type_copy($1))
 		);
 		$$ = vars;
 	}
@@ -422,7 +422,8 @@ declaration
 				expr_arr.expr[i], $1
 			);
 			ast_variable_arr_append(vars, ast_variable_create(
-				ast_declaration_name(decl), ast_declaration_type(decl)
+				dynamic_str(ast_declaration_name(decl)),
+				ast_type_copy(ast_declaration_type(decl))
 			));
 		}
 		assert(ast_variable_arr_n(vars) > 0);
