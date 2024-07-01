@@ -124,20 +124,25 @@ ast_type_create_userdef(char *name)
 }
 
 struct value *
-ast_type_rconst(struct ast_type *t, struct state *s, char *comment, bool persist)
+ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
+		char *comment, bool persist)
 {
 	switch (t->base) {
 	case TYPE_INT:
-		return value_int_indefinite_create();
+		assert(range);
+		return value_int_indefinite_create(range);
 	case TYPE_POINTER:
 		return value_ptr_indefinite_create(t->ptr_type);
 	case TYPE_USERDEF:
 		return ast_type_rconst(
 			externals_gettypedef(state_getext(s), t->userdef), s,
-			comment, persist
+			range, comment, persist
 		);
 	case TYPE_STRUCT:
 		return value_struct_indefinite_create(t, s, comment, persist);
+	case TYPE_RANGE:
+		assert(range);
+		return value_int_indefinite_create(range);
 	default:
 		assert(false);
 	}

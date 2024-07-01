@@ -154,7 +154,8 @@ state_range_aredeallocands(struct state *, struct object *,
 		struct ast_expr *lw, struct ast_expr *up);
 
 struct value *
-state_rconst(struct state *, struct ast_type *, char *comment, bool persist);
+state_rconst(struct state *, struct ast_type *, struct ast_expr *range,
+		char *comment, bool persist);
 
 struct value *
 state_static_init(struct state *, struct ast_expr *);

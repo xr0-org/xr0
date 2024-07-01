@@ -1,0 +1,1 @@
+0v: src/object/object.c:788: object_res_hasobject: Assertion `!object_res_iserror(res)' failed.

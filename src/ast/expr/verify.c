@@ -1068,9 +1068,6 @@ value_binary_eval(struct eval *rv1, enum ast_binary_operator op,
 static struct e_res *
 range_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("%s\n", state_str(state));
-	printf("range: %s\n", ast_expr_str(expr));
-	assert(false);
 	return e_res_eval_create(
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */
@@ -1078,6 +1075,7 @@ range_eval(struct ast_expr *expr, struct state *state)
 			state_rconst(
 				state,
 				ast_type_create_range(),
+				expr,
 				NULL,
 				false
 			)

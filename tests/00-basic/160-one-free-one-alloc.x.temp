@@ -1,0 +1,1 @@
+0v: src/value/value.c:276: value_int_lw: Assertion `v->type == VALUE_RCONST' failed.

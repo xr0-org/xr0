@@ -37,7 +37,7 @@ struct value *
 value_literal_create(char *);
 
 struct value *
-value_int_indefinite_create();
+value_int_indefinite_create(struct ast_expr *range);
 
 struct value *
 value_int_ne_create(int not_val);
@@ -50,6 +50,15 @@ value_int_lw(struct value *);
 
 int
 value_int_up(struct value *);
+
+struct value *
+value_int_sum(struct value *, struct value *, struct state *);
+
+struct value *
+value_int_difference(struct value *, struct value *, struct state *);
+
+struct value *
+value_int_product(struct value *, struct value *, struct state *);
 
 struct value *
 value_bang(struct value *);

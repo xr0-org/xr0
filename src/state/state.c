@@ -263,9 +263,10 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 }
 
 struct value *
-state_rconst(struct state *state, struct ast_type *t, char *comment, bool persist)
+state_rconst(struct state *state, struct ast_type *t, struct ast_expr *range,
+		char *comment, bool persist)
 {
-	struct value *v = ast_type_rconst(t, state, comment, persist);
+	struct value *v = ast_type_rconst(t, state, range, comment, persist);
 	if (value_isstruct(v)) {
 		return v;
 	}

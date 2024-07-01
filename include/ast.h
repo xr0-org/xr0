@@ -171,6 +171,12 @@ ast_expr_range_lw(struct ast_expr *);
 struct ast_expr *
 ast_expr_range_up(struct ast_expr *);
 
+bool
+ast_expr_israngemin(struct ast_expr *);
+
+bool
+ast_expr_israngemax(struct ast_expr *);
+
 struct ast_expr *
 ast_expr_alloc_create(struct ast_expr *);
 
@@ -212,10 +218,10 @@ struct math_state;
 bool
 ast_expr_matheval(struct ast_expr *e);
 
-DECLARE_RESULT_TYPE(int, int, intresult)
+struct value_res;
 
-struct intresult *
-ast_expr_consteval(struct ast_expr *);
+struct value_res *
+ast_expr_rangeeval(struct ast_expr *, struct state *);
 
 bool
 ast_expr_decide(struct ast_expr *, struct state *);
@@ -577,7 +583,8 @@ ast_type_create_range();
 struct externals;
 
 struct value *
-ast_type_rconst(struct ast_type *, struct state *s, char *comment, bool persist);
+ast_type_rconst(struct ast_type *, struct state *s, struct ast_expr *range,
+		char *comment, bool persist);
 
 void
 ast_type_destroy(struct ast_type *);

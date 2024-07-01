@@ -96,8 +96,19 @@ value_ptr_create(struct location *loc)
 	return v;
 }
 
+struct number_value;
+
+struct number_value *
+number_value_min_create();
+
+struct number_value *
+number_value_max_create();
+
+struct number_value *
+number_value_constant_create(int constant);
+
 struct number *
-number_indefinite_create();
+number_indefinite_create(struct number_value *lw, struct number_value *up);
 
 struct value *
 value_ptr_indefinite_create()
@@ -106,7 +117,9 @@ value_ptr_indefinite_create()
 	assert(v);
 	v->type = VALUE_PTR;
 	v->ptr.isindefinite = true;
-	v->ptr.n = number_indefinite_create();
+	v->ptr.n = number_indefinite_create(
+		number_value_min_create(), number_value_max_create()
+	);
 	return v;
 }
 
@@ -181,6 +194,24 @@ value_int_ne_create(int not_val)
 	return v;
 }
 
+struct value *
+value_int_sum(struct value *v1, struct value *v2, struct state *s)
+{
+	assert(false);
+}
+
+struct value *
+value_int_difference(struct value *v1, struct value *v2, struct state *s)
+{
+	assert(false);
+}
+
+struct value *
+value_int_product(struct value *v1, struct value *v2, struct state *s)
+{
+	assert(false);
+}
+
 static struct value *
 value_rconst_bang(struct value *);
 
@@ -208,17 +239,32 @@ value_int_range_create(int lw, int excl_up)
 	return v;
 }
 
-struct number *
-number_indefinite_create();
+static struct number_value *
+range_limit_to_value(struct ast_expr *limit);
 
 struct value *
-value_int_indefinite_create()
+value_int_indefinite_create(struct ast_expr *range)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_indefinite_create();
+	v->n = number_indefinite_create(
+		range_limit_to_value(ast_expr_range_lw(range)),
+		range_limit_to_value(ast_expr_range_up(range))
+	);
 	return v;
+}
+
+static struct number_value *
+range_limit_to_value(struct ast_expr *limit)
+{
+	if (ast_expr_israngemax(limit)) {
+		return number_value_max_create();
+	} else if (ast_expr_israngemin(limit)) {
+		return number_value_min_create();
+	} else {
+		return number_value_constant_create(ast_expr_as_constant(limit));
+	}
 }
 
 int
@@ -227,19 +273,19 @@ number_range_lw(struct number *);
 int
 value_int_lw(struct value *v)
 {
+	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
 	return number_range_lw(v->n);
 }
 
 int
 number_range_up(struct number *);
 
-
 int
 value_int_up(struct value *v)
 {
+	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
 	return number_range_up(v->n);
 }
-
 
 struct number *
 number_computed_create(struct ast_expr *);
@@ -327,11 +373,16 @@ value_struct_indefinite_create(struct ast_type *t, struct state *s,
 		struct object *obj = map_get(v->_struct.m, field);
 		struct strbuilder *b = strbuilder_create();
 		strbuilder_printf(b, "%s.%s", comment, field);
+		struct ast_expr *range = ast_expr_range_create(
+			ast_expr_rangemin_create(),
+			ast_expr_rangemax_create()
+		);
 		object_assign(
 			obj,
 			state_rconst(
 				s,
 				ast_variable_type(var[i]),
+				range,
 				strbuilder_build(b), /* comment */
 				persist
 			)
@@ -949,9 +1000,6 @@ number_ranges_create(struct number_range_arr *ranges)
 	return num;
 }
 
-struct number_value *
-number_value_constant_create(int constant);
-
 struct number_range_arr *
 number_range_arr_single_create(int val);
 
@@ -992,13 +1040,6 @@ number_computed_bang(struct number *orig)
 	num->computation = ast_expr_inverted_copy(orig->computation, true);
 	return num;
 }
-
-
-struct number_value *
-number_value_min_create();
-
-struct number_value *
-number_value_max_create();
 
 struct number_range_arr *
 number_range_arr_ne_create(int val)
@@ -1041,16 +1082,16 @@ number_with_range_create(int lw, int excl_up)
 	return number_ranges_create(arr);
 }
 
+char *
+number_value_str(struct number_value *v);
+
 struct number *
-number_indefinite_create()
+number_indefinite_create(struct number_value *lw, struct number_value *up)
 {
 	struct number_range_arr *arr = number_range_arr_create();
 	number_range_arr_append(
 		arr, 
-		number_range_create(
-			number_value_min_create(),
-			number_value_max_create()
-		)
+		number_range_create(lw, up)
 	);
 	return number_ranges_create(arr);
 }
@@ -1390,9 +1431,6 @@ number_range_upper(struct number_range *r)
 {
 	return r->upper;
 }
-
-char *
-number_value_str(struct number_value *v);
 
 char *
 number_range_str(struct number_range *r)
