@@ -861,6 +861,7 @@ struct ast_expr *
 ast_expr_copy(struct ast_expr *expr)
 {
 	assert(expr);
+
 	switch (expr->kind) {
 	case EXPR_IDENTIFIER:
 		return ast_expr_identifier_create(dynamic_str(expr->u.string));

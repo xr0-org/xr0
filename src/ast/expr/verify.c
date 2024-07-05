@@ -1707,11 +1707,7 @@ binary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_bloc
 {
 	struct ast_expr *gen_e1 = ast_expr_geninstr(ast_expr_binary_e1(expr), loc, b, s),
 			*gen_e2 = ast_expr_geninstr(ast_expr_binary_e2(expr), loc, b, s);
-	struct ast_expr *gen = ast_expr_binary_create(
-		gen_e1, ast_expr_binary_op(expr), gen_e2
-	);
-	ast_block_append_stmt(b, ast_stmt_create_expr(loc, gen));
-	return gen;
+	return ast_expr_binary_create(gen_e1, ast_expr_binary_op(expr), gen_e2);
 }
 
 static struct ast_expr *
