@@ -909,12 +909,17 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		if (e_res_iserror(lval_res)) {
 			return e_res_as_error(lval_res);
 		}
-		struct object *l_obj = object_res_as_object(
-			state_get(state, eval_as_lval(e_res_as_eval(lval_res)), true)
+		struct object_res *o_res = state_get(
+			state, eval_as_lval(e_res_as_eval(lval_res)), true
 		);
+		if (object_res_iserror(o_res)) {
+			printf("error: %s\n", error_str(object_res_as_error(o_res)));
+			assert(false);
+			return object_res_as_error(o_res);
+		}
 		ast_expr_destroy(name);
 
-		object_assign(l_obj, value_copy(arg[i]));
+		object_assign(object_res_as_object(o_res), value_copy(arg[i]));
 	}
 	return NULL;
 }
@@ -929,9 +934,6 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	if (e_res_iserror(l_res)) {
 		return e_res_error_create(e_res_as_error(l_res));
 	}
-	printf("%s\n", state_str(state));
-	printf("expr: %s\n", ast_expr_str(expr));
-	printf("eval (lval): %s\n", eval_str(e_res_as_eval(l_res)));
 	struct object_res *obj_res = eval_to_object(
 		e_res_as_eval(l_res), state, true
 	);

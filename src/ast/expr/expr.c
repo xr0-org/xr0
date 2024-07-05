@@ -11,7 +11,6 @@
 #include "state.h"
 #include "stmt/stmt.h"
 #include "util.h"
-#include "value.h"
 
 static struct ast_expr *
 ast_expr_create()
@@ -1138,55 +1137,53 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 	}
 }
 
-static struct value_res *
-binary_rangeeval(struct ast_expr *, struct state *);
+void
+nulldestruct(int x) { /* do nothing */ }
 
-struct value_res *
-ast_expr_rangeeval(struct ast_expr *e, struct state *s)
+DEFINE_RESULT_TYPE(int, int, nulldestruct, intresult, true)
+
+static struct intresult *
+binary_consteval(struct ast_expr *);
+
+struct intresult *
+ast_expr_consteval(struct ast_expr *e)
 {
 	switch (e->kind) {
 	case EXPR_CONSTANT:
-		return value_res_value_create(
-			value_int_create(ast_expr_as_constant(e))
-		);
+		return intresult_int_create(ast_expr_as_constant(e));
 	case EXPR_BINARY:
-		return binary_rangeeval(e, s);
+		return binary_consteval(e);
 	default:
 		assert(false);
 	}
 }
 
-static struct value_res *
-binary_rangeeval(struct ast_expr *e, struct state *s)
+static struct intresult *
+binary_consteval(struct ast_expr *e)
 {
-	struct value_res *r1 = ast_expr_rangeeval(ast_expr_binary_e1(e), s),
-			 *r2 = ast_expr_rangeeval(ast_expr_binary_e2(e), s);
-	if (value_res_iserror(r1)) {
+	struct intresult *r1 = ast_expr_consteval(ast_expr_binary_e1(e)),
+			 *r2 = ast_expr_consteval(ast_expr_binary_e2(e));
+	if (intresult_iserror(r1)) {
 		return r1;
 	}
-	if (value_res_iserror(r2)) {
+	if (intresult_iserror(r2)) {
 		return r2;
 	}
-	struct value *v1 = value_res_as_value(r1),
-		     *v2 = value_res_as_value(r2);
+	int ans1 = intresult_as_int(r1),
+	    ans2 = intresult_as_int(r2);
+	intresult_destroy(r2);
+	intresult_destroy(r1);
 
-	struct value *res;
 	switch (ast_expr_binary_op(e)) {
 	case BINARY_OP_ADDITION:
-		res = value_int_sum(v1, v2, s);
-		break;
+		return intresult_int_create(ans1+ans2);
 	case BINARY_OP_SUBTRACTION:
-		res = value_int_difference(v1, v2, s);
-		break;
+		return intresult_int_create(ans1-ans2);
 	case BINARY_OP_MULTIPLICATION:
-		res = value_int_product(v1, v2, s);
-		break;
+		return intresult_int_create(ans1*ans2);
 	default:
 		assert(false);
 	}
-	value_res_destroy(r2);
-	value_res_destroy(r1);
-	return value_res_value_create(res);
 }
 
 static struct string_arr *

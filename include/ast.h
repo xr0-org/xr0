@@ -218,10 +218,10 @@ struct math_state;
 bool
 ast_expr_matheval(struct ast_expr *e);
 
-struct value_res;
+DECLARE_RESULT_TYPE(int, int, intresult)
 
-struct value_res *
-ast_expr_rangeeval(struct ast_expr *, struct state *);
+struct intresult *
+ast_expr_consteval(struct ast_expr *);
 
 bool
 ast_expr_decide(struct ast_expr *, struct state *);
@@ -584,7 +584,7 @@ struct externals;
 
 struct value *
 ast_type_rconst(struct ast_type *, struct state *s, struct ast_expr *range,
-		char *comment, bool persist);
+	char *comment, bool persist);
 
 void
 ast_type_destroy(struct ast_type *);

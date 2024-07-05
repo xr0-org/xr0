@@ -99,19 +99,15 @@ struct object_res *
 block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		bool constructive)
 {
-	struct value_res *offset_res = ast_expr_rangeeval(offset, s);
-	if (value_res_iserror(offset_res)) {
-		return object_res_error_create(value_res_as_error(offset_res));
-	}
-	struct value *v_offset = value_res_as_value(offset_res);
-	int o_lw = value_int_lw(v_offset),
-	    o_up = value_int_up(v_offset);
-	if (o_lw < 0 || o_up >= b->size) {
+	struct intresult *offseteval = ast_expr_consteval(offset);
+	int of = intresult_as_int(offseteval);
+	if (of < 0 || of >= b->size) {
 		return object_res_error_create(
 			error_printf("out of bounds")
 		);
 	}
-	value_res_destroy(offset_res);
+	offset = ast_expr_constant_create(of);
+	intresult_destroy(offseteval);
 
 	int index = object_arr_index(b->arr, offset, s);
 	if (index == -1) {
