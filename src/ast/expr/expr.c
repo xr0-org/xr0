@@ -27,6 +27,12 @@ ast_expr_identifier_create(char *s)
 	return expr;
 }
 
+bool
+ast_expr_isidentifier(struct ast_expr *expr)
+{
+	return expr->kind == EXPR_IDENTIFIER;
+}
+
 char *
 ast_expr_as_identifier(struct ast_expr *expr)
 {

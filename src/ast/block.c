@@ -155,7 +155,7 @@ ast_block_setups(struct ast_block *abs, struct state *state)
 	int nstmts = ast_block_nstmts(abs);
 	struct ast_stmt **stmts = ast_block_stmts(abs);
 	for (int i = 0; i < nstmts; i++) {
-		struct error *err = ast_stmt_buildsetup(stmts[i], state, setups);		
+		struct error *err = ast_stmt_buildsetup(stmts[i], state, setups);
 		if (err) {
 			return (struct preconds_result) { .b = NULL, .err = err };
 		}

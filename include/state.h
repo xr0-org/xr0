@@ -47,7 +47,7 @@ struct state *
 state_create(struct frame *, struct externals *);
 
 void
-state_setprops(struct state *s, struct props *p);
+state_setvconsts(struct state *new, struct state *old);
 
 bool
 state_assume(struct state *, struct ast_expr *cond);
@@ -154,7 +154,7 @@ state_range_aredeallocands(struct state *, struct object *,
 		struct ast_expr *lw, struct ast_expr *up);
 
 struct value *
-state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
+state_vconst(struct state *, struct ast_type *, char *key, bool persist);
 
 struct value *
 state_static_init(struct state *, struct ast_expr *);

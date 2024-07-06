@@ -313,7 +313,7 @@ value_struct_create(struct ast_type *t)
 
 struct value *
 value_struct_indefinite_create(struct ast_type *t, struct state *s,
-		char *comment, bool persist)
+		char *key, bool persist)
 {
 	t = ast_type_struct_complete(t, state_getext(s));
 	assert(ast_type_struct_members(t));
@@ -326,13 +326,13 @@ value_struct_indefinite_create(struct ast_type *t, struct state *s,
 		char *field = ast_variable_name(var[i]);
 		struct object *obj = map_get(v->_struct.m, field);
 		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "%s.%s", comment, field);
+		strbuilder_printf(b, "%s.%s", key, field);
 		object_assign(
 			obj,
 			state_vconst(
 				s,
 				ast_variable_type(var[i]),
-				strbuilder_build(b), /* comment */
+				strbuilder_build(b), /* key */
 				persist
 			)
 		);
@@ -1029,13 +1029,21 @@ number_decide(struct number *n, struct state *s)
 		}
 		return bool_res_bool_create(!bool_res_as_bool(res));
 	}
-	printf("cond: %s\n", ast_expr_str(cond));
 	return decide(cond, s);
 }
 
 static struct bool_res *
 decide(struct ast_expr *expr, struct state *s)
 {
+	char *expr_str = ast_expr_str(expr);
+	a_printf(
+		ast_expr_isidentifier(expr), 
+		"cannot decide on `%s', " \
+		"only identifiers, bangs, and calls are supported\n",
+		expr_str
+	);
+	free(expr_str);
+
 	struct value *v = state_getvconst(s, ast_expr_as_identifier(expr));
 	assert(v->type == VALUE_INT);
 	struct number *r = v->n;

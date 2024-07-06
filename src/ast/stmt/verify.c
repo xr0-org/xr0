@@ -698,7 +698,8 @@ static struct error *
 comp_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
 
 struct error *
-ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups) {
+ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
+{
 	switch (ast_stmt_kind(stmt)) {	
 	case STMT_DECLARATION:
 	case STMT_NOP:
@@ -740,11 +741,12 @@ sel_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *set
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
+	printf("%s\n", state_str(state));
+	printf("cond: %s\n", ast_expr_str(cond));
+	assert(false);
 	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
-		// v_printf("setup branch decision error: %s\n", error_str(dec.err));
-		/* XXX: if error is `undecidable', must be decidable in some other branch */
-		return NULL;
+		assert(false);
 	}
 	if (dec.decision) {
 		return ast_stmt_buildsetup(body, state, setups);

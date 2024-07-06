@@ -10,6 +10,9 @@ struct ast_expr;
 struct ast_expr *
 ast_expr_identifier_create(char *);
 
+bool
+ast_expr_isidentifier(struct ast_expr *);
+
 char *
 ast_expr_as_identifier(struct ast_expr *);
 
@@ -249,8 +252,7 @@ ast_expr_pf_augment(struct value *, struct ast_expr *, struct state *);
 struct ast_function;
 
 struct value *
-ast_expr_call_arbitrary(struct ast_expr *, struct ast_function *,
-	struct state *);
+ast_expr_call_arbitrary(struct ast_function *, struct state *);
 
 struct ast_block;
 struct lexememarker;
@@ -570,7 +572,7 @@ ast_type_create_range(struct ast_expr *lw, struct ast_expr *up_nonincl);
 struct externals;
 
 struct value *
-ast_type_vconst(struct ast_type *, struct state *s, char *comment, bool persist);
+ast_type_vconst(struct ast_type *, struct state *s, char *key, bool persist);
 
 void
 ast_type_destroy(struct ast_type *);

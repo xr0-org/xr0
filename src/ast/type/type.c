@@ -127,7 +127,7 @@ ast_type_create_userdef(char *name)
 }
 
 struct value *
-ast_type_vconst(struct ast_type *t, struct state *s, char *comment, bool persist)
+ast_type_vconst(struct ast_type *t, struct state *s, char *key, bool persist)
 {
 	switch (t->base) {
 	case TYPE_INT:
@@ -136,10 +136,11 @@ ast_type_vconst(struct ast_type *t, struct state *s, char *comment, bool persist
 		return value_ptr_indefinite_create(t->ptr_type);
 	case TYPE_USERDEF:
 		return ast_type_vconst(
-			externals_gettypedef(state_getext(s), t->userdef), s, comment, persist
+			externals_gettypedef(state_getext(s), t->userdef),
+			s, key, persist
 		);
 	case TYPE_STRUCT:
-		return value_struct_indefinite_create(t, s, comment, persist);
+		return value_struct_indefinite_create(t, s, key, persist);
 	default:
 		assert(false);
 	}

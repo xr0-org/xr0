@@ -807,14 +807,9 @@ static struct e_res *
 call_to_computed_value(struct ast_function *, struct state *s);
 
 struct value *
-ast_expr_call_arbitrary(struct ast_expr *expr, struct ast_function *f,
-		struct state *state)
+ast_expr_call_arbitrary(struct ast_function *f, struct state *state)
 {
-	struct e_res *res = call_to_computed_value(f, state);
-	if (e_res_iserror(res)) {
-		assert(false);
-	}
-	return eval_as_rval(e_res_as_eval(res));
+	return eval_as_rval(e_res_as_eval(call_to_computed_value(f, state)));
 }
 
 static struct e_res *
@@ -847,16 +842,17 @@ call_to_computed_value(struct ast_function *f, struct state *s)
 		}
 	}
 
+	struct ast_expr *call = ast_expr_call_create(
+		ast_expr_identifier_create(dynamic_str(root)),
+		nparams, computed_param
+	);
+	char *key = ast_expr_str(call);
+	struct value *v = state_vconst(
+		s, ast_type_copy(ast_function_type(f)), key, false
+	);
+	free(key);
 	return e_res_eval_create(
-		eval_rval_create(
-			ast_type_copy(ast_function_type(f)),
-			value_sync_create(
-				ast_expr_call_create(
-					ast_expr_identifier_create(dynamic_str(root)),
-					nparams, computed_param
-				)
-			)
-		)
+		eval_rval_create(ast_type_copy(ast_function_type(f)), v)
 	);
 }
 

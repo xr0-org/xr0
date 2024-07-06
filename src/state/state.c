@@ -46,14 +46,9 @@ state_create(struct frame *f, struct externals *ext)
 }
 
 void
-state_setprops(struct state *s, struct props *p)
+state_setvconsts(struct state *new, struct state *old)
 {
-	int n = props_n(p);
-	struct ast_expr **expr = props_props(p);
-	for (int i = 0; i < n; i++) {
-		bool res = state_assume(s, expr[i]);
-		assert(res);
-	}
+	new->vconst = vconst_copy(old->vconst);
 }
 
 bool
@@ -275,16 +270,17 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 }
 
 struct value *
-state_vconst(struct state *state, struct ast_type *t, char *comment, bool persist)
+state_vconst(struct state *state, struct ast_type *t, char *key, bool persist)
 {
-	struct value *v = ast_type_vconst(t, state, comment, persist);
+	struct value *prev = vconst_getbykey(state->vconst, key);
+	if (prev) {
+		return prev;
+	}
+	struct value *v = ast_type_vconst(t, state, key, persist);
 	if (value_isstruct(v)) {
 		return v;
 	}
-	char *c = vconst_declare(
-		state->vconst, v,
-		comment, persist
-	);
+	char *c = vconst_declare(state->vconst, v, key, persist);
 	return value_sync_create(ast_expr_identifier_create(c));
 }
 

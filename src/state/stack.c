@@ -485,7 +485,7 @@ stack_popprep(struct stack *s, struct state *state)
 		if (!v) {
 			state_writeregister(
 				state,
-				ast_expr_call_arbitrary(s->call, s->f, state)
+				ast_expr_call_arbitrary(s->f, state)
 			);
 		}
 	}
