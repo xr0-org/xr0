@@ -1029,6 +1029,7 @@ number_decide(struct number *n, struct state *s)
 		}
 		return bool_res_bool_create(!bool_res_as_bool(res));
 	}
+	printf("cond: %s\n", ast_expr_str(cond));
 	return decide(cond, s);
 }
 

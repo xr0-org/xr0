@@ -353,10 +353,10 @@ path_init_actual(struct path *p)
 	if ((err = ast_function_initparams(p->f, p->actual))) {
 		return err;
 	}
+	state_setprops(p->actual, state_getprops(p->abstract));
 	if ((err = ast_function_initsetup(p->f, p->actual))) {
 		return err;
 	}
-	state_setprops(p->actual, state_getprops(p->abstract));
 	state_clearregister(p->actual);
 	p->path_state = PATH_STATE_ACTUAL;
 	return NULL;
