@@ -1582,14 +1582,34 @@ irreducible_assume(struct ast_expr *e, bool value, struct state *s)
 }
 
 static struct preresult *
+irreducible_assume_value(char *vconst, bool value, struct state *);
+
+static struct preresult *
 irreducible_assume_actual(struct ast_expr *e, struct state *s)
 {
-	struct props *p = state_getprops(s);
-	if (props_contradicts(p, e)) {
-		return preresult_contradiction_create();
+	switch (ast_expr_kind(e)) {
+	case EXPR_IDENTIFIER:
+		return irreducible_assume_value(
+			ast_expr_as_identifier(e), true, s
+		);
+	case EXPR_UNARY:
+		assert(ast_expr_unary_op(e) == UNARY_OP_BANG);
+		return irreducible_assume_value(
+			ast_expr_as_identifier(ast_expr_unary_operand(e)),
+			false, s
+		);
+	default:
+		assert(false);
 	}
-	props_install(state_getprops(s), ast_expr_copy(e));
-	return preresult_empty_create();
+}
+
+static struct preresult *
+irreducible_assume_value(char *vconst, bool value, struct state *s)
+{
+	struct value *v = state_getvconst(s, vconst);
+	return value_assume(v, value)
+		? preresult_empty_create()
+		: preresult_contradiction_create();
 }
 
 static struct preresult *

@@ -898,6 +898,24 @@ values_comparable(struct value *v1, struct value *v2)
 	return v1->type == v2->type;
 }
 
+static void
+nulldestruct(int x) { /* do nothing */ }
+
+DEFINE_RESULT_TYPE(bool, bool, nulldestruct, bool_res, true)
+
+static struct bool_res *
+number_decide(struct number *n, struct state *s);
+
+struct bool_res *
+value_decide(struct value *v, struct state *s)
+{
+	if (value_isconstant(v)) {
+		return bool_res_bool_create(value_as_constant(v));
+	}
+	assert(v->type == VALUE_SYNC);
+	return number_decide(v->n, s);
+}
+
 bool
 value_equal(struct value *v1, struct value *v2)
 {
@@ -993,6 +1011,27 @@ number_computed_bang(struct number *orig)
 	return num;
 }
 
+static bool
+number_range_arr_canbe(struct number_range_arr *arr, bool value);
+
+static struct bool_res *
+number_decide(struct number *n, struct state *s)
+{
+	assert(n->type == NUMBER_COMPUTED);
+	struct value *v = state_getvconst(
+		s, ast_expr_as_identifier(n->computation)
+	);
+	assert(v->type == VALUE_INT);
+	struct number *r = v->n;
+	assert(r->type == NUMBER_RANGES);
+	if (!number_range_arr_canbe(r->ranges, false)) {
+		return bool_res_bool_create(true);
+	}
+	if (number_isconstant(r) && number_as_constant(r) == 0) {
+		return bool_res_bool_create(false);
+	}
+	return bool_res_error_create(error_undecideable_cond(n->computation));
+}
 
 struct number_value *
 number_value_min_create();
@@ -1173,9 +1212,6 @@ number_ranges_equal(struct number *n1, struct number *n2)
 
 	return true;
 }
-
-static bool
-number_range_arr_canbe(struct number_range_arr *arr, bool value);
 
 static struct number_range_arr *
 number_range_assumed_value(bool value);
@@ -1395,14 +1431,20 @@ char *
 number_value_str(struct number_value *v);
 
 char *
+number_value_str_inrange(struct number_value *v);
+
+char *
 number_range_str(struct number_range *r)
 {
 	struct strbuilder *b = strbuilder_create();
 	if (number_range_issingle(r)) {
 		strbuilder_printf(b, "%s", number_value_str(r->lower));
 	} else {
-		strbuilder_printf(b, "%s:%s", number_value_str(r->lower),
-				number_value_str(r->upper));
+		strbuilder_printf(
+			b, "%s?%s",
+			number_value_str_inrange(r->lower),
+			number_value_str_inrange(r->upper)
+		);
 	}
 	return strbuilder_build(b);
 }
@@ -1418,7 +1460,6 @@ number_range_copy(struct number_range *r)
 	);
 }
 
-/* number_value_le: v ≤ constant */
 static bool
 number_value_le_constant(struct number_value *v, int constant);
 
@@ -1535,6 +1576,19 @@ number_value_str(struct number_value *v)
 		assert(false);
 	}
 	return strbuilder_build(b);
+}
+
+char *
+number_value_str_inrange(struct number_value *v)
+{
+	switch (v->type) {
+	case NUMBER_VALUE_CONSTANT:
+		return number_value_str(v);
+	case NUMBER_VALUE_LIMIT:
+		return dynamic_str("");
+	default:
+		assert(false);
+	}
 }
 
 struct number_value *

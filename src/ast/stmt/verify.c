@@ -617,34 +617,14 @@ sel_decide(struct ast_expr *control, struct state *state)
 	struct value *v = value_res_as_value(
 		eval_to_value(e_res_as_eval(res), state)
 	);
-	if (value_issync(v)) {
-		struct ast_expr *sync = value_as_sync(v);
-		struct props *p = state_getprops(state);
-		if (props_get(p, sync)) {
-			return (struct decision) { .decision = true, .err = NULL };
-		} else if (props_contradicts(p, sync)) {
-			return (struct decision) { .decision = false, .err = NULL };
-		}
+	struct bool_res *dec_res = value_decide(v, state);
+	if (bool_res_iserror(dec_res)) {
+		return (struct decision) { .err = bool_res_as_error(dec_res) };
 	}
-	if (value_isconstant(v)) {
-		if (value_as_constant(v)) {
-			return (struct decision) { .decision = true, .err = NULL };	
-		}
-		return (struct decision) { .decision = false, .err = NULL };
-	} 
-
-	struct value *zero = value_int_create(0);
-
-	if (!values_comparable(zero, v)) {
-		return (struct decision) {
-			.decision = false,
-			.err      = error_undecideable_cond(value_to_expr(v))
-		};
-	}
-
-	bool nonzero = !value_equal(zero, v);
-	value_destroy(zero);
-	return (struct decision) { .decision = nonzero, .err = NULL };
+	return (struct decision) {
+		.decision	= bool_res_as_bool(dec_res),
+		.err		= NULL,
+	};
 }
 
 static struct ast_expr *

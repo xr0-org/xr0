@@ -129,6 +129,11 @@ value_references(struct value *, struct location *, struct state *,
 
 enum ast_binary_operator;
 
+DECLARE_RESULT_TYPE(bool, bool, bool_res)
+
+struct bool_res *
+value_decide(struct value *, struct state *);
+
 bool
 values_comparable(struct value *v1, struct value *v2);
 

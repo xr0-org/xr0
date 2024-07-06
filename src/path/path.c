@@ -311,6 +311,7 @@ path_copywithcond(struct path *old, struct ast_expr *cond)
 		if (!state_assume(p->actual, cond)) {
 			p->path_state = PATH_STATE_ATEND;
 		}
+		state_assume(p->abstract, cond);
 		break;
 	default:
 		assert(false);

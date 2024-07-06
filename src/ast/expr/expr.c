@@ -1061,7 +1061,7 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 	}
 }
 
-void
+static void
 nulldestruct(int x) { /* do nothing */ }
 
 DEFINE_RESULT_TYPE(int, int, nulldestruct, intresult, true)
