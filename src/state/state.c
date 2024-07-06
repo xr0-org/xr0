@@ -45,13 +45,25 @@ state_create(struct frame *f, struct externals *ext)
 	return state;
 }
 
-struct state *
-state_create_withprops(struct frame *f, struct externals *ext,
-		struct props *props)
+void
+state_setprops(struct state *s, struct props *p)
 {
-	struct state *state = state_create(f, ext);
-	state->props = props_copy(props);
-	return state;
+	int n = props_n(p);
+	struct ast_expr **expr = props_props(p);
+	for (int i = 0; i < n; i++) {
+		bool res = state_assume(s, expr[i]);
+		assert(res);
+	}
+}
+
+bool
+state_assume(struct state *s, struct ast_expr *cond)
+{
+	struct preresult *r = ast_expr_assume(cond, s);
+	assert(!preresult_iserror(r));
+	bool ans = !preresult_iscontradiction(r);
+	props_install(s->props, cond);
+	return ans;
 }
 
 void

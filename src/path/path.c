@@ -288,10 +288,6 @@ path_split(struct path *p, struct ast_expr *cond)
 static struct ast_function *
 copy_withcondname(struct ast_function *, struct ast_expr *cond); 
 
-/* state_assume: return false if contradiction encountered. */
-static bool
-state_assume(struct state *, struct ast_expr *cond);
-
 static struct path *
 path_copywithcond(struct path *old, struct ast_expr *cond)
 {
@@ -317,20 +313,6 @@ path_copywithcond(struct path *old, struct ast_expr *cond)
 		assert(false);
 	}
 	return p;
-}
-
-bool
-preresult_iserror(struct preresult *);
-
-bool
-preresult_iscontradiction(struct preresult *);
-
-static bool
-state_assume(struct state *s, struct ast_expr *cond)
-{
-	struct preresult *r = ast_expr_assume(cond, s);
-	assert(!preresult_iserror(r));
-	return !preresult_iscontradiction(r);
 }
 
 static char *
@@ -367,17 +349,14 @@ path_init_actual(struct path *p)
 		ast_expr_identifier_create(dynamic_str("base act")), /* xxx */
 		p->f
 	);
-	p->actual = state_create_withprops(
-		f,
-		p->ext,
-		state_getprops(p->abstract)
-	);
+	p->actual = state_create(f, p->ext);
 	if ((err = ast_function_initparams(p->f, p->actual))) {
 		return err;
 	}
 	if ((err = ast_function_initsetup(p->f, p->actual))) {
 		return err;
 	}
+	state_setprops(p->actual, state_getprops(p->abstract));
 	state_clearregister(p->actual);
 	p->path_state = PATH_STATE_ACTUAL;
 	return NULL;

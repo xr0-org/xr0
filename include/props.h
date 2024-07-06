@@ -23,7 +23,7 @@ int
 props_n(struct props *);
 
 struct ast_expr **
-props_prop(struct props *);
+props_props(struct props *);
 
 void
 props_install(struct props *, struct ast_expr *);

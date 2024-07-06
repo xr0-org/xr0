@@ -218,6 +218,12 @@ ast_expr_exec(struct ast_expr *, struct state *);
 struct e_res;
 struct preresult;
 
+bool
+preresult_iserror(struct preresult *);
+
+bool
+preresult_iscontradiction(struct preresult *);
+
 struct preresult *
 ast_expr_assume(struct ast_expr *, struct state *);
 
@@ -466,8 +472,6 @@ ast_stmt_linearise(struct ast_stmt *, struct state *);
 
 bool
 ast_stmt_linearisable(struct ast_stmt *);
-
-struct preresult;
 
 bool
 ast_stmt_isterminal(struct ast_stmt *, struct state *);

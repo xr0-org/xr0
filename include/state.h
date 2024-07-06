@@ -46,8 +46,11 @@ struct frame;
 struct state *
 state_create(struct frame *, struct externals *);
 
-struct state *
-state_create_withprops(struct frame *, struct externals *, struct props *props);
+void
+state_setprops(struct state *s, struct props *p);
+
+bool
+state_assume(struct state *, struct ast_expr *cond);
 
 struct state *
 state_copy(struct state *);
