@@ -12,6 +12,26 @@
 #include "type/type.h"
 #include "util.h"
 
+char *CURR_FUNC = NULL;
+int CURR_RCONST_COUNT = 0;
+
+void
+setcurrfunc(char *func)
+{
+	CURR_RCONST_COUNT = 0;
+	CURR_FUNC = func;
+}
+
+char *
+getrconstkey()
+{
+	assert(CURR_FUNC);
+
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s:%d", CURR_FUNC, CURR_RCONST_COUNT++);
+	return strbuilder_build(b);
+}
+
 extern char *yytext;
 
 int
@@ -202,7 +222,7 @@ primary_expression
 	: identifier
 		{ $$ = ast_expr_identifier_create($1); }
 	| ARB_ARG
-		{ $$ = ast_expr_arbarg_create(); }
+		{ $$ = ast_expr_arbarg_create(getrconstkey()); }
 	| CONSTANT
 		{ $$ = ast_expr_constant_create(parse_int(yytext)); } /* XXX */
 	| CHAR_LITERAL
@@ -261,9 +281,6 @@ isdeallocand_expression
 	| ISDEALLOCAND_OP isdeallocand_expression {
 		$$ = ast_expr_isdeallocand_create($2);
 	}
-	| ARB_ARG isdeallocand_expression {
-		$$ = ast_expr_isdereferencable_create($2);
-	}
 	;
 
 unary_expression
@@ -298,7 +315,7 @@ multiplicative_expression
 	| multiplicative_expression '*' cast_expression
 	| multiplicative_expression '/' cast_expression
 	/*| multiplicative_expression '%' cast_expression*/
-;
+	;
 
 additive_expression
 	: multiplicative_expression
@@ -321,15 +338,10 @@ relational_operator
         | GE_OP	{ $$ = BINARY_OP_GE; }
 	;
 
-justification
-	: '{' shift_expression '}'
-	| /* empty */
-	;
-
 relational_expression
 	: shift_expression
-	| relational_expression relational_operator justification shift_expression
-		{ $$ = ast_expr_binary_create($1, $2, $4); }
+	| relational_expression relational_operator shift_expression
+		{ $$ = ast_expr_binary_create($1, $2, $3); }
 	;
 
 equality_operator
@@ -339,8 +351,8 @@ equality_operator
 
 equality_expression
 	: relational_expression
-	| equality_expression equality_operator justification relational_expression
-		{ $$ = ast_expr_binary_create($1, $2, $4); }
+	| equality_expression equality_operator relational_expression
+		{ $$ = ast_expr_binary_create($1, $2, $3); }
 	;
 
 and_expression
@@ -881,7 +893,9 @@ block_statement
 	;
 
 function_definition
-	: AXIOM declaration_specifiers function_declarator block_statement {
+	: AXIOM declaration_specifiers function_declarator 
+		{ setcurrfunc($3.decl.name); }
+		block_statement {
 		for (int i = 0; i < $3.ptr_valence; i++) {
 			assert($2);
 			$2 = ast_type_create_ptr($2);
@@ -892,11 +906,14 @@ function_definition
 			$3.decl.name,
 			$3.decl.n,
 			$3.decl.param,
-			$4.abstract ? $4.abstract : ast_block_create(NULL, 0),
-			$4.body
+			$5.abstract,
+			$5.body,
+			lexloc()
 		);
 	}
-	| declaration_specifiers function_declarator block_statement {
+	| declaration_specifiers function_declarator
+		{ setcurrfunc($2.decl.name); }
+		block_statement {
 		for (int i = 0; i < $2.ptr_valence; i++) {
 			assert($1);
 			$1 = ast_type_create_ptr($1);
@@ -907,19 +924,23 @@ function_definition
 			$2.decl.name,
 			$2.decl.n,
 			$2.decl.param,
-			$3.abstract ? $3.abstract : ast_block_create(NULL, 0),
-			$3.body
+			$4.abstract,
+			$4.body,
+			lexloc()
 		);
 	}
-	| function_declarator block_statement { 
+	| function_declarator
+		{ setcurrfunc($1.decl.name); }
+		block_statement { 
 		$$ = ast_function_create(
 			false,
 			ast_type_create(TYPE_VOID, 0),
 			$1.decl.name,
 			$1.decl.n,
 			$1.decl.param,
-			$2.abstract ? $2.abstract : ast_block_create(NULL, 0),
-			$2.body
+			$3.abstract,
+			$3.body,
+			lexloc()
 		);
 	}
 	;

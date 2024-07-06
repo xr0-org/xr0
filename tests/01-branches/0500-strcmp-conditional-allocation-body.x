@@ -3,11 +3,11 @@
 
 void *
 test(char *s) ~ [
-	if (strcmp(s, "yes") == 0) {
+	if (strcmp(s, "yes")) {
 		return .malloc(1);
 	}
 ]{
-	if (strcmp(s, "yes") == 0) {
+	if (strcmp(s, "yes")) {
 		return malloc(1);
 	}
 	return NULL;

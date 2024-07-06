@@ -167,6 +167,18 @@ error_state_deref_rconst();
 struct error *
 error_to_state_deref_rconst(struct error *err);
 
+struct error *
+error_modulate_skip();
+
+struct error *
+error_to_modulate_skip(struct error *);
+
+struct error *
+error_eval_void();
+
+struct error *
+error_to_eval_void(struct error *);
+
 char *
 error_str(struct error *);
 

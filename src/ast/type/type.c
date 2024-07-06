@@ -4,6 +4,8 @@
 #include <string.h>
 #include "ast.h"
 #include "ext.h"
+#include "intern.h"
+#include "lex.h"
 #include "state.h"
 #include "type.h"
 #include "util.h"
@@ -127,22 +129,122 @@ ast_type_create_userdef(char *name)
 }
 
 struct value *
-ast_type_vconst(struct ast_type *t, struct state *s, char *comment, bool persist)
+ast_type_vconst(struct ast_type *t, struct state *s, char *key, bool persist)
 {
 	switch (t->base) {
 	case TYPE_INT:
-		return value_int_indefinite_create();
 	case TYPE_POINTER:
-		return value_ptr_indefinite_create(t->ptr_type);
+		/* no key in the value except for structs */
+		return ast_type_vconstnokey(t, s, persist);
 	case TYPE_USERDEF:
 		return ast_type_vconst(
-			externals_gettypedef(state_getext(s), t->userdef), s, comment, persist
+			externals_gettypedef(state_getext(s), t->userdef),
+			s, key, persist
 		);
 	case TYPE_STRUCT:
-		return value_struct_indefinite_create(t, s, comment, persist);
+		return value_struct_rconst_create(t, s, key, persist);
 	default:
 		assert(false);
 	}
+}
+
+struct value *
+ast_type_vconstnokey(struct ast_type *t, struct state *s, bool persist)
+{
+	switch (t->base) {
+	case TYPE_INT:
+		return value_int_rconst_create();
+	case TYPE_POINTER:
+		return value_ptr_rconst_create(t->ptr_type);
+	case TYPE_USERDEF:
+		return ast_type_vconstnokey(
+			externals_gettypedef(state_getext(s), t->userdef),
+			s, persist
+		);
+	case TYPE_STRUCT:
+		return value_struct_rconstnokey_create(t, s, persist);
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_expr *
+struct_rconstgeninstr(struct ast_type *, struct namedseq *,
+		struct lexememarker *, struct ast_block *, struct externals *);
+
+struct ast_expr *
+ast_type_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
+		struct lexememarker *loc, struct ast_block *b,
+		struct externals *ext)
+{
+	switch (t->base) {
+	case TYPE_INT:
+	case TYPE_POINTER:
+		return ast_expr_arbarg_create(namedseq_next(seq));
+	case TYPE_USERDEF:
+		/* TODO: cast to userdef */
+		return ast_type_rconstgeninstr(
+			externals_gettypedef(ext, t->userdef),
+			seq, loc, b, ext
+		);
+	case TYPE_STRUCT:
+		return struct_rconstgeninstr(t, seq, loc, b, ext);
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_expr *
+struct_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
+		struct lexememarker *loc, struct ast_block *b,
+		struct externals *ext)
+{
+	t = ast_type_struct_complete(t, ext);
+	if (!t) {
+		/* TODO: user error */ 
+		assert(false);
+	}
+
+	struct ast_variable_arr *vars = ast_variable_arr_create();
+	char *v_name = "<ret>";
+	ast_variable_arr_append(
+		vars,
+		ast_variable_create(
+			dynamic_str(v_name),
+			ast_type_create_struct_partial(
+				dynamic_str(ast_type_struct_tag(t))
+			)
+		)
+	);
+	struct ast_stmt *decl = ast_stmt_create_declaration(
+		lexememarker_copy(loc), vars
+	);
+	ast_block_prepend_stmt(b, decl);
+
+	struct ast_variable_arr *varr = ast_type_struct_members(t);
+	int n = ast_variable_arr_n(varr);
+	struct ast_variable **var = ast_variable_arr_v(varr);
+	for (int i = 0; i < n; i++) {
+		char *m = ast_variable_name(var[i]);
+		struct ast_type *m_type = ast_type_struct_membertype(t, m, ext);
+		assert(m_type);
+		/* XXX: handle nested structs */
+		assert(m_type->base != TYPE_STRUCT);
+		struct ast_expr *m_expr = ast_expr_member_create(
+			ast_expr_identifier_create(dynamic_str(v_name)), m
+		);
+		struct ast_expr *val = ast_type_rconstgeninstr(
+			m_type, seq, loc, b, ext
+		);
+		ast_block_append_stmt(
+			b,
+			ast_stmt_create_expr(
+				lexememarker_copy(loc),
+				ast_expr_assignment_create(m_expr, val)
+			)
+		);
+	}
+	return ast_expr_identifier_create(dynamic_str(v_name));
 }
 
 bool

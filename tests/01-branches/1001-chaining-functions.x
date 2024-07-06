@@ -3,13 +3,18 @@
 struct tuple { int x; int y; };
 
 struct tuple
-tuple_create();
+tuple_create() ~ [
+	struct tuple t;
+	t.x = $;
+	t.y = $;
+	return t;
+];
 
 void *
-conditional_alloc(int x) ~ [ if (x) return .malloc(1); ];
+conditional_alloc(int x) ~ [ if (x) { return .malloc(1); } ];
 
 void *
-test() ~ [ if (tuple_create().x) return .malloc(1); ]
+test() ~ [ if (tuple_create().x) { return .malloc(1); } ]
 {
 	struct tuple t;
 

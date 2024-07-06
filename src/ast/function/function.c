@@ -1,21 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 
 #include "ast.h"
-#include "lex.h"
+#include "command.h"
+#include "ext.h"
 #include "function.h"
-#include "stmt/stmt.h"
 #include "intern.h"
+#include "lex.h"
 #include "object.h"
-#include "props.h"
 #include "path.h"
 #include "state.h"
-#include "type/type.h"
 #include "stmt/stmt.h"
-#include "ext.h"
+#include "stmt/stmt.h"
+#include "type/type.h"
 #include "util.h"
-#include "command.h"
 
 struct ast_function {
 	bool isaxiom;
@@ -29,6 +29,7 @@ struct ast_function {
 
 	struct ast_block *abstract, 
 			 *body;
+	struct lexememarker *loc;
 };
 
 struct ast_function *
@@ -39,7 +40,8 @@ ast_function_create(
 	int nparam,
 	struct ast_variable **param,
 	struct ast_block *abstract, 
-	struct ast_block *body)
+	struct ast_block *body,
+	struct lexememarker *loc)
 {
 	struct ast_function *f = malloc(sizeof(struct ast_function));
 	f->isaxiom = isaxiom;
@@ -47,9 +49,9 @@ ast_function_create(
 	f->name = name;
 	f->nparam = nparam;
 	f->param = param;
-	assert(abstract);
 	f->abstract = abstract;
 	f->body = body;
+	f->loc = loc;
 	return f;
 }
 
@@ -60,10 +62,13 @@ ast_function_destroy(struct ast_function *f)
 	for (int i = 0; i < f->nparam; i++) {
 		ast_variable_destroy(f->param[i]);
 	}
-	ast_block_destroy(f->abstract);
+	if (f->abstract) {
+		ast_block_destroy(f->abstract);
+	}
 	if (f->body) {
 		ast_block_destroy(f->body);
 	}
+	lexememarker_destroy(f->loc);
 	free(f->param);
 	free(f->name);
 	free(f);
@@ -86,9 +91,12 @@ ast_function_str(struct ast_function *f)
 		strbuilder_printf(b, "%s%s", v, space);
 		free(v);
 	}
-	char *abs = ast_block_absstr(f->abstract, 1);
-	strbuilder_printf(b, ") ~ %s", abs);
-	free(abs);
+	strbuilder_printf(b, ")");
+	if (f->abstract) {
+		char *abs = ast_block_absstr(f->abstract, 1);
+		strbuilder_printf(b, " ~ %s", abs);
+		free(abs);
+	}
 	if (f->body) {
 		char *body = ast_block_str(f->body, 1);
 		strbuilder_printf(b, "%s", body);
@@ -127,8 +135,9 @@ ast_function_copy(struct ast_function *f)
 		dynamic_str(f->name),
 		f->nparam,
 		param,
-		ast_block_copy(f->abstract),
-		f->body ? ast_block_copy(f->body) : NULL
+		f->abstract ? ast_block_copy(f->abstract) : NULL,
+		f->body ? ast_block_copy(f->body) : NULL,
+		lexememarker_copy(f->loc)
 	);
 }
 
@@ -141,19 +150,13 @@ ast_function_isaxiom(struct ast_function *f)
 bool
 ast_function_isproto(struct ast_function *f)
 {
-	return f->abstract && !f->body;
+	return !f->body;
 }
 
 bool
 ast_function_isvoid(struct ast_function *f)
 {
 	return ast_type_isvoid(f->ret);
-}
-
-bool
-ast_function_absisempty(struct ast_function *f)
-{
-	return ast_block_nstmts(f->abstract) == 0;
 }
 
 struct ast_type *
@@ -175,7 +178,6 @@ ast_function_body(struct ast_function *f)
 struct ast_block *
 ast_function_abstract(struct ast_function *f)
 {
-	assert(f->abstract);
 	return f->abstract;
 }
 
@@ -201,6 +203,48 @@ ast_function_protostitch(struct ast_function *f, struct externals *ext)
 	}
 	/* XXX: leaks */
 	return f;
+}
+
+static bool
+abstract_hastoplevelreturn(struct ast_function *);
+
+static struct ast_block_res *
+generate_abstract(struct ast_function *, struct externals *);
+
+struct error *
+ast_function_ensure_hasabstract(struct ast_function *f, struct externals *ext)
+{
+	if (!abstract_hastoplevelreturn(f)) {
+		struct ast_block_res *res = generate_abstract(f, ext);
+		if (ast_block_res_iserror(res)) {
+			return ast_block_res_as_error(res);
+		}
+		f->abstract = ast_block_res_as_block(res);
+	}
+	return NULL;
+}
+
+static bool
+abstract_hastoplevelreturn(struct ast_function *f)
+{
+	return f->abstract && ast_block_hastoplevelreturn(f->abstract);
+}
+
+static struct ast_block_res *
+generate_abstract(struct ast_function *f, struct externals *ext)
+{
+	struct ast_block *b = f->abstract ? f->abstract : ast_block_create(NULL, 0);
+	if (!ast_type_isvoid(f->ret)) {
+		struct namedseq *seq = namedseq_create(dynamic_str(f->name));
+		struct ast_expr *ret = ast_type_rconstgeninstr(
+			f->ret, seq, f->loc, b, ext
+		);
+		namedseq_destroy(seq);
+		ast_block_append_stmt(
+			b, ast_stmt_create_jump(lexememarker_copy(f->loc), JUMP_RETURN, ret)
+		);
+	}
+	return ast_block_res_block_create(b);
 }
 
 struct error *
@@ -250,26 +294,6 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 			return err;
 		}
 	}
-	return NULL;
-}
-
-struct error *
-ast_function_initsetup(struct ast_function *f, struct state *s)
-{
-	struct preconds_result pre = ast_block_setups(ast_function_abstract(f), s);
-	if (pre.err) {
-		return pre.err;
-	}
-	if (!pre.b) {
-		return NULL;
-	}
-	struct frame *setupframe = frame_setup_create(
-		"setup",
-		pre.b,
-		EXEC_SETUP
-	);
-	state_pushframe(s, setupframe);
-	state_initsetup(s, state_frameid(s));
 	return NULL;
 }
 

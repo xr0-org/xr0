@@ -2,7 +2,6 @@
 #define AST_FUNCTION_H
 
 struct ast_function;
-
 struct ast_function_arr;
 
 struct ast_function_arr *

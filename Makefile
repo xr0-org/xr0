@@ -15,7 +15,6 @@ UTIL_DIR = $(SRC_DIR)/util
 SRC_0V_DIR = $(SRC_DIR)
 
 EXT_DIR = $(SRC_0V_DIR)/ext
-PROPS_DIR = $(SRC_0V_DIR)/props
 PATH_DIR = $(SRC_0V_DIR)/path
 STATE_DIR = $(SRC_0V_DIR)/state
 OBJECT_DIR = $(SRC_0V_DIR)/object
@@ -38,7 +37,6 @@ CLUMP_OBJ = $(BUILD_DIR)/clump.o
 LOCATION_OBJ = $(BUILD_DIR)/location.o
 BLOCK_OBJ = $(BUILD_DIR)/block.o
 EXT_OBJ = $(BUILD_DIR)/ext.o
-PROPS_OBJ = $(BUILD_DIR)/props.o
 PATH_OBJ = $(BUILD_DIR)/path.o
 OBJECT_OBJ = $(BUILD_DIR)/object.o
 VALUE_OBJ = $(BUILD_DIR)/value.o
@@ -73,7 +71,6 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 		$(HEAP_OBJ) \
 		$(STACK_OBJ) \
 		$(PROGRAM_OBJ) \
-		$(PROPS_OBJ) \
 		$(STATIC_OBJ) \
 		$(EXT_OBJ) \
 		$(PATH_OBJ)
@@ -126,10 +123,6 @@ $(STATE_OBJ): $(STATE_DIR)/state.c $(STATE_OBJECTS)
 $(EXT_OBJ): $(EXT_DIR)/ext.c
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(EXT_DIR)/ext.c
-
-$(PROPS_OBJ): $(PROPS_DIR)/props.c
-	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(PROPS_DIR)/props.c
 
 $(PATH_OBJ): $(PATH_DIR)/path.c
 	@printf 'CC\t$@\n'

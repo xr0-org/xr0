@@ -211,6 +211,9 @@ pass0(struct ast *root, struct externals *ext)
 			continue;
 		}
 		struct ast_function *f = ast_externdecl_as_function(decl);
+		/* maybe axioms need these ensures also as well */
+		struct error *err = ast_function_ensure_hasabstract(f, ext);
+		assert(!err);
 		if (ast_function_isaxiom(f)) {
 			ast_externdecl_install(decl, ext);
 			continue;
@@ -254,7 +257,6 @@ pass1(struct ast *root, struct externals *ext, bool debug)
 			continue;
 		}
 		/* XXX: ensure that verified functions always have an abstract */
-		assert(ast_function_abstract(f));
 		if ((err = handle_debug(f, ext, debug))) {
 			fprintf(stderr, "%s\n", error_str(err));
 			exit(EXIT_FAILURE);
@@ -313,9 +315,6 @@ pass_inorder(struct string_arr *order, struct externals *ext)
 		if (ast_function_isaxiom(f) || ast_function_isproto(f)) {
 			continue;
 		}
-		/* XXX: ensure that verified functions always have an abstract */
-		assert(ast_function_abstract(f));
-
 		if ((err = ast_function_verify(f, ext))) {
 			fprintf(stderr, "%s\n", error_str(err));
 			exit(EXIT_FAILURE);
@@ -372,14 +371,10 @@ proto_defisvalid(struct ast_function *proto, struct ast_function *def)
 	struct ast_block *proto_abs = ast_function_abstract(proto),
 			 *def_abs = ast_function_abstract(def);
 
-	/* XXX: the indent level must be >= to get around an assert in
-	 * ast_block_str. this check should be made more accessible */
-	bool abs_match = strcmp(ast_block_str(proto_abs, 1), ast_block_str(def_abs, 1)) == 0,
-	     protoabs_only = proto_abs && ast_function_absisempty(def); 
-	if (abs_match || protoabs_only) {
-		return true;
-	}
-	return false;
+	return (proto_abs && !def_abs)
+		/* XXX: the indent level must be >= to get around an assert in
+		 * ast_block_str. this check should be made more accessible */
+		|| strcmp(ast_block_str(proto_abs, 1), ast_block_str(def_abs, 1)) == 0;
 }
 
 struct ast *root;

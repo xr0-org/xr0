@@ -97,16 +97,16 @@ value_ptr_create(struct location *loc)
 }
 
 struct number *
-number_indefinite_create();
+number_rconst_create();
 
 struct value *
-value_ptr_indefinite_create()
+value_ptr_rconst_create()
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_PTR;
 	v->ptr.isindefinite = true;
-	v->ptr.n = number_indefinite_create();
+	v->ptr.n = number_rconst_create();
 	return v;
 }
 
@@ -209,15 +209,15 @@ value_int_range_create(int lw, int excl_up)
 }
 
 struct number *
-number_indefinite_create();
+number_rconst_create();
 
 struct value *
-value_int_indefinite_create()
+value_int_rconst_create()
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_indefinite_create();
+	v->n = number_rconst_create();
 	return v;
 }
 
@@ -312,8 +312,8 @@ value_struct_create(struct ast_type *t)
 }
 
 struct value *
-value_struct_indefinite_create(struct ast_type *t, struct state *s,
-		char *comment, bool persist)
+value_struct_rconst_create(struct ast_type *t, struct state *s,
+		char *key, bool persist)
 {
 	t = ast_type_struct_complete(t, state_getext(s));
 	assert(ast_type_struct_members(t));
@@ -326,13 +326,39 @@ value_struct_indefinite_create(struct ast_type *t, struct state *s,
 		char *field = ast_variable_name(var[i]);
 		struct object *obj = map_get(v->_struct.m, field);
 		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "%s.%s", comment, field);
+		strbuilder_printf(b, "%s.%s", key, field);
 		object_assign(
 			obj,
 			state_vconst(
 				s,
 				ast_variable_type(var[i]),
-				strbuilder_build(b), /* comment */
+				strbuilder_build(b), /* key */
+				persist
+			)
+		);
+	}
+
+	return v;
+}
+
+struct value *
+value_struct_rconstnokey_create(struct ast_type *t, struct state *s, bool persist)
+{
+	t = ast_type_struct_complete(t, state_getext(s));
+	assert(ast_type_struct_members(t));
+
+	struct value *v = value_struct_create(t);
+
+	int n = ast_variable_arr_n(v->_struct.members);
+	struct ast_variable **var = ast_variable_arr_v(v->_struct.members);
+	for (int i = 0; i < n; i++) {
+		char *field = ast_variable_name(var[i]);
+		struct object *obj = map_get(v->_struct.m, field);
+		object_assign(
+			obj,
+			state_vconstnokey(
+				s,
+				ast_variable_type(var[i]),
 				persist
 			)
 		);
@@ -898,6 +924,24 @@ values_comparable(struct value *v1, struct value *v2)
 	return v1->type == v2->type;
 }
 
+static void
+nulldestruct(int x) { /* do nothing */ }
+
+DEFINE_RESULT_TYPE(bool, bool, nulldestruct, bool_res, true)
+
+static struct bool_res *
+number_decide(struct number *n, struct state *s);
+
+struct bool_res *
+value_decide(struct value *v, struct state *s)
+{
+	if (value_isconstant(v)) {
+		return bool_res_bool_create(value_as_constant(v));
+	}
+	assert(v->type == VALUE_SYNC);
+	return number_decide(v->n, s);
+}
+
 bool
 value_equal(struct value *v1, struct value *v2)
 {
@@ -993,6 +1037,68 @@ number_computed_bang(struct number *orig)
 	return num;
 }
 
+static bool
+number_range_arr_canbe(struct number_range_arr *arr, bool value);
+
+static struct bool_res *
+decide(struct ast_expr *, struct state *);
+
+static struct bool_res *
+number_decide(struct number *n, struct state *s)
+{
+	assert(n->type == NUMBER_COMPUTED);
+	struct ast_expr *cond = n->computation;
+	if (ast_expr_isnot(cond)) {
+		struct bool_res *res = decide(ast_expr_unary_operand(cond), s);
+		if (bool_res_iserror(res)) {
+			return res;
+		}
+		return bool_res_bool_create(!bool_res_as_bool(res));
+	}
+	return decide(cond, s);
+}
+
+static struct number *
+getdecider(struct value *v);
+
+static struct bool_res *
+decide(struct ast_expr *expr, struct state *s)
+{
+	char *expr_str = ast_expr_str(expr);
+	a_printf(
+		ast_expr_isidentifier(expr), 
+		"cannot decide on `%s', " \
+		"only identifiers, bangs, and calls are supported\n",
+		expr_str
+	);
+	free(expr_str);
+
+	struct value *rconst = state_getvconst(s, ast_expr_as_identifier(expr));
+	assert(rconst);
+	struct number *r = getdecider(rconst);
+	assert(r->type == NUMBER_RANGES);
+	if (!number_range_arr_canbe(r->ranges, false)) {
+		return bool_res_bool_create(true);
+	}
+	if (number_isconstant(r) && number_as_constant(r) == 0) {
+		return bool_res_bool_create(false);
+	}
+	return bool_res_error_create(error_undecideable_cond(expr));
+}
+
+static struct number *
+getdecider(struct value *v)
+{
+	switch (v->type) {
+	case VALUE_INT:
+		return v->n;
+	case VALUE_PTR:
+		assert(v->ptr.isindefinite);
+		return v->ptr.n;
+	default:
+		assert(false);
+	}
+}
 
 struct number_value *
 number_value_min_create();
@@ -1042,7 +1148,7 @@ number_with_range_create(int lw, int excl_up)
 }
 
 struct number *
-number_indefinite_create()
+number_rconst_create()
 {
 	struct number_range_arr *arr = number_range_arr_create();
 	number_range_arr_append(
@@ -1173,9 +1279,6 @@ number_ranges_equal(struct number *n1, struct number *n2)
 
 	return true;
 }
-
-static bool
-number_range_arr_canbe(struct number_range_arr *arr, bool value);
 
 static struct number_range_arr *
 number_range_assumed_value(bool value);
@@ -1395,14 +1498,20 @@ char *
 number_value_str(struct number_value *v);
 
 char *
+number_value_str_inrange(struct number_value *v);
+
+char *
 number_range_str(struct number_range *r)
 {
 	struct strbuilder *b = strbuilder_create();
 	if (number_range_issingle(r)) {
 		strbuilder_printf(b, "%s", number_value_str(r->lower));
 	} else {
-		strbuilder_printf(b, "%s:%s", number_value_str(r->lower),
-				number_value_str(r->upper));
+		strbuilder_printf(
+			b, "%s?%s",
+			number_value_str_inrange(r->lower),
+			number_value_str_inrange(r->upper)
+		);
 	}
 	return strbuilder_build(b);
 }
@@ -1418,7 +1527,6 @@ number_range_copy(struct number_range *r)
 	);
 }
 
-/* number_value_le: v ≤ constant */
 static bool
 number_value_le_constant(struct number_value *v, int constant);
 
@@ -1535,6 +1643,19 @@ number_value_str(struct number_value *v)
 		assert(false);
 	}
 	return strbuilder_build(b);
+}
+
+char *
+number_value_str_inrange(struct number_value *v)
+{
+	switch (v->type) {
+	case NUMBER_VALUE_CONSTANT:
+		return number_value_str(v);
+	case NUMBER_VALUE_LIMIT:
+		return dynamic_str("");
+	default:
+		assert(false);
+	}
 }
 
 struct number_value *

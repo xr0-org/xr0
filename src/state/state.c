@@ -11,7 +11,6 @@
 #include "static.h"
 #include "location.h"
 #include "object.h"
-#include "props.h"
 #include "stack.h"
 #include "state.h"
 #include "static.h"
@@ -40,18 +39,22 @@ state_create(struct frame *f, struct externals *ext)
 	state->clump = clump_create();
 	state->stack = stack_create(f, NULL);
 	state->heap = heap_create();
-	state->props = props_create();
 	state->reg = NULL;
 	return state;
 }
 
-struct state *
-state_create_withprops(struct frame *f, struct externals *ext,
-		struct props *props)
+void
+state_setvconsts(struct state *new, struct state *old)
 {
-	struct state *state = state_create(f, ext);
-	state->props = props_copy(props);
-	return state;
+	new->vconst = vconst_copy(old->vconst);
+}
+
+bool
+state_assume(struct state *s, struct ast_expr *cond)
+{
+	struct preresult *r = ast_expr_assume(cond, s);
+	assert(!preresult_iserror(r));
+	return !preresult_iscontradiction(r);
 }
 
 void
@@ -62,7 +65,6 @@ state_destroy(struct state *state)
 	clump_destroy(state->clump);
 	stack_destroy(state->stack);
 	heap_destroy(state->heap);
-	props_destroy(state->props);
 	free(state);
 }
 
@@ -77,7 +79,6 @@ state_copy(struct state *state)
 	copy->clump = clump_copy(state->clump);
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
-	copy->props = props_copy(state->props);
 	copy->reg = state->reg ? value_copy(state->reg) : NULL;
 	return copy;
 }
@@ -114,11 +115,6 @@ state_str(struct state *state)
 		strbuilder_printf(b, "rconst:\n%s\n", vconst);
 	}
 	free(vconst);
-	char *props = props_str(state->props, "\t");
-	if (strlen(props) > 0) {
-		strbuilder_printf(b, "assume:\n%s\n", props);
-	}
-	free(props);
 	char *clump = clump_str(state->clump, "\t");
 	if (strlen(clump) > 0) {
 		strbuilder_printf(b, "clump:\n%s\n", clump);
@@ -143,26 +139,20 @@ state_islinear(struct state *s)
 	return stack_islinear(s->stack);
 }
 
-bool
-state_insetup(struct state *s)
-{
-	return stack_insetup(s->stack);	
-}
-
 char *
 state_execmode_str(enum execution_mode m)
 {
 	char *execmode_type_str[] = {
-		[EXEC_ABSTRACT] 		= "ABSTRACT",
-		[EXEC_ABSTRACT_NO_SETUP] 	= "INTERNAL",
-		[EXEC_SETUP]			= "INTERNAL",
+		[EXEC_ABSTRACT_SETUP_ONLY]	= "ABSTRACT (SETUP ONLY)",
+		[EXEC_INSETUP]			= "SETUP",
+		[EXEC_ABSTRACT_NO_SETUP]	= "ABSTRACT (NO SETUP)",
 		[EXEC_ACTUAL]			= "ACTUAL",
 		[EXEC_VERIFY]			= "VERIFY",
 	};
 	switch (m) {
-	case EXEC_ABSTRACT:
+	case EXEC_ABSTRACT_SETUP_ONLY:
+	case EXEC_INSETUP:
 	case EXEC_ABSTRACT_NO_SETUP:
-	case EXEC_SETUP:
 	case EXEC_ACTUAL:
 	case EXEC_VERIFY:
 		return dynamic_str(execmode_type_str[m]);
@@ -187,6 +177,12 @@ bool
 state_atend(struct state *s)
 {
 	return stack_atend(s->stack);
+}
+
+bool
+state_atsetupend(struct state *s)
+{
+	return stack_atsetupend(s->stack);
 }
 
 struct error *
@@ -263,16 +259,32 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 }
 
 struct value *
-state_vconst(struct state *state, struct ast_type *t, char *comment, bool persist)
+state_vconst(struct state *state, struct ast_type *t, char *key, bool persist)
 {
-	struct value *v = ast_type_vconst(t, state, comment, persist);
+	assert(key);
+
+	char *prev = vconst_getidbykey(state->vconst, key);
+	if (prev) {
+		return value_sync_create(
+			ast_expr_identifier_create(dynamic_str(prev))
+		);
+	}
+	struct value *v = ast_type_vconst(t, state, key, persist);
 	if (value_isstruct(v)) {
 		return v;
 	}
-	char *c = vconst_declare(
-		state->vconst, v,
-		comment, persist
-	);
+	char *c = vconst_declare(state->vconst, v, key, persist);
+	return value_sync_create(ast_expr_identifier_create(c));
+}
+
+struct value *
+state_vconstnokey(struct state *state, struct ast_type *t, bool persist)
+{
+	struct value *v = ast_type_vconstnokey(t, state, persist);
+	if (value_isstruct(v)) {
+		return v;
+	}
+	char *c = vconst_declarenokey(state->vconst, v, persist);
 	return value_sync_create(ast_expr_identifier_create(c));
 }
 
@@ -310,28 +322,6 @@ state_clearregister(struct state *state)
 {
 	/* XXX: used after initing the actual state */
 	state->reg = NULL;
-}
-
-void
-state_initsetup(struct state *s, int frameid)
-{
-	struct error *err;
-	
-	assert(state_execmode(s) == EXEC_SETUP);
-	while (!(state_atend(s) && state_frameid(s) == frameid)) {
-		if ((err = state_step(s))) {
-			assert(false);
-		}
-	}
-}
-
-enum execution_mode
-state_next_execmode(struct state *s)
-{
-	if (stack_execmode(s->stack) == EXEC_ABSTRACT) {
-		return EXEC_ABSTRACT;
-	}
-	return EXEC_ABSTRACT_NO_SETUP;
 }
 
 struct error *
@@ -527,12 +517,16 @@ state_getvariabletype(struct state *state, char *id)
 	return variable_type(v);
 }
 
-struct location *
+struct loc_res *
 state_getloc(struct state *state, char *id)
 {
 	struct variable *v = stack_getvariable(state->stack, id);
-	assert(v);
-	return variable_location(v);
+	if (!v) {
+		return loc_res_error_create(
+			error_printf("unknown variable `%s'", id)
+		);
+	}
+	return loc_res_loc_create(variable_location(v));
 }
 
 struct object_res *
@@ -610,7 +604,7 @@ state_range_alloc(struct state *state, struct object *obj,
 struct location *
 state_alloc(struct state *state, int size)
 {
-	if (state_insetup(state)) {
+	if (stack_insetup(state->stack)) {
 		return heap_newcallerblock(state->heap, size);
 	}
 	return heap_newblock(state->heap, size);
@@ -740,9 +734,6 @@ state_undeclareliterals(struct state *s);
 static void
 state_undeclarevars(struct state *s);
 
-static void
-state_popprops(struct state *s);
-
 void
 state_unnest(struct state *s);
 
@@ -758,7 +749,6 @@ state_normalise(struct state *s)
 	state_unnest(s);
 	state_undeclareliterals(s);
 	state_undeclarevars(s);
-	state_popprops(s);
 	if (s->reg) {
 		state_permuteheap(s, deriveorder(s));
 	}
@@ -805,13 +795,6 @@ state_undeclarevars(struct state *s)
 		s->reg = value_abstractcopy(v, s);
 	}
 	stack_undeclare(s->stack, s);
-}
-
-static void
-state_popprops(struct state *s)
-{
-	props_destroy(s->props);
-	s->props = props_create();
 }
 
 void

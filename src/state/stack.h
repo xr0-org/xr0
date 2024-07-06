@@ -26,9 +26,6 @@ stack_return(struct stack *);
 struct ast_expr *
 stack_framecall(struct stack *);
 
-int
-stack_id(struct stack *);
-
 struct location *
 stack_newblock(struct stack *, int size);
 
@@ -55,6 +52,12 @@ stack_lexememarker(struct stack *);
 
 bool
 stack_atend(struct stack *);
+
+bool
+stack_atsetupend(struct stack *);
+
+int
+stack_id(struct stack *);
 
 struct error *
 stack_step(struct stack *, struct state *);

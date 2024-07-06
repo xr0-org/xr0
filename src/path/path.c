@@ -12,8 +12,10 @@
 struct path {
 	enum path_state {
 		PATH_STATE_UNINIT,
+		PATH_STATE_SETUPABSTRACT,
 		PATH_STATE_ABSTRACT,
 		PATH_STATE_HALFWAY,
+		PATH_STATE_SETUPACTUAL,
 		PATH_STATE_ACTUAL,
 		PATH_STATE_AUDIT,
 		PATH_STATE_SPLIT,
@@ -96,7 +98,13 @@ path_destroy(struct path *p)
 }
 
 char *
+path_setupabstract_str(struct path *);
+
+char *
 path_abstract_str(struct path *);
+
+char *
+path_setupactual_str(struct path *);
 
 char *
 path_actual_str(struct path *);
@@ -110,10 +118,14 @@ path_str(struct path *p)
 	switch (p->path_state) {
 	case PATH_STATE_UNINIT:
 		return dynamic_str("path init abstract state");
+	case PATH_STATE_SETUPABSTRACT:
+		return path_setupabstract_str(p);
 	case PATH_STATE_ABSTRACT:
 		return path_abstract_str(p);
 	case PATH_STATE_HALFWAY:
 		return dynamic_str("path init actual state");
+	case PATH_STATE_SETUPACTUAL:
+		return path_setupactual_str(p);
 	case PATH_STATE_ACTUAL:
 		return path_actual_str(p);
 	case PATH_STATE_AUDIT:
@@ -131,10 +143,7 @@ char *
 path_abstract_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
-	bool insetup = state_insetup(p->abstract);
-	strbuilder_printf(
-		b, "phase:\t%s\n\n", insetup ? "SETUP (ABSTRACT)" : state_execmode_str(state_execmode(p->abstract))
-	);
+	strbuilder_printf(b, "phase:\tABSTRACT\n\n");
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->abstract));
 	strbuilder_printf(b, "%s\n", state_str(p->abstract));
 	return strbuilder_build(b);
@@ -144,10 +153,27 @@ char *
 path_actual_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
-	bool insetup = state_insetup(p->actual);
-	strbuilder_printf(
-		b, "phase:\t%s\n\n", insetup ? "SETUP (ACTUAL)" : state_execmode_str(state_execmode(p->actual))
-	);
+	strbuilder_printf(b, "phase:\tACTUAL\n\n");
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
+	strbuilder_printf(b, "%s\n", state_str(p->actual));
+	return strbuilder_build(b);
+}
+
+char *
+path_setupabstract_str(struct path *p)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "phase:\tSETUP (ABSTRACT)\n\n");
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->abstract));
+	strbuilder_printf(b, "%s\n", state_str(p->abstract));
+	return strbuilder_build(b);
+}
+
+char *
+path_setupactual_str(struct path *p)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "phase:\tSETUP (ACTUAL)\n\n");
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
 	strbuilder_printf(b, "%s\n", state_str(p->actual));
 	return strbuilder_build(b);
@@ -190,13 +216,19 @@ static struct error *
 path_init_abstract(struct path *p);
 
 static struct error *
-path_step_abstract(struct path *p, bool print);
+path_step_abstract(struct path *p);
+
+static struct error *
+path_step_setupabstract(struct path *p);
 
 static struct error *
 path_init_actual(struct path *p);
 
 static struct error *
-path_step_actual(struct path *p, bool print);
+path_step_setupactual(struct path *p);
+
+static struct error *
+path_step_actual(struct path *p);
 
 static struct error *
 path_step_split(struct path *p);
@@ -210,12 +242,16 @@ path_step(struct path *p)
 	switch (p->path_state) {
 	case PATH_STATE_UNINIT:
 		return path_init_abstract(p);
+	case PATH_STATE_SETUPABSTRACT:
+		return path_step_setupabstract(p);
 	case PATH_STATE_ABSTRACT:
-		return path_step_abstract(p, true);
+		return path_step_abstract(p);
 	case PATH_STATE_HALFWAY:
 		return path_init_actual(p);
+	case PATH_STATE_SETUPACTUAL:
+		return path_step_setupactual(p);
 	case PATH_STATE_ACTUAL:
-		return path_step_actual(p, true);
+		return path_step_actual(p);
 	case PATH_STATE_AUDIT:
 		return path_audit(p);
 	case PATH_STATE_SPLIT:
@@ -235,7 +271,7 @@ path_init_abstract(struct path *p)
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
 		ast_function_type(p->f),
-		EXEC_ABSTRACT,
+		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
 		p->f
 	);
@@ -243,8 +279,14 @@ path_init_abstract(struct path *p)
 	if ((err = ast_function_initparams(p->f, p->abstract))) {
 		return err;
 	}
-	state_clearregister(p->abstract);
-	p->path_state = PATH_STATE_ABSTRACT;
+	assert(!state_readregister(p->abstract));
+	struct frame *setupframe = frame_setup_create(
+		"setup",
+		ast_function_abstract(p->f),
+		EXEC_ABSTRACT_SETUP_ONLY
+	);
+	state_pushframe(p->abstract, setupframe);
+	p->path_state = PATH_STATE_SETUPABSTRACT;
 	return NULL;
 }
 
@@ -252,9 +294,9 @@ static void
 path_split(struct path *p, struct ast_expr *cond);
 
 static struct error *
-path_step_abstract(struct path *p, bool print)
+path_step_abstract(struct path *p)
 {	
-	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
+	if (state_atend(p->abstract)) {
 		p->path_state = PATH_STATE_HALFWAY;
 		return NULL;
 	}
@@ -288,10 +330,6 @@ path_split(struct path *p, struct ast_expr *cond)
 static struct ast_function *
 copy_withcondname(struct ast_function *, struct ast_expr *cond); 
 
-/* state_assume: return false if contradiction encountered. */
-static bool
-state_assume(struct state *, struct ast_expr *cond);
-
 static struct path *
 path_copywithcond(struct path *old, struct ast_expr *cond)
 {
@@ -299,37 +337,26 @@ path_copywithcond(struct path *old, struct ast_expr *cond)
 	char *fname = ast_function_name(p->f);
 	p->path_state = old->path_state;
 	switch (old->path_state) {
+	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
 		p->abstract = state_copywithname(old->abstract, fname);
 		if (!state_assume(p->abstract, cond)) {
 			p->path_state = PATH_STATE_ATEND;
 		}
 		break;
+	case PATH_STATE_SETUPACTUAL:
 	case PATH_STATE_ACTUAL:
 		p->abstract = state_copywithname(old->abstract, fname);
 		p->actual = state_copywithname(old->actual, fname);
 		if (!state_assume(p->actual, cond)) {
 			p->path_state = PATH_STATE_ATEND;
 		}
+		state_assume(p->abstract, cond);
 		break;
 	default:
 		assert(false);
 	}
 	return p;
-}
-
-bool
-preresult_iserror(struct preresult *);
-
-bool
-preresult_iscontradiction(struct preresult *);
-
-static bool
-state_assume(struct state *s, struct ast_expr *cond)
-{
-	struct preresult *r = ast_expr_assume(cond, s);
-	assert(!preresult_iserror(r));
-	return !preresult_iscontradiction(r);
 }
 
 static char *
@@ -354,9 +381,30 @@ split_name(char *name, struct ast_expr *assumption)
 }
 
 static struct error *
+path_step_setupabstract(struct path *p)
+{
+	if (state_atsetupend(p->abstract)) {
+		p->path_state = PATH_STATE_ABSTRACT;
+		return NULL;
+	}
+
+	struct error *err = state_step(p->abstract);
+	if (!err) {
+		return NULL;
+	}
+	struct error *uc_err = error_to_undecideable_cond(err);
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
+	}
+	return state_stacktrace(p->abstract, err);
+}
+
+static struct error *
 path_init_actual(struct path *p)
 {
 	struct error *err;
+
 	/* if body empty just apply setup */
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
@@ -366,27 +414,46 @@ path_init_actual(struct path *p)
 		ast_expr_identifier_create(dynamic_str("base act")), /* xxx */
 		p->f
 	);
-	p->actual = state_create_withprops(
-		f,
-		p->ext,
-		state_getprops(p->abstract)
-	);
+	p->actual = state_create(f, p->ext);
 	if ((err = ast_function_initparams(p->f, p->actual))) {
 		return err;
 	}
-	if ((err = ast_function_initsetup(p->f, p->actual))) {
-		return err;
-	}
-	state_clearregister(p->actual);
-	p->path_state = PATH_STATE_ACTUAL;
+	state_setvconsts(p->actual, p->abstract);
+	struct frame *setupframe = frame_setup_create(
+		"setup",
+		ast_function_abstract(p->f),
+		EXEC_ABSTRACT_SETUP_ONLY
+	);
+	state_pushframe(p->actual, setupframe);
+	p->path_state = PATH_STATE_SETUPACTUAL;
 	return NULL;
 }
 
 static struct error *
-path_step_actual(struct path *p, bool print)
+path_step_actual(struct path *p)
 {	
-	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
+	if (state_atend(p->actual)) {
 		p->path_state = PATH_STATE_AUDIT;
+		return NULL;
+	}
+
+	struct error *err = state_step(p->actual);
+	if (!err) {
+		return NULL;
+	}
+	struct error *uc_err = error_to_undecideable_cond(err);
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
+	}
+	return state_stacktrace(p->actual, err);
+}
+
+static struct error *
+path_step_setupactual(struct path *p)
+{	
+	if (state_atsetupend(p->actual)) {
+		p->path_state = PATH_STATE_ACTUAL;
 		return NULL;
 	}
 
@@ -455,7 +522,13 @@ branch_step(struct path *parent, struct path *branch)
 /* path_next */
 
 static struct error *
+path_next_setupabstract(struct path *);
+
+static struct error *
 path_next_abstract(struct path *);
+
+static struct error *
+path_next_setupactual(struct path *);
 
 static struct error *
 path_next_actual(struct path *);
@@ -469,10 +542,14 @@ path_next(struct path *p)
 	switch (p->path_state) {
 	case PATH_STATE_UNINIT:
 		return path_step(p);
+	case PATH_STATE_SETUPABSTRACT:
+		return path_next_setupabstract(p);
 	case PATH_STATE_ABSTRACT:
 		return path_next_abstract(p);
 	case PATH_STATE_HALFWAY:
 		return path_step(p);
+	case PATH_STATE_SETUPACTUAL:
+		return path_next_setupactual(p);
 	case PATH_STATE_ACTUAL:
 		return path_next_actual(p);
 	case PATH_STATE_AUDIT:
@@ -488,7 +565,7 @@ path_next(struct path *p)
 static struct error *
 path_next_abstract(struct path *p)
 {
-	if (state_atend(p->abstract) && state_frameid(p->abstract) == 0) {
+	if (state_atend(p->abstract)) {
 		p->path_state = PATH_STATE_HALFWAY;
 		return NULL;
 	}
@@ -507,10 +584,49 @@ path_next_abstract(struct path *p)
 static struct error *
 path_next_actual(struct path *p)
 {
-	if (state_atend(p->actual) && state_frameid(p->actual) == 0) {
+	if (state_atend(p->actual)) {
 		p->path_state = PATH_STATE_AUDIT;
 		return NULL;
 	}
+	struct error *err = state_next(p->actual);
+	if (!err) {
+		return NULL;
+	}
+	struct error *uc_err = error_to_undecideable_cond(err);
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
+	}
+	return state_stacktrace(p->actual, err);
+}
+
+static struct error *
+path_next_setupabstract(struct path *p)
+{
+	if (state_atsetupend(p->abstract)) {
+		p->path_state = PATH_STATE_ABSTRACT;
+		return NULL;
+	}
+	struct error *err = state_next(p->abstract);
+	if (!err) {
+		return NULL;
+	}
+	struct error *uc_err = error_to_undecideable_cond(err);
+	if (uc_err) {
+		path_split(p, error_get_undecideable_cond(uc_err));
+		return NULL;
+	}
+	return state_stacktrace(p->abstract, err);
+}
+
+static struct error *
+path_next_setupactual(struct path *p)
+{
+	if (state_atsetupend(p->actual)) {
+		p->path_state = PATH_STATE_ACTUAL;
+		return NULL;
+	}
+
 	struct error *err = state_next(p->actual);
 	if (!err) {
 		return NULL;
@@ -586,12 +702,14 @@ struct lexememarker *
 path_lexememarker(struct path *p)
 {
 	switch (p->path_state) {
+	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
 		return state_lexememarker(p->abstract);
+	case PATH_STATE_SETUPACTUAL:
 	case PATH_STATE_ACTUAL:
 		return state_lexememarker(p->actual);	
 	case PATH_STATE_SPLIT:
-		return path_split_lexememarker(p);
+		return path_split_lexememarker(p);	
 	case PATH_STATE_UNINIT:
 	case PATH_STATE_HALFWAY:
 	case PATH_STATE_AUDIT:

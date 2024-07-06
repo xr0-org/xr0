@@ -362,6 +362,7 @@ strip_iflibx(char *filename)
 struct lexememarker *
 lexememarker_copy(struct lexememarker *loc)
 {
+	assert(loc);
 	return lexememarker_create(
 		loc->linenum,
 		loc->column,

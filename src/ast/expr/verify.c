@@ -10,7 +10,6 @@
 #include "intern.h"
 #include "math.h"
 #include "object.h"
-#include "props.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
@@ -407,12 +406,14 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 		);
 	}
 
-	/* TODO: check that id exists in state return error if not */
-
+	struct loc_res *loc_res = state_getloc(state, id);
+	if (loc_res_iserror(loc_res)) {
+		return e_res_error_create(loc_res_as_error(loc_res));
+	}
 	return e_res_eval_create(
 		eval_lval_create(
 			ast_type_copy(state_getvariabletype(state, id)),
-			location_copy(state_getloc(state, id))
+			location_copy(loc_res_as_loc(loc_res))
 		)
 	);
 }
@@ -521,7 +522,8 @@ bang_eval(struct ast_expr *expr, struct state *state)
 	}
 	struct eval *eval = e_res_as_eval(res);
 	return e_res_eval_create(
-		eval_rval_create(eval_type(eval), value_bang(eval_as_rval(eval)))
+		eval_rval_create(eval_type(eval),
+		value_bang(value_res_as_value(eval_to_value(eval, state))))
 	);
 }
 
@@ -605,7 +607,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		state_next_execmode(state),
+		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_copy(expr),
 		f
 	);
@@ -622,7 +624,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		);
 	}
 
-	return e_res_eval_create(NULL);
+	return e_res_error_create(error_eval_void());
 }
 
 static struct error *
@@ -635,7 +637,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	struct error *err;
 
 	char *fname = ast_function_name(f);
-	struct frame *setupframe = frame_call_create(
+	struct frame *frame = frame_call_create(
 		fname,
 		ast_function_abstract(f),
 		ast_function_type(f),
@@ -643,16 +645,32 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 		ast_expr_copy(call),
 		f
 	);
-	struct state *param_state = state_create(
-		setupframe,
-		state_getext(arg_state)
-	);
+	struct state *param_state = state_create(frame, state_getext(arg_state));
 	if ((err = ast_function_initparams(f, param_state))) {
 		return err;
 	}
-	if ((err = ast_function_initsetup(f, param_state))) {
-		assert(false);
+	struct ast_block_res *mod_abs_res = ast_block_setupmodulate(
+		ast_function_abstract(f), arg_state
+	);
+	if (ast_block_res_iserror(mod_abs_res)) {
+		return ast_block_res_as_error(mod_abs_res);
 	}
+	struct frame *setupframe = frame_setup_create(
+		"setup",
+		ast_block_res_as_block(mod_abs_res),
+		EXEC_ABSTRACT_SETUP_ONLY
+	);
+	state_pushframe(param_state, setupframe);
+	while (!state_atsetupend(param_state)) {
+		err = state_step(param_state);
+		if (err) {
+			printf("%s\n", state_str(param_state));
+			printf("err: %s\n", error_str(err));
+		}
+		assert(!err);
+	}
+	assert(!state_atend(param_state));
+	state_popframe(param_state);
 
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **param = ast_function_params(f);
@@ -660,10 +678,10 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	for (int i = 0; i < nparams; i++) {
 		char *id = ast_variable_name(param[i]);
 		struct value *param = value_ptr_create(
-			location_copy(state_getloc(param_state, id))
+			location_copy(loc_res_as_loc(state_getloc(param_state, id)))
 		);
 		struct value *arg = value_ptr_create(
-			location_copy(state_getloc(arg_state, id))
+			location_copy(loc_res_as_loc(state_getloc(arg_state, id)))
 		);
 		err = verify_paramspec(param, arg, param_state, arg_state);
 		value_destroy(arg);
@@ -750,35 +768,9 @@ shouldarrconv(struct e_res *res)
 }
 
 static struct ast_type *
-calloralloc_type(struct ast_expr *, struct state *s);
-
-struct e_res *
-ast_expr_pf_augment(struct value *v, struct ast_expr *expr,
-		struct state *state)
-{
-	struct ast_type *t = calloralloc_type(expr, state);
-	if (!value_isstruct(v)) {
-		return e_res_eval_create(
-			eval_rval_create(ast_type_copy(t), value_copy(v))
-		);
-	}
-	struct e_res *res = ast_expr_pf_reduce(expr, state);
-	if (e_res_iserror(res)) {
-		return res;
-	}
-	struct eval *eval = e_res_as_eval(res);
-	return e_res_eval_create(
-		eval_rval_create(
-			eval_type(eval),
-			value_pf_augment(v, value_as_sync(eval_as_rval(eval)))
-		)
-	);
-}
-
-static struct ast_type *
 call_type(struct ast_expr *call, struct state *);
 
-static struct ast_type *
+struct ast_type *
 calloralloc_type(struct ast_expr *e, struct state *s)
 {
 	switch (ast_expr_kind(e)) {
@@ -802,63 +794,6 @@ call_type(struct ast_expr *call, struct state *state)
 	return ast_type_copy(ast_function_type(f));
 }
 
-
-static struct e_res *
-call_to_computed_value(struct ast_function *, struct state *s);
-
-struct value *
-ast_expr_call_arbitrary(struct ast_expr *expr, struct ast_function *f,
-		struct state *state)
-{
-	struct e_res *res = call_to_computed_value(f, state);
-	if (e_res_iserror(res)) {
-		assert(false);
-	}
-	return eval_as_rval(e_res_as_eval(res));
-}
-
-static struct e_res *
-call_to_computed_value(struct ast_function *f, struct state *s)
-{
-	/* TODO: function-valued root */
-	char *root = ast_function_name(f);
-
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **uncomputed_param = ast_function_params(f);
-	struct ast_expr **computed_param = malloc(
-		sizeof(struct ast_expr *) * nparams
-	);
-	for (int i = 0; i < nparams; i++) {
-		struct ast_expr *param = ast_expr_identifier_create(
-			dynamic_str(ast_variable_name(uncomputed_param[i]))
-		);
-		struct e_res *res = ast_expr_eval(param, s);
-		ast_expr_destroy(param);
-		if (e_res_iserror(res)) {
-			return res;
-		}
-		struct value *v = value_res_as_value(
-			eval_to_value(e_res_as_eval(res), s)
-		);
-		if (value_islocation(v)) {
-			computed_param[i] = ast_expr_identifier_create(value_str(v));
-		} else {
-			computed_param[i] = value_to_expr(v);
-		}
-	}
-
-	return e_res_eval_create(
-		eval_rval_create(
-			ast_type_copy(ast_function_type(f)),
-			value_sync_create(
-				ast_expr_call_create(
-					ast_expr_identifier_create(dynamic_str(root)),
-					nparams, computed_param
-				)
-			)
-		)
-	);
-}
 
 struct value_arr_res *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
@@ -1075,7 +1010,7 @@ arbarg_eval(struct ast_expr *expr, struct state *state)
 				state,
 				/* XXX: we will investigate type conversions later */
 				ast_type_create_ptr(ast_type_create(TYPE_VOID, 0)),
-				NULL,
+				ast_expr_arbarg_key(expr),
 				false
 			)
 		)
@@ -1084,9 +1019,6 @@ arbarg_eval(struct ast_expr *expr, struct state *state)
 
 static struct e_res *
 assign_absexec(struct ast_expr *, struct state *);
-
-static struct e_res *
-isdereferencable_absexec(struct ast_expr *, struct state *);
 
 static struct e_res *
 call_absexec(struct ast_expr *, struct state *);
@@ -1100,8 +1032,6 @@ ast_expr_abseval(struct ast_expr *expr, struct state *state)
 	switch (ast_expr_kind(expr)) {
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
-	case EXPR_ISDEREFERENCABLE:
-		return isdereferencable_absexec(expr, state);
 	case EXPR_ALLOCATION:
 		return alloc_absexec(expr, state);
 	case EXPR_CALL:
@@ -1160,7 +1090,7 @@ call_absexec(struct ast_expr *expr, struct state *state)
 		ast_function_name(f),
 		ast_function_abstract(f),
 		ast_function_type(f),
-		state_next_execmode(state),
+		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_copy(expr),
 		f
 	);
@@ -1319,13 +1249,6 @@ assign_absexec(struct ast_expr *expr, struct state *state)
 	return res;
 }
 
-static struct e_res *
-isdereferencable_absexec(struct ast_expr *expr, struct state *state)
-{
-	struct props *p = state_getprops(state);
-	props_install(p, expr);
-	return e_res_eval_create(NULL);
-}
 
 static struct preresult *
 reduce_assume(struct ast_expr *, bool value, struct state *);
@@ -1340,13 +1263,7 @@ static struct preresult *
 identifier_assume(struct ast_expr *expr, bool value, struct state *state);
 
 static struct preresult *
-ast_expr_pf_reduce_assume(struct ast_expr *, bool value, struct state *);
-
-static struct preresult *
 irreducible_assume(struct ast_expr *, bool value, struct state *);
-
-static struct preresult *
-binary_assume(struct ast_expr *expr, bool value, struct state *);
 
 static struct preresult *
 reduce_assume(struct ast_expr *expr, bool value, struct state *s)
@@ -1359,11 +1276,6 @@ reduce_assume(struct ast_expr *expr, bool value, struct state *s)
 		return reduce_assume(ast_expr_unary_operand(expr), !value, s);
 	case EXPR_BRACKETED:
 		return reduce_assume(expr->root, value, s);
-	case EXPR_CALL:
-	case EXPR_STRUCTMEMBER:
-		return ast_expr_pf_reduce_assume(expr, value, s);
-	case EXPR_BINARY:
-		return binary_assume(expr, value, s);
 	default:
 		assert(false);
 	}
@@ -1384,190 +1296,6 @@ identifier_assume(struct ast_expr *expr, bool value, struct state *s)
 	return irreducible_assume(value_as_sync(res_v), value, s);
 }
 
-static struct preresult *
-ast_expr_pf_reduce_assume(struct ast_expr *expr, bool value, struct state *s)
-{
-	struct e_res *res = ast_expr_pf_reduce(expr, s);
-	/* TODO: user errors */
-	assert(!e_res_iserror(res) && e_res_haseval(res));
-
-	struct value *res_v = eval_as_rval(e_res_as_eval(res));
-	return irreducible_assume(value_as_sync(res_v), value, s);
-}
-
-static struct e_res *
-binary_pf_reduce(struct ast_expr *e1, enum ast_binary_operator,
-		struct ast_expr *e2, struct state *);
-
-static struct e_res *
-unary_pf_reduce(struct ast_expr *, struct state *);
-
-static struct e_res *
-call_pf_reduce(struct ast_expr *, struct state *);
-
-static struct e_res *
-structmember_pf_reduce(struct ast_expr *, struct state *);
-
-struct e_res *
-ast_expr_pf_reduce(struct ast_expr *e, struct state *s)
-{
-	switch (ast_expr_kind(e)) {
-	case EXPR_CONSTANT:
-	case EXPR_STRING_LITERAL:
-	case EXPR_IDENTIFIER:
-		return ast_expr_eval(e, s);
-	case EXPR_UNARY:
-		return unary_pf_reduce(e, s);
-	case EXPR_BINARY:
-		return binary_pf_reduce(
-			ast_expr_binary_e1(e),
-			ast_expr_binary_op(e),
-			ast_expr_binary_e2(e),
-			s
-		);
-	case EXPR_CALL:
-		return call_pf_reduce(e, s);
-	case EXPR_STRUCTMEMBER:
-		return structmember_pf_reduce(e, s);
-	case EXPR_BRACKETED:
-		return ast_expr_pf_reduce(ast_expr_bracketed_root(e), s);
-	default:
-		assert(false);
-	}
-}
-
-static struct e_res *
-unary_pf_reduce(struct ast_expr *e, struct state *s)
-{
-	/* TODO: reduce by actually dereferencing if expr is a deref and this is
-	 * possible in the current state */
-	struct e_res *res = ast_expr_pf_reduce(ast_expr_unary_operand(e), s);
-	if (e_res_iserror(res)) {
-		return res;
-	}
-	struct eval *eval = e_res_as_eval(res);
-	struct value *v = value_res_as_value(eval_to_value(eval, s));
-	return e_res_eval_create(
-		eval_rval_create(
-			eval_type(eval),
-			value_sync_create(
-				ast_expr_unary_create(
-					value_as_sync(v),
-					ast_expr_unary_op(e)
-				)
-			)
-		)
-	);
-}
-
-static struct e_res *
-binary_pf_reduce(struct ast_expr *e1, enum ast_binary_operator op,
-		struct ast_expr *e2, struct state *s)
-{
-	struct e_res *res1 = ast_expr_pf_reduce(e1, s);
-	if (e_res_iserror(res1)) {
-		return res1;
-	}
-	assert(e_res_haseval(res1));
-	struct e_res *res2 = ast_expr_pf_reduce(e2, s);
-	if (e_res_iserror(res2)) {
-		return res2;
-	}
-	assert(e_res_haseval(res2));
-	struct eval *rv1 = e_res_as_eval(res1),
-		    *rv2 = e_res_as_eval(res2);
-	struct value *v1 = value_res_as_value(eval_to_value(rv1, s)),
-		     *v2 = value_res_as_value(eval_to_value(rv2, s));
-	return e_res_eval_create(
-		eval_rval_create(
-			eval_type(rv1), /* TODO: compare types */
-			value_sync_create(
-				ast_expr_binary_create(
-					value_to_expr(v1),
-					op,
-					value_to_expr(v2)
-				)
-			)
-		)
-	);
-}
-
-static struct e_res *
-call_pf_reduce(struct ast_expr *e, struct state *s)
-{
-	/* TODO: allow for exprs as root */
-	char *name = ast_expr_as_identifier(ast_expr_call_root(e));
-
-	struct ast_function *f = externals_getfunc(state_getext(s), name);
-	if (!f) {
-		return e_res_error_create(error_printf("`%s' not found\n", name));
-	}
-
-	int nargs = ast_expr_call_nargs(e);
-	struct ast_expr **unreduced_arg = ast_expr_call_args(e);
-	struct ast_expr **reduced_arg = malloc(sizeof(struct ast_expr *) *nargs);
-	for (int i = 0; i < nargs; i++) {
-		struct e_res *res = ast_expr_pf_reduce(unreduced_arg[i], s);
-		if (e_res_iserror(res)) {
-			return res;
-		}
-		assert(e_res_haseval(res));
-		struct value *v = value_res_as_value(
-			eval_to_value(e_res_as_eval(res), s)
-		);
-		reduced_arg[i] = ast_expr_copy(value_to_expr(v));
-	}
-	struct value *v = value_sync_create(
-		ast_expr_call_create(
-			ast_expr_identifier_create(dynamic_str(name)),
-			nargs, reduced_arg
-		)
-	);
-	return e_res_eval_create(
-		eval_rval_create(ast_type_copy(ast_function_type(f)), v)
-	);
-}
-
-static struct e_res *
-structmember_pf_reduce(struct ast_expr *expr, struct state *s)
-{
-	struct e_res *res = ast_expr_pf_reduce(ast_expr_member_root(expr), s);
-	if (e_res_iserror(res)) {
-		return res;
-	}
-	/* XXX: insists on an lvalue (in the sense of location) for root */
-	struct eval *eval = e_res_as_eval(res);
-	struct value *v = value_res_as_value(eval_to_value(eval, s));
-	char *field = ast_expr_member_field(expr);
-	if (value_isstruct(v)) {
-		struct object *obj = value_struct_member(v, field);
-		struct value *obj_value = object_as_value(obj);
-		struct ast_type *obj_type = value_struct_membertype(v, field);
-		assert(obj_value && obj_type);
-		return e_res_eval_create(
-			eval_rval_create(
-				ast_type_copy(obj_type),
-				value_copy(obj_value)
-			)
-		);
-	}
-	assert(value_issync(v));
-	struct ast_type *t = ast_type_struct_membertype(
-		eval_type(eval), field, state_getext(s)
-	);
-	return e_res_eval_create(
-		eval_rval_create(
-			ast_type_copy(t),
-			value_sync_create(
-				ast_expr_member_create(
-					value_as_sync(v),
-					dynamic_str(field)
-				)
-			)
-		)
-	);
-}
-
 
 static struct preresult *
 irreducible_assume_actual(struct ast_expr *e, struct state *s);
@@ -1582,50 +1310,36 @@ irreducible_assume(struct ast_expr *e, bool value, struct state *s)
 }
 
 static struct preresult *
+irreducible_assume_value(char *vconst, bool value, struct state *);
+
+static struct preresult *
 irreducible_assume_actual(struct ast_expr *e, struct state *s)
 {
-	struct props *p = state_getprops(s);
-	if (props_contradicts(p, e)) {
-		return preresult_contradiction_create();
+	switch (ast_expr_kind(e)) {
+	case EXPR_IDENTIFIER:
+		return irreducible_assume_value(
+			ast_expr_as_identifier(e), true, s
+		);
+	case EXPR_UNARY:
+		assert(ast_expr_unary_op(e) == UNARY_OP_BANG);
+		return irreducible_assume_value(
+			ast_expr_as_identifier(ast_expr_unary_operand(e)),
+			false, s
+		);
+	default:
+		assert(false);
 	}
-	props_install(state_getprops(s), ast_expr_copy(e));
-	return preresult_empty_create();
 }
 
 static struct preresult *
-binary_assume(struct ast_expr *expr, bool value, struct state *s)
+irreducible_assume_value(char *vconst, bool value, struct state *s)
 {
-	struct e_res *r1 = ast_expr_pf_reduce(expr->u.binary.e1, s),
-		     *r2 = ast_expr_pf_reduce(expr->u.binary.e2, s);
-
-	/* TODO: user errors */
-	struct value *v1 = eval_as_rval(e_res_as_eval(r1)),
-		     *v2 = eval_as_rval(e_res_as_eval(r2));
-
-	return irreducible_assume(
-		ast_expr_binary_create(
-			value_to_expr(v1),
-			expr->u.binary.op,
-			value_to_expr(v2)
-		),
-		value,
-		s
-	);
+	struct value *v = state_getvconst(s, vconst);
+	return value_assume(v, value)
+		? preresult_empty_create()
+		: preresult_contradiction_create();
 }
 
-/*
-given f(x)
-
-want:
-	<rtype> t0 = f(x);
-
-
-given f(g(x), y);
-
-want:
-	<rtype g> t0 = g(x);
-	<rtype f> t1 = f(t0, y);
- */
 
 static struct ast_expr *
 unary_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,

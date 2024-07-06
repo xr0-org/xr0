@@ -125,42 +125,44 @@ ast_block_stmts(struct ast_block *b)
 }
 
 bool
-ast_block_isterminal(struct ast_block *b, struct state *s)
-{
-	for (int i = 0; i < b->nstmt; i++) {
-		if (ast_stmt_isterminal(b->stmt[i], s)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-bool
 ast_block_empty(struct ast_block *b)
 {
 	return b->nstmt == 0;
 }
 
-void
-ast_block_append_stmt(struct ast_block *b, struct ast_stmt *v)
+static int
+ast_block_insert(struct ast_block *b, int index, struct ast_stmt *stmt)
 {
 	b->stmt = realloc(b->stmt, sizeof(struct ast_stmt *) * ++b->nstmt);
-	b->stmt[b->nstmt-1] = v;
+	assert(b->stmt);
+	for (int i = b->nstmt-1; i > index; i--) {
+		b->stmt[i] = b->stmt[i-1];
+	}
+	b->stmt[index] = stmt;
+	return index;
 }
 
-struct preconds_result
-ast_block_setups(struct ast_block *abs, struct state *state)
+void
+ast_block_prepend_stmt(struct ast_block *b, struct ast_stmt *stmt)
 {
-	struct ast_block *setups = ast_block_create(NULL, 0);
-	int nstmts = ast_block_nstmts(abs);
-	struct ast_stmt **stmts = ast_block_stmts(abs);
-	for (int i = 0; i < nstmts; i++) {
-		struct error *err = ast_stmt_buildsetup(stmts[i], state, setups);		
-		if (err) {
-			return (struct preconds_result) { .b = NULL, .err = err };
+	ast_block_insert(b, 0, stmt);
+}
+
+void
+ast_block_append_stmt(struct ast_block *b, struct ast_stmt *stmt)
+{
+	ast_block_insert(b, b->nstmt, stmt);
+}
+
+bool
+ast_block_hastoplevelreturn(struct ast_block *b)
+{
+	for (int i = 0; i < b->nstmt; i++) {
+		if (ast_stmt_isreturn(b->stmt[i])) {
+			return true;
 		}
 	}
-	return (struct preconds_result) { .b = setups, .err = NULL };
+	return false;
 }
 
 static char *
@@ -195,4 +197,26 @@ generate_tempvar(int tempid)
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "<t%d>", tempid);
 	return strbuilder_build(b);
+}
+
+DEFINE_RESULT_TYPE(struct ast_block *, block, ast_block_destroy, ast_block_res, false)
+
+struct ast_block_res *
+ast_block_setupmodulate(struct ast_block *old, struct state *s)
+{
+	struct ast_block *new = ast_block_create(NULL, 0);
+	for (int i = 0; i < old->nstmt; i++) {
+		struct ast_stmt_res *res = ast_stmt_setupmodulate(old->stmt[i], s);
+		if (ast_stmt_res_iserror(res)) {
+			struct error *err = ast_stmt_res_as_error(res);
+			if (error_to_modulate_skip(err)) {
+				ast_stmt_res_errorignore(res);
+				continue; /* skip */
+			} else {
+				return ast_block_res_error_create(err);
+			}
+		}
+		ast_block_append_stmt(new, ast_stmt_res_as_stmt(res));
+	}
+	return ast_block_res_block_create(new);
 }

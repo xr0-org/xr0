@@ -27,10 +27,10 @@ struct value;
 struct state;
 
 enum execution_mode {
-	EXEC_ABSTRACT,
+	EXEC_ABSTRACT_SETUP_ONLY,
+	EXEC_INSETUP,
 	EXEC_ABSTRACT_NO_SETUP,
 	EXEC_ACTUAL,
-	EXEC_SETUP,
 	EXEC_VERIFY
 };
 
@@ -46,8 +46,11 @@ struct frame;
 struct state *
 state_create(struct frame *, struct externals *);
 
-struct state *
-state_create_withprops(struct frame *, struct externals *, struct props *props);
+void
+state_setvconsts(struct state *new, struct state *old);
+
+bool
+state_assume(struct state *, struct ast_expr *cond);
 
 struct state *
 state_copy(struct state *);
@@ -63,6 +66,9 @@ state_str(struct state *);
 
 bool
 state_atend(struct state *);
+
+bool
+state_atsetupend(struct state *);
 
 struct error *
 state_step(struct state *);
@@ -109,7 +115,11 @@ state_getobject(struct state *, char *id);
 struct ast_type *
 state_getvariabletype(struct state *, char *id);
 
-struct location *
+struct location;
+
+DECLARE_RESULT_TYPE(struct location *, loc, loc_res)
+
+struct loc_res *
 state_getloc(struct state *state, char *id);
 
 struct object_res *
@@ -151,7 +161,10 @@ state_range_aredeallocands(struct state *, struct object *,
 		struct ast_expr *lw, struct ast_expr *up);
 
 struct value *
-state_vconst(struct state *, struct ast_type *, char *comment, bool persist);
+state_vconst(struct state *, struct ast_type *, char *key, bool persist);
+
+struct value *
+state_vconstnokey(struct state *, struct ast_type *, bool persist);
 
 struct value *
 state_static_init(struct state *, struct ast_expr *);
@@ -185,15 +198,6 @@ state_writeregister(struct state *, struct value *);
 
 void
 state_clearregister(struct state *);
-
-bool
-state_insetup(struct state *);
-
-void
-state_initsetup(struct state *s, int frameid);
-
-enum execution_mode
-state_next_execmode(struct state *s);
 
 struct error *
 state_stacktrace(struct state *, struct error *);

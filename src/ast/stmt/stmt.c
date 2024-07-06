@@ -7,7 +7,6 @@
 #include "expr/expr.h"
 #include "intern.h"
 #include "lex.h"
-#include "props.h"
 #include "state.h"
 #include "stmt.h"
 #include "util.h"
@@ -93,7 +92,7 @@ ast_stmt_declaration_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	for (int i = 0; i < ast_variable_arr_n(vars); i++) {
 		struct ast_variable **v = ast_variable_arr_v(vars);
 		char *s = ast_variable_str(v[i]);
-		strbuilder_printf(b, "%s", s);
+		strbuilder_printf(b, "%s;", s);
 		free(s);
 	}
 }
@@ -292,42 +291,14 @@ ast_stmt_create_jump(struct lexememarker *loc, enum ast_jump_kind kind,
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt)
 {
+	assert(stmt->kind == STMT_JUMP);
 	return stmt->u.jump.rv;
 }
 
-static bool
-sel_isterminal(struct ast_stmt *stmt, struct state *s);
-
 bool
-ast_stmt_isterminal(struct ast_stmt *stmt, struct state *s)
+ast_stmt_isreturn(struct ast_stmt *stmt)
 {
-	switch (stmt->kind) {
-	case STMT_JUMP:
-		return stmt->u.jump.kind == JUMP_RETURN;
-	case STMT_COMPOUND:
-		return ast_block_isterminal(stmt->u.compound, s);
-	case STMT_SELECTION:
-		return sel_isterminal(stmt, s);
-	default:
-		return false;
-	}
-}
-
-static bool
-sel_isterminal(struct ast_stmt *stmt, struct state *s)
-{
-	struct decision dec = sel_decide(ast_stmt_sel_cond(stmt), s);
-	assert(!dec.err);
-	if (dec.decision) {
-		return ast_stmt_isterminal(ast_stmt_sel_body(stmt), s);
-	}
-	return false;
-}
-
-bool
-ast_stmt_isselection(struct ast_stmt *stmt)
-{
-	return stmt->kind == STMT_SELECTION;
+	return stmt->kind == STMT_JUMP && stmt->u.jump.kind == JUMP_RETURN;
 }
 
 static void
@@ -782,23 +753,6 @@ ast_stmt_equal(struct ast_stmt *s1, struct ast_stmt *s2)
 	}
 }
 
-bool
-ast_stmt_linearisable(struct ast_stmt *stmt)
-{
-	switch (stmt->kind) {
-	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
-	case STMT_NOP:
-	case STMT_LABELLED:
-	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
-	case STMT_ITERATION_E:
-	case STMT_ITERATION:
-		return false;
-	default:
-		return true;
-	}
-}
-
 enum ast_stmt_kind
 ast_stmt_kind(struct ast_stmt *stmt)
 {
@@ -966,6 +920,79 @@ preconds_compound_verify(struct ast_stmt *stmt)
 		}
 	}
 	return NULL;
+}
+
+DEFINE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_destroy, ast_stmt_res, false)
+
+static struct ast_stmt_res *
+sel_setupmodulate(struct ast_stmt *, struct state *);
+
+static struct ast_stmt_res *
+comp_setupmodulate(struct ast_stmt *, struct state *);
+
+struct ast_stmt_res *
+ast_stmt_setupmodulate(struct ast_stmt *stmt, struct state *s)
+{
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_EXPR:
+	case STMT_ITERATION:
+	case STMT_JUMP:
+		return ast_stmt_res_error_create(error_modulate_skip());
+	case STMT_DECLARATION:
+	case STMT_NOP:
+		/* TODO: */
+		return ast_stmt_res_stmt_create(stmt);
+	case STMT_LABELLED:
+		a_printf(
+			ast_stmt_ispre(stmt),
+			"only setup labels supported in abstract\n"
+		);
+		return ast_stmt_res_stmt_create(stmt);
+	case STMT_SELECTION:
+		return sel_setupmodulate(stmt, s);
+	case STMT_COMPOUND:
+		return comp_setupmodulate(stmt, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_stmt_res *
+sel_setupmodulate(struct ast_stmt *stmt, struct state *s)
+{
+	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
+	struct ast_stmt *body = ast_stmt_sel_body(stmt),
+			*nest = ast_stmt_sel_nest(stmt);
+	struct decision dec = sel_decide(cond, s);
+	if (dec.err) {
+		return ast_stmt_res_error_create(dec.err);
+	}
+	if (dec.decision) {
+		return ast_stmt_setupmodulate(body, s);
+	} else if (nest) {
+		return ast_stmt_setupmodulate(nest, s);
+	}
+	return ast_stmt_res_error_create(error_modulate_skip());
+}
+
+static struct ast_stmt_res *
+comp_setupmodulate(struct ast_stmt *stmt, struct state *s)
+{
+	struct ast_block_res *res = ast_block_setupmodulate(
+		ast_stmt_as_block(stmt), s
+	);
+	if (ast_block_res_iserror(res)) {
+		return ast_stmt_res_error_create(ast_block_res_as_error(res));
+	}
+	struct ast_block *b = ast_block_res_as_block(res); 
+	if (ast_block_nstmts(b) == 0) {
+		return ast_stmt_res_error_create(error_modulate_skip());
+	}
+	return ast_stmt_res_stmt_create(
+		ast_stmt_create_compound(
+			lexememarker_copy(ast_stmt_lexememarker(stmt)), b
+		)
+	);
 }
 
 #include "verify.c"

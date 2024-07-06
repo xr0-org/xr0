@@ -28,9 +28,8 @@ struct ast_expr {
 		EXPR_ASSIGNMENT		= 1 << 10,
 
 		EXPR_ISDEALLOCAND	= 1 << 11,
-		EXPR_ISDEREFERENCABLE	= 1 << 12,
-		EXPR_ARBARG		= 1 << 13,
-		EXPR_ALLOCATION		= 1 << 14,
+		EXPR_ARBARG		= 1 << 12,
+		EXPR_ALLOCATION		= 1 << 13,
 	} kind;
 	struct ast_expr *root;
 	union {
@@ -75,6 +74,7 @@ struct ast_expr {
 			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
 		} alloc;
+		char *arbarg_key;
 	} u;
 };
 
@@ -122,5 +122,8 @@ ast_expr_declarator(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_initialiser(struct ast_expr *);
+
+struct ast_type *
+calloralloc_type(struct ast_expr *e, struct state *s);
 
 #endif

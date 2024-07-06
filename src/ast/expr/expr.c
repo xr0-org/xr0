@@ -27,6 +27,12 @@ ast_expr_identifier_create(char *s)
 	return expr;
 }
 
+bool
+ast_expr_isidentifier(struct ast_expr *expr)
+{
+	return expr->kind == EXPR_IDENTIFIER;
+}
+
 char *
 ast_expr_as_identifier(struct ast_expr *expr)
 {
@@ -395,6 +401,34 @@ ast_expr_unary_operand(struct ast_expr *expr)
 }
 
 bool
+ast_expr_isverifiable(struct ast_expr *expr)
+{
+	switch (expr->kind) {
+	case EXPR_IDENTIFIER:
+	case EXPR_CONSTANT:
+		return true;
+	case EXPR_STRUCTMEMBER:
+		return ast_expr_isverifiable(ast_expr_member_root(expr));
+	case EXPR_BRACKETED:
+		return ast_expr_isverifiable(ast_expr_bracketed_root(expr));
+	case EXPR_UNARY:
+		return ast_expr_isverifiable(ast_expr_unary_operand(expr));
+	case EXPR_ISDEALLOCAND:
+		return ast_expr_isverifiable(ast_expr_isdeallocand_assertand(expr));
+	case EXPR_INCDEC:
+	case EXPR_CALL:
+	case EXPR_ASSIGNMENT:
+	case EXPR_ARBARG:
+		return false;
+	case EXPR_BINARY:
+		return ast_expr_isverifiable(ast_expr_binary_e1(expr)) &&
+			ast_expr_isverifiable(ast_expr_binary_e2(expr));
+	default:
+		assert(false);
+	}
+}
+
+bool
 ast_expr_unary_isdereference(struct ast_expr *expr)
 {
 	if (ast_expr_kind(expr) != EXPR_UNARY) {
@@ -610,28 +644,6 @@ ast_expr_isdeallocand_assertand(struct ast_expr *expr)
 	return expr->root;
 }
 
-struct ast_expr *
-ast_expr_isdereferencable_create(struct ast_expr *assertand)
-{
-	struct ast_expr *new = ast_expr_create();
-	new->kind = EXPR_ISDEREFERENCABLE;
-	new->root = assertand;
-	return new;
-}
-
-struct ast_expr *
-ast_expr_isdereferencable_assertand(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_ISDEREFERENCABLE);
-	return expr->root;
-}
-
-bool
-ast_expr_isisdereferencable(struct ast_expr *expr)
-{
-	return expr->kind == EXPR_ISDEREFERENCABLE;
-}
-
 static void
 ast_expr_isdeallocand_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
@@ -640,20 +652,22 @@ ast_expr_isdeallocand_str_build(struct ast_expr *expr, struct strbuilder *b)
 	free(root);
 }
 
-static void
-ast_expr_isdereferencable_str_build(struct ast_expr *expr, struct strbuilder *b)
-{
-	char *root = ast_expr_str(expr->root);
-	strbuilder_printf(b, "$%s", root);
-	free(root);
-}
-
 struct ast_expr *
-ast_expr_arbarg_create()
+ast_expr_arbarg_create(char *key)
 {
+	assert(key);
+
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_ARBARG;
+	expr->u.arbarg_key = key;
 	return expr;
+}
+
+char *
+ast_expr_arbarg_key(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_ARBARG);
+	return expr->u.arbarg_key;
 }
 
 struct ast_expr *
@@ -790,10 +804,8 @@ ast_expr_destroy(struct ast_expr *expr)
 	case EXPR_ISDEALLOCAND:
 		ast_expr_destroy(expr->root);
 		break;
-	case EXPR_ISDEREFERENCABLE:
-		ast_expr_destroy(expr->root);
-		break;
 	case EXPR_ARBARG:
+		free(expr->u.arbarg_key);
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_destroy(expr->u.alloc.arg);
@@ -842,11 +854,8 @@ ast_expr_str(struct ast_expr *expr)
 	case EXPR_ISDEALLOCAND:
 		ast_expr_isdeallocand_str_build(expr, b);
 		break;
-	case EXPR_ISDEREFERENCABLE:
-		ast_expr_isdereferencable_str_build(expr, b);
-		break;
 	case EXPR_ARBARG:
-		strbuilder_putc(b, '$');
+		strbuilder_printf(b, "$%s", expr->u.arbarg_key);
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_alloc_str_build(expr, b);
@@ -905,12 +914,8 @@ ast_expr_copy(struct ast_expr *expr)
 		return ast_expr_isdeallocand_create(
 			ast_expr_copy(expr->root)
 		);
-	case EXPR_ISDEREFERENCABLE:
-		return ast_expr_isdereferencable_create(
-			ast_expr_copy(expr->root)
-		);
 	case EXPR_ARBARG:
-		return ast_expr_arbarg_create();
+		return ast_expr_arbarg_create(dynamic_str(expr->u.arbarg_key));
 	case EXPR_ALLOCATION:
 		return ast_expr_alloc_copy(expr);
 	default:
@@ -1061,7 +1066,7 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 	}
 }
 
-void
+static void
 nulldestruct(int x) { /* do nothing */ }
 
 DEFINE_RESULT_TYPE(int, int, nulldestruct, intresult, true)
@@ -1122,7 +1127,6 @@ ast_expr_getfuncs(struct ast_expr *expr)
 	case EXPR_STRING_LITERAL:
 	case EXPR_STRUCTMEMBER:
 	case EXPR_ISDEALLOCAND:
-	case EXPR_ISDEREFERENCABLE:
 	case EXPR_ARBARG:
 		return string_arr_create();	
 	case EXPR_CALL:
