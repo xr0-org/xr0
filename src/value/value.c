@@ -1015,12 +1015,27 @@ static bool
 number_range_arr_canbe(struct number_range_arr *arr, bool value);
 
 static struct bool_res *
+decide(struct ast_expr *, struct state *);
+
+static struct bool_res *
 number_decide(struct number *n, struct state *s)
 {
 	assert(n->type == NUMBER_COMPUTED);
-	struct value *v = state_getvconst(
-		s, ast_expr_as_identifier(n->computation)
-	);
+	struct ast_expr *cond = n->computation;
+	if (ast_expr_isnot(cond)) {
+		struct bool_res *res = decide(ast_expr_unary_operand(cond), s);
+		if (bool_res_iserror(res)) {
+			return res;
+		}
+		return bool_res_bool_create(!bool_res_as_bool(res));
+	}
+	return decide(cond, s);
+}
+
+static struct bool_res *
+decide(struct ast_expr *expr, struct state *s)
+{
+	struct value *v = state_getvconst(s, ast_expr_as_identifier(expr));
 	assert(v->type == VALUE_INT);
 	struct number *r = v->n;
 	assert(r->type == NUMBER_RANGES);
@@ -1030,7 +1045,7 @@ number_decide(struct number *n, struct state *s)
 	if (number_isconstant(r) && number_as_constant(r) == 0) {
 		return bool_res_bool_create(false);
 	}
-	return bool_res_error_create(error_undecideable_cond(n->computation));
+	return bool_res_error_create(error_undecideable_cond(expr));
 }
 
 struct number_value *
