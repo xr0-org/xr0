@@ -253,26 +253,6 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 	return NULL;
 }
 
-struct error *
-ast_function_initsetup(struct ast_function *f, struct state *s)
-{
-	struct preconds_result pre = ast_block_setups(ast_function_abstract(f), s);
-	if (pre.err) {
-		return pre.err;
-	}
-	if (!pre.b) {
-		return NULL;
-	}
-	struct frame *setupframe = frame_setup_create(
-		"setup",
-		pre.b,
-		EXEC_SETUP
-	);
-	state_pushframe(s, setupframe);
-	state_initsetup(s, state_frameid(s));
-	return NULL;
-}
-
 static struct error *
 inititalise_param(struct ast_variable *param, struct state *state)
 {

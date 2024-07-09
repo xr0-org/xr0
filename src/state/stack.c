@@ -74,13 +74,6 @@ stack_create(struct frame *f, struct stack *prev)
 	return stack;
 }
 
-int
-stack_id(struct stack *s)
-{
-	assert(s);
-	return s->id;
-}
-
 struct stack *
 stack_getframe(struct stack *s, int frame)
 {
@@ -313,6 +306,13 @@ stack_insetup(struct stack *s)
 	return stack_insetup(s->prev);
 }
 
+int
+stack_id(struct stack *s)
+{
+	assert(s);
+	return s->id;
+}
+
 enum execution_mode
 stack_execmode(struct stack *s)
 {
@@ -325,10 +325,36 @@ stack_lexememarker(struct stack *s)
 	return program_lexememarker(s->p);
 }
 
+static bool
+stack_isbase(struct stack *s)
+{
+	if (s->id == 0) {
+		assert(s->kind == FRAME_CALL);
+		return true;
+	}
+	return false;
+}
+
+static bool
+stack_issetupbase(struct stack *s)
+{
+	if (s->id == 1) { 
+		assert(s->kind == FRAME_SETUP);
+		return true;
+	}
+	return false;
+}
+
 bool
 stack_atend(struct stack *s)
 {
-	return program_atend(s->p);
+	return program_atend(s->p) && stack_isbase(s);
+}
+
+bool
+stack_atsetupend(struct stack *s)
+{
+	return program_atend(s->p) && stack_issetupbase(s);
 }
 
 struct error *

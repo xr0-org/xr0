@@ -196,6 +196,12 @@ state_atend(struct state *s)
 	return stack_atend(s->stack);
 }
 
+bool
+state_atsetupend(struct state *s)
+{
+	return stack_atsetupend(s->stack);
+}
+
 struct error *
 state_step(struct state *s)
 {
@@ -320,26 +326,17 @@ state_clearregister(struct state *state)
 	state->reg = NULL;
 }
 
-void
-state_initsetup(struct state *s, int frameid)
-{
-	struct error *err;
-	
-	assert(state_execmode(s) == EXEC_SETUP);
-	while (!(state_atend(s) && state_frameid(s) == frameid)) {
-		if ((err = state_step(s))) {
-			assert(false);
-		}
-	}
-}
-
 enum execution_mode
 state_next_execmode(struct state *s)
 {
-	if (stack_execmode(s->stack) == EXEC_ABSTRACT) {
+	switch (stack_execmode(s->stack)) {
+	case EXEC_ABSTRACT:
 		return EXEC_ABSTRACT;
+	case EXEC_ABSTRACT_NO_SETUP:
+		return EXEC_ABSTRACT_NO_SETUP;
+	default:
+		assert(false);
 	}
-	return EXEC_ABSTRACT_NO_SETUP;
 }
 
 struct error *

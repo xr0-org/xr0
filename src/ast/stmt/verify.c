@@ -495,6 +495,16 @@ ast_stmt_absprocess_nosetup(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
+ast_stmt_setupexec(struct ast_stmt *stmt, struct state *state);
+
+struct error *
+ast_stmt_absprocess_setup(struct ast_stmt *stmt, struct state *state)
+{
+	/* XXX: reject undefined things for this */
+	return ast_stmt_setupexec(stmt, state);
+}
+
+static struct error *
 ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
@@ -562,7 +572,7 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 labelled_absexec(struct ast_stmt *stmt, struct state *state)
 {
-	assert(ast_stmt_ispre(stmt));
+	a_printf(ast_stmt_ispre(stmt), "only setup labels supported in abstract\n");
 	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
 	if (ast_stmt_kind(inner) == STMT_SELECTION) {
 		return error_printf("setup preconditions must be decidable");
@@ -642,7 +652,8 @@ iter_absexec(struct ast_stmt *stmt, struct state *state)
 	if ((err = ast_expr_alloc_rangeprocess(alloc, lw, up, state))) {
 		return err;
 	}
-	return NULL; }
+	return NULL;
+}
 
 static struct ast_expr *
 hack_alloc_from_neteffect(struct ast_stmt *stmt)
@@ -689,84 +700,82 @@ jump_absexec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
-labelled_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
+labelled_setupexec(struct ast_stmt *, struct state *);
 
 static struct error *
-sel_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
+sel_setupexec(struct ast_stmt *stmt, struct state *);
 
 static struct error *
-comp_buildsetup(struct ast_stmt *, struct state *, struct ast_block *);
+comp_setupexec(struct ast_stmt *stmt, struct state *);
 
-struct error *
-ast_stmt_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
+static struct error *
+ast_stmt_setupexec(struct ast_stmt *stmt, struct state *state)
 {
-	switch (ast_stmt_kind(stmt)) {	
+	switch (ast_stmt_kind(stmt)) {
 	case STMT_DECLARATION:
+		return stmt_decl_exec(stmt, state);
 	case STMT_NOP:
+	case STMT_EXPR:
 	case STMT_JUMP:
 	case STMT_REGISTER:
-	case STMT_EXPR:
 	case STMT_ITERATION:
 		return NULL;
 	case STMT_LABELLED:
-		return labelled_buildsetup(stmt, state, setups);
+		return labelled_setupexec(stmt, state);
 	case STMT_SELECTION:
-		return sel_buildsetup(stmt, state, setups);
+		return sel_setupexec(stmt, state);
 	case STMT_COMPOUND:
-		return comp_buildsetup(stmt, state, setups);
+		return comp_setupexec(stmt, state);
 	default:
 		assert(false);
 	}
 }
 
 static struct error *
-labelled_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
+labelled_setupexec(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_block *b = ast_stmt_labelled_as_block(stmt);
-	/* XXX: assert no declarations */
-	int nstmts = ast_block_nstmts(b);
-	struct ast_stmt **stmts = ast_block_stmts(b);
-	for (int i = 0; i < nstmts; i++) {
-		if (ast_stmt_kind(stmts[i]) == STMT_SELECTION) {
-			return error_printf("setup preconditions must be decidable");
-		}
-		ast_block_append_stmt(setups, ast_stmt_copy(stmts[i]));	
+	a_printf(ast_stmt_ispre(stmt), "only setup labels supported in abstract\n");
+
+	if (!state_insetup(state)) {
+		return NULL;
 	}
-	return NULL;
+
+	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
+	if (ast_stmt_kind(inner) == STMT_SELECTION) {
+		return error_printf("setup preconditions must be decidable");
+	}
+	return ast_stmt_absexec(inner, state);
 }
 
 static struct error *
-sel_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
+sel_setupexec(struct ast_stmt *stmt, struct state *state)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
 	printf("%s\n", state_str(state));
 	printf("cond: %s\n", ast_expr_str(cond));
-	assert(false);
 	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
-		assert(false);
+		return dec.err;
 	}
 	if (dec.decision) {
-		return ast_stmt_buildsetup(body, state, setups);
+		return ast_stmt_setupexec(body, state);
 	} else if (nest) {
-		return ast_stmt_buildsetup(nest, state, setups);
+		return ast_stmt_setupexec(nest, state);
 	}
 	return NULL;
 }
 
 static struct error *
-comp_buildsetup(struct ast_stmt *stmt, struct state *state, struct ast_block *setups)
+comp_setupexec(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_block *b = ast_stmt_as_block(stmt);
-	int nstmts = ast_block_nstmts(b);
-	struct ast_stmt **stmts = ast_block_stmts(b);
-	for (int i = 0; i < nstmts; i++) {
-		struct error *err = ast_stmt_buildsetup(stmts[i], state, setups);
-		if (err) {
-			return err;
-		}
-	}	
+	assert(state_insetup(state));
+	struct frame *block_frame = frame_block_create(
+		dynamic_str("block"),
+		ast_stmt_as_block(stmt),
+		EXEC_SETUP
+	);
+	state_pushframe(state, block_frame);
 	return NULL;
 }

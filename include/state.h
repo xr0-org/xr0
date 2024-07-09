@@ -67,6 +67,9 @@ state_str(struct state *);
 bool
 state_atend(struct state *);
 
+bool
+state_atsetupend(struct state *);
+
 struct error *
 state_step(struct state *);
 
@@ -191,9 +194,6 @@ state_clearregister(struct state *);
 
 bool
 state_insetup(struct state *);
-
-void
-state_initsetup(struct state *s, int frameid);
 
 enum execution_mode
 state_next_execmode(struct state *s);

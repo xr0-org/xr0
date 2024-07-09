@@ -183,8 +183,9 @@ program_stmt_process(struct program *p, struct state *s)
 	case EXEC_ABSTRACT:
 		return ast_stmt_absprocess(stmt, s);
 	case EXEC_ABSTRACT_NO_SETUP:
-	case EXEC_SETUP:
 		return ast_stmt_absprocess_nosetup(stmt, s);
+	case EXEC_SETUP:
+		return ast_stmt_absprocess_setup(stmt, s);
 	case EXEC_ACTUAL:
 		return ast_stmt_process(stmt, s);
 	case EXEC_VERIFY:

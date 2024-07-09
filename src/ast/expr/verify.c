@@ -635,7 +635,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	struct error *err;
 
 	char *fname = ast_function_name(f);
-	struct frame *setupframe = frame_call_create(
+	struct frame *frame = frame_call_create(
 		fname,
 		ast_function_abstract(f),
 		ast_function_type(f),
@@ -643,16 +643,22 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 		ast_expr_copy(call),
 		f
 	);
-	struct state *param_state = state_create(
-		setupframe,
-		state_getext(arg_state)
-	);
+	struct state *param_state = state_create(frame, state_getext(arg_state));
 	if ((err = ast_function_initparams(f, param_state))) {
 		return err;
 	}
-	if ((err = ast_function_initsetup(f, param_state))) {
-		assert(false);
+	struct frame *setupframe = frame_setup_create(
+		"setup",
+		ast_function_abstract(f),
+		EXEC_SETUP
+	);
+	state_pushframe(param_state, setupframe);
+	while (!state_atsetupend(param_state)) {
+		err = state_step(param_state);
+		assert(!err);
 	}
+	assert(!state_atend(param_state));
+	state_popframe(param_state);
 
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **param = ast_function_params(f);

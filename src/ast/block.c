@@ -148,21 +148,6 @@ ast_block_append_stmt(struct ast_block *b, struct ast_stmt *v)
 	b->stmt[b->nstmt-1] = v;
 }
 
-struct preconds_result
-ast_block_setups(struct ast_block *abs, struct state *state)
-{
-	struct ast_block *setups = ast_block_create(NULL, 0);
-	int nstmts = ast_block_nstmts(abs);
-	struct ast_stmt **stmts = ast_block_stmts(abs);
-	for (int i = 0; i < nstmts; i++) {
-		struct error *err = ast_stmt_buildsetup(stmts[i], state, setups);
-		if (err) {
-			return (struct preconds_result) { .b = NULL, .err = err };
-		}
-	}
-	return (struct preconds_result) { .b = setups, .err = NULL };
-}
-
 static char *
 generate_tempvar(int tempid);
 
