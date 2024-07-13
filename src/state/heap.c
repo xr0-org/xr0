@@ -426,7 +426,9 @@ vconst_str(struct vconst *v, char *indent)
 		char *value = value_str((struct value *) e.value);
 		strbuilder_printf(b, "%s%s: %s", indent, e.key, value);
 		char *key = map_get(v->keymap, e.key);
-		strbuilder_printf(b, "\t\"%s\"", key);
+		if (key) {
+			strbuilder_printf(b, "\t\"%s\"", key);
+		}
 		strbuilder_printf(b, "\n");
 		free(value);
 	}

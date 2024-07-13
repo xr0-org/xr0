@@ -1071,8 +1071,8 @@ decide(struct ast_expr *expr, struct state *s)
 	free(expr_str);
 
 	struct value *v = state_getvconst(s, ast_expr_as_identifier(expr));
-	assert(v->type == VALUE_INT);
-	struct number *r = v->n;
+	assert(v->type == VALUE_INT || (v->type == VALUE_PTR && v->ptr.isindefinite));
+	struct number *r = v->type == VALUE_INT ? v->n : v->ptr.n;
 	assert(r->type == NUMBER_RANGES);
 	if (!number_range_arr_canbe(r->ranges, false)) {
 		return bool_res_bool_create(true);

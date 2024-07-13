@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "ext.h"
 #include "lex.h"
 #include "intern.h"
 #include "props.h"
@@ -439,7 +440,7 @@ register_call_exec(struct ast_expr *call, struct state *state)
 }
 
 static struct e_res *
-hack_default_values(struct state *);
+call_return(struct state *);
 
 static struct error *
 register_mov_exec(struct ast_variable *temp, struct state *state)
@@ -456,7 +457,7 @@ register_mov_exec(struct ast_variable *temp, struct state *state)
 		state_get(state, eval_as_lval(e_res_as_eval(l_res)), true)
 	);
 
-	struct e_res *r_res = hack_default_values(state);
+	struct e_res *r_res = call_return(state);
 	if (e_res_iserror(r_res)) {
 		return e_res_as_error(r_res);
 	}
@@ -466,15 +467,20 @@ register_mov_exec(struct ast_variable *temp, struct state *state)
 	return NULL;
 }
 
+struct ast_type *
+calloralloc_type(struct ast_expr *e, struct state *s);
+
 static struct e_res *
-hack_default_values(struct state *state)
+call_return(struct state *state)
 {
-	struct ast_expr *expr = state_framecall(state);
-	struct value *v = state_popregister(state);
+	struct value *v = state_readregister(state);
 	if (!v) {
 		return e_res_empty_create();
 	}
-	return ast_expr_pf_augment(v, expr, state);
+	state_popregister(state);
+	return e_res_eval_create(
+		eval_rval_create(calloralloc_type(state_framecall(state), state), v)
+	);
 }
 
 struct error *
