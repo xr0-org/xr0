@@ -97,16 +97,16 @@ value_ptr_create(struct location *loc)
 }
 
 struct number *
-number_indefinite_create();
+number_rconst_create();
 
 struct value *
-value_ptr_indefinite_create()
+value_ptr_rconst_create()
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_PTR;
 	v->ptr.isindefinite = true;
-	v->ptr.n = number_indefinite_create();
+	v->ptr.n = number_rconst_create();
 	return v;
 }
 
@@ -209,15 +209,15 @@ value_int_range_create(int lw, int excl_up)
 }
 
 struct number *
-number_indefinite_create();
+number_rconst_create();
 
 struct value *
-value_int_indefinite_create()
+value_int_rconst_create()
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_indefinite_create();
+	v->n = number_rconst_create();
 	return v;
 }
 
@@ -312,7 +312,7 @@ value_struct_create(struct ast_type *t)
 }
 
 struct value *
-value_struct_indefinite_create(struct ast_type *t, struct state *s,
+value_struct_rconst_create(struct ast_type *t, struct state *s,
 		char *key, bool persist)
 {
 	t = ast_type_struct_complete(t, state_getext(s));
@@ -333,6 +333,32 @@ value_struct_indefinite_create(struct ast_type *t, struct state *s,
 				s,
 				ast_variable_type(var[i]),
 				strbuilder_build(b), /* key */
+				persist
+			)
+		);
+	}
+
+	return v;
+}
+
+struct value *
+value_struct_rconstnokey_create(struct ast_type *t, struct state *s, bool persist)
+{
+	t = ast_type_struct_complete(t, state_getext(s));
+	assert(ast_type_struct_members(t));
+
+	struct value *v = value_struct_create(t);
+
+	int n = ast_variable_arr_n(v->_struct.members);
+	struct ast_variable **var = ast_variable_arr_v(v->_struct.members);
+	for (int i = 0; i < n; i++) {
+		char *field = ast_variable_name(var[i]);
+		struct object *obj = map_get(v->_struct.m, field);
+		object_assign(
+			obj,
+			state_vconstnokey(
+				s,
+				ast_variable_type(var[i]),
 				persist
 			)
 		);
@@ -1105,7 +1131,7 @@ number_with_range_create(int lw, int excl_up)
 }
 
 struct number *
-number_indefinite_create()
+number_rconst_create()
 {
 	struct number_range_arr *arr = number_range_arr_create();
 	number_range_arr_append(

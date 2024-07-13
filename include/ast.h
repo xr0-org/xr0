@@ -473,7 +473,7 @@ struct error *
 ast_stmt_linearise(struct ast_stmt *, struct state *);
 
 bool
-ast_stmt_linearisable(struct ast_stmt *);
+ast_stmt_linearisable(struct ast_stmt *, bool insetup);
 
 bool
 ast_stmt_isterminal(struct ast_stmt *, struct state *);
@@ -573,6 +573,9 @@ struct externals;
 
 struct value *
 ast_type_vconst(struct ast_type *, struct state *s, char *key, bool persist);
+
+struct value *
+ast_type_vconstnokey(struct ast_type *, struct state *s, bool persist);
 
 void
 ast_type_destroy(struct ast_type *);

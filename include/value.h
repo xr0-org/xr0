@@ -25,7 +25,7 @@ struct value *
 value_ptr_create(struct location *loc);
 
 struct value *
-value_ptr_indefinite_create();
+value_ptr_rconst_create();
 
 struct value *
 value_int_create(int val);
@@ -37,7 +37,7 @@ struct value *
 value_literal_create(char *);
 
 struct value *
-value_int_indefinite_create();
+value_int_rconst_create();
 
 struct value *
 value_int_ne_create(int not_val);
@@ -64,8 +64,11 @@ bool
 value_isstruct(struct value *v);
 
 struct value *
-value_struct_indefinite_create(struct ast_type *, struct state *,
-		char *comment, bool persist);
+value_struct_rconst_create(struct ast_type *, struct state *,
+		char *key, bool persist);
+
+struct value *
+value_struct_rconstnokey_create(struct ast_type *, struct state *, bool persist);
 
 struct value *
 value_pf_augment(struct value *, struct ast_expr *root);

@@ -150,6 +150,7 @@ char *
 path_actual_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
+	printf("state: %s", state_str(p->actual));
 	assert(!state_insetup(p->actual));
 	strbuilder_printf(
 		b, "phase:\t%s\n\n", state_execmode_str(state_execmode(p->actual))
@@ -639,10 +640,11 @@ path_lexememarker(struct path *p)
 	switch (p->path_state) {
 	case PATH_STATE_ABSTRACT:
 		return state_lexememarker(p->abstract);
+	case PATH_STATE_SETUPACTUAL:
 	case PATH_STATE_ACTUAL:
 		return state_lexememarker(p->actual);	
 	case PATH_STATE_SPLIT:
-		return path_split_lexememarker(p);
+		return path_split_lexememarker(p);	
 	case PATH_STATE_UNINIT:
 	case PATH_STATE_HALFWAY:
 	case PATH_STATE_AUDIT:

@@ -160,6 +160,9 @@ struct value *
 state_vconst(struct state *, struct ast_type *, char *key, bool persist);
 
 struct value *
+state_vconstnokey(struct state *, struct ast_type *, bool persist);
+
+struct value *
 state_static_init(struct state *, struct ast_expr *);
 
 struct value *

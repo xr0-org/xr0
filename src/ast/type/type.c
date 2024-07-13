@@ -131,16 +131,36 @@ ast_type_vconst(struct ast_type *t, struct state *s, char *key, bool persist)
 {
 	switch (t->base) {
 	case TYPE_INT:
-		return value_int_indefinite_create();
 	case TYPE_POINTER:
-		return value_ptr_indefinite_create(t->ptr_type);
+		/* no key in the value except for structs */
+		return ast_type_vconstnokey(t, s, persist);
 	case TYPE_USERDEF:
 		return ast_type_vconst(
 			externals_gettypedef(state_getext(s), t->userdef),
 			s, key, persist
 		);
 	case TYPE_STRUCT:
-		return value_struct_indefinite_create(t, s, key, persist);
+		return value_struct_rconst_create(t, s, key, persist);
+	default:
+		assert(false);
+	}
+}
+
+struct value *
+ast_type_vconstnokey(struct ast_type *t, struct state *s, bool persist)
+{
+	switch (t->base) {
+	case TYPE_INT:
+		return value_int_rconst_create();
+	case TYPE_POINTER:
+		return value_ptr_rconst_create(t->ptr_type);
+	case TYPE_USERDEF:
+		return ast_type_vconstnokey(
+			externals_gettypedef(state_getext(s), t->userdef),
+			s, persist
+		);
+	case TYPE_STRUCT:
+		return value_struct_rconstnokey_create(t, s, persist);
 	default:
 		assert(false);
 	}

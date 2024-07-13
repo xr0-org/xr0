@@ -321,17 +321,12 @@ static char *
 vconst_id(struct map *varmap, struct map *persistmap, bool persist);
 
 char *
-vconst_declare(struct vconst *v, struct value *val, char *key, bool persist)
+vconst_declarenokey(struct vconst *v, struct value *val, bool persist)
 {
 	struct map *m = v->varmap;
-
 	char *s = vconst_id(m, v->persist, persist);
-
 	map_set(m, dynamic_str(s), val);
-	assert(key);
-	map_set(v->keymap, dynamic_str(s), dynamic_str(key));
 	map_set(v->persist, dynamic_str(s), (void *) persist);
-
 	return s;
 }
 
@@ -363,14 +358,23 @@ count_true(struct map *m)
 	return n;
 }
 
+char *
+vconst_declare(struct vconst *v, struct value *val, char *key, bool persist)
+{
+	char *s = vconst_declarenokey(v, val, persist);
+	assert(key);
+	map_set(v->keymap, dynamic_str(s), dynamic_str(key));
+	return s;
+}
+
 struct value *
 vconst_get(struct vconst *v, char *id)
 {
 	return map_get(v->varmap, id);
 }
 
-struct value *
-vconst_getbykey(struct vconst *v, char *key)
+char *
+vconst_getidbykey(struct vconst *v, char *key)
 {
 	/* XXX */
 	struct map *m = v->keymap;
@@ -379,7 +383,7 @@ vconst_getbykey(struct vconst *v, char *key)
 		char *id = e.key,
 		     *varkey = (char *) e.value;
 		if (strcmp(key, varkey) == 0) {
-			return vconst_get(v, id);
+			return id;
 		}
 	}
 	return NULL;

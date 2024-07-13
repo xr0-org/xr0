@@ -278,15 +278,30 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 struct value *
 state_vconst(struct state *state, struct ast_type *t, char *key, bool persist)
 {
-	struct value *prev = vconst_getbykey(state->vconst, key);
+	assert(key);
+
+	char *prev = vconst_getidbykey(state->vconst, key);
 	if (prev) {
-		return prev;
+		return value_sync_create(
+			ast_expr_identifier_create(dynamic_str(prev))
+		);
 	}
 	struct value *v = ast_type_vconst(t, state, key, persist);
 	if (value_isstruct(v)) {
 		return v;
 	}
 	char *c = vconst_declare(state->vconst, v, key, persist);
+	return value_sync_create(ast_expr_identifier_create(c));
+}
+
+struct value *
+state_vconstnokey(struct state *state, struct ast_type *t, bool persist)
+{
+	struct value *v = ast_type_vconstnokey(t, state, persist);
+	if (value_isstruct(v)) {
+		return v;
+	}
+	char *c = vconst_declarenokey(state->vconst, v, persist);
 	return value_sync_create(ast_expr_identifier_create(c));
 }
 
@@ -329,14 +344,10 @@ state_clearregister(struct state *state)
 enum execution_mode
 state_next_execmode(struct state *s)
 {
-	switch (stack_execmode(s->stack)) {
-	case EXEC_ABSTRACT:
+	if (stack_execmode(s->stack) == EXEC_ABSTRACT) {
 		return EXEC_ABSTRACT;
-	case EXEC_ABSTRACT_NO_SETUP:
-		return EXEC_ABSTRACT_NO_SETUP;
-	default:
-		assert(false);
 	}
+	return EXEC_ABSTRACT_NO_SETUP;
 }
 
 struct error *

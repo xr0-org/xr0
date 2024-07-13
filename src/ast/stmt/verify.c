@@ -717,7 +717,6 @@ ast_stmt_setupexec(struct ast_stmt *stmt, struct state *state)
 	case STMT_NOP:
 	case STMT_EXPR:
 	case STMT_JUMP:
-	case STMT_REGISTER:
 	case STMT_ITERATION:
 		return NULL;
 	case STMT_LABELLED:
@@ -726,6 +725,8 @@ ast_stmt_setupexec(struct ast_stmt *stmt, struct state *state)
 		return sel_setupexec(stmt, state);
 	case STMT_COMPOUND:
 		return comp_setupexec(stmt, state);
+	case STMT_REGISTER:
+		return stmt_register_exec(stmt, state);
 	default:
 		assert(false);
 	}
@@ -753,8 +754,6 @@ sel_setupexec(struct ast_stmt *stmt, struct state *state)
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
-	printf("%s\n", state_str(state));
-	printf("cond: %s\n", ast_expr_str(cond));
 	struct decision dec = sel_decide(cond, state);
 	if (dec.err) {
 		return dec.err;

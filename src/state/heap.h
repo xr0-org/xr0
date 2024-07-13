@@ -77,11 +77,14 @@ vconst_str(struct vconst *, char *indent);
 char *
 vconst_declare(struct vconst *, struct value *, char *key, bool persist);
 
+char *
+vconst_declarenokey(struct vconst *, struct value *, bool persist);
+
 struct value *
 vconst_get(struct vconst *, char *id);
 
-struct value *
-vconst_getbykey(struct vconst *, char *key);
+char *
+vconst_getidbykey(struct vconst *, char *key);
 
 void
 vconst_undeclare(struct vconst *);

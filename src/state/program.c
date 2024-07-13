@@ -176,7 +176,7 @@ static struct error *
 program_stmt_process(struct program *p, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	if (!state_islinear(s) && ast_stmt_linearisable(stmt)) {
+	if (!state_islinear(s) && ast_stmt_linearisable(stmt, state_insetup(s))) {
 		return ast_stmt_linearise(stmt, s);
 	}
 	switch (state_execmode(s)) {

@@ -655,6 +655,10 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	state_pushframe(param_state, setupframe);
 	while (!state_atsetupend(param_state)) {
 		err = state_step(param_state);
+		if (err) {
+			printf("%s\n", state_str(param_state));
+			printf("err: %s\n", error_str(err));
+		}
 		assert(!err);
 	}
 	assert(!state_atend(param_state));
@@ -1073,11 +1077,10 @@ arbarg_eval(struct ast_expr *expr, struct state *state)
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */
 			ast_type_create_range(NULL, NULL),
-			state_vconst(
+			state_vconstnokey(
 				state,
 				/* XXX: we will investigate type conversions later */
 				ast_type_create_ptr(ast_type_create(TYPE_VOID, 0)),
-				NULL,
 				false
 			)
 		)
