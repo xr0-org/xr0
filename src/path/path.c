@@ -150,7 +150,6 @@ char *
 path_actual_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
-	printf("state: %s", state_str(p->actual));
 	assert(!state_insetup(p->actual));
 	strbuilder_printf(
 		b, "phase:\t%s\n\n", state_execmode_str(state_execmode(p->actual))

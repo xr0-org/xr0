@@ -313,6 +313,11 @@ struct preconds_result {
 struct preconds_result
 ast_block_setups(struct ast_block *b, struct state *);
 
+DECLARE_RESULT_TYPE(struct ast_block *, block, ast_block_res)
+
+struct ast_block_res *
+ast_block_setupmodulate(struct ast_block *, struct state *);
+
 struct ast_stmt;
 
 struct lexememarker;
@@ -498,6 +503,11 @@ ast_stmt_absprocess_nosetup(struct ast_stmt *stmt, struct state *);
 
 struct error *
 ast_stmt_absprocess_setup(struct ast_stmt *stmt, struct state *);
+
+DECLARE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_res)
+
+struct ast_stmt_res *
+ast_stmt_setupmodulate(struct ast_stmt *, struct state *);
 
 struct ast_type;
 

@@ -1007,5 +1007,77 @@ preconds_compound_verify(struct ast_stmt *stmt)
 	return NULL;
 }
 
+DEFINE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_destroy, ast_stmt_res, false)
+
+static struct ast_stmt_res *
+sel_setupmodulate(struct ast_stmt *, struct state *);
+
+static struct ast_stmt_res *
+comp_setupmodulate(struct ast_stmt *, struct state *);
+
+struct ast_stmt_res *
+ast_stmt_setupmodulate(struct ast_stmt *stmt, struct state *s)
+{
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_EXPR:
+	case STMT_ITERATION:
+	case STMT_JUMP:
+		return ast_stmt_res_error_create(error_modulate_skip());
+	case STMT_DECLARATION:
+	case STMT_NOP:
+		/* TODO: */
+		return ast_stmt_res_stmt_create(stmt);
+	case STMT_LABELLED:
+		a_printf(
+			ast_stmt_ispre(stmt),
+			"only setup labels supported in abstract\n"
+		);
+		return ast_stmt_res_stmt_create(stmt);
+	case STMT_SELECTION:
+		return sel_setupmodulate(stmt, s);
+	case STMT_COMPOUND:
+		return comp_setupmodulate(stmt, s);
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_stmt_res *
+sel_setupmodulate(struct ast_stmt *stmt, struct state *s)
+{
+	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
+	struct ast_stmt *body = ast_stmt_sel_body(stmt),
+			*nest = ast_stmt_sel_nest(stmt);
+	struct decision dec = sel_decide(cond, s);
+	if (dec.err) {
+		return ast_stmt_res_error_create(dec.err);
+	}
+	if (dec.decision) {
+		return ast_stmt_setupmodulate(body, s);
+	} else if (nest) {
+		return ast_stmt_setupmodulate(nest, s);
+	}
+	return ast_stmt_res_error_create(error_modulate_skip());
+}
+
+static struct ast_stmt_res *
+comp_setupmodulate(struct ast_stmt *stmt, struct state *s)
+{
+	struct ast_block_res *res = ast_block_setupmodulate(
+		ast_stmt_as_block(stmt), s
+	);
+	if (ast_block_res_iserror(res)) {
+		return ast_stmt_res_error_create(ast_block_res_as_error(res));
+	}
+	struct ast_block *b = ast_block_res_as_block(res); 
+	if (ast_block_nstmts(b) == 0) {
+		return ast_stmt_res_error_create(error_modulate_skip());
+	}
+	return ast_stmt_res_stmt_create(
+		ast_stmt_create_compound(
+			lexememarker_copy(ast_stmt_lexememarker(stmt)), b
+		)
+	);
+}
 
 #include "verify.c"

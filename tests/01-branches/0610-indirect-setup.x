@@ -1,15 +1,12 @@
 #include <stdlib.h>
 
-foo(int num) ~ [
-	if (num) {
-		setup: num = 3;
+foo(int cond, int x) ~ [
+	if (cond) {
+		setup: x = 3;
 	}
 ]{}
 
-test(int x) ~ [
-	if (x) {
-	}
-]{
-	x = 3;
-	foo(x);
+test(int x)
+{
+	foo(x, 3);
 }

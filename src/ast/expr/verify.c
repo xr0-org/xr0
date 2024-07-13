@@ -647,9 +647,15 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	if ((err = ast_function_initparams(f, param_state))) {
 		return err;
 	}
+	struct ast_block_res *mod_abs_res = ast_block_setupmodulate(
+		ast_function_abstract(f), arg_state
+	);
+	if (ast_block_res_iserror(mod_abs_res)) {
+		return ast_block_res_as_error(mod_abs_res);
+	}
 	struct frame *setupframe = frame_setup_create(
 		"setup",
-		ast_function_abstract(f),
+		ast_block_res_as_block(mod_abs_res),
 		EXEC_SETUP
 	);
 	state_pushframe(param_state, setupframe);

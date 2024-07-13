@@ -181,3 +181,25 @@ generate_tempvar(int tempid)
 	strbuilder_printf(b, "<t%d>", tempid);
 	return strbuilder_build(b);
 }
+
+DEFINE_RESULT_TYPE(struct ast_block *, block, ast_block_destroy, ast_block_res, false)
+
+struct ast_block_res *
+ast_block_setupmodulate(struct ast_block *old, struct state *s)
+{
+	struct ast_block *new = ast_block_create(NULL, 0);
+	for (int i = 0; i < old->nstmt; i++) {
+		struct ast_stmt_res *res = ast_stmt_setupmodulate(old->stmt[i], s);
+		if (ast_stmt_res_iserror(res)) {
+			struct error *err = ast_stmt_res_as_error(res);
+			if (error_to_modulate_skip(err)) {
+				ast_stmt_res_errorignore(res);
+				continue; /* skip */
+			} else {
+				return ast_block_res_error_create(err);
+			}
+		}
+		ast_block_append_stmt(new, ast_stmt_res_as_stmt(res));
+	}
+	return ast_block_res_block_create(new);
+}
