@@ -333,6 +333,9 @@ path_copywithcond(struct path *old, struct ast_expr *cond)
 		}
 		state_assume(p->abstract, cond);
 		break;
+	case PATH_STATE_SETUPACTUAL:
+		printf("%s\n", state_str(old->actual));
+		printf("cond: %s\n", ast_expr_str(cond));
 	default:
 		assert(false);
 	}

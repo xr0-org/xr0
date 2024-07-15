@@ -3,12 +3,7 @@
 struct tuple { int x; int y; };
 
 struct tuple
-tuple_create() ~ [
-	struct tuple t;
-	t.x = $;
-	t.y = $;
-	return t;
-];
+tuple_create();
 
 void *
 conditional_alloc(int x) ~ [ if (x) { return .malloc(1); } ];

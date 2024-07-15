@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 struct tuple { int x; int y; };
 
 struct tuple
@@ -8,10 +10,17 @@ tuple_create() ~ [
 	return t;
 ];
 
-test()
+void *
+conditional_alloc(int x) ~ [ if (x) { return .malloc(1); } ];
+
+void *
+test() ~ [ if (tuple_create().x) { return .malloc(1); } ]
 {
-	/* TODO: fix by changing to .x after ~ [] works again */
-	~ [ tuple_create().x == tuple_create().y; ]
+	struct tuple t;
+
+	t = tuple_create();
+
+	return conditional_alloc(t.x);
 }
 
 struct tuple
@@ -22,4 +31,13 @@ tuple_create()
 	t.x = 0;
 	t.y = 0;
 	return t;
+}
+
+void *
+conditional_alloc(int x)
+{
+	if (x) {
+		return malloc(1);
+	}
+	return NULL;
 }
