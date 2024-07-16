@@ -337,6 +337,7 @@ path_copywithcond(struct path *old, struct ast_expr *cond)
 	char *fname = ast_function_name(p->f);
 	p->path_state = old->path_state;
 	switch (old->path_state) {
+	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
 		p->abstract = state_copywithname(old->abstract, fname);
 		if (!state_assume(p->abstract, cond)) {
