@@ -386,6 +386,8 @@ struct error {
 		ERROR_STATE_DEREF_RCONST,
 
 		ERROR_MODULATE_SKIP,
+
+		ERROR_EVAL_VOID,
 	} type;
 	union error_contents {
 		char *printf;
@@ -573,6 +575,20 @@ error_to_modulate_skip(struct error *err)
 	return error_to(err, ERROR_MODULATE_SKIP);
 }
 
+struct error *
+error_eval_void()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_EVAL_VOID;
+	return err;
+}
+
+struct error *
+error_to_eval_void(struct error *err)
+{
+	return error_to(err, ERROR_EVAL_VOID);
+}
+
 char *
 error_str(struct error *err)
 {
@@ -586,6 +602,8 @@ error_str(struct error *err)
 		[ERROR_STATE_DEREF_RCONST]	= "state_deref rconst",
 
 		[ERROR_MODULATE_SKIP]		= "modulate skip",
+
+		[ERROR_EVAL_VOID]		= "eval void",
 	};
 
 	switch (err->type) {
@@ -597,6 +615,7 @@ error_str(struct error *err)
 	case ERROR_STATE_GET_NOBLOCK:
 	case ERROR_STATE_DEREF_RCONST:
 	case ERROR_MODULATE_SKIP:
+	case ERROR_EVAL_VOID:
 		return dynamic_str(error_type_str[err->type]);
 	default:
 		assert(false);

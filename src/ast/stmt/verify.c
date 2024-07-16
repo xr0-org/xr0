@@ -118,6 +118,8 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 }
 
 /* stmt_verify */
+static bool
+islinearisable(struct ast_stmt *stmt);
 
 static struct error *
 stmt_expr_verify(struct ast_stmt *stmt, struct state *state);
@@ -126,21 +128,68 @@ static struct error *
 stmt_iter_verify(struct ast_stmt *stmt, struct state *state);
 
 struct error *
-ast_stmt_verify(struct ast_stmt *stmt, struct state *state)
+ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
 {
+	if (!state_islinear(s) && islinearisable(stmt)) {
+		return linearise(stmt, s);
+	}
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
 	case STMT_REGISTER:
-		return ast_stmt_exec(stmt, state);
+		return ast_stmt_exec(stmt, s);
 	case STMT_EXPR:
-		return stmt_expr_verify(stmt, state);
+		return stmt_expr_verify(stmt, s);
 	case STMT_ITERATION:
-		return stmt_iter_verify(stmt, state);
+		return stmt_iter_verify(stmt, s);
 	default:
 		assert(false);
 	}
 }
+
+static bool
+islinearisable(struct ast_stmt *stmt)
+{
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
+	case STMT_NOP:
+	case STMT_LABELLED:
+	case STMT_COMPOUND:
+	case STMT_COMPOUND_V:
+	case STMT_ITERATION_E:
+	case STMT_ITERATION:
+		return false;
+	case STMT_SELECTION:
+	case STMT_EXPR:
+	case STMT_JUMP:
+		return true;
+	default:
+		assert(false);
+	}
+}
+
+static bool
+islinearisable_setuponly(struct ast_stmt *stmt)
+{
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
+	case STMT_NOP:
+	case STMT_LABELLED:
+	case STMT_COMPOUND:
+	case STMT_COMPOUND_V:
+	case STMT_ITERATION_E:
+	case STMT_ITERATION:
+	case STMT_JUMP:
+	case STMT_EXPR:
+		return false;
+	case STMT_SELECTION:
+		return true;
+	default:
+		assert(false);
+	}
+}
+
+
 
 /* stmt_expr_verify */
 
@@ -196,9 +245,6 @@ iter_empty(struct ast_stmt *stmt, struct state *state)
 
 
 /* stmt_exec */
-static bool
-islinearisable(struct ast_stmt *stmt);
-
 static struct error *
 stmt_decl_exec(struct ast_stmt *, struct state *);
 
@@ -389,7 +435,12 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 	if (rv) {
 		struct e_res *res = ast_expr_eval(rv, state);
 		if (e_res_iserror(res)) {
-			return e_res_as_error(res);
+			struct error *err = e_res_as_error(res);
+			if (error_to_eval_void(err)) {
+				e_res_errorignore(res);
+			} else {
+				return err;
+			}
 		}
 		if (e_res_haseval(res)) {
 			struct value *v = value_copy(
@@ -450,7 +501,12 @@ register_mov_exec(struct ast_variable *temp, struct state *state)
 
 	struct e_res *r_res = call_return(state);
 	if (e_res_iserror(r_res)) {
-		return e_res_as_error(r_res);
+		struct error *err = e_res_as_error(r_res);
+		if (error_to_eval_void(err)) {
+			e_res_errorignore(r_res);
+		} else {
+			return err;
+		}
 	}
 	if (e_res_haseval(r_res)) {
 		object_assign(obj, eval_as_rval(e_res_as_eval(r_res)));
@@ -472,48 +528,6 @@ call_return(struct state *state)
 	return e_res_eval_create(
 		eval_rval_create(calloralloc_type(state_framecall(state), state), v)
 	);
-}
-
-static bool
-islinearisable(struct ast_stmt *stmt)
-{
-	switch (ast_stmt_kind(stmt)) {
-	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
-	case STMT_NOP:
-	case STMT_LABELLED:
-	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
-	case STMT_ITERATION_E:
-	case STMT_ITERATION:
-		return false;
-	case STMT_SELECTION:
-	case STMT_EXPR:
-	case STMT_JUMP:
-		return true;
-	default:
-		assert(false);
-	}
-}
-
-static bool
-islinearisable_setuponly(struct ast_stmt *stmt)
-{
-	switch (ast_stmt_kind(stmt)) {
-	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
-	case STMT_NOP:
-	case STMT_LABELLED:
-	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
-	case STMT_ITERATION_E:
-	case STMT_ITERATION:
-	case STMT_JUMP:
-	case STMT_EXPR:
-		return false;
-	case STMT_SELECTION:
-		return true;
-	default:
-		assert(false);
-	}
 }
 
 struct error *
@@ -680,7 +694,12 @@ jump_absexec(struct ast_stmt *stmt, struct state *state)
 	if (rv) {
 		struct e_res *res = ast_expr_abseval(rv, state);
 		if (e_res_iserror(res)) {
-			return e_res_as_error(res);
+			struct error *err = e_res_as_error(res);
+			if (error_to_eval_void(err)) {
+				e_res_errorignore(res);
+			} else {
+				return err;
+			}
 		}
 		if (e_res_haseval(res)) {
 			struct value *v = value_copy(

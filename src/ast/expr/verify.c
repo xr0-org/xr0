@@ -622,7 +622,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		);
 	}
 
-	return e_res_eval_create(NULL);
+	return e_res_error_create(error_eval_void());
 }
 
 static struct error *
@@ -1335,7 +1335,7 @@ isdereferencable_absexec(struct ast_expr *expr, struct state *state)
 {
 	struct props *p = state_getprops(state);
 	props_install(p, expr);
-	return e_res_eval_create(NULL);
+	return e_res_error_create(error_eval_void());
 }
 
 static struct preresult *
