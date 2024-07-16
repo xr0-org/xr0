@@ -14,15 +14,15 @@
 #include "value.h"
 
 static struct error *
-ast_stmt_linearise_proper(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+linearise_proper(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
-struct error *
-ast_stmt_linearise(struct ast_stmt *stmt, struct state *state)
+static struct error *
+linearise(struct ast_stmt *stmt, struct state *state)
 {
 	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
 	struct ast_block *b = ast_block_create(NULL, 0);
-	struct error *err = ast_stmt_linearise_proper(
+	struct error *err = linearise_proper(
 		stmt, b, lexememarker_copy(loc), state
 	);
 	if (err) {
@@ -48,7 +48,7 @@ selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *
 		struct state *);
 
 static struct error *
-ast_stmt_linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
+linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
@@ -114,20 +114,6 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 		nest ? ast_stmt_copy(nest) : NULL
 	);
 	ast_block_append_stmt(b, newsel);
-	return NULL;
-}
-
-struct error *
-ast_stmt_process(struct ast_stmt *stmt, struct state *state)
-{
-	struct error *err;
-
-	if (ast_stmt_ispre(stmt)) {
-		return NULL;
-	}
-	if ((err = ast_stmt_exec(stmt, state))) {
-		return err;
-	}
 	return NULL;
 }
 
@@ -210,6 +196,8 @@ iter_empty(struct ast_stmt *stmt, struct state *state)
 
 
 /* stmt_exec */
+static bool
+islinearisable(struct ast_stmt *stmt);
 
 static struct error *
 stmt_decl_exec(struct ast_stmt *, struct state *);
@@ -233,29 +221,35 @@ static struct error *
 stmt_register_exec(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_exec(struct ast_stmt *stmt, struct state *state)
+ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 {
+	if (!state_islinear(s) && islinearisable(stmt)) {
+		return linearise(stmt, s);
+	}
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_DECLARATION:
-		return stmt_decl_exec(stmt, state);
+		return stmt_decl_exec(stmt, s);
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
+		if (ast_stmt_ispre(stmt)) {
+			return NULL;
+		}
 		assert(false);
 	case STMT_COMPOUND:
-		return stmt_compound_exec(stmt, state);
+		return stmt_compound_exec(stmt, s);
 	case STMT_COMPOUND_V:
-		return stmt_compoundv_exec(stmt, state);
+		return stmt_compoundv_exec(stmt, s);
 	case STMT_EXPR:
-		return ast_expr_exec(ast_stmt_as_expr(stmt), state);
+		return ast_expr_exec(ast_stmt_as_expr(stmt), s);
 	case STMT_SELECTION:
-		return stmt_sel_exec(stmt, state);
+		return stmt_sel_exec(stmt, s);
 	case STMT_ITERATION:
-		return stmt_iter_exec(stmt, state);
+		return stmt_iter_exec(stmt, s);
 	case STMT_JUMP:
-		return stmt_jump_exec(stmt, state);
+		return stmt_jump_exec(stmt, s);
 	case STMT_REGISTER:
-		return stmt_register_exec(stmt, state);
+		return stmt_register_exec(stmt, s);
 	default:
 		assert(false);
 	}
@@ -339,9 +333,6 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 
 static struct ast_stmt *
 iter_neteffect(struct ast_stmt *);
-
-static struct error *
-ast_stmt_absexec(struct ast_stmt *stmt, struct state *state);
 
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
@@ -483,36 +474,54 @@ call_return(struct state *state)
 	);
 }
 
-struct error *
-ast_stmt_absprocess(struct ast_stmt *stmt, struct state *state)
+static bool
+islinearisable(struct ast_stmt *stmt)
 {
-	/* XXX: reject undefined things for this */
-	return ast_stmt_absexec(stmt, state);
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
+	case STMT_NOP:
+	case STMT_LABELLED:
+	case STMT_COMPOUND:
+	case STMT_COMPOUND_V:
+	case STMT_ITERATION_E:
+	case STMT_ITERATION:
+		return false;
+	case STMT_SELECTION:
+	case STMT_EXPR:
+	case STMT_JUMP:
+		return true;
+	default:
+		assert(false);
+	}
 }
 
-static struct error *
-ast_stmt_absexecnosetup(struct ast_stmt *, struct state *);
-
-struct error *
-ast_stmt_absprocess_nosetup(struct ast_stmt *stmt, struct state *state)
+static bool
+islinearisable_setuponly(struct ast_stmt *stmt)
 {
-	/* XXX: reject undefined things for this */
-	return ast_stmt_absexecnosetup(stmt, state);
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
+	case STMT_NOP:
+	case STMT_LABELLED:
+	case STMT_COMPOUND:
+	case STMT_COMPOUND_V:
+	case STMT_ITERATION_E:
+	case STMT_ITERATION:
+	case STMT_JUMP:
+	case STMT_EXPR:
+		return false;
+	case STMT_SELECTION:
+		return true;
+	default:
+		assert(false);
+	}
 }
 
-static struct error *
-ast_stmt_setupexec(struct ast_stmt *stmt, struct state *state);
-
 struct error *
-ast_stmt_absprocess_setup(struct ast_stmt *stmt, struct state *state)
+ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *s)
 {
-	/* XXX: reject undefined things for this */
-	return ast_stmt_setupexec(stmt, state);
-}
-
-static struct error *
-ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *state)
-{
+	if (!state_islinear(s) && islinearisable(stmt)) {
+		return linearise(stmt, s);
+	}
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_LABELLED:
 		return NULL;
@@ -524,14 +533,11 @@ ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *state)
 	case STMT_COMPOUND:
 	case STMT_JUMP:
 	case STMT_REGISTER:
-		return ast_stmt_absexec(stmt, state);
+		return ast_stmt_absexec(stmt, s);
 	default:
 		assert(false);
 	}
 }
-
-static struct error *
-labelled_absexec(struct ast_stmt *, struct state *);
 
 static struct error *
 expr_absexec(struct ast_expr *, struct state *);
@@ -548,49 +554,32 @@ comp_absexec(struct ast_stmt *stmt, struct state *);
 static struct error *
 jump_absexec(struct ast_stmt *, struct state *);
 
-static struct error *
-ast_stmt_absexec(struct ast_stmt *stmt, struct state *state)
+struct error *
+ast_stmt_absexec(struct ast_stmt *stmt, struct state *s)
 {
+	if (!state_islinear(s) && islinearisable(stmt)) {
+		return linearise(stmt, s);
+	}
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_DECLARATION:
-		return stmt_decl_exec(stmt, state);
+		return stmt_decl_exec(stmt, s);
 	case STMT_NOP:
 		return NULL;
-	case STMT_LABELLED:
-		return labelled_absexec(stmt, state);
 	case STMT_EXPR:
-		return expr_absexec(ast_stmt_as_expr(stmt), state);
+		return expr_absexec(ast_stmt_as_expr(stmt), s);
 	case STMT_SELECTION:
-		return sel_absexec(stmt, state);
+		return sel_absexec(stmt, s);
 	case STMT_ITERATION:
-		return iter_absexec(stmt, state);
+		return iter_absexec(stmt, s);
 	case STMT_COMPOUND:
-		return comp_absexec(stmt, state);
+		return comp_absexec(stmt, s);
 	case STMT_JUMP:
-		return jump_absexec(stmt, state);
+		return jump_absexec(stmt, s);
 	case STMT_REGISTER:
-		return stmt_register_exec(stmt, state);
+		return stmt_register_exec(stmt, s);
 	default:
 		assert(false);
 	}
-}
-
-static struct error *
-labelled_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	a_printf(ast_stmt_ispre(stmt), "only setup labels supported in abstract\n");
-	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
-	if (ast_stmt_kind(inner) == STMT_SELECTION) {
-		return error_printf("setup preconditions must be decidable");
-	}
-	struct ast_block *b = ast_stmt_labelled_as_block(stmt);	
-	struct frame *setup_frame = frame_setup_create(
-		dynamic_str("setup"),
-		b,
-		state_next_execmode(state)
-	);
-	state_pushframe(state, setup_frame);
-	return NULL;
 }
 
 static struct error *
@@ -677,7 +666,7 @@ comp_absexec(struct ast_stmt *stmt, struct state *state)
 	struct frame *block_frame = frame_block_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
-		state_next_execmode(state)
+		state_execmode(state)
 	);
 	state_pushframe(state, block_frame);
 	return NULL;
@@ -706,56 +695,64 @@ jump_absexec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
-labelled_setupexec(struct ast_stmt *, struct state *);
+labelled_pushsetup(struct ast_stmt *, struct state *);
 
 static struct error *
-sel_setupexec(struct ast_stmt *stmt, struct state *);
+sel_pushsetup(struct ast_stmt *stmt, struct state *);
 
 static struct error *
-comp_setupexec(struct ast_stmt *stmt, struct state *);
+comp_pushsetup(struct ast_stmt *stmt, struct state *);
 
-static struct error *
-ast_stmt_setupexec(struct ast_stmt *stmt, struct state *state)
+struct error *
+ast_stmt_pushsetup(struct ast_stmt *stmt, struct state *s)
 {
+	if (!state_islinear(s) && islinearisable_setuponly(stmt)) {
+		return linearise(stmt, s);
+	}
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_DECLARATION:
-		return stmt_decl_exec(stmt, state);
+		return stmt_decl_exec(stmt, s);
 	case STMT_NOP:
 	case STMT_EXPR:
 	case STMT_JUMP:
 	case STMT_ITERATION:
 		return NULL;
 	case STMT_LABELLED:
-		return labelled_setupexec(stmt, state);
+		return labelled_pushsetup(stmt, s);
 	case STMT_SELECTION:
-		return sel_setupexec(stmt, state);
+		return sel_pushsetup(stmt, s);
 	case STMT_COMPOUND:
-		return comp_setupexec(stmt, state);
+		return comp_pushsetup(stmt, s);
 	case STMT_REGISTER:
-		return stmt_register_exec(stmt, state);
+		return stmt_register_exec(stmt, s);
 	default:
 		assert(false);
 	}
 }
 
 static struct error *
-labelled_setupexec(struct ast_stmt *stmt, struct state *state)
+labelled_pushsetup(struct ast_stmt *stmt, struct state *state)
 {
 	a_printf(ast_stmt_ispre(stmt), "only setup labels supported in abstract\n");
-
-	if (!state_insetup(state)) {
-		return NULL;
-	}
 
 	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
 	if (ast_stmt_kind(inner) == STMT_SELECTION) {
 		return error_printf("setup preconditions must be decidable");
 	}
-	return ast_stmt_absexec(inner, state);
+
+	struct ast_block *b = ast_stmt_labelled_as_block(stmt);	
+	struct frame *setup_frame = frame_setup_create(
+		dynamic_str("setup"),
+		b,
+		EXEC_INSETUP
+	);
+	state_pushframe(state, setup_frame);
+	return NULL;
 }
 
+
 static struct error *
-sel_setupexec(struct ast_stmt *stmt, struct state *state)
+sel_pushsetup(struct ast_stmt *stmt, struct state *state)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
@@ -765,21 +762,20 @@ sel_setupexec(struct ast_stmt *stmt, struct state *state)
 		return dec.err;
 	}
 	if (dec.decision) {
-		return ast_stmt_setupexec(body, state);
+		return ast_stmt_pushsetup(body, state);
 	} else if (nest) {
-		return ast_stmt_setupexec(nest, state);
+		return ast_stmt_pushsetup(nest, state);
 	}
 	return NULL;
 }
 
 static struct error *
-comp_setupexec(struct ast_stmt *stmt, struct state *state)
+comp_pushsetup(struct ast_stmt *stmt, struct state *state)
 {
-	assert(state_insetup(state));
 	struct frame *block_frame = frame_block_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
-		EXEC_SETUP
+		state_execmode(state)
 	);
 	state_pushframe(state, block_frame);
 	return NULL;

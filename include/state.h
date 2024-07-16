@@ -27,10 +27,10 @@ struct value;
 struct state;
 
 enum execution_mode {
-	EXEC_ABSTRACT,
+	EXEC_ABSTRACT_SETUP_ONLY,
+	EXEC_INSETUP,
 	EXEC_ABSTRACT_NO_SETUP,
 	EXEC_ACTUAL,
-	EXEC_SETUP,
 	EXEC_VERIFY
 };
 
@@ -194,12 +194,6 @@ state_writeregister(struct state *, struct value *);
 
 void
 state_clearregister(struct state *);
-
-bool
-state_insetup(struct state *);
-
-enum execution_mode
-state_next_execmode(struct state *s);
 
 struct error *
 state_stacktrace(struct state *, struct error *);

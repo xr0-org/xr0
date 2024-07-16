@@ -474,12 +474,6 @@ ast_stmt_as_expr(struct ast_stmt *);
 
 enum execution_mode;
 
-struct error *
-ast_stmt_linearise(struct ast_stmt *, struct state *);
-
-bool
-ast_stmt_linearisable(struct ast_stmt *, bool insetup);
-
 bool
 ast_stmt_isterminal(struct ast_stmt *, struct state *);
 
@@ -493,16 +487,13 @@ struct error *
 ast_stmt_exec(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_process(struct ast_stmt *, struct state *);
+ast_stmt_absexec(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_absprocess(struct ast_stmt *stmt, struct state *);
+ast_stmt_absexecnosetup(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_absprocess_nosetup(struct ast_stmt *stmt, struct state *);
-
-struct error *
-ast_stmt_absprocess_setup(struct ast_stmt *stmt, struct state *);
+ast_stmt_pushsetup(struct ast_stmt *, struct state *);
 
 DECLARE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_res)
 

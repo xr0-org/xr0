@@ -176,18 +176,15 @@ static struct error *
 program_stmt_process(struct program *p, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	if (!state_islinear(s) && ast_stmt_linearisable(stmt, state_insetup(s))) {
-		return ast_stmt_linearise(stmt, s);
-	}
 	switch (state_execmode(s)) {
-	case EXEC_ABSTRACT:
-		return ast_stmt_absprocess(stmt, s);
+	case EXEC_ABSTRACT_SETUP_ONLY:
+		return ast_stmt_pushsetup(stmt, s);
+	case EXEC_INSETUP:
+		return ast_stmt_absexec(stmt, s);
 	case EXEC_ABSTRACT_NO_SETUP:
-		return ast_stmt_absprocess_nosetup(stmt, s);
-	case EXEC_SETUP:
-		return ast_stmt_absprocess_setup(stmt, s);
+		return ast_stmt_absexecnosetup(stmt, s);
 	case EXEC_ACTUAL:
-		return ast_stmt_process(stmt, s);
+		return ast_stmt_exec(stmt, s);
 	case EXEC_VERIFY:
 		return ast_stmt_verify(stmt, state_copy(s));
 	default:

@@ -1058,9 +1058,6 @@ number_decide(struct number *n, struct state *s)
 	return decide(cond, s);
 }
 
-static struct number *
-getdecider(struct value *v);
-
 static struct bool_res *
 decide(struct ast_expr *expr, struct state *s)
 {
@@ -1073,9 +1070,9 @@ decide(struct ast_expr *expr, struct state *s)
 	);
 	free(expr_str);
 
-	struct number *r = getdecider(
-		state_getvconst(s, ast_expr_as_identifier(expr))
-	);
+	struct value *v = state_getvconst(s, ast_expr_as_identifier(expr));
+	assert(v->type == VALUE_INT);
+	struct number *r = v->n;
 	assert(r->type == NUMBER_RANGES);
 	if (!number_range_arr_canbe(r->ranges, false)) {
 		return bool_res_bool_create(true);
@@ -1084,20 +1081,6 @@ decide(struct ast_expr *expr, struct state *s)
 		return bool_res_bool_create(false);
 	}
 	return bool_res_error_create(error_undecideable_cond(expr));
-}
-
-static struct number *
-getdecider(struct value *v)
-{
-	switch (v->type) {
-	case VALUE_INT:
-		return v->n;
-	case VALUE_PTR:
-		assert(v->ptr.isindefinite);
-		return v->ptr.n;
-	default:
-		assert(false);
-	}
 }
 
 struct number_value *

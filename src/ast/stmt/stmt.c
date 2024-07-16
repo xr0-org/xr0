@@ -782,62 +782,6 @@ ast_stmt_equal(struct ast_stmt *s1, struct ast_stmt *s2)
 	}
 }
 
-static bool
-ast_stmt_linearisable_setup(struct ast_stmt *);
-
-static bool
-ast_stmt_linearisable_nonsetup(struct ast_stmt *);
-
-bool
-ast_stmt_linearisable(struct ast_stmt *stmt, bool insetup)
-{
-	return insetup
-		? ast_stmt_linearisable_setup(stmt)
-		: ast_stmt_linearisable_nonsetup(stmt);
-}
-
-static bool
-ast_stmt_linearisable_setup(struct ast_stmt *stmt)
-{
-	switch (stmt->kind) {
-	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
-	case STMT_NOP:
-	case STMT_LABELLED:
-	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
-	case STMT_ITERATION_E:
-	case STMT_ITERATION:
-	case STMT_JUMP:
-	case STMT_EXPR:
-		return false;
-	case STMT_SELECTION:
-		return true;
-	default:
-		assert(false);
-	}
-}
-
-static bool
-ast_stmt_linearisable_nonsetup(struct ast_stmt *stmt)
-{
-	switch (stmt->kind) {
-	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
-	case STMT_NOP:
-	case STMT_LABELLED:
-	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
-	case STMT_ITERATION_E:
-	case STMT_ITERATION:
-		return false;
-	case STMT_SELECTION:
-	case STMT_EXPR:
-	case STMT_JUMP:
-		return true;
-	default:
-		assert(false);
-	}
-}
-
 enum ast_stmt_kind
 ast_stmt_kind(struct ast_stmt *stmt)
 {

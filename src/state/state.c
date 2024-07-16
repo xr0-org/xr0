@@ -150,26 +150,20 @@ state_islinear(struct state *s)
 	return stack_islinear(s->stack);
 }
 
-bool
-state_insetup(struct state *s)
-{
-	return stack_insetup(s->stack);	
-}
-
 char *
 state_execmode_str(enum execution_mode m)
 {
 	char *execmode_type_str[] = {
-		[EXEC_ABSTRACT] 		= "ABSTRACT",
-		[EXEC_ABSTRACT_NO_SETUP] 	= "INTERNAL",
-		[EXEC_SETUP]			= "INTERNAL",
+		[EXEC_ABSTRACT_SETUP_ONLY]	= "ABSTRACT (SETUP ONLY)",
+		[EXEC_INSETUP]			= "SETUP",
+		[EXEC_ABSTRACT_NO_SETUP]	= "ABSTRACT (NO SETUP)",
 		[EXEC_ACTUAL]			= "ACTUAL",
 		[EXEC_VERIFY]			= "VERIFY",
 	};
 	switch (m) {
-	case EXEC_ABSTRACT:
+	case EXEC_ABSTRACT_SETUP_ONLY:
+	case EXEC_INSETUP:
 	case EXEC_ABSTRACT_NO_SETUP:
-	case EXEC_SETUP:
 	case EXEC_ACTUAL:
 	case EXEC_VERIFY:
 		return dynamic_str(execmode_type_str[m]);
@@ -339,15 +333,6 @@ state_clearregister(struct state *state)
 {
 	/* XXX: used after initing the actual state */
 	state->reg = NULL;
-}
-
-enum execution_mode
-state_next_execmode(struct state *s)
-{
-	if (stack_execmode(s->stack) == EXEC_ABSTRACT) {
-		return EXEC_ABSTRACT;
-	}
-	return EXEC_ABSTRACT_NO_SETUP;
 }
 
 struct error *
@@ -626,7 +611,7 @@ state_range_alloc(struct state *state, struct object *obj,
 struct location *
 state_alloc(struct state *state, int size)
 {
-	if (state_insetup(state)) {
+	if (stack_insetup(state->stack)) {
 		return heap_newcallerblock(state->heap, size);
 	}
 	return heap_newblock(state->heap, size);

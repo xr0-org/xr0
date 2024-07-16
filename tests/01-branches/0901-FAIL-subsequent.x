@@ -49,3 +49,4 @@ alloc_if(int num)
 		return malloc(1);
 	}
 	return NULL;
+}
