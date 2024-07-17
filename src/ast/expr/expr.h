@@ -75,6 +75,7 @@ struct ast_expr {
 			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
 		} alloc;
+		char *arbarg_key;
 	} u;
 };
 

@@ -655,11 +655,21 @@ ast_expr_isdereferencable_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
-ast_expr_arbarg_create()
+ast_expr_arbarg_create(char *key)
 {
+	assert(key);
+
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_ARBARG;
+	expr->u.arbarg_key = key;
 	return expr;
+}
+
+char *
+ast_expr_arbarg_key(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_ARBARG);
+	return expr->u.arbarg_key;
 }
 
 struct ast_expr *
@@ -800,6 +810,7 @@ ast_expr_destroy(struct ast_expr *expr)
 		ast_expr_destroy(expr->root);
 		break;
 	case EXPR_ARBARG:
+		free(expr->u.arbarg_key);
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_destroy(expr->u.alloc.arg);
@@ -852,7 +863,7 @@ ast_expr_str(struct ast_expr *expr)
 		ast_expr_isdereferencable_str_build(expr, b);
 		break;
 	case EXPR_ARBARG:
-		strbuilder_putc(b, '$');
+		strbuilder_printf(b, "$%s", expr->u.arbarg_key);
 		break;
 	case EXPR_ALLOCATION:
 		ast_expr_alloc_str_build(expr, b);
@@ -916,7 +927,7 @@ ast_expr_copy(struct ast_expr *expr)
 			ast_expr_copy(expr->root)
 		);
 	case EXPR_ARBARG:
-		return ast_expr_arbarg_create();
+		return ast_expr_arbarg_create(dynamic_str(expr->u.arbarg_key));
 	case EXPR_ALLOCATION:
 		return ast_expr_alloc_copy(expr);
 	default:

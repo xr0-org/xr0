@@ -528,12 +528,16 @@ state_getvariabletype(struct state *state, char *id)
 	return variable_type(v);
 }
 
-struct location *
+struct loc_res *
 state_getloc(struct state *state, char *id)
 {
 	struct variable *v = stack_getvariable(state->stack, id);
-	assert(v);
-	return variable_location(v);
+	if (!v) {
+		return loc_res_error_create(
+			error_printf("unknown variable `%s'", id)
+		);
+	}
+	return loc_res_loc_create(variable_location(v));
 }
 
 struct object_res *

@@ -336,12 +336,13 @@ count_true(struct map *m);
 static char *
 vconst_id(struct map *varmap, struct map *persistmap, bool persist)
 {
-	int npersist = count_true(persistmap);
+	int npersist = count_true(persistmap),
+	    nnonpersist = varmap->n - npersist;
 	struct strbuilder *b = strbuilder_create();
 	if (persist) {
 		strbuilder_printf(b, "$%d", (int) npersist);
 	} else {
-		strbuilder_printf(b, "#%d", (int) varmap->n - npersist);
+		strbuilder_printf(b, "#%d", (int) nnonpersist);
 	}
 	return strbuilder_build(b);
 }

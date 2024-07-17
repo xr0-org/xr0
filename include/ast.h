@@ -160,7 +160,10 @@ bool
 ast_expr_isisdereferencable(struct ast_expr *expr);
 
 struct ast_expr *
-ast_expr_arbarg_create();
+ast_expr_arbarg_create(char *key);
+
+char *
+ast_expr_arbarg_key(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_alloc_create(struct ast_expr *);

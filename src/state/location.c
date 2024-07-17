@@ -407,6 +407,9 @@ location_range_dealloc(struct location *loc, struct ast_expr *lw,
 	return block_range_dealloc(b, lw, up, state);
 }
 
+DEFINE_RESULT_TYPE(struct location *, loc, location_destroy, loc_res, false)
+
+
 struct location_arr {
 	int n;
 	struct location **loc;

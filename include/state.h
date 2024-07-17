@@ -115,7 +115,11 @@ state_getobject(struct state *, char *id);
 struct ast_type *
 state_getvariabletype(struct state *, char *id);
 
-struct location *
+struct location;
+
+DECLARE_RESULT_TYPE(struct location *, loc, loc_res)
+
+struct loc_res *
 state_getloc(struct state *state, char *id);
 
 struct object_res *

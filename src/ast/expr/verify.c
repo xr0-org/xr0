@@ -407,12 +407,14 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 		);
 	}
 
-	/* TODO: check that id exists in state return error if not */
-
+	struct loc_res *loc_res = state_getloc(state, id);
+	if (loc_res_iserror(loc_res)) {
+		return e_res_error_create(loc_res_as_error(loc_res));
+	}
 	return e_res_eval_create(
 		eval_lval_create(
 			ast_type_copy(state_getvariabletype(state, id)),
-			location_copy(state_getloc(state, id))
+			location_copy(loc_res_as_loc(loc_res))
 		)
 	);
 }
@@ -676,10 +678,10 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	for (int i = 0; i < nparams; i++) {
 		char *id = ast_variable_name(param[i]);
 		struct value *param = value_ptr_create(
-			location_copy(state_getloc(param_state, id))
+			location_copy(loc_res_as_loc(state_getloc(param_state, id)))
 		);
 		struct value *arg = value_ptr_create(
-			location_copy(state_getloc(arg_state, id))
+			location_copy(loc_res_as_loc(state_getloc(arg_state, id)))
 		);
 		err = verify_paramspec(param, arg, param_state, arg_state);
 		value_destroy(arg);
@@ -1083,10 +1085,11 @@ arbarg_eval(struct ast_expr *expr, struct state *state)
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */
 			ast_type_create_range(NULL, NULL),
-			state_vconstnokey(
+			state_vconst(
 				state,
 				/* XXX: we will investigate type conversions later */
 				ast_type_create_ptr(ast_type_create(TYPE_VOID, 0)),
+				ast_expr_arbarg_key(expr),
 				false
 			)
 		)

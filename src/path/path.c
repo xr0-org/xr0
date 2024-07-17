@@ -344,6 +344,7 @@ path_copywithcond(struct path *old, struct ast_expr *cond)
 			p->path_state = PATH_STATE_ATEND;
 		}
 		break;
+	case PATH_STATE_SETUPACTUAL:
 	case PATH_STATE_ACTUAL:
 		p->abstract = state_copywithname(old->abstract, fname);
 		p->actual = state_copywithname(old->actual, fname);

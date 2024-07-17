@@ -4,7 +4,7 @@ assign(int *q) ~ [
 		q = .clump(sizeof(int));
 		*q = $;
 	}
-] {
+]{
 	int p;
 	p = *q;
 }
