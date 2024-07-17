@@ -25,7 +25,7 @@ do
 	folder=$(dirname "$f")
 
 	printf "%-${length}s ..." "$f"
-	tempfile="${f}.temp"
+	tempfile=$(mktemp)
 	if [ "$folder" == *"$topological_folder"* ]
 	then
 		if [[ "$f" == *"verification"* ]]
