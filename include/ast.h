@@ -139,25 +139,28 @@ struct ast_expr *
 ast_expr_assignment_create(struct ast_expr *root, struct ast_expr *value);
 
 struct ast_expr *
-ast_expr_assignment_lval(struct ast_expr *expr);
+ast_expr_assignment_lval(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_assignment_rval(struct ast_expr *expr);
+ast_expr_assignment_rval(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_isdeallocand_create(struct ast_expr *assertand);
 
 struct ast_expr *
-ast_expr_isdeallocand_assertand(struct ast_expr *expr);
+ast_expr_isdeallocand_assertand(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_isdereferencable_create(struct ast_expr *assertand);
 
 struct ast_expr *
-ast_expr_isdereferencable_assertand(struct ast_expr *expr);
+ast_expr_isdereferencable_assertand(struct ast_expr *);
 
 bool
-ast_expr_isisdereferencable(struct ast_expr *expr);
+ast_expr_isisdereferencable(struct ast_expr *);
+
+bool
+ast_expr_isverifiable(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_arbarg_create(char *key);

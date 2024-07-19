@@ -118,32 +118,23 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 }
 
 /* stmt_verify */
+
 static bool
-islinearisable(struct ast_stmt *stmt);
+islinearisable(struct ast_stmt *);
 
 static struct error *
-stmt_expr_verify(struct ast_stmt *stmt, struct state *state);
-
-static struct error *
-stmt_iter_verify(struct ast_stmt *stmt, struct state *state);
+stmt_expr_verify(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
 {
-	if (!state_islinear(s) && islinearisable(stmt)) {
-		return linearise(stmt, s);
-	}
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
-	case STMT_REGISTER:
-		return ast_stmt_exec(stmt, s);
 	case STMT_EXPR:
 		return stmt_expr_verify(stmt, s);
-	case STMT_ITERATION:
-		return stmt_iter_verify(stmt, s);
 	default:
-		assert(false);
+		return error_printf("verification blocks only support statement expressions");
 	}
 }
 
@@ -189,62 +180,24 @@ islinearisable_setuponly(struct ast_stmt *stmt)
 	}
 }
 
-
-
 /* stmt_expr_verify */
 
 static struct error *
 stmt_expr_verify(struct ast_stmt *stmt, struct state *state)
 {
 	struct ast_expr *expr = ast_stmt_as_expr(stmt);
+	if (!ast_expr_isverifiable(expr)) {
+		return error_printf("cannot verify complex expressions: `%s'", ast_expr_str(expr));
+	}
 	if (ast_expr_decide(expr, state)) {
 		return NULL;
 	}
 	return error_printf("cannot verify statement");
 }
 
-static bool
-iter_empty(struct ast_stmt *stmt, struct state *state);
-
-static struct error *
-stmt_iter_verify(struct ast_stmt *stmt, struct state *state)
-{
-	assert(false);
-
-	/* check for empty sets */
-	if (iter_empty(stmt, state)) {
-		return NULL;
-	}
-
-	/* neteffect is an iter statement */
-	struct ast_stmt *body = ast_stmt_iter_body(stmt);
-	assert(ast_stmt_kind(body) == STMT_COMPOUND);
-	struct ast_block *b = ast_stmt_as_block(body);
-	assert(ast_block_nstmts(b) == 1 && !ast_stmt_isdecl(ast_block_stmts(b)[0]));
-	struct ast_expr *assertion = ast_stmt_as_expr(ast_block_stmts(b)[0]);
-
-	/* we're currently discarding analysis of `offset` and relying on the
-	 * bounds (lw, up beneath) alone */
-	struct ast_expr *lw = ast_stmt_iter_lower_bound(stmt),
-			*up = ast_stmt_iter_upper_bound(stmt);
-
-	if (!ast_expr_rangedecide(assertion, lw, up, state)) {
-		return error_printf("could not verify");	
-	}
-	return NULL;
-}
-
-static bool
-iter_empty(struct ast_stmt *stmt, struct state *state)
-{
-	struct error *err = ast_stmt_exec(ast_stmt_iter_init(stmt), state);
-	assert(!err);
-	/* iter is empty if its cond is false after init (executed above) */
-	return !ast_expr_decide(ast_stmt_as_expr(ast_stmt_iter_cond(stmt)), state);
-}
-
 
 /* stmt_exec */
+
 static struct error *
 stmt_decl_exec(struct ast_stmt *, struct state *);
 

@@ -11,7 +11,12 @@ tuple_create() ~ [
 test()
 {
 	/* TODO: fix by changing to .x after ~ [] works again */
-	~ [ tuple_create().x == tuple_create().y; ]
+	int x;
+	int y;
+
+	x = tuple_create().x;
+	y = tuple_create().y;
+	~ [ x != y; ] /* ERROR: undecidable ? */
 }
 
 struct tuple

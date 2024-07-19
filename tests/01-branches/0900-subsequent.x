@@ -26,7 +26,8 @@ test(int x) ~ [
 	m = x;
 	~ [ m == x; ]
 	n = g(m);
-	~ [ n == g(x); ]
+	k = g(x);
+	~ [ n == k; ]
 	return alloc_if(f(n));
 }
 
