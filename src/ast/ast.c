@@ -259,3 +259,32 @@ ast_protostitch(struct ast_function *f, struct externals *ext)
 
 DEFINE_RESULT_TYPE(struct ast_expr *, expr, ast_expr_destroy, iresult, false)
 DEFINE_RESULT_TYPE(struct eval *, eval, eval_destroy, e_res, false)
+
+struct namedseq {
+	int count;
+	char *name;
+};
+
+struct namedseq *
+namedseq_create(char *name)
+{
+	struct namedseq *seq = malloc(sizeof(struct namedseq));
+	seq->count = 0;
+	seq->name = name;
+	return seq;
+}
+
+char *
+namedseq_next(struct namedseq *seq)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s:%d", seq->name, seq->count++);
+	return strbuilder_build(b);
+}
+
+void
+namedseq_destroy(struct namedseq *seq)
+{
+	free(seq->name);
+	free(seq);
+}

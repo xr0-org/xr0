@@ -45,4 +45,11 @@ ast_type_create(enum ast_type_base base, enum ast_type_modifier mod);
 void
 ast_type_mod_or(struct ast_type *, enum ast_type_modifier);
 
+struct externals;
+struct namedseq;
+
+struct ast_expr *
+ast_type_rconstgeninstr(struct ast_type *, struct namedseq *, struct ast_block *,
+		struct externals *);
+
 #endif

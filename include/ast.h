@@ -249,9 +249,6 @@ struct value;
 
 struct ast_function;
 
-struct value *
-ast_expr_call_arbitrary(struct ast_function *, struct state *);
-
 struct ast_block;
 struct lexememarker;
 
@@ -315,6 +312,8 @@ DECLARE_RESULT_TYPE(struct ast_block *, block, ast_block_res)
 
 struct ast_block_res *
 ast_block_setupmodulate(struct ast_block *, struct state *);
+
+struct externals;
 
 struct ast_stmt;
 
@@ -528,6 +527,7 @@ ast_type_isptr(struct ast_type *);
 struct ast_type *
 ast_type_arr_type(struct ast_type *);
 
+
 struct ast_variable_arr;
 
 struct ast_type *
@@ -718,6 +718,9 @@ ast_function_verify(struct ast_function *, struct externals *);
 
 struct error *
 ast_function_debug(struct ast_function *, struct externals *);
+
+struct error *
+ast_function_ensure_hasabstract(struct ast_function *f, struct externals *ext);
 
 struct ast_externdecl;
 

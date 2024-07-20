@@ -507,13 +507,7 @@ void
 stack_popprep(struct stack *s, struct state *state)
 {
 	if (s->kind == FRAME_CALL && !ast_function_isvoid(s->f)) {
-		struct value *v = state_readregister(state);
-		if (!v) {
-			state_writeregister(
-				state,
-				ast_expr_call_arbitrary(s->f, state)
-			);
-		}
+		assert(state_readregister(state));
 	}
 }
 

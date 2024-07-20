@@ -579,6 +579,10 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	if (!f) {
 		return e_res_error_create(error_printf("`%s' not found\n", name));
 	}
+	err = ast_function_ensure_hasabstract(f, state_getext(state));
+	if (err) {
+		assert(false);
+	}
 
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
@@ -794,59 +798,6 @@ call_type(struct ast_expr *call, struct state *state)
 	return ast_type_copy(ast_function_type(f));
 }
 
-
-static struct e_res *
-call_to_computed_value(struct ast_function *, struct state *s);
-
-struct value *
-ast_expr_call_arbitrary(struct ast_function *f, struct state *state)
-{
-	return eval_as_rval(e_res_as_eval(call_to_computed_value(f, state)));
-}
-
-static struct e_res *
-call_to_computed_value(struct ast_function *f, struct state *s)
-{
-	/* TODO: function-valued root */
-	char *root = ast_function_name(f);
-
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **uncomputed_param = ast_function_params(f);
-	struct ast_expr **computed_param = malloc(
-		sizeof(struct ast_expr *) * nparams
-	);
-	for (int i = 0; i < nparams; i++) {
-		struct ast_expr *param = ast_expr_identifier_create(
-			dynamic_str(ast_variable_name(uncomputed_param[i]))
-		);
-		struct e_res *res = ast_expr_eval(param, s);
-		ast_expr_destroy(param);
-		if (e_res_iserror(res)) {
-			return res;
-		}
-		struct value *v = value_res_as_value(
-			eval_to_value(e_res_as_eval(res), s)
-		);
-		if (value_islocation(v)) {
-			computed_param[i] = ast_expr_identifier_create(value_str(v));
-		} else {
-			computed_param[i] = value_to_expr(v);
-		}
-	}
-
-	struct ast_expr *call = ast_expr_call_create(
-		ast_expr_identifier_create(dynamic_str(root)),
-		nparams, computed_param
-	);
-	char *key = ast_expr_str(call);
-	struct value *v = state_vconst(
-		s, ast_type_copy(ast_function_type(f)), key, false
-	);
-	free(key);
-	return e_res_eval_create(
-		eval_rval_create(ast_type_copy(ast_function_type(f)), v)
-	);
-}
 
 struct value_arr_res *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,

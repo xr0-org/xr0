@@ -14,7 +14,6 @@
 
 char *CURR_FUNC = NULL;
 int CURR_RCONST_COUNT = 0;
-
 void
 setcurrfunc(char *func)
 {
@@ -906,7 +905,7 @@ function_definition
 			$3.decl.name,
 			$3.decl.n,
 			$3.decl.param,
-			$5.abstract ? $5.abstract : ast_block_create(NULL, 0),
+			$5.abstract,
 			$5.body
 		);
 	}
@@ -923,7 +922,7 @@ function_definition
 			$2.decl.name,
 			$2.decl.n,
 			$2.decl.param,
-			$4.abstract ? $4.abstract : ast_block_create(NULL, 0),
+			$4.abstract,
 			$4.body
 		);
 	}
@@ -936,7 +935,7 @@ function_definition
 			$1.decl.name,
 			$1.decl.n,
 			$1.decl.param,
-			$3.abstract ? $3.abstract : ast_block_create(NULL, 0),
+			$3.abstract,
 			$3.body
 		);
 	}

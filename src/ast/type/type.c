@@ -4,6 +4,7 @@
 #include <string.h>
 #include "ast.h"
 #include "ext.h"
+#include "intern.h"
 #include "state.h"
 #include "type.h"
 #include "util.h"
@@ -164,6 +165,65 @@ ast_type_vconstnokey(struct ast_type *t, struct state *s, bool persist)
 	default:
 		assert(false);
 	}
+}
+
+static struct ast_expr *
+struct_rconstgeninstr(struct ast_type *, struct namedseq *, struct ast_block *b,
+		struct externals *);
+
+struct ast_expr *
+ast_type_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
+		struct ast_block *b, struct externals *ext)
+{
+	switch (t->base) {
+	case TYPE_INT:
+	case TYPE_POINTER:
+		return ast_expr_arbarg_create(namedseq_next(seq));
+	case TYPE_USERDEF:
+		/* TODO: cast to userdef */
+		return ast_type_rconstgeninstr(
+			externals_gettypedef(ext, t->userdef),
+			seq, b, ext
+		);
+	case TYPE_STRUCT:
+		return struct_rconstgeninstr(t, seq, b, ext);
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_expr *
+struct_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
+		struct ast_block *b, struct externals *ext)
+{
+	struct ast_type *complete = ast_type_struct_complete(t, ext);
+	if (!complete) {
+		/* TODO: user error */ 
+		assert(false);
+	}
+	struct ast_variable_arr *vars = ast_variable_arr_create();
+	/* Need some way to gen names here (block?) */
+	ast_variable_arr_append(
+		vars, ast_variable_create(dynamic_str("genstruct"), t)
+	);
+	struct ast_stmt *decl = ast_stmt_create_declaration(NULL, vars);
+	ast_block_append_stmt(b, decl);
+
+	struct ast_variable_arr *varr = ast_type_struct_members(t);
+	int n = ast_variable_arr_n(varr);
+	struct ast_variable **var = ast_variable_arr_v(varr);
+	for (int i = 0; i < n; i++) {
+		/* XXX: handle nested structs */
+		struct ast_expr *member = ast_expr_member_create(
+			ast_expr_identifier_create("genstruct"), ast_variable_name(var[i])
+		);
+		struct ast_expr *assign = ast_expr_assignment_create(
+			member, ast_expr_arbarg_create(namedseq_next())
+		);
+		struct ast_stmt *stmt = ast_stmt_create_expr(NULL, assign);
+		ast_block_append_stmt(b, stmt);
+	}
+	return ast_expr_identifier_create("genstruct");
 }
 
 bool

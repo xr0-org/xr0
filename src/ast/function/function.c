@@ -46,7 +46,6 @@ ast_function_create(
 	f->name = name;
 	f->nparam = nparam;
 	f->param = param;
-	assert(abstract);
 	f->abstract = abstract;
 	f->body = body;
 	return f;
@@ -59,7 +58,9 @@ ast_function_destroy(struct ast_function *f)
 	for (int i = 0; i < f->nparam; i++) {
 		ast_variable_destroy(f->param[i]);
 	}
-	ast_block_destroy(f->abstract);
+	if (f->abstract) {
+		ast_block_destroy(f->abstract);
+	}
 	if (f->body) {
 		ast_block_destroy(f->body);
 	}
@@ -85,9 +86,12 @@ ast_function_str(struct ast_function *f)
 		strbuilder_printf(b, "%s%s", v, space);
 		free(v);
 	}
-	char *abs = ast_block_absstr(f->abstract, 1);
-	strbuilder_printf(b, ") ~ %s", abs);
-	free(abs);
+	strbuilder_printf(b, ")");
+	if (f->abstract) {
+		char *abs = ast_block_absstr(f->abstract, 1);
+		strbuilder_printf(b, " ~ %s", abs);
+		free(abs);
+	}
 	if (f->body) {
 		char *body = ast_block_str(f->body, 1);
 		strbuilder_printf(b, "%s", body);
@@ -126,7 +130,7 @@ ast_function_copy(struct ast_function *f)
 		dynamic_str(f->name),
 		f->nparam,
 		param,
-		ast_block_copy(f->abstract),
+		f->abstract ? ast_block_copy(f->abstract) : NULL,
 		f->body ? ast_block_copy(f->body) : NULL
 	);
 }
@@ -152,6 +156,7 @@ ast_function_isvoid(struct ast_function *f)
 bool
 ast_function_absisempty(struct ast_function *f)
 {
+	assert(f->abstract);
 	return ast_block_nstmts(f->abstract) == 0;
 }
 
@@ -201,6 +206,39 @@ ast_function_protostitch(struct ast_function *f, struct externals *ext)
 	/* XXX: leaks */
 	return f;
 }
+
+static struct ast_block_res *
+generate_abstract(char *f_name, struct ast_type *f_type, struct externals *);
+
+struct error *
+ast_function_ensure_hasabstract(struct ast_function *f, struct externals *ext)
+{
+	if (!f->abstract) {
+		struct ast_block_res *res = generate_abstract(
+			f->name, f->ret, ext
+		);
+		if (!ast_block_res_iserror(res)) {
+			return ast_block_res_as_error(res);
+		}
+		f->abstract = ast_block_res_as_block(res);
+	}
+	return NULL;
+}
+
+static struct ast_block_res *
+generate_abstract(char *f_name, struct ast_type *f_type, struct externals *ext)
+{
+	struct ast_block *b = ast_block_create(NULL, 0);
+
+	struct ast_expr *ret = ast_type_rconstgeninstr(
+		f_type, namedseq_create(f_name), b, ext
+	);
+	ast_block_append_stmt(
+		b, ast_stmt_create_jump(NULL, JUMP_RETURN, ret)
+	);
+	return ast_block_res_block_create(b);
+}
+
 
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)

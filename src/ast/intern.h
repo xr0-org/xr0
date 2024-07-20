@@ -78,4 +78,15 @@ preresult_iscontradiction(struct preresult *);
 DECLARE_RESULT_TYPE(struct ast_expr *, expr, iresult)
 DECLARE_RESULT_TYPE(struct eval *, eval, e_res)
 
+struct namedseq;
+
+struct namedseq *
+namedseq_create(char *name);
+
+char *
+namedseq_next();
+
+void
+namedseq_destroy(struct namedseq *);
+
 #endif

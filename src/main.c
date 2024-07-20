@@ -254,7 +254,6 @@ pass1(struct ast *root, struct externals *ext, bool debug)
 			continue;
 		}
 		/* XXX: ensure that verified functions always have an abstract */
-		assert(ast_function_abstract(f));
 		if ((err = handle_debug(f, ext, debug))) {
 			fprintf(stderr, "%s\n", error_str(err));
 			exit(EXIT_FAILURE);
@@ -313,9 +312,6 @@ pass_inorder(struct string_arr *order, struct externals *ext)
 		if (ast_function_isaxiom(f) || ast_function_isproto(f)) {
 			continue;
 		}
-		/* XXX: ensure that verified functions always have an abstract */
-		assert(ast_function_abstract(f));
-
 		if ((err = ast_function_verify(f, ext))) {
 			fprintf(stderr, "%s\n", error_str(err));
 			exit(EXIT_FAILURE);
