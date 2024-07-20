@@ -318,7 +318,7 @@ multiplicative_expression
 	| multiplicative_expression '*' cast_expression
 	| multiplicative_expression '/' cast_expression
 	/*| multiplicative_expression '%' cast_expression*/
-;
+	;
 
 additive_expression
 	: multiplicative_expression
@@ -341,15 +341,10 @@ relational_operator
         | GE_OP	{ $$ = BINARY_OP_GE; }
 	;
 
-justification
-	: '{' shift_expression '}'
-	| /* empty */
-	;
-
 relational_expression
 	: shift_expression
-	| relational_expression relational_operator justification shift_expression
-		{ $$ = ast_expr_binary_create($1, $2, $4); }
+	| relational_expression relational_operator shift_expression
+		{ $$ = ast_expr_binary_create($1, $2, $3); }
 	;
 
 equality_operator
@@ -359,8 +354,8 @@ equality_operator
 
 equality_expression
 	: relational_expression
-	| equality_expression equality_operator justification relational_expression
-		{ $$ = ast_expr_binary_create($1, $2, $4); }
+	| equality_expression equality_operator relational_expression
+		{ $$ = ast_expr_binary_create($1, $2, $3); }
 	;
 
 and_expression

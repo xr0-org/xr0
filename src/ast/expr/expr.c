@@ -406,9 +406,9 @@ ast_expr_isverifiable(struct ast_expr *expr)
 	switch (expr->kind) {
 	case EXPR_IDENTIFIER:
 	case EXPR_CONSTANT:
-	case EXPR_STRUCTMEMBER:
 		return true;
-	case EXPR_STRING_LITERAL:
+	case EXPR_STRUCTMEMBER:
+		return ast_expr_isverifiable(ast_expr_member_root(expr));
 	case EXPR_BRACKETED:
 		return ast_expr_isverifiable(ast_expr_bracketed_root(expr));
 	case EXPR_UNARY:
@@ -419,7 +419,6 @@ ast_expr_isverifiable(struct ast_expr *expr)
 	case EXPR_CALL:
 	case EXPR_ASSIGNMENT:
 	case EXPR_ARBARG:
-	case EXPR_ALLOCATION:
 		return false;
 	case EXPR_BINARY:
 		return ast_expr_isverifiable(ast_expr_binary_e1(expr)) &&
