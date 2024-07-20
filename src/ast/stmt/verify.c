@@ -4,6 +4,7 @@
 #include <string.h>
 #include "ast.h"
 #include "ext.h"
+#include "expr/expr.h"
 #include "lex.h"
 #include "intern.h"
 #include "props.h"
@@ -467,9 +468,6 @@ register_mov_exec(struct ast_variable *temp, struct state *state)
 	return NULL;
 }
 
-struct ast_type *
-calloralloc_type(struct ast_expr *e, struct state *s);
-
 static struct e_res *
 call_return(struct state *state)
 {
@@ -580,7 +578,7 @@ sel_absexec(struct ast_stmt *stmt, struct state *state)
 struct decision
 sel_decide(struct ast_expr *control, struct state *state)
 {
-	struct e_res *res = ast_expr_pf_reduce(control, state);
+	struct e_res *res = ast_expr_eval(control, state);
 	if (e_res_iserror(res)) {
 		return (struct decision) { .err = e_res_as_error(res) };
 	}

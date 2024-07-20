@@ -124,4 +124,7 @@ ast_expr_declarator(struct ast_expr *);
 struct ast_expr *
 ast_expr_initialiser(struct ast_expr *);
 
+struct ast_type *
+calloralloc_type(struct ast_expr *e, struct state *s);
+
 #endif

@@ -1073,9 +1073,9 @@ decide(struct ast_expr *expr, struct state *s)
 	);
 	free(expr_str);
 
-	struct number *r = getdecider(
-		state_getvconst(s, ast_expr_as_identifier(expr))
-	);
+	struct value *rconst = state_getvconst(s, ast_expr_as_identifier(expr));
+	assert(rconst);
+	struct number *r = getdecider(rconst);
 	assert(r->type == NUMBER_RANGES);
 	if (!number_range_arr_canbe(r->ranges, false)) {
 		return bool_res_bool_create(true);

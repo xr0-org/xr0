@@ -245,15 +245,7 @@ ast_expr_eval(struct ast_expr *, struct state *);
 struct e_res *
 ast_expr_abseval(struct ast_expr *, struct state *);
 
-/* ast_expr_pf_reduce: Reduce an expression to "parameter form", in which its
- * only primitives are constants and parameters (vconsts). */
-struct e_res *
-ast_expr_pf_reduce(struct ast_expr *, struct state *);
-
 struct value;
-
-struct e_res *
-ast_expr_pf_augment(struct value *, struct ast_expr *, struct state *);
 
 struct ast_function;
 
