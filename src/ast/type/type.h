@@ -47,9 +47,11 @@ ast_type_mod_or(struct ast_type *, enum ast_type_modifier);
 
 struct externals;
 struct namedseq;
+struct lexememarker;
 
 struct ast_expr *
-ast_type_rconstgeninstr(struct ast_type *, struct namedseq *, struct ast_block *,
-		struct externals *);
+ast_type_rconstgeninstr(struct ast_type *, struct namedseq *,
+		struct lexememarker *, struct ast_block *, struct externals *);
+
 
 #endif

@@ -269,6 +269,7 @@ struct namedseq *
 namedseq_create(char *name)
 {
 	struct namedseq *seq = malloc(sizeof(struct namedseq));
+	assert(seq);
 	seq->count = 0;
 	seq->name = name;
 	return seq;

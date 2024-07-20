@@ -14,6 +14,7 @@
 
 char *CURR_FUNC = NULL;
 int CURR_RCONST_COUNT = 0;
+
 void
 setcurrfunc(char *func)
 {
@@ -906,7 +907,8 @@ function_definition
 			$3.decl.n,
 			$3.decl.param,
 			$5.abstract,
-			$5.body
+			$5.body,
+			lexloc()
 		);
 	}
 	| declaration_specifiers function_declarator
@@ -923,7 +925,8 @@ function_definition
 			$2.decl.n,
 			$2.decl.param,
 			$4.abstract,
-			$4.body
+			$4.body,
+			lexloc()
 		);
 	}
 	| function_declarator
@@ -936,7 +939,8 @@ function_definition
 			$1.decl.n,
 			$1.decl.param,
 			$3.abstract,
-			$3.body
+			$3.body,
+			lexloc()
 		);
 	}
 	;

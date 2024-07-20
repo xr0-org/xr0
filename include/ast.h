@@ -659,7 +659,8 @@ ast_function_create(
 	int nparam,
 	struct ast_variable **param,
 	struct ast_block *abstract, 
-	struct ast_block *body
+	struct ast_block *body,
+	struct lexememarker *loc
 );
 
 void
@@ -682,9 +683,6 @@ ast_function_isaxiom(struct ast_function *f);
 
 bool
 ast_function_isproto(struct ast_function *f);
-
-bool
-ast_function_absisempty(struct ast_function *f);
 
 bool
 ast_function_isvoid(struct ast_function *f);

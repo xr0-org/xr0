@@ -92,7 +92,7 @@ ast_stmt_declaration_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	for (int i = 0; i < ast_variable_arr_n(vars); i++) {
 		struct ast_variable **v = ast_variable_arr_v(vars);
 		char *s = ast_variable_str(v[i]);
-		strbuilder_printf(b, "%s", s);
+		strbuilder_printf(b, "%s;", s);
 		free(s);
 	}
 }

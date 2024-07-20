@@ -579,10 +579,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	if (!f) {
 		return e_res_error_create(error_printf("`%s' not found\n", name));
 	}
-	err = ast_function_ensure_hasabstract(f, state_getext(state));
-	if (err) {
-		assert(false);
-	}
 
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);

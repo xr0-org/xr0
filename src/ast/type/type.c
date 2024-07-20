@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "ext.h"
 #include "intern.h"
+#include "lex.h"
 #include "state.h"
 #include "type.h"
 #include "util.h"
@@ -168,12 +169,13 @@ ast_type_vconstnokey(struct ast_type *t, struct state *s, bool persist)
 }
 
 static struct ast_expr *
-struct_rconstgeninstr(struct ast_type *, struct namedseq *, struct ast_block *b,
-		struct externals *);
+struct_rconstgeninstr(struct ast_type *, struct namedseq *,
+		struct lexememarker *, struct ast_block *, struct externals *);
 
 struct ast_expr *
 ast_type_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
-		struct ast_block *b, struct externals *ext)
+		struct lexememarker *loc, struct ast_block *b,
+		struct externals *ext)
 {
 	switch (t->base) {
 	case TYPE_INT:
@@ -183,10 +185,10 @@ ast_type_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
 		/* TODO: cast to userdef */
 		return ast_type_rconstgeninstr(
 			externals_gettypedef(ext, t->userdef),
-			seq, b, ext
+			seq, loc, b, ext
 		);
 	case TYPE_STRUCT:
-		return struct_rconstgeninstr(t, seq, b, ext);
+		return struct_rconstgeninstr(t, seq, loc, b, ext);
 	default:
 		assert(false);
 	}
@@ -194,36 +196,49 @@ ast_type_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
 
 static struct ast_expr *
 struct_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
-		struct ast_block *b, struct externals *ext)
+		struct lexememarker *loc, struct ast_block *b,
+		struct externals *ext)
 {
-	struct ast_type *complete = ast_type_struct_complete(t, ext);
-	if (!complete) {
+	t = ast_type_struct_complete(t, ext);
+	if (!t) {
 		/* TODO: user error */ 
 		assert(false);
 	}
+
 	struct ast_variable_arr *vars = ast_variable_arr_create();
-	/* Need some way to gen names here (block?) */
+	char *v_name = "<t>";
 	ast_variable_arr_append(
-		vars, ast_variable_create(dynamic_str("genstruct"), t)
+		vars, ast_variable_create(dynamic_str(v_name), ast_type_copy(t))
 	);
-	struct ast_stmt *decl = ast_stmt_create_declaration(NULL, vars);
+	struct ast_stmt *decl = ast_stmt_create_declaration(
+		lexememarker_copy(loc), vars
+	);
 	ast_block_append_stmt(b, decl);
 
 	struct ast_variable_arr *varr = ast_type_struct_members(t);
 	int n = ast_variable_arr_n(varr);
 	struct ast_variable **var = ast_variable_arr_v(varr);
 	for (int i = 0; i < n; i++) {
+		char *m = ast_variable_name(var[i]);
+		struct ast_type *m_type = ast_type_struct_membertype(t, m, ext);
+		assert(m_type);
 		/* XXX: handle nested structs */
-		struct ast_expr *member = ast_expr_member_create(
-			ast_expr_identifier_create("genstruct"), ast_variable_name(var[i])
+		assert(m_type->base != TYPE_STRUCT && m_type->base != TYPE_USERDEF);
+		struct ast_expr *m_expr = ast_expr_member_create(
+			ast_expr_identifier_create(dynamic_str(v_name)), m
 		);
-		struct ast_expr *assign = ast_expr_assignment_create(
-			member, ast_expr_arbarg_create(namedseq_next())
+		struct ast_expr *val = ast_type_rconstgeninstr(
+			m_type, seq, loc, b, ext
 		);
-		struct ast_stmt *stmt = ast_stmt_create_expr(NULL, assign);
-		ast_block_append_stmt(b, stmt);
+		ast_block_append_stmt(
+			b,
+			ast_stmt_create_expr(
+				lexememarker_copy(loc),
+				ast_expr_assignment_create(m_expr, val)
+			)
+		);
 	}
-	return ast_expr_identifier_create("genstruct");
+	return ast_expr_identifier_create(dynamic_str(v_name));
 }
 
 bool
