@@ -11,7 +11,6 @@
 #include "static.h"
 #include "location.h"
 #include "object.h"
-#include "props.h"
 #include "stack.h"
 #include "state.h"
 #include "static.h"
@@ -40,7 +39,6 @@ state_create(struct frame *f, struct externals *ext)
 	state->clump = clump_create();
 	state->stack = stack_create(f, NULL);
 	state->heap = heap_create();
-	state->props = props_create();
 	state->reg = NULL;
 	return state;
 }
@@ -56,9 +54,7 @@ state_assume(struct state *s, struct ast_expr *cond)
 {
 	struct preresult *r = ast_expr_assume(cond, s);
 	assert(!preresult_iserror(r));
-	bool ans = !preresult_iscontradiction(r);
-	props_install(s->props, cond);
-	return ans;
+	return !preresult_iscontradiction(r);
 }
 
 void
@@ -69,7 +65,6 @@ state_destroy(struct state *state)
 	clump_destroy(state->clump);
 	stack_destroy(state->stack);
 	heap_destroy(state->heap);
-	props_destroy(state->props);
 	free(state);
 }
 
@@ -84,7 +79,6 @@ state_copy(struct state *state)
 	copy->clump = clump_copy(state->clump);
 	copy->stack = stack_copy(state->stack);
 	copy->heap = heap_copy(state->heap);
-	copy->props = props_copy(state->props);
 	copy->reg = state->reg ? value_copy(state->reg) : NULL;
 	return copy;
 }
@@ -121,11 +115,6 @@ state_str(struct state *state)
 		strbuilder_printf(b, "rconst:\n%s\n", vconst);
 	}
 	free(vconst);
-	char *props = props_str(state->props, "\t");
-	if (strlen(props) > 0) {
-		strbuilder_printf(b, "assume:\n%s\n", props);
-	}
-	free(props);
 	char *clump = clump_str(state->clump, "\t");
 	if (strlen(clump) > 0) {
 		strbuilder_printf(b, "clump:\n%s\n", clump);
@@ -745,9 +734,6 @@ state_undeclareliterals(struct state *s);
 static void
 state_undeclarevars(struct state *s);
 
-static void
-state_popprops(struct state *s);
-
 void
 state_unnest(struct state *s);
 
@@ -763,7 +749,6 @@ state_normalise(struct state *s)
 	state_unnest(s);
 	state_undeclareliterals(s);
 	state_undeclarevars(s);
-	state_popprops(s);
 	if (s->reg) {
 		state_permuteheap(s, deriveorder(s));
 	}
@@ -810,13 +795,6 @@ state_undeclarevars(struct state *s)
 		s->reg = value_abstractcopy(v, s);
 	}
 	stack_undeclare(s->stack, s);
-}
-
-static void
-state_popprops(struct state *s)
-{
-	props_destroy(s->props);
-	s->props = props_create();
 }
 
 void

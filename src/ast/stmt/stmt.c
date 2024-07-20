@@ -7,7 +7,6 @@
 #include "expr/expr.h"
 #include "intern.h"
 #include "lex.h"
-#include "props.h"
 #include "state.h"
 #include "stmt.h"
 #include "util.h"

@@ -8,7 +8,6 @@
 #include "stmt/stmt.h"
 #include "intern.h"
 #include "object.h"
-#include "props.h"
 #include "path.h"
 #include "state.h"
 #include "type/type.h"

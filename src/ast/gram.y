@@ -281,9 +281,6 @@ isdeallocand_expression
 	| ISDEALLOCAND_OP isdeallocand_expression {
 		$$ = ast_expr_isdeallocand_create($2);
 	}
-	| ARB_ARG isdeallocand_expression {
-		$$ = ast_expr_isdereferencable_create($2);
-	}
 	;
 
 unary_expression

@@ -10,7 +10,6 @@
 #include "intern.h"
 #include "math.h"
 #include "object.h"
-#include "props.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
@@ -1075,9 +1074,6 @@ static struct e_res *
 assign_absexec(struct ast_expr *, struct state *);
 
 static struct e_res *
-isdereferencable_absexec(struct ast_expr *, struct state *);
-
-static struct e_res *
 call_absexec(struct ast_expr *, struct state *);
 
 static struct e_res *
@@ -1089,8 +1085,6 @@ ast_expr_abseval(struct ast_expr *expr, struct state *state)
 	switch (ast_expr_kind(expr)) {
 	case EXPR_ASSIGNMENT:
 		return assign_absexec(expr, state);
-	case EXPR_ISDEREFERENCABLE:
-		return isdereferencable_absexec(expr, state);
 	case EXPR_ALLOCATION:
 		return alloc_absexec(expr, state);
 	case EXPR_CALL:
@@ -1306,14 +1300,6 @@ assign_absexec(struct ast_expr *expr, struct state *state)
 	object_assign(obj, value_copy(v));
 
 	return res;
-}
-
-static struct e_res *
-isdereferencable_absexec(struct ast_expr *expr, struct state *state)
-{
-	struct props *p = state_getprops(state);
-	props_install(p, expr);
-	return e_res_error_create(error_eval_void());
 }
 
 
