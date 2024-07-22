@@ -607,7 +607,6 @@ path_next_setupabstract(struct path *p)
 		p->path_state = PATH_STATE_ABSTRACT;
 		return NULL;
 	}
-
 	struct error *err = state_next(p->abstract);
 	if (!err) {
 		return NULL;

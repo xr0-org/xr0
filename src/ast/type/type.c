@@ -208,7 +208,13 @@ struct_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
 	struct ast_variable_arr *vars = ast_variable_arr_create();
 	char *v_name = "<ret>";
 	ast_variable_arr_append(
-		vars, ast_variable_create(dynamic_str(v_name), ast_type_copy(t))
+		vars,
+		ast_variable_create(
+			dynamic_str(v_name),
+			ast_type_create_struct_partial(
+				dynamic_str(ast_type_struct_tag(t))
+			)
+		)
 	);
 	struct ast_stmt *decl = ast_stmt_create_declaration(
 		lexememarker_copy(loc), vars
