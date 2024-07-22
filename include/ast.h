@@ -289,13 +289,16 @@ bool
 ast_block_empty(struct ast_block *b);
 
 bool
-ast_block_isterminal(struct ast_block *, struct state *);
+ast_block_hastoplevelreturn(struct ast_block *);
 
 struct ast_type;
 
 struct ast_expr *
 ast_block_call_create(struct ast_block *, struct lexememarker *,
 	struct ast_type *, struct ast_expr *);
+
+void
+ast_block_prepend_stmt(struct ast_block *, struct ast_stmt *);
 
 void
 ast_block_append_stmt(struct ast_block *, struct ast_stmt *);
@@ -423,6 +426,9 @@ ast_stmt_create_jump(struct lexememarker *, enum ast_jump_kind, struct ast_expr 
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt);
 
+bool
+ast_stmt_isreturn(struct ast_stmt *);
+
 struct ast_stmt *
 ast_stmt_create_alloc(struct lexememarker *, struct ast_expr *arg);
 
@@ -470,12 +476,6 @@ struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
 
 enum execution_mode;
-
-bool
-ast_stmt_isterminal(struct ast_stmt *, struct state *);
-
-bool
-ast_stmt_isselection(struct ast_stmt *);
 
 struct error *
 ast_stmt_verify(struct ast_stmt *, struct state *);

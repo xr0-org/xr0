@@ -40,5 +40,4 @@ conditional_alloc(int x)
 	if (x) {
 		return malloc(1);
 	}
-	return NULL;
 }

@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-void
+void *
 f(int cond) ~ [ if (cond) return malloc(1); ]
 {
 	if (cond) {

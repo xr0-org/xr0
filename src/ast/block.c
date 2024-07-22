@@ -125,27 +125,44 @@ ast_block_stmts(struct ast_block *b)
 }
 
 bool
-ast_block_isterminal(struct ast_block *b, struct state *s)
-{
-	for (int i = 0; i < b->nstmt; i++) {
-		if (ast_stmt_isterminal(b->stmt[i], s)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-bool
 ast_block_empty(struct ast_block *b)
 {
 	return b->nstmt == 0;
 }
 
-void
-ast_block_append_stmt(struct ast_block *b, struct ast_stmt *v)
+static int
+ast_block_insert(struct ast_block *b, int index, struct ast_stmt *stmt)
 {
 	b->stmt = realloc(b->stmt, sizeof(struct ast_stmt *) * ++b->nstmt);
-	b->stmt[b->nstmt-1] = v;
+	assert(b->stmt);
+	for (int i = b->nstmt-1; i > index; i--) {
+		b->stmt[i] = b->stmt[i-1];
+	}
+	b->stmt[index] = stmt;
+	return index;
+}
+
+void
+ast_block_prepend_stmt(struct ast_block *b, struct ast_stmt *stmt)
+{
+	ast_block_insert(b, 0, stmt);
+}
+
+void
+ast_block_append_stmt(struct ast_block *b, struct ast_stmt *stmt)
+{
+	ast_block_insert(b, b->nstmt, stmt);
+}
+
+bool
+ast_block_hastoplevelreturn(struct ast_block *b)
+{
+	for (int i = 0; i < b->nstmt; i++) {
+		if (ast_stmt_isreturn(b->stmt[i])) {
+			return true;
+		}
+	}
+	return false;
 }
 
 static char *

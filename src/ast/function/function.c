@@ -205,13 +205,16 @@ ast_function_protostitch(struct ast_function *f, struct externals *ext)
 	return f;
 }
 
+static bool
+abstract_hastoplevelreturn(struct ast_function *);
+
 static struct ast_block_res *
 generate_abstract(struct ast_function *, struct externals *);
 
 struct error *
 ast_function_ensure_hasabstract(struct ast_function *f, struct externals *ext)
 {
-	if (!f->abstract) {
+	if (!abstract_hastoplevelreturn(f)) {
 		struct ast_block_res *res = generate_abstract(f, ext);
 		if (ast_block_res_iserror(res)) {
 			return ast_block_res_as_error(res);
@@ -221,10 +224,16 @@ ast_function_ensure_hasabstract(struct ast_function *f, struct externals *ext)
 	return NULL;
 }
 
+static bool
+abstract_hastoplevelreturn(struct ast_function *f)
+{
+	return f->abstract && ast_block_hastoplevelreturn(f->abstract);
+}
+
 static struct ast_block_res *
 generate_abstract(struct ast_function *f, struct externals *ext)
 {
-	struct ast_block *b = ast_block_create(NULL, 0);
+	struct ast_block *b = f->abstract ? f->abstract : ast_block_create(NULL, 0);
 	if (!ast_type_isvoid(f->ret)) {
 		struct namedseq *seq = namedseq_create(dynamic_str(f->name));
 		struct ast_expr *ret = ast_type_rconstgeninstr(

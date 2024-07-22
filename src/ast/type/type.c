@@ -206,14 +206,14 @@ struct_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
 	}
 
 	struct ast_variable_arr *vars = ast_variable_arr_create();
-	char *v_name = "<t>";
+	char *v_name = "<ret>";
 	ast_variable_arr_append(
 		vars, ast_variable_create(dynamic_str(v_name), ast_type_copy(t))
 	);
 	struct ast_stmt *decl = ast_stmt_create_declaration(
 		lexememarker_copy(loc), vars
 	);
-	ast_block_append_stmt(b, decl);
+	ast_block_prepend_stmt(b, decl);
 
 	struct ast_variable_arr *varr = ast_type_struct_members(t);
 	int n = ast_variable_arr_n(varr);
@@ -223,7 +223,7 @@ struct_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
 		struct ast_type *m_type = ast_type_struct_membertype(t, m, ext);
 		assert(m_type);
 		/* XXX: handle nested structs */
-		assert(m_type->base != TYPE_STRUCT && m_type->base != TYPE_USERDEF);
+		assert(m_type->base != TYPE_STRUCT);
 		struct ast_expr *m_expr = ast_expr_member_create(
 			ast_expr_identifier_create(dynamic_str(v_name)), m
 		);
