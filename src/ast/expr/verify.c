@@ -15,181 +15,19 @@
 #include "value.h"
 #include "type/type.h"
 
-static struct bool_res *
-expr_unary_decide(struct ast_expr *expr, struct state *state);
-
-static struct bool_res *
-expr_isdeallocand_decide(struct ast_expr *expr, struct state *state);
-
-static struct bool_res *
-expr_binary_decide(struct ast_expr *expr, struct state *state);
-
-static struct bool_res *
-isnotzero_decide(struct ast_expr *expr, struct state *state);
-
 struct bool_res *
-ast_expr_decide(struct ast_expr *expr, struct state *state)
-{
-	switch (ast_expr_kind(expr)) {
-	case EXPR_CONSTANT:
-		return bool_res_bool_create(ast_expr_as_constant(expr));
-	case EXPR_UNARY:
-		return expr_unary_decide(expr, state);
-	case EXPR_ISDEALLOCAND:
-		assert(state_execmode(state) == EXEC_VERIFY);
-		return expr_isdeallocand_decide(expr, state);
-	case EXPR_BINARY:
-		return expr_binary_decide(expr, state);
-	case EXPR_BRACKETED:
-		return ast_expr_decide(ast_expr_bracketed_root(expr), state);
-	case EXPR_IDENTIFIER:
-	case EXPR_STRUCTMEMBER:
-		return isnotzero_decide(expr, state);
-	default:
-		assert(false);
-	}
-}
-
-static struct bool_res *
-bang_decide(struct ast_expr *, struct state *);
-
-static struct bool_res *
-deref_decide(struct ast_expr *, struct state *);
-
-static struct bool_res *
-expr_unary_decide(struct ast_expr *expr, struct state *state)
-{
-	switch (ast_expr_unary_op(expr)) {
-	case UNARY_OP_BANG:
-		return bang_decide(expr, state);
-	case UNARY_OP_DEREFERENCE:
-		return deref_decide(expr, state);
-	default:
-		assert(false);
-	}
-}
-
-static struct bool_res *
-bang_decide(struct ast_expr *e, struct state *s)
-{
-	struct bool_res *res = ast_expr_decide(ast_expr_unary_operand(e), s);
-	if (bool_res_iserror(res)) {
-		return res;
-	}
-	bool decision = bool_res_as_bool(res);
-	bool_res_destroy(res);
-	return bool_res_bool_create(!decision);
-}
-
-static struct bool_res *
-deref_decide(struct ast_expr *e, struct state *s)
-{
-	struct e_res *res = ast_expr_eval(e, s);
-	if (e_res_iserror(res)) {
-		return bool_res_error_create(e_res_as_error(res));
-	}
-	struct value *zero = value_int_create(0);
-	struct bool_res *iszero_res = value_equal(
-		value_res_as_value(eval_to_value(e_res_as_eval(res), s)),
-		zero,
-		s
-	);
-	value_destroy(zero);
-	if (bool_res_iserror(iszero_res)) {
-		return iszero_res;
-	}
-	bool decision = !bool_res_as_bool(iszero_res);
-	bool_res_destroy(iszero_res);
-	return bool_res_bool_create(decision);
-}
-
-
-static struct object *
-hack_object_from_assertion(struct ast_expr *expr, struct state *state)
-{	
-	/* get assertand */
-	struct ast_expr *assertand = ast_expr_isdeallocand_assertand(expr);
-
-	/* get `assertand' variable */
-	struct e_res *res = ast_expr_eval(assertand, state);
-	if (e_res_iserror(res)) {
-		assert(false);
-	}
-	return object_res_as_object(
-		state_get(state, eval_as_lval(e_res_as_eval(res)), true)
-	);
-}
-
-static struct bool_res *
-expr_isdeallocand_decide(struct ast_expr *expr, struct state *state)
-{
-	struct object *obj = hack_object_from_assertion(expr, state);
-	bool isdeallocand = state_addresses_deallocand(state, obj);
-	return bool_res_bool_create(isdeallocand);
-}
-
-static struct bool_res *
-binary_eq(struct ast_expr *, struct state *);
-
-static struct bool_res *
-binary_ne(struct ast_expr *, struct state *);
-
-static struct bool_res *
-expr_binary_decide(struct ast_expr *expr, struct state *state)
-{
-	switch (ast_expr_binary_op(expr)) {
-	case BINARY_OP_EQ:
-		return binary_eq(expr, state);
-	case BINARY_OP_NE:
-		return binary_ne(expr, state);
-	case BINARY_OP_ADDITION:
-	case BINARY_OP_SUBTRACTION:
-	case BINARY_OP_MULTIPLICATION:
-		return isnotzero_decide(expr, state);
-	default:
-		assert(false);
-	}
-}
-
-static struct bool_res *
-binary_eq(struct ast_expr *expr, struct state *state)
-{
-	struct e_res *res1 = ast_expr_eval(ast_expr_binary_e1(expr), state),
-		     *res2 = ast_expr_eval(ast_expr_binary_e2(expr), state);
-	if (e_res_iserror(res1)) {
-		return bool_res_error_create(e_res_as_error(res1));
-	}
-	if (e_res_iserror(res2)) {
-		return bool_res_error_create(e_res_as_error(res2));
-	}
-	return value_equal(
-		value_res_as_value(eval_to_value(e_res_as_eval(res1), state)),
-		value_res_as_value(eval_to_value(e_res_as_eval(res2), state)),
-		state
-	);
-}
-
-static struct bool_res *
-binary_ne(struct ast_expr *expr, struct state *s)
-{
-	struct bool_res *res = binary_eq(expr, s);
-	if (bool_res_iserror(res)) {
-		return res;
-	}
-	bool eq = bool_res_as_bool(res);
-	bool_res_destroy(res);
-	return bool_res_bool_create(!eq);
-}
-
-static struct bool_res *
-isnotzero_decide(struct ast_expr *expr, struct state *s)
+ast_expr_decide(struct ast_expr *expr, struct state *s)
 {
 	struct ast_expr *prop = ast_expr_binary_create(
 		ast_expr_copy(expr), BINARY_OP_NE, ast_expr_constant_create(0)
 	);
-	struct bool_res *res = ast_expr_decide(prop, s);
-	ast_expr_destroy(prop);
-	return res;
+	struct e_res *res = ast_expr_eval(prop, s);
+	if (e_res_iserror(res)) {
+		return bool_res_error_create(e_res_as_error(res));
+	}
+	return bool_res_bool_create(
+		value_as_constant(eval_as_rval(e_res_as_eval(res)))
+	);
 }
 
 
@@ -266,6 +104,9 @@ static struct e_res *
 range_eval(struct ast_expr *expr, struct state *state);
 
 static struct e_res *
+isdeallocand_eval(struct ast_expr *expr, struct state *state);
+
+static struct e_res *
 directeval(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_kind(expr)) {
@@ -291,6 +132,9 @@ directeval(struct ast_expr *expr, struct state *state)
 		return range_eval(expr, state);
 	case EXPR_BRACKETED:
 		return ast_expr_eval(ast_expr_bracketed_root(expr), state);
+	case EXPR_ISDEALLOCAND:
+		assert(state_execmode(state) == EXEC_VERIFY);
+		return isdeallocand_eval(expr, state);
 	default:
 		assert(false);
 	}
@@ -843,10 +687,32 @@ expr_incdec_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-value_binary_eval(struct eval *, enum ast_binary_operator, struct eval *, struct state *);
+additive_eval(struct ast_expr *, struct state *);
+
+static struct e_res *
+equality_eval(struct ast_expr *, struct state *);
 
 static struct e_res *
 expr_binary_eval(struct ast_expr *expr, struct state *state)
+{
+	switch (ast_expr_binary_op(expr)) {
+	case BINARY_OP_ADDITION:
+	case BINARY_OP_SUBTRACTION:
+		return additive_eval(expr, state);
+	case BINARY_OP_EQ:
+	case BINARY_OP_NE:
+		return equality_eval(expr, state);
+	default:
+		assert(false);
+	}
+}
+
+static struct e_res *
+value_additive_eval(struct eval *, enum ast_binary_operator, struct eval *,
+		struct state *);
+
+static struct e_res *
+additive_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *e1 = ast_expr_binary_e1(expr),
 			*e2 = ast_expr_binary_e2(expr);
@@ -858,7 +724,7 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 	if (e_res_iserror(res2)) {
 		return res2;
 	}
-	return value_binary_eval(
+	return value_additive_eval(
 		e_res_as_eval(res1),
 		ast_expr_binary_op(expr),
 		e_res_as_eval(res2),
@@ -867,7 +733,7 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-value_binary_eval(struct eval *rv1, enum ast_binary_operator op,
+value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 		struct eval *rv2, struct state *s)
 {
 	struct ast_type *t1 = eval_type(rv1),
@@ -876,7 +742,7 @@ value_binary_eval(struct eval *rv1, enum ast_binary_operator op,
 		if (ast_type_isptr(t1)) {
 			a_printf(false, "adding two pointers not supported\n");
 		}
-		return value_binary_eval(rv2, op, rv1, s);
+		return value_additive_eval(rv2, op, rv1, s);
 	}
 	/* ⊢ !ast_type_isptr(t2) */
 
@@ -884,14 +750,6 @@ value_binary_eval(struct eval *rv1, enum ast_binary_operator op,
 		     *v2 = value_res_as_value(eval_to_value(rv2, s));
 
 	if (ast_type_isptr(t1)) {
-		switch (op) {
-		case BINARY_OP_ADDITION:
-		case BINARY_OP_SUBTRACTION:
-			break;
-		default:
-			assert(false);
-		}
-
 		struct location *loc1 = value_as_location(v1);
 		struct location *newloc = location_copy(loc1);
 		struct ast_expr *op1 = offset_as_expr(location_offset(loc1)),
@@ -922,6 +780,67 @@ value_binary_eval(struct eval *rv1, enum ast_binary_operator op,
 }
 
 static struct e_res *
+eq_eval(struct ast_expr *, struct state *);
+
+static struct e_res *
+ne_eval(struct ast_expr *, struct state *);
+
+static struct e_res *
+equality_eval(struct ast_expr *expr, struct state *state)
+{
+	switch (ast_expr_binary_op(expr)) {
+	case BINARY_OP_EQ:
+		return eq_eval(expr, state);
+	case BINARY_OP_NE:
+		return ne_eval(expr, state);
+	default:
+		assert(false);
+	}
+}
+
+static struct e_res *
+eq_eval(struct ast_expr *expr, struct state *state)
+{
+	struct e_res *res1 = ast_expr_eval(ast_expr_binary_e1(expr), state),
+		     *res2 = ast_expr_eval(ast_expr_binary_e2(expr), state);
+	if (e_res_iserror(res1)) {
+		return res1;
+	}
+	if (e_res_iserror(res2)) {
+		return res2;
+	}
+	struct bool_res *res = value_equal(
+		value_res_as_value(eval_to_value(e_res_as_eval(res1), state)),
+		value_res_as_value(eval_to_value(e_res_as_eval(res2), state)),
+		state
+	);
+	if (bool_res_iserror(res)) {
+		return e_res_error_create(bool_res_as_error(res));
+	}
+	return e_res_eval_create(
+		eval_rval_create(
+			ast_type_create_int(),
+			value_int_create(bool_res_as_bool(res))
+		)
+	);
+}
+
+static struct e_res *
+ne_eval(struct ast_expr *expr, struct state *state)
+{
+	struct e_res *res = eq_eval(expr, state);
+	if (e_res_iserror(res)) {
+		return res;
+	}
+	struct value *inv = value_int_create(
+		!value_as_constant(eval_as_rval(e_res_as_eval(res)))
+	);
+	e_res_destroy(res);
+	return e_res_eval_create(eval_rval_create(ast_type_create_int(), inv));
+}
+
+
+static struct e_res *
 range_eval(struct ast_expr *expr, struct state *state)
 {
 	return e_res_eval_create(
@@ -939,6 +858,41 @@ range_eval(struct ast_expr *expr, struct state *state)
 		)
 	);
 }
+
+static struct object *
+hack_object_from_assertion(struct ast_expr *, struct state *);
+
+static struct e_res *
+isdeallocand_eval(struct ast_expr *expr, struct state *state)
+{
+	struct object *obj = hack_object_from_assertion(expr, state);
+	return e_res_eval_create(
+		eval_rval_create(
+			ast_type_create_int(),
+			value_int_create(state_addresses_deallocand(state, obj))
+		)
+	);
+}
+
+static struct object *
+hack_object_from_assertion(struct ast_expr *expr, struct state *state)
+{	
+	/* get assertand */
+	struct ast_expr *assertand = ast_expr_isdeallocand_assertand(expr);
+
+	/* get `assertand' variable */
+	struct e_res *res = ast_expr_eval(assertand, state);
+	if (e_res_iserror(res)) {
+		assert(false);
+	}
+	return object_res_as_object(
+		state_get(state, eval_as_lval(e_res_as_eval(res)), true)
+	);
+}
+
+
+
+
 
 static struct e_res *
 assign_absexec(struct ast_expr *, struct state *);

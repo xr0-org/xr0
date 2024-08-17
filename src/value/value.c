@@ -201,6 +201,9 @@ value_rconst_bang(struct value *);
 struct value *
 value_bang(struct value *v)
 {
+	if (value_isconstant(v)) {
+		return value_int_create(!value_as_constant(v));
+	}
 	switch (v->type) {
 	case VALUE_RCONST:
 		return value_rconst_bang(v);

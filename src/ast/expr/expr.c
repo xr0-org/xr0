@@ -616,6 +616,7 @@ isatomic(struct ast_expr *e)
 	case EXPR_INCDEC:
 	case EXPR_STRUCTMEMBER:
 	case EXPR_UNARY:
+	case EXPR_ISDEALLOCAND:
 		return true;
 	case EXPR_BINARY:
 	case EXPR_ASSIGNMENT:
