@@ -210,7 +210,7 @@ $(GRAM_TAB_C) $(GRAM_TAB_H): $(AST_DIR)/gram.y $(BUILD_DIR)
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
 
-$(BUILD_DIR): tags
+$(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
 # tests

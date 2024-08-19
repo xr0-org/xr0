@@ -7,10 +7,13 @@
 #include "ast.h"
 #include "expr/expr.h"
 #include "gram_util.h"
+#include "intern.h"
 #include "lex.h"
 #include "literals.h"
 #include "type/type.h"
 #include "util.h"
+
+struct namedseq *FUNC_SEQ = NULL;
 
 char *CURR_FUNC = NULL;
 int CURR_RCONST_COUNT = 0;
@@ -18,18 +21,17 @@ int CURR_RCONST_COUNT = 0;
 void
 setcurrfunc(char *func)
 {
-	CURR_RCONST_COUNT = 0;
-	CURR_FUNC = func;
+	if (FUNC_SEQ) {
+		namedseq_destroy(FUNC_SEQ);
+	}
+	FUNC_SEQ = namedseq_create(dynamic_str(func));
 }
 
 char *
 getrconstkey()
 {
-	assert(CURR_FUNC);
-
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "%s:%d", CURR_FUNC, CURR_RCONST_COUNT++);
-	return strbuilder_build(b);
+	assert(FUNC_SEQ);
+	return namedseq_next(FUNC_SEQ);
 }
 
 extern char *yytext;

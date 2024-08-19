@@ -137,41 +137,34 @@ DECLARE_RESULT_TYPE(bool, bool, bool_res)
 struct bool_res *
 value_equal(struct value *lhs, struct value *rhs, struct state *);
 
+int
+value_eq(struct value *lhs, struct value *rhs, struct state *);
+
+int
+value_lt(struct value *lhs, struct value *rhs, struct state *);
+
+struct error *
+value_disentangle(struct value *, struct value *, struct state *);
+
 struct number;
 
 /* value_splitassume: Returns false if contradiction encountered. */
 bool
 value_splitassume(struct value *, struct number *);
 
-struct number_arr;
-
 struct splitinstruct;
 
 struct splitinstruct *
-splitinstruct_create(char *rconst, struct number_arr *splits);
+splitinstruct_create();
 
-char *
-splitinstruct_rconst(struct splitinstruct *);
+void
+splitinstruct_append(struct splitinstruct *, struct map *);
 
-struct number_arr *
+int 
+splitinstruct_n(struct splitinstruct *);
+
+struct map **
 splitinstruct_splits(struct splitinstruct *);
-
-struct number_arr;
-
-struct number_arr *
-number_arr_create();
-
-void
-number_arr_destroy(struct number_arr *);
-
-void
-number_arr_append(struct number_arr *, struct number *);
-
-struct number **
-number_arr_num(struct number_arr *);
-
-int
-number_arr_len(struct number_arr *);
 
 
 DECLARE_RESULT_TYPE(struct value *, value, value_res)
