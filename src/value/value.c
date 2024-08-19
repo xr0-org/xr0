@@ -1067,7 +1067,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 	/* 
 	 * Overlapping ranges that start at the same point:
 	 *
-	 * 	|——–––———————————–––|<----------------------->
+	 * 	|——–––———————————–––|<------------------>
 	 * 	a                   b
 	 *
 	 * 	|––––––––––––––––|<--------------------->
