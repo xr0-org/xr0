@@ -690,6 +690,9 @@ static struct e_res *
 additive_eval(struct ast_expr *, struct state *);
 
 static struct e_res *
+relational_eval(struct ast_expr *, struct state *);
+
+static struct e_res *
 equality_eval(struct ast_expr *, struct state *);
 
 static struct e_res *
@@ -699,6 +702,11 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 	case BINARY_OP_ADDITION:
 	case BINARY_OP_SUBTRACTION:
 		return additive_eval(expr, state);
+	case BINARY_OP_LT:
+	case BINARY_OP_GT:
+	case BINARY_OP_GE:
+	case BINARY_OP_LE:
+		return relational_eval(expr, state);
 	case BINARY_OP_EQ:
 	case BINARY_OP_NE:
 		return equality_eval(expr, state);
@@ -778,6 +786,63 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 	);
 	return e_res_eval_create(eval_rval_create(t1, v));
 }
+
+static struct e_res *
+lt_eval(struct ast_expr *, struct state *);
+
+static struct e_res *
+relational_eval(struct ast_expr *expr, struct state *state)
+{
+	switch (ast_expr_binary_op(expr)) {
+	case BINARY_OP_LT:
+		return lt_eval(expr, state);
+	default:
+		assert(false);
+	}
+}
+
+static struct e_res *
+value_lt_eval(struct eval *, struct eval *, struct state *);
+
+static struct e_res *
+lt_eval(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *e1 = ast_expr_binary_e1(expr),
+			*e2 = ast_expr_binary_e2(expr);
+	struct e_res *res1 = ast_expr_eval(e1, state),
+		     *res2 = ast_expr_eval(e2, state);
+	if (e_res_iserror(res1)) {
+		return res1;
+	}
+	if (e_res_iserror(res2)) {
+		return res2;
+	}
+	return value_lt_eval(
+		e_res_as_eval(res1),
+		e_res_as_eval(res2),
+		state
+	);
+}
+
+static struct e_res *
+value_lt_eval(struct eval *rv1, struct eval *rv2, struct state *s)
+{
+	a_printf(
+		ast_type_isint(eval_type(rv1)) && ast_type_isint(eval_type(rv2)),
+		"only comparisons between two integers are supported\n" 
+	);
+	struct value *v1 = value_res_as_value(eval_to_value(rv1, s)),
+		     *v2 = value_res_as_value(eval_to_value(rv2, s));
+
+	struct error *err;
+	if ((err = value_disentangle(v1, v2, s))) {
+		return e_res_error_create(err);
+	}
+
+	assert(false);
+}
+
+
 
 static struct e_res *
 eq_eval(struct ast_expr *, struct state *);

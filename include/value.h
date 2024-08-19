@@ -137,6 +137,9 @@ DECLARE_RESULT_TYPE(bool, bool, bool_res)
 struct bool_res *
 value_equal(struct value *lhs, struct value *rhs, struct state *);
 
+struct error *
+value_disentangle(struct value *, struct value *, struct state *);
+
 struct number;
 
 /* value_splitassume: Returns false if contradiction encountered. */

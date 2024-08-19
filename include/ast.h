@@ -543,6 +543,9 @@ struct ast_type *
 ast_type_create_arr(struct ast_type *type, int length);
 
 bool
+ast_type_isint(struct ast_type *);
+
+bool
 ast_type_isarr(struct ast_type *);
 
 bool
@@ -613,9 +616,6 @@ ast_type_strwithvar(struct ast_type *, char *var);
 
 struct ast_type *
 ast_type_copy(struct ast_type *t);
-
-enum ast_type_base
-ast_type_base(struct ast_type *t);
 
 struct ast_type *
 ast_type_ptr_type(struct ast_type *t);

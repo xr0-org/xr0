@@ -253,7 +253,7 @@ range_limit_to_value(struct ast_expr *limit)
 	}
 }
 
-int
+static int
 number_range_lw(struct number *);
 
 int
@@ -263,7 +263,7 @@ value_int_lw(struct value *v)
 	return number_range_lw(v->n);
 }
 
-int
+static int
 number_range_up(struct number *);
 
 int
@@ -1001,6 +1001,147 @@ samerconst(struct value *v, struct value *v0)
 	return number_equal(v->n, v0->n);
 }
 
+static int
+value_lw(struct value *, struct state *);
+
+static int
+value_up(struct value *, struct state *);
+
+struct error *
+value_disentangle(struct value *x, struct value *y, struct state *s)
+{
+	printf("%s\n", state_str(s));
+	printf("%s, %s\n", value_str(x), value_str(y));
+
+	int a = value_lw(x, s),
+	    b = value_up(x, s),
+	    c = value_lw(y, s),
+	    d = value_up(y, s);
+
+	/* our analysis begins with x in [a?b] and y in [c?d]. first we
+	 * impose the assumption that a ≤ c without loss of generality. */
+	if (c < a) {
+		return value_disentangle(y, x, s);
+	}
+	/* ⊢ a ≤ c */
+
+	/* 
+	 * The relative locations of b, c, d are undecided, but we know that
+	 * [a?b] is the range that begins first (or they begin at the same
+	 * place):
+	 *
+	 * 	|——–––———————————–––|<----------------------------->
+	 * 	a                   b
+	 *
+	 * 	<--------------------->|––––––––––––––––|<--------->
+	 * 	                       c                d
+	 */
+
+	/* the rule is that if b ≤ c or a ≥ d we have no overlap. the previous
+	 * step eliminated the possibility of a ≥ d */
+
+	if (b <= c) {
+		/* base case: no overlap */
+		return NULL;
+	}
+	/* ⊢ b > c */
+
+	/* 
+	 * There is overlap:
+	 *
+	 * 	|——–––———————————–––|<----------------------->
+	 * 	a                   b
+	 *
+	 * 	<--------------->|––––––––––––––––|<--------->
+	 * 	                 c                d
+	 */
+
+	if (a < c) {
+		/* split into two scenarios:
+		 * 	- x in [a?c], y in [c?d] (x < y)
+		 * 	- x in [c?b], y in [c?d] (same lower bound) */
+		/* ends in return */
+	}
+	/* ⊢ a == c */
+
+	/* 
+	 * Overlapping ranges that start at the same point:
+	 *
+	 * 	|——–––———————————–––|<----------------------->
+	 * 	a                   b
+	 *
+	 * 	|––––––––––––––––|<--------------------->
+	 * 	c                d
+	 */
+
+	if (d < b) {
+		return value_disentangle(y, x, s);
+	}
+	/* ⊢ b ≤ d */
+
+	/* 
+	 * WLOG we assume that the first range finishes before (or at the same
+	 * point as) the second:
+	 *
+	 * 	|——–––————————––|<------>
+	 * 	a               b
+	 *
+	 * 	|–––––––––––––––––––––––|
+	 * 	c                       d
+	 */
+
+	if (b < d) {
+		/* split into two scenarios:
+		 * 	- x in [a?b], y in [b?d] (x < y)
+		 * 	- x, y in [a?b] (perfect overlap) */
+		/* ends in return */
+	}
+	/* ⊢ b == d */
+
+	/* 
+	 * Perfect overlap:
+	 *
+	 * 	|——–––————————––|
+	 * 	a               b
+	 *
+	 * 	|–––––––––––––––|
+	 * 	c               d
+	 */
+
+	/* handle perfect overlap */
+
+	assert(false);
+	d = d;
+	value_up(y, s);
+}
+
+static int
+number_bound(struct number *, int islw, struct state *);
+
+static int
+value_bound(struct value *v, struct state *s, int islw)
+{
+	switch (v->type) {
+	case VALUE_INT:
+	case VALUE_RCONST:
+		return number_bound(v->n, islw, s);
+	default:
+		assert(false);
+	}
+}
+
+static int
+value_lw(struct value *v, struct state *s)
+{
+	return value_bound(v, s, 1);
+}
+
+static int
+value_up(struct value *v, struct state *s)
+{
+	return value_bound(v, s, 0);
+}
+
 
 static bool
 number_assume(struct number *n, struct number *split);
@@ -1203,6 +1344,31 @@ splitinstruct_splits(struct splitinstruct *inst)
 	return inst->splits;
 }
 
+static int
+rconst_bound(char *rconst, int islw, struct state *);
+
+static int
+number_bound(struct number *n, int islw, struct state *s)
+{
+	switch (n->type) {
+	case NUMBER_RANGES:
+		return islw ? number_range_lw(n) : number_range_up(n);
+	case NUMBER_COMPUTED:
+		return rconst_bound(
+			ast_expr_as_identifier(n->computation), islw, s
+		);
+	default:
+		assert(false);
+	}
+}
+
+static int
+rconst_bound(char *id, int islw, struct state *s)
+{
+	struct value *rconst = state_getrconst(s, id);
+	assert(rconst && rconst->type == VALUE_INT);
+	return number_bound(rconst->n, islw, s);
+}
 
 
 struct number_value *
@@ -1283,21 +1449,23 @@ number_value_as_constant(struct number_value *v);
 struct number_value *
 number_range_lower(struct number_range *r);
 
-int
+static int
 number_range_lw(struct number *n)
 {
+	assert(n->type == NUMBER_RANGES);
 	assert(number_range_arr_n(n->ranges) == 1);
 
 	struct number_range *r = number_range_arr_range(n->ranges)[0];
 	return number_value_as_constant(number_range_lower(r));
 }
 
-struct number_value *
+static struct number_value *
 number_range_upper(struct number_range *r);
 
-int
+static int
 number_range_up(struct number *n)
 {
+	assert(n->type == NUMBER_RANGES);
 	assert(number_range_arr_n(n->ranges) == 1);
 
 	struct number_range *r = number_range_arr_range(n->ranges)[0];

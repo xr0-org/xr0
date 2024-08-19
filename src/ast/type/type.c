@@ -29,6 +29,12 @@ struct ast_type {
 };
 
 bool
+ast_type_isint(struct ast_type *t)
+{
+	return t->base == TYPE_INT;
+}
+
+bool
 ast_type_isarr(struct ast_type *t)
 {
 	return t->base == TYPE_ARRAY;
