@@ -1010,6 +1010,28 @@ value_up(struct value *, struct state *);
 static int
 value_issinglerange(struct value *, struct state *);
 
+int
+value_lt(struct value *lhs, struct value *rhs, struct state *s)
+{
+	assert(value_issinglerange(lhs, s) && value_issinglerange(rhs, s));
+
+	int a = value_lw(lhs, s),
+	    b = value_up(lhs, s),
+	    c = value_lw(rhs, s),
+	    d = value_up(rhs, s);
+
+	if (b <= c) {
+		return 1;
+	} else if (a >= d) {
+		return 0;
+	}
+
+	/* our assumption is that if there is overlap it is perfect and in a
+	 * single point */
+	assert(a == c && b == d && b-a == 1);
+	return 0;
+}
+
 static void
 value_splitto(struct value *, int lw, int up, struct map *, struct state *);
 
@@ -1017,8 +1039,6 @@ struct error *
 value_disentangle(struct value *x, struct value *y, struct state *s)
 {
 	assert(value_issinglerange(x, s) && value_issinglerange(y, s));
-
-	printf("x: %s, y: %s\n", value_str(x), value_str(y));
 
 	int a = value_lw(x, s),
 	    b = value_up(x, s),
@@ -1138,9 +1158,9 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 	 * 	c               d
 	 */
 
-	/* handle perfect overlap */
+	a_printf(b-a==1, "perfect assumed to be at single points only for now\n");
 
-	assert(false);
+	return NULL;
 }
 
 static int

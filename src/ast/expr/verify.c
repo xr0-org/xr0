@@ -788,24 +788,11 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 }
 
 static struct e_res *
-lt_eval(struct ast_expr *, struct state *);
+value_relational_eval(struct eval *, enum ast_binary_operator op,
+		struct eval *, struct state *);
 
 static struct e_res *
 relational_eval(struct ast_expr *expr, struct state *state)
-{
-	switch (ast_expr_binary_op(expr)) {
-	case BINARY_OP_LT:
-		return lt_eval(expr, state);
-	default:
-		assert(false);
-	}
-}
-
-static struct e_res *
-value_lt_eval(struct eval *, struct eval *, struct state *);
-
-static struct e_res *
-lt_eval(struct ast_expr *expr, struct state *state)
 {
 	struct ast_expr *e1 = ast_expr_binary_e1(expr),
 			*e2 = ast_expr_binary_e2(expr);
@@ -817,15 +804,21 @@ lt_eval(struct ast_expr *expr, struct state *state)
 	if (e_res_iserror(res2)) {
 		return res2;
 	}
-	return value_lt_eval(
+	return value_relational_eval(
 		e_res_as_eval(res1),
+		ast_expr_binary_op(expr),
 		e_res_as_eval(res2),
 		state
 	);
 }
 
+static int
+value_compare(struct value *, enum ast_binary_operator op,
+		struct value *, struct state *);
+
 static struct e_res *
-value_lt_eval(struct eval *rv1, struct eval *rv2, struct state *s)
+value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
+		struct eval *rv2, struct state *s)
 {
 	a_printf(
 		ast_type_isint(eval_type(rv1)) && ast_type_isint(eval_type(rv2)),
@@ -834,13 +827,34 @@ value_lt_eval(struct eval *rv1, struct eval *rv2, struct state *s)
 	struct value *v1 = value_res_as_value(eval_to_value(rv1, s)),
 		     *v2 = value_res_as_value(eval_to_value(rv2, s));
 
-	printf("%s\n", state_str(s));
 	struct error *err;
 	if ((err = value_disentangle(v1, v2, s))) {
 		return e_res_error_create(err);
 	}
 
-	assert(false);
+	return e_res_eval_create(
+		eval_rval_create(
+			ast_type_create_int(),
+			value_int_create(value_compare(v1, op, v2, s))
+		)
+	);
+}
+
+
+static int
+value_compare(struct value *lhs, enum ast_binary_operator op,
+		struct value *rhs, struct state *s)
+{
+	switch (op) {
+	case BINARY_OP_LT:
+		return value_lt(lhs, rhs, s);
+	case BINARY_OP_GT:
+		return value_lt(rhs, lhs, s);
+	case BINARY_OP_GE:
+	case BINARY_OP_LE:
+	default:
+		assert(false);
+	}
 }
 
 
