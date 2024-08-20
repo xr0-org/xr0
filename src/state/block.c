@@ -116,15 +116,14 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 
 	if (!value_isconstant(range)) {
 		assert(tagval_hastag(tv));
-		struct number_arr *splits = number_arr_create();
+		struct splitinstruct *splits = splitinstruct_create();
+		char *tag = tagval_tag(tv);
 		for (int i = lw; i < up; i++) {
-			number_arr_append(splits, number_single_create(i));
+			struct map *m = map_create();
+			map_set(m, tag, number_single_create(i));
+			splitinstruct_append(splits, m);
 		}
-		return object_res_error_create(
-			error_undecideable_cond(
-				splitinstruct_create(tagval_tag(tv), splits)
-			)
-		);
+		return object_res_error_create(error_undecideable_cond(splits));
 	}
 
 	offset = ast_expr_constant_create(value_as_constant(range));

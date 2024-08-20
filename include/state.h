@@ -51,8 +51,9 @@ state_setrconsts(struct state *new, struct state *old);
 
 struct number;
 
-bool
-state_assume(struct state *, char *rconst, struct number *split);
+/* state_split: return 0 if contradiction encountered. */
+int
+state_split(struct state *, struct map *split);
 
 struct state *
 state_copy(struct state *);

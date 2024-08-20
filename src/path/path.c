@@ -314,17 +314,15 @@ path_step_abstract(struct path *p)
 }
 
 static struct path *
-path_copywithcond(struct path *old, char *rconst, struct number *);
+path_copywithsplit(struct path *old, struct map *split);
 
 static void
 path_split(struct path *p, struct splitinstruct *inst)
 {
-	char *rconst = splitinstruct_rconst(inst);
-	struct number_arr *splits = splitinstruct_splits(inst);
-	int n = number_arr_len(splits);
-	struct number **split = number_arr_num(splits);
+	struct map **split = splitinstruct_splits(inst);
+	int n = splitinstruct_n(inst);
 	for (int i = 0; i < n; i++) {
-		path_arr_append(p->paths, path_copywithcond(p, rconst, split[i]));
+		path_arr_append(p->paths, path_copywithsplit(p, split[i]));
 	}
 	/* TODO: destroy abstract and actual */
 	p->abstract = NULL;
@@ -333,13 +331,13 @@ path_split(struct path *p, struct splitinstruct *inst)
 }
 
 static struct ast_function *
-copy_withcondname(struct ast_function *, char *rconst, struct number *split); 
+copy_withsplitname(struct ast_function *, struct map *split); 
 
 static struct path *
-path_copywithcond(struct path *old, char *rconst, struct number *split)
+path_copywithsplit(struct path *old, struct map *split)
 {
 	struct path *p = path_create(
-		copy_withcondname(old->f, rconst, split), old->ext
+		copy_withsplitname(old->f, split), old->ext
 	);
 	char *fname = ast_function_name(p->f);
 	p->path_state = old->path_state;
@@ -347,7 +345,7 @@ path_copywithcond(struct path *old, char *rconst, struct number *split)
 	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
 		p->abstract = state_copywithname(old->abstract, fname);
-		if (!state_assume(p->abstract, rconst, split)) {
+		if (!state_split(p->abstract, split)) {
 			p->path_state = PATH_STATE_ATEND;
 		}
 		break;
@@ -355,10 +353,10 @@ path_copywithcond(struct path *old, char *rconst, struct number *split)
 	case PATH_STATE_ACTUAL:
 		p->abstract = state_copywithname(old->abstract, fname);
 		p->actual = state_copywithname(old->actual, fname);
-		if (!state_assume(p->actual, rconst, split)) {
+		if (!state_split(p->actual, split)) {
 			p->path_state = PATH_STATE_ATEND;
 		}
-		state_assume(p->abstract, rconst, split);
+		state_split(p->abstract, split);
 		break;
 	default:
 		assert(false);
@@ -367,23 +365,37 @@ path_copywithcond(struct path *old, char *rconst, struct number *split)
 }
 
 static char *
-split_name(char *name, char *rconst, struct number *split);
+split_name(char *name, struct map *split);
 
 static struct ast_function *
-copy_withcondname(struct ast_function *old, char *rconst, struct number *split)
+copy_withsplitname(struct ast_function *old, struct map *split)
 {
 	struct ast_function *f = ast_function_copy(old);
-	ast_function_setname(f, split_name(ast_function_name(f), rconst, split));
+	ast_function_setname(f, split_name(ast_function_name(f), split));
 	return f;
 }
 
 static char *
-split_name(char *name, char *rconst, struct number *split)
+split_name(char *name, struct map *split)
 {
 	struct strbuilder *b = strbuilder_create();
-	char *split_str = number_str(split);
-	strbuilder_printf(b, "%s | %s ∈ %s", name, rconst, split_str);
-	free(split_str);
+	strbuilder_printf(b, "%s | ", name);
+	if (split->n > 1) {
+		strbuilder_printf(b, "{ ");
+	}
+	for (int i = 0; i < split->n; i++) {
+		struct entry e = split->entry[i];
+		char *rconst = e.key;
+		char *num = number_str((struct number *) e.value);
+		strbuilder_printf(
+			b, "%s ∈ %s%s", rconst, num,
+			(i+1 < split->n ? "," : "")
+		);
+		free(num);
+	}
+	if (split->n > 1) {
+		strbuilder_printf(b, " }");
+	}
 	return strbuilder_build(b);
 }
 

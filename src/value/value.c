@@ -1010,25 +1010,33 @@ value_up(struct value *, struct state *);
 struct error *
 value_disentangle(struct value *x, struct value *y, struct state *s)
 {
-	printf("%s\n", state_str(s));
-	printf("%s, %s\n", value_str(x), value_str(y));
+	printf("x: %s, y: %s\n", value_str(x), value_str(y));
 
 	int a = value_lw(x, s),
 	    b = value_up(x, s),
 	    c = value_lw(y, s),
 	    d = value_up(y, s);
 
-	/* our analysis begins with x in [a?b] and y in [c?d]. first we
-	 * impose the assumption that a ≤ c without loss of generality. */
+	/* 
+	 * Our analysis begins with x in [a?b] and y in [c?d].
+	 *
+	 * 	<--------------->|——–––———————————–––|<------------>
+	 * 	                 a                   b
+	 *
+	 * 	<--------------------->|––––––––––––––––|<--------->
+	 * 	                       c                d
+	 * 
+	 */
+	assert(false);
 	if (c < a) {
 		return value_disentangle(y, x, s);
 	}
 	/* ⊢ a ≤ c */
 
 	/* 
-	 * The relative locations of b, c, d are undecided, but we know that
-	 * [a?b] is the range that begins first (or they begin at the same
-	 * place):
+	 * WLOG, assume that a ≤ c. The relative locations of b, c, d are
+	 * undecided, but we know that [a?b] is the range that begins first (or
+	 * they begin at the same place):
 	 *
 	 * 	|——–––———————————–––|<----------------------------->
 	 * 	a                   b
@@ -1111,8 +1119,6 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 	/* handle perfect overlap */
 
 	assert(false);
-	d = d;
-	value_up(y, s);
 }
 
 static int
@@ -1296,12 +1302,14 @@ isequal(struct ast_expr *lhs, int rhs, struct state *s)
 	if (number_isconstant(n) && number_as_constant(n) == rhs) {
 		return bool_res_bool_create(true);
 	}
-	struct number_arr *splits = number_arr_create();
-	number_arr_append(splits, number_single_create(rhs));
-	number_arr_append(splits, number_exclude_create(n, rhs));
-	return bool_res_error_create(
-		error_undecideable_cond(splitinstruct_create(id, splits))
-	);
+	struct splitinstruct *splits = splitinstruct_create();
+	struct map *m_single = map_create(),
+		   *m_exclude = map_create();
+	map_set(m_single, dynamic_str(id), number_single_create(rhs));
+	map_set(m_exclude, dynamic_str(id), number_exclude_create(n, rhs));
+	splitinstruct_append(splits, m_single);
+	splitinstruct_append(splits, m_exclude);
+	return bool_res_error_create(error_undecideable_cond(splits));
 }
 
 static struct number *
@@ -1316,32 +1324,6 @@ getdecider(struct value *v)
 	default:
 		assert(false);
 	}
-}
-
-struct splitinstruct {
-	char *rconst;
-	struct number_arr *splits;
-};
-
-struct splitinstruct *
-splitinstruct_create(char *rconst, struct number_arr *splits)
-{
-	struct splitinstruct *inst = malloc(sizeof(struct splitinstruct));
-	inst->rconst = rconst;
-	inst->splits = splits;
-	return inst;
-}
-
-char *
-splitinstruct_rconst(struct splitinstruct *inst)
-{
-	return inst->rconst;
-}
-
-struct number_arr *
-splitinstruct_splits(struct splitinstruct *inst)
-{
-	return inst->splits;
 }
 
 static int
@@ -1652,50 +1634,36 @@ number_copy(struct number *num)
 	}
 }
 
-
-struct number_arr {
+struct splitinstruct {
 	int n;
-	struct number **num;
+	struct map **m;
 };
 
-struct number_arr *
-number_arr_create()
+struct splitinstruct *
+splitinstruct_create()
 {
-	struct number_arr *arr = calloc(1, sizeof(struct number_arr));
-	assert(arr);
-	return arr;
+	return calloc(1, sizeof(struct splitinstruct));
 }
 
-void
-number_arr_destroy(struct number_arr *arr)
+void 
+splitinstruct_append(struct splitinstruct *s, struct map *m)
 {
-	for (int i = 0; i < arr->n; i++) {
-		free(arr->num[i]);
-	}
-	free(arr->num);
-	free(arr);
+	s->m = realloc(s->m, sizeof(struct map *) * ++s->n);
+	assert(s->m);
+	s->m[s->n-1] = m;
 }
 
-struct number **
-number_arr_num(struct number_arr *arr)
+int 
+splitinstruct_n(struct splitinstruct *s)
 {
-	return arr->num;
+	return s->n;
 }
 
-int
-number_arr_len(struct number_arr *arr)
+struct map **
+splitinstruct_splits(struct splitinstruct *s)
 {
-	return arr->n;
+	return s->m;
 }
-
-void
-number_arr_append(struct number_arr *arr, struct number *num)
-{
-	arr->num = realloc(arr->num, sizeof(struct number *) * ++arr->n);
-	assert(arr->num);
-	arr->num[arr->n-1] = num;
-}
-
 
 
 struct number_range_arr {

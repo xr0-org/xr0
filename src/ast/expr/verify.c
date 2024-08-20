@@ -834,6 +834,7 @@ value_lt_eval(struct eval *rv1, struct eval *rv2, struct state *s)
 	struct value *v1 = value_res_as_value(eval_to_value(rv1, s)),
 		     *v2 = value_res_as_value(eval_to_value(rv2, s));
 
+	printf("%s\n", state_str(s));
 	struct error *err;
 	if ((err = value_disentangle(v1, v2, s))) {
 		return e_res_error_create(err);

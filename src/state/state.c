@@ -49,12 +49,18 @@ state_setrconsts(struct state *new, struct state *old)
 	new->rconst = rconst_copy(old->rconst);
 }
 
-bool
-state_assume(struct state *s, char *rconst, struct number *split)
+int
+state_split(struct state *s, struct map *split)
 {
-	struct value *v = state_getrconst(s, rconst);
-	assert(v);
-	return value_splitassume(v, split);
+	for (int i = 0; i < split->n; i++) {
+		struct entry e = split->entry[i];
+		struct value *v = state_getrconst(s, e.key);
+		assert(v);
+		if (!value_splitassume(v, (struct number *) e.value)) {
+			return 0;
+		}
+	}
+	return 1;
 }
 
 void
