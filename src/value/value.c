@@ -108,8 +108,8 @@ number_value_max_create();
 struct number_value *
 number_value_constant_create(int constant);
 
-struct number *
-number_rconst_create(struct number_value *lw, struct number_value *up);
+static struct number *
+number_singlerange_create(struct number_value *lw, struct number_value *up);
 
 struct value *
 value_ptr_rconst_create()
@@ -118,7 +118,7 @@ value_ptr_rconst_create()
 	assert(v);
 	v->type = VALUE_PTR;
 	v->ptr.isindefinite = true;
-	v->ptr.n = number_rconst_create(
+	v->ptr.n = number_singlerange_create(
 		number_value_min_create(), number_value_max_create()
 	);
 	return v;
@@ -234,7 +234,7 @@ value_int_rconst_create(struct ast_expr *range)
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_rconst_create(
+	v->n = number_singlerange_create(
 		range_limit_to_value(ast_expr_range_lw(range)),
 		range_limit_to_value(ast_expr_range_up(range))
 	);
@@ -1007,9 +1007,17 @@ value_lw(struct value *, struct state *);
 static int
 value_up(struct value *, struct state *);
 
+static int
+value_issinglerange(struct value *, struct state *);
+
+static void
+value_splitto(struct value *, int lw, int up, struct map *, struct state *);
+
 struct error *
 value_disentangle(struct value *x, struct value *y, struct state *s)
 {
+	assert(value_issinglerange(x, s) && value_issinglerange(y, s));
+
 	printf("x: %s, y: %s\n", value_str(x), value_str(y));
 
 	int a = value_lw(x, s),
@@ -1027,7 +1035,6 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 	 * 	                       c                d
 	 * 
 	 */
-	assert(false);
 	if (c < a) {
 		return value_disentangle(y, x, s);
 	}
@@ -1068,7 +1075,14 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 		/* split into two scenarios:
 		 * 	- x in [a?c], y in [c?d] (x < y)
 		 * 	- x in [c?b], y in [c?d] (same lower bound) */
-		/* ends in return */
+		struct splitinstruct *splits = splitinstruct_create();
+		struct map *x_lt_y = map_create(),
+			   *a_eq_c = map_create();
+		value_splitto(x, a, c, x_lt_y, s);
+		value_splitto(x, c, b, a_eq_c, s);
+		splitinstruct_append(splits, x_lt_y);
+		splitinstruct_append(splits, a_eq_c);
+		return error_undecideable_cond(splits);
 	}
 	/* ⊢ a == c */
 
@@ -1103,6 +1117,14 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 		 * 	- x in [a?b], y in [b?d] (x < y)
 		 * 	- x, y in [a?b] (perfect overlap) */
 		/* ends in return */
+		struct splitinstruct *splits = splitinstruct_create();
+		struct map *x_lt_y = map_create(),
+			   *b_eq_d = map_create();
+		value_splitto(y, b, d, x_lt_y, s);
+		value_splitto(y, a, b, b_eq_d, s);
+		splitinstruct_append(splits, x_lt_y);
+		splitinstruct_append(splits, b_eq_d);
+		return error_undecideable_cond(splits);
 	}
 	/* ⊢ b == d */
 
@@ -1122,30 +1144,75 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 }
 
 static int
-number_bound(struct number *, int islw, struct state *);
+number_lw(struct number *, struct state *);
 
 static int
-value_bound(struct value *v, struct state *s, int islw)
+number_up(struct number *, struct state *);
+
+static int
+_value_bound(struct value *v, struct state *s, int islw);
+
+static int
+value_lw(struct value *v, struct state *s)
+{
+	return _value_bound(v, s, 1);
+}
+
+static int
+_value_bound(struct value *v, struct state *s, int islw)
 {
 	switch (v->type) {
 	case VALUE_INT:
 	case VALUE_RCONST:
-		return number_bound(v->n, islw, s);
+		return islw ? number_lw(v->n, s) : number_up(v->n, s);
 	default:
 		assert(false);
 	}
 }
 
 static int
-value_lw(struct value *v, struct state *s)
+value_up(struct value *v, struct state *s)
 {
-	return value_bound(v, s, 1);
+	return _value_bound(v, s, 0);
 }
 
 static int
-value_up(struct value *v, struct state *s)
+number_issinglerange(struct number *, struct state *);
+
+static int
+value_issinglerange(struct value *v, struct state *s)
 {
-	return value_bound(v, s, 0);
+	switch (v->type) {
+	case VALUE_INT:
+	case VALUE_RCONST:
+		return number_issinglerange(v->n, s);
+	default:
+		assert(false);
+	}
+
+}
+
+static void
+number_splitto(struct number *, int lw, int up, struct map *splits,
+		struct state *);
+
+static void
+value_splitto(struct value *v, int lw, int up, struct map *splits,
+		struct state *s)
+{
+	switch (v->type) {
+	case VALUE_INT:
+		assert(
+			value_issinglerange(v, s)
+			&& value_lw(v, s) == lw
+			&& value_up(v, s) == up
+		);
+		return;
+	case VALUE_RCONST:
+		return number_splitto(v->n, lw, up, splits, s);
+	default:
+		assert(false);
+	}
 }
 
 
@@ -1327,16 +1394,31 @@ getdecider(struct value *v)
 }
 
 static int
-rconst_bound(char *rconst, int islw, struct state *);
+_number_bound(struct number *n, int islw, struct state *s);
 
 static int
-number_bound(struct number *n, int islw, struct state *s)
+number_lw(struct number *n, struct state *s)
+{
+	return _number_bound(n, 1, s);
+}
+
+static int
+number_up(struct number *n, struct state *s)
+{
+	return _number_bound(n, 0, s);
+}
+
+static int
+_rconst_bound(char *rconst, int islw, struct state *);
+
+static int
+_number_bound(struct number *n, int islw, struct state *s)
 {
 	switch (n->type) {
 	case NUMBER_RANGES:
 		return islw ? number_range_lw(n) : number_range_up(n);
 	case NUMBER_COMPUTED:
-		return rconst_bound(
+		return _rconst_bound(
 			ast_expr_as_identifier(n->computation), islw, s
 		);
 	default:
@@ -1345,11 +1427,58 @@ number_bound(struct number *n, int islw, struct state *s)
 }
 
 static int
-rconst_bound(char *id, int islw, struct state *s)
+_rconst_bound(char *id, int islw, struct state *s)
 {
 	struct value *rconst = state_getrconst(s, id);
 	assert(rconst && rconst->type == VALUE_INT);
-	return number_bound(rconst->n, islw, s);
+	return _number_bound(rconst->n, islw, s);
+}
+
+static int
+_rconst_issinglerange(char *rconst, struct state *);
+
+static int
+number_issinglerange(struct number *n, struct state *s)
+{
+	switch (n->type) {
+	case NUMBER_RANGES:
+		return number_range_arr_n(n->ranges) == 1;
+	case NUMBER_COMPUTED:
+		return _rconst_issinglerange(
+			ast_expr_as_identifier(n->computation), s
+		);
+	default:
+		assert(false);
+	}
+}
+
+static int
+_rconst_issinglerange(char *id, struct state *s)
+{
+	struct value *rconst = state_getrconst(s, id);
+	assert(rconst && rconst->type == VALUE_INT);
+	return number_issinglerange(rconst->n, s);
+}
+
+
+static void
+number_splitto(struct number *n, int lw, int up, struct map *splits,
+		struct state *s)
+{
+	assert(
+		n->type == NUMBER_COMPUTED
+		&& number_issinglerange(n, s)
+		&& number_lw(n, s) <= lw && up <= number_up(n, s)
+	);
+
+	map_set(
+		splits,
+		dynamic_str(ast_expr_as_identifier(n->computation)),
+		number_singlerange_create(
+			number_value_constant_create(lw),
+			number_value_constant_create(up)
+		)
+	);
 }
 
 
@@ -1414,8 +1543,8 @@ number_with_range_create(int lw, int excl_up)
 char *
 number_value_str(struct number_value *v);
 
-struct number *
-number_rconst_create(struct number_value *lw, struct number_value *up)
+static struct number *
+number_singlerange_create(struct number_value *lw, struct number_value *up)
 {
 	struct number_range_arr *arr = number_range_arr_create();
 	number_range_arr_append(
