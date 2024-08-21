@@ -320,6 +320,12 @@ range_expression
 			$4 ? $4 : ast_expr_rangemax_create()
 		);
 	}
+	| '[' range_operand '!' range_operand ']' {
+		$$ = ast_expr_range_createnokey(
+			$2 ? $2 : ast_expr_rangemin_create(),
+			$4 ? $4 : ast_expr_rangemax_create()
+		);
+	}
 	;
 
 range_operand

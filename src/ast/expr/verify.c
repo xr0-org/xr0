@@ -409,7 +409,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	/* XXX: pass copy so we don't observe */
-	if ((err = call_setupverify(f, ast_expr_copy(expr), state_copy(state)))) {
+	if ((err = call_setupverify(f, ast_expr_copy(expr), state))) {
 		return e_res_error_create(
 			error_printf("precondition failure: %w", err)
 		);
@@ -862,8 +862,8 @@ value_compare(struct value *lhs, enum ast_binary_operator op,
 	}
 }
 
-static char *
-modulatedkey(struct ast_expr *, struct state *);
+static struct value *
+range_rconst(struct ast_expr *, struct state *);
 
 static struct e_res *
 range_eval(struct ast_expr *expr, struct state *state)
@@ -872,15 +872,33 @@ range_eval(struct ast_expr *expr, struct state *state)
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */
 			ast_type_create_range(),
-			state_rconst(
-				state,
-				/* XXX: we will investigate type conversions later */
-				ast_type_create_range(),
-				expr,
-				modulatedkey(expr, state),
-				false
-			)
+			range_rconst(expr, state)
 		)
+	);
+}
+
+static char *
+modulatedkey(struct ast_expr *, struct state *);
+
+static struct value *
+range_rconst(struct ast_expr *expr, struct state *state)
+{
+	if (ast_expr_range_haskey(expr)) {
+		return state_rconst(
+			state,
+			/* XXX: we will investigate type conversions later */
+			ast_type_create_range(),
+			expr,
+			modulatedkey(expr, state),
+			false
+		);
+	}
+	return state_rconstnokey(
+		state,
+		/* XXX: we will investigate type conversions later */
+		ast_type_create_range(),
+		expr,
+		false
 	);
 }
 
@@ -893,7 +911,6 @@ modulatedkey(struct ast_expr *e, struct state *s)
 	free(mod);
 	return strbuilder_build(b);
 }
-
 
 static struct object *
 hack_object_from_assertion(struct ast_expr *, struct state *);
@@ -1014,7 +1031,7 @@ call_absexec(struct ast_expr *expr, struct state *state)
 	}
 
 	/* XXX: pass copy so we don't observe */
-	if ((err = call_setupverify(f, ast_expr_copy(expr), state_copy(state)))) {
+	if ((err = call_setupverify(f, ast_expr_copy(expr), state))) {
 		return e_res_error_create(
 			error_printf("precondition failure: %w", err)
 		);

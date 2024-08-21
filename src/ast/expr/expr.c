@@ -695,6 +695,19 @@ ast_expr_isdeallocand_str_build(struct ast_expr *expr, struct strbuilder *b)
 }
 
 struct ast_expr *
+ast_expr_range_createnokey(struct ast_expr *lw, struct ast_expr *up)
+{
+	assert(lw && up);
+
+	struct ast_expr *expr = ast_expr_create();
+	expr->kind = EXPR_RANGE;
+	expr->u.range.key = NULL;
+	expr->u.range.lw = lw;
+	expr->u.range.up = up;
+	return expr;
+}
+
+struct ast_expr *
 ast_expr_range_create(char *key, struct ast_expr *lw, struct ast_expr *up)
 {
 	assert(key && lw && up);
@@ -712,10 +725,43 @@ ast_expr_range_str_build(struct ast_expr *expr, struct strbuilder *b)
 {
 	char *lw = ast_expr_str(expr->u.range.lw),
 	     *up = ast_expr_str(expr->u.range.up);
-	strbuilder_printf(b, "$%s[%s?%s]", expr->u.range.key, lw, up);
+	if (ast_expr_range_haskey(expr)) {
+		strbuilder_printf(b, "$%s[%s?%s]", expr->u.range.key, lw, up);
+	} else {
+		strbuilder_printf(b, "[%s!%s]", lw, up);
+	}
 	free(up);
 	free(lw);
 }
+
+int
+ast_expr_range_haskey(struct ast_expr *expr)
+{
+	assert(expr->kind == EXPR_RANGE);
+	return (long) expr->u.range.key;
+}
+
+char *
+ast_expr_range_key(struct ast_expr *expr)
+{
+	assert(ast_expr_range_haskey(expr));
+	return expr->u.range.key;
+}
+
+struct ast_expr *
+ast_expr_range_lw(struct ast_expr *e)
+{
+	assert(e->kind == EXPR_RANGE);
+	return e->u.range.lw;
+}
+
+struct ast_expr *
+ast_expr_range_up(struct ast_expr *e)
+{
+	assert(e->kind == EXPR_RANGE);
+	return e->u.range.up;
+}
+
 
 struct ast_expr *
 ast_expr_rangemin_create()
@@ -735,26 +781,7 @@ ast_expr_rangemax_create()
 	return expr;
 }
 
-char *
-ast_expr_range_key(struct ast_expr *expr)
-{
-	assert(expr->kind == EXPR_RANGE);
-	return expr->u.range.key;
-}
 
-struct ast_expr *
-ast_expr_range_lw(struct ast_expr *e)
-{
-	assert(e->kind == EXPR_RANGE);
-	return e->u.range.lw;
-}
-
-struct ast_expr *
-ast_expr_range_up(struct ast_expr *e)
-{
-	assert(e->kind == EXPR_RANGE);
-	return e->u.range.up;
-}
 
 bool
 ast_expr_israngemin(struct ast_expr *e)
@@ -904,7 +931,9 @@ ast_expr_destroy(struct ast_expr *expr)
 		ast_expr_destroy(expr->root);
 		break;
 	case EXPR_RANGE:
-		free(expr->u.range.key);
+		if (expr->u.range.key) {
+			free(expr->u.range.key);
+		}
 		if (expr->u.range.lw) {
 			ast_expr_destroy(expr->u.range.lw);
 		}
@@ -1025,8 +1054,14 @@ ast_expr_copy(struct ast_expr *expr)
 			ast_expr_copy(expr->root)
 		);
 	case EXPR_RANGE:
-		return ast_expr_range_create(
-			dynamic_str(expr->u.range.key),
+		if (ast_expr_range_haskey(expr)) {
+			return ast_expr_range_create(
+				dynamic_str(expr->u.range.key),
+				ast_expr_copy(expr->u.range.lw),
+				ast_expr_copy(expr->u.range.up)
+			);
+		}
+		return ast_expr_range_createnokey(
 			ast_expr_copy(expr->u.range.lw),
 			ast_expr_copy(expr->u.range.up)
 		);

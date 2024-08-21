@@ -254,7 +254,7 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 {
 	struct path *path = path_create(f, ext);
 	while (!path_atend(path)) {
-		struct error *err = path_step(path);
+		struct error *err = path_progress(path, progressor_step());
 		if (err) {
 			return err;
 		}

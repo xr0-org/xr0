@@ -22,11 +22,16 @@ path_str(struct path *);
 bool
 path_atend(struct path *);
 
-struct error *
-path_step(struct path *);
+typedef struct error *(progressor)(struct state *);
+
+progressor *
+progressor_step();
+
+progressor *
+progressor_next();
 
 struct error *
-path_next(struct path *);
+path_progress(struct path *, progressor *);
 
 struct error *
 path_verify(struct path *, struct ast_expr *);

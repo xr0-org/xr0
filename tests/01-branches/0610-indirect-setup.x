@@ -1,12 +1,16 @@
 #include <stdlib.h>
 
-foo(int cond, int x) ~ [
+foo(int cond, void *p) ~ [
 	if (cond) {
-		setup: x = 3;
+		setup: p = malloc(1);
 	}
 ]{}
 
 test(int x)
 {
-	foo(x, 3);
+	void *p;
+
+	p = malloc(1);
+	foo(x, p);
+	free(p);
 }

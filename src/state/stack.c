@@ -475,11 +475,11 @@ stack_isnested(struct stack *s)
 	return s->kind == FRAME_NESTED;
 }
 
-static char *
-stack_propername(struct stack *);
+char *
+error_context(struct stack *);
 
 static char *
-stack_context(struct stack *);
+stack_propername(struct stack *);
 
 struct error *
 stack_trace(struct stack *s, struct error *err)
@@ -488,36 +488,31 @@ stack_trace(struct stack *s, struct error *err)
 		assert(s->prev);
 		return stack_trace(s->prev, err);
 	}
-
-	struct strbuilder *b = strbuilder_create();
-
+	char *ctx = error_context(s);
 	char *loc = program_loc(s->p);
-	char *err_str = error_str(err);
-	strbuilder_printf(b, "%s: %s (%s)", loc, err_str, stack_propername(s));
-	free(err_str);
+	struct error *e = error_printf(
+		"%s: %w (%s)%s", loc, err, stack_propername(s), ctx
+	);
 	free(loc);
+	free(ctx);
+	return e;
+}
+
+static char *
+stack_context(struct stack *);
+
+char *
+error_context(struct stack *s)
+{
+	struct strbuilder *b = strbuilder_create();
 	if (s->prev) {
 		char *context = stack_context(s->prev);
 		if (strlen(context)) {
 			strbuilder_printf(b, "%s", context);
 		}
 		free(context);
-
-		char *msg = strbuilder_build(b);
-		struct error *trace_err = error_printf("%s", msg);
-		free(msg);
-		return trace_err;
 	}
-	char *msg = strbuilder_build(b);
-	struct error *e = error_printf("%s", msg);
-	free(msg);
-	return e;
-}
-
-static char *
-stack_propername(struct stack *s)
-{
-	return s->kind == FRAME_CALL ? s->name : stack_propername(s->prev);
+	return strbuilder_build(b);
 }
 
 static char *
@@ -537,6 +532,14 @@ stack_context(struct stack *s)
 	}
 	return strbuilder_build(b);
 }
+
+static char *
+stack_propername(struct stack *s)
+{
+	return s->kind == FRAME_CALL ? s->name : stack_propername(s->prev);
+}
+
+
 
 struct map *
 stack_getvarmap(struct stack *s)

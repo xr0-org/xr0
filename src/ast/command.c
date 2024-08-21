@@ -81,10 +81,10 @@ command_next(struct path *p)
 	struct command *cmd = getcmd();
 	switch (cmd->kind) {
 	case COMMAND_STEP:
-		err = path_step(p);
+		err = path_progress(p, progressor_step());
 		break;
 	case COMMAND_NEXT:
-		err = path_next(p);	
+		err = path_progress(p, progressor_next());	
 		break;
 	case COMMAND_VERIFY:
 		err = command_verify_exec(p, cmd);
@@ -111,7 +111,7 @@ static struct error *
 command_continue_exec(struct path *p)
 {
 	while (!path_atend(p)) {
-		struct error *err = path_step(p);
+		struct error *err = path_progress(p, progressor_step());
 		if (err) {
 			return err;
 		}
