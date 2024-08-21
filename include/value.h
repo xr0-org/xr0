@@ -138,6 +138,9 @@ struct bool_res *
 value_equal(struct value *lhs, struct value *rhs, struct state *);
 
 int
+value_eq(struct value *lhs, struct value *rhs, struct state *);
+
+int
 value_lt(struct value *lhs, struct value *rhs, struct state *);
 
 struct error *

@@ -304,14 +304,17 @@ address_eval(struct ast_expr *expr, struct state *state)
 static struct e_res *
 bang_eval(struct ast_expr *expr, struct state *state)
 {
-	struct e_res *res = ast_expr_eval(ast_expr_unary_operand(expr), state);
-	if (e_res_iserror(res)) {
-		return res;
+	struct bool_res *istrue_res = ast_expr_decide(
+		ast_expr_unary_operand(expr), state
+	);
+	if (bool_res_iserror(istrue_res)) {
+		return e_res_error_create(bool_res_as_error(istrue_res));
 	}
-	struct eval *eval = e_res_as_eval(res);
 	return e_res_eval_create(
-		eval_rval_create(eval_type(eval),
-		value_bang(value_res_as_value(eval_to_value(eval, state))))
+		eval_rval_create(
+			ast_type_create_int(),
+			value_int_create(!bool_res_as_bool(istrue_res))
+		)
 	);
 }
 
@@ -693,9 +696,6 @@ static struct e_res *
 relational_eval(struct ast_expr *, struct state *);
 
 static struct e_res *
-equality_eval(struct ast_expr *, struct state *);
-
-static struct e_res *
 expr_binary_eval(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_binary_op(expr)) {
@@ -706,10 +706,9 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 	case BINARY_OP_GT:
 	case BINARY_OP_GE:
 	case BINARY_OP_LE:
-		return relational_eval(expr, state);
 	case BINARY_OP_EQ:
 	case BINARY_OP_NE:
-		return equality_eval(expr, state);
+		return relational_eval(expr, state);
 	default:
 		assert(false);
 	}
@@ -846,6 +845,10 @@ value_compare(struct value *lhs, enum ast_binary_operator op,
 		struct value *rhs, struct state *s)
 {
 	switch (op) {
+	case BINARY_OP_EQ:
+		return value_eq(lhs, rhs, s);
+	case BINARY_OP_NE:
+		return !value_eq(lhs, rhs, s);
 	case BINARY_OP_LT:
 		return value_lt(lhs, rhs, s);
 	case BINARY_OP_GT:
@@ -855,68 +858,6 @@ value_compare(struct value *lhs, enum ast_binary_operator op,
 	default:
 		assert(false);
 	}
-}
-
-
-
-static struct e_res *
-eq_eval(struct ast_expr *, struct state *);
-
-static struct e_res *
-ne_eval(struct ast_expr *, struct state *);
-
-static struct e_res *
-equality_eval(struct ast_expr *expr, struct state *state)
-{
-	switch (ast_expr_binary_op(expr)) {
-	case BINARY_OP_EQ:
-		return eq_eval(expr, state);
-	case BINARY_OP_NE:
-		return ne_eval(expr, state);
-	default:
-		assert(false);
-	}
-}
-
-static struct e_res *
-eq_eval(struct ast_expr *expr, struct state *state)
-{
-	struct e_res *res1 = ast_expr_eval(ast_expr_binary_e1(expr), state),
-		     *res2 = ast_expr_eval(ast_expr_binary_e2(expr), state);
-	if (e_res_iserror(res1)) {
-		return res1;
-	}
-	if (e_res_iserror(res2)) {
-		return res2;
-	}
-	struct bool_res *res = value_equal(
-		value_res_as_value(eval_to_value(e_res_as_eval(res1), state)),
-		value_res_as_value(eval_to_value(e_res_as_eval(res2), state)),
-		state
-	);
-	if (bool_res_iserror(res)) {
-		return e_res_error_create(bool_res_as_error(res));
-	}
-	return e_res_eval_create(
-		eval_rval_create(
-			ast_type_create_int(),
-			value_int_create(bool_res_as_bool(res))
-		)
-	);
-}
-
-static struct e_res *
-ne_eval(struct ast_expr *expr, struct state *state)
-{
-	struct e_res *res = eq_eval(expr, state);
-	if (e_res_iserror(res)) {
-		return res;
-	}
-	struct value *inv = value_int_create(
-		!value_as_constant(eval_as_rval(e_res_as_eval(res)))
-	);
-	e_res_destroy(res);
-	return e_res_eval_create(eval_rval_create(ast_type_create_int(), inv));
 }
 
 
