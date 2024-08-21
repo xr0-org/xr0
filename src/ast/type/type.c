@@ -176,6 +176,9 @@ ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range
 		);
 	case TYPE_STRUCT:
 		return value_struct_rconstnokey_create(t, s, persist);
+	case TYPE_RANGE:
+		assert(range);
+		return value_int_rconst_create(range);
 	default:
 		assert(false);
 	}

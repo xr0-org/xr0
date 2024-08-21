@@ -163,7 +163,13 @@ bool
 ast_expr_isverifiable(struct ast_expr *);
 
 struct ast_expr *
+ast_expr_range_createnokey(struct ast_expr *lw, struct ast_expr *up);
+
+struct ast_expr *
 ast_expr_range_create(char *key, struct ast_expr *lw, struct ast_expr *up);
+
+int
+ast_expr_range_haskey(struct ast_expr *);
 
 char *
 ast_expr_range_key(struct ast_expr *);
