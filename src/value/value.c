@@ -1010,14 +1010,15 @@ value_lt(struct value *lhs, struct value *rhs, struct state *s)
 			    *c = value_lw(rhs, s),
 			    *d = value_up(rhs, s);
 
-	if (number_value_le(b, c)) {
+	if (number_value_le(b, c)) { /* b ≤ c ==> lhs < rhs */
 		return 1;
-	} else if (number_value_ge(d, a)) {
-		return 0;
-	}
-
-	/* our assumption is that if there is overlap it is perfect */
-	assert(number_value_eq(a, c) && number_value_eq(b, d));
+	} 
+	assert(
+		number_value_ge(a, d) /* rhs < lhs */
+		/* our assumption is that if there is overlap it is perfect */
+		|| samerconst(lhs, rhs)
+		|| (number_value_eq(a, c) && number_value_eq(b, d))
+	);
 	return 0;
 }
 

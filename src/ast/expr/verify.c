@@ -854,7 +854,9 @@ value_compare(struct value *lhs, enum ast_binary_operator op,
 	case BINARY_OP_GT:
 		return value_lt(rhs, lhs, s);
 	case BINARY_OP_GE:
+		return value_eq(lhs, rhs, s) || value_lt(rhs, lhs, s);
 	case BINARY_OP_LE:
+		return value_eq(lhs, rhs, s) || value_lt(lhs, rhs, s);
 	default:
 		assert(false);
 	}
@@ -1244,12 +1246,12 @@ unary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block
 }
 
 static struct ast_expr *
-binary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+binary_geninstr(struct ast_expr *e, struct lexememarker *loc, struct ast_block *b,
 		struct state *s)
 {
-	struct ast_expr *gen_e1 = ast_expr_geninstr(ast_expr_binary_e1(expr), loc, b, s),
-			*gen_e2 = ast_expr_geninstr(ast_expr_binary_e2(expr), loc, b, s);
-	return ast_expr_binary_create(gen_e1, ast_expr_binary_op(expr), gen_e2);
+	struct ast_expr *e1 = ast_expr_geninstr(ast_expr_binary_e1(e), loc, b, s),
+			*e2 = ast_expr_geninstr(ast_expr_binary_e2(e), loc, b, s);
+	return ast_expr_binary_create(e1, ast_expr_binary_op(e), e2);
 }
 
 static struct ast_expr *

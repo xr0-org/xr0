@@ -16,9 +16,12 @@ main()
 	a[3] = 7;
 
 	i = index();
-	if (i < 0 || i > 3) {
-		return -1;
+	if (i < 0) {
+		return 0;
+	}
+	if (i > 3) {
+		return 0;
 	}
 	res = a[i];
-	~ [ res == a[[0?4]]; ] 
+	~ [ res == a[i]; ] 
 }

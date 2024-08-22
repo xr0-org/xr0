@@ -356,7 +356,7 @@ path_copywithsplit(struct path *old, struct map *split)
 		if (!state_split(p->actual, split)) {
 			p->path_state = PATH_STATE_ATEND;
 		}
-		state_split(p->abstract, split);
+		state_setrconsts(p->abstract, p->actual);
 		break;
 	default:
 		assert(false);
