@@ -4,11 +4,12 @@
 #include <string.h>
 #include "ast.h"
 #include "block.h"
-#include "stack.h"
 #include "heap.h"
-#include "state.h"
 #include "location.h"
 #include "object.h"
+#include "path.h"
+#include "stack.h"
+#include "state.h"
 #include "util.h"
 #include "value.h"
 
@@ -123,7 +124,9 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 			map_set(m, tag, number_single_create(i));
 			splitinstruct_append(splits, m);
 		}
-		return object_res_error_create(error_undecideable_cond(splits));
+		return object_res_error_create(
+			error_pathinstruct(pathinstruct_split(splits))
+		);
 	}
 
 	offset = ast_expr_constant_create(value_as_constant(range));

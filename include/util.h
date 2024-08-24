@@ -132,16 +132,16 @@ struct error;
 struct error *
 error_printf(char *fmt, ...);
 
-struct splitinstruct;
+struct pathinstruct;
 
 struct error *
-error_undecideable_cond(struct splitinstruct *);
+error_pathinstruct(struct pathinstruct *);
 
 struct error *
-error_to_undecideable_cond(struct error *);
+error_to_pathinstruct(struct error *);
 
-struct splitinstruct *
-error_get_splitinstruct(struct error *);
+struct pathinstruct *
+error_get_pathinstruct(struct error *);
 
 struct error *
 error_return();

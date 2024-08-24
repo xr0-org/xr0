@@ -45,4 +45,11 @@ path_lexememarker(struct path *);
 int
 path_frameid(struct path *);
 
+struct splitinstruct;
+struct pathinstruct;
+
+struct pathinstruct *
+pathinstruct_split(struct splitinstruct *);
+
+
 #endif

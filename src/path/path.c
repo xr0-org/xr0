@@ -340,18 +340,18 @@ static struct error *
 progressact(struct path *, progressor *);
 
 static void
-path_split(struct path *p, struct splitinstruct *);
+pathinstruct_do(struct pathinstruct *, struct path *);
 
 static struct error *
 progress(struct path *p, progressor *prog)
 {
 	struct error *err = progressact(p, prog);
 	if (err) {
-		struct error *uc_err = error_to_undecideable_cond(err);
-		if (!uc_err) {
+		struct error *inst_err = error_to_pathinstruct(err);
+		if (!inst_err) {
 			return err;
 		}
-		path_split(p, error_get_splitinstruct(uc_err));
+		pathinstruct_do(error_get_pathinstruct(inst_err), p);
 	}
 	return NULL;
 }
@@ -616,4 +616,36 @@ path_split_lexememarker(struct path *p)
 {
 	struct path *branch = p->paths->paths[p->branch_index];
 	return path_lexememarker(branch);
+}
+
+
+struct pathinstruct {
+	enum pathinstruct_type {
+		PATHINSTRUCT_SPLIT,
+	} type;
+	union {
+		struct splitinstruct *split;
+	};
+};
+
+struct pathinstruct *
+pathinstruct_split(struct splitinstruct *s)
+{
+	struct pathinstruct *inst = malloc(sizeof(struct pathinstruct));
+	assert(inst);
+	inst->type = PATHINSTRUCT_SPLIT;
+	inst->split = s;
+	return inst;
+}
+
+static void
+pathinstruct_do(struct pathinstruct *inst, struct path *p)
+{
+	switch (inst->type) {
+	case PATHINSTRUCT_SPLIT:
+		path_split(p, inst->split);
+		break;
+	default:
+		assert(false);
+	}
 }

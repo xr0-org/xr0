@@ -377,7 +377,7 @@ v_printf(char *fmt, ...)
 struct error {
 	enum error_type {
 		ERROR_PRINTF,
-		ERROR_UNDECIDEABLE_COND,
+		ERROR_PATHINSTRUCT,
 		ERROR_RETURN,
 
 		ERROR_BLOCK_OBSERVE_NOOBJ,
@@ -391,7 +391,7 @@ struct error {
 	} type;
 	union error_contents {
 		char *printf;
-		struct splitinstruct *split;
+		struct pathinstruct *inst;
 	} contents;
 	struct error *inner;
 };
@@ -482,25 +482,25 @@ findnextfmt(char **p)
 }
 
 struct error *
-error_undecideable_cond(struct splitinstruct *split)
+error_pathinstruct(struct pathinstruct *inst)
 {
 	struct error *err = calloc(1, sizeof(struct error));
-	err->type = ERROR_UNDECIDEABLE_COND;
-	err->contents.split = split;
+	err->type = ERROR_PATHINSTRUCT;
+	err->contents.inst = inst;
 	return err;
 }
 
 struct error *
-error_to_undecideable_cond(struct error *err)
+error_to_pathinstruct(struct error *err)
 {
-	return error_to(err, ERROR_UNDECIDEABLE_COND);
+	return error_to(err, ERROR_PATHINSTRUCT);
 }
 
-struct splitinstruct *
-error_get_splitinstruct(struct error *err)
+struct pathinstruct *
+error_get_pathinstruct(struct error *err)
 {
-	assert(err->type == ERROR_UNDECIDEABLE_COND);
-	return err->contents.split;
+	assert(err->type == ERROR_PATHINSTRUCT);
+	return err->contents.inst;
 }
 
 struct error *
@@ -591,7 +591,7 @@ char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
-		[ERROR_UNDECIDEABLE_COND]	= "undecideable condition",
+		[ERROR_PATHINSTRUCT]		= "path instruction",
 		[ERROR_RETURN]			= "returned",
 
 		[ERROR_BLOCK_OBSERVE_NOOBJ]	= "block_observe no object",
@@ -607,7 +607,7 @@ error_str(struct error *err)
 	switch (err->type) {
 	case ERROR_PRINTF:
 		return dynamic_str(err->contents.printf);
-	case ERROR_UNDECIDEABLE_COND:
+	case ERROR_PATHINSTRUCT:
 	case ERROR_RETURN:
 	case ERROR_BLOCK_OBSERVE_NOOBJ:
 	case ERROR_STATE_GET_NOBLOCK:
