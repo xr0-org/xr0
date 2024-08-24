@@ -747,6 +747,10 @@ struct error *
 ast_function_verify(struct ast_function *, struct externals *);
 
 struct error *
+ast_function_setupverify(struct ast_function *f, struct state *param_state,
+		struct state *arg_state);
+
+struct error *
 ast_function_debug(struct ast_function *, struct externals *);
 
 struct error *

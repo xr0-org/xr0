@@ -17,6 +17,7 @@
 #include "stmt/stmt.h"
 #include "stmt/stmt.h"
 #include "type/type.h"
+#include "value.h"
 #include "util.h"
 
 struct ast_function {
@@ -399,6 +400,81 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 	}
 
 	map_set(g, dynamic_str(fname), val);
+}
+
+static struct error *
+verify_paramspec(struct value *param, struct value *arg,
+		struct state *param_state, struct state *arg_state);
+
+struct error *
+ast_function_setupverify(struct ast_function *f, struct state *param_state,
+		struct state *arg_state)
+{
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **param = ast_function_params(f);
+	for (int i = 0; i < nparams; i++) {
+		char *id = ast_variable_name(param[i]);
+		struct value *param = value_ptr_create(
+			location_copy(loc_res_as_loc(state_getloc(param_state, id)))
+		);
+		struct value *arg = value_ptr_create(
+			location_copy(loc_res_as_loc(state_getloc(arg_state, id)))
+		);
+		struct error *err = verify_paramspec(
+			param, arg, param_state, arg_state
+		);
+		value_destroy(arg);
+		value_destroy(param);
+		if (err) {
+			return error_printf(
+				"parameter `%s' of `%s' %w",
+				id, ast_function_name(f), err
+			);
+		}
+	}
+	return NULL;
+}
+
+static struct error *
+verify_paramspec(struct value *param, struct value *arg,
+		struct state *param_state, struct state *arg_state)
+{
+	if (!state_islval(param_state, param)) {
+		return NULL;
+	}
+	if (!state_islval(arg_state, arg)) {
+		return error_printf("must be lvalue");
+	}
+	if (state_isalloc(param_state, param) && !state_isalloc(arg_state, arg)) {
+		return error_printf("must be heap allocated");
+	}
+	struct object_res *param_res = state_get(
+		param_state, value_as_location(param), false
+	);
+	if (object_res_iserror(param_res)) {
+		return object_res_as_error(param_res);
+	}
+	struct object_res *arg_res = state_get(
+		arg_state, value_as_location(arg), false
+	);
+	if (object_res_iserror(arg_res)) {
+		return object_res_as_error(arg_res);
+	}
+	assert(object_res_hasobject(param_res));
+	assert(object_res_hasobject(arg_res));
+	struct object *param_obj = object_res_as_object(param_res),
+		      *arg_obj = object_res_as_object(arg_res);
+	if (!object_hasvalue(param_obj)) {
+		return NULL; /* spec makes no claim about param */
+	}
+	if (!object_hasvalue(arg_obj)) {
+		return error_printf("must be rvalue");
+	}
+	return verify_paramspec(
+		object_as_value(param_obj),
+		object_as_value(arg_obj),
+		param_state, arg_state
+	);
 }
 
 #include "arr.c"

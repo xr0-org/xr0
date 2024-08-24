@@ -10,10 +10,11 @@
 #include "intern.h"
 #include "math.h"
 #include "object.h"
+#include "path.h"
 #include "state.h"
+#include "type/type.h"
 #include "util.h"
 #include "value.h"
-#include "type/type.h"
 
 struct bool_res *
 ast_expr_decide(struct ast_expr *expr, struct state *s)
@@ -354,9 +355,6 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 
 /* expr_call_eval */
 
-static struct error *
-call_setupverify(struct ast_function *, struct ast_expr *, struct state *state);
-
 static struct e_res *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
@@ -408,124 +406,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return e_res_error_create(err);
 	}
 
-	/* XXX: pass copy so we don't observe */
-	if ((err = call_setupverify(f, ast_expr_copy(expr), state))) {
-		return e_res_error_create(
-			error_printf("precondition failure: %w", err)
-		);
-	}
-
-	return e_res_error_create(error_eval_void());
-}
-
-static struct error *
-verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
-		struct state *arg_state);
-
-static struct error *
-call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *arg_state)
-{
-	struct error *err;
-
-	char *fname = ast_function_name(f);
-	struct frame *frame = frame_call_create(
-		fname,
-		ast_function_abstract(f),
-		ast_function_type(f),
-		EXEC_ABSTRACT_NO_SETUP,
-		ast_expr_copy(call),
-		f
-	);
-	struct state *param_state = state_create(frame, state_getext(arg_state));
-	if ((err = ast_function_initparams(f, param_state))) {
-		return err;
-	}
-	struct ast_block_res *mod_abs_res = ast_block_setupmodulate(
-		ast_function_abstract(f), arg_state
-	);
-	if (ast_block_res_iserror(mod_abs_res)) {
-		return ast_block_res_as_error(mod_abs_res);
-	}
-	struct frame *setupframe = frame_setup_create(
-		"setup",
-		ast_block_res_as_block(mod_abs_res),
-		EXEC_ABSTRACT_SETUP_ONLY
-	);
-	state_pushframe(param_state, setupframe);
-	while (!state_atsetupend(param_state)) {
-		err = state_step(param_state);
-		if (err) {
-			printf("%s\n", state_str(param_state));
-			printf("err: %s\n", error_str(err));
-		}
-		assert(!err);
-	}
-	assert(!state_atend(param_state));
-	state_popframe(param_state);
-
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **param = ast_function_params(f);
-
-	for (int i = 0; i < nparams; i++) {
-		char *id = ast_variable_name(param[i]);
-		struct value *param = value_ptr_create(
-			location_copy(loc_res_as_loc(state_getloc(param_state, id)))
-		);
-		struct value *arg = value_ptr_create(
-			location_copy(loc_res_as_loc(state_getloc(arg_state, id)))
-		);
-		err = verify_paramspec(param, arg, param_state, arg_state);
-		value_destroy(arg);
-		value_destroy(param);
-		if (err) {
-			return error_printf(
-				"parameter `%s' of `%s' %w", id, fname, err
-			);
-		}
-	}
-	return NULL;
-}
-
-static struct error *
-verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
-		struct state *arg_state)
-{
-	if (!state_islval(param_state, param)) {
-		return NULL;
-	}
-	if (!state_islval(arg_state, arg)) {
-		return error_printf("must be lvalue");
-	}
-	if (state_isalloc(param_state, param) && !state_isalloc(arg_state, arg)) {
-		return error_printf("must be heap allocated");
-	}
-	struct object_res *param_res = state_get(
-		param_state, value_as_location(param), false
-	);
-	if (object_res_iserror(param_res)) {
-		return object_res_as_error(param_res);
-	}
-	struct object_res *arg_res = state_get(
-		arg_state, value_as_location(arg), false
-	);
-	if (object_res_iserror(arg_res)) {
-		return object_res_as_error(arg_res);
-	}
-	assert(object_res_hasobject(param_res));
-	assert(object_res_hasobject(arg_res));
-	struct object *param_obj = object_res_as_object(param_res),
-		      *arg_obj = object_res_as_object(arg_res);
-	if (!object_hasvalue(param_obj)) {
-		return NULL; /* spec makes no claim about param */
-	}
-	if (!object_hasvalue(arg_obj)) {
-		return error_printf("must be rvalue");
-	}
-	return verify_paramspec(
-		object_as_value(param_obj),
-		object_as_value(arg_obj),
-		param_state, arg_state
-	);
+	return e_res_error_create(error_pathinstruct(pathinstruct_call(expr)));
 }
 
 static struct ast_type *
@@ -1030,14 +911,7 @@ call_absexec(struct ast_expr *expr, struct state *state)
 		return e_res_error_create(err);
 	}
 
-	/* XXX: pass copy so we don't observe */
-	if ((err = call_setupverify(f, ast_expr_copy(expr), state))) {
-		return e_res_error_create(
-			error_printf("precondition failure: %w", err)
-		);
-	}
-
-	return e_res_empty_create();
+	return e_res_error_create(error_pathinstruct(pathinstruct_call(expr)));
 }
 
 static int

@@ -51,5 +51,9 @@ struct pathinstruct;
 struct pathinstruct *
 pathinstruct_split(struct splitinstruct *);
 
+struct ast_expr;
+
+struct pathinstruct *
+pathinstruct_call(struct ast_expr *);
 
 #endif

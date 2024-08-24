@@ -3,25 +3,48 @@
 #include <assert.h>
 
 #include "ast.h"
+#include "ext.h"
 #include "lex.h"
 #include "object.h"
 #include "state.h"
 #include "path.h"
 #include "value.h"
 
+struct path_arr;
+
+static struct path_arr *
+path_arr_create();
+
+static void
+path_arr_destroy(struct path_arr *);
+
+static int
+path_arr_n(struct path_arr *);
+
+static struct path **
+path_arr_paths(struct path_arr *);
+
+static int
+path_arr_append(struct path_arr *, struct path *);
+
+static bool
+path_arr_atend(struct path_arr *);
+
 struct path {
 	enum path_state {
 		PATH_STATE_UNINIT,
 		PATH_STATE_SETUPABSTRACT,
 		PATH_STATE_ABSTRACT,
+		PATH_STATE_ABSTRACTCALL,
 		PATH_STATE_HALFWAY,
 		PATH_STATE_SETUPACTUAL,
 		PATH_STATE_ACTUAL,
+		PATH_STATE_ACTUALCALL,
 		PATH_STATE_AUDIT,
 		PATH_STATE_SPLIT,
 		PATH_STATE_ATEND,
 	} path_state;
-	struct state *abstract, *actual;
+	struct state *abstract, *actual, *param_state;
 	
 	int branch_index;
 	struct path_arr *paths;
@@ -29,50 +52,6 @@ struct path {
 	struct ast_function *f;
 	struct externals *ext;
 };
-
-struct path_arr {
-	int n;
-	struct path **paths;
-};
-
-static struct path_arr *
-path_arr_create()
-{
-	struct path_arr *arr = calloc(1, sizeof(struct path_arr));
-	assert(arr);
-	return arr;
-}
-
-static void
-path_arr_destroy(struct path_arr *arr)
-{
-	for (int i = 0; i < arr->n; i++) {
-		path_destroy(arr->paths[i]);
-	}
-	free(arr->paths);
-	free(arr);
-}
-
-static int
-path_arr_append(struct path_arr *arr, struct path *p)
-{
-	arr->paths = realloc(arr->paths, sizeof(struct path_arr) * ++arr->n);
-	assert(arr->paths);
-	int loc = arr->n-1;
-	arr->paths[loc] = p;
-	return loc;
-}
-
-static bool
-path_arr_atend(struct path_arr *arr)
-{
-	for (int i = 0; i < arr->n; i++) {
-		if (!path_atend(arr->paths[i])) {
-			return false;	
-		}
-	}
-	return true;
-}
 
 struct path *
 path_create(struct ast_function *f, struct externals *ext)
@@ -82,6 +61,9 @@ path_create(struct ast_function *f, struct externals *ext)
 	p->ext = ext;
 	p->paths = path_arr_create();
 	p->path_state = PATH_STATE_UNINIT;
+	p->abstract = NULL;
+	p->actual = NULL;
+	p->param_state = NULL;
 	return p;
 }
 
@@ -121,12 +103,14 @@ path_str(struct path *p)
 	case PATH_STATE_SETUPABSTRACT:
 		return path_setupabstract_str(p);
 	case PATH_STATE_ABSTRACT:
+	case PATH_STATE_ABSTRACTCALL:
 		return path_abstract_str(p);
 	case PATH_STATE_HALFWAY:
 		return dynamic_str("path init actual state");
 	case PATH_STATE_SETUPACTUAL:
 		return path_setupactual_str(p);
 	case PATH_STATE_ACTUAL:
+	case PATH_STATE_ACTUALCALL:
 		return path_actual_str(p);
 	case PATH_STATE_AUDIT:
 		return dynamic_str("path audit");
@@ -143,7 +127,10 @@ char *
 path_abstract_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "phase:\tABSTRACT\n\n");
+	strbuilder_printf(
+		b, "phase:\tABSTRACT\n\n",
+		p->path_state == PATH_STATE_ABSTRACTCALL ? " (CALL)" : ""
+	);
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->abstract));
 	strbuilder_printf(b, "%s\n", state_str(p->abstract));
 	return strbuilder_build(b);
@@ -153,7 +140,10 @@ char *
 path_actual_str(struct path *p)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "phase:\tACTUAL\n\n");
+	strbuilder_printf(
+		b, "phase:\tACTUAL%s\n\n",
+		p->path_state == PATH_STATE_ACTUALCALL ? " (CALL)" : ""
+	);
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
 	strbuilder_printf(b, "%s\n", state_str(p->actual));
 	return strbuilder_build(b);
@@ -182,16 +172,17 @@ path_setupactual_str(struct path *p)
 char *
 path_split_str(struct path *p)
 {
-	struct path *branch = p->paths->paths[p->branch_index];
+	struct path *branch = path_arr_paths(p->paths)[p->branch_index];
 	return path_str(branch);
 }
 
 static void
 path_nextbranch(struct path *p)
 {
-	assert(p->paths->n >= 2);
+	int n = path_arr_n(p->paths);
+	assert(n >= 2);
 	int index = p->branch_index;
-	if (index < p->paths->n - 1) {
+	if (index < n) {
 		p->branch_index++;	
 	}
 }
@@ -248,8 +239,10 @@ path_progress(struct path *p, progressor *prog)
 		return path_audit(p);
 	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
+	case PATH_STATE_ABSTRACTCALL:
 	case PATH_STATE_SETUPACTUAL:
 	case PATH_STATE_ACTUAL:
+	case PATH_STATE_ACTUALCALL:
 	case PATH_STATE_SPLIT:
 		return progress(p, prog);
 	case PATH_STATE_ATEND:
@@ -339,7 +332,7 @@ path_audit(struct path *p)
 static struct error *
 progressact(struct path *, progressor *);
 
-static void
+static struct error *
 pathinstruct_do(struct pathinstruct *, struct path *);
 
 static struct error *
@@ -351,7 +344,7 @@ progress(struct path *p, progressor *prog)
 		if (!inst_err) {
 			return err;
 		}
-		pathinstruct_do(error_get_pathinstruct(inst_err), p);
+		return pathinstruct_do(error_get_pathinstruct(inst_err), p);
 	}
 	return NULL;
 }
@@ -363,10 +356,16 @@ static struct error *
 path_progress_abstract(struct path *p, progressor *);
 
 static struct error *
+path_progress_abstractcall(struct path *p, progressor *);
+
+static struct error *
 path_progress_setupactual(struct path *p, progressor *);
 
 static struct error *
 path_progress_actual(struct path *p, progressor *);
+
+static struct error *
+path_progress_actualcall(struct path *p, progressor *);
 
 static struct error *
 path_progress_split(struct path *p, progressor *);
@@ -379,10 +378,14 @@ progressact(struct path *p, progressor *prog)
 		return path_progress_setupabstract(p, prog);
 	case PATH_STATE_ABSTRACT:
 		return path_progress_abstract(p, prog);
+	case PATH_STATE_ABSTRACTCALL:
+		return path_progress_abstractcall(p, prog);
 	case PATH_STATE_SETUPACTUAL:
 		return path_progress_setupactual(p, prog);
 	case PATH_STATE_ACTUAL:
 		return path_progress_actual(p, prog);
+	case PATH_STATE_ACTUALCALL:
+		return path_progress_actualcall(p, prog);
 	case PATH_STATE_SPLIT:
 		return path_progress_split(p, prog);
 	default:
@@ -424,6 +427,16 @@ path_progress_abstract(struct path *p, progressor *prog)
 }
 
 static struct error *
+path_progress_abstractcall(struct path *p, progressor *prog)
+{	
+	if (state_atend(p->abstract)) {
+		p->path_state = PATH_STATE_ABSTRACT;
+		return NULL;
+	}
+	return progressortrace(p->abstract, prog);
+}
+
+static struct error *
 path_progress_setupactual(struct path *p, progressor *prog)
 {
 	if (state_atsetupend(p->actual)) {
@@ -444,6 +457,16 @@ path_progress_actual(struct path *p, progressor *prog)
 }
 
 static struct error *
+path_progress_actualcall(struct path *p, progressor *prog)
+{	
+	if (state_atend(p->actual)) {
+		p->path_state = PATH_STATE_ACTUAL;
+		return NULL;
+	}
+	return progressortrace(p->actual, prog);
+}
+
+static struct error *
 branch_progress(struct path *, struct path *, progressor *);
 
 static struct error *
@@ -452,7 +475,7 @@ path_progress_split(struct path *p, progressor *prog)
 	/* path_atend holds this invariant whenever this function is called */ 
 	assert(!path_arr_atend(p->paths));
 	return branch_progress(
-		p, p->paths->paths[p->branch_index], prog
+		p, path_arr_paths(p->paths)[p->branch_index], prog
 	);
 }
 
@@ -465,7 +488,6 @@ branch_progress(struct path *parent, struct path *branch, progressor *prog)
 	}
 	return path_progress(branch, prog);
 }
-
 
 /* path_split */
 
@@ -483,6 +505,7 @@ path_split(struct path *p, struct splitinstruct *inst)
 	/* TODO: destroy abstract and actual */
 	p->abstract = NULL;
 	p->actual = NULL;
+	p->param_state = NULL;
 	p->path_state = PATH_STATE_SPLIT;
 }
 
@@ -555,6 +578,95 @@ split_name(char *name, struct map *split)
 	return strbuilder_build(b);
 }
 
+static struct error *
+path_initcallabstract(struct path *, struct ast_expr *);
+
+static struct error *
+path_initcallactual(struct path *, struct ast_expr *);
+
+static struct error *
+path_initcall(struct path *p, struct ast_expr *call)
+{
+	switch (p->path_state) {
+	case PATH_STATE_ABSTRACT:
+		return path_initcallabstract(p, call);
+	case PATH_STATE_ACTUAL:
+		return path_initcallactual(p, call);
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+path_initcallabstract(struct path *p, struct ast_expr *call)
+{
+	struct error *err;
+
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(ast_expr_call_root(call));
+	struct ast_function *f = externals_getfunc(
+		state_getext(p->abstract), name
+	);
+	assert(f);
+
+	struct frame *frame = frame_call_create(
+		name,
+		ast_function_abstract(f),
+		ast_function_type(f),
+		EXEC_ABSTRACT_NO_SETUP,
+		ast_expr_copy(call),
+		f
+	);
+	p->param_state = state_create(frame, state_getext(p->abstract));
+	if ((err = ast_function_initparams(f, p->param_state))) {
+		return err;
+	}
+	struct frame *setupframe = frame_setup_create(
+		"setup",
+		ast_function_abstract(f),
+		EXEC_ABSTRACT_SETUP_ONLY
+	);
+	state_pushframe(p->param_state, setupframe);
+	p->path_state = PATH_STATE_ABSTRACTCALL;
+	return NULL;
+}
+
+static struct error *
+path_initcallactual(struct path *p, struct ast_expr *call)
+{
+	struct error *err;
+
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(ast_expr_call_root(call));
+	struct ast_function *f = externals_getfunc(
+		state_getext(p->actual), name
+	);
+	assert(f);
+
+	struct frame *frame = frame_call_create(
+		name,
+		ast_function_abstract(f),
+		ast_function_type(f),
+		EXEC_ABSTRACT_NO_SETUP,
+		ast_expr_copy(call),
+		f
+	);
+	p->param_state = state_create(frame, state_getext(p->actual));
+	if ((err = ast_function_initparams(f, p->param_state))) {
+		assert(false);
+		return err;
+	}
+	struct frame *setupframe = frame_setup_create(
+		"setup",
+		ast_function_abstract(f),
+		EXEC_ABSTRACT_SETUP_ONLY
+	);
+	state_pushframe(p->param_state, setupframe);
+	p->path_state = PATH_STATE_ACTUALCALL;
+	return NULL;
+}
+
+/* path_verify */
 
 static struct error *
 path_split_verify(struct path *, struct ast_expr *);
@@ -582,9 +694,11 @@ path_verify(struct path *p, struct ast_expr *expr)
 static struct error *
 path_split_verify(struct path *p, struct ast_expr *expr)
 {
-	struct path *branch = p->paths->paths[p->branch_index];
+	struct path *branch = path_arr_paths(p->paths)[p->branch_index];
 	return path_verify(branch, expr);
 }
+
+/* path_lexememarker */
 
 static struct lexememarker *
 path_split_lexememarker(struct path *);
@@ -614,37 +728,112 @@ path_lexememarker(struct path *p)
 static struct lexememarker *
 path_split_lexememarker(struct path *p)
 {
-	struct path *branch = p->paths->paths[p->branch_index];
+	struct path *branch = path_arr_paths(p->paths)[p->branch_index];
 	return path_lexememarker(branch);
+}
+
+struct path_arr {
+	int n;
+	struct path **paths;
+};
+
+static struct path_arr *
+path_arr_create()
+{
+	struct path_arr *arr = calloc(1, sizeof(struct path_arr));
+	assert(arr);
+	return arr;
+}
+
+static void
+path_arr_destroy(struct path_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		path_destroy(arr->paths[i]);
+	}
+	free(arr->paths);
+	free(arr);
+}
+
+static int
+path_arr_n(struct path_arr *arr)
+{
+	return arr->n;
+}
+
+static struct path **
+path_arr_paths(struct path_arr *arr)
+{
+	return arr->paths;
+}
+
+static int
+path_arr_append(struct path_arr *arr, struct path *p)
+{
+	arr->paths = realloc(arr->paths, sizeof(struct path_arr) * ++arr->n);
+	assert(arr->paths);
+	int loc = arr->n-1;
+	arr->paths[loc] = p;
+	return loc;
+}
+
+static bool
+path_arr_atend(struct path_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		if (!path_atend(arr->paths[i])) {
+			return false;	
+		}
+	}
+	return true;
 }
 
 
 struct pathinstruct {
 	enum pathinstruct_type {
 		PATHINSTRUCT_SPLIT,
+		PATHINSTRUCT_CALL,
 	} type;
 	union {
 		struct splitinstruct *split;
+		struct ast_expr *call;
 	};
 };
+
+static struct pathinstruct *
+pathinstruct_create(enum pathinstruct_type type)
+{
+	struct pathinstruct *inst = malloc(sizeof(struct pathinstruct));
+	assert(inst);
+	inst->type = type;
+	return inst;
+}
 
 struct pathinstruct *
 pathinstruct_split(struct splitinstruct *s)
 {
-	struct pathinstruct *inst = malloc(sizeof(struct pathinstruct));
-	assert(inst);
-	inst->type = PATHINSTRUCT_SPLIT;
+	struct pathinstruct *inst = pathinstruct_create(PATHINSTRUCT_SPLIT);
 	inst->split = s;
 	return inst;
 }
 
-static void
+struct pathinstruct *
+pathinstruct_call(struct ast_expr *call)
+{
+	struct pathinstruct *inst = pathinstruct_create(PATHINSTRUCT_CALL);
+	inst->call = call;
+	return inst;
+}
+
+static struct error *
 pathinstruct_do(struct pathinstruct *inst, struct path *p)
 {
 	switch (inst->type) {
 	case PATHINSTRUCT_SPLIT:
 		path_split(p, inst->split);
-		break;
+		return NULL;
+	case PATHINSTRUCT_CALL:
+		return path_initcall(p, inst->call);
 	default:
 		assert(false);
 	}
