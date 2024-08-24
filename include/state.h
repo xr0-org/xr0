@@ -204,6 +204,12 @@ state_return(struct state *);
 struct ast_expr *
 state_framecall(struct state *);
 
+/* state_argmodulator: return a string that is unique down to the values of the
+ * arguments for the call in the nearest call frame. return an empty string if
+ * the nearest call frame is the base frame. */
+char *
+state_argmodulator(struct state *);
+
 bool
 state_returnreferences(struct state *, struct location *);
 

@@ -26,6 +26,11 @@ stack_return(struct stack *);
 struct ast_expr *
 stack_framecall(struct stack *);
 
+struct externals;
+
+char *
+stack_argmodulator(struct stack *, struct state *);
+
 struct location *
 stack_newblock(struct stack *, int size);
 

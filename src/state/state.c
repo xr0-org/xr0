@@ -350,6 +350,13 @@ state_framecall(struct state *s)
 	return stack_framecall(s->stack);
 }
 
+char *
+state_argmodulator(struct state *s)
+{
+	return stack_argmodulator(s->stack, s);
+}
+
+
 static struct location *
 allocstatic(char *lit, struct state *);
 

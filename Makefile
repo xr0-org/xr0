@@ -231,5 +231,8 @@ check-verbose: $(RUNTEST) $(TESTFILES) $(XR0V)
 	$(VALGRIND) --num-callers=30 \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
+debug: $(RUNTEST) $(TESTFILES) $(XR0V)
+	$(VALGRIND) $(XR0V) -d -I libx $(filter-out $@,$(MAKECMDGOALS))
+
 clean:
 	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(OBJECTS) $(XR0_OBJECTS)

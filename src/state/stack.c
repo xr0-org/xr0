@@ -125,6 +125,60 @@ stack_framecall(struct stack *s)
 	return NULL;
 }
 
+static char *
+argmodulator(struct stack *, struct state *);
+
+char *
+stack_argmodulator(struct stack *stack, struct state *state)
+{
+	if (!stack->prev) {
+		/* base frame */
+		assert(stack->kind == FRAME_CALL);
+		return dynamic_str("");
+	}
+	switch (stack->kind) {
+	case FRAME_CALL:
+		assert(stack->call);
+		return argmodulator(stack, state);
+	case FRAME_NESTED:
+	case FRAME_INTERMEDIATE:
+	case FRAME_SETUP:
+		assert(stack->prev);
+		return stack_argmodulator(stack->prev, state);
+	default:
+		assert(false);
+	}
+}
+
+static char *
+argmodulator(struct stack *stack, struct state *state)
+{
+	struct string_arr *arr = string_arr_create();
+	struct map *m = stack->varmap;
+	for (int i = 0; i < m->n; i++) {
+		struct variable *v = (struct variable *) m->entry[i].value;
+		if (!variable_isparam(v)) {
+			continue;
+		}
+		struct location *loc = variable_location(v);
+		assert(loc);
+		string_arr_append(
+			arr,
+			value_str(
+				object_as_value(
+					object_res_as_object(
+						state_get(state, loc, false)
+					)
+				)
+			)
+		);
+	}
+	char *ret = string_arr_str(arr);
+	string_arr_destroy(arr);
+	return ret;
+}
+
+
 void
 stack_destroy(struct stack *stack)
 {

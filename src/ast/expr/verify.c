@@ -862,6 +862,8 @@ value_compare(struct value *lhs, enum ast_binary_operator op,
 	}
 }
 
+static char *
+modulatedkey(struct ast_expr *, struct state *);
 
 static struct e_res *
 range_eval(struct ast_expr *expr, struct state *state)
@@ -875,12 +877,23 @@ range_eval(struct ast_expr *expr, struct state *state)
 				/* XXX: we will investigate type conversions later */
 				ast_type_create_range(),
 				expr,
-				ast_expr_range_key(expr),
+				modulatedkey(expr, state),
 				false
 			)
 		)
 	);
 }
+
+static char *
+modulatedkey(struct ast_expr *e, struct state *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	char *mod = state_argmodulator(s);
+	strbuilder_printf(b, "%s:{%s}", ast_expr_range_key(e), mod);
+	free(mod);
+	return strbuilder_build(b);
+}
+
 
 static struct object *
 hack_object_from_assertion(struct ast_expr *, struct state *);
