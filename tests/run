@@ -4,14 +4,16 @@ start=$(date +"%s")
 
 ntests=0
 npass=0
+nignore=0
 
 expected_suffix="EXPECTED"
 fail_prefix="FAIL"
 topological_folder="topological"
 main_func="main"
 
-pass="\e[32mPASS\e[0m\n"
 fail="\e[31mFAIL\e[0m\n"
+pass="\e[32mPASS\e[0m\n"
+ignore="\e[33mIGNORE\e[0m\n"
 
 XR0=$(pwd)/bin/0v
 libx=$(pwd)/libx
@@ -19,6 +21,13 @@ cd tests
 length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
 	tail -1 | wc -c)
 
+# Read in test cases to ignore
+declare -A ignore_map
+while read -r fname; do
+	ignore_map["$fname"]="true"
+done < "wmw-www"
+
+# Loop through and run tests
 for f in */*.x
 do
 	ntests=$((ntests+1))
@@ -26,6 +35,14 @@ do
 
 	printf "%-${length}s ..." "$f"
 	tempfile=$(mktemp)
+
+	# skip ignores
+	if [[ "${ignore_map[$f]}" == "true" ]]; then
+		printf "$ignore"
+		nignore=$((nignore+1))
+		continue
+	fi
+
 	if [ "$folder" == *"$topological_folder"* ]
 	then
 		if [[ "$f" == *"verification"* ]]
@@ -64,10 +81,10 @@ do
 	rm $tempfile
 done
 
-nfail=$((ntests-npass))
+nfail=$((ntests-(npass+nignore)))
 finish=$(date +"%s")
-printf '\n%d tests:\t%d passed\t%d failed\tin %d seconds\n' \
-	$ntests $npass $nfail $((finish-start))
+printf '\n%d tests:\t%d passed\t%d failed\t%d ignored\tin %d seconds\n' \
+	$ntests $npass $nfail $nignore $((finish-start))
 if [ $nfail -ne 0 ]
 then
 	exit 1

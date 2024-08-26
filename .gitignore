@@ -10,3 +10,4 @@ a.out
 *.output
 *-preproc.[c0]
 tags
+*.temp
