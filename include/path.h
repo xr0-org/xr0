@@ -46,10 +46,22 @@ int
 path_frameid(struct path *);
 
 struct splitinstruct;
+struct ast_expr;
+
 struct pathinstruct;
 
 struct pathinstruct *
 pathinstruct_split(struct splitinstruct *);
 
+struct pathinstruct *
+pathinstruct_call(struct ast_expr *);
+
+/* pathinstruct_shouldadvancepc: whether the program counter should advance when
+ * this instruction is triggered */
+int
+pathinstruct_shouldadvancepc(struct pathinstruct *);
+
+char *
+pathinstruct_str(struct pathinstruct *);
 
 #endif

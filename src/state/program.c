@@ -6,6 +6,7 @@
 #include "breakpoint.h"
 #include "lex.h"
 #include "program.h"
+#include "path.h"
 #include "state.h"
 #include "util.h"
 
@@ -39,12 +40,31 @@ program_setatend(struct program *p)
 	p->s = PROGRAM_COUNTER_ATEND;
 }
 
+/* hack_indexforstore: this hack exists because of the change to use a
+ * pathinstruct error for calls. as a result the moment when the program counter
+ * is incremented is before pushing the new call frame, which means there is an
+ * off-by-one when the location at which this pushing has taken place is noted.
+ * this hack doesn't solve the problem, but just forces the previous location to
+ * be taken, preventing a memory error */
+static int
+hack_indexforstore(struct program *);
+
 void
 program_storeloc(struct program *p)
 {
 	if (ast_block_nstmts(p->b) > 0) {
-		p->loc = ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index]);
+		p->loc = ast_stmt_lexememarker(
+			ast_block_stmts(p->b)[hack_indexforstore(p)]
+		);
 	}
+}
+
+static int
+hack_indexforstore(struct program *p)
+{
+	int nstmts = ast_block_nstmts(p->b);
+	assert(nstmts > 0);
+	return p->index == nstmts ? p->index - 1 : p->index;
 }
 
 static enum program_state
@@ -155,26 +175,56 @@ program_step(struct program *p, struct state *s)
 }
 
 static struct error *
-program_stmt_process(struct program *p, struct state *s);
+step(struct program *, struct state *);
 
 static struct error *
 program_stmt_step(struct program *p, struct state *s)
 {
-	struct error *err = program_stmt_process(p, s);
-	if (!err) {
-		program_nextstmt(p, s);
-		return NULL;
+	struct error *err = step(p, s);
+	if (err) {
+		struct error *return_err = error_to_return(err);
+		if (return_err) {
+			state_return(s);
+			return NULL;
+		}
+		return err;
 	}
-	struct error *return_err = error_to_return(err);
-	if (return_err) {
-		state_return(s);
-		return NULL;
+	return NULL;
+}
+
+static struct error *
+stepact(struct program *, struct state *);
+
+static int
+shouldadvancepc(struct error *err);
+
+static struct error *
+step(struct program *p, struct state *s)
+{
+	struct error *err = stepact(p, s);
+	if (shouldadvancepc(err)) {
+		program_nextstmt(p, s);
 	}
 	return err;
 }
 
+static int
+shouldadvancepc(struct error *err)
+{
+	if (!err) {
+		return 1;
+	}
+	struct error *p_err = error_to_pathinstruct(err);
+	if (p_err) {
+		return pathinstruct_shouldadvancepc(
+			error_get_pathinstruct(p_err)
+		);
+	}
+	return 0;
+}
+
 static struct error *
-program_stmt_process(struct program *p, struct state *s)
+stepact(struct program *p, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	switch (state_execmode(s)) {

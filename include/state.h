@@ -67,11 +67,11 @@ state_destroy(struct state *state);
 char *
 state_str(struct state *);
 
-bool
-state_atend(struct state *);
+int
+state_atend(struct state *, int base_depth);
 
-bool
-state_atsetupend(struct state *);
+int
+state_atsetupend(struct state *, int base_depth);
 
 struct error *
 state_step(struct state *);

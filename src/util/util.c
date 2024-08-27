@@ -3,9 +3,10 @@
 #include <stdarg.h>
 #include <string.h>
 #include <assert.h>
-#include "util.h"
 #include "ast.h"
 #include "ext.h"
+#include "path.h"
+#include "util.h"
 
 char *
 dynamic_str(const char *s)
@@ -608,6 +609,7 @@ error_str(struct error *err)
 	case ERROR_PRINTF:
 		return dynamic_str(err->contents.printf);
 	case ERROR_PATHINSTRUCT:
+		return pathinstruct_str(err->contents.inst);
 	case ERROR_RETURN:
 	case ERROR_BLOCK_OBSERVE_NOOBJ:
 	case ERROR_STATE_GET_NOBLOCK:

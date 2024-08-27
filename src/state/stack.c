@@ -379,36 +379,39 @@ stack_lexememarker(struct stack *s)
 	return program_lexememarker(s->p);
 }
 
-static bool
-stack_isbase(struct stack *s)
+static int
+stack_isbase(struct stack *s, int base_depth)
 {
-	if (s->id == 0) {
-		assert(s->kind == FRAME_CALL);
-		return true;
+	assert(s->id >= base_depth);
+
+	if (s->id == base_depth) {
+		return 1;
 	}
-	return false;
+	return 0;
 }
 
-static bool
-stack_issetupbase(struct stack *s)
+static int
+stack_issetupbase(struct stack *s, int base_depth)
 {
-	if (s->id == 1) { 
-		assert(s->kind == FRAME_SETUP);
-		return true;
+	int setup_base_depth = base_depth + 1;
+	assert(s->id >= setup_base_depth);
+
+	if (s->id == setup_base_depth) { 
+		return 1;
 	}
-	return false;
+	return 0;
 }
 
-bool
-stack_atend(struct stack *s)
+int
+stack_atend(struct stack *s, int base_depth)
 {
-	return program_atend(s->p) && stack_isbase(s);
+	return program_atend(s->p) && stack_isbase(s, base_depth);
 }
 
-bool
-stack_atsetupend(struct stack *s)
+int
+stack_atsetupend(struct stack *s, int base_depth)
 {
-	return program_atend(s->p) && stack_issetupbase(s);
+	return program_atend(s->p) && stack_issetupbase(s, base_depth);
 }
 
 struct error *

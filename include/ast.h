@@ -58,6 +58,11 @@ ast_expr_call_nargs(struct ast_expr *);
 struct ast_expr **
 ast_expr_call_args(struct ast_expr *);
 
+struct state;
+
+struct error *
+ast_expr_callprepare(struct ast_expr *, struct state *);
+
 struct ast_expr *
 ast_expr_incdec_create(struct ast_expr *, bool inc, bool pre);
 
@@ -748,6 +753,10 @@ ast_function_verify(struct ast_function *, struct externals *);
 
 struct error *
 ast_function_debug(struct ast_function *, struct externals *);
+
+struct error *
+ast_function_setupverify(struct ast_function *, struct state *param_state,
+		struct state *arg_state);
 
 struct error *
 ast_function_ensure_hasabstract(struct ast_function *f, struct externals *ext);

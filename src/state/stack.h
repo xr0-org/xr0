@@ -55,11 +55,11 @@ stack_execmode(struct stack *);
 struct lexememarker *
 stack_lexememarker(struct stack *);
 
-bool
-stack_atend(struct stack *);
+int
+stack_atend(struct stack *, int base_depth);
 
-bool
-stack_atsetupend(struct stack *);
+int
+stack_atsetupend(struct stack *, int base_depth);
 
 int
 stack_id(struct stack *);
@@ -69,9 +69,6 @@ stack_step(struct stack *, struct state *);
 
 struct error *
 stack_next(struct stack *, struct state *);
-
-void
-stack_nextstmt(struct stack *s, struct state *state);
 
 struct stack *
 stack_prev(struct stack *);

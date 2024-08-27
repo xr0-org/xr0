@@ -179,16 +179,16 @@ state_lexememarker(struct state *s)
 	return stack_lexememarker(s->stack);
 }
 
-bool
-state_atend(struct state *s)
+int
+state_atend(struct state *s, int base_depth)
 {
-	return stack_atend(s->stack);
+	return stack_atend(s->stack, base_depth);
 }
 
-bool
-state_atsetupend(struct state *s)
+int
+state_atsetupend(struct state *s, int base_depth)
 {
-	return stack_atsetupend(s->stack);
+	return stack_atsetupend(s->stack, base_depth);
 }
 
 struct error *
