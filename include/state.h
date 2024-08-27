@@ -219,8 +219,8 @@ state_callerreferences(struct state *, struct location *);
 /* FRAME DTO */
 
 struct frame *
-frame_call_create(char *name, struct ast_block *, struct ast_type *,
-		enum execution_mode, struct ast_expr *, struct ast_function *);
+frame_call_create(char *name, struct ast_block *, enum execution_mode,
+		struct ast_expr *, struct ast_function *);
 
 struct frame *
 frame_block_create(char *name, struct ast_block *, enum execution_mode);

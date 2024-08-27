@@ -699,13 +699,13 @@ void
 ast_function_destroy(struct ast_function *);
 
 char *
-ast_function_str(struct ast_function *f);
+ast_function_str(struct ast_function *);
 
 void
-ast_function_setname(struct ast_function *f, char *name);
+ast_function_setname(struct ast_function *, char *name);
 
 char *
-ast_function_name(struct ast_function *f);
+ast_function_name(struct ast_function *);
 
 struct ast_function *
 ast_function_copy(struct ast_function *);

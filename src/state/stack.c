@@ -17,7 +17,7 @@ struct frame;
 
 struct stack {
 	int id;
-	struct program *p;
+
 	struct block_arr *memory;
 	struct map *varmap;		/* lvalues of blocks in frame */
 	struct stack *prev;
@@ -25,19 +25,20 @@ struct stack {
 	char *name;
 	enum execution_mode mode;
 	enum frame_kind kind;
+	struct program *p;
+
 	struct ast_expr *call;
 	struct ast_function *f;
 };
 
 struct frame {
 	char *name;
-	struct ast_block *b;
-	struct ast_type *ret_type;
-	enum execution_mode mode;
 	enum frame_kind kind;
+	enum execution_mode mode;
+	struct program *p;
+
 	struct ast_expr *call;
 	struct ast_function *f;
-	bool advance;
 };
 
 struct location *
@@ -56,8 +57,8 @@ stack_create(struct frame *f, struct stack *prev)
 	struct stack *stack = calloc(1, sizeof(struct stack));
 	assert(stack);
 
-	assert(f->b);
-	stack->p = program_create(f->b);
+	assert(f->p);
+	stack->p = f->p;
 	stack->memory = block_arr_create();
 	stack->varmap = map_create();
 	stack->prev = prev;
@@ -577,28 +578,24 @@ stack_getblock(struct stack *s, int address)
 }
 
 static struct frame *
-frame_create(char *n, struct ast_block *b, struct ast_type *r, enum execution_mode mode,
+frame_create(char *n, struct ast_block *b, enum execution_mode mode,
 		enum frame_kind kind)
 {
 	struct frame *f = malloc(sizeof(struct frame));
 	f->name = dynamic_str(n);
-	f->b = ast_block_copy(b);
-	if (kind == FRAME_CALL) {
-		assert(r);
-		f->ret_type = ast_type_copy(r);
-	}
+	f->p = program_create(ast_block_copy(b));
 	f->mode = mode;
 	f->kind = kind;
-	f->call = NULL;
-	f->f = NULL;
-	f->advance = true;
+	f->call = NULL; /* for call type frame only */
+	f->f = NULL;	/* for call type frame only */
 	return f;
 }
 
 struct frame *
-frame_call_create(char *n, struct ast_block *b, struct ast_type *r, enum execution_mode mode, struct ast_expr *call, struct ast_function *func)
+frame_call_create(char *n, struct ast_block *b, enum execution_mode mode,
+		struct ast_expr *call, struct ast_function *func)
 {
-	struct frame *f = frame_create(n, b, r, mode, FRAME_CALL);
+	struct frame *f = frame_create(n, b, mode, FRAME_CALL);
 	f->call = call;
 	f->f = func;
 	return f;
@@ -607,27 +604,19 @@ frame_call_create(char *n, struct ast_block *b, struct ast_type *r, enum executi
 struct frame *
 frame_block_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, b, NULL, mode, FRAME_NESTED);
+	return frame_create(n, b, mode, FRAME_NESTED);
 }
 
 struct frame *
 frame_setup_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	struct frame* f = frame_create(n, b, NULL, mode, FRAME_SETUP);
-	f->advance = false;
-	return f;
+	return frame_create(n, b, mode, FRAME_SETUP);
 }
 
 struct frame *
 frame_intermediate_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, b, NULL, mode, FRAME_INTERMEDIATE);
-}
-
-bool
-frame_advance(struct frame *f)
-{
-	return f->advance;
+	return frame_create(n, b, mode, FRAME_INTERMEDIATE);
 }
 
 struct variable {

@@ -266,7 +266,6 @@ path_init_abstract(struct path *p)
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
-		ast_function_type(p->f),
 		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
 		p->f
@@ -295,7 +294,6 @@ path_init_actual(struct path *p)
 	struct frame *f = frame_call_create(
 		ast_function_name(p->f),
 		ast_function_body(p->f),
-		ast_function_type(p->f),
 		EXEC_ACTUAL,
 		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
 		p->f
