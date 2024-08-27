@@ -263,11 +263,9 @@ path_init_abstract(struct path *p)
 {
 	struct error *err;
 
-	struct frame *f = frame_call_create(
+	struct frame *f = frame_callabstract_create(
 		ast_function_name(p->f),
 		ast_function_abstract(p->f),
-		ast_function_type(p->f),
-		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
 		p->f
 	);
@@ -276,10 +274,9 @@ path_init_abstract(struct path *p)
 		return err;
 	}
 	assert(!state_readregister(p->abstract));
-	struct frame *setupframe = frame_setup_create(
-		"setup",
-		ast_function_abstract(p->f),
-		EXEC_ABSTRACT_SETUP_ONLY
+	struct frame *setupframe = frame_blockfindsetup_create(
+		dynamic_str("setup"),
+		ast_function_abstract(p->f)
 	);
 	state_pushframe(p->abstract, setupframe);
 	p->path_state = PATH_STATE_SETUPABSTRACT;
@@ -292,11 +289,9 @@ path_init_actual(struct path *p)
 	struct error *err;
 
 	/* if body empty just apply setup */
-	struct frame *f = frame_call_create(
+	struct frame *f = frame_callactual_create(
 		ast_function_name(p->f),
 		ast_function_body(p->f),
-		ast_function_type(p->f),
-		EXEC_ACTUAL,
 		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
 		p->f
 	);
@@ -305,10 +300,9 @@ path_init_actual(struct path *p)
 		return err;
 	}
 	state_setrconsts(p->actual, p->abstract);
-	struct frame *setupframe = frame_setup_create(
-		"setup",
-		ast_function_abstract(p->f),
-		EXEC_ABSTRACT_SETUP_ONLY
+	struct frame *setupframe = frame_blockfindsetup_create(
+		dynamic_str("setup"),
+		ast_function_abstract(p->f)
 	);
 	state_pushframe(p->actual, setupframe);
 	p->path_state = PATH_STATE_SETUPACTUAL;

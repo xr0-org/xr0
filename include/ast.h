@@ -254,9 +254,6 @@ struct bool_res;
 struct bool_res *
 ast_expr_decide(struct ast_expr *, struct state *);
 
-struct error *
-ast_expr_exec(struct ast_expr *, struct state *);
-
 struct e_res;
 struct preresult;
 
@@ -271,9 +268,6 @@ ast_expr_varinfomap(struct map *, struct ast_expr *, struct state *s);
 
 struct e_res *
 ast_expr_eval(struct ast_expr *, struct state *);
-
-struct e_res *
-ast_expr_abseval(struct ast_expr *, struct state *);
 
 struct value;
 
@@ -514,12 +508,6 @@ struct error *
 ast_stmt_exec(struct ast_stmt *, struct state *);
 
 struct error *
-ast_stmt_absexec(struct ast_stmt *, struct state *);
-
-struct error *
-ast_stmt_absexecnosetup(struct ast_stmt *, struct state *);
-
-struct error *
 ast_stmt_pushsetup(struct ast_stmt *, struct state *);
 
 DECLARE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_res)
@@ -699,13 +687,13 @@ void
 ast_function_destroy(struct ast_function *);
 
 char *
-ast_function_str(struct ast_function *f);
+ast_function_str(struct ast_function *);
 
 void
-ast_function_setname(struct ast_function *f, char *name);
+ast_function_setname(struct ast_function *, char *name);
 
 char *
-ast_function_name(struct ast_function *f);
+ast_function_name(struct ast_function *);
 
 struct ast_function *
 ast_function_copy(struct ast_function *);

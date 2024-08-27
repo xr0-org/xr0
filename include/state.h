@@ -26,21 +26,6 @@ struct value;
 
 struct state;
 
-enum execution_mode {
-	EXEC_ABSTRACT_SETUP_ONLY,
-	EXEC_INSETUP,
-	EXEC_ABSTRACT_NO_SETUP,
-	EXEC_ACTUAL,
-	EXEC_VERIFY
-};
-
-enum frame_kind {
-	FRAME_NESTED,
-	FRAME_INTERMEDIATE,
-	FRAME_CALL,
-	FRAME_SETUP
-};
-
 struct frame;
 
 struct state *
@@ -142,11 +127,17 @@ state_dealloc(struct state *, struct location *);
 bool
 state_islinear(struct state *);
 
-char *
-state_execmode_str(enum execution_mode);
+int
+state_modecanverify(struct state *);
 
-enum execution_mode
-state_execmode(struct state *);
+int
+state_modecanrunxr0cmd(struct state *);
+
+
+struct stack;
+
+struct stack *
+state_stack(struct state *);
 
 struct lexememarker *
 state_lexememarker(struct state *);
@@ -219,17 +210,27 @@ state_callerreferences(struct state *, struct location *);
 /* FRAME DTO */
 
 struct frame *
-frame_call_create(char *name, struct ast_block *, struct ast_type *,
-		enum execution_mode, struct ast_expr *, struct ast_function *);
+frame_callabstract_create(char *name, struct ast_block *, struct ast_expr *,
+		struct ast_function *);
 
 struct frame *
-frame_block_create(char *name, struct ast_block *, enum execution_mode);
+frame_callactual_create(char *name, struct ast_block *, struct ast_expr *,
+		struct ast_function *);
 
 struct frame *
-frame_setup_create(char *name, struct ast_block *, enum execution_mode);
+frame_blockverify_create(char *name, struct ast_block *);
 
 struct frame *
-frame_intermediate_create(char *name, struct ast_block *, enum execution_mode);
+frame_blockfindsetup_create(char *name, struct ast_block *);
+
+struct frame *
+frame_blocksame_create(char *name, struct ast_block *, struct state *);
+
+struct frame *
+frame_setup_create(char *name, struct ast_block *);
+
+struct frame *
+frame_linear_create(char *name, struct ast_block *, struct state *);
 
 /* USED BY VALUE */
 

@@ -49,8 +49,11 @@ stack_str(struct stack *, struct state *);
 bool
 stack_islinear(struct stack *);
 
-enum execution_mode
-stack_execmode(struct stack *);
+int
+stack_modecanverify(struct stack *);
+
+int
+stack_modecanrunxr0cmd(struct stack *);
 
 struct lexememarker *
 stack_lexememarker(struct stack *);

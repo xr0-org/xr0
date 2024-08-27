@@ -17,20 +17,85 @@ struct program {
 	} s;
 	int index;
 	struct lexememarker *loc;
+	enum execution_mode {
+		EXEC_FINDSETUP,
+		EXEC_SETUP,
+		EXEC_ABSTRACT,
+		EXEC_ACTUAL,
+		EXEC_VERIFY,
+	} mode;
 };
 
 static enum program_state
 program_state_init(struct ast_block *);
 
-struct program *
-program_create(struct ast_block *b)
+static struct program *
+program_create(struct ast_block *b, enum execution_mode m)
 {
 	struct program *p = malloc(sizeof(struct program));
+	assert(p);
 	p->b = b;
 	p->s = program_state_init(b);
 	p->index = 0;
 	p->loc = NULL;
+	p->mode = m;
 	return p;
+}
+
+struct program *
+program_same_create(struct ast_block *b, struct program *origin)
+{
+	return program_create(b, origin->mode);
+}
+
+struct program *
+program_findsetup_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_FINDSETUP);
+}
+
+struct program *
+program_setup_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_SETUP);
+}
+
+struct program *
+program_abstract_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_ABSTRACT);
+}
+
+struct program *
+program_actual_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_ACTUAL);
+}
+
+struct program *
+program_verify_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_VERIFY);
+}
+
+struct program *
+program_copy(struct program *old)
+{
+	struct program *new = malloc(sizeof(struct program));
+	assert(new);
+	new->b = ast_block_copy(old->b);
+	new->s = old->s;
+	new->index = old->index;
+	new->loc = old->loc ? lexememarker_copy(old->loc) : NULL;
+	new->mode = old->mode;
+	return new;
+}
+
+void
+program_destroy(struct program *p)
+{
+	/* no ownership of block */
+	free(p);
 }
 
 void
@@ -53,22 +118,6 @@ program_state_init(struct ast_block *b)
 	return ast_block_nstmts(b) ? PROGRAM_COUNTER_STMTS : PROGRAM_COUNTER_ATEND;
 }
 
-void
-program_destroy(struct program *p)
-{
-	/* no ownership of block */
-	free(p);
-}
-
-struct program *
-program_copy(struct program *old)
-{
-	struct program *new = program_create(old->b);
-	new->s = old->s;
-	new->index = old->index;
-	return new;
-}
-
 char *
 program_str(struct program *p)
 {
@@ -82,6 +131,25 @@ program_index(struct program *p)
 {
 	return p->index;
 }
+
+int
+program_modecanverify(struct program *p)
+{
+	return p->mode == EXEC_VERIFY;
+}
+
+int
+program_modecanrunxr0cmd(struct program *p)
+{
+	switch (p->mode) {
+	case EXEC_SETUP:
+	case EXEC_ABSTRACT:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
 
 char *
 program_render(struct program *p)
@@ -177,17 +245,15 @@ static struct error *
 program_stmt_process(struct program *p, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	switch (state_execmode(s)) {
-	case EXEC_ABSTRACT_SETUP_ONLY:
+	switch (p->mode) {
+	case EXEC_FINDSETUP:
 		return ast_stmt_pushsetup(stmt, s);
-	case EXEC_INSETUP:
-		return ast_stmt_absexec(stmt, s);
-	case EXEC_ABSTRACT_NO_SETUP:
-		return ast_stmt_absexecnosetup(stmt, s);
+	case EXEC_SETUP:
+	case EXEC_ABSTRACT:
 	case EXEC_ACTUAL:
 		return ast_stmt_exec(stmt, s);
 	case EXEC_VERIFY:
-		return ast_stmt_verify(stmt, state_copy(s));
+		return ast_stmt_verify(stmt, s);
 	default:
 		assert(false);
 	}
