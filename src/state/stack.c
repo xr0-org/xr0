@@ -581,12 +581,12 @@ struct frame {
 
 
 static struct frame *
-frame_create(char *n, struct ast_block *b, enum execution_mode mode,
+frame_create(char *n, struct program *p, enum execution_mode mode,
 		enum frame_kind kind)
 {
 	struct frame *f = malloc(sizeof(struct frame));
 	f->name = dynamic_str(n);
-	f->p = program_create(ast_block_copy(b));
+	f->p = p;
 	f->mode = mode;
 	f->kind = kind;
 	f->call = NULL; /* for call type frame only */
@@ -600,7 +600,7 @@ frame_call_create(char *n, struct ast_block *b, enum execution_mode mode,
 {
 	assert(call);
 	assert(func);
-	struct frame *f = frame_create(n, b, mode, FRAME_CALL);
+	struct frame *f = frame_create(n, program_create(b), mode, FRAME_CALL);
 	f->call = ast_expr_copy(call);
 	f->f = ast_function_copy(func);
 	return f;
@@ -609,19 +609,19 @@ frame_call_create(char *n, struct ast_block *b, enum execution_mode mode,
 struct frame *
 frame_block_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, b, mode, FRAME_NESTED);
+	return frame_create(n, program_create(b), mode, FRAME_NESTED);
 }
 
 struct frame *
 frame_setup_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, b, mode, FRAME_SETUP);
+	return frame_create(n, program_create(b), mode, FRAME_SETUP);
 }
 
 struct frame *
 frame_intermediate_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, b, mode, FRAME_INTERMEDIATE);
+	return frame_create(n, program_create(b), mode, FRAME_INTERMEDIATE);
 }
 
 static void
@@ -634,20 +634,14 @@ frame_setname(struct frame *f, char *new)
 static struct frame *
 frame_copy(struct frame *f)
 {
-	switch (f->kind) {
-	case FRAME_CALL:
-		return frame_call_create(
-			f->name, program_block(f->p), f->mode, f->call, f->f
-		);
-	case FRAME_NESTED:
-	case FRAME_INTERMEDIATE:
-	case FRAME_SETUP:
-		return frame_create(
-			f->name, program_block(f->p), f->mode, f->kind
-		);
-	default:
-		assert(false);
+	struct frame *copy = frame_create(
+		f->name, program_copy(f->p), f->mode, f->kind
+	);
+	if (f->kind == FRAME_CALL) {
+		copy->call = ast_expr_copy(f->call);
+		copy->f = ast_function_copy(f->f);
 	}
+	return copy;
 }
 
 static void
