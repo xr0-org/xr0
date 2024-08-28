@@ -34,13 +34,6 @@ enum execution_mode {
 	EXEC_VERIFY
 };
 
-enum frame_kind {
-	FRAME_NESTED,
-	FRAME_INTERMEDIATE,
-	FRAME_CALL,
-	FRAME_SETUP
-};
-
 struct frame;
 
 struct state *

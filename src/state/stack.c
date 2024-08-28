@@ -15,30 +15,49 @@
 
 struct frame;
 
+static void
+frame_setname(struct frame *, char *);
+
+static struct frame *
+frame_copy(struct frame *);
+
+static void
+frame_destroy(struct frame *);
+
+static char *
+frame_name(struct frame *);
+
+static struct program *
+frame_program(struct frame *);
+
+static struct ast_function *
+frame_function(struct frame *);
+
+static int
+frame_iscall(struct frame *);
+
+static int
+frame_isnested(struct frame *);
+
+static int
+frame_isinter(struct frame *);
+
+static int
+frame_issetup(struct frame *);
+
+static struct ast_expr *
+frame_call(struct frame *);
+
+static enum execution_mode
+frame_mode(struct frame *);
+
 struct stack {
 	int id;
 
 	struct block_arr *memory;
 	struct map *varmap;		/* lvalues of blocks in frame */
 	struct stack *prev;
-
-	char *name;
-	enum execution_mode mode;
-	enum frame_kind kind;
-	struct program *p;
-
-	struct ast_expr *call;
-	struct ast_function *f;
-};
-
-struct frame {
-	char *name;
-	enum frame_kind kind;
-	enum execution_mode mode;
-	struct program *p;
-
-	struct ast_expr *call;
-	struct ast_function *f;
+	struct frame *f;	
 };
 
 struct location *
@@ -57,21 +76,11 @@ stack_create(struct frame *f, struct stack *prev)
 	struct stack *stack = calloc(1, sizeof(struct stack));
 	assert(stack);
 
-	assert(f->p);
-	stack->p = f->p;
 	stack->memory = block_arr_create();
 	stack->varmap = map_create();
 	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
-
-	stack->name = f->name;
-	stack->mode = f->mode;
-	stack->kind = f->kind;
-	if (stack->kind == FRAME_CALL) {
-		stack->call = f->call;
-		stack->f = f->f;
-	}
-
+	stack->f = f;
 	return stack;
 }
 
@@ -93,20 +102,20 @@ stack_getframe(struct stack *s, int frame)
 char *
 stack_programtext(struct stack *s)
 {
-	return program_render(s->p);
+	return program_render(frame_program(s->f));
 }
 
 int
 stack_programindex(struct stack *s)
 {
-	return program_index(s->p);
+	return program_index(frame_program(s->f));
 }
 
 void
 stack_return(struct stack *s)
 {
-	program_setatend(s->p);
-	if (s->prev && s->kind != FRAME_CALL) {
+	program_setatend(frame_program(s->f));
+	if (s->prev && frame_iscall(s->f)) {
 		stack_return(s->prev);
 	}
 }
@@ -114,16 +123,7 @@ stack_return(struct stack *s)
 struct ast_expr *
 stack_framecall(struct stack *s)
 {
-	switch (s->kind) {
-	case FRAME_CALL:
-		assert(s->call);
-		return s->call;
-	case FRAME_INTERMEDIATE:
-		return program_prevcall(s->p);
-	default:
-		assert(false);
-	}
-	return NULL;
+	return frame_call(s->f);	
 }
 
 static char *
@@ -134,21 +134,13 @@ stack_argmodulator(struct stack *stack, struct state *state)
 {
 	if (!stack->prev) {
 		/* base frame */
-		assert(stack->kind == FRAME_CALL);
+		assert(frame_iscall(stack->f));
 		return dynamic_str("");
 	}
-	switch (stack->kind) {
-	case FRAME_CALL:
-		assert(stack->call);
-		return argmodulator(stack, state);
-	case FRAME_NESTED:
-	case FRAME_INTERMEDIATE:
-	case FRAME_SETUP:
-		assert(stack->prev);
-		return stack_argmodulator(stack->prev, state);
-	default:
-		assert(false);
-	}
+	/* ⊢ stack->prev */
+	return frame_iscall(stack->f)
+		? argmodulator(stack, state)
+		: stack_argmodulator(stack->prev, state);
 }
 
 static char *
@@ -193,7 +185,7 @@ stack_destroy(struct stack *stack)
 
 	/* XXX: call expr leak */
 
-	program_destroy(stack->p);
+	frame_destroy(stack->f);
 	free(stack);
 }
 
@@ -210,20 +202,11 @@ struct stack *
 stack_copy(struct stack *stack)
 {
 	struct stack *copy = calloc(1, sizeof(struct stack));
-	copy->mode = stack->mode;
-	copy->p = program_copy(stack->p);
 	copy->memory = block_arr_copy(stack->memory);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->id = stack->id;
-	if (stack->prev) {
-		copy->prev = stack_copy(stack->prev);
-	}
-	copy->name = dynamic_str(stack->name);
-	copy->kind = stack->kind;
-	if (stack->kind == FRAME_CALL) {
-		copy->call = ast_expr_copy(stack->call);
-		copy->f = ast_function_copy(stack->f);
-	}
+	copy->prev = stack->prev ? stack_copy(stack->prev) : NULL;
+	copy->f = frame_copy(stack->f);
 	return copy;
 }
 
@@ -244,7 +227,7 @@ rename_lowestframe(struct stack *s, char *new_name)
 	if (s->prev) {
 		rename_lowestframe(s->prev, new_name);
 	} else {
-		s->name = new_name;
+		frame_setname(s->f, new_name);
 	}
 }
 
@@ -302,7 +285,7 @@ stack_str(struct stack *stack, struct state *state)
 	for (int i = 0, len = 30; i < len-2; i++ ) {
 		strbuilder_putc(b, '-');
 	}
-	strbuilder_printf(b, " %s\n", stack->name);
+	strbuilder_printf(b, " %s\n", frame_name(stack->f));
 	if (stack->prev) {
 		char *prev = stack_str(stack->prev, state);
 		strbuilder_printf(b, prev);
@@ -346,13 +329,13 @@ maxlenorzero(struct string_arr *arr)
 bool
 stack_islinear(struct stack *s)
 {
-	return s->kind == FRAME_INTERMEDIATE;
+	return frame_isinter(s->f);
 }
 
 bool
 stack_insetup(struct stack *s)
 {	
-	if (s->kind == FRAME_SETUP) {
+	if (frame_issetup(s->f)) {
 		return true;
 	}
 	if (s->prev == NULL) {
@@ -371,20 +354,20 @@ stack_id(struct stack *s)
 enum execution_mode
 stack_execmode(struct stack *s)
 {
-	return s->mode;
+	return frame_mode(s->f);
 }
 
 struct lexememarker *
 stack_lexememarker(struct stack *s)
 {
-	return program_lexememarker(s->p);
+	return program_lexememarker(frame_program(s->f));
 }
 
 static bool
 stack_isbase(struct stack *s)
 {
 	if (s->id == 0) {
-		assert(s->kind == FRAME_CALL);
+		assert(frame_iscall(s->f));
 		return true;
 	}
 	return false;
@@ -394,7 +377,7 @@ static bool
 stack_issetupbase(struct stack *s)
 {
 	if (s->id == 1) { 
-		assert(s->kind == FRAME_SETUP);
+		assert(frame_issetup(s->f));
 		return true;
 	}
 	return false;
@@ -403,31 +386,31 @@ stack_issetupbase(struct stack *s)
 bool
 stack_atend(struct stack *s)
 {
-	return program_atend(s->p) && stack_isbase(s);
+	return program_atend(frame_program(s->f)) && stack_isbase(s);
 }
 
 bool
 stack_atsetupend(struct stack *s)
 {
-	return program_atend(s->p) && stack_issetupbase(s);
+	return program_atend(frame_program(s->f)) && stack_issetupbase(s);
 }
 
 struct error *
 stack_step(struct stack *s, struct state *state)
 {
-	return program_step(s->p, state);
+	return program_step(frame_program(s->f), state);
 }
 
 struct error *
 stack_next(struct stack *s, struct state *state)
 {
-	return program_next(s->p, state);
+	return program_next(frame_program(s->f), state);
 }
 
 void
 stack_storeloc(struct stack *s)
 {
-	program_storeloc(s->p);
+	program_storeloc(frame_program(s->f));
 }
 
 void
@@ -467,13 +450,13 @@ stack_undeclare(struct stack *stack, struct state *state)
 static bool
 stack_iscall(struct stack *s)
 {
-	return s->kind == FRAME_CALL;
+	return frame_iscall(s->f);
 }
 
 bool
 stack_isnested(struct stack *s)
 {
-	return s->kind == FRAME_NESTED;
+	return frame_isnested(s->f);
 }
 
 char *
@@ -485,12 +468,12 @@ stack_propername(struct stack *);
 struct error *
 stack_trace(struct stack *s, struct error *err)
 {
-	if (s->kind != FRAME_CALL) {
+	if (!frame_iscall(s->f)) {
 		assert(s->prev);
 		return stack_trace(s->prev, err);
 	}
 	char *ctx = error_context(s);
-	char *loc = program_loc(s->p);
+	char *loc = program_loc(frame_program(s->f));
 	struct error *e = error_printf(
 		"%s: %w (%s)%s", loc, err, stack_propername(s), ctx
 	);
@@ -520,8 +503,8 @@ static char *
 stack_context(struct stack *s)
 {
 	struct strbuilder *b = strbuilder_create();
-	if (s->kind == FRAME_CALL) {
-		char *loc = program_loc(s->p);
+	if (frame_iscall(s->f)) {
+		char *loc = program_loc(frame_program(s->f));
 		strbuilder_printf(b, "\t%s (%s)", loc, stack_propername(s));
 		free(loc);
 	}
@@ -537,7 +520,7 @@ stack_context(struct stack *s)
 static char *
 stack_propername(struct stack *s)
 {
-	return s->kind == FRAME_CALL ? s->name : stack_propername(s->prev);
+	return frame_iscall(s->f) ? frame_name(s->f) : stack_propername(s->prev);
 }
 
 
@@ -564,7 +547,7 @@ stack_getvariable(struct stack *s, char *id)
 void
 stack_popprep(struct stack *s, struct state *state)
 {
-	if (s->kind == FRAME_CALL && !ast_function_isvoid(s->f)) {
+	if (frame_iscall(s->f) && !ast_function_isvoid(frame_function(s->f))) {
 		assert(state_readregister(state));
 	}
 }
@@ -576,6 +559,26 @@ stack_getblock(struct stack *s, int address)
 
 	return block_arr_blocks(s->memory)[address];
 }
+
+
+/* frame */
+
+struct frame {
+	char *name;
+	enum frame_kind {
+		FRAME_NESTED,
+		FRAME_INTERMEDIATE,
+		FRAME_CALL,
+		FRAME_SETUP
+	} kind;
+	enum execution_mode mode;
+	struct program *p;
+
+	struct ast_expr *call;
+	struct ast_function *f;
+};
+
+
 
 static struct frame *
 frame_create(char *n, struct ast_block *b, enum execution_mode mode,
@@ -595,9 +598,11 @@ struct frame *
 frame_call_create(char *n, struct ast_block *b, enum execution_mode mode,
 		struct ast_expr *call, struct ast_function *func)
 {
+	assert(call);
+	assert(func);
 	struct frame *f = frame_create(n, b, mode, FRAME_CALL);
-	f->call = call;
-	f->f = func;
+	f->call = ast_expr_copy(call);
+	f->f = ast_function_copy(func);
 	return f;
 }
 
@@ -618,6 +623,106 @@ frame_intermediate_create(char *n, struct ast_block *b, enum execution_mode mode
 {
 	return frame_create(n, b, mode, FRAME_INTERMEDIATE);
 }
+
+static void
+frame_setname(struct frame *f, char *new)
+{
+	free(f->name);
+	f->name = new;
+}
+
+static struct frame *
+frame_copy(struct frame *f)
+{
+	switch (f->kind) {
+	case FRAME_CALL:
+		return frame_call_create(
+			f->name, program_block(f->p), f->mode, f->call, f->f
+		);
+	case FRAME_NESTED:
+	case FRAME_INTERMEDIATE:
+	case FRAME_SETUP:
+		return frame_create(
+			f->name, program_block(f->p), f->mode, f->kind
+		);
+	default:
+		assert(false);
+	}
+}
+
+static void
+frame_destroy(struct frame *f)
+{
+	free(f->name);
+	program_destroy(f->p);
+	if (frame_iscall(f)) {
+		ast_expr_destroy(f->call);
+		ast_function_destroy(f->f);
+	}
+}
+
+static char *
+frame_name(struct frame *f)
+{
+	return f->name;
+}
+
+static struct program *
+frame_program(struct frame *f)
+{
+	return f->p;
+}
+
+static struct ast_function *
+frame_function(struct frame *f)
+{
+	assert(frame_iscall(f));
+	return f->f;
+}
+
+static int
+frame_iscall(struct frame *f)
+{
+	return f->kind == FRAME_CALL;
+}
+
+static int
+frame_isnested(struct frame *f)
+{
+	return f->kind == FRAME_NESTED;
+}
+
+static int
+frame_isinter(struct frame *f)
+{
+	return f->kind == FRAME_INTERMEDIATE;
+}
+
+static int
+frame_issetup(struct frame *f)
+{
+	return f->kind == FRAME_SETUP;
+}
+
+struct ast_expr *
+frame_call(struct frame *f)
+{
+	switch (f->kind) {
+	case FRAME_CALL:
+		return f->call;
+	case FRAME_INTERMEDIATE:
+		return program_prevcall(f->p);
+	default:
+		assert(false);
+	}
+}
+
+static enum execution_mode
+frame_mode(struct frame *f)
+{
+	return f->mode;
+}
+
 
 struct variable {
 	struct ast_type *type;

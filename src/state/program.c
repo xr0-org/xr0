@@ -115,6 +115,12 @@ program_prevcall(struct program *p)
 	return ast_expr_copy(ast_stmt_register_call(c));
 }
 
+struct ast_block *
+program_block(struct program *p)
+{
+	return p->b;
+}
+
 static bool
 program_stmt_atend(struct program *, struct state *);
 

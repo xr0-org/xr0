@@ -33,6 +33,9 @@ program_atend(struct program *);
 struct ast_expr *
 program_prevcall(struct program *);
 
+struct ast_block *
+program_block(struct program *);
+
 enum execution_mode;
 
 struct error *
