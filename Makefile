@@ -213,7 +213,7 @@ $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
 # tests
-TESTDIR = tests
+TESTDIR = tests/0v
 RUNTEST = $(TESTDIR)/run
 TESTFILES = $(shell find $(TESTDIR) -name '*.0')
 
@@ -221,7 +221,7 @@ tags:
 	@ctags -R .
 
 test: $(RUNTEST) $(TESTFILES) $(XR0V) 
-	@./tests/run
+	@./tests/0v/run
 
 check: $(RUNTEST) $(TESTFILES) $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))

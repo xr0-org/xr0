@@ -17,7 +17,7 @@ ignore="\e[33mIGNORE\e[0m\n"
 
 XR0=$(pwd)/bin/0v
 libx=$(pwd)/libx
-cd tests
+cd tests/0v
 length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
 	tail -1 | wc -c)
 
