@@ -84,24 +84,10 @@ main(int argc, char * argv[])
 
 			/* read output from child process */
 			sleep(1);
-			while (1) {
-				sleep(1);
-				nbytes = read(from_child[0], buffer, sizeof(buffer) - 1);
-				if (nbytes == -1) {
-					fprintf(stderr, "read failed");
-					exit(EXIT_FAILURE);
-				} else if (nbytes == 0) {
-					printf("end of file\n");
-					break;
-				}
-				
-				buffer[nbytes] = '\0';
-				printf("read %ld bytes from bin/0v:\n%s\n", nbytes, buffer);
-				fflush(stdout);
-				break;
-			}
+			nbytes = read(from_child[0], buffer, sizeof(buffer) - 1);
+			buffer[nbytes] = '\0';
+			printf("read %ld bytes from bin/0v:\n%s\n", nbytes, buffer);
 		}
-
 
 		int status;
 		if (waitpid(pid, &status, 0) == -1) {
