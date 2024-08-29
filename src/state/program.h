@@ -4,7 +4,7 @@
 struct program;
 
 struct program *
-program_create(struct ast_block *);
+program_create(struct ast_block *, enum execution_mode);
 
 struct program *
 program_copy(struct program *);
@@ -17,6 +17,9 @@ program_str(struct program *);
 
 int
 program_index(struct program *);
+
+enum execution_mode
+program_mode(struct program *);
 
 void
 program_storeloc(struct program *);

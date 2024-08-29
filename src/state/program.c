@@ -17,20 +17,43 @@ struct program {
 	} s;
 	int index;
 	struct lexememarker *loc;
+	enum execution_mode mode;
 };
 
 static enum program_state
 program_state_init(struct ast_block *);
 
 struct program *
-program_create(struct ast_block *b)
+program_create(struct ast_block *b, enum execution_mode m)
 {
 	struct program *p = malloc(sizeof(struct program));
+	assert(p);
 	p->b = b;
 	p->s = program_state_init(b);
 	p->index = 0;
 	p->loc = NULL;
+	p->mode = m;
 	return p;
+}
+
+struct program *
+program_copy(struct program *old)
+{
+	struct program *new = malloc(sizeof(struct program));
+	assert(new);
+	new->b = ast_block_copy(old->b);
+	new->s = old->s;
+	new->index = old->index;
+	new->loc = old->loc ? lexememarker_copy(old->loc) : NULL;
+	new->mode = old->mode;
+	return new;
+}
+
+void
+program_destroy(struct program *p)
+{
+	/* no ownership of block */
+	free(p);
 }
 
 void
@@ -53,22 +76,6 @@ program_state_init(struct ast_block *b)
 	return ast_block_nstmts(b) ? PROGRAM_COUNTER_STMTS : PROGRAM_COUNTER_ATEND;
 }
 
-void
-program_destroy(struct program *p)
-{
-	/* no ownership of block */
-	free(p);
-}
-
-struct program *
-program_copy(struct program *old)
-{
-	struct program *new = program_create(old->b);
-	new->s = old->s;
-	new->index = old->index;
-	return new;
-}
-
 char *
 program_str(struct program *p)
 {
@@ -81,6 +88,12 @@ int
 program_index(struct program *p)
 {
 	return p->index;
+}
+
+enum execution_mode
+program_mode(struct program *p)
+{
+	return p->mode;
 }
 
 char *
@@ -177,7 +190,7 @@ static struct error *
 program_stmt_process(struct program *p, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
-	switch (state_execmode(s)) {
+	switch (p->mode) {
 	case EXEC_ABSTRACT_SETUP_ONLY:
 		return ast_stmt_pushsetup(stmt, s);
 	case EXEC_INSETUP:

@@ -559,7 +559,6 @@ struct frame {
 		FRAME_CALL,
 		FRAME_SETUP,
 	} kind;
-	enum execution_mode mode;
 	struct program *p;
 
 	struct ast_expr *call;
@@ -567,15 +566,13 @@ struct frame {
 };
 
 static struct frame *
-frame_create(char *n, struct program *p, enum execution_mode mode,
-		enum frame_kind kind)
+frame_create(char *n, struct program *p, enum frame_kind kind)
 {
 	assert(p);
 
 	struct frame *f = malloc(sizeof(struct frame));
 	f->name = dynamic_str(n);
 	f->p = p;
-	f->mode = mode;
 	f->kind = kind;
 	f->call = NULL; /* for call type frame only */
 	f->f = NULL;	/* for call type frame only */
@@ -588,7 +585,7 @@ frame_call_create(char *n, struct ast_block *b, enum execution_mode mode,
 {
 	assert(call); assert(func);
 
-	struct frame *f = frame_create(n, program_create(b), mode, FRAME_CALL);
+	struct frame *f = frame_create(n, program_create(b, mode), FRAME_CALL);
 	f->call = ast_expr_copy(call);
 	f->f = ast_function_copy(func);
 	return f;
@@ -597,19 +594,19 @@ frame_call_create(char *n, struct ast_block *b, enum execution_mode mode,
 struct frame *
 frame_block_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, program_create(b), mode, FRAME_NESTED);
+	return frame_create(n, program_create(b, mode), FRAME_NESTED);
 }
 
 struct frame *
 frame_setup_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, program_create(b), mode, FRAME_SETUP);
+	return frame_create(n, program_create(b, mode), FRAME_SETUP);
 }
 
 struct frame *
 frame_intermediate_create(char *n, struct ast_block *b, enum execution_mode mode)
 {
-	return frame_create(n, program_create(b), mode, FRAME_INTERMEDIATE);
+	return frame_create(n, program_create(b, mode), FRAME_INTERMEDIATE);
 }
 
 static void
@@ -626,9 +623,7 @@ frame_destroy(struct frame *f)
 static struct frame *
 frame_copy(struct frame *f)
 {
-	struct frame *copy = frame_create(
-		f->name, program_copy(f->p), f->mode, f->kind
-	);
+	struct frame *copy = frame_create(f->name, program_copy(f->p), f->kind);
 	if (f->kind == FRAME_CALL) {
 		copy->call = ast_expr_copy(f->call);
 		copy->f = ast_function_copy(f->f);
@@ -702,7 +697,7 @@ frame_call(struct frame *f)
 static enum execution_mode
 frame_mode(struct frame *f)
 {
-	return f->mode;
+	return program_mode(f->p);
 }
 
 
