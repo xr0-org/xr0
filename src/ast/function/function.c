@@ -264,12 +264,12 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 }
 
 struct error *
-ast_function_debug(struct ast_function *f, struct externals *ext)
+ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 {
 	struct path *path = path_create(f, ext);
 	while (!path_atend(path)) {
 		d_printf("%s\n", path_str(path));
-		struct error *err = command_next(path);
+		struct error *err = command_next(path, sep);
 		if (err) {
 			return err;
 		}

@@ -1,0 +1,27 @@
+path init abstract state
+path init abstract state
+phase:	ACTUAL
+
+text:
+	int p;
+-->	p = 0;
+	~ [ p==0; ]
+	modify0(&(p), 0);
+	~ [ p==0; ]
+	modify0(&(p), 1);
+	~ [ p==1; ]
+	modify1(&(p), 0);
+	~ [ p==1; ]
+	modify1(&(p), 1);
+	~ [ p==2; ]
+
+rconst:
+	#0: int:{?}	"main:0:{}"
+
+stack:
+	0: |1|  (int p)
+	---------------------------- main
+
+
+
+(0db)

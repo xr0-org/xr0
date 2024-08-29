@@ -58,7 +58,7 @@ command_destroy(struct command *cmd)
 bool should_continue = false;
 
 static struct command *
-getcmd();
+getcmd(char *debugsep);
 
 static struct error *
 command_continue_exec(struct path *);
@@ -70,7 +70,7 @@ static struct ast_expr *
 command_arg_toexpr(struct command *);
 
 struct error *
-command_next(struct path *p)
+command_next(struct path *p, char *debugsep)
 {
 	struct error *err;
 
@@ -78,7 +78,7 @@ command_next(struct path *p)
 		should_continue = false;
 		return command_continue_exec(p);
 	}
-	struct command *cmd = getcmd();
+	struct command *cmd = getcmd(debugsep);
 	switch (cmd->kind) {
 	case COMMAND_STEP:
 		err = path_progress(p, progressor_step());
@@ -172,15 +172,15 @@ command_arg_toexpr(struct command *c)
 #define MAX_ARGSLEN 100
 
 static struct command *
-process_command(char *cmd);
+process_command(char *cmd, char *debugsep);
 
 static struct command *
-process_commandwithargs(char *cmd, char *args);
+process_commandwithargs(char *cmd, char *args, char *debugsep);
 
 static struct command *
-getcmd()
+getcmd(char *debugsep)
 {
-	printf("(0db) ");
+	d_printf("(0db) %s", debugsep);
 	char line[MAX_LINELEN];
 	char cmd[MAX_COMMANDLEN];
 	char args[MAX_ARGSLEN];
@@ -193,14 +193,14 @@ getcmd()
 		/* ⊢ command no args */
 		strcpy(cmd, line);
 		cmd[strcspn(cmd, "\n")] = '\0';
-		return process_command(cmd);
+		return process_command(cmd, debugsep);
 	} else {
 		/* ⊢ command with args */
 		*space = '\0';
 		strcpy(cmd, line);
 		strcpy(args, space+1);
 		args[strcspn(args, "\n")] = '\0';
-		return process_commandwithargs(cmd, args);	
+		return process_commandwithargs(cmd, args, debugsep);	
 	}
 }
 
@@ -223,7 +223,7 @@ static bool
 command_isquit(char *cmd);
 
 static struct command *
-process_command(char *cmd)
+process_command(char *cmd, char *sep)
 {
 	if (command_ishelp(cmd)) {
 		return command_create_help(COMMAND_HELP);
@@ -237,7 +237,7 @@ process_command(char *cmd)
 		return command_create(COMMAND_QUIT);
 	} else {
 		d_printf("unknown command `%s'\n", cmd);
-		return getcmd();
+		return getcmd(sep);
 	}
 }
 
@@ -287,13 +287,13 @@ static struct string_arr *
 args_tokenise(char *args);
 
 static struct command *
-command_help(struct string_arr *args);
+command_help(struct string_arr *args, char *debugsep);
 
 static bool
 command_isbreak(char *cmd);
 
 static struct command *
-command_break(struct string_arr *args);
+command_break(struct string_arr *args, char *debugsep);
 
 static bool
 command_isverify(char *cmd);
@@ -302,22 +302,22 @@ static struct command *
 command_verify(char *arg);
 
 static struct command *
-process_commandwithargs(char *cmd, char *args)
+process_commandwithargs(char *cmd, char *args, char *debugsep)
 {
 	struct string_arr *args_tk = args_tokenise(dynamic_str(args));
 	if (args_tk == NULL) {
 		fprintf(stderr, "invalid command args: %s\n", args);
-		return getcmd();
+		return getcmd(debugsep);
 	}
 	if (command_ishelp(cmd)) {
-		return command_help(args_tk);
+		return command_help(args_tk, debugsep);
 	} else if (command_isbreak(cmd)) {
-		return command_break(args_tk);	
+		return command_break(args_tk, debugsep);	
 	} else if (command_isverify(cmd)) {
 		return command_verify(args);
 	} else {
 		d_printf("unknown command `%s'\n", cmd);
-		return getcmd();
+		return getcmd(debugsep);
 	}
 }
 
@@ -350,11 +350,11 @@ static void
 command_help_quit();
 
 static struct command *
-command_help(struct string_arr *args)
+command_help(struct string_arr *args, char *debugsep)
 {
 	if (string_arr_n(args) != 1) {
 		d_printf("`help' expects single argument\n");
-		return getcmd();
+		return getcmd(debugsep);
 	}
 	char *arg = string_arr_s(args)[0];
 	if (command_isstep(arg)) {
@@ -369,7 +369,7 @@ command_help(struct string_arr *args)
 		command_help_quit();
 	} else {
 		d_printf("`help' received unknown argument\n");
-		return getcmd();
+		return getcmd(debugsep);
 	}
 	return command_create(COMMAND_HELP);
 }
@@ -435,11 +435,11 @@ static struct command *
 break_list();
 
 static struct command *
-command_break(struct string_arr *args)
+command_break(struct string_arr *args, char *debugsep)
 {
 	if (string_arr_n(args) != 1) {
 		fprintf(stderr, "`break' expects single argument\n");
-		return getcmd();
+		return getcmd(debugsep);
 	}
 	char *arg = string_arr_s(args)[0];
 	if (break_argisset(arg)) {
@@ -448,7 +448,7 @@ command_break(struct string_arr *args)
 		return break_list();
 	} else {
 		fprintf(stderr, "`break' received unknown argument\n");
-		return getcmd();
+		return getcmd(debugsep);
 	}
 }
 

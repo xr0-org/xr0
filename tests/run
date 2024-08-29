@@ -1,10 +1,14 @@
 #!/bin/bash
 printf 'running test suite at %s\n\n' "$(date)"
-start=$(date +"%s")
+start=$(date +%s)
+
+TESTDIR=$(pwd)/tests
+XR0=$(pwd)/bin/0v
+LIBX=$(pwd)/libx
+IGNORE_FILE=$TESTDIR/wmw-www
 
 ntests=0
 npass=0
-nignore=0
 
 expected_suffix="EXPECTED"
 fail_prefix="FAIL"
@@ -15,14 +19,50 @@ fail="\e[31mFAIL\e[0m\n"
 pass="\e[32mPASS\e[0m\n"
 ignore="\e[33mIGNORE\e[0m\n"
 
-XR0=$(pwd)/bin/0v
-libx=$(pwd)/libx
-cd tests
-length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
-	tail -1 | wc -c)
+run_cmd() {
+	f=$1
+	folder=$(dirname "$f")
+	tempfile=$2
 
-# Read in test cases to ignore
-ignore_files=$(cat "wmw-www")
+	args=""
+
+	args_file=$folder/args
+	if [ -f $args_file ]; then
+		args=$(cat $args_file)
+	fi
+
+	$XR0 -I $LIBX $args $f > "$tempfile" 2>&1
+}
+
+run_test() {
+	f=$1
+	folder=$(dirname "$f")
+	tempfile=$2
+
+	output=$(run_cmd $f $tempfile)
+
+	# cases where we have an expected output to compare with
+	if [[ "$f" == *"${fail_prefix}"* || "$folder" == *"$topological_folder"* ]]
+	then
+		expected_file="${f}.${expected_suffix}"
+		
+		echo "$(<$tempfile)" | diff - $expected_file
+	else
+		# silence is golden
+		cat $tempfile
+	fi
+}
+
+nignore=$(cat $IGNORE_FILE | wc -l)
+ignore_files=$(cat $IGNORE_FILE)
+
+for f in $ignore_files; do
+	file=$TESTDIR/0v/$f
+	if [ ! -f "$file" ]; then
+		printf "error: ignored file %s not found\n" "$file" 1>&2
+		exit 1
+	fi
+done
 
 should_ignore() {
     for name in $ignore_files; do
@@ -33,64 +73,52 @@ should_ignore() {
     return 1
 }
 
-# Loop through and run tests
+cd $TESTDIR/0v
+
+ntests=$(ls */*.x | wc -l)
+
+length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
+	tail -1 | wc -c)
+
+# loop through and run tests
 for f in */*.x
 do
-	ntests=$((ntests+1))
-	folder=$(dirname "$f")
-
 	printf "%-${length}s ..." "$f"
-	tempfile=$(mktemp)
 
 	# skip ignores
 	if should_ignore $f; then
 		printf "$ignore"
-		nignore=$((nignore+1))
 		continue
 	fi
 
-	if [ "$folder" == *"$topological_folder"* ]
-	then
-		if [[ "$f" == *"verification"* ]]
-		then
-			output=$($XR0 -x main -I $libx -v $f > "$tempfile" 2>&1)
-		else
-			output=$($XR0 -t main -I $libx $f > "$tempfile" 2>&1)
-		fi
-	else 
-		output=$($XR0 -I $libx $f > "$tempfile" 2>&1)
-	fi
-
-	# cases where we have an expected output to compare with
-	if [[ "$f" == *"${fail_prefix}"* || "$folder" == *"$topological_folder"* ]]
-	then
-		expected_file="${f}.${expected_suffix}"
-		
-		output_file=$(<$tempfile)
-		echo "$output_file" | diff - $expected_file
-		if diff -q "$tempfile" "$expected_file" >/dev/null;
-		then
-			npass=$((npass+1))
-			printf "$pass"
-		else
-			printf "$fail"
-		fi
+	tempfile=$(mktemp)
+	succ=$(run_test $f $tempfile)
+	if [[ $succ -eq 0 ]]; then
+		npass=$((npass+1))
+		printf "$pass"
 	else
-		# silence is golden
-		if [[ $(cat $tempfile) -eq 0 ]] 
-		then
-			npass=$((npass+1))
-			printf "$pass"
-		fi
+		printf "$fail"
 	fi
-
 	rm $tempfile
+
 done
 
+cd $TESTDIR
+cd ..
+printf "%-${length}s ..." "0db/00-basic"
+if $TESTDIR/0db/run; then
+	npass=$((npass+1))
+	printf "$pass"
+else
+	printf "$fail"
+fi
+ntests=$((ntests+1))
+
 nfail=$((ntests-(npass+nignore)))
-finish=$(date +"%s")
-printf '\n%d tests:\t%d passed\t%d failed\t%d ignored\tin %d seconds\n' \
-	$ntests $npass $nfail $nignore $((finish-start))
+finish=$(date +%s)
+time=$(echo "$finish-$start" | bc)
+printf "\n%d tests:\t%d passed\t%d failed\t%d ignored\tin %d seconds\n" \
+	$ntests $npass $nfail $nignore $time
 if [ $nfail -ne 0 ]
 then
 	exit 1

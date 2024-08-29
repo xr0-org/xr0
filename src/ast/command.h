@@ -4,6 +4,6 @@
 struct path;
 
 struct error *
-command_next(struct path *);
+command_next(struct path *, char *debugsep);
 
 #endif

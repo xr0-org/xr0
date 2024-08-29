@@ -214,23 +214,21 @@ $(BUILD_DIR):
 
 # tests
 TESTDIR = tests
-RUNTEST = $(TESTDIR)/run
-TESTFILES = $(shell find $(TESTDIR) -name '*.0')
 
 tags:
 	@ctags -R .
 
-test: $(RUNTEST) $(TESTFILES) $(XR0V) 
+test: $(XR0V) $(TESTDIR)
 	@./tests/run
 
-check: $(RUNTEST) $(TESTFILES) $(XR0V)
+check: $(RUNTEST) $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
-check-verbose: $(RUNTEST) $(TESTFILES) $(XR0V)
+check-verbose: $(RUNTEST) $(XR0V)
 	$(VALGRIND) --num-callers=30 \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
-debug: $(RUNTEST) $(TESTFILES) $(XR0V)
+debug: $(RUNTEST) $(XR0V)
 	$(VALGRIND) $(XR0V) -d -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 clean:
