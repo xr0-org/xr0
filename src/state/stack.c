@@ -21,14 +21,7 @@ struct stack {
 	struct block_arr *memory;
 	struct map *varmap;		/* lvalues of blocks in frame */
 	struct stack *prev;
-
-	char *name;
-	enum execution_mode mode;
-	enum frame_kind kind;
-	struct program *p;
-
-	struct ast_expr *call;
-	struct ast_function *f;
+	struct frame *f;
 };
 
 struct frame {
@@ -58,19 +51,12 @@ stack_create(struct frame *f, struct stack *prev)
 	assert(stack);
 
 	assert(f->p);
-	stack->p = f->p;
 	stack->memory = block_arr_create();
 	stack->varmap = map_create();
 	stack->prev = prev;
 	stack->id = prev ? prev->id + 1 : 0;
 
-	stack->name = f->name;
-	stack->mode = f->mode;
-	stack->kind = f->kind;
-	if (stack->kind == FRAME_CALL) {
-		stack->call = f->call;
-		stack->f = f->f;
-	}
+	stack->f = f;
 
 	return stack;
 }
@@ -93,20 +79,20 @@ stack_getframe(struct stack *s, int frame)
 char *
 stack_programtext(struct stack *s)
 {
-	return program_render(s->p);
+	return program_render(s->f->p);
 }
 
 int
 stack_programindex(struct stack *s)
 {
-	return program_index(s->p);
+	return program_index(s->f->p);
 }
 
 void
 stack_return(struct stack *s)
 {
-	program_setatend(s->p);
-	if (s->prev && s->kind != FRAME_CALL) {
+	program_setatend(s->f->p);
+	if (s->prev && s->f->kind != FRAME_CALL) {
 		stack_return(s->prev);
 	}
 }
@@ -114,12 +100,12 @@ stack_return(struct stack *s)
 struct ast_expr *
 stack_framecall(struct stack *s)
 {
-	switch (s->kind) {
+	switch (s->f->kind) {
 	case FRAME_CALL:
-		assert(s->call);
-		return s->call;
+		assert(s->f->call);
+		return s->f->call;
 	case FRAME_INTERMEDIATE:
-		return program_prevcall(s->p);
+		return program_prevcall(s->f->p);
 	default:
 		assert(false);
 	}
@@ -134,12 +120,12 @@ stack_argmodulator(struct stack *stack, struct state *state)
 {
 	if (!stack->prev) {
 		/* base frame */
-		assert(stack->kind == FRAME_CALL);
+		assert(stack->f->kind == FRAME_CALL);
 		return dynamic_str("");
 	}
-	switch (stack->kind) {
+	switch (stack->f->kind) {
 	case FRAME_CALL:
-		assert(stack->call);
+		assert(stack->f->call);
 		return argmodulator(stack, state);
 	case FRAME_NESTED:
 	case FRAME_INTERMEDIATE:
@@ -193,7 +179,7 @@ stack_destroy(struct stack *stack)
 
 	/* XXX: call expr leak */
 
-	program_destroy(stack->p);
+	program_destroy(stack->f->p);
 	free(stack);
 }
 
@@ -210,19 +196,21 @@ struct stack *
 stack_copy(struct stack *stack)
 {
 	struct stack *copy = calloc(1, sizeof(struct stack));
-	copy->mode = stack->mode;
-	copy->p = program_copy(stack->p);
 	copy->memory = block_arr_copy(stack->memory);
 	copy->varmap = varmap_copy(stack->varmap);
 	copy->id = stack->id;
 	if (stack->prev) {
 		copy->prev = stack_copy(stack->prev);
 	}
-	copy->name = dynamic_str(stack->name);
-	copy->kind = stack->kind;
-	if (stack->kind == FRAME_CALL) {
-		copy->call = ast_expr_copy(stack->call);
-		copy->f = ast_function_copy(stack->f);
+	copy->f = malloc(sizeof(struct frame));
+	assert(copy->f);
+	copy->f->name = dynamic_str(stack->f->name);
+	copy->f->p = program_copy(stack->f->p);
+	copy->f->mode = stack->f->mode;
+	copy->f->kind = stack->f->kind;
+	if (stack->f->kind == FRAME_CALL) {
+		copy->f->call = ast_expr_copy(stack->f->call);
+		copy->f->f = ast_function_copy(stack->f->f);
 	}
 	return copy;
 }
@@ -244,7 +232,7 @@ rename_lowestframe(struct stack *s, char *new_name)
 	if (s->prev) {
 		rename_lowestframe(s->prev, new_name);
 	} else {
-		s->name = new_name;
+		s->f->name = new_name;
 	}
 }
 
@@ -302,7 +290,7 @@ stack_str(struct stack *stack, struct state *state)
 	for (int i = 0, len = 30; i < len-2; i++ ) {
 		strbuilder_putc(b, '-');
 	}
-	strbuilder_printf(b, " %s\n", stack->name);
+	strbuilder_printf(b, " %s\n", stack->f->name);
 	if (stack->prev) {
 		char *prev = stack_str(stack->prev, state);
 		strbuilder_printf(b, prev);
@@ -346,13 +334,13 @@ maxlenorzero(struct string_arr *arr)
 bool
 stack_islinear(struct stack *s)
 {
-	return s->kind == FRAME_INTERMEDIATE;
+	return s->f->kind == FRAME_INTERMEDIATE;
 }
 
 bool
 stack_insetup(struct stack *s)
 {	
-	if (s->kind == FRAME_SETUP) {
+	if (s->f->kind == FRAME_SETUP) {
 		return true;
 	}
 	if (s->prev == NULL) {
@@ -371,20 +359,20 @@ stack_id(struct stack *s)
 enum execution_mode
 stack_execmode(struct stack *s)
 {
-	return s->mode;
+	return s->f->mode;
 }
 
 struct lexememarker *
 stack_lexememarker(struct stack *s)
 {
-	return program_lexememarker(s->p);
+	return program_lexememarker(s->f->p);
 }
 
 static bool
 stack_isbase(struct stack *s)
 {
 	if (s->id == 0) {
-		assert(s->kind == FRAME_CALL);
+		assert(s->f->kind == FRAME_CALL);
 		return true;
 	}
 	return false;
@@ -394,7 +382,7 @@ static bool
 stack_issetupbase(struct stack *s)
 {
 	if (s->id == 1) { 
-		assert(s->kind == FRAME_SETUP);
+		assert(s->f->kind == FRAME_SETUP);
 		return true;
 	}
 	return false;
@@ -403,31 +391,31 @@ stack_issetupbase(struct stack *s)
 bool
 stack_atend(struct stack *s)
 {
-	return program_atend(s->p) && stack_isbase(s);
+	return program_atend(s->f->p) && stack_isbase(s);
 }
 
 bool
 stack_atsetupend(struct stack *s)
 {
-	return program_atend(s->p) && stack_issetupbase(s);
+	return program_atend(s->f->p) && stack_issetupbase(s);
 }
 
 struct error *
 stack_step(struct stack *s, struct state *state)
 {
-	return program_step(s->p, state);
+	return program_step(s->f->p, state);
 }
 
 struct error *
 stack_next(struct stack *s, struct state *state)
 {
-	return program_next(s->p, state);
+	return program_next(s->f->p, state);
 }
 
 void
 stack_storeloc(struct stack *s)
 {
-	program_storeloc(s->p);
+	program_storeloc(s->f->p);
 }
 
 void
@@ -467,13 +455,13 @@ stack_undeclare(struct stack *stack, struct state *state)
 static bool
 stack_iscall(struct stack *s)
 {
-	return s->kind == FRAME_CALL;
+	return s->f->kind == FRAME_CALL;
 }
 
 bool
 stack_isnested(struct stack *s)
 {
-	return s->kind == FRAME_NESTED;
+	return s->f->kind == FRAME_NESTED;
 }
 
 char *
@@ -485,12 +473,12 @@ stack_propername(struct stack *);
 struct error *
 stack_trace(struct stack *s, struct error *err)
 {
-	if (s->kind != FRAME_CALL) {
+	if (s->f->kind != FRAME_CALL) {
 		assert(s->prev);
 		return stack_trace(s->prev, err);
 	}
 	char *ctx = error_context(s);
-	char *loc = program_loc(s->p);
+	char *loc = program_loc(s->f->p);
 	struct error *e = error_printf(
 		"%s: %w (%s)%s", loc, err, stack_propername(s), ctx
 	);
@@ -520,8 +508,8 @@ static char *
 stack_context(struct stack *s)
 {
 	struct strbuilder *b = strbuilder_create();
-	if (s->kind == FRAME_CALL) {
-		char *loc = program_loc(s->p);
+	if (s->f->kind == FRAME_CALL) {
+		char *loc = program_loc(s->f->p);
 		strbuilder_printf(b, "\t%s (%s)", loc, stack_propername(s));
 		free(loc);
 	}
@@ -537,7 +525,7 @@ stack_context(struct stack *s)
 static char *
 stack_propername(struct stack *s)
 {
-	return s->kind == FRAME_CALL ? s->name : stack_propername(s->prev);
+	return s->f->kind == FRAME_CALL ? s->f->name : stack_propername(s->prev);
 }
 
 
@@ -564,7 +552,7 @@ stack_getvariable(struct stack *s, char *id)
 void
 stack_popprep(struct stack *s, struct state *state)
 {
-	if (s->kind == FRAME_CALL && !ast_function_isvoid(s->f)) {
+	if (s->f->kind == FRAME_CALL && !ast_function_isvoid(s->f->f)) {
 		assert(state_readregister(state));
 	}
 }
