@@ -3,6 +3,8 @@
 
 struct program;
 
+enum execution_mode;
+
 struct program *
 program_create(struct ast_block *, enum execution_mode);
 
@@ -35,8 +37,6 @@ program_atend(struct program *);
 
 struct ast_expr *
 program_prevcall(struct program *);
-
-enum execution_mode;
 
 struct error *
 program_step(struct program *, struct state *);
