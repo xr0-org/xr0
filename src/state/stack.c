@@ -553,7 +553,12 @@ stack_getblock(struct stack *s, int address)
 
 struct frame {
 	char *name;
-	enum frame_kind kind;
+	enum frame_kind {
+		FRAME_NESTED,
+		FRAME_INTERMEDIATE,
+		FRAME_CALL,
+		FRAME_SETUP,
+	} kind;
 	enum execution_mode mode;
 	struct program *p;
 
