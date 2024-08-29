@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <assert.h>
+#include <fcntl.h>
 
 #define XR0 "./../../bin/0v"
 #define LIBX "./../../libx"
@@ -36,50 +37,83 @@ main(int argc, char * argv[])
 		/* redirect stderr to capture error messages */
 		dup2(from_child[1], STDERR_FILENO);
 		
-		/* close pipe file descriptors */
-		close(to_child[0]);
+		/* close unused ends of pipes */
 		close(to_child[1]);
 		close(from_child[0]);
-		close(from_child[1]);
 
 		/* execute Xr0 */
 		char *args[] = { XR0, "-I", LIBX, "-d", TEST, (char *) NULL };
-		int err = execvp(args[0], args);
-		assert(!err);
 
 		if (execvp(XR0, args) == -1) {
-			fprintf(stderr, "execvp failed");
+			fprintf(stderr, "execvp failed\n");
 			exit(EXIT_FAILURE);
 		}
 	} else { /* parent process */
 		printf("in parent process...\n");
 
-		/* close unused ends of pipes in parent */
-		close(to_child[0]); /* parent doesn't read from to_child */
-		close(from_child[1]); /* parent doesn't write to from_child */
+		/* close unused ends of pipes */
+		close(to_child[0]);
+		close(from_child[1]);
 
-		/* send input to child */
-		char *input = "step\n";
-		write(to_child[1], input, strlen(input));
-
-		/* close write to child */
-		close(to_child[1]);
-
-		/* buffer to read output from child */
 		char buffer[MAX_BUF];
 		ssize_t nbytes;
 
-		while ((nbytes = read(from_child[0], buffer, sizeof(buffer) - 1) > 0)) {
-			/* keep reading */
+		/* read initial debugger info */
+		nbytes = read(from_child[0], buffer, sizeof(buffer) - 1);
+		printf("initial read %ld bytes from bin/0v:\n\n%s\n\n", nbytes, buffer);
+		if (nbytes == -1) {
+			fprintf(stderr, "read failed\n");
+			exit(EXIT_FAILURE);
+		} else if (nbytes == 0) {
+			printf("no output from bin/0v\n");
 		}
 
-		printf("output from bin/0v: %s\n", buffer);
-		buffer[nbytes] = '\0'; /* null terminate string */
+		const char *commands[] = {
+			"step\n", "next\n", "quit\n"
+		};
+		int ncommands = sizeof(commands) / sizeof(commands[0]);
+		for (int i = 0; i < ncommands; i++) {
+			/* write command to child process */
+			ssize_t bytes_written = write(to_child[1], commands[i], strlen(commands[i]));
+			if (bytes_written == -1) {
+				fprintf(stderr, "write failed\n");
+				break;
+			}
+			fsync(to_child[1]);
+			printf("sent command: %s\n", commands[i]);
 
-		/* close read end */
-		close(from_child[0]);
+			/* read output from child process */
+			sleep(1);
+			while (1) {
+				sleep(1);
+				nbytes = read(from_child[0], buffer, sizeof(buffer) - 1);
+				if (nbytes == -1) {
+					fprintf(stderr, "read failed");
+					exit(EXIT_FAILURE);
+				} else if (nbytes == 0) {
+					printf("end of file\n");
+					break;
+				}
+				
+				buffer[nbytes] = '\0';
+				printf("read %ld bytes from bin/0v:\n%s\n", nbytes, buffer);
+				fflush(stdout);
+				break;
+			}
+		}
 
-		wait(NULL);
+
+		int status;
+		if (waitpid(pid, &status, 0) == -1) {
+			fprintf(stderr, "wait failed\n");
+			exit(EXIT_FAILURE);
+		} else {
+			if (WIFEXITED(status)) {
+				printf("child exited with status %d\n", WEXITSTATUS(status));
+			} else if (WIFSIGNALED(status)) {
+				printf("child killed by signal %d\n", WTERMSIG(status));
+			}
+		}
 	}
 
 	/* errors */
@@ -87,5 +121,6 @@ main(int argc, char * argv[])
 	printf("errno: %d\n", err);
 
 	printf("debugger tests finished\n");
+
 	return 0;
 }
