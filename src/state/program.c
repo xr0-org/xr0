@@ -65,7 +65,9 @@ program_copy(struct program *old)
 {
 	struct program *new = program_create(old->b);
 	new->s = old->s;
+	new->b = ast_block_copy(old->b);
 	new->index = old->index;
+	new->loc = old->loc ? lexememarker_copy(old->loc) : NULL;
 	return new;
 }
 
