@@ -115,7 +115,7 @@ void
 stack_return(struct stack *s)
 {
 	program_setatend(frame_program(s->f));
-	if (s->prev && frame_iscall(s->f)) {
+	if (s->prev && !frame_iscall(s->f)) {
 		stack_return(s->prev);
 	}
 }
