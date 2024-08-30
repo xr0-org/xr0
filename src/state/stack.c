@@ -188,7 +188,7 @@ stack_destroy(struct stack *stack)
 
 	/* XXX: call expr leak */
 
-	program_destroy(frame_program(stack->f));
+	frame_destroy(stack->f);
 	free(stack);
 }
 

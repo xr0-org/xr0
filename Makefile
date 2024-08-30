@@ -1,5 +1,5 @@
 # commands
-CFLAGS = -g -I include -std=gnu11 -Wreturn-type -Wall
+CFLAGS = -g -I include -std=gnu11 -Werror -Wreturn-type -Wall
 VALGRIND = valgrind --fullpath-after=`pwd`/src/
 LEX = lex
 YACC = bison -yvd

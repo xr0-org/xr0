@@ -40,7 +40,7 @@ struct e_res *
 ast_expr_eval(struct ast_expr *expr, struct state *state)
 {
 	struct e_res *res = directeval(expr, state);
-	if (e_res_iserror(res)) {
+	if (e_res_iserror(res) || !e_res_haseval(res)) {
 		return res;
 	}
 	struct eval *eval = e_res_as_eval(res);
@@ -81,6 +81,9 @@ static struct e_res *
 expr_call_eval(struct ast_expr *expr, struct state *state);
 
 static struct e_res *
+expr_alloc_eval(struct ast_expr *expr, struct state *state);
+
+static struct e_res *
 expr_assign_eval(struct ast_expr *expr, struct state *state);
 
 static struct e_res *
@@ -111,6 +114,8 @@ directeval(struct ast_expr *expr, struct state *state)
 		return expr_structmember_eval(expr, state);
 	case EXPR_CALL:
 		return expr_call_eval(expr, state);
+	case EXPR_ALLOCATION:
+		return expr_alloc_eval(expr, state);
 	case EXPR_ASSIGNMENT:
 		return expr_assign_eval(expr, state);
 	case EXPR_INCDEC:
@@ -403,7 +408,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		);
 	}
 
-	return e_res_error_create(error_eval_void());
+	return e_res_empty_create();
 }
 
 static struct error *
@@ -930,102 +935,6 @@ hack_object_from_assertion(struct ast_expr *expr, struct state *state)
 	);
 }
 
-
-
-
-
-static struct e_res *
-assign_absexec(struct ast_expr *, struct state *);
-
-static struct e_res *
-call_absexec(struct ast_expr *, struct state *);
-
-static struct e_res *
-alloc_absexec(struct ast_expr *, struct state *);
-
-struct e_res *
-ast_expr_abseval(struct ast_expr *expr, struct state *state)
-{
-	switch (ast_expr_kind(expr)) {
-	case EXPR_ASSIGNMENT:
-		return assign_absexec(expr, state);
-	case EXPR_ALLOCATION:
-		return alloc_absexec(expr, state);
-	case EXPR_CALL:
-		return call_absexec(expr, state);
-	case EXPR_IDENTIFIER:
-	case EXPR_CONSTANT:
-	case EXPR_UNARY:
-	case EXPR_STRUCTMEMBER:
-	case EXPR_RANGE:
-		return ast_expr_eval(expr, state);	
-	default:
-		assert(false);
-	}
-}
-
-static struct e_res *
-call_absexec(struct ast_expr *expr, struct state *state)
-{
-	breakpoint_reset();
-
-	struct error *err;
-
-	struct ast_expr *root = ast_expr_call_root(expr);
-	/* TODO: function-valued-expressions */
-	char *name = ast_expr_as_identifier(root);
-
-	struct ast_function *f = externals_getfunc(state_getext(state), name);
-	if (!f) {
-		return e_res_error_create(error_printf("`%s' not found\n", name));
-	}
-
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **params = ast_function_params(f);
-
-	int nargs = ast_expr_call_nargs(expr);
-	if (nargs != nparams) {
-		return e_res_error_create(
-			error_printf(
-				"`%s' given %d arguments instead of %d\n",
-				name, nargs, nparams
-			)
-		);
-	}
-
-	struct value_arr_res *args_res = prepare_arguments(
-		nargs, ast_expr_call_args(expr),
-		nparams, params,
-		state
-	);
-	if (value_arr_res_iserror(args_res)) {
-		return e_res_error_create(value_arr_res_as_error(args_res));
-	}
-	struct value_arr *args = value_arr_res_as_arr(args_res);
-
-	struct frame *call_frame = frame_call_create(
-		ast_function_name(f),
-		ast_function_abstract(f),
-		EXEC_ABSTRACT_NO_SETUP,
-		ast_expr_copy(expr),
-		f
-	);
-	state_pushframe(state, call_frame);
-
-	if ((err = prepare_parameters(nparams, params, args, name, state))) {
-		return e_res_error_create(err);
-	}
-
-	/* XXX: pass copy so we don't observe */
-	if ((err = call_setupverify(f, ast_expr_copy(expr), state))) {
-		return e_res_error_create(
-			error_printf("precondition failure: %w", err)
-		);
-	}
-
-	return e_res_empty_create();
-}
-
 static int
 hack_constorone(struct ast_expr *, struct state *);
 
@@ -1036,8 +945,18 @@ dealloc_process(struct ast_expr *, struct state *);
  * returns a location or gets the location pointed to by an lvalue and attempts
  * to free possibly returning an error */
 static struct e_res *
-alloc_absexec(struct ast_expr *expr, struct state *state)
+expr_alloc_eval(struct ast_expr *expr, struct state *state)
 {
+	switch (state_execmode(state)) {
+	case EXEC_INSETUP:
+	case EXEC_ABSTRACT_NO_SETUP:
+		break;
+	default:
+		return e_res_error_create(
+			error_printf("Xr0 commands can only be run in abstract mode")
+		);
+	}
+
 	struct e_res *res;
 	switch (ast_expr_alloc_kind(expr)) {
 	case ALLOC:
@@ -1132,38 +1051,6 @@ dealloc_process(struct ast_expr *expr, struct state *state)
 	return e_res_empty_create();
 }
 
-static struct e_res *
-assign_absexec(struct ast_expr *expr, struct state *state)
-{
-	struct ast_expr *lval = ast_expr_assignment_lval(expr),
-			*rval = ast_expr_assignment_rval(expr);
-
-	struct e_res *res = ast_expr_abseval(rval, state);
-	if (e_res_iserror(res)) {
-		return res;
-	}
-	if (!e_res_haseval(res)) {
-		assert(false);
-		return e_res_error_create(error_printf("undefined indirection (rvalue)"));
-	}
-	struct e_res *l_res = ast_expr_eval(lval, state);
-	if (e_res_iserror(l_res)) {
-		return e_res_error_create(e_res_as_error(l_res));
-	}
-	struct object *obj = object_res_as_object(
-		state_get(state, eval_as_lval(e_res_as_eval(l_res)), true)
-	);
-	if (!obj) {
-		return e_res_error_create(error_printf("undefined indirection (lvalue)"));
-	}
-
-	struct value *v = value_res_as_value(
-		eval_to_value(e_res_as_eval(res), state)
-	);
-	object_assign(obj, value_copy(v));
-
-	return res;
-}
 
 static struct ast_expr *
 range_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,

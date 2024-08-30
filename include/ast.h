@@ -269,9 +269,6 @@ ast_expr_varinfomap(struct map *, struct ast_expr *, struct state *s);
 struct e_res *
 ast_expr_eval(struct ast_expr *, struct state *);
 
-struct e_res *
-ast_expr_abseval(struct ast_expr *, struct state *);
-
 struct value;
 
 struct ast_function;
@@ -509,9 +506,6 @@ ast_stmt_verify(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_exec(struct ast_stmt *, struct state *);
-
-struct error *
-ast_stmt_absexec(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_pushsetup(struct ast_stmt *, struct state *);

@@ -226,7 +226,7 @@ static struct error *
 stmt_compound_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-expr_exec(struct ast_expr *, struct state *);
+stmt_expr_exec(struct ast_expr *, struct state *);
 
 static struct error *
 stmt_sel_exec(struct ast_stmt *, struct state *);
@@ -253,12 +253,12 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 		return NULL;
 	case STMT_LABELLED:
 		return NULL;
+	case STMT_EXPR:
+		return stmt_expr_exec(ast_stmt_as_expr(stmt), s);
 	case STMT_COMPOUND:
 		return stmt_compound_exec(stmt, s);
 	case STMT_COMPOUND_V:
 		return stmt_compoundv_exec(stmt, s);
-	case STMT_EXPR:
-		return expr_exec(ast_stmt_as_expr(stmt), s);
 	case STMT_SELECTION:
 		return stmt_sel_exec(stmt, s);
 	case STMT_ITERATION:
@@ -296,7 +296,7 @@ decl_init(struct ast_variable *v, struct state *s)
 			ast_expr_identifier_create(ast_variable_name(v)),
 			ast_variable_init(v)
 		);
-		return expr_exec(assign, s);
+		return stmt_expr_exec(assign, s);
 	}
 	return NULL;
 }
@@ -319,14 +319,14 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 	struct frame *block_frame = frame_block_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
-		EXEC_ACTUAL
+		state_execmode(state)
 	);
 	state_pushframe(state, block_frame);
 	return NULL;
 }
 
 static struct error *
-expr_exec(struct ast_expr *expr, struct state *state)
+stmt_expr_exec(struct ast_expr *expr, struct state *state)
 {
 	struct e_res *res = ast_expr_eval(expr, state);
 	if (e_res_iserror(res)) {
@@ -372,7 +372,7 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 		return NULL;
 	}
 
-	struct error *err = ast_stmt_absexec(neteffect, state);
+	struct error *err = ast_stmt_exec(neteffect, state);
 	if (err) {
 		return err;
 	}
@@ -456,7 +456,7 @@ stmt_register_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 register_call_exec(struct ast_expr *call, struct state *state)
 {
-	struct e_res *res = ast_expr_abseval(call, state);
+	struct e_res *res = ast_expr_eval(call, state);
 	if (e_res_iserror(res)) {
 		return e_res_as_error(res);
 	}
@@ -509,123 +509,6 @@ call_return(struct state *state)
 	);
 }
 
-static struct error *
-expr_absexec(struct ast_expr *, struct state *);
-
-static struct error *
-sel_absexec(struct ast_stmt *stmt, struct state *);
-
-static struct error *
-iter_absexec(struct ast_stmt *stmt, struct state *);
-
-static struct error *
-comp_absexec(struct ast_stmt *stmt, struct state *);
-
-static struct error *
-jump_absexec(struct ast_stmt *, struct state *);
-
-struct error *
-ast_stmt_absexec(struct ast_stmt *stmt, struct state *s)
-{
-	if (!state_islinear(s) && islinearisable(stmt)) {
-		return linearise(stmt, s);
-	}
-	switch (ast_stmt_kind(stmt)) {
-	case STMT_DECLARATION:
-		return stmt_decl_exec(stmt, s);
-	case STMT_NOP:
-		return NULL;
-	case STMT_LABELLED:
-		return NULL;
-	case STMT_EXPR:
-		return expr_absexec(ast_stmt_as_expr(stmt), s);
-	case STMT_SELECTION:
-		return sel_absexec(stmt, s);
-	case STMT_ITERATION:
-		return iter_absexec(stmt, s);
-	case STMT_COMPOUND:
-		return comp_absexec(stmt, s);
-	case STMT_JUMP:
-		return jump_absexec(stmt, s);
-	case STMT_REGISTER:
-		return stmt_register_exec(stmt, s);
-	default:
-		assert(false);
-	}
-}
-
-static struct error *
-expr_absexec(struct ast_expr *expr, struct state *state)
-{
-	struct e_res *res = ast_expr_abseval(expr, state);
-	if (e_res_iserror(res)) {
-		return e_res_as_error(res);
-	}
-	return NULL;
-}
-
-static struct error *
-sel_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
-	struct ast_stmt *body = ast_stmt_sel_body(stmt),
-			*nest = ast_stmt_sel_nest(stmt);
-	struct bool_res *res = ast_expr_decide(cond, state);
-	if (bool_res_iserror(res)) {
-		return bool_res_as_error(res);
-	}
-	if (bool_res_as_bool(res)) {
-		return ast_stmt_absexec(body, state);
-	} else if (nest) {
-		return ast_stmt_absexec(nest, state);
-	}
-	return NULL;
-}
-
-static struct error *
-iter_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	assert(false);
-}
-
-static struct error *
-comp_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	struct frame *block_frame = frame_block_create(
-		dynamic_str("block"),
-		ast_stmt_as_block(stmt),
-		state_execmode(state)
-	);
-	state_pushframe(state, block_frame);
-	return NULL;
-}
-
-static struct error *
-jump_absexec(struct ast_stmt *stmt, struct state *state)
-{
-	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
-
-	if (rv) {
-		struct e_res *res = ast_expr_abseval(rv, state);
-		if (e_res_iserror(res)) {
-			struct error *err = e_res_as_error(res);
-			if (error_to_eval_void(err)) {
-				e_res_errorignore(res);
-			} else {
-				return err;
-			}
-		}
-		if (e_res_haseval(res)) {
-			struct value *v = value_copy(
-				value_res_as_value(
-					eval_to_value(e_res_as_eval(res), state)
-				)
-			);
-			state_writeregister(state, v);
-		}
-	}
-	return error_return();
-}
 
 static struct error *
 labelled_pushsetup(struct ast_stmt *, struct state *);
