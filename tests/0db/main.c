@@ -28,6 +28,9 @@ trim(char *str);
 struct instr *
 read_testcfg(const char *fname, int *icount);
 
+char *
+read_state(const char *fname);
+
 int
 main(int argc, char * argv[])
 {
@@ -98,20 +101,19 @@ main(int argc, char * argv[])
 			fprintf(stderr, "read failed\n");
 		}
 		printf("read %ld bytes from bin/0v:\n%s\n", nbytes, buffer);
+		
+		/* XXX: compare initial debugger message */
 
-		const char *commands[] = {
-			"step\n", "next\n", "quit\n"
-		};
-		int ncommands = sizeof(commands) / sizeof(commands[0]);
-		for (int i = 0; i < ncommands; i++) {
+		for (int i = 0; i < icount; i++) {
+			char *cmd = instr[i].cmd;
+			char *state = instr[i].state;
 			/* write command to child process */
-			ssize_t bytes_written = write(to_child[1], commands[i], strlen(commands[i]));
+			ssize_t bytes_written = write(to_child[1], cmd, strlen(cmd));
 			if (bytes_written == -1) {
-				fprintf(stderr, "write failed\n");
-				break;
+				perror("write failed");
 			}
 			fsync(to_child[1]);
-			printf("sent command: %s\n", commands[i]);
+			printf("sent command: %s\n", cmd);
 
 			/* read output from child process */
 			sleep(1);
@@ -125,9 +127,16 @@ main(int argc, char * argv[])
 				/* eof */
 				printf("end of output from child\n");
 			} else {
-				fprintf(stderr, "read failed\n");
+				perror("read failed");
 			}
-			printf("read %ld bytes from bin/0v:\n%s\n", nbytes, buffer);
+			printf("returned:\n%s\n", buffer);
+			
+			char *expected = read_state(state);
+			if (strcmp(expected, buffer) != 0) {
+				fprintf(stderr, "expected state does not match returned state\n");	
+			} else {
+				printf("states match\n");
+			}
 		}
 
 		close(to_child[1]);
@@ -159,7 +168,7 @@ trim(char *str)
 {
 	char *end;
 
-	while (*str == ' ') str++; /* grow head */
+	while (*str == ' ' || *str == '\"') str++; /* grow head */
 	end = str + strlen(str) - 1;
 	while (end > str && (*end == ' ')) end--; /* shrink end */
 	*(end + 1) = '\0';
@@ -191,13 +200,54 @@ read_testcfg(const char *fname, int *icount)
 			return NULL;
 		}
 		
-		instructions[*icount].cmd = malloc(strlen(cmd) + 1);
-		instructions[*icount].state = malloc(strlen(state) + 1);
+		/* +2 for "\n" and "\0" */
+		instructions[*icount].cmd = malloc(strlen(cmd));
+		instructions[*icount].state = malloc(strlen(state));
+
+		/* copy over */
 		strcpy(instructions[*icount].cmd, cmd);	
 		strcpy(instructions[*icount].state, state);
+
+		instructions[*icount].cmd[strlen(cmd)] = '\n';
+
+		printf("[%s]\n", instructions[*icount].cmd);
 
 		(*icount)++;
 	}
 	fclose(f);
 	return instructions;
 }
+
+char *
+read_state(const char *fname)
+{
+	printf("fname: [%s]\n", fname);
+	FILE *f = fopen(fname, "r");
+	if (f == NULL) {
+		perror("error opening file");
+		return NULL;	
+	}
+
+	fseek(f, 0, SEEK_END);
+	long fsize = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	char *state = malloc(fsize + 1);
+	if (state == NULL) {
+		perror("error during memory allocation");
+		fclose(f);
+		return NULL;
+	}
+	size_t nbytes = fread(state, 1, fsize, f);	
+	if (nbytes != fsize) {
+		perror("error reading file");
+		free(state);
+		fclose(f);
+		return NULL;
+	}
+	state[fsize] = '\0';
+	fclose(f);
+	return state;
+}
+
+
