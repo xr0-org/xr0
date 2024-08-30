@@ -38,7 +38,7 @@ main(int argc, char * argv[])
 	int icount;
 	struct instr *instr = read_testcfg(TEST_CFG, &icount);
 	for (int i = 0; i < icount; i++) {
-		printf("[ %s, %s]\n", instr[i].cmd, instr[i].state);
+		printf("[%s, %s]\n", instr[i].cmd, instr[i].state);
 	}
 
 	int to_child[2];
@@ -129,7 +129,6 @@ main(int argc, char * argv[])
 			} else {
 				perror("read failed");
 			}
-			printf("returned:\n%s\n", buffer);
 			
 			char *expected = read_state(state);
 			if (strcmp(expected, buffer) != 0) {
@@ -249,5 +248,3 @@ read_state(const char *fname)
 	fclose(f);
 	return state;
 }
-
-
