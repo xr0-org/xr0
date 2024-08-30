@@ -18,9 +18,9 @@ struct program {
 	int index;
 	struct lexememarker *loc;
 	enum execution_mode {
-		EXEC_ABSTRACT_SETUP_ONLY,
-		EXEC_INSETUP,
-		EXEC_ABSTRACT_NO_SETUP,
+		EXEC_FINDSETUP,
+		EXEC_SETUP,
+		EXEC_ABSTRACT,
 		EXEC_ACTUAL,
 		EXEC_VERIFY,
 	} mode;
@@ -51,19 +51,19 @@ program_same_create(struct ast_block *b, struct program *origin)
 struct program *
 program_findsetup_create(struct ast_block *b)
 {
-	return program_create(b, EXEC_ABSTRACT_SETUP_ONLY);
+	return program_create(b, EXEC_FINDSETUP);
 }
 
 struct program *
 program_setup_create(struct ast_block *b)
 {
-	return program_create(b, EXEC_INSETUP);
+	return program_create(b, EXEC_SETUP);
 }
 
 struct program *
 program_abstract_create(struct ast_block *b)
 {
-	return program_create(b, EXEC_ABSTRACT_NO_SETUP);
+	return program_create(b, EXEC_ABSTRACT);
 }
 
 struct program *
@@ -142,8 +142,8 @@ int
 program_modecanrunxr0cmd(struct program *p)
 {
 	switch (p->mode) {
-	case EXEC_INSETUP:
-	case EXEC_ABSTRACT_NO_SETUP:
+	case EXEC_SETUP:
+	case EXEC_ABSTRACT:
 		return 1;
 	default:
 		return 0;
@@ -246,10 +246,10 @@ program_stmt_process(struct program *p, struct state *s)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	switch (p->mode) {
-	case EXEC_ABSTRACT_SETUP_ONLY:
+	case EXEC_FINDSETUP:
 		return ast_stmt_pushsetup(stmt, s);
-	case EXEC_INSETUP:
-	case EXEC_ABSTRACT_NO_SETUP:
+	case EXEC_SETUP:
+	case EXEC_ABSTRACT:
 	case EXEC_ACTUAL:
 		return ast_stmt_exec(stmt, s);
 	case EXEC_VERIFY:
