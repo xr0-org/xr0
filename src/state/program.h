@@ -3,10 +3,23 @@
 
 struct program;
 
-enum execution_mode;
+struct program *
+program_same_create(struct ast_block *, struct program *origin);
 
 struct program *
-program_create(struct ast_block *, enum execution_mode);
+program_findsetup_create(struct ast_block *);
+
+struct program *
+program_setup_create(struct ast_block *);
+
+struct program *
+program_abstract_create(struct ast_block *);
+
+struct program *
+program_actual_create(struct ast_block *);
+
+struct program *
+program_verify_create(struct ast_block *);
 
 struct program *
 program_copy(struct program *);
@@ -20,8 +33,11 @@ program_str(struct program *);
 int
 program_index(struct program *);
 
-enum execution_mode
-program_mode(struct program *);
+int
+program_modecanverify(struct program *);
+
+int
+program_modecanrunxr0cmd(struct program *);
 
 void
 program_storeloc(struct program *);

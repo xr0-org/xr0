@@ -127,7 +127,7 @@ directeval(struct ast_expr *expr, struct state *state)
 	case EXPR_BRACKETED:
 		return ast_expr_eval(ast_expr_bracketed_root(expr), state);
 	case EXPR_ISDEALLOCAND:
-		assert(state_execmode(state) == EXEC_VERIFY);
+		assert(state_modecanverify(state));
 		return isdeallocand_eval(expr, state);
 	default:
 		assert(false);
@@ -388,10 +388,9 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	}
 	struct value_arr *args = value_arr_res_as_arr(args_res);
 
-	struct frame *call_frame = frame_call_create(
+	struct frame *call_frame = frame_callabstract_create(
 		ast_function_name(f),
 		ast_function_abstract(f),
-		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_copy(expr),
 		f
 	);
@@ -421,10 +420,9 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	struct error *err;
 
 	char *fname = ast_function_name(f);
-	struct frame *frame = frame_call_create(
+	struct frame *frame = frame_callabstract_create(
 		fname,
 		ast_function_abstract(f),
-		EXEC_ABSTRACT_NO_SETUP,
 		ast_expr_copy(call),
 		f
 	);
@@ -438,10 +436,9 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	if (ast_block_res_iserror(mod_abs_res)) {
 		return ast_block_res_as_error(mod_abs_res);
 	}
-	struct frame *setupframe = frame_setup_create(
-		"setup",
-		ast_block_res_as_block(mod_abs_res),
-		EXEC_ABSTRACT_SETUP_ONLY
+	struct frame *setupframe = frame_blockfindsetup_create(
+		dynamic_str("setup"),
+		ast_block_res_as_block(mod_abs_res)
 	);
 	state_pushframe(param_state, setupframe);
 	while (!state_atsetupend(param_state)) {
@@ -947,11 +944,7 @@ dealloc_process(struct ast_expr *, struct state *);
 static struct e_res *
 expr_alloc_eval(struct ast_expr *expr, struct state *state)
 {
-	switch (state_execmode(state)) {
-	case EXEC_INSETUP:
-	case EXEC_ABSTRACT_NO_SETUP:
-		break;
-	default:
+	if (!state_modecanrunxr0cmd(state)) {
 		return e_res_error_create(
 			error_printf("Xr0 commands can only be run in abstract mode")
 		);

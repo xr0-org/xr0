@@ -27,8 +27,11 @@ frame_setname(struct frame *, char *);
 static char *
 frame_name(struct frame *);
 
-static enum execution_mode
-frame_mode(struct frame *);
+static int
+frame_modecanverify(struct frame *);
+
+static int
+frame_modecanrunxr0cmd(struct frame *);
 
 static struct program *
 frame_program(struct frame *);
@@ -43,7 +46,7 @@ static struct ast_function *
 frame_function(struct frame *);
 
 static int
-frame_isnested(struct frame *);
+frame_isblock(struct frame *);
 
 static int
 frame_isinter(struct frame *);
@@ -339,7 +342,7 @@ stack_islinear(struct stack *s)
 
 bool
 stack_insetup(struct stack *s)
-{	
+{
 	return frame_issetup(s->f) || (s->prev && stack_insetup(s->prev));
 }
 
@@ -350,11 +353,18 @@ stack_id(struct stack *s)
 	return s->id;
 }
 
-enum execution_mode
-stack_execmode(struct stack *s)
+int
+stack_modecanverify(struct stack *s)
 {
-	return frame_mode(s->f);
+	return frame_modecanverify(s->f);
 }
+
+int
+stack_modecanrunxr0cmd(struct stack *s)
+{
+	return frame_modecanrunxr0cmd(s->f);
+}
+
 
 struct lexememarker *
 stack_lexememarker(struct stack *s)
@@ -376,7 +386,7 @@ static bool
 stack_issetupbase(struct stack *s)
 {
 	if (s->id == 1) { 
-		assert(frame_issetup(s->f));
+		assert(frame_issetup(s->f) || frame_isblock(s->f));
 		return true;
 	}
 	return false;
@@ -449,7 +459,7 @@ stack_undeclare(struct stack *stack, struct state *state)
 bool
 stack_isnested(struct stack *s)
 {
-	return frame_isnested(s->f);
+	return frame_isblock(s->f);
 }
 
 char *
@@ -554,8 +564,8 @@ stack_getblock(struct stack *s, int address)
 struct frame {
 	char *name;
 	enum frame_kind {
-		FRAME_NESTED,
-		FRAME_INTERMEDIATE,
+		FRAME_BLOCK,
+		FRAME_LINEAR,
 		FRAME_CALL,
 		FRAME_SETUP,
 	} kind;
@@ -579,34 +589,72 @@ frame_create(char *n, struct program *p, enum frame_kind kind)
 	return f;
 }
 
-struct frame *
-frame_call_create(char *n, struct ast_block *b, enum execution_mode mode,
-		struct ast_expr *call, struct ast_function *func)
+static struct frame *
+frame_call_create(char *n, struct program *p, struct ast_expr *call,
+		struct ast_function *func)
 {
 	assert(call); assert(func);
 
-	struct frame *f = frame_create(n, program_create(b, mode), FRAME_CALL);
+	struct frame *f = frame_create(n, p, FRAME_CALL);
 	f->call = ast_expr_copy(call);
 	f->f = ast_function_copy(func);
 	return f;
 }
 
 struct frame *
-frame_block_create(char *n, struct ast_block *b, enum execution_mode mode)
+frame_callabstract_create(char *n, struct ast_block *b, struct ast_expr *call,
+		struct ast_function *func)
 {
-	return frame_create(n, program_create(b, mode), FRAME_NESTED);
+	return frame_call_create(n, program_abstract_create(b), call, func);
 }
 
 struct frame *
-frame_setup_create(char *n, struct ast_block *b, enum execution_mode mode)
+frame_callactual_create(char *n, struct ast_block *b, struct ast_expr *call,
+		struct ast_function *func)
 {
-	return frame_create(n, program_create(b, mode), FRAME_SETUP);
+	return frame_call_create(n, program_actual_create(b), call, func);
+}
+
+static struct frame *
+frame_block_create_withprogram(char *n, struct program *p)
+{
+	return frame_create(n, p, FRAME_BLOCK);
 }
 
 struct frame *
-frame_intermediate_create(char *n, struct ast_block *b, enum execution_mode mode)
+frame_blockverify_create(char *name, struct ast_block *b)
 {
-	return frame_create(n, program_create(b, mode), FRAME_INTERMEDIATE);
+	return frame_block_create_withprogram(name, program_verify_create(b));
+}
+
+struct frame *
+frame_blockfindsetup_create(char *name, struct ast_block *b)
+{
+	return frame_block_create_withprogram(name, program_findsetup_create(b));
+}
+
+struct frame *
+frame_blocksame_create(char *name, struct ast_block *b, struct state *s)
+{
+	return frame_block_create_withprogram(
+		name, program_same_create(b, state_stack(s)->f->p)
+	);
+}
+
+struct frame *
+frame_setup_create(char *n, struct ast_block *b)
+{
+	return frame_create(n, program_setup_create(b), FRAME_SETUP);
+}
+
+struct frame *
+frame_linear_create(char *n, struct ast_block *b, struct state *s)
+{
+	return frame_create(
+		n,
+		program_same_create(b, state_stack(s)->f->p),
+		FRAME_LINEAR
+	);
 }
 
 static void
@@ -644,6 +692,18 @@ frame_name(struct frame *f)
 	return f->name;
 }
 
+static int
+frame_modecanverify(struct frame *f)
+{
+	return program_modecanverify(f->p);
+}
+
+static int
+frame_modecanrunxr0cmd(struct frame *f)
+{
+	return program_modecanrunxr0cmd(f->p);
+}
+
 static struct program *
 frame_program(struct frame *f)
 {
@@ -664,15 +724,15 @@ frame_iscall(struct frame *f)
 }
 
 static int
-frame_isnested(struct frame *f)
+frame_isblock(struct frame *f)
 {
-	return f->kind == FRAME_NESTED;
+	return f->kind == FRAME_BLOCK;
 }
 
 static int
 frame_isinter(struct frame *f)
 {
-	return f->kind == FRAME_INTERMEDIATE;
+	return f->kind == FRAME_LINEAR;
 }
 
 static int
@@ -687,19 +747,12 @@ frame_call(struct frame *f)
 	switch (f->kind) {
 	case FRAME_CALL:
 		return f->call;
-	case FRAME_INTERMEDIATE:
+	case FRAME_LINEAR:
 		return program_prevcall(f->p);
 	default:
 		assert(false);
 	}
 }
-
-static enum execution_mode
-frame_mode(struct frame *f)
-{
-	return program_mode(f->p);
-}
-
 
 struct variable {
 	struct ast_type *type;

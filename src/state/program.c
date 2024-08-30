@@ -17,13 +17,19 @@ struct program {
 	} s;
 	int index;
 	struct lexememarker *loc;
-	enum execution_mode mode;
+	enum execution_mode {
+		EXEC_ABSTRACT_SETUP_ONLY,
+		EXEC_INSETUP,
+		EXEC_ABSTRACT_NO_SETUP,
+		EXEC_ACTUAL,
+		EXEC_VERIFY,
+	} mode;
 };
 
 static enum program_state
 program_state_init(struct ast_block *);
 
-struct program *
+static struct program *
 program_create(struct ast_block *b, enum execution_mode m)
 {
 	struct program *p = malloc(sizeof(struct program));
@@ -34,6 +40,42 @@ program_create(struct ast_block *b, enum execution_mode m)
 	p->loc = NULL;
 	p->mode = m;
 	return p;
+}
+
+struct program *
+program_same_create(struct ast_block *b, struct program *origin)
+{
+	return program_create(b, origin->mode);
+}
+
+struct program *
+program_findsetup_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_ABSTRACT_SETUP_ONLY);
+}
+
+struct program *
+program_setup_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_INSETUP);
+}
+
+struct program *
+program_abstract_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_ABSTRACT_NO_SETUP);
+}
+
+struct program *
+program_actual_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_ACTUAL);
+}
+
+struct program *
+program_verify_create(struct ast_block *b)
+{
+	return program_create(b, EXEC_VERIFY);
 }
 
 struct program *
@@ -90,11 +132,24 @@ program_index(struct program *p)
 	return p->index;
 }
 
-enum execution_mode
-program_mode(struct program *p)
+int
+program_modecanverify(struct program *p)
 {
-	return p->mode;
+	return p->mode == EXEC_VERIFY;
 }
+
+int
+program_modecanrunxr0cmd(struct program *p)
+{
+	switch (p->mode) {
+	case EXEC_INSETUP:
+	case EXEC_ABSTRACT_NO_SETUP:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
 
 char *
 program_render(struct program *p)

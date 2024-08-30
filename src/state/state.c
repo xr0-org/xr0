@@ -145,32 +145,22 @@ state_islinear(struct state *s)
 	return stack_islinear(s->stack);
 }
 
-char *
-state_execmode_str(enum execution_mode m)
+struct stack *
+state_stack(struct state *s)
 {
-	char *execmode_type_str[] = {
-		[EXEC_ABSTRACT_SETUP_ONLY]	= "ABSTRACT (SETUP ONLY)",
-		[EXEC_INSETUP]			= "SETUP",
-		[EXEC_ABSTRACT_NO_SETUP]	= "ABSTRACT (NO SETUP)",
-		[EXEC_ACTUAL]			= "ACTUAL",
-		[EXEC_VERIFY]			= "VERIFY",
-	};
-	switch (m) {
-	case EXEC_ABSTRACT_SETUP_ONLY:
-	case EXEC_INSETUP:
-	case EXEC_ABSTRACT_NO_SETUP:
-	case EXEC_ACTUAL:
-	case EXEC_VERIFY:
-		return dynamic_str(execmode_type_str[m]);
-	default:
-		assert(false);
-	}
+	return s->stack;
 }
 
-enum execution_mode
-state_execmode(struct state *s)
+int
+state_modecanverify(struct state *s)
 {
-	return stack_execmode(s->stack);
+	return stack_modecanverify(s->stack);
+}
+
+int
+state_modecanrunxr0cmd(struct state *s)
+{
+	return stack_modecanrunxr0cmd(s->stack);
 }
 
 struct lexememarker *

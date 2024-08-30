@@ -28,8 +28,8 @@ linearise(struct ast_stmt *stmt, struct state *state)
 	if (err) {
 		return err;
 	}
-	struct frame *inter_frame = frame_intermediate_create(
-		dynamic_str("inter"), b, state_execmode(state)
+	struct frame *inter_frame = frame_linear_create(
+		dynamic_str("inter"), b, state
 	);
 	state_pushframe(state, inter_frame);
 	return NULL;
@@ -252,6 +252,7 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
+		a_printf(ast_stmt_ispre(stmt), "only setup labels supported\n");
 		return NULL;
 	case STMT_EXPR:
 		return stmt_expr_exec(ast_stmt_as_expr(stmt), s);
@@ -304,10 +305,8 @@ decl_init(struct ast_variable *v, struct state *s)
 static struct error *
 stmt_compoundv_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct frame *block_frame = frame_block_create(
-		dynamic_str("verification block"),
-		ast_stmt_as_block(stmt),
-		EXEC_VERIFY
+	struct frame *block_frame = frame_blockverify_create(
+		dynamic_str("verification block"), ast_stmt_as_block(stmt)
 	);
 	state_pushframe(state, block_frame);
 	return NULL;
@@ -316,10 +315,10 @@ stmt_compoundv_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct frame *block_frame = frame_block_create(
+	struct frame *block_frame = frame_blocksame_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
-		state_execmode(state)
+		state
 	);
 	state_pushframe(state, block_frame);
 	return NULL;
@@ -556,11 +555,9 @@ labelled_pushsetup(struct ast_stmt *stmt, struct state *state)
 		return error_printf("setup preconditions must be decidable");
 	}
 
-	struct ast_block *b = ast_stmt_labelled_as_block(stmt);	
 	struct frame *setup_frame = frame_setup_create(
 		dynamic_str("setup"),
-		b,
-		EXEC_INSETUP
+		ast_stmt_labelled_as_block(stmt)
 	);
 	state_pushframe(state, setup_frame);
 	return NULL;
@@ -588,10 +585,10 @@ sel_pushsetup(struct ast_stmt *stmt, struct state *state)
 static struct error *
 comp_pushsetup(struct ast_stmt *stmt, struct state *state)
 {
-	struct frame *block_frame = frame_block_create(
+	struct frame *block_frame = frame_blocksame_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
-		state_execmode(state)
+		state
 	);
 	state_pushframe(state, block_frame);
 	return NULL;
