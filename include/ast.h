@@ -254,9 +254,6 @@ struct bool_res;
 struct bool_res *
 ast_expr_decide(struct ast_expr *, struct state *);
 
-struct error *
-ast_expr_exec(struct ast_expr *, struct state *);
-
 struct e_res;
 struct preresult;
 
@@ -515,9 +512,6 @@ ast_stmt_exec(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_absexec(struct ast_stmt *, struct state *);
-
-struct error *
-ast_stmt_absexecnosetup(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_pushsetup(struct ast_stmt *, struct state *);

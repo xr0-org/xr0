@@ -194,13 +194,12 @@ program_stmt_process(struct program *p, struct state *s)
 	case EXEC_ABSTRACT_SETUP_ONLY:
 		return ast_stmt_pushsetup(stmt, s);
 	case EXEC_INSETUP:
-		return ast_stmt_absexec(stmt, s);
 	case EXEC_ABSTRACT_NO_SETUP:
-		return ast_stmt_absexecnosetup(stmt, s);
+		return ast_stmt_absexec(stmt, s);
 	case EXEC_ACTUAL:
 		return ast_stmt_exec(stmt, s);
 	case EXEC_VERIFY:
-		return ast_stmt_verify(stmt, state_copy(s));
+		return ast_stmt_verify(stmt, s);
 	default:
 		assert(false);
 	}

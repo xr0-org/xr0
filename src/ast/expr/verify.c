@@ -31,17 +31,6 @@ ast_expr_decide(struct ast_expr *expr, struct state *s)
 }
 
 
-struct error *
-ast_expr_exec(struct ast_expr *expr, struct state *state)
-{
-	struct e_res *res = ast_expr_eval(expr, state);
-	if (e_res_iserror(res)) {
-		return e_res_as_error(res);
-	}
-	/* e_res_destroy(res); */
-	return NULL;
-}
-
 /* ast_expr_eval */
 
 static struct e_res *

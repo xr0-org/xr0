@@ -118,6 +118,17 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 }
 
 /* stmt_verify */
+static struct error *
+directverify(struct ast_stmt *, struct state *);
+
+struct error *
+ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
+{
+	struct state *copy = state_copy(s);
+	struct error *err = directverify(stmt, copy);
+	state_destroy(copy);
+	return err;
+}
 
 static bool
 islinearisable(struct ast_stmt *);
@@ -125,8 +136,8 @@ islinearisable(struct ast_stmt *);
 static struct error *
 stmt_expr_verify(struct ast_stmt *, struct state *);
 
-struct error *
-ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
+static struct error *
+directverify(struct ast_stmt *stmt, struct state *s)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
@@ -215,6 +226,9 @@ static struct error *
 stmt_compound_exec(struct ast_stmt *, struct state *);
 
 static struct error *
+expr_exec(struct ast_expr *, struct state *);
+
+static struct error *
 stmt_sel_exec(struct ast_stmt *, struct state *);
 
 static struct error *
@@ -238,16 +252,13 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
-		if (ast_stmt_ispre(stmt)) {
-			return NULL;
-		}
-		assert(false);
+		return NULL;
 	case STMT_COMPOUND:
 		return stmt_compound_exec(stmt, s);
 	case STMT_COMPOUND_V:
 		return stmt_compoundv_exec(stmt, s);
 	case STMT_EXPR:
-		return ast_expr_exec(ast_stmt_as_expr(stmt), s);
+		return expr_exec(ast_stmt_as_expr(stmt), s);
 	case STMT_SELECTION:
 		return stmt_sel_exec(stmt, s);
 	case STMT_ITERATION:
@@ -285,7 +296,7 @@ decl_init(struct ast_variable *v, struct state *s)
 			ast_expr_identifier_create(ast_variable_name(v)),
 			ast_variable_init(v)
 		);
-		return ast_expr_exec(assign, s);
+		return expr_exec(assign, s);
 	}
 	return NULL;
 }
@@ -311,6 +322,17 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 		EXEC_ACTUAL
 	);
 	state_pushframe(state, block_frame);
+	return NULL;
+}
+
+static struct error *
+expr_exec(struct ast_expr *expr, struct state *state)
+{
+	struct e_res *res = ast_expr_eval(expr, state);
+	if (e_res_iserror(res)) {
+		return e_res_as_error(res);
+	}
+	e_res_destroy(res); 
 	return NULL;
 }
 
@@ -487,29 +509,6 @@ call_return(struct state *state)
 	);
 }
 
-struct error *
-ast_stmt_absexecnosetup(struct ast_stmt *stmt, struct state *s)
-{
-	if (!state_islinear(s) && islinearisable(stmt)) {
-		return linearise(stmt, s);
-	}
-	switch (ast_stmt_kind(stmt)) {
-	case STMT_LABELLED:
-		return NULL;
-	case STMT_DECLARATION:
-	case STMT_NOP:
-	case STMT_EXPR:
-	case STMT_SELECTION:
-	case STMT_ITERATION:
-	case STMT_COMPOUND:
-	case STMT_JUMP:
-	case STMT_REGISTER:
-		return ast_stmt_absexec(stmt, s);
-	default:
-		assert(false);
-	}
-}
-
 static struct error *
 expr_absexec(struct ast_expr *, struct state *);
 
@@ -535,6 +534,8 @@ ast_stmt_absexec(struct ast_stmt *stmt, struct state *s)
 	case STMT_DECLARATION:
 		return stmt_decl_exec(stmt, s);
 	case STMT_NOP:
+		return NULL;
+	case STMT_LABELLED:
 		return NULL;
 	case STMT_EXPR:
 		return expr_absexec(ast_stmt_as_expr(stmt), s);
