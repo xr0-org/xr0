@@ -9,13 +9,34 @@
 
 #define XR0 "./../../bin/0v"
 #define LIBX "./../../libx"
-#define TEST "debugger-test.x"
+#define TEST "00-basic/test.x"
+#define TEST_CFG "00-basic/test.cfg"
 #define MAX_BUF 10240 /* 10 KB, states can be big... */
+
+#define MAX_LINE_LEN 256
+
+struct instr;
+
+struct instr {
+	char *cmd;
+	char *state;
+};
+
+char *
+trim(char *str);
+
+struct instr *
+read_testcfg(const char *fname, int *icount);
 
 int
 main(int argc, char * argv[])
 {
 	printf("running debugger tests...\n");
+	int icount;
+	struct instr *instr = read_testcfg(TEST_CFG, &icount);
+	for (int i = 0; i < icount; i++) {
+		printf("[ %s, %s]\n", instr[i].cmd, instr[i].state);
+	}
 
 	int to_child[2];
 	int from_child[2];
@@ -48,6 +69,8 @@ main(int argc, char * argv[])
 			fprintf(stderr, "execvp failed\n");
 			exit(EXIT_FAILURE);
 		}
+        	fflush(stdout);
+
 	} else { /* parent process */
 		printf("in parent process...\n");
 
@@ -59,14 +82,22 @@ main(int argc, char * argv[])
 		ssize_t nbytes;
 
 		/* read initial debugger info */
+		usleep(100000); // Sleep for 100 ms
+
 		nbytes = read(from_child[0], buffer, sizeof(buffer) - 1);
-		printf("initial read %ld bytes from bin/0v:\n\n%s\n\n", nbytes, buffer);
-		if (nbytes == -1) {
-			fprintf(stderr, "read failed\n");
-			exit(EXIT_FAILURE);
+		if (nbytes > 0) {
+			buffer[nbytes] = '\0';
+			printf("read from child: %s\n", buffer);
+		} else if (nbytes == -1 && errno == EAGAIN) {
+			/* No data to read right now */
+			usleep(100000); // Sleep for 100 ms
 		} else if (nbytes == 0) {
-			printf("no output from bin/0v\n");
+			/* eof reached */
+			printf("end of output from child\n");
+		} else {
+			fprintf(stderr, "read failed\n");
 		}
+		printf("read %ld bytes from bin/0v:\n%s\n", nbytes, buffer);
 
 		const char *commands[] = {
 			"step\n", "next\n", "quit\n"
@@ -85,9 +116,22 @@ main(int argc, char * argv[])
 			/* read output from child process */
 			sleep(1);
 			nbytes = read(from_child[0], buffer, sizeof(buffer) - 1);
-			buffer[nbytes] = '\0';
+			if (nbytes > 0) {
+				buffer[nbytes] = '\0';
+			} else if (nbytes == -1 && errno == EAGAIN) {
+				/* No data to read right now */
+				usleep(100000); // Sleep for 100 ms
+			} else if (nbytes == 0) {
+				/* eof */
+				printf("end of output from child\n");
+			} else {
+				fprintf(stderr, "read failed\n");
+			}
 			printf("read %ld bytes from bin/0v:\n%s\n", nbytes, buffer);
 		}
+
+		close(to_child[1]);
+		close(from_child[0]);
 
 		int status;
 		if (waitpid(pid, &status, 0) == -1) {
@@ -103,10 +147,57 @@ main(int argc, char * argv[])
 	}
 
 	/* errors */
-	int err = errno;
-	printf("errno: %d\n", err);
+	printf("errno: %d\n", errno);
 
 	printf("debugger tests finished\n");
 
 	return 0;
+}
+
+char *
+trim(char *str)
+{
+	char *end;
+
+	while (*str == ' ') str++; /* grow head */
+	end = str + strlen(str) - 1;
+	while (end > str && (*end == ' ')) end--; /* shrink end */
+	*(end + 1) = '\0';
+	return str;
+}
+
+struct instr *
+read_testcfg(const char *fname, int *icount)
+{
+	FILE *f = fopen(fname, "r");
+	if (f == NULL) {
+		perror("error opening file");
+		return NULL;	
+	}
+
+	char line[MAX_LINE_LEN];
+	struct instr *instructions = NULL;
+	*icount = 0;
+
+	while(fgets(line, sizeof(line), f)) {
+		line[strcspn(line, "\n")] = 0;
+
+		char *cmd = strtok(line, ":");
+		char *state = strtok(NULL, ":");
+		
+		instructions = realloc(instructions, sizeof(struct instr) * (*icount + 1));
+		if (instructions == NULL) {
+			perror("error in memory allocation");
+			return NULL;
+		}
+		
+		instructions[*icount].cmd = malloc(strlen(cmd) + 1);
+		instructions[*icount].state = malloc(strlen(state) + 1);
+		strcpy(instructions[*icount].cmd, cmd);	
+		strcpy(instructions[*icount].state, state);
+
+		(*icount)++;
+	}
+	fclose(f);
+	return instructions;
 }
