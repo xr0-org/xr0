@@ -9,8 +9,10 @@
 
 #define XR0 "./../../bin/0v"
 #define LIBX "./../../libx"
+
 #define TEST "00-basic/test.x"
 #define TEST_CFG "00-basic/test.cfg"
+
 #define MAX_BUF 10240 /* 10 KB, states can be big... */
 
 #define MAX_LINE_LEN 256
@@ -98,7 +100,8 @@ main(int argc, char * argv[])
 			/* eof reached */
 			printf("end of output from child\n");
 		} else {
-			fprintf(stderr, "read failed\n");
+			perror("read failed");
+			exit(EXIT_FAILURE);
 		}
 		printf("read %ld bytes from bin/0v:\n%s\n", nbytes, buffer);
 		
@@ -111,6 +114,7 @@ main(int argc, char * argv[])
 			ssize_t bytes_written = write(to_child[1], cmd, strlen(cmd));
 			if (bytes_written == -1) {
 				perror("write failed");
+				exit(EXIT_FAILURE);
 			}
 			fsync(to_child[1]);
 			printf("sent command: %s\n", cmd);
@@ -128,11 +132,17 @@ main(int argc, char * argv[])
 				printf("end of output from child\n");
 			} else {
 				perror("read failed");
+				exit(EXIT_FAILURE);
 			}
 			
+			FILE *f = fopen(state, "w");
+			fprintf(f, "%s", buffer);
+			fclose(f);
+
 			char *expected = read_state(state);
 			if (strcmp(expected, buffer) != 0) {
 				fprintf(stderr, "expected state does not match returned state\n");	
+				exit(EXIT_FAILURE);
 			} else {
 				printf("states match\n");
 			}
@@ -148,8 +158,10 @@ main(int argc, char * argv[])
 		} else {
 			if (WIFEXITED(status)) {
 				printf("child exited with status %d\n", WEXITSTATUS(status));
+				exit(EXIT_FAILURE);
 			} else if (WIFSIGNALED(status)) {
 				printf("child killed by signal %d\n", WTERMSIG(status));
+				exit(EXIT_FAILURE);
 			}
 		}
 	}
@@ -158,7 +170,6 @@ main(int argc, char * argv[])
 	printf("errno: %d\n", errno);
 
 	printf("debugger tests finished\n");
-
 	return 0;
 }
 
@@ -220,11 +231,10 @@ read_testcfg(const char *fname, int *icount)
 char *
 read_state(const char *fname)
 {
-	printf("fname: [%s]\n", fname);
 	FILE *f = fopen(fname, "r");
 	if (f == NULL) {
 		perror("error opening file");
-		return NULL;	
+		exit(EXIT_FAILURE);
 	}
 
 	fseek(f, 0, SEEK_END);
@@ -235,14 +245,14 @@ read_state(const char *fname)
 	if (state == NULL) {
 		perror("error during memory allocation");
 		fclose(f);
-		return NULL;
+		exit(EXIT_FAILURE);
 	}
 	size_t nbytes = fread(state, 1, fsize, f);	
 	if (nbytes != fsize) {
 		perror("error reading file");
 		free(state);
 		fclose(f);
-		return NULL;
+		exit(EXIT_FAILURE);
 	}
 	state[fsize] = '\0';
 	fclose(f);
