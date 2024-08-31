@@ -73,6 +73,9 @@ scenario_str(struct scenario *);
 static struct error *
 scenario_progress(struct scenario *, progressor *);
 
+static struct scenario *
+scenario_copywithsplit(struct scenario *, struct map *split);
+
 static struct error *
 scenario_verify(struct scenario *, struct ast_expr *);
 
@@ -351,6 +354,76 @@ progress_actual(struct scenario *s, progressor *prog)
 	return progressortrace(s->actual, prog);
 }
 
+static struct ast_function *
+copy_withsplitname(struct ast_function *, struct map *split); 
+
+static struct scenario *
+scenario_copywithsplit(struct scenario *old, struct map *split)
+{
+	struct scenario *s = scenario_create(
+		copy_withsplitname(old->f, split), old->ext
+	);
+	char *fname = ast_function_name(s->f);
+	s->state = old->state;
+	switch (old->state) {
+	case SCENARIO_STATE_SETUPABSTRACT:
+	case SCENARIO_STATE_ABSTRACT:
+		s->abstract = state_copywithname(old->abstract, fname);
+		if (!state_split(s->abstract, split)) {
+			s->state = SCENARIO_STATE_ATEND;
+		}
+		break;
+	case SCENARIO_STATE_SETUPACTUAL:
+	case SCENARIO_STATE_ACTUAL:
+		s->abstract = state_copywithname(old->abstract, fname);
+		s->actual = state_copywithname(old->actual, fname);
+		if (!state_split(s->actual, split)) {
+			s->state = SCENARIO_STATE_ATEND;
+		}
+		state_setrconsts(s->abstract, s->actual);
+		break;
+	default:
+		assert(false);
+	}
+	return s;
+}
+
+static char *
+split_name(char *name, struct map *split);
+
+static struct ast_function *
+copy_withsplitname(struct ast_function *old, struct map *split)
+{
+	struct ast_function *f = ast_function_copy(old);
+	ast_function_setname(f, split_name(ast_function_name(f), split));
+	return f;
+}
+
+static char *
+split_name(char *name, struct map *split)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s | ", name);
+	if (split->n > 1) {
+		strbuilder_printf(b, "{ ");
+	}
+	for (int i = 0; i < split->n; i++) {
+		struct entry e = split->entry[i];
+		char *rconst = e.key;
+		char *num = number_str((struct number *) e.value);
+		strbuilder_printf(
+			b, "%s ∈ %s%s", rconst, num,
+			(i+1 < split->n ? "," : "")
+		);
+		free(num);
+	}
+	if (split->n > 1) {
+		strbuilder_printf(b, " }");
+	}
+	return strbuilder_build(b);
+}
+
+
 
 static struct error *
 scenario_verify(struct scenario *s, struct ast_expr *expr)
@@ -488,9 +561,8 @@ static void
 verifier_split(struct verifier *p, struct splitinstruct *inst)
 {
 	p->mux = mux_create(verifier_gensplits(p, inst));
-	/* TODO: destroy abstract and actual */
-	p->s->abstract = NULL;
-	p->s->actual = NULL;
+	/* TODO: destroy p->s */
+	p->s = NULL;
 	p->issplit = true;
 }
 
@@ -509,75 +581,15 @@ verifier_gensplits(struct verifier *p, struct splitinstruct *inst)
 	return arr;
 }
 
-static struct ast_function *
-copy_withsplitname(struct ast_function *, struct map *split); 
-
 static struct verifier *
 verifier_copywithsplit(struct verifier *old, struct map *split)
 {
 	struct verifier *p = verifier_create(
 		copy_withsplitname(old->s->f, split), old->s->ext
 	);
-	char *fname = ast_function_name(p->s->f);
-	p->s->state = old->s->state;
-	switch (old->s->state) {
-	case SCENARIO_STATE_SETUPABSTRACT:
-	case SCENARIO_STATE_ABSTRACT:
-		p->s->abstract = state_copywithname(old->s->abstract, fname);
-		if (!state_split(p->s->abstract, split)) {
-			p->s->state = SCENARIO_STATE_ATEND;
-		}
-		break;
-	case SCENARIO_STATE_SETUPACTUAL:
-	case SCENARIO_STATE_ACTUAL:
-		p->s->abstract = state_copywithname(old->s->abstract, fname);
-		p->s->actual = state_copywithname(old->s->actual, fname);
-		if (!state_split(p->s->actual, split)) {
-			p->s->state = SCENARIO_STATE_ATEND;
-		}
-		state_setrconsts(p->s->abstract, p->s->actual);
-		break;
-	default:
-		assert(false);
-	}
+	p->s = scenario_copywithsplit(old->s, split);
 	return p;
 }
-
-static char *
-split_name(char *name, struct map *split);
-
-static struct ast_function *
-copy_withsplitname(struct ast_function *old, struct map *split)
-{
-	struct ast_function *f = ast_function_copy(old);
-	ast_function_setname(f, split_name(ast_function_name(f), split));
-	return f;
-}
-
-static char *
-split_name(char *name, struct map *split)
-{
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "%s | ", name);
-	if (split->n > 1) {
-		strbuilder_printf(b, "{ ");
-	}
-	for (int i = 0; i < split->n; i++) {
-		struct entry e = split->entry[i];
-		char *rconst = e.key;
-		char *num = number_str((struct number *) e.value);
-		strbuilder_printf(
-			b, "%s ∈ %s%s", rconst, num,
-			(i+1 < split->n ? "," : "")
-		);
-		free(num);
-	}
-	if (split->n > 1) {
-		strbuilder_printf(b, " }");
-	}
-	return strbuilder_build(b);
-}
-
 
 struct error *
 verifier_verify(struct verifier *p, struct ast_expr *expr)
