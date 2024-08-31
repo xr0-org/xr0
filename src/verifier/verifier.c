@@ -27,7 +27,6 @@ static int
 verifier_arr_append(struct verifier_arr *, struct verifier *);
 
 
-
 /* mux: multiplexer for splittings of verifiers */
 struct mux;
 
@@ -46,33 +45,62 @@ mux_activeverifier(struct mux *);
 static void
 mux_next(struct mux *);
 
-struct verifier {
-	bool issplit;
-
-	struct mux *mux;
-
-	enum verifier_state {
-		PATH_STATE_UNINIT,
-		PATH_STATE_SETUPABSTRACT,
-		PATH_STATE_ABSTRACT,
-		PATH_STATE_HALFWAY,
-		PATH_STATE_SETUPACTUAL,
-		PATH_STATE_ACTUAL,
-		PATH_STATE_AUDIT,
-		PATH_STATE_ATEND,
-	} verifier_state;
+struct scenario {
+	enum scenario_state {
+		SCENARIO_STATE_UNINIT,
+		SCENARIO_STATE_SETUPABSTRACT,
+		SCENARIO_STATE_ABSTRACT,
+		SCENARIO_STATE_HALFWAY,
+		SCENARIO_STATE_SETUPACTUAL,
+		SCENARIO_STATE_ACTUAL,
+		SCENARIO_STATE_AUDIT,
+		SCENARIO_STATE_ATEND,
+	} state;
 	struct state *abstract, *actual;
 	struct ast_function *f;
 	struct externals *ext;
+};
+
+static struct scenario *
+scenario_create(struct ast_function *, struct externals *);
+
+static void
+scenario_destroy(struct scenario *);
+
+static struct scenario *
+scenario_create(struct ast_function *f, struct externals *ext)
+{
+	struct scenario *s = malloc(sizeof(struct scenario));
+	assert(s);
+	s->f = ast_function_copy(f);
+	s->ext = ext;
+	s->state = SCENARIO_STATE_UNINIT;
+	return s;
+}
+
+static void
+scenario_destroy(struct scenario *s)
+{
+	/*state_destroy(s->abstract);*/
+	/*state_destroy(s->actual);*/
+	ast_function_destroy(s->f);
+	free(s);
+
+}
+
+
+struct verifier {
+	bool issplit;
+	struct mux *mux;
+	struct scenario *s;
 };
 
 struct verifier *
 verifier_create(struct ast_function *f, struct externals *ext)
 {
 	struct verifier *p = calloc(1, sizeof(struct verifier));
-	p->f = ast_function_copy(f);
-	p->ext = ext;
-	p->verifier_state = PATH_STATE_UNINIT;
+	assert(p);
+	p->s = scenario_create(f, ext);
 	return p;
 }
 
@@ -81,12 +109,13 @@ verifier_destroy(struct verifier *p)
 {
 	assert(verifier_atend(p));
 
-	/*state_destroy(p->abstract);*/
-	/*state_destroy(p->actual);*/
-	if (p->mux) {
+	if (p->issplit) {
+		assert(p->mux);
 		mux_destroy(p->mux);
+	} else {
+		assert(p->s);
+		scenario_destroy(p->s);
 	}
-	ast_function_destroy(p->f);
 	free(p);
 }
 
@@ -109,22 +138,22 @@ verifier_str(struct verifier *p)
 		return verifier_str(mux_activeverifier(p->mux));
 	}
 
-	switch (p->verifier_state) {
-	case PATH_STATE_UNINIT:
+	switch (p->s->state) {
+	case SCENARIO_STATE_UNINIT:
 		return dynamic_str("path init abstract state");
-	case PATH_STATE_SETUPABSTRACT:
+	case SCENARIO_STATE_SETUPABSTRACT:
 		return verifier_setupabstract_str(p);
-	case PATH_STATE_ABSTRACT:
+	case SCENARIO_STATE_ABSTRACT:
 		return verifier_abstract_str(p);
-	case PATH_STATE_HALFWAY:
+	case SCENARIO_STATE_HALFWAY:
 		return dynamic_str("path init actual state");
-	case PATH_STATE_SETUPACTUAL:
+	case SCENARIO_STATE_SETUPACTUAL:
 		return verifier_setupactual_str(p);
-	case PATH_STATE_ACTUAL:
+	case SCENARIO_STATE_ACTUAL:
 		return verifier_actual_str(p);
-	case PATH_STATE_AUDIT:
+	case SCENARIO_STATE_AUDIT:
 		return dynamic_str("path audit");
-	case PATH_STATE_ATEND:
+	case SCENARIO_STATE_ATEND:
 		return dynamic_str("path at end");
 	default:
 		assert(false);
@@ -136,8 +165,8 @@ verifier_abstract_str(struct verifier *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\tABSTRACT\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->abstract));
-	strbuilder_printf(b, "%s\n", state_str(p->abstract));
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->s->abstract));
+	strbuilder_printf(b, "%s\n", state_str(p->s->abstract));
 	return strbuilder_build(b);
 }
 
@@ -146,8 +175,8 @@ verifier_actual_str(struct verifier *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\tACTUAL\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
-	strbuilder_printf(b, "%s\n", state_str(p->actual));
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->s->actual));
+	strbuilder_printf(b, "%s\n", state_str(p->s->actual));
 	return strbuilder_build(b);
 }
 
@@ -156,8 +185,8 @@ verifier_setupabstract_str(struct verifier *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\tSETUP (ABSTRACT)\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->abstract));
-	strbuilder_printf(b, "%s\n", state_str(p->abstract));
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->s->abstract));
+	strbuilder_printf(b, "%s\n", state_str(p->s->abstract));
 	return strbuilder_build(b);
 }
 
@@ -166,8 +195,8 @@ verifier_setupactual_str(struct verifier *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\tSETUP (ACTUAL)\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->actual));
-	strbuilder_printf(b, "%s\n", state_str(p->actual));
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->s->actual));
+	strbuilder_printf(b, "%s\n", state_str(p->s->actual));
 	return strbuilder_build(b);
 }
 
@@ -177,7 +206,7 @@ verifier_atend(struct verifier *p)
 	if (p->issplit) {
 		return mux_atend(p->mux);
 	}
-	return p->verifier_state == PATH_STATE_ATEND;
+	return p->s->state == SCENARIO_STATE_ATEND;
 }
 
 progressor *
@@ -213,19 +242,19 @@ verifier_progress(struct verifier *p, progressor *prog)
 	if (p->issplit) {
 		return progress(p, prog);
 	}
-	switch (p->verifier_state) {
-	case PATH_STATE_UNINIT:
+	switch (p->s->state) {
+	case SCENARIO_STATE_UNINIT:
 		return verifier_init_abstract(p);
-	case PATH_STATE_HALFWAY:
+	case SCENARIO_STATE_HALFWAY:
 		return verifier_init_actual(p);
-	case PATH_STATE_AUDIT:
+	case SCENARIO_STATE_AUDIT:
 		return verifier_audit(p);
-	case PATH_STATE_SETUPABSTRACT:
-	case PATH_STATE_ABSTRACT:
-	case PATH_STATE_SETUPACTUAL:
-	case PATH_STATE_ACTUAL:
+	case SCENARIO_STATE_SETUPABSTRACT:
+	case SCENARIO_STATE_ABSTRACT:
+	case SCENARIO_STATE_SETUPACTUAL:
+	case SCENARIO_STATE_ACTUAL:
 		return progress(p, prog);
-	case PATH_STATE_ATEND:
+	case SCENARIO_STATE_ATEND:
 	default:
 		assert(false);
 	}
@@ -237,22 +266,22 @@ verifier_init_abstract(struct verifier *p)
 	struct error *err;
 
 	struct frame *f = frame_callabstract_create(
-		ast_function_name(p->f),
-		ast_function_abstract(p->f),
+		ast_function_name(p->s->f),
+		ast_function_abstract(p->s->f),
 		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
-		p->f
+		p->s->f
 	);
-	p->abstract = state_create(f, p->ext);
-	if ((err = ast_function_initparams(p->f, p->abstract))) {
+	p->s->abstract = state_create(f, p->s->ext);
+	if ((err = ast_function_initparams(p->s->f, p->s->abstract))) {
 		return err;
 	}
-	assert(!state_readregister(p->abstract));
+	assert(!state_readregister(p->s->abstract));
 	struct frame *setupframe = frame_blockfindsetup_create(
 		dynamic_str("setup"),
-		ast_function_abstract(p->f)
+		ast_function_abstract(p->s->f)
 	);
-	state_pushframe(p->abstract, setupframe);
-	p->verifier_state = PATH_STATE_SETUPABSTRACT;
+	state_pushframe(p->s->abstract, setupframe);
+	p->s->state = SCENARIO_STATE_SETUPABSTRACT;
 	return NULL;
 }
 
@@ -263,43 +292,43 @@ verifier_init_actual(struct verifier *p)
 
 	/* if body empty just apply setup */
 	struct frame *f = frame_callactual_create(
-		ast_function_name(p->f),
-		ast_function_body(p->f),
+		ast_function_name(p->s->f),
+		ast_function_body(p->s->f),
 		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
-		p->f
+		p->s->f
 	);
-	p->actual = state_create(f, p->ext);
-	if ((err = ast_function_initparams(p->f, p->actual))) {
+	p->s->actual = state_create(f, p->s->ext);
+	if ((err = ast_function_initparams(p->s->f, p->s->actual))) {
 		return err;
 	}
-	state_setrconsts(p->actual, p->abstract);
+	state_setrconsts(p->s->actual, p->s->abstract);
 	struct frame *setupframe = frame_blockfindsetup_create(
 		dynamic_str("setup"),
-		ast_function_abstract(p->f)
+		ast_function_abstract(p->s->f)
 	);
-	state_pushframe(p->actual, setupframe);
-	p->verifier_state = PATH_STATE_SETUPACTUAL;
+	state_pushframe(p->s->actual, setupframe);
+	p->s->state = SCENARIO_STATE_SETUPACTUAL;
 	return NULL;
 }
 
 static struct error *
 verifier_audit(struct verifier *p)
 {
-	if (state_hasgarbage(p->actual)) {
-		v_printf("actual: %s", state_str(p->actual));
+	if (state_hasgarbage(p->s->actual)) {
+		v_printf("actual: %s", state_str(p->s->actual));
 		return error_printf(
-			"%s: garbage on heap", ast_function_name(p->f)
+			"%s: garbage on heap", ast_function_name(p->s->f)
 		);
 	}
-	if (!state_equal(p->actual, p->abstract)) {
+	if (!state_equal(p->s->actual, p->s->abstract)) {
 		/* unequal states are printed by state_equal so that the user
 		 * can see the states with undeclared vars */
 		return error_printf(
 			"%s: actual and abstract states differ",
-			ast_function_name(p->f)
+			ast_function_name(p->s->f)
 		);
 	}
-	p->verifier_state = PATH_STATE_ATEND;
+	p->s->state = SCENARIO_STATE_ATEND;
 	return NULL;
 }
 
@@ -344,14 +373,14 @@ progressact(struct verifier *p, progressor *prog)
 	if (p->issplit) {
 		return verifier_progress_split(p, prog);
 	}
-	switch (p->verifier_state) {
-	case PATH_STATE_SETUPABSTRACT:
+	switch (p->s->state) {
+	case SCENARIO_STATE_SETUPABSTRACT:
 		return verifier_progress_setupabstract(p, prog);
-	case PATH_STATE_ABSTRACT:
+	case SCENARIO_STATE_ABSTRACT:
 		return verifier_progress_abstract(p, prog);
-	case PATH_STATE_SETUPACTUAL:
+	case SCENARIO_STATE_SETUPACTUAL:
 		return verifier_progress_setupactual(p, prog);
-	case PATH_STATE_ACTUAL:
+	case SCENARIO_STATE_ACTUAL:
 		return verifier_progress_actual(p, prog);
 	default:
 		assert(false);
@@ -364,11 +393,11 @@ progressortrace(struct state *, progressor *);
 static struct error *
 verifier_progress_setupabstract(struct verifier *p, progressor *prog)
 {
-	if (state_atsetupend(p->abstract)) {
-		p->verifier_state = PATH_STATE_ABSTRACT;
+	if (state_atsetupend(p->s->abstract)) {
+		p->s->state = SCENARIO_STATE_ABSTRACT;
 		return NULL;
 	}
-	return progressortrace(p->abstract, prog);
+	return progressortrace(p->s->abstract, prog);
 }
 
 static struct error *
@@ -384,31 +413,31 @@ progressortrace(struct state *s, progressor *prog)
 static struct error *
 verifier_progress_abstract(struct verifier *p, progressor *prog)
 {	
-	if (state_atend(p->abstract)) {
-		p->verifier_state = PATH_STATE_HALFWAY;
+	if (state_atend(p->s->abstract)) {
+		p->s->state = SCENARIO_STATE_HALFWAY;
 		return NULL;
 	}
-	return progressortrace(p->abstract, prog);
+	return progressortrace(p->s->abstract, prog);
 }
 
 static struct error *
 verifier_progress_setupactual(struct verifier *p, progressor *prog)
 {
-	if (state_atsetupend(p->actual)) {
-		p->verifier_state = PATH_STATE_ACTUAL;
+	if (state_atsetupend(p->s->actual)) {
+		p->s->state = SCENARIO_STATE_ACTUAL;
 		return NULL;
 	}
-	return progressortrace(p->actual, prog);
+	return progressortrace(p->s->actual, prog);
 }
 
 static struct error *
 verifier_progress_actual(struct verifier *p, progressor *prog)
 {	
-	if (state_atend(p->actual)) {
-		p->verifier_state = PATH_STATE_AUDIT;
+	if (state_atend(p->s->actual)) {
+		p->s->state = SCENARIO_STATE_AUDIT;
 		return NULL;
 	}
-	return progressortrace(p->actual, prog);
+	return progressortrace(p->s->actual, prog);
 }
 
 static struct error *
@@ -433,8 +462,8 @@ verifier_split(struct verifier *p, struct splitinstruct *inst)
 {
 	p->mux = mux_create(verifier_gensplits(p, inst));
 	/* TODO: destroy abstract and actual */
-	p->abstract = NULL;
-	p->actual = NULL;
+	p->s->abstract = NULL;
+	p->s->actual = NULL;
 	p->issplit = true;
 }
 
@@ -461,26 +490,26 @@ static struct verifier *
 verifier_copywithsplit(struct verifier *old, struct map *split)
 {
 	struct verifier *p = verifier_create(
-		copy_withsplitname(old->f, split), old->ext
+		copy_withsplitname(old->s->f, split), old->s->ext
 	);
-	char *fname = ast_function_name(p->f);
-	p->verifier_state = old->verifier_state;
-	switch (old->verifier_state) {
-	case PATH_STATE_SETUPABSTRACT:
-	case PATH_STATE_ABSTRACT:
-		p->abstract = state_copywithname(old->abstract, fname);
-		if (!state_split(p->abstract, split)) {
-			p->verifier_state = PATH_STATE_ATEND;
+	char *fname = ast_function_name(p->s->f);
+	p->s->state = old->s->state;
+	switch (old->s->state) {
+	case SCENARIO_STATE_SETUPABSTRACT:
+	case SCENARIO_STATE_ABSTRACT:
+		p->s->abstract = state_copywithname(old->s->abstract, fname);
+		if (!state_split(p->s->abstract, split)) {
+			p->s->state = SCENARIO_STATE_ATEND;
 		}
 		break;
-	case PATH_STATE_SETUPACTUAL:
-	case PATH_STATE_ACTUAL:
-		p->abstract = state_copywithname(old->abstract, fname);
-		p->actual = state_copywithname(old->actual, fname);
-		if (!state_split(p->actual, split)) {
-			p->verifier_state = PATH_STATE_ATEND;
+	case SCENARIO_STATE_SETUPACTUAL:
+	case SCENARIO_STATE_ACTUAL:
+		p->s->abstract = state_copywithname(old->s->abstract, fname);
+		p->s->actual = state_copywithname(old->s->actual, fname);
+		if (!state_split(p->s->actual, split)) {
+			p->s->state = SCENARIO_STATE_ATEND;
 		}
-		state_setrconsts(p->abstract, p->actual);
+		state_setrconsts(p->s->abstract, p->s->actual);
 		break;
 	default:
 		assert(false);
@@ -530,15 +559,15 @@ verifier_verify(struct verifier *p, struct ast_expr *expr)
 	if (p->issplit) {
 		return verifier_verify(mux_activeverifier(p->mux), expr);
 	}
-	switch(p->verifier_state) {
-	case PATH_STATE_ABSTRACT:
-		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->abstract);
-	case PATH_STATE_ACTUAL:
-		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->actual);	
-	case PATH_STATE_UNINIT:
-	case PATH_STATE_HALFWAY:
-	case PATH_STATE_AUDIT:
-	case PATH_STATE_ATEND:
+	switch(p->s->state) {
+	case SCENARIO_STATE_ABSTRACT:
+		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->s->abstract);
+	case SCENARIO_STATE_ACTUAL:
+		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->s->actual);	
+	case SCENARIO_STATE_UNINIT:
+	case SCENARIO_STATE_HALFWAY:
+	case SCENARIO_STATE_AUDIT:
+	case SCENARIO_STATE_ATEND:
 		return NULL;
 	default:
 		assert(false);
@@ -551,17 +580,17 @@ verifier_lexememarker(struct verifier *p)
 	if (p->issplit) {
 		return verifier_lexememarker(mux_activeverifier(p->mux));
 	}
-	switch (p->verifier_state) {
-	case PATH_STATE_SETUPABSTRACT:
-	case PATH_STATE_ABSTRACT:
-		return state_lexememarker(p->abstract);
-	case PATH_STATE_SETUPACTUAL:
-	case PATH_STATE_ACTUAL:
-		return state_lexememarker(p->actual);	
-	case PATH_STATE_UNINIT:
-	case PATH_STATE_HALFWAY:
-	case PATH_STATE_AUDIT:
-	case PATH_STATE_ATEND:
+	switch (p->s->state) {
+	case SCENARIO_STATE_SETUPABSTRACT:
+	case SCENARIO_STATE_ABSTRACT:
+		return state_lexememarker(p->s->abstract);
+	case SCENARIO_STATE_SETUPACTUAL:
+	case SCENARIO_STATE_ACTUAL:
+		return state_lexememarker(p->s->actual);	
+	case SCENARIO_STATE_UNINIT:
+	case SCENARIO_STATE_HALFWAY:
+	case SCENARIO_STATE_AUDIT:
+	case SCENARIO_STATE_ATEND:
 		return NULL;
 	default:
 		assert(false);
