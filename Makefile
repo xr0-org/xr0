@@ -213,16 +213,13 @@ $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
 # tests
-0V_TESTDIR = tests/0v
-0V_RUNTEST = $(0V_TESTDIR)/run
-0DB_TESTDIR = tests/0db
+TESTDIR = tests
 
 tags:
 	@ctags -R .
 
-test: $(XR0V) $(0V_TESTDIR) $(0V_RUNTEST) $(0DB_TESTDIR)
-	@./tests/0v/run
-	@cd tests/0db && ./a.out
+test: $(XR0V) $(TESTDIR)
+	@./tests/run
 
 check: $(RUNTEST) $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))

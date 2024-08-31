@@ -2,9 +2,13 @@
 printf 'running test suite at %s\n\n' "$(date)"
 start=$(date +"%s")
 
+TESTDIR=$(pwd)/tests
+XR0=$(pwd)/bin/0v
+LIBX=$(pwd)/libx
+IGNORE_FILE=$TESTDIR/wmw-www
+
 ntests=0
 npass=0
-nignore=0
 
 expected_suffix="EXPECTED"
 fail_prefix="FAIL"
@@ -15,14 +19,16 @@ fail="\e[31mFAIL\e[0m\n"
 pass="\e[32mPASS\e[0m\n"
 ignore="\e[33mIGNORE\e[0m\n"
 
-XR0=$(pwd)/bin/0v
-libx=$(pwd)/libx
-cd tests/0v
-length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
-	tail -1 | wc -c)
+nignore=$(cat $IGNORE_FILE | wc -l)
+ignore_files=$(cat $IGNORE_FILE)
 
-# Read in test cases to ignore
-ignore_files=$(cat "wmw-www")
+for f in $ignore_files; do
+	file=$TESTDIR/0v/$f
+	if [ ! -f "$file" ]; then
+		printf "error: ignored file %s not found\n" "$file" 1>&2
+		exit
+	fi
+done
 
 should_ignore() {
     for name in $ignore_files; do
@@ -33,10 +39,16 @@ should_ignore() {
     return 1
 }
 
-# Loop through and run tests
+cd $TESTDIR/0v
+
+ntests=$(ls */*.x | wc -l)
+
+length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
+	tail -1 | wc -c)
+
+# loop through and run tests
 for f in */*.x
 do
-	ntests=$((ntests+1))
 	folder=$(dirname "$f")
 
 	printf "%-${length}s ..." "$f"
@@ -45,7 +57,6 @@ do
 	# skip ignores
 	if should_ignore $f; then
 		printf "$ignore"
-		nignore=$((nignore+1))
 		continue
 	fi
 
@@ -53,12 +64,12 @@ do
 	then
 		if [[ "$f" == *"verification"* ]]
 		then
-			output=$($XR0 -x main -I $libx -v $f > "$tempfile" 2>&1)
+			output=$($XR0 -x main -I $LIBX -v $f > "$tempfile" 2>&1)
 		else
-			output=$($XR0 -t main -I $libx $f > "$tempfile" 2>&1)
+			output=$($XR0 -t main -I $LIBX $f > "$tempfile" 2>&1)
 		fi
 	else 
-		output=$($XR0 -I $libx $f > "$tempfile" 2>&1)
+		output=$($XR0 -I $LIBX $f > "$tempfile" 2>&1)
 	fi
 
 	# cases where we have an expected output to compare with
