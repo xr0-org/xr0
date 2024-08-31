@@ -377,7 +377,7 @@ v_printf(char *fmt, ...)
 struct error {
 	enum error_type {
 		ERROR_PRINTF,
-		ERROR_PATHINSTRUCT,
+		ERROR_VERIFIERINSTRUCT,
 		ERROR_RETURN,
 
 		ERROR_BLOCK_OBSERVE_NOOBJ,
@@ -391,7 +391,7 @@ struct error {
 	} type;
 	union error_contents {
 		char *printf;
-		struct pathinstruct *inst;
+		struct verifierinstruct *inst;
 	} contents;
 	struct error *inner;
 };
@@ -482,24 +482,24 @@ findnextfmt(char **p)
 }
 
 struct error *
-error_pathinstruct(struct pathinstruct *inst)
+error_verifierinstruct(struct verifierinstruct *inst)
 {
 	struct error *err = calloc(1, sizeof(struct error));
-	err->type = ERROR_PATHINSTRUCT;
+	err->type = ERROR_VERIFIERINSTRUCT;
 	err->contents.inst = inst;
 	return err;
 }
 
 struct error *
-error_to_pathinstruct(struct error *err)
+error_to_verifierinstruct(struct error *err)
 {
-	return error_to(err, ERROR_PATHINSTRUCT);
+	return error_to(err, ERROR_VERIFIERINSTRUCT);
 }
 
-struct pathinstruct *
-error_get_pathinstruct(struct error *err)
+struct verifierinstruct *
+error_get_verifierinstruct(struct error *err)
 {
-	assert(err->type == ERROR_PATHINSTRUCT);
+	assert(err->type == ERROR_VERIFIERINSTRUCT);
 	return err->contents.inst;
 }
 
@@ -591,7 +591,7 @@ char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
-		[ERROR_PATHINSTRUCT]		= "path instruction",
+		[ERROR_VERIFIERINSTRUCT]		= "path instruction",
 		[ERROR_RETURN]			= "returned",
 
 		[ERROR_BLOCK_OBSERVE_NOOBJ]	= "block_observe no object",
@@ -607,7 +607,7 @@ error_str(struct error *err)
 	switch (err->type) {
 	case ERROR_PRINTF:
 		return dynamic_str(err->contents.printf);
-	case ERROR_PATHINSTRUCT:
+	case ERROR_VERIFIERINSTRUCT:
 	case ERROR_RETURN:
 	case ERROR_BLOCK_OBSERVE_NOOBJ:
 	case ERROR_STATE_GET_NOBLOCK:

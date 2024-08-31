@@ -6,31 +6,35 @@
 #include "lex.h"
 #include "object.h"
 #include "state.h"
-#include "path.h"
+#include "verifier.h"
 #include "value.h"
 
-struct path_arr;
+struct verifier_arr;
 
-static struct path_arr *
-path_arr_create();
+static struct verifier_arr *
+verifier_arr_create();
 
 static void
-path_arr_destroy(struct path_arr *);
+verifier_arr_destroy(struct verifier_arr *);
 
 static int
-path_arr_n(struct path_arr *);
+verifier_arr_n(struct verifier_arr *);
 
-static struct path **
-path_arr_paths(struct path_arr *);
+static struct verifier **
+verifier_arr_paths(struct verifier_arr *);
 
 static bool
-path_arr_atend(struct path_arr *);
+verifier_arr_atend(struct verifier_arr *);
 
 static int
-path_arr_append(struct path_arr *, struct path *);
+verifier_arr_append(struct verifier_arr *, struct verifier *);
 
-struct path {
-	enum path_state {
+struct verifier {
+	int branch_index;
+	struct verifier_arr *verifiers;
+	struct externals *ext;
+
+	enum verifier_state {
 		PATH_STATE_UNINIT,
 		PATH_STATE_SETUPABSTRACT,
 		PATH_STATE_ABSTRACT,
@@ -38,76 +42,72 @@ struct path {
 		PATH_STATE_SETUPACTUAL,
 		PATH_STATE_ACTUAL,
 		PATH_STATE_AUDIT,
-		PATH_STATE_SPLIT,
 		PATH_STATE_ATEND,
-	} path_state;
+		PATH_STATE_SPLIT,
+	} verifier_state;
 	struct state *abstract, *actual;
 	
-	int branch_index;
-	struct path_arr *paths;
-
 	struct ast_function *f;
-	struct externals *ext;
 };
 
-struct path *
-path_create(struct ast_function *f, struct externals *ext)
+struct verifier *
+verifier_create(struct ast_function *f, struct externals *ext)
 {
-	struct path *p = calloc(1, sizeof(struct path));
+	struct verifier *p = calloc(1, sizeof(struct verifier));
 	p->f = ast_function_copy(f);
 	p->ext = ext;
-	p->paths = path_arr_create();
-	p->path_state = PATH_STATE_UNINIT;
+	p->verifiers = verifier_arr_create();
+	p->verifier_state = PATH_STATE_UNINIT;
 	return p;
 }
 
 void
-path_destroy(struct path *p)
+verifier_destroy(struct verifier *p)
 {
-	assert(path_atend(p));
+	assert(verifier_atend(p));
 
 	/*state_destroy(p->abstract);*/
 	/*state_destroy(p->actual);*/
-	path_arr_destroy(p->paths);
+	verifier_arr_destroy(p->verifiers);
 	ast_function_destroy(p->f);
 	free(p);
 }
 
 char *
-path_setupabstract_str(struct path *);
+verifier_setupabstract_str(struct verifier *);
 
 char *
-path_abstract_str(struct path *);
+verifier_abstract_str(struct verifier *);
 
 char *
-path_setupactual_str(struct path *);
+verifier_setupactual_str(struct verifier *);
 
 char *
-path_actual_str(struct path *);
+verifier_actual_str(struct verifier *);
 
 char *
-path_split_str(struct path *);
+verifier_split_str(struct verifier *);
 
 char *
-path_str(struct path *p)
+verifier_str(struct verifier *p)
 {
-	switch (p->path_state) {
+	switch (p->verifier_state) {
 	case PATH_STATE_UNINIT:
 		return dynamic_str("path init abstract state");
 	case PATH_STATE_SETUPABSTRACT:
-		return path_setupabstract_str(p);
+		return verifier_setupabstract_str(p);
 	case PATH_STATE_ABSTRACT:
-		return path_abstract_str(p);
+		return verifier_abstract_str(p);
 	case PATH_STATE_HALFWAY:
 		return dynamic_str("path init actual state");
 	case PATH_STATE_SETUPACTUAL:
-		return path_setupactual_str(p);
+		return verifier_setupactual_str(p);
 	case PATH_STATE_ACTUAL:
-		return path_actual_str(p);
+		return verifier_actual_str(p);
 	case PATH_STATE_AUDIT:
 		return dynamic_str("path audit");
 	case PATH_STATE_SPLIT:
-		return path_split_str(p);
+		return verifier_split_str(p);
 	case PATH_STATE_ATEND:
 		return dynamic_str("path at end");
 	default:
@@ -116,7 +116,7 @@ path_str(struct path *p)
 }
 
 char *
-path_abstract_str(struct path *p)
+verifier_abstract_str(struct verifier *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\tABSTRACT\n\n");
@@ -126,7 +126,7 @@ path_abstract_str(struct path *p)
 }
 
 char *
-path_actual_str(struct path *p)
+verifier_actual_str(struct verifier *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\tACTUAL\n\n");
@@ -136,7 +136,7 @@ path_actual_str(struct path *p)
 }
 
 char *
-path_setupabstract_str(struct path *p)
+verifier_setupabstract_str(struct verifier *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\tSETUP (ABSTRACT)\n\n");
@@ -146,7 +146,7 @@ path_setupabstract_str(struct path *p)
 }
 
 char *
-path_setupactual_str(struct path *p)
+verifier_setupactual_str(struct verifier *p)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\tSETUP (ACTUAL)\n\n");
@@ -156,16 +156,16 @@ path_setupactual_str(struct path *p)
 }
 
 char *
-path_split_str(struct path *p)
+verifier_split_str(struct verifier *p)
 {
-	struct path *branch = path_arr_paths(p->paths)[p->branch_index];
-	return path_str(branch);
+	struct verifier *branch = verifier_arr_paths(p->verifiers)[p->branch_index];
+	return verifier_str(branch);
 }
 
 static void
-path_nextbranch(struct path *p)
+verifier_nextbranch(struct verifier *p)
 {
-	int n = path_arr_n(p->paths);
+	int n = verifier_arr_n(p->verifiers);
 	assert(n >= 2);
 	int index = p->branch_index;
 	if (index < n - 1) {
@@ -174,11 +174,11 @@ path_nextbranch(struct path *p)
 }
 
 bool
-path_atend(struct path *p)
+verifier_atend(struct verifier *p)
 {
-	switch (p->path_state) {
+	switch (p->verifier_state) {
 	case PATH_STATE_SPLIT:
-		return path_arr_atend(p->paths);
+		return verifier_arr_atend(p->verifiers);
 	case PATH_STATE_ATEND:
 		return true;
 	default:
@@ -199,30 +199,30 @@ progressor_next()
 }
 
 
-/* path_progress */
+/* verifier_progress */
 
 static struct error *
-path_init_abstract(struct path *p);
+verifier_init_abstract(struct verifier *p);
 
 static struct error *
-path_init_actual(struct path *p);
+verifier_init_actual(struct verifier *p);
 
 static struct error *
-path_audit(struct path *p);
+verifier_audit(struct verifier *p);
 
 static struct error *
-progress(struct path *, progressor *);
+progress(struct verifier *, progressor *);
 
 struct error *
-path_progress(struct path *p, progressor *prog)
+verifier_progress(struct verifier *p, progressor *prog)
 {
-	switch (p->path_state) {
+	switch (p->verifier_state) {
 	case PATH_STATE_UNINIT:
-		return path_init_abstract(p);
+		return verifier_init_abstract(p);
 	case PATH_STATE_HALFWAY:
-		return path_init_actual(p);
+		return verifier_init_actual(p);
 	case PATH_STATE_AUDIT:
-		return path_audit(p);
+		return verifier_audit(p);
 	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
 	case PATH_STATE_SETUPACTUAL:
@@ -236,7 +236,7 @@ path_progress(struct path *p, progressor *prog)
 }
 
 static struct error *
-path_init_abstract(struct path *p)
+verifier_init_abstract(struct verifier *p)
 {
 	struct error *err;
 
@@ -256,12 +256,12 @@ path_init_abstract(struct path *p)
 		ast_function_abstract(p->f)
 	);
 	state_pushframe(p->abstract, setupframe);
-	p->path_state = PATH_STATE_SETUPABSTRACT;
+	p->verifier_state = PATH_STATE_SETUPABSTRACT;
 	return NULL;
 }
 
 static struct error *
-path_init_actual(struct path *p)
+verifier_init_actual(struct verifier *p)
 {
 	struct error *err;
 
@@ -282,12 +282,12 @@ path_init_actual(struct path *p)
 		ast_function_abstract(p->f)
 	);
 	state_pushframe(p->actual, setupframe);
-	p->path_state = PATH_STATE_SETUPACTUAL;
+	p->verifier_state = PATH_STATE_SETUPACTUAL;
 	return NULL;
 }
 
 static struct error *
-path_audit(struct path *p)
+verifier_audit(struct verifier *p)
 {
 	if (state_hasgarbage(p->actual)) {
 		v_printf("actual: %s", state_str(p->actual));
@@ -303,59 +303,59 @@ path_audit(struct path *p)
 			ast_function_name(p->f)
 		);
 	}
-	p->path_state = PATH_STATE_ATEND;
+	p->verifier_state = PATH_STATE_ATEND;
 	return NULL;
 }
 
 static struct error *
-progressact(struct path *, progressor *);
+progressact(struct verifier *, progressor *);
 
 static void
-pathinstruct_do(struct pathinstruct *, struct path *);
+verifierinstruct_do(struct verifierinstruct *, struct verifier *);
 
 static struct error *
-progress(struct path *p, progressor *prog)
+progress(struct verifier *p, progressor *prog)
 {
 	struct error *err = progressact(p, prog);
 	if (err) {
-		struct error *inst_err = error_to_pathinstruct(err);
+		struct error *inst_err = error_to_verifierinstruct(err);
 		if (!inst_err) {
 			return err;
 		}
-		pathinstruct_do(error_get_pathinstruct(inst_err), p);
+		verifierinstruct_do(error_get_verifierinstruct(inst_err), p);
 	}
 	return NULL;
 }
 
 static struct error *
-path_progress_setupabstract(struct path *p, progressor *);
+verifier_progress_setupabstract(struct verifier *p, progressor *);
 
 static struct error *
-path_progress_abstract(struct path *p, progressor *);
+verifier_progress_abstract(struct verifier *p, progressor *);
 
 static struct error *
-path_progress_setupactual(struct path *p, progressor *);
+verifier_progress_setupactual(struct verifier *p, progressor *);
 
 static struct error *
-path_progress_actual(struct path *p, progressor *);
+verifier_progress_actual(struct verifier *p, progressor *);
 
 static struct error *
-path_progress_split(struct path *p, progressor *);
+verifier_progress_split(struct verifier *p, progressor *);
 
 static struct error *
-progressact(struct path *p, progressor *prog)
+progressact(struct verifier *p, progressor *prog)
 {
-	switch (p->path_state) {
+	switch (p->verifier_state) {
 	case PATH_STATE_SETUPABSTRACT:
-		return path_progress_setupabstract(p, prog);
+		return verifier_progress_setupabstract(p, prog);
 	case PATH_STATE_ABSTRACT:
-		return path_progress_abstract(p, prog);
+		return verifier_progress_abstract(p, prog);
 	case PATH_STATE_SETUPACTUAL:
-		return path_progress_setupactual(p, prog);
+		return verifier_progress_setupactual(p, prog);
 	case PATH_STATE_ACTUAL:
-		return path_progress_actual(p, prog);
+		return verifier_progress_actual(p, prog);
 	case PATH_STATE_SPLIT:
-		return path_progress_split(p, prog);
+		return verifier_progress_split(p, prog);
 	default:
 		assert(false);
 	}
@@ -365,10 +365,10 @@ static struct error *
 progressortrace(struct state *, progressor *);
 
 static struct error *
-path_progress_setupabstract(struct path *p, progressor *prog)
+verifier_progress_setupabstract(struct verifier *p, progressor *prog)
 {
 	if (state_atsetupend(p->abstract)) {
-		p->path_state = PATH_STATE_ABSTRACT;
+		p->verifier_state = PATH_STATE_ABSTRACT;
 		return NULL;
 	}
 	return progressortrace(p->abstract, prog);
@@ -385,95 +385,95 @@ progressortrace(struct state *s, progressor *prog)
 }
 
 static struct error *
-path_progress_abstract(struct path *p, progressor *prog)
+verifier_progress_abstract(struct verifier *p, progressor *prog)
 {	
 	if (state_atend(p->abstract)) {
-		p->path_state = PATH_STATE_HALFWAY;
+		p->verifier_state = PATH_STATE_HALFWAY;
 		return NULL;
 	}
 	return progressortrace(p->abstract, prog);
 }
 
 static struct error *
-path_progress_setupactual(struct path *p, progressor *prog)
+verifier_progress_setupactual(struct verifier *p, progressor *prog)
 {
 	if (state_atsetupend(p->actual)) {
-		p->path_state = PATH_STATE_ACTUAL;
+		p->verifier_state = PATH_STATE_ACTUAL;
 		return NULL;
 	}
 	return progressortrace(p->actual, prog);
 }
 
 static struct error *
-path_progress_actual(struct path *p, progressor *prog)
+verifier_progress_actual(struct verifier *p, progressor *prog)
 {	
 	if (state_atend(p->actual)) {
-		p->path_state = PATH_STATE_AUDIT;
+		p->verifier_state = PATH_STATE_AUDIT;
 		return NULL;
 	}
 	return progressortrace(p->actual, prog);
 }
 
 static struct error *
-branch_progress(struct path *, struct path *, progressor *);
+branch_progress(struct verifier *, struct verifier *, progressor *);
 
 static struct error *
-path_progress_split(struct path *p, progressor *prog)
+verifier_progress_split(struct verifier *p, progressor *prog)
 {
-	/* path_atend holds this invariant whenever this function is called */ 
-	assert(!path_arr_atend(p->paths));
+	/* verifier_atend holds this invariant whenever this function is called */ 
+	assert(!verifier_arr_atend(p->verifiers));
 	return branch_progress(
-		p, path_arr_paths(p->paths)[p->branch_index], prog
+		p, verifier_arr_paths(p->verifiers)[p->branch_index], prog
 	);
 }
 
 static struct error *
-branch_progress(struct path *parent, struct path *branch, progressor *prog)
+branch_progress(struct verifier *parent, struct verifier *branch, progressor *prog)
 {
-	if (path_atend(branch)) {
-		path_nextbranch(parent);
+	if (verifier_atend(branch)) {
+		verifier_nextbranch(parent);
 		return NULL;
 	}
-	return path_progress(branch, prog);
+	return verifier_progress(branch, prog);
 }
 
 
-/* path_split */
+/* verifier_split */
 
-static struct path *
-path_copywithsplit(struct path *old, struct map *split);
+static struct verifier *
+verifier_copywithsplit(struct verifier *old, struct map *split);
 
 static void
-path_split(struct path *p, struct splitinstruct *inst)
+verifier_split(struct verifier *p, struct splitinstruct *inst)
 {
 	struct map **split = splitinstruct_splits(inst);
 	int n = splitinstruct_n(inst);
 	for (int i = 0; i < n; i++) {
-		path_arr_append(p->paths, path_copywithsplit(p, split[i]));
+		verifier_arr_append(p->verifiers, verifier_copywithsplit(p, split[i]));
 	}
 	/* TODO: destroy abstract and actual */
 	p->abstract = NULL;
 	p->actual = NULL;
-	p->path_state = PATH_STATE_SPLIT;
+	p->verifier_state = PATH_STATE_SPLIT;
 }
 
 static struct ast_function *
 copy_withsplitname(struct ast_function *, struct map *split); 
 
-static struct path *
-path_copywithsplit(struct path *old, struct map *split)
+static struct verifier *
+verifier_copywithsplit(struct verifier *old, struct map *split)
 {
-	struct path *p = path_create(
+	struct verifier *p = verifier_create(
 		copy_withsplitname(old->f, split), old->ext
 	);
 	char *fname = ast_function_name(p->f);
-	p->path_state = old->path_state;
-	switch (old->path_state) {
+	p->verifier_state = old->verifier_state;
+	switch (old->verifier_state) {
 	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
 		p->abstract = state_copywithname(old->abstract, fname);
 		if (!state_split(p->abstract, split)) {
-			p->path_state = PATH_STATE_ATEND;
+			p->verifier_state = PATH_STATE_ATEND;
 		}
 		break;
 	case PATH_STATE_SETUPACTUAL:
@@ -481,7 +481,7 @@ path_copywithsplit(struct path *old, struct map *split)
 		p->abstract = state_copywithname(old->abstract, fname);
 		p->actual = state_copywithname(old->actual, fname);
 		if (!state_split(p->actual, split)) {
-			p->path_state = PATH_STATE_ATEND;
+			p->verifier_state = PATH_STATE_ATEND;
 		}
 		state_setrconsts(p->abstract, p->actual);
 		break;
@@ -528,18 +528,18 @@ split_name(char *name, struct map *split)
 
 
 static struct error *
-path_split_verify(struct path *, struct ast_expr *);
+verifier_split_verify(struct verifier *, struct ast_expr *);
 
 struct error *
-path_verify(struct path *p, struct ast_expr *expr)
+verifier_verify(struct verifier *p, struct ast_expr *expr)
 {
-	switch(p->path_state) {
+	switch(p->verifier_state) {
 	case PATH_STATE_ABSTRACT:
 		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->abstract);
 	case PATH_STATE_ACTUAL:
 		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->actual);	
 	case PATH_STATE_SPLIT:
-		return path_split_verify(p, expr);
+		return verifier_split_verify(p, expr);
 	case PATH_STATE_UNINIT:
 	case PATH_STATE_HALFWAY:
 	case PATH_STATE_AUDIT:
@@ -551,19 +551,19 @@ path_verify(struct path *p, struct ast_expr *expr)
 }
 
 static struct error *
-path_split_verify(struct path *p, struct ast_expr *expr)
+verifier_split_verify(struct verifier *p, struct ast_expr *expr)
 {
-	struct path *branch = path_arr_paths(p->paths)[p->branch_index];
-	return path_verify(branch, expr);
+	struct verifier *branch = verifier_arr_paths(p->verifiers)[p->branch_index];
+	return verifier_verify(branch, expr);
 }
 
 static struct lexememarker *
-path_split_lexememarker(struct path *);
+verifier_split_lexememarker(struct verifier *);
 
 struct lexememarker *
-path_lexememarker(struct path *p)
+verifier_lexememarker(struct verifier *p)
 {
-	switch (p->path_state) {
+	switch (p->verifier_state) {
 	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
 		return state_lexememarker(p->abstract);
@@ -571,7 +571,7 @@ path_lexememarker(struct path *p)
 	case PATH_STATE_ACTUAL:
 		return state_lexememarker(p->actual);	
 	case PATH_STATE_SPLIT:
-		return path_split_lexememarker(p);	
+		return verifier_split_lexememarker(p);	
 	case PATH_STATE_UNINIT:
 	case PATH_STATE_HALFWAY:
 	case PATH_STATE_AUDIT:
@@ -583,63 +583,63 @@ path_lexememarker(struct path *p)
 }
 
 static struct lexememarker *
-path_split_lexememarker(struct path *p)
+verifier_split_lexememarker(struct verifier *p)
 {
-	struct path *branch = path_arr_paths(p->paths)[p->branch_index];
-	return path_lexememarker(branch);
+	struct verifier *branch = verifier_arr_paths(p->verifiers)[p->branch_index];
+	return verifier_lexememarker(branch);
 }
 
 
-struct path_arr {
+struct verifier_arr {
 	int n;
-	struct path **paths;
+	struct verifier **verifiers;
 };
 
-static struct path_arr *
-path_arr_create()
+static struct verifier_arr *
+verifier_arr_create()
 {
-	struct path_arr *arr = calloc(1, sizeof(struct path_arr));
+	struct verifier_arr *arr = calloc(1, sizeof(struct verifier_arr));
 	assert(arr);
 	return arr;
 }
 
 static void
-path_arr_destroy(struct path_arr *arr)
+verifier_arr_destroy(struct verifier_arr *arr)
 {
 	for (int i = 0; i < arr->n; i++) {
-		path_destroy(arr->paths[i]);
+		verifier_destroy(arr->verifiers[i]);
 	}
-	free(arr->paths);
+	free(arr->verifiers);
 	free(arr);
 }
 
 static int
-path_arr_n(struct path_arr *arr)
+verifier_arr_n(struct verifier_arr *arr)
 {
 	return arr->n;
 }
 
-static struct path **
-path_arr_paths(struct path_arr *arr)
+static struct verifier **
+verifier_arr_paths(struct verifier_arr *arr)
 {
-	return arr->paths;
+	return arr->verifiers;
 }
 
 static int
-path_arr_append(struct path_arr *arr, struct path *p)
+verifier_arr_append(struct verifier_arr *arr, struct verifier *p)
 {
-	arr->paths = realloc(arr->paths, sizeof(struct path_arr) * ++arr->n);
-	assert(arr->paths);
+	arr->verifiers = realloc(arr->verifiers, sizeof(struct verifier_arr) * ++arr->n);
+	assert(arr->verifiers);
 	int loc = arr->n-1;
-	arr->paths[loc] = p;
+	arr->verifiers[loc] = p;
 	return loc;
 }
 
 static bool
-path_arr_atend(struct path_arr *arr)
+verifier_arr_atend(struct verifier_arr *arr)
 {
 	for (int i = 0; i < arr->n; i++) {
-		if (!path_atend(arr->paths[i])) {
+		if (!verifier_atend(arr->verifiers[i])) {
 			return false;	
 		}
 	}
@@ -647,8 +647,8 @@ path_arr_atend(struct path_arr *arr)
 }
 
 
-struct pathinstruct {
-	enum pathinstruct_type {
+struct verifierinstruct {
+	enum verifierinstruct_type {
 		PATHINSTRUCT_SPLIT,
 	} type;
 	union {
@@ -656,10 +656,10 @@ struct pathinstruct {
 	};
 };
 
-struct pathinstruct *
-pathinstruct_split(struct splitinstruct *s)
+struct verifierinstruct *
+verifierinstruct_split(struct splitinstruct *s)
 {
-	struct pathinstruct *inst = malloc(sizeof(struct pathinstruct));
+	struct verifierinstruct *inst = malloc(sizeof(struct verifierinstruct));
 	assert(inst);
 	inst->type = PATHINSTRUCT_SPLIT;
 	inst->split = s;
@@ -667,11 +667,11 @@ pathinstruct_split(struct splitinstruct *s)
 }
 
 static void
-pathinstruct_do(struct pathinstruct *inst, struct path *p)
+verifierinstruct_do(struct verifierinstruct *inst, struct verifier *p)
 {
 	switch (inst->type) {
 	case PATHINSTRUCT_SPLIT:
-		path_split(p, inst->split);
+		verifier_split(p, inst->split);
 		break;
 	default:
 		assert(false);

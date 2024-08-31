@@ -132,16 +132,16 @@ struct error;
 struct error *
 error_printf(char *fmt, ...);
 
-struct pathinstruct;
+struct verifierinstruct;
 
 struct error *
-error_pathinstruct(struct pathinstruct *);
+error_verifierinstruct(struct verifierinstruct *);
 
 struct error *
-error_to_pathinstruct(struct error *);
+error_to_verifierinstruct(struct error *);
 
-struct pathinstruct *
-error_get_pathinstruct(struct error *);
+struct verifierinstruct *
+error_get_verifierinstruct(struct error *);
 
 struct error *
 error_return();

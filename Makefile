@@ -1,6 +1,6 @@
 # commands
 CFLAGS = -g -I include -std=gnu11 -Werror -Wreturn-type -Wall
-VALGRIND = valgrind --fullpath-after=`pwd`/src/
+VALGRIND = valgrind --fullverifier-after=`pwd`/src/
 LEX = lex
 YACC = bison -yvd
 
@@ -14,7 +14,7 @@ UTIL_DIR = $(SRC_DIR)/util
 SRC_0V_DIR = $(SRC_DIR)
 
 EXT_DIR = $(SRC_0V_DIR)/ext
-PATH_DIR = $(SRC_0V_DIR)/path
+VERIFIERDIR = $(SRC_0V_DIR)/verifier
 STATE_DIR = $(SRC_0V_DIR)/state
 OBJECT_DIR = $(SRC_0V_DIR)/object
 VALUE_DIR = $(SRC_0V_DIR)/value
@@ -36,7 +36,7 @@ CLUMP_OBJ = $(BUILD_DIR)/clump.o
 LOCATION_OBJ = $(BUILD_DIR)/location.o
 BLOCK_OBJ = $(BUILD_DIR)/block.o
 EXT_OBJ = $(BUILD_DIR)/ext.o
-PATH_OBJ = $(BUILD_DIR)/path.o
+VERIFIEROBJ = $(BUILD_DIR)/verifier.o
 OBJECT_OBJ = $(BUILD_DIR)/object.o
 VALUE_OBJ = $(BUILD_DIR)/value.o
 MATH_OBJ = $(BUILD_DIR)/math.o
@@ -72,7 +72,7 @@ STATE_OBJECTS = $(VALUE_OBJ) \
 		$(PROGRAM_OBJ) \
 		$(STATIC_OBJ) \
 		$(EXT_OBJ) \
-		$(PATH_OBJ)
+		$(VERIFIEROBJ)
 
 OBJECTS = $(XR0_OBJECTS) $(STATE_OBJECTS)
 
@@ -123,9 +123,9 @@ $(EXT_OBJ): $(EXT_DIR)/ext.c
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ -c $(EXT_DIR)/ext.c
 
-$(PATH_OBJ): $(PATH_DIR)/path.c
+$(VERIFIEROBJ): $(VERIFIERDIR)/verifier.c
 	@printf 'CC\t$@\n'
-	@$(CC) $(CFLAGS) -o $@ -c $(PATH_DIR)/path.c
+	@$(CC) $(CFLAGS) -o $@ -c $(VERIFIERDIR)/verifier.c
 
 $(STACK_OBJ): $(STATE_DIR)/stack.c $(BLOCK_OBJ)
 	@printf 'CC\t$@\n'
