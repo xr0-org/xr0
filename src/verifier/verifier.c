@@ -23,9 +23,6 @@ verifier_arr_n(struct verifier_arr *);
 static struct verifier **
 verifier_arr_paths(struct verifier_arr *);
 
-static bool
-verifier_arr_atend(struct verifier_arr *);
-
 static int
 verifier_arr_append(struct verifier_arr *, struct verifier *);
 
@@ -33,22 +30,28 @@ verifier_arr_append(struct verifier_arr *, struct verifier *);
 struct mux;
 
 static struct mux *
-mux_create();
+mux_create(struct verifier_arr *);
 
 static void
 mux_destroy(struct mux *);
 
+static int
+mux_atend(struct mux *);
+
+static struct verifier *
+mux_activeverifier(struct mux *);
+
 struct mux {
-	int branch_index;
+	int index;
 	struct verifier_arr *verifiers;
 };
 
 static struct mux *
-mux_create()
+mux_create(struct verifier_arr *verifiers)
 {
 	struct mux *mux = calloc(1, sizeof(struct mux));
 	assert(mux);
-	mux->verifiers = verifier_arr_create();
+	mux->verifiers = verifiers;
 	return mux;
 }
 
@@ -58,6 +61,31 @@ mux_destroy(struct mux *mux)
 	verifier_arr_destroy(mux->verifiers);
 	free(mux);
 }
+
+static int
+mux_atend(struct mux *mux)
+{
+	int nverifiers = verifier_arr_n(mux->verifiers);
+	assert(mux->index < nverifiers);
+
+	return mux->index == nverifiers-1
+		&& verifier_atend(verifier_arr_paths(mux->verifiers)[mux->index]);
+}
+
+static struct verifier *
+mux_activeverifier(struct mux *mux)
+{
+	assert(!mux_atend(mux));
+
+	struct verifier *curr = verifier_arr_paths(mux->verifiers)[mux->index];
+	if (!verifier_atend(curr)) {
+		return curr;
+	}
+
+	mux->index++;
+	return mux_activeverifier(mux);
+}
+
 
 struct verifier {
 	bool issplit;
@@ -85,7 +113,6 @@ verifier_create(struct ast_function *f, struct externals *ext)
 	struct verifier *p = calloc(1, sizeof(struct verifier));
 	p->f = ast_function_copy(f);
 	p->ext = ext;
-	p->mux = mux_create();
 	p->verifier_state = PATH_STATE_UNINIT;
 	return p;
 }
@@ -97,7 +124,9 @@ verifier_destroy(struct verifier *p)
 
 	/*state_destroy(p->abstract);*/
 	/*state_destroy(p->actual);*/
-	mux_destroy(p->mux);
+	if (p->mux) {
+		mux_destroy(p->mux);
+	}
 	ast_function_destroy(p->f);
 	free(p);
 }
@@ -189,26 +218,14 @@ verifier_setupactual_str(struct verifier *p)
 char *
 verifier_split_str(struct verifier *p)
 {
-	struct verifier *branch = verifier_arr_paths(p->mux->verifiers)[p->mux->branch_index];
-	return verifier_str(branch);
-}
-
-static void
-verifier_nextbranch(struct verifier *p)
-{
-	int n = verifier_arr_n(p->mux->verifiers);
-	assert(n >= 2);
-	int index = p->mux->branch_index;
-	if (index < n - 1) {
-		p->mux->branch_index++;	
-	}
+	return verifier_str(mux_activeverifier(p->mux));
 }
 
 bool
 verifier_atend(struct verifier *p)
 {
 	if (p->issplit) {
-		return verifier_arr_atend(p->mux->verifiers);
+		return mux_atend(p->mux);
 	}
 	return p->verifier_state == PATH_STATE_ATEND;
 }
@@ -445,47 +462,42 @@ verifier_progress_actual(struct verifier *p, progressor *prog)
 }
 
 static struct error *
-branch_progress(struct verifier *, struct verifier *, progressor *);
-
-static struct error *
 verifier_progress_split(struct verifier *p, progressor *prog)
 {
-	/* verifier_atend holds this invariant whenever this function is called */ 
-	assert(!verifier_arr_atend(p->mux->verifiers));
-	return branch_progress(
-		p, verifier_arr_paths(p->mux->verifiers)[p->mux->branch_index], prog
-	);
-}
-
-static struct error *
-branch_progress(struct verifier *parent, struct verifier *branch, progressor *prog)
-{
-	if (verifier_atend(branch)) {
-		verifier_nextbranch(parent);
-		return NULL;
-	}
-	return verifier_progress(branch, prog);
+	return verifier_progress(mux_activeverifier(p->mux), prog);
 }
 
 
 /* verifier_split */
 
-static struct verifier *
-verifier_copywithsplit(struct verifier *old, struct map *split);
+static struct verifier_arr *
+verifier_gensplits(struct verifier *, struct splitinstruct *);
 
 static void
 verifier_split(struct verifier *p, struct splitinstruct *inst)
 {
-	struct map **split = splitinstruct_splits(inst);
-	int n = splitinstruct_n(inst);
-	for (int i = 0; i < n; i++) {
-		verifier_arr_append(p->mux->verifiers, verifier_copywithsplit(p, split[i]));
-	}
+	p->mux = mux_create(verifier_gensplits(p, inst));
 	/* TODO: destroy abstract and actual */
 	p->abstract = NULL;
 	p->actual = NULL;
 	p->issplit = true;
 }
+
+static struct verifier *
+verifier_copywithsplit(struct verifier *old, struct map *split);
+
+static struct verifier_arr *
+verifier_gensplits(struct verifier *p, struct splitinstruct *inst)
+{
+	struct verifier_arr *arr = verifier_arr_create();;
+	struct map **split = splitinstruct_splits(inst);
+	int n = splitinstruct_n(inst);
+	for (int i = 0; i < n; i++) {
+		verifier_arr_append(arr, verifier_copywithsplit(p, split[i]));
+	}
+	return arr;
+}
+
 
 static struct ast_function *
 copy_withsplitname(struct ast_function *, struct map *split); 
@@ -584,8 +596,7 @@ verifier_verify(struct verifier *p, struct ast_expr *expr)
 static struct error *
 verifier_split_verify(struct verifier *p, struct ast_expr *expr)
 {
-	struct verifier *branch = verifier_arr_paths(p->mux->verifiers)[p->mux->branch_index];
-	return verifier_verify(branch, expr);
+	return verifier_verify(mux_activeverifier(p->mux), expr);
 }
 
 static struct lexememarker *
@@ -617,8 +628,7 @@ verifier_lexememarker(struct verifier *p)
 static struct lexememarker *
 verifier_split_lexememarker(struct verifier *p)
 {
-	struct verifier *branch = verifier_arr_paths(p->mux->verifiers)[p->mux->branch_index];
-	return verifier_lexememarker(branch);
+	return verifier_lexememarker(mux_activeverifier(p->mux));
 }
 
 
@@ -666,18 +676,6 @@ verifier_arr_append(struct verifier_arr *arr, struct verifier *p)
 	arr->verifiers[loc] = p;
 	return loc;
 }
-
-static bool
-verifier_arr_atend(struct verifier_arr *arr)
-{
-	for (int i = 0; i < arr->n; i++) {
-		if (!verifier_atend(arr->verifiers[i])) {
-			return false;	
-		}
-	}
-	return true;
-}
-
 
 struct verifierinstruct {
 	enum verifierinstruct_type {
