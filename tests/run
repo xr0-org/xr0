@@ -1,6 +1,6 @@
 #!/bin/bash
 printf 'running test suite at %s\n\n' "$(date)"
-start=$(date +"%s.%N")
+start=$(date +%s)
 
 TESTDIR=$(pwd)/tests
 XR0=$(pwd)/bin/0v
@@ -115,9 +115,9 @@ fi
 ntests=$((ntests+1))
 
 nfail=$((ntests-(npass+nignore)))
-finish=$(date +"%s.%N")
+finish=$(date +%s)
 time=$(echo "$finish-$start" | bc)
-printf "\n%d tests:\t%d passed\t%d failed\t%d ignored\tin %.3f seconds\n" \
+printf "\n%d tests:\t%d passed\t%d failed\t%d ignored\tin %d seconds\n" \
 	$ntests $npass $nfail $nignore $time
 if [ $nfail -ne 0 ]
 then

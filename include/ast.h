@@ -747,7 +747,7 @@ struct error *
 ast_function_verify(struct ast_function *, struct externals *);
 
 struct error *
-ast_function_debug(struct ast_function *, struct externals *);
+ast_function_debug(struct ast_function *, struct externals *, char *debugsep);
 
 struct error *
 ast_function_ensure_hasabstract(struct ast_function *f, struct externals *ext);

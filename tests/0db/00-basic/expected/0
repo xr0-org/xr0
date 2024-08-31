@@ -1,4 +1,4 @@
-The Xr0 Static Debugger for C
+(0db) The Xr0 Static Debugger for C
 Copyright (C) 2024 Xr0
 License Apache 2.0
 
@@ -19,3 +19,4 @@ For help, type "help".
 
 
 path init abstract state
+(0db)
