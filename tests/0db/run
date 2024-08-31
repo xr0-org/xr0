@@ -1,0 +1,20 @@
+#!/bin/bash
+
+output=$(./../../bin/0v -I ./../../libx -d 00-basic/test.x < 00-basic/test.cfg 2>&1)
+echo "$output"
+
+# Split the output by the delimiter "(0db)" and write each part to a file
+# Using awk to process the splitting and file writing
+echo "$output" | awk -v RS='\\(0db\\) ' -v file_prefix="00-basic/actual_" '
+BEGIN { RS="\\(0db\\)"; count=0 }  # Set the record separator and initialize the counter
+{
+    # trim leading and trailing whitespace
+    gsub(/^[ \t\r\n]+|[ \t\r\n]+$/, "", $0)
+    
+    if (length($0) > 0) {   # Check if the line is non-empty
+        filename = file_prefix count ".state" # Generate a filename with incrementing counter
+        print > filename                      # write the current record to the gen filename
+        close(filename)                       # close the file to flush the output
+        count++                               # increment the counter for the next file
+    }
+}'

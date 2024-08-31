@@ -180,7 +180,7 @@ process_commandwithargs(char *cmd, char *args);
 static struct command *
 getcmd()
 {
-	printf("(0db) ");
+	d_printf("(0db) ");
 	char line[MAX_LINELEN];
 	char cmd[MAX_COMMANDLEN];
 	char args[MAX_ARGSLEN];
