@@ -69,64 +69,39 @@ scenario_verify(struct scenario *, struct ast_expr *);
 static struct lexememarker *
 scenario_lexememarker(struct scenario *);
 
-struct verifier {
-	int issplit;
-	struct mux *mux;
-	struct scenario *s;
-};
+
+struct verifier;
 
 static struct verifier *
-_verifier_create(struct scenario *s)
-{
-	struct verifier *p = malloc(sizeof(struct verifier));
-	assert(p);
-	p->issplit = 0;
-	p->mux = NULL;
-	p->s = s;
-	return p;
-}
+_verifier_copywithsplit(struct verifier *old, struct map *split);
 
-struct verifier *
-verifier_create(struct ast_function *f, struct externals *ext)
-{
-	return _verifier_create(scenario_create(f, ext));
-}
+static void
+_verifier_split(struct verifier *, struct mux *);
 
-static struct verifier *
-verifier_copywithsplit(struct verifier *old, struct map *split)
-{
-	return _verifier_create(scenario_copywithsplit(old->s, split));
-}
+static int
+_verifier_issplit(struct verifier *);
 
-void
-verifier_destroy(struct verifier *p)
-{
-	assert(verifier_atend(p));
+static struct mux *
+_verifier_mux(struct verifier *);
 
-	if (p->issplit) {
-		assert(p->mux);
-		mux_destroy(p->mux);
-	} else {
-		assert(p->s);
-		scenario_destroy(p->s);
-	}
-	free(p);
-}
+static struct scenario *
+_verifier_scenario(struct verifier *);
 
 char *
 verifier_str(struct verifier *p)
 {
-	return p->issplit
-		? verifier_str(mux_activeverifier(p->mux))
-		: scenario_str(p->s);
+	return _verifier_issplit(p)
+		? verifier_str(mux_activeverifier(_verifier_mux(p)))
+		: scenario_str(_verifier_scenario(p));
 }
 
 bool
 verifier_atend(struct verifier *p)
 {
-	return p->issplit ? mux_atend(p->mux) : scenario_atend(p->s);
+	return _verifier_issplit(p)
+		? mux_atend(_verifier_mux(p))
+		: scenario_atend(_verifier_scenario(p));
 }
-
 
 /* verifier_progress */
 
@@ -148,15 +123,15 @@ verifierinstruct_do(struct verifierinstruct *, struct verifier *);
 struct error *
 verifier_progress(struct verifier *p, progressor *prog)
 {
-	if (p->issplit) {
-		struct verifier *branch = mux_activeverifier(p->mux);
+	if (_verifier_issplit(p)) {
+		struct verifier *branch = mux_activeverifier(_verifier_mux(p));
 		if (verifier_atend(branch)) {
-			mux_next(p->mux);
+			mux_next(_verifier_mux(p));
 			return NULL;
 		}
 		return verifier_progress(branch, prog);
 	}
-	struct error *err = scenario_progress(p->s, prog);
+	struct error *err = scenario_progress(_verifier_scenario(p), prog);
 	if (err) {
 		struct error *inst_err = error_to_verifierinstruct(err);
 		if (!inst_err) {
@@ -176,10 +151,7 @@ verifier_gensplits(struct verifier *, struct splitinstruct *);
 static void
 verifier_split(struct verifier *p, struct splitinstruct *inst)
 {
-	p->mux = mux_create(verifier_gensplits(p, inst));
-	/* TODO: destroy p->s */
-	p->s = NULL;
-	p->issplit = true;
+	_verifier_split(p, mux_create(verifier_gensplits(p, inst)));
 }
 
 static struct verifier_arr *
@@ -189,7 +161,7 @@ verifier_gensplits(struct verifier *p, struct splitinstruct *inst)
 	struct map **split = splitinstruct_splits(inst);
 	int n = splitinstruct_n(inst);
 	for (int i = 0; i < n; i++) {
-		verifier_arr_append(arr, verifier_copywithsplit(p, split[i]));
+		verifier_arr_append(arr, _verifier_copywithsplit(p, split[i]));
 	}
 	return arr;
 }
@@ -197,17 +169,92 @@ verifier_gensplits(struct verifier *p, struct splitinstruct *inst)
 struct error *
 verifier_verify(struct verifier *p, struct ast_expr *expr)
 {
-	return p->issplit
-		? verifier_verify(mux_activeverifier(p->mux), expr)
-		: scenario_verify(p->s, expr);
+	return _verifier_issplit(p)
+		? verifier_verify(mux_activeverifier(_verifier_mux(p)), expr)
+		: scenario_verify(_verifier_scenario(p), expr);
 }
 
 struct lexememarker *
 verifier_lexememarker(struct verifier *p)
 {
-	return p->issplit
-		? verifier_lexememarker(mux_activeverifier(p->mux))
-		: scenario_lexememarker(p->s);
+	return _verifier_issplit(p)
+		? verifier_lexememarker(mux_activeverifier(_verifier_mux(p)))
+		: scenario_lexememarker(_verifier_scenario(p));
+}
+
+struct verifier {
+	int issplit;
+	union {
+		struct mux *mux;
+		struct scenario *s;
+	};
+};
+
+static struct verifier *
+_verifier_create(struct scenario *s)
+{
+	assert(s);
+
+	struct verifier *p = malloc(sizeof(struct verifier));
+	assert(p);
+	p->issplit = 0;
+	p->s = s;
+	return p;
+}
+
+struct verifier *
+verifier_create(struct ast_function *f, struct externals *ext)
+{
+	return _verifier_create(scenario_create(f, ext));
+}
+
+static struct verifier *
+_verifier_copywithsplit(struct verifier *old, struct map *split)
+{
+	return _verifier_create(scenario_copywithsplit(old->s, split));
+}
+
+static void
+_verifier_split(struct verifier *p, struct mux *mux)
+{
+	assert(!_verifier_issplit(p));
+	/* TODO: destroy p->s */
+	p->issplit = 1;
+	p->mux = mux;
+}
+
+void
+verifier_destroy(struct verifier *p)
+{
+	assert(verifier_atend(p));
+
+	if (p->issplit) {
+		assert(p->mux);
+		mux_destroy(p->mux);
+	} else {
+		scenario_destroy(p->s);
+	}
+	free(p);
+}
+
+static int
+_verifier_issplit(struct verifier *p)
+{
+	return p->issplit;
+}
+
+static struct mux *
+_verifier_mux(struct verifier *p)
+{
+	assert(p->issplit);
+	return p->mux;
+}
+
+static struct scenario *
+_verifier_scenario(struct verifier *p)
+{
+	assert(!p->issplit);
+	return p->s;
 }
 
 
@@ -662,15 +709,18 @@ split_name(char *name, struct map *split)
 }
 
 
-
 static struct error *
 scenario_verify(struct scenario *s, struct ast_expr *expr)
 {
 	switch(s->state) {
 	case SCENARIO_STATE_ABSTRACT:
-		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), s->abstract);
+		return ast_stmt_verify(
+			ast_stmt_create_expr(NULL, expr), s->abstract
+		);
 	case SCENARIO_STATE_ACTUAL:
-		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), s->actual);	
+		return ast_stmt_verify(
+			ast_stmt_create_expr(NULL, expr), s->actual
+		);
 	case SCENARIO_STATE_UNINIT:
 	case SCENARIO_STATE_HALFWAY:
 	case SCENARIO_STATE_AUDIT:
@@ -700,9 +750,6 @@ scenario_lexememarker(struct scenario *s)
 		assert(false);
 	}
 }
-
-
-
 
 
 struct verifierinstruct {
