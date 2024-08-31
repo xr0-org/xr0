@@ -12,7 +12,7 @@
 #include "breakpoint.h"
 #include "command.h"
 #include "util.h"
-#include "path.h"
+#include "verifier.h"
 
 enum command_kind {
 	COMMAND_HELP,
@@ -61,16 +61,16 @@ static struct command *
 getcmd(char *debugsep);
 
 static struct error *
-command_continue_exec(struct path *);
+command_continue_exec(struct verifier *);
 
 static struct error *
-command_verify_exec(struct path *, struct command *);
+command_verify_exec(struct verifier *, struct command *);
 
 static struct ast_expr *
 command_arg_toexpr(struct command *);
 
 struct error *
-command_next(struct path *p, char *debugsep)
+command_next(struct verifier *p, char *debugsep)
 {
 	struct error *err;
 
@@ -81,10 +81,10 @@ command_next(struct path *p, char *debugsep)
 	struct command *cmd = getcmd(debugsep);
 	switch (cmd->kind) {
 	case COMMAND_STEP:
-		err = path_progress(p, progressor_step());
+		err = verifier_progress(p, progressor_step());
 		break;
 	case COMMAND_NEXT:
-		err = path_progress(p, progressor_next());	
+		err = verifier_progress(p, progressor_next());	
 		break;
 	case COMMAND_VERIFY:
 		err = command_verify_exec(p, cmd);
@@ -108,14 +108,14 @@ command_next(struct path *p, char *debugsep)
 }
 
 static struct error *
-command_continue_exec(struct path *p)
+command_continue_exec(struct verifier *p)
 {
-	while (!path_atend(p)) {
-		struct error *err = path_progress(p, progressor_step());
+	while (!verifier_atend(p)) {
+		struct error *err = verifier_progress(p, progressor_step());
 		if (err) {
 			return err;
 		}
-		struct lexememarker *loc = path_lexememarker(p);
+		struct lexememarker *loc = verifier_lexememarker(p);
 		if (loc && breakpoint_shouldbreak(loc)) {
 			return NULL;
 		}
@@ -125,9 +125,9 @@ command_continue_exec(struct path *p)
 }
 
 static struct error *
-command_verify_exec(struct path *p, struct command *cmd)
+command_verify_exec(struct verifier *p, struct command *cmd)
 {
-	struct error *err = path_verify(p, command_arg_toexpr(cmd));
+	struct error *err = verifier_verify(p, command_arg_toexpr(cmd));
 	if (err) {
 		d_printf("false: %s\n", error_str(err));
 	} else {

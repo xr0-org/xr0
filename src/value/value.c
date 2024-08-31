@@ -6,9 +6,9 @@
 #include "ast.h"
 #include "state.h"
 #include "object.h"
-#include "path.h"
 #include "util.h"
 #include "value.h"
+#include "verifier.h"
 
 struct value {
 	enum value_type {
@@ -1122,7 +1122,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 		value_splitto(x, number_singlerange_create(c, b), a_eq_c, s);
 		splitinstruct_append(splits, x_lt_y);
 		splitinstruct_append(splits, a_eq_c);
-		return error_pathinstruct(pathinstruct_split(splits));
+		return error_verifierinstruct(verifierinstruct_split(splits));
 	}
 	/* ⊢ a == c */
 
@@ -1164,7 +1164,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 		value_splitto(y, number_singlerange_create(a, b), b_eq_d, s);
 		splitinstruct_append(splits, x_lt_y);
 		splitinstruct_append(splits, b_eq_d);
-		return error_pathinstruct(pathinstruct_split(splits));
+		return error_verifierinstruct(verifierinstruct_split(splits));
 	}
 	/* ⊢ b == d */
 

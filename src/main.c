@@ -13,7 +13,6 @@
 #include "ext.h"
 #include "state.h"
 #include "util.h"
-#include "verify.h"
 #include "signal.h"
 
 /* XXX */

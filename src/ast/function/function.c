@@ -12,12 +12,12 @@
 #include "intern.h"
 #include "lex.h"
 #include "object.h"
-#include "path.h"
 #include "state.h"
 #include "stmt/stmt.h"
 #include "stmt/stmt.h"
 #include "type/type.h"
 #include "util.h"
+#include "verifier.h"
 
 struct ast_function {
 	bool isaxiom;
@@ -252,29 +252,29 @@ generate_abstract(struct ast_function *f, struct externals *ext)
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)
 {
-	struct path *path = path_create(f, ext);
-	while (!path_atend(path)) {
-		struct error *err = path_progress(path, progressor_step());
+	struct verifier *verifier = verifier_create(f, ext);
+	while (!verifier_atend(verifier)) {
+		struct error *err = verifier_progress(verifier, progressor_step());
 		if (err) {
 			return err;
 		}
 	}
-	path_destroy(path);
+	verifier_destroy(verifier);
 	return NULL;
 }
 
 struct error *
 ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 {
-	struct path *path = path_create(f, ext);
-	while (!path_atend(path)) {
-		d_printf("%s\n", path_str(path));
-		struct error *err = command_next(path, sep);
+	struct verifier *verifier = verifier_create(f, ext);
+	while (!verifier_atend(verifier)) {
+		d_printf("%s\n", verifier_str(verifier));
+		struct error *err = command_next(verifier, sep);
 		if (err) {
 			return err;
 		}
 	}
-	path_destroy(path);
+	verifier_destroy(verifier);
 	return NULL;
 }
 

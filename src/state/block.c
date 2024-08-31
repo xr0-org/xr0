@@ -7,11 +7,11 @@
 #include "heap.h"
 #include "location.h"
 #include "object.h"
-#include "path.h"
 #include "stack.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
+#include "verifier.h"
 
 struct block {
 	struct object_arr *arr;
@@ -125,7 +125,7 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 			splitinstruct_append(splits, m);
 		}
 		return object_res_error_create(
-			error_pathinstruct(pathinstruct_split(splits))
+			error_verifierinstruct(verifierinstruct_split(splits))
 		);
 	}
 
