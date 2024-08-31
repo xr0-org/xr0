@@ -9,6 +9,26 @@
 #include "path.h"
 #include "value.h"
 
+struct path_arr;
+
+static struct path_arr *
+path_arr_create();
+
+static void
+path_arr_destroy(struct path_arr *);
+
+static int
+path_arr_n(struct path_arr *);
+
+static struct path **
+path_arr_paths(struct path_arr *);
+
+static bool
+path_arr_atend(struct path_arr *);
+
+static int
+path_arr_append(struct path_arr *, struct path *);
+
 struct path {
 	enum path_state {
 		PATH_STATE_UNINIT,
@@ -29,50 +49,6 @@ struct path {
 	struct ast_function *f;
 	struct externals *ext;
 };
-
-struct path_arr {
-	int n;
-	struct path **paths;
-};
-
-static struct path_arr *
-path_arr_create()
-{
-	struct path_arr *arr = calloc(1, sizeof(struct path_arr));
-	assert(arr);
-	return arr;
-}
-
-static void
-path_arr_destroy(struct path_arr *arr)
-{
-	for (int i = 0; i < arr->n; i++) {
-		path_destroy(arr->paths[i]);
-	}
-	free(arr->paths);
-	free(arr);
-}
-
-static int
-path_arr_append(struct path_arr *arr, struct path *p)
-{
-	arr->paths = realloc(arr->paths, sizeof(struct path_arr) * ++arr->n);
-	assert(arr->paths);
-	int loc = arr->n-1;
-	arr->paths[loc] = p;
-	return loc;
-}
-
-static bool
-path_arr_atend(struct path_arr *arr)
-{
-	for (int i = 0; i < arr->n; i++) {
-		if (!path_atend(arr->paths[i])) {
-			return false;	
-		}
-	}
-	return true;
-}
 
 struct path *
 path_create(struct ast_function *f, struct externals *ext)
@@ -182,16 +158,17 @@ path_setupactual_str(struct path *p)
 char *
 path_split_str(struct path *p)
 {
-	struct path *branch = p->paths->paths[p->branch_index];
+	struct path *branch = path_arr_paths(p->paths)[p->branch_index];
 	return path_str(branch);
 }
 
 static void
 path_nextbranch(struct path *p)
 {
-	assert(p->paths->n >= 2);
+	int n = path_arr_n(p->paths);
+	assert(n >= 2);
 	int index = p->branch_index;
-	if (index < p->paths->n - 1) {
+	if (index < n - 1) {
 		p->branch_index++;	
 	}
 }
@@ -446,7 +423,7 @@ path_progress_split(struct path *p, progressor *prog)
 	/* path_atend holds this invariant whenever this function is called */ 
 	assert(!path_arr_atend(p->paths));
 	return branch_progress(
-		p, p->paths->paths[p->branch_index], prog
+		p, path_arr_paths(p->paths)[p->branch_index], prog
 	);
 }
 
@@ -576,7 +553,7 @@ path_verify(struct path *p, struct ast_expr *expr)
 static struct error *
 path_split_verify(struct path *p, struct ast_expr *expr)
 {
-	struct path *branch = p->paths->paths[p->branch_index];
+	struct path *branch = path_arr_paths(p->paths)[p->branch_index];
 	return path_verify(branch, expr);
 }
 
@@ -608,8 +585,65 @@ path_lexememarker(struct path *p)
 static struct lexememarker *
 path_split_lexememarker(struct path *p)
 {
-	struct path *branch = p->paths->paths[p->branch_index];
+	struct path *branch = path_arr_paths(p->paths)[p->branch_index];
 	return path_lexememarker(branch);
+}
+
+
+struct path_arr {
+	int n;
+	struct path **paths;
+};
+
+static struct path_arr *
+path_arr_create()
+{
+	struct path_arr *arr = calloc(1, sizeof(struct path_arr));
+	assert(arr);
+	return arr;
+}
+
+static void
+path_arr_destroy(struct path_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		path_destroy(arr->paths[i]);
+	}
+	free(arr->paths);
+	free(arr);
+}
+
+static int
+path_arr_n(struct path_arr *arr)
+{
+	return arr->n;
+}
+
+static struct path **
+path_arr_paths(struct path_arr *arr)
+{
+	return arr->paths;
+}
+
+static int
+path_arr_append(struct path_arr *arr, struct path *p)
+{
+	arr->paths = realloc(arr->paths, sizeof(struct path_arr) * ++arr->n);
+	assert(arr->paths);
+	int loc = arr->n-1;
+	arr->paths[loc] = p;
+	return loc;
+}
+
+static bool
+path_arr_atend(struct path_arr *arr)
+{
+	for (int i = 0; i < arr->n; i++) {
+		if (!path_atend(arr->paths[i])) {
+			return false;	
+		}
+	}
+	return true;
 }
 
 
