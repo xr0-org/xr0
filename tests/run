@@ -19,41 +19,37 @@ fail="\e[31mFAIL\e[0m\n"
 pass="\e[32mPASS\e[0m\n"
 ignore="\e[33mIGNORE\e[0m\n"
 
-run_test() {
-	folder=$1
+run_cmd() {
+	f=$1
+	folder=$(dirname "$f")
 	tempfile=$2
 
-	if [ "$folder" == *"$topological_folder"* ]
-	then
-		if [[ "$f" == *"verification"* ]]
-		then
-			output=$($XR0 -x main -I $LIBX -v $f > "$tempfile" 2>&1)
-		else
-			output=$($XR0 -t main -I $LIBX $f > "$tempfile" 2>&1)
-		fi
-	else 
-		output=$($XR0 -I $LIBX $f > "$tempfile" 2>&1)
+	args=""
+
+	args_file=$folder/args
+	if [ -f $args_file ]; then
+		args=$(cat $args_file)
 	fi
+
+	$XR0 -I $LIBX $args $f > "$tempfile" 2>&1
+}
+
+run_test() {
+	f=$1
+	folder=$(dirname "$f")
+	tempfile=$2
+
+	output=$(run_cmd $f $tempfile)
 
 	# cases where we have an expected output to compare with
 	if [[ "$f" == *"${fail_prefix}"* || "$folder" == *"$topological_folder"* ]]
 	then
 		expected_file="${f}.${expected_suffix}"
 		
-		output_file=$(<$tempfile)
-		echo "$output_file" | diff - $expected_file
-		if diff -q "$tempfile" "$expected_file" >/dev/null;
-		then
-			return 0
-		else
-			return 1
-		fi
+		echo "$(<$tempfile)" | diff - $expected_file
 	else
 		# silence is golden
-		if [[ $(cat $tempfile) -eq 0 ]] 
-		then
-			return 0
-		fi
+		cat $tempfile
 	fi
 }
 
@@ -96,7 +92,7 @@ do
 	fi
 
 	tempfile=$(mktemp)
-	succ=$(run_test $(dirname "$f") $tempfile)
+	succ=$(run_test $f $tempfile)
 	if [[ $succ -eq 0 ]]; then
 		npass=$((npass+1))
 		printf "$pass"
@@ -106,6 +102,17 @@ do
 	rm $tempfile
 
 done
+
+cd $TESTDIR
+cd ..
+printf "%-${length}s ..." "0db/00-basic"
+if $TESTDIR/0db/run; then
+	npass=$((npass+1))
+	printf "$pass"
+else
+	printf "$fail"
+fi
+ntests=$((ntests+1))
 
 nfail=$((ntests-(npass+nignore)))
 finish=$(date +"%s.%N")
