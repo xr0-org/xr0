@@ -67,6 +67,9 @@ scenario_create(struct ast_function *, struct externals *);
 static void
 scenario_destroy(struct scenario *);
 
+static char *
+scenario_str(struct scenario *);
+
 static struct scenario *
 scenario_create(struct ast_function *f, struct externals *ext)
 {
@@ -87,6 +90,85 @@ scenario_destroy(struct scenario *s)
 	free(s);
 
 }
+
+static char *
+setupabstract_str(struct scenario *);
+
+static char *
+abstract_str(struct scenario *);
+
+static char *
+setupactual_str(struct scenario *);
+
+static char *
+actual_str(struct scenario *);
+
+static char *
+scenario_str(struct scenario *s)
+{
+	switch (s->state) {
+	case SCENARIO_STATE_UNINIT:
+		return dynamic_str("path init abstract state");
+	case SCENARIO_STATE_SETUPABSTRACT:
+		return setupabstract_str(s);
+	case SCENARIO_STATE_ABSTRACT:
+		return abstract_str(s);
+	case SCENARIO_STATE_HALFWAY:
+		return dynamic_str("path init actual state");
+	case SCENARIO_STATE_SETUPACTUAL:
+		return setupactual_str(s);
+	case SCENARIO_STATE_ACTUAL:
+		return actual_str(s);
+	case SCENARIO_STATE_AUDIT:
+		return dynamic_str("path audit");
+	case SCENARIO_STATE_ATEND:
+		return dynamic_str("path at end");
+	default:
+		assert(false);
+	}
+}
+
+static char *
+abstract_str(struct scenario *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "phase:\tABSTRACT\n\n");
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->abstract));
+	strbuilder_printf(b, "%s\n", state_str(s->abstract));
+	return strbuilder_build(b);
+}
+
+static char *
+actual_str(struct scenario *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "phase:\tACTUAL\n\n");
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->actual));
+	strbuilder_printf(b, "%s\n", state_str(s->actual));
+	return strbuilder_build(b);
+}
+
+static char *
+setupabstract_str(struct scenario *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "phase:\tSETUP (ABSTRACT)\n\n");
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->abstract));
+	strbuilder_printf(b, "%s\n", state_str(s->abstract));
+	return strbuilder_build(b);
+}
+
+static char *
+setupactual_str(struct scenario *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "phase:\tSETUP (ACTUAL)\n\n");
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->actual));
+	strbuilder_printf(b, "%s\n", state_str(s->actual));
+	return strbuilder_build(b);
+}
+
+
 
 
 struct verifier {
@@ -119,85 +201,12 @@ verifier_destroy(struct verifier *p)
 	free(p);
 }
 
-static char *
-verifier_setupabstract_str(struct verifier *);
-
-static char *
-verifier_abstract_str(struct verifier *);
-
-static char *
-verifier_setupactual_str(struct verifier *);
-
-static char *
-verifier_actual_str(struct verifier *);
-
 char *
 verifier_str(struct verifier *p)
 {
-	if (p->issplit) {
-		return verifier_str(mux_activeverifier(p->mux));
-	}
-
-	switch (p->s->state) {
-	case SCENARIO_STATE_UNINIT:
-		return dynamic_str("path init abstract state");
-	case SCENARIO_STATE_SETUPABSTRACT:
-		return verifier_setupabstract_str(p);
-	case SCENARIO_STATE_ABSTRACT:
-		return verifier_abstract_str(p);
-	case SCENARIO_STATE_HALFWAY:
-		return dynamic_str("path init actual state");
-	case SCENARIO_STATE_SETUPACTUAL:
-		return verifier_setupactual_str(p);
-	case SCENARIO_STATE_ACTUAL:
-		return verifier_actual_str(p);
-	case SCENARIO_STATE_AUDIT:
-		return dynamic_str("path audit");
-	case SCENARIO_STATE_ATEND:
-		return dynamic_str("path at end");
-	default:
-		assert(false);
-	}
-}
-
-static char *
-verifier_abstract_str(struct verifier *p)
-{
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "phase:\tABSTRACT\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->s->abstract));
-	strbuilder_printf(b, "%s\n", state_str(p->s->abstract));
-	return strbuilder_build(b);
-}
-
-static char *
-verifier_actual_str(struct verifier *p)
-{
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "phase:\tACTUAL\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->s->actual));
-	strbuilder_printf(b, "%s\n", state_str(p->s->actual));
-	return strbuilder_build(b);
-}
-
-static char *
-verifier_setupabstract_str(struct verifier *p)
-{
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "phase:\tSETUP (ABSTRACT)\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->s->abstract));
-	strbuilder_printf(b, "%s\n", state_str(p->s->abstract));
-	return strbuilder_build(b);
-}
-
-static char *
-verifier_setupactual_str(struct verifier *p)
-{
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "phase:\tSETUP (ACTUAL)\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(p->s->actual));
-	strbuilder_printf(b, "%s\n", state_str(p->s->actual));
-	return strbuilder_build(b);
+	return p->issplit
+		? verifier_str(mux_activeverifier(p->mux))
+		: scenario_str(p->s);
 }
 
 bool
