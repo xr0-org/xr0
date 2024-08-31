@@ -70,6 +70,17 @@ scenario_destroy(struct scenario *);
 static char *
 scenario_str(struct scenario *);
 
+static struct error *
+scenario_progress(struct scenario *, progressor *);
+
+static struct error *
+scenario_verify(struct scenario *, struct ast_expr *);
+
+static struct lexememarker *
+scenario_lexememarker(struct scenario *);
+
+
+
 static struct scenario *
 scenario_create(struct ast_function *f, struct externals *ext)
 {
@@ -88,7 +99,6 @@ scenario_destroy(struct scenario *s)
 	/*state_destroy(s->actual);*/
 	ast_function_destroy(s->f);
 	free(s);
-
 }
 
 static char *
@@ -169,6 +179,216 @@ setupactual_str(struct scenario *s)
 }
 
 
+/* scenario_progress */
+
+static struct error *
+init_abstract(struct scenario *);
+
+static struct error *
+init_actual(struct scenario *);
+
+static struct error *
+audit(struct scenario *);
+
+static struct error *
+progress_setupabstract(struct scenario *s, progressor *);
+
+static struct error *
+progress_abstract(struct scenario *s, progressor *);
+
+static struct error *
+progress_setupactual(struct scenario *s, progressor *);
+
+static struct error *
+progress_actual(struct scenario *s, progressor *);
+
+static struct error *
+scenario_progress(struct scenario *s, progressor *prog)
+{
+	switch (s->state) {
+	case SCENARIO_STATE_UNINIT:
+		return init_abstract(s);
+	case SCENARIO_STATE_HALFWAY:
+		return init_actual(s);
+	case SCENARIO_STATE_AUDIT:
+		return audit(s);
+	case SCENARIO_STATE_SETUPABSTRACT:
+		return progress_setupabstract(s, prog);
+	case SCENARIO_STATE_ABSTRACT:
+		return progress_abstract(s, prog);
+	case SCENARIO_STATE_SETUPACTUAL:
+		return progress_setupactual(s, prog);
+	case SCENARIO_STATE_ACTUAL:
+		return progress_actual(s, prog);
+	case SCENARIO_STATE_ATEND:
+	default:
+		assert(false);
+	}
+}
+
+static struct error *
+init_abstract(struct scenario *s)
+{
+	struct error *err;
+
+	struct frame *f = frame_callabstract_create(
+		ast_function_name(s->f),
+		ast_function_abstract(s->f),
+		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
+		s->f
+	);
+	s->abstract = state_create(f, s->ext);
+	if ((err = ast_function_initparams(s->f, s->abstract))) {
+		return err;
+	}
+	assert(!state_readregister(s->abstract));
+	struct frame *setupframe = frame_blockfindsetup_create(
+		dynamic_str("setup"),
+		ast_function_abstract(s->f)
+	);
+	state_pushframe(s->abstract, setupframe);
+	s->state = SCENARIO_STATE_SETUPABSTRACT;
+	return NULL;
+}
+
+static struct error *
+init_actual(struct scenario *s)
+{
+	struct error *err;
+
+	/* if body empty just apply setup */
+	struct frame *f = frame_callactual_create(
+		ast_function_name(s->f),
+		ast_function_body(s->f),
+		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
+		s->f
+	);
+	s->actual = state_create(f, s->ext);
+	if ((err = ast_function_initparams(s->f, s->actual))) {
+		return err;
+	}
+	state_setrconsts(s->actual, s->abstract);
+	struct frame *setupframe = frame_blockfindsetup_create(
+		dynamic_str("setup"),
+		ast_function_abstract(s->f)
+	);
+	state_pushframe(s->actual, setupframe);
+	s->state = SCENARIO_STATE_SETUPACTUAL;
+	return NULL;
+}
+
+static struct error *
+audit(struct scenario *s)
+{
+	if (state_hasgarbage(s->actual)) {
+		v_printf("actual: %s", state_str(s->actual));
+		return error_printf(
+			"%s: garbage on heap", ast_function_name(s->f)
+		);
+	}
+	if (!state_equal(s->actual, s->abstract)) {
+		/* unequal states are printed by state_equal so that the user
+		 * can see the states with undeclared vars */
+		return error_printf(
+			"%s: actual and abstract states differ",
+			ast_function_name(s->f)
+		);
+	}
+	s->state = SCENARIO_STATE_ATEND;
+	return NULL;
+}
+
+static struct error *
+progressortrace(struct state *, progressor *);
+
+static struct error *
+progress_setupabstract(struct scenario *s, progressor *prog)
+{
+	if (state_atsetupend(s->abstract)) {
+		s->state = SCENARIO_STATE_ABSTRACT;
+		return NULL;
+	}
+	return progressortrace(s->abstract, prog);
+}
+
+static struct error *
+progressortrace(struct state *s, progressor *prog)
+{
+	struct error *err = prog(s);
+	if (err) {
+		return state_stacktrace(s, err);
+	}
+	return NULL;
+}
+
+static struct error *
+progress_abstract(struct scenario *s, progressor *prog)
+{	
+	if (state_atend(s->abstract)) {
+		s->state = SCENARIO_STATE_HALFWAY;
+		return NULL;
+	}
+	return progressortrace(s->abstract, prog);
+}
+
+static struct error *
+progress_setupactual(struct scenario *s, progressor *prog)
+{
+	if (state_atsetupend(s->actual)) {
+		s->state = SCENARIO_STATE_ACTUAL;
+		return NULL;
+	}
+	return progressortrace(s->actual, prog);
+}
+
+static struct error *
+progress_actual(struct scenario *s, progressor *prog)
+{	
+	if (state_atend(s->actual)) {
+		s->state = SCENARIO_STATE_AUDIT;
+		return NULL;
+	}
+	return progressortrace(s->actual, prog);
+}
+
+
+static struct error *
+scenario_verify(struct scenario *s, struct ast_expr *expr)
+{
+	switch(s->state) {
+	case SCENARIO_STATE_ABSTRACT:
+		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), s->abstract);
+	case SCENARIO_STATE_ACTUAL:
+		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), s->actual);	
+	case SCENARIO_STATE_UNINIT:
+	case SCENARIO_STATE_HALFWAY:
+	case SCENARIO_STATE_AUDIT:
+	case SCENARIO_STATE_ATEND:
+		return NULL;
+	default:
+		assert(false);
+	}
+}
+
+static struct lexememarker *
+scenario_lexememarker(struct scenario *s)
+{
+	switch (s->state) {
+	case SCENARIO_STATE_SETUPABSTRACT:
+	case SCENARIO_STATE_ABSTRACT:
+		return state_lexememarker(s->abstract);
+	case SCENARIO_STATE_SETUPACTUAL:
+	case SCENARIO_STATE_ACTUAL:
+		return state_lexememarker(s->actual);	
+	case SCENARIO_STATE_UNINIT:
+	case SCENARIO_STATE_HALFWAY:
+	case SCENARIO_STATE_AUDIT:
+	case SCENARIO_STATE_ATEND:
+		return NULL;
+	default:
+		assert(false);
+	}
+}
 
 
 struct verifier {
@@ -233,124 +453,21 @@ progressor_next()
 
 /* verifier_progress */
 
-static struct error *
-verifier_init_abstract(struct verifier *p);
-
-static struct error *
-verifier_init_actual(struct verifier *p);
-
-static struct error *
-verifier_audit(struct verifier *p);
-
-static struct error *
-progress(struct verifier *, progressor *);
+static void
+verifierinstruct_do(struct verifierinstruct *, struct verifier *);
 
 struct error *
 verifier_progress(struct verifier *p, progressor *prog)
 {
 	if (p->issplit) {
-		return progress(p, prog);
+		struct verifier *branch = mux_activeverifier(p->mux);
+		if (verifier_atend(branch)) {
+			mux_next(p->mux);
+			return NULL;
+		}
+		return verifier_progress(branch, prog);
 	}
-	switch (p->s->state) {
-	case SCENARIO_STATE_UNINIT:
-		return verifier_init_abstract(p);
-	case SCENARIO_STATE_HALFWAY:
-		return verifier_init_actual(p);
-	case SCENARIO_STATE_AUDIT:
-		return verifier_audit(p);
-	case SCENARIO_STATE_SETUPABSTRACT:
-	case SCENARIO_STATE_ABSTRACT:
-	case SCENARIO_STATE_SETUPACTUAL:
-	case SCENARIO_STATE_ACTUAL:
-		return progress(p, prog);
-	case SCENARIO_STATE_ATEND:
-	default:
-		assert(false);
-	}
-}
-
-static struct error *
-verifier_init_abstract(struct verifier *p)
-{
-	struct error *err;
-
-	struct frame *f = frame_callabstract_create(
-		ast_function_name(p->s->f),
-		ast_function_abstract(p->s->f),
-		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
-		p->s->f
-	);
-	p->s->abstract = state_create(f, p->s->ext);
-	if ((err = ast_function_initparams(p->s->f, p->s->abstract))) {
-		return err;
-	}
-	assert(!state_readregister(p->s->abstract));
-	struct frame *setupframe = frame_blockfindsetup_create(
-		dynamic_str("setup"),
-		ast_function_abstract(p->s->f)
-	);
-	state_pushframe(p->s->abstract, setupframe);
-	p->s->state = SCENARIO_STATE_SETUPABSTRACT;
-	return NULL;
-}
-
-static struct error *
-verifier_init_actual(struct verifier *p)
-{
-	struct error *err;
-
-	/* if body empty just apply setup */
-	struct frame *f = frame_callactual_create(
-		ast_function_name(p->s->f),
-		ast_function_body(p->s->f),
-		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
-		p->s->f
-	);
-	p->s->actual = state_create(f, p->s->ext);
-	if ((err = ast_function_initparams(p->s->f, p->s->actual))) {
-		return err;
-	}
-	state_setrconsts(p->s->actual, p->s->abstract);
-	struct frame *setupframe = frame_blockfindsetup_create(
-		dynamic_str("setup"),
-		ast_function_abstract(p->s->f)
-	);
-	state_pushframe(p->s->actual, setupframe);
-	p->s->state = SCENARIO_STATE_SETUPACTUAL;
-	return NULL;
-}
-
-static struct error *
-verifier_audit(struct verifier *p)
-{
-	if (state_hasgarbage(p->s->actual)) {
-		v_printf("actual: %s", state_str(p->s->actual));
-		return error_printf(
-			"%s: garbage on heap", ast_function_name(p->s->f)
-		);
-	}
-	if (!state_equal(p->s->actual, p->s->abstract)) {
-		/* unequal states are printed by state_equal so that the user
-		 * can see the states with undeclared vars */
-		return error_printf(
-			"%s: actual and abstract states differ",
-			ast_function_name(p->s->f)
-		);
-	}
-	p->s->state = SCENARIO_STATE_ATEND;
-	return NULL;
-}
-
-static struct error *
-progressact(struct verifier *, progressor *);
-
-static void
-verifierinstruct_do(struct verifierinstruct *, struct verifier *);
-
-static struct error *
-progress(struct verifier *p, progressor *prog)
-{
-	struct error *err = progressact(p, prog);
+	struct error *err = scenario_progress(p->s, prog);
 	if (err) {
 		struct error *inst_err = error_to_verifierinstruct(err);
 		if (!inst_err) {
@@ -359,105 +476,6 @@ progress(struct verifier *p, progressor *prog)
 		verifierinstruct_do(error_get_verifierinstruct(inst_err), p);
 	}
 	return NULL;
-}
-
-static struct error *
-verifier_progress_setupabstract(struct verifier *p, progressor *);
-
-static struct error *
-verifier_progress_abstract(struct verifier *p, progressor *);
-
-static struct error *
-verifier_progress_setupactual(struct verifier *p, progressor *);
-
-static struct error *
-verifier_progress_actual(struct verifier *p, progressor *);
-
-static struct error *
-verifier_progress_split(struct verifier *p, progressor *);
-
-static struct error *
-progressact(struct verifier *p, progressor *prog)
-{
-	if (p->issplit) {
-		return verifier_progress_split(p, prog);
-	}
-	switch (p->s->state) {
-	case SCENARIO_STATE_SETUPABSTRACT:
-		return verifier_progress_setupabstract(p, prog);
-	case SCENARIO_STATE_ABSTRACT:
-		return verifier_progress_abstract(p, prog);
-	case SCENARIO_STATE_SETUPACTUAL:
-		return verifier_progress_setupactual(p, prog);
-	case SCENARIO_STATE_ACTUAL:
-		return verifier_progress_actual(p, prog);
-	default:
-		assert(false);
-	}
-}
-
-static struct error *
-progressortrace(struct state *, progressor *);
-
-static struct error *
-verifier_progress_setupabstract(struct verifier *p, progressor *prog)
-{
-	if (state_atsetupend(p->s->abstract)) {
-		p->s->state = SCENARIO_STATE_ABSTRACT;
-		return NULL;
-	}
-	return progressortrace(p->s->abstract, prog);
-}
-
-static struct error *
-progressortrace(struct state *s, progressor *prog)
-{
-	struct error *err = prog(s);
-	if (err) {
-		return state_stacktrace(s, err);
-	}
-	return NULL;
-}
-
-static struct error *
-verifier_progress_abstract(struct verifier *p, progressor *prog)
-{	
-	if (state_atend(p->s->abstract)) {
-		p->s->state = SCENARIO_STATE_HALFWAY;
-		return NULL;
-	}
-	return progressortrace(p->s->abstract, prog);
-}
-
-static struct error *
-verifier_progress_setupactual(struct verifier *p, progressor *prog)
-{
-	if (state_atsetupend(p->s->actual)) {
-		p->s->state = SCENARIO_STATE_ACTUAL;
-		return NULL;
-	}
-	return progressortrace(p->s->actual, prog);
-}
-
-static struct error *
-verifier_progress_actual(struct verifier *p, progressor *prog)
-{	
-	if (state_atend(p->s->actual)) {
-		p->s->state = SCENARIO_STATE_AUDIT;
-		return NULL;
-	}
-	return progressortrace(p->s->actual, prog);
-}
-
-static struct error *
-verifier_progress_split(struct verifier *p, progressor *prog)
-{
-	struct verifier *branch = mux_activeverifier(p->mux);
-	if (verifier_atend(branch)) {
-		mux_next(p->mux);
-		return NULL;
-	}
-	return verifier_progress(branch, prog);
 }
 
 
@@ -490,7 +508,6 @@ verifier_gensplits(struct verifier *p, struct splitinstruct *inst)
 	}
 	return arr;
 }
-
 
 static struct ast_function *
 copy_withsplitname(struct ast_function *, struct map *split); 
@@ -565,46 +582,19 @@ split_name(char *name, struct map *split)
 struct error *
 verifier_verify(struct verifier *p, struct ast_expr *expr)
 {
-	if (p->issplit) {
-		return verifier_verify(mux_activeverifier(p->mux), expr);
-	}
-	switch(p->s->state) {
-	case SCENARIO_STATE_ABSTRACT:
-		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->s->abstract);
-	case SCENARIO_STATE_ACTUAL:
-		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->s->actual);	
-	case SCENARIO_STATE_UNINIT:
-	case SCENARIO_STATE_HALFWAY:
-	case SCENARIO_STATE_AUDIT:
-	case SCENARIO_STATE_ATEND:
-		return NULL;
-	default:
-		assert(false);
-	}
+	return p->issplit
+		? verifier_verify(mux_activeverifier(p->mux), expr)
+		: scenario_verify(p->s, expr);
 }
 
 struct lexememarker *
 verifier_lexememarker(struct verifier *p)
 {
-	if (p->issplit) {
-		return verifier_lexememarker(mux_activeverifier(p->mux));
-	}
-	switch (p->s->state) {
-	case SCENARIO_STATE_SETUPABSTRACT:
-	case SCENARIO_STATE_ABSTRACT:
-		return state_lexememarker(p->s->abstract);
-	case SCENARIO_STATE_SETUPACTUAL:
-	case SCENARIO_STATE_ACTUAL:
-		return state_lexememarker(p->s->actual);	
-	case SCENARIO_STATE_UNINIT:
-	case SCENARIO_STATE_HALFWAY:
-	case SCENARIO_STATE_AUDIT:
-	case SCENARIO_STATE_ATEND:
-		return NULL;
-	default:
-		assert(false);
-	}
+	return p->issplit
+		? verifier_lexememarker(mux_activeverifier(p->mux))
+		: scenario_lexememarker(p->s);
 }
+
 
 struct mux {
 	int index;
