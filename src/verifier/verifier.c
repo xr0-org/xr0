@@ -46,7 +46,7 @@ static void
 mux_next(struct mux *);
 
 static struct scenario *
-scenario_create(struct ast_function *, struct externals *);
+scenario_create(struct ast_function *);
 
 static void
 scenario_destroy(struct scenario *);
@@ -58,7 +58,7 @@ static int
 scenario_atend(struct scenario *);
 
 static struct error *
-scenario_progress(struct scenario *, progressor *);
+scenario_progress(struct scenario *, progressor *, struct externals *);
 
 static struct scenario *
 scenario_copywithsplit(struct scenario *, struct map *split);
@@ -86,6 +86,10 @@ _verifier_mux(struct verifier *);
 
 static struct scenario *
 _verifier_scenario(struct verifier *);
+
+static struct externals *
+_verifier_ext(struct verifier *);
+
 
 char *
 verifier_str(struct verifier *p)
@@ -131,7 +135,9 @@ verifier_progress(struct verifier *p, progressor *prog)
 		}
 		return verifier_progress(branch, prog);
 	}
-	struct error *err = scenario_progress(_verifier_scenario(p), prog);
+	struct error *err = scenario_progress(
+		_verifier_scenario(p), prog, _verifier_ext(p)
+	);
 	if (err) {
 		struct error *inst_err = error_to_verifierinstruct(err);
 		if (!inst_err) {
@@ -188,10 +194,11 @@ struct verifier {
 		struct mux *mux;
 		struct scenario *s;
 	};
+	struct externals *ext;
 };
 
 static struct verifier *
-_verifier_create(struct scenario *s)
+_verifier_create(struct scenario *s, struct externals *ext)
 {
 	assert(s);
 
@@ -199,19 +206,20 @@ _verifier_create(struct scenario *s)
 	assert(p);
 	p->issplit = 0;
 	p->s = s;
+	p->ext = ext;
 	return p;
 }
 
 struct verifier *
 verifier_create(struct ast_function *f, struct externals *ext)
 {
-	return _verifier_create(scenario_create(f, ext));
+	return _verifier_create(scenario_create(f), ext);
 }
 
 static struct verifier *
 _verifier_copywithsplit(struct verifier *old, struct map *split)
 {
-	return _verifier_create(scenario_copywithsplit(old->s, split));
+	return _verifier_create(scenario_copywithsplit(old->s, split), old->ext);
 }
 
 static void
@@ -256,6 +264,13 @@ _verifier_scenario(struct verifier *p)
 	assert(!p->issplit);
 	return p->s;
 }
+
+static struct externals *
+_verifier_ext(struct verifier *p)
+{
+	return p->ext;
+}
+
 
 
 struct mux {
@@ -360,16 +375,14 @@ struct scenario {
 	} state;
 	struct state *abstract, *actual;
 	struct ast_function *f;
-	struct externals *ext;
 };
 
 static struct scenario *
-scenario_create(struct ast_function *f, struct externals *ext)
+scenario_create(struct ast_function *f)
 {
 	struct scenario *s = malloc(sizeof(struct scenario));
 	assert(s);
 	s->f = ast_function_copy(f);
-	s->ext = ext;
 	s->state = SCENARIO_STATE_UNINIT;
 	return s;
 }
@@ -470,10 +483,10 @@ scenario_atend(struct scenario *s)
 /* scenario_progress */
 
 static struct error *
-init_abstract(struct scenario *);
+init_abstract(struct scenario *, struct externals *);
 
 static struct error *
-init_actual(struct scenario *);
+init_actual(struct scenario *, struct externals *);
 
 static struct error *
 audit(struct scenario *);
@@ -491,13 +504,13 @@ static struct error *
 progress_actual(struct scenario *s, progressor *);
 
 static struct error *
-scenario_progress(struct scenario *s, progressor *prog)
+scenario_progress(struct scenario *s, progressor *prog, struct externals *ext)
 {
 	switch (s->state) {
 	case SCENARIO_STATE_UNINIT:
-		return init_abstract(s);
+		return init_abstract(s, ext);
 	case SCENARIO_STATE_HALFWAY:
-		return init_actual(s);
+		return init_actual(s, ext);
 	case SCENARIO_STATE_AUDIT:
 		return audit(s);
 	case SCENARIO_STATE_SETUPABSTRACT:
@@ -515,7 +528,7 @@ scenario_progress(struct scenario *s, progressor *prog)
 }
 
 static struct error *
-init_abstract(struct scenario *s)
+init_abstract(struct scenario *s, struct externals *ext)
 {
 	struct error *err;
 
@@ -525,7 +538,7 @@ init_abstract(struct scenario *s)
 		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
 		s->f
 	);
-	s->abstract = state_create(f, s->ext);
+	s->abstract = state_create(f, ext);
 	if ((err = ast_function_initparams(s->f, s->abstract))) {
 		return err;
 	}
@@ -540,7 +553,7 @@ init_abstract(struct scenario *s)
 }
 
 static struct error *
-init_actual(struct scenario *s)
+init_actual(struct scenario *s, struct externals *ext)
 {
 	struct error *err;
 
@@ -551,7 +564,7 @@ init_actual(struct scenario *s)
 		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
 		s->f
 	);
-	s->actual = state_create(f, s->ext);
+	s->actual = state_create(f, ext);
 	if ((err = ast_function_initparams(s->f, s->actual))) {
 		return err;
 	}
@@ -645,9 +658,7 @@ copy_withsplitname(struct ast_function *, struct map *split);
 static struct scenario *
 scenario_copywithsplit(struct scenario *old, struct map *split)
 {
-	struct scenario *s = scenario_create(
-		copy_withsplitname(old->f, split), old->ext
-	);
+	struct scenario *s = scenario_create(copy_withsplitname(old->f, split));
 	char *fname = ast_function_name(s->f);
 	s->state = old->state;
 	switch (old->state) {
