@@ -30,9 +30,10 @@ static int
 verifier_arr_append(struct verifier_arr *, struct verifier *);
 
 struct verifier {
+	bool issplit;
+
 	int branch_index;
 	struct verifier_arr *verifiers;
-	struct externals *ext;
 
 	enum verifier_state {
 		PATH_STATE_UNINIT,
@@ -43,11 +44,10 @@ struct verifier {
 		PATH_STATE_ACTUAL,
 		PATH_STATE_AUDIT,
 		PATH_STATE_ATEND,
-		PATH_STATE_SPLIT,
 	} verifier_state;
 	struct state *abstract, *actual;
-	
 	struct ast_function *f;
+	struct externals *ext;
 };
 
 struct verifier *
@@ -91,6 +91,10 @@ verifier_split_str(struct verifier *);
 char *
 verifier_str(struct verifier *p)
 {
+	if (p->issplit) {
+		return verifier_split_str(p);
+	}
+
 	switch (p->verifier_state) {
 	case PATH_STATE_UNINIT:
 		return dynamic_str("path init abstract state");
@@ -106,8 +110,6 @@ verifier_str(struct verifier *p)
 		return verifier_actual_str(p);
 	case PATH_STATE_AUDIT:
 		return dynamic_str("path audit");
-	case PATH_STATE_SPLIT:
-		return verifier_split_str(p);
 	case PATH_STATE_ATEND:
 		return dynamic_str("path at end");
 	default:
@@ -176,14 +178,10 @@ verifier_nextbranch(struct verifier *p)
 bool
 verifier_atend(struct verifier *p)
 {
-	switch (p->verifier_state) {
-	case PATH_STATE_SPLIT:
+	if (p->issplit) {
 		return verifier_arr_atend(p->verifiers);
-	case PATH_STATE_ATEND:
-		return true;
-	default:
-		return false;
 	}
+	return p->verifier_state == PATH_STATE_ATEND;
 }
 
 progressor *
@@ -216,6 +214,9 @@ progress(struct verifier *, progressor *);
 struct error *
 verifier_progress(struct verifier *p, progressor *prog)
 {
+	if (p->issplit) {
+		return progress(p, prog);
+	}
 	switch (p->verifier_state) {
 	case PATH_STATE_UNINIT:
 		return verifier_init_abstract(p);
@@ -227,7 +228,6 @@ verifier_progress(struct verifier *p, progressor *prog)
 	case PATH_STATE_ABSTRACT:
 	case PATH_STATE_SETUPACTUAL:
 	case PATH_STATE_ACTUAL:
-	case PATH_STATE_SPLIT:
 		return progress(p, prog);
 	case PATH_STATE_ATEND:
 	default:
@@ -345,6 +345,9 @@ verifier_progress_split(struct verifier *p, progressor *);
 static struct error *
 progressact(struct verifier *p, progressor *prog)
 {
+	if (p->issplit) {
+		return verifier_progress_split(p, prog);
+	}
 	switch (p->verifier_state) {
 	case PATH_STATE_SETUPABSTRACT:
 		return verifier_progress_setupabstract(p, prog);
@@ -354,8 +357,6 @@ progressact(struct verifier *p, progressor *prog)
 		return verifier_progress_setupactual(p, prog);
 	case PATH_STATE_ACTUAL:
 		return verifier_progress_actual(p, prog);
-	case PATH_STATE_SPLIT:
-		return verifier_progress_split(p, prog);
 	default:
 		assert(false);
 	}
@@ -454,7 +455,7 @@ verifier_split(struct verifier *p, struct splitinstruct *inst)
 	/* TODO: destroy abstract and actual */
 	p->abstract = NULL;
 	p->actual = NULL;
-	p->verifier_state = PATH_STATE_SPLIT;
+	p->issplit = true;
 }
 
 static struct ast_function *
@@ -533,13 +534,14 @@ verifier_split_verify(struct verifier *, struct ast_expr *);
 struct error *
 verifier_verify(struct verifier *p, struct ast_expr *expr)
 {
+	if (p->issplit) {
+		return verifier_split_verify(p, expr);
+	}
 	switch(p->verifier_state) {
 	case PATH_STATE_ABSTRACT:
 		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->abstract);
 	case PATH_STATE_ACTUAL:
 		return ast_stmt_verify(ast_stmt_create_expr(NULL, expr), p->actual);	
-	case PATH_STATE_SPLIT:
-		return verifier_split_verify(p, expr);
 	case PATH_STATE_UNINIT:
 	case PATH_STATE_HALFWAY:
 	case PATH_STATE_AUDIT:
@@ -563,6 +565,9 @@ verifier_split_lexememarker(struct verifier *);
 struct lexememarker *
 verifier_lexememarker(struct verifier *p)
 {
+	if (p->issplit) {
+		return verifier_split_lexememarker(p);	
+	}
 	switch (p->verifier_state) {
 	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
@@ -570,8 +575,6 @@ verifier_lexememarker(struct verifier *p)
 	case PATH_STATE_SETUPACTUAL:
 	case PATH_STATE_ACTUAL:
 		return state_lexememarker(p->actual);	
-	case PATH_STATE_SPLIT:
-		return verifier_split_lexememarker(p);	
 	case PATH_STATE_UNINIT:
 	case PATH_STATE_HALFWAY:
 	case PATH_STATE_AUDIT:
