@@ -15,9 +15,6 @@ struct ast_expr;
 /* ext */
 struct externals;
 
-/* props */
-struct props;
-
 /* object */
 struct object;
 
@@ -66,9 +63,6 @@ state_next(struct state *);
 
 struct externals *
 state_getext(struct state *);
-
-struct props *
-state_getprops(struct state *);
 
 char *
 state_programtext(struct state *);

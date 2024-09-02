@@ -13,6 +13,8 @@ struct int_arr;
 
 struct ast_type;
 
+struct state;
+
 struct int_arr *
 value_deriveorder(struct value *, struct circuitbreaker *, struct state *);
 
@@ -35,6 +37,8 @@ value_isint(struct value *v);
 
 struct value *
 value_literal_create(char *);
+
+struct ast_expr;
 
 struct value *
 value_int_rconst_create(struct ast_expr *range);

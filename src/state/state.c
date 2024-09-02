@@ -16,6 +16,7 @@
 #include "static.h"
 #include "util.h"
 #include "value.h"
+#include "verifier.h"
 
 struct state {
 	struct externals *ext;
@@ -24,7 +25,6 @@ struct state {
 	struct clump *clump;
 	struct stack *stack;
 	struct heap *heap;
-	struct props *props;
 	struct value *reg;
 };
 
@@ -203,12 +203,6 @@ struct heap *
 state_getheap(struct state *s)
 {
 	return s->heap;
-}
-
-struct props *
-state_getprops(struct state *s)
-{
-	return s->props;
 }
 
 char *
