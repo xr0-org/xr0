@@ -378,6 +378,7 @@ struct error {
 	enum error_type {
 		ERROR_PRINTF,
 		ERROR_VERIFIERINSTRUCT,
+		ERROR_VERIFIERCONTRADICTION,
 		ERROR_RETURN,
 
 		ERROR_BLOCK_OBSERVE_NOOBJ,
@@ -504,6 +505,20 @@ error_get_verifierinstruct(struct error *err)
 }
 
 struct error *
+error_verifiercontradiction()
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_VERIFIERCONTRADICTION;
+	return err;
+}
+
+struct error *
+error_to_verifiercontradiction(struct error *err)
+{
+	return error_to(err, ERROR_VERIFIERCONTRADICTION);
+}
+
+struct error *
 error_return()
 {
 	struct error *err = calloc(1, sizeof(struct error));
@@ -591,7 +606,8 @@ char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
-		[ERROR_VERIFIERINSTRUCT]		= "path instruction",
+		[ERROR_VERIFIERINSTRUCT]	= "path instruction",
+		[ERROR_VERIFIERCONTRADICTION]	= "verifier contradiction",
 		[ERROR_RETURN]			= "returned",
 
 		[ERROR_BLOCK_OBSERVE_NOOBJ]	= "block_observe no object",
@@ -608,6 +624,7 @@ error_str(struct error *err)
 	case ERROR_PRINTF:
 		return dynamic_str(err->contents.printf);
 	case ERROR_VERIFIERINSTRUCT:
+	case ERROR_VERIFIERCONTRADICTION:
 	case ERROR_RETURN:
 	case ERROR_BLOCK_OBSERVE_NOOBJ:
 	case ERROR_STATE_GET_NOBLOCK:

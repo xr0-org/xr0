@@ -1,4 +1,4 @@
-phase:	SETUP (ABSTRACT)
+phase:	ABSTRACT (SETUP)
 
 text:
 -->	setup: q = .clump(1);

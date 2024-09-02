@@ -16,6 +16,7 @@
 #include "static.h"
 #include "util.h"
 #include "value.h"
+#include "verifier.h"
 
 struct state {
 	struct externals *ext;
@@ -24,43 +25,22 @@ struct state {
 	struct clump *clump;
 	struct stack *stack;
 	struct heap *heap;
-	struct props *props;
 	struct value *reg;
 };
 
 struct state *
-state_create(struct frame *f, struct externals *ext)
+state_create(struct frame *f, struct rconst *rconst, struct externals *ext)
 {
 	struct state *state = malloc(sizeof(struct state));
 	assert(state);
 	state->ext = ext;
 	state->static_memory = static_memory_create();
-	state->rconst = rconst_create();
+	state->rconst = rconst;
 	state->clump = clump_create();
 	state->stack = stack_create(f, NULL);
 	state->heap = heap_create();
 	state->reg = NULL;
 	return state;
-}
-
-void
-state_setrconsts(struct state *new, struct state *old)
-{
-	new->rconst = rconst_copy(old->rconst);
-}
-
-int
-state_split(struct state *s, struct map *split)
-{
-	for (int i = 0; i < split->n; i++) {
-		struct entry e = split->entry[i];
-		struct value *v = state_getrconst(s, e.key);
-		assert(v);
-		if (!value_splitassume(v, (struct number *) e.value)) {
-			return 0;
-		}
-	}
-	return 1;
 }
 
 void
@@ -90,11 +70,18 @@ state_copy(struct state *state)
 }
 
 struct state *
-state_copywithname(struct state *state, char *func_name)
+state_split(struct state *state, struct rconst *rconst, char *func_name)
 {
 	struct state *copy = state_copy(state);
+	copy->rconst = rconst;
 	copy->stack = stack_copywithname(state->stack, func_name);
 	return copy;
+}
+
+char *
+state_funcname(struct state *s)
+{
+	return stack_funcname(s->stack);
 }
 
 char *
@@ -203,12 +190,6 @@ struct heap *
 state_getheap(struct state *s)
 {
 	return s->heap;
-}
-
-struct props *
-state_getprops(struct state *s)
-{
-	return s->props;
 }
 
 char *

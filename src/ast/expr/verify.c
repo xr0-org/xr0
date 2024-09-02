@@ -12,6 +12,7 @@
 #include "util.h"
 #include "value.h"
 #include "type.h"
+#include "verifier.h"
 
 struct bool_res *
 ast_expr_decide(struct ast_expr *expr, struct state *s)
@@ -424,10 +425,10 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 		ast_expr_copy(call),
 		f
 	);
-	struct state *param_state = state_create(frame, state_getext(arg_state));
-	if ((err = ast_function_initparams(f, param_state))) {
-		return err;
-	}
+	struct state *param_state = state_create(
+		frame, rconst_create(), state_getext(arg_state)
+	);
+	ast_function_initparams(f, param_state);
 	struct ast_block_res *mod_abs_res = ast_block_setupmodulate(
 		ast_function_abstract(f), arg_state
 	);

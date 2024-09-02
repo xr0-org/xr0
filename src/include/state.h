@@ -15,9 +15,6 @@ struct ast_expr;
 /* ext */
 struct externals;
 
-/* props */
-struct props;
-
 /* object */
 struct object;
 
@@ -28,23 +25,21 @@ struct state;
 
 struct frame;
 
-struct state *
-state_create(struct frame *, struct externals *);
+struct rconst;
 
-void
-state_setrconsts(struct state *new, struct state *old);
+struct state *
+state_create(struct frame *, struct rconst *, struct externals *);
 
 struct number;
-
-/* state_split: return 0 if contradiction encountered. */
-int
-state_split(struct state *, struct map *split);
 
 struct state *
 state_copy(struct state *);
 
 struct state *
-state_copywithname(struct state *, char *func_name);
+state_split(struct state *, struct rconst *, char *funcname);
+
+char *
+state_funcname(struct state *s);
 
 void
 state_destroy(struct state *state);
@@ -66,9 +61,6 @@ state_next(struct state *);
 
 struct externals *
 state_getext(struct state *);
-
-struct props *
-state_getprops(struct state *);
 
 char *
 state_programtext(struct state *);
@@ -107,6 +99,7 @@ struct ast_type *
 state_getvariabletype(struct state *, char *id);
 
 struct location;
+struct circuitbreaker;
 
 DECLARE_RESULT_TYPE(struct location *, loc, loc_res)
 

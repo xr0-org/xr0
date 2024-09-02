@@ -144,6 +144,12 @@ struct verifierinstruct *
 error_get_verifierinstruct(struct error *);
 
 struct error *
+error_verifiercontradiction();
+
+struct error *
+error_to_verifiercontradiction(struct error *);
+
+struct error *
 error_return();
 
 struct error *

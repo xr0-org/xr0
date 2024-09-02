@@ -1,6 +1,8 @@
-path init abstract state
-path init abstract state
-phase:	ACTUAL
+phase:	ABSTRACT (INIT)
+
+phase:	ABSTRACT (INIT)
+
+phase:	ACTUAL (EXEC)
 
 text:
 	int p;

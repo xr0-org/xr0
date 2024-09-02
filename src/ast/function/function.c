@@ -277,13 +277,12 @@ ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 	return NULL;
 }
 
-static struct error *
+static void
 inititalise_param(struct ast_variable *v, struct state *);
 
-struct error *
+void
 ast_function_initparams(struct ast_function *f, struct state *s)
 {
-	struct error *err;
 	/* declare params and locals in stack frame */	
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **params = ast_function_params(f);
@@ -291,14 +290,11 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 		state_declare(s, params[i], true);
 	}
 	for (int i = 0; i < nparams; i++) {
-		if ((err = inititalise_param(params[i], s))) {
-			return err;
-		}
+		inititalise_param(params[i], s);
 	}
-	return NULL;
 }
 
-static struct error *
+static void
 inititalise_param(struct ast_variable *param, struct state *state)
 {
 	char *name = ast_variable_name(param);
@@ -326,7 +322,6 @@ inititalise_param(struct ast_variable *param, struct state *state)
 		);
 		object_assign(obj, val);
 	}
-	return NULL;
 }
 
 static void

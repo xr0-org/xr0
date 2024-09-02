@@ -722,7 +722,7 @@ ast_function_nparams(struct ast_function *f);
 struct ast_variable **
 ast_function_params(struct ast_function *f);
 
-struct error *
+void
 ast_function_initparams(struct ast_function *, struct state *);
 
 struct error *

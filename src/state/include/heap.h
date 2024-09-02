@@ -58,38 +58,4 @@ heap_undeclare(struct heap *, struct state *);
 void
 heap_fillorder(struct heap *, struct int_arr *);
 
-/* TODO: extract to own file */
-
-struct rconst;
-
-struct rconst *
-rconst_create();
-
-struct rconst *
-rconst_copy(struct rconst *);
-
-void
-rconst_destroy(struct rconst *);
-
-char *
-rconst_str(struct rconst *, char *indent);
-
-char *
-rconst_declare(struct rconst *, struct value *, char *key, bool persist);
-
-char *
-rconst_declarenokey(struct rconst *, struct value *, bool persist);
-
-struct value *
-rconst_get(struct rconst *, char *id);
-
-char *
-rconst_getidbykey(struct rconst *, char *key);
-
-void
-rconst_undeclare(struct rconst *);
-
-bool
-rconst_eval(struct rconst *, struct ast_expr *);
-
 #endif

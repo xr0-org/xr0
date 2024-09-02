@@ -7,7 +7,7 @@ LIBX=$(pwd)/libx
 
 TESTDIR=$(pwd)/tests/0db/00-basic
 
-output=$($XR0 -I $LIBX -d@ $TESTDIR/test.x < $TESTDIR/test.cfg 2>&1)
+output=$($XR0 -I $LIBX -r@ $TESTDIR/test.x < $TESTDIR/test.cfg 2>&1)
 
 tempdir=$(mktemp -d)
 
