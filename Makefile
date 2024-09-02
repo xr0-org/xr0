@@ -1,5 +1,5 @@
 # commands
-CFLAGS = -g -I include -std=gnu11 -Werror -Wreturn-type -Wall
+CFLAGS = -g -I src/include -std=gnu11 -Werror -Wreturn-type -Wall
 VALGRIND = valgrind --fullverifier-after=`pwd`/src/
 LEX = lex
 YACC = bison -yvd
@@ -7,8 +7,8 @@ YACC = bison -yvd
 # dirs
 BIN_DIR = bin
 BUILD_DIR = build
-INCLUDE_DIR = include
 SRC_DIR = src
+INCLUDE_DIR = $(SRC_DIR)/include
 UTIL_DIR = $(SRC_DIR)/util
 
 SRC_0V_DIR = $(SRC_DIR)
