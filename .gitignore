@@ -11,3 +11,4 @@ a.out
 *-preproc.[c0]
 tags
 *.temp
+*.mk

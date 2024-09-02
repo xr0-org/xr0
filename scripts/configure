@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# This script generates src.mk, which is included in the Makefile.
+#
+# src.mk imposes the following module rules:
+#
+#	1. Every directory in `/src` and its descendant directories, including
+#	`/src` itself, defines a module.
+#
+#	2. Every C file within a module can include headers from the
+#	`[root]/include` directory (if it exists) where `[root]` is the module
+#	root directory. E.g., `/src/main.c` and `/src/ast/expr.c` can both
+#	include headers from `/src/include`, but `/src/ast/expr.c` can also
+#	include from `/src/ast/include`.
+#
+#	3. Every C file is treated as its own translation unit.
+#
+#	4. Every `.c` and `.h` file in the directory is a Makefile-dependency of
+#	every other such file.
+#
+# This script also generates Synastic config files for Vim that reflect these
+# rules.
