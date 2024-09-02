@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script generates src.mk, which is included in the Makefile.
 #
@@ -20,3 +20,37 @@
 #
 # This script also generates Synastic config files for Vim that reflect these
 # rules.
+
+set +x
+
+function listincludes() {
+	path=$1
+	echo $path/includes
+	parent=$(dirname $path)
+	if [[ $parent != "." ]]; then
+		listincludes $parent
+	fi
+}
+
+
+SRCDIR=src
+BUILDDIR=build
+
+# TODO: make build directories
+
+for dir in $(find $SRCDIR -type d ! -name "include"); do
+	build_dir=$BUILDDIR/$(echo $dir | sed "s/^$SRCDIR\///")
+
+	printf "# $dir\n"
+	includes=$(listincludes $dir)
+	for f in $(find $dir -maxdepth 1 -type f -name "*.c"); do
+		obj=$build_dir/$(basename $f | sed "s/.c$/.o/;")
+		printf "$obj: $build_dir \$(OBJECTS)\n"
+		printf "\t\$(CC) \$(CFLAGS) -o \$@ -c $f "
+		for inc in $includes; do
+			printf -- '\\\n\t\t-I %s ' $inc
+		done
+		printf "\n"
+	done
+	printf "\n"
+done
