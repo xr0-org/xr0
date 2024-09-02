@@ -13,7 +13,7 @@
 #include "state.h"
 #include "util.h"
 #include "value.h"
-#include "type/type.h"
+#include "type.h"
 
 struct bool_res *
 ast_expr_decide(struct ast_expr *expr, struct state *s)

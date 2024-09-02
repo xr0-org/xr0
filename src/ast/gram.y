@@ -5,12 +5,12 @@
 #include <string.h>
 #include <assert.h>
 #include "ast.h"
-#include "expr/expr.h"
+#include "expr.h"
 #include "gram_util.h"
 #include "intern.h"
 #include "lex.h"
 #include "literals.h"
-#include "type/type.h"
+#include "type.h"
 #include "util.h"
 
 struct namedseq *FUNC_SEQ = NULL;

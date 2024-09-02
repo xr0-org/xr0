@@ -4,7 +4,7 @@
 #include <string.h>
 #include "ast.h"
 #include "ext.h"
-#include "expr/expr.h"
+#include "expr.h"
 #include "lex.h"
 #include "intern.h"
 #include "object.h"
