@@ -13,9 +13,8 @@
 #include "lex.h"
 #include "object.h"
 #include "state.h"
-#include "stmt/stmt.h"
-#include "stmt/stmt.h"
-#include "type/type.h"
+#include "stmt.h"
+#include "type.h"
 #include "util.h"
 #include "verifier.h"
 
@@ -400,5 +399,3 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 
 	map_set(g, dynamic_str(fname), val);
 }
-
-#include "arr.c"

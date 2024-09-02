@@ -4,16 +4,14 @@
 #include <string.h>
 
 #include "ast.h"
-#include "breakpoint.h"
 #include "expr.h"
 #include "ext.h"
 #include "intern.h"
-#include "math.h"
 #include "object.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
-#include "type/type.h"
+#include "type.h"
 
 struct bool_res *
 ast_expr_decide(struct ast_expr *expr, struct state *s)

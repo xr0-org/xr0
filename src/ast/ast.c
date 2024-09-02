@@ -3,20 +3,15 @@
 #include <assert.h>
 #include <string.h>
 #include "ast.h"
+#include "function.h"
+#include "intern.h"
 #include "lex.h"
 #include "math.h"
+#include "object.h"
 #include "state.h"
+#include "topological.h"
 #include "util.h"
-
-#include "expr/expr.c"
-#include "topological.c"
-#include "block.c"
-#include "stmt/stmt.c"
-#include "type/type.c"
-#include "variable.c"
-#include "function/function.c"
-#include "externdecl.c"
-#include "literals.c"
+#include "value.h"
 
 struct ast *
 ast_create(struct ast_externdecl *decl)

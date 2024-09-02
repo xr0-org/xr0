@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "ast.h"
-#include "expr/expr.h"
+#include "expr.h"
 #include "intern.h"
 #include "lex.h"
 #include "state.h"
@@ -994,5 +994,3 @@ comp_setupmodulate(struct ast_stmt *stmt, struct state *s)
 		)
 	);
 }
-
-#include "verify.c"

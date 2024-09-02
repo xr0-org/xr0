@@ -4,8 +4,8 @@
 #include "ast.h"
 #include "ext.h"
 #include "util.h"
-#include "stmt/stmt.h"
-#include "function/function.h"
+#include "stmt.h"
+#include "function.h"
 
 /*
  * map<node, string_arr> g maps node to adjacent neighbouring nodes

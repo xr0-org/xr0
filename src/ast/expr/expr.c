@@ -4,12 +4,10 @@
 #include <string.h>
 
 #include "ast.h"
-#include "intern.h"
-#include "ext.h"
 #include "expr.h"
 #include "math.h"
 #include "state.h"
-#include "stmt/stmt.h"
+#include "stmt.h"
 #include "util.h"
 #include "value.h"
 
@@ -1565,5 +1563,3 @@ ast_expr_initialiser(struct ast_expr *expr)
 		assert(false);
 	}
 }
-
-#include "verify.c"
