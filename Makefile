@@ -2,7 +2,7 @@
 
 # commands
 CFLAGS = -g -I src/include -std=gnu11 -Werror -Wreturn-type -Wall
-VALGRIND = valgrind --fullverifier-after=`pwd`/src/
+VALGRIND = valgrind --fullpath-after=`pwd`/src/
 LEX = lex
 YACC = bison -yvd
 
@@ -12,14 +12,19 @@ BUILD_DIR = build
 SRC_DIR = src
 TEST_DIR = tests
 
-include src.mk
-
 # executable
 XR0V = $(BIN_DIR)/0v
+
+DEPS_MK = scripts/deps.mk
+SRC_MK = scripts/src.mk
+
+include $(DEPS_MK)
 
 $(XR0V): $(BIN_DIR) $(HEADERS) $(OBJECTS) parser
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ $(OBJECTS)
+
+include $(SRC_MK)
 
 AST_DIR = $(SRC_DIR)/ast
 
@@ -92,4 +97,4 @@ matrix-verbose: $(XR0V)
 
 
 clean:
-	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(PARSER_JUNK)
+	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(PARSER_JUNK) *.mk
