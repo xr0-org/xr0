@@ -21,7 +21,7 @@ SRC_MK = scripts/src.mk
 
 include $(DEPS_MK)
 
-$(XR0V): $(BIN_DIR) $(HEADERS) $(SOURCES) parser
+$(XR0V): $(BIN_DIR) $(HEADERS) $(OBJECTS) parser
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ $(OBJECTS)
 
