@@ -12,3 +12,4 @@ a.out
 tags
 *.temp
 *.mk
+!scripts/tmpl.mk
