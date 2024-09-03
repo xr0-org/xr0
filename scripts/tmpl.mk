@@ -21,7 +21,7 @@ SRC_MK = scripts/src.mk
 
 include $(DEPS_MK)
 
-$(XR0V): $(BIN_DIR) $(HEADERS) $(OBJECTS) parser
+$(XR0V): $(BIN_DIR) $(HEADERS) $(SOURCES) parser
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ $(OBJECTS)
 
@@ -34,18 +34,16 @@ GRAM_TAB_H = $(SRC_DIR)/include/gram.tab.h
 GRAM_TAB_C = $(AST_DIR)/gram.tab.c
 LEX_YY_C = $(AST_DIR)/lex.yy.c
 
-parser: $(LEX_YY_C) $(GRAM_TAB_H)
+parser: $(LEX_YY_C) $(GRAM_TAB_H) $(GRAM_TAB_C)
 
 $(LEX_YY_C): $(AST_DIR)/lex.l
 	@printf 'LEX\t$@\n'
 	@$(LEX) -o $@ $(AST_DIR)/lex.l
 
-$(GRAM_TAB_H): $(GRAM_TAB_C)
-	@mv $(AST_DIR)/gram.tab.h $(GRAM_TAB_H)
-
-$(GRAM_TAB_C): $(AST_DIR)/gram.y
+$(GRAM_TAB_C) $(GRAM_TAB_H): $(AST_DIR)/gram.y
 	@printf 'YACC\t$@\n'
 	@$(YACC) -o $(GRAM_TAB_C) $(AST_DIR)/gram.y
+	@mv $(AST_DIR)/gram.tab.h $(GRAM_TAB_H)
 
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)

@@ -66,6 +66,16 @@ for dir in $INCLUDEDIRS; do
 done
 printf "\n\n"
 
+# sources
+printf "SOURCES ="
+for dir in $SRCDIRS; do
+	for f in $(find $dir -maxdepth 1 -type f -name "*.c"); do
+		printf " \\"			# escape previous line
+		printf "\n\t$f"
+	done
+done
+printf "\n\n"
+
 # objects
 printf "OBJECTS ="
 for dir in $SRCDIRS; do
