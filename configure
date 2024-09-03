@@ -20,11 +20,12 @@
 #
 # This script also generates Synastic config files for Vim that reflect these
 # rules.
+
+set +x
+
 TMPL_MKFILE=scripts/tmpl.mk
 DEPS_MKFILE=scripts/deps.mk
 SRC_MKFILE=scripts/src.mk
-
-set +x
 
 SRCDIR=src
 BUILDDIR=build
