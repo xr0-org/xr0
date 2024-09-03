@@ -58,7 +58,7 @@ static int
 path_atend(struct path *);
 
 static struct error *
-path_progress(struct path *, progressor *, struct externals *);
+path_progress(struct path *, struct rconst *, struct externals *, progressor *);
 
 static struct path *
 path_copywithsplit(struct path *, struct rconst *, struct map *split);
@@ -91,6 +91,10 @@ _verifier_path(struct verifier *);
 
 static struct externals *
 _verifier_ext(struct verifier *);
+
+static struct rconst *
+_verifier_rconst(struct verifier *);
+
 
 
 char *
@@ -138,7 +142,7 @@ verifier_progress(struct verifier *p, progressor *prog)
 		return verifier_progress(branch, prog);
 	}
 	struct error *err = path_progress(
-		_verifier_path(p), prog, _verifier_ext(p)
+		_verifier_path(p), _verifier_rconst(p), _verifier_ext(p), prog
 	);
 	if (err) {
 		struct error *inst_err = error_to_verifierinstruct(err);
@@ -165,15 +169,21 @@ verifier_split(struct verifier *p, struct splitinstruct *inst)
 static struct verifier_arr *
 verifier_gensplits(struct verifier *p, struct splitinstruct *inst)
 {
-	struct verifier_arr *arr = verifier_arr_create();;
+	struct verifier_arr *arr = verifier_arr_create();
 	struct map **split = splitinstruct_splits(inst);
 	int n = splitinstruct_n(inst);
 	for (int i = 0; i < n; i++) {
 		struct v_res *res = _verifier_copywithsplit(p, split[i]);
-		if (!v_res_iserror(res)) {
-			verifier_arr_append(arr, v_res_as_verifier(res));
+		if (v_res_iserror(res)) {
+			/* contradictions not added to mux */
+			assert(
+				error_to_verifiercontradiction(
+					v_res_as_error(res)
+				)
+			);
+			continue;
 		}
-		assert(error_to_verifiercontradiction(v_res_as_error(res)));
+		verifier_arr_append(arr, v_res_as_verifier(res));
 	}
 	return arr;
 }
@@ -252,8 +262,7 @@ splitcopy(struct rconst *old, struct map *split)
 		struct value *v = rconst_get(new, e.key);
 		assert(v);
 		if (!value_splitassume(v, (struct number *) e.value)) {
-			assert(false);
-			return 0;
+			return NULL;
 		}
 	}
 	return new;
@@ -280,7 +289,7 @@ verifier_destroy(struct verifier *p)
 	} else {
 		path_destroy(p->s);
 	}
-	rconst_destroy(p->rconst);
+	/*rconst_destroy(p->rconst);*/
 	free(p);
 }
 
@@ -308,6 +317,12 @@ static struct externals *
 _verifier_ext(struct verifier *p)
 {
 	return p->ext;
+}
+
+static struct rconst *
+_verifier_rconst(struct verifier *p)
+{
+	return p->rconst;
 }
 
 DEFINE_RESULT_TYPE(struct verifier *, verifier, verifier_destroy, v_res, false)
@@ -527,10 +542,10 @@ path_atend(struct path *s)
 /* path_progress */
 
 static struct error *
-init_abstract(struct path *, struct externals *);
+init_abstract(struct path *, struct rconst *, struct externals *);
 
 static struct error *
-init_actual(struct path *, struct externals *);
+init_actual(struct path *, struct rconst *, struct externals *);
 
 static struct error *
 audit(struct path *);
@@ -548,13 +563,14 @@ static struct error *
 progress_actual(struct path *s, progressor *);
 
 static struct error *
-path_progress(struct path *s, progressor *prog, struct externals *ext)
+path_progress(struct path *s, struct rconst *rconst, struct externals *ext,
+		progressor *prog)
 {
 	switch (s->state) {
 	case PATH_STATE_UNINIT:
-		return init_abstract(s, ext);
+		return init_abstract(s, rconst, ext);
 	case PATH_STATE_HALFWAY:
-		return init_actual(s, ext);
+		return init_actual(s, rconst, ext);
 	case PATH_STATE_AUDIT:
 		return audit(s);
 	case PATH_STATE_SETUPABSTRACT:
@@ -572,7 +588,7 @@ path_progress(struct path *s, progressor *prog, struct externals *ext)
 }
 
 static struct error *
-init_abstract(struct path *s, struct externals *ext)
+init_abstract(struct path *s, struct rconst *rconst, struct externals *ext)
 {
 	struct error *err;
 
@@ -582,7 +598,7 @@ init_abstract(struct path *s, struct externals *ext)
 		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
 		s->f
 	);
-	s->abstract = state_create(f, ext);
+	s->abstract = state_create(f, rconst, ext);
 	if ((err = ast_function_initparams(s->f, s->abstract))) {
 		return err;
 	}
@@ -597,7 +613,7 @@ init_abstract(struct path *s, struct externals *ext)
 }
 
 static struct error *
-init_actual(struct path *s, struct externals *ext)
+init_actual(struct path *s, struct rconst *rconst, struct externals *ext)
 {
 	struct error *err;
 
@@ -608,12 +624,11 @@ init_actual(struct path *s, struct externals *ext)
 		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
 		s->f
 	);
-	s->actual = state_create(f, ext);
+	s->actual = state_create(f, rconst, ext);
 	if ((err = ast_function_initparams(s->f, s->actual))) {
 		return err;
 	}
 	assert(!state_readregister(s->actual));
-	state_setrconsts(s->actual, s->abstract);
 	struct frame *setupframe = frame_blockfindsetup_create(
 		dynamic_str("setup"),
 		ast_function_abstract(s->f)
@@ -709,19 +724,12 @@ path_copywithsplit(struct path *old, struct rconst *rconst, struct map *split)
 	switch (old->state) {
 	case PATH_STATE_SETUPABSTRACT:
 	case PATH_STATE_ABSTRACT:
-		s->abstract = state_copywithname(old->abstract, fname);
-		if (!state_split(s->abstract, split)) {
-			s->state = PATH_STATE_ATEND;
-		}
+		s->abstract = state_split(old->abstract, rconst, fname);
 		break;
 	case PATH_STATE_SETUPACTUAL:
 	case PATH_STATE_ACTUAL:
-		s->abstract = state_copywithname(old->abstract, fname);
-		s->actual = state_copywithname(old->actual, fname);
-		if (!state_split(s->actual, split)) {
-			s->state = PATH_STATE_ATEND;
-		}
-		state_setrconsts(s->abstract, s->actual);
+		s->abstract = state_split(old->abstract, rconst, fname);
+		s->actual = state_split(old->actual, rconst, fname);
 		break;
 	default:
 		assert(false);
