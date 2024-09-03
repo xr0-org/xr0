@@ -96,6 +96,7 @@ struct ast_type *
 state_getvariabletype(struct state *, char *id);
 
 struct location;
+struct circuitbreaker;
 
 DECLARE_RESULT_TYPE(struct location *, loc, loc_res)
 

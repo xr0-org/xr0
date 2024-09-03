@@ -4,9 +4,11 @@
 #include <stdbool.h>
 
 struct ast_function;
+struct ast_expr;
 struct externals;
-struct state;
 struct error;
+struct state;
+struct value;
 
 struct verifier;
 
