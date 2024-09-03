@@ -47,8 +47,10 @@ INCLUDEDIRS=$(find $SRCDIR -type d -name "include")
 SRCDIRS=$(find $SRCDIR -type d ! -name "include")
 
 # hack in Lex/Yacc files
-touch $SRCDIR/ast/lex.yy.c $SRCDIR/ast/gram.tab.c $SRCDIR/include/gram.tab.h
-touch $SRCDIR/ast/lex.l $SRCDIR/ast/gram.y
+PARSER_FILES="$SRCDIR/ast/lex.yy.c \
+	$SRCDIR/ast/gram.tab.c \
+	$SRCDIR/include/gram.tab.h"
+touch $PARSER_FILES
 
 exec > $DEPS_MKFILE
 
@@ -106,5 +108,8 @@ for dir in $SRCDIRS; do
 done
 
 exec > /dev/tty
+
+# hack in parser files
+rm $PARSER_FILES
 
 cp $TMPL_MKFILE Makefile
