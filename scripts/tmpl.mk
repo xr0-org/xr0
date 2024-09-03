@@ -26,7 +26,6 @@ $(XR0V): $(BIN_DIR) $(HEADERS) $(OBJECTS) parser
 	@printf 'CC\t$@\n'
 	@$(CC) $(CFLAGS) -o $@ $(OBJECTS)
 
-
 AST_DIR = $(SRC_DIR)/ast
 
 PARSER_JUNK = $(GRAM_TAB_H) $(GRAM_TAB_C) $(LEX_YY_C) $(AST_DIR)/gram.output
