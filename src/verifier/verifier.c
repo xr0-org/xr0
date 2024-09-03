@@ -46,7 +46,7 @@ static void
 mux_next(struct mux *);
 
 static struct path *
-path_create(struct ast_function *);
+path_create();
 
 static void
 path_destroy(struct path *);
@@ -488,15 +488,13 @@ struct path {
 		PATH_STATE_ATEND,
 	} state;
 	struct state *abstract, *actual;
-	struct ast_function *f;
 };
 
 static struct path *
-path_create(struct ast_function *f)
+path_create()
 {
 	struct path *s = malloc(sizeof(struct path));
 	assert(s);
-	s->f = ast_function_copy(f);
 	s->state = PATH_STATE_UNINIT;
 	return s;
 }
@@ -506,7 +504,6 @@ path_destroy(struct path *s)
 {
 	/*state_destroy(s->abstract);*/
 	/*state_destroy(s->actual);*/
-	ast_function_destroy(s->f);
 	free(s);
 }
 
@@ -605,7 +602,7 @@ init_actual(struct path *, struct rconst *, struct ast_function *,
 		struct externals *);
 
 static struct error *
-audit(struct path *);
+audit(struct path *, struct ast_function *);
 
 static struct error *
 progress_setupabstract(struct path *s, progressor *);
@@ -630,7 +627,7 @@ path_progress(struct path *s, struct rconst *rconst, struct ast_function *f,
 	case PATH_STATE_HALFWAY:
 		return init_actual(s, rconst, f, ext);
 	case PATH_STATE_AUDIT:
-		return audit(s);
+		return audit(s, f);
 	case PATH_STATE_SETUPABSTRACT:
 		return progress_setupabstract(s, prog);
 	case PATH_STATE_ABSTRACT:
@@ -682,7 +679,7 @@ init_actual(struct path *s, struct rconst *rconst, struct ast_function *f,
 		ast_function_name(f),
 		ast_function_body(f),
 		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
-		s->f
+		f
 	);
 	s->actual = state_create(frame, rconst, ext);
 	if ((err = ast_function_initparams(f, s->actual))) {
@@ -699,12 +696,12 @@ init_actual(struct path *s, struct rconst *rconst, struct ast_function *f,
 }
 
 static struct error *
-audit(struct path *s)
+audit(struct path *s, struct ast_function *f)
 {
 	if (state_hasgarbage(s->actual)) {
 		v_printf("actual: %s", state_str(s->actual));
 		return error_printf(
-			"%s: garbage on heap", ast_function_name(s->f)
+			"%s: garbage on heap", ast_function_name(f)
 		);
 	}
 	if (!state_equal(s->actual, s->abstract)) {
@@ -712,7 +709,7 @@ audit(struct path *s)
 		 * can see the states with undeclared vars */
 		return error_printf(
 			"%s: actual and abstract states differ",
-			ast_function_name(s->f)
+			ast_function_name(f)
 		);
 	}
 	s->state = PATH_STATE_ATEND;
@@ -775,7 +772,7 @@ progress_actual(struct path *s, progressor *prog)
 static struct path *
 path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
 {
-	struct path *s = path_create(ast_function_copy(old->f));
+	struct path *s = path_create();
 	s->state = old->state;
 	switch (old->state) {
 	case PATH_STATE_SETUPABSTRACT:
