@@ -61,7 +61,7 @@ static struct error *
 path_progress(struct path *, progressor *, struct externals *);
 
 static struct path *
-path_copywithsplit(struct path *, struct map *split);
+path_copywithsplit(struct path *, struct rconst *, struct map *split);
 
 static struct error *
 path_verify(struct path *, struct ast_expr *);
@@ -72,7 +72,9 @@ path_lexememarker(struct path *);
 
 struct verifier;
 
-static struct verifier *
+DECLARE_RESULT_TYPE(struct verifier *, verifier, v_res)
+
+static struct v_res *
 _verifier_copywithsplit(struct verifier *old, struct map *split);
 
 static void
@@ -167,7 +169,11 @@ verifier_gensplits(struct verifier *p, struct splitinstruct *inst)
 	struct map **split = splitinstruct_splits(inst);
 	int n = splitinstruct_n(inst);
 	for (int i = 0; i < n; i++) {
-		verifier_arr_append(arr, _verifier_copywithsplit(p, split[i]));
+		struct v_res *res = _verifier_copywithsplit(p, split[i]);
+		if (!v_res_iserror(res)) {
+			verifier_arr_append(arr, v_res_as_verifier(res));
+		}
+		assert(error_to_verifiercontradiction(v_res_as_error(res)));
 	}
 	return arr;
 }
@@ -221,13 +227,19 @@ verifier_create(struct ast_function *f, struct externals *ext)
 static struct rconst *
 splitcopy(struct rconst *, struct map *split);
 
-static struct verifier *
+static struct v_res *
 _verifier_copywithsplit(struct verifier *old, struct map *split)
 {
-	return _verifier_create(
-		path_copywithsplit(old->s, split),
-		splitcopy(old->rconst, split),
-		old->ext
+	struct rconst *rconst = splitcopy(old->rconst, split);
+	if (!rconst) {
+		return v_res_error_create(error_verifiercontradiction());
+	}
+	return v_res_verifier_create(
+		_verifier_create(
+			path_copywithsplit(old->s, rconst, split),
+			rconst,
+			old->ext
+		)
 	);
 }
 
@@ -297,6 +309,8 @@ _verifier_ext(struct verifier *p)
 {
 	return p->ext;
 }
+
+DEFINE_RESULT_TYPE(struct verifier *, verifier, verifier_destroy, v_res, false)
 
 
 
@@ -687,7 +701,7 @@ static struct ast_function *
 copy_withsplitname(struct ast_function *, struct map *split); 
 
 static struct path *
-path_copywithsplit(struct path *old, struct map *split)
+path_copywithsplit(struct path *old, struct rconst *rconst, struct map *split)
 {
 	struct path *s = path_create(copy_withsplitname(old->f, split));
 	char *fname = ast_function_name(s->f);
