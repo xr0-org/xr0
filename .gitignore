@@ -13,4 +13,4 @@ tags
 *.temp
 *.mk
 !scripts/tmpl.mk
-Makefile
+/Makefile

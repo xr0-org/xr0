@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script generates src.mk, which is included in the Makefile.
 #
@@ -45,6 +45,9 @@ function listincludes() {
 
 INCLUDEDIRS=$(find $SRCDIR -type d -name "include")
 SRCDIRS=$(find $SRCDIR -type d ! -name "include")
+
+# hack in Lex/Yacc files
+touch $SRCDIR/ast/lex.yy.c $SRCDIR/ast/gram.tab.c $SRCDIR/include/gram.tab.h
 
 exec > $DEPS_MKFILE
 
