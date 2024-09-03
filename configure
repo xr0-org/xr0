@@ -48,6 +48,7 @@ SRCDIRS=$(find $SRCDIR -type d ! -name "include")
 
 # hack in Lex/Yacc files
 touch $SRCDIR/ast/lex.yy.c $SRCDIR/ast/gram.tab.c $SRCDIR/include/gram.tab.h
+touch $SRCDIR/ast/lex.l $SRCDIR/ast/gram.y
 
 exec > $DEPS_MKFILE
 
