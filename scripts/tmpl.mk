@@ -63,12 +63,12 @@ debug: $(RUNTEST) $(XR0V)
 	$(VALGRIND) $(XR0V) -d -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 lex: $(XR0V)
-	$(VALGRIND) $(XR0V) -I libx tests/99-program/100-lex/parse.x
+	$(VALGRIND) $(XR0V) -I libx $(TEST_DIR)/99-program/100-lex/parse.x
 
 PARSER = $(BUILD_DIR)/lex-gen
 
 lex-gen:
-	@$(XR0C) tests/5-program/100-lex/parse.x > build/parse.c
+	@$(XR0C) $(TEST_DIR)/5-program/100-lex/parse.x > build/parse.c
 	@c89 -g -o $(PARSER) $(BUILD_DIR)/parse.c
 	@$(PARSER) > $(BUILD_DIR)/gen_firstchar
 	@echo '%' > $(BUILD_DIR)/percent
@@ -76,22 +76,22 @@ lex-gen:
 
 lex-leaks: $(XR0V)
 	$(VALGRIND) --leak-check=full \
-		$(XR0V) -I libx tests/99-program/100-lex/parse.x
+		$(XR0V) -I libx $(TEST_DIR)/99-program/100-lex/parse.x
 
 lex-verbose: $(XR0V) 
 	$(VALGRIND) --num-callers=30 \
-		$(XR0V) -I libx -v tests/99-program/100-lex/parse.x
+		$(XR0V) -I libx -v $(TEST_DIR)/99-program/100-lex/parse.x
 
 matrix: $(XR0V)
-	$(VALGRIND) $(XR0V) -I libx tests/99-program/000-matrix.x
+	$(VALGRIND) $(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
 
 matrix-leaks: $(XR0V)
 	$(VALGRIND) --leak-check=full \
-		$(XR0V) -I libx tests/99-program/000-matrix.x
+		$(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
 
 matrix-verbose: $(XR0V) 
 	$(VALGRIND) --num-callers=30 \
-		$(XR0V) -I libx tests/99-program/000-matrix.x
+		$(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
 
 
 clean:
