@@ -20,6 +20,7 @@
 #
 # This script also generates Synastic config files for Vim that reflect these
 # rules.
+TMPL_MKFILE=scripts/tmpl.mk
 DEPS_MKFILE=scripts/deps.mk
 SRC_MKFILE=scripts/src.mk
 
@@ -99,3 +100,7 @@ for dir in $SRCDIRS; do
 	printf "$build_dir:\n"
 	printf "\t@mkdir -p \$@\n"
 done
+
+exec > /dev/tty
+
+cp $TMPL_MKFILE Makefile
