@@ -4,8 +4,6 @@
 #include <string.h>
 
 #include "ast.h"
-#include "intern.h"
-#include "ext.h"
 #include "expr.h"
 #include "math.h"
 #include "state.h"

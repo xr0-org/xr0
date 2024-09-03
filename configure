@@ -17,9 +17,15 @@
 #
 #	4. Every `.c` and `.h` file in the directory is a Makefile-dependency of
 #	every other such file.
+#	
+#	5. In keeping with [0], the -I include directories are ordered
+#	according to nearness to the file, so that if `x.h` is imported in
+#	`/src/abc` and there is both `/src/include/x.h` and
+#	`/src/abc/include/x.h` then the latter will be chosen.
 #
-# This script also generates Synastic config files for Vim that reflect these
-# rules.
+# 	[0]: "Directories named in -I options shall be searched in the order
+# 	specified".
+# 	https://pubs.opengroup.org/onlinepubs/9699919799/utilities/c99.html
 
 set +x
 
@@ -45,6 +51,8 @@ function listincludes() {
 
 INCLUDEDIRS=$(find $SRCDIR -type d -name "include")
 SRCDIRS=$(find $SRCDIR -type d ! -name "include")
+
+
 
 # hack in Lex/Yacc files
 PARSER_FILES="$SRCDIR/ast/lex.yy.c \
@@ -88,6 +96,8 @@ for dir in $SRCDIRS; do
 		printf "$obj: $build_dir parser\n"
 		printf "\t@printf \"CC\\\\t\$@\\\\n\"\n"
 		printf "\t@\$(CC) \$(CFLAGS) -o \$@ -c $f "
+
+		# the order of inclusions is important: see (5.) above.
 		for inc in $includes; do
 			printf -- '\\\n\t\t-I %s ' $inc
 		done

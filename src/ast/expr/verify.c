@@ -4,11 +4,9 @@
 #include <string.h>
 
 #include "ast.h"
-#include "breakpoint.h"
 #include "expr.h"
 #include "ext.h"
 #include "intern.h"
-#include "math.h"
 #include "object.h"
 #include "state.h"
 #include "util.h"
