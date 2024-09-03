@@ -97,4 +97,4 @@ matrix-verbose: $(XR0V)
 
 
 clean:
-	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(PARSER_JUNK) *.mk
+	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(PARSER_JUNK) $(DEPS_MK) $(SRC_MK)
