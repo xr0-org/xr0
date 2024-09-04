@@ -29,6 +29,22 @@ segment_create()
 	return s;
 }
 
+struct segment *
+segment_copywithsplit(struct segment *old, struct rconst *rconst, char *fname)
+{
+	struct segment *new = segment_create();
+	new->phase = old->phase;
+	switch (old->phase) {
+	case SEGMENT_PHASE_SETUP:
+	case SEGMENT_PHASE_EXEC:
+		new->state = state_split(old->state, rconst, fname);
+		break;
+	default:
+		assert(false);
+	}
+	return new;
+}
+
 static char *
 setupabstract_str(struct segment *);
 
@@ -70,6 +86,35 @@ abstract_str(struct segment *s)
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->state));
 	strbuilder_printf(b, "%s\n", state_str(s->state));
 	return strbuilder_build(b);
+}
+
+struct error *
+segment_verify(struct segment *s, struct ast_expr *e)
+{
+	switch (s->phase) {
+	case SEGMENT_PHASE_EXEC:
+		return ast_stmt_verify(ast_stmt_create_expr(NULL, e), s->state);
+	case SEGMENT_PHASE_INIT:
+	case SEGMENT_PHASE_ATEND:
+		return NULL;
+	default:
+		assert(false);
+	}
+}
+
+struct lexememarker *
+segment_lexememarker(struct segment *s)
+{
+	switch (s->phase) {
+	case SEGMENT_PHASE_SETUP:
+	case SEGMENT_PHASE_EXEC:
+		return state_lexememarker(s->state);
+	case SEGMENT_PHASE_INIT:
+	case SEGMENT_PHASE_ATEND:
+		return NULL;
+	default:
+		assert(false);
+	}
 }
 
 
@@ -146,22 +191,6 @@ actual_str(struct path *s)
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->actual));
 	strbuilder_printf(b, "%s\n", state_str(s->actual));
 	return strbuilder_build(b);
-}
-
-struct segment *
-segment_copywithsplit(struct segment *old, struct rconst *rconst, char *fname)
-{
-	struct segment *new = segment_create();
-	new->phase = old->phase;
-	switch (old->phase) {
-	case SEGMENT_PHASE_SETUP:
-	case SEGMENT_PHASE_EXEC:
-		new->state = state_split(old->state, rconst, fname);
-		break;
-	default:
-		assert(false);
-	}
-	return new;
 }
 
 int
@@ -379,17 +408,7 @@ path_verify(struct path *s, struct ast_expr *expr)
 {
 	switch (s->phase) {
 	case PATH_PHASE_ABSTRACT:
-		switch (s->abstract->phase) {
-		case SEGMENT_PHASE_EXEC:
-			return ast_stmt_verify(
-				ast_stmt_create_expr(NULL, expr), s->abstract->state
-			);
-		case SEGMENT_PHASE_INIT:
-		case SEGMENT_PHASE_ATEND:
-			return NULL;
-		default:
-			assert(false);
-		}
+		return segment_verify(s->abstract, expr);
 	case PATH_PHASE_ACTUAL:
 		return ast_stmt_verify(
 			ast_stmt_create_expr(NULL, expr), s->actual
@@ -407,16 +426,7 @@ path_lexememarker(struct path *s)
 {
 	switch (s->phase) {
 	case PATH_PHASE_ABSTRACT:
-		switch (s->abstract->phase) {
-		case SEGMENT_PHASE_SETUP:
-		case SEGMENT_PHASE_EXEC:
-			return state_lexememarker(s->abstract->state);
-		case SEGMENT_PHASE_INIT:
-		case SEGMENT_PHASE_ATEND:
-			return NULL;
-		default:
-			assert(false);
-		}
+		return segment_lexememarker(s->abstract);
 	case PATH_PHASE_SETUPACTUAL:
 	case PATH_PHASE_ACTUAL:
 		return state_lexememarker(s->actual);	
