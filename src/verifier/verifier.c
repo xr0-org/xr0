@@ -4,7 +4,6 @@
 
 #include "ast.h"
 #include "lex.h"
-#include "object.h"
 #include "state.h"
 #include "verifier.h"
 #include "value.h"

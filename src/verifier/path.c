@@ -3,23 +3,33 @@
 
 #include "ast.h"
 #include "lex.h"
-#include "util.h"
 #include "state.h"
+#include "util.h"
 #include "verifier.h"
 
 #include "path.h"
 
+struct segment {
+	enum segment_phase {
+		SEGMENT_PHASE_INIT,
+		SEGMENT_PHASE_SETUP,
+		SEGMENT_PHASE_EXEC,
+		SEGMENT_PHASE_ATEND,
+	} phase;
+	struct state *s;
+};
+
 struct path {
-	enum path_state {
-		PATH_STATE_UNINIT,
-		PATH_STATE_SETUPABSTRACT,
-		PATH_STATE_ABSTRACT,
-		PATH_STATE_HALFWAY,
-		PATH_STATE_SETUPACTUAL,
-		PATH_STATE_ACTUAL,
-		PATH_STATE_AUDIT,
-		PATH_STATE_ATEND,
-	} state;
+	enum path_phase {
+		PATH_PHASE_UNINIT,
+		PATH_PHASE_SETUPABSTRACT,
+		PATH_PHASE_ABSTRACT,
+		PATH_PHASE_HALFWAY,
+		PATH_PHASE_SETUPACTUAL,
+		PATH_PHASE_ACTUAL,
+		PATH_PHASE_AUDIT,
+		PATH_PHASE_ATEND,
+	} phase;
 	struct state *abstract, *actual;
 };
 
@@ -28,7 +38,7 @@ path_create()
 {
 	struct path *s = malloc(sizeof(struct path));
 	assert(s);
-	s->state = PATH_STATE_UNINIT;
+	s->phase = PATH_PHASE_UNINIT;
 	return s;
 }
 
@@ -55,22 +65,22 @@ actual_str(struct path *);
 char *
 path_str(struct path *s)
 {
-	switch (s->state) {
-	case PATH_STATE_UNINIT:
+	switch (s->phase) {
+	case PATH_PHASE_UNINIT:
 		return dynamic_str("path init abstract state");
-	case PATH_STATE_SETUPABSTRACT:
+	case PATH_PHASE_SETUPABSTRACT:
 		return setupabstract_str(s);
-	case PATH_STATE_ABSTRACT:
+	case PATH_PHASE_ABSTRACT:
 		return abstract_str(s);
-	case PATH_STATE_HALFWAY:
+	case PATH_PHASE_HALFWAY:
 		return dynamic_str("path init actual state");
-	case PATH_STATE_SETUPACTUAL:
+	case PATH_PHASE_SETUPACTUAL:
 		return setupactual_str(s);
-	case PATH_STATE_ACTUAL:
+	case PATH_PHASE_ACTUAL:
 		return actual_str(s);
-	case PATH_STATE_AUDIT:
+	case PATH_PHASE_AUDIT:
 		return dynamic_str("path audit");
-	case PATH_STATE_ATEND:
+	case PATH_PHASE_ATEND:
 		return dynamic_str("path at end");
 	default:
 		assert(false);
@@ -120,7 +130,7 @@ setupactual_str(struct path *s)
 int
 path_atend(struct path *s)
 {
-	return s->state == PATH_STATE_ATEND;
+	return s->phase == PATH_PHASE_ATEND;
 }
 
 
@@ -154,22 +164,22 @@ path_progress(struct path *s, struct rconst *rconst, struct ast_function *f,
 		struct externals *ext,
 		progressor *prog)
 {
-	switch (s->state) {
-	case PATH_STATE_UNINIT:
+	switch (s->phase) {
+	case PATH_PHASE_UNINIT:
 		return init_abstract(s, rconst, f, ext);
-	case PATH_STATE_HALFWAY:
+	case PATH_PHASE_HALFWAY:
 		return init_actual(s, rconst, f, ext);
-	case PATH_STATE_AUDIT:
+	case PATH_PHASE_AUDIT:
 		return audit(s, f);
-	case PATH_STATE_SETUPABSTRACT:
+	case PATH_PHASE_SETUPABSTRACT:
 		return progress_setupabstract(s, prog);
-	case PATH_STATE_ABSTRACT:
+	case PATH_PHASE_ABSTRACT:
 		return progress_abstract(s, prog);
-	case PATH_STATE_SETUPACTUAL:
+	case PATH_PHASE_SETUPACTUAL:
 		return progress_setupactual(s, prog);
-	case PATH_STATE_ACTUAL:
+	case PATH_PHASE_ACTUAL:
 		return progress_actual(s, prog);
-	case PATH_STATE_ATEND:
+	case PATH_PHASE_ATEND:
 	default:
 		assert(false);
 	}
@@ -197,7 +207,7 @@ init_abstract(struct path *s, struct rconst *rconst, struct ast_function *f,
 		ast_function_abstract(f)
 	);
 	state_pushframe(s->abstract, setupframe);
-	s->state = PATH_STATE_SETUPABSTRACT;
+	s->phase = PATH_PHASE_SETUPABSTRACT;
 	return NULL;
 }
 
@@ -224,7 +234,7 @@ init_actual(struct path *s, struct rconst *rconst, struct ast_function *f,
 		ast_function_abstract(f)
 	);
 	state_pushframe(s->actual, setupframe);
-	s->state = PATH_STATE_SETUPACTUAL;
+	s->phase = PATH_PHASE_SETUPACTUAL;
 	return NULL;
 }
 
@@ -245,7 +255,7 @@ audit(struct path *s, struct ast_function *f)
 			ast_function_name(f)
 		);
 	}
-	s->state = PATH_STATE_ATEND;
+	s->phase = PATH_PHASE_ATEND;
 	return NULL;
 }
 
@@ -256,7 +266,7 @@ static struct error *
 progress_setupabstract(struct path *s, progressor *prog)
 {
 	if (state_atsetupend(s->abstract)) {
-		s->state = PATH_STATE_ABSTRACT;
+		s->phase = PATH_PHASE_ABSTRACT;
 		return NULL;
 	}
 	return progressortrace(s->abstract, prog);
@@ -276,7 +286,7 @@ static struct error *
 progress_abstract(struct path *s, progressor *prog)
 {	
 	if (state_atend(s->abstract)) {
-		s->state = PATH_STATE_HALFWAY;
+		s->phase = PATH_PHASE_HALFWAY;
 		return NULL;
 	}
 	return progressortrace(s->abstract, prog);
@@ -286,7 +296,7 @@ static struct error *
 progress_setupactual(struct path *s, progressor *prog)
 {
 	if (state_atsetupend(s->actual)) {
-		s->state = PATH_STATE_ACTUAL;
+		s->phase = PATH_PHASE_ACTUAL;
 		return NULL;
 	}
 	return progressortrace(s->actual, prog);
@@ -296,7 +306,7 @@ static struct error *
 progress_actual(struct path *s, progressor *prog)
 {	
 	if (state_atend(s->actual)) {
-		s->state = PATH_STATE_AUDIT;
+		s->phase = PATH_PHASE_AUDIT;
 		return NULL;
 	}
 	return progressortrace(s->actual, prog);
@@ -306,14 +316,14 @@ struct path *
 path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
 {
 	struct path *s = path_create();
-	s->state = old->state;
-	switch (old->state) {
-	case PATH_STATE_SETUPABSTRACT:
-	case PATH_STATE_ABSTRACT:
+	s->phase = old->phase;
+	switch (old->phase) {
+	case PATH_PHASE_SETUPABSTRACT:
+	case PATH_PHASE_ABSTRACT:
 		s->abstract = state_split(old->abstract, rconst, fname);
 		break;
-	case PATH_STATE_SETUPACTUAL:
-	case PATH_STATE_ACTUAL:
+	case PATH_PHASE_SETUPACTUAL:
+	case PATH_PHASE_ACTUAL:
 		s->abstract = state_split(old->abstract, rconst, fname);
 		s->actual = state_split(old->actual, rconst, fname);
 		break;
@@ -326,19 +336,19 @@ path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
 struct error *
 path_verify(struct path *s, struct ast_expr *expr)
 {
-	switch(s->state) {
-	case PATH_STATE_ABSTRACT:
+	switch(s->phase) {
+	case PATH_PHASE_ABSTRACT:
 		return ast_stmt_verify(
 			ast_stmt_create_expr(NULL, expr), s->abstract
 		);
-	case PATH_STATE_ACTUAL:
+	case PATH_PHASE_ACTUAL:
 		return ast_stmt_verify(
 			ast_stmt_create_expr(NULL, expr), s->actual
 		);
-	case PATH_STATE_UNINIT:
-	case PATH_STATE_HALFWAY:
-	case PATH_STATE_AUDIT:
-	case PATH_STATE_ATEND:
+	case PATH_PHASE_UNINIT:
+	case PATH_PHASE_HALFWAY:
+	case PATH_PHASE_AUDIT:
+	case PATH_PHASE_ATEND:
 		return NULL;
 	default:
 		assert(false);
@@ -348,17 +358,17 @@ path_verify(struct path *s, struct ast_expr *expr)
 struct lexememarker *
 path_lexememarker(struct path *s)
 {
-	switch (s->state) {
-	case PATH_STATE_SETUPABSTRACT:
-	case PATH_STATE_ABSTRACT:
+	switch (s->phase) {
+	case PATH_PHASE_SETUPABSTRACT:
+	case PATH_PHASE_ABSTRACT:
 		return state_lexememarker(s->abstract);
-	case PATH_STATE_SETUPACTUAL:
-	case PATH_STATE_ACTUAL:
+	case PATH_PHASE_SETUPACTUAL:
+	case PATH_PHASE_ACTUAL:
 		return state_lexememarker(s->actual);	
-	case PATH_STATE_UNINIT:
-	case PATH_STATE_HALFWAY:
-	case PATH_STATE_AUDIT:
-	case PATH_STATE_ATEND:
+	case PATH_PHASE_UNINIT:
+	case PATH_PHASE_HALFWAY:
+	case PATH_PHASE_AUDIT:
+	case PATH_PHASE_ATEND:
 		return NULL;
 	default:
 		assert(false);
