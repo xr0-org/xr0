@@ -17,7 +17,7 @@ struct segment {
 		SEGMENT_PHASE_EXEC,
 		SEGMENT_PHASE_ATEND,
 	} phase;
-	struct state *s;
+	struct state *state;
 };
 
 struct segment *
@@ -28,6 +28,50 @@ segment_create()
 	s->phase = SEGMENT_PHASE_INIT;
 	return s;
 }
+
+static char *
+setupabstract_str(struct segment *);
+
+static char *
+abstract_str(struct segment *);
+
+char *
+segment_str(struct segment *s)
+{
+	switch (s->phase) {
+	case SEGMENT_PHASE_INIT:
+		return dynamic_str("path init abstract state");
+	case SEGMENT_PHASE_SETUP:
+		return setupabstract_str(s);
+	case SEGMENT_PHASE_EXEC:
+		return abstract_str(s);
+	case SEGMENT_PHASE_ATEND:
+		return dynamic_str("path init actual state");
+	default:
+		assert(false);
+	}
+}
+
+static char *
+setupabstract_str(struct segment *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "phase:\tSETUP (ABSTRACT)\n\n");
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->state));
+	strbuilder_printf(b, "%s\n", state_str(s->state));
+	return strbuilder_build(b);
+}
+
+static char *
+abstract_str(struct segment *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "phase:\tABSTRACT\n\n");
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->state));
+	strbuilder_printf(b, "%s\n", state_str(s->state));
+	return strbuilder_build(b);
+}
+
 
 struct path {
 	enum path_phase {
@@ -60,12 +104,6 @@ path_destroy(struct path *s)
 }
 
 static char *
-setupabstract_str(struct path *);
-
-static char *
-abstract_str(struct path *);
-
-static char *
 setupactual_str(struct path *);
 
 static char *
@@ -76,18 +114,7 @@ path_str(struct path *s)
 {
 	switch (s->phase) {
 	case PATH_PHASE_ABSTRACT:
-		switch (s->abstract->phase) {
-		case SEGMENT_PHASE_INIT:
-			return dynamic_str("path init abstract state");
-		case SEGMENT_PHASE_SETUP:
-			return setupabstract_str(s);
-		case SEGMENT_PHASE_EXEC:
-			return abstract_str(s);
-		case SEGMENT_PHASE_ATEND:
-			return dynamic_str("path init actual state");
-		default:
-			assert(false);
-		}
+		return segment_str(s->abstract);
 	case PATH_PHASE_SETUPACTUAL:
 		return setupactual_str(s);
 	case PATH_PHASE_ACTUAL:
@@ -102,12 +129,12 @@ path_str(struct path *s)
 }
 
 static char *
-abstract_str(struct path *s)
+setupactual_str(struct path *s)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "phase:\tABSTRACT\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->abstract->s));
-	strbuilder_printf(b, "%s\n", state_str(s->abstract->s));
+	strbuilder_printf(b, "phase:\tSETUP (ACTUAL)\n\n");
+	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->actual));
+	strbuilder_printf(b, "%s\n", state_str(s->actual));
 	return strbuilder_build(b);
 }
 
@@ -116,26 +143,6 @@ actual_str(struct path *s)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\tACTUAL\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->actual));
-	strbuilder_printf(b, "%s\n", state_str(s->actual));
-	return strbuilder_build(b);
-}
-
-static char *
-setupabstract_str(struct path *s)
-{
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "phase:\tSETUP (ABSTRACT)\n\n");
-	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->abstract->s));
-	strbuilder_printf(b, "%s\n", state_str(s->abstract->s));
-	return strbuilder_build(b);
-}
-
-static char *
-setupactual_str(struct path *s)
-{
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "phase:\tSETUP (ACTUAL)\n\n");
 	strbuilder_printf(b, "text:\n%s\n", state_programtext(s->actual));
 	strbuilder_printf(b, "%s\n", state_str(s->actual));
 	return strbuilder_build(b);
@@ -216,16 +223,16 @@ init_abstract(struct path *s, struct rconst *rconst, struct ast_function *f,
 		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
 		f
 	);
-	s->abstract->s = state_create(frame, rconst, ext);
-	if ((err = ast_function_initparams(f, s->abstract->s))) {
+	s->abstract->state = state_create(frame, rconst, ext);
+	if ((err = ast_function_initparams(f, s->abstract->state))) {
 		return err;
 	}
-	assert(!state_readregister(s->abstract->s));
+	assert(!state_readregister(s->abstract->state));
 	struct frame *setupframe = frame_blockfindsetup_create(
 		dynamic_str("setup"),
 		ast_function_abstract(f)
 	);
-	state_pushframe(s->abstract->s, setupframe);
+	state_pushframe(s->abstract->state, setupframe);
 	s->abstract->phase = SEGMENT_PHASE_SETUP;
 	return NULL;
 }
@@ -266,7 +273,7 @@ audit(struct path *s, struct ast_function *f)
 			"%s: garbage on heap", ast_function_name(f)
 		);
 	}
-	if (!state_equal(s->actual, s->abstract->s)) {
+	if (!state_equal(s->actual, s->abstract->state)) {
 		/* unequal states are printed by state_equal so that the user
 		 * can see the states with undeclared vars */
 		return error_printf(
@@ -284,11 +291,11 @@ progressortrace(struct state *, progressor *);
 static struct error *
 progress_setupabstract(struct path *s, progressor *prog)
 {
-	if (state_atsetupend(s->abstract->s)) {
+	if (state_atsetupend(s->abstract->state)) {
 		s->abstract->phase = SEGMENT_PHASE_EXEC;
 		return NULL;
 	}
-	return progressortrace(s->abstract->s, prog);
+	return progressortrace(s->abstract->state, prog);
 }
 
 static struct error *
@@ -304,11 +311,11 @@ progressortrace(struct state *s, progressor *prog)
 static struct error *
 progress_abstract(struct path *s, progressor *prog)
 {	
-	if (state_atend(s->abstract->s)) {
+	if (state_atend(s->abstract->state)) {
 		s->abstract->phase = SEGMENT_PHASE_ATEND;
 		return NULL;
 	}
-	return progressortrace(s->abstract->s, prog);
+	return progressortrace(s->abstract->state, prog);
 }
 
 static struct error *
@@ -342,7 +349,7 @@ path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
 		switch (old->abstract->phase) {
 		case SEGMENT_PHASE_SETUP:
 		case SEGMENT_PHASE_EXEC:
-			s->abstract->s = state_split(old->abstract->s, rconst, fname);
+			s->abstract->state = state_split(old->abstract->state, rconst, fname);
 			break;
 		default:
 			assert(false);
@@ -350,7 +357,7 @@ path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
 		break;
 	case PATH_PHASE_SETUPACTUAL:
 	case PATH_PHASE_ACTUAL:
-		s->abstract->s = state_split(old->abstract->s, rconst, fname);
+		s->abstract->state = state_split(old->abstract->state, rconst, fname);
 		s->actual = state_split(old->actual, rconst, fname);
 		break;
 	default:
@@ -367,7 +374,7 @@ path_verify(struct path *s, struct ast_expr *expr)
 		switch (s->abstract->phase) {
 		case SEGMENT_PHASE_EXEC:
 			return ast_stmt_verify(
-				ast_stmt_create_expr(NULL, expr), s->abstract->s
+				ast_stmt_create_expr(NULL, expr), s->abstract->state
 			);
 		case SEGMENT_PHASE_INIT:
 		case SEGMENT_PHASE_ATEND:
@@ -395,7 +402,7 @@ path_lexememarker(struct path *s)
 		switch (s->abstract->phase) {
 		case SEGMENT_PHASE_SETUP:
 		case SEGMENT_PHASE_EXEC:
-			return state_lexememarker(s->abstract->s);
+			return state_lexememarker(s->abstract->state);
 		case SEGMENT_PHASE_INIT:
 		case SEGMENT_PHASE_ATEND:
 			return NULL;
