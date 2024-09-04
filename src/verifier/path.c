@@ -184,10 +184,10 @@ init(struct segment *, struct rconst *, struct ast_function *f,
 		struct externals *, int abstract);
 
 static struct error *
-progress_setupabstract(struct segment *, progressor *);
+setup(struct segment *, progressor *);
 
 static struct error *
-progress_abstract(struct segment *, progressor *);
+exec(struct segment *, progressor *);
 
 static struct error *
 audit(struct path *, struct ast_function *);
@@ -206,9 +206,9 @@ path_progress(struct path *p, struct rconst *rconst, struct ast_function *f,
 		case SEGMENT_PHASE_INIT:
 			return init(p->abstract, rconst, f, ext, 1);
 		case SEGMENT_PHASE_SETUP:
-			return progress_setupabstract(p->abstract, prog);
+			return setup(p->abstract, prog);
 		case SEGMENT_PHASE_EXEC:
-			return progress_abstract(p->abstract, prog);
+			return exec(p->abstract, prog);
 		default:
 			assert(false);
 		}
@@ -221,12 +221,9 @@ path_progress(struct path *p, struct rconst *rconst, struct ast_function *f,
 		case SEGMENT_PHASE_INIT:
 			return init(p->actual, rconst, f, ext, 0);
 		case SEGMENT_PHASE_SETUP:
-			return progress_setupabstract(p->actual, prog);
+			return setup(p->actual, prog);
 		case SEGMENT_PHASE_EXEC:
-			return progress_abstract(p->actual, prog);
-		case SEGMENT_PHASE_ATEND:
-			p->phase = PATH_PHASE_AUDIT;
-			return NULL;
+			return exec(p->actual, prog);
 		default:
 			assert(false);
 		}
@@ -304,7 +301,7 @@ static struct error *
 progressortrace(struct state *, progressor *);
 
 static struct error *
-progress_setupabstract(struct segment *s, progressor *prog)
+setup(struct segment *s, progressor *prog)
 {
 	if (state_atsetupend(s->state)) {
 		s->phase = SEGMENT_PHASE_EXEC;
@@ -324,7 +321,7 @@ progressortrace(struct state *s, progressor *prog)
 }
 
 static struct error *
-progress_abstract(struct segment *s, progressor *prog)
+exec(struct segment *s, progressor *prog)
 {	
 	if (state_atend(s->state)) {
 		s->phase = SEGMENT_PHASE_ATEND;
