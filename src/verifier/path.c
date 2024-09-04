@@ -198,6 +198,10 @@ path_progress(struct path *p, struct rconst *rconst, struct ast_function *f,
 {
 	switch (p->phase) {
 	case PATH_PHASE_ABSTRACT:
+		if (p->abstract->phase == SEGMENT_PHASE_ATEND) {
+			p->phase = PATH_PHASE_ACTUAL;
+			return NULL;
+		}
 		switch (p->abstract->phase) {
 		case SEGMENT_PHASE_INIT:
 			return init(p->abstract, rconst, f, ext, 1);
@@ -205,13 +209,14 @@ path_progress(struct path *p, struct rconst *rconst, struct ast_function *f,
 			return progress_setupabstract(p->abstract, prog);
 		case SEGMENT_PHASE_EXEC:
 			return progress_abstract(p->abstract, prog);
-		case SEGMENT_PHASE_ATEND:
-			p->phase = PATH_PHASE_ACTUAL;
-			return NULL;
 		default:
 			assert(false);
 		}
 	case PATH_PHASE_ACTUAL:
+		if (p->actual->phase == SEGMENT_PHASE_ATEND) {
+			p->phase = PATH_PHASE_AUDIT;
+			return NULL;
+		}
 		switch (p->actual->phase) {
 		case SEGMENT_PHASE_INIT:
 			return init(p->actual, rconst, f, ext, 0);
