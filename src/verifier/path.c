@@ -148,6 +148,22 @@ actual_str(struct path *s)
 	return strbuilder_build(b);
 }
 
+struct segment *
+segment_copywithsplit(struct segment *old, struct rconst *rconst, char *fname)
+{
+	struct segment *new = segment_create();
+	new->phase = old->phase;
+	switch (old->phase) {
+	case SEGMENT_PHASE_SETUP:
+	case SEGMENT_PHASE_EXEC:
+		new->state = state_split(old->state, rconst, fname);
+		break;
+	default:
+		assert(false);
+	}
+	return new;
+}
+
 int
 path_atend(struct path *s)
 {
@@ -343,17 +359,9 @@ path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
 {
 	struct path *s = path_create();
 	s->phase = old->phase;
-	s->abstract = segment_create();
 	switch (old->phase) {
 	case PATH_PHASE_ABSTRACT:
-		switch (old->abstract->phase) {
-		case SEGMENT_PHASE_SETUP:
-		case SEGMENT_PHASE_EXEC:
-			s->abstract->state = state_split(old->abstract->state, rconst, fname);
-			break;
-		default:
-			assert(false);
-		}
+		s->abstract = segment_copywithsplit(old->abstract, rconst, fname);
 		break;
 	case PATH_PHASE_SETUPACTUAL:
 	case PATH_PHASE_ACTUAL:
