@@ -94,6 +94,12 @@ exec_str(struct segment *s, int abstract)
 	return strbuilder_build(b);
 }
 
+int
+segment_atend(struct segment *s)
+{
+	return s->phase == SEGMENT_PHASE_ATEND;
+}
+
 struct error *
 segment_verify(struct segment *s, struct ast_expr *e)
 {
@@ -179,9 +185,13 @@ path_atend(struct path *s)
 
 /* path_progress */
 
-static struct error *
-init(struct segment *, struct rconst *, struct ast_function *f,
-		struct externals *, int abstract);
+static void
+init_abstract(struct segment *, struct rconst *, struct ast_function *f,
+		struct externals *);
+
+static void
+init_actual(struct segment *, struct rconst *, struct ast_function *,
+		struct externals *);
 
 static struct error *
 setup(struct segment *, progressor *);
@@ -198,13 +208,14 @@ path_progress(struct path *p, struct rconst *rconst, struct ast_function *f,
 {
 	switch (p->phase) {
 	case PATH_PHASE_ABSTRACT:
-		if (p->abstract->phase == SEGMENT_PHASE_ATEND) {
+		if (segment_atend(p->abstract)) {
 			p->phase = PATH_PHASE_ACTUAL;
-			return NULL;
+			return path_progress(p, rconst, f, ext, prog);
 		}
 		switch (p->abstract->phase) {
 		case SEGMENT_PHASE_INIT:
-			return init(p->abstract, rconst, f, ext, 1);
+			init_abstract(p->abstract, rconst, f, ext);
+			return NULL;
 		case SEGMENT_PHASE_SETUP:
 			return setup(p->abstract, prog);
 		case SEGMENT_PHASE_EXEC:
@@ -213,13 +224,14 @@ path_progress(struct path *p, struct rconst *rconst, struct ast_function *f,
 			assert(false);
 		}
 	case PATH_PHASE_ACTUAL:
-		if (p->actual->phase == SEGMENT_PHASE_ATEND) {
+		if (segment_atend(p->actual)) {
 			p->phase = PATH_PHASE_AUDIT;
-			return NULL;
+			return path_progress(p, rconst, f, ext, prog);
 		}
 		switch (p->actual->phase) {
 		case SEGMENT_PHASE_INIT:
-			return init(p->actual, rconst, f, ext, 0);
+			init_actual(p->actual, rconst, f, ext);
+			return NULL;
 		case SEGMENT_PHASE_SETUP:
 			return setup(p->actual, prog);
 		case SEGMENT_PHASE_EXEC:
@@ -235,20 +247,18 @@ path_progress(struct path *p, struct rconst *rconst, struct ast_function *f,
 	}
 }
 
-static struct state *
-init_state(struct rconst *, struct ast_function *, struct externals *,
-		int abstract);
-
-static struct error *
-init(struct segment *s, struct rconst *rconst, struct ast_function *f,
-		struct externals *ext, int abstract)
+static void
+init_abstract(struct segment *s, struct rconst *rconst, struct ast_function *f,
+		struct externals *ext)
 {
-	struct error *err;
-	
-	s->state = init_state(rconst, f, ext, abstract);
-	if ((err = ast_function_initparams(f, s->state))) {
-		return err;
-	}
+	struct frame *frame = frame_callabstract_create(
+		ast_function_name(f),
+		ast_function_abstract(f),
+		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
+		f
+	);
+	s->state = state_create(frame, rconst, ext);
+	ast_function_initparams(f, s->state);
 	assert(!state_readregister(s->state));
 	struct frame *setupframe = frame_blockfindsetup_create(
 		dynamic_str("setup"),
@@ -256,25 +266,29 @@ init(struct segment *s, struct rconst *rconst, struct ast_function *f,
 	);
 	state_pushframe(s->state, setupframe);
 	s->phase = SEGMENT_PHASE_SETUP;
-	return NULL;
 }
 
-static struct state *
-init_state(struct rconst *rconst, struct ast_function *f, struct externals *ext,
-		int abstract)
+static void
+init_actual(struct segment *s, struct rconst *rconst, struct ast_function *f,
+		struct externals *ext)
 {
-	struct ast_expr *frame_id = ast_expr_identifier_create(
-		abstract ? dynamic_str("base abs") : dynamic_str("base act") /* XXX */
-	);
-	struct frame *frame = frame_callabstract_create(
+	/* if body empty just apply setup */
+	struct frame *frame = frame_callactual_create(
 		ast_function_name(f),
-		abstract ? ast_function_abstract(f) : ast_function_body(f),
-		frame_id,
+		ast_function_body(f),
+		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
 		f
 	);
-	return state_create(frame, rconst, ext);
+	s->state = state_create(frame, rconst, ext);
+	ast_function_initparams(f, s->state);
+	assert(!state_readregister(s->state));
+	struct frame *setupframe = frame_blockfindsetup_create(
+		dynamic_str("setup"),
+		ast_function_abstract(f)
+	);
+	state_pushframe(s->state, setupframe);
+	s->phase = SEGMENT_PHASE_SETUP;
 }
-
 
 static struct error *
 audit(struct path *p, struct ast_function *f)
