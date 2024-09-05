@@ -44,6 +44,9 @@ struct stack *
 stack_copywithname(struct stack *, char *new_name);
 
 char *
+stack_funcname(struct stack *);
+
+char *
 stack_str(struct stack *, struct state *);
 
 bool

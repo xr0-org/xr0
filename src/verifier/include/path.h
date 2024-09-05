@@ -20,8 +20,7 @@ int
 path_atend(struct path *);
 
 struct error *
-path_progress(struct path *, struct rconst *, struct ast_function *f,
-		struct externals *, progressor *);
+path_progress(struct path *, progressor *);
 
 struct path *
 path_copywithsplit(struct path *, struct rconst *, char *fname);

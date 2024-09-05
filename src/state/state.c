@@ -79,6 +79,12 @@ state_split(struct state *state, struct rconst *rconst, char *func_name)
 }
 
 char *
+state_funcname(struct state *s)
+{
+	return stack_funcname(s->stack);
+}
+
+char *
 state_str(struct state *state)
 {
 	struct strbuilder *b = strbuilder_create();

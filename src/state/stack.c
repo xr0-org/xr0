@@ -239,6 +239,12 @@ rename_lowestframe(struct stack *s, char *new_name)
 	}
 }
 
+char *
+stack_funcname(struct stack *s)
+{
+	return s->prev ? stack_funcname(s->prev) : frame_name(s->f);
+}
+
 static struct map *
 varmap_copy(struct map *m)
 {

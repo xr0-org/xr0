@@ -32,16 +32,6 @@ _verifier_mux(struct verifier *);
 static struct path *
 _verifier_path(struct verifier *);
 
-static struct rconst *
-_verifier_rconst(struct verifier *);
-
-static struct ast_function *
-_verifier_function(struct verifier *);
-
-static struct externals *
-_verifier_ext(struct verifier *);
-
-
 char *
 verifier_str(struct verifier *p)
 {
@@ -83,10 +73,7 @@ verifier_progress(struct verifier *p, progressor *prog)
 		}
 		return verifier_progress(branch, prog);
 	}
-	struct error *err = path_progress(
-		_verifier_path(p), _verifier_rconst(p), _verifier_function(p),
-		_verifier_ext(p), prog
-	);
+	struct error *err = path_progress(_verifier_path(p), prog);
 	if (err) {
 		struct error *inst_err = error_to_verifierinstruct(err);
 		if (!inst_err) {
@@ -256,7 +243,6 @@ split_name(char *name, struct map *split)
 }
 
 
-
 static void
 _verifier_split(struct verifier *p, struct mux *mux)
 {
@@ -299,24 +285,6 @@ _verifier_path(struct verifier *p)
 {
 	assert(!p->issplit);
 	return p->s;
-}
-
-static struct rconst *
-_verifier_rconst(struct verifier *p)
-{
-	return p->rconst;
-}
-
-static struct ast_function *
-_verifier_function(struct verifier *p)
-{
-	return p->f;
-}
-
-static struct externals *
-_verifier_ext(struct verifier *p)
-{
-	return p->ext;
 }
 
 DEFINE_RESULT_TYPE(struct verifier *, verifier, verifier_destroy, v_res, false)

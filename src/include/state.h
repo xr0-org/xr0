@@ -36,7 +36,10 @@ struct state *
 state_copy(struct state *);
 
 struct state *
-state_split(struct state *, struct rconst *, char *func_name);
+state_split(struct state *, struct rconst *, char *funcname);
+
+char *
+state_funcname(struct state *s);
 
 void
 state_destroy(struct state *state);
