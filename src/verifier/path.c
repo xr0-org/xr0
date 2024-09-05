@@ -35,6 +35,9 @@ segment_copywithsplit(struct segment *old, struct rconst *rconst, char *fname)
 	struct segment *new = segment_create();
 	new->phase = old->phase;
 	switch (old->phase) {
+	case SEGMENT_PHASE_INIT:
+		assert(old->state);
+		/* fallthrough */
 	case SEGMENT_PHASE_SETUP:
 	case SEGMENT_PHASE_EXEC:
 	case SEGMENT_PHASE_ATEND:
@@ -141,26 +144,35 @@ struct path {
 	struct segment *abstract, *actual;
 };
 
+static void
+init_abstract(struct segment *, struct rconst *, struct ast_function *f,
+		struct externals *);
+
+static void
+init_actual(struct segment *, struct rconst *, struct ast_function *,
+		struct externals *);
+
 struct path *
-path_create()
+path_create(struct rconst *rconst, struct ast_function *f, struct externals *ext)
 {
 	struct path *s = malloc(sizeof(struct path));
 	assert(s);
 	s->phase = PATH_PHASE_ABSTRACT;
 	s->abstract = segment_create();
+	init_abstract(s->abstract, rconst, f, ext);
 	s->actual = segment_create();
+	init_actual(s->actual, rconst, f, ext);
 	return s;
 }
 
 struct path *
 path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
 {
-	struct path *s = path_create();
+	struct path *s = malloc(sizeof(struct path));
+	assert(s);
 	s->phase = old->phase;
 	switch (old->phase) {
 	case PATH_PHASE_ABSTRACT:
-		s->abstract = segment_copywithsplit(old->abstract, rconst, fname);
-		break;
 	case PATH_PHASE_ACTUAL:
 		s->abstract = segment_copywithsplit(old->abstract, rconst, fname);
 		s->actual = segment_copywithsplit(old->actual, rconst, fname);
@@ -205,14 +217,6 @@ path_atend(struct path *s)
 
 /* path_progress */
 
-static void
-init_abstract(struct segment *, struct rconst *, struct ast_function *f,
-		struct externals *);
-
-static void
-init_actual(struct segment *, struct rconst *, struct ast_function *,
-		struct externals *);
-
 static struct error *
 setup(struct segment *, progressor *);
 
@@ -234,7 +238,7 @@ path_progress(struct path *p, struct rconst *rconst, struct ast_function *f,
 		}
 		switch (p->abstract->phase) {
 		case SEGMENT_PHASE_INIT:
-			init_abstract(p->abstract, rconst, f, ext);
+			p->abstract->phase = SEGMENT_PHASE_SETUP;
 			return NULL;
 		case SEGMENT_PHASE_SETUP:
 			return setup(p->abstract, prog);
@@ -250,7 +254,7 @@ path_progress(struct path *p, struct rconst *rconst, struct ast_function *f,
 		}
 		switch (p->actual->phase) {
 		case SEGMENT_PHASE_INIT:
-			init_actual(p->actual, rconst, f, ext);
+			p->actual->phase = SEGMENT_PHASE_SETUP;
 			return NULL;
 		case SEGMENT_PHASE_SETUP:
 			return setup(p->actual, prog);
@@ -285,7 +289,6 @@ init_abstract(struct segment *s, struct rconst *rconst, struct ast_function *f,
 		ast_function_abstract(f)
 	);
 	state_pushframe(s->state, setupframe);
-	s->phase = SEGMENT_PHASE_SETUP;
 }
 
 static void
@@ -307,7 +310,6 @@ init_actual(struct segment *s, struct rconst *rconst, struct ast_function *f,
 		ast_function_abstract(f)
 	);
 	state_pushframe(s->state, setupframe);
-	s->phase = SEGMENT_PHASE_SETUP;
 }
 
 static struct error *

@@ -177,7 +177,8 @@ _verifier_create(struct path *s, struct rconst *rconst, struct ast_function *f,
 struct verifier *
 verifier_create(struct ast_function *f, struct externals *ext)
 {
-	return _verifier_create(path_create(), rconst_create(), f, ext);
+	struct rconst *rconst = rconst_create();
+	return _verifier_create(path_create(rconst, f, ext), rconst, f, ext);
 }
 
 static struct rconst *
