@@ -37,6 +37,7 @@ segment_copywithsplit(struct segment *old, struct rconst *rconst, char *fname)
 	switch (old->phase) {
 	case SEGMENT_PHASE_SETUP:
 	case SEGMENT_PHASE_EXEC:
+	case SEGMENT_PHASE_ATEND:
 		new->state = state_split(old->state, rconst, fname);
 		break;
 	default:
