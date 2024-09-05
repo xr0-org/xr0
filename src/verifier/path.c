@@ -29,73 +29,13 @@ _segment_create(enum segment_phase phase)
 	return s;
 }
 
-static void
-init_abstract(struct segment *, struct rconst *, struct ast_function *f,
-		struct externals *);
-
 struct segment *
-segment_abstract_create(struct rconst *rconst, struct ast_function *f,
-		struct externals *ext)
+segment_create_withstate(struct state *state)
 {
 	struct segment *s = _segment_create(SEGMENT_PHASE_INIT);
-	init_abstract(s, rconst, f, ext);
+	s->state = state;
 	return s;
 }
-
-static void
-init_abstract(struct segment *s, struct rconst *rconst, struct ast_function *f,
-		struct externals *ext)
-{
-	struct frame *frame = frame_callabstract_create(
-		ast_function_name(f),
-		ast_function_abstract(f),
-		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
-		f
-	);
-	s->state = state_create(frame, rconst, ext);
-	ast_function_initparams(f, s->state);
-	assert(!state_readregister(s->state));
-	struct frame *setupframe = frame_blockfindsetup_create(
-		dynamic_str("setup"),
-		ast_function_abstract(f)
-	);
-	state_pushframe(s->state, setupframe);
-}
-
-static void
-init_actual(struct segment *, struct rconst *, struct ast_function *,
-		struct externals *);
-
-struct segment *
-segment_actual_create(struct rconst *rconst, struct ast_function *f,
-		struct externals *ext)
-{
-	struct segment *s = _segment_create(SEGMENT_PHASE_INIT);
-	init_actual(s, rconst, f, ext);
-	return s;
-}
-
-static void
-init_actual(struct segment *s, struct rconst *rconst, struct ast_function *f,
-		struct externals *ext)
-{
-	/* if body empty just apply setup */
-	struct frame *frame = frame_callactual_create(
-		ast_function_name(f),
-		ast_function_body(f),
-		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
-		f
-	);
-	s->state = state_create(frame, rconst, ext);
-	ast_function_initparams(f, s->state);
-	assert(!state_readregister(s->state));
-	struct frame *setupframe = frame_blockfindsetup_create(
-		dynamic_str("setup"),
-		ast_function_abstract(f)
-	);
-	state_pushframe(s->state, setupframe);
-}
-
 
 struct segment *
 segment_copywithsplit(struct segment *old, struct rconst *rconst, char *fname)
@@ -211,16 +151,64 @@ struct path {
 	struct segment *abstract, *actual;
 };
 
+static struct frame *
+frame_callabstract(struct ast_function *);
+
+static struct frame *
+frame_callactual(struct ast_function *);
+
 struct path *
 path_create(struct rconst *rconst, struct ast_function *f, struct externals *ext)
 {
 	struct path *s = malloc(sizeof(struct path));
 	assert(s);
 	s->phase = PATH_PHASE_ABSTRACT;
-	s->abstract = segment_abstract_create(rconst, f, ext);
-	s->actual = segment_actual_create(rconst, f, ext);
+	struct state *abstract = 
+		state_create(frame_callabstract(f), rconst, ext);
+	ast_function_initparams(f, abstract);
+	state_pushframe(
+		abstract,
+		frame_blockfindsetup_create(
+			dynamic_str("setup"), ast_function_abstract(f)
+		)
+	);
+	s->abstract = segment_create_withstate(abstract);
+	struct state *actual = 
+		state_create(frame_callactual(f), rconst, ext);
+	ast_function_initparams(f, actual);
+	state_pushframe(
+		actual,
+		frame_blockfindsetup_create(
+			dynamic_str("setup"), ast_function_abstract(f)
+		)
+	);
+	s->actual = segment_create_withstate(actual);
 	return s;
 }
+
+static struct frame *
+frame_callabstract(struct ast_function *f)
+{
+	return frame_callabstract_create(
+		ast_function_name(f),
+		ast_function_abstract(f),
+		ast_expr_identifier_create(dynamic_str("base abs")), /* XXX */
+		f
+	);
+}
+
+static struct frame *
+frame_callactual(struct ast_function *f)
+{
+	return frame_callactual_create(
+		ast_function_name(f),
+		ast_function_body(f),
+		ast_expr_identifier_create(dynamic_str("base act")), /* XXX */
+		f
+	);
+}
+
+
 
 struct path *
 path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
