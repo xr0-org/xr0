@@ -151,6 +151,25 @@ path_create()
 	return s;
 }
 
+struct path *
+path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
+{
+	struct path *s = path_create();
+	s->phase = old->phase;
+	switch (old->phase) {
+	case PATH_PHASE_ABSTRACT:
+		s->abstract = segment_copywithsplit(old->abstract, rconst, fname);
+		break;
+	case PATH_PHASE_ACTUAL:
+		s->abstract = segment_copywithsplit(old->abstract, rconst, fname);
+		s->actual = segment_copywithsplit(old->actual, rconst, fname);
+		break;
+	default:
+		assert(false);
+	}
+	return s;
+}
+
 void
 path_destroy(struct path *s)
 {
@@ -342,25 +361,6 @@ exec(struct segment *s, progressor *prog)
 		return NULL;
 	}
 	return progressortrace(s->state, prog);
-}
-
-struct path *
-path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
-{
-	struct path *s = path_create();
-	s->phase = old->phase;
-	switch (old->phase) {
-	case PATH_PHASE_ABSTRACT:
-		s->abstract = segment_copywithsplit(old->abstract, rconst, fname);
-		break;
-	case PATH_PHASE_ACTUAL:
-		s->abstract->state = state_split(old->abstract->state, rconst, fname);
-		s->actual->state = state_split(old->actual->state, rconst, fname);
-		break;
-	default:
-		assert(false);
-	}
-	return s;
 }
 
 struct error *
