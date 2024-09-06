@@ -18,5 +18,6 @@ of a program.
 For help, type "help".
 
 
-path init abstract state
+phase:	ABSTRACT (INIT)
+
 (0db)

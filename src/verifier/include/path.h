@@ -8,7 +8,7 @@ struct ast_function;
 struct externals;
 
 struct path *
-path_create(struct rconst *, struct ast_function *, struct externals *);
+path_create(struct state *abstract, struct state *actual);
 
 void
 path_destroy(struct path *);

@@ -67,7 +67,7 @@ parse_config(int argc, char *argv[])
 	struct string_arr *includedirs = default_includes();
 	char *outfile = OUTPUT_PATH;
 	int opt;
-	while ((opt = getopt(argc, argv, "vsFo:t:x:I:d::")) != -1) {
+	while ((opt = getopt(argc, argv, "vsFo:t:x:I:dr:")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
@@ -90,11 +90,11 @@ parse_config(int argc, char *argv[])
 		case 'x':
 			sortconf = sortconfig_create(SORTMODE_VERIFY, optarg);
 			break;
+		case 'r':
+			assert(!debugsep);
+			debugsep = dynamic_str(optarg);
+			/* fallthrough */
 		case 'd':
-			if (optarg) {
-				assert(!debugsep);
-				debugsep = dynamic_str(optarg);
-			}
 			debug = true;
 			break;
 		default:
