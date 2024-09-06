@@ -36,7 +36,7 @@ segment_create_withstate(struct state *state)
 }
 
 struct segment *
-segment_copywithsplit(struct segment *old, struct rconst *rconst, char *fname)
+segment_split(struct segment *old, struct rconst *rconst, char *fname)
 {
 	struct segment *new = _segment_create(old->phase);
 	switch (old->phase) {
@@ -52,6 +52,13 @@ segment_copywithsplit(struct segment *old, struct rconst *rconst, char *fname)
 		assert(false);
 	}
 	return new;
+}
+
+void
+segment_destroy(struct segment *s)
+{
+	/*state_destroy(s->state);*/
+	free(s);
 }
 
 static char *

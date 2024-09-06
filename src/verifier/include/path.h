@@ -23,7 +23,7 @@ struct error *
 path_progress(struct path *, progressor *);
 
 struct path *
-path_copywithsplit(struct path *, struct rconst *, char *fname);
+path_split(struct path *, struct rconst *, char *fname);
 
 struct error *
 path_verify(struct path *, struct ast_expr *);

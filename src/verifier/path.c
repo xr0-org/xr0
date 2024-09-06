@@ -33,7 +33,7 @@ path_create(struct state *abstract, struct state *actual)
 }
 
 struct path *
-path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
+path_split(struct path *old, struct rconst *rconst, char *fname)
 {
 	struct path *p = malloc(sizeof(struct path));
 	assert(p);
@@ -41,8 +41,8 @@ path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
 	switch (old->phase) {
 	case PATH_PHASE_ABSTRACT:
 	case PATH_PHASE_ACTUAL:
-		p->abstract = segment_copywithsplit(old->abstract, rconst, fname);
-		p->actual = segment_copywithsplit(old->actual, rconst, fname);
+		p->abstract = segment_split(old->abstract, rconst, fname);
+		p->actual = segment_split(old->actual, rconst, fname);
 		break;
 	default:
 		assert(false);
@@ -53,8 +53,8 @@ path_copywithsplit(struct path *old, struct rconst *rconst, char *fname)
 void
 path_destroy(struct path *p)
 {
-	/*state_destroy(p->abstract);*/
-	/*state_destroy(p->actual);*/
+	segment_destroy(p->abstract);
+	segment_destroy(p->actual);
 	free(p);
 }
 

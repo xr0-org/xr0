@@ -14,7 +14,10 @@ struct segment *
 segment_create_withstate(struct state *);
 
 struct segment *
-segment_copywithsplit(struct segment *old, struct rconst *rconst, char *fname);
+segment_split(struct segment *old, struct rconst *rconst, char *fname);
+
+void
+segment_destroy(struct segment *);
 
 char *
 segment_str(struct segment *, char *phase);

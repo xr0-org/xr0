@@ -247,7 +247,7 @@ _verifier_copywithsplit(struct verifier *old, struct map *split)
 	struct ast_function *f = copy_withsplitname(old->f, split);
 	return v_res_verifier_create(
 		_verifier_create(
-			path_copywithsplit(old->p, rconst, ast_function_name(f)),
+			path_split(old->p, rconst, ast_function_name(f)),
 			rconst,
 			f,
 			old->ext
