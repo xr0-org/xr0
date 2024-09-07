@@ -165,7 +165,8 @@ comment()
 
 	if ((c1 = input()) != '/' && c != EOF) {
 		unput(c1);
-		return comment();
+		comment();
+		return;
 	}
 
 	if (c != EOF) {
@@ -173,12 +174,7 @@ comment()
 	}
 }
 
-struct lexememarker marker = (struct lexememarker) {
-	.linenum = 0,
-	.column = 0,
-	.filename = NULL,
-	.flags = 0,
-};
+struct lexememarker marker;
 
 struct lexememarker *
 lexloc()
@@ -317,6 +313,12 @@ lex_begin()
 {
 	table = map_create();
 	installclass = IC_NONE;
+	marker = (struct lexememarker) {
+		.linenum	= 0,
+		.column		= 0,
+		.filename	= NULL,
+		.flags		= 0,
+	};
 }
 
 void

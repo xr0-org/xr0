@@ -297,7 +297,8 @@ map_sum(struct map *m1, struct map *m2)
 	}
 	for (int i = 0; i < m2->n; i++) {
 		struct entry e = m2->entry[i];
-		map_set(m, dynamic_str(e.key), (long) map_get(m, e.key) + e.value);
+		long sum = (long) map_get(m, e.key) + (long) e.value;
+		map_set(m, dynamic_str(e.key), (void *) sum);
 	}
 
 	map_destroy(m2);

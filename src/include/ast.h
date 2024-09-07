@@ -82,16 +82,8 @@ ast_expr_member_root(struct ast_expr *);
 char *
 ast_expr_member_field(struct ast_expr *);
 
-enum ast_unary_operator;
-
-struct ast_expr *
-ast_expr_unary_create(struct ast_expr *, enum ast_unary_operator);
-
 struct ast_expr *
 ast_expr_inverted_copy(struct ast_expr *expr, bool invert);
-
-enum ast_unary_operator
-ast_expr_unary_op(struct ast_expr *);
 
 bool
 ast_expr_unary_isdereference(struct ast_expr *);
@@ -203,12 +195,6 @@ ast_expr_clump_create(struct ast_expr *);
 
 struct ast_expr *
 ast_expr_alloc_arg(struct ast_expr *);
-
-enum ast_alloc_kind
-ast_expr_alloc_kind(struct ast_expr *);
-
-struct ast_expr *
-ast_expr_alloc_kind_create(struct ast_expr *arg, enum ast_alloc_kind);
 
 struct state;
 
@@ -498,8 +484,6 @@ ast_stmt_as_v_block(struct ast_stmt *);
 
 struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
-
-enum execution_mode;
 
 struct error *
 ast_stmt_verify(struct ast_stmt *, struct state *);

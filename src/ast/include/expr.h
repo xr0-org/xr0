@@ -3,12 +3,6 @@
 
 #include "util.h"
 
-enum ast_alloc_kind {
-	ALLOC		= 1 << 0,
-	DEALLOC		= 1 << 1,
-	CLUMP		= 1 << 2,
-};
-
 struct ast_expr {
 	enum ast_expr_kind {
 		EXPR_IDENTIFIER		= 1 << 0,
@@ -77,7 +71,11 @@ struct ast_expr {
 		} range;
 		bool ismax;
 		struct {
-			enum ast_alloc_kind kind;
+			enum ast_alloc_kind {
+				ALLOC		= 1 << 0,
+				DEALLOC		= 1 << 1,
+				CLUMP		= 1 << 2,
+			} kind;
 			struct ast_expr *arg;
 		} alloc;
 	} u;
@@ -93,8 +91,20 @@ ast_expr_binary_create(struct ast_expr *e1, enum ast_binary_operator,
 enum ast_binary_operator
 ast_expr_binary_op(struct ast_expr *);
 
+struct ast_expr *
+ast_expr_unary_create(struct ast_expr *, enum ast_unary_operator);
+
+enum ast_unary_operator
+ast_expr_unary_op(struct ast_expr *);
+
 struct ast_stmt_splits
 ast_expr_splits(struct ast_expr *, struct state *);
+
+enum ast_alloc_kind
+ast_expr_alloc_kind(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_alloc_kind_create(struct ast_expr *arg, enum ast_alloc_kind);
 
 struct value_arr;
 struct value_arr_res;

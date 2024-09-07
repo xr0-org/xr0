@@ -1256,9 +1256,10 @@ value_splitto(struct value *v, struct number *range, struct map *splits,
 			&& number_value_eq(value_lw(v, s), number_lw(range, s))
 			&& number_value_eq(value_up(v, s), number_up(range, s))
 		);
-		return;
+		break;
 	case VALUE_RCONST:
-		return number_splitto(v->n, range, splits, s);
+		number_splitto(v->n, range, splits, s);
+		break;
 	default:
 		assert(false);
 	}

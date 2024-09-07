@@ -134,8 +134,6 @@ bool
 value_references(struct value *, struct location *, struct state *,
 		struct circuitbreaker *);
 
-enum ast_binary_operator;
-
 DECLARE_RESULT_TYPE(bool, bool, bool_res)
 
 struct bool_res *
