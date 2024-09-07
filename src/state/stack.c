@@ -67,6 +67,10 @@ static struct location *
 stack_newblock(struct stack *stack, int size)
 {
 	struct block *b = block_create(size);
+	/* "Storage is guaranteed to be reserved for a new instance of such an
+	 * object on each normal entry into the block in which it is declared,
+	 * or on a jump from outside the block to a label in the block or in an
+	 * enclosed block." (3.1.2.4) */
 	block_install(b, object_value_create(ast_expr_constant_create(0), NULL));
 	return location_create_automatic(
 		stack->id,

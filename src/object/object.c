@@ -122,7 +122,7 @@ object_hasvalue(struct object *obj)
 struct value *
 object_as_value(struct object *obj)
 {
-	assert(obj->value);
+	assert(object_hasvalue(obj));
 	return obj->value;
 }
 
