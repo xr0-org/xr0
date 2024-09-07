@@ -410,8 +410,7 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct error *
-verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
-		struct state *arg_state);
+verify_paramspec(char *id, struct state *spec_state, struct state *caller_state);
 
 static struct error *
 call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *arg_state)
@@ -455,17 +454,8 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 	struct ast_variable **param = ast_function_params(f);
 
 	for (int i = 0; i < nparams; i++) {
-		char *id = ast_variable_name(param[i]);
-		struct value *param = value_ptr_create(
-			location_copy(loc_res_as_loc(state_getloc(param_state, id)))
-		);
-		struct value *arg = value_ptr_create(
-			location_copy(loc_res_as_loc(state_getloc(arg_state, id)))
-		);
-		err = verify_paramspec(param, arg, param_state, arg_state);
-		value_destroy(arg);
-		value_destroy(param);
-		if (err) {
+		char *id = ast_variable_name(param[i]); 
+		if ((err = verify_paramspec(id, param_state, arg_state))) {
 			return error_printf(
 				"parameter `%s' of `%s' %w", id, fname, err
 			);
@@ -475,13 +465,32 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 }
 
 static struct error *
-verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
+abc(struct value *param, struct value *arg, struct state *spec,
+		struct state *caller);
+
+static struct error *
+verify_paramspec(char *id, struct state *spec, struct state *caller)
+{
+	struct value *spec_v = value_ptr_create(
+		location_copy(loc_res_as_loc(state_getloc(spec, id)))
+	);
+	struct value *caller_v = value_ptr_create(
+		location_copy(loc_res_as_loc(state_getloc(caller, id)))
+	);
+	struct error *err = abc(spec_v, caller_v, spec, caller);
+	value_destroy(spec_v);
+	value_destroy(caller_v);
+	return err;
+}
+
+static struct error *
+abc(struct value *param, struct value *arg, struct state *param_state,
 		struct state *arg_state)
 {
 	if (!state_islval(param_state, param)) {
 		return NULL;
 	}
-	/* spec mentions param */
+	/* spec constrains param */
 	if (!state_islval(arg_state, arg)) {
 		return error_printf("must be lvalue");
 	}
@@ -500,7 +509,7 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 	if (!object_hasvalue(arg_obj)) {
 		return error_printf("must have value");
 	}
-	return verify_paramspec(
+	return abc(
 		object_as_value(param_obj),
 		object_as_value(arg_obj),
 		param_state, arg_state

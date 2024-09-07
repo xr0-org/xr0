@@ -367,30 +367,21 @@ state_clump(struct state *state)
 {
 	/* XXX: should type be associated with blocks for type checking when we
 	 * assign? */
-	int address = clump_newblock(state->clump);
-	struct location *loc = location_create_dereferencable(
-		address,
-		offset_create(ast_expr_constant_create(0))
+	return value_ptr_create(
+		location_create_dereferencable(
+			clump_newblock(state->clump),
+			offset_create(ast_expr_constant_create(0))
+		)
 	);
-	return value_ptr_create(loc);
 }
 
 bool
 state_islval(struct state *state, struct value *v)
 {
-	assert(v);
 	if (!value_islocation(v)) {
 		return false;
 	}
 	struct location *loc = value_as_location(v);
-	struct object_res *res = state_get(state, loc, false); /* put object there */
-	if (object_res_iserror(res)) {
-		struct error *err = object_res_as_error(res);
-		assert(
-			error_to_block_observe_noobj(err)
-			|| error_to_state_get_no_block(err)
-		);
-	}
 	return location_tostatic(loc, state->static_memory)
 		|| location_toheap(loc, state->heap)
 		|| location_tostack(loc, state->stack)
