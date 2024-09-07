@@ -436,7 +436,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 		return ast_block_res_as_error(mod_abs_res);
 	}
 	struct frame *setupframe = frame_blockfindsetup_create(
-		dynamic_str("setup"),
+		dynamic_str("findsetup"),
 		ast_block_res_as_block(mod_abs_res)
 	);
 	state_pushframe(param_state, setupframe);
@@ -487,27 +487,17 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 	if (state_isalloc(param_state, param) && !state_isalloc(arg_state, arg)) {
 		return error_printf("must be heap allocated");
 	}
-	struct object_res *param_res = state_get(
-		param_state, value_as_location(param), false
+	struct object *param_obj = object_res_as_object(
+		state_get(param_state, value_as_location(param), false)
 	);
-	if (object_res_iserror(param_res)) {
-		return object_res_as_error(param_res);
-	}
-	struct object_res *arg_res = state_get(
-		arg_state, value_as_location(arg), false
+	struct object *arg_obj = object_res_as_object(
+		state_get(arg_state, value_as_location(arg), false)
 	);
-	if (object_res_iserror(arg_res)) {
-		return object_res_as_error(arg_res);
-	}
-	assert(object_res_hasobject(param_res));
-	assert(object_res_hasobject(arg_res));
-	struct object *param_obj = object_res_as_object(param_res),
-		      *arg_obj = object_res_as_object(arg_res);
 	if (!object_hasvalue(param_obj)) {
 		return NULL; /* spec makes no claim about param */
 	}
 	if (!object_hasvalue(arg_obj)) {
-		return error_printf("must be rvalue");
+		return error_printf("must have value");
 	}
 	return verify_paramspec(
 		object_as_value(param_obj),
