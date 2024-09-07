@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# This script generates src.mk, which is included in the Makefile.
+TMPL_MKFILE=scripts/tmpl.mk
+DEPS_MKFILE=scripts/deps.mk
+
+# This script generates the Makefile from $TMPL_MKFILE and $DEPS_MKFILE,
+# the latter of which contains the rules to build the various object files.
 #
-# src.mk imposes the following module rules:
+# $DEPS_MKFILE imposes the following module rules:
 #
 #	1. Every directory in `/src` and its descendant directories, including
 #	`/src` itself, defines a module.
@@ -29,9 +33,6 @@
 
 set +x
 
-TMPL_MKFILE=scripts/tmpl.mk
-DEPS_MKFILE=scripts/deps.mk
-
 SRCDIR=src
 BUILDDIR=build
 
@@ -51,8 +52,6 @@ function listincludes() {
 
 INCLUDEDIRS=$(find $SRCDIR -type d -name "include")
 SRCDIRS=$(find $SRCDIR -type d ! -name "include")
-
-
 
 # hack in Lex/Yacc files
 PARSER_FILES="$SRCDIR/ast/lex.yy.c \
