@@ -481,6 +481,7 @@ verify_paramspec(struct value *param, struct value *arg, struct state *param_sta
 	if (!state_islval(param_state, param)) {
 		return NULL;
 	}
+	/* spec mentions param */
 	if (!state_islval(arg_state, arg)) {
 		return error_printf("must be lvalue");
 	}

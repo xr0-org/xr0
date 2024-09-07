@@ -383,7 +383,7 @@ state_islval(struct state *state, struct value *v)
 		return false;
 	}
 	struct location *loc = value_as_location(v);
-	struct object_res *res = state_get(state, loc, true); /* put object there */
+	struct object_res *res = state_get(state, loc, false); /* put object there */
 	if (object_res_iserror(res)) {
 		struct error *err = object_res_as_error(res);
 		assert(
@@ -391,10 +391,10 @@ state_islval(struct state *state, struct value *v)
 			|| error_to_state_get_no_block(err)
 		);
 	}
-	return location_tostatic(loc, state->static_memory) ||
-		location_toheap(loc, state->heap) ||
-		location_tostack(loc, state->stack) ||
-		location_toclump(loc, state->clump);
+	return location_tostatic(loc, state->static_memory)
+		|| location_toheap(loc, state->heap)
+		|| location_tostack(loc, state->stack)
+		|| location_toclump(loc, state->clump);
 }
 
 bool
@@ -471,17 +471,16 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	return object_res_object_create(member);
 }
 
-void
-state_blockinstall(struct block *b, struct object *obj)
-{
-	block_install(b, obj);
-}
-
 struct block *
 state_getblock(struct state *state, struct location *loc)
 {
 	struct block_res *res = location_getblock(
-		loc, state->static_memory, state->rconst, state->stack, state->heap, state->clump
+		loc,
+		state->static_memory,
+		state->rconst,
+		state->stack,
+		state->heap,
+		state->clump
 	);
 	if (block_res_hasblock(res)) {
 		return block_res_as_block(res);

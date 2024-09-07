@@ -11,8 +11,7 @@ assign(void *p) ~ [
 
 int
 main() {
-	int q;
-	int p;
+	int p; int q;
 
 	assign(&q);
 	p = 2;	

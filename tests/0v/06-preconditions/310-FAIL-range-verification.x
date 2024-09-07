@@ -1,5 +1,5 @@
 int
-foo(int x) ~ [ setup: int x = [0?2]; ]
+foo(int x) ~ [ setup: x = [0?2]; ]
 {
 	return 3;
 }

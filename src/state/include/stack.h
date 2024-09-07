@@ -31,9 +31,6 @@ struct externals;
 char *
 stack_argmodulator(struct stack *, struct state *);
 
-struct location *
-stack_newblock(struct stack *, int size);
-
 void
 stack_destroy(struct stack *);
 

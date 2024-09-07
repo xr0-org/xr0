@@ -63,14 +63,16 @@ struct stack {
 	struct frame *f;
 };
 
-struct location *
+static struct location *
 stack_newblock(struct stack *stack, int size)
 {
-	int address = block_arr_append(stack->memory, block_create(size));
-	struct location *loc = location_create_automatic(
-		stack->id, address, offset_create(ast_expr_constant_create(0))
+	struct block *b = block_create(size);
+	block_install(b, object_value_create(ast_expr_constant_create(0), NULL));
+	return location_create_automatic(
+		stack->id,
+		block_arr_append(stack->memory, b),
+		offset_create(ast_expr_constant_create(0))
 	);
-	return loc;
 }
 
 struct stack *
@@ -775,9 +777,11 @@ variable_create(struct ast_type *type, struct stack *stack, bool isparam)
 	v->isparam = isparam;
 
 	v->loc = stack_newblock(stack, ast_type_size(type));
-	struct block_res *res = location_getblock(v->loc, NULL, NULL, stack, NULL, NULL);
-	struct block *b = block_res_as_block(res);
-	assert(b);
+	assert(
+		block_res_as_block(
+			location_getblock(v->loc, NULL, NULL, stack, NULL, NULL)
+		)
+	);
 
 	return v;
 }
