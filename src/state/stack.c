@@ -63,14 +63,20 @@ struct stack {
 	struct frame *f;
 };
 
-struct location *
+static struct location *
 stack_newblock(struct stack *stack, int size)
 {
-	int address = block_arr_append(stack->memory, block_create(size));
-	struct location *loc = location_create_automatic(
-		stack->id, address, offset_create(ast_expr_constant_create(0))
+	struct block *b = block_create(size);
+	/* "Storage is guaranteed to be reserved for a new instance of such an
+	 * object on each normal entry into the block in which it is declared,
+	 * or on a jump from outside the block to a label in the block or in an
+	 * enclosed block." (3.1.2.4) */
+	block_install(b, object_value_create(ast_expr_constant_create(0), NULL));
+	return location_create_automatic(
+		stack->id,
+		block_arr_append(stack->memory, b),
+		offset_create(ast_expr_constant_create(0))
 	);
-	return loc;
 }
 
 struct stack *
@@ -129,6 +135,16 @@ struct ast_expr *
 stack_framecall(struct stack *s)
 {
 	return frame_call(s->f);
+}
+
+struct ast_type *
+stack_returntype(struct stack *s)
+{
+	if (!frame_iscall(s->f)) {
+		assert(s->prev);
+		return stack_returntype(s->prev);
+	}
+	return ast_function_type(frame_function(s->f));
 }
 
 static char *
@@ -775,9 +791,11 @@ variable_create(struct ast_type *type, struct stack *stack, bool isparam)
 	v->isparam = isparam;
 
 	v->loc = stack_newblock(stack, ast_type_size(type));
-	struct block_res *res = location_getblock(v->loc, NULL, NULL, stack, NULL, NULL);
-	struct block *b = block_res_as_block(res);
-	assert(b);
+	assert(
+		block_res_as_block(
+			location_getblock(v->loc, NULL, NULL, stack, NULL, NULL)
+		)
+	);
 
 	return v;
 }

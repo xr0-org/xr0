@@ -94,6 +94,12 @@ ast_expr_isnot(struct ast_expr *);
 struct ast_expr *
 ast_expr_unary_operand(struct ast_expr *);
 
+int
+ast_expr_isnegative(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_negative_operand(struct ast_expr *);
+
 struct ast_expr *
 ast_expr_eq_create(struct ast_expr *, struct ast_expr *);
 
@@ -494,6 +500,10 @@ ast_stmt_exec(struct ast_stmt *, struct state *);
 struct error *
 ast_stmt_pushsetup(struct ast_stmt *, struct state *);
 
+struct error *
+ast_specval_verify(struct ast_type *, struct value *param, struct value *arg,
+		struct state *spec, struct state *caller);
+
 DECLARE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_res)
 
 struct ast_stmt_res *
@@ -528,6 +538,9 @@ ast_type_isarr(struct ast_type *);
 
 bool
 ast_type_isptr(struct ast_type *);
+
+int
+ast_type_equal(struct ast_type *, struct ast_type *);
 
 struct ast_type *
 ast_type_arr_type(struct ast_type *);

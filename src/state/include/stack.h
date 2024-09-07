@@ -23,6 +23,9 @@ stack_programindex(struct stack *);
 void
 stack_return(struct stack *);
 
+struct ast_type *
+stack_returntype(struct stack *);
+
 struct ast_expr *
 stack_framecall(struct stack *);
 
@@ -30,9 +33,6 @@ struct externals;
 
 char *
 stack_argmodulator(struct stack *, struct state *);
-
-struct location *
-stack_newblock(struct stack *, int size);
 
 void
 stack_destroy(struct stack *);

@@ -206,7 +206,7 @@ static struct frame *
 frame_setup(struct ast_function *f)
 {
 	return frame_blockfindsetup_create(
-		dynamic_str("setup"), ast_function_abstract(f)
+		dynamic_str("findsetup"), ast_function_abstract(f)
 	);
 }
 

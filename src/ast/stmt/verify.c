@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
 #include "ext.h"
 #include "expr.h"
@@ -12,6 +13,8 @@
 #include "stmt.h"
 #include "util.h"
 #include "value.h"
+
+#include "type.h"
 
 static struct error *
 linearise_proper(struct ast_stmt *, struct ast_block *, struct lexememarker *,
@@ -84,7 +87,6 @@ jump_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *
 		struct state *state)
 {
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
-
 	struct ast_expr *gen = ast_expr_geninstr(
 		rv, lexememarker_copy(loc), b, state
 	);
@@ -412,7 +414,6 @@ static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
-
 	if (rv) {
 		struct e_res *res = ast_expr_eval(rv, state);
 		if (e_res_iserror(res)) {
@@ -424,10 +425,23 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 			}
 		}
 		if (e_res_haseval(res)) {
+			struct eval *eval = e_res_as_eval(res);
+			struct ast_type *spec_t = state_getreturntype(state),
+					*rv_t = eval_type(eval);
+			if (!ast_type_compatible(spec_t, rv_t)) {
+				char *spec_t_str = ast_type_str(spec_t),
+				     *rv_t_str = ast_type_str(rv_t);
+				struct error *err = error_printf(
+					"cannot return %s as %s",
+					rv_t_str,
+					spec_t_str
+				);
+				free(rv_t_str);
+				free(spec_t_str);
+				return err;
+			}
 			struct value *v = value_copy(
-				value_res_as_value(
-					eval_to_value(e_res_as_eval(res), state)
-				)
+				value_res_as_value(eval_to_value(eval, state))
 			);
 			state_writeregister(state, v);
 		}

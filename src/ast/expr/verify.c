@@ -228,6 +228,9 @@ static struct e_res *
 bang_eval(struct ast_expr *, struct state *);
 
 static struct e_res *
+negative_eval(struct ast_expr *, struct state *);
+
+static struct e_res *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_unary_op(expr)) {
@@ -237,6 +240,8 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 		return address_eval(expr, state);
 	case UNARY_OP_BANG:
 		return bang_eval(expr, state);
+	case UNARY_OP_NEGATIVE:
+		return negative_eval(expr, state);
 	default:
 		assert(false);
 	}
@@ -310,6 +315,40 @@ bang_eval(struct ast_expr *expr, struct state *state)
 		)
 	);
 }
+
+static struct e_res *
+negative_eval(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *operand = ast_expr_unary_operand(expr);
+	struct e_res *res = ast_expr_eval(operand, state);
+	if (e_res_iserror(res)) {
+		return res;
+	}
+	struct eval *eval = e_res_as_eval(res);
+	struct value_res *v_res = eval_to_value(eval, state);
+	if (value_res_iserror(v_res)) {
+		return e_res_error_create(value_res_as_error(v_res));
+	}
+	if (!value_res_hasvalue(v_res)) {
+		char *s = ast_expr_str(expr);
+		struct error *e = error_printf(
+			"undefined memory access: %s has no value", s
+		);
+		free(s);
+		return e_res_error_create(e);
+	}
+	return e_res_eval_create(
+		eval_rval_create(
+			eval_type(eval),
+			value_int_create(
+				-value_as_int(
+					value_res_as_value(v_res), state
+				)
+			)
+		)
+	);
+}
+
 
 static struct e_res *
 expr_structmember_eval(struct ast_expr *expr, struct state *s)
@@ -409,12 +448,11 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	return e_res_empty_create();
 }
 
-static struct error *
-verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
-		struct state *arg_state);
+static struct object *
+location_mustgetobject(struct location *, struct state *);
 
 static struct error *
-call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *arg_state)
+call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *caller)
 {
 	struct error *err;
 
@@ -425,96 +463,153 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 		ast_expr_copy(call),
 		f
 	);
-	struct state *param_state = state_create(
-		frame, rconst_create(), state_getext(arg_state)
+	struct state *spec = state_create(
+		frame, rconst_create(), state_getext(caller)
 	);
-	ast_function_initparams(f, param_state);
+
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **param = ast_function_params(f);
+	for (int i = 0; i < nparams; i++) {
+		state_declare(spec, param[i], true);
+	}
+
 	struct ast_block_res *mod_abs_res = ast_block_setupmodulate(
-		ast_function_abstract(f), arg_state
+		ast_function_abstract(f), caller
 	);
 	if (ast_block_res_iserror(mod_abs_res)) {
 		return ast_block_res_as_error(mod_abs_res);
 	}
 	struct frame *setupframe = frame_blockfindsetup_create(
-		dynamic_str("setup"),
+		dynamic_str("findsetup"),
 		ast_block_res_as_block(mod_abs_res)
 	);
-	state_pushframe(param_state, setupframe);
-	while (!state_atsetupend(param_state)) {
-		err = state_step(param_state);
+	state_pushframe(spec, setupframe);
+	while (!state_atsetupend(spec)) {
+		err = state_step(spec);
 		if (err) {
-			printf("%s\n", state_str(param_state));
+			printf("%s\n", state_str(spec));
 			printf("err: %s\n", error_str(err));
 		}
 		assert(!err);
 	}
-	assert(!state_atend(param_state));
-	state_popframe(param_state);
-
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **param = ast_function_params(f);
+	assert(!state_atend(spec));
+	state_popframe(spec);
 
 	for (int i = 0; i < nparams; i++) {
-		char *id = ast_variable_name(param[i]);
-		struct value *param = value_ptr_create(
-			location_copy(loc_res_as_loc(state_getloc(param_state, id)))
+		char *id = ast_variable_name(param[i]); 
+		struct object *param_obj = location_mustgetobject(
+			loc_res_as_loc(state_getloc(spec, id)), spec
 		);
-		struct value *arg = value_ptr_create(
-			location_copy(loc_res_as_loc(state_getloc(arg_state, id)))
+		if (!object_hasvalue(param_obj)) {
+			continue;
+		}
+		err = ast_specval_verify(
+			state_getvariabletype(spec, id),
+			object_as_value(param_obj),
+			/* we can safely assume that arg has a value because
+			 * it's the result of an argument expression being
+			 * evaluated */
+			object_as_value(
+				location_mustgetobject(
+					loc_res_as_loc(state_getloc(caller, id)),
+					caller
+				)
+			),
+			spec,
+			caller
 		);
-		err = verify_paramspec(param, arg, param_state, arg_state);
-		value_destroy(arg);
-		value_destroy(param);
 		if (err) {
-			return error_printf(
-				"parameter `%s' of `%s' %w", id, fname, err
-			);
+			return error_printf("argument of `%s' %w", id, err);
 		}
 	}
 	return NULL;
 }
 
-static struct error *
-verify_paramspec(struct value *param, struct value *arg, struct state *param_state,
-		struct state *arg_state)
+static int
+loc_hasobject(struct location *, struct state *);
+
+struct error *
+ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
+		struct state *spec, struct state *caller)
 {
-	if (!state_islval(param_state, param)) {
+	if (ast_type_isint(t)) {
+		return value_confirmsubset(arg, param, caller, spec);
+	} else if (ast_type_isstruct(t)) {
+		return value_struct_specval_verify(param, arg, caller, spec);
+	}
+	a_printf(
+		ast_type_isptr(t),
+		"can only verify int, struct and pointer params\n"
+	);
+
+	if (!value_islocation(param)) {
+		/* allow for NULL and other invalid-pointer setups */
 		return NULL;
 	}
-	if (!state_islval(arg_state, arg)) {
+	/* spec requires value be valid pointer */
+	if (!value_islocation(arg)) {
+		return error_printf("must be pointing at something");
+	}
+
+	struct location *param_ref = value_as_location(param),
+			*arg_ref = value_as_location(arg);
+	if (!state_loc_valid(spec, param_ref)) {
+		/* spec freed reference */
+		return NULL;
+	}
+	if (!state_loc_valid(caller, arg_ref)) {
 		return error_printf("must be lvalue");
 	}
-	if (state_isalloc(param_state, param) && !state_isalloc(arg_state, arg)) {
+
+	if (state_loc_onheap(spec, param_ref)
+			&& !state_loc_onheap(caller, arg_ref)) {
 		return error_printf("must be heap allocated");
 	}
-	struct object_res *param_res = state_get(
-		param_state, value_as_location(param), false
-	);
-	if (object_res_iserror(param_res)) {
-		return object_res_as_error(param_res);
+
+	if (!loc_hasobject(param_ref, spec)) {
+		return NULL;
 	}
-	struct object_res *arg_res = state_get(
-		arg_state, value_as_location(arg), false
-	);
-	if (object_res_iserror(arg_res)) {
-		return object_res_as_error(arg_res);
+	/* spec requires an object */
+	if (!loc_hasobject(arg_ref, caller)) {
+		return error_printf("must have object");
 	}
-	assert(object_res_hasobject(param_res));
-	assert(object_res_hasobject(arg_res));
-	struct object *param_obj = object_res_as_object(param_res),
-		      *arg_obj = object_res_as_object(arg_res);
-	if (!object_hasvalue(param_obj)) {
-		return NULL; /* spec makes no claim about param */
+
+	struct object *param_ref_obj = location_mustgetobject(param_ref, spec),
+		      *arg_ref_obj = location_mustgetobject(arg_ref, caller);
+	if (!object_hasvalue(param_ref_obj)) {
+		/* spec imposes no requirement on param */
+		return NULL;
 	}
-	if (!object_hasvalue(arg_obj)) {
-		return error_printf("must be rvalue");
+	/* spec requires value */
+	if (!object_hasvalue(arg_ref_obj)) {
+		return error_printf("must have value");
 	}
-	return verify_paramspec(
-		object_as_value(param_obj),
-		object_as_value(arg_obj),
-		param_state, arg_state
+
+	return ast_specval_verify(
+		t,
+		object_as_value(param_ref_obj),
+		object_as_value(arg_ref_obj),
+		spec, caller
 	);
 }
+
+static int
+loc_hasobject(struct location *loc, struct state *s)
+{
+	struct object_res *res = state_get(s, loc, false);
+	if (object_res_iserror(res)) {
+		assert(error_to_block_observe_noobj(object_res_as_error(res)));
+		return 0;
+	}
+	return 1;
+}
+
+static struct object *
+location_mustgetobject(struct location *loc, struct state *s)
+{
+	return object_res_as_object(state_get(s, loc, false));
+}
+
 
 static struct ast_type *
 call_type(struct ast_expr *call, struct state *);

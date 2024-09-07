@@ -174,6 +174,12 @@ struct error *
 error_to_state_deref_rconst(struct error *err);
 
 struct error *
+error_value_bounds(struct error *inner);
+
+struct error *
+error_to_value_bounds(struct error *);
+
+struct error *
 error_modulate_skip();
 
 struct error *

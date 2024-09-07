@@ -367,48 +367,26 @@ state_clump(struct state *state)
 {
 	/* XXX: should type be associated with blocks for type checking when we
 	 * assign? */
-	int address = clump_newblock(state->clump);
-	struct location *loc = location_create_dereferencable(
-		address,
-		offset_create(ast_expr_constant_create(0))
+	return value_ptr_create(
+		location_create_dereferencable(
+			clump_newblock(state->clump),
+			offset_create(ast_expr_constant_create(0))
+		)
 	);
-	return value_ptr_create(loc);
 }
 
 bool
-state_islval(struct state *state, struct value *v)
+state_loc_valid(struct state *state, struct location *loc)
 {
-	assert(v);
-	if (!value_islocation(v)) {
-		return false;
-	}
-	struct location *loc = value_as_location(v);
-	struct object_res *res = state_get(state, loc, true); /* put object there */
-	if (object_res_iserror(res)) {
-		struct error *err = object_res_as_error(res);
-		assert(
-			error_to_block_observe_noobj(err)
-			|| error_to_state_get_no_block(err)
-		);
-	}
-	return location_tostatic(loc, state->static_memory) ||
-		location_toheap(loc, state->heap) ||
-		location_tostack(loc, state->stack) ||
-		location_toclump(loc, state->clump);
+	return location_tostatic(loc, state->static_memory)
+		|| location_toheap(loc, state->heap)
+		|| location_tostack(loc, state->stack)
+		|| location_toclump(loc, state->clump);
 }
 
 bool
-state_isalloc(struct state *state, struct value *v)
+state_loc_onheap(struct state *state, struct location *loc)
 {
-	assert(v);
-	if (!value_islocation(v)) {
-		return false;
-	}
-	struct location *loc = value_as_location(v);
-	struct object_res *res = state_get(state, loc, true); /* put object there */
-	if (object_res_iserror(res)) {
-		assert(false);
-	}
 	return location_toheap(loc, state->heap);
 }
 
@@ -471,17 +449,16 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	return object_res_object_create(member);
 }
 
-void
-state_blockinstall(struct block *b, struct object *obj)
-{
-	block_install(b, obj);
-}
-
 struct block *
 state_getblock(struct state *state, struct location *loc)
 {
 	struct block_res *res = location_getblock(
-		loc, state->static_memory, state->rconst, state->stack, state->heap, state->clump
+		loc,
+		state->static_memory,
+		state->rconst,
+		state->stack,
+		state->heap,
+		state->clump
 	);
 	if (block_res_hasblock(res)) {
 		return block_res_as_block(res);
@@ -521,6 +498,12 @@ state_getloc(struct state *state, char *id)
 		);
 	}
 	return loc_res_loc_create(variable_location(v));
+}
+
+struct ast_type *
+state_getreturntype(struct state *s)
+{
+	return stack_returntype(s->stack);
 }
 
 struct object_res *
@@ -637,28 +620,42 @@ state_eval(struct state *s, struct ast_expr *e)
 static void
 state_normalise(struct state *s);
 
-bool
-state_equal(struct state *s1, struct state *s2)
+struct error *
+state_specverify(struct state *actual, struct state *spec)
 {
-	struct state *s1_c = state_copy(s1),
-		     *s2_c = state_copy(s2);
-	state_normalise(s1_c);
-	state_normalise(s2_c);
+	struct state *actual_c = state_copy(actual),
+		     *spec_c = state_copy(spec);
+	if (spec->reg) {
+		if (!actual->reg) {
+			return error_printf("must have return value");
+		}
+		struct error *err = ast_specval_verify(
+			stack_returntype(spec->stack),
+			spec->reg,
+			actual->reg,
+			spec,
+			actual
+		);
+		if (err) {
+			return error_printf("return value %s", error_str(err));
+		}
+	}
+	state_normalise(actual_c);
+	state_normalise(spec_c);
 
-	char *str1 = state_str(s1_c),
-	     *str2 = state_str(s2_c);
-	bool equal = strcmp(str1, str2) == 0;
+	char *str1 = state_str(actual_c),
+	     *str2 = state_str(spec_c);
+	int equal = strcmp(str1, str2) == 0;
 	if (!equal) {
-		v_printf("actual:\n%s", str1);
-		v_printf("abstract:\n%s", str2);
+		return error_printf("actual and abstract states differ");
 	}
 	free(str2);
 	free(str1);
 
-	state_destroy(s2_c);
-	state_destroy(s1_c);
+	state_destroy(spec_c);
+	state_destroy(actual_c);
 
-	return equal;
+	return NULL;
 }
 
 static void

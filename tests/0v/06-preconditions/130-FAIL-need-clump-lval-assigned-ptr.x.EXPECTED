@@ -1,2 +1,2 @@
-06-preconditions/130-FAIL-need-clump-lval-assigned-ptr.x:5:22: precondition failure: parameter `x' of `func' must be lvalue (func)
+06-preconditions/130-FAIL-need-clump-lval-assigned-ptr.x:5:22: precondition failure: argument of `x' must be pointing at something (func)
 	06-preconditions/130-FAIL-need-clump-lval-assigned-ptr.x:16:9 (main)

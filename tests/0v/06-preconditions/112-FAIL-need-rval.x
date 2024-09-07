@@ -3,7 +3,7 @@
 int
 func(int *x) ~ [ 
 	setup: {
-		x = .malloc(1);
+		x = .clump(1);
 		*x = [?];
 	}
 	return *x;
@@ -14,9 +14,7 @@ func(int *x) ~ [
 int
 main()
 {
-	int *p;
+	int p;
 	int q;
-	p = malloc(1);
-	q = func(p);	/* ERROR: spec required rvalue */
-	return 0;
+	q = func(&p);	/* ERROR: spec required rvalue */
 }

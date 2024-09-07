@@ -399,6 +399,19 @@ ast_expr_unary_operand(struct ast_expr *expr)
 	return expr->root;
 }
 
+int
+ast_expr_isnegative(struct ast_expr *expr)
+{
+	return expr->kind == EXPR_UNARY && expr->u.unary_op == UNARY_OP_NEGATIVE;
+}
+
+struct ast_expr *
+ast_expr_negative_operand(struct ast_expr *expr)
+{
+	assert(ast_expr_isnegative(expr));
+	return expr->root;
+}
+
 bool
 ast_expr_isverifiable(struct ast_expr *expr)
 {

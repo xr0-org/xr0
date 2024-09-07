@@ -10,6 +10,7 @@ main()
 
 	p = allocating();
 	free(p);
+	return 0;
 }
 
 void *

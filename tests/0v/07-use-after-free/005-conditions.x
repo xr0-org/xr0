@@ -22,7 +22,7 @@ modify1(int *q, int x) ~ [
 	}
 }
 
-int *
+int
 main()
 {
 	int p;
@@ -36,4 +36,5 @@ main()
 	~ [ p == 1; ]
 	modify1(&p, 1);
 	~ [ p == 2; ]
+	return 0;
 }

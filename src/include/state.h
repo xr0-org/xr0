@@ -86,8 +86,8 @@ state_unnest(struct state *);
 void
 state_declare(struct state *, struct ast_variable *var, bool isparam);
 
-struct object_res *
-state_getresult(struct state *);
+struct ast_type *
+state_getreturntype(struct state *);
 
 bool
 state_isparam(struct state *, char *id);
@@ -153,10 +153,10 @@ struct value *
 state_clump(struct state *);
 
 bool
-state_islval(struct state *, struct value *);
+state_loc_valid(struct state *, struct location *);
 
 bool
-state_isalloc(struct state *, struct value *);
+state_loc_onheap(struct state *, struct location *);
 
 struct value *
 state_getrconst(struct state *, char *id);
@@ -164,8 +164,8 @@ state_getrconst(struct state *, char *id);
 bool
 state_hasgarbage(struct state *);
 
-bool
-state_equal(struct state *s1, struct state *s2);
+struct error *
+state_specverify(struct state *actual, struct state *spec);
 
 struct value *
 state_popregister(struct state *);
@@ -281,9 +281,6 @@ bool
 state_eval(struct state *, struct ast_expr *);
 
 struct block;
-
-void
-state_blockinstall(struct block *, struct object *);
 
 struct block *
 state_getblock(struct state *, struct location *);

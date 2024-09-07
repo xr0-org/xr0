@@ -41,7 +41,7 @@ value_literal_create(char *);
 struct ast_expr;
 
 struct value *
-value_int_rconst_create(struct ast_expr *range);
+value_int_rconst_create(struct ast_expr *range, struct state *);
 
 struct value *
 value_int_ne_create(int not_val);
@@ -54,6 +54,9 @@ value_int_lw(struct value *);
 
 int
 value_int_up(struct value *);
+
+int
+value_as_int(struct value *, struct state *);
 
 struct value *
 value_bang(struct value *);
@@ -82,6 +85,10 @@ value_struct_membertype(struct value *, char *member);
 
 struct object *
 value_struct_member(struct value *, char *member);
+
+struct error *
+value_struct_specval_verify(struct value *param, struct value *arg,
+		struct state *spec, struct state *caller);
 
 struct value *
 value_copy(struct value *);
@@ -136,9 +143,6 @@ value_references(struct value *, struct location *, struct state *,
 
 DECLARE_RESULT_TYPE(bool, bool, bool_res)
 
-struct bool_res *
-value_equal(struct value *lhs, struct value *rhs, struct state *);
-
 int
 value_eq(struct value *lhs, struct value *rhs, struct state *);
 
@@ -148,9 +152,15 @@ value_lt(struct value *lhs, struct value *rhs, struct state *);
 struct error *
 value_disentangle(struct value *, struct value *, struct state *);
 
+/* value_confirmsubset: returns an error if v (as belonging to s) is not
+ * decidably a subset of v0 (as belonging to s0). */
+struct error *
+value_confirmsubset(struct value *v, struct value *v0, struct state *s,
+		struct state *s0);
+
 struct number;
 
-/* value_splitassume: Returns false if contradiction encountered. */
+/* value_splitassume: returns false if contradiction encountered. */
 bool
 value_splitassume(struct value *, struct number *);
 

@@ -227,31 +227,41 @@ value_int_range_create(int lw, int excl_up)
 }
 
 static struct number_value *
-range_limit_to_value(struct ast_expr *limit);
+range_limit_to_value(struct ast_expr *limit, struct state *s);
 
 struct value *
-value_int_rconst_create(struct ast_expr *range)
+value_int_rconst_create(struct ast_expr *range, struct state *s)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
 	v->n = number_singlerange_create(
-		range_limit_to_value(ast_expr_range_lw(range)),
-		range_limit_to_value(ast_expr_range_up(range))
+		range_limit_to_value(ast_expr_range_lw(range), s),
+		range_limit_to_value(ast_expr_range_up(range), s)
 	);
 	return v;
 }
 
+static int
+_constant(struct ast_expr *);
+
 static struct number_value *
-range_limit_to_value(struct ast_expr *limit)
+range_limit_to_value(struct ast_expr *limit, struct state *s)
 {
 	if (ast_expr_israngemax(limit)) {
 		return number_value_max_create();
 	} else if (ast_expr_israngemin(limit)) {
 		return number_value_min_create();
-	} else {
-		return number_value_constant_create(ast_expr_as_constant(limit));
 	}
+	return number_value_constant_create(_constant(limit));
+}
+
+static int
+_constant(struct ast_expr *expr)
+{
+	return ast_expr_isnegative(expr)
+		? -1 * _constant(ast_expr_negative_operand(expr))
+		: ast_expr_as_constant(expr);
 }
 
 static int
@@ -272,6 +282,16 @@ value_int_up(struct value *v)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
 	return number_range_up(v->n);
+}
+
+static int
+value_issinglerange(struct value *, struct state *);
+
+int
+value_as_int(struct value *v, struct state *s)
+{
+	assert(v->type == VALUE_INT && value_issinglerange(v, s));
+	return value_int_lw(v);
 }
 
 struct number *
@@ -595,6 +615,49 @@ value_struct_member(struct value *v, char *member)
 {
 	return map_get(v->_struct.m, member);
 }
+
+struct error *
+value_struct_specval_verify(struct value *param, struct value *arg,
+		struct state *spec, struct state *caller)
+{
+	assert(value_isstruct(param) && value_isstruct(arg));
+	struct ast_variable_arr *param_members = param->_struct.members,
+				*arg_members = arg->_struct.members;
+
+	int n = ast_variable_arr_n(param_members);
+	assert(ast_variable_arr_n(arg_members) == n);
+	struct ast_variable **param_var = ast_variable_arr_v(param_members),
+			    **arg_var = ast_variable_arr_v(arg_members);
+	for (int i = 0; i < n; i++) {
+		char *field = ast_variable_name(param_var[i]);
+		struct ast_type *t = ast_variable_type(param_var[i]);
+		assert(
+			strcmp(field, ast_variable_name(arg_var[i])) == 0
+			&& ast_type_equal(t, ast_variable_type(arg_var[i]))
+		);
+
+		struct object *param_obj = map_get(param->_struct.m, field),
+			      *arg_obj = map_get(arg->_struct.m, field);
+		assert(param_obj && arg_obj);
+		if (!object_hasvalue(param_obj)) {
+			continue;
+		}
+		struct error *err = ast_specval_verify(
+			t,
+			object_as_value(param_obj),
+			object_as_value(arg_obj),
+			spec,
+			caller
+		);
+		if (err) {
+			return err;
+		}
+	}
+
+	return NULL;
+
+}
+
 
 bool
 struct_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
@@ -998,9 +1061,6 @@ value_lw(struct value *, struct state *);
 static struct number_value *
 value_up(struct value *, struct state *);
 
-static int
-value_issinglerange(struct value *, struct state *);
-
 int
 value_lt(struct value *lhs, struct value *rhs, struct state *s)
 {
@@ -1283,6 +1343,73 @@ value_splitassume(struct value *v, struct number *split)
 	}
 }
 
+static int
+int_or_rconst(struct value *);
+
+static struct value *
+value_tosinglerange(struct value *, struct state *);
+
+char *
+number_value_str(struct number_value *v);
+
+struct error *
+value_confirmsubset(struct value *v, struct value *v0, struct state *s,
+		struct state *s0)
+{
+	a_printf(
+		int_or_rconst(v) && int_or_rconst(v0),
+		"can only compare subset for int or rconst types\n"
+	);
+	assert(value_issinglerange(v, s));
+	struct value *r0 = value_tosinglerange(v0, s0);
+
+	struct number_value *v_lw = value_lw(v, s),
+			    *r0_lw = value_lw(r0, s0);
+	if (!number_value_le(r0_lw, v_lw)) {
+		return error_value_bounds(
+			error_printf("must be ≥ %s", number_value_str(r0_lw))
+		);
+	}
+	struct number_value *v_up = value_up(v, s),
+			    *r0_up = value_up(r0, s0);
+	if (!number_value_le(v_up, r0_up)) {
+		return error_value_bounds(
+			error_printf("must be < %s", number_value_str(r0_up))
+		);
+	}
+	return NULL;
+}
+
+static int
+int_or_rconst(struct value *v)
+{
+	return v->type == VALUE_INT || v->type == VALUE_RCONST;
+}
+
+
+static struct number *
+number_tosinglerange(struct number *, struct state *);
+
+static struct value *
+value_tosinglerange(struct value *old, struct state *s)
+{
+	switch (old->type) {
+	case VALUE_INT:
+	case VALUE_RCONST:
+		break;
+	default:
+		assert(false);
+	}
+
+	struct value *v = malloc(sizeof(struct value));
+	assert(v);
+	v->type = VALUE_INT;
+	v->n = number_tosinglerange(old->n, s);
+	return v;
+}
+
+
+
 struct number {
 	enum number_type type;
 	union {
@@ -1447,6 +1574,33 @@ number_splitto(struct number *n, struct number *range, struct map *splits,
 	);
 }
 
+static struct number *
+_rconst_tosinglerange(char *, struct state *);
+
+static struct number *
+number_tosinglerange(struct number *n, struct state *s)
+{
+	switch (n->type) {
+	case NUMBER_RANGES:
+		assert(number_issinglerange(n, s));
+		return n;
+	case NUMBER_COMPUTED:
+		return _rconst_tosinglerange(
+			ast_expr_as_identifier(n->computation), s
+		);
+	default:
+		assert(false);
+	}
+}
+
+static struct number *
+_rconst_tosinglerange(char *id, struct state *s)
+{
+	struct value *rconst = state_getrconst(s, id);
+	assert(rconst && rconst->type == VALUE_INT);
+	return number_tosinglerange(rconst->n, s);
+}
+
 
 struct number_value *
 number_value_min_create();
@@ -1494,9 +1648,6 @@ number_with_range_create(int lw, int excl_up)
 	);
 	return number_ranges_create(arr);
 }
-
-char *
-number_value_str(struct number_value *v);
 
 static struct number *
 number_singlerange_create(struct number_value *lw, struct number_value *up)

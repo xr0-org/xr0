@@ -18,4 +18,5 @@ main()
 	notleak(&p);
 	free(p);
 	free(q);
+	return 0;
 }
