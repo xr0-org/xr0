@@ -136,8 +136,6 @@ value_references(struct value *, struct location *, struct state *,
 
 enum ast_binary_operator;
 
-DECLARE_RESULT_TYPE(bool, bool, bool_res)
-
 struct bool_res *
 value_equal(struct value *lhs, struct value *rhs, struct state *);
 

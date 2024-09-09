@@ -77,6 +77,7 @@ preresult_iscontradiction(struct preresult *);
 
 DECLARE_RESULT_TYPE(struct ast_expr *, expr, iresult)
 DECLARE_RESULT_TYPE(struct eval *, eval, e_res)
+DECLARE_RESULT_TYPE(bool, bool, bool_res)
 
 struct namedseq;
 

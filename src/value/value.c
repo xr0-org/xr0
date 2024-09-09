@@ -961,11 +961,6 @@ values_comparable(struct value *v1, struct value *v2)
 	return v1->type == v2->type;
 }
 
-static void
-nulldestruct(int x) { /* do nothing */ }
-
-DEFINE_RESULT_TYPE(bool, bool, nulldestruct, bool_res, true)
-
 static bool
 samerconst(struct value *, struct value *);
 

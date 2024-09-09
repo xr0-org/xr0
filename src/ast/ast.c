@@ -255,6 +255,11 @@ ast_protostitch(struct ast_function *f, struct externals *ext)
 DEFINE_RESULT_TYPE(struct ast_expr *, expr, ast_expr_destroy, iresult, false)
 DEFINE_RESULT_TYPE(struct eval *, eval, eval_destroy, e_res, false)
 
+static void
+nulldestruct(int x) { /* do nothing */ }
+
+DEFINE_RESULT_TYPE(bool, bool, nulldestruct, bool_res, true)
+
 struct namedseq {
 	int count;
 	char *name;
