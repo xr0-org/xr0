@@ -153,10 +153,10 @@ struct value *
 state_clump(struct state *);
 
 bool
-state_islval(struct state *, struct value *);
+state_islval(struct state *, struct location *);
 
 bool
-state_isalloc(struct state *, struct value *);
+state_isalloc(struct state *, struct location *);
 
 struct value *
 state_getrconst(struct state *, char *id);

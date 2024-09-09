@@ -376,12 +376,8 @@ state_clump(struct state *state)
 }
 
 bool
-state_islval(struct state *state, struct value *v)
+state_islval(struct state *state, struct location *loc)
 {
-	if (!value_islocation(v)) {
-		return false;
-	}
-	struct location *loc = value_as_location(v);
 	return location_tostatic(loc, state->static_memory)
 		|| location_toheap(loc, state->heap)
 		|| location_tostack(loc, state->stack)
@@ -389,13 +385,8 @@ state_islval(struct state *state, struct value *v)
 }
 
 bool
-state_isalloc(struct state *state, struct value *v)
+state_isalloc(struct state *state, struct location *loc)
 {
-	assert(v);
-	if (!value_islocation(v)) {
-		return false;
-	}
-	struct location *loc = value_as_location(v);
 	struct object_res *res = state_get(state, loc, true); /* put object there */
 	if (object_res_iserror(res)) {
 		assert(false);

@@ -410,10 +410,10 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct error *
-verify_paramspec(char *id, struct state *spec_state, struct state *caller_state);
+verify_spec(char *id, struct state *spec_state, struct state *caller_state);
 
 static struct error *
-call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *arg_state)
+call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *caller)
 {
 	struct error *err;
 
@@ -424,12 +424,18 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 		ast_expr_copy(call),
 		f
 	);
-	struct state *param_state = state_create(
-		frame, rconst_create(), state_getext(arg_state)
+	struct state *spec = state_create(
+		frame, rconst_create(), state_getext(caller)
 	);
-	ast_function_initparams(f, param_state);
+
+	int nparams = ast_function_nparams(f);
+	struct ast_variable **param = ast_function_params(f);
+	for (int i = 0; i < nparams; i++) {
+		state_declare(spec, param[i], true);
+	}
+
 	struct ast_block_res *mod_abs_res = ast_block_setupmodulate(
-		ast_function_abstract(f), arg_state
+		ast_function_abstract(f), caller
 	);
 	if (ast_block_res_iserror(mod_abs_res)) {
 		return ast_block_res_as_error(mod_abs_res);
@@ -438,24 +444,21 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ar
 		dynamic_str("findsetup"),
 		ast_block_res_as_block(mod_abs_res)
 	);
-	state_pushframe(param_state, setupframe);
-	while (!state_atsetupend(param_state)) {
-		err = state_step(param_state);
+	state_pushframe(spec, setupframe);
+	while (!state_atsetupend(spec)) {
+		err = state_step(spec);
 		if (err) {
-			printf("%s\n", state_str(param_state));
+			printf("%s\n", state_str(spec));
 			printf("err: %s\n", error_str(err));
 		}
 		assert(!err);
 	}
-	assert(!state_atend(param_state));
-	state_popframe(param_state);
-
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **param = ast_function_params(f);
+	assert(!state_atend(spec));
+	state_popframe(spec);
 
 	for (int i = 0; i < nparams; i++) {
 		char *id = ast_variable_name(param[i]); 
-		if ((err = verify_paramspec(id, param_state, arg_state))) {
+		if ((err = verify_spec(id, spec, caller))) {
 			return error_printf(
 				"parameter `%s' of `%s' %w", id, fname, err
 			);
@@ -469,7 +472,7 @@ abc(struct value *param, struct value *arg, struct state *spec,
 		struct state *caller);
 
 static struct error *
-verify_paramspec(char *id, struct state *spec, struct state *caller)
+verify_spec(char *id, struct state *spec, struct state *caller)
 {
 	struct value *spec_v = value_ptr_create(
 		location_copy(loc_res_as_loc(state_getloc(spec, id)))
@@ -484,24 +487,33 @@ verify_paramspec(char *id, struct state *spec, struct state *caller)
 }
 
 static struct error *
-abc(struct value *param, struct value *arg, struct state *param_state,
-		struct state *arg_state)
+abc(struct value *param_v, struct value *arg_v, struct state *spec,
+		struct state *caller)
 {
-	if (!state_islval(param_state, param)) {
+	if (!value_islocation(param_v)) {
+		return NULL;
+	}
+	if (!value_islocation(arg_v)) {
+		return error_printf("must be lvalue");
+	}
+	struct location *param = value_as_location(param_v),
+			*arg = value_as_location(arg_v);
+
+	if (!state_islval(spec, param)) {
 		return NULL;
 	}
 	/* spec constrains param */
-	if (!state_islval(arg_state, arg)) {
+	if (!state_islval(caller, arg)) {
 		return error_printf("must be lvalue");
 	}
-	if (state_isalloc(param_state, param) && !state_isalloc(arg_state, arg)) {
+	if (state_isalloc(spec, param) && !state_isalloc(caller, arg)) {
 		return error_printf("must be heap allocated");
 	}
 	struct object *param_obj = object_res_as_object(
-		state_get(param_state, value_as_location(param), false)
+		state_get(spec, param, false)
 	);
 	struct object *arg_obj = object_res_as_object(
-		state_get(arg_state, value_as_location(arg), false)
+		state_get(caller, arg, false)
 	);
 	if (!object_hasvalue(param_obj)) {
 		return NULL; /* spec makes no claim about param */
@@ -512,7 +524,7 @@ abc(struct value *param, struct value *arg, struct state *param_state,
 	return abc(
 		object_as_value(param_obj),
 		object_as_value(arg_obj),
-		param_state, arg_state
+		spec, caller
 	);
 }
 
