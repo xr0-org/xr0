@@ -387,10 +387,6 @@ state_islval(struct state *state, struct location *loc)
 bool
 state_isalloc(struct state *state, struct location *loc)
 {
-	struct object_res *res = state_get(state, loc, true); /* put object there */
-	if (object_res_iserror(res)) {
-		assert(false);
-	}
 	return location_toheap(loc, state->heap);
 }
 

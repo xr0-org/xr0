@@ -1,0 +1,2 @@
+06-preconditions/112-FAIL-need-rval.x:8:2: precondition failure: parameter `x' of `func' must have value (func)
+	06-preconditions/112-FAIL-need-rval.x:19:14 (main)

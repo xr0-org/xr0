@@ -410,7 +410,8 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct error *
-verify_spec(char *id, struct state *spec_state, struct state *caller_state);
+verify_spec(struct location *param, struct location *arg, struct state *spec,
+		struct state *caller);
 
 static struct error *
 call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *caller)
@@ -458,7 +459,13 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 
 	for (int i = 0; i < nparams; i++) {
 		char *id = ast_variable_name(param[i]); 
-		if ((err = verify_spec(id, spec, caller))) {
+		err = verify_spec(
+			loc_res_as_loc(state_getloc(spec, id)),
+			loc_res_as_loc(state_getloc(caller, id)),
+			spec,
+			caller
+		);
+		if (err) {
 			return error_printf(
 				"parameter `%s' of `%s' %w", id, fname, err
 			);
@@ -467,38 +474,13 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 	return NULL;
 }
 
-static struct error *
-abc(struct value *param, struct value *arg, struct state *spec,
-		struct state *caller);
+static int
+hasobject(struct location *, struct state *);
 
 static struct error *
-verify_spec(char *id, struct state *spec, struct state *caller)
-{
-	struct value *spec_v = value_ptr_create(
-		location_copy(loc_res_as_loc(state_getloc(spec, id)))
-	);
-	struct value *caller_v = value_ptr_create(
-		location_copy(loc_res_as_loc(state_getloc(caller, id)))
-	);
-	struct error *err = abc(spec_v, caller_v, spec, caller);
-	value_destroy(spec_v);
-	value_destroy(caller_v);
-	return err;
-}
-
-static struct error *
-abc(struct value *param_v, struct value *arg_v, struct state *spec,
+verify_spec(struct location *param, struct location *arg, struct state *spec,
 		struct state *caller)
 {
-	if (!value_islocation(param_v)) {
-		return NULL;
-	}
-	if (!value_islocation(arg_v)) {
-		return error_printf("must be lvalue");
-	}
-	struct location *param = value_as_location(param_v),
-			*arg = value_as_location(arg_v);
-
 	if (!state_islval(spec, param)) {
 		return NULL;
 	}
@@ -509,6 +491,14 @@ abc(struct value *param_v, struct value *arg_v, struct state *spec,
 	if (state_isalloc(spec, param) && !state_isalloc(caller, arg)) {
 		return error_printf("must be heap allocated");
 	}
+
+	if (!hasobject(param, spec)) {
+		return NULL; /* spec makes no claim about param */
+	}
+	if (!hasobject(arg, caller)) {
+		return error_printf("must have object");
+	}
+
 	struct object *param_obj = object_res_as_object(
 		state_get(spec, param, false)
 	);
@@ -521,12 +511,35 @@ abc(struct value *param_v, struct value *arg_v, struct state *spec,
 	if (!object_hasvalue(arg_obj)) {
 		return error_printf("must have value");
 	}
-	return abc(
-		object_as_value(param_obj),
-		object_as_value(arg_obj),
-		spec, caller
+
+	struct value *param_v = object_as_value(param_obj),
+		     *arg_v = object_as_value(arg_obj);
+	if (!value_islocation(param_v)) {
+		return NULL;
+	}
+	if (!value_islocation(arg_v)) {
+		return error_printf("must be pointing at something");
+	}
+
+	return verify_spec(
+		value_as_location(param_v),
+		value_as_location(arg_v),
+		spec,
+		caller
 	);
 }
+
+static int
+hasobject(struct location *loc, struct state *s)
+{
+	struct object_res *res = state_get(s, loc, false);
+	if (object_res_iserror(res)) {
+		assert(error_to_block_observe_noobj(object_res_as_error(res)));
+		return 0;
+	}
+	return 1;
+}
+
 
 static struct ast_type *
 call_type(struct ast_expr *call, struct state *);
