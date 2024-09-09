@@ -26,7 +26,7 @@ ast_expr_identifier_create(char *s)
 	return expr;
 }
 
-bool
+int
 ast_expr_isidentifier(struct ast_expr *expr)
 {
 	return expr->kind == EXPR_IDENTIFIER;
@@ -118,7 +118,7 @@ ast_expr_as_constant(struct ast_expr *expr)
 	return expr->u.constant.constant;
 }
 
-bool
+int
 ast_expr_isconstant(struct ast_expr *expr)
 {
 	return expr->kind == EXPR_CONSTANT;
@@ -255,13 +255,13 @@ ast_expr_copy_call(struct ast_expr *expr)
 }
 
 struct ast_expr *
-ast_expr_incdec_create(struct ast_expr *root, bool inc, bool pre)
+ast_expr_incdec_create(struct ast_expr *root, int isinc, int ispre)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_INCDEC;
 	expr->root = root;
-	expr->u.incdec.inc = inc;
-	expr->u.incdec.pre = pre;
+	expr->u.incdec.inc = isinc;
+	expr->u.incdec.pre = ispre;
 	return expr;
 }
 
@@ -280,7 +280,7 @@ ast_expr_incdec_to_assignment(struct ast_expr *expr)
 	);
 }
 
-bool
+int
 ast_expr_incdec_pre(struct ast_expr *expr)
 {
 	assert(expr->kind == EXPR_INCDEC);
@@ -288,7 +288,7 @@ ast_expr_incdec_pre(struct ast_expr *expr)
 	return expr->u.incdec.pre;
 }
 
-bool
+int
 ast_expr_incdec_inc(struct ast_expr *expr)
 {
 	assert(expr->kind == EXPR_INCDEC);
@@ -367,10 +367,10 @@ ast_expr_unary_create(struct ast_expr *root, enum ast_unary_operator op)
 }
 
 struct ast_expr *
-ast_expr_inverted_copy(struct ast_expr *expr, bool invert)
+ast_expr_inverted_copy(struct ast_expr *expr, int shouldinvert)
 {
 	struct ast_expr *copy = ast_expr_copy(expr);
-	return invert
+	return shouldinvert
 		? ast_expr_unary_create(copy, UNARY_OP_BANG)
 		: copy;
 }
@@ -399,7 +399,7 @@ ast_expr_unary_operand(struct ast_expr *expr)
 	return expr->root;
 }
 
-bool
+int
 ast_expr_isverifiable(struct ast_expr *expr)
 {
 	switch (expr->kind) {
@@ -427,7 +427,7 @@ ast_expr_isverifiable(struct ast_expr *expr)
 	}
 }
 
-bool
+int
 ast_expr_unary_isdereference(struct ast_expr *expr)
 {
 	if (ast_expr_kind(expr) != EXPR_UNARY) {
@@ -436,7 +436,7 @@ ast_expr_unary_isdereference(struct ast_expr *expr)
 	return ast_expr_unary_op(expr) == UNARY_OP_DEREFERENCE;
 }
 
-bool
+int
 ast_expr_isnot(struct ast_expr *expr)
 {
 	return ast_expr_kind(expr) == EXPR_UNARY &&
@@ -781,13 +781,13 @@ ast_expr_rangemax_create()
 
 
 
-bool
+int
 ast_expr_israngemin(struct ast_expr *e)
 {
 	return e->kind == EXPR_RANGEBOUND && !e->u.ismax;
 }
 
-bool
+int
 ast_expr_israngemax(struct ast_expr *e)
 {
 	return e->kind == EXPR_RANGEBOUND && e->u.ismax;
@@ -1080,7 +1080,7 @@ ast_expr_kind(struct ast_expr *expr)
 	return expr->kind;
 }
 
-bool
+int
 ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 {
 	if (!e1 || !e2) {
@@ -1135,7 +1135,7 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 static bool
 eval_prop(struct math_expr *e1, enum ast_binary_operator, struct math_expr *e2);
 
-bool
+int
 ast_expr_matheval(struct ast_expr *e)
 {
 	assert(e->kind == EXPR_BINARY);
@@ -1143,7 +1143,7 @@ ast_expr_matheval(struct ast_expr *e)
 	struct math_expr *e1 = math_expr(e->u.binary.e1),
 			 *e2 = math_expr(e->u.binary.e2);
 
-	bool val = eval_prop(e1, e->u.binary.op, e2);
+	int val = eval_prop(e1, e->u.binary.op, e2);
 
 	math_expr_destroy(e2);
 	math_expr_destroy(e1);
@@ -1242,10 +1242,10 @@ tagval_tagged_create(struct value *v, char *tag)
 	return tv;
 }
 
-bool
+int
 tagval_hastag(struct tagval *tv)
 {
-	return tv->tag;
+	return (int) tv->tag;
 }
 
 char *

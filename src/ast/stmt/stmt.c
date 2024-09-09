@@ -97,7 +97,7 @@ ast_stmt_declaration_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	}
 }
 
-bool
+int
 ast_stmt_isdecl(struct ast_stmt *stmt)
 {
 	return stmt->kind == STMT_DECLARATION;
@@ -288,7 +288,7 @@ ast_stmt_jump_rv(struct ast_stmt *stmt)
 	return stmt->u.jump.rv;
 }
 
-bool
+int
 ast_stmt_isreturn(struct ast_stmt *stmt)
 {
 	return stmt->kind == STMT_JUMP && stmt->u.jump.kind == JUMP_RETURN;
@@ -306,7 +306,7 @@ ast_stmt_destroy_jump(struct ast_stmt *stmt)
 }
 
 struct ast_stmt *
-ast_stmt_create_sel(struct lexememarker *loc, bool isswitch, struct ast_expr *cond,
+ast_stmt_create_sel(struct lexememarker *loc, int isswitch, struct ast_expr *cond,
 		struct ast_stmt *body, struct ast_stmt *nest)
 {
 	assert(!isswitch); /* XXX */
@@ -462,7 +462,7 @@ ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp
 	return stmt;
 }
 
-bool
+int
 ast_stmt_register_iscall(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_REGISTER);
@@ -729,7 +729,7 @@ ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 	return strbuilder_build(b);
 }
 
-bool
+int
 ast_stmt_equal(struct ast_stmt *s1, struct ast_stmt *s2)
 {
 	if (!s1 || !s2) {

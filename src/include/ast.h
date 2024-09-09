@@ -10,7 +10,7 @@ struct ast_expr;
 struct ast_expr *
 ast_expr_identifier_create(char *);
 
-bool
+int
 ast_expr_isidentifier(struct ast_expr *);
 
 char *
@@ -25,7 +25,7 @@ ast_expr_constant_create_char(char);
 int
 ast_expr_as_constant(struct ast_expr *expr);
 
-bool
+int
 ast_expr_isconstant(struct ast_expr *);
 
 char *
@@ -59,7 +59,7 @@ struct ast_expr **
 ast_expr_call_args(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_incdec_create(struct ast_expr *, bool inc, bool pre);
+ast_expr_incdec_create(struct ast_expr *, int isinc, int ispre);
 
 struct ast_expr *
 ast_expr_incdec_to_assignment(struct ast_expr *expr);
@@ -67,10 +67,10 @@ ast_expr_incdec_to_assignment(struct ast_expr *expr);
 struct ast_expr *
 ast_expr_incdec_root(struct ast_expr *);
 
-bool
+int
 ast_expr_incdec_pre(struct ast_expr *);
 
-bool
+int
 ast_expr_incdec_inc(struct ast_expr *);
 
 struct ast_expr *
@@ -88,15 +88,15 @@ struct ast_expr *
 ast_expr_unary_create(struct ast_expr *, enum ast_unary_operator);
 
 struct ast_expr *
-ast_expr_inverted_copy(struct ast_expr *expr, bool invert);
+ast_expr_inverted_copy(struct ast_expr *expr, int shouldinvert);
 
 enum ast_unary_operator
 ast_expr_unary_op(struct ast_expr *);
 
-bool
+int
 ast_expr_unary_isdereference(struct ast_expr *);
 
-bool
+int
 ast_expr_isnot(struct ast_expr *);
 
 struct ast_expr *
@@ -156,10 +156,10 @@ ast_expr_isdereferencable_create(struct ast_expr *assertand);
 struct ast_expr *
 ast_expr_isdereferencable_assertand(struct ast_expr *);
 
-bool
+int
 ast_expr_isisdereferencable(struct ast_expr *);
 
-bool
+int
 ast_expr_isverifiable(struct ast_expr *);
 
 struct ast_expr *
@@ -186,10 +186,10 @@ ast_expr_rangemin_create();
 struct ast_expr *
 ast_expr_rangemax_create();
 
-bool
+int
 ast_expr_israngemin(struct ast_expr *);
 
-bool
+int
 ast_expr_israngemax(struct ast_expr *);
 
 struct ast_expr *
@@ -221,18 +221,18 @@ ast_expr_str(struct ast_expr *);
 struct ast_expr *
 ast_expr_copy(struct ast_expr *);
 
-bool
+int
 ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2);
 
 struct math_state;
 
-bool
+int
 ast_expr_matheval(struct ast_expr *e);
 
 
 struct tagval;
 
-bool
+int
 tagval_hastag(struct tagval *);
 
 char *
@@ -303,10 +303,10 @@ ast_block_nstmts(struct ast_block *b);
 struct ast_stmt **
 ast_block_stmts(struct ast_block *b);
 
-bool
+int
 ast_block_empty(struct ast_block *b);
 
-bool
+int
 ast_block_hastoplevelreturn(struct ast_block *);
 
 struct ast_type;
@@ -351,7 +351,7 @@ ast_stmt_create_declaration(struct lexememarker *, struct ast_variable_arr *);
 struct ast_variable_arr *
 ast_stmt_declaration_vars(struct ast_stmt *);
 
-bool
+int
 ast_stmt_isdecl(struct ast_stmt *);
 
 struct ast_stmt *
@@ -376,7 +376,7 @@ struct ast_stmt *
 ast_stmt_create_expr(struct lexememarker *, struct ast_expr *);
 
 struct ast_stmt *
-ast_stmt_create_sel(struct lexememarker *, bool isswitch, struct ast_expr *cond,
+ast_stmt_create_sel(struct lexememarker *, int isswitch, struct ast_expr *cond,
 		struct ast_stmt *body, struct ast_stmt *nest);
 
 struct ast_expr *
@@ -441,7 +441,7 @@ ast_stmt_create_jump(struct lexememarker *, enum ast_jump_kind, struct ast_expr 
 struct ast_expr *
 ast_stmt_jump_rv(struct ast_stmt *stmt);
 
-bool
+int
 ast_stmt_isreturn(struct ast_stmt *);
 
 struct ast_stmt *
@@ -465,7 +465,7 @@ ast_stmt_register_call(struct ast_stmt *);
 struct ast_variable *
 ast_stmt_register_mov(struct ast_stmt *);
 
-bool
+int
 ast_stmt_register_iscall(struct ast_stmt *);
 
 void
@@ -477,7 +477,7 @@ ast_stmt_copy(struct ast_stmt *);
 char *
 ast_stmt_str(struct ast_stmt *, int indent_level);
 
-bool
+int
 ast_stmt_equal(struct ast_stmt *, struct ast_stmt *);
 
 /* ast_stmt_as_block: Wrap in block if single statement. */
@@ -527,13 +527,13 @@ ast_type_create_voidptr();
 struct ast_type *
 ast_type_create_arr(struct ast_type *type, int length);
 
-bool
+int
 ast_type_isint(struct ast_type *);
 
-bool
+int
 ast_type_isarr(struct ast_type *);
 
-bool
+int
 ast_type_isptr(struct ast_type *);
 
 struct ast_type *
@@ -568,13 +568,13 @@ ast_type_create_struct_partial(char *tag);
 struct ast_type *
 ast_type_create_userdef(char *name);
 
-bool
+int
 ast_type_isstruct(struct ast_type *);
 
-bool
+int
 ast_type_istypedef(struct ast_type *);
 
-bool
+int
 ast_type_isvoid(struct ast_type *);
 
 struct ast_type *
@@ -584,11 +584,11 @@ struct externals;
 
 struct value *
 ast_type_rconst(struct ast_type *, struct state *s, struct ast_expr *range,
-	char *key, bool persist);
+	char *key, int ispersist);
 
 struct value *
 ast_type_rconstnokey(struct ast_type *, struct state *s, struct ast_expr *range,
-	bool persist);
+	int ispersist);
 
 void
 ast_type_destroy(struct ast_type *);
@@ -664,7 +664,7 @@ ast_variable_type(struct ast_variable *);
 /* ast_function_create: name must be allocated on the heap */
 struct ast_function *
 ast_function_create(
-	bool isaxiom,
+	int isaxiom,
 	struct ast_type *ret,
 	char *name,
 	int nparam,
@@ -689,13 +689,13 @@ ast_function_name(struct ast_function *);
 struct ast_function *
 ast_function_copy(struct ast_function *);
 
-bool
+int
 ast_function_isaxiom(struct ast_function *f);
 
-bool
+int
 ast_function_isproto(struct ast_function *f);
 
-bool
+int
 ast_function_isvoid(struct ast_function *f);
 
 struct ast_type *
@@ -736,7 +736,7 @@ struct ast_externdecl;
 struct ast_externdecl *
 ast_functiondecl_create(struct ast_function *);
 
-bool
+int
 ast_externdecl_isfunction(struct ast_externdecl *);
 
 struct ast_function *

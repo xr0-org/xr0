@@ -28,19 +28,19 @@ struct ast_type {
 	};
 };
 
-bool
+int
 ast_type_isint(struct ast_type *t)
 {
 	return t->base == TYPE_INT;
 }
 
-bool
+int
 ast_type_isarr(struct ast_type *t)
 {
 	return t->base == TYPE_ARRAY;
 }
 
-bool
+int
 ast_type_isptr(struct ast_type *t)
 {
 	return t->base == TYPE_POINTER;
@@ -53,7 +53,7 @@ ast_type_arr_type(struct ast_type *t)
 	return t->arr.type;
 }
 
-bool
+int
 ast_type_isvoid(struct ast_type *t)
 {
 	return t->base == TYPE_VOID;
@@ -133,7 +133,7 @@ ast_type_create_userdef(char *name)
 
 struct value *
 ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
-		char *key, bool persist)
+		char *key, int ispersist)
 {
 	switch (t->base) {
 	case TYPE_INT:
@@ -142,15 +142,15 @@ ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 	case TYPE_POINTER:
 		/* no key in the value except for structs */
 		assert(range);
-		return ast_type_rconstnokey(t, s, range, persist);
+		return ast_type_rconstnokey(t, s, range, ispersist);
 	case TYPE_USERDEF:
 		return ast_type_rconst(
 			externals_gettypedef(state_getext(s), t->userdef), s,
-			range, key, persist
+			range, key, ispersist
 		);
 	case TYPE_STRUCT:
 		/* XXX: struct has no range? */
-		return value_struct_rconst_create(t, s, key, persist);
+		return value_struct_rconst_create(t, s, key, ispersist);
 	case TYPE_RANGE:
 		assert(range);
 		return value_int_rconst_create(range);
@@ -161,7 +161,7 @@ ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 
 struct value *
 ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range,
-		bool persist)
+		int ispersist)
 {
 	switch (t->base) {
 	case TYPE_INT:
@@ -172,10 +172,10 @@ ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range
 	case TYPE_USERDEF:
 		return ast_type_rconstnokey(
 			externals_gettypedef(state_getext(s), t->userdef),
-			s, range, persist
+			s, range, ispersist
 		);
 	case TYPE_STRUCT:
-		return value_struct_rconstnokey_create(t, s, persist);
+		return value_struct_rconstnokey_create(t, s, ispersist);
 	case TYPE_RANGE:
 		assert(range);
 		return value_int_rconst_create(range);
@@ -267,7 +267,7 @@ struct_rconstgeninstr(struct ast_type *t, struct namedseq *seq,
 	return ast_expr_identifier_create(dynamic_str(v_name));
 }
 
-bool
+int
 ast_type_isstruct(struct ast_type *t)
 {
 	return t->base == TYPE_STRUCT;
@@ -354,7 +354,7 @@ ast_type_mod_or(struct ast_type *t, enum ast_type_modifier m)
 	t->mod |= m;
 }
 
-bool
+int
 ast_type_istypedef(struct ast_type *t)
 {
 	return t->mod & MOD_TYPEDEF;

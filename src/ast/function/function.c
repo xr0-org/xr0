@@ -35,7 +35,7 @@ struct ast_function {
 
 struct ast_function *
 ast_function_create(
-	bool isaxiom,
+	int isaxiom,
 	struct ast_type *ret,
 	char *name, 
 	int nparam,
@@ -142,19 +142,19 @@ ast_function_copy(struct ast_function *f)
 	);
 }
 
-bool
+int
 ast_function_isaxiom(struct ast_function *f)
 {
 	return f->isaxiom;
 }
 
-bool
+int
 ast_function_isproto(struct ast_function *f)
 {
 	return !f->body;
 }
 
-bool
+int
 ast_function_isvoid(struct ast_function *f)
 {
 	return ast_type_isvoid(f->ret);

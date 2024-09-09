@@ -124,7 +124,7 @@ ast_block_stmts(struct ast_block *b)
 	return b->stmt;
 }
 
-bool
+int
 ast_block_empty(struct ast_block *b)
 {
 	return b->nstmt == 0;
@@ -154,7 +154,7 @@ ast_block_append_stmt(struct ast_block *b, struct ast_stmt *stmt)
 	ast_block_insert(b, b->nstmt, stmt);
 }
 
-bool
+int
 ast_block_hastoplevelreturn(struct ast_block *b)
 {
 	for (int i = 0; i < b->nstmt; i++) {

@@ -33,7 +33,7 @@ ast_functiondecl_create(struct ast_function *f)
 	return decl;
 }
 
-bool
+int
 ast_externdecl_isfunction(struct ast_externdecl *decl)
 {
 	return decl->kind == EXTERN_FUNCTION;
