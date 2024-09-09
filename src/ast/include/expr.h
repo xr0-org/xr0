@@ -37,7 +37,7 @@ struct ast_expr {
 		char *string; /* identifier, literal, assertion */
 		struct { 
 			int constant;
-			bool ischar;
+			int ischar;
 		} constant;
 		struct {
 			int n;
@@ -75,7 +75,7 @@ struct ast_expr {
 			char *key;
 			struct ast_expr *lw, *up;
 		} range;
-		bool ismax;
+		int ismax;
 		struct {
 			enum ast_alloc_kind kind;
 			struct ast_expr *arg;

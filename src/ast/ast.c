@@ -113,7 +113,7 @@ eval_type(struct eval *e)
 	return e->t;
 }
 
-bool
+int
 eval_islval(struct eval *e)
 {
 	return e->islval;
@@ -126,7 +126,7 @@ eval_as_lval(struct eval *e)
 	return e->l;
 }
 
-bool
+int
 eval_isrval(struct eval *e)
 {
 	return !e->islval;
@@ -159,10 +159,10 @@ eval_to_value(struct eval *e, struct state *s)
 }
 
 struct object_res *
-eval_to_object(struct eval *e, struct state *s, bool constructive)
+eval_to_object(struct eval *e, struct state *s, int isconstructive)
 {
 	assert(eval_islval(e));
-	struct object_res *obj_res = state_get(s, eval_as_lval(e), constructive);
+	struct object_res *obj_res = state_get(s, eval_as_lval(e), isconstructive);
 	if (object_res_iserror(obj_res)) {
 		struct error *err = object_res_as_error(obj_res);
 		if (error_to_state_get_no_block(err)
@@ -214,16 +214,16 @@ preresult_destroy(struct preresult *r)
 	free(r);
 }
 
-bool
+int
 preresult_isempty(struct preresult *r)
 {
 	return !(r->iscontradiction || r->err);
 }
 
-bool
+int
 preresult_iserror(struct preresult *r)
 {
-	return r->err;
+	return (int) r->err;
 }
 
 struct error *
@@ -234,7 +234,7 @@ preresult_as_error(struct preresult *r)
 	return r->err;
 }
 
-bool
+int
 preresult_iscontradiction(struct preresult *r)
 {
 	return r->iscontradiction;

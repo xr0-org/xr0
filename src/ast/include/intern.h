@@ -25,13 +25,13 @@ eval_str(struct eval *);
 struct ast_type *
 eval_type(struct eval *);
 
-bool
+int
 eval_islval(struct eval *);
 
 struct location *
 eval_as_lval(struct eval *);
 
-bool
+int
 eval_isrval(struct eval *);
 
 struct value *
@@ -47,7 +47,7 @@ eval_to_value(struct eval *, struct state *);
 struct object_res;
 
 struct object_res *
-eval_to_object(struct eval *, struct state *, bool constructive);
+eval_to_object(struct eval *, struct state *, int isconstructive);
 
 struct preresult;
 
@@ -63,16 +63,16 @@ preresult_contradiction_create();
 void
 preresult_destroy(struct preresult *);
 
-bool
+int
 preresult_isempty(struct preresult *);
 
-bool
+int
 preresult_iserror(struct preresult *);
 
 struct error *
 preresult_as_error(struct preresult *);
 
-bool
+int
 preresult_iscontradiction(struct preresult *);
 
 DECLARE_RESULT_TYPE(struct ast_expr *, expr, iresult)

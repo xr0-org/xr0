@@ -257,12 +257,6 @@ ast_expr_decide(struct ast_expr *, struct state *);
 struct e_res;
 struct preresult;
 
-bool
-preresult_iserror(struct preresult *);
-
-bool
-preresult_iscontradiction(struct preresult *);
-
 void
 ast_expr_varinfomap(struct map *, struct ast_expr *, struct state *s);
 
@@ -362,9 +356,6 @@ ast_stmt_isdecl(struct ast_stmt *);
 
 struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *, char *label, struct ast_stmt *);
-
-bool
-ast_stmt_ispre(struct ast_stmt *);
 
 struct error *
 ast_stmt_preconds_validate(struct ast_stmt *);

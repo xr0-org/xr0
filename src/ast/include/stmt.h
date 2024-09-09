@@ -21,11 +21,8 @@ enum ast_stmt_kind {
 enum ast_stmt_kind
 ast_stmt_kind(struct ast_stmt *);
 
-bool
+int
 ast_stmt_ispre(struct ast_stmt *stmt);
-
-bool
-ast_stmt_isassume(struct ast_stmt *stmt);
 
 struct string_arr *
 ast_stmt_getfuncs(struct ast_stmt *stmt);

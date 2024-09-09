@@ -169,18 +169,11 @@ ast_stmt_as_compound(struct ast_stmt *stmt)
 	);
 }
 
-bool
+int
 ast_stmt_ispre(struct ast_stmt *stmt)
 {
 	return stmt->kind == STMT_LABELLED
 		&& strcmp(stmt->u.labelled.label, "setup") == 0;
-}
-
-bool
-ast_stmt_isassume(struct ast_stmt *stmt)
-{
-	return stmt->kind == STMT_LABELLED
-		&& strcmp(stmt->u.labelled.label, "assume") == 0;
 }
 
 static void
