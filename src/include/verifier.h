@@ -1,8 +1,6 @@
 #ifndef XR0_PATH
 #define XR0_PATH
 
-#include <stdbool.h>
-
 struct ast_function;
 struct ast_expr;
 struct externals;
@@ -21,7 +19,7 @@ verifier_destroy(struct verifier *);
 char *
 verifier_str(struct verifier *);
 
-bool
+int
 verifier_atend(struct verifier *);
 
 typedef struct error *(progressor)(struct state *);
@@ -68,10 +66,10 @@ char *
 rconst_str(struct rconst *, char *indent);
 
 char *
-rconst_declare(struct rconst *, struct value *, char *key, bool persist);
+rconst_declare(struct rconst *, struct value *, char *key, int ispersist);
 
 char *
-rconst_declarenokey(struct rconst *, struct value *, bool persist);
+rconst_declarenokey(struct rconst *, struct value *, int ispersist);
 
 struct value *
 rconst_get(struct rconst *, char *id);
@@ -82,7 +80,7 @@ rconst_getidbykey(struct rconst *, char *key);
 void
 rconst_undeclare(struct rconst *);
 
-bool
+int
 rconst_eval(struct rconst *, struct ast_expr *);
 
 #endif

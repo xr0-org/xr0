@@ -40,7 +40,7 @@ verifier_str(struct verifier *v)
 		: path_str(_verifier_path(v));
 }
 
-bool
+int
 verifier_atend(struct verifier *v)
 {
 	return _verifier_issplit(v)

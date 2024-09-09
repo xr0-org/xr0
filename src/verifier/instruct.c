@@ -33,6 +33,6 @@ verifierinstruct_do(struct verifierinstruct *inst, struct verifier *p)
 		verifier_split(p, inst->split);
 		break;
 	default:
-		assert(false);
+		assert(0);
 	}
 }

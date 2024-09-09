@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <assert.h>
 #include <ctype.h>
 #include <string.h>
@@ -34,14 +33,14 @@ struct config {
 	char *infile;
 	char *outfile;
 	struct string_arr *includedirs;
-	bool verbose;
+	int isverbose;
 	enum execmode mode;
 
 	char *sortfunc;
 	enum sortmode sortmode;
-	bool debug;
+	int isdebug;
 	char *debugsep;
-	bool preproc; /* skip preprocessing phase when this is true */
+	int ispreproc; /* skip preprocessing phase when this is true */
 };
 
 static struct string_arr *
@@ -59,9 +58,9 @@ struct config
 parse_config(int argc, char *argv[])
 {
 	enum execmode mode = EXECMODE_VERIFY;
-	bool verbose = false;
-	bool debug = false;
-	bool preproc = true;
+	int verbose = false;
+	int debug = false;
+	int preproc = true;
 	char *debugsep = NULL;
 	struct sortconfig sortconf = sortconfig_create(SORTMODE_NONE, "");
 	struct string_arr *includedirs = default_includes();
@@ -111,12 +110,12 @@ parse_config(int argc, char *argv[])
 		.infile		= argv[optind],
 		.outfile	= outfile,
 		.includedirs	= includedirs,
-		.verbose	= verbose,
+		.isverbose	= verbose,
 		.sortmode	= sortconf.mode,
 		.sortfunc	= sortconf.sortfunc,
-		.debug		= debug,
+		.isdebug	= debug,
 		.debugsep	= debugsep ? debugsep : dynamic_str(""),
-		.preproc	= preproc,
+		.ispreproc	= preproc,
 	};
 }
 
@@ -210,7 +209,7 @@ preprocess(char *infile, struct string_arr *includedirs)
 FILE *
 preparefile(struct config *c)
 {
-	if (c->preproc) {
+	if (c->ispreproc) {
 		return preprocess(c->infile, c->includedirs);
 	}
 	FILE *f = fopen(c->infile, "r");
@@ -223,7 +222,7 @@ preparefile(struct config *c)
 
 struct ast *root;
 
-static bool
+static int
 verifyproto(struct ast_function *f, int n, struct ast_externdecl **decl);
 
 void
@@ -265,10 +264,10 @@ static void
 debugger_summary();
 
 static struct error *
-handle_debug(struct ast_function *, struct externals *, bool debug, char *sep);
+handle_debug(struct ast_function *, struct externals *, int debug, char *sep);
 
 void
-pass1(struct ast *root, struct externals *ext, bool debug, char *debugsep)
+pass1(struct ast *root, struct externals *ext, int debug, char *debugsep)
 {
 	struct error *err;
 	if (debug) {
@@ -317,7 +316,7 @@ debugger_summary()
 }
 
 static struct error *
-handle_debug(struct ast_function *f, struct externals *ext, bool debug, char *sep)
+handle_debug(struct ast_function *f, struct externals *ext, int debug, char *sep)
 {
 	struct error *err;
 	if (debug) {
@@ -351,10 +350,10 @@ pass_inorder(struct string_arr *order, struct externals *ext)
 	}
 }
 
-static bool
+static int
 proto_defisvalid(struct ast_function *f1, struct ast_function *f2);
 
-static bool
+static int
 verifyproto(struct ast_function *proto, int n, struct ast_externdecl **decl)
 {
 	struct ast_function *def;
@@ -393,7 +392,7 @@ verifyproto(struct ast_function *proto, int n, struct ast_externdecl **decl)
 	return false;
 }
 
-static bool
+static int
 proto_defisvalid(struct ast_function *proto, struct ast_function *def)
 {
 	struct ast_block *proto_abs = ast_function_abstract(proto),
@@ -421,10 +420,10 @@ main(int argc, char *argv[])
 	extern int LOG_LEVEL;
 
 	struct config c = parse_config(argc, argv);
-	if (c.verbose) {
+	if (c.isverbose) {
 		LOG_LEVEL = LOG_INFO;
 	}
-	if (c.debug) {
+	if (c.isdebug) {
 		LOG_LEVEL = LOG_DEBUG;
 	}
 
@@ -462,7 +461,7 @@ verify(struct config *c)
 	struct string_arr *order;
 	switch (c->sortmode) {
 	case SORTMODE_NONE:
-		pass1(root, ext, c->debug, c->debugsep);
+		pass1(root, ext, c->isdebug, c->debugsep);
 		break;
 	case SORTMODE_SORT:
 		order = ast_topological_order(c->sortfunc, ext);
@@ -485,7 +484,7 @@ verify(struct config *c)
 	return 0;
 }
 
-bool
+int
 isvblock(char c, FILE *);
 
 void
@@ -517,7 +516,7 @@ strip(struct config *config)
 void
 skipws(FILE *f);
 
-bool
+int
 isvblock(char c, FILE *f)
 {
 	if (c != '~') {
