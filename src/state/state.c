@@ -376,7 +376,7 @@ state_clump(struct state *state)
 }
 
 bool
-state_islval(struct state *state, struct location *loc)
+state_loc_valid(struct state *state, struct location *loc)
 {
 	return location_tostatic(loc, state->static_memory)
 		|| location_toheap(loc, state->heap)
@@ -385,7 +385,7 @@ state_islval(struct state *state, struct location *loc)
 }
 
 bool
-state_isalloc(struct state *state, struct location *loc)
+state_loc_onheap(struct state *state, struct location *loc)
 {
 	return location_toheap(loc, state->heap);
 }

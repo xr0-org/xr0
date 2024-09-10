@@ -475,27 +475,29 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 }
 
 static int
-hasobject(struct location *, struct state *);
+loc_hasobject(struct location *, struct state *);
 
 static struct error *
 verify_spec(struct location *param, struct location *arg, struct state *spec,
 		struct state *caller)
 {
-	if (!state_islval(spec, param)) {
+	if (!state_loc_valid(spec, param)) {
 		return NULL;
 	}
 	/* spec constrains param */
-	if (!state_islval(caller, arg)) {
+	if (!state_loc_valid(caller, arg)) {
 		return error_printf("must be lvalue");
 	}
-	if (state_isalloc(spec, param) && !state_isalloc(caller, arg)) {
+
+	if (state_loc_onheap(spec, param) && !state_loc_onheap(caller, arg)) {
 		return error_printf("must be heap allocated");
 	}
 
-	if (!hasobject(param, spec)) {
-		return NULL; /* spec makes no claim about param */
+	if (!loc_hasobject(param, spec)) {
+		return NULL;
 	}
-	if (!hasobject(arg, caller)) {
+	/* spec requires an object */
+	if (!loc_hasobject(arg, caller)) {
 		return error_printf("must have object");
 	}
 
@@ -506,8 +508,9 @@ verify_spec(struct location *param, struct location *arg, struct state *spec,
 		state_get(caller, arg, false)
 	);
 	if (!object_hasvalue(param_obj)) {
-		return NULL; /* spec makes no claim about param */
+		return NULL;
 	}
+	/* spec requiures a value */
 	if (!object_hasvalue(arg_obj)) {
 		return error_printf("must have value");
 	}
@@ -517,6 +520,7 @@ verify_spec(struct location *param, struct location *arg, struct state *spec,
 	if (!value_islocation(param_v)) {
 		return NULL;
 	}
+	/* spec requires value be valid pointer */
 	if (!value_islocation(arg_v)) {
 		return error_printf("must be pointing at something");
 	}
@@ -530,7 +534,7 @@ verify_spec(struct location *param, struct location *arg, struct state *spec,
 }
 
 static int
-hasobject(struct location *loc, struct state *s)
+loc_hasobject(struct location *loc, struct state *s)
 {
 	struct object_res *res = state_get(s, loc, false);
 	if (object_res_iserror(res)) {
