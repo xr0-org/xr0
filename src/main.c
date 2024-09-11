@@ -18,7 +18,7 @@
 /* XXX */
 #define INCLUDE_ENVVAR		"XR0_INCLUDES"
 #define OUTPUT_PATH		"0.c"
-#define PREPROC_CMD_TEMPLATE	"cc %s -nostdinc -E -xc %s"
+#define PREPROC_CMD_TEMPLATE	"cc %s -nostdinc -DXR0 -E -xc %s"
 #define PREPROC_CMD_BASE_LEN 	(strlen(PREPROC_CMD_TEMPLATE) - 4)
 
 #define ERROR_NO_INPUT		"must provide input as string"
@@ -67,7 +67,7 @@ parse_config(int argc, char *argv[])
 	struct string_arr *includedirs = default_includes();
 	char *outfile = OUTPUT_PATH;
 	int opt;
-	while ((opt = getopt(argc, argv, "vsFo:t:x:I:dr:")) != -1) {
+	while ((opt = getopt(argc, argv, "vsFo:t:x:I:dr:D:U:")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
@@ -142,7 +142,6 @@ sortconfig_create(enum sortmode mode, char *sortfunc)
 	}
 }
 
-
 static struct string_arr *
 default_includes()
 {
@@ -153,6 +152,7 @@ default_includes()
 	}
 	return dirs;
 }
+
 
 char *
 genincludes(struct string_arr *includedirs)
