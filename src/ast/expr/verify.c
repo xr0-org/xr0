@@ -410,8 +410,11 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct error *
-verify_spec(struct location *param, struct location *arg, struct state *spec,
+verify_spec(struct object *param, struct object *arg, struct state *spec,
 		struct state *caller);
+
+static struct object *
+location_mustgetobject(struct location *, struct state *);
 
 static struct error *
 call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *caller)
@@ -458,10 +461,16 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 	state_popframe(spec);
 
 	for (int i = 0; i < nparams; i++) {
+		/*printf("spec:\n%s\n", state_str(spec));*/
+		/*printf("caller:\n%s\n", state_str(caller));*/
 		char *id = ast_variable_name(param[i]); 
 		err = verify_spec(
-			loc_res_as_loc(state_getloc(spec, id)),
-			loc_res_as_loc(state_getloc(caller, id)),
+			location_mustgetobject(
+				loc_res_as_loc(state_getloc(spec, id)), spec
+			),
+			location_mustgetobject(
+				loc_res_as_loc(state_getloc(caller, id)), caller
+			),
 			spec,
 			caller
 		);
@@ -478,45 +487,20 @@ static int
 loc_hasobject(struct location *, struct state *);
 
 static struct error *
-verify_spec(struct location *param, struct location *arg, struct state *spec,
+verify_spec(struct object *param, struct object *arg, struct state *spec,
 		struct state *caller)
 {
-	if (!state_loc_valid(spec, param)) {
-		return NULL;
-	}
-	/* spec constrains param */
-	if (!state_loc_valid(caller, arg)) {
-		return error_printf("must be lvalue");
+	/* analyse param's type */
+
+	/* assuming param is pointer */
+	if (!object_hasvalue(param)) {
+		printf("spec:\n%s\n", state_str(spec));
+		printf("param: %s\n", object_str(param));
+		assert(false);
 	}
 
-	if (state_loc_onheap(spec, param) && !state_loc_onheap(caller, arg)) {
-		return error_printf("must be heap allocated");
-	}
-
-	if (!loc_hasobject(param, spec)) {
-		return NULL;
-	}
-	/* spec requires an object */
-	if (!loc_hasobject(arg, caller)) {
-		return error_printf("must have object");
-	}
-
-	struct object *param_obj = object_res_as_object(
-		state_get(spec, param, false)
-	);
-	struct object *arg_obj = object_res_as_object(
-		state_get(caller, arg, false)
-	);
-	if (!object_hasvalue(param_obj)) {
-		return NULL;
-	}
-	/* spec requiures a value */
-	if (!object_hasvalue(arg_obj)) {
-		return error_printf("must have value");
-	}
-
-	struct value *param_v = object_as_value(param_obj),
-		     *arg_v = object_as_value(arg_obj);
+	struct value *param_v = object_as_value(param),
+		     *arg_v = object_as_value(arg);
 	if (!value_islocation(param_v)) {
 		return NULL;
 	}
@@ -525,12 +509,38 @@ verify_spec(struct location *param, struct location *arg, struct state *spec,
 		return error_printf("must be pointing at something");
 	}
 
-	return verify_spec(
-		value_as_location(param_v),
-		value_as_location(arg_v),
-		spec,
-		caller
-	);
+	struct location *param_ref = value_as_location(param_v),
+			*arg_ref = value_as_location(arg_v);
+	assert(state_loc_valid(spec, param_ref));
+	if (!state_loc_valid(caller, arg_ref)) {
+		return error_printf("must be lvalue");
+	}
+
+	if (state_loc_onheap(spec, param_ref)
+			&& !state_loc_onheap(caller, arg_ref)) {
+		return error_printf("must be heap allocated");
+	}
+
+	if (!loc_hasobject(param_ref, spec)) {
+		return NULL;
+	}
+	/* spec requires an object */
+	if (!loc_hasobject(arg_ref, caller)) {
+		return error_printf("must have object");
+	}
+
+	struct object *param_ref_obj = location_mustgetobject(param_ref, spec),
+		      *arg_ref_obj = location_mustgetobject(arg_ref, caller);
+
+	if (!object_hasvalue(param_ref_obj)) {
+		return NULL;
+	}
+	/* spec requires a value */
+	if (!object_hasvalue(arg_ref_obj)) {
+		return error_printf("must have value");
+	}
+
+	return verify_spec(param_ref_obj, arg_ref_obj, spec, caller);
 }
 
 static int
@@ -542,6 +552,12 @@ loc_hasobject(struct location *loc, struct state *s)
 		return 0;
 	}
 	return 1;
+}
+
+static struct object *
+location_mustgetobject(struct location *loc, struct state *s)
+{
+	return object_res_as_object(state_get(s, loc, false));
 }
 
 

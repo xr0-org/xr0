@@ -14,7 +14,7 @@ func(int *x) ~ [
 int
 main()
 {
-	int p;
+	int *p;
 	int q;
 	p = malloc(1);
 	q = func(p);	/* ERROR: spec required rvalue */

@@ -4,10 +4,16 @@
 #include <stddef.h>
 
 axiom void *
-malloc(int size) ~ [ return .malloc(size); ];
+malloc(int size) ~ [
+	setup: size = [0?];
+	return .malloc(size);
+];
 
 axiom void
-free(void *ptr) ~ [ .free(ptr); ];
+free(void *ptr) ~ [
+	setup: ptr = malloc(1);
+	.free(ptr);
+];
 
 axiom void
 exit(int status);
