@@ -490,14 +490,16 @@ static struct error *
 verify_spec(struct object *param, struct object *arg, struct state *spec,
 		struct state *caller)
 {
-	/* analyse param's type */
+	/* TODO: analyse param's type */
 
 	/* assuming param is pointer */
+
 	if (!object_hasvalue(param)) {
-		printf("spec:\n%s\n", state_str(spec));
-		printf("param: %s\n", object_str(param));
-		assert(false);
+		/* spec imposes no requirement on param */
+		return NULL;
 	}
+	/* we can safely assume that arg has a value because it's the result of
+	 * an argument expression being evaluated */
 
 	struct value *param_v = object_as_value(param),
 		     *arg_v = object_as_value(arg);
@@ -532,9 +534,6 @@ verify_spec(struct object *param, struct object *arg, struct state *spec,
 	struct object *param_ref_obj = location_mustgetobject(param_ref, spec),
 		      *arg_ref_obj = location_mustgetobject(arg_ref, caller);
 
-	if (!object_hasvalue(param_ref_obj)) {
-		return NULL;
-	}
 	/* spec requires a value */
 	if (!object_hasvalue(arg_ref_obj)) {
 		return error_printf("must have value");

@@ -1,2 +1,2 @@
-stdlib.h:10:31: undefined free of value not pointing at heap (free)
+stdlib.h:14:24: precondition failure: parameter `ptr' of `free' must be pointing at something (free)
 	00-basic/140-FAIL-sync-free.x:6:9 (unit)
