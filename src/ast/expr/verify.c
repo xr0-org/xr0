@@ -410,8 +410,8 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct error *
-verify_spec(struct object *param, struct object *arg, struct state *spec,
-		struct state *caller);
+verify_spec(struct ast_type *, struct value *param, struct value *arg,
+		struct state *spec, struct state *caller);
 
 static struct object *
 location_mustgetobject(struct location *, struct state *);
@@ -461,15 +461,26 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 	state_popframe(spec);
 
 	for (int i = 0; i < nparams; i++) {
-		/*printf("spec:\n%s\n", state_str(spec));*/
-		/*printf("caller:\n%s\n", state_str(caller));*/
+		printf("spec:\n%s\n", state_str(spec));
+		printf("caller:\n%s\n", state_str(caller));
 		char *id = ast_variable_name(param[i]); 
+		struct object *param_obj = location_mustgetobject(
+			loc_res_as_loc(state_getloc(spec, id)), spec
+		);
+		if (!object_hasvalue(param_obj)) {
+			continue;
+		}
 		err = verify_spec(
-			location_mustgetobject(
-				loc_res_as_loc(state_getloc(spec, id)), spec
-			),
-			location_mustgetobject(
-				loc_res_as_loc(state_getloc(caller, id)), caller
+			state_getvariabletype(spec, id),
+			object_as_value(param_obj),
+			/* we can safely assume that arg has a value because
+			 * it's the result of an argument expression being
+			 * evaluated */
+			object_as_value(
+				location_mustgetobject(
+					loc_res_as_loc(state_getloc(caller, id)),
+					caller
+				)
 			),
 			spec,
 			caller
@@ -487,32 +498,27 @@ static int
 loc_hasobject(struct location *, struct state *);
 
 static struct error *
-verify_spec(struct object *param, struct object *arg, struct state *spec,
-		struct state *caller)
+verify_spec(struct ast_type *t, struct value *param, struct value *arg,
+		struct state *spec, struct state *caller)
 {
-	/* TODO: analyse param's type */
-
-	/* assuming param is pointer */
-
-	if (!object_hasvalue(param)) {
-		/* spec imposes no requirement on param */
-		return NULL;
+	if (ast_type_isint(t)) {
+		printf("param: %s\n", value_str(param));
+		printf("arg: %s\n", value_str(arg));
+		assert(false);
 	}
-	/* we can safely assume that arg has a value because it's the result of
-	 * an argument expression being evaluated */
+	a_printf(ast_type_isptr(t), "can only verify int and pointer params\n");
 
-	struct value *param_v = object_as_value(param),
-		     *arg_v = object_as_value(arg);
-	if (!value_islocation(param_v)) {
+	if (!value_islocation(param)) {
+		/* allow for NULL and other invalid-pointer setups */
 		return NULL;
 	}
 	/* spec requires value be valid pointer */
-	if (!value_islocation(arg_v)) {
+	if (!value_islocation(arg)) {
 		return error_printf("must be pointing at something");
 	}
 
-	struct location *param_ref = value_as_location(param_v),
-			*arg_ref = value_as_location(arg_v);
+	struct location *param_ref = value_as_location(param),
+			*arg_ref = value_as_location(arg);
 	assert(state_loc_valid(spec, param_ref));
 	if (!state_loc_valid(caller, arg_ref)) {
 		return error_printf("must be lvalue");
@@ -533,13 +539,21 @@ verify_spec(struct object *param, struct object *arg, struct state *spec,
 
 	struct object *param_ref_obj = location_mustgetobject(param_ref, spec),
 		      *arg_ref_obj = location_mustgetobject(arg_ref, caller);
-
-	/* spec requires a value */
+	if (!object_hasvalue(param_ref_obj)) {
+		/* spec imposes no requirement on param */
+		return NULL;
+	}
+	/* spec requires value */
 	if (!object_hasvalue(arg_ref_obj)) {
 		return error_printf("must have value");
 	}
 
-	return verify_spec(param_ref_obj, arg_ref_obj, spec, caller);
+	return verify_spec(
+		t,
+		object_as_value(param_ref_obj),
+		object_as_value(arg_ref_obj),
+		spec, caller
+	);
 }
 
 static int
