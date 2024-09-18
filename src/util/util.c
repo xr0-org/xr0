@@ -386,6 +386,8 @@ struct error {
 		ERROR_STATE_GET_NOBLOCK,
 		ERROR_STATE_DEREF_RCONST,
 
+		ERROR_VALUE_BOUNDS,
+
 		ERROR_MODULATE_SKIP,
 
 		ERROR_EVAL_VOID,
@@ -575,6 +577,21 @@ error_to_state_deref_rconst(struct error *err)
 }
 
 struct error *
+error_value_bounds(struct error *inner)
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_VALUE_BOUNDS;
+	err->inner = inner;
+	return err;
+}
+
+struct error *
+error_to_value_bounds(struct error *err)
+{
+	return error_to(err, ERROR_VALUE_BOUNDS);
+}
+
+struct error *
 error_modulate_skip()
 {
 	struct error *err = calloc(1, sizeof(struct error));
@@ -615,6 +632,8 @@ error_str(struct error *err)
 		[ERROR_STATE_GET_NOBLOCK]	= "state_get no block",
 		[ERROR_STATE_DEREF_RCONST]	= "state_deref rconst",
 
+		[ERROR_VALUE_BOUNDS]		= "value bounds",
+
 		[ERROR_MODULATE_SKIP]		= "modulate skip",
 
 		[ERROR_EVAL_VOID]		= "eval void",
@@ -632,6 +651,9 @@ error_str(struct error *err)
 	case ERROR_MODULATE_SKIP:
 	case ERROR_EVAL_VOID:
 		return dynamic_str(error_type_str[err->type]);
+	case ERROR_VALUE_BOUNDS:
+		assert(err->inner);
+		return error_str(err->inner);
 	default:
 		assert(false);
 	}

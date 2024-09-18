@@ -461,8 +461,6 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 	state_popframe(spec);
 
 	for (int i = 0; i < nparams; i++) {
-		printf("spec:\n%s\n", state_str(spec));
-		printf("caller:\n%s\n", state_str(caller));
 		char *id = ast_variable_name(param[i]); 
 		struct object *param_obj = location_mustgetobject(
 			loc_res_as_loc(state_getloc(spec, id)), spec
@@ -487,7 +485,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 		);
 		if (err) {
 			return error_printf(
-				"parameter `%s' of `%s' %w", id, fname, err
+				"argument for `%s' of `%s' %w", id, fname, err
 			);
 		}
 	}
@@ -502,9 +500,7 @@ verify_spec(struct ast_type *t, struct value *param, struct value *arg,
 		struct state *spec, struct state *caller)
 {
 	if (ast_type_isint(t)) {
-		printf("param: %s\n", value_str(param));
-		printf("arg: %s\n", value_str(arg));
-		assert(false);
+		return value_confirmsubset(arg, param, caller, spec);
 	}
 	a_printf(ast_type_isptr(t), "can only verify int and pointer params\n");
 

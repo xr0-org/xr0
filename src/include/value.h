@@ -138,9 +138,6 @@ enum ast_binary_operator;
 
 DECLARE_RESULT_TYPE(bool, bool, bool_res)
 
-struct bool_res *
-value_equal(struct value *lhs, struct value *rhs, struct state *);
-
 int
 value_eq(struct value *lhs, struct value *rhs, struct state *);
 
@@ -150,9 +147,15 @@ value_lt(struct value *lhs, struct value *rhs, struct state *);
 struct error *
 value_disentangle(struct value *, struct value *, struct state *);
 
+/* value_confirmsubset: returns an error if v (as belonging to s) is not
+ * decidably a subset of v0 (as belonging to s0). */
+struct error *
+value_confirmsubset(struct value *v, struct value *v0, struct state *s,
+		struct state *s0);
+
 struct number;
 
-/* value_splitassume: Returns false if contradiction encountered. */
+/* value_splitassume: returns false if contradiction encountered. */
 bool
 value_splitassume(struct value *, struct number *);
 

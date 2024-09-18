@@ -1282,6 +1282,59 @@ value_splitassume(struct value *v, struct number *split)
 	}
 }
 
+static struct value *
+value_tosinglerange(struct value *, struct state *);
+
+char *
+number_value_str(struct number_value *v);
+
+struct error *
+value_confirmsubset(struct value *v, struct value *v0, struct state *s,
+		struct state *s0)
+{
+	assert(value_issinglerange(v, s));
+	struct value *r0 = value_tosinglerange(v0, s0);
+
+	struct number_value *v_lw = value_lw(v, s),
+			    *r0_lw = value_lw(r0, s0);
+	if (!number_value_le(r0_lw, v_lw)) {
+		return error_value_bounds(
+			error_printf("must be ≥ %s", number_value_str(r0_lw))
+		);
+	}
+	struct number_value *v_up = value_up(v, s),
+			    *r0_up = value_up(r0, s0);
+	if (!number_value_le(v_up, r0_up)) {
+		return error_value_bounds(
+			error_printf("must be < %s", number_value_str(r0_up))
+		);
+	}
+	return NULL;
+}
+
+static struct number *
+number_tosinglerange(struct number *, struct state *);
+
+static struct value *
+value_tosinglerange(struct value *old, struct state *s)
+{
+	switch (old->type) {
+	case VALUE_INT:
+	case VALUE_RCONST:
+		break;
+	default:
+		assert(false);
+	}
+
+	struct value *v = malloc(sizeof(struct value));
+	assert(v);
+	v->type = VALUE_INT;
+	v->n = number_tosinglerange(old->n, s);
+	return v;
+}
+
+
+
 struct number {
 	enum number_type type;
 	union {
@@ -1446,6 +1499,33 @@ number_splitto(struct number *n, struct number *range, struct map *splits,
 	);
 }
 
+static struct number *
+_rconst_tosinglerange(char *, struct state *);
+
+static struct number *
+number_tosinglerange(struct number *n, struct state *s)
+{
+	switch (n->type) {
+	case NUMBER_RANGES:
+		assert(number_issinglerange(n, s));
+		return n;
+	case NUMBER_COMPUTED:
+		return _rconst_tosinglerange(
+			ast_expr_as_identifier(n->computation), s
+		);
+	default:
+		assert(false);
+	}
+}
+
+static struct number *
+_rconst_tosinglerange(char *id, struct state *s)
+{
+	struct value *rconst = state_getrconst(s, id);
+	assert(rconst && rconst->type == VALUE_INT);
+	return number_tosinglerange(rconst->n, s);
+}
+
 
 struct number_value *
 number_value_min_create();
@@ -1493,9 +1573,6 @@ number_with_range_create(int lw, int excl_up)
 	);
 	return number_ranges_create(arr);
 }
-
-char *
-number_value_str(struct number_value *v);
 
 static struct number *
 number_singlerange_create(struct number_value *lw, struct number_value *up)
