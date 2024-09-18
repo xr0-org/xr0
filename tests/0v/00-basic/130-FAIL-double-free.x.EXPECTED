@@ -1,2 +1,2 @@
-stdlib.h:14:24: precondition failure: parameter `ptr' of `free' must be lvalue (free)
+stdlib.h:14:24: precondition failure: argument of `ptr' must be lvalue (free)
 	00-basic/130-FAIL-double-free.x:10:9 (unit)

@@ -484,9 +484,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 			caller
 		);
 		if (err) {
-			return error_printf(
-				"argument for `%s' of `%s' %w", id, fname, err
-			);
+			return error_printf("argument of `%s' %w", id, err);
 		}
 	}
 	return NULL;
