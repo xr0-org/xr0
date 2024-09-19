@@ -23,6 +23,9 @@ stack_programindex(struct stack *);
 void
 stack_return(struct stack *);
 
+struct ast_type *
+stack_returntype(struct stack *);
+
 struct ast_expr *
 stack_framecall(struct stack *);
 

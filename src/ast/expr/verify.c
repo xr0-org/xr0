@@ -448,10 +448,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	return e_res_empty_create();
 }
 
-static struct error *
-verify_spec(struct ast_type *, struct value *param, struct value *arg,
-		struct state *spec, struct state *caller);
-
 static struct object *
 location_mustgetobject(struct location *, struct state *);
 
@@ -507,7 +503,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 		if (!object_hasvalue(param_obj)) {
 			continue;
 		}
-		err = verify_spec(
+		err = ast_specval_verify(
 			state_getvariabletype(spec, id),
 			object_as_value(param_obj),
 			/* we can safely assume that arg has a value because
@@ -532,8 +528,8 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 static int
 loc_hasobject(struct location *, struct state *);
 
-static struct error *
-verify_spec(struct ast_type *t, struct value *param, struct value *arg,
+struct error *
+ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
 		struct state *spec, struct state *caller)
 {
 	if (ast_type_isint(t)) {
@@ -581,7 +577,7 @@ verify_spec(struct ast_type *t, struct value *param, struct value *arg,
 		return error_printf("must have value");
 	}
 
-	return verify_spec(
+	return ast_specval_verify(
 		t,
 		object_as_value(param_ref_obj),
 		object_as_value(arg_ref_obj),

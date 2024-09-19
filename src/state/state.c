@@ -614,17 +614,34 @@ state_eval(struct state *s, struct ast_expr *e)
 static void
 state_normalise(struct state *s);
 
-bool
-state_equal(struct state *s1, struct state *s2)
+int
+state_specverify(struct state *actual, struct state *spec)
 {
-	struct state *s1_c = state_copy(s1),
-		     *s2_c = state_copy(s2);
-	state_normalise(s1_c);
-	state_normalise(s2_c);
+	struct state *actual_c = state_copy(actual),
+		     *spec_c = state_copy(spec);
+	if (spec->reg) {
+		if (!actual->reg) {
+			v_printf("must have return value\n");
+			return 0;
+		}
+		struct error *err = ast_specval_verify(
+			stack_returntype(spec->stack),
+			spec->reg,
+			actual->reg,
+			spec,
+			actual
+		);
+		if (err) {
+			v_printf("return value %s\n", error_str(err));
+			return 0;
+		}
+	}
+	state_normalise(actual_c);
+	state_normalise(spec_c);
 
-	char *str1 = state_str(s1_c),
-	     *str2 = state_str(s2_c);
-	bool equal = strcmp(str1, str2) == 0;
+	char *str1 = state_str(actual_c),
+	     *str2 = state_str(spec_c);
+	int equal = strcmp(str1, str2) == 0;
 	if (!equal) {
 		v_printf("actual:\n%s", str1);
 		v_printf("abstract:\n%s", str2);
@@ -632,8 +649,8 @@ state_equal(struct state *s1, struct state *s2)
 	free(str2);
 	free(str1);
 
-	state_destroy(s2_c);
-	state_destroy(s1_c);
+	state_destroy(spec_c);
+	state_destroy(actual_c);
 
 	return equal;
 }

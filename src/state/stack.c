@@ -137,6 +137,12 @@ stack_framecall(struct stack *s)
 	return frame_call(s->f);
 }
 
+struct ast_type *
+stack_returntype(struct stack *s)
+{
+	return ast_function_type(frame_function(s->f));
+}
+
 static char *
 argmodulator(struct stack *, struct state *);
 

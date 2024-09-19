@@ -164,8 +164,8 @@ state_getrconst(struct state *, char *id);
 bool
 state_hasgarbage(struct state *);
 
-bool
-state_equal(struct state *s1, struct state *s2);
+int
+state_specverify(struct state *actual, struct state *spec);
 
 struct value *
 state_popregister(struct state *);

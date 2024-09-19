@@ -203,7 +203,7 @@ segment_audit(struct segment *abstract, struct segment *actual)
 			"%s: garbage on heap", state_funcname(actual->state)
 		);
 	}
-	if (!state_equal(actual->state, abstract->state)) {
+	if (!state_specverify(actual->state, abstract->state)) {
 		/* unequal states are printed by state_equal so that the user
 		 * can see the states with undeclared vars */
 		return error_printf(
