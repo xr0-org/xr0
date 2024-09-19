@@ -227,31 +227,41 @@ value_int_range_create(int lw, int excl_up)
 }
 
 static struct number_value *
-range_limit_to_value(struct ast_expr *limit);
+range_limit_to_value(struct ast_expr *limit, struct state *s);
 
 struct value *
-value_int_rconst_create(struct ast_expr *range)
+value_int_rconst_create(struct ast_expr *range, struct state *s)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
 	v->n = number_singlerange_create(
-		range_limit_to_value(ast_expr_range_lw(range)),
-		range_limit_to_value(ast_expr_range_up(range))
+		range_limit_to_value(ast_expr_range_lw(range), s),
+		range_limit_to_value(ast_expr_range_up(range), s)
 	);
 	return v;
 }
 
+static int
+_constant(struct ast_expr *);
+
 static struct number_value *
-range_limit_to_value(struct ast_expr *limit)
+range_limit_to_value(struct ast_expr *limit, struct state *s)
 {
 	if (ast_expr_israngemax(limit)) {
 		return number_value_max_create();
 	} else if (ast_expr_israngemin(limit)) {
 		return number_value_min_create();
-	} else {
-		return number_value_constant_create(ast_expr_as_constant(limit));
 	}
+	return number_value_constant_create(_constant(limit));
+}
+
+static int
+_constant(struct ast_expr *expr)
+{
+	return ast_expr_isnegative(expr)
+		? -1 * _constant(ast_expr_negative_operand(expr))
+		: ast_expr_as_constant(expr);
 }
 
 static int
@@ -272,6 +282,16 @@ value_int_up(struct value *v)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
 	return number_range_up(v->n);
+}
+
+static int
+value_issinglerange(struct value *, struct state *);
+
+int
+value_as_int(struct value *v, struct state *s)
+{
+	assert(v->type == VALUE_INT && value_issinglerange(v, s));
+	return value_int_lw(v);
 }
 
 struct number *
@@ -997,9 +1017,6 @@ value_lw(struct value *, struct state *);
 
 static struct number_value *
 value_up(struct value *, struct state *);
-
-static int
-value_issinglerange(struct value *, struct state *);
 
 int
 value_lt(struct value *lhs, struct value *rhs, struct state *s)

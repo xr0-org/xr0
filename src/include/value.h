@@ -41,7 +41,7 @@ value_literal_create(char *);
 struct ast_expr;
 
 struct value *
-value_int_rconst_create(struct ast_expr *range);
+value_int_rconst_create(struct ast_expr *range, struct state *);
 
 struct value *
 value_int_ne_create(int not_val);
@@ -54,6 +54,9 @@ value_int_lw(struct value *);
 
 int
 value_int_up(struct value *);
+
+int
+value_as_int(struct value *, struct state *);
 
 struct value *
 value_bang(struct value *);

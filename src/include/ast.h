@@ -102,6 +102,12 @@ ast_expr_isnot(struct ast_expr *);
 struct ast_expr *
 ast_expr_unary_operand(struct ast_expr *);
 
+int
+ast_expr_isnegative(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_negative_operand(struct ast_expr *);
+
 struct ast_expr *
 ast_expr_eq_create(struct ast_expr *, struct ast_expr *);
 

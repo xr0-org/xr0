@@ -138,7 +138,7 @@ ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 	switch (t->base) {
 	case TYPE_INT:
 		assert(range);
-		return value_int_rconst_create(range);
+		return value_int_rconst_create(range, s);
 	case TYPE_POINTER:
 		/* no key in the value except for structs */
 		assert(range);
@@ -153,7 +153,7 @@ ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 		return value_struct_rconst_create(t, s, key, persist);
 	case TYPE_RANGE:
 		assert(range);
-		return value_int_rconst_create(range);
+		return value_int_rconst_create(range, s);
 	default:
 		assert(false);
 	}
@@ -166,7 +166,7 @@ ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range
 	switch (t->base) {
 	case TYPE_INT:
 		assert(range);
-		return value_int_rconst_create(range);
+		return value_int_rconst_create(range, s);
 	case TYPE_POINTER:
 		return value_ptr_rconst_create(t->ptr_type);
 	case TYPE_USERDEF:
@@ -178,7 +178,7 @@ ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range
 		return value_struct_rconstnokey_create(t, s, persist);
 	case TYPE_RANGE:
 		assert(range);
-		return value_int_rconst_create(range);
+		return value_int_rconst_create(range, s);
 	default:
 		assert(false);
 	}

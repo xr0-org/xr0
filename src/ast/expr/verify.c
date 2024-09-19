@@ -228,6 +228,9 @@ static struct e_res *
 bang_eval(struct ast_expr *, struct state *);
 
 static struct e_res *
+negative_eval(struct ast_expr *, struct state *);
+
+static struct e_res *
 expr_unary_eval(struct ast_expr *expr, struct state *state)
 {
 	switch (ast_expr_unary_op(expr)) {
@@ -237,6 +240,8 @@ expr_unary_eval(struct ast_expr *expr, struct state *state)
 		return address_eval(expr, state);
 	case UNARY_OP_BANG:
 		return bang_eval(expr, state);
+	case UNARY_OP_NEGATIVE:
+		return negative_eval(expr, state);
 	default:
 		assert(false);
 	}
@@ -310,6 +315,40 @@ bang_eval(struct ast_expr *expr, struct state *state)
 		)
 	);
 }
+
+static struct e_res *
+negative_eval(struct ast_expr *expr, struct state *state)
+{
+	struct ast_expr *operand = ast_expr_unary_operand(expr);
+	struct e_res *res = ast_expr_eval(operand, state);
+	if (e_res_iserror(res)) {
+		return res;
+	}
+	struct eval *eval = e_res_as_eval(res);
+	struct value_res *v_res = eval_to_value(eval, state);
+	if (value_res_iserror(v_res)) {
+		return e_res_error_create(value_res_as_error(v_res));
+	}
+	if (!value_res_hasvalue(v_res)) {
+		char *s = ast_expr_str(expr);
+		struct error *e = error_printf(
+			"undefined memory access: %s has no value", s
+		);
+		free(s);
+		return e_res_error_create(e);
+	}
+	return e_res_eval_create(
+		eval_rval_create(
+			eval_type(eval),
+			value_int_create(
+				-value_as_int(
+					value_res_as_value(v_res), state
+				)
+			)
+		)
+	);
+}
+
 
 static struct e_res *
 expr_structmember_eval(struct ast_expr *expr, struct state *s)
