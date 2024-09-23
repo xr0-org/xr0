@@ -86,8 +86,8 @@ state_unnest(struct state *);
 void
 state_declare(struct state *, struct ast_variable *var, bool isparam);
 
-struct object_res *
-state_getresult(struct state *);
+struct ast_type *
+state_getreturntype(struct state *);
 
 bool
 state_isparam(struct state *, char *id);

@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-void
+void *
 f() ~ [ return malloc(1); ]
 {
 	free(malloc(1));

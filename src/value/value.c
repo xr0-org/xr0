@@ -616,6 +616,49 @@ value_struct_member(struct value *v, char *member)
 	return map_get(v->_struct.m, member);
 }
 
+struct error *
+value_struct_specval_verify(struct value *param, struct value *arg,
+		struct state *spec, struct state *caller)
+{
+	assert(value_isstruct(param) && value_isstruct(arg));
+	struct ast_variable_arr *param_members = param->_struct.members,
+				*arg_members = arg->_struct.members;
+
+	int n = ast_variable_arr_n(param_members);
+	assert(ast_variable_arr_n(arg_members) == n);
+	struct ast_variable **param_var = ast_variable_arr_v(param_members),
+			    **arg_var = ast_variable_arr_v(arg_members);
+	for (int i = 0; i < n; i++) {
+		char *field = ast_variable_name(param_var[i]);
+		struct ast_type *t = ast_variable_type(param_var[i]);
+		assert(
+			strcmp(field, ast_variable_name(arg_var[i])) == 0
+			&& ast_type_equal(t, ast_variable_type(arg_var[i]))
+		);
+
+		struct object *param_obj = map_get(param->_struct.m, field),
+			      *arg_obj = map_get(arg->_struct.m, field);
+		assert(param_obj && arg_obj);
+		if (!object_hasvalue(param_obj)) {
+			continue;
+		}
+		struct error *err = ast_specval_verify(
+			t,
+			object_as_value(param_obj),
+			object_as_value(arg_obj),
+			spec,
+			caller
+		);
+		if (err) {
+			return err;
+		}
+	}
+
+	return NULL;
+
+}
+
+
 bool
 struct_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
 {

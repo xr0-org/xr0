@@ -528,7 +528,7 @@ type_specifier
 	/*| UNSIGNED*/
 	| struct_or_union_specifier
 	/*| enum_specifier*/
-	| TYPE_NAME	{ $$ = ast_type_create_userdef(dynamic_str(yytext)); }
+	/*| TYPE_NAME	{ $$ = ast_type_create_userdef(dynamic_str(yytext)); }*/
 	;
 
 struct_or_union_specifier

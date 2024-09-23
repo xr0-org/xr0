@@ -86,6 +86,10 @@ value_struct_membertype(struct value *, char *member);
 struct object *
 value_struct_member(struct value *, char *member);
 
+struct error *
+value_struct_specval_verify(struct value *param, struct value *arg,
+		struct state *spec, struct state *caller);
+
 struct value *
 value_copy(struct value *);
 

@@ -1,0 +1,1 @@
+40-type-checking/000-FAIL-void-return.x:4:10: cannot return int as void (foo)

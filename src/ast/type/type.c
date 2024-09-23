@@ -28,6 +28,67 @@ struct ast_type {
 	};
 };
 
+static int
+hack_compatible_because_one_is_range(struct ast_type *, struct ast_type *);
+
+static int
+isvoidptr(struct ast_type *);
+
+int
+ast_type_compatible(struct ast_type *t, struct ast_type *u)
+{
+	if (hack_compatible_because_one_is_range(t, u)) {
+		return 1;
+	}
+	if (isvoidptr(t) || isvoidptr(u)) {
+		return 1;
+	}
+
+	switch (t->base) {
+	case TYPE_VOID:
+	case TYPE_INT:
+	case TYPE_POINTER:
+	case TYPE_STRUCT:
+		return ast_type_equal(t, u);
+	default:
+		assert(false);
+	}
+}
+
+static int
+hack_compatible_because_one_is_range(struct ast_type *t, struct ast_type *u)
+{
+	return t->base == TYPE_RANGE || u->base == TYPE_RANGE;
+}
+
+static int
+isvoidptr(struct ast_type *t)
+{
+	return t->base == TYPE_POINTER && t->ptr_type->base == TYPE_VOID;
+}
+
+
+
+int
+ast_type_equal(struct ast_type *t, struct ast_type *u)
+{
+	if (t->base != u->base) {
+		return 0;
+	}
+	switch (t->base) {
+	case TYPE_VOID:
+	case TYPE_INT:
+		return 1;
+	case TYPE_POINTER:
+		return ast_type_equal(t->ptr_type, u->ptr_type);
+	case TYPE_STRUCT:
+		assert(t->structunion.tag && u->structunion.tag);
+		return strcmp(t->structunion.tag, u->structunion.tag) == 0;
+	default:
+		assert(false);
+	}
+}
+
 bool
 ast_type_isint(struct ast_type *t)
 {
@@ -126,6 +187,7 @@ ast_type_create_struct(char *tag, struct ast_variable_arr *members)
 struct ast_type *
 ast_type_create_userdef(char *name)
 {
+	assert(false);
 	struct ast_type *t = ast_type_create(TYPE_USERDEF, 0);
 	t->userdef = name;
 	return t;

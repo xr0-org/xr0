@@ -53,5 +53,7 @@ struct ast_expr *
 ast_type_rconstgeninstr(struct ast_type *, struct namedseq *,
 		struct lexememarker *, struct ast_block *, struct externals *);
 
+int
+ast_type_compatible(struct ast_type *, struct ast_type *);
 
 #endif

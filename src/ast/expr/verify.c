@@ -534,8 +534,13 @@ ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
 {
 	if (ast_type_isint(t)) {
 		return value_confirmsubset(arg, param, caller, spec);
+	} else if (ast_type_isstruct(t)) {
+		return value_struct_specval_verify(param, arg, caller, spec);
 	}
-	a_printf(ast_type_isptr(t), "can only verify int and pointer params\n");
+	a_printf(
+		ast_type_isptr(t),
+		"can only verify int, struct and pointer params\n"
+	);
 
 	if (!value_islocation(param)) {
 		/* allow for NULL and other invalid-pointer setups */

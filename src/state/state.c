@@ -500,6 +500,12 @@ state_getloc(struct state *state, char *id)
 	return loc_res_loc_create(variable_location(v));
 }
 
+struct ast_type *
+state_getreturntype(struct state *s)
+{
+	return stack_returntype(s->stack);
+}
+
 struct object_res *
 state_getobject(struct state *state, char *id)
 {

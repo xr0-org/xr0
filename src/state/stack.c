@@ -140,6 +140,10 @@ stack_framecall(struct stack *s)
 struct ast_type *
 stack_returntype(struct stack *s)
 {
+	if (!frame_iscall(s->f)) {
+		assert(s->prev);
+		return stack_returntype(s->prev);
+	}
 	return ast_function_type(frame_function(s->f));
 }
 
