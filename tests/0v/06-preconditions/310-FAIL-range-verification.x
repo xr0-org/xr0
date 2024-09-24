@@ -8,4 +8,5 @@ int
 bar(int x)
 {
 	foo(2); /* FAIL */
+	return 0;
 }

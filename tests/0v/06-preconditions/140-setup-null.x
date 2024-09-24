@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-int
+void
 func(int *x) ~ [ 
 	setup: x = NULL;
 ]{
@@ -14,4 +14,5 @@ main()
 	p = 5;
 	
 	func(p);
+	return 0;
 }

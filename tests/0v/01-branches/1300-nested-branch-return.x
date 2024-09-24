@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-void
+void *
 foo(int a, int b)
 {
        int *p;
@@ -19,4 +19,5 @@ foo(int a, int b)
                        free(p);
                }
        }
+       return NULL;
 }

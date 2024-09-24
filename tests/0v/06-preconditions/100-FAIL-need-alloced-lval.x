@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-int
+void
 func(int *x) ~ [ 
 	setup: x = .malloc(1);
 	*x = 5;
@@ -13,4 +13,5 @@ main()
 {
 	int p;
 	func(&p);	/* ERROR: spec requires heap */
+	return 0;
 }

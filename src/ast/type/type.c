@@ -187,7 +187,6 @@ ast_type_create_struct(char *tag, struct ast_variable_arr *members)
 struct ast_type *
 ast_type_create_userdef(char *name)
 {
-	assert(false);
 	struct ast_type *t = ast_type_create(TYPE_USERDEF, 0);
 	t->userdef = name;
 	return t;

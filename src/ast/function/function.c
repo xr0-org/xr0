@@ -231,12 +231,15 @@ abstract_hastoplevelreturn(struct ast_function *f)
 	return f->abstract && ast_block_hastoplevelreturn(f->abstract);
 }
 
+static char *
+genseqname(struct ast_function *);
+
 static struct ast_block_res *
 generate_abstract(struct ast_function *f, struct externals *ext)
 {
 	struct ast_block *b = f->abstract ? f->abstract : ast_block_create(NULL, 0);
 	if (!ast_type_isvoid(f->ret)) {
-		struct namedseq *seq = namedseq_create(dynamic_str(f->name));
+		struct namedseq *seq = namedseq_create(genseqname(f));
 		struct ast_expr *ret = ast_type_rconstgeninstr(
 			f->ret, seq, f->loc, b, ext
 		);
@@ -247,6 +250,15 @@ generate_abstract(struct ast_function *f, struct externals *ext)
 	}
 	return ast_block_res_block_create(b);
 }
+
+static char *
+genseqname(struct ast_function *f)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s:gen", f->name);
+	return strbuilder_build(b);
+}
+
 
 struct error *
 ast_function_verify(struct ast_function *f, struct externals *ext)

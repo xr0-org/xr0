@@ -8,4 +8,5 @@ int
 bar(int x)
 {
 	foo(1);
+	return 0;
 }

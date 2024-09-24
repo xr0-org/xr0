@@ -1,10 +1,10 @@
 #include <stdlib.h>
 
-int
+void
 func(int *x) ~ [ 
 	setup: x = .clump(1);
 ]{
-	
+		
 }
 
 int
