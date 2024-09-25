@@ -6,7 +6,7 @@ modify(int *q) ~ [
 	*q = 2;
 }
 
-int *
+int
 main()
 {
 	int p;
@@ -14,4 +14,5 @@ main()
 	~ [ p == 1; ];
 	modify(&p);
 	~ [ p == 2; ];
+	return 0;
 }

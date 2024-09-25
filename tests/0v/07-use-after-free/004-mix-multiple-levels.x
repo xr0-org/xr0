@@ -35,7 +35,7 @@ modify(int *p, int *q) ~ [
 	*q = 2;
 }
 
-int *
+int
 main()
 {
 	int p;
@@ -45,4 +45,5 @@ main()
 	modify(&p, &q);
 	~ [ p == 3; ];
 	~ [ q == 2; ];
+	return 0;
 }

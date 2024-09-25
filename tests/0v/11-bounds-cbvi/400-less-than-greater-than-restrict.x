@@ -24,4 +24,5 @@ main()
 	}
 	res = a[i];
 	~ [ res == a[i]; ] 
+	return 0;
 }

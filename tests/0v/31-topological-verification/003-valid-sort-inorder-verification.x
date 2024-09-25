@@ -17,6 +17,7 @@ main()
 	s = bar();
 	free(s);
 	free(i);
+	return 0;
 }
 
 int

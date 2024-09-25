@@ -553,7 +553,10 @@ ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
 
 	struct location *param_ref = value_as_location(param),
 			*arg_ref = value_as_location(arg);
-	assert(state_loc_valid(spec, param_ref));
+	if (!state_loc_valid(spec, param_ref)) {
+		/* spec freed reference */
+		return NULL;
+	}
 	if (!state_loc_valid(caller, arg_ref)) {
 		return error_printf("must be lvalue");
 	}

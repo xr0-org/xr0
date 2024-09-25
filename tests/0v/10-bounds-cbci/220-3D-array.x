@@ -11,4 +11,5 @@ foo()
 	a[1][1][1] = i;
 	/* ~ [ *a[1][1][1] == 2; ] */ /* XXX: expand verify */
 	free(i);
+	return 0;
 }
