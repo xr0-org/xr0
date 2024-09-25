@@ -25,11 +25,11 @@ run_cmd() {
 	tempfile=$2
 
 	args=""
-
 	args_file=$folder/args
 	if [ -f $args_file ]; then
 		args=$(cat $args_file)
 	fi
+	echo $XR0 -I $LIBX $args $f >> /tmp/args
 
 	$XR0 -I $LIBX $args $f > "$tempfile" 2>&1
 }

@@ -1342,6 +1342,9 @@ value_splitassume(struct value *v, struct number *split)
 	}
 }
 
+static int
+int_or_rconst(struct value *);
+
 static struct value *
 value_tosinglerange(struct value *, struct state *);
 
@@ -1352,6 +1355,10 @@ struct error *
 value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 		struct state *s0)
 {
+	a_printf(
+		int_or_rconst(v) && int_or_rconst(v0),
+		"can only compare subset for int or rconst types\n"
+	);
 	assert(value_issinglerange(v, s));
 	struct value *r0 = value_tosinglerange(v0, s0);
 
@@ -1371,6 +1378,13 @@ value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 	}
 	return NULL;
 }
+
+static int
+int_or_rconst(struct value *v)
+{
+	return v->type == VALUE_INT || v->type == VALUE_RCONST;
+}
+
 
 static struct number *
 number_tosinglerange(struct number *, struct state *);

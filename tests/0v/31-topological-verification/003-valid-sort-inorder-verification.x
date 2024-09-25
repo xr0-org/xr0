@@ -20,13 +20,13 @@ main()
 	return 0;
 }
 
-int
+int *
 foo()
 {
 	return malloc(sizeof(int));
 }
 
-int
+int *
 bar()
 {
 	return foo();
