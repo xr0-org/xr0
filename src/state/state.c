@@ -620,15 +620,14 @@ state_eval(struct state *s, struct ast_expr *e)
 static void
 state_normalise(struct state *s);
 
-int
+struct error *
 state_specverify(struct state *actual, struct state *spec)
 {
 	struct state *actual_c = state_copy(actual),
 		     *spec_c = state_copy(spec);
 	if (spec->reg) {
 		if (!actual->reg) {
-			v_printf("must have return value\n");
-			return 0;
+			return error_printf("must have return value");
 		}
 		struct error *err = ast_specval_verify(
 			stack_returntype(spec->stack),
@@ -638,8 +637,7 @@ state_specverify(struct state *actual, struct state *spec)
 			actual
 		);
 		if (err) {
-			v_printf("return value %s\n", error_str(err));
-			return 0;
+			return error_printf("return value %s", error_str(err));
 		}
 	}
 	state_normalise(actual_c);
@@ -649,8 +647,7 @@ state_specverify(struct state *actual, struct state *spec)
 	     *str2 = state_str(spec_c);
 	int equal = strcmp(str1, str2) == 0;
 	if (!equal) {
-		v_printf("actual:\n%s", str1);
-		v_printf("abstract:\n%s", str2);
+		return error_printf("actual and abstract states differ");
 	}
 	free(str2);
 	free(str1);
@@ -658,7 +655,7 @@ state_specverify(struct state *actual, struct state *spec)
 	state_destroy(spec_c);
 	state_destroy(actual_c);
 
-	return equal;
+	return NULL;
 }
 
 static void

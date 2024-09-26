@@ -164,7 +164,7 @@ state_getrconst(struct state *, char *id);
 bool
 state_hasgarbage(struct state *);
 
-int
+struct error *
 state_specverify(struct state *actual, struct state *spec);
 
 struct value *
