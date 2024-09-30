@@ -75,13 +75,13 @@ should_ignore() {
 
 cd $TESTDIR/0v
 
-ntests=$(ls */*.x | wc -l)
+ntests=$(ls */*.c | wc -l)
 
-length=$(ls */*.x | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
+length=$(ls */*.c | awk '{ print length, $0 }' | sort -n -s | cut -d' ' -f2- |
 	tail -1 | wc -c)
 
 # loop through and run tests
-for f in */*.x
+for f in */*.c
 do
 	printf "%-${length}s ..." "$f"
 
