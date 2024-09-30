@@ -1,5 +1,12 @@
+#ifdef XR0
+
 int
-index() ~ [ return [0?50]; ]
+index() ~ [ return [0?50]; ];
+
+#endif
+
+int
+index()
 {	
 	return 2;
 }

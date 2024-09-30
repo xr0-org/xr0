@@ -1,11 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifdef XR0
+
 char *
 bar() ~ [ return malloc(sizeof(char) * 10); ];
 
 int *
 foo() ~ [ return malloc(sizeof(int)); ];
+
+#endif
 
 int
 main()

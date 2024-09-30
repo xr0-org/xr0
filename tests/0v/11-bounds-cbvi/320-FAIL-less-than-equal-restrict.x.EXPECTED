@@ -1,1 +1,1 @@
-11-bounds-cbvi/320-FAIL-less-than-equal-restrict.x:4:3: out of bounds (foo | #0 ∈ {2?5} | #0 ∈ {2})
+11-bounds-cbvi/320-FAIL-less-than-equal-restrict.x:12:3: out of bounds (foo | #0 ∈ {2?5} | #0 ∈ {2})

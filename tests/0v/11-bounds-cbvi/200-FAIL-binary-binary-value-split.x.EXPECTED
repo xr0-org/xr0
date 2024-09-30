@@ -1,1 +1,1 @@
-11-bounds-cbvi/200-FAIL-binary-binary-value-split.x:12:19: undefined memory access: *(arr+1) has no value (foo | #0 ∈ {0} | #1 ∈ {0})
+11-bounds-cbvi/200-FAIL-binary-binary-value-split.x:21:19: undefined memory access: *(arr+1) has no value (foo | #0 ∈ {0} | #1 ∈ {0})

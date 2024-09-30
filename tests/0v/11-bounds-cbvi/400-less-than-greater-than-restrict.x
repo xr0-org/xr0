@@ -23,6 +23,10 @@ main()
 		return 0;
 	}
 	res = a[i];
+
+	#ifdef XR0
 	~ [ res == a[i]; ] 
+	#endif
+
 	return 0;
 }
