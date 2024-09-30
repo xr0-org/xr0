@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#ifdef XR0
+
 int *
 func(int x) ~ [
 	int *p;
@@ -8,7 +10,13 @@ func(int x) ~ [
 		.free(p);	
 	}
 	return p;
-] {
+];
+
+#endif
+
+int *
+func(int x)
+{
 	int *p;
 	p = malloc(1);
 

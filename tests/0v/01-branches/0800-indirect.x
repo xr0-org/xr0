@@ -3,6 +3,8 @@
 int
 number(int param);
 
+#ifdef XR0
+
 void *
 alloc_if(int num) ~ [
 	if (num) {
@@ -15,7 +17,13 @@ test(int x) ~ [
 	if (number(x)) {
 		return .malloc(1);
 	}
-]{
+];
+
+#endif
+
+void *
+test(int x)
+{
 	int n;
 
 	n = x;
@@ -37,5 +45,3 @@ alloc_if(int num)
 	}
 	return NULL;
 }
-
-

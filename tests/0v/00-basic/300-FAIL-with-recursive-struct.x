@@ -9,6 +9,8 @@ struct node {
         struct node *next;
 };
 
+#ifdef XR0
+
 struct node *
 f() ~ [
 	struct node *one;
@@ -16,7 +18,13 @@ f() ~ [
         one = malloc(sizeof(struct node));
         one->next = one;
         return one;
-]{
+];
+
+#endif
+
+struct node *
+f()
+{
 	struct node *one;
 
         one = malloc(sizeof(struct node));

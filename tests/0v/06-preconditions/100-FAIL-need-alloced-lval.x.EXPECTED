@@ -1,2 +1,2 @@
-06-preconditions/100-FAIL-need-alloced-lval.x:5:23: precondition failure: argument of `x' must be heap allocated (func)
-	06-preconditions/100-FAIL-need-alloced-lval.x:15:10 (main)
+06-preconditions/100-FAIL-need-alloced-lval.x:7:23: precondition failure: argument of `x' must be heap allocated (func)
+	06-preconditions/100-FAIL-need-alloced-lval.x:23:10 (main)

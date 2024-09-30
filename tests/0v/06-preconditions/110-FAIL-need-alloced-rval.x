@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#ifdef XR0
+
 int
 func(int *x) ~ [ 
 	setup: {
@@ -7,7 +9,13 @@ func(int *x) ~ [
 		*x = [?];
 	}
 	return *x;
-]{
+];
+
+#endif
+
+int
+func(int *x)
+{
 	return *x;	
 }
 

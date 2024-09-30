@@ -5,6 +5,8 @@
 
 #include <stdlib.h>
 
+#ifdef XR0
+
 void *
 test(int x, int y) ~ [
 	if (x) {
@@ -14,7 +16,13 @@ test(int x, int y) ~ [
 	} else {
 		return .malloc(1);
 	}
-]{
+];
+
+#endif
+
+void *
+test(int x, int y)
+{
 	if (!y) {
 		return malloc(1);
 	}

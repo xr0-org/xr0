@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#ifdef XR0
+
 void
 dangling_assign(int **i) ~ [
 	int j;
@@ -8,7 +10,13 @@ dangling_assign(int **i) ~ [
 
 	j = 5;
  	*i = &j;
-] {
+];
+
+#endif
+
+void
+dangling_assign(int **i)
+{
 	int j;
 
 	j = 5;

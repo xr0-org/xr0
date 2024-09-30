@@ -1,7 +1,14 @@
 #include <stdlib.h>
 
+#ifdef XR0
+
 int *
-func() ~ [ return [?]; ]	/* ERROR: */
+func() ~ [ return [?]; ];	/* ERROR: */
+
+#endif
+
+int *
+func()
 {
 	int *p;
 	p = malloc(1);

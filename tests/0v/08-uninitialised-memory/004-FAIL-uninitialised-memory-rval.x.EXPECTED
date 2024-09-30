@@ -1,1 +1,1 @@
-08-uninitialised-memory/004-FAIL-uninitialised-memory-rval.x:12:9: undefined memory access: i has no value (main)
+08-uninitialised-memory/004-FAIL-uninitialised-memory-rval.x:20:9: undefined memory access: i has no value (main)

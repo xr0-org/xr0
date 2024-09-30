@@ -1,1 +1,1 @@
-07-use-after-free/110-FAIL-freed-ptr-dangling-return.x:21:8: undefined indirection: *(i) is rconst not lvalue (main)
+07-use-after-free/110-FAIL-freed-ptr-dangling-return.x:25:8: undefined indirection: *(i) is rconst not lvalue (main)

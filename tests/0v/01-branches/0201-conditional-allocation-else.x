@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+#ifdef XR0
+
 void *
 test(int x) ~ [
 	if (x) {
@@ -7,6 +9,12 @@ test(int x) ~ [
 	} else {
 		return .malloc(1);
 	}
-]{
+];
+
+#endif
+
+void *
+test(int x)
+{
 	return malloc(1);
 }

@@ -1,5 +1,12 @@
+#ifdef XR0
+
 int
-f(int x) ~ [ return [0?2]; ]
+f(int x) ~ [ return [0?2]; ];
+
+#endif
+
+int
+f(int x)
 {
 	return 0;
 }
@@ -12,5 +19,7 @@ g(int x, int y)
 	a = f(x); /* "f:{($0, [?])}:0" */
 	b = f(y); /* "f:{($1, [?])}:0" */
 
+	#ifdef XR0
 	~ [ a == b; ]
+	#endif
 }

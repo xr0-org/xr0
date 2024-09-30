@@ -1,10 +1,18 @@
 #include <stdlib.h>
 
+#ifdef XR0
+
 void
 func(int *x) ~ [ 
 	setup: x = .malloc(1);
 	*x = 5;
-]{
+];
+
+#endif
+
+void
+func(int *x)
+{
 	*x = 5;	
 }
 

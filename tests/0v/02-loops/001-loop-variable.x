@@ -8,7 +8,11 @@ unit(int K)
 
 	for (i = 0; i != K; i++) {
 		p = malloc(1);
+
+		#ifdef XR0
 		~ [ @p; ]
+		#endif
+
 		free(p);
 	}
 }

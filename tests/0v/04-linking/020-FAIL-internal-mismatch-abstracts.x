@@ -1,5 +1,7 @@
 #include <stdlib.h>
 
+/* .x specific test */
+
 void *
 allocating() ~ [ .free(result); ];
 

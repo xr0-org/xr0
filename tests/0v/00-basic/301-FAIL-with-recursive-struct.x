@@ -9,13 +9,21 @@ struct node {
 	struct node *next;
 };
 
+#ifdef XR0
+
 struct node *
 f() ~ [
 	struct node one;
 
 	one.next = &one;
         return &one;
-]{
+];
+
+#endif
+
+struct node *
+f()
+{
 	struct node one;
 
 	one.next = &one;

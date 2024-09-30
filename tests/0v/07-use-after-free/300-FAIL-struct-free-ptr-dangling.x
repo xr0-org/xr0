@@ -11,6 +11,8 @@ struct score {
 	int grade;
 };
 
+#ifdef XR0
+
 struct score *
 create_score(char *subject, int grade) ~ [
 	struct score *s;
@@ -21,7 +23,13 @@ create_score(char *subject, int grade) ~ [
 	s->subject = subject;
 	s->grade = grade;
 	return s;
-] {
+];
+
+#endif
+
+struct score *
+create_score(char *subject, int grade)
+{
 	struct score *s;
 	s = malloc(sizeof(struct score));
 

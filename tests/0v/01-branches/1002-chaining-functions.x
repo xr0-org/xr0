@@ -1,5 +1,7 @@
 struct tuple { int x; int y; };
 
+#ifdef XR0
+
 struct tuple
 tuple_create() ~ [
 	struct tuple t;
@@ -8,6 +10,8 @@ tuple_create() ~ [
 	return t;
 ];
 
+#endif
+
 test()
 {
 	struct tuple a;
@@ -15,7 +19,10 @@ test()
 
 	a = tuple_create();
 	b = tuple_create();
-	~ [ a.x == b.x; ]
+
+	#ifdef XR0
+	~ [ a.x == b.x; ];
+	#endif
 }
 
 struct tuple

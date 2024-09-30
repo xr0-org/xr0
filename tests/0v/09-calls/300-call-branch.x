@@ -1,7 +1,14 @@
 #include <stdlib.h>
 
+#ifdef XR0
+
 void *
-foo(int flag) ~ [ if (flag) return malloc(1); ]
+foo(int flag) ~ [ if (flag) return malloc(1); ];
+
+#endif
+
+void *
+foo(int flag)
 {
 	int k; int *p; void *q;
 

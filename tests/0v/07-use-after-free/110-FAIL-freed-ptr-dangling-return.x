@@ -7,7 +7,11 @@ func()
 	p = malloc(1);
 
 	free(p);	/* p dangling */
+
+	#ifdef XR0
 	~ [ !@p; ];
+	#endif
+
 	return p;	/* return dangling ptr */
 }
 

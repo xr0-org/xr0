@@ -1,3 +1,5 @@
+#ifdef XR0
+
 int
 snapshot_and_change(int *arg) ~ [
 	int j;
@@ -8,12 +10,20 @@ snapshot_and_change(int *arg) ~ [
 	j = *arg;
 	*arg = 3;
 	return j;
-] {
+];
+
+#endif
+
+int
+snapshot_and_change(int *arg)
+{
 	int j;
 	j = *arg;
 	*arg = 3;
 	return j;
 }
+
+#ifdef XR0
 
 void
 modify(int *p, int *q) ~ [
@@ -26,11 +36,20 @@ modify(int *p, int *q) ~ [
 	*q = 2;
 	*p = 3;
 	i = *p;
-] {
+];
+
+#endif
+
+void
+modify(int *p, int *q)
+{
 	int i;
 	i = 0;
 	i = snapshot_and_change(p);
+
+	#ifdef XR0
 	~ [ *p == 3; ];
+	#endif
 
 	*q = 2;
 }
@@ -41,9 +60,17 @@ main()
 	int p;
 	int q;
 	p = 9;
+
+	#ifdef XR0
 	~ [ p == 9; ];
+	#endif
+
 	modify(&p, &q);
+
+	#ifdef XR0
 	~ [ p == 3; ];
 	~ [ q == 2; ];
+	#endif
+
 	return 0;
 }

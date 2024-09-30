@@ -6,6 +6,8 @@ f(int param);
 int
 g(int param);
 
+#ifdef XR0
+
 void *
 alloc_if(int num) ~ [
 	if (num) {
@@ -18,7 +20,13 @@ test(int x) ~ [
 	if (f(g(x))) {
 		return .malloc(1);
 	}
-]{
+];
+
+#endif
+
+void *
+test(int x)
+{
 	int m;
 	int n;
 	int k;

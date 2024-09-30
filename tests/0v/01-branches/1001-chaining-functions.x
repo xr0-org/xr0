@@ -2,6 +2,8 @@
 
 struct tuple { int x; int y; };
 
+#ifdef XR0
+
 struct tuple
 tuple_create() ~ [
 	struct tuple t;
@@ -14,7 +16,12 @@ void *
 conditional_alloc(int x) ~ [ if (x) { return .malloc(1); } ];
 
 void *
-test() ~ [ if (tuple_create().x) { return .malloc(1); } ]
+test() ~ [ if (tuple_create().x) { return .malloc(1); } ];
+
+#endif
+
+void *
+test()
 {
 	struct tuple t;
 

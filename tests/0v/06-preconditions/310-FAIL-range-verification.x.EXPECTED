@@ -1,2 +1,2 @@
-06-preconditions/310-FAIL-range-verification.x:2:32: precondition failure: argument of `x' must be < 2 (foo)
-	06-preconditions/310-FAIL-range-verification.x:10:8 (bar)
+06-preconditions/310-FAIL-range-verification.x:4:32: precondition failure: argument of `x' must be < 2 (foo)
+	06-preconditions/310-FAIL-range-verification.x:17:8 (bar)

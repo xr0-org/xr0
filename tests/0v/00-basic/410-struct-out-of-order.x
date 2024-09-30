@@ -5,6 +5,8 @@ struct pair {
 	void *q;
 };
 
+#ifdef XR0
+
 struct pair *
 f() ~ [
 	struct pair *pair;
@@ -13,7 +15,13 @@ f() ~ [
 	pair->p = malloc(1);
 	pair->q = malloc(1);
 	return pair;
-]{
+];
+
+#endif
+
+struct pair *
+f()
+{
 	struct pair *pair;
 	void *q;
 
