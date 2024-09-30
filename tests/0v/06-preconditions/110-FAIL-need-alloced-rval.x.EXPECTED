@@ -1,2 +1,2 @@
-06-preconditions/110-FAIL-need-alloced-rval.x:8:2: precondition failure: argument of `x' must have object (func)
+06-preconditions/110-FAIL-need-alloced-rval.x:8:2: precondition failure: argument of `x' must have object at index 0 (func)
 	06-preconditions/110-FAIL-need-alloced-rval.x:20:13 (main)

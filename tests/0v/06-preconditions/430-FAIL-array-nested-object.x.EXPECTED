@@ -1,0 +1,2 @@
+06-preconditions/430-FAIL-array-nested-object.x:9:2: precondition failure: argument of `arr' must have object at index 1 (foo)
+	06-preconditions/430-FAIL-array-nested-object.x:21:10 (bar)

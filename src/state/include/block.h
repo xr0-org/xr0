@@ -15,6 +15,10 @@ block_destroy(struct block *);
 char *
 block_str(struct block *);
 
+/* block_size_le: return whether b1's size ≤ b2's size */
+int
+block_size_le(struct block *b1, struct block *b2);
+
 struct error;
 struct value;
 struct ast_expr;
@@ -53,6 +57,12 @@ struct permutation;
 
 struct block *
 block_permuteheaplocs(struct block *, struct permutation *);
+
+struct constraint;
+
+struct error *
+block_constraintverify(struct block *spec, struct location *impl,
+		struct constraint *);
 
 struct block_arr;
 

@@ -1,0 +1,2 @@
+06-preconditions/510-FAIL-shifted-array.x:9:2: precondition failure: argument of `arr' must have value at index 0 (foo)
+	06-preconditions/510-FAIL-shifted-array.x:24:10 (bar)

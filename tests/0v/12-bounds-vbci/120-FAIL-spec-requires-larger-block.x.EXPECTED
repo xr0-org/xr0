@@ -1,0 +1,2 @@
+12-bounds-vbci/120-FAIL-spec-requires-larger-block.x:6:2: precondition failure: argument of `arr' must point at larger block (getval)
+	12-bounds-vbci/120-FAIL-spec-requires-larger-block.x:17:14 (f)

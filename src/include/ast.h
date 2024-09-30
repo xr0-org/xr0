@@ -221,6 +221,9 @@ struct math_state;
 bool
 ast_expr_matheval(struct ast_expr *e);
 
+struct ast_expr *
+ast_expr_simplify(struct ast_expr *);
+
 
 struct tagval;
 
@@ -499,10 +502,6 @@ ast_stmt_exec(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_pushsetup(struct ast_stmt *, struct state *);
-
-struct error *
-ast_specval_verify(struct ast_type *, struct value *param, struct value *arg,
-		struct state *spec, struct state *caller);
 
 DECLARE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_res)
 

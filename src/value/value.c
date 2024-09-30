@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
+
 #include "ast.h"
 #include "state.h"
 #include "object.h"
@@ -626,31 +627,18 @@ value_struct_specval_verify(struct value *param, struct value *arg,
 
 	int n = ast_variable_arr_n(param_members);
 	assert(ast_variable_arr_n(arg_members) == n);
-	struct ast_variable **param_var = ast_variable_arr_v(param_members),
-			    **arg_var = ast_variable_arr_v(arg_members);
+	struct ast_variable **param_var = ast_variable_arr_v(param_members);
 	for (int i = 0; i < n; i++) {
 		char *field = ast_variable_name(param_var[i]);
-		struct ast_type *t = ast_variable_type(param_var[i]);
-		assert(
-			strcmp(field, ast_variable_name(arg_var[i])) == 0
-			&& ast_type_equal(t, ast_variable_type(arg_var[i]))
-		);
-
-		struct object *param_obj = map_get(param->_struct.m, field),
-			      *arg_obj = map_get(arg->_struct.m, field);
-		assert(param_obj && arg_obj);
-		if (!object_hasvalue(param_obj)) {
-			continue;
-		}
-		struct error *err = ast_specval_verify(
-			t,
-			object_as_value(param_obj),
-			object_as_value(arg_obj),
-			spec,
-			caller
+		struct error *err = state_constraintverify_structmember(
+			spec, caller, param, arg, field
 		);
 		if (err) {
-			return err;
+			a_printf(
+				false,
+				"needs test and custom error message: %s\n",
+				error_str(err)
+			);
 		}
 	}
 

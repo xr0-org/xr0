@@ -333,7 +333,7 @@ stmt_expr_exec(struct ast_expr *expr, struct state *state)
 	if (e_res_iserror(res)) {
 		return e_res_as_error(res);
 	}
-	e_res_destroy(res); 
+	/*e_res_destroy(res); */
 	return NULL;
 }
 
@@ -440,9 +440,13 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 				free(spec_t_str);
 				return err;
 			}
-			struct value *v = value_copy(
-				value_res_as_value(eval_to_value(eval, state))
-			);
+			struct value_res *v_res = eval_to_value(eval, state);
+			if (!value_res_hasvalue(v_res)) {
+				return error_printf(
+					"returned expression has no value"
+				);
+			}
+			struct value *v = value_copy(value_res_as_value(v_res));
 			state_writeregister(state, v);
 		}
 	}
@@ -473,6 +477,7 @@ register_call_exec(struct ast_expr *call, struct state *state)
 	if (e_res_iserror(res)) {
 		return e_res_as_error(res);
 	}
+	e_res_destroy(res);
 	return NULL;
 }
 
@@ -504,8 +509,11 @@ register_mov_exec(struct ast_variable *temp, struct state *state)
 		}
 	}
 	if (e_res_haseval(r_res)) {
-		object_assign(obj, eval_as_rval(e_res_as_eval(r_res)));
+		object_assign(
+			obj, value_copy(eval_as_rval(e_res_as_eval(r_res)))
+		);
 	}
+	e_res_destroy(r_res);
 	return NULL;
 }
 

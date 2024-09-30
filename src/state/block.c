@@ -2,16 +2,19 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
-#include "block.h"
-#include "heap.h"
-#include "location.h"
 #include "object.h"
-#include "stack.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
 #include "verifier.h"
+
+#include "block.h"
+#include "constraint.h"
+#include "heap.h"
+#include "location.h"
+#include "stack.h"
 
 struct block {
 	struct object_arr *arr;
@@ -86,6 +89,12 @@ block_str(struct block *block)
 		free(s);
 	}
 	return strbuilder_build(b);
+}
+
+int
+block_size_le(struct block *b1, struct block *b2)
+{
+	return b1->size <= b2->size;
 }
 
 void
@@ -188,6 +197,35 @@ block_undeclare(struct block *b, struct state *s)
 	b->arr = new;
 }
 
+struct error *
+block_constraintverify(struct block *b, struct location *impl_loc,
+		struct constraint *c)
+{
+	int n = object_arr_nobjects(b->arr);
+	struct object **obj = object_arr_objects(b->arr);
+	for (int i = 0; i < n; i++) {
+		struct error *err = constraint_verifyobject(
+			c, obj[i], impl_loc
+		);
+		if (err) {
+			struct ast_expr *actual_offset = ast_expr_sum_create(
+				ast_expr_copy(
+					offset_as_expr(location_offset(impl_loc))
+				),
+				/* XXX: assuming lower is offset */
+				ast_expr_copy(object_lower(obj[i]))
+			);
+			struct ast_expr *simp = ast_expr_simplify(actual_offset);
+			char *simp_str = ast_expr_str(simp);
+			err = error_printf("%w at index %s", err, simp_str);
+			free(simp_str);
+			ast_expr_destroy(simp);
+			ast_expr_destroy(actual_offset);
+			return err;
+		}
+	}
+	return NULL;
+}
 
 struct block_arr {
 	int n;

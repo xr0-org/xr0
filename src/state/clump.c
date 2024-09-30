@@ -7,6 +7,8 @@
 #include "block.h"
 #include "util.h"
 
+#include "clump.h"
+
 struct clump {
 	struct block_arr *blocks;	
 };
@@ -49,9 +51,9 @@ clump_copy(struct clump *c)
 }
 
 int
-clump_newblock(struct clump *c)
+clump_newblock(struct clump *c, int size)
 {
-	int address = block_arr_append(c->blocks, block_callercreate(1));
+	int address = block_arr_append(c->blocks, block_callercreate(size));
 
 	int n = block_arr_nblocks(c->blocks);
 	assert(n > 0);
@@ -91,4 +93,14 @@ block_referenceswithcb(struct block *b, struct location *loc, struct state *s)
 	bool ref = block_references(b, loc, s, cb);	
 	circuitbreaker_destroy(cb);
 	return ref;
+}
+
+void
+clump_undeclare(struct clump *c, struct state *s)
+{
+	int n = block_arr_nblocks(c->blocks);
+	struct block **b = block_arr_blocks(c->blocks);
+	for (int i = 0; i < n; i++) {
+		block_undeclare(b[i], s);
+	}
 }

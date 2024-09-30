@@ -293,6 +293,13 @@ address_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	struct eval *eval = e_res_as_eval(res);
+	a_printf(
+		eval_islval(eval),
+		/* TODO: analyse evaluation above to determine whether this is a
+		 * user error or bug */
+		"operand of address expression must evaluate to lvalue or "
+		"function pointer\n"
+	);
 	struct value *v = value_ptr_create(location_copy(eval_as_lval(eval)));
 	struct ast_type *t = ast_type_create_ptr(ast_type_copy(eval_type(eval)));
 	e_res_destroy(res);
@@ -448,9 +455,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	return e_res_empty_create();
 }
 
-static struct object *
-location_mustgetobject(struct location *, struct state *);
-
 static struct error *
 call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *caller)
 {
@@ -496,120 +500,14 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 	state_popframe(spec);
 
 	for (int i = 0; i < nparams; i++) {
-		char *id = ast_variable_name(param[i]); 
-		struct object *param_obj = location_mustgetobject(
-			loc_res_as_loc(state_getloc(spec, id)), spec
-		);
-		if (!object_hasvalue(param_obj)) {
-			continue;
-		}
-		err = ast_specval_verify(
-			state_getvariabletype(spec, id),
-			object_as_value(param_obj),
-			/* we can safely assume that arg has a value because
-			 * it's the result of an argument expression being
-			 * evaluated */
-			object_as_value(
-				location_mustgetobject(
-					loc_res_as_loc(state_getloc(caller, id)),
-					caller
-				)
-			),
-			spec,
-			caller
-		);
+		char *id = ast_variable_name(param[i]);
+		struct error *err = state_constraintverify(spec, caller, id);
 		if (err) {
 			return error_printf("argument of `%s' %w", id, err);
 		}
 	}
 	return NULL;
 }
-
-static int
-loc_hasobject(struct location *, struct state *);
-
-struct error *
-ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
-		struct state *spec, struct state *caller)
-{
-	if (ast_type_isint(t)) {
-		return value_confirmsubset(arg, param, caller, spec);
-	} else if (ast_type_isstruct(t)) {
-		return value_struct_specval_verify(param, arg, caller, spec);
-	}
-	a_printf(
-		ast_type_isptr(t),
-		"can only verify int, struct and pointer params\n"
-	);
-
-	if (!value_islocation(param)) {
-		/* allow for NULL and other invalid-pointer setups */
-		return NULL;
-	}
-	/* spec requires value be valid pointer */
-	if (!value_islocation(arg)) {
-		return error_printf("must be pointing at something");
-	}
-
-	struct location *param_ref = value_as_location(param),
-			*arg_ref = value_as_location(arg);
-	if (!state_loc_valid(spec, param_ref)) {
-		/* spec freed reference */
-		return NULL;
-	}
-	if (!state_loc_valid(caller, arg_ref)) {
-		return error_printf("must be lvalue");
-	}
-
-	if (state_loc_onheap(spec, param_ref)
-			&& !state_loc_onheap(caller, arg_ref)) {
-		return error_printf("must be heap allocated");
-	}
-
-	if (!loc_hasobject(param_ref, spec)) {
-		return NULL;
-	}
-	/* spec requires an object */
-	if (!loc_hasobject(arg_ref, caller)) {
-		return error_printf("must have object");
-	}
-
-	struct object *param_ref_obj = location_mustgetobject(param_ref, spec),
-		      *arg_ref_obj = location_mustgetobject(arg_ref, caller);
-	if (!object_hasvalue(param_ref_obj)) {
-		/* spec imposes no requirement on param */
-		return NULL;
-	}
-	/* spec requires value */
-	if (!object_hasvalue(arg_ref_obj)) {
-		return error_printf("must have value");
-	}
-
-	return ast_specval_verify(
-		t,
-		object_as_value(param_ref_obj),
-		object_as_value(arg_ref_obj),
-		spec, caller
-	);
-}
-
-static int
-loc_hasobject(struct location *loc, struct state *s)
-{
-	struct object_res *res = state_get(s, loc, false);
-	if (object_res_iserror(res)) {
-		assert(error_to_block_observe_noobj(object_res_as_error(res)));
-		return 0;
-	}
-	return 1;
-}
-
-static struct object *
-location_mustgetobject(struct location *loc, struct state *s)
-{
-	return object_res_as_object(state_get(s, loc, false));
-}
-
 
 static struct ast_type *
 call_type(struct ast_expr *call, struct state *);
@@ -836,10 +734,27 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 	}
 	/* ⊢ !ast_type_isptr(t2) */
 
-	struct value *v1 = value_res_as_value(eval_to_value(rv1, s)),
-		     *v2 = value_res_as_value(eval_to_value(rv2, s));
+	struct value_res *v_res1 = eval_to_value(rv1, s),
+			 *v_res2 = eval_to_value(rv2, s);
+	a_printf(
+		value_res_hasvalue(v_res1) && value_res_hasvalue(v_res2),
+		"undefined memory access needing better error message\n"
+	);
+
+	struct value *v1 = value_res_as_value(v_res1),
+		     *v2 = value_res_as_value(v_res2);
 
 	if (ast_type_isptr(t1)) {
+		if (!value_islocation(v1)) {
+			/* The Standard requires "a pointer to an object type",
+			 * not merely a pointer-type. We are interpreting this
+			 * to mean that the pointer must be valid (i.e. pointing
+			 * at something) for the addition operation to take
+			 * place. 3.3.6 */
+			return e_res_error_create(
+				error_printf("cannot add to invalid pointer")
+			);
+		}
 		struct location *loc1 = value_as_location(v1);
 		struct location *newloc = location_copy(loc1);
 		struct ast_expr *op1 = offset_as_expr(location_offset(loc1)),
@@ -1070,7 +985,13 @@ expr_alloc_eval(struct ast_expr *expr, struct state *state)
 		res = e_res_eval_create(
 			eval_rval_create(
 				ast_type_create_void(),
-				state_clump(state)
+				state_clump(
+					state,
+					hack_constorone(
+						ast_expr_alloc_arg(expr),
+						state
+					)
+				)
 			)
 		);
 		break;
@@ -1081,7 +1002,9 @@ expr_alloc_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	if (e_res_haseval(res)) {
-		state_writeregister(state, eval_as_rval(e_res_as_eval(res)));
+		state_writeregister(
+			state, value_copy(eval_as_rval(e_res_as_eval(res)))
+		);
 	}
 	return res;
 }
@@ -1311,7 +1234,7 @@ call_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	/* XXX: handle root thats a call */
 	char *name = ast_expr_as_identifier(root);
 	struct ast_function *f = externals_getfunc(state_getext(s), name);
-	assert(f);
+	a_printf(f, "BAD ERROR: function `%s' not found\n", name);
 	struct ast_type *rtype = ast_function_type(f);
 	struct ast_expr *call = ast_expr_call_create(
 		ast_expr_copy(root), nargs, gen_args

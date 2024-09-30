@@ -150,7 +150,7 @@ struct value *
 state_static_init(struct state *, struct ast_expr *);
 
 struct value *
-state_clump(struct state *);
+state_clump(struct state *, int size);
 
 bool
 state_loc_valid(struct state *, struct location *);
@@ -244,6 +244,9 @@ bool
 location_referencesheap(struct location *, struct state *,
 		struct circuitbreaker *);
 
+struct location *
+location_withoutoffset(struct location *);
+
 struct offset;
 
 struct offset *
@@ -271,6 +274,14 @@ location_permuteheap(struct location *loc, struct permutation *p);
 
 struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive);
+
+struct error *
+state_constraintverify(struct state *spec, struct state *impl, char *id);
+
+struct error *
+state_constraintverify_structmember(struct state *spec, struct state *impl,
+		struct value *spec_v, struct value *impl_v, char *member);
+
 
 /* USED BY OBJECT */
 

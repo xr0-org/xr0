@@ -4,19 +4,20 @@
 #include <string.h>
 
 #include "ast.h"
-#include "block.h"
-#include "clump.h"
 #include "ext.h"
-#include "heap.h"
-#include "static.h"
-#include "location.h"
 #include "object.h"
-#include "stack.h"
 #include "state.h"
-#include "static.h"
 #include "util.h"
 #include "value.h"
 #include "verifier.h"
+
+#include "block.h"
+#include "clump.h"
+#include "constraint.h"
+#include "heap.h"
+#include "location.h"
+#include "stack.h"
+#include "static.h"
 
 struct state {
 	struct externals *ext;
@@ -363,13 +364,13 @@ allocstatic(char *lit, struct state *state)
 }
 
 struct value *
-state_clump(struct state *state)
+state_clump(struct state *state, int size)
 {
 	/* XXX: should type be associated with blocks for type checking when we
 	 * assign? */
 	return value_ptr_create(
 		location_create_dereferencable(
-			clump_newblock(state->clump),
+			clump_newblock(state->clump, size),
 			offset_create(ast_expr_constant_create(0))
 		)
 	);
@@ -448,6 +449,69 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	}
 	return object_res_object_create(member);
 }
+
+static struct object *
+location_mustgetobject(struct location *, struct state *);
+
+struct error *
+state_constraintverify(struct state *spec, struct state *impl, char *id)
+{
+	struct object *spec_obj = location_mustgetobject(
+		loc_res_as_loc(state_getloc(spec, id)), spec
+	);
+	if (!object_hasvalue(spec_obj)) {
+		return NULL;
+	}
+	struct constraint *c = constraint_create(
+		state_copy(spec),
+		state_copy(impl),
+		ast_type_copy(state_getvariabletype(spec, id))
+	);
+	struct error *err = constraint_verify(
+		c,
+		object_as_value(spec_obj),
+		/* we can safely assume that impl has a value because
+		 * it's the result of an argument expression being
+		 * evaluated */
+		object_as_value(
+			location_mustgetobject(
+				loc_res_as_loc(state_getloc(impl, id)),
+				impl
+			)
+		)
+	);
+	constraint_destroy(c);
+	return err;
+}
+
+struct error *
+state_constraintverify_structmember(struct state *spec, struct state *impl,
+		struct value *spec_v, struct value *impl_v, char *member)
+{
+	struct object *spec_obj = value_struct_member(spec_v, member),
+		      *impl_obj = value_struct_member(impl_v, member);
+	assert(spec_obj && impl_obj);
+	if (!spec_obj) {
+		return NULL;
+	}
+	struct constraint *c = constraint_create(
+		state_copy(spec),
+		state_copy(impl),
+		ast_type_copy(value_struct_membertype(spec_v, member))
+	);
+	struct error *err = constraint_verify(
+		c, object_as_value(spec_obj), object_as_value(impl_obj)
+	);
+	constraint_destroy(c);
+	return err;
+}
+
+static struct object *
+location_mustgetobject(struct location *loc, struct state *s)
+{
+	return object_res_as_object(state_get(s, loc, false));
+}
+
 
 struct block *
 state_getblock(struct state *state, struct location *loc)
@@ -629,13 +693,15 @@ state_specverify(struct state *actual, struct state *spec)
 		if (!actual->reg) {
 			return error_printf("must have return value");
 		}
-		struct error *err = ast_specval_verify(
-			stack_returntype(spec->stack),
-			spec->reg,
-			actual->reg,
-			spec,
-			actual
+		struct constraint *c = constraint_create(
+			state_copy(spec),
+			state_copy(actual),
+			ast_type_copy(stack_returntype(spec->stack))
 		);
+		struct error *err = constraint_verify(
+			c, spec->reg, actual->reg
+		);
+		constraint_destroy(c);
 		if (err) {
 			return error_printf("return value %s", error_str(err));
 		}
@@ -717,7 +783,8 @@ state_undeclareliterals(struct state *s)
 static void
 state_undeclarevars(struct state *s)
 {	
-	heap_undeclare(s->heap, s);
+	/*heap_undeclare(s->heap, s);*/
+	/*clump_undeclare(s->clump, s);*/
 	rconst_undeclare(s->rconst);
 	struct value *v = state_readregister(s);
 	if (v) {
