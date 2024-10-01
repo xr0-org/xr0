@@ -840,6 +840,16 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 		     *v2 = value_res_as_value(eval_to_value(rv2, s));
 
 	if (ast_type_isptr(t1)) {
+		if (!value_islocation(v1)) {
+			/* The Standard requires "a pointer to an object type",
+			 * not merely a pointer-type. We are interpreting this
+			 * to mean that the pointer must be valid (i.e. pointing
+			 * at something) for the addition operation to take
+			 * place. 3.3.6 */
+			return e_res_error_create(
+				error_printf("cannot add to invalid pointer")
+			);
+		}
 		struct location *loc1 = value_as_location(v1);
 		struct location *newloc = location_copy(loc1);
 		struct ast_expr *op1 = offset_as_expr(location_offset(loc1)),
@@ -1070,7 +1080,13 @@ expr_alloc_eval(struct ast_expr *expr, struct state *state)
 		res = e_res_eval_create(
 			eval_rval_create(
 				ast_type_create_void(),
-				state_clump(state)
+				state_clump(
+					state,
+					hack_constorone(
+						ast_expr_alloc_arg(expr),
+						state
+					)
+				)
 			)
 		);
 		break;

@@ -363,13 +363,13 @@ allocstatic(char *lit, struct state *state)
 }
 
 struct value *
-state_clump(struct state *state)
+state_clump(struct state *state, int size)
 {
 	/* XXX: should type be associated with blocks for type checking when we
 	 * assign? */
 	return value_ptr_create(
 		location_create_dereferencable(
-			clump_newblock(state->clump),
+			clump_newblock(state->clump, size),
 			offset_create(ast_expr_constant_create(0))
 		)
 	);

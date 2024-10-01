@@ -7,6 +7,8 @@
 #include "block.h"
 #include "util.h"
 
+#include "clump.h"
+
 struct clump {
 	struct block_arr *blocks;	
 };
@@ -49,9 +51,9 @@ clump_copy(struct clump *c)
 }
 
 int
-clump_newblock(struct clump *c)
+clump_newblock(struct clump *c, int size)
 {
-	int address = block_arr_append(c->blocks, block_callercreate(1));
+	int address = block_arr_append(c->blocks, block_callercreate(size));
 
 	int n = block_arr_nblocks(c->blocks);
 	assert(n > 0);

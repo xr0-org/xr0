@@ -150,7 +150,7 @@ struct value *
 state_static_init(struct state *, struct ast_expr *);
 
 struct value *
-state_clump(struct state *);
+state_clump(struct state *, int size);
 
 bool
 state_loc_valid(struct state *, struct location *);

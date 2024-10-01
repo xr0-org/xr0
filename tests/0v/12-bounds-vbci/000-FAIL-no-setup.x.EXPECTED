@@ -1,0 +1,1 @@
+12-bounds-vbci/000-FAIL-no-setup.x:4:12: cannot add to invalid pointer (access)

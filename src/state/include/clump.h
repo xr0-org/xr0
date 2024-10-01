@@ -18,7 +18,7 @@ struct clump *
 clump_copy(struct clump *);
 
 int
-clump_newblock(struct clump *);
+clump_newblock(struct clump *, int size);
 
 struct block;
 
