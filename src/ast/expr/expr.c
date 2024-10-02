@@ -624,6 +624,7 @@ isatomic(struct ast_expr *e)
 	case EXPR_CONSTANT:
 	case EXPR_BRACKETED:
 	case EXPR_CALL:
+	case EXPR_ALLOCATION:
 	case EXPR_INCDEC:
 	case EXPR_STRUCTMEMBER:
 	case EXPR_UNARY:

@@ -333,7 +333,7 @@ stmt_expr_exec(struct ast_expr *expr, struct state *state)
 	if (e_res_iserror(res)) {
 		return e_res_as_error(res);
 	}
-	e_res_destroy(res); 
+	/*e_res_destroy(res); */
 	return NULL;
 }
 
@@ -473,6 +473,7 @@ register_call_exec(struct ast_expr *call, struct state *state)
 	if (e_res_iserror(res)) {
 		return e_res_as_error(res);
 	}
+	e_res_destroy(res);
 	return NULL;
 }
 
@@ -504,8 +505,11 @@ register_mov_exec(struct ast_variable *temp, struct state *state)
 		}
 	}
 	if (e_res_haseval(r_res)) {
-		object_assign(obj, eval_as_rval(e_res_as_eval(r_res)));
+		object_assign(
+			obj, value_copy(eval_as_rval(e_res_as_eval(r_res)))
+		);
 	}
+	e_res_destroy(r_res);
 	return NULL;
 }
 

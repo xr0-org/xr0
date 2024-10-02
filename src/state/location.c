@@ -303,6 +303,9 @@ location_isauto(struct location *loc)
 	return loc->type == LOCATION_AUTOMATIC;
 }
 
+static struct location *
+withoutoffset(struct location *);
+
 bool
 location_referencesheap(struct location *l, struct state *s, struct circuitbreaker *cb)
 {
@@ -312,15 +315,24 @@ location_referencesheap(struct location *l, struct state *s, struct circuitbreak
 		}
 		return true;
 	}
-	struct object_res *res = state_get(s, l, false);
+	struct location *l_base = withoutoffset(l);
+	struct object_res *res = state_get(s, l_base, false);
 	if (object_res_iserror(res)) {
-		struct error *err = object_res_as_error(res);
-		if (error_to_block_observe_noobj(err)) {
-			object_res_errorignore(res);
-		}
+		assert(error_to_block_observe_noobj(object_res_as_error(res)));
+		object_res_errorignore(res);
 	}
+	location_destroy(l_base);
 	return object_res_hasobject(res)
 		&& object_referencesheap(object_res_as_object(res), s, cb);
+}
+
+static struct location *
+withoutoffset(struct location *old)
+{
+	struct location *new = location_copy(old);
+	offset_destroy(new->offset);
+	new->offset = offset_create(ast_expr_constant_create(0));
+	return new;
 }
 
 static struct block_res *

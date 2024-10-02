@@ -1097,7 +1097,9 @@ expr_alloc_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	if (e_res_haseval(res)) {
-		state_writeregister(state, eval_as_rval(e_res_as_eval(res)));
+		state_writeregister(
+			state, value_copy(eval_as_rval(e_res_as_eval(res)))
+		);
 	}
 	return res;
 }
