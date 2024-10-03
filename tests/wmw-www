@@ -1,6 +1,9 @@
+00-basic/500-FAIL-side-effect.x
+00-basic/520-side-effect-rconst.x
 09-calls/100-FAIL-unique-rconst.x
 09-calls/120-FAIL-unique-rconst.x
 09-calls/130-unique-rconst.x
 09-calls/200-FAIL-wrong-range.x
-99-program/000-matrix.x
 09-calls/300-call-branch.x
+99-program/000-matrix.x
+12-bounds-vbci/031-within-bounds-minus-one-abstract-rconst.x
