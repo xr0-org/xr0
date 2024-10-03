@@ -28,4 +28,7 @@ clump_getblock(struct clump *c, int address);
 bool
 clump_callerreferences(struct clump *, struct location *, struct state *);
 
+void
+clump_undeclare(struct clump *c, struct state *s);
+
 #endif

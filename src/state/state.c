@@ -718,6 +718,7 @@ static void
 state_undeclarevars(struct state *s)
 {	
 	heap_undeclare(s->heap, s);
+	clump_undeclare(s->clump, s);
 	rconst_undeclare(s->rconst);
 	struct value *v = state_readregister(s);
 	if (v) {

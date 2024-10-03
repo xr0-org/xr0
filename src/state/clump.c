@@ -94,3 +94,13 @@ block_referenceswithcb(struct block *b, struct location *loc, struct state *s)
 	circuitbreaker_destroy(cb);
 	return ref;
 }
+
+void
+clump_undeclare(struct clump *c, struct state *s)
+{
+	int n = block_arr_nblocks(c->blocks);
+	struct block **b = block_arr_blocks(c->blocks);
+	for (int i = 0; i < n; i++) {
+		block_undeclare(b[i], s);
+	}
+}
