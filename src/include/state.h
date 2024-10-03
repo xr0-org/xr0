@@ -244,6 +244,9 @@ bool
 location_referencesheap(struct location *, struct state *,
 		struct circuitbreaker *);
 
+struct location *
+location_withoutoffset(struct location *);
+
 struct offset;
 
 struct offset *

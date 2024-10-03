@@ -596,7 +596,9 @@ ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
 static int
 loc_hasobject(struct location *loc, struct state *s)
 {
-	struct object_res *res = state_get(s, loc, false);
+	struct location *loc_base = location_withoutoffset(loc);
+	struct object_res *res = state_get(s, loc_base, false);
+	location_destroy(loc_base);
 	if (object_res_iserror(res)) {
 		assert(error_to_block_observe_noobj(object_res_as_error(res)));
 		return 0;
@@ -1329,7 +1331,7 @@ call_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	/* XXX: handle root thats a call */
 	char *name = ast_expr_as_identifier(root);
 	struct ast_function *f = externals_getfunc(state_getext(s), name);
-	assert(f);
+	a_printf(f, "BAD ERROR: function `%s' not found\n", name);
 	struct ast_type *rtype = ast_function_type(f);
 	struct ast_expr *call = ast_expr_call_create(
 		ast_expr_copy(root), nargs, gen_args

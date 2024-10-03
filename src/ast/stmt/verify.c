@@ -440,9 +440,13 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 				free(spec_t_str);
 				return err;
 			}
-			struct value *v = value_copy(
-				value_res_as_value(eval_to_value(eval, state))
-			);
+			struct value_res *v_res = eval_to_value(eval, state);
+			if (!value_res_hasvalue(v_res)) {
+				return error_printf(
+					"returned expression has no value"
+				);
+			}
+			struct value *v = value_copy(value_res_as_value(v_res));
 			state_writeregister(state, v);
 		}
 	}
