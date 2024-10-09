@@ -1,0 +1,2 @@
+06-preconditions/450-FAIL-array-value.x:9:2: precondition failure: argument of `arr' must have object at index 1 (foo)
+	06-preconditions/450-FAIL-array-value.x:23:10 (bar)

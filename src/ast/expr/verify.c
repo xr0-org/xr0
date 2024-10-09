@@ -798,8 +798,15 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 	}
 	/* ⊢ !ast_type_isptr(t2) */
 
-	struct value *v1 = value_res_as_value(eval_to_value(rv1, s)),
-		     *v2 = value_res_as_value(eval_to_value(rv2, s));
+	struct value_res *v_res1 = eval_to_value(rv1, s),
+			 *v_res2 = eval_to_value(rv2, s);
+	a_printf(
+		value_res_hasvalue(v_res1) && value_res_hasvalue(v_res2),
+		"undefined memory access needing better error message\n"
+	);
+
+	struct value *v1 = value_res_as_value(v_res1),
+		     *v2 = value_res_as_value(v_res2);
 
 	if (ast_type_isptr(t1)) {
 		if (!value_islocation(v1)) {

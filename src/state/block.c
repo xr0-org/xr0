@@ -188,6 +188,9 @@ block_undeclare(struct block *b, struct state *s)
 	b->arr = new;
 }
 
+static struct error *
+specverify_object(struct object *param_obj, struct object_arr *arg_arr,
+		struct state *spec, struct state *caller, struct ast_type *t);
 
 struct error *
 block_specverify(struct block *param, struct block *arg, struct state *spec,
@@ -197,40 +200,11 @@ block_specverify(struct block *param, struct block *arg, struct state *spec,
 	struct object **obj_param = object_arr_objects(param->arr);
 	for (int i = 0; i < n; i++) {
 		struct object *param_obj = obj_param[i];
-		/* assuming lower bound is offset */
-		struct ast_expr *offset = object_lower(param_obj);
-		int arg_index = object_arr_index(arg->arr, offset, caller);
-		if (arg_index == -1) {
-			char *offset_str = ast_expr_str(offset);
-			struct error *err = error_printf(
-				"must have object at index %s", offset_str
-			);
-			free(offset_str);
-			return err;
-		}
-		struct object *arg_obj = object_arr_objects(arg->arr)[arg_index];
-
-		if (!object_hasvalue(param_obj)) {
-			return NULL;
-		}
-		if (!object_hasvalue(arg_obj)) {
-			char *offset_str = ast_expr_str(offset);
-			struct error *err = error_printf(
-				"must have value at index %s", offset_str
-			);
-			free(offset_str);
-			return err;
-		}
-
-		struct error *err = ast_specval_verify(
-			t,
-			object_as_value(param_obj),
-			object_as_value(arg_obj),
-			spec,
-			caller
+		struct error *err = specverify_object(
+			param_obj, arg->arr, spec, caller, t
 		);
 		if (err) {
-			char *offset_str = ast_expr_str(offset);
+			char *offset_str = ast_expr_str(object_lower(param_obj));
 			err = error_printf("%w at index %s", err, offset_str);
 			free(offset_str);
 			return err;
@@ -239,6 +213,30 @@ block_specverify(struct block *param, struct block *arg, struct state *spec,
 	return NULL;
 }
 
+static struct error *
+specverify_object(struct object *param_obj, struct object_arr *arg_arr,
+		struct state *spec, struct state *caller, struct ast_type *t)
+{
+	struct ast_expr *offset = object_lower(param_obj);
+	int arg_index = object_arr_index(arg_arr, offset, caller);
+	if (arg_index == -1) {
+		return error_printf("must have object");
+	}
+	struct object *arg_obj = object_arr_objects(arg_arr)[arg_index];
+	if (!object_hasvalue(param_obj)) {
+		return NULL;
+	}
+	if (!object_hasvalue(arg_obj)) {
+		return error_printf("must have value");
+	}
+	return ast_specval_verify(
+		t,
+		object_as_value(param_obj),
+		object_as_value(arg_obj),
+		spec,
+		caller
+	);
+}
 
 struct block_arr {
 	int n;
