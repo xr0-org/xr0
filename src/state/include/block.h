@@ -54,6 +54,10 @@ struct permutation;
 struct block *
 block_permuteheaplocs(struct block *, struct permutation *);
 
+struct error *
+block_specverify(struct block *param, struct block *arg, struct state *spec,
+		struct state *caller, struct ast_type *t);
+
 struct block_arr;
 
 struct block_arr *

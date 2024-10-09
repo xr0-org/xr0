@@ -525,9 +525,6 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 	return NULL;
 }
 
-static int
-loc_hasobject(struct location *, struct state *);
-
 struct error *
 ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
 		struct state *spec, struct state *caller)
@@ -566,44 +563,7 @@ ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
 		return error_printf("must be heap allocated");
 	}
 
-	if (!loc_hasobject(param_ref, spec)) {
-		return NULL;
-	}
-	/* spec requires an object */
-	if (!loc_hasobject(arg_ref, caller)) {
-		return error_printf("must have object");
-	}
-
-	struct object *param_ref_obj = location_mustgetobject(param_ref, spec),
-		      *arg_ref_obj = location_mustgetobject(arg_ref, caller);
-	if (!object_hasvalue(param_ref_obj)) {
-		/* spec imposes no requirement on param */
-		return NULL;
-	}
-	/* spec requires value */
-	if (!object_hasvalue(arg_ref_obj)) {
-		return error_printf("must have value");
-	}
-
-	return ast_specval_verify(
-		t,
-		object_as_value(param_ref_obj),
-		object_as_value(arg_ref_obj),
-		spec, caller
-	);
-}
-
-static int
-loc_hasobject(struct location *loc, struct state *s)
-{
-	struct location *loc_base = location_withoutoffset(loc);
-	struct object_res *res = state_get(s, loc_base, false);
-	location_destroy(loc_base);
-	if (object_res_iserror(res)) {
-		assert(error_to_block_observe_noobj(object_res_as_error(res)));
-		return 0;
-	}
-	return 1;
+	return state_specverify_block(spec, param_ref, caller, arg_ref, t);
 }
 
 static struct object *

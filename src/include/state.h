@@ -275,6 +275,10 @@ location_permuteheap(struct location *loc, struct permutation *p);
 struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive);
 
+struct error *
+state_specverify_block(struct state *spec, struct location *param,
+		struct state *caller, struct location *arg, struct ast_type *);
+
 /* USED BY OBJECT */
 
 bool

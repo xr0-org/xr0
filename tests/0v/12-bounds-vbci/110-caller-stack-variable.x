@@ -13,5 +13,6 @@ void
 f()
 {
 	int k;
+	k = 0;
 	getval(&k-1);
 }

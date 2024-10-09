@@ -449,6 +449,18 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	return object_res_object_create(member);
 }
 
+struct error *
+state_specverify_block(struct state *spec, struct location *param_ref,
+		struct state *caller, struct location *arg_ref,
+		struct ast_type *t)
+{
+	struct block *b_param = state_getblock(spec, param_ref),
+		     *b_arg = state_getblock(caller, arg_ref);
+	assert(b_param && b_arg);
+	return block_specverify(b_param, b_arg, spec, caller, t);
+}
+
+
 struct block *
 state_getblock(struct state *state, struct location *loc)
 {
