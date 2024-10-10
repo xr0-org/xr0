@@ -473,8 +473,13 @@ state_constraintverify(struct state *spec, struct state *impl, char *id)
 	if (!object_hasvalue(spec_obj)) {
 		return NULL;
 	}
-	return ast_specval_verify(
-		state_getvariabletype(spec, id),
+	struct constraint *c = constraint_create(
+		state_copy(spec),
+		state_copy(impl),
+		ast_type_copy(state_getvariabletype(spec, id))
+	);
+	struct error *err = constraint_verify(
+		c,
 		object_as_value(spec_obj),
 		/* we can safely assume that impl has a value because
 		 * it's the result of an argument expression being
@@ -484,10 +489,10 @@ state_constraintverify(struct state *spec, struct state *impl, char *id)
 				loc_res_as_loc(state_getloc(impl, id)),
 				impl
 			)
-		),
-		spec,
-		impl
+		)
 	);
+	constraint_destroy(c);
+	return err;
 }
 
 struct error *
@@ -500,15 +505,17 @@ state_constraintverify_structmember(struct state *spec, struct state *impl,
 	if (!spec_obj) {
 		return NULL;
 	}
-	return ast_specval_verify(
-		value_struct_membertype(spec_v, member),
-		object_as_value(spec_obj),
-		object_as_value(impl_obj),
-		spec,
-		impl
+	struct constraint *c = constraint_create(
+		state_copy(spec),
+		state_copy(impl),
+		ast_type_copy(value_struct_membertype(spec_v, member))
 	);
+	struct error *err = constraint_verify(
+		c, object_as_value(spec_obj), object_as_value(impl_obj)
+	);
+	constraint_destroy(c);
+	return err;
 }
-
 
 static struct object *
 location_mustgetobject(struct location *loc, struct state *s)
@@ -697,13 +704,15 @@ state_specverify(struct state *actual, struct state *spec)
 		if (!actual->reg) {
 			return error_printf("must have return value");
 		}
-		struct error *err = ast_specval_verify(
-			stack_returntype(spec->stack),
-			spec->reg,
-			actual->reg,
-			spec,
-			actual
+		struct constraint *c = constraint_create(
+			state_copy(spec),
+			state_copy(actual),
+			ast_type_copy(stack_returntype(spec->stack))
 		);
+		struct error *err = constraint_verify(
+			c, spec->reg, actual->reg
+		);
+		constraint_destroy(c);
 		if (err) {
 			return error_printf("return value %s", error_str(err));
 		}

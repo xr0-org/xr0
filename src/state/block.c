@@ -232,13 +232,16 @@ specverify_object(struct object *param_obj, struct object_arr *arg_arr,
 	if (!object_hasvalue(arg_obj)) {
 		return error_printf("must have value");
 	}
-	return ast_specval_verify(
-		t,
-		object_as_value(param_obj),
-		object_as_value(arg_obj),
-		spec,
-		caller
+	struct constraint *c = constraint_create(
+		state_copy(spec),
+		state_copy(caller),
+		ast_type_copy(t)
 	);
+	struct error *err = constraint_verify(
+		c, object_as_value(param_obj), object_as_value(arg_obj)
+	);
+	constraint_destroy(c);
+	return err;
 }
 
 struct block_arr {

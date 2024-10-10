@@ -4,15 +4,14 @@
 struct constraint;
 
 struct constraint *
-constraint_create(struct ast_type *, struct state *spec, struct state *impl);
+constraint_create(struct state *spec, struct state *impl, struct ast_type *);
+
+void
+constraint_destroy(struct constraint *);
 
 struct error;
 
 struct error *
 constraint_verify(struct constraint *, struct value *spec_v, struct value *impl_v);
-
-struct error *
-ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
-		struct state *spec, struct state *caller);
 
 #endif
