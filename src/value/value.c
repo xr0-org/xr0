@@ -634,7 +634,11 @@ value_struct_specval_verify(struct value *param, struct value *arg,
 			spec, caller, param, arg, field
 		);
 		if (err) {
-			return err;
+			a_printf(
+				false,
+				"needs test and custom error message: %s\n",
+				error_str(err)
+			);
 		}
 	}
 
