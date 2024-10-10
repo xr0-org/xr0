@@ -191,20 +191,16 @@ block_undeclare(struct block *b, struct state *s)
 	b->arr = new;
 }
 
-static struct error *
-specverify_object(struct object *param_obj, struct object_arr *arg_arr,
-		struct state *spec, struct state *caller, struct ast_type *t);
-
 struct error *
-block_specverify(struct block *param, struct block *arg, struct state *spec,
-		struct state *caller, struct ast_type *t)
+block_constraintverify(struct block *param, struct location *arg_loc,
+		struct constraint *c)
 {
 	int n = object_arr_nobjects(param->arr);
 	struct object **obj_param = object_arr_objects(param->arr);
 	for (int i = 0; i < n; i++) {
 		struct object *param_obj = obj_param[i];
-		struct error *err = specverify_object(
-			param_obj, arg->arr, spec, caller, t
+		struct error *err = constraint_verifyobject(
+			c, param_obj, arg_loc
 		);
 		if (err) {
 			char *offset_str = ast_expr_str(object_lower(param_obj));
@@ -214,34 +210,6 @@ block_specverify(struct block *param, struct block *arg, struct state *spec,
 		}
 	}
 	return NULL;
-}
-
-static struct error *
-specverify_object(struct object *param_obj, struct object_arr *arg_arr,
-		struct state *spec, struct state *caller, struct ast_type *t)
-{
-	struct ast_expr *offset = object_lower(param_obj);
-	int arg_index = object_arr_index(arg_arr, offset, caller);
-	if (arg_index == -1) {
-		return error_printf("must have object");
-	}
-	struct object *arg_obj = object_arr_objects(arg_arr)[arg_index];
-	if (!object_hasvalue(param_obj)) {
-		return NULL;
-	}
-	if (!object_hasvalue(arg_obj)) {
-		return error_printf("must have value");
-	}
-	struct constraint *c = constraint_create(
-		state_copy(spec),
-		state_copy(caller),
-		ast_type_copy(t)
-	);
-	struct error *err = constraint_verify(
-		c, object_as_value(param_obj), object_as_value(arg_obj)
-	);
-	constraint_destroy(c);
-	return err;
 }
 
 struct block_arr {

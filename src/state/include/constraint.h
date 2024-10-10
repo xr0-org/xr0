@@ -12,6 +12,11 @@ constraint_destroy(struct constraint *);
 struct error;
 
 struct error *
-constraint_verify(struct constraint *, struct value *spec_v, struct value *impl_v);
+constraint_verify(struct constraint *, struct value *spec_v,
+		struct value *impl_v);
+
+struct error *
+constraint_verifyobject(struct constraint *c, struct object *spec_obj,
+		struct location *impl_loc);
 
 #endif
