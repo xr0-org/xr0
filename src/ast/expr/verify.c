@@ -448,9 +448,6 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 	return e_res_empty_create();
 }
 
-static struct object *
-location_mustgetobject(struct location *, struct state *);
-
 static struct error *
 call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *caller)
 {
@@ -496,82 +493,14 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 	state_popframe(spec);
 
 	for (int i = 0; i < nparams; i++) {
-		char *id = ast_variable_name(param[i]); 
-		struct object *param_obj = location_mustgetobject(
-			loc_res_as_loc(state_getloc(spec, id)), spec
-		);
-		if (!object_hasvalue(param_obj)) {
-			continue;
-		}
-		err = ast_specval_verify(
-			state_getvariabletype(spec, id),
-			object_as_value(param_obj),
-			/* we can safely assume that arg has a value because
-			 * it's the result of an argument expression being
-			 * evaluated */
-			object_as_value(
-				location_mustgetobject(
-					loc_res_as_loc(state_getloc(caller, id)),
-					caller
-				)
-			),
-			spec,
-			caller
-		);
+		char *id = ast_variable_name(param[i]);
+		struct error *err = state_constraintverify(spec, caller, id);
 		if (err) {
 			return error_printf("argument of `%s' %w", id, err);
 		}
 	}
 	return NULL;
 }
-
-struct error *
-ast_specval_verify(struct ast_type *t, struct value *param, struct value *arg,
-		struct state *spec, struct state *caller)
-{
-	if (ast_type_isint(t)) {
-		return value_confirmsubset(arg, param, caller, spec);
-	} else if (ast_type_isstruct(t)) {
-		return value_struct_specval_verify(param, arg, caller, spec);
-	}
-	a_printf(
-		ast_type_isptr(t),
-		"can only verify int, struct and pointer params\n"
-	);
-
-	if (!value_islocation(param)) {
-		/* allow for NULL and other invalid-pointer setups */
-		return NULL;
-	}
-	/* spec requires value be valid pointer */
-	if (!value_islocation(arg)) {
-		return error_printf("must be pointing at something");
-	}
-
-	struct location *param_ref = value_as_location(param),
-			*arg_ref = value_as_location(arg);
-	if (!state_loc_valid(spec, param_ref)) {
-		/* spec freed reference */
-		return NULL;
-	}
-	if (!state_loc_valid(caller, arg_ref)) {
-		return error_printf("must be lvalue");
-	}
-
-	if (state_loc_onheap(spec, param_ref)
-			&& !state_loc_onheap(caller, arg_ref)) {
-		return error_printf("must be heap allocated");
-	}
-
-	return state_specverify_block(spec, param_ref, caller, arg_ref, t);
-}
-
-static struct object *
-location_mustgetobject(struct location *loc, struct state *s)
-{
-	return object_res_as_object(state_get(s, loc, false));
-}
-
 
 static struct ast_type *
 call_type(struct ast_expr *call, struct state *);

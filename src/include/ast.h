@@ -500,10 +500,6 @@ ast_stmt_exec(struct ast_stmt *, struct state *);
 struct error *
 ast_stmt_pushsetup(struct ast_stmt *, struct state *);
 
-struct error *
-ast_specval_verify(struct ast_type *, struct value *param, struct value *arg,
-		struct state *spec, struct state *caller);
-
 DECLARE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_res)
 
 struct ast_stmt_res *

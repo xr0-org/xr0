@@ -4,19 +4,20 @@
 #include <string.h>
 
 #include "ast.h"
-#include "block.h"
-#include "clump.h"
 #include "ext.h"
-#include "heap.h"
-#include "static.h"
-#include "location.h"
 #include "object.h"
-#include "stack.h"
 #include "state.h"
-#include "static.h"
 #include "util.h"
 #include "value.h"
 #include "verifier.h"
+
+#include "block.h"
+#include "clump.h"
+#include "constraint.h"
+#include "heap.h"
+#include "location.h"
+#include "stack.h"
+#include "static.h"
 
 struct state {
 	struct externals *ext;
@@ -458,6 +459,61 @@ state_specverify_block(struct state *spec, struct location *param_ref,
 		     *b_arg = state_getblock(caller, arg_ref);
 	assert(b_param && b_arg);
 	return block_specverify(b_param, b_arg, spec, caller, t);
+}
+
+static struct object *
+location_mustgetobject(struct location *, struct state *);
+
+struct error *
+state_constraintverify(struct state *spec, struct state *impl, char *id)
+{
+	struct object *spec_obj = location_mustgetobject(
+		loc_res_as_loc(state_getloc(spec, id)), spec
+	);
+	if (!object_hasvalue(spec_obj)) {
+		return NULL;
+	}
+	return ast_specval_verify(
+		state_getvariabletype(spec, id),
+		object_as_value(spec_obj),
+		/* we can safely assume that impl has a value because
+		 * it's the result of an argument expression being
+		 * evaluated */
+		object_as_value(
+			location_mustgetobject(
+				loc_res_as_loc(state_getloc(impl, id)),
+				impl
+			)
+		),
+		spec,
+		impl
+	);
+}
+
+struct error *
+state_constraintverify_structmember(struct state *spec, struct state *impl,
+		struct value *spec_v, struct value *impl_v, char *member)
+{
+	struct object *spec_obj = value_struct_member(spec_v, member),
+		      *impl_obj = value_struct_member(impl_v, member);
+	assert(spec_obj && impl_obj);
+	if (!spec_obj) {
+		return NULL;
+	}
+	return ast_specval_verify(
+		value_struct_membertype(spec_v, member),
+		object_as_value(spec_obj),
+		object_as_value(impl_obj),
+		spec,
+		impl
+	);
+}
+
+
+static struct object *
+location_mustgetobject(struct location *loc, struct state *s)
+{
+	return object_res_as_object(state_get(s, loc, false));
 }
 
 

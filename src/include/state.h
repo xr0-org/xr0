@@ -279,6 +279,14 @@ struct error *
 state_specverify_block(struct state *spec, struct location *param,
 		struct state *caller, struct location *arg, struct ast_type *);
 
+struct error *
+state_constraintverify(struct state *spec, struct state *impl, char *id);
+
+struct error *
+state_constraintverify_structmember(struct state *spec, struct state *impl,
+		struct value *spec_v, struct value *impl_v, char *member);
+
+
 /* USED BY OBJECT */
 
 bool

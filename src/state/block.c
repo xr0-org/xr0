@@ -2,16 +2,19 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
-#include "block.h"
-#include "heap.h"
-#include "location.h"
 #include "object.h"
-#include "stack.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
 #include "verifier.h"
+
+#include "block.h"
+#include "constraint.h"
+#include "heap.h"
+#include "location.h"
+#include "stack.h"
 
 struct block {
 	struct object_arr *arr;
