@@ -22,6 +22,7 @@ bar()
 
 	obj[0] = 0;
 	obj[1] = malloc(1);
+	obj[1][0] = 0;
 	foo(obj);
 	free(obj[1]);
 }
