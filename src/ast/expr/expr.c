@@ -1231,6 +1231,43 @@ binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
 	}
 }
 
+static struct ast_expr *
+binary_simplify(struct ast_expr *);
+
+struct ast_expr *
+ast_expr_simplify(struct ast_expr *e)
+{
+	switch (e->kind) {
+	case EXPR_CONSTANT:
+		return ast_expr_copy(e);
+	case EXPR_BINARY:
+		return binary_simplify(e);
+	default:
+		assert(false);
+	}
+}
+
+static struct ast_expr *
+binary_simplify(struct ast_expr *e)
+{
+	struct ast_expr *e1 = ast_expr_simplify(ast_expr_binary_e1(e)),
+			*e2 = ast_expr_simplify(ast_expr_binary_e2(e));
+	int e1_n = ast_expr_as_constant(e1),
+	    e2_n = ast_expr_as_constant(e2);
+	ast_expr_destroy(e2);
+	ast_expr_destroy(e1);
+	switch (ast_expr_binary_op(e)) {
+	case BINARY_OP_ADDITION:
+		return ast_expr_constant_create(e1_n+e2_n);
+	case BINARY_OP_SUBTRACTION:
+		return ast_expr_constant_create(e1_n-e2_n);
+	case BINARY_OP_MULTIPLICATION:
+		return ast_expr_constant_create(e1_n*e2_n);
+	default:
+		assert(false);
+	}
+}
+
 struct tagval {
 	char *tag;
 	struct value *v;
@@ -1370,8 +1407,6 @@ binary_rangeeval_norm(struct value *v, enum ast_binary_operator op, int c)
 {
 	int lw = value_int_lw(v),
 	    up = value_int_up(v);
-	assert(c >= 0);
-
 	switch (op) {
 	case BINARY_OP_ADDITION:
 		return value_int_range_create(lw+c, up+c);
@@ -1383,6 +1418,7 @@ binary_rangeeval_norm(struct value *v, enum ast_binary_operator op, int c)
 			assert(c == 1);
 			return v;
 		}
+		assert(c >= 0);
 		/* ⊢ lw == value_as_constant(v) */
 		return value_int_create(lw*c);
 	default:

@@ -221,6 +221,9 @@ struct math_state;
 bool
 ast_expr_matheval(struct ast_expr *e);
 
+struct ast_expr *
+ast_expr_simplify(struct ast_expr *);
+
 
 struct tagval;
 

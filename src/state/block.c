@@ -192,22 +192,33 @@ block_undeclare(struct block *b, struct state *s)
 }
 
 struct error *
-block_constraintverify(struct block *param, struct location *arg_loc,
-		struct constraint *c)
+block_constraintverify(struct block *b, struct ast_expr *spec_offset,
+		struct location *impl_loc, struct constraint *c, struct state *s)
 {
-	int n = object_arr_nobjects(param->arr);
-	struct object **obj_param = object_arr_objects(param->arr);
+	int n = object_arr_nobjects(b->arr);
+	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
-		struct object *param_obj = obj_param[i];
-		struct error *err = constraint_verifyobject(
-			c, param_obj, arg_loc
+		struct ast_expr *offset = ast_expr_difference_create(
+			ast_expr_copy(offset_as_expr(location_offset(impl_loc))),
+			ast_expr_copy(spec_offset)
 		);
+		struct location *offset_loc = location_copy(impl_loc);
+		location_setoffset(
+			offset_loc, offset_create(ast_expr_copy(offset))
+		);
+		struct error *err = constraint_verifyobject(
+			c, obj[i], offset_loc
+		);
+		location_destroy(offset_loc);
 		if (err) {
-			char *offset_str = ast_expr_str(object_lower(param_obj));
+			struct ast_expr *simp = ast_expr_simplify(offset);
+			char *offset_str = ast_expr_str(simp);
+			ast_expr_destroy(simp);
 			err = error_printf("%w at index %s", err, offset_str);
 			free(offset_str);
 			return err;
 		}
+		ast_expr_destroy(offset);
 	}
 	return NULL;
 }

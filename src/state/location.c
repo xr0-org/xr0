@@ -187,6 +187,7 @@ location_block(struct location *loc)
 struct offset *
 location_offset(struct location *loc)
 {
+	assert(loc->offset);
 	return loc->offset;
 }
 
@@ -538,7 +539,7 @@ offset_equal(struct offset *o1, struct offset *o2)
 struct ast_expr *
 offset_as_expr(struct offset *o)
 {
-	assert(!o->member);
+	assert(!o->member && o->offset);
 	return o->offset;
 }
 

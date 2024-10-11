@@ -82,7 +82,9 @@ verifyloc(struct constraint *c, struct location *spec, struct location *impl)
 {
 	struct block *b_param = state_getblock(c->spec, spec);
 	assert(b_param);
-	return block_constraintverify(b_param, impl, c);
+	return block_constraintverify(
+		b_param, offset_as_expr(location_offset(spec)), impl, c, c->spec
+	);
 }
 
 struct error *
@@ -101,8 +103,7 @@ constraint_verifyobject(struct constraint *c, struct object *spec_obj,
 		if (error_to_block_observe_noobj(err)) {
 			return error_printf("must have object");
 		}
-		printf("err: %s\n", error_str(err));
-		assert(false);
+		return err;
 	}
 	struct object *arg_obj = object_res_as_object(res);
 	if (!object_hasvalue(spec_obj)) {
