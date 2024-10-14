@@ -293,6 +293,13 @@ address_eval(struct ast_expr *expr, struct state *state)
 		return res;
 	}
 	struct eval *eval = e_res_as_eval(res);
+	a_printf(
+		eval_islval(eval),
+		/* TODO: analyse evaluation above to determine whether this is a
+		 * user error or bug */
+		"operand of address expression must evaluate to lvalue or "
+		"function pointer\n"
+	);
 	struct value *v = value_ptr_create(location_copy(eval_as_lval(eval)));
 	struct ast_type *t = ast_type_create_ptr(ast_type_copy(eval_type(eval)));
 	e_res_destroy(res);
