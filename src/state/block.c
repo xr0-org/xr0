@@ -195,31 +195,36 @@ struct error *
 block_constraintverify(struct block *b, struct ast_expr *spec_offset,
 		struct location *impl_loc, struct constraint *c, struct state *s)
 {
+	struct ast_expr *offset = ast_expr_difference_create(
+		ast_expr_copy(offset_as_expr(location_offset(impl_loc))),
+		ast_expr_copy(spec_offset)
+	);
+	struct location *offset_loc = location_copy(impl_loc);
+	location_setoffset(
+		offset_loc, offset_create(ast_expr_copy(offset))
+	);
 	int n = object_arr_nobjects(b->arr);
 	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
-		struct ast_expr *offset = ast_expr_difference_create(
-			ast_expr_copy(offset_as_expr(location_offset(impl_loc))),
-			ast_expr_copy(spec_offset)
-		);
-		struct location *offset_loc = location_copy(impl_loc);
-		location_setoffset(
-			offset_loc, offset_create(ast_expr_copy(offset))
-		);
 		struct error *err = constraint_verifyobject(
 			c, obj[i], offset_loc
 		);
-		location_destroy(offset_loc);
 		if (err) {
-			struct ast_expr *simp = ast_expr_simplify(offset);
-			char *offset_str = ast_expr_str(simp);
+			struct ast_expr *actual_offset = ast_expr_sum_create(
+				ast_expr_copy(offset),
+				ast_expr_copy(object_lower(obj[i]))
+			);
+			struct ast_expr *simp = ast_expr_simplify(actual_offset);
+			char *simp_str = ast_expr_str(simp);
+			err = error_printf("%w at index %s", err, simp_str);
+			free(simp_str);
 			ast_expr_destroy(simp);
-			err = error_printf("%w at index %s", err, offset_str);
-			free(offset_str);
+			ast_expr_destroy(actual_offset);
 			return err;
 		}
-		ast_expr_destroy(offset);
 	}
+	location_destroy(offset_loc);
+	ast_expr_destroy(offset);
 	return NULL;
 }
 
