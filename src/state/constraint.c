@@ -34,58 +34,74 @@ constraint_destroy(struct constraint *c)
 	free(c);
 }
 
-static struct error *
-verifyloc(struct constraint *c, struct location *spec, struct location *impl);
+/* location_reloffset: return a location pointing at the same block as l1 but
+ * with an offset that is the difference between l1's and l2's offset. */
+static struct location *
+location_reloffset(struct location *l1, struct location *l2);
 
 struct error *
-constraint_verify(struct constraint *c, struct value *param, struct value *arg)
+constraint_verify(struct constraint *c, struct value *spec_v,
+		struct value *impl_v)
 {
 	if (ast_type_isint(c->t)) {
-		return value_confirmsubset(arg, param, c->impl, c->spec);
+		return value_confirmsubset(impl_v, spec_v, c->impl, c->spec);
 	} else if (ast_type_isstruct(c->t)) {
-		return value_struct_specval_verify(param, arg, c->impl, c->spec);
+		return value_struct_specval_verify(spec_v, impl_v, c->impl, c->spec);
 	}
 	a_printf(
 		ast_type_isptr(c->t),
 		"can only verify int, struct and pointer params\n"
 	);
 
-	if (!value_islocation(param)) {
+	if (!value_islocation(spec_v)) {
 		/* allow for NULL and other invalid-pointer setups */
 		return NULL;
 	}
 	/* spec requires value be valid pointer */
-	if (!value_islocation(arg)) {
+	if (!value_islocation(impl_v)) {
 		return error_printf("must be pointing at something");
 	}
 
-	struct location *param_ref = value_as_location(param),
-			*arg_ref = value_as_location(arg);
-	if (!state_loc_valid(c->spec, param_ref)) {
+	struct location *spec_loc = value_as_location(spec_v),
+			*impl_loc = value_as_location(impl_v);
+	if (!state_loc_valid(c->spec, spec_loc)) {
 		/* spec freed reference */
 		return NULL;
 	}
-	if (!state_loc_valid(c->impl, arg_ref)) {
+	if (!state_loc_valid(c->impl, impl_loc)) {
 		return error_printf("must be lvalue");
 	}
 
-	if (state_loc_onheap(c->spec, param_ref)
-			&& !state_loc_onheap(c->impl, arg_ref)) {
+	if (state_loc_onheap(c->spec, spec_loc)
+			&& !state_loc_onheap(c->impl, impl_loc)) {
 		return error_printf("must be heap allocated");
 	}
 
-	return verifyloc(c, param_ref, arg_ref);
+	/* we shift the impl_loc's offset by spec_loc's so that
+	 * block_constraintverify can behave as though both were offset zero */
+	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
+	struct block *spec_b = state_getblock(c->spec, spec_loc);
+	assert(spec_b);
+	struct error *err = block_constraintverify(spec_b, rel_impl_loc, c);
+	location_destroy(rel_impl_loc);
+
+	return err;
 }
 
-static struct error *
-verifyloc(struct constraint *c, struct location *spec, struct location *impl)
+static struct location *
+location_reloffset(struct location *l1, struct location *l2)
 {
-	struct block *b_param = state_getblock(c->spec, spec);
-	assert(b_param);
-	return block_constraintverify(
-		b_param, offset_as_expr(location_offset(spec)), impl, c, c->spec
+	struct ast_expr *offset = ast_expr_difference_create(
+		ast_expr_copy(offset_as_expr(location_offset(l1))),
+		ast_expr_copy(offset_as_expr(location_offset(l2)))
 	);
+	struct location *offset_loc = location_copy(l1);
+	location_setoffset(
+		offset_loc, offset_create(ast_expr_copy(offset))
+	);
+	return offset_loc;
 }
+
 
 struct error *
 constraint_verifyobject(struct constraint *c, struct object *spec_obj,

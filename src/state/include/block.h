@@ -57,8 +57,8 @@ block_permuteheaplocs(struct block *, struct permutation *);
 struct constraint;
 
 struct error *
-block_constraintverify(struct block *spec, struct ast_expr *,
-		struct location *impl, struct constraint *, struct state *);
+block_constraintverify(struct block *spec, struct location *impl,
+		struct constraint *);
 
 struct block_arr;
 
