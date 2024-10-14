@@ -34,6 +34,10 @@ constraint_destroy(struct constraint *c)
 	free(c);
 }
 
+static int
+size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec,
+		struct state *impl);
+
 /* location_reloffset: return a location pointing at the same block as l1 but
  * with an offset that is the difference between l1's and l2's offset. */
 static struct location *
@@ -77,6 +81,10 @@ constraint_verify(struct constraint *c, struct value *spec_v,
 		return error_printf("must be heap allocated");
 	}
 
+	if (!size_le(spec_loc, impl_loc, c->spec, c->impl)) {
+		return error_printf("must point at larger block");
+	}
+
 	/* we shift the impl_loc's offset by spec_loc's so that
 	 * block_constraintverify can behave as though both were offset zero */
 	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
@@ -102,6 +110,15 @@ location_reloffset(struct location *l1, struct location *l2)
 	return offset_loc;
 }
 
+static int
+size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec,
+		struct state *impl)
+{
+	struct block *spec_b = state_getblock(spec, spec_loc),
+		     *impl_b = state_getblock(impl, impl_loc);
+	assert(spec_b && impl_b);
+	return block_size_le(spec_b, impl_b);
+}
 
 struct error *
 constraint_verifyobject(struct constraint *c, struct object *spec_obj,

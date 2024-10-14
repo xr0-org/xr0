@@ -91,6 +91,12 @@ block_str(struct block *block)
 	return strbuilder_build(b);
 }
 
+int
+block_size_le(struct block *b1, struct block *b2)
+{
+	return b1->size <= b2->size;
+}
+
 void
 block_install(struct block *b, struct object *obj)
 {
