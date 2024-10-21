@@ -160,7 +160,6 @@ islinearisable(struct ast_stmt *stmt)
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:
-	case STMT_ITERATION_E:
 	case STMT_ITERATION:
 		return false;
 	case STMT_SELECTION:
@@ -181,7 +180,6 @@ islinearisable_setuponly(struct ast_stmt *stmt)
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:
-	case STMT_ITERATION_E:
 	case STMT_ITERATION:
 	case STMT_JUMP:
 	case STMT_EXPR:
@@ -360,54 +358,11 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 
 /* stmt_expr_eval */
 
-static struct ast_stmt *
-iter_neteffect(struct ast_stmt *);
-
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 {
-	/* TODO: check internal consistency of iteration */
-
-	struct ast_stmt *neteffect = iter_neteffect(stmt);
-	if (!neteffect) {
-		return NULL;
-	}
-
-	struct error *err = ast_stmt_exec(neteffect, state);
-	if (err) {
-		return err;
-	}
-
-	ast_stmt_destroy(neteffect);
-
-	return NULL;
-}
-
-/* iter_neteffect */
-
-static struct ast_stmt *
-iter_neteffect(struct ast_stmt *iter)
-{
-	struct ast_block *abs = ast_stmt_iter_abstract(iter);
-	assert(abs);
-
-	int nstmts = ast_block_nstmts(abs);
-	if (!nstmts) {
-		return NULL;
-	}
-
-	assert(nstmts == 1 && !ast_stmt_isdecl(ast_block_stmts(abs)[0]));
-
-	return ast_stmt_create_iter(
-		NULL,
-		ast_stmt_copy(ast_stmt_iter_init(iter)),
-		ast_stmt_copy(ast_stmt_iter_cond(iter)),
-		ast_expr_copy(ast_stmt_iter_iter(iter)),
-		ast_block_create(NULL, 0),
-		ast_stmt_create_compound(
-			NULL, ast_block_copy(ast_stmt_iter_abstract(iter))
-		)
-	);
+	printf("stmt: %s\n", ast_stmt_str(stmt, 1));
+	assert(false);
 }
 
 static struct error *

@@ -3,12 +3,8 @@
 void
 unit()
 {
-	int i;
-	void *p;
-
-	for (i = 0; i != 9; i++) {
-		p = malloc(1);
-		~ [ @p; ]
-		free(p);
+	int i = 0;
+	while (i != 9) {
+		i++;
 	}
 }

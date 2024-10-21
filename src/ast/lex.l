@@ -69,7 +69,6 @@ check_type();
 "short"			{ count(); return(SHORT); }
 "signed"		{ count(); return(SIGNED); }
 "sizeof"		{ count(); return(SIZEOF); }
-"some"			{ count(); return(SOME); }
 "static"		{ count(); return(STATIC); }
 "sfunc"			{ count(); return(SFUNC); }
 "struct"		{ count(); return(STRUCT); }

@@ -30,9 +30,9 @@ struct ast_stmt {
 			struct ast_stmt *nest;
 		} selection;
 		struct {
-			struct ast_stmt *init, *cond, *body;
-			struct ast_expr *iter;
-			struct ast_block *abstract;
+			/* only supporting while */
+			struct ast_expr *cond;
+			struct ast_stmt *body;
 		} iteration;
 		struct ast_expr *expr;
 		struct {
@@ -65,6 +65,7 @@ static struct ast_stmt *
 ast_stmt_create(struct lexememarker *loc)
 {
 	struct ast_stmt *stmt = calloc(1, sizeof(struct ast_stmt));
+	assert(stmt);
 	stmt->loc = loc;
 	return stmt;
 }
@@ -376,79 +377,32 @@ ast_stmt_sel_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *
 }
 
 struct ast_stmt *
-ast_stmt_create_iter(struct lexememarker *loc,
-		struct ast_stmt *init, struct ast_stmt *cond,
-		struct ast_expr *iter, struct ast_block *abstract,
+ast_stmt_create_iter(struct lexememarker *loc, struct ast_expr *cond,
 		struct ast_stmt *body)
 {
-	assert(init && cond && iter && abstract && body);
+	assert(cond && body);
+
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_ITERATION;
-	stmt->u.iteration.init = init;
 	stmt->u.iteration.cond = cond;
-	stmt->u.iteration.iter = iter;
 	stmt->u.iteration.body = body;
-	stmt->u.iteration.abstract = abstract;
 	return stmt;
 }
 
-struct ast_stmt *
-ast_stmt_iter_init(struct ast_stmt *stmt)
+static void
+ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_ITERATION);
-	return stmt->u.iteration.init;
-}
+	char *cond = ast_expr_str(stmt->u.iteration.cond),
+	     *body = ast_stmt_str(stmt->u.iteration.body, indent_level);
 
-struct ast_stmt *
-ast_stmt_iter_cond(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ITERATION);
-	return stmt->u.iteration.cond;
-}
+	strbuilder_printf(
+		b,
+		"while (%s) %s",
+		cond, body
+	);
 
-struct ast_expr *
-ast_stmt_iter_iter(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ITERATION);
-	return stmt->u.iteration.iter;
-}
-
-struct ast_block *
-ast_stmt_iter_abstract(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ITERATION);
-	return stmt->u.iteration.abstract;
-}
-
-struct ast_stmt *
-ast_stmt_iter_body(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ITERATION);
-	return stmt->u.iteration.body;
-}
-
-struct ast_expr *
-ast_stmt_iter_lower_bound(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ITERATION);
-	struct ast_expr *init = ast_stmt_as_expr(stmt->u.iteration.init);
-	switch (ast_expr_kind(init)) {
-	case EXPR_IDENTIFIER:
-		return init;
-	case EXPR_ASSIGNMENT:
-		return ast_expr_assignment_rval(init);
-	default:
-		assert(false);
-	}
-}
-
-struct ast_expr *
-ast_stmt_iter_upper_bound(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ITERATION);
-	struct ast_stmt *cond = stmt->u.iteration.cond;
-	assert(cond->kind == STMT_EXPR);
-	return ast_expr_binary_e2(cond->u.expr);
+	free(cond); free(body);
 }
 
 struct ast_stmt *
@@ -488,56 +442,6 @@ ast_stmt_register_mov(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_REGISTER);
 	return stmt->u._register.op.temp;
-}
-
-static struct ast_stmt *
-ast_stmt_copy_iter(struct ast_stmt *stmt)
-{
-	stmt->kind = STMT_ITERATION;
-	struct ast_stmt *copy = ast_stmt_copy(stmt);
-	stmt->kind = STMT_ITERATION_E;
-	return ast_stmt_create_iter_e(copy);
-}
-
-static void
-ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *b)
-{
-	assert(stmt->kind == STMT_ITERATION);
-	char *init = ast_stmt_str(stmt->u.iteration.init, indent_level),
-	     *cond = ast_stmt_str(stmt->u.iteration.cond, indent_level),
-	     *body = ast_stmt_str(stmt->u.iteration.body, indent_level),
-	     *iter = ast_expr_str(stmt->u.iteration.iter);
-
-	char *abs = stmt->u.iteration.abstract ?
-		ast_block_absstr(stmt->u.iteration.abstract, indent_level) : "";
-
-	strbuilder_printf(
-		b,
-		"for (%s %s %s) ~ %s%s",
-		init, cond, iter, abs, body
-	);
-
-	free(init); free(cond); free(body); free(iter);
-}
-
-struct ast_stmt *
-ast_stmt_create_iter_e(struct ast_stmt *stmt)
-{
-	/* TODO: determine where loc should go */
-	assert(stmt->kind == STMT_ITERATION);
-	stmt->kind = STMT_ITERATION_E;
-	return stmt;
-}
-
-static void
-ast_stmt_iter_e_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *b)
-{
-	assert(stmt->kind == STMT_ITERATION_E);
-	stmt->kind = STMT_ITERATION;
-	char *s = ast_stmt_str(stmt, indent_level);
-	stmt->kind = STMT_ITERATION_E;
-	strbuilder_printf(b, ".%s", s);
-	free(s);
 }
 
 static void
@@ -602,14 +506,6 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 			ast_stmt_destroy(stmt->u.selection.nest);
 		}
 		break;
-	case STMT_ITERATION:
-	case STMT_ITERATION_E:
-		ast_stmt_destroy(stmt->u.iteration.init);
-		ast_stmt_destroy(stmt->u.iteration.cond);
-		ast_stmt_destroy(stmt->u.iteration.body);
-		ast_expr_destroy(stmt->u.iteration.iter);
-		ast_block_destroy(stmt->u.iteration.abstract);
-		break;
 	case STMT_EXPR:
 		ast_expr_destroy(stmt->u.expr);
 		break;
@@ -669,14 +565,9 @@ ast_stmt_copy(struct ast_stmt *stmt)
 	case STMT_ITERATION:
 		return ast_stmt_create_iter(
 			loc,
-			ast_stmt_copy(stmt->u.iteration.init),
-			ast_stmt_copy(stmt->u.iteration.cond),
-			ast_expr_copy(stmt->u.iteration.iter),
-			ast_block_copy(stmt->u.iteration.abstract),
+			ast_expr_copy(stmt->u.iteration.cond),
 			ast_stmt_copy(stmt->u.iteration.body)
 		);
-	case STMT_ITERATION_E:
-		return ast_stmt_copy_iter(stmt);
 	case STMT_JUMP:
 		return ast_stmt_create_jump(
 			loc, stmt->u.jump.kind,
@@ -720,9 +611,6 @@ ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 		break;
 	case STMT_ITERATION:
 		ast_stmt_iter_sprint(stmt, indent_level, b);
-		break;
-	case STMT_ITERATION_E:
-		ast_stmt_iter_e_sprint(stmt, indent_level, b);
 		break;
 	case STMT_JUMP:
 		ast_stmt_jump_sprint(stmt, b);
@@ -780,9 +668,6 @@ static struct string_arr *
 ast_stmt_selection_getfuncs(struct ast_stmt *stmt);
 
 static struct string_arr *
-ast_stmt_iteration_getfuncs(struct ast_stmt *stmt);
-
-static struct string_arr *
 ast_stmt_compound_getfuncs(struct ast_stmt *stmt);
 
 struct string_arr *
@@ -801,9 +686,6 @@ ast_stmt_getfuncs(struct ast_stmt *stmt)
 		return ast_stmt_expr_getfuncs(stmt);
 	case STMT_SELECTION:
 		return ast_stmt_selection_getfuncs(stmt);
-	case STMT_ITERATION:
-	case STMT_ITERATION_E:
-		return ast_stmt_iteration_getfuncs(stmt);
 	case STMT_JUMP:
 		return ast_expr_getfuncs(stmt->u.jump.rv);
 	default:
@@ -839,28 +721,6 @@ ast_stmt_selection_getfuncs(struct ast_stmt *stmt)
 }
 
 static struct string_arr *
-ast_stmt_iteration_getfuncs(struct ast_stmt *stmt)
-{
-	struct ast_stmt *init = stmt->u.iteration.init,
-			*cond = stmt->u.iteration.cond,
-			*body = stmt->u.iteration.body;
-	struct ast_expr *iter = stmt->u.iteration.iter;
-	/* XXX: inlucde loop abstracts potentially */
-	struct string_arr *init_arr = ast_stmt_getfuncs(init),
-			  *cond_arr = ast_stmt_getfuncs(cond),
-			  *body_arr = ast_stmt_getfuncs(body),
-			  *iter_arr = ast_expr_getfuncs(iter);
-	
-	return string_arr_concat(
-		string_arr_create(),
-		string_arr_concat(
-			string_arr_concat(init_arr, cond_arr),
-			string_arr_concat(body_arr, iter_arr)
-		)
-	);
-}
-
-static struct string_arr *
 ast_stmt_compound_getfuncs(struct ast_stmt *stmt)
 {
 	struct string_arr *res = string_arr_create();
@@ -888,7 +748,6 @@ ast_stmt_preconds_validate(struct ast_stmt *stmt)
 	switch (stmt->kind) {
 	case STMT_EXPR:
 	case STMT_ALLOCATION:
-	case STMT_ITERATION:
 		return NULL;
 	case STMT_SELECTION:
 		return preconds_selection_verify(stmt);	
@@ -935,7 +794,6 @@ ast_stmt_setupmodulate(struct ast_stmt *stmt, struct state *s)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_EXPR:
-	case STMT_ITERATION:
 	case STMT_JUMP:
 		return ast_stmt_res_error_create(error_modulate_skip());
 	case STMT_DECLARATION:
