@@ -40,5 +40,22 @@ struct ast_stmt *
 ast_stmt_create_iter(struct lexememarker *, struct ast_expr *cond,
 		struct ast_stmt *body);
 
+struct ast_expr *
+ast_stmt_iter_cond(struct ast_stmt *);
+
+struct ast_stmt *
+ast_stmt_iter_body(struct ast_stmt *);
+
+struct ast_stmt *
+ast_stmt_create_return(struct lexememarker *, struct ast_expr *rv);
+
+struct ast_expr *
+ast_stmt_return_value(struct ast_stmt *stmt);
+
+bool
+ast_stmt_isreturn(struct ast_stmt *);
+
+struct ast_stmt *
+ast_stmt_create_break(struct lexememarker *);
 
 #endif

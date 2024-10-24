@@ -7,4 +7,5 @@ unit()
 	while (i != 9) {
 		i++;
 	}
+	~ [ i == 9; ] /* unknowable */
 }

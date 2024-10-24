@@ -2,8 +2,11 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
 #include "util.h"
+
+#include "stmt.h"
 
 struct ast_block {
 	int nstmt;

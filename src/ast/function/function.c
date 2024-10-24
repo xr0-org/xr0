@@ -13,10 +13,11 @@
 #include "lex.h"
 #include "object.h"
 #include "state.h"
-#include "stmt.h"
 #include "type.h"
 #include "util.h"
 #include "verifier.h"
+
+#include "stmt.h"
 
 struct ast_function {
 	bool isaxiom;
@@ -245,7 +246,7 @@ generate_abstract(struct ast_function *f, struct externals *ext)
 		);
 		namedseq_destroy(seq);
 		ast_block_append_stmt(
-			b, ast_stmt_create_jump(lexememarker_copy(f->loc), JUMP_RETURN, ret)
+			b, ast_stmt_create_return(lexememarker_copy(f->loc), ret)
 		);
 	}
 	return ast_block_res_block_create(b);

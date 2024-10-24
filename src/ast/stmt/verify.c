@@ -47,7 +47,11 @@ jump_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
 static struct error *
-selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+sel_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
+
+static struct error *
+iter_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
 static struct error *
@@ -60,7 +64,9 @@ linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 	case STMT_JUMP:
 		return jump_linearise(stmt, b, loc, state);
 	case STMT_SELECTION:
-		return selection_linearise(stmt, b, loc, state);
+		return sel_linearise(stmt, b, loc, state);
+	case STMT_ITERATION:
+		return iter_linearise(stmt, b, loc, state);
 	default:
 		assert(false);
 	}
@@ -86,19 +92,19 @@ static struct error *
 jump_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
 		struct state *state)
 {
-	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
+	struct ast_expr *rv = ast_stmt_return_value(stmt);
 	struct ast_expr *gen = ast_expr_geninstr(
 		rv, lexememarker_copy(loc), b, state
 	);
-	struct ast_stmt *newjump = ast_stmt_create_jump(
-		lexememarker_copy(loc), JUMP_RETURN, gen
+	struct ast_stmt *newjump = ast_stmt_create_return(
+		lexememarker_copy(loc), gen
 	);
 	ast_block_append_stmt(b, newjump);
 	return NULL;
 }
 
 static struct error *
-selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
+sel_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
 		struct state *state)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
@@ -118,6 +124,49 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 	ast_block_append_stmt(b, newsel);
 	return NULL;
 }
+
+static struct ast_block *
+prepend_body(struct ast_stmt *body, struct ast_stmt *stmt);
+
+static struct error *
+iter_linearise(struct ast_stmt *stmt, struct ast_block *b, 
+		struct lexememarker *loc, struct state *state)
+{
+	struct ast_stmt *term = ast_stmt_create_sel(
+		lexememarker_copy(loc),
+		false,
+		ast_expr_unary_create(
+			ast_expr_copy(ast_stmt_iter_cond(stmt)), UNARY_OP_BANG
+		),
+		ast_stmt_create_break(lexememarker_copy(loc)),
+		NULL
+	);
+	struct ast_stmt *body = ast_stmt_iter_body(stmt);
+	ast_block_append_stmt(
+		b,
+		/* while(1) form */
+		ast_stmt_create_iter(
+			lexememarker_copy(loc),
+			ast_expr_constant_create(1),
+			ast_stmt_create_compound(
+				lexememarker_copy(ast_stmt_lexememarker(body)),
+				prepend_body(body, term)
+			)
+		)
+	);
+	return NULL;
+}
+
+static struct ast_block *
+prepend_body(struct ast_stmt *old, struct ast_stmt *stmt)
+{
+	assert(ast_stmt_kind(old) == STMT_COMPOUND);
+	struct ast_block *new = ast_block_copy(ast_stmt_as_block(old));
+	ast_block_prepend_stmt(new, stmt);
+	return new;
+}
+
+
 
 /* stmt_verify */
 static struct error *
@@ -160,9 +209,9 @@ islinearisable(struct ast_stmt *stmt)
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:
-	case STMT_ITERATION:
 		return false;
 	case STMT_SELECTION:
+	case STMT_ITERATION:
 	case STMT_EXPR:
 	case STMT_JUMP:
 		return true;
@@ -368,7 +417,7 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
+	struct ast_expr *rv = ast_stmt_return_value(stmt);
 	if (rv) {
 		struct e_res *res = ast_expr_eval(rv, state);
 		if (e_res_iserror(res)) {

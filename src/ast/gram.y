@@ -846,10 +846,11 @@ iteration_statement
 jump_statement
 	/*: GOTO IDENTIFIER ';'*/
 	/*| CONTINUE ';'*/
-	/*| BREAK ';'*/
+	: BREAK ';'
+		{ $$ = ast_stmt_create_break(lexloc()); }
 	/*| RETURN ';'*/
-	: RETURN expression ';'
-		{ $$ = ast_stmt_create_jump(lexloc(), JUMP_RETURN, $2); }
+	| RETURN expression ';'
+		{ $$ = ast_stmt_create_return(lexloc(), $2); }
 	;
 
 translation_unit
