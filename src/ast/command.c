@@ -139,7 +139,7 @@ command_verify_exec(struct verifier *p, struct command *cmd)
 struct ast_expr *YACC_PARSED_EXPR;
 
 int
-yyparse();
+yyparse(void);
 
 static struct ast_expr *
 command_arg_toexpr(struct command *c)
@@ -205,7 +205,7 @@ getcmd(char *debugsep)
 }
 
 static struct command *
-command_create_help();
+command_create_help(void);
 
 static bool
 command_ishelp(char *cmd);
@@ -226,7 +226,7 @@ static struct command *
 process_command(char *cmd, char *sep)
 {
 	if (command_ishelp(cmd)) {
-		return command_create_help(COMMAND_HELP);
+		return command_create_help();
 	} else if (command_isstep(cmd)) {
 		return command_create(COMMAND_STEP);
 	} else if (command_isnext(cmd)) {
@@ -248,7 +248,7 @@ command_ishelp(char *cmd)
 }
 
 static struct command *
-command_create_help()
+command_create_help(void)
 {
 	d_printf("List of commands:\n");
 	d_printf("step -- Step to next logical statement.\n");
@@ -335,19 +335,19 @@ args_tokenise(char *args)
 }
 
 static void
-command_help_step();
+command_help_step(void);
 
 static void
-command_help_next();
+command_help_next(void);
 
 static void
-command_help_continue();
+command_help_continue(void);
 
 static void
-command_help_break();
+command_help_break(void);
 
 static void
-command_help_quit();
+command_help_quit(void);
 
 static struct command *
 command_help(struct string_arr *args, char *debugsep)
@@ -375,7 +375,7 @@ command_help(struct string_arr *args, char *debugsep)
 }
 
 static void
-command_help_step()
+command_help_step(void)
 {
 	d_printf("Step to the next logical statement, entering\n");
 	d_printf("the current one when appropriate.\n");
@@ -383,21 +383,21 @@ command_help_step()
 }
 
 static void
-command_help_next()
+command_help_next(void)
 {
 	d_printf("Step over the current statement.\n");
 	d_printf("Usage: n(ext)\n\n");
 }
 
 static void
-command_help_continue()
+command_help_continue(void)
 {
 	d_printf("Step until breakpoint, error or end.\n");
 	d_printf("Usage: c(ontinue)\n\n");
 }
 
 static void
-command_help_break()
+command_help_break(void)
 {
 	d_printf("break -- Set breakpoint.\n");
 	d_printf("Usage: b(reak) [LINE_NUMBER]\n\n");
@@ -410,7 +410,7 @@ command_help_break()
 }
 
 static void
-command_help_quit()
+command_help_quit(void)
 {
 	d_printf("Quit.\n");
 	d_printf("Usage: q(uit)\n");
@@ -432,7 +432,7 @@ static struct command *
 break_set(char *arg);
 
 static struct command *
-break_list();
+break_list(void);
 
 static struct command *
 command_break(struct string_arr *args, char *debugsep)
@@ -504,7 +504,7 @@ command_verify(char *arg)
 }
 
 static struct command *
-break_list()
+break_list(void)
 {
 	d_printf("%s\n", breakpoint_list());
 	return command_create(COMMAND_BREAKPOINT_LIST);

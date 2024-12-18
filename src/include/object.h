@@ -100,7 +100,7 @@ struct heap;
 struct object_arr;
 
 struct object_arr *
-object_arr_create();
+object_arr_create(void);
 
 void
 object_arr_destroy(struct object_arr *);

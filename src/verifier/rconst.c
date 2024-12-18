@@ -13,7 +13,7 @@ struct rconst {
 };
 
 struct rconst *
-rconst_create()
+rconst_create(void)
 {
 	struct rconst *v = malloc(sizeof(struct rconst));
 	v->varmap = map_create();

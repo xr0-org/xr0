@@ -28,7 +28,7 @@ setcurrfunc(char *func)
 }
 
 char *
-getrconstkey()
+getrconstkey(void)
 {
 	assert(FUNC_SEQ);
 	return namedseq_next(FUNC_SEQ);
@@ -37,10 +37,10 @@ getrconstkey()
 extern char *yytext;
 
 int
-yylex();
+yylex(void);
 
 int
-yyerror();
+yyerror(char *);
 
 /* XXX */
 char *

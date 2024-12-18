@@ -15,7 +15,7 @@ struct static_memory {
 };
 
 struct static_memory *
-static_memory_create()
+static_memory_create(void)
 {
 	struct static_memory *sm = malloc(sizeof(struct static_memory));
 	assert(sm);

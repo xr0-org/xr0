@@ -4,7 +4,7 @@
 struct externals;
 
 struct externals *
-externals_create();
+externals_create(void);
 
 void
 externals_destroy(struct externals *);

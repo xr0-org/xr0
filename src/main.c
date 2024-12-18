@@ -25,7 +25,7 @@
 #define ERROR_NO_SORTFUNC	"supply function to `-t' flag to evaluate dependencies for"
 
 int
-yyparse();
+yyparse(void);
 
 enum execmode { EXECMODE_VERIFY, EXECMODE_STRIP, };
 enum sortmode { SORTMODE_NONE, SORTMODE_SORT, SORTMODE_VERIFY };
@@ -45,7 +45,7 @@ struct config {
 };
 
 static struct string_arr *
-default_includes();
+default_includes(void);
 
 struct sortconfig {
 	enum sortmode mode;
@@ -143,7 +143,7 @@ sortconfig_create(enum sortmode mode, char *sortfunc)
 }
 
 static struct string_arr *
-default_includes()
+default_includes(void)
 {
 	struct string_arr *dirs = string_arr_create();
 	char *env = getenv(INCLUDE_ENVVAR);
@@ -262,7 +262,7 @@ pass0(struct ast *root, struct externals *ext)
 }
 
 static void
-debugger_summary();
+debugger_summary(void);
 
 static struct error *
 handle_debug(struct ast_function *, struct externals *, bool debug, char *sep);
@@ -294,7 +294,7 @@ pass1(struct ast *root, struct externals *ext, bool debug, char *debugsep)
 }
 
 static void
-debugger_summary()
+debugger_summary(void)
 {
 	d_printf("(0db) The Xr0 Static Debugger for C\n");
 	d_printf("Copyright (C) 2024 Xr0\n");

@@ -96,7 +96,7 @@ struct ast_variable_arr {
 };
 
 struct ast_variable_arr *
-ast_variable_arr_create()
+ast_variable_arr_create(void)
 {
 	return calloc(1, sizeof(struct ast_variable_arr));
 }

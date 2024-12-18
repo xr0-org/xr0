@@ -25,7 +25,7 @@ struct map {
 };
 
 struct map *
-map_create();
+map_create(void);
 
 void
 map_destroy(struct map *);
@@ -42,10 +42,10 @@ map_set(struct map *, const char *key, const void *value);
 struct string_arr;
 
 struct string_arr *
-string_arr_create();
+string_arr_create(void);
 
 void
-string_arr_destroy();
+string_arr_destroy(struct string_arr *);
 
 char **
 string_arr_s(struct string_arr *);
@@ -71,10 +71,10 @@ string_arr_str(struct string_arr *);
 struct int_arr;
 
 struct int_arr *
-int_arr_create();
+int_arr_create(void);
 
 void
-int_arr_destroy();
+int_arr_destroy(struct int_arr *);
 
 int *
 int_arr_arr(struct int_arr *);
@@ -91,7 +91,7 @@ int_arr_appendrange(struct int_arr *arr, struct int_arr *arr2);
 struct strbuilder;
 
 struct strbuilder *
-strbuilder_create();
+strbuilder_create(void);
 
 int
 strbuilder_printf(struct strbuilder *b, const char *fmt, ...);
@@ -144,31 +144,31 @@ struct verifierinstruct *
 error_get_verifierinstruct(struct error *);
 
 struct error *
-error_verifiercontradiction();
+error_verifiercontradiction(void);
 
 struct error *
 error_to_verifiercontradiction(struct error *);
 
 struct error *
-error_return();
+error_return(void);
 
 struct error *
 error_to_return(struct error *);
 
 struct error *
-error_block_observe_noobj();
+error_block_observe_noobj(void);
 
 struct error *
 error_to_block_observe_noobj(struct error *);
 
 struct error *
-error_state_get_no_block();
+error_state_get_no_block(void);
 
 struct error *
 error_to_state_get_no_block(struct error *err);
 
 struct error *
-error_state_deref_rconst();
+error_state_deref_rconst(void);
 
 struct error *
 error_to_state_deref_rconst(struct error *err);
@@ -180,13 +180,13 @@ struct error *
 error_to_value_bounds(struct error *);
 
 struct error *
-error_modulate_skip();
+error_modulate_skip(void);
 
 struct error *
 error_to_modulate_skip(struct error *);
 
 struct error *
-error_eval_void();
+error_eval_void(void);
 
 struct error *
 error_to_eval_void(struct error *);
@@ -198,7 +198,7 @@ error_str(struct error *);
 struct circuitbreaker;
 
 struct circuitbreaker *
-circuitbreaker_create();
+circuitbreaker_create(void);
 
 struct circuitbreaker *
 circuitbreaker_copy(struct circuitbreaker *);
@@ -216,7 +216,7 @@ struct RTNAME * \
 RTNAME##_error_create(struct error *err); \
 \
 struct RTNAME * \
-RTNAME##_empty_create(); \
+RTNAME##_empty_create(void); \
 \
 struct RTNAME * \
 RTNAME##_##VNAME##_create(TYPE val); \
@@ -261,7 +261,7 @@ RTNAME##_error_create(struct error *err) \
 } \
 \
 struct RTNAME * \
-RTNAME##_empty_create() \
+RTNAME##_empty_create(void) \
 { \
 	struct RTNAME *r = malloc(sizeof(struct RTNAME)); \
 	r->hasvalue = false; \

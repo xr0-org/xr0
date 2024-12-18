@@ -43,7 +43,7 @@ entry_destroy(struct entry e)
 }
 
 struct map *
-map_create()
+map_create(void)
 {
 	return (struct map *) calloc(1, sizeof(struct map));
 }
@@ -103,7 +103,7 @@ struct strbuilder {
 #define CAP_MULT 2
 
 struct strbuilder *
-strbuilder_create()
+strbuilder_create(void)
 {
 	struct strbuilder *b = malloc(sizeof(struct strbuilder));
 	b->cap = CAP_DEFAULT;
@@ -195,7 +195,7 @@ struct string_arr {
 };
 
 struct string_arr *
-string_arr_create()
+string_arr_create(void)
 {
 	struct string_arr *arr = calloc(1, sizeof(struct string_arr));
 	assert(arr);
@@ -298,7 +298,7 @@ struct int_arr {
 };
 
 struct int_arr *
-int_arr_create()
+int_arr_create(void)
 {
 	struct int_arr *arr = calloc(1, sizeof(struct int_arr));
 	assert(arr);
@@ -507,7 +507,7 @@ error_get_verifierinstruct(struct error *err)
 }
 
 struct error *
-error_verifiercontradiction()
+error_verifiercontradiction(void)
 {
 	struct error *err = calloc(1, sizeof(struct error));
 	err->type = ERROR_VERIFIERCONTRADICTION;
@@ -521,7 +521,7 @@ error_to_verifiercontradiction(struct error *err)
 }
 
 struct error *
-error_return()
+error_return(void)
 {
 	struct error *err = calloc(1, sizeof(struct error));
 	err->type = ERROR_RETURN;
@@ -535,7 +535,7 @@ error_to_return(struct error *err)
 }
 
 struct error *
-error_block_observe_noobj()
+error_block_observe_noobj(void)
 {
 	struct error *err = calloc(1, sizeof(struct error));
 	err->type = ERROR_BLOCK_OBSERVE_NOOBJ;
@@ -549,7 +549,7 @@ error_to_block_observe_noobj(struct error *err)
 }
 
 struct error *
-error_state_get_no_block()
+error_state_get_no_block(void)
 {
 	struct error *err = calloc(1, sizeof(struct error));
 	err->type = ERROR_STATE_GET_NOBLOCK;
@@ -563,7 +563,7 @@ error_to_state_get_no_block(struct error *err)
 }
 
 struct error *
-error_state_deref_rconst()
+error_state_deref_rconst(void)
 {
 	struct error *err = calloc(1, sizeof(struct error));
 	err->type = ERROR_STATE_DEREF_RCONST;
@@ -592,7 +592,7 @@ error_to_value_bounds(struct error *err)
 }
 
 struct error *
-error_modulate_skip()
+error_modulate_skip(void)
 {
 	struct error *err = calloc(1, sizeof(struct error));
 	err->type = ERROR_MODULATE_SKIP;
@@ -606,7 +606,7 @@ error_to_modulate_skip(struct error *err)
 }
 
 struct error *
-error_eval_void()
+error_eval_void(void)
 {
 	struct error *err = calloc(1, sizeof(struct error));
 	err->type = ERROR_EVAL_VOID;
@@ -665,7 +665,7 @@ struct circuitbreaker {
 };
 
 struct circuitbreaker *
-circuitbreaker_create()
+circuitbreaker_create(void)
 {
 	return calloc(1, sizeof(struct circuitbreaker));
 }

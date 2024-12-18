@@ -376,7 +376,7 @@ location_auto_getblock(struct location *loc, struct stack *s)
 static struct block_res *
 block_res_or_empty(struct block *b)
 {
-	return b ? block_res_block_create(b) : block_res_empty_create(b);
+	return b ? block_res_block_create(b) : block_res_empty_create();
 }
 
 struct block *
@@ -404,7 +404,7 @@ struct location_arr {
 };
 
 struct location_arr *
-location_arr_create()
+location_arr_create(void)
 {
 	struct location_arr *arr = calloc(1, sizeof(struct location_arr));
 	assert(arr);

@@ -200,7 +200,7 @@ struct preresult {
 };
 
 struct preresult *
-preresult_empty_create()
+preresult_empty_create(void)
 {
 	return calloc(1, sizeof(struct preresult));
 }
@@ -216,7 +216,7 @@ preresult_error_create(struct error *err)
 }
 
 struct preresult *
-preresult_contradiction_create()
+preresult_contradiction_create(void)
 {
 	struct preresult *r = preresult_empty_create();
 	r->iscontradiction = true;

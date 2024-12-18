@@ -6,7 +6,7 @@
 struct clump;
 
 struct clump *
-clump_create();
+clump_create(void);
 
 void
 clump_destroy(struct clump *);

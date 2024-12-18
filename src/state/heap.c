@@ -21,7 +21,7 @@ struct heap {
 };
 
 struct heap *
-heap_create()
+heap_create(void)
 {
 	struct heap *h = malloc(sizeof(struct heap)); assert(h);
 	h->blocks = block_arr_create();

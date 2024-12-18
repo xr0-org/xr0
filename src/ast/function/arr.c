@@ -11,7 +11,7 @@ struct ast_function_arr {
 };
 
 struct ast_function_arr *
-ast_function_arr_create()
+ast_function_arr_create(void)
 {
 	return calloc(1, sizeof(struct ast_function_arr));
 }

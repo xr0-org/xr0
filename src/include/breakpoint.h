@@ -4,7 +4,7 @@
 struct breakpoint;
 
 char *
-breakpoint_list();
+breakpoint_list(void);
 
 struct error *
 breakpoint_set(char *filename, int linenum);
@@ -18,6 +18,6 @@ bool
 breakpoint_shouldbreak(struct lexememarker *);
 
 void
-breakpoint_reset();
+breakpoint_reset(void);
 
 #endif

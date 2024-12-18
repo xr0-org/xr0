@@ -131,7 +131,7 @@ ast_type_create(enum ast_type_base base, enum ast_type_modifier mod)
 }
 
 struct ast_type *
-ast_type_create_int()
+ast_type_create_int(void)
 {
 	return ast_type_create(TYPE_INT, 0);
 }
@@ -146,19 +146,19 @@ ast_type_create_ptr(struct ast_type *ref)
 }
 
 struct ast_type *
-ast_type_create_char()
+ast_type_create_char(void)
 {
 	return ast_type_create(TYPE_CHAR, 0);
 }
 
 struct ast_type *
-ast_type_create_void()
+ast_type_create_void(void)
 {
 	return ast_type_create(TYPE_VOID, 0);
 }
 
 struct ast_type *
-ast_type_create_voidptr()
+ast_type_create_voidptr(void)
 {
 	struct ast_type *t = ast_type_create(TYPE_POINTER, 0);
 	t->ptr_type = ast_type_create(TYPE_VOID, 0);
@@ -229,7 +229,7 @@ ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range
 		assert(range);
 		return value_int_rconst_create(range, s);
 	case TYPE_POINTER:
-		return value_ptr_rconst_create(t->ptr_type);
+		return value_ptr_rconst_create();
 	case TYPE_USERDEF:
 		return ast_type_rconstnokey(
 			externals_gettypedef(state_getext(s), t->userdef),
@@ -404,7 +404,7 @@ ast_type_copy_struct(struct ast_type *old)
 }
 
 struct ast_type *
-ast_type_create_range()
+ast_type_create_range(void)
 {
 	return ast_type_create(TYPE_RANGE, 0);
 }

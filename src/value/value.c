@@ -102,10 +102,10 @@ value_ptr_create(struct location *loc)
 struct number_value;
 
 struct number_value *
-number_value_min_create();
+number_value_min_create(void);
 
 struct number_value *
-number_value_max_create();
+number_value_max_create(void);
 
 struct number_value *
 number_value_constant_create(int constant);
@@ -114,7 +114,7 @@ static struct number *
 number_singlerange_create(struct number_value *lw, struct number_value *up);
 
 struct value *
-value_ptr_rconst_create()
+value_ptr_rconst_create(void)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
@@ -935,7 +935,7 @@ struct value_arr {
 };
 
 struct value_arr *
-value_arr_create()
+value_arr_create(void)
 {
 	return calloc(1, sizeof(struct value_arr));
 }
@@ -1591,10 +1591,10 @@ _rconst_tosinglerange(char *id, struct state *s)
 
 
 struct number_value *
-number_value_min_create();
+number_value_min_create(void);
 
 struct number_value *
-number_value_max_create();
+number_value_max_create(void);
 
 struct number_range_arr *
 number_range_arr_ne_create(int val)
@@ -1861,7 +1861,7 @@ struct splitinstruct {
 };
 
 struct splitinstruct *
-splitinstruct_create()
+splitinstruct_create(void)
 {
 	return calloc(1, sizeof(struct splitinstruct));
 }
@@ -1893,7 +1893,7 @@ struct number_range_arr {
 };
 
 struct number_range_arr *
-number_range_arr_create()
+number_range_arr_create(void)
 {
 	struct number_range_arr *arr = calloc(1, sizeof(struct number_range_arr));
 	assert(arr);
@@ -2130,13 +2130,13 @@ number_value_limit_create(bool max)
 }
 
 struct number_value *
-number_value_min_create()
+number_value_min_create(void)
 {
 	return number_value_limit_create(false);
 }
 
 struct number_value *
-number_value_max_create()
+number_value_max_create(void)
 {
 	return number_value_limit_create(true);
 }

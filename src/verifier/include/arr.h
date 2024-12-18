@@ -6,7 +6,7 @@ struct verifier;
 struct verifier_arr;
 
 struct verifier_arr *
-verifier_arr_create();
+verifier_arr_create(void);
 
 void
 verifier_arr_destroy(struct verifier_arr *);

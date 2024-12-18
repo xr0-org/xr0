@@ -51,13 +51,13 @@ verifier_atend(struct verifier *v)
 /* verifier_progress */
 
 progressor *
-progressor_step()
+progressor_step(void)
 {
 	return state_step;
 }
 
 progressor *
-progressor_next()
+progressor_next(void)
 {
 	return state_next;
 }

@@ -6,7 +6,7 @@
 struct static_memory;
 
 struct static_memory *
-static_memory_create();
+static_memory_create(void);
 
 void
 static_memory_destroy(struct static_memory *);

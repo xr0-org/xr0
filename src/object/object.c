@@ -441,7 +441,7 @@ struct object_arr {
 };
 
 struct object_arr *
-object_arr_create()
+object_arr_create(void)
 {
 	struct object_arr *arr = calloc(1, sizeof(struct object_arr));
 	assert(arr);

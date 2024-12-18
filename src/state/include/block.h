@@ -67,7 +67,7 @@ block_constraintverify(struct block *spec, struct location *impl,
 struct block_arr;
 
 struct block_arr *
-block_arr_create();
+block_arr_create(void);
 
 void
 block_arr_destroy(struct block_arr *);

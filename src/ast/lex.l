@@ -14,16 +14,16 @@ IS			(u|U|l|L)*
 #include "gram.tab.h"
 
 void
-count();
+count(void);
 
 void
-comment();
+comment(void);
 
 void
-preproc();
+preproc(void);
 
 long
-check_type();
+check_type(void);
 %}
 
 %%
@@ -149,13 +149,13 @@ L?\"(\\.|[^\\"])*\"	{ count(); return(STRING_LITERAL); }
 %%
 
 int
-yywrap()
+yywrap(void)
 {
 	return 1;
 }
 
 void
-comment()
+comment(void)
 {
 	char c, c1;
 
@@ -177,14 +177,14 @@ comment()
 struct lexememarker marker;
 
 struct lexememarker *
-lexloc()
+lexloc(void)
 {
 	assert(marker.filename);
 	return lexememarker_copy(&marker);
 }
 
 struct lexememarker
-process_linemarker()
+process_linemarker(void)
 {
 	/* advance beyond '#' */
 	char c = input();
@@ -261,7 +261,7 @@ process_linemarker()
 }
 
 void
-preproc()
+preproc(void)
 {	
 	if (marker.filename) {
 		free(marker.filename);
@@ -270,7 +270,7 @@ preproc()
 }
 
 void
-count()
+count(void)
 {
 	for (char *s = yytext; *s; s++) {
 		switch (*s) {
@@ -289,7 +289,7 @@ count()
 }
 
 long
-check_type()
+check_type(void)
 {
 	if (map_get(table, yytext)) {
 		return TYPE_NAME;
@@ -309,7 +309,7 @@ struct map *table;
 enum ictype installclass;
 
 void
-lex_begin()
+lex_begin(void)
 {
 	table = map_create();
 	installclass = IC_NONE;
@@ -322,7 +322,7 @@ lex_begin()
 }
 
 void
-lex_finish()
+lex_finish(void)
 {
 	if (marker.filename) {
 		free(marker.filename);

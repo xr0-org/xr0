@@ -27,7 +27,7 @@ struct value *
 value_ptr_create(struct location *loc);
 
 struct value *
-value_ptr_rconst_create();
+value_ptr_rconst_create(void);
 
 struct value *
 value_int_create(int val);
@@ -167,7 +167,7 @@ value_splitassume(struct value *, struct number *);
 struct splitinstruct;
 
 struct splitinstruct *
-splitinstruct_create();
+splitinstruct_create(void);
 
 void
 splitinstruct_append(struct splitinstruct *, struct map *);
@@ -184,7 +184,7 @@ DECLARE_RESULT_TYPE(struct value *, value, value_res)
 struct value_arr;
 
 struct value_arr *
-value_arr_create();
+value_arr_create(void);
 
 void
 value_arr_destroy(struct value_arr *arr);
@@ -224,7 +224,7 @@ number_range_destroy(struct number_range *);
 struct number_range_arr;
 
 struct number_range_arr *
-number_range_arr_create();
+number_range_arr_create(void);
 
 void
 number_range_arr_destroy(struct number_range_arr *arr);

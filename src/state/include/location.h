@@ -126,10 +126,10 @@ location_dealloc(struct location *, struct heap *);
 struct location_arr;
 
 struct location_arr *
-location_arr_create();
+location_arr_create(void);
 
 void
-location_arr_destroy();
+location_arr_destroy(struct location_arr *);
 
 struct location **
 location_arr_loc(struct location_arr *);

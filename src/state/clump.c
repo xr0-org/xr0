@@ -14,7 +14,7 @@ struct clump {
 };
 
 struct clump *
-clump_create()
+clump_create(void)
 {
 	struct clump *c = malloc(sizeof(struct clump));
 	assert(c);

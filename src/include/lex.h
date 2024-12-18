@@ -15,7 +15,7 @@ struct lexememarker {
 };
 
 struct lexememarker *
-lexloc();
+lexloc(void);
 
 int
 lexememarker_linenum(struct lexememarker *);
@@ -45,12 +45,12 @@ enum ictype {
 extern enum ictype installclass;
 
 void
-lex_begin();
+lex_begin(void);
 
 void
-lex_finish();
+lex_finish(void);
 
 int
-yylex_destroy();
+yylex_destroy(void);
 
 #endif

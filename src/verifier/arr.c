@@ -12,7 +12,7 @@ struct verifier_arr {
 };
 
 struct verifier_arr *
-verifier_arr_create()
+verifier_arr_create(void)
 {
 	struct verifier_arr *arr = calloc(1, sizeof(struct verifier_arr));
 	assert(arr);

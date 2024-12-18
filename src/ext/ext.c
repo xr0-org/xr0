@@ -9,7 +9,7 @@ struct externals {
 };
 
 struct externals *
-externals_create()
+externals_create(void)
 {
 	struct externals *ext = malloc(sizeof(struct externals));
 	ext->func = map_create();

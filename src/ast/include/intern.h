@@ -52,13 +52,13 @@ eval_to_object(struct eval *, struct state *, bool constructive);
 struct preresult;
 
 struct preresult *
-preresult_empty_create();
+preresult_empty_create(void);
 
 struct preresult *
 preresult_error_create(struct error *err);
 
 struct preresult *
-preresult_contradiction_create();
+preresult_contradiction_create(void);
 
 void
 preresult_destroy(struct preresult *);
@@ -84,7 +84,7 @@ struct namedseq *
 namedseq_create(char *name);
 
 char *
-namedseq_next();
+namedseq_next(struct namedseq *);
 
 void
 namedseq_destroy(struct namedseq *);

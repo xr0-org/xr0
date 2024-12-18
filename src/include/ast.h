@@ -44,7 +44,7 @@ struct ast_expr *
 ast_expr_bracketed_root(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_iteration_create();
+ast_expr_iteration_create(void);
 
 struct ast_expr *
 ast_expr_call_create(struct ast_expr *, int narg, struct ast_expr **arg);
@@ -179,10 +179,10 @@ struct ast_expr *
 ast_expr_range_up(struct ast_expr *);
 
 struct ast_expr *
-ast_expr_rangemin_create();
+ast_expr_rangemin_create(void);
 
 struct ast_expr *
-ast_expr_rangemax_create();
+ast_expr_rangemax_create(void);
 
 bool
 ast_expr_israngemin(struct ast_expr *);
@@ -512,19 +512,19 @@ struct ast_type;
 
 /* TODO: allow modifiers for pointer, array and typedef types */
 struct ast_type *
-ast_type_create_int();
+ast_type_create_int(void);
 
 struct ast_type *
 ast_type_create_ptr(struct ast_type *type);
 
 struct ast_type *
-ast_type_create_char();
+ast_type_create_char(void);
 
 struct ast_type *
-ast_type_create_void();
+ast_type_create_void(void);
 
 struct ast_type *
-ast_type_create_voidptr();
+ast_type_create_voidptr(void);
 
 struct ast_type *
 ast_type_create_arr(struct ast_type *type, int length);
@@ -583,7 +583,7 @@ bool
 ast_type_isvoid(struct ast_type *);
 
 struct ast_type *
-ast_type_create_range();
+ast_type_create_range(void);
 
 struct externals;
 
@@ -619,7 +619,7 @@ ast_type_deref(struct ast_type *);
 struct ast_variable_arr;
 
 struct ast_variable_arr *
-ast_variable_arr_create();
+ast_variable_arr_create(void);
 
 void
 ast_variable_arr_append(struct ast_variable_arr *, struct ast_variable *);

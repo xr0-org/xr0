@@ -233,7 +233,7 @@ struct block_arr {
 };
 
 struct block_arr *
-block_arr_create()
+block_arr_create(void)
 {
 	struct block_arr *arr = calloc(1, sizeof(struct block_arr));
 	assert(arr);

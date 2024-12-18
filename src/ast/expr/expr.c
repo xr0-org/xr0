@@ -12,7 +12,7 @@
 #include "value.h"
 
 static struct ast_expr *
-ast_expr_create()
+ast_expr_create(void)
 {
 	return malloc(sizeof(struct ast_expr));
 }
@@ -175,7 +175,7 @@ ast_expr_bracketed_str_build(struct ast_expr *expr, struct strbuilder *b)
 
 
 struct ast_expr *
-ast_expr_iteration_create()
+ast_expr_iteration_create(void)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_ITERATION;
@@ -776,7 +776,7 @@ ast_expr_range_up(struct ast_expr *e)
 
 
 struct ast_expr *
-ast_expr_rangemin_create()
+ast_expr_rangemin_create(void)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_RANGEBOUND;
@@ -785,7 +785,7 @@ ast_expr_rangemin_create()
 }
 
 struct ast_expr *
-ast_expr_rangemax_create()
+ast_expr_rangemax_create(void)
 {
 	struct ast_expr *expr = ast_expr_create();
 	expr->kind = EXPR_RANGEBOUND;

@@ -26,7 +26,7 @@ static char *
 breakpoint_str(struct breakpoint);
 
 char *
-breakpoint_list()
+breakpoint_list(void)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "Num\tLine\n");
@@ -119,7 +119,7 @@ breakpoint_shouldbreak(struct lexememarker *loc)
 }
 
 void
-breakpoint_reset()
+breakpoint_reset(void)
 {
 	for (int i = 0; i < breakpoint_count; i++) {
 		breakpoints[i].reached = false;

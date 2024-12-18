@@ -5,7 +5,7 @@ struct ast_function;
 struct ast_function_arr;
 
 struct ast_function_arr *
-ast_function_arr_create();
+ast_function_arr_create(void);
 
 struct ast_function_arr *
 ast_function_arr_copy(struct ast_function_arr *);
