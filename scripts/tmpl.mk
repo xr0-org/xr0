@@ -1,7 +1,7 @@
 .POSIX:
 
 # commands
-CC = gcc
+CC = cc
 CFLAGS = -g -I src/include -std=gnu11 -Werror -Wreturn-type -Wall -pedantic
 VALGRIND = valgrind --fullpath-after=`pwd`/src/
 LEX = lex

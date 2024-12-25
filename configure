@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 TMPL_MKFILE=scripts/tmpl.mk
 DEPS_MKFILE=scripts/deps.mk

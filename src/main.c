@@ -486,7 +486,7 @@ verify(struct config *c)
 }
 
 bool
-isvblock(char c, FILE *);
+isvblock(int c, FILE *);
 
 void
 skipvblock(FILE *);
@@ -498,7 +498,7 @@ strip(struct config *config)
 	FILE *in = fopen(config->infile, "rb"),
 	     *out = fopen(config->outfile, "w");
 
-	char c;
+	int c;
 
 	while ((c = fgetc(in)) != EOF) {
 		if (isvblock(c, in)) {
@@ -518,7 +518,7 @@ void
 skipws(FILE *f);
 
 bool
-isvblock(char c, FILE *f)
+isvblock(int c, FILE *f)
 {
 	if (c != '~') {
 		return false;

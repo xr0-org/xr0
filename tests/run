@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 printf 'running test suite at %s\n\n' "$(date)"
 start=$(date +%s)
 
