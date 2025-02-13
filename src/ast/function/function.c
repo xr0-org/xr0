@@ -314,26 +314,14 @@ inititalise_param(struct ast_variable *param, struct state *state)
 
 	struct object_res *res = state_getobject(state, name);
 	struct object *obj = object_res_as_object(res);
-	if (object_hasvalue(obj)) {
-		/* must on the clump or heap */
-		//struct value *val = object_as_value(obj);	
-		//struct location *loc = value_as_location(val);
-		//assert(
-		//	location_type(loc) == LOCATION_DEREFERENCABLE ||
-		//	location_type(loc) == LOCATION_DYNAMIC
-		//);
-	} else {
-		/* variables that aren't talked about by the preconditions */
-		struct ast_expr *r = ast_expr_range_create(
-			dynamic_str(name),
-			ast_expr_rangemin_create(),
-			ast_expr_rangemax_create()
-		);
-		struct value *val = state_rconst(
-			state, t, r, dynamic_str(name), true
-		);
-		object_assign(obj, val);
-	}
+	assert(!object_hasvalue(obj)); /* XXX: see git blame */
+	struct ast_expr *r = ast_expr_range_create(
+		dynamic_str(name),
+		ast_expr_rangemin_create(),
+		ast_expr_rangemax_create()
+	);
+	struct value *val = state_rconst(state, t, r, dynamic_str(name), true);
+	object_assign(obj, val);
 }
 
 static void
