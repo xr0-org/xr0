@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
 #include "util.h"
 
@@ -172,21 +173,28 @@ struct ast_expr *
 ast_block_call_create(struct ast_block *b, struct lexememarker *loc,
 		struct ast_type *rtype, struct ast_expr *expr)
 {
-	struct ast_stmt *call = ast_stmt_register_call_create(
-		loc, ast_expr_copy(expr)
+	ast_block_append_stmt(
+		b,
+		ast_stmt_register_setupv_create(loc, ast_expr_copy(expr))
 	);
-	ast_block_append_stmt(b, call);
+
+	ast_block_append_stmt(
+		b,
+		ast_stmt_register_call_create(loc, ast_expr_copy(expr))
+	);
 
 	if (!ast_type_isvoid(rtype)) {
 		char *tvar = generate_tempvar(b->tempcount++);
-		struct ast_stmt *read = ast_stmt_register_mov_create(
-			loc,
-			ast_variable_create(
-				dynamic_str(tvar), ast_type_copy(rtype)
+		ast_block_append_stmt(
+			b, 
+			ast_stmt_register_mov_create(
+				loc,
+				ast_variable_create(
+					dynamic_str(tvar), ast_type_copy(rtype)
+				)
 			)
 		);
-		ast_block_append_stmt(b, read);
-		return ast_expr_identifier_create(dynamic_str(tvar));
+		return ast_expr_identifier_create(tvar);
 	}
 	return NULL;
 }
@@ -202,11 +210,11 @@ generate_tempvar(int tempid)
 DEFINE_RESULT_TYPE(struct ast_block *, block, ast_block_destroy, ast_block_res, false)
 
 struct ast_block_res *
-ast_block_setupmodulate(struct ast_block *old, struct state *s)
+ast_block_setupdecide(struct ast_block *old, struct state *s)
 {
 	struct ast_block *new = ast_block_create(NULL, 0);
 	for (int i = 0; i < old->nstmt; i++) {
-		struct ast_stmt_res *res = ast_stmt_setupmodulate(old->stmt[i], s);
+		struct ast_stmt_res *res = ast_stmt_setupdecide(old->stmt[i], s);
 		if (ast_stmt_res_iserror(res)) {
 			struct error *err = ast_stmt_res_as_error(res);
 			if (error_to_modulate_skip(err)) {

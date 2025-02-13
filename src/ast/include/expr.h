@@ -141,4 +141,9 @@ ast_expr_initialiser(struct ast_expr *);
 struct ast_type *
 calloralloc_type(struct ast_expr *e, struct state *s);
 
+struct e_res;
+
+struct e_res *
+ast_expr_setupverify(struct ast_expr *, struct state *);
+
 #endif

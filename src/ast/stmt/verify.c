@@ -454,6 +454,9 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
+register_setupv_exec(struct ast_expr *call, struct state *);
+
+static struct error *
 register_call_exec(struct ast_expr *call, struct state *);
 
 static struct error *
@@ -462,12 +465,24 @@ register_mov_exec(struct ast_variable *temp, struct state *);
 static struct error *
 stmt_register_exec(struct ast_stmt *stmt, struct state *state)
 {
-	/* XXX: assert we are in intermediate frame */
-	if (ast_stmt_register_iscall(stmt)) {
+	if (ast_stmt_register_issetupv(stmt)) {
+		return register_setupv_exec(ast_stmt_register_call(stmt), state);
+	} else if (ast_stmt_register_iscall(stmt)) {
 		return register_call_exec(ast_stmt_register_call(stmt), state);
 	} else {
 		return register_mov_exec(ast_stmt_register_mov(stmt), state);
 	}
+}
+
+static struct error *
+register_setupv_exec(struct ast_expr *call, struct state *state)
+{
+	struct e_res *res = ast_expr_setupverify(call, state);
+	if (e_res_iserror(res)) {
+		return e_res_as_error(res);
+	}
+	e_res_destroy(res);
+	return NULL;
 }
 
 static struct error *
@@ -570,7 +585,10 @@ ast_stmt_pushsetup(struct ast_stmt *stmt, struct state *s)
 static struct error *
 labelled_pushsetup(struct ast_stmt *stmt, struct state *state)
 {
-	a_printf(ast_stmt_ispre(stmt), "only setup labels supported in abstract\n");
+	a_printf(
+		ast_stmt_ispre(stmt),
+		"only setup labels supported in abstract\n"
+	);
 
 	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
 	if (ast_stmt_kind(inner) == STMT_SELECTION) {

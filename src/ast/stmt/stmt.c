@@ -44,7 +44,11 @@ struct ast_stmt {
 			struct ast_expr *arg;
 		} alloc;
 		struct {
-			bool iscall;
+			enum ast_register_kind {
+				REGISTER_SETUPV,
+				REGISTER_CALL,
+				REGISTER_MOV,
+			} kind;
 			union {
 				struct ast_expr *call;
 				struct ast_variable *temp;
@@ -452,28 +456,47 @@ ast_stmt_iter_upper_bound(struct ast_stmt *stmt)
 }
 
 struct ast_stmt *
-ast_stmt_register_call_create(struct lexememarker *loc, struct ast_expr *call) {
+ast_stmt_register_setupv_create(struct lexememarker *loc, struct ast_expr *call)
+{
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_REGISTER;
-	stmt->u._register.iscall = true;
+	stmt->u._register.kind = REGISTER_SETUPV;
 	stmt->u._register.op.call = call;
 	return stmt;
 }
 
 struct ast_stmt *
-ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp) {
+ast_stmt_register_call_create(struct lexememarker *loc, struct ast_expr *call)
+{
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_REGISTER;
-	stmt->u._register.iscall = false;
+	stmt->u._register.kind = REGISTER_CALL;
+	stmt->u._register.op.call = call;
+	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp)
+{
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_REGISTER;
+	stmt->u._register.kind = REGISTER_MOV;
 	stmt->u._register.op.temp = temp;
 	return stmt;
+}
+
+bool
+ast_stmt_register_issetupv(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_REGISTER);
+	return stmt->u._register.kind == REGISTER_SETUPV;
 }
 
 bool
 ast_stmt_register_iscall(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_REGISTER);
-	return stmt->u._register.iscall;
+	return stmt->u._register.kind == REGISTER_CALL;
 }
 
 struct ast_expr *
@@ -559,12 +582,27 @@ static void
 ast_stmt_register_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_REGISTER);
-	if (stmt->u._register.iscall) {
-		char *call = ast_expr_str(stmt->u._register.op.call);
+	char *call;
+	switch (stmt->u._register.kind) {
+	case REGISTER_SETUPV:
+		call = ast_expr_str(stmt->u._register.op.call);
+		strbuilder_printf(b, "setupv %s;", call);
+		free(call);
+		break;
+	case REGISTER_CALL:
+		call = ast_expr_str(stmt->u._register.op.call);
 		strbuilder_printf(b, "call %s;", call);
-	} else {
-		char *tempvar = ast_variable_name(stmt->u._register.op.temp);
-		strbuilder_printf(b, "movret %s;", tempvar);
+		free(call);
+		break;
+	case REGISTER_MOV:
+		strbuilder_printf(
+			b,
+			"movret %s;",
+			ast_variable_name(stmt->u._register.op.temp)
+		);
+		break;
+	default:
+		assert(false);
 	}
 }
 
@@ -683,9 +721,22 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			ast_expr_copy_ifnotnull(stmt->u.jump.rv)
 		);
 	case STMT_REGISTER:
-		return stmt->u._register.iscall
-			? ast_stmt_register_call_create(loc, stmt->u._register.op.call)
-			: ast_stmt_register_mov_create(loc, stmt->u._register.op.temp);
+		switch (stmt->u._register.kind) {
+		case REGISTER_SETUPV:
+			return ast_stmt_register_setupv_create(
+				loc, stmt->u._register.op.call
+			);
+		case REGISTER_CALL:
+			return ast_stmt_register_call_create(
+				loc, stmt->u._register.op.call
+			);
+		case REGISTER_MOV:
+			return ast_stmt_register_mov_create(
+				loc, stmt->u._register.op.temp
+			);
+		default:
+			assert(false);
+		}
 	default:
 		assert(false);
 	}
@@ -925,13 +976,13 @@ preconds_compound_verify(struct ast_stmt *stmt)
 DEFINE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_destroy, ast_stmt_res, false)
 
 static struct ast_stmt_res *
-sel_setupmodulate(struct ast_stmt *, struct state *);
+sel_setupdecide(struct ast_stmt *, struct state *);
 
 static struct ast_stmt_res *
-comp_setupmodulate(struct ast_stmt *, struct state *);
+comp_setupdecide(struct ast_stmt *, struct state *);
 
 struct ast_stmt_res *
-ast_stmt_setupmodulate(struct ast_stmt *stmt, struct state *s)
+ast_stmt_setupdecide(struct ast_stmt *stmt, struct state *s)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_EXPR:
@@ -949,16 +1000,16 @@ ast_stmt_setupmodulate(struct ast_stmt *stmt, struct state *s)
 		);
 		return ast_stmt_res_stmt_create(stmt);
 	case STMT_SELECTION:
-		return sel_setupmodulate(stmt, s);
+		return sel_setupdecide(stmt, s);
 	case STMT_COMPOUND:
-		return comp_setupmodulate(stmt, s);
+		return comp_setupdecide(stmt, s);
 	default:
 		assert(false);
 	}
 }
 
 static struct ast_stmt_res *
-sel_setupmodulate(struct ast_stmt *stmt, struct state *s)
+sel_setupdecide(struct ast_stmt *stmt, struct state *s)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
@@ -968,17 +1019,17 @@ sel_setupmodulate(struct ast_stmt *stmt, struct state *s)
 		return ast_stmt_res_error_create(bool_res_as_error(res));
 	}
 	if (bool_res_as_bool(res)) {
-		return ast_stmt_setupmodulate(body, s);
+		return ast_stmt_setupdecide(body, s);
 	} else if (nest) {
-		return ast_stmt_setupmodulate(nest, s);
+		return ast_stmt_setupdecide(nest, s);
 	}
 	return ast_stmt_res_error_create(error_modulate_skip());
 }
 
 static struct ast_stmt_res *
-comp_setupmodulate(struct ast_stmt *stmt, struct state *s)
+comp_setupdecide(struct ast_stmt *stmt, struct state *s)
 {
-	struct ast_block_res *res = ast_block_setupmodulate(
+	struct ast_block_res *res = ast_block_setupdecide(
 		ast_stmt_as_block(stmt), s
 	);
 	if (ast_block_res_iserror(res)) {
