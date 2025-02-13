@@ -29,6 +29,15 @@ struct pattern_arr *
 pattern_arr_create(int n, struct pattern *p) ~ [
 	struct pattern_arr *arr;
 
+	setup: {
+		int i;
+		p = malloc(sizeof(struct pattern)*n);
+		for (i = 0; i < n; i++) {
+			p[i].name = malloc(1);
+			p[i].pattern = malloc(1);
+		}
+	}
+
 	arr = malloc(sizeof(struct pattern));
 	arr->n = n;
 	arr->p = p;
@@ -44,7 +53,22 @@ pattern_arr_create(int n, struct pattern *p) ~ [
 
 void
 pattern_arr_destroy(struct pattern_arr *arr) ~ [
-	setup: arr = pattern_arr_create($, malloc(1));
+	int i;
+
+	setup: {
+		int n = $;
+		struct pattern *p = malloc(sizeof(struct pattern)*n);
+		for (i = 0; i < n; i++) {
+			p[i].name = malloc(1);
+			p[i].pattern = malloc(1);
+		}
+		arr = pattern_arr_create(n, p);
+	}
+
+	for (i = 0; i < arr->n; i++) {
+		free(arr->p[i].name);
+		free(arr->p[i].pattern);
+	}
 	free(arr->p);
 	free(arr);
 ]{
@@ -170,7 +194,7 @@ parse(char *pos) ~ [
 	struct token_arr *tokens;
 
 	pre = malloc(1); *pre = $;
-	patterns = pattern_arr_create($, malloc(1));
+	patterns = parse_defs(pos).patterns;
 	tokens = token_arr_create($, malloc(1));
 	post = malloc(1); *post = $;
 	return lexer_create(pre, post, patterns, tokens);
@@ -178,11 +202,13 @@ parse(char *pos) ~ [
 
 void
 lexer_destroy(struct lexer *l) ~ [
-	setup: l = lexer_create(
-		malloc(1), malloc(1),
-		pattern_arr_create($, malloc(1)),
-		token_arr_create($, malloc(1))
-	);
+	setup: {
+		l = lexer_create(
+			malloc(1), malloc(1),
+			pattern_arr_create($, malloc(1)),
+			token_arr_create($, malloc(1))
+		);
+	}
 
 	free(l->pre);
 	free(l->post);
@@ -298,15 +324,15 @@ struct defsresult {
 char *
 skipoptions(char *pos);
 
-int
-count_patterns(char *pos);
-
 struct defsresult
 parse_defs(char *pos) ~ [
+	struct patternpos set;
 	struct defsresult res;
 	res.pre = malloc(sizeof(char) * 1000);
-	res.patterns = pattern_arr_create($, malloc(1));
-	res.pos = $;
+	pos = $;
+	set = parse_defs_n(pos, count_patterns(pos));
+	res.pos = set.pos;
+	res.patterns = set.patterns;
 	return res;
 ];
 
@@ -440,15 +466,21 @@ parse_tonewline(char *input) ~ [ return malloc(sizeof(char) * 1000); ]
 	return substr(input, s - input);
 }
 
-struct patternet {
-	struct pattern_arr *patterns;
-	char *pos;
-};
+int
+count_patterns(char *pos);
 
-struct patternet
-parse_defsproper(char *input) ~ [
-	struct patternet res;
-	res.patterns = pattern_arr_create($, malloc(1));
+struct patternpos
+parse_defs_n(char *pos, int npat) ~ [
+	int i; struct pattern *p;
+	struct patternpos res;
+
+	p = malloc(sizeof(struct pattern)*npat);
+	for (i = 0; i < npat; i++) {
+		p[i].name = malloc(1);
+		p[i].pattern = malloc(1);
+	}
+
+	res.patterns = pattern_arr_create(npat, p);
 	res.pos = $;
 	return res;
 ];
@@ -457,7 +489,7 @@ struct defsresult
 parse_defs(char *pos)
 {
 	struct stringresult raw;
-	struct patternet set;
+	struct patternpos set;
 	struct defsresult res;
 
 	pos = skipws(pos);
@@ -468,7 +500,7 @@ parse_defs(char *pos)
 	raw = parse_defsraw(pos);
 	pos = raw.pos;
 	pos = skipoptions(pos);
-	set = parse_defsproper(pos);
+	set = parse_defs_n(pos, count_patterns(pos));
 
 	res.pre = raw.s;
 	res.patterns = set.patterns;
@@ -534,32 +566,9 @@ struct patternresult {
 };
 
 struct patternpos {
-	struct pattern *patterns; /* an array */
+	struct pattern_arr *patterns;
 	char *pos;
 };
-
-struct patternpos
-parse_defs_n(char *pos, int npat) ~ [
-	struct patternpos res;
-
-	res.patterns = malloc(sizeof(struct pattern) * npat);
-	res.pos = $;
-	return res;
-];
-
-struct patternet
-parse_defsproper(char *input)
-{
-	int n;
-	struct patternpos p_pos;
-	struct patternet res;
-
-	n = count_patterns(input);
-	p_pos = parse_defs_n(input, n);
-	res.patterns = pattern_arr_create(n, p_pos.patterns);
-	res.pos = p_pos.pos;
-	return res;
-}
 
 struct patternresult
 parse_pattern(char *pos) ~ [
@@ -607,20 +616,20 @@ parse_pattern(char *pos)
 struct patternpos
 parse_defs_n(char *pos, int n)
 {
-	int i;
-	struct pattern *p;
-	struct patternresult parsed;
+	int i; struct pattern *p;
 	struct patternpos res;
 
 	p = malloc(sizeof(struct pattern) * n);
 	for (i = 0; i < n; i++) {
+		struct patternresult parsed;
+
 		parsed = parse_pattern(pos);
 		p[i] = *parsed.p;
 		free(parsed.p);
 		pos = skipws(parsed.pos);
 	}
 
-	res.patterns = p;
+	res.patterns = pattern_arr_create(n, p);
 	res.pos = pos;
 	return res;
 }
