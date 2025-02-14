@@ -571,7 +571,7 @@ void
 stack_popprep(struct stack *s, struct state *state)
 {
 	if (frame_iscall(s->f) && !ast_function_isvoid(frame_function(s->f))) {
-		assert(state_readregister(state));
+		/*assert(state_readregister(state));*/
 	}
 }
 

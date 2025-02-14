@@ -391,13 +391,17 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 	return e_res_eval_create(eval_lval_create(t, l));
 }
 
-/* expr_call_eval */
-
-static struct error *
-call_setupverify(struct ast_function *, struct ast_expr *, struct state *state);
+static struct e_res *
+expr_call_prepare(struct ast_expr *expr, struct state *state);
 
 static struct e_res *
 expr_call_eval(struct ast_expr *expr, struct state *state)
+{
+	return expr_call_prepare(expr, state);
+}
+
+static struct e_res *
+expr_call_prepare(struct ast_expr *expr, struct state *state)
 {
 	struct error *err;
 
@@ -445,18 +449,60 @@ expr_call_eval(struct ast_expr *expr, struct state *state)
 		return e_res_error_create(err);
 	}
 
-	/* XXX: pass copy so we don't observe */
-	if ((err = call_setupverify(f, ast_expr_copy(expr), state))) {
+	return e_res_empty_create();
+}
+
+static struct e_res *
+setupverify(struct ast_expr *expr, struct state *state);
+
+struct e_res *
+expr_setupverify(struct ast_expr *expr, struct state *state)
+{
+	/* XXX: no setup verification for alloc statement */
+	if (ast_expr_kind(expr) != EXPR_ALLOCATION) {
+		struct e_res *res = setupverify(expr, state);
+		if (e_res_iserror(res)) {
+			return res;
+		}
+	}
+	state_popframe(state);
+	return e_res_empty_create();
+}
+
+static struct error *
+call_setupverify(struct ast_function *f, struct ast_expr *call,
+		struct state *impl);
+
+static struct e_res *
+setupverify(struct ast_expr *expr, struct state *state)
+{
+	struct e_res *res = expr_call_prepare(expr, state);
+	if (e_res_iserror(res)) {
+		return res;
+	}
+
+	/* TODO: function-valued-expressions */
+	char *name = ast_expr_as_identifier(ast_expr_call_root(expr));
+
+	struct ast_function *f = externals_getfunc(state_getext(state), name);
+	assert(f);
+
+	struct error *err = call_setupverify(f, ast_expr_copy(expr), state);
+	if (err) {
 		return e_res_error_create(
 			error_printf("precondition failure: %w", err)
 		);
 	}
 
+	/* remove call frame pushed in prepare */
+	state_popframe(state);
+
 	return e_res_empty_create();
 }
 
 static struct error *
-call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *caller)
+call_setupverify(struct ast_function *f, struct ast_expr *call,
+		struct state *impl)
 {
 	struct error *err;
 
@@ -468,7 +514,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 		f
 	);
 	struct state *spec = state_create(
-		frame, rconst_create(), state_getext(caller)
+		frame, rconst_create(), state_getext(impl)
 	);
 
 	int nparams = ast_function_nparams(f);
@@ -478,7 +524,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 	}
 
 	struct ast_block_res *mod_abs_res = ast_block_setupmodulate(
-		ast_function_abstract(f), caller
+		ast_function_abstract(f), impl
 	);
 	if (ast_block_res_iserror(mod_abs_res)) {
 		return ast_block_res_as_error(mod_abs_res);
@@ -490,10 +536,6 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 	state_pushframe(spec, setupframe);
 	while (!state_atsetupend(spec)) {
 		err = state_step(spec);
-		if (err) {
-			printf("%s\n", state_str(spec));
-			printf("err: %s\n", error_str(err));
-		}
 		assert(!err);
 	}
 	assert(!state_atend(spec));
@@ -501,7 +543,7 @@ call_setupverify(struct ast_function *f, struct ast_expr *call, struct state *ca
 
 	for (int i = 0; i < nparams; i++) {
 		char *id = ast_variable_name(param[i]);
-		struct error *err = state_constraintverify(spec, caller, id);
+		struct error *err = state_constraintverify(spec, impl, id);
 		if (err) {
 			return error_printf("argument of `%s' %w", id, err);
 		}
@@ -1183,7 +1225,9 @@ static struct ast_expr *
 alloc_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
 		struct state *s)
 {
-	struct ast_expr	*gen_arg = ast_expr_geninstr(ast_expr_alloc_arg(expr), loc, b, s);
+	struct ast_expr	*gen_arg = ast_expr_geninstr(
+		ast_expr_alloc_arg(expr), loc, b, s
+	);
 	enum ast_alloc_kind kind = ast_expr_alloc_kind(expr);
 
 	struct ast_expr *alloc = ast_expr_alloc_kind_create(gen_arg, kind);

@@ -473,6 +473,9 @@ struct ast_variable *
 ast_stmt_register_mov(struct ast_stmt *);
 
 bool
+ast_stmt_register_issetupv(struct ast_stmt *);
+
+bool
 ast_stmt_register_iscall(struct ast_stmt *);
 
 void

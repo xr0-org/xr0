@@ -173,12 +173,10 @@ struct ast_expr *
 ast_block_call_create(struct ast_block *b, struct lexememarker *loc,
 		struct ast_type *rtype, struct ast_expr *expr)
 {
-	/*
 	ast_block_append_stmt(
 		b,
 		ast_stmt_register_setupv_create(loc, ast_expr_copy(expr))
 	);
-	*/
 
 	ast_block_append_stmt(
 		b,

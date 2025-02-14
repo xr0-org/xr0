@@ -486,6 +486,13 @@ ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp
 }
 
 bool
+ast_stmt_register_issetupv(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_REGISTER);
+	return stmt->u._register.kind == REGISTER_SETUPV;
+}
+
+bool
 ast_stmt_register_iscall(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_REGISTER);
