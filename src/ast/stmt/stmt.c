@@ -44,7 +44,11 @@ struct ast_stmt {
 			struct ast_expr *arg;
 		} alloc;
 		struct {
-			bool iscall;
+			enum ast_register_kind {
+				REGISTER_SETUPV,
+				REGISTER_CALL,
+				REGISTER_MOV,
+			} kind;
 			union {
 				struct ast_expr *call;
 				struct ast_variable *temp;
@@ -452,19 +456,31 @@ ast_stmt_iter_upper_bound(struct ast_stmt *stmt)
 }
 
 struct ast_stmt *
-ast_stmt_register_call_create(struct lexememarker *loc, struct ast_expr *call) {
+ast_stmt_register_setupv_create(struct lexememarker *loc, struct ast_expr *call)
+{
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_REGISTER;
-	stmt->u._register.iscall = true;
+	stmt->u._register.kind = REGISTER_SETUPV;
 	stmt->u._register.op.call = call;
 	return stmt;
 }
 
 struct ast_stmt *
-ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp) {
+ast_stmt_register_call_create(struct lexememarker *loc, struct ast_expr *call)
+{
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_REGISTER;
-	stmt->u._register.iscall = false;
+	stmt->u._register.kind = REGISTER_CALL;
+	stmt->u._register.op.call = call;
+	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp)
+{
+	struct ast_stmt *stmt = ast_stmt_create(loc);
+	stmt->kind = STMT_REGISTER;
+	stmt->u._register.kind = REGISTER_MOV;
 	stmt->u._register.op.temp = temp;
 	return stmt;
 }
@@ -473,7 +489,7 @@ bool
 ast_stmt_register_iscall(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_REGISTER);
-	return stmt->u._register.iscall;
+	return stmt->u._register.kind == REGISTER_CALL;
 }
 
 struct ast_expr *
@@ -559,12 +575,27 @@ static void
 ast_stmt_register_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_REGISTER);
-	if (stmt->u._register.iscall) {
-		char *call = ast_expr_str(stmt->u._register.op.call);
+	char *call;
+	switch (stmt->u._register.kind) {
+	case REGISTER_SETUPV:
+		call = ast_expr_str(stmt->u._register.op.call);
+		strbuilder_printf(b, "setupv %s;", call);
+		free(call);
+		break;
+	case REGISTER_CALL:
+		call = ast_expr_str(stmt->u._register.op.call);
 		strbuilder_printf(b, "call %s;", call);
-	} else {
-		char *tempvar = ast_variable_name(stmt->u._register.op.temp);
-		strbuilder_printf(b, "movret %s;", tempvar);
+		free(call);
+		break;
+	case REGISTER_MOV:
+		strbuilder_printf(
+			b,
+			"movret %s;",
+			ast_variable_name(stmt->u._register.op.temp)
+		);
+		break;
+	default:
+		assert(false);
 	}
 }
 
@@ -683,9 +714,22 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			ast_expr_copy_ifnotnull(stmt->u.jump.rv)
 		);
 	case STMT_REGISTER:
-		return stmt->u._register.iscall
-			? ast_stmt_register_call_create(loc, stmt->u._register.op.call)
-			: ast_stmt_register_mov_create(loc, stmt->u._register.op.temp);
+		switch (stmt->u._register.kind) {
+		case REGISTER_SETUPV:
+			return ast_stmt_register_setupv_create(
+				loc, stmt->u._register.op.call
+			);
+		case REGISTER_CALL:
+			return ast_stmt_register_call_create(
+				loc, stmt->u._register.op.call
+			);
+		case REGISTER_MOV:
+			return ast_stmt_register_mov_create(
+				loc, stmt->u._register.op.temp
+			);
+		default:
+			assert(false);
+		}
 	default:
 		assert(false);
 	}

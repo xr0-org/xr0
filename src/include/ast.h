@@ -458,6 +458,9 @@ struct ast_stmt *
 ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
 
 struct ast_stmt *
+ast_stmt_register_setupv_create(struct lexememarker *, struct ast_expr *call);
+
+struct ast_stmt *
 ast_stmt_register_call_create(struct lexememarker *, struct ast_expr *call);
 
 struct ast_stmt *
