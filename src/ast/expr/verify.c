@@ -400,6 +400,7 @@ static struct e_res *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
 	struct error *err;
+	printf("call_eval\n");
 
 	struct ast_expr *root = ast_expr_call_root(expr);
 	/* TODO: function-valued-expressions */
