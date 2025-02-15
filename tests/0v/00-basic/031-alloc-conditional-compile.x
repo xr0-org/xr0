@@ -3,7 +3,7 @@
 #ifdef XR0
 
 void *
-alloc() ~ [ return .malloc(1); ];
+alloc() ~ [ return malloc(1); ];
 
 #endif
 

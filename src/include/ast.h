@@ -547,6 +547,9 @@ ast_type_isarr(struct ast_type *);
 bool
 ast_type_isptr(struct ast_type *);
 
+bool
+ast_type_isrange(struct ast_type *);
+
 int
 ast_type_equal(struct ast_type *, struct ast_type *);
 

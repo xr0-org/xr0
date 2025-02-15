@@ -122,6 +122,12 @@ ast_type_isvoid(struct ast_type *t)
 	return t->base == TYPE_VOID;
 }
 
+bool
+ast_type_isrange(struct ast_type *t)
+{
+	return t->base == TYPE_RANGE;
+}
+
 struct ast_type *
 ast_type_create(enum ast_type_base base, enum ast_type_modifier mod)
 {

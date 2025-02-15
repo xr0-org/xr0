@@ -868,12 +868,31 @@ static struct e_res *
 value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 		struct eval *rv2, struct state *s)
 {
-	a_printf(
-		ast_type_isint(eval_type(rv1)) && ast_type_isint(eval_type(rv2)),
-		"only comparisons between two integers are supported\n" 
-	);
 	struct value *v1 = value_res_as_value(eval_to_value(rv1, s)),
 		     *v2 = value_res_as_value(eval_to_value(rv2, s));
+
+	struct ast_type *t1 = eval_type(rv1),
+			*t2 = eval_type(rv2);
+
+	if (ast_type_isrange(t1)) {
+		struct eval *coerced = eval_rval_create(
+			ast_type_create_int(), value_copy(v1)
+		);
+		struct e_res *res = value_relational_eval(coerced, op, rv2, s);
+		eval_destroy(coerced);
+		return res;
+	}
+	if (ast_type_isrange(t2)) {
+		return value_relational_eval(rv2, op, rv1, s);
+	}
+
+	printf("%s\n", state_str(s));
+	printf("rv1: %s\n", eval_str(rv1));
+	printf("rv2: %s\n", eval_str(rv2));
+	a_printf(
+		ast_type_isint(t1) && ast_type_isint(t2),
+		"only comparisons between two integers are supported\n" 
+	);
 
 	struct error *err;
 	if ((err = value_disentangle(v1, v2, s))) {

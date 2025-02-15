@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void *
-unit() ~ [ return .malloc(1); ]
+unit() ~ [ return malloc(1); ]
 {
 	void *p; void *q;
 
