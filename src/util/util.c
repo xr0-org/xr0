@@ -623,7 +623,7 @@ char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
-		[ERROR_VERIFIERINSTRUCT]	= "path instruction",
+		[ERROR_VERIFIERINSTRUCT]	= "verifier instruction",
 		[ERROR_VERIFIERCONTRADICTION]	= "verifier contradiction",
 		[ERROR_RETURN]			= "returned",
 

@@ -465,7 +465,6 @@ expr_setupverify(struct ast_expr *expr, struct state *state)
 			return res;
 		}
 	}
-	state_popframe(state);
 	return e_res_empty_create();
 }
 
@@ -489,6 +488,10 @@ setupverify(struct ast_expr *expr, struct state *state)
 
 	struct error *err = call_setupverify(f, ast_expr_copy(expr), state);
 	if (err) {
+		if (error_to_verifierinstruct(err)) {
+			/* remove call frame pushed in prepare */
+			state_popframe(state);
+		}
 		return e_res_error_create(
 			error_printf("precondition failure: %w", err)
 		);

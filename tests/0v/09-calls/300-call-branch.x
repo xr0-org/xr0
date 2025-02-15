@@ -24,10 +24,12 @@ bar(int val)
 	void *p;
 
 	p = foo(val);
-	free(p);
+	if (val) {
+		free(p);
+	}
 }
 
-int
+void
 main()
 {
 	bar(1);
