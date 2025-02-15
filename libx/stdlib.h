@@ -6,7 +6,7 @@
 axiom void *
 malloc(int size) ~ [
 	setup: size = [0?];
-	if ([?])
+	if ([!])
 		return .malloc(size);
 	else
 		return NULL;
