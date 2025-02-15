@@ -16,7 +16,7 @@ axiom void
 free(void *ptr) ~ [
 	if (ptr) {
 		setup: ptr = .malloc(1);
-	       .free(ptr);
+		.free(ptr);
 	}
 ];
 

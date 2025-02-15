@@ -1,14 +1,15 @@
 #include <stdlib.h>
 
-void
-unit()
+void *
+leak()
 {
 	void *p;
 
 	p = malloc(1);
 	if (p) {
-		~ [ @p; ]
+		free(p);
+	} else {
+		p = malloc(1);
 	}
-	free(p);
-	~ [ !@p; ]
+	return p;
 }

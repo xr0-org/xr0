@@ -861,7 +861,10 @@ relational_eval(struct ast_expr *expr, struct state *state)
 }
 
 static int
-value_compare(struct value *, enum ast_binary_operator op,
+comparewithnull(struct value *, enum ast_binary_operator op, struct state *);
+
+static int
+compare(struct value *, enum ast_binary_operator op,
 		struct value *, struct state *);
 
 static struct e_res *
@@ -870,27 +873,27 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 {
 	struct value *v1 = value_res_as_value(eval_to_value(rv1, s)),
 		     *v2 = value_res_as_value(eval_to_value(rv2, s));
-
 	struct ast_type *t1 = eval_type(rv1),
 			*t2 = eval_type(rv2);
 
-	if (ast_type_isrange(t1)) {
-		struct eval *coerced = eval_rval_create(
-			ast_type_create_int(), value_copy(v1)
+	if (ast_type_isptr(t1)) {
+		a_printf(
+			/* NULL pointer constant */
+			ast_type_isint(t2) && !value_as_constant(v2),
+			"only pointer comparisons with NULL are supported\n"
 		);
-		struct e_res *res = value_relational_eval(coerced, op, rv2, s);
-		eval_destroy(coerced);
-		return res;
+		return e_res_eval_create(
+			eval_rval_create(
+				ast_type_create_int(),
+				value_int_create(comparewithnull(v1, op, s))
+			)
+		);
 	}
-	if (ast_type_isrange(t2)) {
+	if (ast_type_isptr(t2)) {
 		return value_relational_eval(rv2, op, rv1, s);
 	}
-
-	printf("%s\n", state_str(s));
-	printf("rv1: %s\n", eval_str(rv1));
-	printf("rv2: %s\n", eval_str(rv2));
 	a_printf(
-		ast_type_isint(t1) && ast_type_isint(t2),
+		ast_type_isint(eval_type(rv1)) && ast_type_isint(eval_type(rv2)),
 		"only comparisons between two integers are supported\n" 
 	);
 
@@ -902,14 +905,48 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 	return e_res_eval_create(
 		eval_rval_create(
 			ast_type_create_int(),
-			value_int_create(value_compare(v1, op, v2, s))
+			value_int_create(compare(v1, op, v2, s))
 		)
 	);
 }
 
+static int
+isnull(struct value *, struct state *);
 
 static int
-value_compare(struct value *lhs, enum ast_binary_operator op,
+comparewithnull(struct value *v, enum ast_binary_operator op, struct state *s)
+{
+	switch (op) {
+	case BINARY_OP_EQ:
+		return isnull(v, s);
+	case BINARY_OP_NE:
+		return !isnull(v, s);
+	default:
+		assert(false);
+	}
+}
+
+static int
+iszero(struct value *, struct state *);
+
+static int
+isnull(struct value *v, struct state *s)
+{
+	return !value_islocation(v) && iszero(v, s);
+}
+
+static int
+iszero(struct value *v, struct state *s)
+{
+	struct value *zero = value_int_create(0);
+	int iszero = value_eq(v, zero, s);
+	value_destroy(zero);
+	return iszero;
+}
+
+
+static int
+compare(struct value *lhs, enum ast_binary_operator op,
 		struct value *rhs, struct state *s)
 {
 	switch (op) {
@@ -983,14 +1020,21 @@ modulatedkey(struct ast_expr *e, struct state *s)
 static struct object *
 hack_object_from_assertion(struct ast_expr *, struct state *);
 
+static int
+isdeallocand(struct object *, struct state *);
+
 static struct e_res *
 isdeallocand_eval(struct ast_expr *expr, struct state *state)
 {
-	struct object *obj = hack_object_from_assertion(expr, state);
 	return e_res_eval_create(
 		eval_rval_create(
 			ast_type_create_int(),
-			value_int_create(state_addresses_deallocand(state, obj))
+			value_int_create(
+				isdeallocand(
+					hack_object_from_assertion(expr, state),
+					state
+				)
+			)
 		)
 	);
 }
@@ -1010,6 +1054,19 @@ hack_object_from_assertion(struct ast_expr *expr, struct state *state)
 		state_get(state, eval_as_lval(e_res_as_eval(res)), true)
 	);
 }
+
+static int
+isdeallocand(struct object *obj, struct state *s)
+{
+	if (object_hasvalue(obj)) {
+		struct value *v = object_as_value(obj);
+		if (value_isconstant(v) && !value_as_constant(v)) {
+			return 0;
+		}
+	}
+	return state_addresses_deallocand(s, obj);
+}
+
 
 static int
 hack_constorone(struct ast_expr *, struct state *);
