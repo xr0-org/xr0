@@ -29,17 +29,11 @@ struct ast_type {
 };
 
 static int
-hack_compatible_because_one_is_range(struct ast_type *, struct ast_type *);
-
-static int
 isvoidptr(struct ast_type *);
 
 int
 ast_type_compatible(struct ast_type *t, struct ast_type *u)
 {
-	if (hack_compatible_because_one_is_range(t, u)) {
-		return 1;
-	}
 	if (isvoidptr(t) || isvoidptr(u)) {
 		return 1;
 	}
@@ -56,18 +50,26 @@ ast_type_compatible(struct ast_type *t, struct ast_type *u)
 }
 
 static int
-hack_compatible_because_one_is_range(struct ast_type *t, struct ast_type *u)
-{
-	return t->base == TYPE_RANGE || u->base == TYPE_RANGE;
-}
-
-static int
 isvoidptr(struct ast_type *t)
 {
 	return t->base == TYPE_POINTER && t->ptr_type->base == TYPE_VOID;
 }
 
-
+int
+ast_type_compatiblewithrconst(struct ast_type *t)
+{
+	switch (t->base) {
+	case TYPE_VOID:
+	case TYPE_STRUCT:
+		return 0;
+	case TYPE_INT:
+	case TYPE_CHAR:
+	case TYPE_POINTER:
+		return 1;
+	default:
+		assert(false);
+	}
+}
 
 int
 ast_type_equal(struct ast_type *t, struct ast_type *u)
@@ -134,6 +136,12 @@ struct ast_type *
 ast_type_create_int(void)
 {
 	return ast_type_create(TYPE_INT, 0);
+}
+
+struct ast_type *
+ast_type_create_range(void)
+{
+	return ast_type_create_int();
 }
 
 struct ast_type *
@@ -212,9 +220,6 @@ ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 	case TYPE_STRUCT:
 		/* XXX: struct has no range? */
 		return value_struct_rconst_create(t, s, key, persist);
-	case TYPE_RANGE:
-		assert(range);
-		return value_int_rconst_create(range, s);
 	default:
 		assert(false);
 	}
@@ -237,9 +242,6 @@ ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range
 		);
 	case TYPE_STRUCT:
 		return value_struct_rconstnokey_create(t, s, persist);
-	case TYPE_RANGE:
-		assert(range);
-		return value_int_rconst_create(range, s);
 	default:
 		assert(false);
 	}
@@ -403,12 +405,6 @@ ast_type_copy_struct(struct ast_type *old)
 	return new;
 }
 
-struct ast_type *
-ast_type_create_range(void)
-{
-	return ast_type_create(TYPE_RANGE, 0);
-}
-
 void
 ast_type_mod_or(struct ast_type *t, enum ast_type_modifier m)
 {
@@ -462,9 +458,6 @@ ast_type_copy(struct ast_type *t)
 	case TYPE_CHAR:
 		return ast_type_create(t->base, t->mod);
 
-	case TYPE_RANGE:
-		return ast_type_create_range();
-
 	default:
 		assert(false);
 	}
@@ -492,7 +485,6 @@ const char *type_basestr[] = {
 	[TYPE_DOUBLE]	= "double",
 	[TYPE_SIGNED]	= "signed",
 	[TYPE_UNSIGNED]	= "unsigned",
-	[TYPE_RANGE]	= "range",
 };
 
 char *

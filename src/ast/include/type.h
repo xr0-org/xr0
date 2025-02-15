@@ -35,8 +35,6 @@ enum ast_type_base { /* base type */
 	TYPE_USERDEF,
 
 	TYPE_ENUM,
-
-	TYPE_RANGE,
 };
 
 struct ast_type *
@@ -55,5 +53,8 @@ ast_type_rconstgeninstr(struct ast_type *, struct namedseq *,
 
 int
 ast_type_compatible(struct ast_type *, struct ast_type *);
+
+int
+ast_type_compatiblewithrconst(struct ast_type *);
 
 #endif

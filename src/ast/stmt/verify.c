@@ -410,6 +410,9 @@ iter_neteffect(struct ast_stmt *iter)
 	);
 }
 
+static int
+compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
+
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
@@ -426,11 +429,10 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		}
 		if (e_res_haseval(res)) {
 			struct eval *eval = e_res_as_eval(res);
-			struct ast_type *spec_t = state_getreturntype(state),
-					*rv_t = eval_type(eval);
-			if (!ast_type_compatible(spec_t, rv_t)) {
+			struct ast_type *spec_t = state_getreturntype(state);
+			if (!compatible(eval, spec_t, state)) {
 				char *spec_t_str = ast_type_str(spec_t),
-				     *rv_t_str = ast_type_str(rv_t);
+				     *rv_t_str = ast_type_str(eval_type(eval));
 				struct error *err = error_printf(
 					"cannot return %s as %s",
 					rv_t_str,
@@ -451,6 +453,15 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 		}
 	}
 	return error_return();
+}
+
+static int
+compatible(struct eval *e, struct ast_type *spec_t, struct state *s)
+{
+	return ast_type_compatible(eval_type(e), spec_t) || (
+		ast_type_compatiblewithrconst(spec_t)
+		&& value_issync(value_res_as_value(eval_to_value(e, s)))
+	);
 }
 
 static struct error *

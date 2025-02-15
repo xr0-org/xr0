@@ -521,6 +521,9 @@ struct ast_type *
 ast_type_create_int(void);
 
 struct ast_type *
+ast_type_create_range(void);
+
+struct ast_type *
 ast_type_create_ptr(struct ast_type *type);
 
 struct ast_type *
@@ -587,9 +590,6 @@ ast_type_istypedef(struct ast_type *);
 
 bool
 ast_type_isvoid(struct ast_type *);
-
-struct ast_type *
-ast_type_create_range(void);
 
 struct externals;
 
