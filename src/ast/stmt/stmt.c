@@ -976,13 +976,13 @@ preconds_compound_verify(struct ast_stmt *stmt)
 DEFINE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_destroy, ast_stmt_res, false)
 
 static struct ast_stmt_res *
-sel_setupmodulate(struct ast_stmt *, struct state *);
+sel_setupdecide(struct ast_stmt *, struct state *);
 
 static struct ast_stmt_res *
-comp_setupmodulate(struct ast_stmt *, struct state *);
+comp_setupdecide(struct ast_stmt *, struct state *);
 
 struct ast_stmt_res *
-ast_stmt_setupmodulate(struct ast_stmt *stmt, struct state *s)
+ast_stmt_setupdecide(struct ast_stmt *stmt, struct state *s)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_EXPR:
@@ -1000,16 +1000,16 @@ ast_stmt_setupmodulate(struct ast_stmt *stmt, struct state *s)
 		);
 		return ast_stmt_res_stmt_create(stmt);
 	case STMT_SELECTION:
-		return sel_setupmodulate(stmt, s);
+		return sel_setupdecide(stmt, s);
 	case STMT_COMPOUND:
-		return comp_setupmodulate(stmt, s);
+		return comp_setupdecide(stmt, s);
 	default:
 		assert(false);
 	}
 }
 
 static struct ast_stmt_res *
-sel_setupmodulate(struct ast_stmt *stmt, struct state *s)
+sel_setupdecide(struct ast_stmt *stmt, struct state *s)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
@@ -1019,17 +1019,17 @@ sel_setupmodulate(struct ast_stmt *stmt, struct state *s)
 		return ast_stmt_res_error_create(bool_res_as_error(res));
 	}
 	if (bool_res_as_bool(res)) {
-		return ast_stmt_setupmodulate(body, s);
+		return ast_stmt_setupdecide(body, s);
 	} else if (nest) {
-		return ast_stmt_setupmodulate(nest, s);
+		return ast_stmt_setupdecide(nest, s);
 	}
 	return ast_stmt_res_error_create(error_modulate_skip());
 }
 
 static struct ast_stmt_res *
-comp_setupmodulate(struct ast_stmt *stmt, struct state *s)
+comp_setupdecide(struct ast_stmt *stmt, struct state *s)
 {
-	struct ast_block_res *res = ast_block_setupmodulate(
+	struct ast_block_res *res = ast_block_setupdecide(
 		ast_stmt_as_block(stmt), s
 	);
 	if (ast_block_res_iserror(res)) {

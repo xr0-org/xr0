@@ -392,16 +392,16 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 }
 
 static struct e_res *
-expr_call_prepare(struct ast_expr *expr, struct state *state);
+pushcallframe(struct ast_expr *expr, struct state *state);
 
 static struct e_res *
 expr_call_eval(struct ast_expr *expr, struct state *state)
 {
-	return expr_call_prepare(expr, state);
+	return pushcallframe(expr, state);
 }
 
 static struct e_res *
-expr_call_prepare(struct ast_expr *expr, struct state *state)
+pushcallframe(struct ast_expr *expr, struct state *state)
 {
 	struct error *err;
 
@@ -452,107 +452,117 @@ expr_call_prepare(struct ast_expr *expr, struct state *state)
 	return e_res_empty_create();
 }
 
-static struct e_res *
+static struct error *
 setupverify(struct ast_expr *expr, struct state *state);
 
 struct e_res *
-expr_setupverify(struct ast_expr *expr, struct state *state)
+ast_expr_setupverify(struct ast_expr *expr, struct state *state)
 {
 	/* XXX: no setup verification for alloc statement */
 	if (ast_expr_kind(expr) != EXPR_ALLOCATION) {
-		struct e_res *res = setupverify(expr, state);
-		if (e_res_iserror(res)) {
-			return res;
+		struct error *err = setupverify(expr, state);
+		if (err) {
+			return e_res_error_create(err);
 		}
 	}
 	return e_res_empty_create();
 }
 
+static struct ast_block_res *
+setupdecided_abstract(struct ast_expr *, struct state *);
+
 static struct error *
-call_setupverify(struct ast_function *f, struct ast_expr *call,
-		struct state *impl);
-
-static struct e_res *
-setupverify(struct ast_expr *expr, struct state *state)
+setupverify(struct ast_expr *call, struct state *impl)
 {
-	struct e_res *res = expr_call_prepare(expr, state);
-	if (e_res_iserror(res)) {
-		return res;
-	}
+	char *fname = ast_expr_as_identifier(ast_expr_call_root(call));
 
-	/* TODO: function-valued-expressions */
-	char *name = ast_expr_as_identifier(ast_expr_call_root(expr));
-
-	struct ast_function *f = externals_getfunc(state_getext(state), name);
+	struct ast_function *f = externals_getfunc(state_getext(impl), fname);
 	assert(f);
 
-	struct error *err = call_setupverify(f, ast_expr_copy(expr), state);
-	if (err) {
-		if (error_to_verifierinstruct(err)) {
-			/* remove call frame pushed in prepare */
-			state_popframe(state);
-		}
-		return e_res_error_create(
-			error_printf("precondition failure: %w", err)
-		);
-	}
-
-	/* remove call frame pushed in prepare */
-	state_popframe(state);
-
-	return e_res_empty_create();
-}
-
-static struct error *
-call_setupverify(struct ast_function *f, struct ast_expr *call,
-		struct state *impl)
-{
-	struct error *err;
-
-	char *fname = ast_function_name(f);
-	struct frame *frame = frame_callabstract_create(
-		fname,
-		ast_function_abstract(f),
-		ast_expr_copy(call),
-		f
-	);
 	struct state *spec = state_create(
-		frame, rconst_create(), state_getext(impl)
+		frame_callabstract_create(
+			fname, ast_function_abstract(f), ast_expr_copy(call), f
+		),
+		rconst_create(),
+		state_getext(impl)
 	);
-
 	int nparams = ast_function_nparams(f);
 	struct ast_variable **param = ast_function_params(f);
 	for (int i = 0; i < nparams; i++) {
 		state_declare(spec, param[i], true);
 	}
 
-	struct ast_block_res *mod_abs_res = ast_block_setupmodulate(
-		ast_function_abstract(f), impl
+	struct ast_block_res *decided_abs_res = setupdecided_abstract(
+		call, impl
 	);
-	if (ast_block_res_iserror(mod_abs_res)) {
-		return ast_block_res_as_error(mod_abs_res);
+	if (ast_block_res_iserror(decided_abs_res)) {
+		return ast_block_res_as_error(decided_abs_res);
 	}
-	struct frame *setupframe = frame_blockfindsetup_create(
-		dynamic_str("findsetup"),
-		ast_block_res_as_block(mod_abs_res)
+	state_pushframe(
+		spec, 
+		frame_blockfindsetup_create(
+			dynamic_str("findsetup"),
+			ast_block_res_as_block(decided_abs_res)
+		)
 	);
-	state_pushframe(spec, setupframe);
+
 	while (!state_atsetupend(spec)) {
-		err = state_step(spec);
+		struct error *err = state_step(spec);
 		assert(!err);
 	}
 	assert(!state_atend(spec));
+
 	state_popframe(spec);
+
+	struct e_res *push_res = pushcallframe(call, impl);
+	assert(!e_res_iserror(push_res));
 
 	for (int i = 0; i < nparams; i++) {
 		char *id = ast_variable_name(param[i]);
 		struct error *err = state_constraintverify(spec, impl, id);
 		if (err) {
-			return error_printf("argument of `%s' %w", id, err);
+			return error_printf(
+				"precondition failure: argument of `%s' %w",
+				id, err
+			);
 		}
 	}
+
+	state_popframe(impl);
+
 	return NULL;
 }
+
+static struct ast_block_res *
+setupdecided_abstract(struct ast_expr *call, struct state *s)
+{
+	struct ast_function *f = externals_getfunc(
+		state_getext(s),
+		ast_expr_as_identifier(ast_expr_call_root(call))
+	);
+	assert(f);
+
+	/* modulation is by parameters in called function, so we prepare these
+	 * first */
+	struct e_res *push_res = pushcallframe(call, s);
+	if (e_res_iserror(push_res)) {
+		return ast_block_res_error_create(e_res_as_error(push_res));
+	}
+
+	struct ast_block_res *res = ast_block_setupdecide(
+		ast_function_abstract(f), s
+	);
+	if (ast_block_res_iserror(res)) {
+		assert(error_to_verifierinstruct(ast_block_res_as_error(res)));
+	}
+
+	/* pop call frame */
+	state_popframe(s);
+
+	return res;
+}
+
+
 
 static struct ast_type *
 call_type(struct ast_expr *call, struct state *);
@@ -635,11 +645,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		struct object_res *o_res = state_get(
 			state, eval_as_lval(e_res_as_eval(lval_res)), true
 		);
-		if (object_res_iserror(o_res)) {
-			printf("error: %s\n", error_str(object_res_as_error(o_res)));
-			assert(false);
-			return object_res_as_error(o_res);
-		}
+		assert(!object_res_iserror(o_res));
 		ast_expr_destroy(name);
 
 		object_assign(object_res_as_object(o_res), value_copy(arg[i]));

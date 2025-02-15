@@ -144,6 +144,6 @@ calloralloc_type(struct ast_expr *e, struct state *s);
 struct e_res;
 
 struct e_res *
-expr_setupverify(struct ast_expr *, struct state *);
+ast_expr_setupverify(struct ast_expr *, struct state *);
 
 #endif

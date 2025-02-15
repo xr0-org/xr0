@@ -333,7 +333,7 @@ ast_block_setups(struct ast_block *b, struct state *);
 DECLARE_RESULT_TYPE(struct ast_block *, block, ast_block_res)
 
 struct ast_block_res *
-ast_block_setupmodulate(struct ast_block *, struct state *);
+ast_block_setupdecide(struct ast_block *, struct state *);
 
 struct externals;
 
@@ -512,7 +512,7 @@ ast_stmt_pushsetup(struct ast_stmt *, struct state *);
 DECLARE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_res)
 
 struct ast_stmt_res *
-ast_stmt_setupmodulate(struct ast_stmt *, struct state *);
+ast_stmt_setupdecide(struct ast_stmt *, struct state *);
 
 struct ast_type;
 

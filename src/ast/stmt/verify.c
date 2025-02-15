@@ -477,7 +477,7 @@ stmt_register_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 register_setupv_exec(struct ast_expr *call, struct state *state)
 {
-	struct e_res *res = expr_setupverify(call, state);
+	struct e_res *res = ast_expr_setupverify(call, state);
 	if (e_res_iserror(res)) {
 		return e_res_as_error(res);
 	}
@@ -585,7 +585,10 @@ ast_stmt_pushsetup(struct ast_stmt *stmt, struct state *s)
 static struct error *
 labelled_pushsetup(struct ast_stmt *stmt, struct state *state)
 {
-	a_printf(ast_stmt_ispre(stmt), "only setup labels supported in abstract\n");
+	a_printf(
+		ast_stmt_ispre(stmt),
+		"only setup labels supported in abstract\n"
+	);
 
 	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
 	if (ast_stmt_kind(inner) == STMT_SELECTION) {

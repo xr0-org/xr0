@@ -210,11 +210,11 @@ generate_tempvar(int tempid)
 DEFINE_RESULT_TYPE(struct ast_block *, block, ast_block_destroy, ast_block_res, false)
 
 struct ast_block_res *
-ast_block_setupmodulate(struct ast_block *old, struct state *s)
+ast_block_setupdecide(struct ast_block *old, struct state *s)
 {
 	struct ast_block *new = ast_block_create(NULL, 0);
 	for (int i = 0; i < old->nstmt; i++) {
-		struct ast_stmt_res *res = ast_stmt_setupmodulate(old->stmt[i], s);
+		struct ast_stmt_res *res = ast_stmt_setupdecide(old->stmt[i], s);
 		if (ast_stmt_res_iserror(res)) {
 			struct error *err = ast_stmt_res_as_error(res);
 			if (error_to_modulate_skip(err)) {
