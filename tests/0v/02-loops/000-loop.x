@@ -4,11 +4,14 @@ void
 unit()
 {
 	int i;
-	void *p;
 
-	for (i = 0; i != 9; i++) {
-		p = malloc(1);
-		~ [ @p; ]
-		free(p);
+	i = 0;
+
+	while (1) ~ [ i = [0?10]; ] {
+		if (!(i < 9))
+			break;
+		i++;
 	}
+
+	~ [ i == 9; ]
 }

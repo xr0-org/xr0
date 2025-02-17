@@ -31,8 +31,9 @@ struct ast_stmt {
 			struct ast_stmt *nest;
 		} selection;
 		struct {
-			struct ast_stmt *init, *cond, *body;
+			struct ast_stmt *init, *cond;
 			struct ast_expr *iter;
+			struct ast_stmt *body;
 			struct ast_block *abstract;
 		} iteration;
 		struct ast_expr *expr;
