@@ -29,4 +29,9 @@ ast_stmt_getfuncs(struct ast_stmt *);
 struct iter *
 ast_stmt_as_iter(struct ast_stmt *);
 
+struct lexememarker;
+
+struct ast_stmt *
+ast_stmt_create_iter(struct lexememarker *, struct iter *);
+
 #endif

@@ -53,6 +53,10 @@ selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *
 		struct state *);
 
 static struct error *
+iter_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
+
+static struct error *
 linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
@@ -63,6 +67,8 @@ linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		return jump_linearise(stmt, b, loc, state);
 	case STMT_SELECTION:
 		return selection_linearise(stmt, b, loc, state);
+	case STMT_ITERATION:
+		return iter_linearise(stmt, b, loc, state);
 	default:
 		assert(false);
 	}
@@ -88,20 +94,21 @@ static struct error *
 jump_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
 		struct state *state)
 {
+	assert(ast_stmt_isreturn(stmt));
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 	struct ast_expr *gen = ast_expr_geninstr(
 		rv, lexememarker_copy(loc), b, state
 	);
-	struct ast_stmt *newjump = ast_stmt_create_jump(
-		lexememarker_copy(loc), JUMP_RETURN, gen
+	struct ast_stmt *newjump = ast_stmt_create_return(
+		lexememarker_copy(loc), gen
 	);
 	ast_block_append_stmt(b, newjump);
 	return NULL;
 }
 
 static struct error *
-selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
-		struct state *state)
+selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
@@ -120,6 +127,20 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 	ast_block_append_stmt(b, newsel);
 	return NULL;
 }
+
+static struct error *
+iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
+{
+	struct ast_block *w1 = iter_while1form(ast_stmt_as_iter(stmt), loc);
+	printf(
+		"before:\n%s\nafter:\n%s\n",
+		ast_stmt_str(stmt, 1),
+		ast_block_str(w1, 1)
+	);
+	assert(false);
+}
+
 
 /* stmt_verify */
 static struct error *
@@ -167,11 +188,12 @@ islinearisable(struct ast_stmt *stmt)
 	case STMT_COMPOUND_V:
 		return false;
 	case STMT_ITERATION:
-		return false;
+		return !iter_inwhile1form(ast_stmt_as_iter(stmt));
 	case STMT_SELECTION:
 	case STMT_EXPR:
-	case STMT_JUMP:
 		return true;
+	case STMT_JUMP:
+		return ast_stmt_isreturn(stmt);
 	default:
 		assert(false);
 	}

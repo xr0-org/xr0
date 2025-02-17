@@ -3,9 +3,11 @@
 #include <assert.h>
 
 #include "ast.h"
+#include "lex.h"
 #include "util.h"
 
 #include "expr.h"
+#include "iter.h"
 #include "stmt.h"
 
 struct iter {
@@ -86,18 +88,55 @@ iter_destroy(struct iter *iter)
 	free(iter);
 }
 
-void
-iter_sprint(struct iter *iter, int indent_level, struct strbuilder *b)
-{
-	assert(iter->type == FOR);
+static void
+while_sprint(struct iter *, int indent, struct strbuilder *);
 
-	char *init = ast_stmt_str(iter->for_init, indent_level),
+static void
+for_sprint(struct iter *, int indent, struct strbuilder *);
+
+void
+iter_sprint(struct iter *iter, int indent, struct strbuilder *b)
+{
+	switch (iter->type) {
+	case WHILE:
+		while_sprint(iter, indent, b);
+		break;
+	case FOR:
+		for_sprint(iter, indent, b);
+		break;
+	default:
+		assert(false);
+	}
+}
+
+static void
+while_sprint(struct iter *iter, int indent, struct strbuilder *b)
+{
+	char *cond = ast_expr_str(iter->cond),
+	     *body = ast_stmt_str(iter->body, indent);
+
+	char *inv = iter->inv ?
+		ast_block_absstr(iter->inv, indent) : dynamic_str("");
+
+	strbuilder_printf(
+		b,
+		"while (%s) ~ %s%s",
+		cond, inv, body
+	);
+
+	free(cond); free(body); free(inv);
+}
+
+static void
+for_sprint(struct iter *iter, int indent, struct strbuilder *b)
+{
+	char *init = ast_stmt_str(iter->for_init, indent),
 	     *cond = ast_expr_str(iter->cond),
-	     *body = ast_stmt_str(iter->body, indent_level),
+	     *body = ast_stmt_str(iter->body, indent),
 	     *update = ast_expr_str(iter->for_update);
 
 	char *inv = iter->inv ?
-		ast_block_absstr(iter->inv, indent_level) : dynamic_str("");
+		ast_block_absstr(iter->inv, indent) : dynamic_str("");
 
 	strbuilder_printf(
 		b,
@@ -121,14 +160,7 @@ isone(struct ast_expr *);
 int
 iter_inwhile1form(struct iter *iter)
 {
-	switch (iter->type) {
-	case WHILE:
-		return isone(iter->cond);
-	case FOR:
-		return 0;
-	default:
-		assert(0);
-	}
+	return iter->type == WHILE && isone(iter->cond);
 }
 
 static int
@@ -136,6 +168,96 @@ isone(struct ast_expr *e)
 {
 	return ast_expr_isconstant(e) && ast_expr_as_constant(e) == 1;
 }
+
+static struct ast_block *
+for_while1form(struct iter *, struct lexememarker *);
+
+struct ast_block *
+iter_while1form(struct iter *iter, struct lexememarker *loc)
+{
+	assert(!iter_inwhile1form(iter));
+	switch (iter->type) {
+	case FOR:
+		return for_while1form(iter, loc);
+	default:
+		assert(false);
+	}
+}
+
+static struct iter *
+while1form(struct iter *, struct lexememarker *loc);
+
+static struct ast_block *
+for_while1form(struct iter *old, struct lexememarker *loc)
+{
+	struct iter *new = while1form(old, loc);
+	ast_block_append_stmt(
+		ast_stmt_as_block(new->body),
+		ast_stmt_create_expr(
+			lexememarker_copy(loc),
+			ast_expr_copy(old->for_update)
+		)
+	);
+	struct ast_block *b = ast_block_create(NULL, 0);
+	ast_block_append_stmt(b, ast_stmt_copy(old->for_init));
+	ast_block_append_stmt(
+		b, ast_stmt_create_iter(lexememarker_copy(loc), new)
+	);
+	return b;
+}
+
+static struct ast_block *
+prepend(struct ast_stmt *old, struct ast_stmt *stmt);
+
+static struct iter *
+while1form(struct iter *old, struct lexememarker *loc)
+{
+	struct ast_stmt *term = ast_stmt_create_sel(
+		lexememarker_copy(loc),
+		false,
+		ast_expr_unary_create(ast_expr_copy(old->cond), UNARY_OP_BANG),
+		ast_stmt_create_break(lexememarker_copy(loc)),
+		NULL
+	);
+	return iter_while_create(
+		ast_expr_constant_create(1),
+		old->inv ? ast_block_copy(old->inv) : NULL,
+		ast_stmt_create_compound(
+			lexememarker_copy(ast_stmt_lexememarker(old->body)),
+			prepend(old->body, term)
+		)
+	);
+}
+
+static struct ast_block *
+toblock(struct ast_stmt *);
+
+static struct ast_block *
+prepend(struct ast_stmt *old, struct ast_stmt *stmt)
+{
+	struct ast_block *new = toblock(old);
+	ast_block_prepend_stmt(new, stmt);
+	return new;
+}
+
+static struct ast_block *
+toblock(struct ast_stmt *stmt)
+{
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_COMPOUND:
+		return ast_block_copy(ast_stmt_as_block(stmt));
+	case STMT_NOP:
+	case STMT_SELECTION:
+		break;
+	default:
+		assert(false);
+	}
+	struct ast_block *b = ast_block_create(NULL, 0);
+	ast_block_append_stmt(b, ast_stmt_copy(stmt));
+	return b;
+}
+
+
 
 struct string_arr *
 iter_getfuncs(struct iter *iter)

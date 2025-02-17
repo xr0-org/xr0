@@ -3,8 +3,9 @@
 
 struct iter;
 
-struct ast_stmt;
+struct ast_block;
 struct ast_expr;
+struct ast_stmt;
 
 struct iter *
 iter_for_create(struct ast_stmt *init, struct ast_stmt *cond,
@@ -20,10 +21,18 @@ iter_destroy(struct iter *);
 struct strbuilder;
 
 void
-iter_sprint(struct iter *iter, int indent_level, struct strbuilder *);
+iter_sprint(struct iter *iter, int indent, struct strbuilder *);
 
 struct ast_block *
 iter_inv(struct iter *);
+
+int
+iter_inwhile1form(struct iter *);
+
+struct lexememarker;
+
+struct ast_block *
+iter_while1form(struct iter *, struct lexememarker *);
 
 struct string_arr;
 
