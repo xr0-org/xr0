@@ -6,4 +6,9 @@ struct string_arr;
 struct string_arr *
 ast_stmt_getfuncs(struct ast_stmt *stmt);
 
+struct ast_stmt *
+ast_stmt_create_for(struct lexememarker *loc, struct ast_stmt *init,
+		struct ast_stmt *cond, struct ast_expr *update,
+		struct ast_block *inv, struct ast_stmt *body);
+
 #endif

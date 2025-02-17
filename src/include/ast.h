@@ -389,13 +389,6 @@ ast_stmt_sel_body(struct ast_stmt *stmt);
 struct ast_stmt *
 ast_stmt_sel_nest(struct ast_stmt *stmt);
 
-
-struct ast_stmt *
-ast_stmt_create_iter(struct lexememarker *,
-		struct ast_stmt *init, struct ast_stmt *cond,
-		struct ast_expr *iter, struct ast_block *invariant,
-		struct ast_stmt *body);
-
 struct ast_stmt *
 ast_stmt_create_compound(struct lexememarker *, struct ast_block *);
 

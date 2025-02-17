@@ -23,7 +23,10 @@ ast_stmt_kind(struct ast_stmt *);
 bool
 ast_stmt_issetup(struct ast_stmt *);
 
-struct ast_block *
-ast_stmt_iter_invariant(struct ast_stmt *);
+struct string_arr *
+ast_stmt_getfuncs(struct ast_stmt *);
+
+struct iter *
+ast_stmt_as_iter(struct ast_stmt *);
 
 #endif

@@ -15,6 +15,7 @@
 
 #include "type.h"
 
+#include "iter.h"
 #include "stmt.h"
 
 static struct error *
@@ -166,7 +167,6 @@ islinearisable(struct ast_stmt *stmt)
 	case STMT_COMPOUND_V:
 		return false;
 	case STMT_ITERATION:
-		/* TODO: break verification into linear sequence */
 		return false;
 	case STMT_SELECTION:
 	case STMT_EXPR:
@@ -369,7 +369,7 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 	printf("%s\n", ast_stmt_str(stmt, 1));
 
 	struct state *inv_state = state_copy(state);
-	state_pushinvariantframe(inv_state, ast_stmt_iter_invariant(stmt));
+	state_pushinvariantframe(inv_state, iter_inv(ast_stmt_as_iter(stmt)));
 	while (!state_atinvariantend(inv_state)) {
 		struct error *err = state_step(inv_state);
 		assert(!err);

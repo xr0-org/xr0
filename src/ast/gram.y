@@ -4,14 +4,17 @@
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
+
 #include "ast.h"
-#include "expr.h"
 #include "gram_util.h"
 #include "intern.h"
 #include "lex.h"
 #include "literals.h"
-#include "type.h"
 #include "util.h"
+
+#include "expr.h"
+#include "stmt.h"
+#include "type.h"
 
 struct namedseq *FUNC_SEQ = NULL;
 
@@ -834,7 +837,7 @@ iteration_statement
 	| DO statement WHILE '(' expression ')' ';'
 	*/
 	: FOR '(' expression_statement expression_statement expression ')' optional_compound_verification statement
-		{ $$ = ast_stmt_create_iter(lexloc(), $3, $4, $5, $7, $8); }
+		{ $$ = ast_stmt_create_for(lexloc(), $3, $4, $5, $7, $8); }
 	;
 
 jump_statement
