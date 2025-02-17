@@ -125,10 +125,9 @@ variable_array_create(struct ast_variable *v)
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
-%token AXIOM LEMMA SFUNC
-%token ARB_ARG
+%token AXIOM
 
-%token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR SOME GOTO CONTINUE BREAK RETURN
+%token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
 %token TK_ALLOC TK_DEALLOC TK_CLUMP
 
 %token START_AST START_EXPR
@@ -199,8 +198,7 @@ variable_array_create(struct ast_variable *v)
 %type <integer> pointer abstract_declarator 
 %type <lexememarker> selection_statement_if
 %type <stmt> statement expression_statement selection_statement jump_statement 
-%type <stmt> labelled_statement iteration_statement for_iteration_statement
-%type <stmt> iteration_effect_statement
+%type <stmt> labelled_statement iteration_statement
 %type <stmt_array> statement_list declaration_list
 %type <string> identifier
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
@@ -753,8 +751,6 @@ statement
 	| selection_statement
 	| iteration_statement
 	| jump_statement
-	| iteration_effect_statement
-		{ $$ = ast_stmt_create_iter_e($1); }
 	| compound_verification_statement
 		{ $$ = ast_stmt_create_compound_v(lexloc(), $1); }
 	;
@@ -787,10 +783,6 @@ block
 		$$ = ast_block_create(new.stmt, new.n);
 	}
 	;
-
-iteration_effect_statement
-	: '.' for_iteration_statement
-		{ $$ = $2; }
 
 compound_verification_statement
 	: '~' '[' ']'		{ $$ = ast_block_create(NULL, 0); }
@@ -832,31 +824,17 @@ selection_statement_if
 	: IF { $$ = lexloc(); }
 	;
 
-for_some
-	: FOR
-	| SOME
-	;
-
 optional_compound_verification
 	: /* empty */ { $$ = ast_block_create(NULL, 0); }
 	| compound_verification_statement
-	;
-
-for_iteration_statement
-	/* : for_some '(' expression_statement expression_statement ')' statement
-		{ $$ = ast_stmt_create_iter(lexloc(), NULL, $3, $4, $6); }
-	*/
-	: for_some '(' expression_statement expression_statement expression ')' optional_compound_verification statement
-		{
-		/*struct ast_stmt *stmt = $8; */
-		$$ = ast_stmt_create_iter(lexloc(), $3, $4, $5, $7, $8); }
 	;
 
 iteration_statement
 	/*: WHILE '(' expression ')' statement
 	| DO statement WHILE '(' expression ')' ';'
 	*/
-	: for_iteration_statement
+	: FOR '(' expression_statement expression_statement expression ')' optional_compound_verification statement
+		{ $$ = ast_stmt_create_iter(lexloc(), $3, $4, $5, $7, $8); }
 	;
 
 jump_statement

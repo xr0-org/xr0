@@ -358,9 +358,6 @@ ast_stmt_isdecl(struct ast_stmt *);
 struct ast_stmt *
 ast_stmt_create_labelled(struct lexememarker *, char *label, struct ast_stmt *);
 
-bool
-ast_stmt_ispre(struct ast_stmt *);
-
 struct error *
 ast_stmt_preconds_validate(struct ast_stmt *);
 
@@ -419,9 +416,6 @@ ast_stmt_iter_lower_bound(struct ast_stmt *stmt);
 
 struct ast_expr *
 ast_stmt_iter_upper_bound(struct ast_stmt *stmt);
-
-struct ast_stmt *
-ast_stmt_create_iter_e(struct ast_stmt *iter_stmt);
 
 struct ast_stmt *
 ast_stmt_create_compound(struct lexememarker *, struct ast_block *);

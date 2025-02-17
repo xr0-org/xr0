@@ -62,16 +62,13 @@ check_type(void);
 "goto"			{ count(); return(GOTO); }
 "if"			{ count(); return(IF); }
 "int"			{ count(); return(INT); }
-"lemma"			{ count(); return(LEMMA); }
 "long"			{ count(); return(LONG); }
 "register"		{ count(); return(REGISTER); }
 "return"		{ count(); return(RETURN); }
 "short"			{ count(); return(SHORT); }
 "signed"		{ count(); return(SIGNED); }
 "sizeof"		{ count(); return(SIZEOF); }
-"some"			{ count(); return(SOME); }
 "static"		{ count(); return(STATIC); }
-"sfunc"			{ count(); return(SFUNC); }
 "struct"		{ count(); return(STRUCT); }
 "switch"		{ count(); return(SWITCH); }
 "typedef"		{ count(); return(TYPEDEF); }
@@ -141,7 +138,6 @@ L?\"(\\.|[^\\"])*\"	{ count(); return(STRING_LITERAL); }
 "|"			{ count(); return('|'); }
 "?"			{ count(); return('?'); }
 "@"			{ count(); return(ISDEALLOCAND_OP); }
-"$"			{ count(); return(ARB_ARG); }
 
 [ \t\v\n\f]		{ count(); }
 .			{ /* ignore bad characters */ }

@@ -8,9 +8,10 @@
 #include "intern.h"
 #include "lex.h"
 #include "state.h"
-#include "stmt.h"
 #include "util.h"
 #include "value.h"
+
+#include "stmt.h"
 
 struct ast_stmt {
 	enum ast_stmt_kind kind;
@@ -140,7 +141,7 @@ ast_stmt_to_block(struct ast_stmt *);
 struct ast_block *
 ast_stmt_labelled_as_block(struct ast_stmt *stmt)
 {
-	assert(ast_stmt_ispre(stmt));
+	assert(ast_stmt_issetup(stmt));
 	struct ast_stmt *setup = ast_stmt_labelled_stmt(stmt);
 	switch (setup->kind) {
 	case STMT_EXPR:
@@ -174,17 +175,10 @@ ast_stmt_as_compound(struct ast_stmt *stmt)
 }
 
 bool
-ast_stmt_ispre(struct ast_stmt *stmt)
+ast_stmt_issetup(struct ast_stmt *stmt)
 {
 	return stmt->kind == STMT_LABELLED
 		&& strcmp(stmt->u.labelled.label, "setup") == 0;
-}
-
-bool
-ast_stmt_isassume(struct ast_stmt *stmt)
-{
-	return stmt->kind == STMT_LABELLED
-		&& strcmp(stmt->u.labelled.label, "assume") == 0;
 }
 
 static void
@@ -513,15 +507,6 @@ ast_stmt_register_mov(struct ast_stmt *stmt)
 	return stmt->u._register.op.temp;
 }
 
-static struct ast_stmt *
-ast_stmt_copy_iter(struct ast_stmt *stmt)
-{
-	stmt->kind = STMT_ITERATION;
-	struct ast_stmt *copy = ast_stmt_copy(stmt);
-	stmt->kind = STMT_ITERATION_E;
-	return ast_stmt_create_iter_e(copy);
-}
-
 static void
 ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *b)
 {
@@ -541,26 +526,6 @@ ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder 
 	);
 
 	free(init); free(cond); free(body); free(iter);
-}
-
-struct ast_stmt *
-ast_stmt_create_iter_e(struct ast_stmt *stmt)
-{
-	/* TODO: determine where loc should go */
-	assert(stmt->kind == STMT_ITERATION);
-	stmt->kind = STMT_ITERATION_E;
-	return stmt;
-}
-
-static void
-ast_stmt_iter_e_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *b)
-{
-	assert(stmt->kind == STMT_ITERATION_E);
-	stmt->kind = STMT_ITERATION;
-	char *s = ast_stmt_str(stmt, indent_level);
-	stmt->kind = STMT_ITERATION_E;
-	strbuilder_printf(b, ".%s", s);
-	free(s);
 }
 
 static void
@@ -641,7 +606,6 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 		}
 		break;
 	case STMT_ITERATION:
-	case STMT_ITERATION_E:
 		ast_stmt_destroy(stmt->u.iteration.init);
 		ast_stmt_destroy(stmt->u.iteration.cond);
 		ast_stmt_destroy(stmt->u.iteration.body);
@@ -713,8 +677,6 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			ast_block_copy(stmt->u.iteration.abstract),
 			ast_stmt_copy(stmt->u.iteration.body)
 		);
-	case STMT_ITERATION_E:
-		return ast_stmt_copy_iter(stmt);
 	case STMT_JUMP:
 		return ast_stmt_create_jump(
 			loc, stmt->u.jump.kind,
@@ -771,9 +733,6 @@ ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 		break;
 	case STMT_ITERATION:
 		ast_stmt_iter_sprint(stmt, indent_level, b);
-		break;
-	case STMT_ITERATION_E:
-		ast_stmt_iter_e_sprint(stmt, indent_level, b);
 		break;
 	case STMT_JUMP:
 		ast_stmt_jump_sprint(stmt, b);
@@ -853,7 +812,6 @@ ast_stmt_getfuncs(struct ast_stmt *stmt)
 	case STMT_SELECTION:
 		return ast_stmt_selection_getfuncs(stmt);
 	case STMT_ITERATION:
-	case STMT_ITERATION_E:
 		return ast_stmt_iteration_getfuncs(stmt);
 	case STMT_JUMP:
 		return ast_expr_getfuncs(stmt->u.jump.rv);
@@ -995,7 +953,7 @@ ast_stmt_setupdecide(struct ast_stmt *stmt, struct state *s)
 		return ast_stmt_res_stmt_create(stmt);
 	case STMT_LABELLED:
 		a_printf(
-			ast_stmt_ispre(stmt),
+			ast_stmt_issetup(stmt),
 			"only setup labels supported in abstract\n"
 		);
 		return ast_stmt_res_stmt_create(stmt);

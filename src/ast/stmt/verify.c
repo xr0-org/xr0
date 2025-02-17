@@ -10,11 +10,12 @@
 #include "intern.h"
 #include "object.h"
 #include "state.h"
-#include "stmt.h"
 #include "util.h"
 #include "value.h"
 
 #include "type.h"
+
+#include "stmt.h"
 
 static struct error *
 linearise_proper(struct ast_stmt *, struct ast_block *, struct lexememarker *,
@@ -160,7 +161,6 @@ islinearisable(struct ast_stmt *stmt)
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:
-	case STMT_ITERATION_E:
 	case STMT_ITERATION:
 		return false;
 	case STMT_SELECTION:
@@ -181,7 +181,6 @@ islinearisable_setuponly(struct ast_stmt *stmt)
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:
-	case STMT_ITERATION_E:
 	case STMT_ITERATION:
 	case STMT_JUMP:
 	case STMT_EXPR:
@@ -254,7 +253,7 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
-		a_printf(ast_stmt_ispre(stmt), "only setup labels supported\n");
+		a_printf(ast_stmt_issetup(stmt), "only setup labels supported\n");
 		return NULL;
 	case STMT_EXPR:
 		return stmt_expr_exec(ast_stmt_as_expr(stmt), s);
@@ -597,7 +596,7 @@ static struct error *
 labelled_pushsetup(struct ast_stmt *stmt, struct state *state)
 {
 	a_printf(
-		ast_stmt_ispre(stmt),
+		ast_stmt_issetup(stmt),
 		"only setup labels supported in abstract\n"
 	);
 

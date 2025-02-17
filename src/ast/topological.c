@@ -4,7 +4,6 @@
 #include "ast.h"
 #include "ext.h"
 #include "util.h"
-#include "stmt.h"
 #include "function.h"
 
 /*
