@@ -133,12 +133,9 @@ iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
 	struct ast_block *w1 = iter_while1form(ast_stmt_as_iter(stmt), loc);
-	printf(
-		"before:\n%s\nafter:\n%s\n",
-		ast_stmt_str(stmt, 1),
-		ast_block_str(w1, 1)
-	);
-	assert(false);
+	ast_block_appendallcopy(b, w1);
+	ast_block_destroy(w1);
+	return NULL;
 }
 
 
