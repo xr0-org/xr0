@@ -6,6 +6,8 @@
 #include "ast.h"
 #include "util.h"
 
+#include "stmt.h"
+
 struct ast_block {
 	int nstmt;
 	struct ast_stmt **stmt;
@@ -155,11 +157,20 @@ ast_block_append_stmt(struct ast_block *b, struct ast_stmt *stmt)
 	ast_block_insert(b, b->nstmt, stmt);
 }
 
+void
+ast_block_appendallcopy(struct ast_block *b, struct ast_block *from)
+{
+	for (int i = 0; i < from->nstmt; i++) {
+		ast_block_append_stmt(b, ast_stmt_copy(from->stmt[i]));
+	}
+}
+
 bool
 ast_block_hastoplevelreturn(struct ast_block *b)
 {
 	for (int i = 0; i < b->nstmt; i++) {
-		if (ast_stmt_isreturn(b->stmt[i])) {
+		struct ast_stmt *stmt = b->stmt[i];
+		if (ast_stmt_isjump(stmt) && ast_stmt_isreturn(stmt)) {
 			return true;
 		}
 	}

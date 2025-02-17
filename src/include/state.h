@@ -47,11 +47,17 @@ state_destroy(struct state *state);
 char *
 state_str(struct state *);
 
-bool
+int
 state_atend(struct state *);
 
-bool
+int
 state_atsetupend(struct state *);
+
+int
+state_atinvariantend(struct state *);
+
+int
+state_atloopend(struct state *);
 
 struct error *
 state_step(struct state *);
@@ -185,6 +191,9 @@ state_stacktrace(struct state *, struct error *);
 void
 state_return(struct state *);
 
+void
+state_break(struct state *);
+
 struct ast_expr *
 state_framecall(struct state *);
 
@@ -212,6 +221,12 @@ frame_callactual_create(char *name, struct ast_block *, struct ast_expr *,
 
 struct frame *
 frame_blockverify_create(char *name, struct ast_block *);
+
+void
+state_pushinvariantframe(struct state *, struct ast_block *);
+
+void
+state_pushloopframe(struct state *, struct ast_block *);
 
 struct frame *
 frame_blockfindsetup_create(char *name, struct ast_block *);
@@ -282,6 +297,11 @@ struct error *
 state_constraintverify_structmember(struct state *spec, struct state *impl,
 		struct value *spec_v, struct value *impl_v, char *member);
 
+struct error *
+state_constraintverify_all(struct state *spec, struct state *impl);
+
+struct error *
+state_verifyinvariant(struct state *);
 
 /* USED BY OBJECT */
 

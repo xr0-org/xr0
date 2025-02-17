@@ -21,6 +21,9 @@ int
 stack_programindex(struct stack *);
 
 void
+stack_break(struct stack *);
+
+void
 stack_return(struct stack *);
 
 struct ast_type *
@@ -61,11 +64,17 @@ stack_modecanrunxr0cmd(struct stack *);
 struct lexememarker *
 stack_lexememarker(struct stack *);
 
-bool
+int
 stack_atend(struct stack *);
 
-bool
+int
 stack_atsetupend(struct stack *);
+
+int
+stack_atinvariantend(struct stack *);
+
+int
+stack_atloopend(struct stack *);
 
 int
 stack_id(struct stack *);
@@ -97,8 +106,17 @@ stack_undeclare(struct stack *stack, struct state *state);
 bool
 stack_isnested(struct stack *);
 
-bool
+int
 stack_insetup(struct stack *);
+
+int
+stack_ininvariant(struct stack *);
+
+int
+stack_inloop(struct stack *);
+
+int
+stack_isloopbase(struct stack *);
 
 struct error *
 stack_trace(struct stack *, struct error *);
@@ -109,11 +127,23 @@ stack_getvarmap(struct stack *);
 struct variable *
 stack_getvariable(struct stack *s, char *id);
 
+struct error *
+stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
+		struct state *impl);
+
+struct error *
+stack_verifyinvariant(struct stack *s, struct state *impl);
+
 struct ast_expr;
 
 struct block *
 stack_getblock(struct stack *, int address);
 
+struct frame *
+frame_invariant_create(struct ast_block *, struct stack *);
+
+struct frame *
+frame_loop_create(struct ast_block *, struct stack *, struct state *inv_state);
 
 /* variable */
 

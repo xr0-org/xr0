@@ -157,16 +157,40 @@ state_lexememarker(struct state *s)
 	return stack_lexememarker(s->stack);
 }
 
-bool
+int
 state_atend(struct state *s)
 {
 	return stack_atend(s->stack);
 }
 
-bool
+int
 state_atsetupend(struct state *s)
 {
 	return stack_atsetupend(s->stack);
+}
+
+int
+state_atinvariantend(struct state *s)
+{
+	return stack_atinvariantend(s->stack);
+}
+
+int
+state_atloopend(struct state *s)
+{
+	return stack_atloopend(s->stack);
+}
+
+void
+state_pushinvariantframe(struct state *s, struct ast_block *b)
+{
+	state_pushframe(s, frame_invariant_create(b, s->stack));
+}
+
+void
+state_pushloopframe(struct state *s, struct ast_block *b)
+{
+	state_pushframe(s, frame_loop_create(b, s->stack, state_copy(s)));
 }
 
 struct error *
@@ -314,6 +338,16 @@ void
 state_return(struct state *s)
 {
 	stack_return(s->stack);	
+}
+
+void
+state_break(struct state *s)
+{
+	assert(stack_inloop(s->stack));
+	while (!stack_isloopbase(s->stack)) {
+		state_popframe(s);
+	}
+	state_popframe(s);
 }
 
 struct ast_expr *
@@ -470,9 +504,8 @@ state_constraintverify(struct state *spec, struct state *impl, char *id)
 	struct error *err = constraint_verify(
 		c,
 		object_as_value(spec_obj),
-		/* we can safely assume that impl has a value because
-		 * it's the result of an argument expression being
-		 * evaluated */
+		/* we can safely assume that impl has a value for id because
+		 * it's the result of an argument expression being evaluated */
 		object_as_value(
 			location_mustgetobject(
 				loc_res_as_loc(state_getloc(impl, id)),
@@ -510,6 +543,18 @@ static struct object *
 location_mustgetobject(struct location *loc, struct state *s)
 {
 	return object_res_as_object(state_get(s, loc, false));
+}
+
+struct error *
+state_constraintverify_all(struct state *spec, struct state *impl)
+{
+	return stack_constraintverify_all(spec->stack, spec, impl);
+}
+
+struct error *
+state_verifyinvariant(struct state *s)
+{
+	return stack_verifyinvariant(s->stack, s);
 }
 
 

@@ -15,6 +15,8 @@
 
 #include "type.h"
 
+#include "iter.h"
+#include "jump.h"
 #include "stmt.h"
 
 static struct error *
@@ -52,6 +54,10 @@ selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *
 		struct state *);
 
 static struct error *
+iter_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
+
+static struct error *
 linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
@@ -62,6 +68,8 @@ linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		return jump_linearise(stmt, b, loc, state);
 	case STMT_SELECTION:
 		return selection_linearise(stmt, b, loc, state);
+	case STMT_ITERATION:
+		return iter_linearise(stmt, b, loc, state);
 	default:
 		assert(false);
 	}
@@ -84,23 +92,22 @@ expr_linearise(struct ast_stmt *stmt, struct ast_block *b,
 }
 
 static struct error *
-jump_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
-		struct state *state)
+jump_linearise(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
 {
-	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 	struct ast_expr *gen = ast_expr_geninstr(
-		rv, lexememarker_copy(loc), b, state
+		jump_rv(ast_stmt_as_jump(stmt)), lexememarker_copy(loc), b, state
 	);
-	struct ast_stmt *newjump = ast_stmt_create_jump(
-		lexememarker_copy(loc), JUMP_RETURN, gen
+	struct ast_stmt *newjump = ast_stmt_create_return(
+		lexememarker_copy(loc), gen
 	);
 	ast_block_append_stmt(b, newjump);
 	return NULL;
 }
 
 static struct error *
-selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
-		struct state *state)
+selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
@@ -117,6 +124,16 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememar
 		nest ? ast_stmt_copy(nest) : NULL
 	);
 	ast_block_append_stmt(b, newsel);
+	return NULL;
+}
+
+static struct error *
+iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
+{
+	struct ast_block *w1 = iter_while1form(ast_stmt_as_iter(stmt), loc);
+	ast_block_appendallcopy(b, w1);
+	ast_block_destroy(w1);
 	return NULL;
 }
 
@@ -148,29 +165,44 @@ directverify(struct ast_stmt *stmt, struct state *s)
 	case STMT_EXPR:
 		return stmt_expr_verify(stmt, s);
 	default:
-		return error_printf("verification blocks only support statement expressions");
+		return error_printf(
+			"verification blocks only support statement expressions"
+		);
 	}
 }
+
+static int
+jump_islinearisable(struct jump *);
 
 static bool
 islinearisable(struct ast_stmt *stmt)
 {
 	switch (ast_stmt_kind(stmt)) {
-	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
+	case STMT_DECLARATION: /* XXX: will have to be linearised with
+				  initialisation */
 	case STMT_NOP:
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:
-	case STMT_ITERATION:
 		return false;
+	case STMT_ITERATION:
+		return !iter_inwhile1form(ast_stmt_as_iter(stmt));
 	case STMT_SELECTION:
 	case STMT_EXPR:
-	case STMT_JUMP:
 		return true;
+	case STMT_JUMP:
+		return jump_islinearisable(ast_stmt_as_jump(stmt));
 	default:
 		assert(false);
 	}
 }
+
+static int
+jump_islinearisable(struct jump *j)
+{
+	return jump_isreturn(j) && jump_hasrv(j);
+}
+
 
 static bool
 islinearisable_setuponly(struct ast_stmt *stmt)
@@ -357,57 +389,49 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 	return NULL;
 }
 
-/* stmt_expr_eval */
+static struct error *
+iter_setupverify(struct ast_stmt *, struct state *);
 
-static struct ast_stmt *
-iter_neteffect(struct ast_stmt *);
+static void
+deriveinvstate(struct ast_stmt *, struct state *);
 
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 {
-	/* TODO: check internal consistency of iteration */
-
-	struct ast_stmt *neteffect = iter_neteffect(stmt);
-	if (!neteffect) {
-		return NULL;
-	}
-
-	struct error *err = ast_stmt_exec(neteffect, state);
+	struct error *err = iter_setupverify(stmt, state);
 	if (err) {
 		return err;
 	}
 
-	ast_stmt_destroy(neteffect);
+	deriveinvstate(stmt, state);
+
+	iter_pushstatebody(ast_stmt_as_iter(stmt), state);
 
 	return NULL;
 }
 
-/* iter_neteffect */
-
-static struct ast_stmt *
-iter_neteffect(struct ast_stmt *iter)
+static struct error *
+iter_setupverify(struct ast_stmt *stmt, struct state *impl)
 {
-	struct ast_block *abs = ast_stmt_iter_abstract(iter);
-	assert(abs);
-
-	int nstmts = ast_block_nstmts(abs);
-	if (!nstmts) {
-		return NULL;
-	}
-
-	assert(nstmts == 1 && !ast_stmt_isdecl(ast_block_stmts(abs)[0]));
-
-	return ast_stmt_create_iter(
-		NULL,
-		ast_stmt_copy(ast_stmt_iter_init(iter)),
-		ast_stmt_copy(ast_stmt_iter_cond(iter)),
-		ast_expr_copy(ast_stmt_iter_iter(iter)),
-		ast_block_create(NULL, 0),
-		ast_stmt_create_compound(
-			NULL, ast_block_copy(ast_stmt_iter_abstract(iter))
-		)
-	);
+	struct state *spec = state_copy(impl);
+	deriveinvstate(stmt, spec);
+	struct error *err = state_constraintverify_all(spec, impl);
+	state_destroy(spec);
+	return err;
 }
+
+static void
+deriveinvstate(struct ast_stmt *stmt, struct state *state)
+{
+	state_pushinvariantframe(state, iter_inv(ast_stmt_as_iter(stmt)));
+	while (!state_atinvariantend(state)) {
+		struct error *err = state_step(state);
+		assert(!err);
+	}
+	state_popframe(state);
+}
+
+
 
 static int
 compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
@@ -415,8 +439,12 @@ compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
-	if (rv) {
+	struct jump *j = ast_stmt_as_jump(stmt);
+	if (jump_isbreak(j)) {
+		return error_break();
+	}
+	if (jump_hasrv(j)) {
+		struct ast_expr *rv = jump_rv(j);
 		struct e_res *res = ast_expr_eval(rv, state);
 		if (e_res_iserror(res)) {
 			struct error *err = e_res_as_error(res);

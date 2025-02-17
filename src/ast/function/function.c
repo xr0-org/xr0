@@ -245,7 +245,7 @@ generate_abstract(struct ast_function *f, struct externals *ext)
 		);
 		namedseq_destroy(seq);
 		ast_block_append_stmt(
-			b, ast_stmt_create_jump(lexememarker_copy(f->loc), JUMP_RETURN, ret)
+			b, ast_stmt_create_return(lexememarker_copy(f->loc), ret)
 		);
 	}
 	return ast_block_res_block_create(b);
@@ -265,7 +265,9 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 {
 	struct verifier *verifier = verifier_create(f, ext);
 	while (!verifier_atend(verifier)) {
-		struct error *err = verifier_progress(verifier, progressor_step());
+		struct error *err = verifier_progress(
+			verifier, progressor_step()
+		);
 		if (err) {
 			return err;
 		}

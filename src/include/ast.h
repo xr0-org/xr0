@@ -322,6 +322,9 @@ ast_block_prepend_stmt(struct ast_block *, struct ast_stmt *);
 void
 ast_block_append_stmt(struct ast_block *, struct ast_stmt *);
 
+void
+ast_block_appendallcopy(struct ast_block *b, struct ast_block *from);
+
 struct preconds_result {
 	struct ast_block *b;
 	struct error *err;
@@ -389,34 +392,6 @@ ast_stmt_sel_body(struct ast_stmt *stmt);
 struct ast_stmt *
 ast_stmt_sel_nest(struct ast_stmt *stmt);
 
-
-struct ast_stmt *
-ast_stmt_create_iter(struct lexememarker *,
-		struct ast_stmt *init, struct ast_stmt *cond,
-		struct ast_expr *iter, struct ast_block *abstract,
-		struct ast_stmt *body);
-
-struct ast_stmt *
-ast_stmt_iter_init(struct ast_stmt *stmt);
-
-struct ast_stmt *
-ast_stmt_iter_cond(struct ast_stmt *stmt);
-
-struct ast_expr *
-ast_stmt_iter_iter(struct ast_stmt *stmt);
-
-struct ast_block *
-ast_stmt_iter_abstract(struct ast_stmt *stmt);
-
-struct ast_stmt *
-ast_stmt_iter_body(struct ast_stmt *stmt);
-
-struct ast_expr *
-ast_stmt_iter_lower_bound(struct ast_stmt *stmt);
-
-struct ast_expr *
-ast_stmt_iter_upper_bound(struct ast_stmt *stmt);
-
 struct ast_stmt *
 ast_stmt_create_compound(struct lexememarker *, struct ast_block *);
 
@@ -429,18 +404,11 @@ ast_stmt_as_block(struct ast_stmt *);
 struct ast_stmt *
 ast_stmt_create_compound_v(struct lexememarker *, struct ast_block *);
 
-enum ast_jump_kind {
-	JUMP_RETURN	= 1 << 0,
-};
+struct ast_stmt *
+ast_stmt_create_break(struct lexememarker *);
 
 struct ast_stmt *
-ast_stmt_create_jump(struct lexememarker *, enum ast_jump_kind, struct ast_expr *rv);
-
-struct ast_expr *
-ast_stmt_jump_rv(struct ast_stmt *stmt);
-
-bool
-ast_stmt_isreturn(struct ast_stmt *);
+ast_stmt_create_return(struct lexememarker *, struct ast_expr *rv);
 
 struct ast_stmt *
 ast_stmt_create_alloc(struct lexememarker *, struct ast_expr *arg);

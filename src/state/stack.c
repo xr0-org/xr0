@@ -54,6 +54,18 @@ frame_isinter(struct frame *);
 static int
 frame_issetup(struct frame *);
 
+static int
+frame_isinvariant(struct frame *);
+
+static int
+frame_isloop(struct frame *);
+
+static int
+frame_parentstackid(struct frame *);
+
+static struct error *
+frame_verifyinvariant(struct frame *, struct state *impl);
+
 struct stack {
 	int id;
 
@@ -123,18 +135,21 @@ stack_programindex(struct stack *s)
 }
 
 void
+stack_break(struct stack *s)
+{
+	program_setatend(frame_program(s->f));
+	if (!stack_isloopbase(s)) {
+		stack_break(s->prev);
+	}
+}
+
+void
 stack_return(struct stack *s)
 {
 	program_setatend(frame_program(s->f));
 	if (s->prev && !frame_iscall(s->f)) {
 		stack_return(s->prev);
 	}
-}
-
-struct ast_expr *
-stack_framecall(struct stack *s)
-{
-	return frame_call(s->f);
 }
 
 struct ast_type *
@@ -145,6 +160,12 @@ stack_returntype(struct stack *s)
 		return stack_returntype(s->prev);
 	}
 	return ast_function_type(frame_function(s->f));
+}
+
+struct ast_expr *
+stack_framecall(struct stack *s)
+{
+	return frame_call(s->f);
 }
 
 static char *
@@ -221,17 +242,17 @@ static struct map *
 varmap_copy(struct map *);
 
 struct stack *
-stack_copy(struct stack *stack)
+stack_copy(struct stack *old)
 {
-	struct stack *copy = calloc(1, sizeof(struct stack));
-	copy->memory = block_arr_copy(stack->memory);
-	copy->varmap = varmap_copy(stack->varmap);
-	copy->id = stack->id;
-	if (stack->prev) {
-		copy->prev = stack_copy(stack->prev);
+	struct stack *new = calloc(1, sizeof(struct stack));
+	new->memory = block_arr_copy(old->memory);
+	new->varmap = varmap_copy(old->varmap);
+	new->id = old->id;
+	if (old->prev) {
+		new->prev = stack_copy(old->prev);
 	}
-	copy->f = frame_copy(stack->f);
-	return copy;
+	new->f = frame_copy(old->f);
+	return new;
 }
 
 static void
@@ -362,10 +383,22 @@ stack_islinear(struct stack *s)
 	return frame_isinter(s->f);
 }
 
-bool
+int
 stack_insetup(struct stack *s)
 {
 	return frame_issetup(s->f) || (s->prev && stack_insetup(s->prev));
+}
+
+int
+stack_ininvariant(struct stack *s)
+{
+	return frame_isinvariant(s->f) || (s->prev && stack_ininvariant(s->prev));
+}
+
+int
+stack_inloop(struct stack *s)
+{
+	return frame_isloop(s->f) || (s->prev && stack_inloop(s->prev));
 }
 
 int
@@ -414,16 +447,42 @@ stack_issetupbase(struct stack *s)
 	return false;
 }
 
-bool
+static int
+stack_isinvariantbase(struct stack *s)
+{
+	return frame_isinvariant(s->f)
+		&& s->id == frame_parentstackid(s->f)+1;
+}
+
+int
+stack_isloopbase(struct stack *s)
+{
+	return frame_isloop(s->f)
+		&& s->id == frame_parentstackid(s->f)+1;
+}
+
+int
 stack_atend(struct stack *s)
 {
 	return program_atend(frame_program(s->f)) && stack_isbase(s);
 }
 
-bool
+int
 stack_atsetupend(struct stack *s)
 {
 	return program_atend(frame_program(s->f)) && stack_issetupbase(s);
+}
+
+int
+stack_atinvariantend(struct stack *s)
+{
+	return program_atend(frame_program(s->f)) && stack_isinvariantbase(s);
+}
+
+int
+stack_atloopend(struct stack *s)
+{
+	return program_atend(frame_program(s->f)) && stack_isloopbase(s);
 }
 
 struct error *
@@ -567,6 +626,48 @@ stack_getvariable(struct stack *s, char *id)
 	return v;
 }
 
+static struct error *
+constraintverify_all(struct map *, struct state *spec, struct state *impl);
+
+struct error *
+stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
+		struct state *impl)
+{
+	struct error *err = constraintverify_all(spec_stack->varmap, spec, impl);
+	if (err) {
+		return err;
+	}
+	return spec_stack->prev
+		? stack_constraintverify_all(spec_stack->prev, spec, impl)
+		: NULL;
+}
+
+static struct error *
+constraintverify_all(struct map *m, struct state *spec, struct state *impl)
+{
+	int i;
+
+	for (i = 0; i < m->n; i++) {
+		struct error *err;
+		char *id = m->entry[i].key;
+
+		if ((err = state_constraintverify(spec, impl, id))) {
+			return error_printf(
+				"invariant failure: `%s' %w",
+				id, err
+			);
+		}
+	}
+
+	return NULL;
+}
+
+struct error *
+stack_verifyinvariant(struct stack *s, struct state *impl)
+{
+	return frame_verifyinvariant(s->f, impl);
+}
+
 void
 stack_popprep(struct stack *s, struct state *state)
 {
@@ -590,11 +691,16 @@ struct frame {
 		FRAME_LINEAR,
 		FRAME_CALL,
 		FRAME_SETUP,
+		FRAME_INVARIANT,
+		FRAME_LOOP,
 	} kind;
 	struct program *p;
 
 	struct ast_expr *call;
 	struct ast_function *f;
+
+	int parentstackid; /* only defined in FRAME_INVARIANT and FRAME_LOOP */
+	struct state *inv_state; /* only defined in FRAME_LOOP */
 };
 
 static struct frame *
@@ -650,6 +756,27 @@ frame_blockverify_create(char *name, struct ast_block *b)
 }
 
 struct frame *
+frame_invariant_create(struct ast_block *b, struct stack *s)
+{
+	struct frame *f = frame_create(
+		"invariant", program_abstract_create(b), FRAME_INVARIANT
+	);
+	f->parentstackid = stack_id(s);
+	return f;
+}
+
+struct frame *
+frame_loop_create(struct ast_block *b, struct stack *s, struct state *inv_state)
+{
+	struct frame *f = frame_create(
+		"loop", program_abstract_create(b), FRAME_LOOP
+	);
+	f->parentstackid = stack_id(s);
+	f->inv_state = inv_state;
+	return f;
+}
+
+struct frame *
 frame_blockfindsetup_create(char *name, struct ast_block *b)
 {
 	return frame_block_create_withprogram(name, program_findsetup_create(b));
@@ -688,17 +815,36 @@ frame_destroy(struct frame *f)
 		ast_expr_destroy(f->call);
 		ast_function_destroy(f->f);
 	}
+	if (frame_isloop(f)) {
+		state_destroy(f->inv_state);
+	}
 }
 
 static struct frame *
-frame_copy(struct frame *f)
+frame_copy(struct frame *old)
 {
-	struct frame *copy = frame_create(f->name, program_copy(f->p), f->kind);
-	if (f->kind == FRAME_CALL) {
-		copy->call = ast_expr_copy(f->call);
-		copy->f = ast_function_copy(f->f);
+	struct frame *new = frame_create(
+		old->name, program_copy(old->p), old->kind
+	);
+	switch (old->kind) {
+	case FRAME_CALL:
+		new->call = ast_expr_copy(old->call);
+		new->f = ast_function_copy(old->f);
+		break;
+	case FRAME_LOOP:
+		new->inv_state = state_copy(old->inv_state);
+		/* fallthrough */
+	case FRAME_INVARIANT:
+		new->parentstackid = old->parentstackid;
+		break;
+	case FRAME_BLOCK:
+	case FRAME_LINEAR:
+	case FRAME_SETUP:
+		break;
+	default:
+		assert(false);
 	}
-	return copy;
+	return new;
 }
 
 static void
@@ -763,6 +909,30 @@ frame_issetup(struct frame *f)
 	return f->kind == FRAME_SETUP;
 }
 
+static int
+frame_isinvariant(struct frame *f)
+{
+	return f->kind == FRAME_INVARIANT;
+}
+
+static int
+frame_isloop(struct frame *f)
+{
+	return f->kind == FRAME_LOOP;
+}
+
+static int
+frame_parentstackid(struct frame *f)
+{
+	switch (f->kind) {
+	case FRAME_INVARIANT:
+	case FRAME_LOOP:
+		return f->parentstackid;
+	default:
+		assert(false);
+	}
+}
+
 struct ast_expr *
 frame_call(struct frame *f)
 {
@@ -774,6 +944,13 @@ frame_call(struct frame *f)
 	default:
 		assert(false);
 	}
+}
+
+static struct error *
+frame_verifyinvariant(struct frame *f, struct state *impl)
+{
+	assert(frame_isloop(f));
+	return state_constraintverify_all(f->inv_state, impl);
 }
 
 struct variable {
