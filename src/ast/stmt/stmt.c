@@ -34,7 +34,7 @@ struct ast_stmt {
 			struct ast_stmt *init, *cond;
 			struct ast_expr *iter;
 			struct ast_stmt *body;
-			struct ast_block *abstract;
+			struct ast_block *inv;
 		} iteration;
 		struct ast_expr *expr;
 		struct {
@@ -377,17 +377,17 @@ ast_stmt_sel_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *
 struct ast_stmt *
 ast_stmt_create_iter(struct lexememarker *loc,
 		struct ast_stmt *init, struct ast_stmt *cond,
-		struct ast_expr *iter, struct ast_block *abstract,
+		struct ast_expr *iter, struct ast_block *invariant,
 		struct ast_stmt *body)
 {
-	assert(init && cond && iter && abstract && body);
+	assert(init && cond && iter && invariant && body);
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_ITERATION;
 	stmt->u.iteration.init = init;
 	stmt->u.iteration.cond = cond;
 	stmt->u.iteration.iter = iter;
 	stmt->u.iteration.body = body;
-	stmt->u.iteration.abstract = abstract;
+	stmt->u.iteration.inv = invariant;
 	return stmt;
 }
 
@@ -413,10 +413,10 @@ ast_stmt_iter_iter(struct ast_stmt *stmt)
 }
 
 struct ast_block *
-ast_stmt_iter_abstract(struct ast_stmt *stmt)
+ast_stmt_iter_invariant(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ITERATION);
-	return stmt->u.iteration.abstract;
+	return stmt->u.iteration.inv;
 }
 
 struct ast_stmt *
@@ -509,7 +509,8 @@ ast_stmt_register_mov(struct ast_stmt *stmt)
 }
 
 static void
-ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder *b)
+ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level,
+		struct strbuilder *b)
 {
 	assert(stmt->kind == STMT_ITERATION);
 	char *init = ast_stmt_str(stmt->u.iteration.init, indent_level),
@@ -517,8 +518,8 @@ ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level, struct strbuilder 
 	     *body = ast_stmt_str(stmt->u.iteration.body, indent_level),
 	     *iter = ast_expr_str(stmt->u.iteration.iter);
 
-	char *abs = stmt->u.iteration.abstract ?
-		ast_block_absstr(stmt->u.iteration.abstract, indent_level) : "";
+	char *abs = stmt->u.iteration.inv ?
+		ast_block_absstr(stmt->u.iteration.inv, indent_level) : "";
 
 	strbuilder_printf(
 		b,
@@ -611,7 +612,7 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 		ast_stmt_destroy(stmt->u.iteration.cond);
 		ast_stmt_destroy(stmt->u.iteration.body);
 		ast_expr_destroy(stmt->u.iteration.iter);
-		ast_block_destroy(stmt->u.iteration.abstract);
+		ast_block_destroy(stmt->u.iteration.inv);
 		break;
 	case STMT_EXPR:
 		ast_expr_destroy(stmt->u.expr);
@@ -675,7 +676,7 @@ ast_stmt_copy(struct ast_stmt *stmt)
 			ast_stmt_copy(stmt->u.iteration.init),
 			ast_stmt_copy(stmt->u.iteration.cond),
 			ast_expr_copy(stmt->u.iteration.iter),
-			ast_block_copy(stmt->u.iteration.abstract),
+			ast_block_copy(stmt->u.iteration.inv),
 			ast_stmt_copy(stmt->u.iteration.body)
 		);
 	case STMT_JUMP:

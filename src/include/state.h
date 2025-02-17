@@ -53,6 +53,9 @@ state_atend(struct state *);
 bool
 state_atsetupend(struct state *);
 
+int
+state_atinvariantend(struct state *);
+
 struct error *
 state_step(struct state *);
 
@@ -212,6 +215,9 @@ frame_callactual_create(char *name, struct ast_block *, struct ast_expr *,
 
 struct frame *
 frame_blockverify_create(char *name, struct ast_block *);
+
+void
+state_pushinvariantframe(struct state *, struct ast_block *);
 
 struct frame *
 frame_blockfindsetup_create(char *name, struct ast_block *);

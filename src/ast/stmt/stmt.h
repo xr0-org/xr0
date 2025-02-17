@@ -21,6 +21,9 @@ enum ast_stmt_kind
 ast_stmt_kind(struct ast_stmt *);
 
 bool
-ast_stmt_issetup(struct ast_stmt *stmt);
+ast_stmt_issetup(struct ast_stmt *);
+
+struct ast_block *
+ast_stmt_iter_invariant(struct ast_stmt *);
 
 #endif

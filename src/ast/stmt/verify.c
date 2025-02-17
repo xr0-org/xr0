@@ -148,7 +148,9 @@ directverify(struct ast_stmt *stmt, struct state *s)
 	case STMT_EXPR:
 		return stmt_expr_verify(stmt, s);
 	default:
-		return error_printf("verification blocks only support statement expressions");
+		return error_printf(
+			"verification blocks only support statement expressions"
+		);
 	}
 }
 
@@ -156,12 +158,15 @@ static bool
 islinearisable(struct ast_stmt *stmt)
 {
 	switch (ast_stmt_kind(stmt)) {
-	case STMT_DECLARATION: /* XXX: will have to be linearised with initialisation */
+	case STMT_DECLARATION: /* XXX: will have to be linearised with
+				  initialisation */
 	case STMT_NOP:
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
 	case STMT_COMPOUND_V:
+		return false;
 	case STMT_ITERATION:
+		/* TODO: break verification into linear sequence */
 		return false;
 	case STMT_SELECTION:
 	case STMT_EXPR:
@@ -357,56 +362,22 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 	return NULL;
 }
 
-/* stmt_expr_eval */
-
-static struct ast_stmt *
-iter_neteffect(struct ast_stmt *);
-
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 {
-	/* TODO: check internal consistency of iteration */
+	printf("%s\n", state_str(state));
+	printf("%s\n", ast_stmt_str(stmt, 1));
 
-	struct ast_stmt *neteffect = iter_neteffect(stmt);
-	if (!neteffect) {
-		return NULL;
+	struct state *inv_state = state_copy(state);
+	state_pushinvariantframe(inv_state, ast_stmt_iter_invariant(stmt));
+	while (!state_atinvariantend(inv_state)) {
+		struct error *err = state_step(inv_state);
+		assert(!err);
 	}
+	state_popframe(inv_state);
 
-	struct error *err = ast_stmt_exec(neteffect, state);
-	if (err) {
-		return err;
-	}
-
-	ast_stmt_destroy(neteffect);
-
-	return NULL;
-}
-
-/* iter_neteffect */
-
-static struct ast_stmt *
-iter_neteffect(struct ast_stmt *iter)
-{
-	struct ast_block *abs = ast_stmt_iter_abstract(iter);
-	assert(abs);
-
-	int nstmts = ast_block_nstmts(abs);
-	if (!nstmts) {
-		return NULL;
-	}
-
-	assert(nstmts == 1 && !ast_stmt_isdecl(ast_block_stmts(abs)[0]));
-
-	return ast_stmt_create_iter(
-		NULL,
-		ast_stmt_copy(ast_stmt_iter_init(iter)),
-		ast_stmt_copy(ast_stmt_iter_cond(iter)),
-		ast_expr_copy(ast_stmt_iter_iter(iter)),
-		ast_block_create(NULL, 0),
-		ast_stmt_create_compound(
-			NULL, ast_block_copy(ast_stmt_iter_abstract(iter))
-		)
-	);
+	printf("%s\n", state_str(inv_state));
+	assert(false);
 }
 
 static int

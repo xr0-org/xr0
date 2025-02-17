@@ -169,6 +169,19 @@ state_atsetupend(struct state *s)
 	return stack_atsetupend(s->stack);
 }
 
+int
+state_atinvariantend(struct state *s)
+{
+	return stack_atinvariantend(s->stack);
+}
+
+void
+state_pushinvariantframe(struct state *s, struct ast_block *b)
+{
+	state_pushframe(s, frame_invariant_create(b, s->stack));
+	assert(stack_ininvariant(s->stack));
+}
+
 struct error *
 state_step(struct state *s)
 {

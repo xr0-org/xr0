@@ -54,6 +54,12 @@ frame_isinter(struct frame *);
 static int
 frame_issetup(struct frame *);
 
+static int
+frame_isinvariant(struct frame *);
+
+static int
+frame_invariant_parentstackid(struct frame *);
+
 struct stack {
 	int id;
 
@@ -369,6 +375,12 @@ stack_insetup(struct stack *s)
 }
 
 int
+stack_ininvariant(struct stack *s)
+{
+	return frame_isinvariant(s->f) || (s->prev && stack_ininvariant(s->prev));
+}
+
+int
 stack_id(struct stack *s)
 {
 	assert(s);
@@ -414,6 +426,13 @@ stack_issetupbase(struct stack *s)
 	return false;
 }
 
+static int
+stack_isinvariantbase(struct stack *s)
+{
+	return frame_isinvariant(s->f)
+		&& s->id == frame_invariant_parentstackid(s->f)+1;
+}
+
 bool
 stack_atend(struct stack *s)
 {
@@ -424,6 +443,12 @@ bool
 stack_atsetupend(struct stack *s)
 {
 	return program_atend(frame_program(s->f)) && stack_issetupbase(s);
+}
+
+int
+stack_atinvariantend(struct stack *s)
+{
+	return program_atend(frame_program(s->f)) && stack_isinvariantbase(s);
 }
 
 struct error *
@@ -590,11 +615,14 @@ struct frame {
 		FRAME_LINEAR,
 		FRAME_CALL,
 		FRAME_SETUP,
+		FRAME_INVARIANT,
 	} kind;
 	struct program *p;
 
 	struct ast_expr *call;
 	struct ast_function *f;
+
+	int invariant_parentstackid;
 };
 
 static struct frame *
@@ -647,6 +675,16 @@ struct frame *
 frame_blockverify_create(char *name, struct ast_block *b)
 {
 	return frame_block_create_withprogram(name, program_verify_create(b));
+}
+
+struct frame *
+frame_invariant_create(struct ast_block *b, struct stack *s)
+{
+	struct frame *f = frame_create(
+		"invariant", program_abstract_create(b), FRAME_INVARIANT
+	);
+	f->invariant_parentstackid = stack_id(s);
+	return f;
 }
 
 struct frame *
@@ -761,6 +799,19 @@ static int
 frame_issetup(struct frame *f)
 {
 	return f->kind == FRAME_SETUP;
+}
+
+static int
+frame_isinvariant(struct frame *f)
+{
+	return f->kind == FRAME_INVARIANT;
+}
+
+static int
+frame_invariant_parentstackid(struct frame *f)
+{
+	assert(frame_isinvariant(f));
+	return f->invariant_parentstackid;
 }
 
 struct ast_expr *

@@ -68,6 +68,9 @@ bool
 stack_atsetupend(struct stack *);
 
 int
+stack_atinvariantend(struct stack *);
+
+int
 stack_id(struct stack *);
 
 struct error *
@@ -100,6 +103,9 @@ stack_isnested(struct stack *);
 bool
 stack_insetup(struct stack *);
 
+int
+stack_ininvariant(struct stack *);
+
 struct error *
 stack_trace(struct stack *, struct error *);
 
@@ -114,6 +120,8 @@ struct ast_expr;
 struct block *
 stack_getblock(struct stack *, int address);
 
+struct frame *
+frame_invariant_create(struct ast_block *, struct stack *);
 
 /* variable */
 
