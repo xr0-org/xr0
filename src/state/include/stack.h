@@ -122,6 +122,9 @@ struct error *
 stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl);
 
+struct error *
+stack_verifyinvariant(struct stack *s, struct state *impl);
+
 struct ast_expr;
 
 struct block *
@@ -131,7 +134,7 @@ struct frame *
 frame_invariant_create(struct ast_block *, struct stack *);
 
 struct frame *
-frame_loop_create(struct ast_block *, struct stack *);
+frame_loop_create(struct ast_block *, struct stack *, struct state *inv_state);
 
 /* variable */
 

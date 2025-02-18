@@ -190,7 +190,7 @@ state_pushinvariantframe(struct state *s, struct ast_block *b)
 void
 state_pushloopframe(struct state *s, struct ast_block *b)
 {
-	state_pushframe(s, frame_loop_create(b, s->stack));
+	state_pushframe(s, frame_loop_create(b, s->stack, state_copy(s)));
 }
 
 struct error *
@@ -539,6 +539,12 @@ struct error *
 state_constraintverify_all(struct state *spec, struct state *impl)
 {
 	return stack_constraintverify_all(spec->stack, spec, impl);
+}
+
+struct error *
+state_verifyinvariant(struct state *s)
+{
+	return stack_verifyinvariant(s->stack, s);
 }
 
 

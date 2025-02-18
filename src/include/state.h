@@ -297,6 +297,9 @@ state_constraintverify_structmember(struct state *spec, struct state *impl,
 struct error *
 state_constraintverify_all(struct state *spec, struct state *impl);
 
+struct error *
+state_verifyinvariant(struct state *);
+
 /* USED BY OBJECT */
 
 bool

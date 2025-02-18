@@ -63,6 +63,9 @@ frame_isloop(struct frame *);
 static int
 frame_parentstackid(struct frame *);
 
+static struct error *
+frame_verifyinvariant(struct frame *, struct state *impl);
+
 struct stack {
 	int id;
 
@@ -644,6 +647,11 @@ constraintverify_all(struct map *m, struct state *spec, struct state *impl)
 	return NULL;
 }
 
+struct error *
+stack_verifyinvariant(struct stack *s, struct state *impl)
+{
+	return frame_verifyinvariant(s->f, impl);
+}
 
 void
 stack_popprep(struct stack *s, struct state *state)
@@ -677,6 +685,7 @@ struct frame {
 	struct ast_function *f;
 
 	int parentstackid; /* only defined in FRAME_INVARIANT and FRAME_LOOP */
+	struct state *inv_state; /* only defined in FRAME_LOOP */
 };
 
 static struct frame *
@@ -742,12 +751,13 @@ frame_invariant_create(struct ast_block *b, struct stack *s)
 }
 
 struct frame *
-frame_loop_create(struct ast_block *b, struct stack *s)
+frame_loop_create(struct ast_block *b, struct stack *s, struct state *inv_state)
 {
 	struct frame *f = frame_create(
 		"loop", program_abstract_create(b), FRAME_LOOP
 	);
 	f->parentstackid = stack_id(s);
+	f->inv_state = inv_state;
 	return f;
 }
 
@@ -790,6 +800,9 @@ frame_destroy(struct frame *f)
 		ast_expr_destroy(f->call);
 		ast_function_destroy(f->f);
 	}
+	if (frame_isloop(f)) {
+		state_destroy(f->inv_state);
+	}
 }
 
 static struct frame *
@@ -803,8 +816,10 @@ frame_copy(struct frame *old)
 		new->call = ast_expr_copy(old->call);
 		new->f = ast_function_copy(old->f);
 		break;
-	case FRAME_INVARIANT:
 	case FRAME_LOOP:
+		new->inv_state = state_copy(old->inv_state);
+		/* fallthrough */
+	case FRAME_INVARIANT:
 		new->parentstackid = old->parentstackid;
 		break;
 	case FRAME_BLOCK:
@@ -914,6 +929,13 @@ frame_call(struct frame *f)
 	default:
 		assert(false);
 	}
+}
+
+static struct error *
+frame_verifyinvariant(struct frame *f, struct state *impl)
+{
+	assert(frame_isloop(f));
+	return state_constraintverify_all(f->inv_state, impl);
 }
 
 struct variable {

@@ -160,7 +160,11 @@ static struct error *
 exec(struct segment *s, progressor *prog)
 {	
 	if (state_atloopend(s->state)) {
-		assert(false);
+		struct error *err = state_verifyinvariant(s->state);
+		if (err) {
+			return err;
+		}
+		s->phase = SEGMENT_PHASE_ATEND;
 	}
 	if (state_atend(s->state)) {
 		s->phase = SEGMENT_PHASE_ATEND;
