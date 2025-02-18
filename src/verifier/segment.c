@@ -162,9 +162,9 @@ exec(struct segment *s, progressor *prog)
 	if (state_atloopend(s->state)) {
 		struct error *err = state_verifyinvariant(s->state);
 		if (err) {
-			return err;
+			return state_stacktrace(s->state, err);
 		}
-		s->phase = SEGMENT_PHASE_ATEND;
+		assert(false);
 	}
 	if (state_atend(s->state)) {
 		s->phase = SEGMENT_PHASE_ATEND;

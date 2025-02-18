@@ -1475,7 +1475,7 @@ static struct number_value *
 _ranges_bound(struct number *, int islw);
 
 static struct number_value *
-_rconst_bound(char *rconst, int islw, struct state *);
+_rconst_bound(struct ast_expr *, int islw, struct state *);
 
 static struct number_value *
 _number_bound(struct number *n, int islw, struct state *s)
@@ -1484,9 +1484,7 @@ _number_bound(struct number *n, int islw, struct state *s)
 	case NUMBER_RANGES:
 		return _ranges_bound(n, islw);
 	case NUMBER_COMPUTED:
-		return _rconst_bound(
-			ast_expr_as_identifier(n->computation), islw, s
-		);
+		return _rconst_bound(n->computation, islw, s);
 	default:
 		assert(false);
 	}
@@ -1510,15 +1508,17 @@ _ranges_bound(struct number *n, int islw)
 
 
 static struct number_value *
-_rconst_bound(char *id, int islw, struct state *s)
+_rconst_bound(struct ast_expr *e, int islw, struct state *s)
 {
-	struct value *rconst = state_getrconst(s, id);
+	struct value *rconst = tagval_value(
+		tagval_res_as_tagval(ast_expr_rangeeval(e, s))
+	);
 	assert(rconst && rconst->type == VALUE_INT);
 	return _number_bound(rconst->n, islw, s);
 }
 
 static int
-_rconst_issinglerange(char *rconst, struct state *);
+_rconst_issinglerange(struct ast_expr *, struct state *);
 
 static int
 number_issinglerange(struct number *n, struct state *s)
@@ -1527,18 +1527,18 @@ number_issinglerange(struct number *n, struct state *s)
 	case NUMBER_RANGES:
 		return number_range_arr_n(n->ranges) == 1;
 	case NUMBER_COMPUTED:
-		return _rconst_issinglerange(
-			ast_expr_as_identifier(n->computation), s
-		);
+		return _rconst_issinglerange(n->computation, s);
 	default:
 		assert(false);
 	}
 }
 
 static int
-_rconst_issinglerange(char *id, struct state *s)
+_rconst_issinglerange(struct ast_expr *e, struct state *s)
 {
-	struct value *rconst = state_getrconst(s, id);
+	struct value *rconst = tagval_value(
+		tagval_res_as_tagval(ast_expr_rangeeval(e, s))
+	);
 	assert(rconst && rconst->type == VALUE_INT);
 	return number_issinglerange(rconst->n, s);
 }
