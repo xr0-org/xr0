@@ -92,13 +92,11 @@ expr_linearise(struct ast_stmt *stmt, struct ast_block *b,
 }
 
 static struct error *
-jump_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
-		struct state *state)
+jump_linearise(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
 {
-	assert(jump_isreturn(ast_stmt_as_jump(stmt)));
-	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 	struct ast_expr *gen = ast_expr_geninstr(
-		rv, lexememarker_copy(loc), b, state
+		jump_rv(ast_stmt_as_jump(stmt)), lexememarker_copy(loc), b, state
 	);
 	struct ast_stmt *newjump = ast_stmt_create_return(
 		lexememarker_copy(loc), gen
@@ -173,6 +171,9 @@ directverify(struct ast_stmt *stmt, struct state *s)
 	}
 }
 
+static int
+jump_islinearisable(struct jump *);
+
 static bool
 islinearisable(struct ast_stmt *stmt)
 {
@@ -190,11 +191,18 @@ islinearisable(struct ast_stmt *stmt)
 	case STMT_EXPR:
 		return true;
 	case STMT_JUMP:
-		return ast_stmt_isreturn(stmt);
+		return jump_islinearisable(ast_stmt_as_jump(stmt));
 	default:
 		assert(false);
 	}
 }
+
+static int
+jump_islinearisable(struct jump *j)
+{
+	return jump_isreturn(j) && jump_hasrv(j);
+}
+
 
 static bool
 islinearisable_setuponly(struct ast_stmt *stmt)
@@ -431,7 +439,7 @@ compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
+	struct ast_expr *rv = jump_rv(ast_stmt_as_jump(stmt));
 	if (rv) {
 		struct e_res *res = ast_expr_eval(rv, state);
 		if (e_res_iserror(res)) {

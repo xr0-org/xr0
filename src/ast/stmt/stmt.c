@@ -291,25 +291,30 @@ ast_stmt_create_return(struct lexememarker *loc, struct ast_expr *rv)
 	return ast_stmt_create_jump(loc, jump_return_create(rv));
 }
 
+int
+ast_stmt_isjump(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_JUMP;
+}
+
 struct jump *
 ast_stmt_as_jump(struct ast_stmt *stmt)
 {
-	assert(stmt->kind == STMT_JUMP);
+	assert(ast_stmt_isjump(stmt));
 	return stmt->u.jump;
 }
 
 int
 ast_stmt_isreturn(struct ast_stmt *stmt)
 {
-	return jump_isreturn(stmt->u.jump);
+	return jump_isreturn(ast_stmt_as_jump(stmt));
 }
 
 int
 ast_stmt_isbreak(struct ast_stmt *stmt)
 {
-	return jump_isbreak(stmt->u.jump);
+	return jump_isbreak(ast_stmt_as_jump(stmt));
 }
-
 
 struct ast_stmt *
 ast_stmt_create_sel(struct lexememarker *loc, bool isswitch, struct ast_expr *cond,

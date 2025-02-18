@@ -20,6 +20,7 @@ static struct jump *
 jump_create(enum type t)
 {
 	struct jump *j = malloc(sizeof(struct jump));
+	assert(j);
 	j->t = t;
 	return j;
 }

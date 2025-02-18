@@ -169,7 +169,8 @@ bool
 ast_block_hastoplevelreturn(struct ast_block *b)
 {
 	for (int i = 0; i < b->nstmt; i++) {
-		if (ast_stmt_isreturn(b->stmt[i])) {
+		struct ast_stmt *stmt = b->stmt[i];
+		if (ast_stmt_isjump(stmt) && ast_stmt_isreturn(stmt)) {
 			return true;
 		}
 	}
