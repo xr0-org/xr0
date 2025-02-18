@@ -15,6 +15,7 @@ struct segment {
 		SEGMENT_PHASE_SETUP,
 		SEGMENT_PHASE_EXEC,
 		SEGMENT_PHASE_ATEND,
+		SEGMENT_PHASE_ATLOOPEND,
 	} phase;
 	struct state *state;
 };
@@ -73,6 +74,7 @@ segment_str(struct segment *s, char *pathphase)
 	switch (s->phase) {
 	case SEGMENT_PHASE_INIT:
 	case SEGMENT_PHASE_ATEND:
+	case SEGMENT_PHASE_ATLOOPEND:
 		break;
 	case SEGMENT_PHASE_SETUP:
 	case SEGMENT_PHASE_EXEC:
@@ -97,6 +99,8 @@ phasename(struct segment *s)
 		return "EXEC";
 	case SEGMENT_PHASE_ATEND:
 		return "END";
+	case SEGMENT_PHASE_ATLOOPEND:
+		return "END LOOP";
 	default:
 		assert(false);
 	}
@@ -105,7 +109,13 @@ phasename(struct segment *s)
 int
 segment_atend(struct segment *s)
 {
-	return s->phase == SEGMENT_PHASE_ATEND;
+	switch (s->phase) {
+	case SEGMENT_PHASE_ATEND:
+	case SEGMENT_PHASE_ATLOOPEND:
+		return 1;
+	default:
+		return 0;
+	}
 }
 
 
@@ -164,7 +174,7 @@ exec(struct segment *s, progressor *prog)
 		if (err) {
 			return state_stacktrace(s->state, err);
 		}
-		assert(false);
+		s->phase = SEGMENT_PHASE_ATLOOPEND;
 	}
 	if (state_atend(s->state)) {
 		s->phase = SEGMENT_PHASE_ATEND;
@@ -196,6 +206,7 @@ segment_lexememarker(struct segment *s)
 		return state_lexememarker(s->state);
 	case SEGMENT_PHASE_INIT:
 	case SEGMENT_PHASE_ATEND:
+	case SEGMENT_PHASE_ATLOOPEND:
 		return NULL;
 	default:
 		assert(false);
@@ -205,6 +216,10 @@ segment_lexememarker(struct segment *s)
 struct error *
 segment_audit(struct segment *abstract, struct segment *actual)
 {
+	if (actual->phase == SEGMENT_PHASE_ATLOOPEND) {
+		return NULL;
+	}
+
 	if (state_hasgarbage(actual->state)) {
 		v_printf("actual: %s", state_str(actual->state));
 		return error_printf(

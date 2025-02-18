@@ -430,6 +430,8 @@ compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
+	assert(ast_stmt_isreturn(stmt));
+
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 	if (rv) {
 		struct e_res *res = ast_expr_eval(rv, state);
