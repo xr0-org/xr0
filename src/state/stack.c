@@ -638,7 +638,7 @@ constraintverify_all(struct map *m, struct state *spec, struct state *impl)
 
 		if ((err = state_constraintverify(spec, impl, id))) {
 			return error_printf(
-				"precondition failure: `%s' %w",
+				"invariant failure: `%s' %w",
 				id, err
 			);
 		}

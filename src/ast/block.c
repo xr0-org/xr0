@@ -6,6 +6,8 @@
 #include "ast.h"
 #include "util.h"
 
+#include "stmt.h"
+
 struct ast_block {
 	int nstmt;
 	struct ast_stmt **stmt;

@@ -410,12 +410,6 @@ ast_stmt_create_break(struct lexememarker *);
 struct ast_stmt *
 ast_stmt_create_return(struct lexememarker *, struct ast_expr *rv);
 
-struct ast_expr *
-ast_stmt_jump_rv(struct ast_stmt *stmt);
-
-bool
-ast_stmt_isreturn(struct ast_stmt *);
-
 struct ast_stmt *
 ast_stmt_create_alloc(struct lexememarker *, struct ast_expr *arg);
 

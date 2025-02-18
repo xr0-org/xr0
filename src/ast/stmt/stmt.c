@@ -12,6 +12,7 @@
 #include "value.h"
 
 #include "iter.h"
+#include "jump.h"
 #include "stmt.h"
 
 struct ast_stmt {
@@ -33,13 +34,7 @@ struct ast_stmt {
 		} selection;
 		struct iter *iter;
 		struct ast_expr *expr;
-		struct {
-			enum ast_jump_kind {
-				JUMP_BREAK,
-				JUMP_RETURN,
-			} kind;
-			struct ast_expr *rv;
-		} jump;
+		struct jump *jump;
 		struct {
 			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
@@ -276,51 +271,45 @@ ast_stmt_create_compound_v(struct lexememarker *loc, struct ast_block *b)
 }
 
 static struct ast_stmt *
-ast_stmt_create_jump(struct lexememarker *loc, enum ast_jump_kind kind)
+ast_stmt_create_jump(struct lexememarker *loc, struct jump *j)
 {
 	struct ast_stmt *stmt = ast_stmt_create(loc);
 	stmt->kind = STMT_JUMP;
-	stmt->u.jump.kind = kind;
+	stmt->u.jump = j;
 	return stmt;
 }
 
 struct ast_stmt *
 ast_stmt_create_break(struct lexememarker *loc)
 {
-	return ast_stmt_create_jump(loc, JUMP_BREAK);
+	return ast_stmt_create_jump(loc, jump_break_create());
 }
 
 struct ast_stmt *
 ast_stmt_create_return(struct lexememarker *loc, struct ast_expr *rv)
 {
-	struct ast_stmt *stmt = ast_stmt_create_jump(loc, JUMP_RETURN);
-	stmt->u.jump.rv = rv;
-	return stmt;
+	return ast_stmt_create_jump(loc, jump_return_create(rv));
 }
 
-struct ast_expr *
-ast_stmt_jump_rv(struct ast_stmt *stmt)
+struct jump *
+ast_stmt_as_jump(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_JUMP);
-	return stmt->u.jump.rv;
+	return stmt->u.jump;
 }
 
-bool
+int
 ast_stmt_isreturn(struct ast_stmt *stmt)
 {
-	return stmt->kind == STMT_JUMP && stmt->u.jump.kind == JUMP_RETURN;
+	return jump_isreturn(stmt->u.jump);
 }
 
-static void
-ast_stmt_destroy_jump(struct ast_stmt *stmt)
+int
+ast_stmt_isbreak(struct ast_stmt *stmt)
 {
-	if (stmt->u.jump.kind == JUMP_RETURN) {
-		struct ast_expr *rv = stmt->u.jump.rv;
-		if (rv) {
-			ast_expr_destroy(rv);
-		}
-	}
+	return jump_isbreak(stmt->u.jump);
 }
+
 
 struct ast_stmt *
 ast_stmt_create_sel(struct lexememarker *loc, bool isswitch, struct ast_expr *cond,
@@ -480,21 +469,9 @@ ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level,
 static void
 ast_stmt_jump_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
-	assert(stmt->kind == STMT_JUMP);
-	
-	switch (stmt->u.jump.kind) {
-	case JUMP_BREAK:
-		strbuilder_printf(b, "break;");
-		return;
-	case JUMP_RETURN:
-		break;
-	default:
-		assert(false);
-	}
-
-	char *rv = ast_expr_str(stmt->u.jump.rv);
-	strbuilder_printf(b, "return %s;", rv);
-	free(rv);
+	char *s = jump_str(stmt->u.jump);
+	strbuilder_printf(b, "%s\n", s);
+	free(s);
 }
 
 static void
@@ -523,12 +500,6 @@ ast_stmt_register_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 	default:
 		assert(false);
 	}
-}
-
-static struct ast_expr *
-ast_expr_copy_ifnotnull(struct ast_expr *expr)
-{
-	return expr ? ast_expr_copy(expr) : NULL;
 }
 
 void
@@ -566,7 +537,7 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 		ast_expr_destroy(stmt->u.expr);
 		break;
 	case STMT_JUMP:
-		ast_stmt_destroy_jump(stmt);
+		jump_destroy(stmt->u.jump);
 		break;
 	default:
 		assert(false);
@@ -621,16 +592,7 @@ ast_stmt_copy(struct ast_stmt *stmt)
 	case STMT_ITERATION:
 		return ast_stmt_create_iter(loc, iter_copy(stmt->u.iter));
 	case STMT_JUMP:
-		switch (stmt->u.jump.kind) {
-		case JUMP_BREAK:
-			return ast_stmt_create_break(loc);
-		case JUMP_RETURN:
-			return ast_stmt_create_return(
-				loc, ast_expr_copy_ifnotnull(stmt->u.jump.rv)
-			);
-		default:
-			assert(false);
-		}
+		return ast_stmt_create_jump(loc, jump_copy(stmt->u.jump));
 	case STMT_REGISTER:
 		switch (stmt->u._register.kind) {
 		case REGISTER_SETUPV:
@@ -760,7 +722,7 @@ ast_stmt_getfuncs(struct ast_stmt *stmt)
 	case STMT_ITERATION:
 		return iter_getfuncs(stmt->u.iter);
 	case STMT_JUMP:
-		return ast_expr_getfuncs(stmt->u.jump.rv);
+		return jump_getfuncs(stmt->u.jump);
 	default:
 		assert(false);
 	}

@@ -16,6 +16,7 @@
 #include "type.h"
 
 #include "iter.h"
+#include "jump.h"
 #include "stmt.h"
 
 static struct error *
@@ -94,7 +95,7 @@ static struct error *
 jump_linearise(struct ast_stmt *stmt, struct ast_block *b, struct lexememarker *loc,
 		struct state *state)
 {
-	assert(ast_stmt_isreturn(stmt));
+	assert(jump_isreturn(ast_stmt_as_jump(stmt)));
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 	struct ast_expr *gen = ast_expr_geninstr(
 		rv, lexememarker_copy(loc), b, state
@@ -430,8 +431,6 @@ compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 {
-	assert(ast_stmt_isreturn(stmt));
-
 	struct ast_expr *rv = ast_stmt_jump_rv(stmt);
 	if (rv) {
 		struct e_res *res = ast_expr_eval(rv, state);

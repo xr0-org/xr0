@@ -12,7 +12,7 @@
 #include "stmt.h"
 
 struct iter {
-	enum iter_type {
+	enum type {
 		WHILE,
 		DO,
 		FOR,
@@ -28,7 +28,7 @@ struct iter {
 };
 
 static struct iter *
-iter_create(enum iter_type type, struct ast_expr *cond, struct ast_block *inv,
+iter_create(enum type type, struct ast_expr *cond, struct ast_block *inv,
 		struct ast_stmt *body)
 {
 	struct iter *iter = malloc(sizeof(struct iter));

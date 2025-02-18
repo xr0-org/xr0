@@ -34,4 +34,7 @@ struct lexememarker;
 struct ast_stmt *
 ast_stmt_create_iter(struct lexememarker *, struct iter *);
 
+struct jump *
+ast_stmt_as_jump(struct ast_stmt *);
+
 #endif
