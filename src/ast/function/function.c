@@ -265,7 +265,9 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 {
 	struct verifier *verifier = verifier_create(f, ext);
 	while (!verifier_atend(verifier)) {
-		struct error *err = verifier_progress(verifier, progressor_step());
+		struct error *err = verifier_progress(
+			verifier, progressor_step()
+		);
 		if (err) {
 			return err;
 		}

@@ -61,14 +61,17 @@ stack_modecanrunxr0cmd(struct stack *);
 struct lexememarker *
 stack_lexememarker(struct stack *);
 
-bool
+int
 stack_atend(struct stack *);
 
-bool
+int
 stack_atsetupend(struct stack *);
 
 int
 stack_atinvariantend(struct stack *);
+
+int
+stack_atloopend(struct stack *);
 
 int
 stack_id(struct stack *);
@@ -126,6 +129,9 @@ stack_getblock(struct stack *, int address);
 
 struct frame *
 frame_invariant_create(struct ast_block *, struct stack *);
+
+struct frame *
+frame_loop_create(struct ast_block *, struct stack *);
 
 /* variable */
 

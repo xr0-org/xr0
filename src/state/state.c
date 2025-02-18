@@ -157,13 +157,13 @@ state_lexememarker(struct state *s)
 	return stack_lexememarker(s->stack);
 }
 
-bool
+int
 state_atend(struct state *s)
 {
 	return stack_atend(s->stack);
 }
 
-bool
+int
 state_atsetupend(struct state *s)
 {
 	return stack_atsetupend(s->stack);
@@ -175,11 +175,22 @@ state_atinvariantend(struct state *s)
 	return stack_atinvariantend(s->stack);
 }
 
+int
+state_atloopend(struct state *s)
+{
+	return stack_atloopend(s->stack);
+}
+
 void
 state_pushinvariantframe(struct state *s, struct ast_block *b)
 {
 	state_pushframe(s, frame_invariant_create(b, s->stack));
-	assert(stack_ininvariant(s->stack));
+}
+
+void
+state_pushloopframe(struct state *s, struct ast_block *b)
+{
+	state_pushframe(s, frame_loop_create(b, s->stack));
 }
 
 struct error *

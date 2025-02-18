@@ -389,9 +389,6 @@ deriveinvstate(struct ast_stmt *, struct state *);
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 {
-	printf("%s\n", state_str(state));
-	printf("%s\n", ast_stmt_str(stmt, 1));
-
 	struct error *err = iter_setupverify(stmt, state);
 	if (err) {
 		return err;
@@ -399,8 +396,9 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 
 	deriveinvstate(stmt, state);
 
-	printf("%s\n", state_str(state));
-	assert(false);
+	iter_pushstatebody(ast_stmt_as_iter(stmt), state);
+
+	return NULL;
 }
 
 static struct error *

@@ -4,6 +4,7 @@
 
 #include "ast.h"
 #include "lex.h"
+#include "state.h"
 #include "util.h"
 
 #include "expr.h"
@@ -257,7 +258,12 @@ toblock(struct ast_stmt *stmt)
 	return b;
 }
 
-
+void
+iter_pushstatebody(struct iter *iter, struct state *s)
+{
+	/* TODO: clean up block somehow */
+	state_pushloopframe(s, toblock(iter->body));
+}
 
 struct string_arr *
 iter_getfuncs(struct iter *iter)

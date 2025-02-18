@@ -34,6 +34,11 @@ struct lexememarker;
 struct ast_block *
 iter_while1form(struct iter *, struct lexememarker *);
 
+struct state;
+
+void
+iter_pushstatebody(struct iter *, struct state *);
+
 struct string_arr;
 
 struct string_arr *

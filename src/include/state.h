@@ -47,14 +47,17 @@ state_destroy(struct state *state);
 char *
 state_str(struct state *);
 
-bool
+int
 state_atend(struct state *);
 
-bool
+int
 state_atsetupend(struct state *);
 
 int
 state_atinvariantend(struct state *);
+
+int
+state_atloopend(struct state *);
 
 struct error *
 state_step(struct state *);
@@ -218,6 +221,9 @@ frame_blockverify_create(char *name, struct ast_block *);
 
 void
 state_pushinvariantframe(struct state *, struct ast_block *);
+
+void
+state_pushloopframe(struct state *, struct ast_block *);
 
 struct frame *
 frame_blockfindsetup_create(char *name, struct ast_block *);

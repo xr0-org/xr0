@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 
@@ -158,6 +159,9 @@ progressortrace(struct state *s, progressor *prog)
 static struct error *
 exec(struct segment *s, progressor *prog)
 {	
+	if (state_atloopend(s->state)) {
+		assert(false);
+	}
 	if (state_atend(s->state)) {
 		s->phase = SEGMENT_PHASE_ATEND;
 		return NULL;
