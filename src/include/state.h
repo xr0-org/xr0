@@ -191,6 +191,9 @@ state_stacktrace(struct state *, struct error *);
 void
 state_return(struct state *);
 
+void
+state_break(struct state *);
+
 struct ast_expr *
 state_framecall(struct state *);
 

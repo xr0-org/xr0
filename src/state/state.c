@@ -340,6 +340,16 @@ state_return(struct state *s)
 	stack_return(s->stack);	
 }
 
+void
+state_break(struct state *s)
+{
+	assert(stack_inloop(s->stack));
+	while (!stack_isloopbase(s->stack)) {
+		state_popframe(s);
+	}
+	state_popframe(s);
+}
+
 struct ast_expr *
 state_framecall(struct state *s)
 {

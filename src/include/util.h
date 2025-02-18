@@ -156,6 +156,12 @@ struct error *
 error_to_return(struct error *);
 
 struct error *
+error_break(void);
+
+struct error *
+error_to_break(struct error *);
+
+struct error *
 error_block_observe_noobj(void);
 
 struct error *

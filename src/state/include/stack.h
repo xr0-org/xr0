@@ -21,6 +21,9 @@ int
 stack_programindex(struct stack *);
 
 void
+stack_break(struct stack *);
+
+void
 stack_return(struct stack *);
 
 struct ast_type *
@@ -103,11 +106,17 @@ stack_undeclare(struct stack *stack, struct state *state);
 bool
 stack_isnested(struct stack *);
 
-bool
+int
 stack_insetup(struct stack *);
 
 int
 stack_ininvariant(struct stack *);
+
+int
+stack_inloop(struct stack *);
+
+int
+stack_isloopbase(struct stack *);
 
 struct error *
 stack_trace(struct stack *, struct error *);

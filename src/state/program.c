@@ -238,6 +238,11 @@ program_stmt_step(struct program *p, struct state *s)
 		state_return(s);
 		return NULL;
 	}
+	struct error *break_err = error_to_break(err);
+	if (break_err) {
+		state_break(s);
+		return NULL;
+	}
 	return err;
 }
 

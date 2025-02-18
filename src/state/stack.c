@@ -135,18 +135,21 @@ stack_programindex(struct stack *s)
 }
 
 void
+stack_break(struct stack *s)
+{
+	program_setatend(frame_program(s->f));
+	if (!stack_isloopbase(s)) {
+		stack_break(s->prev);
+	}
+}
+
+void
 stack_return(struct stack *s)
 {
 	program_setatend(frame_program(s->f));
 	if (s->prev && !frame_iscall(s->f)) {
 		stack_return(s->prev);
 	}
-}
-
-struct ast_expr *
-stack_framecall(struct stack *s)
-{
-	return frame_call(s->f);
 }
 
 struct ast_type *
@@ -157,6 +160,12 @@ stack_returntype(struct stack *s)
 		return stack_returntype(s->prev);
 	}
 	return ast_function_type(frame_function(s->f));
+}
+
+struct ast_expr *
+stack_framecall(struct stack *s)
+{
+	return frame_call(s->f);
 }
 
 static char *
@@ -374,7 +383,7 @@ stack_islinear(struct stack *s)
 	return frame_isinter(s->f);
 }
 
-bool
+int
 stack_insetup(struct stack *s)
 {
 	return frame_issetup(s->f) || (s->prev && stack_insetup(s->prev));
@@ -384,6 +393,12 @@ int
 stack_ininvariant(struct stack *s)
 {
 	return frame_isinvariant(s->f) || (s->prev && stack_ininvariant(s->prev));
+}
+
+int
+stack_inloop(struct stack *s)
+{
+	return frame_isloop(s->f) || (s->prev && stack_inloop(s->prev));
 }
 
 int
@@ -439,7 +454,7 @@ stack_isinvariantbase(struct stack *s)
 		&& s->id == frame_parentstackid(s->f)+1;
 }
 
-static int
+int
 stack_isloopbase(struct stack *s)
 {
 	return frame_isloop(s->f)

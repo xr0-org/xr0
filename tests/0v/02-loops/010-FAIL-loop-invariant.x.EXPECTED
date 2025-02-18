@@ -1,0 +1,1 @@
+02-loops/010-FAIL-loop-invariant.x:9:3: invariant failure: `i' must be < 9 (unit)
