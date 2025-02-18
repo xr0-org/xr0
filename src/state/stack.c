@@ -592,6 +592,43 @@ stack_getvariable(struct stack *s, char *id)
 	return v;
 }
 
+static struct error *
+constraintverify_all(struct map *, struct state *spec, struct state *impl);
+
+struct error *
+stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
+		struct state *impl)
+{
+	struct error *err = constraintverify_all(spec_stack->varmap, spec, impl);
+	if (err) {
+		return err;
+	}
+	return spec_stack->prev
+		? stack_constraintverify_all(spec_stack->prev, spec, impl)
+		: NULL;
+}
+
+static struct error *
+constraintverify_all(struct map *m, struct state *spec, struct state *impl)
+{
+	int i;
+
+	for (i = 0; i < m->n; i++) {
+		struct error *err;
+		char *id = m->entry[i].key;
+
+		if ((err = state_constraintverify(spec, impl, id))) {
+			return error_printf(
+				"precondition failure: `%s' %w",
+				id, err
+			);
+		}
+	}
+
+	return NULL;
+}
+
+
 void
 stack_popprep(struct stack *s, struct state *state)
 {

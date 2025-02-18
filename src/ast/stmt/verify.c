@@ -138,7 +138,6 @@ iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 	return NULL;
 }
 
-
 /* stmt_verify */
 static struct error *
 directverify(struct ast_stmt *, struct state *);
@@ -382,22 +381,50 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
+iter_setupverify(struct ast_stmt *, struct state *);
+
+static void
+deriveinvstate(struct ast_stmt *, struct state *);
+
+static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 {
 	printf("%s\n", state_str(state));
 	printf("%s\n", ast_stmt_str(stmt, 1));
 
-	struct state *inv_state = state_copy(state);
-	state_pushinvariantframe(inv_state, iter_inv(ast_stmt_as_iter(stmt)));
-	while (!state_atinvariantend(inv_state)) {
-		struct error *err = state_step(inv_state);
-		assert(!err);
+	struct error *err = iter_setupverify(stmt, state);
+	if (err) {
+		return err;
 	}
-	state_popframe(inv_state);
 
-	printf("%s\n", state_str(inv_state));
+	deriveinvstate(stmt, state);
+
+	printf("%s\n", state_str(state));
 	assert(false);
 }
+
+static struct error *
+iter_setupverify(struct ast_stmt *stmt, struct state *impl)
+{
+	struct state *spec = state_copy(impl);
+	deriveinvstate(stmt, spec);
+	struct error *err = state_constraintverify_all(spec, impl);
+	state_destroy(spec);
+	return err;
+}
+
+static void
+deriveinvstate(struct ast_stmt *stmt, struct state *state)
+{
+	state_pushinvariantframe(state, iter_inv(ast_stmt_as_iter(stmt)));
+	while (!state_atinvariantend(state)) {
+		struct error *err = state_step(state);
+		assert(!err);
+	}
+	state_popframe(state);
+}
+
+
 
 static int
 compatible(struct eval *ret, struct ast_type *spec_t, struct state *);

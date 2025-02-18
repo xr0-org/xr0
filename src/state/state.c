@@ -483,9 +483,8 @@ state_constraintverify(struct state *spec, struct state *impl, char *id)
 	struct error *err = constraint_verify(
 		c,
 		object_as_value(spec_obj),
-		/* we can safely assume that impl has a value because
-		 * it's the result of an argument expression being
-		 * evaluated */
+		/* we can safely assume that impl has a value for id because
+		 * it's the result of an argument expression being evaluated */
 		object_as_value(
 			location_mustgetobject(
 				loc_res_as_loc(state_getloc(impl, id)),
@@ -523,6 +522,12 @@ static struct object *
 location_mustgetobject(struct location *loc, struct state *s)
 {
 	return object_res_as_object(state_get(s, loc, false));
+}
+
+struct error *
+state_constraintverify_all(struct state *spec, struct state *impl)
+{
+	return stack_constraintverify_all(spec->stack, spec, impl);
 }
 
 

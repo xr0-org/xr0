@@ -115,6 +115,10 @@ stack_getvarmap(struct stack *);
 struct variable *
 stack_getvariable(struct stack *s, char *id);
 
+struct error *
+stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
+		struct state *impl);
+
 struct ast_expr;
 
 struct block *
