@@ -200,43 +200,49 @@ value_arr_v(struct value_arr *arr);
 
 DECLARE_RESULT_TYPE(struct value_arr *, arr, value_arr_res)
 
-struct cconst;
-
-struct number_range;
-
-struct number_range *
-number_range_create(struct cconst *lw, struct cconst *up);
-
-void
-number_range_destroy(struct number_range *);
-
-struct number_range_arr;
-
-struct number_range_arr *
-number_range_arr_create(void);
-
-void
-number_range_arr_destroy(struct number_range_arr *arr);
-
-int
-number_range_arr_n(struct number_range_arr *);
-
-struct number_range **
-number_range_arr_range(struct number_range_arr *);
-
-int
-number_range_arr_append(struct number_range_arr *, struct number_range *);
-
-
 struct number;
 
+struct cconst;
+
+
 struct number *
-number_single_create(int val);
+number_cconst_create(struct cconst *);
+
+/* TODO: remove */
+struct number *
+number_single_create(int);
+
+struct number *
+number_singlerange_create(struct number *lw, struct number *up);
+
+struct number *
+number_copy(struct number *);
 
 void
 number_destroy(struct number *);
 
 char *
 number_str(struct number *);
+
+char *
+number_str_inrange(struct number *);
+
+struct cconst *
+number_as_cconst(struct number *);
+
+int
+number_eq(struct number *, struct number *);
+
+int
+number_le(struct number *lhs, struct number *rhs);
+
+int
+number_lt(struct number *lhs, struct number *rhs);
+
+int
+number_ge(struct number *lhs, struct number *rhs);
+
+int
+numbers_aresinglerange(struct number *lw, struct number *up);
 
 #endif

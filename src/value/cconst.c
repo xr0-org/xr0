@@ -97,18 +97,18 @@ cconst_copy(struct cconst *v)
 }
 
 int
-cconsts_aresingle(struct cconst *v1, struct cconst *v2)
+cconsts_aresinglerange(struct cconst *lw, struct cconst *up)
 {
 	/* XXX: this omits the case where we have a constant value equal to one
 	 * of the limits */
-	if (v1->t != v2->t) {
+	if (lw->t != up->t) {
 		return 0;
 	}
-	switch (v1->t) {
+	switch (lw->t) {
 	case CONSTANT:
-		return v1->constant == v2->constant-1;
+		return lw->constant == up->constant-1;
 	case LIMIT:
-		return v1->ismax == v2->ismax;
+		return lw->ismax == up->ismax;
 	default:
 		assert(0);
 	}
