@@ -1,5 +1,5 @@
-#ifndef VALUE_H
-#define VALUE_H
+#ifndef XR0_VALUE_H
+#define XR0_VALUE_H
 
 #include <stdbool.h>
 
@@ -200,18 +200,7 @@ value_arr_v(struct value_arr *arr);
 
 DECLARE_RESULT_TYPE(struct value_arr *, arr, value_arr_res)
 
-enum number_value_type {
-	NUMBER_VALUE_CONSTANT,
-	NUMBER_VALUE_LIMIT,
-};
-
 struct number_value;
-
-struct number_value *
-number_value_create(enum number_value_type, int contant, bool max);
-
-void
-number_value_destroy(struct number_value *);
 
 struct number_range;
 
@@ -238,11 +227,6 @@ number_range_arr_range(struct number_range_arr *);
 int
 number_range_arr_append(struct number_range_arr *, struct number_range *);
 
-
-enum number_type {
-	NUMBER_RANGES,
-	NUMBER_COMPUTED,
-};
 
 struct number;
 

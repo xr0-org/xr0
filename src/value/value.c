@@ -11,6 +11,8 @@
 #include "value.h"
 #include "verifier.h"
 
+#include "number_value.h"
+
 struct value {
 	enum value_type {
 		VALUE_RCONST,
@@ -1031,18 +1033,6 @@ samerconst(struct value *v, struct value *v0)
 		&& number_computed_equal(v->n, v0->n);
 }
 
-static bool
-number_value_lt(struct number_value *lhs, struct number_value *rhs);
-
-static bool
-number_value_eq(struct number_value *lhs, struct number_value *rhs);
-
-static bool
-number_value_le(struct number_value *lhs, struct number_value *rhs);
-
-static bool
-number_value_ge(struct number_value *lhs, struct number_value *rhs);
-
 static struct number_value *
 value_lw(struct value *, struct state *);
 
@@ -1399,7 +1389,10 @@ value_tosinglerange(struct value *old, struct state *s)
 
 
 struct number {
-	enum number_type type;
+	enum number_type {
+		NUMBER_RANGES,
+		NUMBER_COMPUTED,
+	} type;
 	union {
 		struct number_range_arr *ranges;
 		struct ast_expr *computation;
@@ -1989,7 +1982,6 @@ number_range_arr_containsrange(struct number_range_arr *arr,
 }
 
 
-
 struct number_range {
 	struct number_value *lower, *upper;
 };
@@ -2022,9 +2014,6 @@ number_range_upper(struct number_range *r)
 {
 	return r->upper;
 }
-
-static bool
-number_value_equal(struct number_value *v1, struct number_value *v2);
 
 struct number_value *
 number_value_copy(struct number_value *v);
@@ -2099,188 +2088,4 @@ number_range_as_constant(struct number_range *r)
 	assert(number_range_issingle(r));
 
 	return number_value_as_constant(r->lower);
-}
-
-struct number_value {
-	enum number_value_type type;
-	union {
-		int constant;
-		bool max;
-	};
-};
-
-struct number_value *
-number_value_constant_create(int constant)
-{
-	struct number_value *v = malloc(sizeof(struct number_value));
-	assert(v);
-	v->type = NUMBER_VALUE_CONSTANT;
-	v->constant = constant;
-	return v;
-}
-
-struct number_value *
-number_value_limit_create(bool max)
-{
-	struct number_value *v = malloc(sizeof(struct number_value));
-	assert(v);
-	v->type = NUMBER_VALUE_LIMIT;
-	v->max = max;
-	return v;
-}
-
-struct number_value *
-number_value_min_create(void)
-{
-	return number_value_limit_create(false);
-}
-
-struct number_value *
-number_value_max_create(void)
-{
-	return number_value_limit_create(true);
-}
-
-void
-number_value_destroy(struct number_value *v)
-{
-	free(v);
-}
-
-char *
-number_value_str(struct number_value *v)
-{
-	struct strbuilder *b = strbuilder_create();
-	switch (v->type) {
-	case NUMBER_VALUE_CONSTANT:
-		strbuilder_printf(b, "%d", v->constant);
-		break;
-	case NUMBER_VALUE_LIMIT:
-		strbuilder_printf(b, "%s", v->max ? "MAX" : "MIN");
-		break;
-	default:
-		assert(false);
-	}
-	return strbuilder_build(b);
-}
-
-char *
-number_value_str_inrange(struct number_value *v)
-{
-	switch (v->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return number_value_str(v);
-	case NUMBER_VALUE_LIMIT:
-		return dynamic_str("");
-	default:
-		assert(false);
-	}
-}
-
-struct number_value *
-number_value_copy(struct number_value *v)
-{
-	switch (v->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return number_value_constant_create(v->constant);
-	case NUMBER_VALUE_LIMIT:
-		return number_value_limit_create(v->max);
-	default:
-		assert(false);
-	}
-}
-
-bool
-number_values_aresingle(struct number_value *v1, struct number_value *v2)
-{
-	/* XXX: this omits the case where we have a constant value equal to one
-	 * of the limits */
-	if (v1->type != v2->type) {
-		return false;
-	}
-	switch (v1->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return v1->constant == v2->constant-1;
-	case NUMBER_VALUE_LIMIT:
-		return v1->max == v2->max;
-	default:
-		assert(false);
-	}
-}
-
-int
-number_value_difference(struct number_value *v1, struct number_value *v2)
-{
-	assert(v1->type == v2->type);
-
-	switch (v1->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return v1->constant - v2->constant;
-	default:
-		assert(false);
-	}
-}
-
-bool
-number_value_equal(struct number_value *v1, struct number_value *v2)
-{
-	if (v1->type != v2->type) {
-		return false;
-	}
-	switch (v1->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return number_value_difference(v1, v2) == 0;
-	case NUMBER_VALUE_LIMIT:
-		return v1->max == v2->max;
-	default:
-		assert(false);
-	}
-
-}
-
-int
-number_value_as_constant(struct number_value *v)
-{
-	assert(v->type == NUMBER_VALUE_CONSTANT);
-
-	return v->constant;
-}
-
-static bool
-number_value_le(struct number_value *v1, struct number_value *v2)
-{
-	if (v1->type != v2->type) {
-		if (v1->type == NUMBER_VALUE_LIMIT) {
-			return !v1->max;
-		}
-		assert(v2->type == NUMBER_VALUE_LIMIT);
-		return v2->max;
-	}
-	assert(v1->type == v2->type);
-	switch (v1->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return v1->constant <= v2->constant;
-	case NUMBER_VALUE_LIMIT:
-		return !v1->max || v2->max;
-	default:
-		assert(false);
-	}
-}
-
-static bool
-number_value_ge(struct number_value *v1, struct number_value *v2)
-{
-	return number_value_le(v2, v1);
-}
-
-static bool
-number_value_eq(struct number_value *v1, struct number_value *v2)
-{
-	return number_value_le(v1, v2) && number_value_le(v2, v1);
-}
-
-static bool
-number_value_lt(struct number_value *v1, struct number_value *v2)
-{
-	return number_value_le(v1, v2) && !number_value_eq(v1, v2);
 }
