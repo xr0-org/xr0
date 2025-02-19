@@ -837,24 +837,18 @@ value_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb
 	}
 }
 
-bool
-value_isconstant(struct value *v);
+int
+value_isconstant(struct value *v)
+{
+	return v->type == VALUE_INT && number_isconstant(v->n);
+}
 
 int
 value_as_constant(struct value *v)
 {
-	assert(v->type == VALUE_INT);
+	assert(value_isconstant(v));
 
 	return cconst_as_constant(number_as_cconst(v->n));
-}
-
-bool
-value_isconstant(struct value *v)
-{
-	if (v->type != VALUE_INT) {
-		return false;
-	}
-	return number_isconstant(v->n);
 }
 
 bool
@@ -1496,12 +1490,28 @@ number_str_inrange(struct number *n)
 	return cconst_str_inrange(number_as_cconst(n));
 }
 
+int
+number_iscconst(struct number *n)
+{
+	return n->type == NUMBER_CCONST;
+}
 
 struct cconst *
 number_as_cconst(struct number *n)
 {
-	assert(n->type == NUMBER_CCONST);
-	return n->cconst;
+	if (number_iscconst(n)) {
+		return n->cconst;
+	}
+	assert(number_isrange(n));
+	struct range_arr *arr = n->ranges;
+	assert(range_arr_n(arr) == 1);
+	return range_as_cconst(range_arr_range(arr)[0]);
+}
+
+int
+number_isrange(struct number *n)
+{
+	return n->type == NUMBER_RANGES;
 }
 
 int

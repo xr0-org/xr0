@@ -119,9 +119,7 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 	int lw = value_int_lw(range, s),
 	    up = value_int_up(range, s);
 	if (lw < 0 || b->size < up) {
-		return object_res_error_create(
-			error_printf("out of bounds")
-		);
+		return object_res_error_create(error_printf("out of bounds"));
 	}
 
 	if (!value_isconstant(range)) {

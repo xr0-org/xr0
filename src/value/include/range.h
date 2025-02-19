@@ -29,6 +29,9 @@ range_contains_range(struct range *r, struct range *r2);
 int
 range_issingle(struct range *r);
 
+struct cconst *
+range_as_cconst(struct range *);
+
 
 struct range_arr;
 

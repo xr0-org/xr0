@@ -116,7 +116,7 @@ struct circuitbreaker;
 bool
 value_referencesheap(struct value *, struct state *, struct circuitbreaker *);
 
-bool
+int
 value_isconstant(struct value *v);
 
 int
@@ -227,8 +227,19 @@ number_str(struct number *);
 char *
 number_str_inrange(struct number *);
 
+int
+number_iscconst(struct number *);
+
 struct cconst *
 number_as_cconst(struct number *);
+
+int
+number_isrange(struct number *);
+
+struct range;
+
+struct range *
+number_as_range(struct number *);
 
 int
 number_isexpr(struct number *);
