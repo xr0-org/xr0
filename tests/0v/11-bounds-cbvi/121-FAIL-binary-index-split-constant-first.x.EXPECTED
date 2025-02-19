@@ -1,1 +1,1 @@
-11-bounds-cbvi/121-FAIL-binary-index-split-constant-first.x:6:24: undefined memory access: *(arr+1) has no value (foo | #0 ∈ {0})
+11-bounds-cbvi/121-FAIL-binary-index-split-constant-first.x:6:24: undefined memory access: *(arr+1) has no value (foo | #0 ∈ 0)

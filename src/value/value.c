@@ -1390,7 +1390,7 @@ number_single_create(int val)
 }
 
 struct number *
-ranges_create(struct range_arr *ranges)
+number_ranges_create(struct range_arr *ranges)
 {
 	struct number *num = _number_create(NUMBER_RANGES);
 	num->ranges = ranges;
@@ -1421,7 +1421,7 @@ number_copy(struct number *num)
 	case NUMBER_CCONST:
 		return number_cconst_create(cconst_copy(num->cconst));
 	case NUMBER_RANGES:
-		return ranges_create(range_arr_copy(num->ranges));
+		return number_ranges_create(range_arr_copy(num->ranges));
 	case NUMBER_EXPR:
 		return number_expr_create(ast_expr_copy(num->expr));
 	default:
@@ -1678,6 +1678,8 @@ static struct number *
 number_tosinglerange(struct number *n, struct state *s)
 {
 	switch (n->type) {
+	case NUMBER_CCONST:
+		return n;
 	case NUMBER_RANGES:
 		assert(number_issinglerange(n, s));
 		return n;
@@ -1723,7 +1725,7 @@ range_arr_ne_create(int val)
 struct number *
 number_ne_create(int val)
 {
-	return ranges_create(range_arr_ne_create(val));
+	return number_ranges_create(range_arr_ne_create(val));
 }
 
 struct number *
@@ -1737,7 +1739,7 @@ number_with_range_create(int lw, int excl_up)
 			number_cconst_create(cconst_constant_create(excl_up))
 		)
 	);
-	return ranges_create(arr);
+	return number_ranges_create(arr);
 }
 
 struct number *
@@ -1748,7 +1750,7 @@ number_singlerange_create(struct number *lw, struct number *up)
 		arr, 
 		range_create(lw, up)
 	);
-	return ranges_create(arr);
+	return number_ranges_create(arr);
 }
 
 bool
@@ -1794,10 +1796,16 @@ ranges_equal(struct number *n1, struct number *n2)
 	return true;
 }
 
+static struct number *
+_cconst_to_range(struct cconst *);
 
 static bool
 number_assume(struct number *n, struct number *split)
 {
+	if (number_iscconst(split)) {
+		split = _cconst_to_range(number_as_cconst(split));
+	}
+
 	assert(n->type == NUMBER_RANGES && split->type == NUMBER_RANGES);
 
 	if (!range_arr_containsrangearr(n->ranges, split->ranges)) {
@@ -1808,6 +1816,22 @@ number_assume(struct number *n, struct number *split)
 
 	return true;
 }
+
+static struct number *
+_cconst_to_range(struct cconst *c)
+{
+	int k = cconst_as_constant(c);
+	struct range_arr *r = range_arr_create();
+	range_arr_append(
+		r,
+		range_create(
+			number_cconst_create(cconst_constant_create(k)),
+			number_cconst_create(cconst_constant_create(k+1))
+		)
+	);
+	return number_ranges_create(r);
+}
+
 
 int
 number_isconstant(struct number *n)
