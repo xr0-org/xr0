@@ -1,5 +1,5 @@
-#ifndef VALUE_H
-#define VALUE_H
+#ifndef XR0_VALUE_H
+#define XR0_VALUE_H
 
 #include <stdbool.h>
 
@@ -41,19 +41,23 @@ value_literal_create(char *);
 struct ast_expr;
 
 struct value *
-value_int_rconst_create(struct ast_expr *range, struct state *);
+value_int_range_create(struct value *lw, struct value *up);
+
+struct value *
+value_int_max_create(void);
+
+struct value *
+value_int_min_create(void);
+
 
 struct value *
 value_int_ne_create(int not_val);
 
-struct value *
-value_int_range_create(int lw, int excl_up);
+int
+value_int_lw(struct value *, struct state *);
 
 int
-value_int_lw(struct value *);
-
-int
-value_int_up(struct value *);
+value_int_up(struct value *, struct state *);
 
 int
 value_as_int(struct value *, struct state *);
@@ -67,7 +71,7 @@ value_rconst_create(struct ast_expr *);
 struct value *
 value_struct_create(struct ast_type *);
 
-bool
+int
 value_isstruct(struct value *v);
 
 struct value *
@@ -105,7 +109,7 @@ value_str(struct value *);
 char *
 value_type_str(struct value *);
 
-bool
+int
 value_islocation(struct value *);
 
 struct location *
@@ -116,14 +120,14 @@ struct circuitbreaker;
 bool
 value_referencesheap(struct value *, struct state *, struct circuitbreaker *);
 
-bool
+int
 value_isconstant(struct value *v);
 
 int
 value_as_constant(struct value *v);
 
-bool
-value_issync(struct value *v);
+int
+value_isrconst(struct value *v);
 
 struct ast_expr *
 value_as_rconst(struct value *v);
@@ -160,24 +164,9 @@ value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 
 struct number;
 
-/* value_splitassume: returns false if contradiction encountered. */
-bool
-value_splitassume(struct value *, struct number *);
-
-struct splitinstruct;
-
-struct splitinstruct *
-splitinstruct_create(void);
-
-void
-splitinstruct_append(struct splitinstruct *, struct map *);
-
-int 
-splitinstruct_n(struct splitinstruct *);
-
-struct map **
-splitinstruct_splits(struct splitinstruct *);
-
+/* value_splitassume: returns 0 if contradiction encountered. */
+int
+value_splitassume(struct value *, struct number *, struct state *);
 
 DECLARE_RESULT_TYPE(struct value *, value, value_res)
 
@@ -200,59 +189,18 @@ value_arr_v(struct value_arr *arr);
 
 DECLARE_RESULT_TYPE(struct value_arr *, arr, value_arr_res)
 
-enum number_value_type {
-	NUMBER_VALUE_CONSTANT,
-	NUMBER_VALUE_LIMIT,
-};
-
-struct number_value;
-
-struct number_value *
-number_value_create(enum number_value_type, int contant, bool max);
-
-void
-number_value_destroy(struct number_value *);
-
-struct number_range;
-
-struct number_range *
-number_range_create(struct number_value *lw, struct number_value *up);
-
-void
-number_range_destroy(struct number_range *);
-
-struct number_range_arr;
-
-struct number_range_arr *
-number_range_arr_create(void);
-
-void
-number_range_arr_destroy(struct number_range_arr *arr);
-
-int
-number_range_arr_n(struct number_range_arr *);
-
-struct number_range **
-number_range_arr_range(struct number_range_arr *);
-
-int
-number_range_arr_append(struct number_range_arr *, struct number_range *);
-
-
-enum number_type {
-	NUMBER_RANGES,
-	NUMBER_COMPUTED,
-};
-
+/* TODO: remove */
 struct number;
 
 struct number *
-number_single_create(int val);
-
-void
-number_destroy(struct number *);
+number_single_create(int);
 
 char *
 number_str(struct number *);
+
+struct value *
+value_number_create(struct number *);
+
+
 
 #endif

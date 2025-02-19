@@ -636,7 +636,7 @@ state_getobject(struct state *state, char *id)
 struct object_res *
 state_deref(struct state *state, struct value *ptr_val)
 {
-	if (value_issync(ptr_val)) {
+	if (value_isrconst(ptr_val)) {
 		return object_res_error_create(error_state_deref_rconst());
 	}
 	struct location *deref = value_as_location(ptr_val);

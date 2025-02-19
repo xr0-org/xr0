@@ -127,6 +127,9 @@ ast_expr_product_create(struct ast_expr *, struct ast_expr *);
 struct ast_expr *
 ast_expr_difference_create(struct ast_expr *, struct ast_expr *);
 
+int
+ast_expr_isbinary(struct ast_expr *);
+
 struct ast_expr *
 ast_expr_binary_e1(struct ast_expr *);
 
@@ -224,6 +227,27 @@ ast_expr_matheval(struct ast_expr *e);
 struct ast_expr *
 ast_expr_simplify(struct ast_expr *);
 
+struct shift;
+
+struct shift *
+shift_create(char *id, int width); 
+
+void
+shift_destroy(struct shift *);
+
+char *
+shift_id(struct shift *);
+
+int
+shift_width(struct shift *);
+
+DECLARE_RESULT_TYPE(struct shift *, shift, shift_res)
+
+/* ast_expr_getsplitshift: if the expression can be expressed as an identifier
+ * added to a constant, return this identifer and constant in a struct split *;
+ * return an error otherwise. */
+struct shift_res *
+ast_expr_getsplitshift(struct ast_expr *);
 
 struct tagval;
 

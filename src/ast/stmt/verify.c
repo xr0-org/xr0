@@ -487,7 +487,7 @@ compatible(struct eval *e, struct ast_type *spec_t, struct state *s)
 {
 	return ast_type_compatible(eval_type(e), spec_t) || (
 		ast_type_compatiblewithrconst(spec_t)
-		&& value_issync(value_res_as_value(eval_to_value(e, s)))
+		&& value_isrconst(value_res_as_value(eval_to_value(e, s)))
 	);
 }
 

@@ -312,8 +312,23 @@ cast_expression
 	/*| '(' type_name ')' cast_expression*/
 	;
 
-range_expression
+multiplicative_expression
 	: cast_expression
+	| multiplicative_expression '*' cast_expression
+	| multiplicative_expression '/' cast_expression
+	| multiplicative_expression '%' cast_expression
+	;
+
+additive_expression
+	: multiplicative_expression
+	| additive_expression '+' multiplicative_expression
+		{ $$ = ast_expr_binary_create($1, BINARY_OP_ADDITION, $3); }
+	| additive_expression '-' multiplicative_expression
+		{ $$ = ast_expr_binary_create($1, BINARY_OP_SUBTRACTION, $3); }
+	;
+
+range_expression
+	: additive_expression
 	| '[' range_operand '?' range_operand ']' {
 		$$ = ast_expr_range_create(
 			getrconstkey(),
@@ -330,29 +345,14 @@ range_expression
 	;
 
 range_operand
-	: cast_expression
+	: additive_expression
 	| /* empty */		{ $$ = NULL; }
 	;
 
-multiplicative_expression
-	: range_expression
-	| multiplicative_expression '*' range_expression
-	| multiplicative_expression '/' range_expression
-	| multiplicative_expression '%' range_expression
-	;
-
-additive_expression
-	: multiplicative_expression
-	| additive_expression '+' multiplicative_expression
-		{ $$ = ast_expr_binary_create($1, BINARY_OP_ADDITION, $3); }
-	| additive_expression '-' multiplicative_expression
-		{ $$ = ast_expr_binary_create($1, BINARY_OP_SUBTRACTION, $3); }
-	;
-
 shift_expression
-	: additive_expression
-	| shift_expression LEFT_OP additive_expression
-	| shift_expression RIGHT_OP additive_expression
+	: range_expression
+	| shift_expression LEFT_OP range_expression
+	| shift_expression RIGHT_OP range_expression
 	;
 
 relational_operator

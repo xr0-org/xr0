@@ -11,6 +11,10 @@
 #include "value.h"
 #include "verifier.h"
 
+#include "number.h"
+#include "cconst.h"
+#include "range.h"
+
 struct value {
 	enum value_type {
 		VALUE_RCONST,
@@ -99,20 +103,6 @@ value_ptr_create(struct location *loc)
 	return v;
 }
 
-struct number_value;
-
-struct number_value *
-number_value_min_create(void);
-
-struct number_value *
-number_value_max_create(void);
-
-struct number_value *
-number_value_constant_create(int constant);
-
-static struct number *
-number_singlerange_create(struct number_value *lw, struct number_value *up);
-
 struct value *
 value_ptr_rconst_create(void)
 {
@@ -121,7 +111,8 @@ value_ptr_rconst_create(void)
 	v->type = VALUE_PTR;
 	v->ptr.isindefinite = true;
 	v->ptr.n = number_singlerange_create(
-		number_value_min_create(), number_value_max_create()
+		number_cconst_create(cconst_min_create()),
+		number_cconst_create(cconst_max_create())
 	);
 	return v;
 }
@@ -153,7 +144,8 @@ value_ptr_copy(struct value *old)
 void
 value_ptr_sprint(struct value *v, struct strbuilder *b)
 {
-	char *s = v->ptr.isindefinite ? number_str(v->ptr.n) : location_str(v->ptr.loc);
+	char *s = v->ptr.isindefinite ?
+		number_str(v->ptr.n) : location_str(v->ptr.loc);
 	strbuilder_printf(b, "ptr:%s", s);
 	free(s);
 }
@@ -164,7 +156,17 @@ value_int_create(int val)
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_single_create(val);
+	v->n = number_cconst_create(cconst_constant_create(val));
+	return v;
+}
+
+struct value *
+value_number_create(struct number *n)
+{
+	struct value *v = malloc(sizeof(struct value));
+	assert(v);
+	v->type = VALUE_INT;
+	v->n = n;
 	return v;
 }
 
@@ -214,75 +216,57 @@ value_bang(struct value *v)
 	}
 }
 
-struct number *
-number_with_range_create(int lw, int excl_up);
+static int
+_canbebound(struct value *);
 
 struct value *
-value_int_range_create(int lw, int excl_up)
+value_int_range_create(struct value *lw, struct value *up)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_with_range_create(lw, excl_up);
+	assert(_canbebound(lw) && _canbebound(up));
+	v->n = number_singlerange_create(lw->n, up->n);
 	return v;
 }
 
-static struct number_value *
-range_limit_to_value(struct ast_expr *limit, struct state *s);
+static int
+_canbebound(struct value *v)
+{
+	return value_isint(v) || value_isrconst(v);
+}
 
-struct value *
-value_int_rconst_create(struct ast_expr *range, struct state *s)
+
+static struct value *
+_value_int_limit_create(int islw)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_singlerange_create(
-		range_limit_to_value(ast_expr_range_lw(range), s),
-		range_limit_to_value(ast_expr_range_up(range), s)
+	v->n = number_cconst_create(
+		islw ? cconst_min_create() : cconst_max_create()
 	);
 	return v;
 }
 
-static int
-_constant(struct ast_expr *);
+struct value *
+value_int_max_create(void) { return _value_int_limit_create(0); }
 
-static struct number_value *
-range_limit_to_value(struct ast_expr *limit, struct state *s)
-{
-	if (ast_expr_israngemax(limit)) {
-		return number_value_max_create();
-	} else if (ast_expr_israngemin(limit)) {
-		return number_value_min_create();
-	}
-	return number_value_constant_create(_constant(limit));
-}
-
-static int
-_constant(struct ast_expr *expr)
-{
-	return ast_expr_isnegative(expr)
-		? -1 * _constant(ast_expr_negative_operand(expr))
-		: ast_expr_as_constant(expr);
-}
-
-static int
-number_range_lw(struct number *);
+struct value *
+value_int_min_create(void) { return _value_int_limit_create(1); }
 
 int
-value_int_lw(struct value *v)
+value_int_lw(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return number_range_lw(v->n);
+	return cconst_as_constant(number_as_cconst(number_lw(v->n, s)));
 }
 
-static int
-number_range_up(struct number *);
-
 int
-value_int_up(struct value *v)
+value_int_up(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return number_range_up(v->n);
+	return cconst_as_constant(number_as_cconst(number_up(v->n, s)));
 }
 
 static int
@@ -292,11 +276,15 @@ int
 value_as_int(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_INT && value_issinglerange(v, s));
-	return value_int_lw(v);
+	return value_int_lw(v, s);
 }
 
 struct number *
-number_computed_create(struct ast_expr *);
+value_as_number(struct value *v)
+{
+	assert(v->type == VALUE_INT);
+	return v->n;
+}
 
 struct value *
 value_rconst_create(struct ast_expr *e)
@@ -304,12 +292,9 @@ value_rconst_create(struct ast_expr *e)
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_RCONST;
-	v->n = number_computed_create(e);
+	v->n = number_expr_create(e);
 	return v;
 }
-
-static struct number *
-number_computed_bang(struct number *);
 
 static struct value *
 value_rconst_bang(struct value *orig)
@@ -317,7 +302,9 @@ value_rconst_bang(struct value *orig)
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_RCONST;
-	v->n = number_computed_bang(orig->n);
+	v->n = number_expr_create(
+		ast_expr_inverted_copy(number_as_expr(orig->n), true)
+	);
 	return v;
 }
 
@@ -449,7 +436,7 @@ value_pf_augment(struct value *old, struct ast_expr *root)
 		if (!obj_value) {
 			continue;
 		}
-		if (!value_issync(obj_value)) {
+		if (!value_isrconst(obj_value)) {
 			continue;
 		}
 		object_assign(
@@ -464,7 +451,7 @@ value_pf_augment(struct value *old, struct ast_expr *root)
 	return v;
 }
 
-bool
+int
 value_isstruct(struct value *v)
 {
 	return v->type == VALUE_STRUCT;
@@ -808,15 +795,15 @@ value_type_str(struct value *v)
 {
 	char *value_type_str[] = {
 		[VALUE_RCONST] = "rconst",
-		[VALUE_PTR] = "ptr",
-		[VALUE_INT] = "int",
+		[VALUE_PTR] 	= "ptr",
+		[VALUE_INT]	= "int",
 		[VALUE_LITERAL] = "literal",
-		[VALUE_STRUCT] = "struct",
+		[VALUE_STRUCT]	= "struct",
 	};
 	return dynamic_str(value_type_str[v->type]);
 }
 
-bool
+int
 value_islocation(struct value *v)
 {
 	assert(v);
@@ -843,56 +830,35 @@ value_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb
 	}
 }
 
-bool
-value_isconstant(struct value *v);
-
 int
-number_as_constant(struct number *n);
+value_isconstant(struct value *v)
+{
+	return v->type == VALUE_INT && number_isconstant(v->n);
+}
 
 int
 value_as_constant(struct value *v)
 {
-	assert(v->type == VALUE_INT);
+	assert(value_isconstant(v));
 
-	return number_as_constant(v->n);
+	return cconst_as_constant(number_as_cconst(v->n));
 }
 
-bool
-number_isconstant(struct number *n);
-
-bool
-value_isconstant(struct value *v)
-{
-	if (v->type != VALUE_INT) {
-		return false;
-	}
-	return number_isconstant(v->n);
-}
-
-bool
-number_issync(struct number *n);
-
-bool
-value_issync(struct value *v)
+int
+value_isrconst(struct value *v)
 {
 	if (v->type != VALUE_RCONST) {
-		return false;
+		return 0;
 	}
-	return number_issync(v->n);
+	return number_isexpr(v->n);
 }
-
-struct ast_expr *
-number_as_sync(struct number *n);
 
 struct ast_expr *
 value_as_rconst(struct value *v)
 {
 	assert(v->type == VALUE_RCONST);
-	return number_as_sync(v->n);
+	return number_as_expr(v->n);
 }
-
-struct ast_expr *
-number_to_expr(struct number *n);
 
 struct ast_expr *
 value_to_expr(struct value *v)
@@ -1021,32 +987,27 @@ static bool
 samerconst(struct value *, struct value *);
 
 static int
-number_computed_equal(struct number *n1, struct number *n2);
+_number_expr_equal(struct number *n, struct number *n0);
 
 static bool
 samerconst(struct value *v, struct value *v0)
 {
 	return v->type == VALUE_RCONST
 		&& v->type == v0->type
-		&& number_computed_equal(v->n, v0->n);
+		&& _number_expr_equal(v->n, v0->n);
 }
 
-static bool
-number_value_lt(struct number_value *lhs, struct number_value *rhs);
+static int
+_number_expr_equal(struct number *n, struct number *n0)
+{
+	return number_isexpr(n) && number_isexpr(n0)
+		&& ast_expr_equal(number_as_expr(n), number_as_expr(n0));
+}
 
-static bool
-number_value_eq(struct number_value *lhs, struct number_value *rhs);
-
-static bool
-number_value_le(struct number_value *lhs, struct number_value *rhs);
-
-static bool
-number_value_ge(struct number_value *lhs, struct number_value *rhs);
-
-static struct number_value *
+static struct number *
 value_lw(struct value *, struct state *);
 
-static struct number_value *
+static struct number *
 value_up(struct value *, struct state *);
 
 int
@@ -1054,40 +1015,40 @@ value_lt(struct value *lhs, struct value *rhs, struct state *s)
 {
 	assert(value_issinglerange(lhs, s) && value_issinglerange(rhs, s));
 
-	struct number_value *a = value_lw(lhs, s),
-			    *b = value_up(lhs, s),
-			    *c = value_lw(rhs, s),
-			    *d = value_up(rhs, s);
+	struct number *a = value_lw(lhs, s),
+		      *b = value_up(lhs, s),
+		      *c = value_lw(rhs, s),
+		      *d = value_up(rhs, s);
 
-	if (number_value_le(b, c)) { /* b ≤ c ==> lhs < rhs */
+	if (number_le(b, c, s)) { /* b ≤ c ==> lhs < rhs */
 		return 1;
 	} 
 	assert(
-		number_value_ge(a, d) /* rhs < lhs */
+		number_ge(a, d, s) /* rhs < lhs */
 		/* our assumption is that if there is overlap it is perfect */
 		|| samerconst(lhs, rhs)
-		|| (number_value_eq(a, c) && number_value_eq(b, d))
+		|| (number_eq(a, c, s) && number_eq(b, d, s))
 	);
 	return 0;
 }
 
 int
-number_value_as_constant(struct number_value *v);
+cconst_as_constant(struct cconst *v);
 
 int
 value_eq(struct value *lhs, struct value *rhs, struct state *s)
 {
 	assert(value_issinglerange(lhs, s) && value_issinglerange(rhs, s));
 
-	struct number_value *a = value_lw(lhs, s),
-			    *b = value_up(lhs, s),
-			    *c = value_lw(rhs, s),
-			    *d = value_up(rhs, s);
+	struct number *a = value_lw(lhs, s),
+		      *b = value_up(lhs, s),
+		      *c = value_lw(rhs, s),
+		      *d = value_up(rhs, s);
 
-	if (number_value_eq(a, c) && number_value_eq(b, d)) {
+	if (number_eq(a, c, s) && number_eq(b, d, s)) {
 		if (!samerconst(lhs, rhs)) {
-			int c_a = number_value_as_constant(a),
-			    c_b = number_value_as_constant(b);
+			int c_a = cconst_as_constant(number_as_cconst((a))),
+			    c_b = cconst_as_constant(number_as_cconst((b)));
 			assert(c_b-c_a == 1);
 		}
 		return 1;
@@ -1097,165 +1058,26 @@ value_eq(struct value *lhs, struct value *rhs, struct state *s)
 }
 
 
-static void
-value_splitto(struct value *, struct number *, struct map *, struct state *);
-
-static struct number *
-number_singlerange_create(struct number_value *lw, struct number_value *up);
+static int
+int_or_rconst(struct value *);
 
 struct error *
 value_disentangle(struct value *x, struct value *y, struct state *s)
 {
-	assert(value_issinglerange(x, s) && value_issinglerange(y, s));
-
-	struct number_value *a = value_lw(x, s),
-			    *b = value_up(x, s),
-			    *c = value_lw(y, s),
-			    *d = value_up(y, s);
-
-	/* 
-	 * Our analysis begins with x in [a?b] and y in [c?d].
-	 *
-	 * 	<--------------->|——–––———————————–––|<------------>
-	 * 	                 a                   b
-	 *
-	 * 	<--------------------->|––––––––––––––––|<--------->
-	 * 	                       c                d
-	 * 
-	 */
-	if (number_value_lt(c, a)) {
-		return value_disentangle(y, x, s);
-	}
-	/* ⊢ a ≤ c */
-
-	/* 
-	 * WLOG, assume that a ≤ c. The relative locations of b, c, d are
-	 * undecided, but we know that [a?b] is the range that begins first (or
-	 * they begin at the same place):
-	 *
-	 * 	|——–––———————————–––|<----------------------------->
-	 * 	a                   b
-	 *
-	 * 	<--------------------->|––––––––––––––––|<--------->
-	 * 	                       c                d
-	 */
-
-	/* the rule is that if b ≤ c or a ≥ d we have no overlap. the previous
-	 * step eliminated the possibility of a ≥ d */
-
-	if (number_value_le(b, c)) {
-		/* base case: no overlap */
-		return NULL;
-	}
-	/* ⊢ b > c */
-
-	/* 
-	 * There is overlap:
-	 *
-	 * 	|——–––———————————–––|<----------------------->
-	 * 	a                   b
-	 *
-	 * 	<--------------->|––––––––––––––––|<--------->
-	 * 	                 c                d
-	 */
-
-	if (number_value_lt(a, c)) {
-		/* split into two scenarios:
-		 * 	- x in [a?c], y in [c?d] (x < y)
-		 * 	- x in [c?b], y in [c?d] (same lower bound) */
-		struct splitinstruct *splits = splitinstruct_create();
-		struct map *x_lt_y = map_create(),
-			   *a_eq_c = map_create();
-		value_splitto(x, number_singlerange_create(a, c), x_lt_y, s);
-		value_splitto(x, number_singlerange_create(c, b), a_eq_c, s);
-		splitinstruct_append(splits, x_lt_y);
-		splitinstruct_append(splits, a_eq_c);
-		return error_verifierinstruct(verifierinstruct_split(splits));
-	}
-	/* ⊢ a == c */
-
-	/* 
-	 * Overlapping ranges that start at the same point:
-	 *
-	 * 	|——–––———————————–––|<------------------>
-	 * 	a                   b
-	 *
-	 * 	|––––––––––––––––|<--------------------->
-	 * 	c                d
-	 */
-
-	if (number_value_lt(d, b)) {
-		return value_disentangle(y, x, s);
-	}
-	/* ⊢ b ≤ d */
-
-	/* 
-	 * WLOG we assume that the first range finishes before (or at the same
-	 * point as) the second:
-	 *
-	 * 	|——–––————————––|<------>
-	 * 	a               b
-	 *
-	 * 	|–––––––––––––––––––––––|
-	 * 	c                       d
-	 */
-
-	if (number_value_lt(b, d)) {
-		/* split into two scenarios:
-		 * 	- x in [a?b], y in [b?d] (x < y)
-		 * 	- x, y in [a?b] (perfect overlap) */
-		/* ends in return */
-		struct splitinstruct *splits = splitinstruct_create();
-		struct map *x_lt_y = map_create(),
-			   *b_eq_d = map_create();
-		value_splitto(y, number_singlerange_create(b, d), x_lt_y, s);
-		value_splitto(y, number_singlerange_create(a, b), b_eq_d, s);
-		splitinstruct_append(splits, x_lt_y);
-		splitinstruct_append(splits, b_eq_d);
-		return error_verifierinstruct(verifierinstruct_split(splits));
-	}
-	/* ⊢ b == d */
-
-	/* 
-	 * Perfect overlap:
-	 *
-	 * 	|——–––————————––|
-	 * 	a               b
-	 *
-	 * 	|–––––––––––––––|
-	 * 	c               d
-	 */
-
-	if (samerconst(x, y)) {
-		return NULL;
-	}
-
-	int c_a = number_value_as_constant(a),
-	    c_b = number_value_as_constant(b);
-	a_printf(
-		c_b-c_a==1,
-		"perfect overlap assumed to be at single points only for now\n"
-	);
-
-	return NULL;
+	assert(int_or_rconst(x) && int_or_rconst(y));
+	return number_disentangle(x->n, y->n, s);
 }
 
-static struct number_value *
-number_lw(struct number *, struct state *);
-
-static struct number_value *
-number_up(struct number *, struct state *);
-
-static struct number_value *
+static struct number *
 _value_bound(struct value *v, struct state *s, int islw);
 
-static struct number_value *
+static struct number *
 value_lw(struct value *v, struct state *s)
 {
 	return _value_bound(v, s, 1);
 }
 
-static struct number_value *
+static struct number *
 _value_bound(struct value *v, struct state *s, int islw)
 {
 	switch (v->type) {
@@ -1267,14 +1089,11 @@ _value_bound(struct value *v, struct state *s, int islw)
 	}
 }
 
-static struct number_value *
+static struct number *
 value_up(struct value *v, struct state *s)
 {
 	return _value_bound(v, s, 0);
 }
-
-static int
-number_issinglerange(struct number *, struct state *);
 
 static int
 value_issinglerange(struct value *v, struct state *s)
@@ -1289,43 +1108,15 @@ value_issinglerange(struct value *v, struct state *s)
 
 }
 
-static void
-number_splitto(struct number *, struct number *range, struct map *splits,
-		struct state *);
-
-static void
-value_splitto(struct value *v, struct number *range, struct map *splits,
-		struct state *s)
+int
+value_splitassume(struct value *v, struct number *split, struct state *s)
 {
 	switch (v->type) {
 	case VALUE_INT:
-		assert(
-			value_issinglerange(v, s)
-			&& number_value_eq(value_lw(v, s), number_lw(range, s))
-			&& number_value_eq(value_up(v, s), number_up(range, s))
-		);
-		break;
-	case VALUE_RCONST:
-		number_splitto(v->n, range, splits, s);
-		break;
-	default:
-		assert(false);
-	}
-}
-
-
-static bool
-number_assume(struct number *n, struct number *split);
-
-bool
-value_splitassume(struct value *v, struct number *split)
-{
-	switch (v->type) {
-	case VALUE_INT:
-		return number_assume(v->n, split);
+		return number_assume(v->n, split, s);
 	case VALUE_PTR:
 		assert(v->ptr.isindefinite);
-		return number_assume(v->ptr.n, split);
+		return number_assume(v->ptr.n, split, s);
 	default:
 		assert(false);
 	}
@@ -1338,7 +1129,7 @@ static struct value *
 value_tosinglerange(struct value *, struct state *);
 
 char *
-number_value_str(struct number_value *v);
+cconst_str(struct cconst *v);
 
 struct error *
 value_confirmsubset(struct value *v, struct value *v0, struct state *s,
@@ -1351,18 +1142,18 @@ value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 	assert(value_issinglerange(v, s));
 	struct value *r0 = value_tosinglerange(v0, s0);
 
-	struct number_value *v_lw = value_lw(v, s),
-			    *r0_lw = value_lw(r0, s0);
-	if (!number_value_le(r0_lw, v_lw)) {
+	struct number *v_lw = value_lw(v, s),
+		      *r0_lw = value_lw(r0, s0);
+	if (!number_le(r0_lw, v_lw, s)) {
 		return error_value_bounds(
-			error_printf("must be ≥ %s", number_value_str(r0_lw))
+			error_printf("must be ≥ %s", number_str(r0_lw))
 		);
 	}
-	struct number_value *v_up = value_up(v, s),
-			    *r0_up = value_up(r0, s0);
-	if (!number_value_le(v_up, r0_up)) {
+	struct number *v_up = value_up(v, s),
+		      *r0_up = value_up(r0, s0);
+	if (!number_le(v_up, r0_up, s)) {
 		return error_value_bounds(
-			error_printf("must be < %s", number_value_str(r0_up))
+			error_printf("must be < %s", number_str(r0_up))
 		);
 	}
 	return NULL;
@@ -1374,9 +1165,6 @@ int_or_rconst(struct value *v)
 	return v->type == VALUE_INT || v->type == VALUE_RCONST;
 }
 
-
-static struct number *
-number_tosinglerange(struct number *, struct state *);
 
 static struct value *
 value_tosinglerange(struct value *old, struct state *s)
@@ -1394,893 +1182,4 @@ value_tosinglerange(struct value *old, struct state *s)
 	v->type = VALUE_INT;
 	v->n = number_tosinglerange(old->n, s);
 	return v;
-}
-
-
-
-struct number {
-	enum number_type type;
-	union {
-		struct number_range_arr *ranges;
-		struct ast_expr *computation;
-	};
-};
-
-struct number *
-number_ranges_create(struct number_range_arr *ranges)
-{
-	struct number *num = calloc(1, sizeof(struct number));
-	num->type = NUMBER_RANGES;
-	num->ranges = ranges;
-	return num;
-}
-
-struct number_range_arr *
-number_range_arr_single_create(int val);
-
-struct number *
-number_single_create(int val)
-{
-	return number_ranges_create(number_range_arr_single_create(val));
-}
-
-struct number_range_arr *
-number_range_arr_single_create(int val)
-{
-	struct number_range_arr *arr = number_range_arr_create();
-	number_range_arr_append(
-		arr, 
-		number_range_create(
-			number_value_constant_create(val),
-			number_value_constant_create(val+1)
-		)
-	);
-	return arr;
-}
-
-struct number *
-number_computed_create(struct ast_expr *e)
-{
-	struct number *num = calloc(1, sizeof(struct number));
-	num->type = NUMBER_COMPUTED;
-	num->computation = e;
-	return num;
-}
-
-static struct number *
-number_computed_bang(struct number *orig)
-{
-	struct number *num = calloc(1, sizeof(struct number));
-	num->type = NUMBER_COMPUTED;
-	num->computation = ast_expr_inverted_copy(orig->computation, true);
-	return num;
-}
-
-static struct number_value *
-_number_bound(struct number *n, int islw, struct state *s);
-
-static struct number_value *
-number_lw(struct number *n, struct state *s)
-{
-	return _number_bound(n, 1, s);
-}
-
-static struct number_value *
-number_up(struct number *n, struct state *s)
-{
-	return _number_bound(n, 0, s);
-}
-
-static struct number_value *
-_ranges_bound(struct number *, int islw);
-
-static struct number_value *
-_rconst_bound(struct ast_expr *, int islw, struct state *);
-
-static struct number_value *
-_number_bound(struct number *n, int islw, struct state *s)
-{
-	switch (n->type) {
-	case NUMBER_RANGES:
-		return _ranges_bound(n, islw);
-	case NUMBER_COMPUTED:
-		return _rconst_bound(n->computation, islw, s);
-	default:
-		assert(false);
-	}
-}
-
-static struct number_value *
-number_range_lower(struct number_range *);
-
-static struct number_value *
-number_range_upper(struct number_range *);
-
-static struct number_value *
-_ranges_bound(struct number *n, int islw)
-{
-	assert(n->type == NUMBER_RANGES);
-	assert(number_range_arr_n(n->ranges) == 1);
-
-	struct number_range *r = number_range_arr_range(n->ranges)[0];
-	return islw ? number_range_lower(r) : number_range_upper(r);
-}
-
-
-static struct number_value *
-_rconst_bound(struct ast_expr *e, int islw, struct state *s)
-{
-	struct value *rconst = tagval_value(
-		tagval_res_as_tagval(ast_expr_rangeeval(e, s))
-	);
-	assert(rconst && rconst->type == VALUE_INT);
-	return _number_bound(rconst->n, islw, s);
-}
-
-static int
-_rconst_issinglerange(struct ast_expr *, struct state *);
-
-static int
-number_issinglerange(struct number *n, struct state *s)
-{
-	switch (n->type) {
-	case NUMBER_RANGES:
-		return number_range_arr_n(n->ranges) == 1;
-	case NUMBER_COMPUTED:
-		return _rconst_issinglerange(n->computation, s);
-	default:
-		assert(false);
-	}
-}
-
-static int
-_rconst_issinglerange(struct ast_expr *e, struct state *s)
-{
-	struct value *rconst = tagval_value(
-		tagval_res_as_tagval(ast_expr_rangeeval(e, s))
-	);
-	assert(rconst && rconst->type == VALUE_INT);
-	return number_issinglerange(rconst->n, s);
-}
-
-
-static void
-number_splitto(struct number *n, struct number *range, struct map *splits,
-		struct state *s)
-{
-	assert(
-		n->type == NUMBER_COMPUTED
-		&& number_issinglerange(n, s)
-		&& number_value_le(number_lw(n, s), number_lw(range, s))
-		&& number_value_le(number_up(range, s), number_up(n, s))
-	);
-
-	map_set(
-		splits,
-		dynamic_str(ast_expr_as_identifier(n->computation)),
-		range
-	);
-}
-
-static struct number *
-_rconst_tosinglerange(char *, struct state *);
-
-static struct number *
-number_tosinglerange(struct number *n, struct state *s)
-{
-	switch (n->type) {
-	case NUMBER_RANGES:
-		assert(number_issinglerange(n, s));
-		return n;
-	case NUMBER_COMPUTED:
-		return _rconst_tosinglerange(
-			ast_expr_as_identifier(n->computation), s
-		);
-	default:
-		assert(false);
-	}
-}
-
-static struct number *
-_rconst_tosinglerange(char *id, struct state *s)
-{
-	struct value *rconst = state_getrconst(s, id);
-	assert(rconst && rconst->type == VALUE_INT);
-	return number_tosinglerange(rconst->n, s);
-}
-
-
-struct number_value *
-number_value_min_create(void);
-
-struct number_value *
-number_value_max_create(void);
-
-struct number_range_arr *
-number_range_arr_ne_create(int val)
-{
-	struct number_range_arr *arr = number_range_arr_create();
-	number_range_arr_append(
-		arr, 
-		number_range_create( /* [MIN:val) */
-			number_value_min_create(),
-			number_value_constant_create(val)
-		)
-	);
-	number_range_arr_append(
-		arr, 
-		number_range_create( /* [val+1:MAX) XXX */
-			number_value_constant_create(val+1),
-			number_value_max_create()
-		)
-	);
-	return arr;
-}
-
-struct number *
-number_ne_create(int val)
-{
-	return number_ranges_create(number_range_arr_ne_create(val));
-}
-
-struct number *
-number_with_range_create(int lw, int excl_up)
-{
-	struct number_range_arr *arr = number_range_arr_create();
-	number_range_arr_append(
-		arr, 
-		number_range_create( /* [lw:excl_up) */
-			number_value_constant_create(lw),
-			number_value_constant_create(excl_up)
-		)
-	);
-	return number_ranges_create(arr);
-}
-
-static struct number *
-number_singlerange_create(struct number_value *lw, struct number_value *up)
-{
-	struct number_range_arr *arr = number_range_arr_create();
-	number_range_arr_append(
-		arr, 
-		number_range_create(lw, up)
-	);
-	return number_ranges_create(arr);
-}
-
-int
-number_value_as_constant(struct number_value *v);
-
-struct number_value *
-number_range_lower(struct number_range *r);
-
-static int
-number_range_lw(struct number *n)
-{
-	assert(n->type == NUMBER_RANGES);
-	assert(number_range_arr_n(n->ranges) == 1);
-
-	struct number_range *r = number_range_arr_range(n->ranges)[0];
-	return number_value_as_constant(number_range_lower(r));
-}
-
-static int
-number_range_up(struct number *n)
-{
-	assert(n->type == NUMBER_RANGES);
-	assert(number_range_arr_n(n->ranges) == 1);
-
-	struct number_range *r = number_range_arr_range(n->ranges)[0];
-	return number_value_as_constant(number_range_upper(r));
-}
-
-void
-number_destroy(struct number *n)
-{
-	switch (n->type) {
-	case NUMBER_RANGES:
-		number_range_arr_destroy(n->ranges);
-		break;
-	case NUMBER_COMPUTED:
-		ast_expr_destroy(n->computation);
-		break;
-	default:
-		assert(false);
-	}
-}
-
-
-char *
-number_range_str(struct number_range *r);
-
-char *
-number_ranges_sprint(struct number *num)
-{
-	assert(num->type == NUMBER_RANGES);
-
-	struct strbuilder *b = strbuilder_create();
-	int n = number_range_arr_n(num->ranges);
-	struct number_range **range = number_range_arr_range(num->ranges);
-	strbuilder_putc(b, '{');
-	for (int i = 0; i < n; i++) {
-		char *r = number_range_str(range[i]);
-		strbuilder_printf(b, "%s%s", r, (i+1 < n ? ", " : ""));
-		free(r);
-	}
-	strbuilder_putc(b, '}');
-	return strbuilder_build(b);
-}
-
-char *
-number_str(struct number *num)
-{
-	switch (num->type) {
-	case NUMBER_RANGES:
-		return number_ranges_sprint(num);
-	case NUMBER_COMPUTED:
-		return ast_expr_str(num->computation);
-	default:
-		assert(false);
-	}
-}
-
-bool
-number_ranges_equal(struct number *n1, struct number *n2);
-
-static int
-number_computed_equal(struct number *n1, struct number *n2)
-{
-	if (n1->type != n2->type) {
-		return 0;
-	}
-	switch (n1->type) {
-	case NUMBER_RANGES:
-		return 0;
-	case NUMBER_COMPUTED:
-		return ast_expr_equal(n1->computation, n2->computation);
-	default:
-		assert(false);
-	}
-}
-
-bool
-number_range_equal(struct number_range *, struct number_range *);
-
-bool
-number_ranges_equal(struct number *n1, struct number *n2)
-{
-	assert(n1->type == n2->type && n1->type == NUMBER_RANGES);
-
-	int len = number_range_arr_n(n1->ranges);
-	if (len != number_range_arr_n(n2->ranges)) {
-		return false;
-	}
-
-	struct number_range **n1_r = number_range_arr_range(n1->ranges),
-			    **n2_r = number_range_arr_range(n2->ranges);
-	for (int i = 0; i < len; i++) {
-		if (!number_range_equal(n1_r[i], n2_r[i])) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-static bool
-number_range_arr_containsrangearr(struct number_range_arr *arr,
-		struct number_range_arr *range);
-
-static bool
-number_assume(struct number *n, struct number *split)
-{
-	assert(n->type == NUMBER_RANGES && split->type == NUMBER_RANGES);
-
-	if (!number_range_arr_containsrangearr(n->ranges, split->ranges)) {
-		return false;
-	}
-
-	n->ranges = split->ranges;
-
-	return true;
-}
-
-bool
-number_range_issingle(struct number_range *r);
-
-bool
-number_isconstant(struct number *n)
-{
-	assert(n->type == NUMBER_RANGES);
-
-	return number_range_arr_n(n->ranges) == 1 &&
-		number_range_issingle(number_range_arr_range(n->ranges)[0]);
-}
-
-int
-number_range_as_constant(struct number_range *r);
-
-int
-number_as_constant(struct number *n)
-{
-	assert(n->type == NUMBER_RANGES
-			&& number_range_arr_n(n->ranges) == 1);
-
-	return number_range_as_constant(number_range_arr_range(n->ranges)[0]);
-}
-
-bool
-number_issync(struct number *n)
-{
-	return n->type == NUMBER_COMPUTED;
-}
-
-struct ast_expr *
-number_as_sync(struct number *n)
-{
-	assert(n->type == NUMBER_COMPUTED);
-
-	return n->computation;
-}
-
-struct ast_expr *
-number_ranges_to_expr(struct number_range_arr *);
-
-struct ast_expr *
-number_to_expr(struct number *n)
-{
-	switch (n->type) {
-	case NUMBER_RANGES:
-		return number_ranges_to_expr(n->ranges);
-	case NUMBER_COMPUTED:
-		return ast_expr_copy(number_as_sync(n));
-	default:
-		assert(false);
-	}
-}
-
-struct number_range_arr *
-number_range_arr_copy(struct number_range_arr *old);
-
-struct number *
-number_copy(struct number *num)
-{
-	switch (num->type) {
-	case NUMBER_RANGES:
-		return number_ranges_create(number_range_arr_copy(num->ranges));
-	case NUMBER_COMPUTED:
-		return number_computed_create(ast_expr_copy(num->computation));
-	default:
-		assert(false);
-	}
-}
-
-struct splitinstruct {
-	int n;
-	struct map **m;
-};
-
-struct splitinstruct *
-splitinstruct_create(void)
-{
-	return calloc(1, sizeof(struct splitinstruct));
-}
-
-void 
-splitinstruct_append(struct splitinstruct *s, struct map *m)
-{
-	s->m = realloc(s->m, sizeof(struct map *) * ++s->n);
-	assert(s->m);
-	s->m[s->n-1] = m;
-}
-
-int 
-splitinstruct_n(struct splitinstruct *s)
-{
-	return s->n;
-}
-
-struct map **
-splitinstruct_splits(struct splitinstruct *s)
-{
-	return s->m;
-}
-
-
-struct number_range_arr {
-	int n;
-	struct number_range **range;
-};
-
-struct number_range_arr *
-number_range_arr_create(void)
-{
-	struct number_range_arr *arr = calloc(1, sizeof(struct number_range_arr));
-	assert(arr);
-	return arr;
-}
-
-void
-number_range_arr_destroy(struct number_range_arr *arr)
-{
-	for (int i = 0; i < arr->n; i++) {
-		number_range_destroy(arr->range[i]);	
-	}
-	free(arr->range);
-	free(arr);
-}
-
-int
-number_range_arr_n(struct number_range_arr *arr)
-{
-	return arr->n;
-}
-
-struct number_range **
-number_range_arr_range(struct number_range_arr *arr)
-{
-	return arr->range;
-}
-
-int
-number_range_arr_append(struct number_range_arr *arr, struct number_range *r)
-{
-	arr->range = realloc(arr->range, sizeof(struct number_range *) * ++arr->n);
-	assert(arr->range);
-	int loc = arr->n-1;
-	arr->range[loc] = r;
-	return loc;
-}
-
-struct number_range *
-number_range_copy(struct number_range *);
-
-struct number_range_arr *
-number_range_arr_copy(struct number_range_arr *old)
-{
-	struct number_range_arr *new = number_range_arr_create();
-	for (int i = 0; i < old->n; i++) {
-		number_range_arr_append(new, number_range_copy(old->range[i]));
-	}
-	return new;
-}
-
-struct ast_expr *
-number_ranges_to_expr(struct number_range_arr *arr)
-{
-	assert(number_range_arr_n(arr) == 1);
-
-	return ast_expr_constant_create(
-		number_range_as_constant(arr->range[0])
-	);
-}
-
-static bool
-number_range_arr_containsrange(struct number_range_arr *, struct number_range *);
-
-static bool
-number_range_arr_containsrangearr(struct number_range_arr *arr,
-		struct number_range_arr *range_arr)
-{
-	for (int i = 0; i < range_arr->n; i++) {
-		if (!number_range_arr_containsrange(arr, range_arr->range[i])) {
-			return false;
-		}
-	}
-	return true;
-}
-
-static bool
-number_range_contains_range(struct number_range *r, struct number_range *r2);
-
-static bool
-number_range_arr_containsrange(struct number_range_arr *arr,
-		struct number_range *range)
-{
-	for (int i = 0; i < arr->n; i++) {
-		/* XXX: currently will assert false if arr->range[i] contains
-		 * the lower bound of range but not the entire range, so we're
-		 * asserting out the possibility of partial inclusion */
-		if (number_range_contains_range(arr->range[i], range)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-
-
-struct number_range {
-	struct number_value *lower, *upper;
-};
-
-struct number_range *
-number_range_create(struct number_value *lw, struct number_value *up)
-{
-	struct number_range *r = malloc(sizeof(struct number_range));
-	r->lower = lw;
-	r->upper = up;
-	return r;
-}
-
-void
-number_range_destroy(struct number_range *r)
-{
-	number_value_destroy(r->lower);
-	number_value_destroy(r->upper);
-	free(r);
-}
-
-struct number_value *
-number_range_lower(struct number_range *r)
-{
-	return r->lower;
-}
-
-struct number_value *
-number_range_upper(struct number_range *r)
-{
-	return r->upper;
-}
-
-static bool
-number_value_equal(struct number_value *v1, struct number_value *v2);
-
-struct number_value *
-number_value_copy(struct number_value *v);
-
-char *
-number_value_str(struct number_value *v);
-
-char *
-number_value_str_inrange(struct number_value *v);
-
-char *
-number_range_str(struct number_range *r)
-{
-	struct strbuilder *b = strbuilder_create();
-	if (number_range_issingle(r)) {
-		strbuilder_printf(b, "%s", number_value_str(r->lower));
-	} else {
-		strbuilder_printf(
-			b, "%s?%s",
-			number_value_str_inrange(r->lower),
-			number_value_str_inrange(r->upper)
-		);
-	}
-	return strbuilder_build(b);
-}
-
-struct number_range *
-number_range_copy(struct number_range *r)
-{
-	return number_range_create(
-		number_value_copy(r->lower), number_value_copy(r->upper)
-	);
-}
-
-static bool
-number_range_contains_range(struct number_range *r, struct number_range *r2)
-{
-	if (number_value_le(r->lower, r2->lower)) {
-		/* XXX: exclude partial inclusion cases */
-		assert(r->upper);
-		assert(r2->upper);
-		assert(number_value_le(r2->upper, r->upper));
-		/* ⊢ r->lower ≤ r2->lower && r2->upper ≤ r->upper */
-		return true;
-	}
-	/* r->lower > r2->lower so r2 cannot in be in r */
-	return false;
-}
-
-bool
-number_values_aresingle(struct number_value *v1, struct number_value *v2);
-
-bool
-number_range_issingle(struct number_range *r)
-{
-	return number_values_aresingle(r->lower, r->upper);
-}
-
-bool
-number_range_equal(struct number_range *r1, struct number_range *r2)
-{
-	return number_value_equal(r1->lower, r2->lower)
-		&& number_value_equal(r1->upper, r2->upper);
-}
-
-int
-number_value_as_constant(struct number_value *v);
-
-int
-number_range_as_constant(struct number_range *r)
-{
-	assert(number_range_issingle(r));
-
-	return number_value_as_constant(r->lower);
-}
-
-struct number_value {
-	enum number_value_type type;
-	union {
-		int constant;
-		bool max;
-	};
-};
-
-struct number_value *
-number_value_constant_create(int constant)
-{
-	struct number_value *v = malloc(sizeof(struct number_value));
-	assert(v);
-	v->type = NUMBER_VALUE_CONSTANT;
-	v->constant = constant;
-	return v;
-}
-
-struct number_value *
-number_value_limit_create(bool max)
-{
-	struct number_value *v = malloc(sizeof(struct number_value));
-	assert(v);
-	v->type = NUMBER_VALUE_LIMIT;
-	v->max = max;
-	return v;
-}
-
-struct number_value *
-number_value_min_create(void)
-{
-	return number_value_limit_create(false);
-}
-
-struct number_value *
-number_value_max_create(void)
-{
-	return number_value_limit_create(true);
-}
-
-void
-number_value_destroy(struct number_value *v)
-{
-	free(v);
-}
-
-char *
-number_value_str(struct number_value *v)
-{
-	struct strbuilder *b = strbuilder_create();
-	switch (v->type) {
-	case NUMBER_VALUE_CONSTANT:
-		strbuilder_printf(b, "%d", v->constant);
-		break;
-	case NUMBER_VALUE_LIMIT:
-		strbuilder_printf(b, "%s", v->max ? "MAX" : "MIN");
-		break;
-	default:
-		assert(false);
-	}
-	return strbuilder_build(b);
-}
-
-char *
-number_value_str_inrange(struct number_value *v)
-{
-	switch (v->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return number_value_str(v);
-	case NUMBER_VALUE_LIMIT:
-		return dynamic_str("");
-	default:
-		assert(false);
-	}
-}
-
-struct number_value *
-number_value_copy(struct number_value *v)
-{
-	switch (v->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return number_value_constant_create(v->constant);
-	case NUMBER_VALUE_LIMIT:
-		return number_value_limit_create(v->max);
-	default:
-		assert(false);
-	}
-}
-
-bool
-number_values_aresingle(struct number_value *v1, struct number_value *v2)
-{
-	/* XXX: this omits the case where we have a constant value equal to one
-	 * of the limits */
-	if (v1->type != v2->type) {
-		return false;
-	}
-	switch (v1->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return v1->constant == v2->constant-1;
-	case NUMBER_VALUE_LIMIT:
-		return v1->max == v2->max;
-	default:
-		assert(false);
-	}
-}
-
-int
-number_value_difference(struct number_value *v1, struct number_value *v2)
-{
-	assert(v1->type == v2->type);
-
-	switch (v1->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return v1->constant - v2->constant;
-	default:
-		assert(false);
-	}
-}
-
-bool
-number_value_equal(struct number_value *v1, struct number_value *v2)
-{
-	if (v1->type != v2->type) {
-		return false;
-	}
-	switch (v1->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return number_value_difference(v1, v2) == 0;
-	case NUMBER_VALUE_LIMIT:
-		return v1->max == v2->max;
-	default:
-		assert(false);
-	}
-
-}
-
-int
-number_value_as_constant(struct number_value *v)
-{
-	assert(v->type == NUMBER_VALUE_CONSTANT);
-
-	return v->constant;
-}
-
-static bool
-number_value_le(struct number_value *v1, struct number_value *v2)
-{
-	if (v1->type != v2->type) {
-		if (v1->type == NUMBER_VALUE_LIMIT) {
-			return !v1->max;
-		}
-		assert(v2->type == NUMBER_VALUE_LIMIT);
-		return v2->max;
-	}
-	assert(v1->type == v2->type);
-	switch (v1->type) {
-	case NUMBER_VALUE_CONSTANT:
-		return v1->constant <= v2->constant;
-	case NUMBER_VALUE_LIMIT:
-		return !v1->max || v2->max;
-	default:
-		assert(false);
-	}
-}
-
-static bool
-number_value_ge(struct number_value *v1, struct number_value *v2)
-{
-	return number_value_le(v2, v1);
-}
-
-static bool
-number_value_eq(struct number_value *v1, struct number_value *v2)
-{
-	return number_value_le(v1, v2) && number_value_le(v2, v1);
-}
-
-static bool
-number_value_lt(struct number_value *v1, struct number_value *v2)
-{
-	return number_value_le(v1, v2) && !number_value_eq(v1, v2);
 }

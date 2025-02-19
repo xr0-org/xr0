@@ -200,6 +200,9 @@ ast_type_create_userdef(char *name)
 	return t;
 }
 
+static struct value *
+_expr_to_range_value(struct ast_expr *, struct state *);
+
 struct value *
 ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 		char *key, bool persist)
@@ -207,7 +210,7 @@ ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 	switch (t->base) {
 	case TYPE_INT:
 		assert(range);
-		return value_int_rconst_create(range, s);
+		return _expr_to_range_value(range, s);
 	case TYPE_POINTER:
 		/* no key in the value except for structs */
 		assert(range);
@@ -225,6 +228,31 @@ ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 	}
 }
 
+static struct value *
+_bound_to_value(struct ast_expr *, struct state *);
+
+static struct value *
+_expr_to_range_value(struct ast_expr *expr, struct state *s)
+{
+	return value_int_range_create(
+		_bound_to_value(ast_expr_range_lw(expr), s),
+		_bound_to_value(ast_expr_range_up(expr), s)
+	);
+}
+
+static struct value *
+_bound_to_value(struct ast_expr *expr, struct state *s)
+{
+	if (ast_expr_israngemin(expr)) {
+		return value_int_min_create();
+	} else if (ast_expr_israngemax(expr)) {
+		return value_int_max_create();
+	}
+	return value_res_as_value(
+		eval_to_value(e_res_as_eval(ast_expr_eval(expr, s)), s)
+	);
+}
+
 struct value *
 ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range,
 		bool persist)
@@ -232,7 +260,7 @@ ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range
 	switch (t->base) {
 	case TYPE_INT:
 		assert(range);
-		return value_int_rconst_create(range, s);
+		return _expr_to_range_value(range, s);
 	case TYPE_POINTER:
 		return value_ptr_rconst_create();
 	case TYPE_USERDEF:

@@ -47,11 +47,31 @@ verifier_lexememarker(struct verifier *);
 int
 verifier_frameid(struct verifier *);
 
-struct splitinstruct;
 struct verifierinstruct;
+
+struct splitinstruct;
 
 struct verifierinstruct *
 verifierinstruct_split(struct splitinstruct *);
+
+struct splitinstruct;
+
+struct splitinstruct *
+splitinstruct_create(struct state *);
+
+struct map;
+
+void
+splitinstruct_append(struct splitinstruct *, struct map *);
+
+int 
+splitinstruct_n(struct splitinstruct *);
+
+struct map **
+splitinstruct_splits(struct splitinstruct *);
+
+struct state *
+splitinstruct_state(struct splitinstruct *);
 
 struct rconst;
 

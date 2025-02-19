@@ -123,6 +123,11 @@ ast_expr_isconstant(struct ast_expr *expr)
 	return expr->kind == EXPR_CONSTANT;
 }
 
+int
+ast_expr_isbinary(struct ast_expr *expr)
+{
+	return expr->kind == EXPR_BINARY;
+}
 
 
 struct ast_expr *
@@ -1267,6 +1272,53 @@ binary_simplify(struct ast_expr *e)
 	}
 }
 
+DEFINE_RESULT_TYPE(struct shift *, shift, shift_destroy, shift_res, false)
+
+static struct shift_res *
+binary_getsplitshift(struct ast_expr *, enum ast_binary_operator,
+		struct ast_expr *);
+
+struct shift_res *
+ast_expr_getsplitshift(struct ast_expr *e)
+{
+	switch (ast_expr_kind(e)) {
+	case EXPR_BINARY:
+		return binary_getsplitshift(
+			ast_expr_binary_e1(e),
+			ast_expr_binary_op(e),
+			ast_expr_binary_e2(e)
+		);
+	case EXPR_IDENTIFIER:
+		return shift_res_shift_create(
+			shift_create(dynamic_str(ast_expr_as_identifier(e)), 0)
+		);
+	default:
+		return shift_res_error_create(
+			error_printf("%s not in split form", ast_expr_str(e))
+		);
+	}
+}
+
+static struct shift_res *
+binary_getsplitshift(struct ast_expr *e, enum ast_binary_operator op,
+		struct ast_expr *e0)
+{
+	a_printf(
+		ast_expr_isidentifier(e)
+		&& ast_expr_isconstant(e0)
+		&& op == BINARY_OP_ADDITION,
+		"split shift restricted to the special case of a right-sided, "\
+		"constant addition to identifier\n"
+	);
+	return shift_res_shift_create(
+		shift_create(
+			dynamic_str(ast_expr_as_identifier(e)),
+			ast_expr_as_constant(e0)
+		)
+	);
+}
+
+
 struct tagval {
 	char *tag;
 	struct value *v;
@@ -1352,7 +1404,7 @@ ast_expr_rangeeval(struct ast_expr *e, struct state *s)
 
 static struct tagval_res *
 binary_rangeeval_actual(struct tagval *, enum ast_binary_operator,
-		struct tagval *);
+		struct tagval *, struct state *);
 
 static struct tagval_res *
 binary_rangeeval(struct ast_expr *e, struct state *s)
@@ -1368,19 +1420,21 @@ binary_rangeeval(struct ast_expr *e, struct state *s)
 	return binary_rangeeval_actual(
 		tagval_res_as_tagval(vres1),
 		ast_expr_binary_op(e),
-		tagval_res_as_tagval(vres2)
+		tagval_res_as_tagval(vres2),
+		s
 	);
 }
 
 static struct value *
-binary_rangeeval_norm(struct value *, enum ast_binary_operator, int);
+binary_rangeeval_norm(struct value *, enum ast_binary_operator, int,
+		struct state *);
 
 static struct tagval *
 addtagifpresent(struct value *v, struct tagval *);
 
 static struct tagval_res *
 binary_rangeeval_actual(struct tagval *tv1, enum ast_binary_operator op,
-		struct tagval *tv2)
+		struct tagval *tv2, struct state *s)
 {
 	struct value *v1 = tagval_value(tv1),
 		     *v2 = tagval_value(tv2);
@@ -1390,27 +1444,32 @@ binary_rangeeval_actual(struct tagval *tv1, enum ast_binary_operator op,
 				error_printf("one must be constant")
 			); 
 		}
-		return binary_rangeeval_actual(tv2, op, tv1);
+		return binary_rangeeval_actual(tv2, op, tv1, s);
 	}
 	/* ⊢ value_isconstant(v2) */
 	return tagval_res_tagval_create(
 		addtagifpresent(
-			binary_rangeeval_norm(v1, op, value_as_constant(v2)),
+			binary_rangeeval_norm(v1, op, value_as_constant(v2), s),
 			tv1
 		)
 	);
 }
 
 static struct value *
-binary_rangeeval_norm(struct value *v, enum ast_binary_operator op, int c)
+binary_rangeeval_norm(struct value *v, enum ast_binary_operator op, int c,
+		struct state *s)
 {
-	int lw = value_int_lw(v),
-	    up = value_int_up(v);
+	int lw = value_int_lw(v, s),
+	    up = value_int_up(v, s);
 	switch (op) {
 	case BINARY_OP_ADDITION:
-		return value_int_range_create(lw+c, up+c);
+		return value_int_range_create(
+			value_int_create(lw+c), value_int_create(up+c)
+		);
 	case BINARY_OP_SUBTRACTION:
-		return value_int_range_create(lw-c, up-c);
+		return value_int_range_create(
+			value_int_create(lw-c), value_int_create(up-c)
+		);
 	case BINARY_OP_MULTIPLICATION:
 		if (!value_isconstant(v)) {
 			/* XXX: cannot multiply ranges without modulo-ranges */
