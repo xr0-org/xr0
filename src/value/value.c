@@ -143,7 +143,8 @@ value_ptr_copy(struct value *old)
 void
 value_ptr_sprint(struct value *v, struct strbuilder *b)
 {
-	char *s = v->ptr.isindefinite ? number_str(v->ptr.n) : location_str(v->ptr.loc);
+	char *s = v->ptr.isindefinite ?
+		number_str(v->ptr.n) : location_str(v->ptr.loc);
 	strbuilder_printf(b, "ptr:%s", s);
 	free(s);
 }
@@ -264,24 +265,18 @@ _constant(struct ast_expr *expr)
 		: ast_expr_as_constant(expr);
 }
 
-static int
-range_lw(struct number *);
-
 int
-value_int_lw(struct value *v)
+value_int_lw(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return range_lw(v->n);
+	return cconst_as_constant(number_as_cconst(number_lw(v->n, s)));
 }
 
-static int
-range_up(struct number *);
-
 int
-value_int_up(struct value *v)
+value_int_up(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return range_up(v->n);
+	return cconst_as_constant(number_as_cconst(number_up(v->n, s)));
 }
 
 static int
@@ -291,7 +286,7 @@ int
 value_as_int(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_INT && value_issinglerange(v, s));
-	return value_int_lw(v);
+	return value_int_lw(v, s);
 }
 
 struct number *
@@ -854,9 +849,6 @@ value_as_constant(struct value *v)
 }
 
 bool
-number_isconstant(struct number *n);
-
-bool
 value_isconstant(struct value *v)
 {
 	if (v->type != VALUE_INT) {
@@ -1216,12 +1208,6 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 }
 
 static struct number *
-number_lw(struct number *, struct state *);
-
-static struct number *
-number_up(struct number *, struct state *);
-
-static struct number *
 _value_bound(struct value *v, struct state *s, int islw);
 
 static struct number *
@@ -1438,6 +1424,8 @@ struct number *
 number_copy(struct number *num)
 {
 	switch (num->type) {
+	case NUMBER_CCONST:
+		return number_cconst_create(cconst_copy(num->cconst));
 	case NUMBER_RANGES:
 		return ranges_create(range_arr_copy(num->ranges));
 	case NUMBER_EXPR:
@@ -1451,6 +1439,9 @@ void
 number_destroy(struct number *n)
 {
 	switch (n->type) {
+	case NUMBER_CCONST:
+		cconst_destroy(n->cconst);
+		break;
 	case NUMBER_RANGES:
 		range_arr_destroy(n->ranges);
 		break;
@@ -1460,6 +1451,7 @@ number_destroy(struct number *n)
 	default:
 		assert(false);
 	}
+	free(n);
 }
 
 static char *
@@ -1469,10 +1461,12 @@ char *
 number_str(struct number *num)
 {
 	switch (num->type) {
+	case NUMBER_CCONST:
+		return cconst_str(number_as_cconst(num));
 	case NUMBER_RANGES:
 		return _ranges_str(num);
 	case NUMBER_EXPR:
-		return ast_expr_str(num->expr);
+		return ast_expr_str(number_as_expr(num));
 	default:
 		assert(false);
 	}
@@ -1550,17 +1544,20 @@ number_ge(struct number *lhs, struct number *rhs)
 static struct number *
 _number_bound(struct number *n, int islw, struct state *s);
 
-static struct number *
+struct number *
 number_lw(struct number *n, struct state *s)
 {
 	return _number_bound(n, 1, s);
 }
 
-static struct number *
+struct number *
 number_up(struct number *n, struct state *s)
 {
 	return _number_bound(n, 0, s);
 }
+
+static struct number *
+_cconst_bound(struct cconst *, int islw);
 
 static struct number *
 _ranges_bound(struct number *, int islw);
@@ -1572,6 +1569,8 @@ static struct number *
 _number_bound(struct number *n, int islw, struct state *s)
 {
 	switch (n->type) {
+	case NUMBER_CCONST:
+		return _cconst_bound(n->cconst, islw);
 	case NUMBER_RANGES:
 		return _ranges_bound(n, islw);
 	case NUMBER_EXPR:
@@ -1579,6 +1578,19 @@ _number_bound(struct number *n, int islw, struct state *s)
 	default:
 		assert(false);
 	}
+}
+
+static struct number *
+_cconst_bound(struct cconst *c, int islw)
+{
+	if (islw) {
+		return number_cconst_create(cconst_copy(c));
+	}
+	/* exclude MIN/MAX cases for simplicity */
+	assert(cconst_isconstant(c));
+	int k = cconst_as_constant(c);
+	assert(k < INT_MAX);
+	return number_cconst_create(cconst_constant_create(k + 1));
 }
 
 static struct number *
@@ -1609,6 +1621,8 @@ static int
 number_issinglerange(struct number *n, struct state *s)
 {
 	switch (n->type) {
+	case NUMBER_CCONST:
+		return 1;
 	case NUMBER_RANGES:
 		return range_arr_n(n->ranges) == 1;
 	case NUMBER_EXPR:
@@ -1727,32 +1741,6 @@ number_singlerange_create(struct number *lw, struct number *up)
 	return ranges_create(arr);
 }
 
-static int
-range_lw(struct number *n)
-{
-	assert(n->type == NUMBER_RANGES);
-	assert(range_arr_n(n->ranges) == 1);
-
-	return cconst_as_constant(
-		number_as_cconst(
-			range_lower(range_arr_range(n->ranges)[0])
-		)
-	);
-}
-
-static int
-range_up(struct number *n)
-{
-	assert(n->type == NUMBER_RANGES);
-	assert(range_arr_n(n->ranges) == 1);
-
-	return cconst_as_constant(
-		number_as_cconst(
-			range_upper(range_arr_range(n->ranges)[0])
-		)
-	);
-}
-
 bool
 ranges_equal(struct number *n1, struct number *n2);
 
@@ -1811,13 +1799,18 @@ number_assume(struct number *n, struct number *split)
 	return true;
 }
 
-bool
+int
 number_isconstant(struct number *n)
 {
-	assert(n->type == NUMBER_RANGES);
-
-	return range_arr_n(n->ranges) == 1 &&
-		range_issingle(range_arr_range(n->ranges)[0]);
+	switch (n->type) {
+	case NUMBER_CCONST:
+		return cconst_isconstant(n->cconst);
+	case NUMBER_RANGES:
+		return range_arr_n(n->ranges) == 1 &&
+			range_issingle(range_arr_range(n->ranges)[0]);
+	default:
+		assert(false);
+	}
 }
 
 static struct ast_expr *

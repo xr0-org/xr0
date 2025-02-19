@@ -27,6 +27,15 @@ char *
 cconst_str_inrange(struct cconst *);
 
 int
+cconst_ismax(struct cconst *);
+
+int
+cconst_ismin(struct cconst *);
+
+int
+cconst_isconstant(struct cconst *);
+
+int
 cconst_as_constant(struct cconst *);
 
 int

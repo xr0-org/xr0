@@ -50,10 +50,10 @@ struct value *
 value_int_range_create(int lw, int excl_up);
 
 int
-value_int_lw(struct value *);
+value_int_lw(struct value *, struct state *);
 
 int
-value_int_up(struct value *);
+value_int_up(struct value *, struct state *);
 
 int
 value_as_int(struct value *, struct state *);
@@ -237,6 +237,9 @@ struct ast_expr *
 number_as_expr(struct number *);
 
 int
+number_isconstant(struct number *);
+
+int
 number_eq(struct number *, struct number *);
 
 int
@@ -250,5 +253,11 @@ number_ge(struct number *lhs, struct number *rhs);
 
 int
 numbers_aresinglerange(struct number *lw, struct number *up);
+
+struct number *
+number_lw(struct number *, struct state *);
+
+struct number *
+number_up(struct number *, struct state *);
 
 #endif

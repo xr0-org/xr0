@@ -128,11 +128,20 @@ cconst_difference(struct cconst *v1, struct cconst *v2)
 }
 
 int
-cconst_as_constant(struct cconst *v)
-{
-	assert(v->t == CONSTANT);
+cconst_ismax(struct cconst *c) { return c->t == LIMIT && c->ismax; }
 
-	return v->constant;
+int
+cconst_ismin(struct cconst *c) { return c->t == LIMIT && !c->ismax; }
+
+int
+cconst_isconstant(struct cconst *c) { return c->t == CONSTANT; }
+
+int
+cconst_as_constant(struct cconst *c)
+{
+	assert(cconst_isconstant(c));
+
+	return c->constant;
 }
 
 int

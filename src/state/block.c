@@ -116,8 +116,8 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 	struct tagval *tv = tagval_res_as_tagval(res);
 
 	struct value *range = tagval_value(tv);
-	int lw = value_int_lw(range),
-	    up = value_int_up(range);
+	int lw = value_int_lw(range, s),
+	    up = value_int_up(range, s);
 	if (lw < 0 || b->size < up) {
 		return object_res_error_create(
 			error_printf("out of bounds")

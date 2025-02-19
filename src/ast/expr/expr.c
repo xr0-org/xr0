@@ -1352,7 +1352,7 @@ ast_expr_rangeeval(struct ast_expr *e, struct state *s)
 
 static struct tagval_res *
 binary_rangeeval_actual(struct tagval *, enum ast_binary_operator,
-		struct tagval *);
+		struct tagval *, struct state *);
 
 static struct tagval_res *
 binary_rangeeval(struct ast_expr *e, struct state *s)
@@ -1368,19 +1368,21 @@ binary_rangeeval(struct ast_expr *e, struct state *s)
 	return binary_rangeeval_actual(
 		tagval_res_as_tagval(vres1),
 		ast_expr_binary_op(e),
-		tagval_res_as_tagval(vres2)
+		tagval_res_as_tagval(vres2),
+		s
 	);
 }
 
 static struct value *
-binary_rangeeval_norm(struct value *, enum ast_binary_operator, int);
+binary_rangeeval_norm(struct value *, enum ast_binary_operator, int,
+		struct state *);
 
 static struct tagval *
 addtagifpresent(struct value *v, struct tagval *);
 
 static struct tagval_res *
 binary_rangeeval_actual(struct tagval *tv1, enum ast_binary_operator op,
-		struct tagval *tv2)
+		struct tagval *tv2, struct state *s)
 {
 	struct value *v1 = tagval_value(tv1),
 		     *v2 = tagval_value(tv2);
@@ -1390,22 +1392,23 @@ binary_rangeeval_actual(struct tagval *tv1, enum ast_binary_operator op,
 				error_printf("one must be constant")
 			); 
 		}
-		return binary_rangeeval_actual(tv2, op, tv1);
+		return binary_rangeeval_actual(tv2, op, tv1, s);
 	}
 	/* ⊢ value_isconstant(v2) */
 	return tagval_res_tagval_create(
 		addtagifpresent(
-			binary_rangeeval_norm(v1, op, value_as_constant(v2)),
+			binary_rangeeval_norm(v1, op, value_as_constant(v2), s),
 			tv1
 		)
 	);
 }
 
 static struct value *
-binary_rangeeval_norm(struct value *v, enum ast_binary_operator op, int c)
+binary_rangeeval_norm(struct value *v, enum ast_binary_operator op, int c,
+		struct state *s)
 {
-	int lw = value_int_lw(v),
-	    up = value_int_up(v);
+	int lw = value_int_lw(v, s),
+	    up = value_int_up(v, s);
 	switch (op) {
 	case BINARY_OP_ADDITION:
 		return value_int_range_create(lw+c, up+c);
