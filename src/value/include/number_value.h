@@ -7,10 +7,10 @@ struct number_value *
 number_value_constant_create(int contant);
 
 struct number_value *
-number_value_min_create();
+number_value_min_create(void);
 
 struct number_value *
-number_value_max_create();
+number_value_max_create(void);
 
 void
 number_value_destroy(struct number_value *);

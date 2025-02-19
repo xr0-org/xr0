@@ -917,8 +917,6 @@ range_rconst(struct ast_expr *, struct state *);
 static struct e_res *
 range_eval(struct ast_expr *expr, struct state *state)
 {
-	printf("%s\n", state_str(state));
-	printf("expr: %s\n", ast_expr_str(expr));
 	return e_res_eval_create(
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */

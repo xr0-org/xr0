@@ -37,15 +37,15 @@ static struct number_value *
 _number_value_limit_create(int ismax)
 {
 	struct number_value *v = _number_value_create(LIMIT);
-	v->ismax = 0;
+	v->ismax = ismax;
 	return v;
 }
 
 struct number_value *
-number_value_min_create() { return _number_value_limit_create(0); }
+number_value_min_create(void) { return _number_value_limit_create(0); }
 
 struct number_value *
-number_value_max_create() { return _number_value_limit_create(1); }
+number_value_max_create(void) { return _number_value_limit_create(1); }
 
 void
 number_value_destroy(struct number_value *v)
