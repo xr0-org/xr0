@@ -3,9 +3,9 @@
 
 #include "util.h"
 
-#include "number_value.h"
+#include "cconst.h"
 
-struct number_value {
+struct cconst {
 	enum type {
 		CONSTANT,
 		LIMIT,
@@ -16,45 +16,45 @@ struct number_value {
 	};
 };
 
-static struct number_value *
-_number_value_create(enum type t)
+static struct cconst *
+_cconst_create(enum type t)
 {
-	struct number_value *v = malloc(sizeof(struct number_value));
+	struct cconst *v = malloc(sizeof(struct cconst));
 	assert(v);
 	v->t = t;
 	return v;
 }
 
-struct number_value *
-number_value_constant_create(int constant)
+struct cconst *
+cconst_constant_create(int constant)
 {
-	struct number_value *v = _number_value_create(CONSTANT);
+	struct cconst *v = _cconst_create(CONSTANT);
 	v->constant = constant;
 	return v;
 }
 
-static struct number_value *
-_number_value_limit_create(int ismax)
+static struct cconst *
+_cconst_limit_create(int ismax)
 {
-	struct number_value *v = _number_value_create(LIMIT);
+	struct cconst *v = _cconst_create(LIMIT);
 	v->ismax = ismax;
 	return v;
 }
 
-struct number_value *
-number_value_min_create(void) { return _number_value_limit_create(0); }
+struct cconst *
+cconst_min_create(void) { return _cconst_limit_create(0); }
 
-struct number_value *
-number_value_max_create(void) { return _number_value_limit_create(1); }
+struct cconst *
+cconst_max_create(void) { return _cconst_limit_create(1); }
 
 void
-number_value_destroy(struct number_value *v)
+cconst_destroy(struct cconst *v)
 {
 	free(v);
 }
 
 char *
-number_value_str(struct number_value *v)
+cconst_str(struct cconst *v)
 {
 	struct strbuilder *b = strbuilder_create();
 	switch (v->t) {
@@ -71,11 +71,11 @@ number_value_str(struct number_value *v)
 }
 
 char *
-number_value_str_inrange(struct number_value *v)
+cconst_str_inrange(struct cconst *v)
 {
 	switch (v->t) {
 	case CONSTANT:
-		return number_value_str(v);
+		return cconst_str(v);
 	case LIMIT:
 		return dynamic_str("");
 	default:
@@ -83,21 +83,21 @@ number_value_str_inrange(struct number_value *v)
 	}
 }
 
-struct number_value *
-number_value_copy(struct number_value *v)
+struct cconst *
+cconst_copy(struct cconst *v)
 {
 	switch (v->t) {
 	case CONSTANT:
-		return number_value_constant_create(v->constant);
+		return cconst_constant_create(v->constant);
 	case LIMIT:
-		return _number_value_limit_create(v->ismax);
+		return _cconst_limit_create(v->ismax);
 	default:
 		assert(0);
 	}
 }
 
 int
-number_values_aresingle(struct number_value *v1, struct number_value *v2)
+cconsts_aresingle(struct cconst *v1, struct cconst *v2)
 {
 	/* XXX: this omits the case where we have a constant value equal to one
 	 * of the limits */
@@ -115,7 +115,7 @@ number_values_aresingle(struct number_value *v1, struct number_value *v2)
 }
 
 int
-number_value_difference(struct number_value *v1, struct number_value *v2)
+cconst_difference(struct cconst *v1, struct cconst *v2)
 {
 	assert(v1->t == v2->t);
 
@@ -128,7 +128,7 @@ number_value_difference(struct number_value *v1, struct number_value *v2)
 }
 
 int
-number_value_as_constant(struct number_value *v)
+cconst_as_constant(struct cconst *v)
 {
 	assert(v->t == CONSTANT);
 
@@ -136,7 +136,7 @@ number_value_as_constant(struct number_value *v)
 }
 
 int
-number_value_le(struct number_value *v1, struct number_value *v2)
+cconst_le(struct cconst *v1, struct cconst *v2)
 {
 	if (v1->t != v2->t) {
 		if (v1->t == LIMIT) {
@@ -157,19 +157,19 @@ number_value_le(struct number_value *v1, struct number_value *v2)
 }
 
 int
-number_value_ge(struct number_value *v1, struct number_value *v2)
+cconst_ge(struct cconst *v1, struct cconst *v2)
 {
-	return number_value_le(v2, v1);
+	return cconst_le(v2, v1);
 }
 
 int
-number_value_eq(struct number_value *v1, struct number_value *v2)
+cconst_eq(struct cconst *v1, struct cconst *v2)
 {
-	return number_value_le(v1, v2) && number_value_le(v2, v1);
+	return cconst_le(v1, v2) && cconst_le(v2, v1);
 }
 
 int
-number_value_lt(struct number_value *v1, struct number_value *v2)
+cconst_lt(struct cconst *v1, struct cconst *v2)
 {
-	return number_value_le(v1, v2) && !number_value_eq(v1, v2);
+	return cconst_le(v1, v2) && !cconst_eq(v1, v2);
 }

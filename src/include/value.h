@@ -200,12 +200,12 @@ value_arr_v(struct value_arr *arr);
 
 DECLARE_RESULT_TYPE(struct value_arr *, arr, value_arr_res)
 
-struct number_value;
+struct cconst;
 
 struct number_range;
 
 struct number_range *
-number_range_create(struct number_value *lw, struct number_value *up);
+number_range_create(struct cconst *lw, struct cconst *up);
 
 void
 number_range_destroy(struct number_range *);
