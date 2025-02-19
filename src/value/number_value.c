@@ -65,7 +65,7 @@ number_value_str(struct number_value *v)
 		strbuilder_printf(b, "%s", v->ismax ? "MAX" : "MIN");
 		break;
 	default:
-		assert(false);
+		assert(0);
 	}
 	return strbuilder_build(b);
 }
@@ -79,7 +79,7 @@ number_value_str_inrange(struct number_value *v)
 	case LIMIT:
 		return dynamic_str("");
 	default:
-		assert(false);
+		assert(0);
 	}
 }
 
@@ -92,17 +92,17 @@ number_value_copy(struct number_value *v)
 	case LIMIT:
 		return _number_value_limit_create(v->ismax);
 	default:
-		assert(false);
+		assert(0);
 	}
 }
 
-bool
+int
 number_values_aresingle(struct number_value *v1, struct number_value *v2)
 {
 	/* XXX: this omits the case where we have a constant value equal to one
 	 * of the limits */
 	if (v1->t != v2->t) {
-		return false;
+		return 0;
 	}
 	switch (v1->t) {
 	case CONSTANT:
@@ -110,7 +110,7 @@ number_values_aresingle(struct number_value *v1, struct number_value *v2)
 	case LIMIT:
 		return v1->ismax == v2->ismax;
 	default:
-		assert(false);
+		assert(0);
 	}
 }
 
@@ -123,25 +123,8 @@ number_value_difference(struct number_value *v1, struct number_value *v2)
 	case CONSTANT:
 		return v1->constant - v2->constant;
 	default:
-		assert(false);
+		assert(0);
 	}
-}
-
-bool
-number_value_equal(struct number_value *v1, struct number_value *v2)
-{
-	if (v1->t != v2->t) {
-		return false;
-	}
-	switch (v1->t) {
-	case CONSTANT:
-		return number_value_difference(v1, v2) == 0;
-	case LIMIT:
-		return v1->ismax == v2->ismax;
-	default:
-		assert(false);
-	}
-
 }
 
 int
@@ -169,7 +152,7 @@ number_value_le(struct number_value *v1, struct number_value *v2)
 	case LIMIT:
 		return !v1->ismax || v2->ismax;
 	default:
-		assert(false);
+		assert(0);
 	}
 }
 

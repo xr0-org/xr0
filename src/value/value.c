@@ -2015,15 +2015,6 @@ number_range_upper(struct number_range *r)
 	return r->upper;
 }
 
-struct number_value *
-number_value_copy(struct number_value *v);
-
-char *
-number_value_str(struct number_value *v);
-
-char *
-number_value_str_inrange(struct number_value *v);
-
 char *
 number_range_str(struct number_range *r)
 {
@@ -2075,8 +2066,8 @@ number_range_issingle(struct number_range *r)
 bool
 number_range_equal(struct number_range *r1, struct number_range *r2)
 {
-	return number_value_equal(r1->lower, r2->lower)
-		&& number_value_equal(r1->upper, r2->upper);
+	return number_value_eq(r1->lower, r2->lower)
+		&& number_value_eq(r1->upper, r2->upper);
 }
 
 int
