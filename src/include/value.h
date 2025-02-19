@@ -231,6 +231,12 @@ struct cconst *
 number_as_cconst(struct number *);
 
 int
+number_isexpr(struct number *);
+
+struct ast_expr *
+number_as_expr(struct number *);
+
+int
 number_eq(struct number *, struct number *);
 
 int
