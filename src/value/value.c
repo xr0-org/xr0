@@ -1830,10 +1830,12 @@ static struct ast_expr *
 number_to_expr(struct number *n)
 {
 	switch (n->type) {
+	case NUMBER_CCONST:
+		return ast_expr_constant_create(cconst_as_constant(n->cconst));
 	case NUMBER_RANGES:
 		return _ranges_to_expr(n->ranges);
 	case NUMBER_EXPR:
-		return ast_expr_copy(number_as_expr(n));
+		return ast_expr_copy(n->expr);
 	default:
 		assert(false);
 	}
