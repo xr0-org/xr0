@@ -26,7 +26,7 @@ jump_create(enum type t)
 }
 
 struct jump *
-jump_break_create()
+jump_break_create(void)
 {
 	return jump_create(BREAK);
 }

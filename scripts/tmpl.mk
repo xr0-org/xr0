@@ -2,7 +2,10 @@
 
 # commands
 CC = cc
-CFLAGS = -g -I src/include -std=gnu11 -Werror -Wreturn-type -Wall -pedantic
+CFLAGS = -g -I src/include \
+	 -std=gnu11 -pedantic -Wall -Werror \
+	 -Wreturn-type \
+	 -Wstrict-prototypes
 VALGRIND = valgrind --fullpath-after=`pwd`/src/
 LEX = lex
 YACC = bison -yvd

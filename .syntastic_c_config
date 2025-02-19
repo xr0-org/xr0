@@ -1,6 +1,7 @@
 -I src/include
 -I build
--Werror
--Wreturn-type
--Wall
 -pedantic
+-Werror
+-Wall
+-Wreturn-type
+-Wstrict-prototypes

@@ -2,7 +2,7 @@
 #define XR0_AST_STMT_JUMP_H
 
 struct jump *
-jump_break_create();
+jump_break_create(void);
 
 struct jump *
 jump_return_create(struct ast_expr *rv);
