@@ -1411,9 +1411,13 @@ binary_rangeeval_norm(struct value *v, enum ast_binary_operator op, int c,
 	    up = value_int_up(v, s);
 	switch (op) {
 	case BINARY_OP_ADDITION:
-		return value_int_range_create(lw+c, up+c);
+		return value_int_range_create(
+			value_int_create(lw+c), value_int_create(up+c)
+		);
 	case BINARY_OP_SUBTRACTION:
-		return value_int_range_create(lw-c, up-c);
+		return value_int_range_create(
+			value_int_create(lw-c), value_int_create(up-c)
+		);
 	case BINARY_OP_MULTIPLICATION:
 		if (!value_isconstant(v)) {
 			/* XXX: cannot multiply ranges without modulo-ranges */

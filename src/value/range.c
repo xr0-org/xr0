@@ -6,6 +6,7 @@
 #include "value.h"
 
 #include "cconst.h"
+#include "number.h"
 #include "range.h"
 
 struct range {

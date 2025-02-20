@@ -41,13 +41,17 @@ value_literal_create(char *);
 struct ast_expr;
 
 struct value *
-value_int_rconst_create(struct ast_expr *range, struct state *);
+value_int_range_create(struct value *lw, struct value *up);
+
+struct value *
+value_int_max_create(void);
+
+struct value *
+value_int_min_create(void);
+
 
 struct value *
 value_int_ne_create(int not_val);
-
-struct value *
-value_int_range_create(int lw, int excl_up);
 
 int
 value_int_lw(struct value *, struct state *);
@@ -160,24 +164,9 @@ value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 
 struct number;
 
-/* value_splitassume: returns false if contradiction encountered. */
-bool
+/* value_splitassume: returns 0 if contradiction encountered. */
+int
 value_splitassume(struct value *, struct number *);
-
-struct splitinstruct;
-
-struct splitinstruct *
-splitinstruct_create(void);
-
-void
-splitinstruct_append(struct splitinstruct *, struct map *);
-
-int 
-splitinstruct_n(struct splitinstruct *);
-
-struct map **
-splitinstruct_splits(struct splitinstruct *);
-
 
 DECLARE_RESULT_TYPE(struct value *, value, value_res)
 
@@ -200,75 +189,13 @@ value_arr_v(struct value_arr *arr);
 
 DECLARE_RESULT_TYPE(struct value_arr *, arr, value_arr_res)
 
+/* TODO: remove */
 struct number;
 
-struct cconst;
-
-
-struct number *
-number_cconst_create(struct cconst *);
-
-/* TODO: remove */
 struct number *
 number_single_create(int);
 
-struct number *
-number_singlerange_create(struct number *lw, struct number *up);
-
-struct number *
-number_copy(struct number *);
-
-void
-number_destroy(struct number *);
-
 char *
 number_str(struct number *);
-
-char *
-number_str_inrange(struct number *);
-
-int
-number_iscconst(struct number *);
-
-struct cconst *
-number_as_cconst(struct number *);
-
-int
-number_isrange(struct number *);
-
-struct range;
-
-struct range *
-number_as_range(struct number *);
-
-int
-number_isexpr(struct number *);
-
-struct ast_expr *
-number_as_expr(struct number *);
-
-int
-number_isconstant(struct number *);
-
-int
-number_eq(struct number *, struct number *);
-
-int
-number_le(struct number *lhs, struct number *rhs);
-
-int
-number_lt(struct number *lhs, struct number *rhs);
-
-int
-number_ge(struct number *lhs, struct number *rhs);
-
-int
-numbers_aresinglerange(struct number *lw, struct number *up);
-
-struct number *
-number_lw(struct number *, struct state *);
-
-struct number *
-number_up(struct number *, struct state *);
 
 #endif
