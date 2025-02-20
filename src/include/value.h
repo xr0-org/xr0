@@ -166,7 +166,7 @@ struct number;
 
 /* value_splitassume: returns 0 if contradiction encountered. */
 int
-value_splitassume(struct value *, struct number *);
+value_splitassume(struct value *, struct number *, struct state *);
 
 DECLARE_RESULT_TYPE(struct value *, value, value_res)
 

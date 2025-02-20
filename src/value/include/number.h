@@ -57,16 +57,16 @@ int
 number_isconstant(struct number *);
 
 int
-number_eq(struct number *, struct number *);
+number_lt(struct number *lhs, struct number *rhs, struct state *);
 
 int
-number_le(struct number *lhs, struct number *rhs);
+number_le(struct number *lhs, struct number *rhs, struct state *);
 
 int
-number_lt(struct number *lhs, struct number *rhs);
+number_eq(struct number *, struct number *, struct state *);
 
 int
-number_ge(struct number *lhs, struct number *rhs);
+number_ge(struct number *lhs, struct number *rhs, struct state *);
 
 int
 number_issinglerange(struct number *, struct state *);
@@ -92,6 +92,6 @@ number_splitto(struct number *n, struct number *range, struct map *splits,
 		struct state *s);
 
 int
-number_assume(struct number *n, struct number *split);
+number_assume(struct number *n, struct number *split, struct state *);
 
 #endif

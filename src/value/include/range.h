@@ -23,8 +23,10 @@ range_lower(struct range *);
 struct number *
 range_upper(struct range *);
 
+struct state;
+
 int
-range_contains_range(struct range *r, struct range *r2);
+range_contains_range(struct range *r, struct range *r2, struct state *);
 
 int
 range_issingle(struct range *r);
@@ -54,7 +56,7 @@ int
 range_arr_append(struct range_arr *, struct range *);
 
 int
-range_arr_containsrangearr(struct range_arr *arr,
-		struct range_arr *range);
+range_arr_containsrangearr(struct range_arr *arr, struct range_arr *range,
+		struct state *);
 
 #endif

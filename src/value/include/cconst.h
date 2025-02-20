@@ -39,16 +39,7 @@ int
 cconst_as_constant(struct cconst *);
 
 int
-cconst_lt(struct cconst *lhs, struct cconst *rhs);
-
-int
-cconst_eq(struct cconst *lhs, struct cconst *rhs);
-
-int
 cconst_le(struct cconst *lhs, struct cconst *rhs);
-
-int
-cconst_ge(struct cconst *lhs, struct cconst *rhs);
 
 int
 cconsts_aresinglerange(struct cconst *lw, struct cconst *up);

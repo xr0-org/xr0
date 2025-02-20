@@ -67,13 +67,13 @@ range_copy(struct range *r)
 }
 
 int
-range_contains_range(struct range *r, struct range *r2)
+range_contains_range(struct range *r, struct range *r2, struct state *s)
 {
-	if (number_le(r->lower, r2->lower)) {
+	if (number_le(r->lower, r2->lower, s)) {
 		/* XXX: exclude partial inclusion cases */
 		assert(r->upper);
 		assert(r2->upper);
-		assert(number_le(r2->upper, r->upper));
+		assert(number_le(r2->upper, r->upper, s));
 		/* ⊢ r->lower ≤ r2->lower && r2->upper ≤ r->upper */
 		return true;
 	}
@@ -85,13 +85,6 @@ int
 range_issingle(struct range *r)
 {
 	return numbers_aresinglerange(r->lower, r->upper);
-}
-
-int
-range_equal(struct range *r1, struct range *r2)
-{
-	return number_eq(r1->lower, r2->lower)
-		&& number_eq(r1->upper, r2->upper);
 }
 
 struct cconst *
@@ -158,14 +151,14 @@ range_arr_append(struct range_arr *arr, struct range *r)
 }
 
 static bool
-range_arr_containsrange(struct range_arr *, struct range *);
+range_arr_containsrange(struct range_arr *, struct range *, struct state *);
 
 int
-range_arr_containsrangearr(struct range_arr *arr,
-		struct range_arr *range_arr)
+range_arr_containsrangearr(struct range_arr *arr, struct range_arr *range_arr,
+		struct state *s)
 {
 	for (int i = 0; i < range_arr->n; i++) {
-		if (!range_arr_containsrange(arr, range_arr->range[i])) {
+		if (!range_arr_containsrange(arr, range_arr->range[i], s)) {
 			return 0;
 		}
 	}
@@ -173,14 +166,14 @@ range_arr_containsrangearr(struct range_arr *arr,
 }
 
 static bool
-range_arr_containsrange(struct range_arr *arr,
-		struct range *range)
+range_arr_containsrange(struct range_arr *arr, struct range *range,
+		struct state *s)
 {
 	for (int i = 0; i < arr->n; i++) {
 		/* XXX: currently will assert false if arr->range[i] contains
 		 * the lower bound of range but not the entire range, so we're
 		 * asserting out the possibility of partial inclusion */
-		if (range_contains_range(arr->range[i], range)) {
+		if (range_contains_range(arr->range[i], range, s)) {
 			return true;
 		}
 	}

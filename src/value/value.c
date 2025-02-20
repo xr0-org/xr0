@@ -1010,14 +1010,14 @@ value_lt(struct value *lhs, struct value *rhs, struct state *s)
 		      *c = value_lw(rhs, s),
 		      *d = value_up(rhs, s);
 
-	if (number_le(b, c)) { /* b ≤ c ==> lhs < rhs */
+	if (number_le(b, c, s)) { /* b ≤ c ==> lhs < rhs */
 		return 1;
 	} 
 	assert(
-		number_ge(a, d) /* rhs < lhs */
+		number_ge(a, d, s) /* rhs < lhs */
 		/* our assumption is that if there is overlap it is perfect */
 		|| samerconst(lhs, rhs)
-		|| (number_eq(a, c) && number_eq(b, d))
+		|| (number_eq(a, c, s) && number_eq(b, d, s))
 	);
 	return 0;
 }
@@ -1035,7 +1035,7 @@ value_eq(struct value *lhs, struct value *rhs, struct state *s)
 		      *c = value_lw(rhs, s),
 		      *d = value_up(rhs, s);
 
-	if (number_eq(a, c) && number_eq(b, d)) {
+	if (number_eq(a, c, s) && number_eq(b, d, s)) {
 		if (!samerconst(lhs, rhs)) {
 			int c_a = cconst_as_constant(number_as_cconst((a))),
 			    c_b = cconst_as_constant(number_as_cconst((b)));
@@ -1071,7 +1071,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 	 * 	                       c                d
 	 * 
 	 */
-	if (number_lt(c, a)) {
+	if (number_lt(c, a, s)) {
 		return value_disentangle(y, x, s);
 	}
 	/* ⊢ a ≤ c */
@@ -1091,7 +1091,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 	/* the rule is that if b ≤ c or a ≥ d we have no overlap. the previous
 	 * step eliminated the possibility of a ≥ d */
 
-	if (number_le(b, c)) {
+	if (number_le(b, c, s)) {
 		/* base case: no overlap */
 		return NULL;
 	}
@@ -1107,7 +1107,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 	 * 	                 c                d
 	 */
 
-	if (number_lt(a, c)) {
+	if (number_lt(a, c, s)) {
 		/* split into two scenarios:
 		 * 	- x in [a?c], y in [c?d] (x < y)
 		 * 	- x in [c?b], y in [c?d] (same lower bound) */
@@ -1132,7 +1132,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 	 * 	c                d
 	 */
 
-	if (number_lt(d, b)) {
+	if (number_lt(d, b, s)) {
 		return value_disentangle(y, x, s);
 	}
 	/* ⊢ b ≤ d */
@@ -1148,7 +1148,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 	 * 	c                       d
 	 */
 
-	if (number_lt(b, d)) {
+	if (number_lt(b, d, s)) {
 		/* split into two scenarios:
 		 * 	- x in [a?b], y in [b?d] (x < y)
 		 * 	- x, y in [a?b] (perfect overlap) */
@@ -1236,8 +1236,8 @@ value_splitto(struct value *v, struct number *range, struct map *splits,
 	case VALUE_INT:
 		assert(
 			value_issinglerange(v, s)
-			&& number_eq(value_lw(v, s), number_lw(range, s))
-			&& number_eq(value_up(v, s), number_up(range, s))
+			&& number_eq(value_lw(v, s), number_lw(range, s), s)
+			&& number_eq(value_up(v, s), number_up(range, s), s)
 		);
 		break;
 	case VALUE_RCONST:
@@ -1249,14 +1249,14 @@ value_splitto(struct value *v, struct number *range, struct map *splits,
 }
 
 int
-value_splitassume(struct value *v, struct number *split)
+value_splitassume(struct value *v, struct number *split, struct state *s)
 {
 	switch (v->type) {
 	case VALUE_INT:
-		return number_assume(v->n, split);
+		return number_assume(v->n, split, s);
 	case VALUE_PTR:
 		assert(v->ptr.isindefinite);
-		return number_assume(v->ptr.n, split);
+		return number_assume(v->ptr.n, split, s);
 	default:
 		assert(false);
 	}
@@ -1284,14 +1284,16 @@ value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 
 	struct number *v_lw = value_lw(v, s),
 		      *r0_lw = value_lw(r0, s0);
-	if (!number_le(r0_lw, v_lw)) {
+	if (!number_le(r0_lw, v_lw, s)) {
 		return error_value_bounds(
 			error_printf("must be ≥ %s", number_str(r0_lw))
 		);
 	}
+	printf("s:\n%s\ns0:\n%s\n", state_str(s), state_str(s0));
+	printf("v: %s, r0: %s\n", value_str(v), value_str(r0));
 	struct number *v_up = value_up(v, s),
 		      *r0_up = value_up(r0, s0);
-	if (!number_le(v_up, r0_up)) {
+	if (!number_le(v_up, r0_up, s)) {
 		return error_value_bounds(
 			error_printf("must be < %s", number_str(r0_up))
 		);

@@ -137,6 +137,9 @@ _ranges_str(struct number *num)
 char *
 number_str_inrange(struct number *n)
 {
+	if (number_isexpr(n)) {
+		return ast_expr_str(number_as_expr(n));
+	}
 	return cconst_str_inrange(number_as_cconst(n));
 }
 
@@ -177,28 +180,47 @@ number_as_expr(struct number *n)
 	return n->expr;
 }
 
-int
-number_eq(struct number *n, struct number *n0)
-{
-	return cconst_eq(number_as_cconst(n), number_as_cconst(n0));
-}
+static struct number *
+eval(struct ast_expr *, struct state *);
 
 int
-number_lt(struct number *lhs, struct number *rhs)
+number_le(struct number *lhs, struct number *rhs, struct state *s)
 {
-	return cconst_lt(number_as_cconst(lhs), number_as_cconst(rhs));
-}
-
-int
-number_le(struct number *lhs, struct number *rhs)
-{
+	printf("lhs: %s, rhs: %s\n", number_str(lhs), number_str(rhs));
+	if (number_isexpr(lhs)) {
+	}
+	if (number_isexpr(rhs)) {
+		printf(
+			"rhs (eval): %s\n",
+			number_str(eval(number_as_expr(rhs), s))
+		);
+	}
 	return cconst_le(number_as_cconst(lhs), number_as_cconst(rhs));
 }
 
-int
-number_ge(struct number *lhs, struct number *rhs)
+static struct number *
+eval(struct ast_expr *e, struct state *s)
 {
-	return cconst_ge(number_as_cconst(lhs), number_as_cconst(rhs));
+	assert(0);
+}
+
+
+int
+number_ge(struct number *lhs, struct number *rhs, struct state *s)
+{
+	return number_le(rhs, lhs, s);
+}
+
+int
+number_eq(struct number *n, struct number *n0, struct state *s)
+{
+	return number_le(n, n0, s) && number_ge(n, n0, s);
+}
+
+int
+number_lt(struct number *lhs, struct number *rhs, struct state *s)
+{
+	return number_le(lhs, rhs, s) && !number_eq(lhs, rhs, s);
 }
 
 static struct number *
@@ -310,8 +332,8 @@ number_splitto(struct number *n, struct number *range, struct map *splits,
 	assert(
 		n->type == NUMBER_EXPR
 		&& number_issinglerange(n, s)
-		&& number_le(number_lw(n, s), number_lw(range, s))
-		&& number_le(number_up(range, s), number_up(n, s))
+		&& number_le(number_lw(n, s), number_lw(range, s), s)
+		&& number_le(number_up(range, s), number_up(n, s), s)
 	);
 
 	map_set(
@@ -420,7 +442,7 @@ static struct number *
 _cconst_to_range(struct cconst *);
 
 int
-number_assume(struct number *n, struct number *split)
+number_assume(struct number *n, struct number *split, struct state *s)
 {
 	if (number_iscconst(split)) {
 		split = _cconst_to_range(number_as_cconst(split));
@@ -428,13 +450,13 @@ number_assume(struct number *n, struct number *split)
 
 	assert(n->type == NUMBER_RANGES && split->type == NUMBER_RANGES);
 
-	if (!range_arr_containsrangearr(n->ranges, split->ranges)) {
-		return false;
+	if (!range_arr_containsrangearr(n->ranges, split->ranges, s)) {
+		return 0;
 	}
 
 	n->ranges = split->ranges;
 
-	return true;
+	return 1;
 }
 
 static struct number *
@@ -500,7 +522,9 @@ _ranges_to_expr(struct range_arr *arr)
 int
 numbers_aresinglerange(struct number *lw, struct number *up)
 {
-	return cconsts_aresinglerange(
-		number_as_cconst(lw), number_as_cconst(up)
-	);
+	return !number_isexpr(lw)
+		&& !number_isexpr(up)
+		&& cconsts_aresinglerange(
+			number_as_cconst(lw), number_as_cconst(up)
+		);
 }
