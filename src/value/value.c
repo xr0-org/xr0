@@ -206,16 +206,26 @@ value_bang(struct value *v)
 	}
 }
 
+static int
+_canbebound(struct value *);
+
 struct value *
 value_int_range_create(struct value *lw, struct value *up)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	assert(value_isint(lw) && value_isint(up));
+	assert(_canbebound(lw) && _canbebound(up));
 	v->n = number_singlerange_create(lw->n, up->n);
 	return v;
 }
+
+static int
+_canbebound(struct value *v)
+{
+	return value_isint(v) || value_isrconst(v);
+}
+
 
 static struct value *
 _value_int_limit_create(int islw)
@@ -416,7 +426,7 @@ value_pf_augment(struct value *old, struct ast_expr *root)
 		if (!obj_value) {
 			continue;
 		}
-		if (!value_issync(obj_value)) {
+		if (!value_isrconst(obj_value)) {
 			continue;
 		}
 		object_assign(
@@ -431,7 +441,7 @@ value_pf_augment(struct value *old, struct ast_expr *root)
 	return v;
 }
 
-bool
+int
 value_isstruct(struct value *v)
 {
 	return v->type == VALUE_STRUCT;
@@ -775,15 +785,15 @@ value_type_str(struct value *v)
 {
 	char *value_type_str[] = {
 		[VALUE_RCONST] = "rconst",
-		[VALUE_PTR] = "ptr",
-		[VALUE_INT] = "int",
+		[VALUE_PTR] 	= "ptr",
+		[VALUE_INT]	= "int",
 		[VALUE_LITERAL] = "literal",
-		[VALUE_STRUCT] = "struct",
+		[VALUE_STRUCT]	= "struct",
 	};
 	return dynamic_str(value_type_str[v->type]);
 }
 
-bool
+int
 value_islocation(struct value *v)
 {
 	assert(v);
@@ -824,11 +834,11 @@ value_as_constant(struct value *v)
 	return cconst_as_constant(number_as_cconst(v->n));
 }
 
-bool
-value_issync(struct value *v)
+int
+value_isrconst(struct value *v)
 {
 	if (v->type != VALUE_RCONST) {
-		return false;
+		return 0;
 	}
 	return number_isexpr(v->n);
 }

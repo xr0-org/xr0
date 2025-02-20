@@ -71,7 +71,7 @@ value_rconst_create(struct ast_expr *);
 struct value *
 value_struct_create(struct ast_type *);
 
-bool
+int
 value_isstruct(struct value *v);
 
 struct value *
@@ -109,7 +109,7 @@ value_str(struct value *);
 char *
 value_type_str(struct value *);
 
-bool
+int
 value_islocation(struct value *);
 
 struct location *
@@ -126,8 +126,8 @@ value_isconstant(struct value *v);
 int
 value_as_constant(struct value *v);
 
-bool
-value_issync(struct value *v);
+int
+value_isrconst(struct value *v);
 
 struct ast_expr *
 value_as_rconst(struct value *v);
