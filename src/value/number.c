@@ -181,29 +181,33 @@ number_as_expr(struct number *n)
 }
 
 static struct number *
-eval(struct ast_expr *, struct state *);
+_eval(struct ast_expr *, struct state *);
 
 int
 number_le(struct number *lhs, struct number *rhs, struct state *s)
 {
-	printf("lhs: %s, rhs: %s\n", number_str(lhs), number_str(rhs));
 	if (number_isexpr(lhs)) {
+		return number_le(_eval(number_as_expr(lhs), s), rhs, s);
 	}
 	if (number_isexpr(rhs)) {
-		printf(
-			"rhs (eval): %s\n",
-			number_str(eval(number_as_expr(rhs), s))
-		);
+		return number_le(lhs, _eval(number_as_expr(rhs), s), s);
+	}
+	if (number_isrange(lhs)) {
+		return number_le(number_up(lhs, s), rhs, s);
+	}
+	if (number_isrange(rhs)) {
+		return number_le(lhs, number_lw(rhs, s), s);
 	}
 	return cconst_le(number_as_cconst(lhs), number_as_cconst(rhs));
 }
 
 static struct number *
-eval(struct ast_expr *e, struct state *s)
+_eval(struct ast_expr *e, struct state *s)
 {
-	assert(0);
+	return value_as_number(
+		tagval_value(tagval_res_as_tagval(ast_expr_rangeeval(e, s)))
+	);
 }
-
 
 int
 number_ge(struct number *lhs, struct number *rhs, struct state *s)
@@ -409,33 +413,6 @@ number_singlerange_create(struct number *lw, struct number *up)
 		range_create(lw, up)
 	);
 	return number_ranges_create(arr);
-}
-
-bool
-ranges_equal(struct number *n1, struct number *n2);
-
-bool
-range_equal(struct range *, struct range *);
-
-bool
-ranges_equal(struct number *n1, struct number *n2)
-{
-	assert(n1->type == n2->type && n1->type == NUMBER_RANGES);
-
-	int len = range_arr_n(n1->ranges);
-	if (len != range_arr_n(n2->ranges)) {
-		return false;
-	}
-
-	struct range **n1_r = range_arr_range(n1->ranges),
-			    **n2_r = range_arr_range(n2->ranges);
-	for (int i = 0; i < len; i++) {
-		if (!range_equal(n1_r[i], n2_r[i])) {
-			return false;
-		}
-	}
-
-	return true;
 }
 
 static struct number *

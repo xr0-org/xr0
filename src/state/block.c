@@ -124,7 +124,7 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 
 	if (!value_isconstant(range)) {
 		assert(tagval_hastag(tv));
-		struct splitinstruct *splits = splitinstruct_create();
+		struct splitinstruct *splits = splitinstruct_create(s);
 		char *tag = tagval_tag(tv);
 		for (int i = lw; i < up; i++) {
 			struct map *m = map_create();

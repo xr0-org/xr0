@@ -57,7 +57,7 @@ verifierinstruct_split(struct splitinstruct *);
 struct splitinstruct;
 
 struct splitinstruct *
-splitinstruct_create(void);
+splitinstruct_create(struct state *);
 
 struct map;
 
@@ -69,6 +69,9 @@ splitinstruct_n(struct splitinstruct *);
 
 struct map **
 splitinstruct_splits(struct splitinstruct *);
+
+struct state *
+splitinstruct_state(struct splitinstruct *);
 
 struct rconst;
 

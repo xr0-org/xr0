@@ -1111,7 +1111,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 		/* split into two scenarios:
 		 * 	- x in [a?c], y in [c?d] (x < y)
 		 * 	- x in [c?b], y in [c?d] (same lower bound) */
-		struct splitinstruct *splits = splitinstruct_create();
+		struct splitinstruct *splits = splitinstruct_create(s);
 		struct map *x_lt_y = map_create(),
 			   *a_eq_c = map_create();
 		value_splitto(x, number_singlerange_create(a, c), x_lt_y, s);
@@ -1153,7 +1153,7 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 		 * 	- x in [a?b], y in [b?d] (x < y)
 		 * 	- x, y in [a?b] (perfect overlap) */
 		/* ends in return */
-		struct splitinstruct *splits = splitinstruct_create();
+		struct splitinstruct *splits = splitinstruct_create(s);
 		struct map *x_lt_y = map_create(),
 			   *b_eq_d = map_create();
 		value_splitto(y, number_singlerange_create(b, d), x_lt_y, s);
@@ -1178,6 +1178,8 @@ value_disentangle(struct value *x, struct value *y, struct state *s)
 		return NULL;
 	}
 
+	printf("%s\n", state_str(s));
+	printf("a: %s, b: %s\n", number_str(a), number_str(b));
 	int c_a = cconst_as_constant(number_as_cconst(a)),
 	    c_b = cconst_as_constant(number_as_cconst(b));
 	a_printf(
@@ -1289,8 +1291,6 @@ value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 			error_printf("must be ≥ %s", number_str(r0_lw))
 		);
 	}
-	printf("s:\n%s\ns0:\n%s\n", state_str(s), state_str(s0));
-	printf("v: %s, r0: %s\n", value_str(v), value_str(r0));
 	struct number *v_up = value_up(v, s),
 		      *r0_up = value_up(r0, s0);
 	if (!number_le(v_up, r0_up, s)) {
