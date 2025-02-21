@@ -94,4 +94,7 @@ number_splitto(struct number *n, struct number *range, struct map *splits,
 int
 number_assume(struct number *n, struct number *split, struct state *);
 
+struct error *
+number_disentangle(struct number *, struct number *, struct state *);
+
 #endif

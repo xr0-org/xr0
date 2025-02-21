@@ -198,4 +198,9 @@ number_single_create(int);
 char *
 number_str(struct number *);
 
+struct value *
+value_number_create(struct number *);
+
+
+
 #endif
