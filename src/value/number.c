@@ -181,36 +181,27 @@ number_as_expr(struct number *n)
 	return n->expr;
 }
 
-static struct number *
-_eval(struct ast_expr *, struct state *);
-
 int
 number_le(struct number *lhs, struct number *rhs, struct state *s)
 {
-	if (number_isexpr(lhs)) {
-		return number_le(_eval(number_as_expr(lhs), s), rhs, s);
-	}
-	if (number_isexpr(rhs)) {
-		return number_le(lhs, _eval(number_as_expr(rhs), s), s);
+	if (number_isexpr(lhs) || number_isexpr(rhs)) {
+		printf("%s ≤ %s\n", number_str(lhs), number_str(rhs));
+		struct error *err = number_disentangle(lhs, rhs, s);
+		if (err) {
+			printf("err: %s\n", error_str(err));
+		}
+		assert(0);
 	}
 	if (number_isrange(lhs) || number_isrange(rhs)) {
 		printf("%s\n", state_str(s));
 		printf("lhs: %s, rhs: %s\n", number_str(lhs), number_str(rhs));
-		/*struct error *err = number_disentangle(lhs, rhs, s);*/
-		/*if (err) {*/
-			/*printf("err: %s\n", error_str(err));*/
-		/*}*/
+		struct error *err = number_disentangle(lhs, rhs, s);
+		if (err) {
+			printf("err: %s\n", error_str(err));
+		}
 		assert(0);
 	}
 	return cconst_le(number_as_cconst(lhs), number_as_cconst(rhs));
-}
-
-static struct number *
-_eval(struct ast_expr *e, struct state *s)
-{
-	return value_as_number(
-		tagval_value(tagval_res_as_tagval(ast_expr_rangeeval(e, s)))
-	);
 }
 
 int
@@ -336,12 +327,11 @@ void
 number_splitto(struct number *n, struct number *range, struct map *splits,
 		struct state *s)
 {
-	assert(
-		number_isexpr(n)
-		&& number_issinglerange(n, s)
-		&& number_le(number_lw(n, s), number_lw(range, s), s)
-		&& number_le(number_up(range, s), number_up(n, s), s)
-	);
+	printf("n: %s, range: %s\n", number_str(n), number_str(range));
+	assert(number_isexpr(n));
+	assert(number_issinglerange(n, s));
+	assert(number_le(number_lw(n, s), number_lw(range, s), s));
+	assert(number_le(number_up(range, s), number_up(n, s), s));
 
 	map_set(
 		splits,
@@ -617,6 +607,7 @@ number_disentangle(struct number *x, struct number *y, struct state *s)
 		struct splitinstruct *splits = splitinstruct_create(s);
 		struct map *x_lt_y = map_create(),
 			   *b_eq_d = map_create();
+		printf("x: %s, y: %s\n", number_str(x), number_str(y));
 		number_splitto(y, number_singlerange_create(b, d), x_lt_y, s);
 		number_splitto(y, number_singlerange_create(a, b), b_eq_d, s);
 		splitinstruct_append(splits, x_lt_y);
