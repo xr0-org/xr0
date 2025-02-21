@@ -194,11 +194,12 @@ number_le(struct number *lhs, struct number *rhs, struct state *s)
 		return number_le(lhs, _eval(number_as_expr(rhs), s), s);
 	}
 	if (number_isrange(lhs) || number_isrange(rhs)) {
+		printf("%s\n", state_str(s));
 		printf("lhs: %s, rhs: %s\n", number_str(lhs), number_str(rhs));
-		struct error *err = number_disentangle(lhs, rhs, s);
-		if (err) {
-			printf("err: %s\n", error_str(err));
-		}
+		/*struct error *err = number_disentangle(lhs, rhs, s);*/
+		/*if (err) {*/
+			/*printf("err: %s\n", error_str(err));*/
+		/*}*/
 		assert(0);
 	}
 	return cconst_le(number_as_cconst(lhs), number_as_cconst(rhs));
@@ -335,10 +336,6 @@ void
 number_splitto(struct number *n, struct number *range, struct map *splits,
 		struct state *s)
 {
-	if (number_eq(n, range, s)) {
-		return;
-	}
-
 	assert(
 		number_isexpr(n)
 		&& number_issinglerange(n, s)
