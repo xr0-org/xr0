@@ -123,6 +123,11 @@ ast_expr_isconstant(struct ast_expr *expr)
 	return expr->kind == EXPR_CONSTANT;
 }
 
+int
+ast_expr_isbinary(struct ast_expr *expr)
+{
+	return expr->kind == EXPR_BINARY;
+}
 
 
 struct ast_expr *
@@ -1266,6 +1271,53 @@ binary_simplify(struct ast_expr *e)
 		assert(false);
 	}
 }
+
+DEFINE_RESULT_TYPE(struct shift *, shift, shift_destroy, shift_res, false)
+
+static struct shift_res *
+binary_getsplitshift(struct ast_expr *, enum ast_binary_operator,
+		struct ast_expr *);
+
+struct shift_res *
+ast_expr_getsplitshift(struct ast_expr *e)
+{
+	switch (ast_expr_kind(e)) {
+	case EXPR_BINARY:
+		return binary_getsplitshift(
+			ast_expr_binary_e1(e),
+			ast_expr_binary_op(e),
+			ast_expr_binary_e2(e)
+		);
+	case EXPR_IDENTIFIER:
+		return shift_res_shift_create(
+			shift_create(dynamic_str(ast_expr_as_identifier(e)), 0)
+		);
+	default:
+		return shift_res_error_create(
+			error_printf("%s not in split form", ast_expr_str(e))
+		);
+	}
+}
+
+static struct shift_res *
+binary_getsplitshift(struct ast_expr *e, enum ast_binary_operator op,
+		struct ast_expr *e0)
+{
+	a_printf(
+		ast_expr_isidentifier(e)
+		&& ast_expr_isconstant(e0)
+		&& op == BINARY_OP_ADDITION,
+		"split shift restricted to the special case of a right-sided, "\
+		"constant addition to identifier\n"
+	);
+	return shift_res_shift_create(
+		shift_create(
+			dynamic_str(ast_expr_as_identifier(e)),
+			ast_expr_as_constant(e0)
+		)
+	);
+}
+
 
 struct tagval {
 	char *tag;

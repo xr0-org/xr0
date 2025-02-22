@@ -22,6 +22,24 @@ range_create(struct number *lw, struct number *up)
 	return r;
 }
 
+struct range *
+range_shift(struct range *r, int w)
+{
+	return range_create(
+		number_cconst_create(
+			cconst_constant_create(
+				cconst_as_constant(number_as_cconst(r->lower))+w
+			)
+		),
+		number_cconst_create(
+			cconst_constant_create(
+				cconst_as_constant(number_as_cconst(r->upper))+w
+			)
+		)
+	);
+}
+
+
 void
 range_destroy(struct range *r)
 {
@@ -69,11 +87,11 @@ range_copy(struct range *r)
 int
 range_contains_range(struct range *r, struct range *r2, struct state *s)
 {
-	if (number_le(r->lower, r2->lower, s)) {
+	if (number_le(r->lower, r2->lower, s, s)) {
 		/* XXX: exclude partial inclusion cases */
 		assert(r->upper);
 		assert(r2->upper);
-		assert(number_le(r2->upper, r->upper, s));
+		assert(number_le(r2->upper, r->upper, s, s));
 		/* ⊢ r->lower ≤ r2->lower && r2->upper ≤ r->upper */
 		return true;
 	}

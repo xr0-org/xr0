@@ -181,45 +181,60 @@ number_as_expr(struct number *n)
 	return n->expr;
 }
 
+static struct number *
+_eval(struct ast_expr *e, struct state *s);
+
 int
-number_le(struct number *lhs, struct number *rhs, struct state *s)
+number_le(struct number *lhs, struct number *rhs, struct state *s_lhs,
+		struct state *s_rhs)
 {
-	if (number_isexpr(lhs) || number_isexpr(rhs)) {
-		printf("%s ≤ %s\n", number_str(lhs), number_str(rhs));
-		struct error *err = number_disentangle(lhs, rhs, s);
-		if (err) {
-			printf("err: %s\n", error_str(err));
-		}
-		assert(0);
+	if (number_isexpr(lhs)) {
+		return number_le(
+			_eval(number_as_expr(lhs), s_lhs), rhs, s_lhs, s_rhs
+		);
 	}
-	if (number_isrange(lhs) || number_isrange(rhs)) {
-		printf("%s\n", state_str(s));
-		printf("lhs: %s, rhs: %s\n", number_str(lhs), number_str(rhs));
-		struct error *err = number_disentangle(lhs, rhs, s);
-		if (err) {
-			printf("err: %s\n", error_str(err));
-		}
-		assert(0);
+	if (number_isexpr(rhs)) {
+		return number_le(
+			lhs, _eval(number_as_expr(rhs), s_rhs), s_lhs, s_rhs
+		);
+	}
+	if (number_isrange(lhs)) {
+		return number_le(number_up(lhs, s_lhs), rhs, s_lhs, s_rhs);
+	}
+	if (number_isrange(rhs)) {
+		return number_le(lhs, number_lw(rhs, s_rhs), s_lhs, s_rhs);
 	}
 	return cconst_le(number_as_cconst(lhs), number_as_cconst(rhs));
 }
 
-int
-number_ge(struct number *lhs, struct number *rhs, struct state *s)
+static struct number *
+_eval(struct ast_expr *e, struct state *s)
 {
-	return number_le(rhs, lhs, s);
+	return value_as_number(
+		tagval_value(tagval_res_as_tagval(ast_expr_rangeeval(e, s)))
+	);
 }
 
 int
-number_eq(struct number *n, struct number *n0, struct state *s)
+number_ge(struct number *lhs, struct number *rhs, struct state *s_lhs,
+		struct state *s_rhs)
 {
-	return number_le(n, n0, s) && number_ge(n, n0, s);
+	return number_le(rhs, lhs, s_rhs, s_lhs);
 }
 
 int
-number_lt(struct number *lhs, struct number *rhs, struct state *s)
+number_eq(struct number *n, struct number *n0, struct state *s_n,
+		struct state *s_n0)
 {
-	return number_le(lhs, rhs, s) && !number_eq(lhs, rhs, s);
+	return number_le(n, n0, s_n, s_n0) && number_ge(n, n0, s_n, s_n0);
+}
+
+int
+number_lt(struct number *lhs, struct number *rhs, struct state *s_lhs,
+		struct state *s_rhs)
+{
+	return number_le(lhs, rhs, s_lhs, s_rhs)
+		&& !number_eq(lhs, rhs, s_lhs, s_rhs);
 }
 
 static struct number *
@@ -327,17 +342,22 @@ void
 number_splitto(struct number *n, struct number *range, struct map *splits,
 		struct state *s)
 {
-	printf("n: %s, range: %s\n", number_str(n), number_str(range));
 	assert(number_isexpr(n));
 	assert(number_issinglerange(n, s));
-	assert(number_le(number_lw(n, s), number_lw(range, s), s));
-	assert(number_le(number_up(range, s), number_up(n, s), s));
+	assert(number_issinglerange(range, s));
+	assert(number_le(number_lw(n, s), number_lw(range, s), s, s));
+	assert(number_le(number_up(range, s), number_up(n, s), s, s));
 
-	map_set(
-		splits,
-		dynamic_str(ast_expr_as_identifier(n->expr)),
-		range
+	struct shift *shift = shift_res_as_shift(
+		ast_expr_getsplitshift(number_as_expr(n))
 	);
+	struct range *unshifted = range_shift(
+		range_arr_range(range->ranges)[0], -shift_width(shift)
+	);
+	struct range_arr *arr = range_arr_create();
+	range_arr_append(arr, unshifted);
+
+	map_set(splits, shift_id(shift), number_ranges_create(arr));
 }
 
 static struct number *
@@ -414,6 +434,7 @@ _cconst_to_range(struct cconst *);
 int
 number_assume(struct number *n, struct number *split, struct state *s)
 {
+	printf("n: %s, split: %s\n", number_str(n), number_str(split));
 	if (number_iscconst(split)) {
 		split = _cconst_to_range(number_as_cconst(split));
 	}
@@ -522,7 +543,7 @@ number_disentangle(struct number *x, struct number *y, struct state *s)
 	 * 	                       c                d
 	 * 
 	 */
-	if (number_lt(c, a, s)) {
+	if (number_lt(c, a, s, s)) {
 		return number_disentangle(y, x, s);
 	}
 	/* ⊢ a ≤ c */
@@ -542,7 +563,7 @@ number_disentangle(struct number *x, struct number *y, struct state *s)
 	/* the rule is that if b ≤ c or a ≥ d we have no overlap. the previous
 	 * step eliminated the possibility of a ≥ d */
 
-	if (number_le(b, c, s)) {
+	if (number_le(b, c, s, s)) {
 		/* base case: no overlap */
 		return NULL;
 	}
@@ -558,7 +579,7 @@ number_disentangle(struct number *x, struct number *y, struct state *s)
 	 * 	                 c                d
 	 */
 
-	if (number_lt(a, c, s)) {
+	if (number_lt(a, c, s, s)) {
 		/* split into two scenarios:
 		 * 	- x in [a?c], y in [c?d] (x < y)
 		 * 	- x in [c?b], y in [c?d] (same lower bound) */
@@ -583,7 +604,7 @@ number_disentangle(struct number *x, struct number *y, struct state *s)
 	 * 	c                d
 	 */
 
-	if (number_lt(d, b, s)) {
+	if (number_lt(d, b, s, s)) {
 		return number_disentangle(y, x, s);
 	}
 	/* ⊢ b ≤ d */
@@ -598,8 +619,7 @@ number_disentangle(struct number *x, struct number *y, struct state *s)
 	 * 	|———————————————————————|
 	 * 	c                       d
 	 */
-
-	if (number_lt(b, d, s)) {
+	if (number_lt(b, d, s, s)) {
 		/* split into two scenarios:
 		 * 	- x in [a?b], y in [b?d] (x < y)
 		 * 	- x, y in [a?b] (perfect overlap) */
@@ -607,7 +627,6 @@ number_disentangle(struct number *x, struct number *y, struct state *s)
 		struct splitinstruct *splits = splitinstruct_create(s);
 		struct map *x_lt_y = map_create(),
 			   *b_eq_d = map_create();
-		printf("x: %s, y: %s\n", number_str(x), number_str(y));
 		number_splitto(y, number_singlerange_create(b, d), x_lt_y, s);
 		number_splitto(y, number_singlerange_create(a, b), b_eq_d, s);
 		splitinstruct_append(splits, x_lt_y);
@@ -630,6 +649,8 @@ number_disentangle(struct number *x, struct number *y, struct state *s)
 		return NULL;
 	}
 
+	printf("%s\n", state_str(s));
+	printf("x: %s, y: %s\n", number_str(x), number_str(y));
 	int c_a = cconst_as_constant(number_as_cconst(a)),
 	    c_b = cconst_as_constant(number_as_cconst(b));
 	a_printf(

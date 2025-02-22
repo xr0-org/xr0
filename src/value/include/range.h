@@ -9,6 +9,10 @@ struct range *
 range_create(struct number *lw, struct number *up);
 
 struct range *
+range_shift(struct range *, int width);
+
+struct state;
+struct range *
 range_copy(struct range *);
 
 void
@@ -23,7 +27,6 @@ range_lower(struct range *);
 struct number *
 range_upper(struct range *);
 
-struct state;
 
 int
 range_contains_range(struct range *r, struct range *r2, struct state *);

@@ -1020,14 +1020,14 @@ value_lt(struct value *lhs, struct value *rhs, struct state *s)
 		      *c = value_lw(rhs, s),
 		      *d = value_up(rhs, s);
 
-	if (number_le(b, c, s)) { /* b ≤ c ==> lhs < rhs */
+	if (number_le(b, c, s, s)) { /* b ≤ c ==> lhs < rhs */
 		return 1;
 	} 
 	assert(
-		number_ge(a, d, s) /* rhs < lhs */
+		number_ge(a, d, s, s) /* rhs < lhs */
 		/* our assumption is that if there is overlap it is perfect */
 		|| samerconst(lhs, rhs)
-		|| (number_eq(a, c, s) && number_eq(b, d, s))
+		|| (number_eq(a, c, s, s) && number_eq(b, d, s, s))
 	);
 	return 0;
 }
@@ -1045,7 +1045,7 @@ value_eq(struct value *lhs, struct value *rhs, struct state *s)
 		      *c = value_lw(rhs, s),
 		      *d = value_up(rhs, s);
 
-	if (number_eq(a, c, s) && number_eq(b, d, s)) {
+	if (number_eq(a, c, s, s) && number_eq(b, d, s, s)) {
 		if (!samerconst(lhs, rhs)) {
 			int c_a = cconst_as_constant(number_as_cconst((a))),
 			    c_b = cconst_as_constant(number_as_cconst((b)));
@@ -1144,14 +1144,14 @@ value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 
 	struct number *v_lw = value_lw(v, s),
 		      *r0_lw = value_lw(r0, s0);
-	if (!number_le(r0_lw, v_lw, s)) {
+	if (!number_le(r0_lw, v_lw, s0, s)) {
 		return error_value_bounds(
 			error_printf("must be ≥ %s", number_str(r0_lw))
 		);
 	}
 	struct number *v_up = value_up(v, s),
 		      *r0_up = value_up(r0, s0);
-	if (!number_le(v_up, r0_up, s)) {
+	if (!number_le(v_up, r0_up, s, s0)) {
 		return error_value_bounds(
 			error_printf("must be < %s", number_str(r0_up))
 		);

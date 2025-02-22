@@ -41,9 +41,6 @@ number_isrange(struct number *);
 
 struct range;
 
-struct range *
-number_as_range(struct number *);
-
 int
 number_isexpr(struct number *);
 
@@ -57,16 +54,20 @@ int
 number_isconstant(struct number *);
 
 int
-number_lt(struct number *lhs, struct number *rhs, struct state *);
+number_lt(struct number *lhs, struct number *rhs, struct state *s_lhs,
+		struct state *s_rhs);
 
 int
-number_le(struct number *lhs, struct number *rhs, struct state *);
+number_le(struct number *lhs, struct number *rhs, struct state *s_lhs,
+		struct state *s_rhs);
 
 int
-number_eq(struct number *, struct number *, struct state *);
+number_eq(struct number *n, struct number *n0, struct state *s_n,
+		struct state *s_n0);
 
 int
-number_ge(struct number *lhs, struct number *rhs, struct state *);
+number_ge(struct number *lhs, struct number *rhs, struct state *s_lhs,
+		struct state *s_rhs);
 
 int
 number_issinglerange(struct number *, struct state *);
