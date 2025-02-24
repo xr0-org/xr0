@@ -41,14 +41,10 @@ value_literal_create(char *);
 struct ast_expr;
 
 struct value *
-value_int_range_create(struct value *lw, struct value *up);
+value_int_range_create(int lw, int up);
 
 struct value *
-value_int_max_create(void);
-
-struct value *
-value_int_min_create(void);
-
+value_int_range_fromexpr(struct ast_expr *, struct state *);
 
 struct value *
 value_int_ne_create(int not_val);
@@ -193,14 +189,15 @@ DECLARE_RESULT_TYPE(struct value_arr *, arr, value_arr_res)
 struct number;
 
 struct number *
-number_single_create(int);
+number_const_create(long);
 
 char *
 number_str(struct number *);
 
+char *
+number_short_str(struct number *);
+
 struct value *
 value_number_create(struct number *);
-
-
 
 #endif

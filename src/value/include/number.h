@@ -3,20 +3,21 @@
 
 struct number;
 
-struct cconst;
-
 struct number *
-number_cconst_create(struct cconst *);
+number_const_create(long);
+
+struct ast_expr;
 
 struct number *
 number_expr_create(struct ast_expr *);
 
-/* TODO: remove */
-struct number *
-number_single_create(int);
+struct range;
 
 struct number *
-number_singlerange_create(struct number *lw, struct number *up);
+number_range_create(struct range *);
+
+struct number *
+number_ne_create(long not_val);
 
 struct number *
 number_copy(struct number *);
@@ -28,16 +29,7 @@ char *
 number_str(struct number *);
 
 char *
-number_str_inrange(struct number *);
-
-int
-number_iscconst(struct number *);
-
-struct cconst *
-number_as_cconst(struct number *);
-
-int
-number_isrange(struct number *);
+number_short_str(struct number *);
 
 struct range;
 
@@ -50,8 +42,14 @@ number_as_expr(struct number *);
 struct ast_expr *
 number_to_expr(struct number *);
 
+long
+number_as_const(struct number *);
+
 int
-number_isconstant(struct number *);
+number_isconst(struct number *);
+
+struct range *
+number_as_range(struct number *);
 
 int
 number_lt(struct number *lhs, struct number *rhs, struct state *);

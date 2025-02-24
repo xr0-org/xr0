@@ -12,8 +12,8 @@
 #include "verifier.h"
 
 #include "number.h"
-#include "cconst.h"
 #include "range.h"
+#include "_limits.h"
 
 struct value {
 	enum value_type {
@@ -110,10 +110,7 @@ value_ptr_rconst_create(void)
 	assert(v);
 	v->type = VALUE_PTR;
 	v->ptr.isindefinite = true;
-	v->ptr.n = number_singlerange_create(
-		number_cconst_create(cconst_min_create()),
-		number_cconst_create(cconst_max_create())
-	);
+	v->ptr.n = number_range_create(range_entire_create());
 	return v;
 }
 
@@ -156,7 +153,7 @@ value_int_create(int val)
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_cconst_create(cconst_constant_create(val));
+	v->n = number_const_create(val);
 	return v;
 }
 
@@ -186,9 +183,6 @@ value_literal_create(char *lit)
 	return v;
 }
 
-struct number *
-number_ne_create(int not_val);
-
 struct value *
 value_int_ne_create(int not_val)
 {
@@ -216,57 +210,48 @@ value_bang(struct value *v)
 	}
 }
 
-static int
-_canbebound(struct value *);
-
 struct value *
-value_int_range_create(struct value *lw, struct value *up)
+value_int_range_create(int lw, int up)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	assert(_canbebound(lw) && _canbebound(up));
-	v->n = number_singlerange_create(lw->n, up->n);
+	v->n = number_range_create(range_create(lw, up));
 	return v;
 }
 
-static int
-_canbebound(struct value *v)
-{
-	return value_isint(v) || value_isrconst(v);
-}
-
-
-static struct value *
-_value_int_limit_create(int islw)
+struct value *
+value_int_range_fromexpr(struct ast_expr *e, struct state *s)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_cconst_create(
-		islw ? cconst_min_create() : cconst_max_create()
-	);
+	v->n = number_range_create(range_fromexpr(e, s));
 	return v;
 }
 
-struct value *
-value_int_max_create(void) { return _value_int_limit_create(0); }
-
-struct value *
-value_int_min_create(void) { return _value_int_limit_create(1); }
+static int
+_isint(long);
 
 int
 value_int_lw(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return cconst_as_constant(number_as_cconst(number_lw(v->n, s)));
+	long l = number_as_const(number_lw(v->n, s));
+	assert(_isint(l));
+	return l;
 }
+
+static int
+_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX; }
 
 int
 value_int_up(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return cconst_as_constant(number_as_cconst(number_up(v->n, s)));
+	long l = number_as_const(number_up(v->n, s));
+	assert(_isint(l));
+	return l;
 }
 
 static int
@@ -833,7 +818,7 @@ value_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb
 int
 value_isconstant(struct value *v)
 {
-	return v->type == VALUE_INT && number_isconstant(v->n);
+	return v->type == VALUE_INT && number_isconst(v->n);
 }
 
 int
@@ -841,7 +826,9 @@ value_as_constant(struct value *v)
 {
 	assert(value_isconstant(v));
 
-	return cconst_as_constant(number_as_cconst(v->n));
+	long l = number_as_const(v->n);
+	assert(_isint(l));
+	return l;
 }
 
 int
@@ -1033,9 +1020,6 @@ value_lt(struct value *lhs, struct value *rhs, struct state *s)
 }
 
 int
-cconst_as_constant(struct cconst *v);
-
-int
 value_eq(struct value *lhs, struct value *rhs, struct state *s)
 {
 	assert(value_issinglerange(lhs, s) && value_issinglerange(rhs, s));
@@ -1047,8 +1031,8 @@ value_eq(struct value *lhs, struct value *rhs, struct state *s)
 
 	if (number_eq(a, c, s) && number_eq(b, d, s)) {
 		if (!samerconst(lhs, rhs)) {
-			int c_a = cconst_as_constant(number_as_cconst((a))),
-			    c_b = cconst_as_constant(number_as_cconst((b)));
+			long c_a = number_as_const(a),
+			     c_b = number_as_const(b);
 			assert(c_b-c_a == 1);
 		}
 		return 1;
@@ -1128,9 +1112,6 @@ int_or_rconst(struct value *);
 static struct value *
 value_tosinglerange(struct value *, struct state *);
 
-char *
-cconst_str(struct cconst *v);
-
 struct error *
 value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 		struct state *s0)
@@ -1146,14 +1127,14 @@ value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 		      *r0_lw = value_lw(r0, s0);
 	if (!number_le(r0_lw, v_lw, s)) {
 		return error_value_bounds(
-			error_printf("must be ≥ %s", number_str(r0_lw))
+			error_printf("must be ≥ %s", number_short_str(r0_lw))
 		);
 	}
 	struct number *v_up = value_up(v, s),
 		      *r0_up = value_up(r0, s0);
 	if (!number_le(v_up, r0_up, s)) {
 		return error_value_bounds(
-			error_printf("must be < %s", number_str(r0_up))
+			error_printf("must be < %s", number_short_str(r0_up))
 		);
 	}
 	return NULL;

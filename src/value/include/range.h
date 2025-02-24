@@ -3,15 +3,15 @@
 
 struct range;
 
-struct number;
+struct range *
+range_create(long lw, long up);
 
 struct range *
-range_create(struct number *lw, struct number *up);
+range_entire_create(void);
 
 struct range *
-range_shift(struct range *, int width);
+range_fromexpr(struct ast_expr *, struct state *);
 
-struct state;
 struct range *
 range_copy(struct range *);
 
@@ -21,22 +21,25 @@ range_destroy(struct range *);
 char *
 range_str(struct range *r);
 
-struct number *
+char *
+range_short_str(struct range *r);
+
+long
 range_lower(struct range *);
 
-struct number *
+long
 range_upper(struct range *);
 
+long
+range_as_const(struct range *);
+
+struct state;
 
 int
-range_contains_range(struct range *r, struct range *r2, struct state *);
+range_contains_range(struct range *r, struct range *r2);
 
 int
 range_issingle(struct range *r);
-
-struct cconst *
-range_as_cconst(struct range *);
-
 
 struct range_arr;
 
@@ -59,7 +62,9 @@ int
 range_arr_append(struct range_arr *, struct range *);
 
 int
-range_arr_containsrangearr(struct range_arr *arr, struct range_arr *range,
-		struct state *);
+range_arr_containsrangearr(struct range_arr *arr, struct range_arr *range);
+
+struct range_arr *
+range_arr_ne_create(long);
 
 #endif

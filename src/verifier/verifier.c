@@ -294,9 +294,9 @@ split_name(char *name, struct map *split)
 	for (int i = 0; i < split->n; i++) {
 		struct entry e = split->entry[i];
 		char *rconst = e.key;
-		char *num = number_str((struct number *) e.value);
+		char *num = number_short_str((struct number *) e.value);
 		strbuilder_printf(
-			b, "%s ∈ %s%s", rconst, num,
+			b, "%s ∈ {%s}%s", rconst, num,
 			(i+1 < split->n ? "," : "")
 		);
 		free(num);

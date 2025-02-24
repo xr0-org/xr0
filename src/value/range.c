@@ -1,117 +1,213 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 
 #include "ast.h"
 #include "util.h"
 #include "value.h"
 
-#include "cconst.h"
 #include "number.h"
 #include "range.h"
+#include "_limits.h"
 
 struct range {
-	struct number *lower, *upper;
+	long lower, upper;
 };
 
+static int
+_isvalidlw(long);
+
+static int
+_isvalidup(long);
+
 struct range *
-range_create(struct number *lw, struct number *up)
+range_create(long lw, long up)
 {
+	a_printf(
+		_isvalidlw(lw) && _isvalidup(up),
+		"only values between INT_MIN and INT_MAX are supported: "\
+		"have %li and %li\n",
+		lw, up
+	);
+	assert(lw < up);
+
 	struct range *r = malloc(sizeof(struct range));
+	assert(r);
 	r->lower = lw;
 	r->upper = up;
 	return r;
 }
 
+static int
+_isvalidlw(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX+1; }
+
+static int
+_isvalidup(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX+2; }
+
 struct range *
-range_shift(struct range *r, int w)
+range_entire_create(void) { return range_create(C89_INT_MIN, C89_INT_MAX+1); }
+
+static long
+_lw_bound_value(struct ast_expr *, struct state *);
+
+static long
+_up_bound_value(struct ast_expr *, struct state *);
+
+struct range *
+range_fromexpr(struct ast_expr *e, struct state *s)
 {
 	return range_create(
-		number_cconst_create(
-			cconst_constant_create(
-				cconst_as_constant(number_as_cconst(r->lower))+w
-			)
-		),
-		number_cconst_create(
-			cconst_constant_create(
-				cconst_as_constant(number_as_cconst(r->upper))+w
-			)
-		)
+		_lw_bound_value(ast_expr_range_lw(e), s),
+		_up_bound_value(ast_expr_range_up(e), s)
 	);
 }
 
+static int
+_eval(struct ast_expr *, struct state *);
+
+static long
+_lw_bound_value(struct ast_expr *e, struct state *s)
+{
+	return ast_expr_israngemin(e) ? C89_INT_MIN : _eval(e, s);
+}
+
+static long
+_up_bound_value(struct ast_expr *e, struct state *s)
+{
+	return ast_expr_israngemax(e) ? C89_INT_MAX+1 : _eval(e, s);
+}
+
+static int
+_eval(struct ast_expr *e, struct state *s)
+{
+	return value_as_int(
+		value_res_as_value(
+			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
+		), s
+	);
+}
+
+struct range *
+range_copy(struct range *r) { return range_create(r->lower, r->upper); }
 
 void
-range_destroy(struct range *r)
-{
-	number_destroy(r->lower);
-	number_destroy(r->upper);
-	free(r);
-}
+range_destroy(struct range *r) { free(r); }
 
-struct number *
-range_lower(struct range *r)
-{
-	return r->lower;
-}
-
-struct number *
-range_upper(struct range *r)
-{
-	return r->upper;
-}
+static char *
+_limit_str(long);
 
 char *
 range_str(struct range *r)
 {
 	struct strbuilder *b = strbuilder_create();
-	if (range_issingle(r)) {
-		strbuilder_printf(b, "%s", number_str(r->lower));
-	} else {
-		strbuilder_printf(
-			b, "%s?%s",
-			number_str_inrange(r->lower),
-			number_str_inrange(r->upper)
-		);
+	char *lw = _limit_str(r->lower),
+	     *up = _limit_str(r->upper);
+	strbuilder_printf(b, "%s?%s", lw, up);
+	free(up);
+	free(lw);
+	return strbuilder_build(b);
+}
+
+static char *
+_limit_str(long l)
+{
+	struct strbuilder *b = strbuilder_create();
+	switch (l) {
+	case C89_INT_MIN:
+	case C89_INT_MAX+1:
+		break;
+	default:
+		strbuilder_printf(b, "%d", l);
 	}
 	return strbuilder_build(b);
 }
 
-struct range *
-range_copy(struct range *r)
+static char *
+_single_str(long);
+
+char *
+range_short_str(struct range *r)
 {
-	return range_create(
-		number_copy(r->lower), number_copy(r->upper)
-	);
+	return range_issingle(r) ? _single_str(r->lower) : range_str(r);
+}
+
+static char *
+_single_str(long l)
+{
+	struct strbuilder *b = strbuilder_create();
+	switch (l) {
+	case C89_INT_MIN:
+		strbuilder_printf(b, "INT_MIN");
+		break;
+	case C89_INT_MAX:
+		strbuilder_printf(b, "INT_MAX");
+		break;
+	default:
+		strbuilder_printf(b, "%d", l);
+	}
+	return strbuilder_build(b);
+}
+
+long
+range_lower(struct range *r) { return r->lower; }
+
+long
+range_upper(struct range *r) { return r->upper; }
+
+long
+range_as_const(struct range *r)
+{
+	assert(range_issingle(r));
+	return r->lower;
 }
 
 int
-range_contains_range(struct range *r, struct range *r2, struct state *s)
+range_contains_range(struct range *r, struct range *r2)
 {
-	if (number_le(r->lower, r2->lower, s)) {
-		/* XXX: exclude partial inclusion cases */
-		assert(r->upper);
-		assert(r2->upper);
-		assert(number_le(r2->upper, r->upper, s));
+	if (r->lower <= r2->lower) {
+		assert(r2->upper <= r->upper);
 		/* ⊢ r->lower ≤ r2->lower && r2->upper ≤ r->upper */
-		return true;
+		return 1;
 	}
 	/* r->lower > r2->lower so r2 cannot in be in r */
-	return false;
+	return 0;
 }
 
 int
 range_issingle(struct range *r)
 {
-	return numbers_aresinglerange(r->lower, r->upper);
+	return r->lower == r->upper-1;
 }
 
-struct cconst *
-range_as_cconst(struct range *r)
+long
+range_as_constant(struct range *r)
 {
 	assert(range_issingle(r));
 
-	return number_as_cconst(r->lower);
+	return r->lower;
 }
+
+struct range_arr *
+range_arr_ne_create(long val)
+{
+	struct range_arr *arr = range_arr_create();
+	range_arr_append(
+		arr, 
+		range_create(
+			/* [MIN:val) */
+			C89_INT_MIN, val
+		)
+	);
+	range_arr_append(
+		arr, 
+		range_create(
+			/* [val+1:MAX) XXX */
+			val+1, C89_INT_MAX+1
+		)
+	);
+	return arr;
+}
+
 
 struct range_arr {
 	int n;
@@ -168,32 +264,30 @@ range_arr_append(struct range_arr *arr, struct range *r)
 	return loc;
 }
 
-static bool
-range_arr_containsrange(struct range_arr *, struct range *, struct state *);
+static int
+range_arr_containsrange(struct range_arr *, struct range *);
 
 int
-range_arr_containsrangearr(struct range_arr *arr, struct range_arr *range_arr,
-		struct state *s)
+range_arr_containsrangearr(struct range_arr *arr, struct range_arr *range_arr)
 {
 	for (int i = 0; i < range_arr->n; i++) {
-		if (!range_arr_containsrange(arr, range_arr->range[i], s)) {
+		if (!range_arr_containsrange(arr, range_arr->range[i])) {
 			return 0;
 		}
 	}
 	return 1;
 }
 
-static bool
-range_arr_containsrange(struct range_arr *arr, struct range *range,
-		struct state *s)
+static int
+range_arr_containsrange(struct range_arr *arr, struct range *range)
 {
 	for (int i = 0; i < arr->n; i++) {
 		/* XXX: currently will assert false if arr->range[i] contains
 		 * the lower bound of range but not the entire range, so we're
 		 * asserting out the possibility of partial inclusion */
-		if (range_contains_range(arr->range[i], range, s)) {
-			return true;
+		if (range_contains_range(arr->range[i], range)) {
+			return 1;
 		}
 	}
-	return false;
+	return 0;
 }

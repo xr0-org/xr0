@@ -128,7 +128,7 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		char *tag = tagval_tag(tv);
 		for (int i = lw; i < up; i++) {
 			struct map *m = map_create();
-			map_set(m, tag, number_single_create(i));
+			map_set(m, tag, number_const_create(i));
 			splitinstruct_append(splits, m);
 		}
 		return object_res_error_create(
