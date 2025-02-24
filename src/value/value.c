@@ -110,10 +110,11 @@ value_ptr_rconst_create(void)
 	assert(v);
 	v->type = VALUE_PTR;
 	v->ptr.isindefinite = true;
-	v->ptr.n = number_singlerange_create(
-		number_cconst_create(cconst_min_create()),
-		number_cconst_create(cconst_max_create())
+	struct range_arr *arr = range_arr_create();
+	range_arr_append(
+		arr, range_create(cconst_min_create(), cconst_max_create())
 	);
+	v->ptr.n = number_ranges_create(arr);
 	return v;
 }
 
@@ -226,7 +227,12 @@ value_int_range_create(struct value *lw, struct value *up)
 	assert(v);
 	v->type = VALUE_INT;
 	assert(_canbebound(lw) && _canbebound(up));
-	v->n = number_singlerange_create(lw->n, up->n);
+	struct range_arr *arr = range_arr_create();
+	range_arr_append(
+		arr,
+		range_create(number_as_cconst(lw->n), number_as_cconst(up->n))
+	);
+	v->n = number_ranges_create(arr);
 	return v;
 }
 

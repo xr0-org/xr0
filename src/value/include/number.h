@@ -15,8 +15,12 @@ number_expr_create(struct ast_expr *);
 struct number *
 number_single_create(int);
 
+struct range;
+
+struct range_arr;
+
 struct number *
-number_singlerange_create(struct number *lw, struct number *up);
+number_ranges_create(struct range_arr *ranges);
 
 struct number *
 number_copy(struct number *);
@@ -31,12 +35,6 @@ char *
 number_str_inrange(struct number *);
 
 int
-number_iscconst(struct number *);
-
-struct cconst *
-number_as_cconst(struct number *);
-
-int
 number_isrange(struct number *);
 
 struct range;
@@ -49,6 +47,9 @@ number_as_expr(struct number *);
 
 struct ast_expr *
 number_to_expr(struct number *);
+
+struct cconst *
+number_as_cconst(struct number *);
 
 int
 number_isconstant(struct number *);

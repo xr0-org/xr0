@@ -31,7 +31,6 @@ range_shift(struct range *r, int w)
 	);
 }
 
-
 void
 range_destroy(struct range *r)
 {
