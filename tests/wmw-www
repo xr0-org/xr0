@@ -1,5 +1,6 @@
 00-basic/500-FAIL-side-effect.x
 00-basic/520-side-effect-rconst.x
+02-loops/100-variable-limit.x
 09-calls/100-FAIL-unique-rconst.x
 09-calls/120-FAIL-unique-rconst.x
 09-calls/130-unique-rconst.x

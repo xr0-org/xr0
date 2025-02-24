@@ -87,11 +87,11 @@ range_copy(struct range *r)
 int
 range_contains_range(struct range *r, struct range *r2, struct state *s)
 {
-	if (number_le(r->lower, r2->lower, s, s)) {
+	if (number_le(r->lower, r2->lower, s)) {
 		/* XXX: exclude partial inclusion cases */
 		assert(r->upper);
 		assert(r2->upper);
-		assert(number_le(r2->upper, r->upper, s, s));
+		assert(number_le(r2->upper, r->upper, s));
 		/* ⊢ r->lower ≤ r2->lower && r2->upper ≤ r->upper */
 		return true;
 	}
