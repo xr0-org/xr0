@@ -284,7 +284,7 @@ _ranges_bound(struct number *n, int islw)
 	assert(range_arr_n(n->ranges) == 1);
 
 	struct range *r = range_arr_range(n->ranges)[0];
-	return islw ? range_lower(r) : range_upper(r);
+	return number_cconst_create(islw ? range_lower(r) : range_upper(r));
 }
 
 
@@ -379,15 +379,15 @@ range_arr_ne_create(int val)
 	range_arr_append(
 		arr, 
 		range_create( /* [MIN:val) */
-			number_cconst_create(cconst_min_create()),
-			number_cconst_create(cconst_constant_create(val))
+			cconst_min_create(),
+			cconst_constant_create(val)
 		)
 	);
 	range_arr_append(
 		arr, 
 		range_create( /* [val+1:MAX) XXX */
-			number_cconst_create(cconst_constant_create(val+1)),
-			number_cconst_create(cconst_max_create())
+			cconst_constant_create(val+1),
+			cconst_max_create()
 		)
 	);
 	return arr;
@@ -405,7 +405,7 @@ number_singlerange_create(struct number *lw, struct number *up)
 	struct range_arr *arr = range_arr_create();
 	range_arr_append(
 		arr, 
-		range_create(lw, up)
+		range_create(number_as_cconst(lw), number_as_cconst(up))
 	);
 	return number_ranges_create(arr);
 }
@@ -422,7 +422,7 @@ number_assume(struct number *n, struct number *split, struct state *s)
 
 	assert(n->type == NUMBER_RANGES && split->type == NUMBER_RANGES);
 
-	if (!range_arr_containsrangearr(n->ranges, split->ranges, s)) {
+	if (!range_arr_containsrangearr(n->ranges, split->ranges)) {
 		return 0;
 	}
 
@@ -439,8 +439,8 @@ _cconst_to_range(struct cconst *c)
 	range_arr_append(
 		r,
 		range_create(
-			number_cconst_create(cconst_constant_create(k)),
-			number_cconst_create(cconst_constant_create(k+1))
+			cconst_constant_create(k),
+			cconst_constant_create(k+1)
 		)
 	);
 	return number_ranges_create(r);
@@ -486,9 +486,7 @@ _ranges_to_expr(struct range_arr *arr)
 	struct range *r = range_arr_range(arr)[0];
 	assert(range_issingle(r));
 
-	return ast_expr_constant_create(
-		cconst_as_constant(number_as_cconst(range_lower(r)))
-	);
+	return ast_expr_constant_create(cconst_as_constant(range_lower(r)));
 }
 
 int

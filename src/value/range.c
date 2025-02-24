@@ -10,11 +10,11 @@
 #include "range.h"
 
 struct range {
-	struct number *lower, *upper;
+	struct cconst *lower, *upper;
 };
 
 struct range *
-range_create(struct number *lw, struct number *up)
+range_create(struct cconst *lw, struct cconst *up)
 {
 	struct range *r = malloc(sizeof(struct range));
 	r->lower = lw;
@@ -26,16 +26,8 @@ struct range *
 range_shift(struct range *r, int w)
 {
 	return range_create(
-		number_cconst_create(
-			cconst_constant_create(
-				cconst_as_constant(number_as_cconst(r->lower))+w
-			)
-		),
-		number_cconst_create(
-			cconst_constant_create(
-				cconst_as_constant(number_as_cconst(r->upper))+w
-			)
-		)
+		cconst_constant_create(cconst_as_constant(r->lower)+w),
+		cconst_constant_create(cconst_as_constant(r->upper)+w)
 	);
 }
 
@@ -43,18 +35,18 @@ range_shift(struct range *r, int w)
 void
 range_destroy(struct range *r)
 {
-	number_destroy(r->lower);
-	number_destroy(r->upper);
+	cconst_destroy(r->lower);
+	cconst_destroy(r->upper);
 	free(r);
 }
 
-struct number *
+struct cconst *
 range_lower(struct range *r)
 {
 	return r->lower;
 }
 
-struct number *
+struct cconst *
 range_upper(struct range *r)
 {
 	return r->upper;
@@ -65,12 +57,12 @@ range_str(struct range *r)
 {
 	struct strbuilder *b = strbuilder_create();
 	if (range_issingle(r)) {
-		strbuilder_printf(b, "%s", number_str(r->lower));
+		strbuilder_printf(b, "%s", cconst_str(r->lower));
 	} else {
 		strbuilder_printf(
 			b, "%s?%s",
-			number_str_inrange(r->lower),
-			number_str_inrange(r->upper)
+			cconst_str_inrange(r->lower),
+			cconst_str_inrange(r->upper)
 		);
 	}
 	return strbuilder_build(b);
@@ -79,30 +71,28 @@ range_str(struct range *r)
 struct range *
 range_copy(struct range *r)
 {
-	return range_create(
-		number_copy(r->lower), number_copy(r->upper)
-	);
+	return range_create(r->lower, r->upper);
 }
 
 int
-range_contains_range(struct range *r, struct range *r2, struct state *s)
+range_contains_range(struct range *r, struct range *r2)
 {
-	if (number_le(r->lower, r2->lower, s)) {
+	if (cconst_le(r->lower, r2->lower)) {
 		/* XXX: exclude partial inclusion cases */
 		assert(r->upper);
 		assert(r2->upper);
-		assert(number_le(r2->upper, r->upper, s));
+		assert(cconst_le(r2->upper, r->upper));
 		/* ⊢ r->lower ≤ r2->lower && r2->upper ≤ r->upper */
-		return true;
+		return 1;
 	}
 	/* r->lower > r2->lower so r2 cannot in be in r */
-	return false;
+	return 0;
 }
 
 int
 range_issingle(struct range *r)
 {
-	return numbers_aresinglerange(r->lower, r->upper);
+	return cconsts_aresinglerange(r->lower, r->upper);
 }
 
 struct cconst *
@@ -110,8 +100,9 @@ range_as_cconst(struct range *r)
 {
 	assert(range_issingle(r));
 
-	return number_as_cconst(r->lower);
+	return r->lower;
 }
+
 
 struct range_arr {
 	int n;
@@ -168,32 +159,30 @@ range_arr_append(struct range_arr *arr, struct range *r)
 	return loc;
 }
 
-static bool
-range_arr_containsrange(struct range_arr *, struct range *, struct state *);
+static int
+range_arr_containsrange(struct range_arr *, struct range *);
 
 int
-range_arr_containsrangearr(struct range_arr *arr, struct range_arr *range_arr,
-		struct state *s)
+range_arr_containsrangearr(struct range_arr *arr, struct range_arr *range_arr)
 {
 	for (int i = 0; i < range_arr->n; i++) {
-		if (!range_arr_containsrange(arr, range_arr->range[i], s)) {
+		if (!range_arr_containsrange(arr, range_arr->range[i])) {
 			return 0;
 		}
 	}
 	return 1;
 }
 
-static bool
-range_arr_containsrange(struct range_arr *arr, struct range *range,
-		struct state *s)
+static int
+range_arr_containsrange(struct range_arr *arr, struct range *range)
 {
 	for (int i = 0; i < arr->n; i++) {
 		/* XXX: currently will assert false if arr->range[i] contains
 		 * the lower bound of range but not the entire range, so we're
 		 * asserting out the possibility of partial inclusion */
-		if (range_contains_range(arr->range[i], range, s)) {
-			return true;
+		if (range_contains_range(arr->range[i], range)) {
+			return 1;
 		}
 	}
-	return false;
+	return 0;
 }
