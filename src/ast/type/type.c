@@ -244,9 +244,9 @@ static struct value *
 _bound_to_value(struct ast_expr *expr, struct state *s)
 {
 	if (ast_expr_israngemin(expr)) {
-		return value_int_min_create();
+		return value_intrange_min_create();
 	} else if (ast_expr_israngemax(expr)) {
-		return value_int_max_create();
+		return value_intrange_max_create();
 	}
 	return value_res_as_value(
 		eval_to_value(e_res_as_eval(ast_expr_eval(expr, s)), s)

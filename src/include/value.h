@@ -44,10 +44,10 @@ struct value *
 value_int_range_create(struct value *lw, struct value *up);
 
 struct value *
-value_int_max_create(void);
+value_intrange_max_create(void);
 
 struct value *
-value_int_min_create(void);
+value_intrange_min_create(void);
 
 
 struct value *
@@ -193,7 +193,7 @@ DECLARE_RESULT_TYPE(struct value_arr *, arr, value_arr_res)
 struct number;
 
 struct number *
-number_single_create(int);
+number_const_create(long);
 
 char *
 number_str(struct number *);

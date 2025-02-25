@@ -3,13 +3,11 @@
 
 struct range;
 
-struct cconst;
+struct range *
+range_create(long lw, long up);
 
 struct range *
-range_create(struct cconst *lw, struct cconst *up);
-
-struct range *
-range_shift(struct range *, int width);
+range_entire_create(void);
 
 struct range *
 range_copy(struct range *);
@@ -20,14 +18,14 @@ range_destroy(struct range *);
 char *
 range_str(struct range *r);
 
-struct cconst *
+long
 range_lower(struct range *);
 
-struct cconst *
+long
 range_upper(struct range *);
 
-struct cconst *
-range_as_cconst(struct range *);
+long
+range_as_const(struct range *);
 
 struct state;
 

@@ -1,86 +1,123 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 
 #include "ast.h"
 #include "util.h"
 #include "value.h"
 
-#include "cconst.h"
 #include "number.h"
 #include "range.h"
+#include "_limits.h"
 
 struct range {
-	struct cconst *lower, *upper;
+	long lower, upper;
 };
 
+static int
+_isint(long);
+
 struct range *
-range_create(struct cconst *lw, struct cconst *up)
+range_create(long lw, long up)
 {
+	a_printf(
+		_isint(lw) && (_isint(up) || up == C89_INT_MAX+1), 
+		"only values between INT_MIN and INT_MAX are supported\n"
+	);
+	assert(lw < up);
+
 	struct range *r = malloc(sizeof(struct range));
+	assert(r);
 	r->lower = lw;
 	r->upper = up;
 	return r;
 }
 
+static int
+_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX; }
+
 struct range *
-range_shift(struct range *r, int w)
-{
-	return range_create(
-		cconst_constant_create(cconst_as_constant(r->lower)+w),
-		cconst_constant_create(cconst_as_constant(r->upper)+w)
-	);
-}
+range_entire_create(void) { return range_create(C89_INT_MIN, C89_INT_MAX+1); }
+
+struct range *
+range_copy(struct range *r) { return range_create(r->lower, r->upper); }
 
 void
-range_destroy(struct range *r)
-{
-	cconst_destroy(r->lower);
-	cconst_destroy(r->upper);
-	free(r);
-}
+range_destroy(struct range *r) { free(r); }
 
-struct cconst *
-range_lower(struct range *r)
-{
-	return r->lower;
-}
+char *
+_single_str(long);
 
-struct cconst *
-range_upper(struct range *r)
-{
-	return r->upper;
-}
+char *
+_limit_str(long);
 
 char *
 range_str(struct range *r)
 {
 	struct strbuilder *b = strbuilder_create();
 	if (range_issingle(r)) {
-		strbuilder_printf(b, "%s", cconst_str(r->lower));
+		char *s = _single_str(r->lower);
+		strbuilder_printf(b, "%s", s);
+		free(s);
 	} else {
-		strbuilder_printf(
-			b, "%s?%s",
-			cconst_str_inrange(r->lower),
-			cconst_str_inrange(r->upper)
-		);
+		char *lw = _limit_str(r->lower),
+		     *up = _limit_str(r->upper);
+		strbuilder_printf(b, "%s?%s", lw, up);
+		free(up);
+		free(lw);
 	}
 	return strbuilder_build(b);
 }
 
-struct range *
-range_copy(struct range *r)
+char *
+_single_str(long l)
 {
-	return range_create(r->lower, r->upper);
+	struct strbuilder *b = strbuilder_create();
+	switch (l) {
+	case C89_INT_MIN:
+		strbuilder_printf(b, "INT_MIN");
+		break;
+	case C89_INT_MAX:
+		strbuilder_printf(b, "INT_MAX");
+		break;
+	default:
+		strbuilder_printf(b, "%d", l);
+	}
+	return strbuilder_build(b);
+}
+
+char *
+_limit_str(long l)
+{
+	struct strbuilder *b = strbuilder_create();
+	switch (l) {
+	case C89_INT_MIN:
+	case C89_INT_MAX:
+		break;
+	default:
+		strbuilder_printf(b, "%d", l);
+	}
+	return strbuilder_build(b);
+}
+
+long
+range_lower(struct range *r) { return r->lower; }
+
+long
+range_upper(struct range *r) { return r->upper; }
+
+long
+range_as_const(struct range *r)
+{
+	assert(range_issingle(r));
+	return r->lower;
 }
 
 int
 range_contains_range(struct range *r, struct range *r2)
 {
-	if (cconst_le(r->lower, r2->lower)) {
-		/* XXX: exclude partial inclusion cases */
-		assert(r->upper);
-		assert(r2->upper);
-		assert(cconst_le(r2->upper, r->upper));
+	if (r->lower <= r2->lower) {
+		assert(r2->upper <= r->upper);
 		/* ⊢ r->lower ≤ r2->lower && r2->upper ≤ r->upper */
 		return 1;
 	}
@@ -91,11 +128,11 @@ range_contains_range(struct range *r, struct range *r2)
 int
 range_issingle(struct range *r)
 {
-	return cconsts_aresinglerange(r->lower, r->upper);
+	return r->lower == r->upper-1;
 }
 
-struct cconst *
-range_as_cconst(struct range *r)
+long
+range_as_constant(struct range *r)
 {
 	assert(range_issingle(r));
 

@@ -12,8 +12,8 @@
 #include "verifier.h"
 
 #include "number.h"
-#include "cconst.h"
 #include "range.h"
+#include "_limits.h"
 
 struct value {
 	enum value_type {
@@ -110,11 +110,7 @@ value_ptr_rconst_create(void)
 	assert(v);
 	v->type = VALUE_PTR;
 	v->ptr.isindefinite = true;
-	struct range_arr *arr = range_arr_create();
-	range_arr_append(
-		arr, range_create(cconst_min_create(), cconst_max_create())
-	);
-	v->ptr.n = number_ranges_create(arr);
+	v->ptr.n = number_range_create(range_entire_create());
 	return v;
 }
 
@@ -157,7 +153,7 @@ value_int_create(int val)
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_cconst_create(cconst_constant_create(val));
+	v->n = number_const_create(val);
 	return v;
 }
 
@@ -186,9 +182,6 @@ value_literal_create(char *lit)
 	v->s = dynamic_str(lit);
 	return v;
 }
-
-struct number *
-number_ne_create(int not_val);
 
 struct value *
 value_int_ne_create(int not_val)
@@ -227,12 +220,9 @@ value_int_range_create(struct value *lw, struct value *up)
 	assert(v);
 	v->type = VALUE_INT;
 	assert(_canbebound(lw) && _canbebound(up));
-	struct range_arr *arr = range_arr_create();
-	range_arr_append(
-		arr,
-		range_create(number_as_cconst(lw->n), number_as_cconst(up->n))
+	v->n = number_range_create(
+		range_create(number_as_const(lw->n), number_as_const(up->n))
 	);
-	v->n = number_ranges_create(arr);
 	return v;
 }
 
@@ -244,35 +234,43 @@ _canbebound(struct value *v)
 
 
 static struct value *
-_value_int_limit_create(int islw)
+_value_intrange_limit_create(int islw)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_cconst_create(
-		islw ? cconst_min_create() : cconst_max_create()
-	);
+	v->n = islw ? number_intrange_min_create() : number_intrange_max_create();
 	return v;
 }
 
 struct value *
-value_int_max_create(void) { return _value_int_limit_create(0); }
+value_intrange_max_create(void) { return _value_intrange_limit_create(0); }
 
 struct value *
-value_int_min_create(void) { return _value_int_limit_create(1); }
+value_intrange_min_create(void) { return _value_intrange_limit_create(1); }
+
+static int
+_isint(long);
 
 int
 value_int_lw(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return cconst_as_constant(number_as_cconst(number_lw(v->n, s)));
+	long l = number_as_const(number_lw(v->n, s));
+	assert(_isint(l));
+	return l;
 }
+
+static int
+_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX; }
 
 int
 value_int_up(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return cconst_as_constant(number_as_cconst(number_up(v->n, s)));
+	long l = number_as_const(number_up(v->n, s));
+	assert(_isint(l));
+	return l;
 }
 
 static int
@@ -839,7 +837,7 @@ value_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb
 int
 value_isconstant(struct value *v)
 {
-	return v->type == VALUE_INT && number_isconstant(v->n);
+	return v->type == VALUE_INT && number_isconst(v->n);
 }
 
 int
@@ -847,7 +845,9 @@ value_as_constant(struct value *v)
 {
 	assert(value_isconstant(v));
 
-	return cconst_as_constant(number_as_cconst(v->n));
+	long l = number_as_const(v->n);
+	assert(_isint(l));
+	return l;
 }
 
 int
@@ -1039,9 +1039,6 @@ value_lt(struct value *lhs, struct value *rhs, struct state *s)
 }
 
 int
-cconst_as_constant(struct cconst *v);
-
-int
 value_eq(struct value *lhs, struct value *rhs, struct state *s)
 {
 	assert(value_issinglerange(lhs, s) && value_issinglerange(rhs, s));
@@ -1053,8 +1050,8 @@ value_eq(struct value *lhs, struct value *rhs, struct state *s)
 
 	if (number_eq(a, c, s) && number_eq(b, d, s)) {
 		if (!samerconst(lhs, rhs)) {
-			int c_a = cconst_as_constant(number_as_cconst((a))),
-			    c_b = cconst_as_constant(number_as_cconst((b)));
+			long c_a = number_as_const(a),
+			     c_b = number_as_const(b);
 			assert(c_b-c_a == 1);
 		}
 		return 1;
@@ -1134,13 +1131,13 @@ int_or_rconst(struct value *);
 static struct value *
 value_tosinglerange(struct value *, struct state *);
 
-char *
-cconst_str(struct cconst *v);
-
 struct error *
 value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 		struct state *s0)
 {
+	printf("s:\n%s\n", state_str(s));
+	printf("s0:\n%s\n", state_str(s0));
+	printf("v: %s, v0: %s\n", value_str(v), value_str(v0));
 	a_printf(
 		int_or_rconst(v) && int_or_rconst(v0),
 		"can only compare subset for int or rconst types\n"
