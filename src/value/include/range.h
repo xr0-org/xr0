@@ -18,6 +18,9 @@ range_destroy(struct range *);
 char *
 range_str(struct range *r);
 
+char *
+range_short_str(struct range *r);
+
 long
 range_lower(struct range *);
 

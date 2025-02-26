@@ -35,14 +35,14 @@ _number_create(enum number_type type)
 struct number *
 number_const_create(long l)
 {
-	assert(l <= C89_INT_MAX);
+	assert(l <= C89_INT_MAX+2);
 	return number_range_create(range_create(l, l+1));
 }
 
 struct number *
 number_intrange_max_create(void)
 {
-	return number_range_create(range_create(C89_INT_MAX, C89_INT_MAX+1));
+	return number_range_create(range_create(C89_INT_MAX+1, C89_INT_MAX+2));
 }
 
 struct number *
@@ -123,8 +123,6 @@ number_str(struct number *num)
 static char *
 _ranges_str(struct number *num)
 {
-	assert(num->type == NUMBER_RANGES);
-
 	struct strbuilder *b = strbuilder_create();
 	int n = range_arr_n(num->ranges);
 	struct range **range = range_arr_range(num->ranges);
@@ -139,18 +137,12 @@ _ranges_str(struct number *num)
 }
 
 char *
-number_str_inrange(struct number *n)
+number_short_str(struct number *n)
 {
 	if (number_isexpr(n)) {
 		return ast_expr_str(number_as_expr(n));
 	}
-	return range_str(number_as_range(n));
-}
-
-int
-number_isrange(struct number *n)
-{
-	return n->type == NUMBER_RANGES;
+	return range_short_str(number_as_range(n));
 }
 
 int
@@ -177,16 +169,6 @@ number_le(struct number *lhs, struct number *rhs, struct state *s)
 	}
 	if (number_isexpr(rhs)) {
 		return number_le(lhs, _eval(number_as_expr(rhs), s), s);
-	}
-	if (number_isrange(lhs) || number_isrange(rhs)) {
-		struct range *r_lhs = number_as_range(lhs),
-			     *r_rhs = number_as_range(rhs);
-		if (range_upper(r_lhs) <= range_lower(r_rhs)) {
-			return 1;
-		}
-		printf("lhs: %s\n", number_str(lhs));
-		printf("rhs: %s\n", number_str(rhs));
-		assert(0);
 	}
 	return number_as_const(lhs) <= number_as_const(rhs);
 }
@@ -419,7 +401,6 @@ number_as_range(struct number *n)
 	assert(n->type == NUMBER_RANGES && range_arr_n(n->ranges) == 1);
 	return range_arr_range(n->ranges)[0];
 }
-
 
 static struct ast_expr *
 _ranges_to_expr(struct range_arr *);

@@ -21,7 +21,7 @@ struct range *
 range_create(long lw, long up)
 {
 	a_printf(
-		_isint(lw) && (_isint(up) || up == C89_INT_MAX+1), 
+		_isint(lw) && _isint(up), 
 		"only values between INT_MIN and INT_MAX are supported\n"
 	);
 	assert(lw < up);
@@ -34,7 +34,7 @@ range_create(long lw, long up)
 }
 
 static int
-_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX; }
+_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX+2; }
 
 struct range *
 range_entire_create(void) { return range_create(C89_INT_MIN, C89_INT_MAX+1); }
@@ -45,31 +45,45 @@ range_copy(struct range *r) { return range_create(r->lower, r->upper); }
 void
 range_destroy(struct range *r) { free(r); }
 
-char *
-_single_str(long);
-
-char *
+static char *
 _limit_str(long);
 
 char *
 range_str(struct range *r)
 {
 	struct strbuilder *b = strbuilder_create();
-	if (range_issingle(r)) {
-		char *s = _single_str(r->lower);
-		strbuilder_printf(b, "%s", s);
-		free(s);
-	} else {
-		char *lw = _limit_str(r->lower),
-		     *up = _limit_str(r->upper);
-		strbuilder_printf(b, "%s?%s", lw, up);
-		free(up);
-		free(lw);
+	char *lw = _limit_str(r->lower),
+	     *up = _limit_str(r->upper);
+	strbuilder_printf(b, "%s?%s", lw, up);
+	free(up);
+	free(lw);
+	return strbuilder_build(b);
+}
+
+static char *
+_limit_str(long l)
+{
+	struct strbuilder *b = strbuilder_create();
+	switch (l) {
+	case C89_INT_MIN:
+	case C89_INT_MAX+1:
+		break;
+	default:
+		strbuilder_printf(b, "%d", l);
 	}
 	return strbuilder_build(b);
 }
 
+static char *
+_single_str(long);
+
 char *
+range_short_str(struct range *r)
+{
+	return range_issingle(r) ? _single_str(r->lower) : range_str(r);
+}
+
+static char *
 _single_str(long l)
 {
 	struct strbuilder *b = strbuilder_create();
@@ -79,20 +93,6 @@ _single_str(long l)
 		break;
 	case C89_INT_MAX:
 		strbuilder_printf(b, "INT_MAX");
-		break;
-	default:
-		strbuilder_printf(b, "%d", l);
-	}
-	return strbuilder_build(b);
-}
-
-char *
-_limit_str(long l)
-{
-	struct strbuilder *b = strbuilder_create();
-	switch (l) {
-	case C89_INT_MIN:
-	case C89_INT_MAX:
 		break;
 	default:
 		strbuilder_printf(b, "%d", l);

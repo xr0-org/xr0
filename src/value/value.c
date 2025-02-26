@@ -1135,9 +1135,6 @@ struct error *
 value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 		struct state *s0)
 {
-	printf("s:\n%s\n", state_str(s));
-	printf("s0:\n%s\n", state_str(s0));
-	printf("v: %s, v0: %s\n", value_str(v), value_str(v0));
 	a_printf(
 		int_or_rconst(v) && int_or_rconst(v0),
 		"can only compare subset for int or rconst types\n"
@@ -1149,14 +1146,14 @@ value_confirmsubset(struct value *v, struct value *v0, struct state *s,
 		      *r0_lw = value_lw(r0, s0);
 	if (!number_le(r0_lw, v_lw, s)) {
 		return error_value_bounds(
-			error_printf("must be ≥ %s", number_str(r0_lw))
+			error_printf("must be ≥ %s", number_short_str(r0_lw))
 		);
 	}
 	struct number *v_up = value_up(v, s),
 		      *r0_up = value_up(r0, s0);
 	if (!number_le(v_up, r0_up, s)) {
 		return error_value_bounds(
-			error_printf("must be < %s", number_str(r0_up))
+			error_printf("must be < %s", number_short_str(r0_up))
 		);
 	}
 	return NULL;

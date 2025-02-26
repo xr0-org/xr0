@@ -33,10 +33,7 @@ char *
 number_str(struct number *);
 
 char *
-number_str_inrange(struct number *);
-
-int
-number_isrange(struct number *);
+number_short_str(struct number *);
 
 struct range;
 

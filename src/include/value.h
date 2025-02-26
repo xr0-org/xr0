@@ -198,6 +198,9 @@ number_const_create(long);
 char *
 number_str(struct number *);
 
+char *
+number_short_str(struct number *);
+
 struct value *
 value_number_create(struct number *);
 
