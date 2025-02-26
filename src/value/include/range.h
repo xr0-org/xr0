@@ -64,4 +64,7 @@ range_arr_append(struct range_arr *, struct range *);
 int
 range_arr_containsrangearr(struct range_arr *arr, struct range_arr *range);
 
+struct range_arr *
+range_arr_ne_create(long);
+
 #endif

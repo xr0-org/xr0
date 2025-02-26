@@ -15,14 +15,19 @@ struct range {
 };
 
 static int
-_isint(long);
+_isvalidlw(long);
+
+static int
+_isvalidup(long);
 
 struct range *
 range_create(long lw, long up)
 {
 	a_printf(
-		_isint(lw) && _isint(up), 
-		"only values between INT_MIN and INT_MAX are supported\n"
+		_isvalidlw(lw) && _isvalidup(up),
+		"only values between INT_MIN and INT_MAX are supported: "\
+		"have %li and %li\n",
+		lw, up
 	);
 	assert(lw < up);
 
@@ -34,7 +39,10 @@ range_create(long lw, long up)
 }
 
 static int
-_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX+2; }
+_isvalidlw(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX+1; }
+
+static int
+_isvalidup(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX+2; }
 
 struct range *
 range_entire_create(void) { return range_create(C89_INT_MIN, C89_INT_MAX+1); }
@@ -177,6 +185,27 @@ range_as_constant(struct range *r)
 	assert(range_issingle(r));
 
 	return r->lower;
+}
+
+struct range_arr *
+range_arr_ne_create(long val)
+{
+	struct range_arr *arr = range_arr_create();
+	range_arr_append(
+		arr, 
+		range_create(
+			/* [MIN:val) */
+			C89_INT_MIN, val
+		)
+	);
+	range_arr_append(
+		arr, 
+		range_create(
+			/* [val+1:MAX) XXX */
+			val+1, C89_INT_MAX+1
+		)
+	);
+	return arr;
 }
 
 

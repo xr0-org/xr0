@@ -35,7 +35,6 @@ _number_create(enum number_type type)
 struct number *
 number_const_create(long l)
 {
-	assert(l <= C89_INT_MAX+2);
 	return number_range_create(range_create(l, l+1));
 }
 
@@ -311,32 +310,10 @@ _rconst_tosinglerange(char *id, struct state *s)
 	return number_tosinglerange(value_as_number(rconst), s);
 }
 
-
-static struct range_arr *
-_range_arr_ne_create(long val)
-{
-	struct range_arr *arr = range_arr_create();
-	range_arr_append(
-		arr, 
-		range_create(
-			/* [MIN:val) */
-			C89_INT_MIN, val
-		)
-	);
-	range_arr_append(
-		arr, 
-		range_create(
-			/* [val+1:MAX) XXX */
-			val+1, C89_INT_MAX+1
-		)
-	);
-	return arr;
-}
-
 struct number *
 number_ne_create(long val)
 {
-	return _number_ranges_create(_range_arr_ne_create(val));
+	return _number_ranges_create(range_arr_ne_create(val));
 }
 
 static struct number *
