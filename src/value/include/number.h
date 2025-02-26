@@ -6,11 +6,7 @@ struct number;
 struct number *
 number_const_create(long);
 
-struct number *
-number_intrange_min_create(void);
-
-struct number *
-number_intrange_max_create(void);
+struct ast_expr;
 
 struct number *
 number_expr_create(struct ast_expr *);

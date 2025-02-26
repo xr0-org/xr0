@@ -285,6 +285,44 @@ preresult_iscontradiction(struct preresult *);
 void
 ast_expr_varinfomap(struct map *, struct ast_expr *, struct state *s);
 
+struct eval;
+struct ast_type;
+struct location;
+
+struct eval *
+eval_lval_create(struct ast_type *, struct location *);
+
+struct eval *
+eval_rval_create(struct ast_type *, struct value *);
+
+void
+eval_destroy(struct eval *);
+
+char *
+eval_str(struct eval *);
+
+struct ast_type *
+eval_type(struct eval *);
+
+bool
+eval_islval(struct eval *);
+
+struct location *
+eval_as_lval(struct eval *);
+
+bool
+eval_isrval(struct eval *);
+
+struct value *
+eval_as_rval(struct eval *);
+
+struct value_res;
+
+struct value_res *
+eval_to_value(struct eval *, struct state *);
+
+DECLARE_RESULT_TYPE(struct eval *, eval, e_res)
+
 struct e_res *
 ast_expr_eval(struct ast_expr *, struct state *);
 

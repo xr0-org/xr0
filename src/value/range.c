@@ -39,6 +39,46 @@ _isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX+2; }
 struct range *
 range_entire_create(void) { return range_create(C89_INT_MIN, C89_INT_MAX+1); }
 
+static long
+_lw_bound_value(struct ast_expr *, struct state *);
+
+static long
+_up_bound_value(struct ast_expr *, struct state *);
+
+struct range *
+range_fromexpr(struct ast_expr *e, struct state *s)
+{
+	return range_create(
+		_lw_bound_value(ast_expr_range_lw(e), s),
+		_up_bound_value(ast_expr_range_up(e), s)
+	);
+}
+
+static int
+_eval(struct ast_expr *, struct state *);
+
+static long
+_lw_bound_value(struct ast_expr *e, struct state *s)
+{
+	return ast_expr_israngemin(e) ? C89_INT_MIN : _eval(e, s);
+}
+
+static long
+_up_bound_value(struct ast_expr *e, struct state *s)
+{
+	return ast_expr_israngemax(e) ? C89_INT_MAX+1 : _eval(e, s);
+}
+
+static int
+_eval(struct ast_expr *e, struct state *s)
+{
+	return value_as_int(
+		value_res_as_value(
+			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
+		), s
+	);
+}
+
 struct range *
 range_copy(struct range *r) { return range_create(r->lower, r->upper); }
 

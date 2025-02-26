@@ -210,44 +210,25 @@ value_bang(struct value *v)
 	}
 }
 
-static int
-_canbebound(struct value *);
-
 struct value *
-value_int_range_create(struct value *lw, struct value *up)
+value_int_range_create(int lw, int up)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	assert(_canbebound(lw) && _canbebound(up));
-	v->n = number_range_create(
-		range_create(number_as_const(lw->n), number_as_const(up->n))
-	);
+	v->n = number_range_create(range_create(lw, up));
 	return v;
 }
 
-static int
-_canbebound(struct value *v)
-{
-	return value_isint(v) || value_isrconst(v);
-}
-
-
-static struct value *
-_value_intrange_limit_create(int islw)
+struct value *
+value_int_range_fromexpr(struct ast_expr *e, struct state *s)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = islw ? number_intrange_min_create() : number_intrange_max_create();
+	v->n = number_range_create(range_fromexpr(e, s));
 	return v;
 }
-
-struct value *
-value_intrange_max_create(void) { return _value_intrange_limit_create(0); }
-
-struct value *
-value_intrange_min_create(void) { return _value_intrange_limit_create(1); }
 
 static int
 _isint(long);

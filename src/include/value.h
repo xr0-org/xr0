@@ -41,14 +41,10 @@ value_literal_create(char *);
 struct ast_expr;
 
 struct value *
-value_int_range_create(struct value *lw, struct value *up);
+value_int_range_create(int lw, int up);
 
 struct value *
-value_intrange_max_create(void);
-
-struct value *
-value_intrange_min_create(void);
-
+value_int_range_fromexpr(struct ast_expr *, struct state *);
 
 struct value *
 value_int_ne_create(int not_val);

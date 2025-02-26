@@ -39,18 +39,6 @@ number_const_create(long l)
 	return number_range_create(range_create(l, l+1));
 }
 
-struct number *
-number_intrange_max_create(void)
-{
-	return number_range_create(range_create(C89_INT_MAX+1, C89_INT_MAX+2));
-}
-
-struct number *
-number_intrange_min_create(void)
-{
-	return number_range_create(range_create(C89_INT_MIN, C89_INT_MIN+1));
-}
-
 static struct number *
 _number_ranges_create(struct range_arr *ranges)
 {

@@ -10,6 +10,9 @@ struct range *
 range_entire_create(void);
 
 struct range *
+range_fromexpr(struct ast_expr *, struct state *);
+
+struct range *
 range_copy(struct range *);
 
 void
