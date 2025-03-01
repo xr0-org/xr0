@@ -217,9 +217,6 @@ ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 			externals_gettypedef(state_getext(s), t->userdef), s,
 			range, key, persist
 		);
-	case TYPE_STRUCT:
-		/* XXX: struct has no range? */
-		return value_struct_rconst_create(t, s, key, persist);
 	default:
 		assert(false);
 	}
@@ -240,8 +237,6 @@ ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range
 			externals_gettypedef(state_getext(s), t->userdef),
 			s, range, persist
 		);
-	case TYPE_STRUCT:
-		return value_struct_rconstnokey_create(t, s, persist);
 	default:
 		assert(false);
 	}

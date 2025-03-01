@@ -273,9 +273,6 @@ state_rconst(struct state *state, struct ast_type *t, struct ast_expr *range,
 		);
 	}
 	struct value *v = ast_type_rconst(t, state, range, key, persist);
-	if (value_isstruct(v)) {
-		return v;
-	}
 	char *c = rconst_declare(state->rconst, v, key, persist);
 	return value_rconst_create(ast_expr_identifier_create(c));
 }
@@ -285,9 +282,6 @@ state_rconstnokey(struct state *state, struct ast_type *t, struct ast_expr *rang
 		bool persist)
 {
 	struct value *v = ast_type_rconstnokey(t, state, range, persist);
-	if (value_isstruct(v)) {
-		return v;
-	}
 	char *c = rconst_declarenokey(state->rconst, v, persist);
 	return value_rconst_create(ast_expr_identifier_create(c));
 }
