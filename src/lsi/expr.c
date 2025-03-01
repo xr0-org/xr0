@@ -6,7 +6,7 @@
 
 #include "ring_expr.h"
 
-struct expr {
+struct lsi_expr {
 	enum type { CONST, VAR, RING } t;
 	union {
 		int c;
@@ -15,51 +15,51 @@ struct expr {
 	};
 };
 
-static struct expr *
+static struct lsi_expr *
 _expr_create(enum type t)
 {
-	struct expr *e = malloc(sizeof(struct expr));
+	struct lsi_expr *e = malloc(sizeof(struct lsi_expr));
 	assert(e);
 	e->t = t;
 	return e;
 }
 
-struct expr *
-expr_const_create(int c)
+struct lsi_expr *
+lsi_expr_const_create(int c)
 {
-	struct expr *e = _expr_create(CONST);
+	struct lsi_expr *e = _expr_create(CONST);
 	e->c = c;
 	return e;
 }
 
-struct expr *
-expr_var_create(char *s)
+struct lsi_expr *
+lsi_expr_var_create(char *s)
 {
-	struct expr *e = _expr_create(VAR);
+	struct lsi_expr *e = _expr_create(VAR);
 	e->s = s;
 	return e;
 }
 
-struct expr *
-expr_sum_create(struct expr *e0, struct expr *e1)
+struct lsi_expr *
+lsi_expr_sum_create(struct lsi_expr *e0, struct lsi_expr *e1)
 {
-	struct expr *e = _expr_create(RING);
+	struct lsi_expr *e = _expr_create(RING);
 	e->r = ring_expr_sum_create(e0, e1);
 	return e;
 }
 
-struct expr *
-expr_product_create(struct expr *e0, struct expr *e1)
+struct lsi_expr *
+lsi_expr_product_create(struct lsi_expr *e0, struct lsi_expr *e1)
 {
-	struct expr *e = _expr_create(RING);
+	struct lsi_expr *e = _expr_create(RING);
 	e->r = ring_expr_product_create(e0, e1);
 	return e;
 }
 
-struct expr *
-expr_copy(struct expr *old)
+struct lsi_expr *
+lsi_expr_copy(struct lsi_expr *old)
 {
-	struct expr *new = _expr_create(old->t);
+	struct lsi_expr *new = _expr_create(old->t);
 	switch (old->t) {
 	case CONST:
 		new->c = old->c;
@@ -77,7 +77,7 @@ expr_copy(struct expr *old)
 }
 
 void
-expr_destroy(struct expr *e)
+lsi_expr_destroy(struct lsi_expr *e)
 {
 	switch (e->t) {
 	case CONST:
@@ -98,7 +98,7 @@ static char *
 _const_str(int);
 
 char *
-expr_str(struct expr *e)
+lsi_expr_str(struct lsi_expr *e)
 {
 	switch (e->t) {
 	case CONST:

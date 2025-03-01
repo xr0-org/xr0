@@ -88,10 +88,12 @@ char *
 rconst_str(struct rconst *, char *indent);
 
 char *
-rconst_declare(struct rconst *, struct value *, char *key, bool persist);
+rconst_declare(struct rconst *, struct value *, char *key, bool persist,
+		struct state *);
 
 char *
-rconst_declarenokey(struct rconst *, struct value *, bool persist);
+rconst_declarenokey(struct rconst *, struct value *, bool persist,
+		struct state *);
 
 struct value *
 rconst_get(struct rconst *, char *id);

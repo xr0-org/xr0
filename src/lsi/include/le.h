@@ -1,12 +1,12 @@
 #ifndef XR0_LSI_LE_H
 #define XR0_LSI_LE_H
 
-struct le;
+struct lsi_le;
 
-struct le *
-le_copy(struct le *);
+struct lsi_le *
+lsi_le_copy(struct lsi_le *);
 
 void
-le_destroy(struct le *);
+lsi_le_destroy(struct lsi_le *);
 
 #endif

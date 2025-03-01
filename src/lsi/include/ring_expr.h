@@ -3,13 +3,13 @@
 
 struct ring_expr;
 
-struct expr;
+struct lsi_expr;
 
 struct ring_expr *
-ring_expr_sum_create(struct expr *, struct expr *);
+ring_expr_sum_create(struct lsi_expr *, struct lsi_expr *);
 
 struct ring_expr *
-ring_expr_product_create(struct expr *, struct expr *);
+ring_expr_product_create(struct lsi_expr *, struct lsi_expr *);
 
 struct ring_expr *
 ring_expr_copy(struct ring_expr *);

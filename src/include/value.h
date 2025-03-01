@@ -49,10 +49,10 @@ value_int_range_fromexpr(struct ast_expr *, struct state *);
 struct value *
 value_int_ne_create(int not_val);
 
-int
+long
 value_int_lw(struct value *, struct state *);
 
-int
+long
 value_int_up(struct value *, struct state *);
 
 int

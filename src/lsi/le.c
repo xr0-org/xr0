@@ -6,38 +6,38 @@
 
 #include "expr.h"
 
-struct le { struct expr *l, *r; };
+struct lsi_le { struct lsi_expr *l, *r; };
 
-struct le *
-le_create(struct expr *l, struct expr *r)
+struct lsi_le *
+lsi_le_create(struct lsi_expr *l, struct lsi_expr *r)
 {
-	struct le *le = malloc(sizeof(struct le));
+	struct lsi_le *le = malloc(sizeof(struct lsi_le));
 	assert(le);
 	le->l = l;
 	le->r = r;
 	return le;
 }
 
-struct le *
-le_copy(struct le *old)
+struct lsi_le *
+lsi_le_copy(struct lsi_le *old)
 {
-	return le_create(expr_copy(old->l), expr_copy(old->r));
+	return lsi_le_create(lsi_expr_copy(old->l), lsi_expr_copy(old->r));
 }
 
 void
-le_destroy(struct le *le)
+lsi_le_destroy(struct lsi_le *le)
 {
-	expr_destroy(le->l);
-	expr_destroy(le->r);
+	lsi_expr_destroy(le->l);
+	lsi_expr_destroy(le->r);
 	free(le);
 }
 
 char *
-le_str(struct le *le)
+lsi_le_str(struct lsi_le *le)
 {
 	struct strbuilder *b = strbuilder_create();
-	char *l = expr_str(le->l),
-	     *r = expr_str(le->r);
+	char *l = lsi_expr_str(le->l),
+	     *r = lsi_expr_str(le->r);
 	strbuilder_printf(b, "%s <= %s", l, r);
 	free(r);
 	free(l);

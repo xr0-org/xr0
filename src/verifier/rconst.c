@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 
@@ -12,7 +13,7 @@ struct rconst {
 	struct map *keymap;
 	struct map *persist;
 
-	struct le_arr *constraints;
+	struct lsi_le_arr *constraints;
 };
 
 struct rconst *
@@ -22,7 +23,7 @@ rconst_create(void)
 	v->varmap = map_create();
 	v->keymap = map_create();
 	v->persist = map_create();
-	v->constraints = le_arr_create();
+	v->constraints = lsi_le_arr_create();
 	return v;
 }
 
@@ -36,7 +37,7 @@ rconst_destroy(struct rconst *v)
 	map_destroy(m);
 	map_destroy(v->keymap);
 	map_destroy(v->persist);
-	le_arr_destroy(v->constraints);
+	lsi_le_arr_destroy(v->constraints);
 	free(v);
 }
 
@@ -71,7 +72,7 @@ rconst_copy(struct rconst *old)
 			e.value
 		);
 	}
-	new->constraints = le_arr_copy(old->constraints);
+	new->constraints = lsi_le_arr_copy(old->constraints);
 	return new;
 }
 
@@ -79,12 +80,17 @@ static char *
 rconst_id(struct map *varmap, struct map *persistmap, bool persist);
 
 char *
-rconst_declarenokey(struct rconst *v, struct value *val, bool persist)
+rconst_declarenokey(struct rconst *v, struct value *val, bool persist,
+		struct state *state)
 {
 	struct map *m = v->varmap;
 	char *s = rconst_id(m, v->persist, persist);
 	map_set(m, dynamic_str(s), val);
 	map_set(v->persist, dynamic_str(s), (void *) persist);
+	printf("var: %s, val: %s\n", s, value_str(val));
+	printf("%li <= %s\n", value_int_lw(val, state), s);
+	printf("%s < %li\n", s, value_int_up(val, state));
+	assert(0);
 	return s;
 }
 
@@ -118,9 +124,10 @@ count_true(struct map *m)
 }
 
 char *
-rconst_declare(struct rconst *v, struct value *val, char *key, bool persist)
+rconst_declare(struct rconst *v, struct value *val, char *key, bool persist,
+		struct state *state)
 {
-	char *s = rconst_declarenokey(v, val, persist);
+	char *s = rconst_declarenokey(v, val, persist, state);
 	assert(key);
 	map_set(v->keymap, dynamic_str(s), dynamic_str(key));
 	return s;
@@ -192,9 +199,9 @@ rconst_str(struct rconst *v, char *indent)
 		free(value);
 	}
 
-	int len = le_arr_len(v->constraints);
+	int len = lsi_le_arr_len(v->constraints);
 	for (int i = 0; i < len; i++) {
-		char *s = le_str(le_arr_get(v->constraints, i));
+		char *s = lsi_le_str(lsi_le_arr_get(v->constraints, i));
 		strbuilder_printf(b, "%s|- %s\n", indent, s);
 		free(s);
 	}

@@ -230,28 +230,18 @@ value_int_range_fromexpr(struct ast_expr *e, struct state *s)
 	return v;
 }
 
-static int
-_isint(long);
-
-int
+long
 value_int_lw(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	long l = number_as_const(number_lw(v->n, s));
-	assert(_isint(l));
-	return l;
+	return number_as_const(number_lw(v->n, s));
 }
 
-static int
-_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX; }
-
-int
+long
 value_int_up(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	long l = number_as_const(number_up(v->n, s));
-	assert(_isint(l));
-	return l;
+	return number_as_const(number_up(v->n, s));
 }
 
 static int
@@ -821,6 +811,9 @@ value_isconstant(struct value *v)
 	return v->type == VALUE_INT && number_isconst(v->n);
 }
 
+static int
+_isint(long l);
+
 int
 value_as_constant(struct value *v)
 {
@@ -830,6 +823,9 @@ value_as_constant(struct value *v)
 	assert(_isint(l));
 	return l;
 }
+
+static int
+_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX; }
 
 int
 value_isrconst(struct value *v)
