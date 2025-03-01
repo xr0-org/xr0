@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "ast.h"
+#include "state.h"
 #include "util.h"
 #include "value.h"
 
@@ -80,11 +81,10 @@ _up_bound_value(struct ast_expr *e, struct state *s)
 static int
 _eval(struct ast_expr *e, struct state *s)
 {
-	return value_as_int(
-		value_res_as_value(
-			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
-		), s
+	struct value *v = value_res_as_value(
+		eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
 	);
+	return value_as_int(v, s);
 }
 
 struct range *
