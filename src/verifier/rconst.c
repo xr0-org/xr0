@@ -87,10 +87,22 @@ rconst_declarenokey(struct rconst *v, struct value *val, bool persist,
 	char *s = rconst_id(m, v->persist, persist);
 	map_set(m, dynamic_str(s), val);
 	map_set(v->persist, dynamic_str(s), (void *) persist);
-	printf("var: %s, val: %s\n", s, value_str(val));
-	printf("%li <= %s\n", value_int_lw(val, state), s);
-	printf("%s < %li\n", s, value_int_up(val, state));
-	assert(0);
+	lsi_le_arr_append(
+		v->constraints,
+		lsi_le_create(
+			lsi_expr_const_create(value_int_lw(val, state)),
+			lsi_expr_var_create(dynamic_str(s))
+		)
+	);
+	lsi_le_arr_append(
+		v->constraints,
+		lsi_le_create(
+			lsi_expr_var_create(dynamic_str(s)),
+			/* value_int_up returns exclusive upper bound,
+			 * lsi requires inclusive */
+			lsi_expr_const_create(value_int_up(val, state)-1)
+		)
+	);
 	return s;
 }
 
@@ -189,17 +201,18 @@ rconst_str(struct rconst *v, char *indent)
 	struct map *m = v->varmap;
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
-		char *value = value_str((struct value *) e.value);
-		strbuilder_printf(b, "%s%s: %s", indent, e.key, value);
+		strbuilder_printf(b, "%s%s", indent, e.key);
 		char *key = map_get(v->keymap, e.key);
 		if (key) {
 			strbuilder_printf(b, "\t\"%s\"", key);
 		}
 		strbuilder_printf(b, "\n");
-		free(value);
 	}
 
 	int len = lsi_le_arr_len(v->constraints);
+	if (len) {
+		strbuilder_printf(b, "\n");
+	}
 	for (int i = 0; i < len; i++) {
 		char *s = lsi_le_str(lsi_le_arr_get(v->constraints, i));
 		strbuilder_printf(b, "%s|- %s\n", indent, s);

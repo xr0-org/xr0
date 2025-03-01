@@ -1,8 +1,10 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 
 #include "util.h"
 #include "lsi.h"
+#include "_limits.h"
 
 #include "ring_expr.h"
 
@@ -27,6 +29,12 @@ _expr_create(enum type t)
 struct lsi_expr *
 lsi_expr_const_create(int c)
 {
+	a_printf(
+		C89_INT_MIN <= c && c <= C89_INT_MAX,
+		"only values between INT_MIN and INT_MAX are supported: "\
+		"have %d\n", c
+	);
+
 	struct lsi_expr *e = _expr_create(CONST);
 	e->c = c;
 	return e;
@@ -116,6 +124,15 @@ static char *
 _const_str(int c)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "%d", c);
+	switch (c) {
+	case C89_INT_MIN:
+		strbuilder_printf(b, "INT_MIN");
+		break;
+	case C89_INT_MAX:
+		strbuilder_printf(b, "INT_MAX");
+		break;
+	default:
+		strbuilder_printf(b, "%d", c);
+	}
 	return strbuilder_build(b);
 }
