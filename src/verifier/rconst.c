@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "ast.h"
+#include "lsi.h"
 #include "util.h"
 #include "value.h"
 
@@ -10,6 +11,8 @@ struct rconst {
 	struct map *varmap;
 	struct map *keymap;
 	struct map *persist;
+
+	struct le_arr *constraints;
 };
 
 struct rconst *
@@ -19,6 +22,7 @@ rconst_create(void)
 	v->varmap = map_create();
 	v->keymap = map_create();
 	v->persist = map_create();
+	v->constraints = le_arr_create();
 	return v;
 }
 
@@ -32,6 +36,7 @@ rconst_destroy(struct rconst *v)
 	map_destroy(m);
 	map_destroy(v->keymap);
 	map_destroy(v->persist);
+	le_arr_destroy(v->constraints);
 	free(v);
 }
 
@@ -66,7 +71,7 @@ rconst_copy(struct rconst *old)
 			e.value
 		);
 	}
-
+	new->constraints = le_arr_copy(old->constraints);
 	return new;
 }
 
@@ -186,6 +191,14 @@ rconst_str(struct rconst *v, char *indent)
 		strbuilder_printf(b, "\n");
 		free(value);
 	}
+
+	int len = le_arr_len(v->constraints);
+	for (int i = 0; i < len; i++) {
+		char *s = le_str(le_arr_get(v->constraints, i));
+		strbuilder_printf(b, "%s|- %s\n", indent, s);
+		free(s);
+	}
+
 	return strbuilder_build(b);
 }
 
