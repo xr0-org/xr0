@@ -29,12 +29,12 @@ math_ge(struct math_expr *e1, struct math_expr *e2)
 	return math_le(e2, e1);
 }
 
-struct tally {
+struct math_tally {
 	struct map *map;
 	int num;
 };
 
-static struct tally
+static struct math_tally
 tally(struct math_expr *);
 
 static struct math_expr *
@@ -72,7 +72,7 @@ variable_tally_eq(struct map *, struct map *);
 bool
 math_le(struct math_expr *e1, struct math_expr *e2)
 {
-	struct tally d1 = tally(e1),
+	struct math_tally d1 = tally(e1),
 		     d2 = tally(e2);
 
 	return variable_tally_eq(d1.map, d2.map) && d1.num <= d2.num;
@@ -221,7 +221,7 @@ math_expr_nullablesum(struct math_expr *e1, struct math_expr *e2)
 struct math_expr *
 math_expr_simplify(struct math_expr *raw)
 {
-	struct tally t = tally(raw);
+	struct math_tally t = tally(raw);
 
 	struct map *m = t.map;
 
@@ -246,16 +246,16 @@ math_expr_simplify(struct math_expr *raw)
 	return expr;
 }
 
-static struct tally
+static struct math_tally
 atom_tally(struct math_atom *);
 
-static struct tally
+static struct math_tally
 sum_tally(struct math_expr *e);
 
-static struct tally
+static struct math_tally
 neg_tally(struct math_expr *e);
 
-static struct tally
+static struct math_tally
 tally(struct math_expr *e)
 {
 	switch (e->type) {
@@ -273,15 +273,15 @@ tally(struct math_expr *e)
 static struct map *
 map_sum(struct map *, struct map *);
 
-static struct tally
+static struct math_tally
 sum_tally(struct math_expr *e)
 {
 	assert(e->type == EXPR_SUM);
 
-	struct tally r1 = tally(e->sum.e1),
+	struct math_tally r1 = tally(e->sum.e1),
 		     r2 = tally(e->sum.e2);
 
-	return (struct tally) {
+	return (struct math_tally) {
 		map_sum(r1.map, r2.map), r1.num + r2.num,
 	};
 }
@@ -308,10 +308,10 @@ map_sum(struct map *m1, struct map *m2)
 }
 
 
-static struct tally
+static struct math_tally
 neg_tally(struct math_expr *e)
 {
-	struct tally r = tally(e->negated);
+	struct math_tally r = tally(e->negated);
 
 	struct map *m = r.map;
 	for (int i = 0; i < m->n; i++) {
@@ -415,14 +415,14 @@ math_atom_str(struct math_atom *a)
 static struct map *
 map_fromvar(char *id);
 
-static struct tally
+static struct math_tally
 atom_tally(struct math_atom *a)
 {
 	switch (a->type) {
 	case ATOM_NAT:
-		return (struct tally) { map_create(), a->i };
+		return (struct math_tally) { map_create(), a->i };
 	case ATOM_VARIABLE:
-		return (struct tally) {
+		return (struct math_tally) {
 			map_fromvar(dynamic_str(a->v)), 0
 		};
 	default:

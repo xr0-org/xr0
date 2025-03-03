@@ -65,7 +65,7 @@ lsi_expr_product_create(struct lsi_expr *e0, struct lsi_expr *e1)
 }
 
 struct lsi_expr *
-lsi_expr_copy(struct lsi_expr *old)
+_lsi_expr_copy(struct lsi_expr *old)
 {
 	struct lsi_expr *new = _expr_create(old->t);
 	switch (old->t) {
@@ -85,7 +85,7 @@ lsi_expr_copy(struct lsi_expr *old)
 }
 
 void
-lsi_expr_destroy(struct lsi_expr *e)
+_lsi_expr_destroy(struct lsi_expr *e)
 {
 	switch (e->t) {
 	case CONST:

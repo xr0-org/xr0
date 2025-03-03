@@ -1,32 +1,26 @@
 #ifndef XR0_LSI_H
 #define XR0_LSI_H
 
-struct lsi_le_arr;
+/* lsi: a system of linear inequalities */
+struct lsi;
 
-struct lsi_le_arr *
-lsi_le_arr_create(void);
+struct lsi *
+lsi_create(void);
 
-struct lsi_le_arr *
-lsi_le_arr_copy(struct lsi_le_arr *);
+struct lsi *
+lsi_copy(struct lsi *);
 
 void
-lsi_le_arr_destroy(struct lsi_le_arr *);
+lsi_destroy(struct lsi *);
 
+char *
+lsi_str(struct lsi *, char *prefix);
+
+struct error;
 struct lsi_le;
 
-void
-lsi_le_arr_append(struct lsi_le_arr *, struct lsi_le *);
-
-int
-lsi_le_arr_len(struct lsi_le_arr *);
-
-struct lsi_le *
-lsi_le_arr_get(struct lsi_le_arr *, int);
-
-DECLARE_RESULT_TYPE(struct lsi_le_arr *, arr, lsi_le_arr_res)
-
-struct lsi_le_arr_res *
-lsi_le_arr_reduce(struct lsi_le_arr *);
+struct error *
+lsi_add(struct lsi *, struct lsi_le *);
 
 
 /* lsi_le: a less-than-or-equal-to inequality */
@@ -42,6 +36,8 @@ char *
 lsi_le_str(struct lsi_le *);
 
 
+/* lsi_expr: an arithmetic term involving constants, variables, sums and
+ * products */ 
 struct lsi_expr;
 
 struct lsi_expr *
@@ -55,5 +51,8 @@ lsi_expr_sum_create(struct lsi_expr *, struct lsi_expr *);
 
 struct lsi_expr *
 lsi_expr_product_create(struct lsi_expr *, struct lsi_expr *);
+
+char *
+lsi_expr_str(struct lsi_expr *);
 
 #endif

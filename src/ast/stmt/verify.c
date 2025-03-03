@@ -415,6 +415,7 @@ iter_setupverify(struct ast_stmt *stmt, struct state *impl)
 {
 	struct state *spec = state_copy(impl);
 	deriveinvstate(stmt, spec);
+	printf("spec:\n%s\n", state_str(spec));
 	struct error *err = state_constraintverify_all(spec, impl);
 	state_destroy(spec);
 	return err;

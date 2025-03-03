@@ -38,15 +38,15 @@ struct ring_expr *
 ring_expr_copy(struct ring_expr *e)
 {
 	return _ring_expr_create(
-		lsi_expr_copy(e->e0), e->op, lsi_expr_copy(e->e1)
+		_lsi_expr_copy(e->e0), e->op, _lsi_expr_copy(e->e1)
 	);
 }
 
 void
 ring_expr_destroy(struct ring_expr *e)
 {
-	lsi_expr_destroy(e->e0);
-	lsi_expr_destroy(e->e1);
+	_lsi_expr_destroy(e->e0);
+	_lsi_expr_destroy(e->e1);
 	free(e);
 }
 

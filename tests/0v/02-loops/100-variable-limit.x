@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
 void
-unit(int limit) ~ [ setup: limit = [0?50]; ]
+unit(int limit) ~ [ setup: limit = [50?0]; ]
 {
 	int i;
 

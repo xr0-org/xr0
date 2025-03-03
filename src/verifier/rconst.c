@@ -7,13 +7,14 @@
 #include "lsi.h"
 #include "util.h"
 #include "value.h"
+#include "_limits.h"
 
 struct rconst {
 	struct map *varmap;
 	struct map *keymap;
 	struct map *persist;
 
-	struct lsi_le_arr *constraints;
+	struct lsi *constraints;
 };
 
 struct rconst *
@@ -23,7 +24,7 @@ rconst_create(void)
 	v->varmap = map_create();
 	v->keymap = map_create();
 	v->persist = map_create();
-	v->constraints = lsi_le_arr_create();
+	v->constraints = lsi_create();
 	return v;
 }
 
@@ -31,13 +32,10 @@ void
 rconst_destroy(struct rconst *v)
 {
 	struct map *m = v->varmap;
-	for (int i = 0; i < m->n; i++) {
-		value_destroy((struct value *) m->entry[i].value);
-	}
 	map_destroy(m);
 	map_destroy(v->keymap);
 	map_destroy(v->persist);
-	lsi_le_arr_destroy(v->constraints);
+	lsi_destroy(v->constraints);
 	free(v);
 }
 
@@ -51,7 +49,7 @@ rconst_copy(struct rconst *old)
 		map_set(
 			new->varmap,
 			dynamic_str(e.key),
-			value_copy((struct value *) e.value)
+			(void *) 1
 		);
 	}
 	m = old->keymap;
@@ -72,39 +70,79 @@ rconst_copy(struct rconst *old)
 			e.value
 		);
 	}
-	new->constraints = lsi_le_arr_copy(old->constraints);
+	new->constraints = lsi_copy(old->constraints);
 	return new;
 }
 
 static char *
 rconst_id(struct map *varmap, struct map *persistmap, bool persist);
 
+static struct lsi_expr *
+_range_lw(struct ast_expr *range, struct state *);
+
+static struct lsi_expr *
+_range_up(struct ast_expr *range, struct state *);
+
 char *
-rconst_declarenokey(struct rconst *v, struct value *val, bool persist,
+rconst_declarenokey(struct rconst *v, struct ast_expr *range, bool persist,
 		struct state *state)
 {
 	struct map *m = v->varmap;
 	char *s = rconst_id(m, v->persist, persist);
-	map_set(m, dynamic_str(s), val);
+	map_set(m, dynamic_str(s), (void *) 1);
 	map_set(v->persist, dynamic_str(s), (void *) persist);
-	lsi_le_arr_append(
+	lsi_add(
 		v->constraints,
 		lsi_le_create(
-			lsi_expr_const_create(value_int_lw(val, state)),
+			_range_lw(ast_expr_range_lw(range), state),
 			lsi_expr_var_create(dynamic_str(s))
 		)
 	);
-	lsi_le_arr_append(
+	lsi_add(
 		v->constraints,
 		lsi_le_create(
 			lsi_expr_var_create(dynamic_str(s)),
-			/* value_int_up returns exclusive upper bound,
-			 * lsi requires inclusive */
-			lsi_expr_const_create(value_int_up(val, state)-1)
+			_range_up(ast_expr_range_up(range), state)
 		)
 	);
 	return s;
 }
+
+static struct lsi_expr *
+_range_lw(struct ast_expr *e, struct state *s)
+{
+	if (ast_expr_israngemin(e)) {
+		return lsi_expr_const_create(C89_INT_MIN);
+	} else {
+		struct value *v = value_res_as_value(
+			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
+		);
+		return lsi_expr_const_create(value_as_int(v, s));
+	}
+}
+
+static struct lsi_expr *
+_range_up(struct ast_expr *e, struct state *s)
+{
+	if (ast_expr_israngemax(e)) {
+		return lsi_expr_const_create(C89_INT_MAX);
+	} else {
+		struct value *v = value_res_as_value(
+			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
+		);
+		/* subtract 1 b/c range expression upper bounds are exclusive */
+		if (value_isconstant(v)) {
+			return lsi_expr_const_create(value_as_int(v, s)-1);
+		}
+		return ast_expr_to_lsi(
+			ast_expr_sum_create(
+				ast_expr_copy(value_as_rconst(v)),
+				ast_expr_constant_create(-1)
+			)
+		);
+	}
+}
+
 
 static int
 count_true(struct map *m);
@@ -136,19 +174,19 @@ count_true(struct map *m)
 }
 
 char *
-rconst_declare(struct rconst *v, struct value *val, char *key, bool persist,
+rconst_declare(struct rconst *v, struct ast_expr *range, char *key, bool persist,
 		struct state *state)
 {
-	char *s = rconst_declarenokey(v, val, persist, state);
+	char *s = rconst_declarenokey(v, range, persist, state);
 	assert(key);
 	map_set(v->keymap, dynamic_str(s), dynamic_str(key));
 	return s;
 }
 
-struct value *
-rconst_get(struct rconst *v, char *id)
+int
+rconst_hasvar(struct rconst *r, char *var)
 {
-	return map_get(v->varmap, id);
+	return map_get(r->varmap, var) != NULL;
 }
 
 char *
@@ -182,7 +220,7 @@ rconst_undeclare(struct rconst *v)
 		}
 		map_set(
 			varmap, dynamic_str(key),
-			value_copy((struct value *) map_get(v->varmap, key))
+			(void *) 1
 		);
 		char *c = map_get(v->keymap, key);
 		map_set(keymap, dynamic_str(key), dynamic_str(c));
@@ -193,6 +231,9 @@ rconst_undeclare(struct rconst *v)
 	v->keymap = keymap;
 	v->persist = persist;
 }
+
+static char *
+_constraints_prefix(char *indent);
 
 char *
 rconst_str(struct rconst *v, char *indent)
@@ -209,16 +250,22 @@ rconst_str(struct rconst *v, char *indent)
 		strbuilder_printf(b, "\n");
 	}
 
-	int len = lsi_le_arr_len(v->constraints);
-	if (len) {
-		strbuilder_printf(b, "\n");
+	char *prefix = _constraints_prefix(indent);
+	char *lsi = lsi_str(v->constraints, prefix);
+	if (strlen(lsi) > 0) {
+		strbuilder_printf(b, "\n%s", lsi);
 	}
-	for (int i = 0; i < len; i++) {
-		char *s = lsi_le_str(lsi_le_arr_get(v->constraints, i));
-		strbuilder_printf(b, "%s|- %s\n", indent, s);
-		free(s);
-	}
+	free(lsi);
+	free(prefix);
 
+	return strbuilder_build(b);
+}
+
+static char *
+_constraints_prefix(char *indent)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s|- ", indent);
 	return strbuilder_build(b);
 }
 

@@ -19,16 +19,16 @@ lsi_le_create(struct lsi_expr *l, struct lsi_expr *r)
 }
 
 struct lsi_le *
-lsi_le_copy(struct lsi_le *old)
+_lsi_le_copy(struct lsi_le *old)
 {
-	return lsi_le_create(lsi_expr_copy(old->l), lsi_expr_copy(old->r));
+	return lsi_le_create(_lsi_expr_copy(old->l), _lsi_expr_copy(old->r));
 }
 
 void
-lsi_le_destroy(struct lsi_le *le)
+_lsi_le_destroy(struct lsi_le *le)
 {
-	lsi_expr_destroy(le->l);
-	lsi_expr_destroy(le->r);
+	_lsi_expr_destroy(le->l);
+	_lsi_expr_destroy(le->r);
 	free(le);
 }
 

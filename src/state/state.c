@@ -272,18 +272,24 @@ state_rconst(struct state *state, struct ast_type *t, struct ast_expr *range,
 			ast_expr_identifier_create(dynamic_str(prev))
 		);
 	}
-	struct value *v = ast_type_rconst(t, state, range, key, persist);
-	char *c = rconst_declare(state->rconst, v, key, persist, state);
-	return value_rconst_create(ast_expr_identifier_create(c));
+	return value_rconst_create(
+		ast_expr_identifier_create(
+			rconst_declare(
+				state->rconst, range, key, persist, state
+			)
+		)
+	);
 }
 
 struct value *
-state_rconstnokey(struct state *state, struct ast_type *t, struct ast_expr *range,
-		bool persist)
+state_rconstnokey(struct state *state, struct ast_type *t,
+		struct ast_expr *range, bool persist)
 {
-	struct value *v = ast_type_rconstnokey(t, state, range, persist);
-	char *c = rconst_declarenokey(state->rconst, v, persist, state);
-	return value_rconst_create(ast_expr_identifier_create(c));
+	return value_rconst_create(
+		ast_expr_identifier_create(
+			rconst_declarenokey(state->rconst, range, persist, state)
+		)
+	);
 }
 
 struct value *
@@ -419,10 +425,17 @@ state_loc_onheap(struct state *state, struct location *loc)
 	return location_toheap(loc, state->heap);
 }
 
+int
+state_hasrconst(struct state *state, char *id)
+{
+	return rconst_hasvar(state->rconst, id);
+}
+
 struct value *
 state_getrconst(struct state *state, char *id)
 {
-	return rconst_get(state->rconst, id);
+	assert(state_hasrconst(state, id));
+	return value_rconst_create(ast_expr_identifier_create(dynamic_str(id)));
 }
 
 struct object_res *

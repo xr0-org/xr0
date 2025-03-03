@@ -164,6 +164,9 @@ state_loc_valid(struct state *, struct location *);
 bool
 state_loc_onheap(struct state *, struct location *);
 
+int
+state_hasrconst(struct state *state, char *id);
+
 struct value *
 state_getrconst(struct state *, char *id);
 
