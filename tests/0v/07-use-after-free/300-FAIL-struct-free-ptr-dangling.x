@@ -21,7 +21,7 @@ create_score(char *subject, int grade) ~ [
 	s->subject = subject;
 	s->grade = grade;
 	return s;
-] {
+]{
 	struct score *s;
 	s = malloc(sizeof(struct score));
 
@@ -38,7 +38,6 @@ create_report()
 	char *sub;
 
 	sub = malloc(sizeof(char) * 7);
-	*sub = "english";
 
 	s = create_score(sub, 1);
 	free(sub);		/* dangling ptr */

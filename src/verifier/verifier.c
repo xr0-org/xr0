@@ -10,6 +10,7 @@
 
 #include "arr.h"
 #include "instruct.h"
+#include "lsi.h"
 #include "mux.h"
 #include "path.h"
 
@@ -17,8 +18,8 @@ struct verifier;
 
 DECLARE_RESULT_TYPE(struct verifier *, verifier, v_res)
 
-static struct v_res *
-_verifier_copywithsplit(struct verifier *old, struct map *split, struct state *);
+static struct verifier *
+_verifier_copywithsplit(struct verifier *old, struct lsi_le *);
 
 static void
 _verifier_split(struct verifier *, struct mux *);
@@ -100,23 +101,12 @@ static struct verifier_arr *
 verifier_gensplits(struct verifier *v, struct splitinstruct *inst)
 {
 	struct verifier_arr *arr = verifier_arr_create();
-	struct map **split = splitinstruct_splits(inst);
-	int n = splitinstruct_n(inst);
-	for (int i = 0; i < n; i++) {
-		struct v_res *res = _verifier_copywithsplit(
-			v, split[i], splitinstruct_state(inst)
-		);
-		if (v_res_iserror(res)) {
-			/* contradictions not added to mux */
-			assert(
-				error_to_verifiercontradiction(
-					v_res_as_error(res)
-				)
-			);
-			continue;
-		}
-		verifier_arr_append(arr, v_res_as_verifier(res));
-	}
+	verifier_arr_append(
+		arr, _verifier_copywithsplit(v, splitinstruct_0(inst))
+	);
+	verifier_arr_append(
+		arr, _verifier_copywithsplit(v, splitinstruct_1(inst))
+	);
 	return arr;
 }
 
@@ -138,10 +128,10 @@ verifier_lexememarker(struct verifier *v)
 
 struct verifier {
 	int issplit;
-	union control {
+	union {
 		struct mux *mux;
 		struct path *p;
-	} control;
+	} u;
 	struct rconst *rconst;
 	struct ast_function *f;
 	struct externals *ext;
@@ -156,7 +146,7 @@ _verifier_create(struct path *p, struct rconst *rconst, struct ast_function *f,
 	struct verifier *v = malloc(sizeof(struct verifier));
 	assert(v);
 	v->issplit = 0;
-	v->control.p = p;
+	v->u.p = p;
 	v->rconst = rconst;
 	v->f = ast_function_copy(f);
 	v->ext = ext;
@@ -231,52 +221,27 @@ state_actual(struct rconst *rconst, struct ast_function *f,
 	return s;
 }
 
-
-
-static struct rconst *
-rconst_split(struct rconst *, struct map *split, struct state *);
-
 static struct ast_function *
-copy_withsplitname(struct ast_function *, struct map *split); 
+copy_withsplitname(struct ast_function *, struct lsi_le *split); 
 
-static struct v_res *
-_verifier_copywithsplit(struct verifier *old, struct map *split, struct state *s)
+static struct verifier *
+_verifier_copywithsplit(struct verifier *old, struct lsi_le *split)
 {
-	struct rconst *rconst = rconst_split(old->rconst, split, s);
-	if (!rconst) {
-		return v_res_error_create(error_verifiercontradiction());
-	}
+	struct rconst *rconst = rconst_split(old->rconst, split);
 	struct ast_function *f = copy_withsplitname(old->f, split);
-	return v_res_verifier_create(
-		_verifier_create(
-			path_split(old->control.p, rconst, ast_function_name(f)),
-			rconst,
-			f,
-			old->ext
-		)
+	return _verifier_create(
+		path_split(old->u.p, rconst, ast_function_name(f)),
+		rconst,
+		f,
+		old->ext
 	);
 }
 
-static struct rconst *
-rconst_split(struct rconst *old, struct map *split, struct state *s)
-{
-	struct rconst *new = rconst_copy(old);
-	for (int i = 0; i < split->n; i++) {
-		struct entry e = split->entry[i];
-		struct value *v = rconst_get(new, e.key);
-		assert(v);
-		if (!value_splitassume(v, (struct number *) e.value, s)) {
-			return NULL;
-		}
-	}
-	return new;
-}
-
 static char *
-split_name(char *name, struct map *split);
+split_name(char *name, struct lsi_le *split);
 
 static struct ast_function *
-copy_withsplitname(struct ast_function *old, struct map *split)
+copy_withsplitname(struct ast_function *old, struct lsi_le *split)
 {
 	struct ast_function *f = ast_function_copy(old);
 	ast_function_setname(f, split_name(ast_function_name(f), split));
@@ -284,26 +249,12 @@ copy_withsplitname(struct ast_function *old, struct map *split)
 }
 
 static char *
-split_name(char *name, struct map *split)
+split_name(char *name, struct lsi_le *split)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "%s | ", name);
-	if (split->n > 1) {
-		strbuilder_printf(b, "{ ");
-	}
-	for (int i = 0; i < split->n; i++) {
-		struct entry e = split->entry[i];
-		char *rconst = e.key;
-		char *num = number_short_str((struct number *) e.value);
-		strbuilder_printf(
-			b, "%s ∈ {%s}%s", rconst, num,
-			(i+1 < split->n ? "," : "")
-		);
-		free(num);
-	}
-	if (split->n > 1) {
-		strbuilder_printf(b, " }");
-	}
+	char *s = lsi_le_str(split);
+	strbuilder_printf(b, "%s | %s", name, s);
+	free(s);
 	return strbuilder_build(b);
 }
 
@@ -314,7 +265,7 @@ _verifier_split(struct verifier *v, struct mux *mux)
 	assert(!_verifier_issplit(v));
 	/* TODO: destroy v->s */
 	v->issplit = 1;
-	v->control.mux = mux;
+	v->u.mux = mux;
 }
 
 void
@@ -323,10 +274,10 @@ verifier_destroy(struct verifier *v)
 	assert(verifier_atend(v));
 
 	if (v->issplit) {
-		assert(v->control.mux);
-		mux_destroy(v->control.mux);
+		assert(v->u.mux);
+		mux_destroy(v->u.mux);
 	} else {
-		path_destroy(v->control.p);
+		path_destroy(v->u.p);
 	}
 	/*rconst_destroy(v->rconst);*/
 	free(v);
@@ -342,14 +293,14 @@ static struct mux *
 _verifier_mux(struct verifier *v)
 {
 	assert(v->issplit);
-	return v->control.mux;
+	return v->u.mux;
 }
 
 static struct path *
 _verifier_path(struct verifier *v)
 {
 	assert(!v->issplit);
-	return v->control.p;
+	return v->u.p;
 }
 
 DEFINE_RESULT_TYPE(struct verifier *, verifier, verifier_destroy, v_res, false)

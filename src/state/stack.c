@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
 #include "location.h"
 #include "block.h"
@@ -12,6 +13,9 @@
 #include "value.h"
 #include "util.h"
 #include "program.h"
+#include "lsi.h"
+
+#include "constraint.h"
 
 struct frame;
 
@@ -626,40 +630,124 @@ stack_getvariable(struct stack *s, char *id)
 	return v;
 }
 
-static struct error *
-constraintverify_all(struct map *, struct state *spec, struct state *impl);
-
 struct error *
-stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
+stack_shapeverify_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl)
 {
-	struct error *err = constraintverify_all(spec_stack->varmap, spec, impl);
+	struct error *err = stack_shapeverify_top(
+		spec_stack, spec, impl
+	);
 	if (err) {
 		return err;
 	}
-	return spec_stack->prev
-		? stack_constraintverify_all(spec_stack->prev, spec, impl)
-		: NULL;
+	if (spec_stack->prev) {
+		return stack_shapeverify_all(
+			spec_stack->prev, spec, impl
+		);
+	}
+	return NULL;
 }
 
 static struct error *
-constraintverify_all(struct map *m, struct state *spec, struct state *impl)
+_var_shapeverify(struct state *spec, struct state *impl, char *id);
+
+struct error *
+stack_shapeverify_top(struct stack *spec_stack, struct state *spec,
+		struct state *impl)
 {
 	int i;
 
+	struct map *m = spec_stack->varmap;
 	for (i = 0; i < m->n; i++) {
-		struct error *err;
 		char *id = m->entry[i].key;
-
-		if ((err = state_constraintverify(spec, impl, id))) {
+		struct error *err = _var_shapeverify(spec, impl, id);
+		if (err) {
 			return error_printf(
-				"invariant failure: `%s' %w",
+				"precondition failure: `%s' %w",
 				id, err
 			);
 		}
 	}
 
 	return NULL;
+}
+
+static struct object *
+location_mustgetobject(struct location *, struct state *);
+
+static struct error *
+_var_shapeverify(struct state *spec, struct state *impl, char *id)
+{
+	struct object *spec_obj = location_mustgetobject(
+		loc_res_as_loc(state_getloc(spec, id)), spec
+	);
+	if (!object_hasvalue(spec_obj)) {
+		return NULL;
+	}
+	struct constraint *c = constraint_create(
+		spec, impl,
+		ast_type_copy(state_getvariabletype(spec, id))
+	);
+	struct error *err = constraint_shapeverify(
+		c,
+		object_as_value(spec_obj),
+		/* we can safely assume that impl has a value for id because
+		 * it's the result of an argument expression being evaluated */
+		object_as_value(
+			location_mustgetobject(
+				loc_res_as_loc(state_getloc(impl, id)),
+				impl
+			)
+		)
+	);
+	constraint_destroy(c);
+	return err;
+}
+
+static struct object *
+location_mustgetobject(struct location *loc, struct state *s)
+{
+	return object_res_as_object(state_get(s, loc, false));
+}
+
+static struct lsi_varmap *
+_var_rconst_mapping(struct state *, char *id);
+
+struct lsi_varmap *
+stack_rconst_mapping(struct stack *stack, struct state *state)
+{
+	int i;
+
+	struct lsi_varmap *lv = lsi_varmap_create();
+
+	struct map *m = stack->varmap;
+	for (i = 0; i < m->n; i++)
+		lsi_varmap_addrange(
+			lv, _var_rconst_mapping(state, m->entry[i].key)
+		);
+
+	if (!frame_iscall(stack->f)) {
+		assert(stack->prev);
+		lsi_varmap_addrange(
+			lv, stack_rconst_mapping(stack->prev, state)
+		);
+	}
+
+	return lv;
+}
+
+static struct lsi_varmap *
+_var_rconst_mapping(struct state *s, char *id)
+{
+	struct object *obj = location_mustgetobject(
+		loc_res_as_loc(state_getloc(s, id)), s
+	);
+	if (!object_hasvalue(obj)) {
+		return lsi_varmap_create();
+	}
+	return value_rconst_mapping(
+		object_as_value(obj), state_getvariabletype(s, id), s, id
+	);
 }
 
 struct error *

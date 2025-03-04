@@ -30,7 +30,7 @@ modify(int *p, int *q) ~ [
 	int i;
 	i = 0;
 	i = snapshot_and_change(p);
-	~ [ *p == 3; ];
+	~ [ *p <= 3; *p >= 3; ];
 
 	*q = 2;
 }
@@ -41,9 +41,10 @@ main()
 	int p;
 	int q;
 	p = 9;
-	~ [ p == 9; ];
+	~ [ p <= 9; p >= 9; ];
 	modify(&p, &q);
-	~ [ p == 3; ];
-	~ [ q == 2; ];
+	~ [ p <= 3; p >= 3; ];
+	~ [ q <= 2; q >= 2; ];
+
 	return 0;
 }

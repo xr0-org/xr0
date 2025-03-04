@@ -3,12 +3,17 @@ phase:	ABSTRACT (SETUP)
 text:
 -->	setupv .clump(1);
 	call .clump(1);
-	movret <t0>;
-	q = <t0>;
+	movret #R0;
+	q = #R0;
 
 rconst:
-	$0: ptr:{?}	"q"
-	$1: int:{?}	"x"
+	$0	"q"
+	$1	"x"
+
+	|- -$0 <= 32767
+	|- $0 <= 32767
+	|- -$1 <= 32767
+	|- $1 <= 32767
 
 stack:
 	---------------------------- inter

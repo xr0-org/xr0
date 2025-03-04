@@ -1,2 +1,2 @@
-06-preconditions/320-FAIL-range-verification.x:2:33: precondition failure: argument of `x' must be ≥ -1 (foo)
+06-preconditions/320-FAIL-range-verification.x:2:33: -x <= 1 not satisfied (foo)
 	06-preconditions/320-FAIL-range-verification.x:10:9 (bar)

@@ -221,15 +221,15 @@ segment_audit(struct segment *abstract, struct segment *actual)
 	}
 
 	if (state_hasgarbage(actual->state)) {
-		v_printf("actual: %s", state_str(actual->state));
+		v_printf("%s", state_str(actual->state));
 		return error_printf(
 			"%s: garbage on heap", state_funcname(actual->state)
 		);
 	}
 	struct error *err;
 	if ((err = state_specverify(actual->state, abstract->state))) {
-		v_printf("actual:\n%s", state_str(actual->state));
-		v_printf("abstract:\n%s", state_str(abstract->state));
+		v_printf("spec:\n%s", state_str(abstract->state));
+		v_printf("impl:\n%s", state_str(actual->state));
 		return error_printf(
 			"%s: %s",
 			state_funcname(actual->state),

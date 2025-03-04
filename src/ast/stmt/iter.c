@@ -249,6 +249,7 @@ toblock(struct ast_stmt *stmt)
 		return ast_block_copy(ast_stmt_as_block(stmt));
 	case STMT_NOP:
 	case STMT_SELECTION:
+	case STMT_EXPR:
 		break;
 	default:
 		assert(false);

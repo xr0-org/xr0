@@ -49,7 +49,7 @@ static struct error *
 jump_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
-static struct error *
+struct error *
 selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
@@ -105,7 +105,7 @@ jump_linearise(struct ast_stmt *stmt, struct ast_block *b,
 	return NULL;
 }
 
-static struct error *
+struct error *
 selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
@@ -114,7 +114,14 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
 			*nest = ast_stmt_sel_nest(stmt);
 	
 	struct ast_expr *newcond = ast_expr_geninstr(
-		cond, lexememarker_copy(loc), b, state
+		/* in keeping with 3.6.4.1, linearise out the possibility of a
+		 * non-integer comparison reaching our decision procedures */
+		ast_expr_binary_create(
+			ast_expr_copy(cond),
+			BINARY_OP_NE,
+			ast_expr_constant_create(0)
+		),
+		lexememarker_copy(loc), b, state
 	);
 	struct ast_stmt *newsel = ast_stmt_create_sel(
 		lexememarker_copy(loc),
@@ -141,6 +148,9 @@ iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 static struct error *
 directverify(struct ast_stmt *, struct state *);
 
+static bool
+islinearisable(struct ast_stmt *);
+
 struct error *
 ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
 {
@@ -149,9 +159,6 @@ ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
 	state_destroy(copy);
 	return err;
 }
-
-static bool
-islinearisable(struct ast_stmt *);
 
 static struct error *
 stmt_expr_verify(struct ast_stmt *, struct state *);
@@ -426,7 +433,7 @@ deriveinvstate(struct ast_stmt *stmt, struct state *state)
 	state_pushinvariantframe(state, iter_inv(ast_stmt_as_iter(stmt)));
 	while (!state_atinvariantend(state)) {
 		struct error *err = state_step(state);
-		assert(!err);
+		a_printf(!err, "%s\n", error_str(err));
 	}
 	state_popframe(state);
 }
@@ -498,6 +505,9 @@ static struct error *
 asm_call_exec(struct ast_expr *call, struct state *);
 
 static struct error *
+asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *);
+
+static struct error *
 asm_movret_exec(struct ast_variable *temp, struct state *);
 
 static struct error *
@@ -507,6 +517,12 @@ stmt_asm_exec(struct ast_stmt *stmt, struct state *state)
 		return asm_setupv_exec(ast_stmt_asm_call(stmt), state);
 	} else if (ast_stmt_asm_iscall(stmt)) {
 		return asm_call_exec(ast_stmt_asm_call(stmt), state);
+	} else if (ast_stmt_asm_ismov(stmt)) {
+		return asm_mov_exec(
+			ast_stmt_asm_mov_var(stmt),
+			ast_stmt_asm_mov_val(stmt),
+			state
+		);
 	} else {
 		return asm_movret_exec(ast_stmt_asm_mov_var(stmt), state);
 	}
@@ -531,6 +547,37 @@ asm_call_exec(struct ast_expr *call, struct state *state)
 		return e_res_as_error(res);
 	}
 	e_res_destroy(res);
+	return NULL;
+}
+
+static struct error *
+asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *s)
+{
+	struct e_res *r_res = ast_expr_eval(val, s);
+	if (e_res_iserror(r_res)) {
+		return e_res_as_error(r_res);
+	}
+
+	state_declare(s, temp, false);
+	struct ast_expr *name = ast_expr_identifier_create(
+		dynamic_str(ast_variable_name(temp))
+	);
+	struct e_res *l_res = ast_expr_eval(name, s);
+	if (e_res_iserror(l_res)) {
+		return e_res_as_error(l_res);
+	}
+	struct object *l_obj = object_res_as_object(
+		state_get(s, eval_as_lval(e_res_as_eval(l_res)), true)
+	);
+
+	object_assign(
+		l_obj,
+		value_copy(
+			value_res_as_value(
+				eval_to_value(e_res_as_eval(r_res), s)
+			)
+		)
+	);
 	return NULL;
 }
 
@@ -579,7 +626,9 @@ call_return(struct state *state)
 	}
 	state_popregister(state);
 	return e_res_eval_create(
-		eval_rval_create(calloralloc_type(state_framecall(state), state), v)
+		eval_rval_create(
+			calloralloc_type(state_framecall(state), state), v
+		)
 	);
 }
 

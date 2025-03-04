@@ -10,6 +10,7 @@
 #include "util.h"
 #include "value.h"
 #include "verifier.h"
+#include "lsi.h"
 
 #include "number.h"
 #include "range.h"
@@ -230,28 +231,18 @@ value_int_range_fromexpr(struct ast_expr *e, struct state *s)
 	return v;
 }
 
-static int
-_isint(long);
-
-int
+long
 value_int_lw(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	long l = number_as_const(number_lw(v->n, s));
-	assert(_isint(l));
-	return l;
+	return number_as_const(number_lw(v->n, s));
 }
 
-static int
-_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX; }
-
-int
+long
 value_int_up(struct value *v, struct state *s)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	long l = number_as_const(number_up(v->n, s));
-	assert(_isint(l));
-	return l;
+	return number_as_const(number_up(v->n, s));
 }
 
 static int
@@ -337,104 +328,7 @@ value_struct_create(struct ast_type *t)
 	return v;
 }
 
-struct value *
-value_struct_rconst_create(struct ast_type *t, struct state *s,
-		char *key, bool persist)
-{
-	t = ast_type_struct_complete(t, state_getext(s));
-	assert(ast_type_struct_members(t));
 
-	struct value *v = value_struct_create(t);
-
-	int n = ast_variable_arr_n(v->_struct.members);
-	struct ast_variable **var = ast_variable_arr_v(v->_struct.members);
-	for (int i = 0; i < n; i++) {
-		char *field = ast_variable_name(var[i]);
-		struct object *obj = map_get(v->_struct.m, field);
-		struct strbuilder *b = strbuilder_create();
-		strbuilder_printf(b, "%s.%s", key, field);
-		struct ast_expr *range = ast_expr_range_create(
-			strbuilder_build(b), /* key */
-			ast_expr_rangemin_create(),
-			ast_expr_rangemax_create()
-		);
-		object_assign(
-			obj,
-			state_rconst(
-				s,
-				ast_variable_type(var[i]),
-				range,
-				dynamic_str(ast_expr_range_key(range)),
-				persist
-			)
-		);
-	}
-
-	return v;
-}
-
-struct value *
-value_struct_rconstnokey_create(struct ast_type *t, struct state *s, bool persist)
-{
-	t = ast_type_struct_complete(t, state_getext(s));
-	assert(ast_type_struct_members(t));
-
-	struct value *v = value_struct_create(t);
-
-	int n = ast_variable_arr_n(v->_struct.members);
-	struct ast_variable **var = ast_variable_arr_v(v->_struct.members);
-	for (int i = 0; i < n; i++) {
-		char *field = ast_variable_name(var[i]);
-		struct object *obj = map_get(v->_struct.m, field);
-		struct ast_expr *range = ast_expr_range_create(
-			dynamic_str("no key"),
-			ast_expr_rangemin_create(),
-			ast_expr_rangemax_create()
-		);
-		object_assign(
-			obj,
-			state_rconstnokey(
-				s,
-				ast_variable_type(var[i]),
-				range,
-				persist
-			)
-		);
-	}
-
-	return v;
-}
-
-struct value *
-value_pf_augment(struct value *old, struct ast_expr *root)
-{
-	assert(value_isstruct(old));
-
-	struct value *v = value_copy(old);
-
-	int n = ast_variable_arr_n(v->_struct.members);
-	struct ast_variable **var = ast_variable_arr_v(v->_struct.members);
-	for (int i = 0; i < n; i++) {
-		char *field = ast_variable_name(var[i]);
-		struct object *obj = map_get(v->_struct.m, field);
-		struct value *obj_value = object_as_value(obj);
-		if (!obj_value) {
-			continue;
-		}
-		if (!value_isrconst(obj_value)) {
-			continue;
-		}
-		object_assign(
-			obj,
-			value_rconst_create(
-				ast_expr_member_create(
-					ast_expr_copy(root), dynamic_str(field)
-				)
-			)
-		);
-	}
-	return v;
-}
 
 int
 value_isstruct(struct value *v)
@@ -590,34 +484,227 @@ value_struct_member(struct value *v, char *member)
 }
 
 struct error *
-value_struct_specval_verify(struct value *param, struct value *arg,
-		struct state *spec, struct state *caller)
+value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
+		struct state *spec, struct state *impl)
 {
-	assert(value_isstruct(param) && value_isstruct(arg));
-	struct ast_variable_arr *param_members = param->_struct.members,
-				*arg_members = arg->_struct.members;
+	assert(value_isstruct(spec_v) && value_isstruct(impl_v));
+	struct ast_variable_arr *spec_v_members = spec_v->_struct.members,
+				*impl_v_members = impl_v->_struct.members;
 
-	int n = ast_variable_arr_n(param_members);
-	assert(ast_variable_arr_n(arg_members) == n);
-	struct ast_variable **param_var = ast_variable_arr_v(param_members);
+	int n = ast_variable_arr_n(spec_v_members);
+	assert(ast_variable_arr_n(impl_v_members) == n);
+	struct ast_variable **field = ast_variable_arr_v(spec_v_members);
 	for (int i = 0; i < n; i++) {
-		char *field = ast_variable_name(param_var[i]);
-		struct error *err = state_constraintverify_structmember(
-			spec, caller, param, arg, field
+		struct error *err = state_shapeverify_structmember(
+			spec, impl, spec_v, impl_v,
+			ast_variable_name(field[i])
 		);
 		if (err) {
-			a_printf(
-				false,
-				"needs test and custom error message: %s\n",
-				error_str(err)
-			);
+			return err;
 		}
 	}
 
 	return NULL;
-
 }
 
+static int
+_isrconst(struct ast_type *, struct value *);
+
+static struct lsi_varmap *
+_struct_rconst_mapping(struct value *v, struct state *s, char *varname);
+
+static char *
+_rconst_anyint(struct state *s);
+
+struct lsi_varmap *
+value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
+		char *id)
+{
+	if (ast_type_isarr(t)) {
+		struct ast_type *ptr = ast_type_create_ptr(
+			ast_type_arr_type(ast_type_copy(t))
+		);
+		struct lsi_varmap *lv = value_rconst_mapping(v, ptr, s, id);
+		ast_type_destroy(ptr);
+		return lv;
+	} else if (_isrconst(t, v)) {
+		struct lsi_varmap *lv = lsi_varmap_create();
+		lsi_varmap_set(
+			lv,
+			value_to_rconstid(v, s),
+			dynamic_str(id)
+		);
+		return lv;
+	} else if (ast_type_isstruct(t)) {
+		return _struct_rconst_mapping(v, s, id);
+	}
+
+	/* TODO: reflect on this and align with spec */
+	if (value_isliteral(v) && ast_type_ischar(t)) {
+		return lsi_varmap_create();
+	}
+
+	a_printf(
+		ast_type_isptr(t),
+		"can only verify int, pointer and struct params: "\
+		"have %s with value %s\n",
+		ast_type_str(t), value_str(v)
+	);
+
+	struct lsi_varmap *lv = lsi_varmap_create();
+	lsi_varmap_set(lv, _rconst_anyint(s), dynamic_str(id));
+
+	struct location *loc = value_as_location(v);
+	if (!state_loc_valid(s, loc)) {
+		/* spec freed reference */
+		return lv;
+	}
+
+	lsi_varmap_addrange(lv, state_block_rconst_mapping(s, loc, t, id));
+	return lv;
+}
+
+static int
+_isrconst(struct ast_type *t, struct value *v)
+{
+	return ast_type_isint(t)
+		|| (ast_type_isvoid(t) && value_isconstant(v))
+		|| (ast_type_isptr(t) && !value_islocation(v));
+}
+
+static struct lsi_varmap *
+_struct_rconst_mapping(struct value *v, struct state *s, char *varname)
+{
+	assert(value_isstruct(v));
+	struct ast_variable_arr *members = v->_struct.members;
+
+	struct lsi_varmap *lv = lsi_varmap_create();
+
+	int n = ast_variable_arr_n(members);
+	struct ast_variable **field = ast_variable_arr_v(members);
+	for (int i = 0; i < n; i++) {
+		lsi_varmap_addrange(
+			lv,
+			state_rconst_mapping_structmember(
+				s, v, varname, ast_variable_name(field[i])
+			)
+		);
+	}
+
+	return lv;
+}
+
+static char *
+_rconst_anyint(struct state *s)
+{
+	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
+	struct error *err = state_addconstraint(
+		s,
+		lsi_le_create(
+			lsi_expr_const_create(C89_INT_MIN),
+			lsi_expr_var_create(dynamic_str(rconst))
+		)
+	);
+	assert(!err);
+	err = state_addconstraint(
+		s,
+		lsi_le_create(
+			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_expr_const_create(C89_INT_MAX)
+		)
+	);
+	assert(!err);
+	return rconst;
+}
+
+static char *
+_expr_to_rconstid(struct ast_expr *, struct state *);
+
+static char *
+_int_to_rconstid(struct value *, struct state *);
+
+char *
+value_to_rconstid(struct value *v, struct state *s)
+{
+	switch (v->type) {
+	case VALUE_RCONST:
+		return _expr_to_rconstid(value_as_rconst(v), s);
+	case VALUE_INT:
+		return _int_to_rconstid(v, s);
+	default:
+		assert(0);
+	}
+}
+
+static char *
+_expr_to_rconstid(struct ast_expr *e, struct state *s)
+{
+	if (ast_expr_isidentifier(e)) {
+		char *rconst = ast_expr_as_identifier(e);
+		assert(state_hasrconst(s, rconst));
+		return dynamic_str(rconst);
+	}
+
+	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
+	struct lsi_expr *lsi_e = ast_expr_to_lsi_expr(e);
+	struct error *err = state_addconstraint(
+		s,
+		lsi_le_create(
+			/* e <= rconst */
+			lsi_expr_copy(lsi_e),
+			lsi_expr_var_create(dynamic_str(rconst))
+		)
+	);
+	assert(!err);
+	err = state_addconstraint(
+		s,
+		lsi_le_create(
+			/* rconst <= e */
+			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_expr_copy(lsi_e)
+		)
+	);
+	lsi_expr_destroy(lsi_e);
+	assert(!err);
+	return rconst;
+}
+
+static char *
+_int_to_rconstid(struct value *v, struct state *s)
+{
+	struct number *n = v->n;
+	assert(number_isconst(n));
+	int c = number_as_const(n);
+
+	struct str_res *res = state_getrconstwithvalue(s, c);
+	if (!str_res_iserror(res)) {
+		return dynamic_str(str_res_as_str(res));
+	}
+
+	/* morph v to equivalent rconst */
+	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
+
+	struct error *err = state_addconstraint(
+		s,
+		lsi_le_create(
+			/* c <= rconst */
+			lsi_expr_const_create(c),
+			lsi_expr_var_create(dynamic_str(rconst))
+		)
+	);
+	assert(!err);
+	err = state_addconstraint(
+		s,
+		lsi_le_create(
+			/* rconst <= c */
+			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_expr_const_create(c)
+		)
+	);
+	assert(!err);
+
+	return rconst;
+}
 
 bool
 struct_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
@@ -821,6 +908,9 @@ value_isconstant(struct value *v)
 	return v->type == VALUE_INT && number_isconst(v->n);
 }
 
+static int
+_isint(long l);
+
 int
 value_as_constant(struct value *v)
 {
@@ -830,6 +920,9 @@ value_as_constant(struct value *v)
 	assert(_isint(l));
 	return l;
 }
+
+static int
+_isint(long l) { return C89_INT_MIN <= l && l <= C89_INT_MAX; }
 
 int
 value_isrconst(struct value *v)
@@ -1042,16 +1135,6 @@ value_eq(struct value *lhs, struct value *rhs, struct state *s)
 }
 
 
-static int
-int_or_rconst(struct value *);
-
-struct error *
-value_disentangle(struct value *x, struct value *y, struct state *s)
-{
-	assert(int_or_rconst(x) && int_or_rconst(y));
-	return number_disentangle(x->n, y->n, s);
-}
-
 static struct number *
 _value_bound(struct value *v, struct state *s, int islw);
 
@@ -1104,63 +1187,4 @@ value_splitassume(struct value *v, struct number *split, struct state *s)
 	default:
 		assert(false);
 	}
-}
-
-static int
-int_or_rconst(struct value *);
-
-static struct value *
-value_tosinglerange(struct value *, struct state *);
-
-struct error *
-value_confirmsubset(struct value *v, struct value *v0, struct state *s,
-		struct state *s0)
-{
-	a_printf(
-		int_or_rconst(v) && int_or_rconst(v0),
-		"can only compare subset for int or rconst types\n"
-	);
-	assert(value_issinglerange(v, s));
-	struct value *r0 = value_tosinglerange(v0, s0);
-
-	struct number *v_lw = value_lw(v, s),
-		      *r0_lw = value_lw(r0, s0);
-	if (!number_le(r0_lw, v_lw, s)) {
-		return error_value_bounds(
-			error_printf("must be ≥ %s", number_short_str(r0_lw))
-		);
-	}
-	struct number *v_up = value_up(v, s),
-		      *r0_up = value_up(r0, s0);
-	if (!number_le(v_up, r0_up, s)) {
-		return error_value_bounds(
-			error_printf("must be < %s", number_short_str(r0_up))
-		);
-	}
-	return NULL;
-}
-
-static int
-int_or_rconst(struct value *v)
-{
-	return v->type == VALUE_INT || v->type == VALUE_RCONST;
-}
-
-
-static struct value *
-value_tosinglerange(struct value *old, struct state *s)
-{
-	switch (old->type) {
-	case VALUE_INT:
-	case VALUE_RCONST:
-		break;
-	default:
-		assert(false);
-	}
-
-	struct value *v = malloc(sizeof(struct value));
-	assert(v);
-	v->type = VALUE_INT;
-	v->n = number_tosinglerange(old->n, s);
-	return v;
 }

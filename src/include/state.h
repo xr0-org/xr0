@@ -144,13 +144,33 @@ state_lexememarker(struct state *);
 bool
 state_addresses_deallocand(struct state *, struct object *);
 
-struct value *
-state_rconst(struct state *, struct ast_type *, struct ast_expr *range,
-		char *key, bool persist);
+char *
+state_rconst(struct state *, char *key, bool persist);
 
-struct value *
-state_rconstnokey(struct state *, struct ast_type *, struct ast_expr *range,
-		bool persist);
+char *
+state_rconstnokey(struct state *, bool persist);
+
+int
+state_rconst_isanyint(struct state *, char *rconst);
+
+struct str_res;
+
+struct str_res *
+state_getrconstwithvalue(struct state *, int);
+
+struct lsi_le;
+
+struct error *
+state_addconstraint(struct state *, struct lsi_le *);
+
+int
+state_satisfies(struct state *, struct lsi_le *);
+
+struct lsi_range;
+struct lsi_expr;
+
+struct lsi_range *
+state_range_eval(struct state *, struct lsi_expr *);
 
 struct value *
 state_static_init(struct state *, struct ast_expr *);
@@ -163,6 +183,9 @@ state_loc_valid(struct state *, struct location *);
 
 bool
 state_loc_onheap(struct state *, struct location *);
+
+int
+state_hasrconst(struct state *state, char *id);
 
 struct value *
 state_getrconst(struct state *, char *id);
@@ -291,17 +314,37 @@ struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive);
 
 struct error *
-state_constraintverify(struct state *spec, struct state *impl, char *id);
-
-struct error *
-state_constraintverify_structmember(struct state *spec, struct state *impl,
-		struct value *spec_v, struct value *impl_v, char *member);
+state_constraintverify_top(struct state *spec, struct state *impl);
 
 struct error *
 state_constraintverify_all(struct state *spec, struct state *impl);
 
 struct error *
+state_shapeverify_structmember(struct state *spec, struct state *impl,
+		struct value *spec_v, struct value *impl_v, char *member);
+
+struct lsi_varmap;
+
+struct lsi_varmap *
+state_impl_spec_mapping_structmember(struct state *spec, struct state *impl,
+		struct value *spec_v, struct value *impl_v, char *parent,
+		char *member);
+
+struct lsi_varmap *
+state_rconst_mapping_structmember(struct state *, struct value *, char *parent,
+		char *member);
+
+struct lsi_varmap *
+state_block_rconst_mapping(struct state *, struct location *, struct ast_type *,
+		char *referent);
+
+struct error *
 state_verifyinvariant(struct state *);
+
+struct lsi_le;
+
+int
+state_isfeasible(struct state *, struct lsi_le *);
 
 /* USED BY OBJECT */
 

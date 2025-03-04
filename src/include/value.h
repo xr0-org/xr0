@@ -49,10 +49,10 @@ value_int_range_fromexpr(struct ast_expr *, struct state *);
 struct value *
 value_int_ne_create(int not_val);
 
-int
+long
 value_int_lw(struct value *, struct state *);
 
-int
+long
 value_int_up(struct value *, struct state *);
 
 int
@@ -70,16 +70,6 @@ value_struct_create(struct ast_type *);
 int
 value_isstruct(struct value *v);
 
-struct value *
-value_struct_rconst_create(struct ast_type *, struct state *,
-		char *key, bool persist);
-
-struct value *
-value_struct_rconstnokey_create(struct ast_type *, struct state *, bool persist);
-
-struct value *
-value_pf_augment(struct value *, struct ast_expr *root);
-
 struct ast_type *
 value_struct_membertype(struct value *, char *member);
 
@@ -87,8 +77,17 @@ struct object *
 value_struct_member(struct value *, char *member);
 
 struct error *
-value_struct_specval_verify(struct value *param, struct value *arg,
-		struct state *spec, struct state *caller);
+value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
+		struct state *spec, struct state *impl);
+
+struct lsi_varmap;
+
+struct lsi_varmap *
+value_rconst_mapping(struct value *, struct ast_type *, struct state *,
+		char *id);
+
+char *
+value_to_rconstid(struct value *v, struct state *);
 
 struct value *
 value_copy(struct value *);
@@ -148,15 +147,6 @@ value_eq(struct value *lhs, struct value *rhs, struct state *);
 
 int
 value_lt(struct value *lhs, struct value *rhs, struct state *);
-
-struct error *
-value_disentangle(struct value *, struct value *, struct state *);
-
-/* value_confirmsubset: returns an error if v (as belonging to s) is not
- * decidably a subset of v0 (as belonging to s0). */
-struct error *
-value_confirmsubset(struct value *v, struct value *v0, struct state *s,
-		struct state *s0);
 
 struct number;
 

@@ -1,1 +1,1 @@
-foo: return value must be < 3
+foo: return <= 2 not satisfied

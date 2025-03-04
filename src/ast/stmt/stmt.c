@@ -418,6 +418,13 @@ ast_stmt_asm_call_create(struct lexememarker *loc, struct ast_expr *call)
 }
 
 struct ast_stmt *
+ast_stmt_asm_mov_create(struct lexememarker *loc, struct ast_variable *temp,
+		struct ast_expr *e)
+{
+	return _asm_create(loc, asm_mov_create(temp, e));
+}
+
+struct ast_stmt *
 ast_stmt_asm_movret_create(struct lexememarker *loc, struct ast_variable *temp)
 {
 	return _asm_create(loc, asm_movret_create(temp));
@@ -437,6 +444,20 @@ ast_stmt_asm_iscall(struct ast_stmt *stmt)
 	return asm_iscall(stmt->u._asm);
 }
 
+int
+ast_stmt_asm_ismov(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_ASM);
+	return asm_ismov(stmt->u._asm);
+}
+
+int
+ast_stmt_asm_ismovret(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_ASM);
+	return asm_ismovret(stmt->u._asm);
+}
+
 struct ast_expr *
 ast_stmt_asm_call(struct ast_stmt *stmt)
 {
@@ -451,6 +472,13 @@ ast_stmt_asm_mov_var(struct ast_stmt *stmt)
 	return asm_mov_getvar(stmt->u._asm);
 }
 
+struct ast_expr *
+ast_stmt_asm_mov_val(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_ASM);
+	return asm_mov_getval(stmt->u._asm);
+}
+
 static void
 ast_stmt_iter_sprint(struct ast_stmt *stmt, int indent_level,
 		struct strbuilder *b)
@@ -463,7 +491,7 @@ static void
 ast_stmt_jump_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
 	char *s = jump_str(stmt->u.jump);
-	strbuilder_printf(b, "%s\n", s);
+	strbuilder_printf(b, "%s", s);
 	free(s);
 }
 
@@ -811,8 +839,82 @@ ast_stmt_setupdecide(struct ast_stmt *stmt, struct state *s)
 	}
 }
 
+static struct ast_stmt *
+_hack_make_sel_relational(struct ast_stmt *);
+
+static struct ast_stmt_res *
+sel_setupdecide_proper(struct ast_stmt *, struct state *);
+
 static struct ast_stmt_res *
 sel_setupdecide(struct ast_stmt *stmt, struct state *s)
+{
+	struct ast_stmt *rel_stmt = _hack_make_sel_relational(stmt);
+	struct ast_stmt_res *res = sel_setupdecide_proper(rel_stmt, s);
+	/*ast_stmt_destroy(rel_stmt);*/
+	return res;
+}
+
+static int
+_isrel(struct ast_expr *);
+
+static struct ast_stmt *
+_hack_make_sel_relational(struct ast_stmt *stmt)
+{
+	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
+	struct ast_stmt *body = ast_stmt_sel_body(stmt),
+			*nest = ast_stmt_sel_nest(stmt);
+
+	if (_isrel(cond)) {
+		return ast_stmt_copy(stmt);
+	}
+
+	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
+	return ast_stmt_create_sel(
+		lexememarker_copy(loc),
+		false,
+		ast_expr_binary_create(
+			ast_expr_copy(cond),
+			BINARY_OP_LT,
+			ast_expr_constant_create(0)
+		),
+		ast_stmt_copy(body),
+		ast_stmt_create_sel(
+			lexememarker_copy(loc),
+			false,
+			ast_expr_binary_create(
+				ast_expr_copy(cond),
+				BINARY_OP_GT,
+				ast_expr_constant_create(0)
+			),
+			ast_stmt_copy(body),
+			nest ? ast_stmt_copy(nest) : nest
+		)
+	);
+}
+
+static int
+_isrel(struct ast_expr *e)
+{
+	switch (ast_expr_kind(e)) {
+	case EXPR_BINARY:
+		switch (ast_expr_binary_op(e)) {
+		case BINARY_OP_LT:
+		case BINARY_OP_LE:
+		case BINARY_OP_GE:
+		case BINARY_OP_GT:
+			return 1;
+		default:
+			assert(0);
+		}
+	case EXPR_IDENTIFIER:
+		return 0;
+	default:
+		assert(0);
+	}
+}
+
+static struct ast_stmt_res *
+sel_setupdecide_proper(struct ast_stmt *stmt, struct state *s)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),

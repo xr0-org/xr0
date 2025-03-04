@@ -21,10 +21,8 @@ main()
 
 	r = read_and_write_arbitrary();
 	j = *r;		/* valid rvalue deref */
-	// ~ [ *r == $; ];
-	// ~ [ j == $; ];	/* j has arbitrary value */
 	*r = 2;		/* valid lvalue deref */
-	~ [ *r == 2; ];
+	~ [ *r >= 2; *r <= 2; ];
 
 	free(r);
 

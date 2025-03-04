@@ -20,5 +20,6 @@ g(int x, int y) ~ [
 	a = f(x); /* "f:{($0, [?])}:0" */
 	b = f(y); /* "f:{($1, [?])}:0" */
 
+	/* XXX: needs review: is this correct? */
 	~ [ a == b; ]
 }

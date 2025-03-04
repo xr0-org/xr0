@@ -9,6 +9,7 @@
 #include "util.h"
 #include "value.h"
 #include "verifier.h"
+#include "lsi.h"
 
 #include "block.h"
 #include "constraint.h"
@@ -109,34 +110,39 @@ struct object_res *
 block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		bool constructive)
 {
-	struct tagval_res *res = ast_expr_rangeeval(offset, s);
-	if (tagval_res_iserror(res)) {
-		return object_res_error_create(tagval_res_as_error(res));
-	}
-	struct tagval *tv = tagval_res_as_tagval(res);
+	struct lsi_expr *lsi_o = ast_expr_to_lsi_expr(offset);
 
-	struct value *range = tagval_value(tv);
-	int lw = value_int_lw(range, s),
-	    up = value_int_up(range, s);
-	if (lw < 0 || b->size < up) {
+	struct lsi_le *lw = lsi_le_create(
+		lsi_expr_const_create(0), lsi_expr_copy(lsi_o)
+	);
+	struct lsi_le *up = lsi_le_create(
+		/* non-inclusive upper bound */
+		lsi_expr_copy(lsi_o), lsi_expr_const_create(b->size-1)
+	);
+	if (!state_satisfies(s, lw) || !state_satisfies(s, up)) {
 		return object_res_error_create(error_printf("out of bounds"));
 	}
+	lsi_le_destroy(lw);
+	lsi_le_destroy(up);
 
-	if (!value_isconstant(range)) {
-		assert(tagval_hastag(tv));
-		struct splitinstruct *splits = splitinstruct_create(s);
-		char *tag = tagval_tag(tv);
-		for (int i = lw; i < up; i++) {
-			struct map *m = map_create();
-			map_set(m, tag, number_const_create(i));
-			splitinstruct_append(splits, m);
-		}
+	struct lsi_range *r = state_range_eval(s, lsi_o);
+	if (!lsi_range_isconst(r)) {
+		/* split b/w case when equal to lower bound and not */
+		struct lsi_le *le = lsi_range_expr_le_lw(r, lsi_o);  
+		struct lsi_le *le_neg = lsi_le_negate(le);
 		return object_res_error_create(
-			error_verifierinstruct(verifierinstruct_split(splits))
+			error_verifierinstruct(
+				verifierinstruct_split(
+					splitinstruct_create(le, le_neg)
+				)
+			)
 		);
 	}
 
-	offset = ast_expr_constant_create(value_as_constant(range));
+	offset = ast_expr_constant_create(lsi_range_as_const(r));
+	lsi_range_destroy(r);
+
+	lsi_expr_destroy(lsi_o);
 
 	int index = object_arr_index(b->arr, offset, s);
 	if (index == -1) {
@@ -195,34 +201,97 @@ block_undeclare(struct block *b, struct state *s)
 	b->arr = new;
 }
 
+static char *
+_constraintbased_actual_index(struct location *loc, struct object *obj);
+
 struct error *
-block_constraintverify(struct block *b, struct location *impl_loc,
+block_shapeverify(struct block *b, struct location *impl_loc,
 		struct constraint *c)
 {
 	int n = object_arr_nobjects(b->arr);
 	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
-		struct error *err = constraint_verifyobject(
-			c, obj[i], impl_loc
+		struct error *err = constraint_shapeverify_object(
+			constraint_deref(c), obj[i], impl_loc
 		);
 		if (err) {
-			struct ast_expr *actual_offset = ast_expr_sum_create(
-				ast_expr_copy(
-					offset_as_expr(location_offset(impl_loc))
-				),
-				/* XXX: assuming lower is offset */
-				ast_expr_copy(object_lower(obj[i]))
+			char *index = _constraintbased_actual_index(
+				impl_loc, obj[i]
 			);
-			struct ast_expr *simp = ast_expr_simplify(actual_offset);
-			char *simp_str = ast_expr_str(simp);
-			err = error_printf("%w at index %s", err, simp_str);
-			free(simp_str);
-			ast_expr_destroy(simp);
-			ast_expr_destroy(actual_offset);
+			err = error_printf(
+				"%w at index %s", err, index
+			);
+			free(index);
 			return err;
 		}
 	}
 	return NULL;
+}
+
+static char *
+_constraintbased_actual_index(struct location *loc, struct object *obj)
+{
+	struct ast_expr *actual_offset = ast_expr_sum_create(
+		ast_expr_copy(
+			offset_as_expr(location_offset(loc))
+		),
+		/* XXX: assuming lower is offset */
+		ast_expr_copy(object_lower(obj))
+	);
+	struct ast_expr *simp = ast_expr_simplify(actual_offset);
+	char *s = ast_expr_str(simp);
+	ast_expr_destroy(simp);
+	ast_expr_destroy(actual_offset);
+	return s;
+}
+
+
+static char *
+_object_simplified_index(struct object *obj);
+
+struct lsi_varmap *
+block_rconst_mapping(struct block *b, struct ast_type *t, struct state *s,
+		char *referent)
+{
+	struct lsi_varmap *lv = lsi_varmap_create();
+	int n = object_arr_nobjects(b->arr);
+	struct object **obj = object_arr_objects(b->arr);
+	for (int i = 0; i < n; i++) {
+		struct strbuilder *b = strbuilder_create();
+		char *index = _object_simplified_index(obj[i]);
+		if (strcmp(index, "0") == 0) {
+			strbuilder_printf(b, "*(%s)", referent);
+		} else {
+			strbuilder_printf(b, "%s[%s]", referent, index);
+		}
+		char *alias = strbuilder_build(b);
+		free(index);
+
+		if (!object_hasvalue(obj[i])) {
+			continue;
+		}
+
+		lsi_varmap_addrange(
+			lv,
+			value_rconst_mapping(
+				object_as_value(obj[i]),
+				ast_type_deref(t),
+				s, alias
+			)
+		);
+
+		free(alias);
+	}
+	return lv;
+}
+
+static char *
+_object_simplified_index(struct object *obj)
+{
+	struct ast_expr *simp = ast_expr_simplify(object_lower(obj));
+	char *s = ast_expr_str(simp);
+	ast_expr_destroy(simp);
+	return s;
 }
 
 struct block_arr {

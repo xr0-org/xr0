@@ -1,4 +1,3 @@
-run
-process status
+process launch
 script exit(0) if lldb.process.GetExitStatus() == 0 else lldb.debugger.HandleCommand("bt")
 quit

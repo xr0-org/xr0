@@ -8,6 +8,7 @@
 #include "object.h"
 #include "state.h"
 #include "util.h"
+#include "lsi.h"
 #include "value.h"
 #include "verifier.h"
 
@@ -260,36 +261,55 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 	stack_declare(state->stack, var, isparam);
 }
 
-struct value *
-state_rconst(struct state *state, struct ast_type *t, struct ast_expr *range,
-		char *key, bool persist)
+char *
+state_rconst(struct state *s, char *key, bool persist)
 {
-	assert(key);
-
-	char *prev = rconst_getidbykey(state->rconst, key);
-	if (prev) {
-		return value_rconst_create(
-			ast_expr_identifier_create(dynamic_str(prev))
-		);
-	}
-	struct value *v = ast_type_rconst(t, state, range, key, persist);
-	char *c = rconst_declare(state->rconst, v, key, persist);
-	return value_rconst_create(ast_expr_identifier_create(c));
+	return rconst_declareorget(s->rconst, key, persist, s);
 }
 
-struct value *
-state_rconstnokey(struct state *state, struct ast_type *t, struct ast_expr *range,
-		bool persist)
+char *
+state_rconstnokey(struct state *s, bool persist)
 {
-	struct value *v = ast_type_rconstnokey(t, state, range, persist);
-	char *c = rconst_declarenokey(state->rconst, v, persist);
-	return value_rconst_create(ast_expr_identifier_create(c));
+	return rconst_declarenokey(s->rconst, persist, s);
+}
+
+int
+state_rconst_isanyint(struct state *s, char *rconst)
+{
+	return rconst_isanyint(s->rconst, rconst);
+}
+
+struct str_res *
+state_getrconstwithvalue(struct state *s, int c)
+{
+	return rconst_getwithconstvalue(s->rconst, c);
+}
+
+
+struct error *
+state_addconstraint(struct state *s, struct lsi_le *le)
+{
+	return rconst_addconstraint(s->rconst, le);
+}
+
+int
+state_satisfies(struct state *s, struct lsi_le *le)
+{
+	return rconst_satisfies(s->rconst, le);
+}
+
+struct lsi_range *
+state_range_eval(struct state *s, struct lsi_expr *e)
+{
+	return rconst_range_eval(s->rconst, e);
 }
 
 struct value *
 state_popregister(struct state *state)
 {
-	//v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
+	/* 
+	 * v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
+	 */
 	if (!state->reg) {
 		return NULL;
 	}
@@ -419,10 +439,17 @@ state_loc_onheap(struct state *state, struct location *loc)
 	return location_toheap(loc, state->heap);
 }
 
+int
+state_hasrconst(struct state *state, char *id)
+{
+	return rconst_hasvar(state->rconst, id);
+}
+
 struct value *
 state_getrconst(struct state *state, char *id)
 {
-	return rconst_get(state->rconst, id);
+	assert(state_hasrconst(state, id));
+	return value_rconst_create(ast_expr_identifier_create(dynamic_str(id)));
 }
 
 struct object_res *
@@ -478,41 +505,26 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	return object_res_object_create(member);
 }
 
-static struct object *
-location_mustgetobject(struct location *, struct state *);
-
 struct error *
-state_constraintverify(struct state *spec, struct state *impl, char *id)
+state_constraintverify_top(struct state *spec, struct state *impl)
 {
-	struct object *spec_obj = location_mustgetobject(
-		loc_res_as_loc(state_getloc(spec, id)), spec
-	);
-	if (!object_hasvalue(spec_obj)) {
-		return NULL;
+	struct error *err = stack_shapeverify_top(spec->stack, spec, impl);
+	if (err) {
+		return err;
 	}
-	struct constraint *c = constraint_create(
-		state_copy(spec),
-		state_copy(impl),
-		ast_type_copy(state_getvariabletype(spec, id))
+	struct lsi_varmap *spec_lv = stack_rconst_mapping(spec->stack, spec);
+	struct lsi_varmap *impl_lv = stack_rconst_mapping(impl->stack, impl);
+	err = rconst_constraintverify(
+		spec->rconst, impl->rconst,
+		spec_lv, impl_lv
 	);
-	struct error *err = constraint_verify(
-		c,
-		object_as_value(spec_obj),
-		/* we can safely assume that impl has a value for id because
-		 * it's the result of an argument expression being evaluated */
-		object_as_value(
-			location_mustgetobject(
-				loc_res_as_loc(state_getloc(impl, id)),
-				impl
-			)
-		)
-	);
-	constraint_destroy(c);
+	lsi_varmap_destroy(impl_lv);
+	lsi_varmap_destroy(spec_lv);
 	return err;
 }
 
 struct error *
-state_constraintverify_structmember(struct state *spec, struct state *impl,
+state_shapeverify_structmember(struct state *spec, struct state *impl,
 		struct value *spec_v, struct value *impl_v, char *member)
 {
 	struct object *spec_obj = value_struct_member(spec_v, member),
@@ -526,29 +538,91 @@ state_constraintverify_structmember(struct state *spec, struct state *impl,
 		state_copy(impl),
 		ast_type_copy(value_struct_membertype(spec_v, member))
 	);
-	struct error *err = constraint_verify(
+	struct error *err = constraint_shapeverify(
 		c, object_as_value(spec_obj), object_as_value(impl_obj)
 	);
 	constraint_destroy(c);
 	return err;
 }
 
-static struct object *
-location_mustgetobject(struct location *loc, struct state *s)
+struct lsi_varmap *
+state_rconst_mapping_structmember(struct state *s, struct value *v, char *parent,
+		char *member)
 {
-	return object_res_as_object(state_get(s, loc, false));
+	struct object *obj = value_struct_member(v, member);
+	if (!obj) {
+		return lsi_varmap_create();
+	}
+
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s.%s", parent, member);
+	char *id = strbuilder_build(b);
+
+	struct lsi_varmap *lv = value_rconst_mapping(
+		object_as_value(obj),
+		value_struct_membertype(v, member),
+		s,
+		id
+	);
+
+	free(id);
+
+	return lv;
 }
+
+struct lsi_varmap *
+state_block_rconst_mapping(struct state *s, struct location *loc,
+		struct ast_type *t, char *referent)
+{
+	struct block *b = state_getblock(s, loc);
+	assert(b);
+	return block_rconst_mapping(b, t, s, referent);
+}
+
+static struct error *
+_mutating_constraintverify_all(struct state *spec, struct state *impl);
 
 struct error *
 state_constraintverify_all(struct state *spec, struct state *impl)
 {
-	return stack_constraintverify_all(spec->stack, spec, impl);
+	struct state *spec_copy = state_copy(spec),
+		     *impl_copy = state_copy(impl);
+	struct error *err = _mutating_constraintverify_all(spec_copy, impl_copy);
+	state_destroy(impl_copy);
+	state_destroy(spec_copy);
+	return err;
+}
+
+static struct error *
+_mutating_constraintverify_all(struct state *spec, struct state *impl)
+{
+	struct error *err = stack_shapeverify_all(
+		spec->stack, spec, impl
+	);
+	if (err) {
+		return err;
+	}
+	struct lsi_varmap *spec_lv = stack_rconst_mapping(spec->stack, spec);
+	struct lsi_varmap *impl_lv = stack_rconst_mapping(impl->stack, impl);
+	err = rconst_constraintverify(
+		spec->rconst, impl->rconst,
+		spec_lv, impl_lv
+	);
+	lsi_varmap_destroy(impl_lv);
+	lsi_varmap_destroy(spec_lv);
+	return err;
 }
 
 struct error *
 state_verifyinvariant(struct state *s)
 {
 	return stack_verifyinvariant(s->stack, s);
+}
+
+int
+state_isfeasible(struct state *s, struct lsi_le *le)
+{
+	return rconst_isfeasible(s->rconst, le);
 }
 
 
@@ -720,35 +794,30 @@ state_eval(struct state *s, struct ast_expr *e)
 	return rconst_eval(s->rconst, e);
 }
 
+static struct error *
+_shape_and_constraint_verify(struct state *spec, struct state *impl);
+
 static void
 state_normalise(struct state *s);
 
 struct error *
-state_specverify(struct state *actual, struct state *spec)
+state_specverify(struct state *impl, struct state *spec)
 {
-	struct state *actual_c = state_copy(actual),
+	struct state *impl_c = state_copy(impl),
 		     *spec_c = state_copy(spec);
 	if (spec->reg) {
-		if (!actual->reg) {
+		if (!impl->reg) {
 			return error_printf("must have return value");
 		}
-		struct constraint *c = constraint_create(
-			state_copy(spec),
-			state_copy(actual),
-			ast_type_copy(stack_returntype(spec->stack))
-		);
-		struct error *err = constraint_verify(
-			c, spec->reg, actual->reg
-		);
-		constraint_destroy(c);
+		struct error *err = _shape_and_constraint_verify(spec, impl);
 		if (err) {
-			return error_printf("return value %s", error_str(err));
+			return err;
 		}
 	}
-	state_normalise(actual_c);
+	state_normalise(impl_c);
 	state_normalise(spec_c);
 
-	char *str1 = state_str(actual_c),
+	char *str1 = state_str(impl_c),
 	     *str2 = state_str(spec_c);
 	int equal = strcmp(str1, str2) == 0;
 	if (!equal) {
@@ -758,9 +827,59 @@ state_specverify(struct state *actual, struct state *spec)
 	free(str1);
 
 	state_destroy(spec_c);
-	state_destroy(actual_c);
+	state_destroy(impl_c);
 
 	return NULL;
+}
+
+static struct lsi_varmap *
+_stack_and_return_mapping(struct state *, struct value *ret);
+
+static struct error *
+_shape_and_constraint_verify(struct state *spec, struct state *impl)
+{
+	struct state *spec_copy = state_copy(spec),
+		     *impl_copy = state_copy(impl);
+	struct constraint *c = constraint_create(
+		spec_copy,
+		impl_copy,
+		ast_type_copy(stack_returntype(spec->stack))
+	);
+	struct error *err = constraint_shapeverify(
+		c, spec->reg, impl->reg
+	);
+	if (err) {
+		return error_printf("return value %s", error_str(err));
+	}
+	struct lsi_varmap *spec_lv = _stack_and_return_mapping(
+		spec_copy, spec->reg
+	);
+	struct lsi_varmap *impl_lv = _stack_and_return_mapping(
+		impl_copy, impl->reg
+	);
+	err = rconst_constraintverify(
+		spec_copy->rconst, impl_copy->rconst, spec_lv, impl_lv
+	);
+	lsi_varmap_destroy(impl_lv);
+	lsi_varmap_destroy(spec_lv);
+	constraint_destroy(c);
+	return err;
+}
+
+static struct lsi_varmap *
+_stack_and_return_mapping(struct state *s, struct value *ret)
+{
+	struct lsi_varmap *lv = stack_rconst_mapping(s->stack, s);
+	lsi_varmap_addrange(
+		lv,
+		value_rconst_mapping(
+			ret,
+			stack_returntype(s->stack),
+			s,
+			"return"
+		)
+	);
+	return lv;
 }
 
 static void
