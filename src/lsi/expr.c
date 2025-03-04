@@ -165,5 +165,4 @@ _lsi_expr_negatives(struct lsi_expr *e)
 	}
 
 	return _lsi_expr_tally_create(t);
-
 }
