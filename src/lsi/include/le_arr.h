@@ -1,5 +1,5 @@
-#ifndef XR0_LSI_ARR_H
-#define XR0_LSI_ARR_H
+#ifndef XR0_LSI_LE_ARR_H
+#define XR0_LSI_LE_ARR_H
 
 struct le_arr;
 
@@ -22,10 +22,5 @@ le_arr_len(struct le_arr *);
 
 struct lsi_le *
 le_arr_get(struct le_arr *, int);
-
-struct string_arr;
-
-struct string_arr *
-le_arr_getvars(struct le_arr *);
 
 #endif

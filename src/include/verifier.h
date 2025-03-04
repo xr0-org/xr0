@@ -87,11 +87,13 @@ rconst_destroy(struct rconst *);
 char *
 rconst_str(struct rconst *, char *indent);
 
-char *
+DECLARE_RESULT_TYPE(char *, str, str_res)
+
+struct str_res *
 rconst_declare(struct rconst *, struct ast_expr *range, char *key, bool persist,
 		struct state *);
 
-char *
+struct str_res *
 rconst_declarenokey(struct rconst *, struct ast_expr *range, bool persist,
 		struct state *);
 

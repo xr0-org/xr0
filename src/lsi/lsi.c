@@ -5,8 +5,9 @@
 #include "util.h"
 #include "lsi.h"
 
-#include "arr.h"
 #include "le.h"
+#include "expr_arr.h"
+#include "le_arr.h"
 
 struct lsi { struct le_arr *arr; };
 
@@ -47,23 +48,50 @@ lsi_str(struct lsi *lsi, char *prefix)
 	return strbuilder_build(b);
 }
 
-static struct string_arr *
-_getvars(struct le_arr *);
+static struct error *
+_verifyfeasible(struct lsi *);
 
 struct error *
 lsi_add(struct lsi *lsi, struct lsi_le *le)
 {
 	le_arr_append(lsi->arr, le);
+	return _verifyfeasible(lsi);
+}
 
-	/* TODO: verify feasibility */
+static struct string_arr *
+_getvars(struct le_arr *);
+
+static struct le_arr *
+_eliminate(struct le_arr *, char *var);
+
+static struct error *
+_verifyfeasible(struct lsi *lsi)
+{
+	int i;
+
+	printf("unreduced: \n%s\n", lsi_str(lsi, "	|-	"));
+	struct le_arr *arr = le_arr_copy(lsi->arr);
+
 	struct string_arr *vars = _getvars(lsi->arr);
-	struct strbuilder *b = strbuilder_create();
-	int len = string_arr_n(vars);
-	char **s = string_arr_s(vars);
-	for (int i = 0; i < len; i++) {
-		strbuilder_printf(b, "%s%s", s[i], i+1 < len ? ", " : "");
+	for (i = 0; i < string_arr_n(vars); i++) {
+		arr = _eliminate(arr, string_arr_s(vars)[i]);
 	}
-	printf("vars: %s\n", strbuilder_build(b));
+	string_arr_destroy(vars);
+
+	struct lsi *new = lsi_create();
+	new->arr = arr;
+	printf("reduced: \n%s\n", lsi_str(new, "	|-	"));
+
+	for (i = 0; i < le_arr_len(arr); i++) {
+		struct lsi_le *le = le_arr_get(arr, i);
+		if (!_lsi_le_isfeasible(le)) {
+			struct strbuilder *b = strbuilder_create();
+			char *s = lsi_le_str(le);
+			strbuilder_printf(b, "unfeasible system requires %s", s);
+			free(s);
+			return error_printf(strbuilder_build(b));
+		}
+	}
 
 	return NULL;
 }
@@ -102,4 +130,47 @@ _varstomap(struct le_arr *arr)
 		string_arr_destroy(vararr);
 	}
 	return m;
+}
+
+static struct le_arr *
+_eliminate(struct le_arr *old, char *var)
+{
+	int i, j;
+
+	struct le_arr *new = le_arr_create();
+
+	struct expr_arr *lhs = expr_arr_create(),
+			*rhs = expr_arr_create();
+
+	for (i = 0; i < le_arr_len(old); i++) {
+		struct lsi_le *le = le_arr_get(old, i);
+		long coef = _lsi_le_getstdformcoef(le, var);
+		if (coef == 0) {
+			le_arr_append(new, _lsi_le_copy(le));
+			continue;
+		}
+		long abs = coef >= 0 ? coef : -coef;
+		assert(abs == 1);
+		/* coef is the standard-form coefficient, so if it's negative
+		 * the inequality appears on the rhs as a positive, and the
+		 * inequality provides a lower bound; and vice-versa. */
+		if (coef < 0) {
+			expr_arr_append(lhs, _lsi_le_lowerbound(le, var));
+		} else {
+			assert(coef > 0);
+			expr_arr_append(rhs, _lsi_le_upperbound(le, var));
+		}
+	}
+
+	for (i = 0; i < expr_arr_len(lhs); i++)
+		for (j = 0; j < expr_arr_len(rhs); j++)
+			le_arr_append(
+				new,
+				lsi_le_create(
+					expr_arr_get(lhs, i),
+					expr_arr_get(rhs, j)
+				)
+			);
+
+	return new;
 }

@@ -35,4 +35,10 @@ struct string_arr;
 struct string_arr *
 _lsi_expr_getvars(struct lsi_expr *);
 
+int
+_lsi_expr_getcoef(struct lsi_expr *, char *var);
+
+struct lsi_expr *
+_lsi_expr_except(struct lsi_expr *, char *var);
+
 #endif

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #include "util.h"
 #include "lsi.h"
@@ -127,11 +128,13 @@ lsi_expr_str(struct lsi_expr *e)
 	}
 	string_arr_destroy(arr);
 	int c = tally_getconst(e->_);
-	if (len == 0 || c < 0) {
+	char *preview = strbuilder_preview(b);
+	if (strlen(preview) == 0 || c < 0) {
 		strbuilder_printf(b, "%d", c);
 	} else if (c > 0) {
 		strbuilder_printf(b, "%s%d", len>0 ? "+" : "", c);
 	}
+	free(preview);
 
 	return strbuilder_build(b);
 }
@@ -162,4 +165,18 @@ struct string_arr *
 _lsi_expr_getvars(struct lsi_expr *e)
 {
 	return tally_getvars(e->_);
+}
+
+long
+_lsi_expr_getcoef(struct lsi_expr *e, char *var)
+{
+	return tally_getcoef(e->_, var);
+}
+
+struct lsi_expr *
+_lsi_expr_except(struct lsi_expr *old, char *var)
+{
+	struct lsi_expr *new = _lsi_expr_copy(old);
+	tally_setcoef(new->_, var, 0);
+	return new;
 }

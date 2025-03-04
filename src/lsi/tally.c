@@ -41,10 +41,10 @@ _tally_add(struct tally *t, struct tally *u)
 
 /* _tally_multiply: multiply t by n, as a side effect on t. */
 static void
-_tally_multiply(struct tally *t, int n);
+_tally_multiply(struct tally *t, long n);
 
 struct tally *
-tally_product(struct tally *t, int n)
+tally_product(struct tally *t, long n)
 {
 	struct tally *product = tally_copy(t);
 	_tally_multiply(product, n);
@@ -52,7 +52,7 @@ tally_product(struct tally *t, int n)
 }
 
 static void
-_tally_multiply(struct tally *t, int n)
+_tally_multiply(struct tally *t, long n)
 {
 	int i;
 	struct string_arr *arr;
@@ -70,7 +70,7 @@ _tally_multiply(struct tally *t, int n)
 
 struct tally {
 	struct map *m;
-	int c;
+	long c;
 };
 
 struct tally *
@@ -129,26 +129,26 @@ tally_str(struct tally *t)
 	return strbuilder_build(b);
 }
 
-int
+long
 tally_getcoef(struct tally *t, char *var)
 {
 	return (long) map_get(t->m, var);
 }
 
-int
+long
 tally_getconst(struct tally *t)
 {
 	return t->c;
 }
 
 void
-tally_setcoef(struct tally *t, char *var, int c)
+tally_setcoef(struct tally *t, char *var, long c)
 {
-	map_set(t->m, var, (void *) (long) c);
+	map_set(t->m, var, (void *) c);
 }
 
 void
-tally_setconst(struct tally *t, int c)
+tally_setconst(struct tally *t, long c)
 {
 	t->c = c;
 }

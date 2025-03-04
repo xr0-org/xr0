@@ -272,12 +272,11 @@ state_rconst(struct state *state, struct ast_type *t, struct ast_expr *range,
 			ast_expr_identifier_create(dynamic_str(prev))
 		);
 	}
+	struct str_res *res = rconst_declare(
+		state->rconst, range, key, persist, state
+	);
 	return value_rconst_create(
-		ast_expr_identifier_create(
-			rconst_declare(
-				state->rconst, range, key, persist, state
-			)
-		)
+		ast_expr_identifier_create(str_res_as_str(res))
 	);
 }
 
@@ -285,10 +284,11 @@ struct value *
 state_rconstnokey(struct state *state, struct ast_type *t,
 		struct ast_expr *range, bool persist)
 {
+	struct str_res *res = rconst_declarenokey(
+		state->rconst, range, persist, state
+	);
 	return value_rconst_create(
-		ast_expr_identifier_create(
-			rconst_declarenokey(state->rconst, range, persist, state)
-		)
+		ast_expr_identifier_create(str_res_as_str(res))
 	);
 }
 

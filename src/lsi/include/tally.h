@@ -15,23 +15,23 @@ tally_destroy(struct tally *);
 char *
 tally_str(struct tally *);
 
-int
+long
 tally_getcoef(struct tally *, char *var);
 
-int
+long
 tally_getconst(struct tally *);
 
 void
-tally_setcoef(struct tally *, char *var, int);
+tally_setcoef(struct tally *, char *var, long);
 
 void
-tally_setconst(struct tally *, int);
+tally_setconst(struct tally *, long);
 
 struct tally *
 tally_sum(struct tally *, struct tally *);
 
 struct tally *
-tally_product(struct tally *t, int);
+tally_product(struct tally *t, long);
 
 struct string_arr;
 

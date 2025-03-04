@@ -74,6 +74,8 @@ rconst_copy(struct rconst *old)
 	return new;
 }
 
+DEFINE_RESULT_TYPE(char *, str, free, str_res, false)
+
 static char *
 rconst_id(struct map *varmap, struct map *persistmap, bool persist);
 
@@ -83,29 +85,39 @@ _range_lw(struct ast_expr *range, struct state *);
 static struct lsi_expr *
 _range_up(struct ast_expr *range, struct state *);
 
-char *
+struct str_res *
 rconst_declarenokey(struct rconst *v, struct ast_expr *range, bool persist,
 		struct state *state)
 {
+	struct error *err;
+
 	struct map *m = v->varmap;
 	char *s = rconst_id(m, v->persist, persist);
 	map_set(m, dynamic_str(s), (void *) 1);
 	map_set(v->persist, dynamic_str(s), (void *) persist);
-	lsi_add(
+
+	err = lsi_add(
 		v->constraints,
 		lsi_le_create(
 			_range_lw(ast_expr_range_lw(range), state),
 			lsi_expr_var_create(dynamic_str(s))
 		)
 	);
-	lsi_add(
+	if (err) {
+		return str_res_error_create(err);
+	}
+	err = lsi_add(
 		v->constraints,
 		lsi_le_create(
 			lsi_expr_var_create(dynamic_str(s)),
 			_range_up(ast_expr_range_up(range), state)
 		)
 	);
-	return s;
+	if (err) {
+		return str_res_error_create(err);
+	}
+
+	return str_res_str_create(s);
 }
 
 static struct lsi_expr *
@@ -173,14 +185,18 @@ count_true(struct map *m)
 	return n;
 }
 
-char *
+struct str_res *
 rconst_declare(struct rconst *v, struct ast_expr *range, char *key, bool persist,
 		struct state *state)
 {
-	char *s = rconst_declarenokey(v, range, persist, state);
+	struct str_res *res = rconst_declarenokey(v, range, persist, state);
+	if (str_res_iserror(res)) {
+		return res;
+	}
+	char *s = str_res_as_str(res);
 	assert(key);
 	map_set(v->keymap, dynamic_str(s), dynamic_str(key));
-	return s;
+	return res;
 }
 
 int

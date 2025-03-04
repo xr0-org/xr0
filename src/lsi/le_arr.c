@@ -3,7 +3,7 @@
 
 #include "util.h"
 
-#include "arr.h"
+#include "le_arr.h"
 #include "le.h"
 #include "tally.h"
 
