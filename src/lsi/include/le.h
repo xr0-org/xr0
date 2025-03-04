@@ -17,4 +17,9 @@ _lsi_le_destroy(struct lsi_le *);
 char *
 lsi_le_str(struct lsi_le *);
 
+struct string_arr;
+
+struct string_arr *
+_lsi_le_getvars(struct lsi_le *);
+
 #endif

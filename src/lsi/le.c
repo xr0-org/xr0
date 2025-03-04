@@ -63,3 +63,9 @@ lsi_le_str(struct lsi_le *le)
 
 	return strbuilder_build(b);
 }
+
+struct string_arr *
+_lsi_le_getvars(struct lsi_le *le)
+{
+	return _lsi_expr_getvars(le->_);
+}

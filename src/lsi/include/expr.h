@@ -30,4 +30,9 @@ _lsi_expr_varterms(struct lsi_expr *);
 int
 _lsi_expr_constterm(struct lsi_expr *);
 
+struct string_arr;
+
+struct string_arr *
+_lsi_expr_getvars(struct lsi_expr *);
+
 #endif
