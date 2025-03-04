@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ast.h"
 #include "location.h"
 #include "block.h"
@@ -12,6 +13,7 @@
 #include "value.h"
 #include "util.h"
 #include "program.h"
+#include "lsi.h"
 
 struct frame;
 
@@ -626,40 +628,56 @@ stack_getvariable(struct stack *s, char *id)
 	return v;
 }
 
-static struct error *
+static struct lv_res *
 constraintverify_all(struct map *, struct state *spec, struct state *impl);
 
-struct error *
+struct lv_res *
 stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl)
 {
-	struct error *err = constraintverify_all(spec_stack->varmap, spec, impl);
-	if (err) {
-		return err;
+	struct lv_res *res = constraintverify_all(
+		spec_stack->varmap, spec, impl
+	);
+	if (lv_res_iserror(res) || !spec_stack->prev) {
+		return res;
 	}
-	return spec_stack->prev
-		? stack_constraintverify_all(spec_stack->prev, spec, impl)
-		: NULL;
+	struct lv_res *prev = stack_constraintverify_all(
+		spec_stack->prev, spec, impl
+	);
+	if (lv_res_iserror(prev)) {
+		return prev;
+	}
+	struct lsi_varmap *lv = lsi_varmap_copy(lv_res_as_lv(res));
+	lsi_varmap_addrange(lv, lv_res_as_lv(prev));
+	lv_res_destroy(res);
+	lv_res_destroy(prev);
+	return lv_res_lv_create(lv);
 }
 
-static struct error *
+static struct lv_res *
 constraintverify_all(struct map *m, struct state *spec, struct state *impl)
 {
 	int i;
 
+	struct lsi_varmap *lv = lsi_varmap_create();
+
 	for (i = 0; i < m->n; i++) {
-		struct error *err;
 		char *id = m->entry[i].key;
 
-		if ((err = state_constraintverify(spec, impl, id))) {
-			return error_printf(
-				"invariant failure: `%s' %w",
-				id, err
+		struct lv_res *res = state_constraintverify(spec, impl, id);
+		if (lv_res_iserror(res)) {
+			return lv_res_error_create(
+				error_printf(
+					"invariant failure: `%s' %w",
+					id, lv_res_as_error(res)
+				)
 			);
 		}
+		lsi_varmap_addrange(lv, lv_res_as_lv(res));
+		lv_res_destroy(res);
 	}
 
-	return NULL;
+	return lv_res_lv_create(lv);
 }
 
 struct error *

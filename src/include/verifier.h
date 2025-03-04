@@ -87,14 +87,18 @@ rconst_destroy(struct rconst *);
 char *
 rconst_str(struct rconst *, char *indent);
 
-char *
-rconst_declare(struct rconst *, struct value *, char *key, bool persist);
+DECLARE_RESULT_TYPE(char *, str, str_res)
 
-char *
-rconst_declarenokey(struct rconst *, struct value *, bool persist);
+struct str_res *
+rconst_declare(struct rconst *, struct ast_expr *range, char *key, bool persist,
+		struct state *);
 
-struct value *
-rconst_get(struct rconst *, char *id);
+struct str_res *
+rconst_declarenokey(struct rconst *, struct ast_expr *range, bool persist,
+		struct state *);
+
+int
+rconst_hasvar(struct rconst *, char *var);
 
 char *
 rconst_getidbykey(struct rconst *, char *key);
@@ -104,5 +108,11 @@ rconst_undeclare(struct rconst *);
 
 bool
 rconst_eval(struct rconst *, struct ast_expr *);
+
+struct lsi_varmap;
+
+struct error *
+rconst_constraintverify(struct rconst *spec, struct rconst *impl,
+		struct lsi_varmap *spec_impl_m);
 
 #endif
