@@ -5,15 +5,25 @@
 
 #include "arr.h"
 #include "le.h"
+#include "tally.h"
 
 struct string_arr *
 le_arr_getvars(struct le_arr *arr)
 {
-	assert(0);
-	/*struct map *m = map_create();*/
-	for (int i = 0; i < le_arr_len(arr); i++) {
-		
+	int i;
+
+	struct tally *t = tally_create();
+	for (i = 0; i < le_arr_len(arr); i++) {
+		struct tally *sum = tally_sum(
+			t, _lsi_le_tally(le_arr_get(arr, i))
+		);
+		tally_destroy(t);
+		t = sum;
 	}
+	struct string_arr *vars = tally_getvars(t);
+	tally_destroy(t);
+
+	return vars;
 }
 
 struct le_arr {

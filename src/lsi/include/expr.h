@@ -3,6 +3,11 @@
 
 struct lsi_expr;
 
+struct tally;
+
+struct lsi_expr *
+_lsi_expr_tally_create(struct tally *);
+
 struct lsi_expr *
 lsi_expr_const_create(int);
 
@@ -23,8 +28,6 @@ _lsi_expr_destroy(struct lsi_expr *);
 
 char *
 lsi_expr_str(struct lsi_expr *);
-
-struct tally;
 
 struct tally *
 _lsi_expr_tally(struct lsi_expr *);

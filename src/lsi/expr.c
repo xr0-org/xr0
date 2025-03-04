@@ -6,23 +6,16 @@
 #include "lsi.h"
 #include "_limits.h"
 
-#include "ring_expr.h"
+#include "tally.h"
 
-struct lsi_expr {
-	enum type { CONST, VAR, RING } t;
-	union {
-		int c;
-		char *s;
-		struct ring_expr *r;
-	};
-};
+struct lsi_expr { struct tally *_; };
 
-static struct lsi_expr *
-_expr_create(enum type t)
+struct lsi_expr *
+_lsi_expr_tally_create(struct tally *t)
 {
 	struct lsi_expr *e = malloc(sizeof(struct lsi_expr));
 	assert(e);
-	e->t = t;
+	e->_ = t;
 	return e;
 }
 
@@ -35,104 +28,117 @@ lsi_expr_const_create(int c)
 		"have %d\n", c
 	);
 
-	struct lsi_expr *e = _expr_create(CONST);
-	e->c = c;
+	struct lsi_expr *e = _lsi_expr_tally_create(tally_create());
+	tally_setconst(e->_, c);
 	return e;
 }
 
 struct lsi_expr *
 lsi_expr_var_create(char *s)
 {
-	struct lsi_expr *e = _expr_create(VAR);
-	e->s = s;
+	struct lsi_expr *e = _lsi_expr_tally_create(tally_create());
+	tally_setcoef(e->_, s, 1);
 	return e;
 }
 
 struct lsi_expr *
 lsi_expr_sum_create(struct lsi_expr *e0, struct lsi_expr *e1)
 {
-	struct lsi_expr *e = _expr_create(RING);
-	e->r = ring_expr_sum_create(e0, e1);
-	return e;
+	return _lsi_expr_tally_create(tally_sum(e0->_, e1->_));
 }
+
+static int
+_isconst(struct lsi_expr *);
+
+static int
+_as_const(struct lsi_expr *);
 
 struct lsi_expr *
 lsi_expr_product_create(struct lsi_expr *e0, struct lsi_expr *e1)
 {
-	struct lsi_expr *e = _expr_create(RING);
-	e->r = ring_expr_product_create(e0, e1);
-	return e;
+	if (_isconst(e1)) {
+		if (_isconst(e0)) {
+			return lsi_expr_const_create(
+				tally_getconst(e0->_)*tally_getconst(e1->_)
+			);
+		}
+		return lsi_expr_product_create(e1, e0);
+	}
+	a_printf(_isconst(e0), "one operand must be constant\n");
+
+	return _lsi_expr_tally_create(tally_product(e1->_, _as_const(e0)));
+}
+
+static int
+_isconst(struct lsi_expr *e)
+{
+	struct string_arr *arr = tally_getvars(e->_);
+	int isconst = string_arr_n(arr) == 0;
+	string_arr_destroy(arr);
+	return isconst;
+}
+
+static int
+_as_const(struct lsi_expr *e)
+{
+	assert(_isconst(e));
+	return tally_getconst(e->_);
 }
 
 struct lsi_expr *
 _lsi_expr_copy(struct lsi_expr *old)
 {
-	struct lsi_expr *new = _expr_create(old->t);
-	switch (old->t) {
-	case CONST:
-		new->c = old->c;
-		break;
-	case VAR:
-		new->s = dynamic_str(old->s);
-		break;
-	case RING:
-		new->r = ring_expr_copy(old->r);
-		break;
-	default:
-		assert(0);
-	}
-	return new;
+	return _lsi_expr_tally_create(tally_copy(old->_));
 }
 
 void
 _lsi_expr_destroy(struct lsi_expr *e)
 {
-	switch (e->t) {
-	case CONST:
-		break;
-	case VAR:
-		free(e->s);
-		break;
-	case RING:
-		ring_expr_destroy(e->r);
-		break;
-	default:
-		assert(0);
-	}
+	tally_destroy(e->_);
 	free(e);
 }
 
+/* _insumform: render c so as to fit into an ordinary elementary arithmetic
+ * expression; thus if c is nonnegative or index is 0, this is simply its `%d'
+ * form, but in other cases it is returned as `- (-c)' (without the brackets). */
 static char *
-_const_str(int);
+_insumform(int c, int index);
 
 char *
 lsi_expr_str(struct lsi_expr *e)
 {
-	switch (e->t) {
-	case CONST:
-		return _const_str(e->c);
-	case VAR:
-		return dynamic_str(e->s);
-	case RING:
-		return ring_expr_str(e->r);
-	default:
-		assert(0);
+	int i;
+	struct strbuilder *b = strbuilder_create();
+
+	struct string_arr *arr = tally_getvars(e->_); 
+	int len = string_arr_n(arr);
+	for (i = 0; i < len; i++) {
+		char *v = string_arr_s(arr)[i];
+		char *coef = _insumform(
+			tally_getcoef(e->_, v), i
+		);
+		strbuilder_printf(b, "%s*%s%s", coef, v, i+1<len ? " " : "");
+		free(coef);
 	}
+	string_arr_destroy(arr);
+
+	return strbuilder_build(b);
 }
 
 static char *
-_const_str(int c)
+_insumform(int c, int index)
 {
 	struct strbuilder *b = strbuilder_create();
-	switch (c) {
-	case C89_INT_MIN:
-		strbuilder_printf(b, "INT_MIN");
-		break;
-	case C89_INT_MAX:
-		strbuilder_printf(b, "INT_MAX");
-		break;
-	default:
+	if (c >= 0 || index == 0) {
 		strbuilder_printf(b, "%d", c);
+	} else {
+		strbuilder_printf(b, "- %d", -c);
 	}
 	return strbuilder_build(b);
+}
+
+struct tally *
+_lsi_expr_tally(struct lsi_expr *e)
+{
+	return e->_;
 }

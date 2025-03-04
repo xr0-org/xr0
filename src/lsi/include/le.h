@@ -19,10 +19,6 @@ lsi_le_str(struct lsi_le *);
 
 struct tally;
 
-/* _lsi_le_tally: a tally of the inequality expressed in the form
- *
- * 	a_0 x_0 + a_1 x_1 + ··· + a_n x_n + c <= 0.
- */
 struct tally *
 _lsi_le_tally(struct lsi_le *);
 
