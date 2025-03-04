@@ -69,7 +69,6 @@ _verifyfeasible(struct lsi *lsi)
 {
 	int i;
 
-	printf("unreduced: \n%s\n", lsi_str(lsi, "	|-	"));
 	struct le_arr *arr = le_arr_copy(lsi->arr);
 
 	struct string_arr *vars = _getvars(lsi->arr);
@@ -80,7 +79,6 @@ _verifyfeasible(struct lsi *lsi)
 
 	struct lsi *new = lsi_create();
 	new->arr = arr;
-	printf("reduced: \n%s\n", lsi_str(new, "	|-	"));
 
 	for (i = 0; i < le_arr_len(arr); i++) {
 		struct lsi_le *le = le_arr_get(arr, i);
