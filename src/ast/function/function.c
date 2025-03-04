@@ -17,6 +17,7 @@
 #include "type.h"
 #include "util.h"
 #include "verifier.h"
+#include "value.h"
 
 struct ast_function {
 	bool isaxiom;
@@ -322,7 +323,9 @@ inititalise_param(struct ast_variable *param, struct state *state)
 		ast_expr_rangemin_create(),
 		ast_expr_rangemax_create()
 	);
-	struct value *val = state_rconst(state, t, r, dynamic_str(name), true);
+	struct value *val = value_res_as_value(
+		state_rconst(state, t, r, dynamic_str(name), true)
+	);
 	object_assign(obj, val);
 }
 
