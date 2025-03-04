@@ -85,7 +85,7 @@ _verifyfeasible(struct lsi *lsi)
 		if (!_lsi_le_isfeasible(le)) {
 			struct strbuilder *b = strbuilder_create();
 			char *s = lsi_le_str(le);
-			strbuilder_printf(b, "unfeasible system requires %s", s);
+			strbuilder_printf(b, "infeasible system requires %s", s);
 			free(s);
 			return error_printf(strbuilder_build(b));
 		}
@@ -148,10 +148,10 @@ _eliminate(struct le_arr *old, char *var)
 			continue;
 		}
 		long abs = coef >= 0 ? coef : -coef;
-		assert(abs == 1);
+		assert(abs == 1); /* TODO fractions */
 		/* coef is the standard-form coefficient, so if it's negative
 		 * the inequality appears on the rhs as a positive, and the
-		 * inequality provides a lower bound; and vice-versa. */
+		 * inequality provides a lower bound; or vice-versa. */
 		if (coef < 0) {
 			expr_arr_append(lhs, _lsi_le_lowerbound(le, var));
 		} else {
