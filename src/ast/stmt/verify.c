@@ -426,7 +426,7 @@ deriveinvstate(struct ast_stmt *stmt, struct state *state)
 	state_pushinvariantframe(state, iter_inv(ast_stmt_as_iter(stmt)));
 	while (!state_atinvariantend(state)) {
 		struct error *err = state_step(state);
-		assert(!err);
+		a_printf(!err, "%s\n", error_str(err));
 	}
 	state_popframe(state);
 }
