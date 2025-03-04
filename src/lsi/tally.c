@@ -7,7 +7,7 @@
 #include "tally.h"
 
 
-/* _tally_add: add u to t */
+/* _tally_add: add u to t, as a side effect on t. */
 static void
 _tally_add(struct tally *t, struct tally *u);
 
@@ -24,8 +24,9 @@ static void
 _tally_add(struct tally *t, struct tally *u)
 {
 	int i;
-	struct string_arr *arr = tally_getvars(u);
+	struct string_arr *arr;
 
+	arr = tally_getvars(u);
 	for (i = 0; i < string_arr_n(arr); i++) {
 		char *var = string_arr_s(arr)[i];
 		tally_setcoef(
@@ -35,10 +36,10 @@ _tally_add(struct tally *t, struct tally *u)
 		);
 	}
 	tally_setconst(t, tally_getconst(t) + tally_getconst(u));
-
 	string_arr_destroy(arr);
 }
 
+/* _tally_multiply: multiply t by n, as a side effect on t. */
 static void
 _tally_multiply(struct tally *t, int n);
 
@@ -54,8 +55,9 @@ static void
 _tally_multiply(struct tally *t, int n)
 {
 	int i;
-	struct string_arr *arr = tally_getvars(t);
+	struct string_arr *arr;
 
+	arr = tally_getvars(t);
 	for (i = 0; i < string_arr_n(arr); i++) {
 		char *var = string_arr_s(arr)[i];
 		tally_setcoef(t, dynamic_str(var), n*tally_getcoef(t, var));

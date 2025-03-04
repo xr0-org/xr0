@@ -8,10 +8,12 @@
 
 #include "tally.h"
 
+/* lsi_expr: an expression involving constants, variables, and sums and products
+ * of them both. */
 struct lsi_expr { struct tally *_; };
 
-struct lsi_expr *
-_lsi_expr_tally_create(struct tally *t)
+static struct lsi_expr *
+_create(struct tally *t)
 {
 	struct lsi_expr *e = malloc(sizeof(struct lsi_expr));
 	assert(e);
@@ -28,7 +30,7 @@ lsi_expr_const_create(int c)
 		"have %d\n", c
 	);
 
-	struct lsi_expr *e = _lsi_expr_tally_create(tally_create());
+	struct lsi_expr *e = _create(tally_create());
 	tally_setconst(e->_, c);
 	return e;
 }
@@ -36,7 +38,7 @@ lsi_expr_const_create(int c)
 struct lsi_expr *
 lsi_expr_var_create(char *s)
 {
-	struct lsi_expr *e = _lsi_expr_tally_create(tally_create());
+	struct lsi_expr *e = _create(tally_create());
 	tally_setcoef(e->_, s, 1);
 	return e;
 }
@@ -44,7 +46,7 @@ lsi_expr_var_create(char *s)
 struct lsi_expr *
 lsi_expr_sum_create(struct lsi_expr *e0, struct lsi_expr *e1)
 {
-	return _lsi_expr_tally_create(tally_sum(e0->_, e1->_));
+	return _create(tally_sum(e0->_, e1->_));
 }
 
 static int
@@ -66,7 +68,7 @@ lsi_expr_product_create(struct lsi_expr *e0, struct lsi_expr *e1)
 	}
 	a_printf(_isconst(e0), "one operand must be constant\n");
 
-	return _lsi_expr_tally_create(tally_product(e1->_, _as_const(e0)));
+	return _create(tally_product(e1->_, _as_const(e0)));
 }
 
 static int
@@ -88,7 +90,7 @@ _as_const(struct lsi_expr *e)
 struct lsi_expr *
 _lsi_expr_copy(struct lsi_expr *old)
 {
-	return _lsi_expr_tally_create(tally_copy(old->_));
+	return _create(tally_copy(old->_));
 }
 
 void
@@ -109,60 +111,48 @@ lsi_expr_str(struct lsi_expr *e)
 	for (i = 0; i < len; i++) {
 		char *v = string_arr_s(arr)[i];
 		int coef = tally_getcoef(e->_, v);
-		strbuilder_printf(b, "%d*%s%s", coef, v, i+1<len ? " " : "");
+		if (coef == 0) {
+			continue;
+		}
+		if (coef < 0) {
+			strbuilder_putc(b, '-');
+		} else if (coef > 0 && i != 0) {
+			strbuilder_putc(b, '+');
+		}
+		int abs = coef > 0 ? coef : -coef;
+		if (abs != 1) {
+			strbuilder_printf(b, "%d*", abs);
+		}
+		strbuilder_printf(b, "%s", v);
 	}
 	string_arr_destroy(arr);
-	strbuilder_printf(b, "%s%d", len>0 ? "+" : "", tally_getconst(e->_));
+	int c = tally_getconst(e->_);
+	if (len == 0 || c < 0) {
+		strbuilder_printf(b, "%d", c);
+	} else if (c > 0) {
+		strbuilder_printf(b, "%s%d", len>0 ? "+" : "", c);
+	}
 
 	return strbuilder_build(b);
 }
 
-struct tally *
-_lsi_expr_tally(struct lsi_expr *e)
-{
-	return e->_;
-}
-
 struct lsi_expr *
-_lsi_expr_positives(struct lsi_expr *e)
+_lsi_expr_varterms(struct lsi_expr *e)
 {
 	struct tally *t = tally_create();
 
 	struct string_arr *arr = tally_getvars(e->_);
 	for (int i = 0; i < string_arr_n(arr); i++) {
 		char *var = string_arr_s(arr)[i];
-		int coef = tally_getcoef(e->_, var);
-		if (coef > 0) {
-			tally_setcoef(t, dynamic_str(var), coef);
-		}
+		tally_setcoef(t, dynamic_str(var), tally_getcoef(e->_, var));
 	}
 	string_arr_destroy(arr);
-	int c = tally_getconst(e->_);
-	if (c > 0) {
-		tally_setconst(t, c);
-	}
 
-	return _lsi_expr_tally_create(t);
+	return _create(t);
 }
 
-struct lsi_expr *
-_lsi_expr_negatives(struct lsi_expr *e)
+int
+_lsi_expr_constterm(struct lsi_expr *e)
 {
-	struct tally *t = tally_create();
-
-	struct string_arr *arr = tally_getvars(e->_);
-	for (int i = 0; i < string_arr_n(arr); i++) {
-		char *var = string_arr_s(arr)[i];
-		int coef = tally_getcoef(e->_, var);
-		if (coef < 0) {
-			tally_setcoef(t, dynamic_str(var), -coef);
-		}
-	}
-	string_arr_destroy(arr);
-	int c = tally_getconst(e->_);
-	if (c < 0) {
-		tally_setconst(t, -c);
-	}
-
-	return _lsi_expr_tally_create(t);
+	return tally_getconst(e->_);
 }

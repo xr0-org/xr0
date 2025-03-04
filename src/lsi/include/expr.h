@@ -25,9 +25,9 @@ char *
 lsi_expr_str(struct lsi_expr *);
 
 struct lsi_expr *
-_lsi_expr_positives(struct lsi_expr *);
+_lsi_expr_varterms(struct lsi_expr *);
 
-struct lsi_expr *
-_lsi_expr_negatives(struct lsi_expr *);
+int
+_lsi_expr_constterm(struct lsi_expr *);
 
 #endif

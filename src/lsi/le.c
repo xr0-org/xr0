@@ -51,18 +51,15 @@ lsi_le_str(struct lsi_le *le)
 {
 	struct strbuilder *b = strbuilder_create();
 
-	/* l <= r is expressed as r-l */
-	struct lsi_expr *lhs = _lsi_expr_negatives(le->_),
-			*rhs = _lsi_expr_positives(le->_);
+	int _const = _lsi_expr_constterm(le->_);
 
-	char *l = lsi_expr_str(lhs),
-	     *r = lsi_expr_str(rhs);
-	strbuilder_printf(b, "%s <= %s", l, r);
-	free(r);
-	free(l);
+	struct lsi_expr *var = _lsi_expr_varterms(le->_);
 
-	_lsi_expr_destroy(rhs);
-	_lsi_expr_destroy(lhs);
+	char *s = lsi_expr_str(var);
+	strbuilder_printf(b, "%s <= %d", s, _const);
+	free(s);
+
+	_lsi_expr_destroy(var);
 
 	return strbuilder_build(b);
 }
