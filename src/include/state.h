@@ -144,11 +144,13 @@ state_lexememarker(struct state *);
 bool
 state_addresses_deallocand(struct state *, struct object *);
 
-struct value *
+struct value_res;
+
+struct value_res *
 state_rconst(struct state *, struct ast_type *, struct ast_expr *range,
 		char *key, bool persist);
 
-struct value *
+struct value_res *
 state_rconstnokey(struct state *, struct ast_type *, struct ast_expr *range,
 		bool persist);
 
@@ -163,6 +165,9 @@ state_loc_valid(struct state *, struct location *);
 
 bool
 state_loc_onheap(struct state *, struct location *);
+
+int
+state_hasrconst(struct state *state, char *id);
 
 struct value *
 state_getrconst(struct state *, char *id);
@@ -290,10 +295,14 @@ location_permuteheap(struct location *loc, struct permutation *p);
 struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive);
 
-struct error *
+struct lsi_varmap;
+
+DECLARE_RESULT_TYPE(struct lsi_varmap *, lv, lv_res)
+
+struct lv_res *
 state_constraintverify(struct state *spec, struct state *impl, char *id);
 
-struct error *
+struct lv_res *
 state_constraintverify_structmember(struct state *spec, struct state *impl,
 		struct value *spec_v, struct value *impl_v, char *member);
 

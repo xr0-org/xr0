@@ -9,6 +9,7 @@
 #include "state.h"
 #include "util.h"
 #include "value.h"
+#include "lsi.h"
 
 static struct ast_expr *
 ast_expr_create(void)
@@ -1271,6 +1272,52 @@ binary_simplify(struct ast_expr *e)
 		assert(false);
 	}
 }
+
+static struct lsi_expr *
+binary_to_lsi(struct ast_expr *, enum ast_binary_operator, struct ast_expr *);
+
+struct lsi_expr *
+ast_expr_to_lsi(struct ast_expr *e)
+{
+	switch (ast_expr_kind(e)) {
+	case EXPR_CONSTANT:
+		return lsi_expr_const_create(ast_expr_as_constant(e));
+	case EXPR_IDENTIFIER:
+		return lsi_expr_var_create(
+			dynamic_str(ast_expr_as_identifier(e))
+		);
+	case EXPR_BINARY:
+		return binary_to_lsi(
+			ast_expr_binary_e1(e),
+			ast_expr_binary_op(e),
+			ast_expr_binary_e2(e)
+		);
+	default:
+		assert(0);
+	}
+}
+
+static struct lsi_expr *
+binary_to_lsi(struct ast_expr *e0, enum ast_binary_operator op,
+		struct ast_expr *e1)
+{
+	struct lsi_expr *l0 = ast_expr_to_lsi(e0),
+			*l1 = ast_expr_to_lsi(e1);
+	switch (op) {
+	case BINARY_OP_ADDITION:
+		return lsi_expr_sum_create(l0, l1);
+	case BINARY_OP_SUBTRACTION:
+		return lsi_expr_sum_create(
+			l0,
+			lsi_expr_product_create(lsi_expr_const_create(-1), l1)
+		);
+	case BINARY_OP_MULTIPLICATION:
+		return lsi_expr_product_create(l0, l1);
+	default:
+		assert(0);
+	}
+}
+
 
 DEFINE_RESULT_TYPE(struct shift *, shift, shift_destroy, shift_res, false)
 

@@ -60,7 +60,7 @@ block_permuteheaplocs(struct block *, struct permutation *);
 
 struct constraint;
 
-struct error *
+struct lv_res *
 block_constraintverify(struct block *spec, struct location *impl,
 		struct constraint *);
 

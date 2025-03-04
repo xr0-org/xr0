@@ -262,12 +262,15 @@ rconst_split(struct rconst *old, struct map *split, struct state *s)
 {
 	struct rconst *new = rconst_copy(old);
 	for (int i = 0; i < split->n; i++) {
+		assert(0);
+		/*
 		struct entry e = split->entry[i];
 		struct value *v = rconst_get(new, e.key);
 		assert(v);
 		if (!value_splitassume(v, (struct number *) e.value, s)) {
 			return NULL;
 		}
+		*/
 	}
 	return new;
 }

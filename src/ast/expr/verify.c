@@ -204,7 +204,7 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 static struct e_res *
 hack_identifier_builtin_eval(char *id, struct state *state)
 {
-	if (state_getrconst(state, id) || strncmp(id, "ptr:", 4) == 0) {
+	if (state_hasrconst(state, id) || strncmp(id, "ptr:", 4) == 0) {
 		/* TODO set type from rconsts */
 		return e_res_eval_create(
 			eval_rval_create(
@@ -519,13 +519,14 @@ setupverify(struct ast_expr *call, struct state *impl)
 
 	for (int i = 0; i < nparams; i++) {
 		char *id = ast_variable_name(param[i]);
-		struct error *err = state_constraintverify(spec, impl, id);
-		if (err) {
+		struct lv_res *res = state_constraintverify(spec, impl, id);
+		if (lv_res_iserror(res)) {
 			return error_printf(
 				"precondition failure: argument of `%s' %w",
-				id, err
+				id, lv_res_as_error(res)
 			);
 		}
+		fprintf(stderr, "WARNING: call constraints not verified\n");
 	}
 
 	state_popframe(impl);
@@ -911,17 +912,21 @@ value_compare(struct value *lhs, enum ast_binary_operator op,
 	}
 }
 
-static struct value *
+static struct value_res *
 range_rconst(struct ast_expr *, struct state *);
 
 static struct e_res *
 range_eval(struct ast_expr *expr, struct state *state)
 {
+	struct value_res *res = range_rconst(expr, state);
+	if (value_res_iserror(res)) {
+		return e_res_error_create(value_res_as_error(res));
+	}
 	return e_res_eval_create(
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */
 			ast_type_create_range(),
-			range_rconst(expr, state)
+			value_res_as_value(res)
 		)
 	);
 }
@@ -929,7 +934,7 @@ range_eval(struct ast_expr *expr, struct state *state)
 static char *
 modulatedkey(struct ast_expr *, struct state *);
 
-static struct value *
+static struct value_res *
 range_rconst(struct ast_expr *expr, struct state *state)
 {
 	if (ast_expr_range_haskey(expr)) {

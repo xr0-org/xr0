@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "util.h"
 #include "verifier.h"
 
 #include "arr.h"

@@ -9,6 +9,7 @@
 #include "util.h"
 #include "value.h"
 #include "verifier.h"
+#include "lsi.h"
 
 #include "block.h"
 #include "constraint.h"
@@ -195,17 +196,18 @@ block_undeclare(struct block *b, struct state *s)
 	b->arr = new;
 }
 
-struct error *
+struct lv_res *
 block_constraintverify(struct block *b, struct location *impl_loc,
 		struct constraint *c)
 {
+	struct lsi_varmap *lv = lsi_varmap_create();
 	int n = object_arr_nobjects(b->arr);
 	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
-		struct error *err = constraint_verifyobject(
+		struct lv_res *res = constraint_verifyobject(
 			c, obj[i], impl_loc
 		);
-		if (err) {
+		if (lv_res_iserror(res)) {
 			struct ast_expr *actual_offset = ast_expr_sum_create(
 				ast_expr_copy(
 					offset_as_expr(location_offset(impl_loc))
@@ -215,14 +217,17 @@ block_constraintverify(struct block *b, struct location *impl_loc,
 			);
 			struct ast_expr *simp = ast_expr_simplify(actual_offset);
 			char *simp_str = ast_expr_str(simp);
-			err = error_printf("%w at index %s", err, simp_str);
+			struct error *err = error_printf(
+				"%w at index %s", lv_res_as_error(res), simp_str
+			);
 			free(simp_str);
 			ast_expr_destroy(simp);
 			ast_expr_destroy(actual_offset);
-			return err;
+			return lv_res_error_create(err);
 		}
+		lsi_varmap_addrange(lv, lv_res_as_lv(res));
 	}
-	return NULL;
+	return lv_res_lv_create(lv);
 }
 
 struct block_arr {

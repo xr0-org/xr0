@@ -227,6 +227,11 @@ ast_expr_matheval(struct ast_expr *e);
 struct ast_expr *
 ast_expr_simplify(struct ast_expr *);
 
+struct lsi_expr;
+
+struct lsi_expr *
+ast_expr_to_lsi(struct ast_expr *);
+
 struct shift;
 
 struct shift *
