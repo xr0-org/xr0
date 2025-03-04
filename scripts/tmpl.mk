@@ -6,7 +6,13 @@ CFLAGS = -g -I src/include \
 	 -std=gnu11 -pedantic -Wall -Werror \
 	 -Wreturn-type \
 	 -Wstrict-prototypes
-VALGRIND = valgrind --fullpath-after=`pwd`/src/
+
+ifdef $(shell command -v valgrind)
+	VALGRIND = valgrind --fullpath-after=`pwd`/src/
+else
+	VALGRIND =
+endif
+
 LEX = lex
 YACC = bison -yvd
 
