@@ -17,9 +17,4 @@ _lsi_le_destroy(struct lsi_le *);
 char *
 lsi_le_str(struct lsi_le *);
 
-struct tally;
-
-struct tally *
-_lsi_le_tally(struct lsi_le *);
-
 #endif

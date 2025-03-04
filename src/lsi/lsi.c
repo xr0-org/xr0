@@ -51,14 +51,5 @@ lsi_add(struct lsi *lsi, struct lsi_le *le)
 {
 	le_arr_append(lsi->arr, le);
 	/* TODO: verify feasibility */
-	struct string_arr *vars = le_arr_getvars(lsi->arr);
-	struct strbuilder *b = strbuilder_create();
-	int len = string_arr_n(vars);
-	char **s = string_arr_s(vars);
-	for (int i = 0; i < len; i++) {
-		strbuilder_printf(b, "%s%s", s[i], i+1 < len ? ", " : "");
-	}
-	printf("vars: %s\n", strbuilder_build(b));
-
 	return NULL;
 }

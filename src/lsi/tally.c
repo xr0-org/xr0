@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 
 #include "util.h"
@@ -46,7 +47,7 @@ tally_product(struct tally *t, int n)
 {
 	struct tally *product = tally_copy(t);
 	_tally_multiply(product, n);
-	return t;
+	return product;
 }
 
 static void
@@ -106,7 +107,24 @@ tally_destroy(struct tally *t)
 char *
 tally_str(struct tally *t)
 {
-	assert(0);
+	int i;
+
+	struct strbuilder *b = strbuilder_create();
+
+	strbuilder_putc(b, '{');
+	struct map *m = t->m;
+	for (i = 0; i < m->n; i++) {
+		struct entry e = m->entry[i];
+		strbuilder_printf(
+			b, 
+			"\'%s\': %d%s", 
+			e.key, e.value,
+			i+1 < m->n ? ", " : ""
+		);
+	}
+	strbuilder_printf(b, "; %d}", t->c);
+
+	return strbuilder_build(b);
 }
 
 int

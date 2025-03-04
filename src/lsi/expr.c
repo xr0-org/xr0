@@ -98,12 +98,6 @@ _lsi_expr_destroy(struct lsi_expr *e)
 	free(e);
 }
 
-/* _insumform: render c so as to fit into an ordinary elementary arithmetic
- * expression; thus if c is nonnegative or index is 0, this is simply its `%d'
- * form, but in other cases it is returned as `- (-c)' (without the brackets). */
-static char *
-_insumform(int c, int index);
-
 char *
 lsi_expr_str(struct lsi_expr *e)
 {
@@ -114,26 +108,12 @@ lsi_expr_str(struct lsi_expr *e)
 	int len = string_arr_n(arr);
 	for (i = 0; i < len; i++) {
 		char *v = string_arr_s(arr)[i];
-		char *coef = _insumform(
-			tally_getcoef(e->_, v), i
-		);
-		strbuilder_printf(b, "%s*%s%s", coef, v, i+1<len ? " " : "");
-		free(coef);
+		int coef = tally_getcoef(e->_, v);
+		strbuilder_printf(b, "%d*%s%s", coef, v, i+1<len ? " " : "");
 	}
 	string_arr_destroy(arr);
+	strbuilder_printf(b, "%s%d", len>0 ? "+" : "", tally_getconst(e->_));
 
-	return strbuilder_build(b);
-}
-
-static char *
-_insumform(int c, int index)
-{
-	struct strbuilder *b = strbuilder_create();
-	if (c >= 0 || index == 0) {
-		strbuilder_printf(b, "%d", c);
-	} else {
-		strbuilder_printf(b, "- %d", -c);
-	}
 	return strbuilder_build(b);
 }
 
@@ -141,4 +121,49 @@ struct tally *
 _lsi_expr_tally(struct lsi_expr *e)
 {
 	return e->_;
+}
+
+struct lsi_expr *
+_lsi_expr_positives(struct lsi_expr *e)
+{
+	struct tally *t = tally_create();
+
+	struct string_arr *arr = tally_getvars(e->_);
+	for (int i = 0; i < string_arr_n(arr); i++) {
+		char *var = string_arr_s(arr)[i];
+		int coef = tally_getcoef(e->_, var);
+		if (coef > 0) {
+			tally_setcoef(t, dynamic_str(var), coef);
+		}
+	}
+	string_arr_destroy(arr);
+	int c = tally_getconst(e->_);
+	if (c > 0) {
+		tally_setconst(t, c);
+	}
+
+	return _lsi_expr_tally_create(t);
+}
+
+struct lsi_expr *
+_lsi_expr_negatives(struct lsi_expr *e)
+{
+	struct tally *t = tally_create();
+
+	struct string_arr *arr = tally_getvars(e->_);
+	for (int i = 0; i < string_arr_n(arr); i++) {
+		char *var = string_arr_s(arr)[i];
+		int coef = tally_getcoef(e->_, var);
+		if (coef < 0) {
+			tally_setcoef(t, dynamic_str(var), -coef);
+		}
+	}
+	string_arr_destroy(arr);
+	int c = tally_getconst(e->_);
+	if (c < 0) {
+		tally_setconst(t, -c);
+	}
+
+	return _lsi_expr_tally_create(t);
+
 }
