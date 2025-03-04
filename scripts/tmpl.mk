@@ -7,11 +7,7 @@ CFLAGS = -g -I src/include \
 	 -Wreturn-type \
 	 -Wstrict-prototypes
 
-ifdef $(shell command -v valgrind)
-	VALGRIND = valgrind --fullpath-after=`pwd`/src/
-else
-	VALGRIND =
-endif
+VALGRIND = valgrind --fullpath-after=`pwd`/src/
 
 LEX = lex
 YACC = bison -yvd
