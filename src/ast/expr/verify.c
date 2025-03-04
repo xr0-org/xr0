@@ -911,17 +911,21 @@ value_compare(struct value *lhs, enum ast_binary_operator op,
 	}
 }
 
-static struct value *
+static struct value_res *
 range_rconst(struct ast_expr *, struct state *);
 
 static struct e_res *
 range_eval(struct ast_expr *expr, struct state *state)
 {
+	struct value_res *res = range_rconst(expr, state);
+	if (value_res_iserror(res)) {
+		return e_res_error_create(value_res_as_error(res));
+	}
 	return e_res_eval_create(
 		eval_rval_create(
 			/* XXX: we will investigate type conversions later */
 			ast_type_create_range(),
-			range_rconst(expr, state)
+			value_res_as_value(res)
 		)
 	);
 }
@@ -929,7 +933,7 @@ range_eval(struct ast_expr *expr, struct state *state)
 static char *
 modulatedkey(struct ast_expr *, struct state *);
 
-static struct value *
+static struct value_res *
 range_rconst(struct ast_expr *expr, struct state *state)
 {
 	if (ast_expr_range_haskey(expr)) {

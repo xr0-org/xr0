@@ -70,11 +70,11 @@ value_struct_create(struct ast_type *);
 int
 value_isstruct(struct value *v);
 
-struct value *
+struct value_res *
 value_struct_rconst_create(struct ast_type *, struct state *,
 		char *key, bool persist);
 
-struct value *
+struct value_res *
 value_struct_rconstnokey_create(struct ast_type *, struct state *, bool persist);
 
 struct value *

@@ -144,11 +144,13 @@ state_lexememarker(struct state *);
 bool
 state_addresses_deallocand(struct state *, struct object *);
 
-struct value *
+struct value_res;
+
+struct value_res *
 state_rconst(struct state *, struct ast_type *, struct ast_expr *range,
 		char *key, bool persist);
 
-struct value *
+struct value_res *
 state_rconstnokey(struct state *, struct ast_type *, struct ast_expr *range,
 		bool persist);
 

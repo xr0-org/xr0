@@ -327,7 +327,7 @@ value_struct_create(struct ast_type *t)
 	return v;
 }
 
-struct value *
+struct value_res *
 value_struct_rconst_create(struct ast_type *t, struct state *s,
 		char *key, bool persist)
 {
@@ -348,22 +348,23 @@ value_struct_rconst_create(struct ast_type *t, struct state *s,
 			ast_expr_rangemin_create(),
 			ast_expr_rangemax_create()
 		);
-		object_assign(
-			obj,
-			state_rconst(
-				s,
-				ast_variable_type(var[i]),
-				range,
-				dynamic_str(ast_expr_range_key(range)),
-				persist
-			)
+		struct value_res *res = state_rconst(
+			s,
+			ast_variable_type(var[i]),
+			range,
+			dynamic_str(ast_expr_range_key(range)),
+			persist
 		);
+		if (value_res_iserror(res)) {
+			return res;
+		}
+		object_assign(obj, value_res_as_value(res));
 	}
 
-	return v;
+	return value_res_value_create(v);
 }
 
-struct value *
+struct value_res *
 value_struct_rconstnokey_create(struct ast_type *t, struct state *s, bool persist)
 {
 	t = ast_type_struct_complete(t, state_getext(s));
@@ -381,18 +382,16 @@ value_struct_rconstnokey_create(struct ast_type *t, struct state *s, bool persis
 			ast_expr_rangemin_create(),
 			ast_expr_rangemax_create()
 		);
-		object_assign(
-			obj,
-			state_rconstnokey(
-				s,
-				ast_variable_type(var[i]),
-				range,
-				persist
-			)
+		struct value_res *res = state_rconstnokey(
+			s, ast_variable_type(var[i]), range, persist
 		);
+		if (value_res_iserror(res)) {
+			return res;
+		}
+		object_assign(obj, value_res_as_value(res));
 	}
 
-	return v;
+	return value_res_value_create(v);
 }
 
 struct value *

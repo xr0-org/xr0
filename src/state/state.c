@@ -260,7 +260,7 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 	stack_declare(state->stack, var, isparam);
 }
 
-struct value *
+struct value_res *
 state_rconst(struct state *state, struct ast_type *t, struct ast_expr *range,
 		char *key, bool persist)
 {
@@ -268,27 +268,39 @@ state_rconst(struct state *state, struct ast_type *t, struct ast_expr *range,
 
 	char *prev = rconst_getidbykey(state->rconst, key);
 	if (prev) {
-		return value_rconst_create(
-			ast_expr_identifier_create(dynamic_str(prev))
+		return value_res_value_create(
+			value_rconst_create(
+				ast_expr_identifier_create(dynamic_str(prev))
+			)
 		);
 	}
 	struct str_res *res = rconst_declare(
 		state->rconst, range, key, persist, state
 	);
-	return value_rconst_create(
-		ast_expr_identifier_create(str_res_as_str(res))
+	if (str_res_iserror(res)) {
+		return value_res_error_create(str_res_as_error(res));
+	}
+	return value_res_value_create(
+		value_rconst_create(
+			ast_expr_identifier_create(str_res_as_str(res))
+		)
 	);
 }
 
-struct value *
+struct value_res *
 state_rconstnokey(struct state *state, struct ast_type *t,
 		struct ast_expr *range, bool persist)
 {
 	struct str_res *res = rconst_declarenokey(
 		state->rconst, range, persist, state
 	);
-	return value_rconst_create(
-		ast_expr_identifier_create(str_res_as_str(res))
+	if (str_res_iserror(res)) {
+		return value_res_error_create(str_res_as_error(res));
+	}
+	return value_res_value_create(
+		value_rconst_create(
+			ast_expr_identifier_create(str_res_as_str(res))
+		)
 	);
 }
 
