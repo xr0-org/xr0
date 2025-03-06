@@ -29,10 +29,10 @@ _tally_add(struct tally *t, struct tally *u)
 	arr = tally_getvars(u);
 	for (i = 0; i < string_arr_n(arr); i++) {
 		char *var = string_arr_s(arr)[i];
-		tally_setcoef(
+		tally_setval(
 			t,
 			dynamic_str(var),
-			tally_getcoef(t, var) + tally_getcoef(u, var)
+			tally_getval(t, var) + tally_getval(u, var)
 		);
 	}
 	tally_setconst(t, tally_getconst(t) + tally_getconst(u));
@@ -60,7 +60,7 @@ _tally_multiply(struct tally *t, long n)
 	arr = tally_getvars(t);
 	for (i = 0; i < string_arr_n(arr); i++) {
 		char *var = string_arr_s(arr)[i];
-		tally_setcoef(t, dynamic_str(var), n*tally_getcoef(t, var));
+		tally_setval(t, dynamic_str(var), n*tally_getval(t, var));
 	}
 	tally_setconst(t, n*tally_getconst(t));
 
@@ -130,7 +130,7 @@ tally_str(struct tally *t)
 }
 
 long
-tally_getcoef(struct tally *t, char *var)
+tally_getval(struct tally *t, char *var)
 {
 	return (long) map_get(t->m, var);
 }
@@ -142,7 +142,7 @@ tally_getconst(struct tally *t)
 }
 
 void
-tally_setcoef(struct tally *t, char *var, long c)
+tally_setval(struct tally *t, char *var, long c)
 {
 	map_set(t->m, var, (void *) c);
 }

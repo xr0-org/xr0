@@ -40,7 +40,7 @@ struct lsi_expr *
 lsi_expr_var_create(char *s)
 {
 	struct lsi_expr *e = _create(tally_create());
-	tally_setcoef(e->_, s, 1);
+	tally_setval(e->_, s, 1);
 	return e;
 }
 
@@ -111,7 +111,7 @@ lsi_expr_str(struct lsi_expr *e)
 	int len = string_arr_n(arr);
 	for (i = 0; i < len; i++) {
 		char *v = string_arr_s(arr)[i];
-		int coef = tally_getcoef(e->_, v);
+		int coef = tally_getval(e->_, v);
 		if (coef == 0) {
 			continue;
 		}
@@ -147,7 +147,7 @@ _lsi_expr_varterms(struct lsi_expr *e)
 	struct string_arr *arr = tally_getvars(e->_);
 	for (int i = 0; i < string_arr_n(arr); i++) {
 		char *var = string_arr_s(arr)[i];
-		tally_setcoef(t, dynamic_str(var), tally_getcoef(e->_, var));
+		tally_setval(t, dynamic_str(var), tally_getval(e->_, var));
 	}
 	string_arr_destroy(arr);
 
@@ -170,13 +170,13 @@ _lsi_expr_getvars(struct lsi_expr *e)
 long
 _lsi_expr_getcoef(struct lsi_expr *e, char *var)
 {
-	return tally_getcoef(e->_, var);
+	return tally_getval(e->_, var);
 }
 
 struct lsi_expr *
 _lsi_expr_except(struct lsi_expr *old, char *var)
 {
 	struct lsi_expr *new = _lsi_expr_copy(old);
-	tally_setcoef(new->_, var, 0);
+	tally_setval(new->_, var, 0);
 	return new;
 }
