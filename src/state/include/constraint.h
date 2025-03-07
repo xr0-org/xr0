@@ -11,11 +11,11 @@ constraint_destroy(struct constraint *);
 
 struct error;
 
-struct error *
+struct lv_res *
 constraint_verify(struct constraint *, struct value *spec_v,
 		struct value *impl_v);
 
-struct error *
+struct lv_res *
 constraint_verifyobject(struct constraint *c, struct object *spec_obj,
 		struct location *impl_loc);
 

@@ -76,7 +76,7 @@ _lsi_le_getvars(struct lsi_le *le)
 	return _lsi_expr_getvars(le->_);
 }
 
-long
+int
 _lsi_le_getstdformcoef(struct lsi_le *le, char *var)
 {
 	return _lsi_expr_getcoef(le->_, var);
@@ -85,7 +85,7 @@ _lsi_le_getstdformcoef(struct lsi_le *le, char *var)
 struct lsi_expr *
 _lsi_le_lowerbound(struct lsi_le *le, char *var)
 {
-	long coef = _lsi_le_getstdformcoef(le, var);
+	int coef = _lsi_le_getstdformcoef(le, var);
 	assert(coef < 0);
 	assert(coef == -1); /* TODO: fractions */
 
@@ -96,7 +96,7 @@ _lsi_le_lowerbound(struct lsi_le *le, char *var)
 struct lsi_expr *
 _lsi_le_upperbound(struct lsi_le *le, char *var)
 {
-	long coef = _lsi_le_getstdformcoef(le, var);
+	int coef = _lsi_le_getstdformcoef(le, var);
 	assert(coef > 0);
 	assert(coef == 1); /* TODO: fractions */
 

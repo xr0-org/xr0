@@ -29,7 +29,7 @@ _lsi_le_getvars(struct lsi_le *);
  *
  * give the coefficient a_i of the variable x_i represented by var. this is
  * obviously zero is var doesn't appear. */
-long
+int
 _lsi_le_getstdformcoef(struct lsi_le *, char *var);
 
 /* _lsi_le_lowerbound: solve to place var alone on the rhs and return the lhs.

@@ -120,6 +120,9 @@ rconst_declarenokey(struct rconst *v, struct ast_expr *range, bool persist,
 	return str_res_str_create(s);
 }
 
+static struct ast_expr *
+_value_to_expr(struct value *, struct state *);
+
 static struct lsi_expr *
 _range_lw(struct ast_expr *e, struct state *s)
 {
@@ -129,8 +132,16 @@ _range_lw(struct ast_expr *e, struct state *s)
 		struct value *v = value_res_as_value(
 			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
 		);
-		return lsi_expr_const_create(value_as_int(v, s));
+		return ast_expr_to_lsi(_value_to_expr(v, s));
 	}
+}
+
+static struct ast_expr *
+_value_to_expr(struct value *v, struct state *s)
+{
+	return value_isconstant(v)
+		? ast_expr_constant_create(value_as_int(v, s))
+		: ast_expr_copy(value_as_rconst(v));
 }
 
 static struct lsi_expr *
@@ -143,12 +154,9 @@ _range_up(struct ast_expr *e, struct state *s)
 			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
 		);
 		/* subtract 1 b/c range expression upper bounds are exclusive */
-		if (value_isconstant(v)) {
-			return lsi_expr_const_create(value_as_int(v, s)-1);
-		}
 		return ast_expr_to_lsi(
 			ast_expr_sum_create(
-				ast_expr_copy(value_as_rconst(v)),
+				_value_to_expr(v, s),
 				ast_expr_constant_create(-1)
 			)
 		);

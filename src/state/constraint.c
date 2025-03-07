@@ -6,8 +6,10 @@
 #include "object.h"
 #include "state.h"
 #include "value.h"
+#include "lsi.h"
 
 #include "block.h"
+#include "constraint.h"
 
 struct constraint {
 	struct state *spec, *impl;
@@ -43,14 +45,18 @@ size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec
 static struct location *
 location_reloffset(struct location *l1, struct location *l2);
 
-struct error *
+struct lv_res *
 constraint_verify(struct constraint *c, struct value *spec_v,
 		struct value *impl_v)
 {
 	if (ast_type_isint(c->t)) {
-		return value_confirmsubset(impl_v, spec_v, c->impl, c->spec);
+		/*return value_confirmsubset(impl_v, spec_v, c->impl, c->spec);*/
+		/* TODO: include non-location pointers in this case */
+		assert(0);
 	} else if (ast_type_isstruct(c->t)) {
-		return value_struct_specval_verify(spec_v, impl_v, c->impl, c->spec);
+		return value_struct_specval_verify(
+			spec_v, impl_v, c->impl, c->spec
+		);
 	}
 	a_printf(
 		ast_type_isptr(c->t),
@@ -59,30 +65,38 @@ constraint_verify(struct constraint *c, struct value *spec_v,
 
 	if (!value_islocation(spec_v)) {
 		/* allow for NULL and other invalid-pointer setups */
-		return NULL;
+		/* TODO: include non-location pointers above case */
+		assert(0);
+		return lv_res_lv_create(lsi_varmap_create());
 	}
 	/* spec requires value be valid pointer */
 	if (!value_islocation(impl_v)) {
-		return error_printf("must be pointing at something");
+		return lv_res_error_create(
+			error_printf("must be pointing at something")
+		);
 	}
 
 	struct location *spec_loc = value_as_location(spec_v),
 			*impl_loc = value_as_location(impl_v);
 	if (!state_loc_valid(c->spec, spec_loc)) {
 		/* spec freed reference */
-		return NULL;
+		return lv_res_lv_create(lsi_varmap_create());
 	}
 	if (!state_loc_valid(c->impl, impl_loc)) {
-		return error_printf("must be lvalue");
+		return lv_res_error_create(error_printf("must be lvalue"));
 	}
 
 	if (state_loc_onheap(c->spec, spec_loc)
 			&& !state_loc_onheap(c->impl, impl_loc)) {
-		return error_printf("must be heap allocated");
+		return lv_res_error_create(
+			error_printf("must be heap allocated")
+		);
 	}
 
 	if (!size_le(spec_loc, impl_loc, c->spec, c->impl)) {
-		return error_printf("must point at larger block");
+		return lv_res_error_create(
+			error_printf("must point at larger block")
+		);
 	}
 
 	/* we shift the impl_loc's offset by spec_loc's so that
@@ -93,7 +107,9 @@ constraint_verify(struct constraint *c, struct value *spec_v,
 	struct error *err = block_constraintverify(spec_b, rel_impl_loc, c);
 	location_destroy(rel_impl_loc);
 
-	return err;
+	return err
+		? lv_res_error_create(err)
+		: lv_res_lv_create(lsi_varmap_create());
 }
 
 static struct location *
@@ -120,7 +136,7 @@ size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec
 	return block_size_le(spec_b, impl_b);
 }
 
-struct error *
+struct lv_res *
 constraint_verifyobject(struct constraint *c, struct object *spec_obj,
 		struct location *impl_loc)
 {
@@ -133,17 +149,18 @@ constraint_verifyobject(struct constraint *c, struct object *spec_obj,
 	struct object_res *res = block_observe(b_impl, offset, c->impl, false);
 	if (object_res_iserror(res)) {
 		struct error *err = object_res_as_error(res);
-		if (error_to_block_observe_noobj(err)) {
-			return error_printf("must have object");
-		}
-		return err;
+		return lv_res_error_create(
+			error_to_block_observe_noobj(err)
+			? error_printf("must have object")
+			: err
+		);
 	}
 	struct object *arg_obj = object_res_as_object(res);
 	if (!object_hasvalue(spec_obj)) {
-		return NULL;
+		return lv_res_lv_create(lsi_varmap_create());
 	}
 	if (!object_hasvalue(arg_obj)) {
-		return error_printf("must have value");
+		return lv_res_error_create(error_printf("must have value"));
 	}
 	return constraint_verify(
 		c, object_as_value(spec_obj), object_as_value(arg_obj)

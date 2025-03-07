@@ -160,14 +160,13 @@ _lsi_expr_constterm(struct lsi_expr *e)
 	return tally_getconst(e->_);
 }
 
-
 struct string_arr *
 _lsi_expr_getvars(struct lsi_expr *e)
 {
 	return tally_getvars(e->_);
 }
 
-long
+int
 _lsi_expr_getcoef(struct lsi_expr *e, char *var)
 {
 	return tally_getval(e->_, var);

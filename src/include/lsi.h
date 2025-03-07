@@ -22,6 +22,13 @@ struct lsi_le;
 struct error *
 lsi_add(struct lsi *, struct lsi_le *);
 
+struct error *
+lsi_addrange(struct lsi *, struct lsi *);
+
+struct lsi_varmap;
+
+struct lsi *
+lsi_renamevars(struct lsi *, struct lsi_varmap *);
 
 /* lsi_le: a less-than-or-equal-to inequality */
 struct lsi_le;
@@ -54,5 +61,21 @@ lsi_expr_product_create(struct lsi_expr *, struct lsi_expr *);
 
 char *
 lsi_expr_str(struct lsi_expr *);
+
+
+/* lsi_varmap: a name->name mapping of variables */
+struct lsi_varmap;
+
+struct lsi_varmap *
+lsi_varmap_create(void);
+
+void
+lsi_varmap_destroy(struct lsi_varmap *);
+
+void
+lsi_varmap_set(struct lsi_varmap *, char *k, char *v);
+
+char *
+lsi_varmap_str(struct lsi_varmap *);
 
 #endif

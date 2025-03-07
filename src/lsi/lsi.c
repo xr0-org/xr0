@@ -71,14 +71,11 @@ _verifyfeasible(struct lsi *lsi)
 
 	struct le_arr *arr = le_arr_copy(lsi->arr);
 
-	struct string_arr *vars = _getvars(lsi->arr);
+	struct string_arr *vars = _getvars(lsi->arr); /* TODO: reverse list */
 	for (i = 0; i < string_arr_n(vars); i++) {
 		arr = _eliminate(arr, string_arr_s(vars)[i]);
 	}
 	string_arr_destroy(vars);
-
-	struct lsi *new = lsi_create();
-	new->arr = arr;
 
 	for (i = 0; i < le_arr_len(arr); i++) {
 		struct lsi_le *le = le_arr_get(arr, i);
@@ -142,12 +139,12 @@ _eliminate(struct le_arr *old, char *var)
 
 	for (i = 0; i < le_arr_len(old); i++) {
 		struct lsi_le *le = le_arr_get(old, i);
-		long coef = _lsi_le_getstdformcoef(le, var);
+		int coef = _lsi_le_getstdformcoef(le, var);
 		if (coef == 0) {
 			le_arr_append(new, _lsi_le_copy(le));
 			continue;
 		}
-		long abs = coef >= 0 ? coef : -coef;
+		int abs = coef >= 0 ? coef : -coef;
 		assert(abs == 1); /* TODO fractions */
 		/* coef is the standard-form coefficient, so if it's negative
 		 * the inequality appears on the rhs as a positive, and the
@@ -160,8 +157,8 @@ _eliminate(struct le_arr *old, char *var)
 		}
 	}
 
-	for (i = 0; i < expr_arr_len(lhs); i++)
-		for (j = 0; j < expr_arr_len(rhs); j++)
+	for (i = 0; i < expr_arr_len(lhs); i++) {
+		for (j = 0; j < expr_arr_len(rhs); j++) {
 			le_arr_append(
 				new,
 				lsi_le_create(
@@ -169,6 +166,8 @@ _eliminate(struct le_arr *old, char *var)
 					expr_arr_get(rhs, j)
 				)
 			);
+		}
+	}
 
 	return new;
 }

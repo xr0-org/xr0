@@ -295,6 +295,10 @@ location_permuteheap(struct location *loc, struct permutation *p);
 struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive);
 
+struct lsi_varmap;
+
+DECLARE_RESULT_TYPE(struct lsi_varmap *, lv, lv_res)
+
 struct error *
 state_constraintverify(struct state *spec, struct state *impl, char *id);
 
