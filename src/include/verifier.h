@@ -109,4 +109,10 @@ rconst_undeclare(struct rconst *);
 bool
 rconst_eval(struct rconst *, struct ast_expr *);
 
+struct lsi_varmap;
+
+struct error *
+rconst_constraintverify(struct rconst *spec, struct rconst *impl,
+		struct lsi_varmap *impl_spec_m);
+
 #endif

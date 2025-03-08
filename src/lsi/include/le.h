@@ -8,6 +8,11 @@ struct lsi_expr;
 struct lsi_le *
 lsi_le_create(struct lsi_expr *l, struct lsi_expr *r);
 
+struct lsi_varmap;
+
+struct lsi_le *
+_lsi_le_renamevars(struct lsi_le *, struct lsi_varmap *);
+
 struct lsi_le *
 _lsi_le_copy(struct lsi_le *);
 

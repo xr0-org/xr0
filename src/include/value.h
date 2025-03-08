@@ -92,6 +92,9 @@ struct lv_res *
 value_struct_specval_verify(struct value *param, struct value *arg,
 		struct state *spec, struct state *caller);
 
+char *
+value_to_rconstid(struct value *v, struct state *);
+
 struct value *
 value_copy(struct value *);
 

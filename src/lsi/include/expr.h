@@ -15,6 +15,11 @@ lsi_expr_sum_create(struct lsi_expr *, struct lsi_expr *);
 struct lsi_expr *
 lsi_expr_product_create(struct lsi_expr *, struct lsi_expr *);
 
+struct lsi_varmap;
+
+struct lsi_expr *
+_lsi_expr_renamevars(struct lsi_expr *, struct lsi_varmap *);
+
 struct lsi_expr *
 _lsi_expr_copy(struct lsi_expr *);
 

@@ -298,3 +298,15 @@ rconst_eval(struct rconst *v, struct ast_expr *e)
 {
 	return ast_expr_matheval(e);
 }
+
+struct error *
+rconst_constraintverify(struct rconst *spec, struct rconst *impl,
+		struct lsi_varmap *m)
+{
+	struct lsi *spec_lsi = lsi_copy(spec->constraints);
+	struct lsi *impl_lsi = lsi_renamevars(impl->constraints, m);
+	struct error *err = lsi_addrange(spec_lsi, impl_lsi);
+	lsi_destroy(impl_lsi);
+	lsi_destroy(spec_lsi);
+	return err;
+}

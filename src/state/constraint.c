@@ -31,8 +31,6 @@ void
 constraint_destroy(struct constraint *c)
 {
 	ast_type_destroy(c->t);
-	state_destroy(c->spec);
-	state_destroy(c->impl);
 	free(c);
 }
 
@@ -50,9 +48,13 @@ constraint_verify(struct constraint *c, struct value *spec_v,
 		struct value *impl_v)
 {
 	if (ast_type_isint(c->t)) {
-		/*return value_confirmsubset(impl_v, spec_v, c->impl, c->spec);*/
-		/* TODO: include non-location pointers in this case */
-		assert(0);
+		struct lsi_varmap *lv = lsi_varmap_create();
+		lsi_varmap_set(
+			lv,
+			value_to_rconstid(impl_v, c->impl),
+			value_to_rconstid(spec_v, c->spec)
+		);
+		return lv_res_lv_create(lv);
 	} else if (ast_type_isstruct(c->t)) {
 		return value_struct_specval_verify(
 			spec_v, impl_v, c->impl, c->spec
@@ -104,12 +106,9 @@ constraint_verify(struct constraint *c, struct value *spec_v,
 	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
 	struct block *spec_b = state_getblock(c->spec, spec_loc);
 	assert(spec_b);
-	struct error *err = block_constraintverify(spec_b, rel_impl_loc, c);
+	struct lv_res *res = block_constraintverify(spec_b, rel_impl_loc, c);
 	location_destroy(rel_impl_loc);
-
-	return err
-		? lv_res_error_create(err)
-		: lv_res_lv_create(lsi_varmap_create());
+	return res;
 }
 
 static struct location *

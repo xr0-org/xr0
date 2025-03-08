@@ -69,13 +69,21 @@ struct lsi_varmap;
 struct lsi_varmap *
 lsi_varmap_create(void);
 
+struct lsi_varmap *
+lsi_varmap_copy(struct lsi_varmap *);
+
 void
 lsi_varmap_destroy(struct lsi_varmap *);
+
+char *
+lsi_varmap_str(struct lsi_varmap *);
 
 void
 lsi_varmap_set(struct lsi_varmap *, char *k, char *v);
 
-char *
-lsi_varmap_str(struct lsi_varmap *);
+/* lsi_varmap_addrange: copy m0's key-value pairs to m, asserting that any common
+ * keys must have the same value in both maps. */
+void
+lsi_varmap_addrange(struct lsi_varmap *m, struct lsi_varmap *m0);
 
 #endif

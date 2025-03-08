@@ -4,6 +4,7 @@
 
 #include "util.h"
 
+#include "varmap.h"
 #include "tally.h"
 
 
@@ -70,17 +71,50 @@ _tally_multiply(struct tally *t, long n)
 
 struct tally {
 	struct map *m;
-	long c;
+	int c;
 };
+
+static struct tally *
+_create(struct map *m, int c)
+{
+	struct tally *t = malloc(sizeof(struct tally));
+	assert(t);
+	t->m = m;
+	t->c = c;
+	return t;
+}
 
 struct tally *
 tally_create(void)
 {
-	struct tally *t = malloc(sizeof(struct tally));
-	assert(t);
-	t->m = map_create();
-	t->c = 0;
-	return t;
+	return _create(map_create(), 0);
+}
+
+struct tally *
+_tally_renamekeys(struct tally *t, struct lsi_varmap *lv)
+{
+	int i;
+
+	struct map *new = map_create();
+	struct map *m = t->m;
+	for (i = 0; i < m->n; i++) {
+		struct entry e = m->entry[i];
+		map_set(
+			new,
+			dynamic_str(
+				/* XXX: for now we copy over values that aren't
+				 * in the map without renaming, but this will
+				 * need rethinking when/if an error due to
+				 * unreachable variables occurs */
+				_lsi_varmap_haskey(lv, e.key)
+				? _lsi_varmap_get(lv, e.key)
+				: e.key
+			),
+			e.value
+		);
+	}
+
+	return _create(new, t->c);
 }
 
 struct tally *

@@ -28,6 +28,20 @@ lsi_copy(struct lsi *old)
 	return new;
 }
 
+struct lsi *
+lsi_renamevars(struct lsi *old, struct lsi_varmap *m)
+{
+	int i;
+
+	struct lsi *new = lsi_create();
+	for (i = 0; i < le_arr_len(old->arr); i++) {
+		le_arr_append(
+			new->arr, _lsi_le_renamevars(le_arr_get(old->arr, i), m)
+		);
+	}
+	return new;
+}
+
 void
 lsi_destroy(struct lsi *lsi)
 {
@@ -55,6 +69,20 @@ struct error *
 lsi_add(struct lsi *lsi, struct lsi_le *le)
 {
 	le_arr_append(lsi->arr, le);
+	return _verifyfeasible(lsi);
+}
+
+struct error *
+lsi_addrange(struct lsi *lsi, struct lsi *lsi0)
+{
+	int i;
+
+	struct le_arr *arr  = lsi->arr,
+		      *arr0 = lsi0->arr;
+	for (i = 0; i < le_arr_len(arr0); i++) {
+		le_arr_append(arr, _lsi_le_copy(le_arr_get(arr0, i)));
+	}
+
 	return _verifyfeasible(lsi);
 }
 

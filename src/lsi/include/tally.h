@@ -6,6 +6,11 @@ struct tally;
 struct tally *
 tally_create(void);
 
+struct lsi_varmap;
+
+struct tally *
+_tally_renamekeys(struct tally *, struct lsi_varmap *);
+
 struct tally *
 tally_copy(struct tally *);
 

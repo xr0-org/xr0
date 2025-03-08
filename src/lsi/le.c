@@ -37,6 +37,13 @@ lsi_le_create(struct lsi_expr *l, struct lsi_expr *r)
 }
 
 struct lsi_le *
+_lsi_le_renamevars(struct lsi_le *le, struct lsi_varmap *m)
+{
+	return _lsi_le_create(_lsi_expr_renamevars(le->_, m));
+}
+
+
+struct lsi_le *
 _lsi_le_copy(struct lsi_le *old)
 {
 	return _lsi_le_create(_lsi_expr_copy(old->_));

@@ -10,6 +10,7 @@
 #include "util.h"
 #include "value.h"
 #include "verifier.h"
+#include "lsi.h"
 
 #include "number.h"
 #include "range.h"
@@ -578,7 +579,7 @@ value_struct_member(struct value *v, char *member)
 	return map_get(v->_struct.m, member);
 }
 
-struct error *
+struct lv_res *
 value_struct_specval_verify(struct value *param, struct value *arg,
 		struct state *spec, struct state *caller)
 {
@@ -586,25 +587,67 @@ value_struct_specval_verify(struct value *param, struct value *arg,
 	struct ast_variable_arr *param_members = param->_struct.members,
 				*arg_members = arg->_struct.members;
 
+	struct lsi_varmap *lv = lsi_varmap_create();
+
 	int n = ast_variable_arr_n(param_members);
 	assert(ast_variable_arr_n(arg_members) == n);
 	struct ast_variable **param_var = ast_variable_arr_v(param_members);
 	for (int i = 0; i < n; i++) {
 		char *field = ast_variable_name(param_var[i]);
-		struct error *err = state_constraintverify_structmember(
+		struct lv_res *res = state_constraintverify_structmember(
 			spec, caller, param, arg, field
 		);
-		if (err) {
+		if (lv_res_iserror(res)) {
 			a_printf(
 				false,
 				"needs test and custom error message: %s\n",
-				error_str(err)
+				error_str(lv_res_as_error(res))
 			);
 		}
+		lsi_varmap_addrange(lv, lv_res_as_lv(res));
 	}
 
-	return NULL;
+	return lv_res_lv_create(lv);
 
+}
+
+static char *
+_int_to_rconstid(struct value *, struct state *);
+
+char *
+value_to_rconstid(struct value *v, struct state *s)
+{
+	switch (v->type) {
+	case VALUE_RCONST:
+		return dynamic_str(ast_expr_as_identifier(value_as_rconst(v)));
+	case VALUE_INT:
+		return _int_to_rconstid(v, s);
+	default:
+		assert(0);
+	}
+}
+
+static char *
+_int_to_rconstid(struct value *v, struct state *s)
+{
+	struct number *n = v->n;
+	assert(number_isconst(n));
+
+	struct ast_type *t = ast_type_create_int();
+	int c = number_as_const(n);
+	struct ast_expr *range = ast_expr_range_createnokey(
+		ast_expr_constant_create(c), ast_expr_constant_create(c+1)
+	);
+
+	/* morph v to equivalent rconst */
+	struct value_res *res = state_rconstnokey(s, t, range, false); /* XXX: persist? */
+	char *id = value_to_rconstid(value_res_as_value(res), s);
+	value_res_destroy(res);
+
+	ast_expr_destroy(range);
+	ast_type_destroy(t);
+
+	return id;
 }
 
 

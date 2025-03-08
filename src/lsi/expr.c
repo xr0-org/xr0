@@ -89,6 +89,12 @@ _as_const(struct lsi_expr *e)
 }
 
 struct lsi_expr *
+_lsi_expr_renamevars(struct lsi_expr *e, struct lsi_varmap *m)
+{
+	return _create(_tally_renamekeys(e->_, m));
+}
+
+struct lsi_expr *
 _lsi_expr_copy(struct lsi_expr *old)
 {
 	return _create(tally_copy(old->_));
