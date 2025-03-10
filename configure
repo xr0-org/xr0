@@ -36,9 +36,9 @@ set +x
 SRCDIR=src
 BUILDDIR=build
 
-# listincludes: output a list of the appropriate include directories from the
+# list_includes: output a list of the appropriate include directories from the
 # given path, in keeping with rule (2.) above
-function listincludes() {
+function list_includes() {
 	path=$1
 	includedir=$path/include
 	if [ -d $includedir ]; then
@@ -46,8 +46,19 @@ function listincludes() {
 	fi
 	parent=$(dirname $path)
 	if [[ $parent != "." ]]; then
-		listincludes $parent
+		list_includes $parent
 	fi
+}
+
+function replace_valgrind_params() {
+	if [[ `command -v valgrind` ]]; then
+		_valgrind="valgrind --fullpath-after=\`pwd\`/src/"
+		_v_flags="--num-callers=30"
+		_leaks="--leak-check=full"
+	fi
+	sed "s|@VALGRIND@|$_valgrind|;\
+		s|@VALGRINDVFLAGS@|$_v_flags|;\
+		s|@VALGRINDFULLLEAKS@|$_leaks|"
 }
 
 INCLUDEDIRS=$(find $SRCDIR -type d -name "include")
@@ -89,7 +100,7 @@ printf "\n"
 for dir in $SRCDIRS; do
 	build_dir=$(echo $dir | sed "s/^$SRCDIR/$BUILDDIR/")
 	printf "\n# $dir with build dir /$build_dir\n"
-	includes=$(listincludes $dir)
+	includes=$(list_includes $dir)
 	for f in $(find $dir -maxdepth 1 -type f -name "*.c"); do
 		obj=$build_dir/$(basename $f | sed "s/.c$/.o/;")
 		printf "$obj: $build_dir parser\n"
@@ -117,4 +128,4 @@ exec > /dev/tty
 # hack in parser files
 rm $PARSER_FILES
 
-cp $TMPL_MKFILE Makefile
+cat $TMPL_MKFILE | replace_valgrind_params > Makefile

@@ -6,7 +6,11 @@ CFLAGS = -g -I src/include \
 	 -std=gnu11 -pedantic -Wall -Werror \
 	 -Wreturn-type \
 	 -Wstrict-prototypes
-VALGRIND = valgrind --fullpath-after=`pwd`/src/
+
+VALGRIND = @VALGRIND@
+VALGRINDVFLAGS = @VALGRINDVFLAGS@
+VALGRINDFULLLEAKS = @VALGRINDFULLLEAKS@
+
 LEX = lex
 YACC = bison -yvd
 
@@ -59,7 +63,7 @@ check: $(RUNTEST) $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 check-verbose: $(RUNTEST) $(XR0V)
-	$(VALGRIND) --num-callers=30 \
+	$(VALGRIND) $(VALGRINDVFLAGS) \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 debug: $(RUNTEST) $(XR0V)
@@ -78,24 +82,23 @@ lex-gen:
 	@diff $(BUILD_DIR)/gen_firstchar $(BUILD_DIR)/percent
 
 lex-leaks: $(XR0V)
-	$(VALGRIND) --leak-check=full \
+	$(VALGRIND) $(VALGRINDFULLLEAKS) \
 		$(XR0V) -I libx $(TEST_DIR)/99-program/100-lex/parse.x
 
 lex-verbose: $(XR0V) 
-	$(VALGRIND) --num-callers=30 \
+	$(VALGRIND) $(VALGRINDVFLAGS) \
 		$(XR0V) -I libx -v $(TEST_DIR)/99-program/100-lex/parse.x
 
 matrix: $(XR0V)
 	$(VALGRIND) $(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
 
 matrix-leaks: $(XR0V)
-	$(VALGRIND) --leak-check=full \
+	$(VALGRIND) $(VALGRINDFULLLEAKS) \
 		$(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
 
 matrix-verbose: $(XR0V) 
-	$(VALGRIND) --num-callers=30 \
+	$(VALGRIND) $(VALGRINDVFLAGS) \
 		$(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
-
 
 clean:
 	@rm -rf $(BUILD_DIR) $(BIN_DIR) $(PARSER_JUNK) $(DEPS_MK) Makefile
