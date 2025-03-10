@@ -396,17 +396,17 @@ inclusive_or_expression
 
 logical_and_expression
 	: inclusive_or_expression
-	| logical_and_expression AND_OP inclusive_or_expression
+	/*| logical_and_expression AND_OP inclusive_or_expression*/
 	;
 
 logical_or_expression
 	: logical_and_expression
-	| logical_or_expression OR_OP logical_and_expression
+	/*| logical_or_expression OR_OP logical_and_expression*/
 	;
 
 conditional_expression
 	: logical_or_expression
-	| logical_or_expression '?' expression ':' conditional_expression
+	/*| logical_or_expression '?' expression ':' conditional_expression*/
 	;
 
 assignment_expression

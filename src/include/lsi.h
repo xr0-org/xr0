@@ -30,6 +30,15 @@ struct lsi_varmap;
 struct lsi *
 lsi_renamevars(struct lsi *, struct lsi_varmap *);
 
+struct lsi *
+lsi_prefixvars(struct lsi *, char *prefix);
+
+int
+lsi_var_isconst(struct lsi *, char *var, int c);
+
+struct error *
+lsi_checksatisfiesrange(struct lsi *, struct lsi *);
+
 /* lsi_le: a less-than-or-equal-to inequality */
 struct lsi_le;
 
@@ -38,6 +47,15 @@ struct lsi_expr;
 /* le_create: l <= r */
 struct lsi_le *
 lsi_le_create(struct lsi_expr *l, struct lsi_expr *r);
+
+struct lsi_le *
+lsi_le_negate(struct lsi_le *);
+
+struct lsi_le *
+lsi_le_copy(struct lsi_le *);
+
+void
+lsi_le_destroy(struct lsi_le *);
 
 char *
 lsi_le_str(struct lsi_le *);
@@ -68,6 +86,9 @@ struct lsi_varmap;
 
 struct lsi_varmap *
 lsi_varmap_create(void);
+
+struct lsi_varmap *
+lsi_varmap_prefix(struct lsi_varmap *, char *key, char *val);
 
 struct lsi_varmap *
 lsi_varmap_copy(struct lsi_varmap *);

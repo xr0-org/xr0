@@ -70,16 +70,6 @@ value_struct_create(struct ast_type *);
 int
 value_isstruct(struct value *v);
 
-struct value_res *
-value_struct_rconst_create(struct ast_type *, struct state *,
-		char *key, bool persist);
-
-struct value_res *
-value_struct_rconstnokey_create(struct ast_type *, struct state *, bool persist);
-
-struct value *
-value_pf_augment(struct value *, struct ast_expr *root);
-
 struct ast_type *
 value_struct_membertype(struct value *, char *member);
 
@@ -153,15 +143,6 @@ value_eq(struct value *lhs, struct value *rhs, struct state *);
 
 int
 value_lt(struct value *lhs, struct value *rhs, struct state *);
-
-struct error *
-value_disentangle(struct value *, struct value *, struct state *);
-
-/* value_confirmsubset: returns an error if v (as belonging to s) is not
- * decidably a subset of v0 (as belonging to s0). */
-struct error *
-value_confirmsubset(struct value *v, struct value *v0, struct state *s,
-		struct state *s0);
 
 struct number;
 
