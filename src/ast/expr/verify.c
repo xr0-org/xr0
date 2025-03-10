@@ -873,20 +873,26 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 		ast_type_isint(eval_type(rv1)) && ast_type_isint(eval_type(rv2)),
 		"only comparisons between two integers are supported\n" 
 	);
-	struct value *v1 = value_res_as_value(eval_to_value(rv1, s)),
-		     *v2 = value_res_as_value(eval_to_value(rv2, s));
-
-	struct error *err;
-	if ((err = value_disentangle(v1, v2, s))) {
-		return e_res_error_create(err);
-	}
-
-	return e_res_eval_create(
-		eval_rval_create(
-			ast_type_create_int(),
-			value_int_create(value_compare(v1, op, v2, s))
+	struct lsi_expr *e = ast_expr_to_lsi(
+		ast_expr_binary_create(
+			ast_expr_identifier_create(
+				value_to_rconstid(
+					value_res_as_value(
+						eval_to_value(rv1, s)
+					), s
+				)
+			),
+			op,
+			ast_expr_identifier_create(
+				value_to_rconstid(
+					value_res_as_value(
+						eval_to_value(rv2, s)
+					), s
+				)
+			)
 		)
 	);
+	assert(0);
 }
 
 
