@@ -227,10 +227,19 @@ ast_expr_matheval(struct ast_expr *e);
 struct ast_expr *
 ast_expr_simplify(struct ast_expr *);
 
+struct lsi;
+
+/* ast_expr_to_lsi: return an lsi whose feasibility is equivalent to the
+ * user-space boolean truth value of the expression (that is, the lsi is
+ * feasible iff the expression compares unequal to 0). hence the expresssion
+ * assumed to belong to user space, with no explicit rconsts. */
+struct lsi *
+ast_expr_to_lsi(struct ast_expr *, struct state *);
+
 struct lsi_expr;
 
 struct lsi_expr *
-ast_expr_to_lsi(struct ast_expr *);
+ast_expr_to_lsi_expr(struct ast_expr *);
 
 struct shift;
 
@@ -380,8 +389,16 @@ ast_block_hastoplevelreturn(struct ast_block *);
 struct ast_type;
 
 struct ast_expr *
-ast_block_call_create(struct ast_block *, struct lexememarker *,
+ast_block_call_geninstr(struct ast_block *, struct lexememarker *,
 	struct ast_type *, struct ast_expr *);
+
+struct ast_expr *
+ast_block_relop_geninstr(struct ast_block *, struct lexememarker *,
+		struct ast_expr *, struct state *);
+
+struct ast_expr *
+ast_block_eqop_geninstr(struct ast_block *, struct lexememarker *,
+		struct ast_expr *, struct state *);
 
 void
 ast_block_prepend_stmt(struct ast_block *, struct ast_stmt *);
@@ -486,26 +503,26 @@ ast_stmt_create_dealloc(struct lexememarker *, struct ast_expr *arg);
 struct ast_stmt *
 ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
 
-struct ast_stmt *
-ast_stmt_asm_setupv_create(struct lexememarker *, struct ast_expr *call);
-
-struct ast_stmt *
-ast_stmt_asm_call_create(struct lexememarker *, struct ast_expr *call);
-
-struct ast_stmt *
-ast_stmt_asm_movret_create(struct lexememarker *, struct ast_variable *v);
-
 struct ast_expr *
 ast_stmt_asm_call(struct ast_stmt *);
 
 struct ast_variable *
 ast_stmt_asm_mov_var(struct ast_stmt *);
 
+struct ast_expr *
+ast_stmt_asm_mov_val(struct ast_stmt *);
+
 int
 ast_stmt_asm_issetupv(struct ast_stmt *);
 
 int
 ast_stmt_asm_iscall(struct ast_stmt *);
+
+int
+ast_stmt_asm_ismov(struct ast_stmt *);
+
+int
+ast_stmt_asm_ismovret(struct ast_stmt *);
 
 void
 ast_stmt_destroy(struct ast_stmt *);

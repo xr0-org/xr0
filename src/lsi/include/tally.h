@@ -12,6 +12,9 @@ struct tally *
 _tally_renamekeys(struct tally *, struct lsi_varmap *);
 
 struct tally *
+_tally_prefixkeys(struct tally *, char *prefix);
+
+struct tally *
 tally_copy(struct tally *);
 
 void
@@ -19,6 +22,12 @@ tally_destroy(struct tally *);
 
 char *
 tally_str(struct tally *);
+
+int
+_tally_eq(struct tally *, struct tally *);
+
+int
+_tally_orthogonal(struct tally *, struct tally *);
 
 long
 tally_getval(struct tally *, char *var);
