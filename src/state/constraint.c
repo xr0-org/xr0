@@ -51,8 +51,8 @@ constraint_verify(struct constraint *c, struct value *spec_v,
 		struct lsi_varmap *lv = lsi_varmap_create();
 		lsi_varmap_set(
 			lv,
-			value_to_rconstid(impl_v, c->impl),
-			value_to_rconstid(spec_v, c->spec)
+			value_to_rconstid(spec_v, c->spec),
+			value_to_rconstid(impl_v, c->impl)
 		);
 		return lv_res_lv_create(lv);
 	} else if (ast_type_isstruct(c->t)) {

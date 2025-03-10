@@ -77,13 +77,18 @@ lsi_addrange(struct lsi *lsi, struct lsi *lsi0)
 {
 	int i;
 
-	struct le_arr *arr  = lsi->arr,
-		      *arr0 = lsi0->arr;
+	struct le_arr *arr0 = lsi0->arr;
 	for (i = 0; i < le_arr_len(arr0); i++) {
-		le_arr_append(arr, _lsi_le_copy(le_arr_get(arr0, i)));
+		struct lsi_le *le = _lsi_le_copy(le_arr_get(arr0, i));
+		struct error *err = lsi_add(lsi, le);
+		if (err) {
+			char *s = lsi_le_str(le);
+			err = error_printf("%s not satisfiable", s);
+			free(s);
+			return err;
+		}
 	}
-
-	return _verifyfeasible(lsi);
+	return NULL;
 }
 
 static struct string_arr *

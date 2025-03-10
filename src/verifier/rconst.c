@@ -303,9 +303,9 @@ struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
 		struct lsi_varmap *m)
 {
-	struct lsi *spec_lsi = lsi_copy(spec->constraints);
-	struct lsi *impl_lsi = lsi_renamevars(impl->constraints, m);
-	struct error *err = lsi_addrange(spec_lsi, impl_lsi);
+	struct lsi *spec_lsi = lsi_renamevars(spec->constraints, m);
+	struct lsi *impl_lsi = lsi_copy(impl->constraints);
+	struct error *err = lsi_addrange(impl_lsi, spec_lsi);
 	lsi_destroy(impl_lsi);
 	lsi_destroy(spec_lsi);
 	return err;

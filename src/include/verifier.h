@@ -113,6 +113,6 @@ struct lsi_varmap;
 
 struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
-		struct lsi_varmap *impl_spec_m);
+		struct lsi_varmap *spec_impl_m);
 
 #endif
