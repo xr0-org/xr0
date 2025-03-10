@@ -7,6 +7,57 @@
 #include "varmap.h"
 #include "tally.h"
 
+static int
+_tally_forwardeq(struct tally *t, struct tally *u);
+
+int
+_tally_eq(struct tally *t, struct tally *u)
+{
+	return _tally_forwardeq(t, u) && _tally_forwardeq(u, t);
+}
+
+static int
+_tally_forwardeq(struct tally *t, struct tally *u)
+{
+	int i;
+	struct string_arr *arr;
+
+	arr = tally_getvars(t);
+	for (i = 0; i < string_arr_n(arr); i++) {
+		char *var = string_arr_s(arr)[i];
+		if (tally_getval(t, var) != tally_getval(u, var)) {
+			return 0;
+		}
+	}
+	string_arr_destroy(arr);
+	return tally_getconst(t) == tally_getconst(u);
+}
+
+static int
+_tally_forwardorthogonal(struct tally *t, struct tally *u);
+
+int
+_tally_orthogonal(struct tally *t, struct tally *u)
+{
+	return _tally_forwardorthogonal(t, u) && _tally_forwardorthogonal(u, t);
+}
+
+static int
+_tally_forwardorthogonal(struct tally *t, struct tally *u)
+{
+	int i;
+	struct string_arr *arr;
+
+	arr = tally_getvars(t);
+	for (i = 0; i < string_arr_n(arr); i++) {
+		char *var = string_arr_s(arr)[i];
+		if (tally_getval(t, var) && tally_getval(u, var)) {
+			return 0;
+		}
+	}
+	string_arr_destroy(arr);
+	return 1;
+}
 
 /* _tally_add: add u to t, as a side effect on t. */
 static void
@@ -115,6 +166,32 @@ _tally_renamekeys(struct tally *t, struct lsi_varmap *lv)
 	}
 
 	return _create(new, t->c);
+}
+
+static char *
+_concat(char *, char *);
+
+struct tally *
+_tally_prefixkeys(struct tally *t, char *prefix)
+{
+	int i;
+
+	struct map *new = map_create();
+	struct map *m = t->m;
+	for (i = 0; i < m->n; i++) {
+		struct entry e = m->entry[i];
+		map_set(new, _concat(prefix, e.key), e.value);
+	}
+
+	return _create(new, t->c);
+}
+
+static char *
+_concat(char *s, char *t)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s%s", s, t);
+	return strbuilder_build(b);
 }
 
 struct tally *

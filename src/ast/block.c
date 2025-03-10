@@ -6,6 +6,7 @@
 #include "ast.h"
 #include "util.h"
 
+#include "expr.h"
 #include "stmt.h"
 
 struct ast_block {
@@ -181,7 +182,7 @@ static char *
 generate_tempvar(int tempid);
 
 struct ast_expr *
-ast_block_call_create(struct ast_block *b, struct lexememarker *loc,
+ast_block_call_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_type *rtype, struct ast_expr *expr)
 {
 	ast_block_append_stmt(
@@ -214,9 +215,139 @@ static char *
 generate_tempvar(int tempid)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "<t%d>", tempid);
+	strbuilder_printf(b, "#R%d", tempid);
 	return strbuilder_build(b);
 }
+
+struct ast_expr *
+ast_block_relop_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e, struct state *s)
+{
+	struct ast_expr *e1 = ast_expr_geninstr(ast_expr_binary_e1(e), loc, b, s),
+			*e2 = ast_expr_geninstr(ast_expr_binary_e2(e), loc, b, s);
+	char *tvar = generate_tempvar(b->tempcount++);
+	ast_block_append_stmt(
+		b, 
+		ast_stmt_asm_mov_create(
+			loc,
+			ast_variable_create(
+				dynamic_str(tvar),
+				/* 3.3.8: The result has type int. */
+				ast_type_create_int()
+			),
+			ast_expr_binary_create(e1, ast_expr_binary_op(e), e2)
+		)
+	);
+	return ast_expr_identifier_create(tvar);
+}
+
+static struct ast_expr *
+ast_block_l_and_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct state *);
+
+static struct ast_expr *
+ast_block_l_or_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct state *);
+
+struct ast_expr *
+ast_block_eqop_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e, struct state *s)
+{
+	struct ast_expr *e1 = ast_expr_binary_e1(e),
+			*e2 = ast_expr_binary_e2(e);
+	switch (ast_expr_binary_op(e)) {
+	case BINARY_OP_EQ:
+		return ast_block_l_and_geninstr(
+			b, loc,
+			ast_expr_binary_create(e1, BINARY_OP_LE, e2),
+			ast_expr_binary_create(e2, BINARY_OP_LE, e1),
+			s
+		);
+	case BINARY_OP_NE:
+		return ast_block_l_or_geninstr(
+			b, loc,
+			ast_expr_binary_create(e1, BINARY_OP_LT, e2),
+			ast_expr_binary_create(e2, BINARY_OP_LT, e1),
+			s
+		);
+	default:
+		assert(0);
+	}
+}
+
+static struct ast_expr *
+ast_block_ternary_geninstr(struct ast_block *, struct lexememarker *,
+		struct ast_expr *, struct ast_expr *, struct ast_expr *,
+		struct state *);
+
+static struct ast_expr *
+ast_block_l_and_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct state *s)
+{
+	return ast_block_ternary_geninstr(
+		/* e1 ? e2 : 0 */
+		b, loc, e1, e2, ast_expr_constant_create(0), s
+	);
+}
+
+static struct ast_expr *
+ast_block_l_or_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct state *s)
+{
+	return ast_block_ternary_geninstr(
+		/* e1 ? 1 : e2 */
+		b, loc, e1, ast_expr_constant_create(1), e2, s
+	);
+}
+
+static struct ast_expr *
+ast_block_ternary_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct ast_expr *e3,
+		struct state *s)
+{
+	struct ast_expr *e1_r = ast_expr_geninstr(e1, loc, b, s),
+			*e2_r = ast_expr_geninstr(e2, loc, b, s),
+			*e3_r = ast_expr_geninstr(e3, loc, b, s);
+
+	/* we implement e1 ? e2 : e3 as
+	 *
+	 * 	if (e1)
+	 * 		mov tvar, e2;
+	 * 	else
+	 * 		mov tvar, e3;
+	 */
+
+	char *tvar = generate_tempvar(b->tempcount++);
+	ast_block_append_stmt(
+		b,
+		ast_stmt_create_sel(
+			loc,
+			false,
+			e1_r,
+			ast_stmt_asm_mov_create(
+				loc,
+				ast_variable_create(
+					dynamic_str(tvar),
+					/* 3.3.9 in association with the result
+					 * type given in 3.3.8 */
+					ast_type_create_int()
+				),
+				e2_r
+			),
+			ast_stmt_asm_mov_create(
+				loc,
+				ast_variable_create(
+					dynamic_str(tvar),
+					/* 3.3.9 */
+					ast_type_create_int()
+				),
+				e3_r
+			)
+		)
+	);
+	return ast_expr_identifier_create(tvar);
+}
+
 
 DEFINE_RESULT_TYPE(struct ast_block *, block, ast_block_destroy, ast_block_res, false)
 

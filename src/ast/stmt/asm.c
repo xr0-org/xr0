@@ -8,11 +8,12 @@
 #include "asm.h"
 
 struct _asm {
-	enum type { SETUPV, CALL, MOVRET } t;
+	enum type { SETUPV, CALL, MOV, MOVRET } t;
 	union {
 		struct ast_expr *call;
 		struct ast_variable *temp;
 	} u;
+	struct ast_expr *val; /* only defined for MOV */
 };
 
 static struct _asm *
@@ -41,6 +42,15 @@ asm_call_create(struct ast_expr *call)
 }
 
 struct _asm *
+asm_mov_create(struct ast_variable *temp, struct ast_expr *val)
+{
+	struct _asm *a = _create(MOV);
+	a->u.temp = temp;
+	a->val = val;
+	return a;
+}
+
+struct _asm *
 asm_movret_create(struct ast_variable *temp)
 {
 	struct _asm *a = _create(MOVRET);
@@ -51,19 +61,20 @@ asm_movret_create(struct ast_variable *temp)
 struct _asm *
 asm_copy(struct _asm *old)
 {
-	struct _asm *new = _create(old->t);
 	switch (old->t) {
 	case SETUPV:
+		return asm_setupv_create(ast_expr_copy(old->u.call));
 	case CALL:
-		new->u.call = old->u.call;
-		break;
+		return asm_call_create(ast_expr_copy(old->u.call));
+	case MOV:
+		return asm_mov_create(
+			ast_variable_copy(old->u.temp), ast_expr_copy(old->val)
+		);
 	case MOVRET:
-		new->u.temp = old->u.temp;
-		break;
+		return asm_movret_create(ast_variable_copy(old->u.temp));
 	default:
 		assert(0);
 	}
-	return new;
 }
 
 void
@@ -73,6 +84,10 @@ asm_destroy(struct _asm *a)
 	case SETUPV:
 	case CALL:
 		ast_expr_destroy(a->u.call);
+		break;
+	case MOV:
+		ast_variable_destroy(a->u.temp);
+		ast_expr_destroy(a->val);
 		break;
 	case MOVRET:
 		ast_variable_destroy(a->u.temp);
@@ -89,6 +104,9 @@ _call_str_with_cmd(struct _asm *, char *cmd);
 static char *
 _mov_str(struct _asm *);
 
+static char *
+_movret_str(struct _asm *);
+
 char *
 asm_str(struct _asm *a)
 {
@@ -97,8 +115,10 @@ asm_str(struct _asm *a)
 		return _call_str_with_cmd(a, "setupv");
 	case CALL:
 		return _call_str_with_cmd(a, "call");
-	case MOVRET:
+	case MOV:
 		return _mov_str(a);
+	case MOVRET:
+		return _movret_str(a);
 	default:
 		assert(0);
 	}
@@ -118,6 +138,16 @@ static char *
 _mov_str(struct _asm *a)
 {
 	struct strbuilder *b = strbuilder_create();
+	char *val = ast_expr_str(a->val);
+	strbuilder_printf(b, "mov %s, %s;", ast_variable_name(a->u.temp), val);
+	free(val);
+	return strbuilder_build(b);
+}
+
+static char *
+_movret_str(struct _asm *a)
+{
+	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "movret %s;", ast_variable_name(a->u.temp));
 	return strbuilder_build(b);
 }
@@ -134,7 +164,13 @@ asm_iscall(struct _asm *a)
 	return a->t == CALL;
 }
 
-static int
+int
+asm_ismov(struct _asm *a)
+{
+	return a->t == MOV;
+}
+
+int
 asm_ismovret(struct _asm *a)
 {
 	return a->t == MOVRET;
@@ -150,6 +186,13 @@ asm_getcall(struct _asm *a)
 struct ast_variable *
 asm_mov_getvar(struct _asm *a)
 {
-	assert(asm_ismovret(a));
+	assert(asm_ismov(a) || asm_ismovret(a));
 	return a->u.temp;
+}
+
+struct ast_expr *
+asm_mov_getval(struct _asm *a)
+{
+	assert(asm_ismov(a));
+	return a->val;
 }
