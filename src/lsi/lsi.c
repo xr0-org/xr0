@@ -42,6 +42,22 @@ lsi_renamevars(struct lsi *old, struct lsi_varmap *m)
 	return new;
 }
 
+struct lsi *
+lsi_prefixvars(struct lsi *old, char *prefix)
+{
+	int i;
+
+	struct lsi *new = lsi_create();
+	for (i = 0; i < le_arr_len(old->arr); i++) {
+		le_arr_append(
+			new->arr,
+			_lsi_le_prefixvars(le_arr_get(old->arr, i), prefix)
+		);
+	}
+	return new;
+
+}
+
 void
 lsi_destroy(struct lsi *lsi)
 {
@@ -62,12 +78,57 @@ lsi_str(struct lsi *lsi, char *prefix)
 	return strbuilder_build(b);
 }
 
+static int
+_var_isconstlowerbounded(struct le_arr *, char *var, int c);
+
+static int
+_var_isconstupperbounded(struct le_arr *, char *var, int c);
+
+int
+lsi_var_isconst(struct lsi *lsi, char *var, int c)
+{
+	struct le_arr *arr = lsi->arr;
+	return _var_isconstlowerbounded(arr, var, c)
+		&& _var_isconstupperbounded(arr, var, c);
+}
+
+static int
+_var_isconstlowerbounded(struct le_arr *arr, char *var, int c)
+{
+	for (int i = 0; i < le_arr_len(arr); i++) {
+		if (_lsi_le_isconstlowerbound(le_arr_get(arr, i), var, c)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int
+_var_isconstupperbounded(struct le_arr *arr, char *var, int c)
+{
+	for (int i = 0; i < le_arr_len(arr); i++) {
+		if (_lsi_le_isconstupperbound(le_arr_get(arr, i), var, c)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static struct error *
 _verifyfeasible(struct lsi *);
 
 struct error *
 lsi_add(struct lsi *lsi, struct lsi_le *le)
 {
+	int i;
+
+	struct le_arr *arr = lsi->arr;
+	for (i = 0; i < le_arr_len(arr); i++) {
+		if (_lsi_le_eq(le_arr_get(arr, i), le)) {
+			return NULL;
+		}
+	}
+
 	le_arr_append(lsi->arr, le);
 	return _verifyfeasible(lsi);
 }
@@ -79,7 +140,7 @@ lsi_addrange(struct lsi *lsi, struct lsi *lsi0)
 
 	struct le_arr *arr0 = lsi0->arr;
 	for (i = 0; i < le_arr_len(arr0); i++) {
-		struct lsi_le *le = _lsi_le_copy(le_arr_get(arr0, i));
+		struct lsi_le *le = lsi_le_copy(le_arr_get(arr0, i));
 		struct error *err = lsi_add(lsi, le);
 		if (err) {
 			char *s = lsi_le_str(le);
@@ -90,6 +151,71 @@ lsi_addrange(struct lsi *lsi, struct lsi *lsi0)
 	}
 	return NULL;
 }
+
+static int
+_satisfies(struct lsi *, struct lsi_le *);
+
+struct error *
+lsi_checksatisfiesrange(struct lsi *l, struct lsi *m)
+{
+	int i;
+
+	struct le_arr *arr = m->arr;
+	for (i = 0; i < le_arr_len(arr); i++) {
+		struct lsi_le *le = le_arr_get(arr, i);
+		if (!_satisfies(l, le)) {
+			char *s = lsi_le_str(le);
+			struct error *err = error_printf("%s not satisfied", s);
+			free(s);
+			return err;
+		}
+	}
+	return NULL;
+}
+
+static int
+_isorthogonal(struct lsi *, struct lsi_le *);
+
+static int
+_isfeasible(struct lsi *, struct lsi_le *);
+
+static int
+_satisfies(struct lsi *l, struct lsi_le *le)
+{
+	struct lsi_le *ng = lsi_le_negate(le);
+	int ans = _isorthogonal(l, le) || !_isfeasible(l, ng);
+	lsi_le_destroy(ng);
+	return ans;
+}
+
+static int
+_isorthogonal(struct lsi *l, struct lsi_le *le)
+{
+	int i;
+
+	struct le_arr *arr = l->arr;
+	for (i = 0; i < le_arr_len(arr); i++) {
+		if (!_lsi_le_orthogonal(le, le_arr_get(arr, i))) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static int
+_isfeasible(struct lsi *l, struct lsi_le *le)
+{
+	struct lsi *copy = lsi_copy(l);
+	struct error *err = lsi_add(copy, lsi_le_copy(le));
+	lsi_destroy(copy);
+	if (err) {
+		assert(error_to_lsi_notfeasible(err));
+		return 0;
+	}
+	return 1;
+}
+
+
 
 static struct string_arr *
 _getvars(struct le_arr *);
@@ -113,11 +239,7 @@ _verifyfeasible(struct lsi *lsi)
 	for (i = 0; i < le_arr_len(arr); i++) {
 		struct lsi_le *le = le_arr_get(arr, i);
 		if (!_lsi_le_isfeasible(le)) {
-			struct strbuilder *b = strbuilder_create();
-			char *s = lsi_le_str(le);
-			strbuilder_printf(b, "infeasible system requires %s", s);
-			free(s);
-			return error_printf(strbuilder_build(b));
+			return error_lsi_notfeasible();
 		}
 	}
 
@@ -174,7 +296,7 @@ _eliminate(struct le_arr *old, char *var)
 		struct lsi_le *le = le_arr_get(old, i);
 		int coef = _lsi_le_getstdformcoef(le, var);
 		if (coef == 0) {
-			le_arr_append(new, _lsi_le_copy(le));
+			le_arr_append(new, lsi_le_copy(le));
 			continue;
 		}
 		int abs = coef >= 0 ? coef : -coef;

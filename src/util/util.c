@@ -392,6 +392,8 @@ struct error {
 		ERROR_MODULATE_SKIP,
 
 		ERROR_EVAL_VOID,
+
+		ERROR_LSI_NOTFEASIBLE,
 	} type;
 	union error_contents {
 		char *printf;
@@ -634,6 +636,20 @@ error_to_eval_void(struct error *err)
 	return error_to(err, ERROR_EVAL_VOID);
 }
 
+struct error *
+error_lsi_notfeasible(void)
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_LSI_NOTFEASIBLE;
+	return err;
+}
+
+struct error *
+error_to_lsi_notfeasible(struct error *err)
+{
+	return error_to(err, ERROR_LSI_NOTFEASIBLE);
+}
+
 char *
 error_str(struct error *err)
 {
@@ -653,6 +669,8 @@ error_str(struct error *err)
 		[ERROR_MODULATE_SKIP]		= "modulate skip",
 
 		[ERROR_EVAL_VOID]		= "eval void",
+
+		[ERROR_LSI_NOTFEASIBLE]		= "not feasible",
 	};
 
 	switch (err->type) {
@@ -667,6 +685,7 @@ error_str(struct error *err)
 	case ERROR_STATE_DEREF_RCONST:
 	case ERROR_MODULATE_SKIP:
 	case ERROR_EVAL_VOID:
+	case ERROR_LSI_NOTFEASIBLE:
 		return dynamic_str(error_type_str[err->type]);
 	case ERROR_VALUE_BOUNDS:
 		assert(err->inner);

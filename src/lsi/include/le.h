@@ -14,13 +14,22 @@ struct lsi_le *
 _lsi_le_renamevars(struct lsi_le *, struct lsi_varmap *);
 
 struct lsi_le *
-_lsi_le_copy(struct lsi_le *);
+_lsi_le_prefixvars(struct lsi_le *, char *prefix);
+
+struct lsi_le *
+lsi_le_negate(struct lsi_le *);
+
+struct lsi_le *
+lsi_le_copy(struct lsi_le *);
 
 void
-_lsi_le_destroy(struct lsi_le *);
+lsi_le_destroy(struct lsi_le *);
 
 char *
 lsi_le_str(struct lsi_le *);
+
+int
+_lsi_le_eq(struct lsi_le *, struct lsi_le *);
 
 struct string_arr;
 
@@ -52,5 +61,16 @@ _lsi_le_upperbound(struct lsi_le *, char *var);
 /* _lsi_le_isfeasible: check feasibility, requiring all terms be constant. */
 int
 _lsi_le_isfeasible(struct lsi_le *);
+
+/* _lsi_le_isconstlowerbound: return 1 if le is c <= v. */
+int
+_lsi_le_isconstlowerbound(struct lsi_le *le, char *var, int c);
+
+/* _lsi_le_isconstupperbound: return 1 if le is var <= c. */
+int
+_lsi_le_isconstupperbound(struct lsi_le *le, char *var, int c);
+
+int
+_lsi_le_orthogonal(struct lsi_le *, struct lsi_le *);
 
 #endif

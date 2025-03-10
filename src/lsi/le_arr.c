@@ -23,7 +23,7 @@ le_arr_copy(struct le_arr *old)
 {
 	struct le_arr *new = le_arr_create();
 	for (int i = 0; i < old->n; i++) {
-		le_arr_append(new, _lsi_le_copy(old->le[i]));
+		le_arr_append(new, lsi_le_copy(old->le[i]));
 	}
 	return new;
 }
@@ -32,7 +32,7 @@ void
 le_arr_destroy(struct le_arr *arr)
 {
 	for (int i = 0; i < arr->n; i++) {
-		_lsi_le_destroy(arr->le[i]);
+		lsi_le_destroy(arr->le[i]);
 	}
 	free(arr);
 }
