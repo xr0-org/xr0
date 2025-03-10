@@ -261,54 +261,37 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 	stack_declare(state->stack, var, isparam);
 }
 
-struct value_res *
-state_rconst(struct state *state, struct ast_type *t, struct ast_expr *range,
-		char *key, bool persist)
+char *
+state_rconst(struct state *s, char *key, bool persist)
 {
-	assert(key);
-
-	char *prev = rconst_getidbykey(state->rconst, key);
-	if (prev) {
-		return value_res_value_create(
-			value_rconst_create(
-				ast_expr_identifier_create(dynamic_str(prev))
-			)
-		);
-	}
-	struct str_res *res = rconst_declare(
-		state->rconst, range, key, persist, state
-	);
-	if (str_res_iserror(res)) {
-		return value_res_error_create(str_res_as_error(res));
-	}
-	return value_res_value_create(
-		value_rconst_create(
-			ast_expr_identifier_create(str_res_as_str(res))
-		)
-	);
+	return rconst_declareorget(s->rconst, key, persist, s);
 }
 
-struct value_res *
-state_rconstnokey(struct state *state, struct ast_type *t,
-		struct ast_expr *range, bool persist)
+char *
+state_rconstnokey(struct state *s, bool persist)
 {
-	struct str_res *res = rconst_declarenokey(
-		state->rconst, range, persist, state
-	);
-	if (str_res_iserror(res)) {
-		return value_res_error_create(str_res_as_error(res));
-	}
-	return value_res_value_create(
-		value_rconst_create(
-			ast_expr_identifier_create(str_res_as_str(res))
-		)
-	);
+	return rconst_declarenokey(s->rconst, persist, s);
+}
+
+struct str_res *
+state_getrconstwithvalue(struct state *s, int c)
+{
+	return rconst_getwithconstvalue(s->rconst, c);
+}
+
+
+struct error *
+state_addconstraint(struct state *s, struct lsi_le *le)
+{
+	return rconst_addconstraint(s->rconst, le);
 }
 
 struct value *
 state_popregister(struct state *state)
 {
-	//v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
+	/* 
+	 * v_printf("reading from register: %s\n", state->reg ? value_str(state->reg) : "NULL");
+	 */
 	if (!state->reg) {
 		return NULL;
 	}
@@ -566,8 +549,22 @@ location_mustgetobject(struct location *loc, struct state *s)
 
 DEFINE_RESULT_TYPE(struct lsi_varmap *, lv, lsi_varmap_destroy, lv_res, false)
 
+static struct error *
+_mutating_constraintverify_all(struct state *spec, struct state *impl);
+
 struct error *
 state_constraintverify_all(struct state *spec, struct state *impl)
+{
+	struct state *spec_copy = state_copy(spec),
+		     *impl_copy = state_copy(impl);
+	struct error *err = _mutating_constraintverify_all(spec_copy, impl_copy);
+	state_destroy(impl_copy);
+	state_destroy(spec_copy);
+	return err;
+}
+
+static struct error *
+_mutating_constraintverify_all(struct state *spec, struct state *impl)
 {
 	struct lv_res *res = stack_constraintverify_all(spec->stack, spec, impl);
 	if (lv_res_iserror(res)) {
@@ -584,6 +581,12 @@ struct error *
 state_verifyinvariant(struct state *s)
 {
 	return stack_verifyinvariant(s->stack, s);
+}
+
+int
+state_isfeasible(struct state *s, struct lsi_le *le)
+{
+	return rconst_isfeasible(s->rconst, le);
 }
 
 
