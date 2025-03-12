@@ -14,3 +14,4 @@ tags
 *.mk
 !scripts/tmpl.mk
 /Makefile
+src/*/Makefile
