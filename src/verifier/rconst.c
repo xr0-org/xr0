@@ -132,7 +132,7 @@ _range_lw(struct ast_expr *e, struct state *s)
 		struct value *v = value_res_as_value(
 			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
 		);
-		return ast_expr_to_lsi(_value_to_expr(v, s));
+		return ast_expr_to_lsi_expr(_value_to_expr(v, s));
 	}
 }
 
@@ -154,7 +154,7 @@ _range_up(struct ast_expr *e, struct state *s)
 			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
 		);
 		/* subtract 1 b/c range expression upper bounds are exclusive */
-		return ast_expr_to_lsi(
+		return ast_expr_to_lsi_expr(
 			ast_expr_sum_create(
 				_value_to_expr(v, s),
 				ast_expr_constant_create(-1)

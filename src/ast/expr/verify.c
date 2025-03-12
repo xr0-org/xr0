@@ -10,6 +10,7 @@
 #include "object.h"
 #include "state.h"
 #include "util.h"
+#include "lsi.h"
 #include "value.h"
 #include "type.h"
 #include "verifier.h"
@@ -837,85 +838,13 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 }
 
 static struct e_res *
-value_relational_eval(struct eval *, enum ast_binary_operator op,
-		struct eval *, struct state *);
-
-static struct e_res *
-relational_eval(struct ast_expr *expr, struct state *state)
+relational_eval(struct ast_expr *e, struct state *s)
 {
-	struct ast_expr *e1 = ast_expr_binary_e1(expr),
-			*e2 = ast_expr_binary_e2(expr);
-	struct e_res *res1 = ast_expr_eval(e1, state),
-		     *res2 = ast_expr_eval(e2, state);
-	if (e_res_iserror(res1)) {
-		return res1;
-	}
-	if (e_res_iserror(res2)) {
-		return res2;
-	}
-	return value_relational_eval(
-		e_res_as_eval(res1),
-		ast_expr_binary_op(expr),
-		e_res_as_eval(res2),
-		state
-	);
-}
-
-static int
-value_compare(struct value *, enum ast_binary_operator op,
-		struct value *, struct state *);
-
-static struct e_res *
-value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
-		struct eval *rv2, struct state *s)
-{
-	a_printf(
-		ast_type_isint(eval_type(rv1)) && ast_type_isint(eval_type(rv2)),
-		"only comparisons between two integers are supported\n" 
-	);
-	struct lsi_expr *e = ast_expr_to_lsi(
-		ast_expr_binary_create(
-			ast_expr_identifier_create(
-				value_to_rconstid(
-					value_res_as_value(
-						eval_to_value(rv1, s)
-					), s
-				)
-			),
-			op,
-			ast_expr_identifier_create(
-				value_to_rconstid(
-					value_res_as_value(
-						eval_to_value(rv2, s)
-					), s
-				)
-			)
-		)
-	);
+	printf("state:\n%s\n", state_str(s));
+	printf("expr: %s\n", ast_expr_str(e));
+	struct lsi *lsi = ast_expr_to_lsi(e, s);
+	printf("lsi:\n%s\n", lsi_str(lsi, "\t"));
 	assert(0);
-}
-
-
-static int
-value_compare(struct value *lhs, enum ast_binary_operator op,
-		struct value *rhs, struct state *s)
-{
-	switch (op) {
-	case BINARY_OP_EQ:
-		return value_eq(lhs, rhs, s);
-	case BINARY_OP_NE:
-		return !value_eq(lhs, rhs, s);
-	case BINARY_OP_LT:
-		return value_lt(lhs, rhs, s);
-	case BINARY_OP_GT:
-		return value_lt(rhs, lhs, s);
-	case BINARY_OP_GE:
-		return value_eq(lhs, rhs, s) || value_lt(rhs, lhs, s);
-	case BINARY_OP_LE:
-		return value_eq(lhs, rhs, s) || value_lt(lhs, rhs, s);
-	default:
-		assert(false);
-	}
 }
 
 static struct value_res *
@@ -1191,7 +1120,7 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	case EXPR_BRACKETED:
 		return bracketed_geninstr(expr, loc, b, s);
 	default:
-		assert(false);
+		assert(0);
 	}
 }
 
@@ -1211,22 +1140,24 @@ range_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block
 }
 
 static struct ast_expr *
-unary_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+unary_geninstr(struct ast_expr *e, struct lexememarker *loc, struct ast_block *b,
 		struct state *s)
 {
 	struct ast_expr *gen_operand = ast_expr_geninstr(
-		ast_expr_unary_operand(expr), loc, b, s
+		ast_expr_unary_operand(e), loc, b, s
 	);
-	return ast_expr_unary_create(gen_operand, ast_expr_unary_op(expr));
+	return ast_expr_unary_create(gen_operand, ast_expr_unary_op(e));
 }
 
 static struct ast_expr *
-binary_geninstr(struct ast_expr *e, struct lexememarker *loc, struct ast_block *b,
-		struct state *s)
+binary_geninstr(struct ast_expr *e, struct lexememarker *loc,
+		struct ast_block *b, struct state *s)
 {
-	struct ast_expr *e1 = ast_expr_geninstr(ast_expr_binary_e1(e), loc, b, s),
-			*e2 = ast_expr_geninstr(ast_expr_binary_e2(e), loc, b, s);
-	return ast_expr_binary_create(e1, ast_expr_binary_op(e), e2);
+	return ast_expr_binary_create(
+		ast_nr_geninstr(ast_expr_binary_e1(e), loc, b, s),
+		ast_expr_binary_op(e),
+		ast_nr_geninstr(ast_expr_binary_e2(e), loc, b, s)
+	);
 }
 
 static struct ast_expr *
@@ -1254,7 +1185,7 @@ alloc_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block
 	struct ast_type *rtype = kind == DEALLOC
 		? ast_type_create_void()
 		: ast_type_create_voidptr();
-	return ast_block_call_create(b, loc, rtype, alloc);
+	return ast_block_call_geninstr(b, loc, rtype, alloc);
 }
 
 static struct ast_expr *
@@ -1303,12 +1234,12 @@ call_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	struct ast_expr *call = ast_expr_call_create(
 		ast_expr_copy(root), nargs, gen_args
 	);
-	return ast_block_call_create(b, loc, rtype, call);
+	return ast_block_call_geninstr(b, loc, rtype, call);
 }
 
 static struct ast_expr *
-structmember_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
-		struct state *s)
+structmember_geninstr(struct ast_expr *expr, struct lexememarker *loc,
+		struct ast_block *b, struct state *s)
 {
 	struct ast_expr *root_gen = ast_expr_geninstr(
 		ast_expr_member_root(expr), loc, b, s
@@ -1316,15 +1247,79 @@ structmember_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct as
 	if (!root_gen) {
 		assert(false); /* XXX: user error void root */
 	}
-	return ast_expr_member_create(root_gen, dynamic_str(ast_expr_member_field(expr)));
+	return ast_expr_member_create(
+		root_gen, dynamic_str(ast_expr_member_field(expr))
+	);
 }
 
 static struct ast_expr *
-bracketed_geninstr(struct ast_expr *expr, struct lexememarker *loc, struct ast_block *b,
+bracketed_geninstr(struct ast_expr *expr, struct lexememarker *loc,
+		struct ast_block *b, struct state *s)
+{
+	return ast_expr_bracketed_create(
+		ast_expr_geninstr(
+			ast_expr_bracketed_root(expr), loc, b, s
+		)
+	);
+}
+
+static struct ast_expr *
+binary_nr_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
+struct ast_expr *
+ast_nr_geninstr(struct ast_expr *e, struct lexememarker *loc, struct ast_block *b,
 		struct state *s)
 {
-	struct ast_expr *gen_root = ast_expr_geninstr(
-		ast_expr_bracketed_root(expr), loc, b, s
-	);
-	return ast_expr_bracketed_create(gen_root);
+	switch (ast_expr_kind(e)) {
+	case EXPR_CONSTANT:
+	case EXPR_ISDEALLOCAND:
+	case EXPR_IDENTIFIER:
+	case EXPR_STRING_LITERAL:
+	case EXPR_RANGEBOUND:
+		assert(e);
+		return e;
+	case EXPR_RANGE:
+		return range_geninstr(e, loc, b, s);
+	case EXPR_STRUCTMEMBER:
+		return structmember_geninstr(e, loc, b, s);
+	case EXPR_BRACKETED:
+		return ast_expr_bracketed_create(
+			ast_nr_geninstr(ast_expr_bracketed_root(e), loc, b, s)
+		);
+	case EXPR_BINARY:
+		return binary_nr_geninstr(e, loc, b, s);
+	case EXPR_INCDEC:
+	case EXPR_UNARY:
+	case EXPR_ASSIGNMENT:
+	case EXPR_CALL:
+	default:
+		printf("gen: %s\n", ast_expr_str(e));
+		assert(0);
+	}
+}
+
+static struct ast_expr *
+binary_nr_geninstr(struct ast_expr *e, struct lexememarker *loc,
+		struct ast_block *b, struct state *s)
+{
+	switch (ast_expr_binary_op(e)) {
+	case BINARY_OP_ADDITION:
+	case BINARY_OP_SUBTRACTION:
+	case BINARY_OP_MULTIPLICATION:
+		/* recurse on parts and synthesise */
+		return binary_geninstr(e, loc, b, s);
+	case BINARY_OP_LT:
+	case BINARY_OP_GT:
+	case BINARY_OP_GE:
+	case BINARY_OP_LE:
+		/* insert tempvar with assignment to relop as statement */
+		return ast_block_relop_geninstr(b, loc, e, s);
+	case BINARY_OP_EQ:
+	case BINARY_OP_NE:
+		/* reframe in terms of relops before recursing */
+		return ast_block_eqop_geninstr(b, loc, e, s);
+	default:
+		assert(0);
+	}
 }

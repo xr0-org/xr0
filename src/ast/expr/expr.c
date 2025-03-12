@@ -1273,11 +1273,18 @@ binary_simplify(struct ast_expr *e)
 	}
 }
 
+struct lsi *
+ast_expr_to_lsi(struct ast_expr *e, struct state *s)
+{
+	assert(0);
+}
+
 static struct lsi_expr *
-binary_to_lsi(struct ast_expr *, enum ast_binary_operator, struct ast_expr *);
+binary_to_lsi_expr(struct ast_expr *, enum ast_binary_operator,
+		struct ast_expr *);
 
 struct lsi_expr *
-ast_expr_to_lsi(struct ast_expr *e)
+ast_expr_to_lsi_expr(struct ast_expr *e)
 {
 	switch (ast_expr_kind(e)) {
 	case EXPR_CONSTANT:
@@ -1287,7 +1294,7 @@ ast_expr_to_lsi(struct ast_expr *e)
 			dynamic_str(ast_expr_as_identifier(e))
 		);
 	case EXPR_BINARY:
-		return binary_to_lsi(
+		return binary_to_lsi_expr(
 			ast_expr_binary_e1(e),
 			ast_expr_binary_op(e),
 			ast_expr_binary_e2(e)
@@ -1298,11 +1305,11 @@ ast_expr_to_lsi(struct ast_expr *e)
 }
 
 static struct lsi_expr *
-binary_to_lsi(struct ast_expr *e0, enum ast_binary_operator op,
+binary_to_lsi_expr(struct ast_expr *e0, enum ast_binary_operator op,
 		struct ast_expr *e1)
 {
-	struct lsi_expr *l0 = ast_expr_to_lsi(e0),
-			*l1 = ast_expr_to_lsi(e1);
+	struct lsi_expr *l0 = ast_expr_to_lsi_expr(e0),
+			*l1 = ast_expr_to_lsi_expr(e1);
 	switch (op) {
 	case BINARY_OP_ADDITION:
 		return lsi_expr_sum_create(l0, l1);

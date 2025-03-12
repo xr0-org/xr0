@@ -227,10 +227,19 @@ ast_expr_matheval(struct ast_expr *e);
 struct ast_expr *
 ast_expr_simplify(struct ast_expr *);
 
+struct lsi;
+
+/* ast_expr_to_lsi: return an lsi whose feasibility is equivalent to the
+ * user-space boolean truth value of the expression (that is, the lsi is
+ * feasible iff the expression compares unequal to 0). hence the expresssion
+ * assumed to belong to user space, with no explicit rconsts. */
+struct lsi *
+ast_expr_to_lsi(struct ast_expr *, struct state *);
+
 struct lsi_expr;
 
 struct lsi_expr *
-ast_expr_to_lsi(struct ast_expr *);
+ast_expr_to_lsi_expr(struct ast_expr *);
 
 struct shift;
 
@@ -342,6 +351,13 @@ struct ast_expr *
 ast_expr_geninstr(struct ast_expr *, struct lexememarker *,
 	struct ast_block *, struct state *);
 
+/* nr_geninstr: non-relational geninstr. generate instructions that ensure
+ * relational (and equality) operators contained in the expression are handled
+ * in separate instructions. */
+struct ast_expr *
+ast_nr_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
+		struct state *);
+
 struct ast_stmt;
 
 struct ast_block;
@@ -380,8 +396,16 @@ ast_block_hastoplevelreturn(struct ast_block *);
 struct ast_type;
 
 struct ast_expr *
-ast_block_call_create(struct ast_block *, struct lexememarker *,
+ast_block_call_geninstr(struct ast_block *, struct lexememarker *,
 	struct ast_type *, struct ast_expr *);
+
+struct ast_expr *
+ast_block_relop_geninstr(struct ast_block *, struct lexememarker *,
+		struct ast_expr *, struct state *);
+
+struct ast_expr *
+ast_block_eqop_geninstr(struct ast_block *, struct lexememarker *,
+		struct ast_expr *, struct state *);
 
 void
 ast_block_prepend_stmt(struct ast_block *, struct ast_stmt *);

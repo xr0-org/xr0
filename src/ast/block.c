@@ -181,7 +181,7 @@ static char *
 generate_tempvar(int tempid);
 
 struct ast_expr *
-ast_block_call_create(struct ast_block *b, struct lexememarker *loc,
+ast_block_call_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_type *rtype, struct ast_expr *expr)
 {
 	ast_block_append_stmt(
@@ -216,6 +216,42 @@ generate_tempvar(int tempid)
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "<t%d>", tempid);
 	return strbuilder_build(b);
+}
+
+struct ast_expr *
+ast_block_relop_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e, struct state *s)
+{
+	struct ast_expr *e1 = ast_nr_geninstr(ast_expr_binary_e1(e), loc, b, s),
+			*e2 = ast_nr_geninstr(ast_expr_binary_e2(e), loc, b, s);
+	printf("e1: %s\n", ast_expr_str(e1));
+	printf("e2: %s\n", ast_expr_str(e2));
+	assert(0);
+	/*
+	char *tvar = generate_tempvar(b->tempcount++);
+	ast_block_append_stmt(
+		b, 
+		ast_stmt_register_mov_create(
+			loc,
+			ast_variable_create(
+				dynamic_str(tvar), ast_type_copy(rtype)
+			)
+		)
+	);
+	return ast_expr_identifier_create(tvar);
+	*/
+}
+
+struct ast_expr *
+ast_block_eqop_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e, struct state *s)
+{
+	printf("eqop: %s\n", ast_expr_str(e));
+	struct ast_expr *e1 = ast_nr_geninstr(ast_expr_binary_e1(e), loc, b, s),
+			*e2 = ast_nr_geninstr(ast_expr_binary_e2(e), loc, b, s);
+	printf("e1: %s\n", ast_expr_str(e1));
+	printf("e2: %s\n", ast_expr_str(e2));
+	assert(0);
 }
 
 DEFINE_RESULT_TYPE(struct ast_block *, block, ast_block_destroy, ast_block_res, false)
