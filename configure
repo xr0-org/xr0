@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
 
 TMPL_MKFILE=scripts/tmpl.mk
-DEPS_MKFILE=scripts/deps.mk
 
-# This script generates the Makefile from $TMPL_MKFILE and $DEPS_MKFILE,
-# the latter of which contains the rules to build the various object files.
+# MODULE RULES
 #
-# $DEPS_MKFILE imposes the following module rules:
+# This script generates the Makefile from $TMPL_MKFILE, imposing the following
+# basic module rules:
 #
 #	1. Every directory in `/src` and its descendant directories, including
 #	`/src` itself, defines a module.
 #
-#	2. Every C file within a module can include headers from the
-#	`[root]/include` directory (if it exists) where `[root]` is the module
-#	root directory. E.g., `/src/main.c` and `/src/ast/expr.c` can both
-#	include headers from `/src/include`, but `/src/ast/expr.c` can also
-#	include from `/src/ast/include`.
+#	2. Every C file within a module `x` can include headers from the
+#	`/x/include` directory (if it exists). E.g., `/src/main.c` and
+#	`/src/ast/expr.c` can both include headers from `/src/include`, but
+#	`/src/ast/expr.c` can also include from `/src/ast/include`.
 #
 #	3. Every C file is treated as its own translation unit.
 #
@@ -30,11 +28,38 @@ DEPS_MKFILE=scripts/deps.mk
 # 	[0]: "Directories named in -I options shall be searched in the order
 # 	specified".
 # 	https://pubs.opengroup.org/onlinepubs/9699919799/utilities/c99.html
+#
+#
+# UNIT TESTS
+#
+# Within `/src` and its descendants, any folder named `_test` is a unit test. It
+# is an independent application with its own `main()`, able to include headers
+# from the module it belongs to, according to the MODULE RULES above. 
+#
+# It goes without saying that unit tests are excluded from the object code
+# generated for the main Makefile.
+#
+# The script generates a Makefile for each unit test that includes all object
+# files, with the exclusion of `/src/main.c`, for obvious reasons. Unit test
+# Makefiles are included in the main Makefile, permitting unit tests of the form
+#
+# 	$ make unit-test src/ast/stmt
+#
+# to run the test inside `/src/ast/stmt/_test` (if it exists). The script also
+# generates and distributes Makefiles inside `/src`, `/src/ast` and
+# `/src/ast/stmt`, etc. so that running
+#
+# 	$ make unit-test
+#
+# in each respective directory runs its test (if it exists) and all the tests
+# recursively contained in it.
 
 set +x
 
 SRCDIR=src
 BUILDDIR=build
+
+DEPS_MKFILE=scripts/deps.mk
 
 # list_includes: output a list of the appropriate include directories from the
 # given path, in keeping with rule (2.) above
