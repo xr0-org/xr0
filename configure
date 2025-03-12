@@ -33,15 +33,15 @@ TMPL_MKFILE=scripts/tmpl.mk
 # UNIT TESTS
 #
 # Within `/src` and its descendants, any folder named `_test` is a unit test. It
-# is an independent application with its own `main()`, able to include headers
-# from the module it belongs to, according to the MODULE RULES above. 
+# is an independent application with its own `main` function, able to include
+# headers from the module it belongs to, according to the MODULE RULES above. 
 #
 # It goes without saying that unit tests are excluded from the object code
-# generated for the main Makefile.
+# generated for the main application Makefile.
 #
 # The script generates a Makefile for each unit test that includes all object
-# files, with the exclusion of `/src/main.c`, for obvious reasons. Unit test
-# Makefiles are included in the main Makefile, so that
+# files, with the exclusion of `/src/main.c` and the other tests, for obvious
+# reasons. Unit test Makefiles are included in the main Makefile, so that
 #
 # 	$ make unit-test src/ast/stmt
 #
