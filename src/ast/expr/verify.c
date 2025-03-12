@@ -1153,11 +1153,29 @@ static struct ast_expr *
 binary_geninstr(struct ast_expr *e, struct lexememarker *loc,
 		struct ast_block *b, struct state *s)
 {
-	return ast_expr_binary_create(
-		ast_nr_geninstr(ast_expr_binary_e1(e), loc, b, s),
-		ast_expr_binary_op(e),
-		ast_nr_geninstr(ast_expr_binary_e2(e), loc, b, s)
-	);
+	switch (ast_expr_binary_op(e)) {
+	case BINARY_OP_ADDITION:
+	case BINARY_OP_SUBTRACTION:
+	case BINARY_OP_MULTIPLICATION:
+		/* recurse on parts and synthesise */
+		return ast_expr_binary_create(
+			ast_expr_geninstr(ast_expr_binary_e1(e), loc, b, s),
+			ast_expr_binary_op(e),
+			ast_expr_geninstr(ast_expr_binary_e2(e), loc, b, s)
+		);
+	case BINARY_OP_LT:
+	case BINARY_OP_GT:
+	case BINARY_OP_GE:
+	case BINARY_OP_LE:
+		/* insert tempvar with assignment to relop as statement */
+		return ast_block_relop_geninstr(b, loc, e, s);
+	case BINARY_OP_EQ:
+	case BINARY_OP_NE:
+		/* reframe in terms of relops before recursing */
+		return ast_block_eqop_geninstr(b, loc, e, s);
+	default:
+		assert(0);
+	}
 }
 
 static struct ast_expr *
@@ -1261,65 +1279,4 @@ bracketed_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 			ast_expr_bracketed_root(expr), loc, b, s
 		)
 	);
-}
-
-static struct ast_expr *
-binary_nr_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
-		struct state *);
-
-struct ast_expr *
-ast_nr_geninstr(struct ast_expr *e, struct lexememarker *loc, struct ast_block *b,
-		struct state *s)
-{
-	switch (ast_expr_kind(e)) {
-	case EXPR_CONSTANT:
-	case EXPR_ISDEALLOCAND:
-	case EXPR_IDENTIFIER:
-	case EXPR_STRING_LITERAL:
-	case EXPR_RANGEBOUND:
-		assert(e);
-		return e;
-	case EXPR_RANGE:
-		return range_geninstr(e, loc, b, s);
-	case EXPR_STRUCTMEMBER:
-		return structmember_geninstr(e, loc, b, s);
-	case EXPR_BRACKETED:
-		return ast_expr_bracketed_create(
-			ast_nr_geninstr(ast_expr_bracketed_root(e), loc, b, s)
-		);
-	case EXPR_BINARY:
-		return binary_nr_geninstr(e, loc, b, s);
-	case EXPR_INCDEC:
-	case EXPR_UNARY:
-	case EXPR_ASSIGNMENT:
-	case EXPR_CALL:
-	default:
-		printf("gen: %s\n", ast_expr_str(e));
-		assert(0);
-	}
-}
-
-static struct ast_expr *
-binary_nr_geninstr(struct ast_expr *e, struct lexememarker *loc,
-		struct ast_block *b, struct state *s)
-{
-	switch (ast_expr_binary_op(e)) {
-	case BINARY_OP_ADDITION:
-	case BINARY_OP_SUBTRACTION:
-	case BINARY_OP_MULTIPLICATION:
-		/* recurse on parts and synthesise */
-		return binary_geninstr(e, loc, b, s);
-	case BINARY_OP_LT:
-	case BINARY_OP_GT:
-	case BINARY_OP_GE:
-	case BINARY_OP_LE:
-		/* insert tempvar with assignment to relop as statement */
-		return ast_block_relop_geninstr(b, loc, e, s);
-	case BINARY_OP_EQ:
-	case BINARY_OP_NE:
-		/* reframe in terms of relops before recursing */
-		return ast_block_eqop_geninstr(b, loc, e, s);
-	default:
-		assert(0);
-	}
 }

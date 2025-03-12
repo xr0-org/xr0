@@ -351,13 +351,6 @@ struct ast_expr *
 ast_expr_geninstr(struct ast_expr *, struct lexememarker *,
 	struct ast_block *, struct state *);
 
-/* nr_geninstr: non-relational geninstr. generate instructions that ensure
- * relational (and equality) operators contained in the expression are handled
- * in separate instructions. */
-struct ast_expr *
-ast_nr_geninstr(struct ast_expr *, struct lexememarker *, struct ast_block *,
-		struct state *);
-
 struct ast_stmt;
 
 struct ast_block;

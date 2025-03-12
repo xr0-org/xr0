@@ -223,8 +223,8 @@ struct ast_expr *
 ast_block_relop_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_expr *e, struct state *s)
 {
-	struct ast_expr *e1 = ast_nr_geninstr(ast_expr_binary_e1(e), loc, b, s),
-			*e2 = ast_nr_geninstr(ast_expr_binary_e2(e), loc, b, s);
+	struct ast_expr *e1 = ast_expr_geninstr(ast_expr_binary_e1(e), loc, b, s),
+			*e2 = ast_expr_geninstr(ast_expr_binary_e2(e), loc, b, s);
 	char *tvar = generate_tempvar(b->tempcount++);
 	ast_block_append_stmt(
 		b, 
@@ -242,8 +242,8 @@ ast_block_eqop_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_expr *e, struct state *s)
 {
 	printf("eqop: %s\n", ast_expr_str(e));
-	struct ast_expr *e1 = ast_nr_geninstr(ast_expr_binary_e1(e), loc, b, s),
-			*e2 = ast_nr_geninstr(ast_expr_binary_e2(e), loc, b, s);
+	struct ast_expr *e1 = ast_expr_geninstr(ast_expr_binary_e1(e), loc, b, s),
+			*e2 = ast_expr_geninstr(ast_expr_binary_e2(e), loc, b, s);
 	printf("b:\n%s\n", ast_block_str(b, 1));
 	printf("e1: %s\n", ast_expr_str(e1));
 	printf("e2: %s\n", ast_expr_str(e2));
