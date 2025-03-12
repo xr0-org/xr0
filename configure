@@ -45,9 +45,9 @@ TMPL_MKFILE=scripts/tmpl.mk
 #
 # 	$ make unit-test src/ast/stmt
 #
-# to run the test inside `/src/ast/stmt/_test` (if it exists). The script also
-# generates and distributes Makefiles inside `/src`, `/src/ast` and
-# `/src/ast/stmt`, etc. so that running
+# to run the test inside `/src/ast/stmt/_test` (if it exists), when this command
+# is executed from the project root. The script also generates and distributes
+# Makefiles inside `/src`, `/src/ast` and `/src/ast/stmt`, etc. so that running
 #
 # 	$ make unit-test
 #
