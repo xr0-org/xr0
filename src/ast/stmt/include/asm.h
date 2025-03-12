@@ -1,7 +1,6 @@
 #ifndef XR0_AST_STMT_ASM_H
 #define XR0_AST_STMT_ASM_H
 
-
 /* struct _asm: an instruction for the abstract machine Xr0 simulates. */ 
 struct _asm;
 

@@ -237,17 +237,65 @@ ast_block_relop_geninstr(struct ast_block *b, struct lexememarker *loc,
 	return ast_expr_identifier_create(tvar);
 }
 
+static struct ast_expr *
+_eqop_l_and_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct state *);
+
+static struct ast_expr *
+_eqop_l_or_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct state *);
+
 struct ast_expr *
 ast_block_eqop_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_expr *e, struct state *s)
 {
-	printf("eqop: %s\n", ast_expr_str(e));
-	struct ast_expr *e1 = ast_expr_geninstr(ast_expr_binary_e1(e), loc, b, s),
-			*e2 = ast_expr_geninstr(ast_expr_binary_e2(e), loc, b, s);
-	printf("b:\n%s\n", ast_block_str(b, 1));
-	printf("e1: %s\n", ast_expr_str(e1));
-	printf("e2: %s\n", ast_expr_str(e2));
+	struct ast_expr *e1 = ast_expr_geninstr(
+		ast_expr_binary_e1(e), loc, b, s
+	);
+	struct ast_expr *e2 = ast_expr_geninstr(
+		ast_expr_binary_e2(e), loc, b, s
+	);
+	switch (ast_expr_binary_op(e)) {
+	case BINARY_OP_EQ:
+		return _eqop_l_and_geninstr(
+			b, loc,
+			ast_expr_binary_create(e1, BINARY_OP_LE, e2),
+			ast_expr_binary_create(e2, BINARY_OP_LE, e1),
+			s
+		);
+	case BINARY_OP_NE:
+		return _eqop_l_or_geninstr(
+			b, loc,
+			ast_expr_binary_create(e1, BINARY_OP_LT, e2),
+			ast_expr_binary_create(e2, BINARY_OP_LT, e1),
+			s
+		);
+	default:
+		assert(0);
+	}
+}
+
+static struct ast_expr *
+_eqop_l_and_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct state *s)
+{
 	assert(0);
+}
+
+static struct ast_expr *
+_eqop_l_or_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct state *s)
+{
+	char *tvar = generate_tempvar(b->tempcount++);
+	/* 	if (e1) {
+	 * 		mov tvar, 1;
+	 *	} else if (e2) {
+	 *		mov tvar, 1;
+	 *	} else {
+	 *		mov tvar, 0;
+	 *	}
+	 */
+	return ast_expr_identifier_create(tvar);
 }
 
 DEFINE_RESULT_TYPE(struct ast_block *, block, ast_block_destroy, ast_block_res, false)

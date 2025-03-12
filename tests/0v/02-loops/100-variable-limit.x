@@ -16,10 +16,6 @@ unit(int limit) ~ [ setup: limit = [0?50]; ]
 
 #2 >= #0
 
-
-
-
-
 le(e1, e2) := { e1 <= e2 }
 
 lt(e1, e2) := le(e1, e2-1)

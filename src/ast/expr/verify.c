@@ -1157,7 +1157,6 @@ binary_geninstr(struct ast_expr *e, struct lexememarker *loc,
 	case BINARY_OP_ADDITION:
 	case BINARY_OP_SUBTRACTION:
 	case BINARY_OP_MULTIPLICATION:
-		/* recurse on parts and synthesise */
 		return ast_expr_binary_create(
 			ast_expr_geninstr(ast_expr_binary_e1(e), loc, b, s),
 			ast_expr_binary_op(e),
