@@ -165,7 +165,13 @@ asm_iscall(struct _asm *a)
 	return a->t == CALL;
 }
 
-static int
+int
+asm_ismov(struct _asm *a)
+{
+	return a->t == MOV;
+}
+
+int
 asm_ismovret(struct _asm *a)
 {
 	return a->t == MOVRET;
@@ -178,8 +184,22 @@ asm_getcall(struct _asm *a)
 	return a->u.call;
 }
 
-struct ast_variable *
+char *
 asm_mov_getvar(struct _asm *a)
+{
+	assert(asm_ismov(a));
+	return a->u.temp_name;
+}
+
+struct ast_expr *
+asm_mov_getval(struct _asm *a)
+{
+	assert(asm_ismov(a));
+	return a->val;
+}
+
+struct ast_variable *
+asm_movret_getvar(struct _asm *a)
 {
 	assert(asm_ismovret(a));
 	return a->u.temp_var;

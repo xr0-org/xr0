@@ -35,10 +35,22 @@ asm_issetupv(struct _asm *);
 int
 asm_iscall(struct _asm *);
 
+int
+asm_ismov(struct _asm *);
+
+int
+asm_ismovret(struct _asm *);
+
 struct ast_expr *
 asm_getcall(struct _asm *);
 
-struct ast_variable *
+char *
 asm_mov_getvar(struct _asm *);
+
+struct ast_expr *
+asm_mov_getval(struct _asm *);
+
+struct ast_variable *
+asm_movret_getvar(struct _asm *);
 
 #endif

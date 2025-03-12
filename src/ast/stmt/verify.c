@@ -498,6 +498,9 @@ static struct error *
 asm_call_exec(struct ast_expr *call, struct state *);
 
 static struct error *
+asm_mov_exec(char *temp, struct ast_expr *val, struct state *);
+
+static struct error *
 asm_movret_exec(struct ast_variable *temp, struct state *);
 
 static struct error *
@@ -507,8 +510,14 @@ stmt_asm_exec(struct ast_stmt *stmt, struct state *state)
 		return asm_setupv_exec(ast_stmt_asm_call(stmt), state);
 	} else if (ast_stmt_asm_iscall(stmt)) {
 		return asm_call_exec(ast_stmt_asm_call(stmt), state);
+	} else if (ast_stmt_asm_ismov(stmt)) {
+		return asm_mov_exec(
+			ast_stmt_asm_mov_var(stmt),
+			ast_stmt_asm_mov_val(stmt),
+			state
+		);
 	} else {
-		return asm_movret_exec(ast_stmt_asm_mov_var(stmt), state);
+		return asm_movret_exec(ast_stmt_asm_movret_var(stmt), state);
 	}
 }
 
@@ -532,6 +541,13 @@ asm_call_exec(struct ast_expr *call, struct state *state)
 	}
 	e_res_destroy(res);
 	return NULL;
+}
+
+static struct error *
+asm_mov_exec(char *temp, struct ast_expr *val, struct state *s)
+{
+	printf("temp: %s, val: %s\n", temp, ast_expr_str(val));
+	assert(0);
 }
 
 static struct e_res *

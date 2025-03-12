@@ -215,7 +215,7 @@ static char *
 generate_tempvar(int tempid)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "<t%d>", tempid);
+	strbuilder_printf(b, "{t%d}", tempid);
 	return strbuilder_build(b);
 }
 
@@ -238,33 +238,29 @@ ast_block_relop_geninstr(struct ast_block *b, struct lexememarker *loc,
 }
 
 static struct ast_expr *
-_eqop_l_and_geninstr(struct ast_block *b, struct lexememarker *loc,
+ast_block_l_and_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_expr *e1, struct ast_expr *e2, struct state *);
 
 static struct ast_expr *
-_eqop_l_or_geninstr(struct ast_block *b, struct lexememarker *loc,
+ast_block_l_or_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_expr *e1, struct ast_expr *e2, struct state *);
 
 struct ast_expr *
 ast_block_eqop_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_expr *e, struct state *s)
 {
-	struct ast_expr *e1 = ast_expr_geninstr(
-		ast_expr_binary_e1(e), loc, b, s
-	);
-	struct ast_expr *e2 = ast_expr_geninstr(
-		ast_expr_binary_e2(e), loc, b, s
-	);
+	struct ast_expr *e1 = ast_expr_binary_e1(e),
+			*e2 = ast_expr_binary_e2(e);
 	switch (ast_expr_binary_op(e)) {
 	case BINARY_OP_EQ:
-		return _eqop_l_and_geninstr(
+		return ast_block_l_and_geninstr(
 			b, loc,
 			ast_expr_binary_create(e1, BINARY_OP_LE, e2),
 			ast_expr_binary_create(e2, BINARY_OP_LE, e1),
 			s
 		);
 	case BINARY_OP_NE:
-		return _eqop_l_or_geninstr(
+		return ast_block_l_or_geninstr(
 			b, loc,
 			ast_expr_binary_create(e1, BINARY_OP_LT, e2),
 			ast_expr_binary_create(e2, BINARY_OP_LT, e1),
@@ -276,27 +272,61 @@ ast_block_eqop_geninstr(struct ast_block *b, struct lexememarker *loc,
 }
 
 static struct ast_expr *
-_eqop_l_and_geninstr(struct ast_block *b, struct lexememarker *loc,
+ast_block_ternary_geninstr(struct ast_block *, struct lexememarker *,
+		struct ast_expr *, struct ast_expr *, struct ast_expr *,
+		struct state *);
+
+static struct ast_expr *
+ast_block_l_and_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_expr *e1, struct ast_expr *e2, struct state *s)
 {
-	assert(0);
+	return ast_block_ternary_geninstr(
+		/* e1 ? e2 : 0 */
+		b, loc, e1, e2, ast_expr_constant_create(0), s
+	);
 }
 
 static struct ast_expr *
-_eqop_l_or_geninstr(struct ast_block *b, struct lexememarker *loc,
+ast_block_l_or_geninstr(struct ast_block *b, struct lexememarker *loc,
 		struct ast_expr *e1, struct ast_expr *e2, struct state *s)
 {
-	char *tvar = generate_tempvar(b->tempcount++);
-	/* 	if (e1) {
-	 * 		mov tvar, 1;
-	 *	} else if (e2) {
-	 *		mov tvar, 1;
-	 *	} else {
-	 *		mov tvar, 0;
-	 *	}
+	return ast_block_ternary_geninstr(
+		/* e1 ? 1 : e2 */
+		b, loc, e1, ast_expr_constant_create(1), e2, s
+	);
+}
+
+static struct ast_expr *
+ast_block_ternary_geninstr(struct ast_block *b, struct lexememarker *loc,
+		struct ast_expr *e1, struct ast_expr *e2, struct ast_expr *e3,
+		struct state *s)
+{
+	struct ast_expr *e1_r = ast_expr_geninstr(e1, loc, b, s),
+			*e2_r = ast_expr_geninstr(e2, loc, b, s),
+			*e3_r = ast_expr_geninstr(e3, loc, b, s);
+
+	/* we implement e1 ? e2 : e3 as
+	 *
+	 * 	if (e1)
+	 * 		mov tvar, e2;
+	 * 	else
+	 * 		mov tvar, e3;
 	 */
+
+	char *tvar = generate_tempvar(b->tempcount++);
+	ast_block_append_stmt(
+		b,
+		ast_stmt_create_sel(
+			loc,
+			false,
+			e1_r,
+			ast_stmt_asm_mov_create(loc, tvar, e2_r),
+			ast_stmt_asm_mov_create(loc, tvar, e3_r)
+		)
+	);
 	return ast_expr_identifier_create(tvar);
 }
+
 
 DEFINE_RESULT_TYPE(struct ast_block *, block, ast_block_destroy, ast_block_res, false)
 
