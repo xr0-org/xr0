@@ -41,11 +41,11 @@ TMPL_MKFILE=scripts/tmpl.mk
 #
 # The script generates a Makefile for each unit test that includes all object
 # files, with the exclusion of `/src/main.c`, for obvious reasons. Unit test
-# Makefiles are included in the main Makefile, permitting unit tests of the form
+# Makefiles are included in the main Makefile, so that
 #
 # 	$ make unit-test src/ast/stmt
 #
-# to run the test inside `/src/ast/stmt/_test` (if it exists), when this command
+# runs the test inside `/src/ast/stmt/_test` (if it exists), when this command
 # is executed from the project root. The script also generates and distributes
 # Makefiles inside `/src`, `/src/ast` and `/src/ast/stmt`, etc. so that running
 #
@@ -53,6 +53,8 @@ TMPL_MKFILE=scripts/tmpl.mk
 #
 # in each respective directory runs its test (if it exists) and all the tests
 # recursively contained in it.
+#
+# Success/failure of a unit test is defined by zero/nonzero exit code.
 
 set +x
 
