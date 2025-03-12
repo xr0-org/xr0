@@ -11,6 +11,7 @@
 #include "util.h"
 #include "value.h"
 
+#include "asm.h"
 #include "iter.h"
 #include "jump.h"
 #include "stmt.h"
@@ -39,17 +40,7 @@ struct ast_stmt {
 			enum ast_alloc_kind kind;
 			struct ast_expr *arg;
 		} alloc;
-		struct {
-			enum ast_register_kind {
-				REGISTER_SETUPV,
-				REGISTER_CALL,
-				REGISTER_MOV,
-			} kind;
-			union {
-				struct ast_expr *call;
-				struct ast_variable *temp;
-			} op;
-		} _register;
+		struct _asm *_asm;
 	} u;
 
 	struct lexememarker *loc;
@@ -405,62 +396,59 @@ ast_stmt_as_iter(struct ast_stmt *stmt)
 	return stmt->u.iter;
 }
 
-struct ast_stmt *
-ast_stmt_register_setupv_create(struct lexememarker *loc, struct ast_expr *call)
+static struct ast_stmt *
+_asm_create(struct lexememarker *loc, struct _asm *_asm)
 {
 	struct ast_stmt *stmt = ast_stmt_create(loc);
-	stmt->kind = STMT_REGISTER;
-	stmt->u._register.kind = REGISTER_SETUPV;
-	stmt->u._register.op.call = call;
+	stmt->kind = STMT_ASM;
+	stmt->u._asm = _asm;
 	return stmt;
 }
 
 struct ast_stmt *
-ast_stmt_register_call_create(struct lexememarker *loc, struct ast_expr *call)
+ast_stmt_asm_setupv_create(struct lexememarker *loc, struct ast_expr *call)
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
-	stmt->kind = STMT_REGISTER;
-	stmt->u._register.kind = REGISTER_CALL;
-	stmt->u._register.op.call = call;
-	return stmt;
+	return _asm_create(loc, asm_setupv_create(call));
 }
 
 struct ast_stmt *
-ast_stmt_register_mov_create(struct lexememarker *loc, struct ast_variable *temp)
+ast_stmt_asm_call_create(struct lexememarker *loc, struct ast_expr *call)
 {
-	struct ast_stmt *stmt = ast_stmt_create(loc);
-	stmt->kind = STMT_REGISTER;
-	stmt->u._register.kind = REGISTER_MOV;
-	stmt->u._register.op.temp = temp;
-	return stmt;
+	return _asm_create(loc, asm_call_create(call));
 }
 
-bool
-ast_stmt_register_issetupv(struct ast_stmt *stmt)
+struct ast_stmt *
+ast_stmt_asm_movret_create(struct lexememarker *loc, struct ast_variable *temp)
 {
-	assert(stmt->kind == STMT_REGISTER);
-	return stmt->u._register.kind == REGISTER_SETUPV;
+	return _asm_create(loc, asm_movret_create(temp));
 }
 
-bool
-ast_stmt_register_iscall(struct ast_stmt *stmt)
+int
+ast_stmt_asm_issetupv(struct ast_stmt *stmt)
 {
-	assert(stmt->kind == STMT_REGISTER);
-	return stmt->u._register.kind == REGISTER_CALL;
+	assert(stmt->kind == STMT_ASM);
+	return asm_issetupv(stmt->u._asm);
+}
+
+int
+ast_stmt_asm_iscall(struct ast_stmt *stmt)
+{
+	assert(stmt->kind == STMT_ASM);
+	return asm_iscall(stmt->u._asm);
 }
 
 struct ast_expr *
-ast_stmt_register_call(struct ast_stmt *stmt)
+ast_stmt_asm_call(struct ast_stmt *stmt)
 {
-	assert(stmt->kind == STMT_REGISTER);
-	return stmt->u._register.op.call;
+	assert(stmt->kind == STMT_ASM);
+	return asm_getcall(stmt->u._asm);
 }
 
 struct ast_variable *
-ast_stmt_register_mov(struct ast_stmt *stmt)
+ast_stmt_asm_mov_var(struct ast_stmt *stmt)
 {
-	assert(stmt->kind == STMT_REGISTER);
-	return stmt->u._register.op.temp;
+	assert(stmt->kind == STMT_ASM);
+	return asm_mov_getvar(stmt->u._asm);
 }
 
 static void
@@ -482,29 +470,10 @@ ast_stmt_jump_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 static void
 ast_stmt_register_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
-	assert(stmt->kind == STMT_REGISTER);
-	char *call;
-	switch (stmt->u._register.kind) {
-	case REGISTER_SETUPV:
-		call = ast_expr_str(stmt->u._register.op.call);
-		strbuilder_printf(b, "setupv %s;", call);
-		free(call);
-		break;
-	case REGISTER_CALL:
-		call = ast_expr_str(stmt->u._register.op.call);
-		strbuilder_printf(b, "call %s;", call);
-		free(call);
-		break;
-	case REGISTER_MOV:
-		strbuilder_printf(
-			b,
-			"movret %s;",
-			ast_variable_name(stmt->u._register.op.temp)
-		);
-		break;
-	default:
-		assert(false);
-	}
+	assert(stmt->kind == STMT_ASM);
+	char *s = asm_str(stmt->u._asm);
+	strbuilder_printf(b, "%s", s);
+	free(s);
 }
 
 void
@@ -598,23 +567,8 @@ ast_stmt_copy(struct ast_stmt *stmt)
 		return ast_stmt_create_iter(loc, iter_copy(stmt->u.iter));
 	case STMT_JUMP:
 		return ast_stmt_create_jump(loc, jump_copy(stmt->u.jump));
-	case STMT_REGISTER:
-		switch (stmt->u._register.kind) {
-		case REGISTER_SETUPV:
-			return ast_stmt_register_setupv_create(
-				loc, stmt->u._register.op.call
-			);
-		case REGISTER_CALL:
-			return ast_stmt_register_call_create(
-				loc, stmt->u._register.op.call
-			);
-		case REGISTER_MOV:
-			return ast_stmt_register_mov_create(
-				loc, stmt->u._register.op.temp
-			);
-		default:
-			assert(false);
-		}
+	case STMT_ASM:
+		return _asm_create(loc, asm_copy(stmt->u._asm));
 	default:
 		assert(false);
 	}
@@ -653,7 +607,7 @@ ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 	case STMT_JUMP:
 		ast_stmt_jump_sprint(stmt, b);
 		break;
-	case STMT_REGISTER:
+	case STMT_ASM:
 		ast_stmt_register_sprint(stmt, b);
 		break;
 	default:

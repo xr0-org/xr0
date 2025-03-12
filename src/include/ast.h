@@ -482,25 +482,25 @@ struct ast_stmt *
 ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
 
 struct ast_stmt *
-ast_stmt_register_setupv_create(struct lexememarker *, struct ast_expr *call);
+ast_stmt_asm_setupv_create(struct lexememarker *, struct ast_expr *call);
 
 struct ast_stmt *
-ast_stmt_register_call_create(struct lexememarker *, struct ast_expr *call);
+ast_stmt_asm_call_create(struct lexememarker *, struct ast_expr *call);
 
 struct ast_stmt *
-ast_stmt_register_mov_create(struct lexememarker *, struct ast_variable *v);
+ast_stmt_asm_movret_create(struct lexememarker *, struct ast_variable *v);
 
 struct ast_expr *
-ast_stmt_register_call(struct ast_stmt *);
+ast_stmt_asm_call(struct ast_stmt *);
 
 struct ast_variable *
-ast_stmt_register_mov(struct ast_stmt *);
+ast_stmt_asm_mov_var(struct ast_stmt *);
 
-bool
-ast_stmt_register_issetupv(struct ast_stmt *);
+int
+ast_stmt_asm_issetupv(struct ast_stmt *);
 
-bool
-ast_stmt_register_iscall(struct ast_stmt *);
+int
+ast_stmt_asm_iscall(struct ast_stmt *);
 
 void
 ast_stmt_destroy(struct ast_stmt *);

@@ -186,19 +186,19 @@ ast_block_call_create(struct ast_block *b, struct lexememarker *loc,
 {
 	ast_block_append_stmt(
 		b,
-		ast_stmt_register_setupv_create(loc, ast_expr_copy(expr))
+		ast_stmt_asm_setupv_create(loc, ast_expr_copy(expr))
 	);
 
 	ast_block_append_stmt(
 		b,
-		ast_stmt_register_call_create(loc, ast_expr_copy(expr))
+		ast_stmt_asm_call_create(loc, ast_expr_copy(expr))
 	);
 
 	if (!ast_type_isvoid(rtype)) {
 		char *tvar = generate_tempvar(b->tempcount++);
 		ast_block_append_stmt(
 			b, 
-			ast_stmt_register_mov_create(
+			ast_stmt_asm_movret_create(
 				loc,
 				ast_variable_create(
 					dynamic_str(tvar), ast_type_copy(rtype)

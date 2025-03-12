@@ -180,7 +180,7 @@ program_prevcall(struct program *p)
 	assert(p->s == PROGRAM_COUNTER_STMTS);
 	assert(p->index > 0);
 	struct ast_stmt *c = ast_block_stmts(p->b)[p->index-1];
-	return ast_expr_copy(ast_stmt_register_call(c));
+	return ast_expr_copy(ast_stmt_asm_call(c));
 }
 
 static bool

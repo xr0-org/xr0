@@ -271,7 +271,7 @@ static struct error *
 stmt_jump_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_register_exec(struct ast_stmt *, struct state *);
+stmt_asm_exec(struct ast_stmt *, struct state *);
 
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
@@ -299,8 +299,8 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 		return stmt_iter_exec(stmt, s);
 	case STMT_JUMP:
 		return stmt_jump_exec(stmt, s);
-	case STMT_REGISTER:
-		return stmt_register_exec(stmt, s);
+	case STMT_ASM:
+		return stmt_asm_exec(stmt, s);
 	default:
 		assert(false);
 	}
@@ -492,28 +492,28 @@ compatible(struct eval *e, struct ast_type *spec_t, struct state *s)
 }
 
 static struct error *
-register_setupv_exec(struct ast_expr *call, struct state *);
+asm_setupv_exec(struct ast_expr *call, struct state *);
 
 static struct error *
-register_call_exec(struct ast_expr *call, struct state *);
+asm_call_exec(struct ast_expr *call, struct state *);
 
 static struct error *
-register_mov_exec(struct ast_variable *temp, struct state *);
+asm_movret_exec(struct ast_variable *temp, struct state *);
 
 static struct error *
-stmt_register_exec(struct ast_stmt *stmt, struct state *state)
+stmt_asm_exec(struct ast_stmt *stmt, struct state *state)
 {
-	if (ast_stmt_register_issetupv(stmt)) {
-		return register_setupv_exec(ast_stmt_register_call(stmt), state);
-	} else if (ast_stmt_register_iscall(stmt)) {
-		return register_call_exec(ast_stmt_register_call(stmt), state);
+	if (ast_stmt_asm_issetupv(stmt)) {
+		return asm_setupv_exec(ast_stmt_asm_call(stmt), state);
+	} else if (ast_stmt_asm_iscall(stmt)) {
+		return asm_call_exec(ast_stmt_asm_call(stmt), state);
 	} else {
-		return register_mov_exec(ast_stmt_register_mov(stmt), state);
+		return asm_movret_exec(ast_stmt_asm_mov_var(stmt), state);
 	}
 }
 
 static struct error *
-register_setupv_exec(struct ast_expr *call, struct state *state)
+asm_setupv_exec(struct ast_expr *call, struct state *state)
 {
 	struct e_res *res = ast_expr_setupverify(call, state);
 	if (e_res_iserror(res)) {
@@ -524,7 +524,7 @@ register_setupv_exec(struct ast_expr *call, struct state *state)
 }
 
 static struct error *
-register_call_exec(struct ast_expr *call, struct state *state)
+asm_call_exec(struct ast_expr *call, struct state *state)
 {
 	struct e_res *res = ast_expr_eval(call, state);
 	if (e_res_iserror(res)) {
@@ -538,7 +538,7 @@ static struct e_res *
 call_return(struct state *);
 
 static struct error *
-register_mov_exec(struct ast_variable *temp, struct state *state)
+asm_movret_exec(struct ast_variable *temp, struct state *state)
 {
 	state_declare(state, temp, false);
 	struct ast_expr *name = ast_expr_identifier_create(
@@ -613,8 +613,8 @@ ast_stmt_pushsetup(struct ast_stmt *stmt, struct state *s)
 		return sel_pushsetup(stmt, s);
 	case STMT_COMPOUND:
 		return comp_pushsetup(stmt, s);
-	case STMT_REGISTER:
-		return stmt_register_exec(stmt, s);
+	case STMT_ASM:
+		return stmt_asm_exec(stmt, s);
 	default:
 		assert(false);
 	}
