@@ -418,6 +418,12 @@ ast_stmt_asm_call_create(struct lexememarker *loc, struct ast_expr *call)
 }
 
 struct ast_stmt *
+ast_stmt_asm_mov_create(struct lexememarker *loc, char *temp, struct ast_expr *e)
+{
+	return _asm_create(loc, asm_mov_create(temp, e));
+}
+
+struct ast_stmt *
 ast_stmt_asm_movret_create(struct lexememarker *loc, struct ast_variable *temp)
 {
 	return _asm_create(loc, asm_movret_create(temp));

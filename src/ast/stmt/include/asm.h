@@ -13,6 +13,9 @@ asm_setupv_create(struct ast_expr *call);
 struct _asm *
 asm_call_create(struct ast_expr *call);
 
+struct _asm *
+asm_mov_create(char *temp, struct ast_expr *val);
+
 struct ast_variable;
 
 struct _asm *

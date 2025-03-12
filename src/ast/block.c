@@ -6,6 +6,7 @@
 #include "ast.h"
 #include "util.h"
 
+#include "expr.h"
 #include "stmt.h"
 
 struct ast_block {
@@ -224,22 +225,16 @@ ast_block_relop_geninstr(struct ast_block *b, struct lexememarker *loc,
 {
 	struct ast_expr *e1 = ast_nr_geninstr(ast_expr_binary_e1(e), loc, b, s),
 			*e2 = ast_nr_geninstr(ast_expr_binary_e2(e), loc, b, s);
-	printf("e1: %s\n", ast_expr_str(e1));
-	printf("e2: %s\n", ast_expr_str(e2));
-	assert(0);
-	/*
 	char *tvar = generate_tempvar(b->tempcount++);
 	ast_block_append_stmt(
 		b, 
-		ast_stmt_register_mov_create(
+		ast_stmt_asm_mov_create(
 			loc,
-			ast_variable_create(
-				dynamic_str(tvar), ast_type_copy(rtype)
-			)
+			dynamic_str(tvar),
+			ast_expr_binary_create(e1, ast_expr_binary_op(e), e2)
 		)
 	);
 	return ast_expr_identifier_create(tvar);
-	*/
 }
 
 struct ast_expr *
@@ -249,6 +244,7 @@ ast_block_eqop_geninstr(struct ast_block *b, struct lexememarker *loc,
 	printf("eqop: %s\n", ast_expr_str(e));
 	struct ast_expr *e1 = ast_nr_geninstr(ast_expr_binary_e1(e), loc, b, s),
 			*e2 = ast_nr_geninstr(ast_expr_binary_e2(e), loc, b, s);
+	printf("b:\n%s\n", ast_block_str(b, 1));
 	printf("e1: %s\n", ast_expr_str(e1));
 	printf("e2: %s\n", ast_expr_str(e2));
 	assert(0);

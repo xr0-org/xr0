@@ -510,15 +510,6 @@ ast_stmt_create_dealloc(struct lexememarker *, struct ast_expr *arg);
 struct ast_stmt *
 ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
 
-struct ast_stmt *
-ast_stmt_asm_setupv_create(struct lexememarker *, struct ast_expr *call);
-
-struct ast_stmt *
-ast_stmt_asm_call_create(struct lexememarker *, struct ast_expr *call);
-
-struct ast_stmt *
-ast_stmt_asm_movret_create(struct lexememarker *, struct ast_variable *v);
-
 struct ast_expr *
 ast_stmt_asm_call(struct ast_stmt *);
 
