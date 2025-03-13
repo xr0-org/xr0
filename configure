@@ -88,8 +88,8 @@ function replace_valgrind_params() {
 		s|@VALGRINDFULLLEAKS@|$_leaks|"
 }
 
-INCLUDEDIRS=$(find $SRCDIR -type d -name "include")
-SRCDIRS=$(find $SRCDIR -type d ! -name "include")
+INCLUDEDIRS=$(find $SRCDIR -type d -name include ! -path "*_test*")
+SRCDIRS=$(find $SRCDIR -type d ! -name include ! -path "*_test*")
 
 # hack in Lex/Yacc files
 PARSER_FILES="$SRCDIR/ast/lex.yy.c \
