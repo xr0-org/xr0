@@ -95,6 +95,12 @@ _lsi_expr_renamevars(struct lsi_expr *e, struct lsi_varmap *m)
 }
 
 struct lsi_expr *
+_lsi_expr_prefixvars(struct lsi_expr *e, char *prefix)
+{
+	return _create(_tally_prefixkeys(e->_, prefix));
+}
+
+struct lsi_expr *
 _lsi_expr_copy(struct lsi_expr *old)
 {
 	return _create(tally_copy(old->_));
@@ -190,4 +196,10 @@ _lsi_expr_except(struct lsi_expr *old, char *var)
 	struct lsi_expr *new = _lsi_expr_copy(old);
 	tally_setval(new->_, var, 0);
 	return new;
+}
+
+int
+_lsi_expr_orthogonal(struct lsi_expr *e, struct lsi_expr *e0)
+{
+	return _tally_orthogonal(e->_, e0->_);
 }

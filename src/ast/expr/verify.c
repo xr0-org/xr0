@@ -19,25 +19,15 @@
 struct bool_res *
 ast_expr_decide(struct ast_expr *expr, struct state *s)
 {
-	struct ast_expr *lt = ast_expr_binary_create(
-		ast_expr_copy(expr), BINARY_OP_LE, ast_expr_constant_create(-1)
-	);
-	struct ast_expr *gt = ast_expr_binary_create(
-		 ast_expr_constant_create(1), BINARY_OP_LE, ast_expr_copy(expr) 
-	);
-	struct e_res *res_lt = ast_expr_eval(lt, s);
-	if (e_res_iserror(res_lt)) {
-		return bool_res_error_create(e_res_as_error(res_lt));
+	struct e_res *res = ast_expr_eval(expr, s);
+	if (e_res_iserror(res)) {
+		return bool_res_error_create(e_res_as_error(res));
 	}
-	struct e_res *res_gt = ast_expr_eval(gt, s);
-	if (e_res_iserror(res_gt)) {
-		return bool_res_error_create(e_res_as_error(res_gt));
-	}
-	ast_expr_destroy(lt);
-	ast_expr_destroy(gt);
 	return bool_res_bool_create(
-		value_as_constant(eval_as_rval(e_res_as_eval(res_lt)))
-			|| value_as_constant(eval_as_rval(e_res_as_eval(res_gt)))
+		/* 3.6.4.1 "if the expression compares unequal to 0" */
+		value_as_constant(
+			value_res_as_value(eval_to_value(e_res_as_eval(res), s))
+		) != 0
 	);
 }
 

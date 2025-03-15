@@ -25,6 +25,32 @@ lsi_varmap_create(void)
 	return _lsi_varmap_create(map_create());
 }
 
+static char *
+_concat(const char *s, const char *t);
+
+struct lsi_varmap *
+lsi_varmap_prefix(struct lsi_varmap *lv_old, char *key, char *val)
+{
+	int i;
+
+	struct map *new = map_create();
+	struct map *m = lv_old->_;
+	for (i = 0; i < m->n; i++) {
+		struct entry e = m->entry[i];
+		map_set(new, _concat(key, e.key), _concat(val, e.value));
+	}
+
+	return _lsi_varmap_create(new);
+}
+
+static char *
+_concat(const char *s, const char *t)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s%s", s, t);
+	return strbuilder_build(b);
+}
+
 struct lsi_varmap *
 lsi_varmap_copy(struct lsi_varmap *lv_old)
 {

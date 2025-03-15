@@ -21,6 +21,9 @@ struct lsi_expr *
 _lsi_expr_renamevars(struct lsi_expr *, struct lsi_varmap *);
 
 struct lsi_expr *
+_lsi_expr_prefixvars(struct lsi_expr *, char *prefix);
+
+struct lsi_expr *
 _lsi_expr_copy(struct lsi_expr *);
 
 void
@@ -48,5 +51,8 @@ _lsi_expr_getcoef(struct lsi_expr *, char *var);
 
 struct lsi_expr *
 _lsi_expr_except(struct lsi_expr *, char *var);
+
+int
+_lsi_expr_orthogonal(struct lsi_expr *, struct lsi_expr *);
 
 #endif

@@ -141,6 +141,9 @@ iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 static struct error *
 directverify(struct ast_stmt *, struct state *);
 
+static bool
+islinearisable(struct ast_stmt *);
+
 struct error *
 ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
 {
@@ -149,9 +152,6 @@ ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
 	state_destroy(copy);
 	return err;
 }
-
-static bool
-islinearisable(struct ast_stmt *);
 
 static struct error *
 stmt_expr_verify(struct ast_stmt *, struct state *);

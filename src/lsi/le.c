@@ -49,6 +49,12 @@ _lsi_le_renamevars(struct lsi_le *le, struct lsi_varmap *m)
 }
 
 struct lsi_le *
+_lsi_le_prefixvars(struct lsi_le *le, char *prefix)
+{
+	return _lsi_le_create(_lsi_expr_prefixvars(le->_, prefix));
+}
+
+struct lsi_le *
 lsi_le_negate(struct lsi_le *le)
 {
 	/* we represent l <= r as the expression l - r. negating this means
@@ -177,4 +183,10 @@ _lsi_le_isconstupperbound(struct lsi_le *le, char *var, int c)
 	int isbound = _lsi_le_eq(le, bound);
 	lsi_le_destroy(bound);
 	return isbound;
+}
+
+int
+_lsi_le_orthogonal(struct lsi_le *le, struct lsi_le *le0)
+{
+	return _lsi_expr_orthogonal(le->_, le0->_);
 }

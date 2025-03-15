@@ -260,13 +260,12 @@ struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
 		struct lsi_varmap *m)
 {
-	struct lsi *spec_lsi = lsi_copy(spec->constraints);
-	struct lsi *impl_lsi = lsi_renamevars(impl->constraints, m);
-	printf("impl (unmapped):\n%s\n", lsi_str(impl->constraints, "\t"));
-	printf("map: %s\n", lsi_varmap_str(m));
-	printf("impl:\n%s\n", lsi_str(impl_lsi, "\t"));
-	printf("spec:\n%s\n", lsi_str(spec_lsi, "\t"));
-	struct error *err = lsi_addrange(spec_lsi, impl_lsi);
+	struct lsi_varmap *prefix_m = lsi_varmap_prefix(m, "impl_", "spec_");
+	struct lsi *spec_lsi = lsi_prefixvars(spec->constraints, "spec_");
+	struct lsi *prefixed_impl = lsi_prefixvars(impl->constraints, "impl_");
+	struct lsi* impl_lsi =  lsi_renamevars(prefixed_impl, prefix_m);
+	lsi_destroy(prefixed_impl);
+	struct error *err = lsi_checksatisfiesrange(impl_lsi, spec_lsi);
 	lsi_destroy(impl_lsi);
 	lsi_destroy(spec_lsi);
 	return err;

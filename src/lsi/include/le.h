@@ -14,6 +14,9 @@ struct lsi_le *
 _lsi_le_renamevars(struct lsi_le *, struct lsi_varmap *);
 
 struct lsi_le *
+_lsi_le_prefixvars(struct lsi_le *, char *prefix);
+
+struct lsi_le *
 lsi_le_negate(struct lsi_le *);
 
 struct lsi_le *
@@ -66,5 +69,8 @@ _lsi_le_isconstlowerbound(struct lsi_le *le, char *var, int c);
 /* _lsi_le_isconstupperbound: return 1 if le is var <= c. */
 int
 _lsi_le_isconstupperbound(struct lsi_le *le, char *var, int c);
+
+int
+_lsi_le_orthogonal(struct lsi_le *, struct lsi_le *);
 
 #endif
