@@ -992,8 +992,9 @@ static struct ast_expr *
 _value_to_expr(struct value *, struct state *);
 
 static struct lsi_expr *
-_range_lw(struct ast_expr *e, struct state *s)
+_range_lw(struct ast_expr *range, struct state *s)
 {
+	struct ast_expr *e = ast_expr_range_lw(range);
 	if (ast_expr_israngemin(e)) {
 		return lsi_expr_const_create(C89_INT_MIN);
 	} else {
@@ -1013,8 +1014,9 @@ _value_to_expr(struct value *v, struct state *s)
 }
 
 static struct lsi_expr *
-_range_up(struct ast_expr *e, struct state *s)
+_range_up(struct ast_expr *range, struct state *s)
 {
+	struct ast_expr *e = ast_expr_range_up(range);
 	if (ast_expr_israngemax(e)) {
 		return lsi_expr_const_create(C89_INT_MAX);
 	} else {
@@ -1039,19 +1041,14 @@ static char *
 declare_rconst(struct ast_expr *expr, struct state *state)
 {
 	if (ast_expr_range_haskey(expr)) {
-		printf("expr: %s\n", ast_expr_str(expr));
 		return state_rconst(
 			state,
-			/* XXX: we will investigate type conversions later */
-			ast_type_create_range(),
 			modulatedkey(expr, state),
 			false
 		);
 	}
 	return state_rconstnokey(
 		state,
-		/* XXX: we will investigate type conversions later */
-		ast_type_create_range(),
 		false
 	);
 }

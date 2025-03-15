@@ -145,10 +145,10 @@ bool
 state_addresses_deallocand(struct state *, struct object *);
 
 char *
-state_rconst(struct state *, struct ast_type *, char *key, bool persist);
+state_rconst(struct state *, char *key, bool persist);
 
 char *
-state_rconstnokey(struct state *, struct ast_type *, bool persist);
+state_rconstnokey(struct state *, bool persist);
 
 struct lsi_le;
 

@@ -7,6 +7,7 @@
 #include "lsi.h"
 #include "util.h"
 #include "value.h"
+#include "verifier.h"
 
 struct rconst {
 	struct map *varmap;
@@ -131,12 +132,9 @@ static char *
 rconst_getidbykey(struct rconst *v, char *key);
 
 char *
-rconst_declareorget(struct rconst *v, struct ast_expr *range, char *key,
-		bool persist, struct state *state)
+rconst_declareorget(struct rconst *v, char *key, bool persist,
+		struct state *state)
 {
-	printf("key: %s\n", key);
-	assert(key);
-
 	char *prev = rconst_getidbykey(v, key);
 	if (prev) {
 		return dynamic_str(prev);

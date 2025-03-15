@@ -516,6 +516,9 @@ value_struct_specval_verify(struct value *param, struct value *arg,
 }
 
 static char *
+_expr_to_rconstid(struct ast_expr *, struct state *);
+
+static char *
 _int_to_rconstid(struct value *, struct state *);
 
 char *
@@ -523,12 +526,36 @@ value_to_rconstid(struct value *v, struct state *s)
 {
 	switch (v->type) {
 	case VALUE_RCONST:
-		return dynamic_str(ast_expr_as_identifier(value_as_rconst(v)));
+		return _expr_to_rconstid(value_as_rconst(v), s);
 	case VALUE_INT:
 		return _int_to_rconstid(v, s);
 	default:
 		assert(0);
 	}
+}
+
+static char *
+_expr_to_rconstid(struct ast_expr *e, struct state *s)
+{
+	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
+	struct lsi_expr *lsi_e = ast_expr_to_lsi_expr(e);
+	state_addconstraint(
+		s,
+		lsi_le_create(
+			/* e <= rconst */
+			lsi_e,
+			lsi_expr_var_create(dynamic_str(rconst))
+		)
+	);
+	state_addconstraint(
+		s,
+		lsi_le_create(
+			/* rconst <= e */
+			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_e
+		)
+	);
+	return rconst;
 }
 
 static char *
@@ -538,9 +565,7 @@ _int_to_rconstid(struct value *v, struct state *s)
 	assert(number_isconst(n));
 
 	/* morph v to equivalent rconst */
-	struct ast_type *t = ast_type_create_int();
-	char *rconst = state_rconstnokey(s, t, false); /* XXX: persist? */
-	ast_type_destroy(t);
+	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
 
 	int c = number_as_const(n);
 	state_addconstraint(

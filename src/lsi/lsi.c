@@ -113,13 +113,7 @@ _verifyfeasible(struct lsi *lsi)
 	for (i = 0; i < le_arr_len(arr); i++) {
 		struct lsi_le *le = le_arr_get(arr, i);
 		if (!_lsi_le_isfeasible(le)) {
-			char *s = lsi_le_str(le);
-			struct error *err = error_printf(
-				"%w: system requires %s",
-				error_lsi_notfeasible(), s
-			);
-			free(s);
-			return err;
+			return error_lsi_notfeasible();
 		}
 	}
 
