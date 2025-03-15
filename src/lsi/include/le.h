@@ -14,10 +14,13 @@ struct lsi_le *
 _lsi_le_renamevars(struct lsi_le *, struct lsi_varmap *);
 
 struct lsi_le *
-_lsi_le_copy(struct lsi_le *);
+lsi_le_negate(struct lsi_le *);
+
+struct lsi_le *
+lsi_le_copy(struct lsi_le *);
 
 void
-_lsi_le_destroy(struct lsi_le *);
+lsi_le_destroy(struct lsi_le *);
 
 char *
 lsi_le_str(struct lsi_le *);

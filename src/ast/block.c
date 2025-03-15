@@ -215,7 +215,7 @@ static char *
 generate_tempvar(int tempid)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "{t%d}", tempid);
+	strbuilder_printf(b, "#R%d", tempid);
 	return strbuilder_build(b);
 }
 
@@ -230,7 +230,11 @@ ast_block_relop_geninstr(struct ast_block *b, struct lexememarker *loc,
 		b, 
 		ast_stmt_asm_mov_create(
 			loc,
-			dynamic_str(tvar),
+			ast_variable_create(
+				dynamic_str(tvar),
+				/* 3.3.8: The result has type int. */
+				ast_type_create_int()
+			),
 			ast_expr_binary_create(e1, ast_expr_binary_op(e), e2)
 		)
 	);
@@ -320,8 +324,25 @@ ast_block_ternary_geninstr(struct ast_block *b, struct lexememarker *loc,
 			loc,
 			false,
 			e1_r,
-			ast_stmt_asm_mov_create(loc, tvar, e2_r),
-			ast_stmt_asm_mov_create(loc, tvar, e3_r)
+			ast_stmt_asm_mov_create(
+				loc,
+				ast_variable_create(
+					dynamic_str(tvar),
+					/* 3.3.9 in association with the result
+					 * type given in 3.3.8 */
+					ast_type_create_int()
+				),
+				e2_r
+			),
+			ast_stmt_asm_mov_create(
+				loc,
+				ast_variable_create(
+					dynamic_str(tvar),
+					/* 3.3.9 */
+					ast_type_create_int()
+				),
+				e3_r
+			)
 		)
 	);
 	return ast_expr_identifier_create(tvar);

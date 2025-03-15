@@ -144,15 +144,16 @@ state_lexememarker(struct state *);
 bool
 state_addresses_deallocand(struct state *, struct object *);
 
-struct value_res;
+char *
+state_rconst(struct state *, struct ast_type *, char *key, bool persist);
 
-struct value_res *
-state_rconst(struct state *, struct ast_type *, struct ast_expr *range,
-		char *key, bool persist);
+char *
+state_rconstnokey(struct state *, struct ast_type *, bool persist);
 
-struct value_res *
-state_rconstnokey(struct state *, struct ast_type *, struct ast_expr *range,
-		bool persist);
+struct lsi_le;
+
+struct error *
+state_addconstraint(struct state *, struct lsi_le *);
 
 struct value *
 state_static_init(struct state *, struct ast_expr *);
@@ -311,6 +312,11 @@ state_constraintverify_all(struct state *spec, struct state *impl);
 
 struct error *
 state_verifyinvariant(struct state *);
+
+struct lsi_le;
+
+int
+state_isfeasible(struct state *, struct lsi_le *);
 
 /* USED BY OBJECT */
 

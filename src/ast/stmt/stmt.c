@@ -418,7 +418,8 @@ ast_stmt_asm_call_create(struct lexememarker *loc, struct ast_expr *call)
 }
 
 struct ast_stmt *
-ast_stmt_asm_mov_create(struct lexememarker *loc, char *temp, struct ast_expr *e)
+ast_stmt_asm_mov_create(struct lexememarker *loc, struct ast_variable *temp,
+		struct ast_expr *e)
 {
 	return _asm_create(loc, asm_mov_create(temp, e));
 }
@@ -464,7 +465,7 @@ ast_stmt_asm_call(struct ast_stmt *stmt)
 	return asm_getcall(stmt->u._asm);
 }
 
-char *
+struct ast_variable *
 ast_stmt_asm_mov_var(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ASM);
@@ -476,13 +477,6 @@ ast_stmt_asm_mov_val(struct ast_stmt *stmt)
 {
 	assert(stmt->kind == STMT_ASM);
 	return asm_mov_getval(stmt->u._asm);
-}
-
-struct ast_variable *
-ast_stmt_asm_movret_var(struct ast_stmt *stmt)
-{
-	assert(stmt->kind == STMT_ASM);
-	return asm_movret_getvar(stmt->u._asm);
 }
 
 static void

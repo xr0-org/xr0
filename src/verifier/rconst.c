@@ -7,7 +7,6 @@
 #include "lsi.h"
 #include "util.h"
 #include "value.h"
-#include "_limits.h"
 
 struct rconst {
 	struct map *varmap;
@@ -74,95 +73,30 @@ rconst_copy(struct rconst *old)
 	return new;
 }
 
+struct rconst *
+rconst_split(struct rconst *old, struct lsi_le *le)
+{
+	struct rconst *new = rconst_copy(old);
+	struct error *err = lsi_add(new->constraints, le);
+	assert(!err); /* origin of split instruct checks feasibility */
+	return new;
+}
+
+
 DEFINE_RESULT_TYPE(char *, str, free, str_res, false)
 
 static char *
 rconst_id(struct map *varmap, struct map *persistmap, bool persist);
 
-static struct lsi_expr *
-_range_lw(struct ast_expr *range, struct state *);
-
-static struct lsi_expr *
-_range_up(struct ast_expr *range, struct state *);
-
-struct str_res *
-rconst_declarenokey(struct rconst *v, struct ast_expr *range, bool persist,
-		struct state *state)
+char *
+rconst_declarenokey(struct rconst *v, bool persist, struct state *state)
 {
-	struct error *err;
-
 	struct map *m = v->varmap;
 	char *s = rconst_id(m, v->persist, persist);
 	map_set(m, dynamic_str(s), (void *) 1);
 	map_set(v->persist, dynamic_str(s), (void *) persist);
-
-	err = lsi_add(
-		v->constraints,
-		lsi_le_create(
-			_range_lw(ast_expr_range_lw(range), state),
-			lsi_expr_var_create(dynamic_str(s))
-		)
-	);
-	if (err) {
-		return str_res_error_create(err);
-	}
-	err = lsi_add(
-		v->constraints,
-		lsi_le_create(
-			lsi_expr_var_create(dynamic_str(s)),
-			_range_up(ast_expr_range_up(range), state)
-		)
-	);
-	if (err) {
-		return str_res_error_create(err);
-	}
-
-	return str_res_str_create(s);
+	return s;
 }
-
-static struct ast_expr *
-_value_to_expr(struct value *, struct state *);
-
-static struct lsi_expr *
-_range_lw(struct ast_expr *e, struct state *s)
-{
-	if (ast_expr_israngemin(e)) {
-		return lsi_expr_const_create(C89_INT_MIN);
-	} else {
-		struct value *v = value_res_as_value(
-			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
-		);
-		return ast_expr_to_lsi_expr(_value_to_expr(v, s));
-	}
-}
-
-static struct ast_expr *
-_value_to_expr(struct value *v, struct state *s)
-{
-	return value_isconstant(v)
-		? ast_expr_constant_create(value_as_int(v, s))
-		: ast_expr_copy(value_as_rconst(v));
-}
-
-static struct lsi_expr *
-_range_up(struct ast_expr *e, struct state *s)
-{
-	if (ast_expr_israngemax(e)) {
-		return lsi_expr_const_create(C89_INT_MAX);
-	} else {
-		struct value *v = value_res_as_value(
-			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
-		);
-		/* subtract 1 b/c range expression upper bounds are exclusive */
-		return ast_expr_to_lsi_expr(
-			ast_expr_sum_create(
-				_value_to_expr(v, s),
-				ast_expr_constant_create(-1)
-			)
-		);
-	}
-}
-
 
 static int
 count_true(struct map *m);
@@ -193,18 +127,24 @@ count_true(struct map *m)
 	return n;
 }
 
-struct str_res *
-rconst_declare(struct rconst *v, struct ast_expr *range, char *key, bool persist,
-		struct state *state)
+static char *
+rconst_getidbykey(struct rconst *v, char *key);
+
+char *
+rconst_declareorget(struct rconst *v, struct ast_expr *range, char *key,
+		bool persist, struct state *state)
 {
-	struct str_res *res = rconst_declarenokey(v, range, persist, state);
-	if (str_res_iserror(res)) {
-		return res;
+	printf("key: %s\n", key);
+	assert(key);
+
+	char *prev = rconst_getidbykey(v, key);
+	if (prev) {
+		return dynamic_str(prev);
 	}
-	char *s = str_res_as_str(res);
+	char *s = rconst_declarenokey(v, persist, state);
 	assert(key);
 	map_set(v->keymap, dynamic_str(s), dynamic_str(key));
-	return res;
+	return s;
 }
 
 int
@@ -213,7 +153,7 @@ rconst_hasvar(struct rconst *r, char *var)
 	return map_get(r->varmap, var) != NULL;
 }
 
-char *
+static char *
 rconst_getidbykey(struct rconst *v, char *key)
 {
 	/* XXX */
@@ -227,6 +167,12 @@ rconst_getidbykey(struct rconst *v, char *key)
 		}
 	}
 	return NULL;
+}
+
+struct error *
+rconst_addconstraint(struct rconst *v, struct lsi_le *le)
+{
+	return lsi_add(v->constraints, le);
 }
 
 void
@@ -309,4 +255,18 @@ rconst_constraintverify(struct rconst *spec, struct rconst *impl,
 	lsi_destroy(impl_lsi);
 	lsi_destroy(spec_lsi);
 	return err;
+}
+
+int
+rconst_isfeasible(struct rconst *r, struct lsi_le *le)
+{
+	struct lsi *constraints = lsi_copy(r->constraints);
+	/* XXX: copy leaks when there's an error */
+	struct error *err = lsi_add(constraints, lsi_le_copy(le));
+	lsi_destroy(constraints);
+	if (err) {
+		assert(error_to_lsi_notfeasible(err));
+		return 0;
+	}
+	return 1;
 }

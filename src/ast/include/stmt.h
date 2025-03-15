@@ -27,7 +27,8 @@ struct ast_stmt *
 ast_stmt_asm_call_create(struct lexememarker *, struct ast_expr *call);
 
 struct ast_stmt *
-ast_stmt_asm_mov_create(struct lexememarker *loc, char *temp, struct ast_expr *);
+ast_stmt_asm_mov_create(struct lexememarker *loc, struct ast_variable *temp,
+		struct ast_expr *);
 
 struct ast_stmt *
 ast_stmt_asm_movret_create(struct lexememarker *, struct ast_variable *temp);

@@ -310,23 +310,21 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 }
 
 static void
-inititalise_param(struct ast_variable *param, struct state *state)
+inititalise_param(struct ast_variable *param, struct state *s)
 {
 	char *name = ast_variable_name(param);
-	struct ast_type *t = ast_variable_type(param);
-
-	struct object_res *res = state_getobject(state, name);
-	struct object *obj = object_res_as_object(res);
-	assert(!object_hasvalue(obj)); /* XXX: see git blame */
-	struct ast_expr *r = ast_expr_range_create(
-		dynamic_str(name),
-		ast_expr_rangemin_create(),
-		ast_expr_rangemax_create()
+	struct e_res *res = ast_expr_eval(
+		ast_expr_assignment_create(
+			ast_expr_identifier_create(dynamic_str(name)),
+			ast_expr_range_create(
+				dynamic_str(name),
+				ast_expr_rangemin_create(),
+				ast_expr_rangemax_create()
+			)
+		),
+		s
 	);
-	struct value *val = value_res_as_value(
-		state_rconst(state, t, r, dynamic_str(name), true)
-	);
-	object_assign(obj, val);
+	assert(!e_res_iserror(res));
 }
 
 static void

@@ -24,16 +24,22 @@ _lsi_le_create(struct lsi_expr *e)
 	return le;
 }
 
+static struct lsi_expr *
+_negate(struct lsi_expr *);
+
 struct lsi_le *
 lsi_le_create(struct lsi_expr *l, struct lsi_expr *r)
 {
 	return _lsi_le_create(
 		/* l - r */
-		lsi_expr_sum_create(
-			l,
-			lsi_expr_product_create(lsi_expr_const_create(-1), r)
-		)
+		lsi_expr_sum_create(l, _negate(r))
 	);
+}
+
+static struct lsi_expr *
+_negate(struct lsi_expr *e)
+{
+	return lsi_expr_product_create(lsi_expr_const_create(-1), e);
 }
 
 struct lsi_le *
@@ -42,15 +48,29 @@ _lsi_le_renamevars(struct lsi_le *le, struct lsi_varmap *m)
 	return _lsi_le_create(_lsi_expr_renamevars(le->_, m));
 }
 
+struct lsi_le *
+lsi_le_negate(struct lsi_le *le)
+{
+	/* we represent l <= r as the expression l - r. negating this means
+	 * writing r < l, or r <= l - 1, which is represented as r - l + 1, or
+	 * 	1 - (l - r).
+	 * so we add 1 to the negation of the original representation. */
+	return _lsi_le_create(
+		lsi_expr_sum_create(
+			lsi_expr_const_create(1),
+			_negate(le->_)
+		)
+	);
+}
 
 struct lsi_le *
-_lsi_le_copy(struct lsi_le *old)
+lsi_le_copy(struct lsi_le *old)
 {
 	return _lsi_le_create(_lsi_expr_copy(old->_));
 }
 
 void
-_lsi_le_destroy(struct lsi_le *le)
+lsi_le_destroy(struct lsi_le *le)
 {
 	_lsi_expr_destroy(le->_);
 	free(le);

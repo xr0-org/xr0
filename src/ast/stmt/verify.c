@@ -498,7 +498,7 @@ static struct error *
 asm_call_exec(struct ast_expr *call, struct state *);
 
 static struct error *
-asm_mov_exec(char *temp, struct ast_expr *val, struct state *);
+asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *);
 
 static struct error *
 asm_movret_exec(struct ast_variable *temp, struct state *);
@@ -517,7 +517,7 @@ stmt_asm_exec(struct ast_stmt *stmt, struct state *state)
 			state
 		);
 	} else {
-		return asm_movret_exec(ast_stmt_asm_movret_var(stmt), state);
+		return asm_movret_exec(ast_stmt_asm_mov_var(stmt), state);
 	}
 }
 
@@ -544,10 +544,28 @@ asm_call_exec(struct ast_expr *call, struct state *state)
 }
 
 static struct error *
-asm_mov_exec(char *temp, struct ast_expr *val, struct state *s)
+asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *s)
 {
-	printf("temp: %s, val: %s\n", temp, ast_expr_str(val));
-	assert(0);
+	struct e_res *r_res = ast_expr_eval(val, s);
+	if (e_res_iserror(r_res)) {
+		return e_res_as_error(r_res);
+	}
+
+	state_declare(s, temp, false);
+	struct ast_expr *name = ast_expr_identifier_create(
+		dynamic_str(ast_variable_name(temp))
+	);
+	struct e_res *l_res = ast_expr_eval(name, s);
+	if (e_res_iserror(l_res)) {
+		return e_res_as_error(l_res);
+	}
+	struct object *obj = object_res_as_object(
+		state_get(s, eval_as_lval(e_res_as_eval(l_res)), true)
+	);
+	object_assign(
+		obj, value_copy(eval_as_rval(e_res_as_eval(r_res)))
+	);
+	return NULL;
 }
 
 static struct e_res *
@@ -595,7 +613,9 @@ call_return(struct state *state)
 	}
 	state_popregister(state);
 	return e_res_eval_create(
-		eval_rval_create(calloralloc_type(state_framecall(state), state), v)
+		eval_rval_create(
+			calloralloc_type(state_framecall(state), state), v
+		)
 	);
 }
 

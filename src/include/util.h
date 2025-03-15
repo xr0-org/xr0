@@ -197,6 +197,12 @@ error_eval_void(void);
 struct error *
 error_to_eval_void(struct error *);
 
+struct error *
+error_lsi_notfeasible(void);
+
+struct error *
+error_to_lsi_notfeasible(struct error *);
+
 char *
 error_str(struct error *);
 

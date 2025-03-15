@@ -14,22 +14,32 @@
 #include "value.h"
 #include "type.h"
 #include "verifier.h"
+#include "_limits.h"
 
 struct bool_res *
 ast_expr_decide(struct ast_expr *expr, struct state *s)
 {
-	struct ast_expr *prop = ast_expr_binary_create(
-		ast_expr_copy(expr), BINARY_OP_NE, ast_expr_constant_create(0)
+	struct ast_expr *lt = ast_expr_binary_create(
+		ast_expr_copy(expr), BINARY_OP_LE, ast_expr_constant_create(-1)
 	);
-	struct e_res *res = ast_expr_eval(prop, s);
-	if (e_res_iserror(res)) {
-		return bool_res_error_create(e_res_as_error(res));
+	struct ast_expr *gt = ast_expr_binary_create(
+		 ast_expr_constant_create(1), BINARY_OP_LE, ast_expr_copy(expr) 
+	);
+	struct e_res *res_lt = ast_expr_eval(lt, s);
+	if (e_res_iserror(res_lt)) {
+		return bool_res_error_create(e_res_as_error(res_lt));
 	}
+	struct e_res *res_gt = ast_expr_eval(gt, s);
+	if (e_res_iserror(res_gt)) {
+		return bool_res_error_create(e_res_as_error(res_gt));
+	}
+	ast_expr_destroy(lt);
+	ast_expr_destroy(gt);
 	return bool_res_bool_create(
-		value_as_constant(eval_as_rval(e_res_as_eval(res)))
+		value_as_constant(eval_as_rval(e_res_as_eval(res_lt)))
+			|| value_as_constant(eval_as_rval(e_res_as_eval(res_gt)))
 	);
 }
-
 
 /* ast_expr_eval */
 
@@ -170,17 +180,6 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 	}
 
 	char *id = ast_expr_as_identifier(expr);
-
-	/* XXX */
-	if (id[0] == '#') {
-		assert(false);
-		return e_res_eval_create(
-			eval_rval_create(
-				ast_type_create_char(),
-				value_literal_create(id)
-			)
-		);
-	}
 
 	struct loc_res *loc_res = state_getloc(state, id);
 	if (loc_res_iserror(loc_res)) {
@@ -740,8 +739,6 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 	case BINARY_OP_GT:
 	case BINARY_OP_GE:
 	case BINARY_OP_LE:
-	case BINARY_OP_EQ:
-	case BINARY_OP_NE:
 		return relational_eval(expr, state);
 	default:
 		assert(false);
@@ -755,10 +752,8 @@ value_additive_eval(struct eval *, enum ast_binary_operator, struct eval *,
 static struct e_res *
 additive_eval(struct ast_expr *expr, struct state *state)
 {
-	struct ast_expr *e1 = ast_expr_binary_e1(expr),
-			*e2 = ast_expr_binary_e2(expr);
-	struct e_res *res1 = ast_expr_eval(e1, state),
-		     *res2 = ast_expr_eval(e2, state);
+	struct e_res *res1 = ast_expr_eval(ast_expr_binary_e1(expr), state),
+		     *res2 = ast_expr_eval(ast_expr_binary_e2(expr), state);
 	if (e_res_iserror(res1)) {
 		return res1;
 	}
@@ -781,7 +776,7 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 			*t2 = eval_type(rv2);
 	if (ast_type_isptr(t2)) {
 		if (ast_type_isptr(t1)) {
-			a_printf(false, "adding two pointers not supported\n");
+			a_printf(0, "adding two pointers not supported\n");
 		}
 		return value_additive_eval(rv2, op, rv1, s);
 	}
@@ -838,14 +833,108 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 }
 
 static struct e_res *
+value_relational_eval(struct eval *, enum ast_binary_operator, struct eval *,
+		struct state *);
+
+static struct e_res *
 relational_eval(struct ast_expr *e, struct state *s)
 {
-	printf("state:\n%s\n", state_str(s));
-	printf("expr: %s\n", ast_expr_str(e));
-	struct lsi *lsi = ast_expr_to_lsi(e, s);
-	printf("lsi:\n%s\n", lsi_str(lsi, "\t"));
-	assert(0);
+	struct e_res *res1 = ast_expr_eval(ast_expr_binary_e1(e), s),
+		     *res2 = ast_expr_eval(ast_expr_binary_e2(e), s);
+	if (e_res_iserror(res1)) {
+		return res1;
+	}
+	if (e_res_iserror(res2)) {
+		return res2;
+	}
+	return value_relational_eval(
+		e_res_as_eval(res1),
+		ast_expr_binary_op(e),
+		e_res_as_eval(res2),
+		s
+	);
 }
+
+static struct lsi_le *
+_rel_to_le(struct lsi_expr *, enum ast_binary_operator, struct lsi_expr *);
+
+static struct e_res *
+value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
+		struct eval *rv2, struct state *s)
+{
+	struct ast_type *t1 = eval_type(rv1),
+			*t2 = eval_type(rv2);
+	if (ast_type_isptr(t2)) {
+		if (ast_type_isptr(t1)) {
+			a_printf(0, "adding two pointers not supported\n");
+		}
+		return value_additive_eval(rv2, op, rv1, s);
+	}
+	/* ⊢ !ast_type_isptr(t2) */
+
+	struct value_res *v_res1 = eval_to_value(rv1, s),
+			 *v_res2 = eval_to_value(rv2, s);
+	a_printf(
+		value_res_hasvalue(v_res1) && value_res_hasvalue(v_res2),
+		"undefined memory access needing better error message\n"
+	);
+
+	struct lsi_le *le = _rel_to_le(
+		lsi_expr_var_create(
+			value_to_rconstid(value_res_as_value(v_res1), s)
+		),
+		op,
+		lsi_expr_var_create(
+			value_to_rconstid(value_res_as_value(v_res2), s)
+		)
+	);
+	struct lsi_le *le_neg = lsi_le_negate(le);
+
+	if (!state_isfeasible(s, le)) {
+		assert(state_isfeasible(s, le_neg));
+		return e_res_eval_create(
+			eval_rval_create(
+				ast_type_create_int(), value_int_create(0)
+			)
+		);
+	}
+	if (!state_isfeasible(s, le_neg)) {
+		return e_res_eval_create(
+			eval_rval_create(
+				ast_type_create_int(), value_int_create(1)
+			)
+		);
+	}
+
+	return e_res_error_create(
+		error_verifierinstruct(
+			verifierinstruct_split(splitinstruct_create(le, le_neg))
+		)
+	);
+}
+
+static struct lsi_le *
+_rel_to_le(struct lsi_expr *e1, enum ast_binary_operator op,
+		struct lsi_expr *e2)
+{
+	switch (op) {
+	case BINARY_OP_LE:
+		return lsi_le_create(e1, e2);
+	case BINARY_OP_LT:
+		/* TODO: overflows */
+		return lsi_le_create(
+			e1,
+			lsi_expr_sum_create(e2, lsi_expr_const_create(-1))
+		);
+	case BINARY_OP_GE:
+		return _rel_to_le(e2, BINARY_OP_LE, e1);
+	case BINARY_OP_GT:
+		return _rel_to_le(e2, BINARY_OP_LT, e1);
+	default:
+		assert(0);
+	}
+}
+
 
 static struct value_res *
 range_rconst(struct ast_expr *, struct state *);
@@ -867,17 +956,94 @@ range_eval(struct ast_expr *expr, struct state *state)
 }
 
 static char *
-modulatedkey(struct ast_expr *, struct state *);
+declare_rconst(struct ast_expr *, struct state *);
+
+static struct lsi_expr *
+_range_lw(struct ast_expr *range, struct state *);
+
+static struct lsi_expr *
+_range_up(struct ast_expr *range, struct state *);
 
 static struct value_res *
-range_rconst(struct ast_expr *expr, struct state *state)
+range_rconst(struct ast_expr *e, struct state *s)
+{
+	char *rconst = declare_rconst(e, s);
+	state_addconstraint(
+		s,
+		lsi_le_create(
+			_range_lw(e, s),
+			lsi_expr_var_create(dynamic_str(rconst))
+		)
+	);
+	state_addconstraint(
+		s,
+		lsi_le_create(
+			lsi_expr_var_create(dynamic_str(rconst)),
+			_range_up(e, s)
+		)
+	);
+	return value_res_value_create(
+		value_rconst_create(ast_expr_identifier_create(rconst))
+	);
+}
+
+
+static struct ast_expr *
+_value_to_expr(struct value *, struct state *);
+
+static struct lsi_expr *
+_range_lw(struct ast_expr *e, struct state *s)
+{
+	if (ast_expr_israngemin(e)) {
+		return lsi_expr_const_create(C89_INT_MIN);
+	} else {
+		struct value *v = value_res_as_value(
+			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
+		);
+		return ast_expr_to_lsi_expr(_value_to_expr(v, s));
+	}
+}
+
+static struct ast_expr *
+_value_to_expr(struct value *v, struct state *s)
+{
+	return value_isconstant(v)
+		? ast_expr_constant_create(value_as_int(v, s))
+		: ast_expr_copy(value_as_rconst(v));
+}
+
+static struct lsi_expr *
+_range_up(struct ast_expr *e, struct state *s)
+{
+	if (ast_expr_israngemax(e)) {
+		return lsi_expr_const_create(C89_INT_MAX);
+	} else {
+		struct value *v = value_res_as_value(
+			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
+		);
+		/* subtract 1 b/c range expression upper bounds are exclusive */
+		return ast_expr_to_lsi_expr(
+			ast_expr_sum_create(
+				_value_to_expr(v, s),
+				ast_expr_constant_create(-1)
+			)
+		);
+	}
+}
+
+
+static char *
+modulatedkey(struct ast_expr *, struct state *);
+
+static char *
+declare_rconst(struct ast_expr *expr, struct state *state)
 {
 	if (ast_expr_range_haskey(expr)) {
+		printf("expr: %s\n", ast_expr_str(expr));
 		return state_rconst(
 			state,
 			/* XXX: we will investigate type conversions later */
 			ast_type_create_range(),
-			expr,
 			modulatedkey(expr, state),
 			false
 		);
@@ -886,10 +1052,10 @@ range_rconst(struct ast_expr *expr, struct state *state)
 		state,
 		/* XXX: we will investigate type conversions later */
 		ast_type_create_range(),
-		expr,
 		false
 	);
 }
+
 
 static char *
 modulatedkey(struct ast_expr *e, struct state *s)

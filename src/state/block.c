@@ -124,7 +124,10 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 	}
 
 	if (!value_isconstant(range)) {
+		assert(0);
 		assert(tagval_hastag(tv));
+		/*
+		XXX
 		struct splitinstruct *splits = splitinstruct_create(s);
 		char *tag = tagval_tag(tv);
 		for (int i = lw; i < up; i++) {
@@ -135,6 +138,7 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		return object_res_error_create(
 			error_verifierinstruct(verifierinstruct_split(splits))
 		);
+		*/
 	}
 
 	offset = ast_expr_constant_create(value_as_constant(range));

@@ -56,27 +56,24 @@ verifierinstruct_split(struct splitinstruct *);
 
 struct splitinstruct;
 
+struct lsi_le;
+
 struct splitinstruct *
-splitinstruct_create(struct state *);
+splitinstruct_create(struct lsi_le *, struct lsi_le *);
 
-struct map;
+struct lsi_le *
+splitinstruct_0(struct splitinstruct *);
 
-void
-splitinstruct_append(struct splitinstruct *, struct map *);
-
-int 
-splitinstruct_n(struct splitinstruct *);
-
-struct map **
-splitinstruct_splits(struct splitinstruct *);
-
-struct state *
-splitinstruct_state(struct splitinstruct *);
+struct lsi_le *
+splitinstruct_1(struct splitinstruct *);
 
 struct rconst;
 
 struct rconst *
 rconst_create(void);
+
+struct rconst *
+rconst_split(struct rconst *, struct lsi_le *);
 
 struct rconst *
 rconst_copy(struct rconst *);
@@ -87,21 +84,22 @@ rconst_destroy(struct rconst *);
 char *
 rconst_str(struct rconst *, char *indent);
 
-DECLARE_RESULT_TYPE(char *, str, str_res)
+char *
+rconst_declareorget(struct rconst *, char *key, bool persist, struct state *);
 
-struct str_res *
-rconst_declare(struct rconst *, struct ast_expr *range, char *key, bool persist,
-		struct state *);
+char *
+rconst_declarenokey(struct rconst *, bool persist, struct state *);
 
-struct str_res *
-rconst_declarenokey(struct rconst *, struct ast_expr *range, bool persist,
-		struct state *);
+struct error *
+rconst_addconstraint(struct rconst *v, struct lsi_le *le);
+
+struct lsi_le;
+
+struct error *
+rconst_addconstraint(struct rconst *, struct lsi_le *);
 
 int
 rconst_hasvar(struct rconst *, char *var);
-
-char *
-rconst_getidbykey(struct rconst *, char *key);
 
 void
 rconst_undeclare(struct rconst *);
@@ -114,5 +112,8 @@ struct lsi_varmap;
 struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
 		struct lsi_varmap *spec_impl_m);
+
+int
+rconst_isfeasible(struct rconst *, struct lsi_le *);
 
 #endif

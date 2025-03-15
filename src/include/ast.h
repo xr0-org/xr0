@@ -506,14 +506,11 @@ ast_stmt_create_clump(struct lexememarker *, struct ast_expr *arg);
 struct ast_expr *
 ast_stmt_asm_call(struct ast_stmt *);
 
-char *
+struct ast_variable *
 ast_stmt_asm_mov_var(struct ast_stmt *);
 
 struct ast_expr *
 ast_stmt_asm_mov_val(struct ast_stmt *);
-
-struct ast_variable *
-ast_stmt_asm_movret_var(struct ast_stmt *);
 
 int
 ast_stmt_asm_issetupv(struct ast_stmt *);
