@@ -18,6 +18,8 @@
 #include "util.h"
 #include "verifier.h"
 #include "value.h"
+#include "lsi.h"
+#include "_limits.h"
 
 struct ast_function {
 	bool isaxiom;
@@ -313,18 +315,28 @@ static void
 inititalise_param(struct ast_variable *param, struct state *s)
 {
 	char *name = ast_variable_name(param);
-	struct e_res *res = ast_expr_eval(
-		ast_expr_assignment_create(
-			ast_expr_identifier_create(dynamic_str(name)),
-			ast_expr_range_create(
-				dynamic_str(name),
-				ast_expr_rangemin_create(),
-				ast_expr_rangemax_create()
-			)
-		),
-		s
+	char *rconst = state_rconst(s, dynamic_str(name), true);
+	state_addconstraint(
+		s,
+		lsi_le_create(
+			lsi_expr_const_create(C89_INT_MIN),
+			lsi_expr_var_create(dynamic_str(rconst))
+		)
 	);
-	assert(!e_res_iserror(res));
+	state_addconstraint(
+		s,
+		lsi_le_create(
+			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_expr_const_create(C89_INT_MAX)
+		)
+	);
+	struct object_res *res = state_getobject(s, name);
+	struct object *obj = object_res_as_object(res);
+	assert(!object_hasvalue(obj)); /* XXX: see git blame */
+	object_assign(
+		obj,
+		value_rconst_create(ast_expr_identifier_create(rconst))
+	);
 }
 
 static void

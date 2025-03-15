@@ -30,6 +30,10 @@ struct lsi_varmap;
 struct lsi *
 lsi_renamevars(struct lsi *, struct lsi_varmap *);
 
+int
+lsi_var_isconst(struct lsi *, char *var, int c);
+
+
 /* lsi_le: a less-than-or-equal-to inequality */
 struct lsi_le;
 

@@ -20,6 +20,9 @@ tally_destroy(struct tally *);
 char *
 tally_str(struct tally *);
 
+int
+_tally_eq(struct tally *, struct tally *);
+
 long
 tally_getval(struct tally *, char *var);
 

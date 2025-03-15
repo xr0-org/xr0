@@ -7,6 +7,31 @@
 #include "varmap.h"
 #include "tally.h"
 
+static int
+_tally_forwardeq(struct tally *t, struct tally *u);
+
+int
+_tally_eq(struct tally *t, struct tally *u)
+{
+	return _tally_forwardeq(t, u) && _tally_forwardeq(u, t);
+}
+
+static int
+_tally_forwardeq(struct tally *t, struct tally *u)
+{
+	int i;
+	struct string_arr *arr;
+
+	arr = tally_getvars(u);
+	for (i = 0; i < string_arr_n(arr); i++) {
+		char *var = string_arr_s(arr)[i];
+		if (tally_getval(t, var) != tally_getval(u, var)) {
+			return 0;
+		}
+	}
+	string_arr_destroy(arr);
+	return tally_getconst(t) == tally_getconst(u);
+}
 
 /* _tally_add: add u to t, as a side effect on t. */
 static void

@@ -273,6 +273,13 @@ state_rconstnokey(struct state *s, bool persist)
 	return rconst_declarenokey(s->rconst, persist, s);
 }
 
+struct str_res *
+state_getrconstwithvalue(struct state *s, int c)
+{
+	return rconst_getwithconstvalue(s->rconst, c);
+}
+
+
 struct error *
 state_addconstraint(struct state *s, struct lsi_le *le)
 {
@@ -542,8 +549,22 @@ location_mustgetobject(struct location *loc, struct state *s)
 
 DEFINE_RESULT_TYPE(struct lsi_varmap *, lv, lsi_varmap_destroy, lv_res, false)
 
+static struct error *
+_mutating_constraintverify_all(struct state *spec, struct state *impl);
+
 struct error *
 state_constraintverify_all(struct state *spec, struct state *impl)
+{
+	struct state *spec_copy = state_copy(spec),
+		     *impl_copy = state_copy(impl);
+	struct error *err = _mutating_constraintverify_all(spec_copy, impl_copy);
+	state_destroy(impl_copy);
+	state_destroy(spec_copy);
+	return err;
+}
+
+static struct error *
+_mutating_constraintverify_all(struct state *spec, struct state *impl)
 {
 	struct lv_res *res = stack_constraintverify_all(spec->stack, spec, impl);
 	if (lv_res_iserror(res)) {

@@ -173,6 +173,19 @@ rconst_addconstraint(struct rconst *v, struct lsi_le *le)
 	return lsi_add(v->constraints, le);
 }
 
+struct str_res *
+rconst_getwithconstvalue(struct rconst *v, int c)
+{
+	struct map *m = v->varmap;
+	for (int i = 0; i < m->n; i++) {
+		char *var = m->entry[i].key;
+		if (lsi_var_isconst(v->constraints, var, c)) {
+			return str_res_str_create(var);
+		}
+	}
+	return str_res_error_create(error_printf("none found"));
+}
+
 void
 rconst_undeclare(struct rconst *v)
 {
@@ -247,9 +260,13 @@ struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
 		struct lsi_varmap *m)
 {
-	struct lsi *spec_lsi = lsi_renamevars(spec->constraints, m);
-	struct lsi *impl_lsi = lsi_copy(impl->constraints);
-	struct error *err = lsi_addrange(impl_lsi, spec_lsi);
+	struct lsi *spec_lsi = lsi_copy(spec->constraints);
+	struct lsi *impl_lsi = lsi_renamevars(impl->constraints, m);
+	printf("impl (unmapped):\n%s\n", lsi_str(impl->constraints, "\t"));
+	printf("map: %s\n", lsi_varmap_str(m));
+	printf("impl:\n%s\n", lsi_str(impl_lsi, "\t"));
+	printf("spec:\n%s\n", lsi_str(spec_lsi, "\t"));
+	struct error *err = lsi_addrange(spec_lsi, impl_lsi);
 	lsi_destroy(impl_lsi);
 	lsi_destroy(spec_lsi);
 	return err;

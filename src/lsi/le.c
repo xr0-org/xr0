@@ -97,6 +97,12 @@ lsi_le_str(struct lsi_le *le)
 	return strbuilder_build(b);
 }
 
+int
+_lsi_le_eq(struct lsi_le *le, struct lsi_le *le0)
+{
+	return _lsi_expr_eq(le->_, le0->_);
+}
+
 struct string_arr *
 _lsi_le_getvars(struct lsi_le *le)
 {
@@ -147,4 +153,28 @@ _lsi_le_isfeasible(struct lsi_le *le)
 	/* l <= r stored as l - r, so the (constant) inequality is only feasible
 	 * if the expression is <= 0 */
 	return _lsi_expr_constterm(le->_) <= 0;
+}
+
+int
+_lsi_le_isconstlowerbound(struct lsi_le *le, char *var, int c)
+{
+	struct lsi_le *bound = lsi_le_create(
+		lsi_expr_const_create(c),
+		lsi_expr_var_create(dynamic_str(var))
+	);
+	int isbound = _lsi_le_eq(le, bound);
+	lsi_le_destroy(bound);
+	return isbound;
+}
+
+int
+_lsi_le_isconstupperbound(struct lsi_le *le, char *var, int c)
+{
+	struct lsi_le *bound = lsi_le_create(
+		lsi_expr_var_create(dynamic_str(var)),
+		lsi_expr_const_create(c)
+	);
+	int isbound = _lsi_le_eq(le, bound);
+	lsi_le_destroy(bound);
+	return isbound;
 }

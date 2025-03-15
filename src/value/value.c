@@ -537,6 +537,12 @@ value_to_rconstid(struct value *v, struct state *s)
 static char *
 _expr_to_rconstid(struct ast_expr *e, struct state *s)
 {
+	if (ast_expr_isidentifier(e)) {
+		char *rconst = ast_expr_as_identifier(e);
+		assert(state_hasrconst(s, rconst));
+		return dynamic_str(rconst);
+	}
+
 	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
 	struct lsi_expr *lsi_e = ast_expr_to_lsi_expr(e);
 	state_addconstraint(
@@ -563,11 +569,16 @@ _int_to_rconstid(struct value *v, struct state *s)
 {
 	struct number *n = v->n;
 	assert(number_isconst(n));
+	int c = number_as_const(n);
+
+	struct str_res *res = state_getrconstwithvalue(s, c);
+	if (!str_res_iserror(res)) {
+		return dynamic_str(str_res_as_str(res));
+	}
 
 	/* morph v to equivalent rconst */
 	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
 
-	int c = number_as_const(n);
 	state_addconstraint(
 		s,
 		lsi_le_create(

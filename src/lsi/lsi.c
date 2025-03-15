@@ -62,12 +62,57 @@ lsi_str(struct lsi *lsi, char *prefix)
 	return strbuilder_build(b);
 }
 
+static int
+_var_isconstlowerbounded(struct le_arr *, char *var, int c);
+
+static int
+_var_isconstupperbounded(struct le_arr *, char *var, int c);
+
+int
+lsi_var_isconst(struct lsi *lsi, char *var, int c)
+{
+	struct le_arr *arr = lsi->arr;
+	return _var_isconstlowerbounded(arr, var, c)
+		&& _var_isconstupperbounded(arr, var, c);
+}
+
+static int
+_var_isconstlowerbounded(struct le_arr *arr, char *var, int c)
+{
+	for (int i = 0; i < le_arr_len(arr); i++) {
+		if (_lsi_le_isconstlowerbound(le_arr_get(arr, i), var, c)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int
+_var_isconstupperbounded(struct le_arr *arr, char *var, int c)
+{
+	for (int i = 0; i < le_arr_len(arr); i++) {
+		if (_lsi_le_isconstupperbound(le_arr_get(arr, i), var, c)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static struct error *
 _verifyfeasible(struct lsi *);
 
 struct error *
 lsi_add(struct lsi *lsi, struct lsi_le *le)
 {
+	int i;
+
+	struct le_arr *arr = lsi->arr;
+	for (i = 0; i < le_arr_len(arr); i++) {
+		if (_lsi_le_eq(le_arr_get(arr, i), le)) {
+			return NULL;
+		}
+	}
+
 	le_arr_append(lsi->arr, le);
 	return _verifyfeasible(lsi);
 }

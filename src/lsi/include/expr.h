@@ -29,6 +29,9 @@ _lsi_expr_destroy(struct lsi_expr *);
 char *
 lsi_expr_str(struct lsi_expr *);
 
+int
+_lsi_expr_eq(struct lsi_expr *, struct lsi_expr *);
+
 struct lsi_expr *
 _lsi_expr_varterms(struct lsi_expr *);
 

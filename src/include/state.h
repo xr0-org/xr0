@@ -150,6 +150,11 @@ state_rconst(struct state *, char *key, bool persist);
 char *
 state_rconstnokey(struct state *, bool persist);
 
+struct str_res;
+
+struct str_res *
+state_getrconstwithvalue(struct state *, int);
+
 struct lsi_le;
 
 struct error *

@@ -987,7 +987,6 @@ range_rconst(struct ast_expr *e, struct state *s)
 	);
 }
 
-
 static struct ast_expr *
 _value_to_expr(struct value *, struct state *);
 

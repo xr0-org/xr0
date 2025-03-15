@@ -145,6 +145,12 @@ lsi_expr_str(struct lsi_expr *e)
 	return strbuilder_build(b);
 }
 
+int
+_lsi_expr_eq(struct lsi_expr *e, struct lsi_expr *e0)
+{
+	return _tally_eq(e->_, e0->_);
+}
+
 struct lsi_expr *
 _lsi_expr_varterms(struct lsi_expr *e)
 {

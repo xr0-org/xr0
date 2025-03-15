@@ -93,6 +93,11 @@ rconst_declarenokey(struct rconst *, bool persist, struct state *);
 struct error *
 rconst_addconstraint(struct rconst *v, struct lsi_le *le);
 
+DECLARE_RESULT_TYPE(char *, str, str_res)
+
+struct str_res *
+rconst_getwithconstvalue(struct rconst *, int);
+
 struct lsi_le;
 
 struct error *
