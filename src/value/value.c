@@ -545,7 +545,7 @@ _expr_to_rconstid(struct ast_expr *e, struct state *s)
 
 	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
 	struct lsi_expr *lsi_e = ast_expr_to_lsi_expr(e);
-	state_addconstraint(
+	struct error *err = state_addconstraint(
 		s,
 		lsi_le_create(
 			/* e <= rconst */
@@ -553,7 +553,8 @@ _expr_to_rconstid(struct ast_expr *e, struct state *s)
 			lsi_expr_var_create(dynamic_str(rconst))
 		)
 	);
-	state_addconstraint(
+	assert(!err);
+	err = state_addconstraint(
 		s,
 		lsi_le_create(
 			/* rconst <= e */
@@ -561,6 +562,7 @@ _expr_to_rconstid(struct ast_expr *e, struct state *s)
 			lsi_e
 		)
 	);
+	assert(!err);
 	return rconst;
 }
 
@@ -579,7 +581,7 @@ _int_to_rconstid(struct value *v, struct state *s)
 	/* morph v to equivalent rconst */
 	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
 
-	state_addconstraint(
+	struct error *err = state_addconstraint(
 		s,
 		lsi_le_create(
 			/* c <= rconst */
@@ -587,7 +589,8 @@ _int_to_rconstid(struct value *v, struct state *s)
 			lsi_expr_var_create(dynamic_str(rconst))
 		)
 	);
-	state_addconstraint(
+	assert(!err);
+	err = state_addconstraint(
 		s,
 		lsi_le_create(
 			/* rconst <= c */
@@ -595,6 +598,7 @@ _int_to_rconstid(struct value *v, struct state *s)
 			lsi_expr_const_create(c)
 		)
 	);
+	assert(!err);
 
 	return rconst;
 }

@@ -958,20 +958,26 @@ static struct value_res *
 range_rconst(struct ast_expr *e, struct state *s)
 {
 	char *rconst = declare_rconst(e, s);
-	state_addconstraint(
+	struct error *err = state_addconstraint(
 		s,
 		lsi_le_create(
 			_range_lw(e, s),
 			lsi_expr_var_create(dynamic_str(rconst))
 		)
 	);
-	state_addconstraint(
+	if (err) {
+		return value_res_error_create(err);
+	}
+	err = state_addconstraint(
 		s,
 		lsi_le_create(
 			lsi_expr_var_create(dynamic_str(rconst)),
 			_range_up(e, s)
 		)
 	);
+	if (err) {
+		return value_res_error_create(err);
+	}
 	return value_res_value_create(
 		value_rconst_create(ast_expr_identifier_create(rconst))
 	);
