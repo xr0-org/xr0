@@ -183,8 +183,7 @@ static int
 _satisfies(struct lsi *l, struct lsi_le *le)
 {
 	struct lsi_le *ng = lsi_le_negate(le);
-	int ans = _isorthogonal(l, le)
-		|| (_isfeasible(l, le) && !_isfeasible(l, ng));
+	int ans = _isorthogonal(l, le) || !_isfeasible(l, ng);
 	lsi_le_destroy(ng);
 	return ans;
 }

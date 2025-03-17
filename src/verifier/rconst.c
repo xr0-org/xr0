@@ -263,7 +263,7 @@ rconst_constraintverify(struct rconst *spec, struct rconst *impl,
 	struct lsi_varmap *prefix_m = lsi_varmap_prefix(m, "impl_", "spec_");
 	struct lsi *spec_lsi = lsi_prefixvars(spec->constraints, "spec_");
 	struct lsi *prefixed_impl = lsi_prefixvars(impl->constraints, "impl_");
-	struct lsi* impl_lsi =  lsi_renamevars(prefixed_impl, prefix_m);
+	struct lsi *impl_lsi =  lsi_renamevars(prefixed_impl, prefix_m);
 	lsi_destroy(prefixed_impl);
 	struct error *err = lsi_checksatisfiesrange(impl_lsi, spec_lsi);
 	lsi_destroy(impl_lsi);
