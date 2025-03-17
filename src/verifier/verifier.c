@@ -138,10 +138,10 @@ verifier_lexememarker(struct verifier *v)
 
 struct verifier {
 	int issplit;
-	union {
+	union control {
 		struct mux *mux;
 		struct path *p;
-	};
+	} control;
 	struct rconst *rconst;
 	struct ast_function *f;
 	struct externals *ext;
@@ -156,7 +156,7 @@ _verifier_create(struct path *p, struct rconst *rconst, struct ast_function *f,
 	struct verifier *v = malloc(sizeof(struct verifier));
 	assert(v);
 	v->issplit = 0;
-	v->p = p;
+	v->control.p = p;
 	v->rconst = rconst;
 	v->f = ast_function_copy(f);
 	v->ext = ext;
@@ -249,7 +249,7 @@ _verifier_copywithsplit(struct verifier *old, struct map *split, struct state *s
 	struct ast_function *f = copy_withsplitname(old->f, split);
 	return v_res_verifier_create(
 		_verifier_create(
-			path_split(old->p, rconst, ast_function_name(f)),
+			path_split(old->control.p, rconst, ast_function_name(f)),
 			rconst,
 			f,
 			old->ext
@@ -314,7 +314,7 @@ _verifier_split(struct verifier *v, struct mux *mux)
 	assert(!_verifier_issplit(v));
 	/* TODO: destroy v->s */
 	v->issplit = 1;
-	v->mux = mux;
+	v->control.mux = mux;
 }
 
 void
@@ -323,10 +323,10 @@ verifier_destroy(struct verifier *v)
 	assert(verifier_atend(v));
 
 	if (v->issplit) {
-		assert(v->mux);
-		mux_destroy(v->mux);
+		assert(v->control.mux);
+		mux_destroy(v->control.mux);
 	} else {
-		path_destroy(v->p);
+		path_destroy(v->control.p);
 	}
 	/*rconst_destroy(v->rconst);*/
 	free(v);
@@ -342,14 +342,14 @@ static struct mux *
 _verifier_mux(struct verifier *v)
 {
 	assert(v->issplit);
-	return v->mux;
+	return v->control.mux;
 }
 
 static struct path *
 _verifier_path(struct verifier *v)
 {
 	assert(!v->issplit);
-	return v->p;
+	return v->control.p;
 }
 
 DEFINE_RESULT_TYPE(struct verifier *, verifier, verifier_destroy, v_res, false)
