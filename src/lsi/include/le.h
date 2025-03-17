@@ -31,6 +31,11 @@ lsi_le_str(struct lsi_le *);
 int
 _lsi_le_eq(struct lsi_le *, struct lsi_le *);
 
+/* _lsi_le_trivimpl: returns 1 if it is trivially the case that l ==> m. thus a
+ * return value of 0 simply indicates uncertainty as to the proposition. */
+int
+_lsi_le_trivimpl(struct lsi_le *l, struct lsi_le *m);
+
 struct string_arr;
 
 struct string_arr *

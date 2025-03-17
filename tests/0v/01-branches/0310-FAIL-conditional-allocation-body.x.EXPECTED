@@ -1,1 +1,1 @@
-test | $0 ∈ {?0}: return value must be pointing at something
+test | $0 <= -1: return value must be pointing at something

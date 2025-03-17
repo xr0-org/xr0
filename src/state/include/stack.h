@@ -127,11 +127,18 @@ stack_getvarmap(struct stack *);
 struct variable *
 stack_getvariable(struct stack *s, char *id);
 
-struct lv_res;
-
-struct lv_res *
-stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
+struct error *
+stack_shapeverify_top(struct stack *, struct state *spec,
 		struct state *impl);
+
+struct error *
+stack_shapeverify_all(struct stack *spec_stack, struct state *spec,
+		struct state *impl);
+
+struct lsi_varmap;
+
+struct lsi_varmap *
+stack_rconst_mapping_top(struct stack *, struct state *);
 
 struct error *
 stack_verifyinvariant(struct stack *s, struct state *impl);

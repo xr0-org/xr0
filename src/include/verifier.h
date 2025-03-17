@@ -78,6 +78,11 @@ rconst_split(struct rconst *, struct lsi_le *);
 struct rconst *
 rconst_copy(struct rconst *);
 
+struct string_arr;
+
+struct rconst *
+rconst_eliminate_except(struct rconst *, struct string_arr *);
+
 void
 rconst_destroy(struct rconst *);
 
@@ -100,8 +105,8 @@ rconst_getwithconstvalue(struct rconst *, int);
 
 struct lsi_le;
 
-struct error *
-rconst_addconstraint(struct rconst *, struct lsi_le *);
+int
+rconst_isanyint(struct rconst *, char *);
 
 int
 rconst_hasvar(struct rconst *, char *var);
@@ -116,7 +121,7 @@ struct lsi_varmap;
 
 struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
-		struct lsi_varmap *spec_impl_m);
+		struct lsi_varmap *spec_m, struct lsi_varmap *impl_m);
 
 int
 rconst_isfeasible(struct rconst *, struct lsi_le *);

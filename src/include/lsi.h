@@ -33,11 +33,23 @@ lsi_renamevars(struct lsi *, struct lsi_varmap *);
 struct lsi *
 lsi_prefixvars(struct lsi *, char *prefix);
 
+struct string_arr;
+
+/* lsi_eliminate_except: use Fourier-Motzkin elimination to produce an
+ * equivalent system with no variables that don't appear in the given array. */
+struct lsi *
+lsi_eliminate_except(struct lsi *, struct string_arr *);
+
 int
 lsi_var_isconst(struct lsi *, char *var, int c);
 
+int
+lsi_var_isanyint(struct lsi *, char *);
+
+/* lsi_checksatisfiesrange: return an error if there is a inequality in m which
+ * isn't satisfied in l. */
 struct error *
-lsi_checksatisfiesrange(struct lsi *, struct lsi *);
+lsi_checksatisfiesrange(struct lsi *l, struct lsi *m);
 
 /* lsi_le: a less-than-or-equal-to inequality */
 struct lsi_le;
@@ -102,9 +114,20 @@ lsi_varmap_str(struct lsi_varmap *);
 void
 lsi_varmap_set(struct lsi_varmap *, char *k, char *v);
 
+void
+lsi_varmap_setvaluealias(struct lsi_varmap *, char *k, char *alias);
+
+struct lsi_varmap *
+lsi_varmap_valuealias_map(struct lsi_varmap *);
+
 /* lsi_varmap_addrange: copy m0's key-value pairs to m, asserting that any common
  * keys must have the same value in both maps. */
 void
 lsi_varmap_addrange(struct lsi_varmap *m, struct lsi_varmap *m0);
+
+struct string_arr;
+
+struct string_arr *
+lsi_varmap_keys(struct lsi_varmap *);
 
 #endif

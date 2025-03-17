@@ -200,38 +200,97 @@ block_undeclare(struct block *b, struct state *s)
 	b->arr = new;
 }
 
-struct lv_res *
-block_constraintverify(struct block *b, struct location *impl_loc,
+static char *
+_constraintbased_actual_index(struct location *loc, struct object *obj);
+
+struct error *
+block_shapeverify(struct block *b, struct location *impl_loc,
 		struct constraint *c)
+{
+	int n = object_arr_nobjects(b->arr);
+	struct object **obj = object_arr_objects(b->arr);
+	for (int i = 0; i < n; i++) {
+		struct error *err = constraint_shapeverify_object(
+			constraint_deref(c), obj[i], impl_loc
+		);
+		if (err) {
+			char *index = _constraintbased_actual_index(
+				impl_loc, obj[i]
+			);
+			err = error_printf(
+				"%w at index %s", err, index
+			);
+			free(index);
+			return err;
+		}
+	}
+	return NULL;
+}
+
+static char *
+_constraintbased_actual_index(struct location *loc, struct object *obj)
+{
+	struct ast_expr *actual_offset = ast_expr_sum_create(
+		ast_expr_copy(
+			offset_as_expr(location_offset(loc))
+		),
+		/* XXX: assuming lower is offset */
+		ast_expr_copy(object_lower(obj))
+	);
+	struct ast_expr *simp = ast_expr_simplify(actual_offset);
+	char *s = ast_expr_str(simp);
+	ast_expr_destroy(simp);
+	ast_expr_destroy(actual_offset);
+	return s;
+}
+
+
+static char *
+_object_simplified_index(struct object *obj);
+
+struct lsi_varmap *
+block_rconst_mapping(struct block *b, struct ast_type *t, struct state *s,
+		char *referent)
 {
 	struct lsi_varmap *lv = lsi_varmap_create();
 	int n = object_arr_nobjects(b->arr);
 	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
-		struct lv_res *res = constraint_verifyobject(
-			c, obj[i], impl_loc
-		);
-		if (lv_res_iserror(res)) {
-			struct ast_expr *actual_offset = ast_expr_sum_create(
-				ast_expr_copy(
-					offset_as_expr(location_offset(impl_loc))
-				),
-				/* XXX: assuming lower is offset */
-				ast_expr_copy(object_lower(obj[i]))
-			);
-			struct ast_expr *simp = ast_expr_simplify(actual_offset);
-			char *simp_str = ast_expr_str(simp);
-			struct error *err = error_printf(
-				"%w at index %s", lv_res_as_error(res), simp_str
-			);
-			free(simp_str);
-			ast_expr_destroy(simp);
-			ast_expr_destroy(actual_offset);
-			return lv_res_error_create(err);
+		struct strbuilder *b = strbuilder_create();
+		char *index = _object_simplified_index(obj[i]);
+		if (strcmp(index, "0") == 0) {
+			strbuilder_printf(b, "*(%s)", referent);
+		} else {
+			strbuilder_printf(b, "%s[%s]", referent, index);
 		}
-		lsi_varmap_addrange(lv, lv_res_as_lv(res));
+		char *alias = strbuilder_build(b);
+		free(index);
+
+		if (!object_hasvalue(obj[i])) {
+			continue;
+		}
+
+		lsi_varmap_addrange(
+			lv,
+			value_rconst_mapping(
+				object_as_value(obj[i]),
+				ast_type_deref(t),
+				s, alias
+			)
+		);
+
+		free(alias);
 	}
-	return lv_res_lv_create(lv);
+	return lv;
+}
+
+static char *
+_object_simplified_index(struct object *obj)
+{
+	struct ast_expr *simp = ast_expr_simplify(object_lower(obj));
+	char *s = ast_expr_str(simp);
+	ast_expr_destroy(simp);
+	return s;
 }
 
 struct block_arr {
