@@ -510,16 +510,9 @@ setupverify(struct ast_expr *call, struct state *impl)
 	struct e_res *push_res = pushcallframe(call, impl);
 	assert(!e_res_iserror(push_res));
 
-	for (int i = 0; i < nparams; i++) {
-		char *id = ast_variable_name(param[i]);
-		struct lv_res *res = state_constraintverify(spec, impl, id);
-		if (lv_res_iserror(res)) {
-			return error_printf(
-				"precondition failure: argument of `%s' %w",
-				id, lv_res_as_error(res)
-			);
-		}
-		fprintf(stderr, "WARNING: call constraints not verified\n");
+	struct error *err = state_constraintverify_top(spec, impl);
+	if (err) {
+		return err;
 	}
 
 	state_popframe(impl);
@@ -848,6 +841,9 @@ relational_eval(struct ast_expr *e, struct state *s)
 	);
 }
 
+static struct lsi_expr * 
+_value_to_lsi_expr(struct value *, struct state *);
+
 static struct lsi_le *
 _rel_to_le(struct lsi_expr *, enum ast_binary_operator, struct lsi_expr *);
 
@@ -873,13 +869,9 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 	);
 
 	struct lsi_le *le = _rel_to_le(
-		lsi_expr_var_create(
-			value_to_rconstid(value_res_as_value(v_res1), s)
-		),
+		_value_to_lsi_expr(value_res_as_value(v_res1), s),
 		op,
-		lsi_expr_var_create(
-			value_to_rconstid(value_res_as_value(v_res2), s)
-		)
+		_value_to_lsi_expr(value_res_as_value(v_res2), s)
 	);
 	struct lsi_le *le_neg = lsi_le_negate(le);
 
@@ -904,6 +896,14 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 			verifierinstruct_split(splitinstruct_create(le, le_neg))
 		)
 	);
+}
+
+static struct lsi_expr * 
+_value_to_lsi_expr(struct value *v, struct state *s)
+{
+	return value_isconstant(v)
+		? lsi_expr_const_create(value_as_constant(v))
+		: lsi_expr_var_create(value_to_rconstid(v, s));
 }
 
 static struct lsi_le *
@@ -1304,10 +1304,35 @@ static struct ast_expr *
 unary_geninstr(struct ast_expr *e, struct lexememarker *loc, struct ast_block *b,
 		struct state *s)
 {
-	struct ast_expr *gen_operand = ast_expr_geninstr(
-		ast_expr_unary_operand(e), loc, b, s
-	);
-	return ast_expr_unary_create(gen_operand, ast_expr_unary_op(e));
+	enum ast_unary_operator op = ast_expr_unary_op(e);
+	struct ast_expr *operand = ast_expr_unary_operand(e);
+	switch (op) {
+	case UNARY_OP_DEREFERENCE:
+	case UNARY_OP_ADDRESS:
+	case UNARY_OP_NEGATIVE:
+		return ast_expr_unary_create(
+			ast_expr_geninstr(operand, loc, b, s), op
+		);
+	case UNARY_OP_BANG:
+		/* double bang optimisation */
+		/* TODO: make deeper for bracketed */
+		if (ast_expr_kind(operand) == EXPR_UNARY && 
+			ast_expr_unary_op(operand) == UNARY_OP_BANG) {
+			return ast_expr_geninstr(
+				ast_expr_unary_operand(operand), loc, b, s
+			);
+		}
+		/* 3.3.3.3 "The expression !E is equivalent to (0==E)." */
+		return ast_expr_geninstr(
+			ast_expr_binary_create(
+				ast_expr_copy(operand),
+				BINARY_OP_EQ,
+				ast_expr_constant_create(0)
+			), loc, b, s
+		);
+	default:
+		assert(0);
+	}
 }
 
 static struct ast_expr *

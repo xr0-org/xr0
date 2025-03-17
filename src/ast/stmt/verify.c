@@ -114,7 +114,14 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
 			*nest = ast_stmt_sel_nest(stmt);
 	
 	struct ast_expr *newcond = ast_expr_geninstr(
-		cond, lexememarker_copy(loc), b, state
+		/* in keeping with 3.6.4.1, linearise out the possibility of a
+		 * non-integer comparison reaching our decision procedures */
+		ast_expr_binary_create(
+			ast_expr_copy(cond),
+			BINARY_OP_NE,
+			ast_expr_constant_create(0)
+		),
+		lexememarker_copy(loc), b, state
 	);
 	struct ast_stmt *newsel = ast_stmt_create_sel(
 		lexememarker_copy(loc),
@@ -559,11 +566,17 @@ asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *s)
 	if (e_res_iserror(l_res)) {
 		return e_res_as_error(l_res);
 	}
-	struct object *obj = object_res_as_object(
+	struct object *l_obj = object_res_as_object(
 		state_get(s, eval_as_lval(e_res_as_eval(l_res)), true)
 	);
+
 	object_assign(
-		obj, value_copy(eval_as_rval(e_res_as_eval(r_res)))
+		l_obj,
+		value_copy(
+			value_res_as_value(
+				eval_to_value(e_res_as_eval(r_res), s)
+			)
+		)
 	);
 	return NULL;
 }
