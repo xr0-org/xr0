@@ -66,6 +66,10 @@ check-verbose: $(RUNTEST) $(XR0V)
 	$(VALGRIND) $(VALGRINDVFLAGS) \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
+check-leaks: $(RUNTEST) $(XR0V)
+	$(VALGRIND) $(VALGRINDFULLLEAKS) \
+		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
+
 debug: $(RUNTEST) $(XR0V)
 	$(VALGRIND) $(XR0V) -d -I libx $(filter-out $@,$(MAKECMDGOALS))
 
