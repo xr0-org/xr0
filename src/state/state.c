@@ -487,42 +487,16 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	return object_res_object_create(member);
 }
 
-static struct object *
-location_mustgetobject(struct location *, struct state *);
-
-struct lv_res *
-state_constraintverify(struct state *spec, struct state *impl, char *id)
+struct error *
+state_constraintverify_top(struct state *spec, struct state *impl)
 {
-	struct object *spec_obj = location_mustgetobject(
-		loc_res_as_loc(state_getloc(spec, id)), spec
-	);
-	if (!object_hasvalue(spec_obj)) {
-		return lv_res_lv_create(lsi_varmap_create());
+	struct lv_res *res = stack_constraintverify_top(spec->stack, spec, impl);
+	if (lv_res_iserror(res)) {
+		return lv_res_as_error(res);
 	}
-	struct constraint *c = constraint_create(
-		spec, impl,
-		ast_type_copy(state_getvariabletype(spec, id))
-	);
-	struct lv_res *res = constraint_verify(
-		c,
-		object_as_value(spec_obj),
-		/* we can safely assume that impl has a value for id because
-		 * it's the result of an argument expression being evaluated */
-		object_as_value(
-			location_mustgetobject(
-				loc_res_as_loc(state_getloc(impl, id)),
-				impl
-			)
-		)
-	);
-	constraint_destroy(c);
-	struct error *err = rconst_constraintverify(
+	return rconst_constraintverify(
 		spec->rconst, impl->rconst, lv_res_as_lv(res)
 	);
-	if (err) {
-		return lv_res_error_create(err);
-	}
-	return res;
 }
 
 struct lv_res *
@@ -545,12 +519,6 @@ state_constraintverify_structmember(struct state *spec, struct state *impl,
 	);
 	constraint_destroy(c);
 	return res;
-}
-
-static struct object *
-location_mustgetobject(struct location *loc, struct state *s)
-{
-	return object_res_as_object(state_get(s, loc, false));
 }
 
 DEFINE_RESULT_TYPE(struct lsi_varmap *, lv, lsi_varmap_destroy, lv_res, false)

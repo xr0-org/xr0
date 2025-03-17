@@ -305,8 +305,8 @@ struct lsi_varmap;
 
 DECLARE_RESULT_TYPE(struct lsi_varmap *, lv, lv_res)
 
-struct lv_res *
-state_constraintverify(struct state *spec, struct state *impl, char *id);
+struct error *
+state_constraintverify_top(struct state *spec, struct state *impl);
 
 struct lv_res *
 state_constraintverify_structmember(struct state *spec, struct state *impl,

@@ -130,6 +130,10 @@ stack_getvariable(struct stack *s, char *id);
 struct lv_res;
 
 struct lv_res *
+stack_constraintverify_top(struct stack *, struct state *spec,
+		struct state *impl);
+
+struct lv_res *
 stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl);
 

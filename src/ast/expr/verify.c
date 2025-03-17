@@ -507,17 +507,11 @@ setupverify(struct ast_expr *call, struct state *impl)
 	struct e_res *push_res = pushcallframe(call, impl);
 	assert(!e_res_iserror(push_res));
 
-	for (int i = 0; i < nparams; i++) {
-		char *id = ast_variable_name(param[i]);
-		struct lv_res *res = state_constraintverify(spec, impl, id);
-		if (lv_res_iserror(res)) {
-			return error_printf(
-				"precondition failure: argument of `%s' %w",
-				id, lv_res_as_error(res)
-			);
-		}
-		fprintf(stderr, "WARNING: call constraints not verified\n");
+	struct error *err = state_constraintverify_top(spec, impl);
+	if (err) {
+		return err;
 	}
+	fprintf(stderr, "WARNING: call constraints not verified\n");
 
 	state_popframe(impl);
 

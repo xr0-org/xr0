@@ -15,6 +15,8 @@
 #include "program.h"
 #include "lsi.h"
 
+#include "constraint.h"
+
 struct frame;
 
 static struct frame *
@@ -628,15 +630,12 @@ stack_getvariable(struct stack *s, char *id)
 	return v;
 }
 
-static struct lv_res *
-constraintverify_all(struct map *, struct state *spec, struct state *impl);
-
 struct lv_res *
 stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl)
 {
-	struct lv_res *res = constraintverify_all(
-		spec_stack->varmap, spec, impl
+	struct lv_res *res = stack_constraintverify_top(
+		spec_stack, spec, impl
 	);
 	if (lv_res_iserror(res) || !spec_stack->prev) {
 		return res;
@@ -655,16 +654,21 @@ stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
 }
 
 static struct lv_res *
-constraintverify_all(struct map *m, struct state *spec, struct state *impl)
+_var_constraintverify(struct state *spec, struct state *impl, char *id);
+
+struct lv_res *
+stack_constraintverify_top(struct stack *spec_stack, struct state *spec,
+		struct state *impl)
 {
 	int i;
 
 	struct lsi_varmap *lv = lsi_varmap_create();
 
+	struct map *m = spec_stack->varmap;
 	for (i = 0; i < m->n; i++) {
 		char *id = m->entry[i].key;
 
-		struct lv_res *res = state_constraintverify(spec, impl, id);
+		struct lv_res *res = _var_constraintverify(spec, impl, id);
 		if (lv_res_iserror(res)) {
 			return lv_res_error_create(
 				error_printf(
@@ -679,6 +683,46 @@ constraintverify_all(struct map *m, struct state *spec, struct state *impl)
 
 	return lv_res_lv_create(lv);
 }
+
+static struct object *
+location_mustgetobject(struct location *, struct state *);
+
+static struct lv_res *
+_var_constraintverify(struct state *spec, struct state *impl, char *id)
+{
+	struct object *spec_obj = location_mustgetobject(
+		loc_res_as_loc(state_getloc(spec, id)), spec
+	);
+	if (!object_hasvalue(spec_obj)) {
+		return lv_res_lv_create(lsi_varmap_create());
+	}
+	struct constraint *c = constraint_create(
+		spec, impl,
+		ast_type_copy(state_getvariabletype(spec, id))
+	);
+	struct lv_res *res = constraint_verify(
+		c,
+		object_as_value(spec_obj),
+		/* we can safely assume that impl has a value for id because
+		 * it's the result of an argument expression being evaluated */
+		object_as_value(
+			location_mustgetobject(
+				loc_res_as_loc(state_getloc(impl, id)),
+				impl
+			)
+		)
+	);
+	constraint_destroy(c);
+	return res;
+}
+
+static struct object *
+location_mustgetobject(struct location *loc, struct state *s)
+{
+	return object_res_as_object(state_get(s, loc, false));
+}
+
+
 
 struct error *
 stack_verifyinvariant(struct stack *s, struct state *impl)
