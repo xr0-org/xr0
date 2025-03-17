@@ -516,6 +516,12 @@ state_constraintverify(struct state *spec, struct state *impl, char *id)
 		)
 	);
 	constraint_destroy(c);
+	struct error *err = rconst_constraintverify(
+		spec->rconst, impl->rconst, lv_res_as_lv(res)
+	);
+	if (err) {
+		return lv_res_error_create(err);
+	}
 	return res;
 }
 
