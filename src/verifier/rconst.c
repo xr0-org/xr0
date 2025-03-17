@@ -258,16 +258,32 @@ rconst_eval(struct rconst *v, struct ast_expr *e)
 
 struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
-		struct lsi_varmap *m)
+		struct lsi_varmap *spec_m, struct lsi_varmap *impl_m)
 {
-	struct lsi_varmap *prefix_m = lsi_varmap_prefix(m, "impl_", "spec_");
-	struct lsi *spec_lsi = lsi_prefixvars(spec->constraints, "spec_");
-	struct lsi *prefixed_impl = lsi_prefixvars(impl->constraints, "impl_");
-	struct lsi *impl_lsi =  lsi_renamevars(prefixed_impl, prefix_m);
-	lsi_destroy(prefixed_impl);
+	struct string_arr *spec_rconsts = lsi_varmap_keys(spec_m),
+			  *impl_rconsts = lsi_varmap_keys(impl_m);
+
+	struct lsi *spec_elim = lsi_eliminate_except(
+		spec->constraints, spec_rconsts
+	);
+	struct lsi *impl_elim = lsi_eliminate_except(
+		impl->constraints, impl_rconsts
+	);
+
+	struct lsi *spec_lsi = lsi_renamevars(spec_elim, spec_m),
+		   *impl_lsi = lsi_renamevars(impl_elim, impl_m);
+
+	lsi_destroy(impl_elim);
+	lsi_destroy(spec_elim);
+
+	string_arr_destroy(impl_rconsts);
+	string_arr_destroy(spec_rconsts);
+
 	struct error *err = lsi_checksatisfiesrange(impl_lsi, spec_lsi);
+
 	lsi_destroy(impl_lsi);
 	lsi_destroy(spec_lsi);
+
 	return err;
 }
 
@@ -283,4 +299,10 @@ rconst_isfeasible(struct rconst *r, struct lsi_le *le)
 		return 0;
 	}
 	return 1;
+}
+
+int
+rconst_isanyint(struct rconst *v, char *rconst)
+{
+	return lsi_var_isanyint(v->constraints, rconst);
 }

@@ -27,12 +27,21 @@ constraint_create(struct state *spec, struct state *impl, struct ast_type *t)
 	return c;
 }
 
+struct constraint *
+constraint_deref(struct constraint *c)
+{
+	return constraint_create(c->spec, c->impl, ast_type_deref(c->t));
+}
+
 void
 constraint_destroy(struct constraint *c)
 {
 	ast_type_destroy(c->t);
 	free(c);
 }
+
+static int
+isrconst(struct ast_type *, struct value *);
 
 static int
 size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec,
@@ -43,21 +52,15 @@ size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec
 static struct location *
 location_reloffset(struct location *l1, struct location *l2);
 
-struct lv_res *
-constraint_verify(struct constraint *c, struct value *spec_v,
+struct error *
+constraint_shapeverify(struct constraint *c, struct value *spec_v,
 		struct value *impl_v)
 {
-	if (ast_type_isint(c->t)) {
-		struct lsi_varmap *lv = lsi_varmap_create();
-		lsi_varmap_set(
-			lv,
-			value_to_rconstid(impl_v, c->impl),
-			value_to_rconstid(spec_v, c->spec)
-		);
-		return lv_res_lv_create(lv);
+	if (isrconst(c->t, spec_v)) {
+		return NULL;
 	} else if (ast_type_isstruct(c->t)) {
-		return value_struct_specval_verify(
-			spec_v, impl_v, c->impl, c->spec
+		return value_struct_shapeverify(
+			spec_v, impl_v, c->spec, c->impl
 		);
 	}
 	a_printf(
@@ -65,50 +68,44 @@ constraint_verify(struct constraint *c, struct value *spec_v,
 		"can only verify int, struct and pointer params\n"
 	);
 
-	if (!value_islocation(spec_v)) {
-		/* allow for NULL and other invalid-pointer setups */
-		/* TODO: include non-location pointers above case */
-		assert(0);
-		return lv_res_lv_create(lsi_varmap_create());
-	}
 	/* spec requires value be valid pointer */
 	if (!value_islocation(impl_v)) {
-		return lv_res_error_create(
-			error_printf("must be pointing at something")
-		);
+		return error_printf("must be pointing at something");
 	}
 
 	struct location *spec_loc = value_as_location(spec_v),
 			*impl_loc = value_as_location(impl_v);
 	if (!state_loc_valid(c->spec, spec_loc)) {
 		/* spec freed reference */
-		return lv_res_lv_create(lsi_varmap_create());
+		return NULL;
 	}
 	if (!state_loc_valid(c->impl, impl_loc)) {
-		return lv_res_error_create(error_printf("must be lvalue"));
+		return error_printf("must be lvalue");
 	}
 
 	if (state_loc_onheap(c->spec, spec_loc)
 			&& !state_loc_onheap(c->impl, impl_loc)) {
-		return lv_res_error_create(
-			error_printf("must be heap allocated")
-		);
+		return error_printf("must be heap allocated");
 	}
 
 	if (!size_le(spec_loc, impl_loc, c->spec, c->impl)) {
-		return lv_res_error_create(
-			error_printf("must point at larger block")
-		);
+		return error_printf("must point at larger block");
 	}
 
 	/* we shift the impl_loc's offset by spec_loc's so that
-	 * block_constraintverify can behave as though both were offset zero */
+	 * block_shapeverify can behave as though both were offset zero */
 	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
 	struct block *spec_b = state_getblock(c->spec, spec_loc);
 	assert(spec_b);
-	struct lv_res *res = block_constraintverify(spec_b, rel_impl_loc, c);
+	struct error *err = block_shapeverify(spec_b, rel_impl_loc, c);
 	location_destroy(rel_impl_loc);
-	return res;
+	return err;
+}
+
+static int
+isrconst(struct ast_type *t, struct value *v)
+{
+	return ast_type_isint(t) || (ast_type_isptr(t) && !value_islocation(v));
 }
 
 static struct location *
@@ -135,8 +132,8 @@ size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec
 	return block_size_le(spec_b, impl_b);
 }
 
-struct lv_res *
-constraint_verifyobject(struct constraint *c, struct object *spec_obj,
+struct error *
+constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
 		struct location *impl_loc)
 {
 	struct block *b_impl = state_getblock(c->impl, impl_loc);
@@ -148,20 +145,18 @@ constraint_verifyobject(struct constraint *c, struct object *spec_obj,
 	struct object_res *res = block_observe(b_impl, offset, c->impl, false);
 	if (object_res_iserror(res)) {
 		struct error *err = object_res_as_error(res);
-		return lv_res_error_create(
-			error_to_block_observe_noobj(err)
+		return error_to_block_observe_noobj(err)
 			? error_printf("must have object")
-			: err
-		);
+			: err;
 	}
-	struct object *arg_obj = object_res_as_object(res);
+	struct object *impl_obj = object_res_as_object(res);
 	if (!object_hasvalue(spec_obj)) {
-		return lv_res_lv_create(lsi_varmap_create());
+		return NULL;
 	}
-	if (!object_hasvalue(arg_obj)) {
-		return lv_res_error_create(error_printf("must have value"));
+	if (!object_hasvalue(impl_obj)) {
+		return error_printf("must have value");
 	}
-	return constraint_verify(
-		c, object_as_value(spec_obj), object_as_value(arg_obj)
+	return constraint_shapeverify(
+		c, object_as_value(spec_obj), object_as_value(impl_obj)
 	);
 }
