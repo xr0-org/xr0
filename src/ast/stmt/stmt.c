@@ -491,7 +491,7 @@ static void
 ast_stmt_jump_sprint(struct ast_stmt *stmt, struct strbuilder *b)
 {
 	char *s = jump_str(stmt->u.jump);
-	strbuilder_printf(b, "%s\n", s);
+	strbuilder_printf(b, "%s", s);
 	free(s);
 }
 

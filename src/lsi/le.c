@@ -109,6 +109,57 @@ _lsi_le_eq(struct lsi_le *le, struct lsi_le *le0)
 	return _lsi_expr_eq(le->_, le0->_);
 }
 
+int
+_constantly_false(struct lsi_le *);
+
+int
+_constantly_true(struct lsi_le *);
+
+int
+_lsi_le_trivimpl(struct lsi_le *l, struct lsi_le *m)
+{
+	/* constant case */
+	if (_constantly_false(l) || _constantly_true(m))
+		return 1;
+
+	/* in general, l ==> m is trivially true if they have the same variable
+	 * terms and the constant term of l is >= that of m, when on the lhs.
+	 * because inequalities are expressed as the difference b/w their lhs
+	 * and rhs, the constant term is already on the correct side. */
+
+	struct lsi_expr *l_var = _lsi_expr_varterms(l->_),
+			*m_var = _lsi_expr_varterms(m->_);
+
+	int impl = _lsi_expr_eq(l_var, m_var)
+		&& _lsi_expr_constterm(l->_) >= _lsi_expr_constterm(m->_);
+	_lsi_expr_destroy(m_var);
+	_lsi_expr_destroy(l_var);
+
+	return impl;
+}
+
+int
+_constantly_false(struct lsi_le *le)
+{
+	struct lsi_expr *zero = lsi_expr_const_create(0);
+	struct lsi_expr *var = _lsi_expr_varterms(le->_);
+	int ans = _lsi_expr_eq(zero, var) && !_lsi_le_isfeasible(le);
+	_lsi_expr_destroy(var);
+	_lsi_expr_destroy(zero);
+	return ans;
+}
+
+int
+_constantly_true(struct lsi_le *le)
+{
+	struct lsi_expr *zero = lsi_expr_const_create(0);
+	struct lsi_expr *var = _lsi_expr_varterms(le->_);
+	int ans = _lsi_expr_eq(zero, var) && _lsi_le_isfeasible(le);
+	_lsi_expr_destroy(var);
+	_lsi_expr_destroy(zero);
+	return ans;
+}
+
 struct string_arr *
 _lsi_le_getvars(struct lsi_le *le)
 {

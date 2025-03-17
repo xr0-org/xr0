@@ -483,37 +483,97 @@ value_struct_member(struct value *v, char *member)
 	return map_get(v->_struct.m, member);
 }
 
-struct lv_res *
-value_struct_specval_verify(struct value *param, struct value *arg,
-		struct state *spec, struct state *caller)
+struct error *
+value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
+		struct state *spec, struct state *impl)
 {
-	assert(value_isstruct(param) && value_isstruct(arg));
-	struct ast_variable_arr *param_members = param->_struct.members,
-				*arg_members = arg->_struct.members;
+	assert(value_isstruct(spec_v) && value_isstruct(impl_v));
+	struct ast_variable_arr *spec_v_members = spec_v->_struct.members,
+				*impl_v_members = impl_v->_struct.members;
+
+	int n = ast_variable_arr_n(spec_v_members);
+	assert(ast_variable_arr_n(impl_v_members) == n);
+	struct ast_variable **field = ast_variable_arr_v(spec_v_members);
+	for (int i = 0; i < n; i++) {
+		struct error *err = state_shapeverify_structmember(
+			spec, impl, spec_v, impl_v,
+			ast_variable_name(field[i])
+		);
+		if (err) {
+			return err;
+		}
+	}
+
+	return NULL;
+}
+
+static int
+isrconst(struct ast_type *, struct value *);
+
+static struct lsi_varmap *
+_struct_rconst_mapping(struct value *v, struct state *s, char *varname);
+
+struct lsi_varmap *
+value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
+		char *id)
+{
+	if (isrconst(t, v)) {
+		struct lsi_varmap *lv = lsi_varmap_create();
+		if (!value_isconstant(v)) {
+			lsi_varmap_set(
+				lv,
+				value_to_rconstid(v, s),
+				dynamic_str(id)
+			);
+		}
+		return lv;
+	} else if (ast_type_isstruct(t)) {
+		return _struct_rconst_mapping(v, s, id);
+	}
+	a_printf(
+		ast_type_isptr(t),
+		"can only verify int, struct and pointer params: have %s\n",
+		ast_type_str(t)
+	);
+
+	struct location *loc = value_as_location(v);
+	if (!state_loc_valid(s, loc)) {
+		/* spec freed reference */
+		return lsi_varmap_create();
+	}
+
+	return state_block_rconst_mapping(s, loc, t, id);
+}
+
+static int
+isrconst(struct ast_type *t, struct value *v)
+{
+	return ast_type_isint(t) || (ast_type_isptr(t) && !value_islocation(v));
+}
+
+static struct lsi_varmap *
+_struct_rconst_mapping(struct value *v, struct state *s, char *varname)
+{
+	assert(value_isstruct(v));
+	struct ast_variable_arr *members = v->_struct.members;
 
 	struct lsi_varmap *lv = lsi_varmap_create();
 
-	int n = ast_variable_arr_n(param_members);
-	assert(ast_variable_arr_n(arg_members) == n);
-	struct ast_variable **param_var = ast_variable_arr_v(param_members);
+	int n = ast_variable_arr_n(members);
+	struct ast_variable **field = ast_variable_arr_v(members);
 	for (int i = 0; i < n; i++) {
-		char *field = ast_variable_name(param_var[i]);
-		struct lv_res *res = state_constraintverify_structmember(
-			spec, caller, param, arg, field
+		lsi_varmap_addrange(
+			lv,
+			state_rconst_mapping_structmember(
+				s, v, varname, ast_variable_name(field[i])
+			)
 		);
-		if (lv_res_iserror(res)) {
-			a_printf(
-				false,
-				"needs test and custom error message: %s\n",
-				error_str(lv_res_as_error(res))
-			);
-		}
-		lsi_varmap_addrange(lv, lv_res_as_lv(res));
 	}
 
-	return lv_res_lv_create(lv);
-
+	return lv;
 }
+
+
 
 static char *
 _expr_to_rconstid(struct ast_expr *, struct state *);

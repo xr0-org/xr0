@@ -76,11 +76,15 @@ value_struct_membertype(struct value *, char *member);
 struct object *
 value_struct_member(struct value *, char *member);
 
-struct lv_res;
+struct error *
+value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
+		struct state *spec, struct state *impl);
 
-struct lv_res *
-value_struct_specval_verify(struct value *param, struct value *arg,
-		struct state *spec, struct state *caller);
+struct lsi_varmap;
+
+struct lsi_varmap *
+value_rconst_mapping(struct value *, struct ast_type *, struct state *,
+		char *id);
 
 char *
 value_to_rconstid(struct value *v, struct state *);
