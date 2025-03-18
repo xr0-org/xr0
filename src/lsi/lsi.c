@@ -156,7 +156,7 @@ static int
 _satisfies(struct lsi *, struct lsi_le *);
 
 struct error *
-lsi_checksatisfiesrange(struct lsi *l, struct lsi *m)
+lsi_checksatisfiesrange(struct lsi *l, struct lsi *m, struct lsi_varmap *lv)
 {
 	int i;
 
@@ -164,9 +164,11 @@ lsi_checksatisfiesrange(struct lsi *l, struct lsi *m)
 	for (i = 0; i < le_arr_len(arr); i++) {
 		struct lsi_le *le = le_arr_get(arr, i);
 		if (!_satisfies(l, le)) {
-			char *s = lsi_le_str(le);
+			struct lsi_le *pretty_le = _lsi_le_renamevars(le, lv);
+			char *s = lsi_le_str(pretty_le);
 			struct error *err = error_printf("%s not satisfied", s);
 			free(s);
+			lsi_le_destroy(pretty_le);
 			return err;
 		}
 	}

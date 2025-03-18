@@ -100,9 +100,6 @@ rconst_getwithconstvalue(struct rconst *, int);
 
 struct lsi_le;
 
-struct error *
-rconst_addconstraint(struct rconst *, struct lsi_le *);
-
 int
 rconst_hasvar(struct rconst *, char *var);
 
@@ -116,7 +113,7 @@ struct lsi_varmap;
 
 struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
-		struct lsi_varmap *spec_impl_m);
+		struct lsi_varmap *impl_spec_m, struct lsi_varmap *spec_var_m);
 
 int
 rconst_isfeasible(struct rconst *, struct lsi_le *);

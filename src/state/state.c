@@ -495,7 +495,9 @@ state_constraintverify_top(struct state *spec, struct state *impl)
 		return lv_res_as_error(res);
 	}
 	return rconst_constraintverify(
-		spec->rconst, impl->rconst, lv_res_as_lv(res)
+		spec->rconst, impl->rconst,
+		lv_res_as_lv(res),
+		lsi_varmap_create()
 	);
 }
 
@@ -545,7 +547,9 @@ _mutating_constraintverify_all(struct state *spec, struct state *impl)
 		return lv_res_as_error(res);
 	}
 	struct error *err = rconst_constraintverify(
-		spec->rconst, impl->rconst, lv_res_as_lv(res)
+		spec->rconst, impl->rconst,
+		lv_res_as_lv(res),
+		lsi_varmap_create()
 	);
 	lv_res_destroy(res);
 	return err;
