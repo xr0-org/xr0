@@ -503,29 +503,50 @@ state_constraintverify_top(struct state *spec, struct state *impl)
 	);
 }
 
-struct lv_res *
-state_constraintverify_structmember(struct state *spec, struct state *impl,
+struct error *
+state_constraint_shapeverify_structmember(struct state *spec, struct state *impl,
 		struct value *spec_v, struct value *impl_v, char *member)
 {
 	struct object *spec_obj = value_struct_member(spec_v, member),
 		      *impl_obj = value_struct_member(impl_v, member);
 	assert(spec_obj && impl_obj);
 	if (!spec_obj) {
-		return lv_res_lv_create(lsi_varmap_create());
+		return NULL;
 	}
 	struct constraint *c = constraint_create(
 		state_copy(spec),
 		state_copy(impl),
 		ast_type_copy(value_struct_membertype(spec_v, member))
 	);
-	struct lv_res *res = constraint_verify(
+	struct error *err = constraint_shapeverify(
 		c, object_as_value(spec_obj), object_as_value(impl_obj)
 	);
 	constraint_destroy(c);
-	return res;
+	return err;
 }
 
-DEFINE_RESULT_TYPE(struct lsi_varmap *, lv, lsi_varmap_destroy, lv_res, false)
+struct lsi_varmap *
+state_constraint_derivemapping_structmember(struct state *spec,
+		struct state *impl, struct value *spec_v, struct value *impl_v,
+		char *member)
+{
+	struct object *spec_obj = value_struct_member(spec_v, member),
+		      *impl_obj = value_struct_member(impl_v, member);
+	assert(spec_obj && impl_obj);
+	if (!spec_obj) {
+		return lsi_varmap_create();
+	}
+	struct constraint *c = constraint_create(
+		state_copy(spec),
+		state_copy(impl),
+		ast_type_copy(value_struct_membertype(spec_v, member))
+	);
+	struct lsi_varmap *lv = constraint_deriverconstmapping(
+		c, object_as_value(spec_obj), object_as_value(impl_obj)
+	);
+	constraint_destroy(c);
+	return lv;
+}
 
 static struct error *
 _mutating_constraintverify_all(struct state *spec, struct state *impl);
@@ -544,17 +565,17 @@ state_constraintverify_all(struct state *spec, struct state *impl)
 static struct error *
 _mutating_constraintverify_all(struct state *spec, struct state *impl)
 {
-	struct lv_res *res = stack_constraintverify_all(spec->stack, spec, impl);
-	if (lv_res_iserror(res)) {
-		return lv_res_as_error(res);
+	struct error *err = stack_constraint_shapeverify_all(
+		spec->stack, spec, impl
+	);
+	if (err) {
+		return err;
 	}
-	struct error *err = rconst_constraintverify(
+	return rconst_constraintverify(
 		spec->rconst, impl->rconst,
-		lv_res_as_lv(res),
+		stack_constraint_rconstmapping_all(spec->stack, spec, impl),
 		lsi_varmap_create()
 	);
-	lv_res_destroy(res);
-	return err;
 }
 
 struct error *
@@ -742,44 +763,51 @@ static void
 state_normalise(struct state *s);
 
 struct error *
-state_specverify(struct state *actual, struct state *spec)
+state_specverify(struct state *impl, struct state *spec)
 {
-	struct state *actual_c = state_copy(actual),
+	struct state *impl_c = state_copy(impl),
 		     *spec_c = state_copy(spec);
 	if (spec->reg) {
-		if (!actual->reg) {
+		if (!impl->reg) {
 			return error_printf("must have return value");
 		}
 		struct constraint *c = constraint_create(
 			state_copy(spec),
-			state_copy(actual),
+			state_copy(impl),
 			ast_type_copy(stack_returntype(spec->stack))
 		);
-		struct lv_res *res = constraint_verify(
-			c, spec->reg, actual->reg
+		struct error *err = constraint_shapeverify(
+			c, spec->reg, impl->reg
+		);
+		if (err) {
+			return error_printf("return value %s", error_str(err));
+		}
+		err = rconst_constraintverify(
+			spec->rconst, impl->rconst,
+			constraint_deriverconstmapping(
+				c, spec->reg, impl->reg
+			),
+			lsi_varmap_create()
 		);
 		constraint_destroy(c);
-		if (lv_res_iserror(res)) {
-			return error_printf(
-				"return value %s",
-				error_str(lv_res_as_error(res))
-			);
+		if (err) {
+			return error_printf("return value %s", error_str(err));
 		}
 	}
-	state_normalise(actual_c);
+	state_normalise(impl_c);
 	state_normalise(spec_c);
 
-	char *str1 = state_str(actual_c),
+	char *str1 = state_str(impl_c),
 	     *str2 = state_str(spec_c);
 	int equal = strcmp(str1, str2) == 0;
 	if (!equal) {
-		return error_printf("actual and abstract states differ");
+		return error_printf("impl and abstract states differ");
 	}
 	free(str2);
 	free(str1);
 
 	state_destroy(spec_c);
-	state_destroy(actual_c);
+	state_destroy(impl_c);
 
 	return NULL;
 }
