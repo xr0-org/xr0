@@ -11,12 +11,19 @@ constraint_destroy(struct constraint *);
 
 struct error;
 
-struct lv_res *
-constraint_verify(struct constraint *, struct value *spec_v,
+struct error *
+constraint_shapeverify(struct constraint *, struct value *spec_v,
 		struct value *impl_v);
 
-struct lv_res *
-constraint_verifyobject(struct constraint *c, struct object *spec_obj,
+struct error *
+constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
 		struct location *impl_loc);
 
+struct lsi_varmap *
+constraint_deriverconstmapping(struct constraint *c, struct value *spec_v,
+		struct value *impl_v);
+
+struct lsi_varmap *
+constraint_deriverconstmapping_object(struct constraint *c,
+		struct object *spec_obj, struct location *impl_loc);
 #endif

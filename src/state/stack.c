@@ -630,77 +630,65 @@ stack_getvariable(struct stack *s, char *id)
 	return v;
 }
 
-struct lv_res *
-stack_constraintverify_all(struct stack *spec_stack, struct state *spec,
+struct error *
+stack_constraint_shapeverify_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl)
 {
-	struct lv_res *res = stack_constraintverify_top(
+	struct error *err = stack_constraint_shapeverify_top(
 		spec_stack, spec, impl
 	);
-	if (lv_res_iserror(res) || !spec_stack->prev) {
-		return res;
+	if (err) {
+		return err;
 	}
-	struct lv_res *prev = stack_constraintverify_all(
-		spec_stack->prev, spec, impl
-	);
-	if (lv_res_iserror(prev)) {
-		return prev;
+	if (spec_stack->prev) {
+		return stack_constraint_shapeverify_all(
+			spec_stack->prev, spec, impl
+		);
 	}
-	struct lsi_varmap *lv = lsi_varmap_copy(lv_res_as_lv(res));
-	lsi_varmap_addrange(lv, lv_res_as_lv(prev));
-	lv_res_destroy(res);
-	lv_res_destroy(prev);
-	return lv_res_lv_create(lv);
+	return NULL;
 }
 
-static struct lv_res *
-_var_constraintverify(struct state *spec, struct state *impl, char *id);
+static struct error *
+_var_constraint_shapeverify(struct state *spec, struct state *impl, char *id);
 
-struct lv_res *
-stack_constraintverify_top(struct stack *spec_stack, struct state *spec,
+struct error *
+stack_constraint_shapeverify_top(struct stack *spec_stack, struct state *spec,
 		struct state *impl)
 {
 	int i;
 
-	struct lsi_varmap *lv = lsi_varmap_create();
-
 	struct map *m = spec_stack->varmap;
 	for (i = 0; i < m->n; i++) {
 		char *id = m->entry[i].key;
-
-		struct lv_res *res = _var_constraintverify(spec, impl, id);
-		if (lv_res_iserror(res)) {
-			return lv_res_error_create(
-				error_printf(
-					"invariant failure: `%s' %w",
-					id, lv_res_as_error(res)
-				)
+		struct error *err = _var_constraint_shapeverify(spec, impl, id);
+		if (err) {
+			return error_printf(
+				"invariant failure: `%s' %w",
+				id, err
 			);
 		}
-		lsi_varmap_addrange(lv, lv_res_as_lv(res));
-		lv_res_destroy(res);
 	}
 
-	return lv_res_lv_create(lv);
+	return NULL;
 }
 
 static struct object *
 location_mustgetobject(struct location *, struct state *);
 
-static struct lv_res *
-_var_constraintverify(struct state *spec, struct state *impl, char *id)
+static struct error *
+_var_constraint_shapeverify(struct state *spec, struct state *impl, char *id)
 {
 	struct object *spec_obj = location_mustgetobject(
 		loc_res_as_loc(state_getloc(spec, id)), spec
 	);
 	if (!object_hasvalue(spec_obj)) {
-		return lv_res_lv_create(lsi_varmap_create());
+		return NULL;
 	}
 	struct constraint *c = constraint_create(
 		spec, impl,
 		ast_type_copy(state_getvariabletype(spec, id))
 	);
-	struct lv_res *res = constraint_verify(
+	struct error *err = constraint_shapeverify(
 		c,
 		object_as_value(spec_obj),
 		/* we can safely assume that impl has a value for id because
@@ -713,7 +701,7 @@ _var_constraintverify(struct state *spec, struct state *impl, char *id)
 		)
 	);
 	constraint_destroy(c);
-	return res;
+	return err;
 }
 
 static struct object *
@@ -722,6 +710,75 @@ location_mustgetobject(struct location *loc, struct state *s)
 	return object_res_as_object(state_get(s, loc, false));
 }
 
+struct lsi_varmap *
+stack_constraint_rconstmapping_all(struct stack *spec_stack, struct state *spec,
+		struct state *impl)
+{
+	struct lsi_varmap *lv = stack_constraint_rconstmapping_top(
+		spec_stack, spec, impl
+	);
+	if (spec_stack->prev) {
+		struct lsi_varmap *prev = stack_constraint_rconstmapping_all(
+			spec_stack->prev, spec, impl
+		);
+		lsi_varmap_addrange(lv, lsi_varmap_copy(prev));
+		lsi_varmap_destroy(prev);
+	}
+	return lv;
+}
+
+static struct lsi_varmap *
+_var_constraint_rconstmapping(struct state *spec, struct state *impl, char *id);
+
+struct lsi_varmap *
+stack_constraint_rconstmapping_top(struct stack *spec_stack, struct state *spec,
+		struct state *impl)
+{
+	int i;
+
+	struct lsi_varmap *lv = lsi_varmap_create();
+
+	struct map *m = spec_stack->varmap;
+	for (i = 0; i < m->n; i++) {
+		lsi_varmap_addrange(
+			lv,
+			_var_constraint_rconstmapping(
+				spec, impl, m->entry[i].key
+			)
+		);
+	}
+
+	return lv;
+}
+
+static struct lsi_varmap *
+_var_constraint_rconstmapping(struct state *spec, struct state *impl, char *id)
+{
+	struct object *spec_obj = location_mustgetobject(
+		loc_res_as_loc(state_getloc(spec, id)), spec
+	);
+	if (!object_hasvalue(spec_obj)) {
+		return lsi_varmap_create();
+	}
+	struct constraint *c = constraint_create(
+		spec, impl,
+		ast_type_copy(state_getvariabletype(spec, id))
+	);
+	struct lsi_varmap *lv = constraint_deriverconstmapping(
+		c,
+		object_as_value(spec_obj),
+		/* we can safely assume that impl has a value for id because
+		 * it's the result of an argument expression being evaluated */
+		object_as_value(
+			location_mustgetobject(
+				loc_res_as_loc(state_getloc(impl, id)),
+				impl
+			)
+		)
+	);
+	constraint_destroy(c);
+	return lv;
+}
 
 
 struct error *

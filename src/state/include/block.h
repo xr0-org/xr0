@@ -60,8 +60,14 @@ block_permuteheaplocs(struct block *, struct permutation *);
 
 struct constraint;
 
-struct lv_res *
-block_constraintverify(struct block *spec, struct location *impl,
+struct error *
+block_constraint_shapeverify(struct block *spec, struct location *impl,
+		struct constraint *);
+
+struct lsi_varmap;
+
+struct lsi_varmap *
+block_constraint_deriverconstmapping(struct block *spec, struct location *impl,
 		struct constraint *);
 
 struct block_arr;

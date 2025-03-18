@@ -490,13 +490,15 @@ state_get(struct state *state, struct location *loc, bool constructive)
 struct error *
 state_constraintverify_top(struct state *spec, struct state *impl)
 {
-	struct lv_res *res = stack_constraintverify_top(spec->stack, spec, impl);
-	if (lv_res_iserror(res)) {
-		return lv_res_as_error(res);
+	struct error *err = stack_constraint_shapeverify_top(
+		spec->stack, spec, impl
+	);
+	if (err) {
+		return err;
 	}
 	return rconst_constraintverify(
 		spec->rconst, impl->rconst,
-		lv_res_as_lv(res),
+		stack_constraint_rconstmapping_top(spec->stack, spec, impl),
 		lsi_varmap_create()
 	);
 }

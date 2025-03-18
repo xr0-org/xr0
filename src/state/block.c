@@ -200,18 +200,17 @@ block_undeclare(struct block *b, struct state *s)
 	b->arr = new;
 }
 
-struct lv_res *
-block_constraintverify(struct block *b, struct location *impl_loc,
+struct error *
+block_constraint_shapeverify(struct block *b, struct location *impl_loc,
 		struct constraint *c)
 {
-	struct lsi_varmap *lv = lsi_varmap_create();
 	int n = object_arr_nobjects(b->arr);
 	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
-		struct lv_res *res = constraint_verifyobject(
+		struct error *err = constraint_shapeverify_object(
 			c, obj[i], impl_loc
 		);
-		if (lv_res_iserror(res)) {
+		if (err) {
 			struct ast_expr *actual_offset = ast_expr_sum_create(
 				ast_expr_copy(
 					offset_as_expr(location_offset(impl_loc))
@@ -221,17 +220,34 @@ block_constraintverify(struct block *b, struct location *impl_loc,
 			);
 			struct ast_expr *simp = ast_expr_simplify(actual_offset);
 			char *simp_str = ast_expr_str(simp);
-			struct error *err = error_printf(
-				"%w at index %s", lv_res_as_error(res), simp_str
+			err = error_printf(
+				"%w at index %s", err, simp_str
 			);
 			free(simp_str);
 			ast_expr_destroy(simp);
 			ast_expr_destroy(actual_offset);
-			return lv_res_error_create(err);
+			return err;
 		}
-		lsi_varmap_addrange(lv, lv_res_as_lv(res));
 	}
-	return lv_res_lv_create(lv);
+	return NULL;
+}
+
+struct lsi_varmap *
+block_constraint_deriverconstmapping(struct block *b, struct location *impl_loc,
+		struct constraint *c)
+{
+	struct lsi_varmap *lv = lsi_varmap_create();
+	int n = object_arr_nobjects(b->arr);
+	struct object **obj = object_arr_objects(b->arr);
+	for (int i = 0; i < n; i++) {
+		lsi_varmap_addrange(
+			lv,
+			constraint_deriverconstmapping_object(
+				c, obj[i], impl_loc
+			)
+		);
+	}
+	return lv;
 }
 
 struct block_arr {

@@ -301,19 +301,22 @@ location_permuteheap(struct location *loc, struct permutation *p);
 struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive);
 
-struct lsi_varmap;
-
-DECLARE_RESULT_TYPE(struct lsi_varmap *, lv, lv_res)
-
 struct error *
 state_constraintverify_top(struct state *spec, struct state *impl);
 
-struct lv_res *
-state_constraintverify_structmember(struct state *spec, struct state *impl,
-		struct value *spec_v, struct value *impl_v, char *member);
-
 struct error *
 state_constraintverify_all(struct state *spec, struct state *impl);
+
+struct error *
+state_constraint_shapeverify_structmember(struct state *spec, struct state *impl,
+		struct value *spec_v, struct value *impl_v, char *member);
+
+struct lsi_varmap;
+
+struct lsi_varmap *
+state_constraint_derivemapping_structmember(struct state *spec,
+		struct state *impl, struct value *spec_v, struct value *impl_v,
+		char *member);
 
 struct error *
 state_verifyinvariant(struct state *);
