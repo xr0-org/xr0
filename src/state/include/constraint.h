@@ -16,14 +16,15 @@ constraint_shapeverify(struct constraint *, struct value *spec_v,
 		struct value *impl_v);
 
 struct error *
-constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
+constraint_shapeverify_object(struct constraint *, struct object *spec_obj,
 		struct location *impl_loc);
 
 struct lsi_varmap *
-constraint_impl_spec_mapping(struct constraint *c, struct value *spec_v,
-		struct value *impl_v);
+constraint_impl_spec_mapping(struct constraint *, struct value *spec_v,
+		struct value *impl_v, char *alias);
 
 struct lsi_varmap *
-constraint_impl_spec_mapping_object(struct constraint *c,
-		struct object *spec_obj, struct location *impl_loc);
+constraint_impl_spec_mapping_object(struct constraint *, struct object *,
+		struct location *impl_loc, char *alias);
+
 #endif

@@ -498,8 +498,7 @@ state_constraintverify_top(struct state *spec, struct state *impl)
 	}
 	return rconst_constraintverify(
 		spec->rconst, impl->rconst,
-		stack_impl_spec_mapping_top(spec->stack, spec, impl),
-		lsi_varmap_create()
+		stack_impl_spec_mapping_top(spec->stack, spec, impl)
 	);
 }
 
@@ -527,7 +526,8 @@ state_shapeverify_structmember(struct state *spec, struct state *impl,
 
 struct lsi_varmap *
 state_impl_spec_mapping_structmember(struct state *spec, struct state *impl,
-		struct value *spec_v, struct value *impl_v, char *member)
+		struct value *spec_v, struct value *impl_v, char *parent,
+		char *member)
 {
 	struct object *spec_obj = value_struct_member(spec_v, member),
 		      *impl_obj = value_struct_member(impl_v, member);
@@ -540,9 +540,16 @@ state_impl_spec_mapping_structmember(struct state *spec, struct state *impl,
 		state_copy(impl),
 		ast_type_copy(value_struct_membertype(spec_v, member))
 	);
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s.%s", parent, member);
+	char *alias = strbuilder_build(b);
 	struct lsi_varmap *lv = constraint_impl_spec_mapping(
-		c, object_as_value(spec_obj), object_as_value(impl_obj)
+		c,
+		object_as_value(spec_obj),
+		object_as_value(impl_obj),
+		alias
 	);
+	free(alias);
 	constraint_destroy(c);
 	return lv;
 }
@@ -572,8 +579,7 @@ _mutating_constraintverify_all(struct state *spec, struct state *impl)
 	}
 	return rconst_constraintverify(
 		spec->rconst, impl->rconst,
-		stack_impl_spec_mapping_all(spec->stack, spec, impl),
-		lsi_varmap_create()
+		stack_impl_spec_mapping_all(spec->stack, spec, impl)
 	);
 }
 
@@ -784,9 +790,8 @@ state_specverify(struct state *impl, struct state *spec)
 		err = rconst_constraintverify(
 			spec->rconst, impl->rconst,
 			constraint_impl_spec_mapping(
-				c, spec->reg, impl->reg
-			),
-			lsi_varmap_create()
+				c, spec->reg, impl->reg, "return"
+			)
 		);
 		constraint_destroy(c);
 		if (err) {

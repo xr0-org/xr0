@@ -125,19 +125,26 @@ size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec
 
 struct lsi_varmap *
 constraint_impl_spec_mapping(struct constraint *c, struct value *spec_v,
-		struct value *impl_v)
+		struct value *impl_v, char *alias)
 {
 	if (ast_type_isint(c->t)) {
 		struct lsi_varmap *lv = lsi_varmap_create();
+		char *spec_rconst = value_to_rconstid(spec_v, c->spec);
 		lsi_varmap_set(
 			lv,
 			value_to_rconstid(impl_v, c->impl),
-			value_to_rconstid(spec_v, c->spec)
+			dynamic_str(spec_rconst)
 		);
+		lsi_varmap_setvaluealias(
+			lv,
+			dynamic_str(spec_rconst),
+			dynamic_str(alias)
+		);
+		free(spec_rconst);
 		return lv;
 	} else if (ast_type_isstruct(c->t)) {
 		return value_struct_impl_spec_mapping(
-			spec_v, impl_v, c->impl, c->spec
+			spec_v, impl_v, c->impl, c->spec, alias
 		);
 	}
 	a_printf(
@@ -165,7 +172,9 @@ constraint_impl_spec_mapping(struct constraint *c, struct value *spec_v,
 	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
 	struct block *spec_b = state_getblock(c->spec, spec_loc);
 	assert(spec_b);
-	struct lsi_varmap *lv = block_impl_spec_mapping(spec_b, rel_impl_loc, c);
+	struct lsi_varmap *lv = block_impl_spec_mapping(
+		spec_b, rel_impl_loc, c, alias
+	);
 	location_destroy(rel_impl_loc);
 	return lv;
 }
@@ -201,7 +210,7 @@ constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
 
 struct lsi_varmap *
 constraint_impl_spec_mapping_object(struct constraint *c,
-		struct object *spec_obj, struct location *impl_loc)
+		struct object *spec_obj, struct location *impl_loc, char *alias)
 {
 	struct block *b_impl = state_getblock(c->impl, impl_loc);
 	assert(b_impl);
@@ -215,6 +224,6 @@ constraint_impl_spec_mapping_object(struct constraint *c,
 		return lsi_varmap_create();
 	}
 	return constraint_impl_spec_mapping(
-		c, object_as_value(spec_obj), object_as_value(arg_obj)
+		c, object_as_value(spec_obj), object_as_value(arg_obj), alias
 	);
 }

@@ -509,7 +509,7 @@ value_struct_shapeverify(struct value *param, struct value *arg,
 
 struct lsi_varmap *
 value_struct_impl_spec_mapping(struct value *param, struct value *arg,
-		struct state *spec, struct state *caller)
+		struct state *spec, struct state *caller, char *varname)
 {
 	assert(value_isstruct(param) && value_isstruct(arg));
 	struct ast_variable_arr *param_members = param->_struct.members,
@@ -525,6 +525,7 @@ value_struct_impl_spec_mapping(struct value *param, struct value *arg,
 			lv,
 			state_impl_spec_mapping_structmember(
 				spec, caller, param, arg,
+				varname,
 				ast_variable_name(field[i])
 			)
 		);

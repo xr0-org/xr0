@@ -256,40 +256,35 @@ rconst_eval(struct rconst *v, struct ast_expr *e)
 	return ast_expr_matheval(e);
 }
 
-static struct lsi *
-_doubleprefixrelative_rename(struct lsi *, char *prefix_a,
-		char *prefix_b, struct lsi_varmap *);
+#define SPEC_PREFIX "spec_"
+#define IMPL_PREFIX "impl_"
 
 struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
-		struct lsi_varmap *impl_spec_m, struct lsi_varmap *spec_var_m)
+		struct lsi_varmap *impl_spec_m)
 {
-	struct lsi *spec_lsi = lsi_prefixvars(spec->constraints, "spec_");
+	struct lsi *spec_lsi = lsi_prefixvars(spec->constraints, SPEC_PREFIX);
 
-	struct lsi *prefixed_impl = lsi_prefixvars(impl->constraints, "impl_");
-	struct lsi *impl_lsi = _doubleprefixrelative_rename(
-		prefixed_impl, "impl_", "spec_", impl_spec_m
+	struct lsi *prefixed_impl = lsi_prefixvars(
+		impl->constraints, IMPL_PREFIX
 	);
+	struct lsi_varmap *prefix_m = lsi_varmap_prefix(
+		impl_spec_m, IMPL_PREFIX, SPEC_PREFIX
+	);
+	struct lsi *impl_lsi = lsi_renamevars(prefixed_impl, prefix_m);
 	lsi_destroy(prefixed_impl);
 
+	struct lsi_varmap *alias_m = lsi_varmap_valuealias_map(prefix_m);
 	struct error *err = lsi_checksatisfiesrange(
-		impl_lsi, spec_lsi, spec_var_m
+		impl_lsi, spec_lsi, alias_m
 	);
+	lsi_varmap_destroy(alias_m);
+
+	lsi_varmap_destroy(prefix_m);
+
 	lsi_destroy(impl_lsi);
 	lsi_destroy(spec_lsi);
 	return err;
-}
-
-static struct lsi *
-_doubleprefixrelative_rename(struct lsi *old, char *prefix_a,
-		char *prefix_b, struct lsi_varmap *m)
-{
-	struct lsi_varmap *prefix_m = lsi_varmap_prefix(
-		m, dynamic_str(prefix_a), dynamic_str(prefix_b)
-	);
-	struct lsi *new = lsi_renamevars(old, prefix_m);
-	lsi_varmap_destroy(prefix_m);
-	return new;
 }
 
 int

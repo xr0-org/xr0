@@ -104,6 +104,12 @@ lsi_varmap_str(struct lsi_varmap *);
 void
 lsi_varmap_set(struct lsi_varmap *, char *k, char *v);
 
+void
+lsi_varmap_setvaluealias(struct lsi_varmap *, char *k, char *alias);
+
+struct lsi_varmap *
+lsi_varmap_valuealias_map(struct lsi_varmap *);
+
 /* lsi_varmap_addrange: copy m0's key-value pairs to m, asserting that any common
  * keys must have the same value in both maps. */
 void

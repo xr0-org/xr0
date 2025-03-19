@@ -68,7 +68,7 @@ struct lsi_varmap;
 
 struct lsi_varmap *
 block_impl_spec_mapping(struct block *spec, struct location *impl,
-		struct constraint *);
+		struct constraint *, char *referent);
 
 struct block_arr;
 

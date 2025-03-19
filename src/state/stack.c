@@ -774,7 +774,8 @@ _var_impl_spec_mapping(struct state *spec, struct state *impl, char *id)
 				loc_res_as_loc(state_getloc(impl, id)),
 				impl
 			)
-		)
+		),
+		id
 	);
 	constraint_destroy(c);
 	return lv;

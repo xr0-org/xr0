@@ -200,6 +200,9 @@ block_undeclare(struct block *b, struct state *s)
 	b->arr = new;
 }
 
+static char *
+_constraintbased_actual_index(struct location *loc, struct object *obj);
+
 struct error *
 block_shapeverify(struct block *b, struct location *impl_loc,
 		struct constraint *c)
@@ -211,41 +214,59 @@ block_shapeverify(struct block *b, struct location *impl_loc,
 			c, obj[i], impl_loc
 		);
 		if (err) {
-			struct ast_expr *actual_offset = ast_expr_sum_create(
-				ast_expr_copy(
-					offset_as_expr(location_offset(impl_loc))
-				),
-				/* XXX: assuming lower is offset */
-				ast_expr_copy(object_lower(obj[i]))
+			char *index = _constraintbased_actual_index(
+				impl_loc, obj[i]
 			);
-			struct ast_expr *simp = ast_expr_simplify(actual_offset);
-			char *simp_str = ast_expr_str(simp);
 			err = error_printf(
-				"%w at index %s", err, simp_str
+				"%w at index %s", err, index
 			);
-			free(simp_str);
-			ast_expr_destroy(simp);
-			ast_expr_destroy(actual_offset);
+			free(index);
 			return err;
 		}
 	}
 	return NULL;
 }
 
+static char *
+_constraintbased_actual_index(struct location *loc, struct object *obj)
+{
+	struct ast_expr *actual_offset = ast_expr_sum_create(
+		ast_expr_copy(
+			offset_as_expr(location_offset(loc))
+		),
+		/* XXX: assuming lower is offset */
+		ast_expr_copy(object_lower(obj))
+	);
+	struct ast_expr *simp = ast_expr_simplify(actual_offset);
+	char *s = ast_expr_str(simp);
+	ast_expr_destroy(simp);
+	ast_expr_destroy(actual_offset);
+	return s;
+}
+
+
 struct lsi_varmap *
 block_impl_spec_mapping(struct block *b, struct location *impl_loc,
-		struct constraint *c)
+		struct constraint *c, char *referent)
 {
 	struct lsi_varmap *lv = lsi_varmap_create();
 	int n = object_arr_nobjects(b->arr);
 	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
+		struct strbuilder *b = strbuilder_create();
+		char *index = _constraintbased_actual_index(impl_loc, obj[i]);
+		strbuilder_printf(b, "%s[%d]", referent, index);
+		char *alias = strbuilder_build(b);
+		free(index);
+
 		lsi_varmap_addrange(
 			lv,
 			constraint_impl_spec_mapping_object(
-				c, obj[i], impl_loc
+				c, obj[i], impl_loc, alias
 			)
 		);
+
+		free(alias);
 	}
 	return lv;
 }

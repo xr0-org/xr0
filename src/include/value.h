@@ -84,8 +84,7 @@ struct lsi_varmap;
 
 struct lsi_varmap *
 value_struct_impl_spec_mapping(struct value *param, struct value *arg,
-		struct state *spec, struct state *impl);
-
+		struct state *spec, struct state *impl, char *varname);
 
 char *
 value_to_rconstid(struct value *v, struct state *);

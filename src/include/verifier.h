@@ -113,7 +113,7 @@ struct lsi_varmap;
 
 struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
-		struct lsi_varmap *impl_spec_m, struct lsi_varmap *spec_var_m);
+		struct lsi_varmap *impl_spec_m);
 
 int
 rconst_isfeasible(struct rconst *, struct lsi_le *);

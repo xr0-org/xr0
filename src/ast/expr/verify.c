@@ -511,7 +511,6 @@ setupverify(struct ast_expr *call, struct state *impl)
 	if (err) {
 		return err;
 	}
-	fprintf(stderr, "WARNING: call constraints not verified\n");
 
 	state_popframe(impl);
 

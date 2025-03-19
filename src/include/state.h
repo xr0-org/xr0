@@ -315,7 +315,8 @@ struct lsi_varmap;
 
 struct lsi_varmap *
 state_impl_spec_mapping_structmember(struct state *spec, struct state *impl,
-		struct value *spec_v, struct value *impl_v, char *member);
+		struct value *spec_v, struct value *impl_v, char *parent,
+		char *member);
 
 struct error *
 state_verifyinvariant(struct state *);
