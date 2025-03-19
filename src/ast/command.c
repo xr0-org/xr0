@@ -49,17 +49,52 @@ command_create_withargs(enum command_kind kind, struct string_arr *args)
 	return cmd;
 }
 
-static void
+struct command *
+command_copy(struct command *old)
+{
+	struct command *new = command_create(old->kind);
+	for (int i = 0; i < string_arr_n(old->args); i++) {
+		string_arr_append(
+			new->args,
+			dynamic_str(string_arr_s(old->args)[i])
+		);
+	}
+	return new;
+}
+
+void
 command_destroy(struct command *cmd)
 {
 	string_arr_destroy(cmd->args);
 	free(cmd);
 }
 
+char *
+command_str(struct command *cmd)
+{
+	switch (cmd->kind) {
+	case COMMAND_STEP:
+		return dynamic_str("step");
+	case COMMAND_NEXT:
+		return dynamic_str("next");
+	case COMMAND_PREV:
+		return dynamic_str("prev");
+	default:
+		printf("%d\n", cmd->kind);
+		assert(0);
+	}
+}
+
 bool should_continue = false;
 
 static struct command *
 getcmd(char *debugsep);
+
+struct command *
+command_read(char *debugsep)
+{
+	return getcmd(debugsep);
+}
 
 static struct error *
 command_continue_exec(struct verifier *);
@@ -73,39 +108,31 @@ command_arg_toexpr(struct command *);
 struct error *
 command_exec(struct verifier *p, struct command *cmd, char *debugsep)
 {
-	struct error *err;
-
+	printf("command: %s\n", command_str(cmd));
 	if (should_continue) {
 		should_continue = false;
 		return command_continue_exec(p);
 	}
 	switch (cmd->kind) {
 	case COMMAND_STEP:
-		err = verifier_progress(p, progressor_step());
-		break;
+		return verifier_progress(p, progressor_step());
 	case COMMAND_NEXT:
-		err = verifier_progress(p, progressor_next());	
-		break;
+		return verifier_progress(p, progressor_next());	
 	case COMMAND_PREV:
-		err = error_prev();
+		return error_prev();
 	case COMMAND_VERIFY:
-		err = command_verify_exec(p, cmd);
-		break;
+		return command_verify_exec(p, cmd);
 	case COMMAND_CONTINUE:
-		err = command_continue_exec(p);
-		break;	
+		return command_continue_exec(p);
 	case COMMAND_HELP:
 	case COMMAND_BREAKPOINT_SET:
 	case COMMAND_BREAKPOINT_LIST:
-		err = NULL;
-		break;
+		return NULL;
 	case COMMAND_QUIT:
 		exit(0);
 	default:
 		assert(false);
 	}
-	command_destroy(cmd);
-	return err;
 }
 
 static struct error *
@@ -218,6 +245,9 @@ static bool
 command_isnext(char *cmd);
 
 static bool
+command_isprev(char *cmd);
+
+static bool
 command_iscontinue(char *cmd);
 
 static bool
@@ -232,6 +262,8 @@ process_command(char *cmd, char *sep)
 		return command_create(COMMAND_STEP);
 	} else if (command_isnext(cmd)) {
 		return command_create(COMMAND_NEXT);
+	} else if (command_isprev(cmd)) {
+		return command_create(COMMAND_PREV);
 	} else if (command_iscontinue(cmd)){
 		return command_create(COMMAND_CONTINUE);
 	} else if (command_isquit(cmd)) {
@@ -270,6 +302,12 @@ static bool
 command_isnext(char *cmd)
 {
 	return strcmp(cmd, "n") == 0 || strcmp(cmd, "next") == 0;
+}
+
+static bool
+command_isprev(char *cmd)
+{
+	return strcmp(cmd, "p") == 0 || strcmp(cmd, "prev") == 0;
 }
 
 static bool

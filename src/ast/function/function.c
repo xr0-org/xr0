@@ -7,6 +7,7 @@
 #include "gram.tab.h"
 #include "ast.h"
 #include "command.h"
+#include "command_deque.h"
 #include "ext.h"
 #include "function.h"
 #include "intern.h"
@@ -277,13 +278,13 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 }
 
 static void
-history_replay(struct verifier *, struct command_stack *, char *sep);
+history_replay(struct verifier *, struct command_deque *, char *sep);
 
 struct error *
 ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 {
 	struct verifier *v = verifier_create(f, ext);
-	struct command_stack *hist = command_stack_create();
+	struct command_deque *hist = command_deque_create();
 
 	while (!verifier_atend(v)) {
 		d_printf("%s\n", verifier_str(v));
@@ -294,27 +295,41 @@ ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 				return err;
 			}
 			/* handle prev */
-			verifier_destroy(v);
+
+			/* pop last command */
+			struct command *cmd = command_deque_popfront(hist);
+			if (!cmd) {
+				/* no commands to pop */
+				assert(0);
+			}
+
+			/* XXX: call verifier_destroy on old v */
 			v = verifier_create(f, ext);
-			history_replay(v, command_stack_copy(hist), sep);
+			history_replay(v, command_deque_copy(hist), sep);
 			continue;
 		}
-		command_stack_push(hist, command_copy(cmd));
+		command_deque_pushback(hist, cmd);
+		command_deque_print(hist);
 	}
 	verifier_destroy(v);
 	return NULL;
 }
 
 static void
-history_replay(struct verifier *v, struct command_stack *h, char *sep)
+history_replay(struct verifier *v, struct command_deque *h, char *sep)
 {
-	while (!command_stack_isempty(h)) {
-		struct error *err = command_exec(v, command_stack_pop(h), sep);
+	printf("replaying:\n");
+	command_deque_print(h);
+	while (!command_deque_isempty(h)) {
+		struct command *c = command_deque_popfront(h);
+		struct error *err = command_exec(v, c, sep);
 		if (err) {
 			/* should be impossible to encounter error replaying */
 			assert(0);
 		}
+		command_destroy(c);
 	}
+	/* command_deque_destroy(h); */
 }
 
 static void
