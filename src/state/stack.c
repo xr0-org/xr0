@@ -764,7 +764,7 @@ _var_constraint_rconstmapping(struct state *spec, struct state *impl, char *id)
 		spec, impl,
 		ast_type_copy(state_getvariabletype(spec, id))
 	);
-	struct lsi_varmap *lv = constraint_deriverconstmapping(
+	struct lsi_varmap *lv = constraint_rconstmapping(
 		c,
 		object_as_value(spec_obj),
 		/* we can safely assume that impl has a value for id because

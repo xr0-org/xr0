@@ -126,7 +126,7 @@ size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec
 }
 
 struct lsi_varmap *
-constraint_deriverconstmapping(struct constraint *c, struct value *spec_v,
+constraint_rconstmapping(struct constraint *c, struct value *spec_v,
 		struct value *impl_v)
 {
 	if (ast_type_isint(c->t)) {
@@ -167,7 +167,7 @@ constraint_deriverconstmapping(struct constraint *c, struct value *spec_v,
 	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
 	struct block *spec_b = state_getblock(c->spec, spec_loc);
 	assert(spec_b);
-	struct lsi_varmap *lv = block_constraint_deriverconstmapping(
+	struct lsi_varmap *lv = block_constraint_rconstmapping(
 		spec_b, rel_impl_loc, c
 	);
 	location_destroy(rel_impl_loc);
@@ -204,7 +204,7 @@ constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
 }
 
 struct lsi_varmap *
-constraint_deriverconstmapping_object(struct constraint *c,
+constraint_rconstmapping_object(struct constraint *c,
 		struct object *spec_obj, struct location *impl_loc)
 {
 	struct block *b_impl = state_getblock(c->impl, impl_loc);
@@ -218,7 +218,7 @@ constraint_deriverconstmapping_object(struct constraint *c,
 	if (!object_hasvalue(spec_obj)) {
 		return lsi_varmap_create();
 	}
-	return constraint_deriverconstmapping(
+	return constraint_rconstmapping(
 		c, object_as_value(spec_obj), object_as_value(arg_obj)
 	);
 }

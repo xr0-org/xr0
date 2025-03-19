@@ -67,7 +67,7 @@ block_constraint_shapeverify(struct block *spec, struct location *impl,
 struct lsi_varmap;
 
 struct lsi_varmap *
-block_constraint_deriverconstmapping(struct block *spec, struct location *impl,
+block_constraint_rconstmapping(struct block *spec, struct location *impl,
 		struct constraint *);
 
 struct block_arr;

@@ -541,7 +541,7 @@ state_constraint_derivemapping_structmember(struct state *spec,
 		state_copy(impl),
 		ast_type_copy(value_struct_membertype(spec_v, member))
 	);
-	struct lsi_varmap *lv = constraint_deriverconstmapping(
+	struct lsi_varmap *lv = constraint_rconstmapping(
 		c, object_as_value(spec_obj), object_as_value(impl_obj)
 	);
 	constraint_destroy(c);
@@ -784,7 +784,7 @@ state_specverify(struct state *impl, struct state *spec)
 		}
 		err = rconst_constraintverify(
 			spec->rconst, impl->rconst,
-			constraint_deriverconstmapping(
+			constraint_rconstmapping(
 				c, spec->reg, impl->reg
 			),
 			lsi_varmap_create()

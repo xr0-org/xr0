@@ -233,7 +233,7 @@ block_constraint_shapeverify(struct block *b, struct location *impl_loc,
 }
 
 struct lsi_varmap *
-block_constraint_deriverconstmapping(struct block *b, struct location *impl_loc,
+block_constraint_rconstmapping(struct block *b, struct location *impl_loc,
 		struct constraint *c)
 {
 	struct lsi_varmap *lv = lsi_varmap_create();
@@ -242,7 +242,7 @@ block_constraint_deriverconstmapping(struct block *b, struct location *impl_loc,
 	for (int i = 0; i < n; i++) {
 		lsi_varmap_addrange(
 			lv,
-			constraint_deriverconstmapping_object(
+			constraint_rconstmapping_object(
 				c, obj[i], impl_loc
 			)
 		);
