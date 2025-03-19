@@ -77,14 +77,14 @@ struct object *
 value_struct_member(struct value *, char *member);
 
 struct error *
-value_struct_specval_shapeverify(struct value *param, struct value *arg,
-		struct state *spec, struct state *caller);
+value_struct_shapeverify(struct value *param, struct value *arg,
+		struct state *spec, struct state *impl);
 
 struct lsi_varmap;
 
 struct lsi_varmap *
-value_struct_specval_derivemapping(struct value *param, struct value *arg,
-		struct state *spec, struct state *caller);
+value_struct_impl_spec_mapping(struct value *param, struct value *arg,
+		struct state *spec, struct state *impl);
 
 
 char *

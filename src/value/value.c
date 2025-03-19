@@ -484,7 +484,7 @@ value_struct_member(struct value *v, char *member)
 }
 
 struct error *
-value_struct_specval_shapeverify(struct value *param, struct value *arg,
+value_struct_shapeverify(struct value *param, struct value *arg,
 		struct state *spec, struct state *caller)
 {
 	assert(value_isstruct(param) && value_isstruct(arg));
@@ -495,7 +495,7 @@ value_struct_specval_shapeverify(struct value *param, struct value *arg,
 	assert(ast_variable_arr_n(arg_members) == n);
 	struct ast_variable **field = ast_variable_arr_v(param_members);
 	for (int i = 0; i < n; i++) {
-		struct error *err = state_constraint_shapeverify_structmember(
+		struct error *err = state_shapeverify_structmember(
 			spec, caller, param, arg,
 			ast_variable_name(field[i])
 		);
@@ -508,7 +508,7 @@ value_struct_specval_shapeverify(struct value *param, struct value *arg,
 }
 
 struct lsi_varmap *
-value_struct_specval_derivemapping(struct value *param, struct value *arg,
+value_struct_impl_spec_mapping(struct value *param, struct value *arg,
 		struct state *spec, struct state *caller)
 {
 	assert(value_isstruct(param) && value_isstruct(arg));
@@ -523,7 +523,7 @@ value_struct_specval_derivemapping(struct value *param, struct value *arg,
 	for (int i = 0; i < n; i++) {
 		lsi_varmap_addrange(
 			lv,
-			state_constraint_derivemapping_structmember(
+			state_impl_spec_mapping_structmember(
 				spec, caller, param, arg,
 				ast_variable_name(field[i])
 			)

@@ -61,13 +61,13 @@ block_permuteheaplocs(struct block *, struct permutation *);
 struct constraint;
 
 struct error *
-block_constraint_shapeverify(struct block *spec, struct location *impl,
+block_shapeverify(struct block *spec, struct location *impl,
 		struct constraint *);
 
 struct lsi_varmap;
 
 struct lsi_varmap *
-block_constraint_rconstmapping(struct block *spec, struct location *impl,
+block_impl_spec_mapping(struct block *spec, struct location *impl,
 		struct constraint *);
 
 struct block_arr;

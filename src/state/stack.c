@@ -631,17 +631,17 @@ stack_getvariable(struct stack *s, char *id)
 }
 
 struct error *
-stack_constraint_shapeverify_all(struct stack *spec_stack, struct state *spec,
+stack_shapeverify_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl)
 {
-	struct error *err = stack_constraint_shapeverify_top(
+	struct error *err = stack_shapeverify_top(
 		spec_stack, spec, impl
 	);
 	if (err) {
 		return err;
 	}
 	if (spec_stack->prev) {
-		return stack_constraint_shapeverify_all(
+		return stack_shapeverify_all(
 			spec_stack->prev, spec, impl
 		);
 	}
@@ -649,10 +649,10 @@ stack_constraint_shapeverify_all(struct stack *spec_stack, struct state *spec,
 }
 
 static struct error *
-_var_constraint_shapeverify(struct state *spec, struct state *impl, char *id);
+_var_shapeverify(struct state *spec, struct state *impl, char *id);
 
 struct error *
-stack_constraint_shapeverify_top(struct stack *spec_stack, struct state *spec,
+stack_shapeverify_top(struct stack *spec_stack, struct state *spec,
 		struct state *impl)
 {
 	int i;
@@ -660,7 +660,7 @@ stack_constraint_shapeverify_top(struct stack *spec_stack, struct state *spec,
 	struct map *m = spec_stack->varmap;
 	for (i = 0; i < m->n; i++) {
 		char *id = m->entry[i].key;
-		struct error *err = _var_constraint_shapeverify(spec, impl, id);
+		struct error *err = _var_shapeverify(spec, impl, id);
 		if (err) {
 			return error_printf(
 				"invariant failure: `%s' %w",
@@ -676,7 +676,7 @@ static struct object *
 location_mustgetobject(struct location *, struct state *);
 
 static struct error *
-_var_constraint_shapeverify(struct state *spec, struct state *impl, char *id)
+_var_shapeverify(struct state *spec, struct state *impl, char *id)
 {
 	struct object *spec_obj = location_mustgetobject(
 		loc_res_as_loc(state_getloc(spec, id)), spec
@@ -711,14 +711,14 @@ location_mustgetobject(struct location *loc, struct state *s)
 }
 
 struct lsi_varmap *
-stack_constraint_rconstmapping_all(struct stack *spec_stack, struct state *spec,
+stack_impl_spec_mapping_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl)
 {
-	struct lsi_varmap *lv = stack_constraint_rconstmapping_top(
+	struct lsi_varmap *lv = stack_impl_spec_mapping_top(
 		spec_stack, spec, impl
 	);
 	if (spec_stack->prev) {
-		struct lsi_varmap *prev = stack_constraint_rconstmapping_all(
+		struct lsi_varmap *prev = stack_impl_spec_mapping_all(
 			spec_stack->prev, spec, impl
 		);
 		lsi_varmap_addrange(lv, lsi_varmap_copy(prev));
@@ -728,10 +728,10 @@ stack_constraint_rconstmapping_all(struct stack *spec_stack, struct state *spec,
 }
 
 static struct lsi_varmap *
-_var_constraint_rconstmapping(struct state *spec, struct state *impl, char *id);
+_var_impl_spec_mapping(struct state *spec, struct state *impl, char *id);
 
 struct lsi_varmap *
-stack_constraint_rconstmapping_top(struct stack *spec_stack, struct state *spec,
+stack_impl_spec_mapping_top(struct stack *spec_stack, struct state *spec,
 		struct state *impl)
 {
 	int i;
@@ -742,7 +742,7 @@ stack_constraint_rconstmapping_top(struct stack *spec_stack, struct state *spec,
 	for (i = 0; i < m->n; i++) {
 		lsi_varmap_addrange(
 			lv,
-			_var_constraint_rconstmapping(
+			_var_impl_spec_mapping(
 				spec, impl, m->entry[i].key
 			)
 		);
@@ -752,7 +752,7 @@ stack_constraint_rconstmapping_top(struct stack *spec_stack, struct state *spec,
 }
 
 static struct lsi_varmap *
-_var_constraint_rconstmapping(struct state *spec, struct state *impl, char *id)
+_var_impl_spec_mapping(struct state *spec, struct state *impl, char *id)
 {
 	struct object *spec_obj = location_mustgetobject(
 		loc_res_as_loc(state_getloc(spec, id)), spec
@@ -764,7 +764,7 @@ _var_constraint_rconstmapping(struct state *spec, struct state *impl, char *id)
 		spec, impl,
 		ast_type_copy(state_getvariabletype(spec, id))
 	);
-	struct lsi_varmap *lv = constraint_rconstmapping(
+	struct lsi_varmap *lv = constraint_impl_spec_mapping(
 		c,
 		object_as_value(spec_obj),
 		/* we can safely assume that impl has a value for id because

@@ -201,7 +201,7 @@ block_undeclare(struct block *b, struct state *s)
 }
 
 struct error *
-block_constraint_shapeverify(struct block *b, struct location *impl_loc,
+block_shapeverify(struct block *b, struct location *impl_loc,
 		struct constraint *c)
 {
 	int n = object_arr_nobjects(b->arr);
@@ -233,7 +233,7 @@ block_constraint_shapeverify(struct block *b, struct location *impl_loc,
 }
 
 struct lsi_varmap *
-block_constraint_rconstmapping(struct block *b, struct location *impl_loc,
+block_impl_spec_mapping(struct block *b, struct location *impl_loc,
 		struct constraint *c)
 {
 	struct lsi_varmap *lv = lsi_varmap_create();
@@ -242,7 +242,7 @@ block_constraint_rconstmapping(struct block *b, struct location *impl_loc,
 	for (int i = 0; i < n; i++) {
 		lsi_varmap_addrange(
 			lv,
-			constraint_rconstmapping_object(
+			constraint_impl_spec_mapping_object(
 				c, obj[i], impl_loc
 			)
 		);

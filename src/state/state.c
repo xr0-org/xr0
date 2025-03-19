@@ -490,7 +490,7 @@ state_get(struct state *state, struct location *loc, bool constructive)
 struct error *
 state_constraintverify_top(struct state *spec, struct state *impl)
 {
-	struct error *err = stack_constraint_shapeverify_top(
+	struct error *err = stack_shapeverify_top(
 		spec->stack, spec, impl
 	);
 	if (err) {
@@ -498,13 +498,13 @@ state_constraintverify_top(struct state *spec, struct state *impl)
 	}
 	return rconst_constraintverify(
 		spec->rconst, impl->rconst,
-		stack_constraint_rconstmapping_top(spec->stack, spec, impl),
+		stack_impl_spec_mapping_top(spec->stack, spec, impl),
 		lsi_varmap_create()
 	);
 }
 
 struct error *
-state_constraint_shapeverify_structmember(struct state *spec, struct state *impl,
+state_shapeverify_structmember(struct state *spec, struct state *impl,
 		struct value *spec_v, struct value *impl_v, char *member)
 {
 	struct object *spec_obj = value_struct_member(spec_v, member),
@@ -526,9 +526,8 @@ state_constraint_shapeverify_structmember(struct state *spec, struct state *impl
 }
 
 struct lsi_varmap *
-state_constraint_derivemapping_structmember(struct state *spec,
-		struct state *impl, struct value *spec_v, struct value *impl_v,
-		char *member)
+state_impl_spec_mapping_structmember(struct state *spec, struct state *impl,
+		struct value *spec_v, struct value *impl_v, char *member)
 {
 	struct object *spec_obj = value_struct_member(spec_v, member),
 		      *impl_obj = value_struct_member(impl_v, member);
@@ -541,7 +540,7 @@ state_constraint_derivemapping_structmember(struct state *spec,
 		state_copy(impl),
 		ast_type_copy(value_struct_membertype(spec_v, member))
 	);
-	struct lsi_varmap *lv = constraint_rconstmapping(
+	struct lsi_varmap *lv = constraint_impl_spec_mapping(
 		c, object_as_value(spec_obj), object_as_value(impl_obj)
 	);
 	constraint_destroy(c);
@@ -565,7 +564,7 @@ state_constraintverify_all(struct state *spec, struct state *impl)
 static struct error *
 _mutating_constraintverify_all(struct state *spec, struct state *impl)
 {
-	struct error *err = stack_constraint_shapeverify_all(
+	struct error *err = stack_shapeverify_all(
 		spec->stack, spec, impl
 	);
 	if (err) {
@@ -573,7 +572,7 @@ _mutating_constraintverify_all(struct state *spec, struct state *impl)
 	}
 	return rconst_constraintverify(
 		spec->rconst, impl->rconst,
-		stack_constraint_rconstmapping_all(spec->stack, spec, impl),
+		stack_impl_spec_mapping_all(spec->stack, spec, impl),
 		lsi_varmap_create()
 	);
 }
@@ -784,7 +783,7 @@ state_specverify(struct state *impl, struct state *spec)
 		}
 		err = rconst_constraintverify(
 			spec->rconst, impl->rconst,
-			constraint_rconstmapping(
+			constraint_impl_spec_mapping(
 				c, spec->reg, impl->reg
 			),
 			lsi_varmap_create()

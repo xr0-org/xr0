@@ -20,10 +20,10 @@ constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
 		struct location *impl_loc);
 
 struct lsi_varmap *
-constraint_rconstmapping(struct constraint *c, struct value *spec_v,
+constraint_impl_spec_mapping(struct constraint *c, struct value *spec_v,
 		struct value *impl_v);
 
 struct lsi_varmap *
-constraint_rconstmapping_object(struct constraint *c,
+constraint_impl_spec_mapping_object(struct constraint *c,
 		struct object *spec_obj, struct location *impl_loc);
 #endif

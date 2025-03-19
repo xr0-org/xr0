@@ -128,21 +128,21 @@ struct variable *
 stack_getvariable(struct stack *s, char *id);
 
 struct error *
-stack_constraint_shapeverify_top(struct stack *, struct state *spec,
+stack_shapeverify_top(struct stack *, struct state *spec,
 		struct state *impl);
 
 struct error *
-stack_constraint_shapeverify_all(struct stack *spec_stack, struct state *spec,
+stack_shapeverify_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl);
 
 struct lsi_varmap;
 
 struct lsi_varmap *
-stack_constraint_rconstmapping_top(struct stack *, struct state *spec,
+stack_impl_spec_mapping_top(struct stack *, struct state *spec,
 		struct state *impl);
 
 struct lsi_varmap *
-stack_constraint_rconstmapping_all(struct stack *spec_stack, struct state *spec,
+stack_impl_spec_mapping_all(struct stack *spec_stack, struct state *spec,
 		struct state *impl);
 
 struct error *
