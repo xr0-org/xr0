@@ -18,6 +18,7 @@ enum command_kind {
 	COMMAND_HELP,
 	COMMAND_STEP,
 	COMMAND_NEXT,
+	COMMAND_PREV,
 	COMMAND_CONTINUE,
 	COMMAND_VERIFY,
 	COMMAND_QUIT,
@@ -70,7 +71,7 @@ static struct ast_expr *
 command_arg_toexpr(struct command *);
 
 struct error *
-command_next(struct verifier *p, char *debugsep)
+command_exec(struct verifier *p, struct command *cmd, char *debugsep)
 {
 	struct error *err;
 
@@ -78,7 +79,6 @@ command_next(struct verifier *p, char *debugsep)
 		should_continue = false;
 		return command_continue_exec(p);
 	}
-	struct command *cmd = getcmd(debugsep);
 	switch (cmd->kind) {
 	case COMMAND_STEP:
 		err = verifier_progress(p, progressor_step());
@@ -86,6 +86,8 @@ command_next(struct verifier *p, char *debugsep)
 	case COMMAND_NEXT:
 		err = verifier_progress(p, progressor_next());	
 		break;
+	case COMMAND_PREV:
+		err = error_prev();
 	case COMMAND_VERIFY:
 		err = command_verify_exec(p, cmd);
 		break;
@@ -102,7 +104,6 @@ command_next(struct verifier *p, char *debugsep)
 	default:
 		assert(false);
 	}
-
 	command_destroy(cmd);
 	return err;
 }

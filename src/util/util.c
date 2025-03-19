@@ -380,6 +380,7 @@ struct error {
 		ERROR_VERIFIERINSTRUCT,
 		ERROR_VERIFIERCONTRADICTION,
 		ERROR_RETURN,
+		ERROR_PREV,
 		ERROR_BREAK,
 
 		ERROR_BLOCK_OBSERVE_NOOBJ,
@@ -536,6 +537,20 @@ error_to_return(struct error *err)
 }
 
 struct error *
+error_prev(void)
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_PREV;
+	return err;
+}
+
+struct error *
+error_to_prev(struct error *err)
+{
+	return error_to(err, ERROR_PREV);
+}
+
+struct error *
 error_break(void)
 {
 	struct error *err = calloc(1, sizeof(struct error));
@@ -642,6 +657,7 @@ error_str(struct error *err)
 		[ERROR_VERIFIERCONTRADICTION]	= "verifier contradiction",
 		[ERROR_RETURN]			= "returned",
 		[ERROR_BREAK]			= "broken",
+		[ERROR_PREV]			= "prev",
 
 		[ERROR_BLOCK_OBSERVE_NOOBJ]	= "block_observe no object",
 
@@ -662,6 +678,7 @@ error_str(struct error *err)
 	case ERROR_VERIFIERCONTRADICTION:
 	case ERROR_RETURN:
 	case ERROR_BREAK:
+	case ERROR_PREV:
 	case ERROR_BLOCK_OBSERVE_NOOBJ:
 	case ERROR_STATE_GET_NOBLOCK:
 	case ERROR_STATE_DEREF_RCONST:

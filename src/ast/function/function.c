@@ -276,19 +276,45 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 	return NULL;
 }
 
+static void
+history_replay(struct verifier *, struct command_stack *, char *sep);
+
 struct error *
 ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 {
-	struct verifier *verifier = verifier_create(f, ext);
-	while (!verifier_atend(verifier)) {
-		d_printf("%s\n", verifier_str(verifier));
-		struct error *err = command_next(verifier, sep);
+	struct verifier *v = verifier_create(f, ext);
+	struct command_stack *hist = command_stack_create();
+
+	while (!verifier_atend(v)) {
+		d_printf("%s\n", verifier_str(v));
+		struct command *cmd = command_read(sep);
+		struct error *err = command_exec(v, cmd, sep);
 		if (err) {
-			return err;
+			if (!error_to_prev(err)) {
+				return err;
+			}
+			/* handle prev */
+			verifier_destroy(v);
+			v = verifier_create(f, ext);
+			history_replay(v, command_stack_copy(hist), sep);
+			continue;
+		}
+		command_stack_push(hist, command_copy(cmd));
+	}
+	verifier_destroy(v);
+	return NULL;
+}
+
+static void
+history_replay(struct verifier *v, struct command_stack *h, char *sep)
+{
+	while (!command_stack_isempty(h)) {
+		struct error *err = command_exec(v, command_stack_pop(h), sep);
+		if (err) {
+			/* should be impossible to encounter error replaying */
+			assert(0);
 		}
 	}
-	verifier_destroy(verifier);
-	return NULL;
 }
 
 static void

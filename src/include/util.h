@@ -156,6 +156,12 @@ struct error *
 error_to_return(struct error *);
 
 struct error *
+error_prev(void);
+
+struct error *
+error_to_prev(struct error *);
+
+struct error *
 error_break(void);
 
 struct error *
