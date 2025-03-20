@@ -57,8 +57,8 @@ command_destroy(struct command *cmd)
 
 bool should_continue = false;
 
-static void
-command_help_exec(void);
+static struct error *
+command_help_exec(struct command *);
 
 static struct command *
 getcmd(char *debugsep);
@@ -96,7 +96,7 @@ command_next(struct verifier *p, char *debugsep)
 		err = command_continue_exec(p);
 		break;	
 	case COMMAND_HELP:
-		command_help_exec();
+		err = command_help_exec(cmd);
 		break;
 	case COMMAND_BREAKPOINT_SET:
 	case COMMAND_BREAKPOINT_LIST:
@@ -112,8 +112,70 @@ command_next(struct verifier *p, char *debugsep)
 	return err;
 }
 
+static bool
+command_ishelp(char *cmd);
+
+static bool
+command_isstep(char *cmd);
+
+static bool
+command_isnext(char *cmd);
+
+static bool
+command_iscontinue(char *cmd);
+
+static bool
+command_isquit(char *cmd);
+
+static bool
+command_isbreak(char *cmd);
+
 static void
-command_help_exec()
+help_base(void);
+
+static void
+help_step(void);
+
+static void
+help_next(void);
+
+static void
+help_continue(void);
+
+static void
+help_break(void);
+
+static void
+help_quit(void);
+
+static struct error *
+command_help_exec(struct command *cmd)
+{
+	int nargs = string_arr_n(cmd->args);
+	if (nargs == 0) {
+		help_base();
+		return NULL;
+	}
+	assert(nargs == 1);
+	char *arg = string_arr_s(cmd->args)[0];
+	if (command_isstep(arg)) {
+		help_step();
+	} else if (command_isnext(arg)) {
+		help_next();
+	} else if (command_iscontinue(arg)) {
+		help_continue();
+	} else if (command_isbreak(arg)) {
+		help_break();
+	} else if (command_isquit(arg)) {
+		help_quit();
+	} else {
+		d_printf("`help' received unknown argument\n");
+	}
+	return NULL;
+}
+
+static void
+help_base()
 {
 	d_printf("List of commands:\n");
 	d_printf("step -- Step to next logical statement.\n");
@@ -121,6 +183,48 @@ command_help_exec()
 	d_printf("break -- Set breakpoint.\n");
 	d_printf("continue -- Step until breakpoint, error or end.\n");
 	d_printf("quit -- Quit.\n\n");
+}
+
+static void
+help_step(void)
+{
+	d_printf("Step to the next logical statement, entering\n");
+	d_printf("the current one when appropriate.\n");
+	d_printf("Usage: s(tep)\n\n");
+}
+
+static void
+help_next(void)
+{
+	d_printf("Step over the current statement.\n");
+	d_printf("Usage: n(ext)\n\n");
+}
+
+static void
+help_continue(void)
+{
+	d_printf("Step until breakpoint, error or end.\n");
+	d_printf("Usage: c(ontinue)\n\n");
+}
+
+static void
+help_break(void)
+{
+	d_printf("break -- Set breakpoint.\n");
+	d_printf("Usage: b(reak) [LINE_NUMBER]\n\n");
+
+	d_printf("list -- List all breakpoints.\n");
+	d_printf("Usage: b(reak) list\n\n");
+
+	d_printf("Note: Currently breakpoints can only be\n");
+	d_printf("set on statements.\n\n");
+}
+
+static void
+help_quit(void)
+{
+	d_printf("Quit.\n");
+	d_printf("Usage: q(uit)\n");
 }
 
 static struct error *
@@ -220,21 +324,6 @@ getcmd(char *debugsep)
 	}
 }
 
-static bool
-command_ishelp(char *cmd);
-
-static bool
-command_isstep(char *cmd);
-
-static bool
-command_isnext(char *cmd);
-
-static bool
-command_iscontinue(char *cmd);
-
-static bool
-command_isquit(char *cmd);
-
 static struct command *
 process_command(char *cmd, char *sep)
 {
@@ -250,7 +339,7 @@ process_command(char *cmd, char *sep)
 		return command_create(COMMAND_QUIT);
 	} else {
 		d_printf("unknown command `%s'\n", cmd);
-		return getcmd(sep);
+		return NULL;
 	}
 }
 
@@ -288,10 +377,7 @@ static struct string_arr *
 args_tokenise(char *args);
 
 static struct command *
-command_help(struct string_arr *args, char *debugsep);
-
-static bool
-command_isbreak(char *cmd);
+command_help_create(struct string_arr *args, char *debugsep);
 
 static struct command *
 command_break(struct string_arr *args, char *debugsep);
@@ -300,7 +386,7 @@ static bool
 command_isverify(char *cmd);
 
 static struct command *
-command_verify(char *arg);
+command_verify_create(char *arg);
 
 static struct command *
 process_commandwithargs(char *cmd, char *args, char *debugsep)
@@ -308,17 +394,17 @@ process_commandwithargs(char *cmd, char *args, char *debugsep)
 	struct string_arr *args_tk = args_tokenise(dynamic_str(args));
 	if (args_tk == NULL) {
 		fprintf(stderr, "invalid command args: %s\n", args);
-		return getcmd(debugsep);
+		return NULL;
 	}
 	if (command_ishelp(cmd)) {
-		return command_help(args_tk, debugsep);
+		return command_help_create(args_tk, debugsep);
 	} else if (command_isbreak(cmd)) {
 		return command_break(args_tk, debugsep);	
 	} else if (command_isverify(cmd)) {
-		return command_verify(args);
+		return command_verify_create(args);
 	} else {
 		d_printf("unknown command `%s'\n", cmd);
-		return getcmd(debugsep);
+		return NULL;
 	}
 }
 
@@ -335,86 +421,15 @@ args_tokenise(char *args)
 	return arg_arr;
 }
 
-static void
-command_help_step(void);
-
-static void
-command_help_next(void);
-
-static void
-command_help_continue(void);
-
-static void
-command_help_break(void);
-
-static void
-command_help_quit(void);
-
 static struct command *
-command_help(struct string_arr *args, char *debugsep)
+command_help_create(struct string_arr *args, char *debugsep)
 {
+	assert(args);
 	if (string_arr_n(args) != 1) {
 		d_printf("`help' expects single argument\n");
-		return getcmd(debugsep);
-	}
-	char *arg = string_arr_s(args)[0];
-	if (command_isstep(arg)) {
-		command_help_step();
-	} else if (command_isnext(arg)) {
-		command_help_next();
-	} else if (command_iscontinue(arg)) {
-		command_help_continue();
-	} else if (command_isbreak(arg)) {
-		command_help_break();
-	} else if (command_isquit(arg)) {
-		command_help_quit();
-	} else {
-		d_printf("`help' received unknown argument\n");
-		return getcmd(debugsep);
-	}
-	return command_create(COMMAND_HELP);
-}
-
-static void
-command_help_step(void)
-{
-	d_printf("Step to the next logical statement, entering\n");
-	d_printf("the current one when appropriate.\n");
-	d_printf("Usage: s(tep)\n\n");
-}
-
-static void
-command_help_next(void)
-{
-	d_printf("Step over the current statement.\n");
-	d_printf("Usage: n(ext)\n\n");
-}
-
-static void
-command_help_continue(void)
-{
-	d_printf("Step until breakpoint, error or end.\n");
-	d_printf("Usage: c(ontinue)\n\n");
-}
-
-static void
-command_help_break(void)
-{
-	d_printf("break -- Set breakpoint.\n");
-	d_printf("Usage: b(reak) [LINE_NUMBER]\n\n");
-
-	d_printf("list -- List all breakpoints.\n");
-	d_printf("Usage: b(reak) list\n\n");
-
-	d_printf("Note: Currently breakpoints can only be\n");
-	d_printf("set on statements.\n\n");
-}
-
-static void
-command_help_quit(void)
-{
-	d_printf("Quit.\n");
-	d_printf("Usage: q(uit)\n");
+		return NULL;
+	}	
+	return command_create_withargs(COMMAND_HELP, args);
 }
 
 static bool
@@ -440,7 +455,7 @@ command_break(struct string_arr *args, char *debugsep)
 {
 	if (string_arr_n(args) != 1) {
 		fprintf(stderr, "`break' expects single argument\n");
-		return getcmd(debugsep);
+		return NULL;
 	}
 	char *arg = string_arr_s(args)[0];
 	if (break_argisset(arg)) {
@@ -449,7 +464,7 @@ command_break(struct string_arr *args, char *debugsep)
 		return break_list();
 	} else {
 		fprintf(stderr, "`break' received unknown argument\n");
-		return getcmd(debugsep);
+		return NULL;
 	}
 }
 
@@ -497,7 +512,7 @@ command_isverify(char *cmd)
 }
 
 static struct command *
-command_verify(char *arg)
+command_verify_create(char *arg)
 {
 	struct string_arr *sarr = string_arr_create();
 	string_arr_append(sarr, dynamic_str(arg));
