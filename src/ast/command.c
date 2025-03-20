@@ -63,6 +63,16 @@ command_help_exec(struct command *);
 static struct command *
 getcmd(char *debugsep);
 
+struct command *
+command_read(char *debugsep)
+{
+	struct command *c = getcmd(debugsep);
+	if (!c) {
+		return getcmd(debugsep);
+	}
+	return c;
+}
+
 static struct error *
 command_continue_exec(struct verifier *);
 
@@ -73,7 +83,7 @@ static struct ast_expr *
 command_arg_toexpr(struct command *);
 
 struct error *
-command_next(struct verifier *p, char *debugsep)
+command_exec(struct verifier *p, struct command *cmd, char *debugsep)
 {
 	struct error *err;
 
@@ -81,7 +91,6 @@ command_next(struct verifier *p, char *debugsep)
 		should_continue = false;
 		return command_continue_exec(p);
 	}
-	struct command *cmd = getcmd(debugsep);
 	switch (cmd->kind) {
 	case COMMAND_STEP:
 		err = verifier_progress(p, progressor_step());
