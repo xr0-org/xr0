@@ -36,6 +36,9 @@ lsi_prefixvars(struct lsi *, char *prefix);
 int
 lsi_var_isconst(struct lsi *, char *var, int c);
 
+int
+lsi_var_isanyint(struct lsi *, char *);
+
 /* lsi_checksatisfiesrange: return an error if there is a inequality in m which
  * isn't satisfied in l. the map is for pretty printing. */
 struct error *

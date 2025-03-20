@@ -663,7 +663,7 @@ stack_shapeverify_top(struct stack *spec_stack, struct state *spec,
 		struct error *err = _var_shapeverify(spec, impl, id);
 		if (err) {
 			return error_printf(
-				"invariant failure: `%s' %w",
+				"precondition failure: `%s' %w",
 				id, err
 			);
 		}

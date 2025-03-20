@@ -150,6 +150,9 @@ state_rconst(struct state *, char *key, bool persist);
 char *
 state_rconstnokey(struct state *, bool persist);
 
+int
+state_rconst_isanyint(struct state *, char *rconst);
+
 struct str_res;
 
 struct str_res *

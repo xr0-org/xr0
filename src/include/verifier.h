@@ -101,6 +101,9 @@ rconst_getwithconstvalue(struct rconst *, int);
 struct lsi_le;
 
 int
+rconst_isanyint(struct rconst *, char *);
+
+int
 rconst_hasvar(struct rconst *, char *var);
 
 void

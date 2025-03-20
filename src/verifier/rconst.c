@@ -300,3 +300,9 @@ rconst_isfeasible(struct rconst *r, struct lsi_le *le)
 	}
 	return 1;
 }
+
+int
+rconst_isanyint(struct rconst *v, char *rconst)
+{
+	return lsi_var_isanyint(v->constraints, rconst);
+}

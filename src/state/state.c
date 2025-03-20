@@ -273,6 +273,12 @@ state_rconstnokey(struct state *s, bool persist)
 	return rconst_declarenokey(s->rconst, persist, s);
 }
 
+int
+state_rconst_isanyint(struct state *s, char *rconst)
+{
+	return rconst_isanyint(s->rconst, rconst);
+}
+
 struct str_res *
 state_getrconstwithvalue(struct state *s, int c)
 {
@@ -805,7 +811,7 @@ state_specverify(struct state *impl, struct state *spec)
 	     *str2 = state_str(spec_c);
 	int equal = strcmp(str1, str2) == 0;
 	if (!equal) {
-		return error_printf("impl and abstract states differ");
+		return error_printf("actual and abstract states differ");
 	}
 	free(str2);
 	free(str1);

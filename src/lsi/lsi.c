@@ -4,6 +4,7 @@
 
 #include "util.h"
 #include "lsi.h"
+#include "_limits.h"
 
 #include "le.h"
 #include "expr_arr.h"
@@ -112,6 +113,14 @@ _var_isconstupperbounded(struct le_arr *arr, char *var, int c)
 		}
 	}
 	return 0;
+}
+
+int
+lsi_var_isanyint(struct lsi *lsi, char *var)
+{
+	struct le_arr *arr = lsi->arr;
+	return _var_isconstlowerbounded(arr, var, C89_INT_MIN)
+		&& _var_isconstupperbounded(arr, var, C89_INT_MAX);
 }
 
 static struct error *

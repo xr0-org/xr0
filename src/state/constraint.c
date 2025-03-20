@@ -35,6 +35,9 @@ constraint_destroy(struct constraint *c)
 }
 
 static int
+isrconst(struct ast_type *, struct value *);
+
+static int
 size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec,
 		struct state *impl);
 
@@ -47,7 +50,7 @@ struct error *
 constraint_shapeverify(struct constraint *c, struct value *spec_v,
 		struct value *impl_v)
 {
-	if (ast_type_isint(c->t)) {
+	if (isrconst(c->t, spec_v)) {
 		return NULL;
 	} else if (ast_type_isstruct(c->t)) {
 		return value_struct_shapeverify(
@@ -59,12 +62,6 @@ constraint_shapeverify(struct constraint *c, struct value *spec_v,
 		"can only verify int, struct and pointer params\n"
 	);
 
-	if (!value_islocation(spec_v)) {
-		/* allow for NULL and other invalid-pointer setups */
-		/* TODO: include non-location pointers above case */
-		assert(0);
-		return NULL;
-	}
 	/* spec requires value be valid pointer */
 	if (!value_islocation(impl_v)) {
 		return error_printf("must be pointing at something");
@@ -99,6 +96,13 @@ constraint_shapeverify(struct constraint *c, struct value *spec_v,
 	return err;
 }
 
+static int
+isrconst(struct ast_type *t, struct value *v)
+{
+	return ast_type_isint(t) || (ast_type_isptr(t) && !value_islocation(v));
+}
+
+
 static struct location *
 location_reloffset(struct location *l1, struct location *l2)
 {
@@ -127,7 +131,22 @@ struct lsi_varmap *
 constraint_impl_spec_mapping(struct constraint *c, struct value *spec_v,
 		struct value *impl_v, char *alias)
 {
-	if (ast_type_isint(c->t)) {
+	if (isrconst(c->t, spec_v)) {
+		if (value_islocation(impl_v)) {
+			a_printf(
+				state_rconst_isanyint(
+					c->spec,
+					ast_expr_as_identifier(
+						value_as_rconst(spec_v)
+					)
+				),
+				"comparisons involving definite and indefinite "\
+				"pointers are only currently supported when "\
+				"indefinite pointer is any integer\n"
+			);
+			return lsi_varmap_create();
+		}
+
 		struct lsi_varmap *lv = lsi_varmap_create();
 		char *spec_rconst = value_to_rconstid(spec_v, c->spec);
 		lsi_varmap_set(
@@ -151,13 +170,6 @@ constraint_impl_spec_mapping(struct constraint *c, struct value *spec_v,
 		ast_type_isptr(c->t),
 		"can only verify int, struct and pointer params\n"
 	);
-
-	if (!value_islocation(spec_v)) {
-		/* allow for NULL and other invalid-pointer setups */
-		/* TODO: include non-location pointers above case */
-		assert(0);
-		return lsi_varmap_create();
-	}
 
 	struct location *spec_loc = value_as_location(spec_v),
 			*impl_loc = value_as_location(impl_v);
