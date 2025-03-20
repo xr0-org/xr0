@@ -204,7 +204,7 @@ process_commandwithargs(char *cmd, char *args, char *debugsep)
 	if (command_ishelp(cmd)) {
 		return command_help_create(args_tk, debugsep);
 	} else if (command_isbreak(cmd)) {
-		return command_break_create(args_tk, debugsep);	
+		return command_break_create(args_tk, debugsep);
 	} else if (command_isverify(cmd)) {
 		return command_verify_create(args);
 	} else {
@@ -233,7 +233,7 @@ command_help_create(struct string_arr *args, char *debugsep)
 	if (string_arr_n(args) != 1) {
 		d_printf("`help' expects single argument\n");
 		return NULL;
-	}	
+	}
 	return command_create_withargs(COMMAND_HELP, args);
 }
 
@@ -270,14 +270,14 @@ command_exec(struct verifier *p, char *debugsep)
 		err = verifier_progress(p, progressor_step());
 		break;
 	case COMMAND_NEXT:
-		err = verifier_progress(p, progressor_next());	
+		err = verifier_progress(p, progressor_next());
 		break;
 	case COMMAND_CONTINUE:
 		err = command_continue_exec(p);
 		break;
 	case COMMAND_VERIFY:
 		err = command_verify_exec(p, cmd);
-		break;		
+		break;
 	case COMMAND_QUIT:
 		exit(0);
 	case COMMAND_BREAKPOINT_SET:
