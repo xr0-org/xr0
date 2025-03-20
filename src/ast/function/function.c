@@ -295,28 +295,19 @@ ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 				return err;
 			}
 
-			command_deque_print(hist);
-
-			printf("popping value\n");
 			struct command *cmd = command_deque_popback(hist);
 			if (!cmd) {
 				printf("\n\n“Go back?” he thought. “No good at all! Go sideways?\n");
 				printf("Impossible! Go forward? Only thing to do!”\n\n");
 				continue;
 			}
-			printf("after pop\n");
-			command_deque_print(hist);
 
 			/* XXX: verifier_destroy(v); */
 			v = verifier_create(f, ext);
 			history_replay(v, command_deque_copy(hist), sep);
 			continue;
 		}
-		printf("pushing value\n");
-		command_deque_print(hist);
 		command_deque_pushback(hist, cmd);
-		printf("after push\n");
-		command_deque_print(hist);
 	}
 	verifier_destroy(v);
 	return NULL;
