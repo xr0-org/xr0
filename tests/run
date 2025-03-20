@@ -105,14 +105,9 @@ done
 
 cd $TESTDIR
 cd ..
-printf "%-${length}s ..." "0db/00-basic"
-if $TESTDIR/0db/run; then
-	npass=$((npass+1))
-	printf "$pass"
-else
-	printf "$fail"
-fi
-ntests=$((ntests+1))
+
+# source to preserve variables
+. $TESTDIR/0db/run
 
 nfail=$((ntests-(npass+nignore)))
 finish=$(date +%s)

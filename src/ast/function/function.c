@@ -282,7 +282,7 @@ ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 	struct verifier *verifier = verifier_create(f, ext);
 	while (!verifier_atend(verifier)) {
 		d_printf("%s\n", verifier_str(verifier));
-		struct error *err = command_next(verifier, sep);
+		struct error *err = command_exec(verifier, sep);
 		if (err) {
 			return err;
 		}

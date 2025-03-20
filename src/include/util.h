@@ -162,6 +162,12 @@ struct error *
 error_to_break(struct error *);
 
 struct error *
+error_cmdvalidation(void);
+
+struct error *
+error_to_cmdvalidation(struct error *);
+
+struct error *
 error_block_observe_noobj(void);
 
 struct error *
