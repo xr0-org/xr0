@@ -57,19 +57,6 @@ command_destroy(struct command *cmd)
 
 bool should_continue = false;
 
-static struct command *
-getcmd(char *debugsep);
-
-struct command *
-command_read(char *debugsep)
-{
-	struct command *c = getcmd(debugsep);
-	if (!c) {
-		return getcmd(debugsep);
-	}
-	return c;
-}
-
 /* getcmd() */
 
 #define MAX_COMMANDLEN 100
@@ -120,7 +107,7 @@ getcmd(char *debugsep)
 		strcpy(cmd, line);
 		strcpy(args, space+1);
 		args[strcspn(args, "\n")] = '\0';
-		return process_commandwithargs(cmd, args, debugsep);	
+		return process_commandwithargs(cmd, args, debugsep);
 	}
 }
 
@@ -143,6 +130,8 @@ process_command(char *cmd, char *sep)
 	}
 }
 
+static struct command *
+command_read(char *debugsep);
 
 static struct error *
 command_help_exec(struct command *);
@@ -165,7 +154,7 @@ command_exec(struct verifier *p, char *debugsep)
 		should_continue = false;
 		return command_continue_exec(p);
 	}
-	struct command *cmd = getcmd(debugsep);
+	struct command *cmd = command_read(debugsep);
 	switch (cmd->kind) {
 	case COMMAND_HELP:
 		err = command_help_exec(cmd);
@@ -194,6 +183,16 @@ command_exec(struct verifier *p, char *debugsep)
 
 	command_destroy(cmd);
 	return err;
+}
+
+static struct command *
+command_read(char *debugsep)
+{
+	struct command *c = getcmd(debugsep);
+	if (!c) {
+		return getcmd(debugsep);
+	}
+	return c;
 }
 
 static bool
