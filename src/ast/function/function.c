@@ -294,21 +294,28 @@ ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 			if (!error_to_prev(err)) {
 				return err;
 			}
-			/* handle prev */
 
-			/* pop last command */
-			struct command *cmd = command_deque_popfront(hist);
+			command_deque_print(hist);
+
+			printf("popping value\n");
+			struct command *cmd = command_deque_popback(hist);
 			if (!cmd) {
-				/* no commands to pop */
-				assert(0);
+				printf("\n\n“Go back?” he thought. “No good at all! Go sideways?\n");
+				printf("Impossible! Go forward? Only thing to do!”\n\n");
+				continue;
 			}
+			printf("after pop\n");
+			command_deque_print(hist);
 
-			/* XXX: call verifier_destroy on old v */
+			/* XXX: verifier_destroy(v); */
 			v = verifier_create(f, ext);
 			history_replay(v, command_deque_copy(hist), sep);
 			continue;
 		}
+		printf("pushing value\n");
+		command_deque_print(hist);
 		command_deque_pushback(hist, cmd);
+		printf("after push\n");
 		command_deque_print(hist);
 	}
 	verifier_destroy(v);
@@ -318,8 +325,6 @@ ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 static void
 history_replay(struct verifier *v, struct command_deque *h, char *sep)
 {
-	printf("replaying:\n");
-	command_deque_print(h);
 	while (!command_deque_isempty(h)) {
 		struct command *c = command_deque_popfront(h);
 		struct error *err = command_exec(v, c, sep);

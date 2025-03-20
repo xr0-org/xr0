@@ -89,15 +89,15 @@ command_deque_pushback(struct command_deque *dq, struct command *c)
 {
 	struct _node *n = _create_node(c);
 	n->next = NULL;
+	n->prev = dq->back;
 
 	if (command_deque_isempty(dq)) {
 		dq->front = n;
-		dq->back = n;
 	} else {
-		n->prev = dq->back;
 		dq->back->next = n;
-		dq->back = n;
 	}
+
+	dq->back = n;
 }
 
 struct command *
@@ -121,19 +121,19 @@ command_deque_popfront(struct command_deque *dq)
 }
 
 struct command *
-command_deque_popback(struct command_deque *q)
+command_deque_popback(struct command_deque *dq)
 {
-	if (command_deque_isempty(q)) {
+	if (command_deque_isempty(dq)) {
 		return NULL;	
 	}
-	struct _node *n = q->back;
+	struct _node *n = dq->back;
 	struct command *c = command_copy(n->_);
 
-	q->back = n->next;
-	if (q->back) {
-		q->back->next = NULL;
+	dq->back = n->prev;
+	if (dq->back) {
+		dq->back->next = NULL;
 	} else {
-		q->front = NULL;
+		dq->front = NULL;
 	}
 	_destroy_node(n);
 

@@ -80,7 +80,6 @@ command_str(struct command *cmd)
 	case COMMAND_PREV:
 		return dynamic_str("prev");
 	default:
-		printf("%d\n", cmd->kind);
 		assert(0);
 	}
 }
@@ -108,7 +107,6 @@ command_arg_toexpr(struct command *);
 struct error *
 command_exec(struct verifier *p, struct command *cmd, char *debugsep)
 {
-	printf("command: %s\n", command_str(cmd));
 	if (should_continue) {
 		should_continue = false;
 		return command_continue_exec(p);
