@@ -57,6 +57,9 @@ command_destroy(struct command *cmd)
 
 bool should_continue = false;
 
+static void
+command_help_exec(void);
+
 static struct command *
 getcmd(char *debugsep);
 
@@ -93,6 +96,8 @@ command_next(struct verifier *p, char *debugsep)
 		err = command_continue_exec(p);
 		break;	
 	case COMMAND_HELP:
+		command_help_exec();
+		break;
 	case COMMAND_BREAKPOINT_SET:
 	case COMMAND_BREAKPOINT_LIST:
 		err = NULL;
@@ -105,6 +110,17 @@ command_next(struct verifier *p, char *debugsep)
 
 	command_destroy(cmd);
 	return err;
+}
+
+static void
+command_help_exec()
+{
+	d_printf("List of commands:\n");
+	d_printf("step -- Step to next logical statement.\n");
+	d_printf("next -- Step over.\n");
+	d_printf("break -- Set breakpoint.\n");
+	d_printf("continue -- Step until breakpoint, error or end.\n");
+	d_printf("quit -- Quit.\n\n");
 }
 
 static struct error *
@@ -204,9 +220,6 @@ getcmd(char *debugsep)
 	}
 }
 
-static struct command *
-command_create_help(void);
-
 static bool
 command_ishelp(char *cmd);
 
@@ -226,7 +239,7 @@ static struct command *
 process_command(char *cmd, char *sep)
 {
 	if (command_ishelp(cmd)) {
-		return command_create_help();
+		return command_create(COMMAND_HELP);
 	} else if (command_isstep(cmd)) {
 		return command_create(COMMAND_STEP);
 	} else if (command_isnext(cmd)) {
@@ -245,18 +258,6 @@ static bool
 command_ishelp(char *cmd)
 {
 	return strcmp(cmd, "h") == 0 || strcmp(cmd, "help") == 0;
-}
-
-static struct command *
-command_create_help(void)
-{
-	d_printf("List of commands:\n");
-	d_printf("step -- Step to next logical statement.\n");
-	d_printf("next -- Step over.\n");
-	d_printf("break -- Set breakpoint.\n");
-	d_printf("continue -- Step until breakpoint, error or end.\n");
-	d_printf("quit -- Quit.\n\n");
-	return command_create(COMMAND_HELP);
 }
 
 static bool

@@ -1,0 +1,132 @@
+(0db) The Xr0 Static Debugger for C
+Copyright (C) 2024 Xr0
+License Apache 2.0
+
+A static debugger is the compile-time analogue of
+runtime debuggers like GDB. Runtime debuggers
+require you to execute a program in order to
+analyse it, but 0db shows line-by-line the state
+of a C program on the basis of the semantics of
+the language alone.
+
+This matters because at runtime we interact with a
+very tiny subset of a program's possible
+behaviours. In the state supplied by 0db you see
+at once what applies to all possible executions
+of a program.
+
+For help, type "help".
+
+
+phase:	ABSTRACT (INIT)
+
+(0db) @phase:	ABSTRACT (SETUP)
+
+text:
+-->	setup: q = .clump(1);
+	if (x) {
+		*(q) = 1;
+	}
+
+rconst:
+	$0: ptr:{?}	"q"
+	$1: int:{?}	"x"
+
+stack:
+	---------------------------- findsetup
+	0: |1| {0:<rconst:$0>} (int * q, π)
+	1: |1| {0:<rconst:$1>} (int x, π)
+	---------------------------- modify0
+
+
+
+(0db) @phase:	ABSTRACT (SETUP)
+
+text:
+	setup: q = .clump(1);
+-->	if (x) {
+		*(q) = 1;
+	}
+
+rconst:
+	$0: ptr:{?}	"q"
+	$1: int:{?}	"x"
+
+clump:
+	0: |1| 
+
+stack:
+	---------------------------- findsetup
+	0: |1| {0:<ptr:clump:0>} (int * q, π)
+	1: |1| {0:<rconst:$1>}   (int x, π)
+	---------------------------- modify0
+
+
+
+(0db) @phase:	ABSTRACT (SETUP)
+
+text:
+	setup: q = .clump(1);
+-->	if (x) {
+		*(q) = 1;
+	}
+
+rconst:
+	$0: ptr:{?}	"q"
+	$1: int:{?}	"x"
+
+clump:
+	0: |1| 
+
+stack:
+	---------------------------- findsetup
+	0: |1| {0:<ptr:clump:0>} (int * q, π)
+	1: |1| {0:<rconst:$1>}   (int x, π)
+	---------------------------- modify0
+
+
+
+(0db) @phase:	ABSTRACT (INIT)
+
+phase:	ABSTRACT (INIT)
+
+phase:	ACTUAL (EXEC)
+
+text:
+	int p;
+-->	p = 0;
+	~ [ p==0; ]
+	modify0(&(p), 0);
+	~ [ p==0; ]
+	modify0(&(p), 1);
+	~ [ p==1; ]
+	modify1(&(p), 0);
+	~ [ p==1; ]
+	modify1(&(p), 1);
+	~ [ p==2; ]
+
+rconst:
+	#0: int:{?}	"main:gen:0:{}"
+
+stack:
+	0: |1| {0:<>} (int p)
+	---------------------------- main
+
+
+
+(0db) @phase:	ACTUAL (EXEC)
+
+text:
+-->	p = 0;
+
+rconst:
+	#0: int:{?}	"main:gen:0:{}"
+
+stack:
+	---------------------------- inter
+	0: |1| {0:<>} (int p)
+	---------------------------- main
+
+
+
+(0db) @
