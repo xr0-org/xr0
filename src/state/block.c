@@ -211,7 +211,7 @@ block_shapeverify(struct block *b, struct location *impl_loc,
 	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
 		struct error *err = constraint_shapeverify_object(
-			c, obj[i], impl_loc
+			constraint_deref(c), obj[i], impl_loc
 		);
 		if (err) {
 			char *index = _constraintbased_actual_index(
@@ -255,14 +255,18 @@ block_impl_spec_mapping(struct block *b, struct location *impl_loc,
 	for (int i = 0; i < n; i++) {
 		struct strbuilder *b = strbuilder_create();
 		char *index = _constraintbased_actual_index(impl_loc, obj[i]);
-		strbuilder_printf(b, "%s[%d]", referent, index);
+		if (strcmp(index, "0") == 0) {
+			strbuilder_printf(b, "*(%s)", referent);
+		} else {
+			strbuilder_printf(b, "%s[%s]", referent, index);
+		}
 		char *alias = strbuilder_build(b);
 		free(index);
 
 		lsi_varmap_addrange(
 			lv,
 			constraint_impl_spec_mapping_object(
-				c, obj[i], impl_loc, alias
+				constraint_deref(c), obj[i], impl_loc, alias
 			)
 		);
 

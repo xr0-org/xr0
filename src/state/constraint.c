@@ -27,6 +27,12 @@ constraint_create(struct state *spec, struct state *impl, struct ast_type *t)
 	return c;
 }
 
+struct constraint *
+constraint_deref(struct constraint *c)
+{
+	return constraint_create(c->spec, c->impl, ast_type_deref(c->t));
+}
+
 void
 constraint_destroy(struct constraint *c)
 {

@@ -6,6 +6,9 @@ struct constraint;
 struct constraint *
 constraint_create(struct state *spec, struct state *impl, struct ast_type *);
 
+struct constraint *
+constraint_deref(struct constraint *);
+
 void
 constraint_destroy(struct constraint *);
 
