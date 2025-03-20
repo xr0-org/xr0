@@ -57,9 +57,6 @@ command_destroy(struct command *cmd)
 
 bool should_continue = false;
 
-static struct error *
-command_help_exec(struct command *);
-
 static struct command *
 getcmd(char *debugsep);
 
@@ -73,53 +70,17 @@ command_read(char *debugsep)
 	return c;
 }
 
-static struct error *
-command_continue_exec(struct verifier *);
+/* getcmd() */
 
-static struct error *
-command_verify_exec(struct verifier *, struct command *);
+#define MAX_COMMANDLEN 100
+#define MAX_LINELEN 1000
+#define MAX_ARGSLEN 100
 
-static struct ast_expr *
-command_arg_toexpr(struct command *);
+static struct command *
+process_command(char *cmd, char *debugsep);
 
-struct error *
-command_exec(struct verifier *p, struct command *cmd, char *debugsep)
-{
-	struct error *err;
-
-	if (should_continue) {
-		should_continue = false;
-		return command_continue_exec(p);
-	}
-	switch (cmd->kind) {
-	case COMMAND_STEP:
-		err = verifier_progress(p, progressor_step());
-		break;
-	case COMMAND_NEXT:
-		err = verifier_progress(p, progressor_next());	
-		break;
-	case COMMAND_VERIFY:
-		err = command_verify_exec(p, cmd);
-		break;
-	case COMMAND_CONTINUE:
-		err = command_continue_exec(p);
-		break;	
-	case COMMAND_HELP:
-		err = command_help_exec(cmd);
-		break;
-	case COMMAND_BREAKPOINT_SET:
-	case COMMAND_BREAKPOINT_LIST:
-		err = NULL;
-		break;
-	case COMMAND_QUIT:
-		exit(0);
-	default:
-		assert(false);
-	}
-
-	command_destroy(cmd);
-	return err;
-}
+static struct command *
+process_commandwithargs(char *cmd, char *args, char *debugsep);
 
 static bool
 command_ishelp(char *cmd);
@@ -135,6 +96,105 @@ command_iscontinue(char *cmd);
 
 static bool
 command_isquit(char *cmd);
+
+static struct command *
+getcmd(char *debugsep)
+{
+	d_printf("(0db) %s", debugsep);
+	char line[MAX_LINELEN];
+	char cmd[MAX_COMMANDLEN];
+	char args[MAX_ARGSLEN];
+	if (!fgets(line, MAX_LINELEN, stdin)) {
+		fprintf(stderr, "error: cannot read line\n");
+		exit(EXIT_FAILURE);
+	}
+	char *space = strchr(line, ' ');
+	if (space == NULL) {
+		/* ⊢ command no args */
+		strcpy(cmd, line);
+		cmd[strcspn(cmd, "\n")] = '\0';
+		return process_command(cmd, debugsep);
+	} else {
+		/* ⊢ command with args */
+		*space = '\0';
+		strcpy(cmd, line);
+		strcpy(args, space+1);
+		args[strcspn(args, "\n")] = '\0';
+		return process_commandwithargs(cmd, args, debugsep);	
+	}
+}
+
+static struct command *
+process_command(char *cmd, char *sep)
+{
+	if (command_ishelp(cmd)) {
+		return command_create(COMMAND_HELP);
+	} else if (command_isstep(cmd)) {
+		return command_create(COMMAND_STEP);
+	} else if (command_isnext(cmd)) {
+		return command_create(COMMAND_NEXT);
+	} else if (command_iscontinue(cmd)){
+		return command_create(COMMAND_CONTINUE);
+	} else if (command_isquit(cmd)) {
+		return command_create(COMMAND_QUIT);
+	} else {
+		d_printf("unknown command `%s'\n", cmd);
+		return NULL;
+	}
+}
+
+
+static struct error *
+command_help_exec(struct command *);
+
+static struct error *
+command_continue_exec(struct verifier *);
+
+static struct error *
+command_verify_exec(struct verifier *, struct command *);
+
+static struct ast_expr *
+command_arg_toexpr(struct command *);
+
+struct error *
+command_exec(struct verifier *p, char *debugsep)
+{
+	struct error *err;
+
+	if (should_continue) {
+		should_continue = false;
+		return command_continue_exec(p);
+	}
+	struct command *cmd = getcmd(debugsep);
+	switch (cmd->kind) {
+	case COMMAND_HELP:
+		err = command_help_exec(cmd);
+		break;
+	case COMMAND_STEP:
+		err = verifier_progress(p, progressor_step());
+		break;
+	case COMMAND_NEXT:
+		err = verifier_progress(p, progressor_next());	
+		break;
+	case COMMAND_CONTINUE:
+		err = command_continue_exec(p);
+		break;
+	case COMMAND_VERIFY:
+		err = command_verify_exec(p, cmd);
+		break;		
+	case COMMAND_QUIT:
+		exit(0);
+	case COMMAND_BREAKPOINT_SET:
+	case COMMAND_BREAKPOINT_LIST:
+		err = NULL;
+		break;
+	default:
+		assert(false);
+	}
+
+	command_destroy(cmd);
+	return err;
+}
 
 static bool
 command_isbreak(char *cmd);
@@ -291,65 +351,6 @@ command_arg_toexpr(struct command *c)
 	/* lex_finish(); */
 
 	return ast_expr_copy(YACC_PARSED_EXPR);
-}
-
-
-/* getcmd() */
-
-#define MAX_COMMANDLEN 100
-#define MAX_LINELEN 1000
-#define MAX_ARGSLEN 100
-
-static struct command *
-process_command(char *cmd, char *debugsep);
-
-static struct command *
-process_commandwithargs(char *cmd, char *args, char *debugsep);
-
-static struct command *
-getcmd(char *debugsep)
-{
-	d_printf("(0db) %s", debugsep);
-	char line[MAX_LINELEN];
-	char cmd[MAX_COMMANDLEN];
-	char args[MAX_ARGSLEN];
-	if (!fgets(line, MAX_LINELEN, stdin)) {
-		fprintf(stderr, "error: cannot read line\n");
-		exit(EXIT_FAILURE);
-	}
-	char *space = strchr(line, ' ');
-	if (space == NULL) {
-		/* ⊢ command no args */
-		strcpy(cmd, line);
-		cmd[strcspn(cmd, "\n")] = '\0';
-		return process_command(cmd, debugsep);
-	} else {
-		/* ⊢ command with args */
-		*space = '\0';
-		strcpy(cmd, line);
-		strcpy(args, space+1);
-		args[strcspn(args, "\n")] = '\0';
-		return process_commandwithargs(cmd, args, debugsep);	
-	}
-}
-
-static struct command *
-process_command(char *cmd, char *sep)
-{
-	if (command_ishelp(cmd)) {
-		return command_create(COMMAND_HELP);
-	} else if (command_isstep(cmd)) {
-		return command_create(COMMAND_STEP);
-	} else if (command_isnext(cmd)) {
-		return command_create(COMMAND_NEXT);
-	} else if (command_iscontinue(cmd)){
-		return command_create(COMMAND_CONTINUE);
-	} else if (command_isquit(cmd)) {
-		return command_create(COMMAND_QUIT);
-	} else {
-		d_printf("unknown command `%s'\n", cmd);
-		return NULL;
-	}
 }
 
 static bool
