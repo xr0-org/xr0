@@ -69,21 +69,6 @@ process_command(char *cmd, char *debugsep);
 static struct command *
 process_commandwithargs(char *cmd, char *args, char *debugsep);
 
-static bool
-command_ishelp(char *cmd);
-
-static bool
-command_isstep(char *cmd);
-
-static bool
-command_isnext(char *cmd);
-
-static bool
-command_iscontinue(char *cmd);
-
-static bool
-command_isquit(char *cmd);
-
 static struct command *
 getcmd(char *debugsep)
 {
@@ -111,6 +96,27 @@ getcmd(char *debugsep)
 	}
 }
 
+static bool
+command_ishelp(char *cmd);
+
+static bool
+command_isstep(char *cmd);
+
+static bool
+command_isnext(char *cmd);
+
+static bool
+command_iscontinue(char *cmd);
+
+static bool
+command_isverify(char *cmd);
+
+static bool
+command_isquit(char *cmd);
+
+static bool
+command_isbreak(char *cmd);
+
 static struct command *
 process_command(char *cmd, char *sep)
 {
@@ -130,6 +136,110 @@ process_command(char *cmd, char *sep)
 	}
 }
 
+static bool
+command_ishelp(char *cmd)
+{
+	return strcmp(cmd, "h") == 0 || strcmp(cmd, "help") == 0;
+}
+
+static bool
+command_isstep(char *cmd)
+{
+	return strcmp(cmd, "s") == 0 || strcmp(cmd, "step") == 0;
+}
+
+static bool
+command_isnext(char *cmd)
+{
+	return strcmp(cmd, "n") == 0 || strcmp(cmd, "next") == 0;
+}
+
+static bool
+command_iscontinue(char *cmd)
+{
+	return strcmp(cmd, "c") == 0 || strcmp(cmd, "continue") == 0;
+}
+
+static bool
+command_isverify(char *cmd)
+{
+	return strcmp(cmd, "v") == 0 || strcmp(cmd, "verify") == 0;
+}
+
+static bool
+command_isquit(char *cmd)
+{
+	return strcmp(cmd, "q") == 0 || strcmp(cmd, "quit") == 0;
+}
+
+static bool
+command_isbreak(char *cmd)
+{
+	return strcmp(cmd, "b") == 0 || strcmp(cmd, "break") == 0;
+}
+
+
+/* command_create_withargs */
+
+static struct string_arr *
+args_tokenise(char *args);
+
+static struct command *
+command_help_create(struct string_arr *args, char *debugsep);
+
+static struct command *
+command_break_create(struct string_arr *args, char *debugsep);
+
+static struct command *
+command_verify_create(char *arg);
+
+static struct command *
+process_commandwithargs(char *cmd, char *args, char *debugsep)
+{
+	struct string_arr *args_tk = args_tokenise(dynamic_str(args));
+	if (args_tk == NULL) {
+		fprintf(stderr, "invalid command args: %s\n", args);
+		return NULL;
+	}
+	if (command_ishelp(cmd)) {
+		return command_help_create(args_tk, debugsep);
+	} else if (command_isbreak(cmd)) {
+		return command_break_create(args_tk, debugsep);	
+	} else if (command_isverify(cmd)) {
+		return command_verify_create(args);
+	} else {
+		d_printf("unknown command `%s'\n", cmd);
+		return NULL;
+	}
+}
+
+static struct string_arr *
+args_tokenise(char *args)
+{
+	struct string_arr *arg_arr = string_arr_create();
+	char *token;
+	token = strtok(args, " ");
+	while (token != NULL) {
+		string_arr_append(arg_arr, dynamic_str(token));	
+		token = strtok(NULL, " ");
+	}
+	return arg_arr;
+}
+
+static struct command *
+command_help_create(struct string_arr *args, char *debugsep)
+{
+	assert(args);
+	if (string_arr_n(args) != 1) {
+		d_printf("`help' expects single argument\n");
+		return NULL;
+	}	
+	return command_create_withargs(COMMAND_HELP, args);
+}
+
+
+
+
 static struct command *
 command_read(char *debugsep);
 
@@ -141,9 +251,6 @@ command_continue_exec(struct verifier *);
 
 static struct error *
 command_verify_exec(struct verifier *, struct command *);
-
-static struct ast_expr *
-command_arg_toexpr(struct command *);
 
 struct error *
 command_exec(struct verifier *p, char *debugsep)
@@ -194,9 +301,6 @@ command_read(char *debugsep)
 	}
 	return c;
 }
-
-static bool
-command_isbreak(char *cmd);
 
 static void
 help_base(void);
@@ -312,6 +416,9 @@ command_continue_exec(struct verifier *p)
 	return NULL;
 }
 
+static struct ast_expr *
+command_arg_toexpr(struct command *);
+
 static struct error *
 command_verify_exec(struct verifier *p, struct command *cmd)
 {
@@ -353,101 +460,6 @@ command_arg_toexpr(struct command *c)
 }
 
 static bool
-command_ishelp(char *cmd)
-{
-	return strcmp(cmd, "h") == 0 || strcmp(cmd, "help") == 0;
-}
-
-static bool
-command_isstep(char *cmd)
-{
-	return strcmp(cmd, "s") == 0 || strcmp(cmd, "step") == 0;
-}
-
-static bool
-command_isnext(char *cmd)
-{
-	return strcmp(cmd, "n") == 0 || strcmp(cmd, "next") == 0;
-}
-
-static bool
-command_iscontinue(char *cmd)
-{
-	return strcmp(cmd, "c") == 0 || strcmp(cmd, "continue") == 0;
-}
-
-static bool
-command_isquit(char *cmd)
-{
-	return strcmp(cmd, "q") == 0 || strcmp(cmd, "quit") == 0;
-}
-
-static struct string_arr *
-args_tokenise(char *args);
-
-static struct command *
-command_help_create(struct string_arr *args, char *debugsep);
-
-static struct command *
-command_break(struct string_arr *args, char *debugsep);
-
-static bool
-command_isverify(char *cmd);
-
-static struct command *
-command_verify_create(char *arg);
-
-static struct command *
-process_commandwithargs(char *cmd, char *args, char *debugsep)
-{
-	struct string_arr *args_tk = args_tokenise(dynamic_str(args));
-	if (args_tk == NULL) {
-		fprintf(stderr, "invalid command args: %s\n", args);
-		return NULL;
-	}
-	if (command_ishelp(cmd)) {
-		return command_help_create(args_tk, debugsep);
-	} else if (command_isbreak(cmd)) {
-		return command_break(args_tk, debugsep);	
-	} else if (command_isverify(cmd)) {
-		return command_verify_create(args);
-	} else {
-		d_printf("unknown command `%s'\n", cmd);
-		return NULL;
-	}
-}
-
-static struct string_arr *
-args_tokenise(char *args)
-{
-	struct string_arr *arg_arr = string_arr_create();
-	char *token;
-	token = strtok(args, " ");
-	while (token != NULL) {
-		string_arr_append(arg_arr, dynamic_str(token));	
-		token = strtok(NULL, " ");
-	}
-	return arg_arr;
-}
-
-static struct command *
-command_help_create(struct string_arr *args, char *debugsep)
-{
-	assert(args);
-	if (string_arr_n(args) != 1) {
-		d_printf("`help' expects single argument\n");
-		return NULL;
-	}	
-	return command_create_withargs(COMMAND_HELP, args);
-}
-
-static bool
-command_isbreak(char *cmd)
-{
-	return strcmp(cmd, "b") == 0 || strcmp(cmd, "break") == 0;
-}
-
-static bool
 break_argisset(char *arg);
 
 static bool
@@ -460,7 +472,7 @@ static struct command *
 break_list(void);
 
 static struct command *
-command_break(struct string_arr *args, char *debugsep)
+command_break_create(struct string_arr *args, char *debugsep)
 {
 	if (string_arr_n(args) != 1) {
 		fprintf(stderr, "`break' expects single argument\n");
@@ -478,6 +490,15 @@ command_break(struct string_arr *args, char *debugsep)
 }
 
 static bool
+isint(const char *);
+
+static bool
+break_argisset(char *arg)
+{
+	return isint(arg);
+}
+
+static bool
 isint(const char *str) {
 	if (str == NULL || *str == '\0') {
 		return false;
@@ -489,18 +510,6 @@ isint(const char *str) {
 		str++;
 	}
 	return true;
-}
-
-static bool
-break_argisset(char *arg)
-{
-	return isint(arg);
-}
-
-static bool
-break_argislist(char *arg)
-{
-	return strcmp(arg, "list") == 0;
 }
 
 static struct command *
@@ -515,9 +524,16 @@ break_set(char *arg)
 }
 
 static bool
-command_isverify(char *cmd)
+break_argislist(char *arg)
 {
-	return strcmp(cmd, "v") == 0 || strcmp(cmd, "verify") == 0;
+	return strcmp(arg, "list") == 0;
+}
+
+static struct command *
+break_list(void)
+{
+	d_printf("%s\n", breakpoint_list());
+	return command_create(COMMAND_BREAKPOINT_LIST);
 }
 
 static struct command *
@@ -526,11 +542,4 @@ command_verify_create(char *arg)
 	struct string_arr *sarr = string_arr_create();
 	string_arr_append(sarr, dynamic_str(arg));
 	return command_create_withargs(COMMAND_VERIFY, sarr);
-}
-
-static struct command *
-break_list(void)
-{
-	d_printf("%s\n", breakpoint_list());
-	return command_create(COMMAND_BREAKPOINT_LIST);
 }
