@@ -7,12 +7,13 @@ LIBX=$(pwd)/libx
 AWKFILE=$(pwd)/tests/0db/split.awk
 TESTDIR=$(pwd)/tests/0db/00-basic
 
+# @ is the configurable debug separator
 output=$($XR0 -I $LIBX -r@ $TESTDIR/test.x < $TESTDIR/test.cfg 2>&1)
 
 tempdir=$(mktemp -d)
 
-# Split the output by the delimiter "(0db)" and write each part to a file
-# Using awk to process the splitting and file writing
+# split the output by the delimiter "(0db)" and write each part to a file
+# using awk to process the splitting and file writing
 echo "$output" | awk -v file_prefix="$tempdir/" -f $AWKFILE
 
 diff -r $tempdir $TESTDIR/expected && rm -rf $tempdir
