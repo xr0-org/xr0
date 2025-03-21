@@ -372,11 +372,14 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 		state_get(s, root_loc, true)
 	);
 	char *field = ast_expr_member_field(expr);
-	struct ast_type *t = ast_type_copy(
-		object_getmembertype(
-			root_obj, eval_type(root_eval), field, s
-		)
+	struct ast_type *member_type = object_getmembertype(
+		root_obj, eval_type(root_eval), field, s
 	);
+	a_printf(
+		member_type,
+		"unknown struct field\n"
+	);
+	struct ast_type *t = ast_type_copy(member_type);
 	assert(t);
 	struct location *l = location_copy(root_loc);
 	location_setoffset(

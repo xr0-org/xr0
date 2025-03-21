@@ -1,3 +1,4 @@
+00-basic/430-struct-rconst.x
 00-basic/500-FAIL-side-effect.x
 00-basic/520-side-effect-rconst.x
 02-loops/100-variable-limit.x
