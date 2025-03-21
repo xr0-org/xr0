@@ -381,6 +381,7 @@ struct error {
 		ERROR_VERIFIERCONTRADICTION,
 		ERROR_RETURN,
 		ERROR_BREAK,
+		ERROR_CMD_VALIDATION,
 
 		ERROR_BLOCK_OBSERVE_NOOBJ,
 
@@ -544,6 +545,20 @@ error_break(void)
 }
 
 struct error *
+error_cmdvalidation(void)
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_CMD_VALIDATION;
+	return err;
+}
+
+struct error *
+error_to_cmdvalidation(struct error *err)
+{
+	return error_to(err, ERROR_CMD_VALIDATION);
+}
+
+struct error *
 error_to_break(struct error *err)
 {
 	return error_to(err, ERROR_BREAK);
@@ -642,6 +657,7 @@ error_str(struct error *err)
 		[ERROR_VERIFIERCONTRADICTION]	= "verifier contradiction",
 		[ERROR_RETURN]			= "returned",
 		[ERROR_BREAK]			= "broken",
+		[ERROR_CMD_VALIDATION]		= "command validation",
 
 		[ERROR_BLOCK_OBSERVE_NOOBJ]	= "block_observe no object",
 
@@ -662,6 +678,7 @@ error_str(struct error *err)
 	case ERROR_VERIFIERCONTRADICTION:
 	case ERROR_RETURN:
 	case ERROR_BREAK:
+	case ERROR_CMD_VALIDATION:
 	case ERROR_BLOCK_OBSERVE_NOOBJ:
 	case ERROR_STATE_GET_NOBLOCK:
 	case ERROR_STATE_DEREF_RCONST:

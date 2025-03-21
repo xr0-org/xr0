@@ -63,13 +63,15 @@ bool should_continue = false;
 #define MAX_LINELEN 1000
 #define MAX_ARGSLEN 100
 
-static struct command *
+DEFINE_RESULT_TYPE(struct command *, cmd, command_destroy, command_res, false)
+
+static struct command_res *
 process_command(char *cmd, char *debugsep);
 
-static struct command *
+static struct command_res *
 process_commandwithargs(char *cmd, char *args, char *debugsep);
 
-static struct command *
+static struct command_res *
 getcmd(char *debugsep)
 {
 	d_printf("(0db) %s", debugsep);
@@ -77,8 +79,7 @@ getcmd(char *debugsep)
 	char cmd[MAX_COMMANDLEN];
 	char args[MAX_ARGSLEN];
 	if (!fgets(line, MAX_LINELEN, stdin)) {
-		fprintf(stderr, "error: cannot read line\n");
-		exit(EXIT_FAILURE);
+		return command_res_error_create(error_printf("error or EOF"));
 	}
 	char *space = strchr(line, ' ');
 	if (space == NULL) {
@@ -117,23 +118,30 @@ command_isquit(char *cmd);
 static bool
 command_isbreak(char *cmd);
 
-static struct command *
+static struct command_res *
 process_command(char *cmd, char *sep)
 {
+	struct command *c = NULL;
 	if (command_ishelp(cmd)) {
-		return command_create(COMMAND_HELP);
+		c = command_create(COMMAND_HELP);
 	} else if (command_isstep(cmd)) {
-		return command_create(COMMAND_STEP);
+		c = command_create(COMMAND_STEP);
 	} else if (command_isnext(cmd)) {
-		return command_create(COMMAND_NEXT);
+		c = command_create(COMMAND_NEXT);
 	} else if (command_iscontinue(cmd)){
-		return command_create(COMMAND_CONTINUE);
+		c = command_create(COMMAND_CONTINUE);
 	} else if (command_isquit(cmd)) {
-		return command_create(COMMAND_QUIT);
+		c = command_create(COMMAND_QUIT);
 	} else {
-		d_printf("unknown command `%s'\n", cmd);
-		return NULL;
+		return command_res_error_create(
+			error_printf(
+				"%w unknown command `%s'",
+				error_cmdvalidation(),
+				cmd
+			)
+		);
 	}
+	return command_res_cmd_create(c);
 }
 
 static bool
@@ -184,23 +192,29 @@ command_isbreak(char *cmd)
 static struct string_arr *
 args_tokenise(char *args);
 
-static struct command *
+static struct command_res *
 command_help_create(struct string_arr *args, char *debugsep);
 
-static struct command *
+static struct command_res *
 command_break_create(struct string_arr *args, char *debugsep);
 
-static struct command *
+static struct command_res *
 command_verify_create(char *arg);
 
-static struct command *
+static struct command_res *
 process_commandwithargs(char *cmd, char *args, char *debugsep)
 {
 	struct string_arr *args_tk = args_tokenise(dynamic_str(args));
 	if (args_tk == NULL) {
-		fprintf(stderr, "invalid command args: %s\n", args);
-		return NULL;
+		return command_res_error_create(
+			error_printf(
+				"%w invalid command args: %s",
+				error_cmdvalidation(),
+				args
+			)
+		);
 	}
+	struct command *c = NULL;
 	if (command_ishelp(cmd)) {
 		return command_help_create(args_tk, debugsep);
 	} else if (command_isbreak(cmd)) {
@@ -208,9 +222,15 @@ process_commandwithargs(char *cmd, char *args, char *debugsep)
 	} else if (command_isverify(cmd)) {
 		return command_verify_create(args);
 	} else {
-		d_printf("unknown command `%s'\n", cmd);
-		return NULL;
+		return command_res_error_create(
+			error_printf(
+				"%w unknown command `%s'",
+				error_cmdvalidation(),
+				cmd
+			)
+		);
 	}
+	return command_res_cmd_create(c);
 }
 
 static struct string_arr *
@@ -226,61 +246,136 @@ args_tokenise(char *args)
 	return arg_arr;
 }
 
-static struct command *
+static struct command_res *
 command_help_create(struct string_arr *args, char *debugsep)
 {
 	assert(args);
 	if (string_arr_n(args) != 1) {
-		d_printf("`help' expects single argument\n");
+		return command_res_error_create(
+			error_printf(
+				"%w `help' expects single argument",
+				error_cmdvalidation()
+			)
+		);
+	}
+	return command_res_cmd_create(command_create_withargs(COMMAND_HELP, args));
+}
+
+static bool
+break_argisset(char *arg);
+
+static bool
+break_argislist(char *arg);
+
+static struct command_res *
+command_break_create(struct string_arr *args, char *debugsep)
+{
+	if (string_arr_n(args) != 1) {
+		fprintf(stderr, "`break' expects single argument\n");
 		return NULL;
 	}
-	return command_create_withargs(COMMAND_HELP, args);
+	char *arg = string_arr_s(args)[0];
+	if (break_argisset(arg)) {
+		return command_res_cmd_create(
+			command_create_withargs(COMMAND_BREAKPOINT_SET, args)
+		);
+	} else if (break_argislist(arg)) {
+		return command_res_cmd_create(
+			command_create(COMMAND_BREAKPOINT_LIST)
+		);
+	} else {
+		fprintf(stderr, "`break' received unknown argument\n");
+		return NULL;
+	}
+}
+
+static bool
+isint(const char *);
+
+static bool
+break_argisset(char *arg)
+{
+	return isint(arg);
+}
+
+static bool
+isint(const char *str) {
+	if (str == NULL || *str == '\0') {
+		return false;
+	}
+	while (*str) {
+		if (!isdigit(*str)) {
+			return false;
+		}
+		str++;
+	}
+	return true;
+}
+
+static bool
+break_argislist(char *arg)
+{
+	return strcmp(arg, "list") == 0;
+}
+
+static struct command_res *
+command_verify_create(char *arg)
+{
+	struct string_arr *sarr = string_arr_create();
+	string_arr_append(sarr, dynamic_str(arg));
+	return command_res_cmd_create(
+		command_create_withargs(COMMAND_VERIFY, sarr)
+	);
 }
 
 
-
+/* command_exec */
 
 static struct command *
 command_read(char *debugsep);
 
 static struct error *
-command_help_exec(struct command *);
+help_exec(struct command *);
 
 static struct error *
-command_continue_exec(struct verifier *);
+continue_exec(struct verifier *);
 
 static struct error *
-command_verify_exec(struct verifier *, struct command *);
+verify_exec(struct verifier *, struct command *);
+
+static struct error *
+break_set_exec(struct command *);
 
 struct error *
-command_exec(struct verifier *p, char *debugsep)
+command_exec(struct verifier *v, char *debugsep)
 {
 	struct error *err;
 
 	if (should_continue) {
 		should_continue = false;
-		return command_continue_exec(p);
+		return continue_exec(v);
 	}
 	struct command *cmd = command_read(debugsep);
 	switch (cmd->kind) {
 	case COMMAND_HELP:
-		err = command_help_exec(cmd);
+		err = help_exec(cmd);
 		break;
 	case COMMAND_STEP:
-		err = verifier_progress(p, progressor_step());
+		err = verifier_progress(v, progressor_step());
 		break;
 	case COMMAND_NEXT:
-		err = verifier_progress(p, progressor_next());
+		err = verifier_progress(v, progressor_next());
 		break;
 	case COMMAND_CONTINUE:
-		err = command_continue_exec(p);
+		err = continue_exec(v);
 		break;
 	case COMMAND_VERIFY:
-		err = command_verify_exec(p, cmd);
+		err = verify_exec(v, cmd);
 		break;
 	case COMMAND_QUIT:
 		exit(0);
 	case COMMAND_BREAKPOINT_SET:
+		err = break_set_exec(cmd);
 	case COMMAND_BREAKPOINT_LIST:
 		err = NULL;
 		break;
@@ -295,11 +390,16 @@ command_exec(struct verifier *p, char *debugsep)
 static struct command *
 command_read(char *debugsep)
 {
-	struct command *c = getcmd(debugsep);
-	if (!c) {
-		return getcmd(debugsep);
+	struct command_res *res = getcmd(debugsep);
+	if (command_res_iserror(res)) {
+		struct error *err = error_to_cmdvalidation(command_res_as_error(res));
+		if (err) {
+			/* XXX: print validation error */
+			return command_read(debugsep);
+		}
+		assert(0);
 	}
-	return c;
+	return command_res_as_cmd(res);
 }
 
 static void
@@ -321,7 +421,7 @@ static void
 help_quit(void);
 
 static struct error *
-command_help_exec(struct command *cmd)
+help_exec(struct command *cmd)
 {
 	int nargs = string_arr_n(cmd->args);
 	if (nargs == 0) {
@@ -400,7 +500,7 @@ help_quit(void)
 }
 
 static struct error *
-command_continue_exec(struct verifier *p)
+continue_exec(struct verifier *p)
 {
 	while (!verifier_atend(p)) {
 		struct error *err = verifier_progress(p, progressor_step());
@@ -420,7 +520,7 @@ static struct ast_expr *
 command_arg_toexpr(struct command *);
 
 static struct error *
-command_verify_exec(struct verifier *p, struct command *cmd)
+verify_exec(struct verifier *p, struct command *cmd)
 {
 	struct error *err = verifier_verify(p, command_arg_toexpr(cmd));
 	if (err) {
@@ -459,87 +559,16 @@ command_arg_toexpr(struct command *c)
 	return ast_expr_copy(YACC_PARSED_EXPR);
 }
 
-static bool
-break_argisset(char *arg);
-
-static bool
-break_argislist(char *arg);
-
-static struct command *
-break_set(char *arg);
-
-static struct command *
-break_list(void);
-
-static struct command *
-command_break_create(struct string_arr *args, char *debugsep)
+static struct error *
+break_set_exec(struct command *c)
 {
-	if (string_arr_n(args) != 1) {
-		fprintf(stderr, "`break' expects single argument\n");
-		return NULL;
-	}
-	char *arg = string_arr_s(args)[0];
-	if (break_argisset(arg)) {
-		return break_set(arg);
-	} else if (break_argislist(arg)) {
-		return break_list();
-	} else {
-		fprintf(stderr, "`break' received unknown argument\n");
-		return NULL;
-	}
-}
-
-static bool
-isint(const char *);
-
-static bool
-break_argisset(char *arg)
-{
-	return isint(arg);
-}
-
-static bool
-isint(const char *str) {
-	if (str == NULL || *str == '\0') {
-		return false;
-	}
-	while (*str) {
-		if (!isdigit(*str)) {
-			return false;
-		}
-		str++;
-	}
-	return true;
-}
-
-static struct command *
-break_set(char *arg)
-{
+	assert(string_arr_n(c->args) == 1);
+	char *arg = string_arr_s(c->args)[0];
+	assert(isint(arg));
 	int linenum = atoi(arg);
 	struct error *err = breakpoint_set("", linenum);
 	if (err) {
-		d_printf("could not set breakpoint: %s", error_str(err));
+		return error_printf("could not set breakpoint: %w", err);
 	}
-	return command_create(COMMAND_BREAKPOINT_SET);
-}
-
-static bool
-break_argislist(char *arg)
-{
-	return strcmp(arg, "list") == 0;
-}
-
-static struct command *
-break_list(void)
-{
-	d_printf("%s\n", breakpoint_list());
-	return command_create(COMMAND_BREAKPOINT_LIST);
-}
-
-static struct command *
-command_verify_create(char *arg)
-{
-	struct string_arr *sarr = string_arr_create();
-	string_arr_append(sarr, dynamic_str(arg));
-	return command_create_withargs(COMMAND_VERIFY, sarr);
+	return NULL;
 }
