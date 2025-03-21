@@ -60,7 +60,7 @@ constraint_shapeverify(struct constraint *c, struct value *spec_v,
 		return NULL;
 	} else if (ast_type_isstruct(c->t)) {
 		return value_struct_shapeverify(
-			spec_v, impl_v, c->impl, c->spec
+			spec_v, impl_v, c->spec, c->impl
 		);
 	}
 	a_printf(
@@ -93,7 +93,7 @@ constraint_shapeverify(struct constraint *c, struct value *spec_v,
 	}
 
 	/* we shift the impl_loc's offset by spec_loc's so that
-	 * block_constraintverify can behave as though both were offset zero */
+	 * block_shapeverify can behave as though both were offset zero */
 	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
 	struct block *spec_b = state_getblock(c->spec, spec_loc);
 	assert(spec_b);
@@ -107,7 +107,6 @@ isrconst(struct ast_type *t, struct value *v)
 {
 	return ast_type_isint(t) || (ast_type_isptr(t) && !value_islocation(v));
 }
-
 
 static struct location *
 location_reloffset(struct location *l1, struct location *l2)
@@ -131,6 +130,35 @@ size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec
 		     *impl_b = state_getblock(impl, impl_loc);
 	assert(spec_b && impl_b);
 	return block_size_le(spec_b, impl_b);
+}
+
+struct error *
+constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
+		struct location *impl_loc)
+{
+	struct block *b_impl = state_getblock(c->impl, impl_loc);
+	assert(b_impl);
+	struct ast_expr *offset = ast_expr_sum_create(
+		offset_as_expr(location_offset(impl_loc)),
+		object_lower(spec_obj) /* XXX: assuming lower is offset */
+	);
+	struct object_res *res = block_observe(b_impl, offset, c->impl, false);
+	if (object_res_iserror(res)) {
+		struct error *err = object_res_as_error(res);
+		return error_to_block_observe_noobj(err)
+			? error_printf("must have object")
+			: err;
+	}
+	struct object *impl_obj = object_res_as_object(res);
+	if (!object_hasvalue(spec_obj)) {
+		return NULL;
+	}
+	if (!object_hasvalue(impl_obj)) {
+		return error_printf("must have value");
+	}
+	return constraint_shapeverify(
+		c, object_as_value(spec_obj), object_as_value(impl_obj)
+	);
 }
 
 struct lsi_varmap *
@@ -169,7 +197,7 @@ constraint_impl_spec_mapping(struct constraint *c, struct value *spec_v,
 		return lv;
 	} else if (ast_type_isstruct(c->t)) {
 		return value_struct_impl_spec_mapping(
-			spec_v, impl_v, c->impl, c->spec, alias
+			spec_v, impl_v, c->spec, c->impl, alias
 		);
 	}
 	a_printf(
@@ -184,9 +212,8 @@ constraint_impl_spec_mapping(struct constraint *c, struct value *spec_v,
 		return lsi_varmap_create();
 	}
 	assert(state_loc_valid(c->impl, impl_loc));
-
 	/* we shift the impl_loc's offset by spec_loc's so that
-	 * block_constraintverify can behave as though both were offset zero */
+	 * block_impl_spec_mapping can behave as though both were offset zero */
 	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
 	struct block *spec_b = state_getblock(c->spec, spec_loc);
 	assert(spec_b);
@@ -195,35 +222,6 @@ constraint_impl_spec_mapping(struct constraint *c, struct value *spec_v,
 	);
 	location_destroy(rel_impl_loc);
 	return lv;
-}
-
-struct error *
-constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
-		struct location *impl_loc)
-{
-	struct block *b_impl = state_getblock(c->impl, impl_loc);
-	assert(b_impl);
-	struct ast_expr *offset = ast_expr_sum_create(
-		offset_as_expr(location_offset(impl_loc)),
-		object_lower(spec_obj) /* XXX: assuming lower is offset */
-	);
-	struct object_res *res = block_observe(b_impl, offset, c->impl, false);
-	if (object_res_iserror(res)) {
-		struct error *err = object_res_as_error(res);
-		return error_to_block_observe_noobj(err)
-			? error_printf("must have object")
-			: err;
-	}
-	struct object *arg_obj = object_res_as_object(res);
-	if (!object_hasvalue(spec_obj)) {
-		return NULL;
-	}
-	if (!object_hasvalue(arg_obj)) {
-		return error_printf("must have value");
-	}
-	return constraint_shapeverify(
-		c, object_as_value(spec_obj), object_as_value(arg_obj)
-	);
 }
 
 struct lsi_varmap *
@@ -237,11 +235,11 @@ constraint_impl_spec_mapping_object(struct constraint *c,
 		object_lower(spec_obj) /* XXX: assuming lower is offset */
 	);
 	struct object_res *res = block_observe(b_impl, offset, c->impl, false);
-	struct object *arg_obj = object_res_as_object(res);
+	struct object *impl_obj = object_res_as_object(res);
 	if (!object_hasvalue(spec_obj)) {
 		return lsi_varmap_create();
 	}
 	return constraint_impl_spec_mapping(
-		c, object_as_value(spec_obj), object_as_value(arg_obj), alias
+		c, object_as_value(spec_obj), object_as_value(impl_obj), alias
 	);
 }

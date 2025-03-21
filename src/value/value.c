@@ -484,19 +484,19 @@ value_struct_member(struct value *v, char *member)
 }
 
 struct error *
-value_struct_shapeverify(struct value *param, struct value *arg,
-		struct state *spec, struct state *caller)
+value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
+		struct state *spec, struct state *impl)
 {
-	assert(value_isstruct(param) && value_isstruct(arg));
-	struct ast_variable_arr *param_members = param->_struct.members,
-				*arg_members = arg->_struct.members;
+	assert(value_isstruct(spec_v) && value_isstruct(impl_v));
+	struct ast_variable_arr *spec_v_members = spec_v->_struct.members,
+				*impl_v_members = impl_v->_struct.members;
 
-	int n = ast_variable_arr_n(param_members);
-	assert(ast_variable_arr_n(arg_members) == n);
-	struct ast_variable **field = ast_variable_arr_v(param_members);
+	int n = ast_variable_arr_n(spec_v_members);
+	assert(ast_variable_arr_n(impl_v_members) == n);
+	struct ast_variable **field = ast_variable_arr_v(spec_v_members);
 	for (int i = 0; i < n; i++) {
 		struct error *err = state_shapeverify_structmember(
-			spec, caller, param, arg,
+			spec, impl, spec_v, impl_v,
 			ast_variable_name(field[i])
 		);
 		if (err) {
@@ -508,23 +508,23 @@ value_struct_shapeverify(struct value *param, struct value *arg,
 }
 
 struct lsi_varmap *
-value_struct_impl_spec_mapping(struct value *param, struct value *arg,
-		struct state *spec, struct state *caller, char *varname)
+value_struct_impl_spec_mapping(struct value *spec_v, struct value *impl_v,
+		struct state *spec, struct state *impl, char *varname)
 {
-	assert(value_isstruct(param) && value_isstruct(arg));
-	struct ast_variable_arr *param_members = param->_struct.members,
-				*arg_members = arg->_struct.members;
+	assert(value_isstruct(spec_v) && value_isstruct(impl_v));
+	struct ast_variable_arr *spec_v_members = spec_v->_struct.members,
+				*impl_v_members = impl_v->_struct.members;
 
 	struct lsi_varmap *lv = lsi_varmap_create();
 
-	int n = ast_variable_arr_n(param_members);
-	assert(ast_variable_arr_n(arg_members) == n);
-	struct ast_variable **field = ast_variable_arr_v(param_members);
+	int n = ast_variable_arr_n(spec_v_members);
+	assert(ast_variable_arr_n(impl_v_members) == n);
+	struct ast_variable **field = ast_variable_arr_v(spec_v_members);
 	for (int i = 0; i < n; i++) {
 		lsi_varmap_addrange(
 			lv,
 			state_impl_spec_mapping_structmember(
-				spec, caller, param, arg,
+				spec, impl, spec_v, impl_v,
 				varname,
 				ast_variable_name(field[i])
 			)

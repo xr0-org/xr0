@@ -77,13 +77,13 @@ struct object *
 value_struct_member(struct value *, char *member);
 
 struct error *
-value_struct_shapeverify(struct value *param, struct value *arg,
+value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
 		struct state *spec, struct state *impl);
 
 struct lsi_varmap;
 
 struct lsi_varmap *
-value_struct_impl_spec_mapping(struct value *param, struct value *arg,
+value_struct_impl_spec_mapping(struct value *spec_v, struct value *impl_v,
 		struct state *spec, struct state *impl, char *varname);
 
 char *
