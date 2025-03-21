@@ -79,7 +79,11 @@ getcmd(char *debugsep)
 	char cmd[MAX_COMMANDLEN];
 	char args[MAX_ARGSLEN];
 	if (!fgets(line, MAX_LINELEN, stdin)) {
-		return command_res_error_create(error_printf("error or EOF"));
+		if (feof(stdin)) {
+			d_printf("EOF encountered, exiting debugger ...");
+			exit(0);
+		}
+		return command_res_error_create(error_printf("error reading line"));
 	}
 	char *space = strchr(line, ' ');
 	if (space == NULL) {
@@ -271,8 +275,12 @@ static struct command_res *
 command_break_create(struct string_arr *args, char *debugsep)
 {
 	if (string_arr_n(args) != 1) {
-		fprintf(stderr, "`break' expects single argument\n");
-		return NULL;
+		return command_res_error_create(
+			error_printf(
+				"%w `break' expects single argument",
+				error_cmdvalidation()
+			)
+		);
 	}
 	char *arg = string_arr_s(args)[0];
 	if (break_argisset(arg)) {
@@ -284,8 +292,13 @@ command_break_create(struct string_arr *args, char *debugsep)
 			command_create(COMMAND_BREAKPOINT_LIST)
 		);
 	} else {
-		fprintf(stderr, "`break' received unknown argument\n");
-		return NULL;
+		return command_res_error_create(
+			error_printf(
+				"%w `break' received unexpected argument `%s'",
+				error_cmdvalidation(),
+				arg
+			)
+		);
 	}
 }
 
@@ -392,11 +405,14 @@ command_read(char *debugsep)
 {
 	struct command_res *res = getcmd(debugsep);
 	if (command_res_iserror(res)) {
-		struct error *err = error_to_cmdvalidation(command_res_as_error(res));
-		if (err) {
+		struct error *err = command_res_as_error(res);
+		struct error *cmd_err = error_to_cmdvalidation(command_res_as_error(res));
+		if (cmd_err) {
 			/* XXX: print validation error */
+			printf("cmd error: %s", error_str(cmd_err));
 			return command_read(debugsep);
 		}
+		printf("error: %s\n", error_str(err));
 		assert(0);
 	}
 	return command_res_as_cmd(res);
