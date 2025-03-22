@@ -374,6 +374,10 @@ command_verify_create(char *arg)
 struct command *
 command_read(char *debugsep)
 {
+	if (should_continue) {
+		should_continue = false;
+		return command_create(COMMAND_CONTINUE);
+	}
 	struct command_res *res = getcmd(debugsep);
 	if (command_res_iserror(res)) {
 		struct error *err = command_res_as_error(res);
@@ -408,10 +412,6 @@ command_exec(struct verifier *v, struct command *c, char *debugsep)
 {
 	struct error *err;
 
-	if (should_continue) {
-		should_continue = false;
-		return continue_exec(v);
-	}
 	switch (c->kind) {
 	case COMMAND_HELP:
 		err = help_exec(c);
