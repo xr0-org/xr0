@@ -296,7 +296,7 @@ ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 			}
 			struct command *c = command_deque_popback(hist);
 			if (!c) {
-				printf("can't go back further");
+				printf("can't go back further\n");
 				continue;
 			}
 
@@ -314,7 +314,16 @@ ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 static void
 history_replay(struct verifier *v, struct command_deque *h, char *sep)
 {
-	assert(0);
+	while (!command_deque_isempty(h)) {
+		struct command *c = command_deque_popfront(h);
+		struct error *err = command_exec(v, c, sep);
+		if (err) {
+			/* should be impossible to encounter error replaying */
+			assert(0);
+		}
+		command_destroy(c);
+	}
+	/* command_deque_destroy(h); */
 }
 
 static void

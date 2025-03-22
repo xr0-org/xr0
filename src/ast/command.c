@@ -19,6 +19,7 @@ enum command_kind {
 	COMMAND_HELP,
 	COMMAND_STEP,
 	COMMAND_NEXT,
+	COMMAND_PREV,
 	COMMAND_CONTINUE,
 	COMMAND_VERIFY,
 	COMMAND_QUIT,
@@ -77,6 +78,8 @@ command_str(struct command *c)
 		return dynamic_str("step");
 	case COMMAND_NEXT:
 		return dynamic_str("next");
+	case COMMAND_PREV:
+		return dynamic_str("prev");
 	default:
 		assert(0);
 	}
@@ -138,6 +141,9 @@ static bool
 command_isnext(char *cmd);
 
 static bool
+command_isprev(char *cmd);
+
+static bool
 command_iscontinue(char *cmd);
 
 static bool
@@ -159,6 +165,8 @@ process_command(char *cmd, char *sep)
 		c = command_create(COMMAND_STEP);
 	} else if (command_isnext(cmd)) {
 		c = command_create(COMMAND_NEXT);
+	} else if (command_isprev(cmd)) {
+		c = command_create(COMMAND_PREV);
 	} else if (command_iscontinue(cmd)){
 		c = command_create(COMMAND_CONTINUE);
 	} else if (command_isquit(cmd)) {
@@ -191,6 +199,12 @@ static bool
 command_isnext(char *cmd)
 {
 	return strcmp(cmd, "n") == 0 || strcmp(cmd, "next") == 0;
+}
+
+static bool
+command_isprev(char *cmd)
+{
+	return strcmp(cmd, "p") == 0 || strcmp(cmd, "prev") == 0;
 }
 
 static bool
@@ -421,6 +435,9 @@ command_exec(struct verifier *v, struct command *c, char *debugsep)
 		break;
 	case COMMAND_NEXT:
 		err = verifier_progress(v, progressor_next());
+		break;
+	case COMMAND_PREV:
+		err = error_prev();
 		break;
 	case COMMAND_CONTINUE:
 		err = continue_exec(v);
