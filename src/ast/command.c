@@ -10,9 +10,10 @@
 #include "lex.h"
 #include "ast.h"
 #include "breakpoint.h"
-#include "command.h"
 #include "util.h"
 #include "verifier.h"
+
+#include "command.h"
 
 enum command_kind {
 	COMMAND_HELP,
@@ -48,11 +49,37 @@ command_create_withargs(enum command_kind kind, struct string_arr *args)
 	return cmd;
 }
 
-static void
+struct command *
+command_copy(struct command *old)
+{
+	struct command *new = command_create(old->kind);
+	for (int i = 0; i < string_arr_n(old->args); i++) {
+		string_arr_append(
+			new->args,
+			dynamic_str(string_arr_s(old->args)[i])
+		);
+	}
+	return new;
+}
+
+void
 command_destroy(struct command *cmd)
 {
 	string_arr_destroy(cmd->args);
 	free(cmd);
+}
+
+char *
+command_str(struct command *c)
+{
+	switch (c->kind) {
+	case COMMAND_STEP:
+		return dynamic_str("step");
+	case COMMAND_NEXT:
+		return dynamic_str("next");
+	default:
+		assert(0);
+	}
 }
 
 bool should_continue = false;
