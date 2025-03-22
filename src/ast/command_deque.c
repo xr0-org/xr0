@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "command_deque.h"
 #include "command.h"
+#include "command_deque.h"
 
 struct _node {
 	struct command *_;
@@ -31,7 +31,7 @@ _destroy_node(struct _node *n)
 
 struct command_deque {
 	struct _node *back;
-	struct _node *front;			
+	struct _node *front;
 };
 
 struct command_deque *
@@ -104,7 +104,7 @@ struct command *
 command_deque_popfront(struct command_deque *dq)
 {
 	if (command_deque_isempty(dq)) {
-		return NULL;	
+		return NULL;
 	}
 	struct _node *n = dq->front;
 	struct command *c = command_copy(n->_);
@@ -124,7 +124,7 @@ struct command *
 command_deque_popback(struct command_deque *dq)
 {
 	if (command_deque_isempty(dq)) {
-		return NULL;	
+		return NULL;
 	}
 	struct _node *n = dq->back;
 	struct command *c = command_copy(n->_);

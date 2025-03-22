@@ -10,10 +10,9 @@
 #include "lex.h"
 #include "ast.h"
 #include "breakpoint.h"
+#include "command.h"
 #include "util.h"
 #include "verifier.h"
-
-#include "command.h"
 
 enum command_kind {
 	COMMAND_HELP,
@@ -435,7 +434,6 @@ command_read(char *debugsep)
 		struct error *err = command_res_as_error(res);
 		struct error *cmd_err = error_to_cmdvalidation(command_res_as_error(res));
 		if (cmd_err) {
-			/* XXX: print validation error */
 			printf("cmd error: %s", error_str(cmd_err));
 			return command_read(debugsep);
 		}
