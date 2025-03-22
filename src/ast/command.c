@@ -512,7 +512,7 @@ static void
 help_quit(void)
 {
 	d_printf("Quit.\n");
-	d_printf("Usage: q(uit)\n");
+	d_printf("Usage: q(uit)\n\n");
 }
 
 static struct error *
