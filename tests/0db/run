@@ -22,7 +22,7 @@ for dir in "$TESTDIR"/*/; do
 	echo "$output" | awk -v file_prefix="$tempdir/" -f "$AWKFILE"
 
 	# note we edit npass and ntests from ../run
-	if diff -r "$tempdir" "$dir/expected" >/dev/null 2>&1; then
+	if diff -r "$tempdir" "$dir/expected"; then
 		npass=$((npass+1))
 		printf "$pass"
 	else

@@ -300,7 +300,7 @@ ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 				continue;
 			}
 
-			/* XXX: verifier destroy assumes at_end */
+			/* XXX: verifier destroy assumes atend */
 			v = verifier_create(f, ext);
 			history_replay(v, command_deque_copy(hist), sep);
 			continue;
