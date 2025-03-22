@@ -7,6 +7,7 @@
 #include "gram.tab.h"
 #include "ast.h"
 #include "command.h"
+#include "command_deque.h"
 #include "ext.h"
 #include "function.h"
 #include "intern.h"
@@ -276,19 +277,44 @@ ast_function_verify(struct ast_function *f, struct externals *ext)
 	return NULL;
 }
 
+static void
+history_replay(struct verifier *, struct command_deque *, char *sep);
+
 struct error *
 ast_function_debug(struct ast_function *f, struct externals *ext, char *sep)
 {
-	struct verifier *verifier = verifier_create(f, ext);
-	while (!verifier_atend(verifier)) {
-		d_printf("%s\n", verifier_str(verifier));
-		struct error *err = command_exec(verifier, sep);
+	struct verifier *v = verifier_create(f, ext);
+	struct command_deque *hist = command_deque_create();
+
+	while (!verifier_atend(v)) {
+		d_printf("%s\n", verifier_str(v));
+		struct command *c = command_read(sep);
+		struct error *err = command_exec(v, c, sep);
 		if (err) {
-			return err;
+			if (!error_to_prev(err)) {
+				return err;
+			}
+			struct command *c = command_deque_popback(hist);
+			if (!c) {
+				printf("can't go back further");
+				continue;
+			}
+
+			/* XXX: verifier destroy assumes at_end */
+			v = verifier_create(f, ext);
+			history_replay(v, command_deque_copy(hist), sep);
+			continue;
 		}
+		command_deque_pushback(hist, c);
 	}
-	verifier_destroy(verifier);
+	verifier_destroy(v);
 	return NULL;
+}
+
+static void
+history_replay(struct verifier *v, struct command_deque *h, char *sep)
+{
+	assert(0);
 }
 
 static void

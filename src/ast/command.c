@@ -11,6 +11,7 @@
 #include "ast.h"
 #include "breakpoint.h"
 #include "command.h"
+#include "command_deque.h"
 #include "util.h"
 #include "verifier.h"
 
@@ -368,65 +369,9 @@ command_verify_create(char *arg)
 }
 
 
-/* command_exec */
+/* command_read */
 
-static struct command *
-command_read(char *debugsep);
-
-static struct error *
-help_exec(struct command *);
-
-static struct error *
-continue_exec(struct verifier *);
-
-static struct error *
-verify_exec(struct verifier *, struct command *);
-
-static struct error *
-break_set_exec(struct command *);
-
-struct error *
-command_exec(struct verifier *v, char *debugsep)
-{
-	struct error *err;
-
-	if (should_continue) {
-		should_continue = false;
-		return continue_exec(v);
-	}
-	struct command *cmd = command_read(debugsep);
-	switch (cmd->kind) {
-	case COMMAND_HELP:
-		err = help_exec(cmd);
-		break;
-	case COMMAND_STEP:
-		err = verifier_progress(v, progressor_step());
-		break;
-	case COMMAND_NEXT:
-		err = verifier_progress(v, progressor_next());
-		break;
-	case COMMAND_CONTINUE:
-		err = continue_exec(v);
-		break;
-	case COMMAND_VERIFY:
-		err = verify_exec(v, cmd);
-		break;
-	case COMMAND_QUIT:
-		exit(0);
-	case COMMAND_BREAKPOINT_SET:
-		err = break_set_exec(cmd);
-	case COMMAND_BREAKPOINT_LIST:
-		err = NULL;
-		break;
-	default:
-		assert(false);
-	}
-
-	command_destroy(cmd);
-	return err;
-}
-
-static struct command *
+struct command *
 command_read(char *debugsep)
 {
 	struct command_res *res = getcmd(debugsep);
@@ -441,6 +386,60 @@ command_read(char *debugsep)
 		assert(0);
 	}
 	return command_res_as_cmd(res);
+}
+
+
+/* command_exec */
+
+static struct error *
+help_exec(struct command *);
+
+static struct error *
+continue_exec(struct verifier *);
+
+static struct error *
+verify_exec(struct verifier *, struct command *);
+
+static struct error *
+break_set_exec(struct command *);
+
+struct error *
+command_exec(struct verifier *v, struct command *c, char *debugsep)
+{
+	struct error *err;
+
+	if (should_continue) {
+		should_continue = false;
+		return continue_exec(v);
+	}
+	switch (c->kind) {
+	case COMMAND_HELP:
+		err = help_exec(c);
+		break;
+	case COMMAND_STEP:
+		err = verifier_progress(v, progressor_step());
+		break;
+	case COMMAND_NEXT:
+		err = verifier_progress(v, progressor_next());
+		break;
+	case COMMAND_CONTINUE:
+		err = continue_exec(v);
+		break;
+	case COMMAND_VERIFY:
+		err = verify_exec(v, c);
+		break;
+	case COMMAND_QUIT:
+		exit(0);
+	case COMMAND_BREAKPOINT_SET:
+		err = break_set_exec(c);
+	case COMMAND_BREAKPOINT_LIST:
+		err = NULL;
+		break;
+	default:
+		assert(false);
+	}
+
+	return err;
 }
 
 static void
