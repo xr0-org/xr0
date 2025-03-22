@@ -11,6 +11,7 @@
 #include "ast.h"
 #include "breakpoint.h"
 #include "command.h"
+#include "command_deque.h"
 #include "util.h"
 #include "verifier.h"
 
@@ -18,6 +19,7 @@ enum command_kind {
 	COMMAND_HELP,
 	COMMAND_STEP,
 	COMMAND_NEXT,
+	COMMAND_PREV,
 	COMMAND_CONTINUE,
 	COMMAND_VERIFY,
 	COMMAND_QUIT,
@@ -48,11 +50,39 @@ command_create_withargs(enum command_kind kind, struct string_arr *args)
 	return cmd;
 }
 
-static void
+struct command *
+command_copy(struct command *old)
+{
+	struct command *new = command_create(old->kind);
+	for (int i = 0; i < string_arr_n(old->args); i++) {
+		string_arr_append(
+			new->args,
+			dynamic_str(string_arr_s(old->args)[i])
+		);
+	}
+	return new;
+}
+
+void
 command_destroy(struct command *cmd)
 {
 	string_arr_destroy(cmd->args);
 	free(cmd);
+}
+
+char *
+command_str(struct command *c)
+{
+	switch (c->kind) {
+	case COMMAND_STEP:
+		return dynamic_str("step");
+	case COMMAND_NEXT:
+		return dynamic_str("next");
+	case COMMAND_PREV:
+		return dynamic_str("prev");
+	default:
+		assert(0);
+	}
 }
 
 bool should_continue = false;
@@ -80,7 +110,7 @@ getcmd(char *debugsep)
 	char args[MAX_ARGSLEN];
 	if (!fgets(line, MAX_LINELEN, stdin)) {
 		if (feof(stdin)) {
-			d_printf("EOF encountered, exiting debugger ...");
+			d_printf("EOF encountered, exiting debugger ...\n");
 			exit(0);
 		}
 		return command_res_error_create(error_printf("error reading line"));
@@ -111,6 +141,9 @@ static bool
 command_isnext(char *cmd);
 
 static bool
+command_isprev(char *cmd);
+
+static bool
 command_iscontinue(char *cmd);
 
 static bool
@@ -132,6 +165,8 @@ process_command(char *cmd, char *sep)
 		c = command_create(COMMAND_STEP);
 	} else if (command_isnext(cmd)) {
 		c = command_create(COMMAND_NEXT);
+	} else if (command_isprev(cmd)) {
+		c = command_create(COMMAND_PREV);
 	} else if (command_iscontinue(cmd)){
 		c = command_create(COMMAND_CONTINUE);
 	} else if (command_isquit(cmd)) {
@@ -164,6 +199,12 @@ static bool
 command_isnext(char *cmd)
 {
 	return strcmp(cmd, "n") == 0 || strcmp(cmd, "next") == 0;
+}
+
+static bool
+command_isprev(char *cmd)
+{
+	return strcmp(cmd, "p") == 0 || strcmp(cmd, "prev") == 0;
 }
 
 static bool
@@ -342,10 +383,31 @@ command_verify_create(char *arg)
 }
 
 
-/* command_exec */
+/* command_read */
 
-static struct command *
-command_read(char *debugsep);
+struct command *
+command_read(char *debugsep)
+{
+	if (should_continue) {
+		should_continue = false;
+		return command_create(COMMAND_CONTINUE);
+	}
+	struct command_res *res = getcmd(debugsep);
+	if (command_res_iserror(res)) {
+		struct error *err = command_res_as_error(res);
+		struct error *cmd_err = error_to_cmdvalidation(command_res_as_error(res));
+		if (cmd_err) {
+			printf("cmd error: %s", error_str(cmd_err));
+			return command_read(debugsep);
+		}
+		printf("error: %s\n", error_str(err));
+		assert(0);
+	}
+	return command_res_as_cmd(res);
+}
+
+
+/* command_exec */
 
 static struct error *
 help_exec(struct command *);
@@ -360,18 +422,13 @@ static struct error *
 break_set_exec(struct command *);
 
 struct error *
-command_exec(struct verifier *v, char *debugsep)
+command_exec(struct verifier *v, struct command *c, char *debugsep)
 {
 	struct error *err;
 
-	if (should_continue) {
-		should_continue = false;
-		return continue_exec(v);
-	}
-	struct command *cmd = command_read(debugsep);
-	switch (cmd->kind) {
+	switch (c->kind) {
 	case COMMAND_HELP:
-		err = help_exec(cmd);
+		err = help_exec(c);
 		break;
 	case COMMAND_STEP:
 		err = verifier_progress(v, progressor_step());
@@ -379,16 +436,19 @@ command_exec(struct verifier *v, char *debugsep)
 	case COMMAND_NEXT:
 		err = verifier_progress(v, progressor_next());
 		break;
+	case COMMAND_PREV:
+		err = error_prev();
+		break;
 	case COMMAND_CONTINUE:
 		err = continue_exec(v);
 		break;
 	case COMMAND_VERIFY:
-		err = verify_exec(v, cmd);
+		err = verify_exec(v, c);
 		break;
 	case COMMAND_QUIT:
 		exit(0);
 	case COMMAND_BREAKPOINT_SET:
-		err = break_set_exec(cmd);
+		err = break_set_exec(c);
 	case COMMAND_BREAKPOINT_LIST:
 		err = NULL;
 		break;
@@ -396,26 +456,7 @@ command_exec(struct verifier *v, char *debugsep)
 		assert(false);
 	}
 
-	command_destroy(cmd);
 	return err;
-}
-
-static struct command *
-command_read(char *debugsep)
-{
-	struct command_res *res = getcmd(debugsep);
-	if (command_res_iserror(res)) {
-		struct error *err = command_res_as_error(res);
-		struct error *cmd_err = error_to_cmdvalidation(command_res_as_error(res));
-		if (cmd_err) {
-			/* XXX: print validation error */
-			printf("cmd error: %s", error_str(cmd_err));
-			return command_read(debugsep);
-		}
-		printf("error: %s\n", error_str(err));
-		assert(0);
-	}
-	return command_res_as_cmd(res);
 }
 
 static void
