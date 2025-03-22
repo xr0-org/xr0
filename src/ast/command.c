@@ -110,7 +110,7 @@ getcmd(char *debugsep)
 	char args[MAX_ARGSLEN];
 	if (!fgets(line, MAX_LINELEN, stdin)) {
 		if (feof(stdin)) {
-			d_printf("EOF encountered, exiting debugger ...");
+			d_printf("EOF encountered, exiting debugger ...\n");
 			exit(0);
 		}
 		return command_res_error_create(error_printf("error reading line"));

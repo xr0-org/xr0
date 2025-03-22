@@ -1,0 +1,19 @@
+phase:	ABSTRACT (SETUP)
+
+text:
+-->	q = .clump(1);
+
+rconst:
+	$0: ptr:{?}	"q"
+	$1: int:{?}	"x"
+
+stack:
+	---------------------------- setup
+	---------------------------- findsetup
+	0: |1| {0:<rconst:$0>} (int * q, π)
+	1: |1| {0:<rconst:$1>} (int x, π)
+	---------------------------- modify0
+
+
+
+(0db)
