@@ -500,8 +500,8 @@ state_constraintverify_top(struct state *spec, struct state *impl)
 	if (err) {
 		return err;
 	}
-	struct lsi_varmap *spec_lv = stack_rconst_mapping_top(spec->stack, spec);
-	struct lsi_varmap *impl_lv = stack_rconst_mapping_top(impl->stack, impl);
+	struct lsi_varmap *spec_lv = stack_rconst_mapping(spec->stack, spec);
+	struct lsi_varmap *impl_lv = stack_rconst_mapping(impl->stack, impl);
 	err = rconst_constraintverify(
 		spec->rconst, impl->rconst,
 		spec_lv, impl_lv
@@ -590,8 +590,8 @@ _mutating_constraintverify_all(struct state *spec, struct state *impl)
 	if (err) {
 		return err;
 	}
-	struct lsi_varmap *spec_lv = stack_rconst_mapping_top(spec->stack, spec);
-	struct lsi_varmap *impl_lv = stack_rconst_mapping_top(impl->stack, impl);
+	struct lsi_varmap *spec_lv = stack_rconst_mapping(spec->stack, spec);
+	struct lsi_varmap *impl_lv = stack_rconst_mapping(impl->stack, impl);
 	err = rconst_constraintverify(
 		spec->rconst, impl->rconst,
 		spec_lv, impl_lv
@@ -857,7 +857,7 @@ _shape_and_constraint_verify(struct state *spec, struct state *impl)
 static struct lsi_varmap *
 _stack_and_return_mapping(struct state *s, struct value *ret)
 {
-	struct lsi_varmap *lv = stack_rconst_mapping_top(s->stack, s);
+	struct lsi_varmap *lv = stack_rconst_mapping(s->stack, s);
 	lsi_varmap_addrange(
 		lv,
 		value_rconst_mapping(
