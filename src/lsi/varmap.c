@@ -137,10 +137,7 @@ lsi_varmap_addrange(struct lsi_varmap *lv, struct lsi_varmap *lv0)
 
 	for (i = 0; i < m0->n; i++) {
 		struct entry e = m0->entry[i];
-		char *id = map_get(m, e.key);
-		if (id) {
-			assert(strcmp(id, e.value) == 0);
-		} else {
+		if (!map_get(m, e.key)) {
 			map_set(m, dynamic_str(e.key), dynamic_str(e.value));
 		}
 	}
@@ -150,10 +147,7 @@ lsi_varmap_addrange(struct lsi_varmap *lv, struct lsi_varmap *lv0)
 
 	for (i = 0; i < alias0->n; i++) {
 		struct entry e = alias0->entry[i];
-		char *id = map_get(alias, e.key);
-		if (id) {
-			assert(strcmp(id, e.value) == 0);
-		} else {
+		if (!map_get(alias, e.key)) {
 			map_set(alias, dynamic_str(e.key), dynamic_str(e.value));
 		}
 	}

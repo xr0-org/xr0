@@ -78,11 +78,6 @@ rconst_split(struct rconst *, struct lsi_le *);
 struct rconst *
 rconst_copy(struct rconst *);
 
-struct string_arr;
-
-struct rconst *
-rconst_eliminate_except(struct rconst *, struct string_arr *);
-
 void
 rconst_destroy(struct rconst *);
 

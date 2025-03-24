@@ -15,7 +15,7 @@ test()
 
 	a = tuple_create();
 	b = tuple_create();
-	~ [ a.x == b.x; ]
+	~ [ a.x <= b.x; b.x <= a.x; ]
 }
 
 struct tuple

@@ -49,7 +49,7 @@ static struct error *
 jump_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
-static struct error *
+struct error *
 selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
@@ -105,7 +105,7 @@ jump_linearise(struct ast_stmt *stmt, struct ast_block *b,
 	return NULL;
 }
 
-static struct error *
+struct error *
 selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
