@@ -40,6 +40,7 @@ struct config {
 	char *sortfunc;
 	enum sortmode sortmode;
 	bool debug;
+	bool debug_onfail;
 	char *debugsep;
 	bool preproc; /* skip preprocessing phase when this is true */
 };
@@ -61,13 +62,14 @@ parse_config(int argc, char *argv[])
 	enum execmode mode = EXECMODE_VERIFY;
 	bool verbose = false;
 	bool debug = false;
+	bool debug_onfail = false;
 	bool preproc = true;
 	char *debugsep = NULL;
 	struct sortconfig sortconf = sortconfig_create(SORTMODE_NONE, "");
 	struct string_arr *includedirs = default_includes();
 	char *outfile = OUTPUT_PATH;
 	int opt;
-	while ((opt = getopt(argc, argv, "vsFo:t:x:I:dr:D:U:")) != -1) {
+	while ((opt = getopt(argc, argv, "vsFo:t:x:I:dr:D")) != -1) {
 		switch (opt) {
 		case 'I':
 			string_arr_append(includedirs, dynamic_str(optarg));
@@ -97,6 +99,9 @@ parse_config(int argc, char *argv[])
 		case 'd':
 			debug = true;
 			break;
+		case 'D':
+			debug_onfail = true;
+			break;
 		default:
 			fprintf(stderr, "Usage: %s [-I libx] input_file\n", argv[0]);
 			exit(EXIT_FAILURE);
@@ -115,6 +120,7 @@ parse_config(int argc, char *argv[])
 		.sortmode	= sortconf.mode,
 		.sortfunc	= sortconf.sortfunc,
 		.debug		= debug,
+		.debug_onfail	= debug_onfail,
 		.debugsep	= debugsep ? debugsep : dynamic_str(""),
 		.preproc	= preproc,
 	};
@@ -265,13 +271,13 @@ static void
 debugger_summary(void);
 
 static struct error *
-handle_debug(struct ast_function *, struct externals *, bool debug, char *sep);
+handle_debug(struct ast_function *, struct externals *, struct config *);
 
 void
-pass1(struct ast *root, struct externals *ext, bool debug, char *debugsep)
+pass1(struct ast *root, struct externals *ext, struct config *c)
 {
 	struct error *err;
-	if (debug) {
+	if (c->debug) {
 		debugger_summary();
 	}
 
@@ -285,7 +291,7 @@ pass1(struct ast *root, struct externals *ext, bool debug, char *debugsep)
 			continue;
 		}
 		/* XXX: ensure that verified functions always have an abstract */
-		if ((err = handle_debug(f, ext, debug, debugsep))) {
+		if ((err = handle_debug(f, ext, c))) {
 			fprintf(stderr, "%s\n", error_str(err));
 			exit(EXIT_FAILURE);
 		}
@@ -317,12 +323,16 @@ debugger_summary(void)
 }
 
 static struct error *
-handle_debug(struct ast_function *f, struct externals *ext, bool debug, char *sep)
+handle_debug(struct ast_function *f, struct externals *ext, struct config *c)
 {
 	struct error *err;
-	if (debug) {
-		if ((err = ast_function_debug(f, ext, sep))) {
+	if (c->debug) {
+		if ((err = ast_function_debug(f, ext, c->debugsep))) {
 			return err;	
+		}
+	} else if (c->debug_onfail) {
+		if ((err = ast_function_debug_onfail(f, ext, c->debugsep))) {
+			return err;
 		}
 	} else {
 		if ((err = ast_function_verify(f, ext))) {
@@ -462,7 +472,7 @@ verify(struct config *c)
 	struct string_arr *order;
 	switch (c->sortmode) {
 	case SORTMODE_NONE:
-		pass1(root, ext, c->debug, c->debugsep);
+		pass1(root, ext, c);
 		break;
 	case SORTMODE_SORT:
 		order = ast_topological_order(c->sortfunc, ext);

@@ -51,6 +51,12 @@ command_create_withargs(enum command_kind kind, struct string_arr *args)
 }
 
 struct command *
+command_step_create()
+{
+	return command_create(COMMAND_STEP);
+}
+
+struct command *
 command_copy(struct command *old)
 {
 	struct command *new = command_create(old->kind);
@@ -389,6 +395,7 @@ struct command *
 command_read(char *debugsep)
 {
 	if (should_continue) {
+		printf("should continue\n");
 		should_continue = false;
 		return command_create(COMMAND_CONTINUE);
 	}

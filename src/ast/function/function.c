@@ -326,6 +326,58 @@ history_replay(struct verifier *v, struct command_deque *h, char *sep)
 	/* command_deque_destroy(h); */
 }
 
+static struct command *
+debug_onfail_command(int failed, char *sep);
+
+struct error *
+ast_function_debug_onfail(struct ast_function *f, struct externals *ext, char *sep)
+{
+	extern int LOG_LEVEL;
+
+	struct verifier *v = verifier_create(f, ext);
+	struct command_deque *hist = command_deque_create();
+
+	int failed = 0;
+	while (!verifier_atend(v)) {
+		if (failed) {
+			d_printf("%s\n", verifier_str(v));
+		}
+		struct command *c = debug_onfail_command(failed, sep);
+		struct error *err = command_exec(v, c, sep);
+		if (err) {
+			if (!error_to_prev(err)) {
+				LOG_LEVEL = LOG_DEBUG;
+				d_printf("failed: err: %s\n", error_str(err));
+				failed = 1;
+			}
+			struct command *c = command_deque_popback(hist);
+			if (!c) {
+				d_printf("can't go back further\n");
+				continue;
+			}
+
+			/* XXX: verifier destroy assumes atend */
+			v = verifier_create(f, ext);
+			history_replay(v, command_deque_copy(hist), sep);
+			continue;
+		}
+		command_deque_pushback(hist, c);
+		command_deque_print(hist);
+	}
+	verifier_destroy(v);
+	return NULL;
+}
+
+static struct command *
+debug_onfail_command(int failed, char *sep)
+{
+	if (failed) {
+		return command_read(sep);
+	} else {
+		return command_step_create();
+	}
+}
+
 static void
 inititalise_param(struct ast_variable *v, struct state *);
 

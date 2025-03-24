@@ -11,6 +11,9 @@ struct command *
 command_read(char *debugsep);
 
 struct command *
+command_step_create(void);
+
+struct command *
 command_copy(struct command *);
 
 void
