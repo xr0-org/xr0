@@ -347,8 +347,9 @@ ast_function_debug_onfail(struct ast_function *f, struct externals *ext, char *s
 		if (err) {
 			if (!error_to_prev(err)) {
 				LOG_LEVEL = LOG_DEBUG;
-				d_printf("failed: err: %s\n", error_str(err));
+				d_printf("failed: err: %s\n\n", error_str(err));
 				failed = 1;
+				continue;
 			}
 			struct command *c = command_deque_popback(hist);
 			if (!c) {
@@ -362,7 +363,6 @@ ast_function_debug_onfail(struct ast_function *f, struct externals *ext, char *s
 			continue;
 		}
 		command_deque_pushback(hist, c);
-		command_deque_print(hist);
 	}
 	verifier_destroy(v);
 	return NULL;
