@@ -6,11 +6,39 @@ XR0=$(pwd)/bin/0v
 LIBX=$(pwd)/libx
 AWKFILE=$(pwd)/tests/0db/split.awk
 TESTDIR=$(pwd)/tests/0db
+IGNORE_0DB_FILE=$TESTDIR/wmw-www
+
+ignore_0db_files=$(cat $IGNORE_0DB_FILE)
+nignore=$(( $nignore + $(cat $IGNORE_0DB_FILE | wc -l) ))
+
+for f in $ignore_0db_files; do
+	file=$TESTDIR/$f
+	if [ ! -d "$file" ]; then
+		printf "error: ignored directory %s not found\n" "$file" 1>&2
+		exit 1
+	fi
+done
+
+should_0db_ignore() {
+    for name in $ignore_0db_files; do
+        if [ "$name" = "$1" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 for dir in "$TESTDIR"/*/; do
 	# remove trailing slash
 	dir=${dir%/}
 	printf "%-${length}s ..." "0db/${dir##*/}"
+	ntests=$(( $ntests +1 ))
+
+	# skip ignores
+	if should_0db_ignore $f; then
+		printf "$ignore"
+		continue
+	fi
 	
 	# @ is the configurable debug separator
 	output=$($XR0 -I "$LIBX" -r@ "$dir/test.x" < "$dir/test.cfg" 2>&1)

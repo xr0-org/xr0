@@ -109,6 +109,12 @@ ast_type_isptr(struct ast_type *t)
 	return t->base == TYPE_POINTER;
 }
 
+bool
+ast_type_ischar(struct ast_type *t)
+{
+	return t->base == TYPE_CHAR;
+}
+
 struct ast_type *
 ast_type_arr_type(struct ast_type *t)
 {

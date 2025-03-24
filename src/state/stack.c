@@ -714,7 +714,7 @@ static struct lsi_varmap *
 _var_rconst_mapping(struct state *, char *id);
 
 struct lsi_varmap *
-stack_rconst_mapping_top(struct stack *stack, struct state *state)
+stack_rconst_mapping(struct stack *stack, struct state *state)
 {
 	int i;
 
@@ -725,6 +725,13 @@ stack_rconst_mapping_top(struct stack *stack, struct state *state)
 		lsi_varmap_addrange(
 			lv, _var_rconst_mapping(state, m->entry[i].key)
 		);
+
+	if (!frame_iscall(stack->f)) {
+		assert(stack->prev);
+		lsi_varmap_addrange(
+			lv, stack_rconst_mapping(stack->prev, state)
+		);
+	}
 
 	return lv;
 }
