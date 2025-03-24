@@ -395,7 +395,6 @@ struct command *
 command_read(char *debugsep)
 {
 	if (should_continue) {
-		printf("should continue\n");
 		should_continue = false;
 		return command_create(COMMAND_CONTINUE);
 	}
@@ -404,10 +403,10 @@ command_read(char *debugsep)
 		struct error *err = command_res_as_error(res);
 		struct error *cmd_err = error_to_cmdvalidation(command_res_as_error(res));
 		if (cmd_err) {
-			printf("cmd error: %s", error_str(cmd_err));
+			d_printf("cmd error: %s\n", error_str(cmd_err));
 			return command_read(debugsep);
 		}
-		printf("error: %s\n", error_str(err));
+		d_printf("error: %s\n", error_str(err));
 		assert(0);
 	}
 	return command_res_as_cmd(res);
