@@ -13,7 +13,12 @@ for dir in "$TESTDIR"/*/; do
 	printf "%-${length}s ..." "0db/${dir##*/}"
 	
 	# @ is the configurable debug separator
-	output=$($XR0 -I "$LIBX" -r@ "$dir/test.x" < "$dir/test.cfg" 2>&1)
+	output=""
+	if [[ ${dir##*/} == "03-debug-on-fail" ]]; then
+		output=$($XR0 -I "$LIBX" -D "$dir/test.x" < "$dir/test.cfg" 2>&1)
+	else
+		output=$($XR0 -I "$LIBX" -r@ "$dir/test.x" < "$dir/test.cfg" 2>&1)
+	fi
 
 	tempdir=$(mktemp -d)
 

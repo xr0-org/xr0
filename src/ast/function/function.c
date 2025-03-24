@@ -347,7 +347,11 @@ ast_function_debug_onfail(struct ast_function *f, struct externals *ext, char *s
 		if (err) {
 			if (!error_to_prev(err)) {
 				LOG_LEVEL = LOG_DEBUG;
-				d_printf("failed: err: %s\n\n", error_str(err));
+				struct error *wrap_err = error_printf(
+					"encountered error: %w", err
+				);
+				d_printf("%s\n", error_str(wrap_err));
+				d_printf("launching debugger...\n\n");
 				failed = 1;
 				continue;
 			}

@@ -1,0 +1,80 @@
+encountered error: tests/0v/11-bounds-cbvi/310-FAIL-less-than-restrict.x:5:3: out of bounds (foo | #0 ∈ {0?3})
+launching debugger...
+
+
+phase:	ACTUAL (EXEC)
+
+text:
+-->	*(arr+i) = 0;
+
+rconst:
+	$0: int:{?}	"i"
+	#0: int:{0?3}	"foo:0:{}"
+
+stack:
+	---------------------------- inter
+	---------------------------- block
+	---------------------------- inter
+	0: |1| {0:<rconst:#0>} (int i, π)
+	1: |2| {0:<>}          (int[2] arr)
+	---------------------------- foo | #0 ∈ {0?3}
+
+
+
+(0db) phase:	ACTUAL (EXEC)
+
+text:
+-->	*(arr+i) = 0;
+
+rconst:
+	$0: int:{?}	"i"
+	#0: int:{0?3}	"foo:0:{}"
+
+stack:
+	---------------------------- block
+	---------------------------- inter
+	0: |1| {0:<rconst:#0>} (int i, π)
+	1: |2| {0:<>}          (int[2] arr)
+	---------------------------- foo | #0 ∈ {0?3}
+
+
+
+(0db) phase:	ACTUAL (EXEC)
+
+text:
+-->	if (i<3) {
+		*(arr+i) = 0;
+	}
+
+rconst:
+	$0: int:{?}	"i"
+	#0: int:{0?3}	"foo:0:{}"
+
+stack:
+	---------------------------- inter
+	0: |1| {0:<rconst:#0>} (int i, π)
+	1: |2| {0:<>}          (int[2] arr)
+	---------------------------- foo | #0 ∈ {0?3}
+
+
+
+(0db) phase:	ACTUAL (EXEC)
+
+text:
+-->	if (i<3) {
+		*(arr+i) = 0;
+	}
+
+rconst:
+	$0: int:{?}	"i"
+	#0: int:{0?5}	"foo:0:{}"
+
+stack:
+	---------------------------- inter
+	0: |1| {0:<rconst:#0>} (int i, π)
+	1: |2| {0:<>}          (int[2] arr)
+	---------------------------- foo
+
+
+
+(0db) EOF encountered, exiting debugger ...
