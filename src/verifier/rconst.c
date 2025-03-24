@@ -256,35 +256,30 @@ rconst_eval(struct rconst *v, struct ast_expr *e)
 	return ast_expr_matheval(e);
 }
 
+static struct lsi *
+_eliminate_rename(struct lsi *, struct lsi_varmap *);
+
 struct error *
 rconst_constraintverify(struct rconst *spec, struct rconst *impl,
 		struct lsi_varmap *spec_m, struct lsi_varmap *impl_m)
 {
-	struct string_arr *spec_rconsts = lsi_varmap_keys(spec_m),
-			  *impl_rconsts = lsi_varmap_keys(impl_m);
-
-	struct lsi *spec_elim = lsi_eliminate_except(
-		spec->constraints, spec_rconsts
-	);
-	struct lsi *impl_elim = lsi_eliminate_except(
-		impl->constraints, impl_rconsts
-	);
-
-	struct lsi *spec_lsi = lsi_renamevars(spec_elim, spec_m),
-		   *impl_lsi = lsi_renamevars(impl_elim, impl_m);
-
-	lsi_destroy(impl_elim);
-	lsi_destroy(spec_elim);
-
-	string_arr_destroy(impl_rconsts);
-	string_arr_destroy(spec_rconsts);
-
+	struct lsi *spec_lsi = _eliminate_rename(spec->constraints, spec_m),
+		   *impl_lsi = _eliminate_rename(impl->constraints, impl_m);
 	struct error *err = lsi_checksatisfiesrange(impl_lsi, spec_lsi);
-
 	lsi_destroy(impl_lsi);
 	lsi_destroy(spec_lsi);
-
 	return err;
+}
+
+static struct lsi *
+_eliminate_rename(struct lsi *lsi, struct lsi_varmap *lv)
+{
+	struct string_arr *arr = lsi_varmap_keys(lv);
+	struct lsi *eliminated = lsi_eliminate_except(lsi, arr);
+	string_arr_destroy(arr);
+	struct lsi *renamed = lsi_renamevars(eliminated, lv);
+	lsi_destroy(eliminated);
+	return renamed;
 }
 
 int

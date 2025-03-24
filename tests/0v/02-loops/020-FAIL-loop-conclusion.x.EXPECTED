@@ -1,1 +1,1 @@
-02-loops/020-FAIL-loop-conclusion.x:11:14: cannot verify statement (unit | #0 ∈ {9})
+02-loops/020-FAIL-loop-conclusion.x:11:22: cannot verify statement (unit | -#0 <= -9)

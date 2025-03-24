@@ -519,17 +519,21 @@ value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
 {
 	if (isrconst(t, v)) {
 		struct lsi_varmap *lv = lsi_varmap_create();
-		if (!value_isconstant(v)) {
-			lsi_varmap_set(
-				lv,
-				value_to_rconstid(v, s),
-				dynamic_str(id)
-			);
-		}
+		lsi_varmap_set(
+			lv,
+			value_to_rconstid(v, s),
+			dynamic_str(id)
+		);
 		return lv;
 	} else if (ast_type_isstruct(t)) {
 		return _struct_rconst_mapping(v, s, id);
 	}
+
+	/* TODO: reflect on this and align with spec */
+	if (value_isliteral(v) && ast_type_ischar(t)) {
+		return lsi_varmap_create();
+	}
+
 	a_printf(
 		ast_type_isptr(t),
 		"can only verify int, struct and pointer params: have %s\n",
