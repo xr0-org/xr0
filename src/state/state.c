@@ -292,6 +292,18 @@ state_addconstraint(struct state *s, struct lsi_le *le)
 	return rconst_addconstraint(s->rconst, le);
 }
 
+int
+state_satisfies(struct state *s, struct lsi_le *le)
+{
+	return rconst_satisfies(s->rconst, le);
+}
+
+struct lsi_range *
+state_range_eval(struct state *s, struct lsi_expr *e)
+{
+	return rconst_range_eval(s->rconst, e);
+}
+
 struct value *
 state_popregister(struct state *state)
 {
@@ -846,7 +858,7 @@ _shape_and_constraint_verify(struct state *spec, struct state *impl)
 		impl_copy, impl->reg
 	);
 	err = rconst_constraintverify(
-		spec->rconst, impl->rconst, spec_lv, impl_lv
+		spec_copy->rconst, impl_copy->rconst, spec_lv, impl_lv
 	);
 	lsi_varmap_destroy(impl_lv);
 	lsi_varmap_destroy(spec_lv);

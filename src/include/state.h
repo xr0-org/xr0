@@ -163,6 +163,15 @@ struct lsi_le;
 struct error *
 state_addconstraint(struct state *, struct lsi_le *);
 
+int
+state_satisfies(struct state *, struct lsi_le *);
+
+struct lsi_range;
+struct lsi_expr;
+
+struct lsi_range *
+state_range_eval(struct state *, struct lsi_expr *);
+
 struct value *
 state_static_init(struct state *, struct ast_expr *);
 

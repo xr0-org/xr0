@@ -27,7 +27,7 @@ int
 _tally_eq(struct tally *, struct tally *);
 
 int
-_tally_orthogonal(struct tally *, struct tally *);
+_tally_varorthogonal(struct tally *, struct tally *);
 
 long
 tally_getval(struct tally *, char *var);

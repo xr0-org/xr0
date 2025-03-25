@@ -720,6 +720,7 @@ expr_binary_eval(struct ast_expr *expr, struct state *state)
 	switch (ast_expr_binary_op(expr)) {
 	case BINARY_OP_ADDITION:
 	case BINARY_OP_SUBTRACTION:
+	case BINARY_OP_MULTIPLICATION:
 		return additive_eval(expr, state);
 	case BINARY_OP_LT:
 	case BINARY_OP_GT:
@@ -779,6 +780,13 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 		     *v2 = value_res_as_value(v_res2);
 
 	if (ast_type_isptr(t1)) {
+		switch (op) {
+		case BINARY_OP_ADDITION:
+		case BINARY_OP_SUBTRACTION:
+			break;
+		default:
+			assert(0);
+		}
 		if (!value_islocation(v1)) {
 			/* The Standard requires "a pointer to an object type",
 			 * not merely a pointer-type. We are interpreting this

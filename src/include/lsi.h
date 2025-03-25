@@ -51,6 +51,18 @@ lsi_var_isanyint(struct lsi *, char *);
 struct error *
 lsi_checksatisfiesrange(struct lsi *l, struct lsi *m);
 
+/* lsi_satisfies: similar to the above except for a single inequality */
+int
+lsi_satisfies(struct lsi *, struct lsi_le *);
+
+struct lsi_range;
+struct lsi_expr;
+
+/* lsi_range_eval: returns a range of the inclusive lower and upper bounds of the
+ * expression within the system. */
+struct lsi_range *
+lsi_range_eval(struct lsi *, struct lsi_expr *);
+
 /* lsi_le: a less-than-or-equal-to inequality */
 struct lsi_le;
 
@@ -89,8 +101,37 @@ lsi_expr_sum_create(struct lsi_expr *, struct lsi_expr *);
 struct lsi_expr *
 lsi_expr_product_create(struct lsi_expr *, struct lsi_expr *);
 
+struct lsi_expr *
+lsi_expr_copy(struct lsi_expr *);
+
+void
+lsi_expr_destroy(struct lsi_expr *);
+
 char *
 lsi_expr_str(struct lsi_expr *);
+
+
+struct lsi_range;
+
+struct lsi_range *
+lsi_range_create(int lw, int up);
+
+void
+lsi_range_destroy(struct lsi_range *);
+
+char *
+lsi_range_str(struct lsi_range *);
+
+int
+lsi_range_isconst(struct lsi_range *);
+
+int
+lsi_range_as_const(struct lsi_range *);
+
+/* lsi_range_expr_le_lw: return an inequality expressing e <= lw where lw is
+ * the lower bound of the range */
+struct lsi_le *
+lsi_range_expr_le_lw(struct lsi_range *, struct lsi_expr *e);
 
 
 /* lsi_varmap: a name->name mapping of variables */

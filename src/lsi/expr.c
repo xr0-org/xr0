@@ -7,6 +7,7 @@
 #include "lsi.h"
 #include "_limits.h"
 
+#include "expr.h"
 #include "tally.h"
 
 /* lsi_expr: an expression involving constants, variables, and sums and products
@@ -101,13 +102,13 @@ _lsi_expr_prefixvars(struct lsi_expr *e, char *prefix)
 }
 
 struct lsi_expr *
-_lsi_expr_copy(struct lsi_expr *old)
+lsi_expr_copy(struct lsi_expr *old)
 {
 	return _create(tally_copy(old->_));
 }
 
 void
-_lsi_expr_destroy(struct lsi_expr *e)
+lsi_expr_destroy(struct lsi_expr *e)
 {
 	tally_destroy(e->_);
 	free(e);
@@ -157,6 +158,17 @@ _lsi_expr_eq(struct lsi_expr *e, struct lsi_expr *e0)
 	return _tally_eq(e->_, e0->_);
 }
 
+int
+_lsi_expr_isconst(struct lsi_expr *e)
+{
+	struct lsi_expr *zero = lsi_expr_const_create(0),
+			*var = _lsi_expr_varterms(e);
+	int ans = _lsi_expr_eq(zero, var);
+	lsi_expr_destroy(var);
+	lsi_expr_destroy(zero);
+	return ans;
+}
+
 struct lsi_expr *
 _lsi_expr_varterms(struct lsi_expr *e)
 {
@@ -193,7 +205,7 @@ _lsi_expr_getcoef(struct lsi_expr *e, char *var)
 struct lsi_expr *
 _lsi_expr_except(struct lsi_expr *old, char *var)
 {
-	struct lsi_expr *new = _lsi_expr_copy(old);
+	struct lsi_expr *new = lsi_expr_copy(old);
 	tally_setval(new->_, var, 0);
 	return new;
 }
@@ -201,5 +213,7 @@ _lsi_expr_except(struct lsi_expr *old, char *var)
 int
 _lsi_expr_orthogonal(struct lsi_expr *e, struct lsi_expr *e0)
 {
-	return _tally_orthogonal(e->_, e0->_);
+	return !_lsi_expr_isconst(e)
+		&& !_lsi_expr_isconst(e0)
+		&& _tally_varorthogonal(e->_, e0->_);
 }

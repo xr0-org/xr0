@@ -72,13 +72,13 @@ lsi_le_negate(struct lsi_le *le)
 struct lsi_le *
 lsi_le_copy(struct lsi_le *old)
 {
-	return _lsi_le_create(_lsi_expr_copy(old->_));
+	return _lsi_le_create(lsi_expr_copy(old->_));
 }
 
 void
 lsi_le_destroy(struct lsi_le *le)
 {
-	_lsi_expr_destroy(le->_);
+	lsi_expr_destroy(le->_);
 	free(le);
 }
 
@@ -98,7 +98,7 @@ lsi_le_str(struct lsi_le *le)
 	strbuilder_printf(b, "%s <= %d", s, _const);
 	free(s);
 
-	_lsi_expr_destroy(var);
+	lsi_expr_destroy(var);
 
 	return strbuilder_build(b);
 }
@@ -132,8 +132,8 @@ _lsi_le_trivimpl(struct lsi_le *l, struct lsi_le *m)
 
 	int impl = _lsi_expr_eq(l_var, m_var)
 		&& _lsi_expr_constterm(l->_) >= _lsi_expr_constterm(m->_);
-	_lsi_expr_destroy(m_var);
-	_lsi_expr_destroy(l_var);
+	lsi_expr_destroy(m_var);
+	lsi_expr_destroy(l_var);
 
 	return impl;
 }
@@ -144,8 +144,8 @@ _constantly_false(struct lsi_le *le)
 	struct lsi_expr *zero = lsi_expr_const_create(0);
 	struct lsi_expr *var = _lsi_expr_varterms(le->_);
 	int ans = _lsi_expr_eq(zero, var) && !_lsi_le_isfeasible(le);
-	_lsi_expr_destroy(var);
-	_lsi_expr_destroy(zero);
+	lsi_expr_destroy(var);
+	lsi_expr_destroy(zero);
 	return ans;
 }
 
@@ -155,8 +155,8 @@ _constantly_true(struct lsi_le *le)
 	struct lsi_expr *zero = lsi_expr_const_create(0);
 	struct lsi_expr *var = _lsi_expr_varterms(le->_);
 	int ans = _lsi_expr_eq(zero, var) && _lsi_le_isfeasible(le);
-	_lsi_expr_destroy(var);
-	_lsi_expr_destroy(zero);
+	lsi_expr_destroy(var);
+	lsi_expr_destroy(zero);
 	return ans;
 }
 
@@ -170,6 +170,17 @@ int
 _lsi_le_getstdformcoef(struct lsi_le *le, char *var)
 {
 	return _lsi_expr_getcoef(le->_, var);
+}
+
+int
+_lsi_le_getstdformconst(struct lsi_le *le)
+{
+	/* le is an inequality l <= r represented as the expression l - r, so to
+	 * get the standard form constant we have to shift both l and r to the
+	 * rhs and then take the sum of their constant terms, which is the same
+	 * thing as negating the constant term of l - r */
+
+	return -_lsi_expr_constterm(le->_);
 }
 
 struct lsi_expr *

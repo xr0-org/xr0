@@ -850,7 +850,7 @@ sel_setupdecide(struct ast_stmt *stmt, struct state *s)
 {
 	struct ast_stmt *rel_stmt = _hack_make_sel_relational(stmt);
 	struct ast_stmt_res *res = sel_setupdecide_proper(rel_stmt, s);
-	ast_stmt_destroy(rel_stmt);
+	/*ast_stmt_destroy(rel_stmt);*/
 	return res;
 }
 

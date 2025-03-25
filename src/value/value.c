@@ -508,16 +508,26 @@ value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
 }
 
 static int
-isrconst(struct ast_type *, struct value *);
+_isrconst(struct ast_type *, struct value *);
 
 static struct lsi_varmap *
 _struct_rconst_mapping(struct value *v, struct state *s, char *varname);
+
+static char *
+_rconst_anyint(struct state *s);
 
 struct lsi_varmap *
 value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
 		char *id)
 {
-	if (isrconst(t, v)) {
+	if (ast_type_isarr(t)) {
+		struct ast_type *ptr = ast_type_create_ptr(
+			ast_type_arr_type(ast_type_copy(t))
+		);
+		struct lsi_varmap *lv = value_rconst_mapping(v, ptr, s, id);
+		ast_type_destroy(ptr);
+		return lv;
+	} else if (_isrconst(t, v)) {
 		struct lsi_varmap *lv = lsi_varmap_create();
 		lsi_varmap_set(
 			lv,
@@ -536,23 +546,30 @@ value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
 
 	a_printf(
 		ast_type_isptr(t),
-		"can only verify int, struct and pointer params: have %s\n",
-		ast_type_str(t)
+		"can only verify int, pointer and struct params: "\
+		"have %s with value %s\n",
+		ast_type_str(t), value_str(v)
 	);
+
+	struct lsi_varmap *lv = lsi_varmap_create();
+	lsi_varmap_set(lv, _rconst_anyint(s), dynamic_str(id));
 
 	struct location *loc = value_as_location(v);
 	if (!state_loc_valid(s, loc)) {
 		/* spec freed reference */
-		return lsi_varmap_create();
+		return lv;
 	}
 
-	return state_block_rconst_mapping(s, loc, t, id);
+	lsi_varmap_addrange(lv, state_block_rconst_mapping(s, loc, t, id));
+	return lv;
 }
 
 static int
-isrconst(struct ast_type *t, struct value *v)
+_isrconst(struct ast_type *t, struct value *v)
 {
-	return ast_type_isint(t) || (ast_type_isptr(t) && !value_islocation(v));
+	return ast_type_isint(t)
+		|| (ast_type_isvoid(t) && value_isconstant(v))
+		|| (ast_type_isptr(t) && !value_islocation(v));
 }
 
 static struct lsi_varmap *
@@ -577,7 +594,28 @@ _struct_rconst_mapping(struct value *v, struct state *s, char *varname)
 	return lv;
 }
 
-
+static char *
+_rconst_anyint(struct state *s)
+{
+	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
+	struct error *err = state_addconstraint(
+		s,
+		lsi_le_create(
+			lsi_expr_const_create(C89_INT_MIN),
+			lsi_expr_var_create(dynamic_str(rconst))
+		)
+	);
+	assert(!err);
+	err = state_addconstraint(
+		s,
+		lsi_le_create(
+			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_expr_const_create(C89_INT_MAX)
+		)
+	);
+	assert(!err);
+	return rconst;
+}
 
 static char *
 _expr_to_rconstid(struct ast_expr *, struct state *);
@@ -613,7 +651,7 @@ _expr_to_rconstid(struct ast_expr *e, struct state *s)
 		s,
 		lsi_le_create(
 			/* e <= rconst */
-			lsi_e,
+			lsi_expr_copy(lsi_e),
 			lsi_expr_var_create(dynamic_str(rconst))
 		)
 	);
@@ -623,9 +661,10 @@ _expr_to_rconstid(struct ast_expr *e, struct state *s)
 		lsi_le_create(
 			/* rconst <= e */
 			lsi_expr_var_create(dynamic_str(rconst)),
-			lsi_e
+			lsi_expr_copy(lsi_e)
 		)
 	);
+	lsi_expr_destroy(lsi_e);
 	assert(!err);
 	return rconst;
 }

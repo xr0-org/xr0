@@ -1,11 +1,7 @@
 #include <stdlib.h>
 
 void
-func(int *x) ~ [ 
-	setup: x = NULL;
-]{
-	
-}
+func(int *x) ~ [ setup: x = [?]; ] {}
 
 int
 main()

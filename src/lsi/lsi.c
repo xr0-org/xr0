@@ -2,13 +2,15 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <limits.h>
 
 #include "util.h"
 #include "lsi.h"
 #include "_limits.h"
 
-#include "le.h"
+#include "expr.h"
 #include "expr_arr.h"
+#include "le.h"
 #include "le_arr.h"
 
 struct lsi { struct le_arr *arr; };
@@ -389,9 +391,6 @@ lsi_addrange(struct lsi *lsi, struct lsi *lsi0)
 	return NULL;
 }
 
-static int
-_satisfies(struct lsi *, struct lsi_le *);
-
 struct error *
 lsi_checksatisfiesrange(struct lsi *l, struct lsi *m)
 {
@@ -400,7 +399,7 @@ lsi_checksatisfiesrange(struct lsi *l, struct lsi *m)
 	struct le_arr *arr = m->arr;
 	for (i = 0; i < le_arr_len(arr); i++) {
 		struct lsi_le *le = le_arr_get(arr, i);
-		if (!_satisfies(l, le)) {
+		if (!lsi_satisfies(l, le)) {
 			char *s = lsi_le_str(le);
 			struct error *err = error_printf("%s not satisfied", s);
 			free(s);
@@ -416,11 +415,12 @@ _isorthogonal(struct lsi *, struct lsi_le *);
 static int
 _isfeasible(struct lsi *, struct lsi_le *);
 
-static int
-_satisfies(struct lsi *l, struct lsi_le *le)
+int
+lsi_satisfies(struct lsi *l, struct lsi_le *le)
 {
 	struct lsi_le *ng = lsi_le_negate(le);
-	int ans = _isorthogonal(l, le) || !_isfeasible(l, ng);
+	int ans = (_isorthogonal(l, le) && _isfeasible(l, le))
+		|| !_isfeasible(l, ng);
 	lsi_le_destroy(ng);
 	return ans;
 }
@@ -450,4 +450,160 @@ _isfeasible(struct lsi *l, struct lsi_le *le)
 		return 0;
 	}
 	return 1;
+}
+
+static char *
+_unusedvar(struct lsi *);
+
+static struct lsi *
+_augment_and_eliminate_rest(struct lsi *, char *var, struct lsi_expr *);
+
+static struct lsi *
+_eliminate_exceptvar(struct lsi *, char *);
+
+static int
+_lowerbound(struct lsi *, char *);
+
+static int
+_upperbound(struct lsi *, char *);
+
+struct lsi_range *
+lsi_range_eval(struct lsi *l, struct lsi_expr *e)
+{
+	if (_lsi_expr_isconst(e)) {
+		int c = _lsi_expr_constterm(e);
+		return lsi_range_create(c, c);
+	}
+
+	char *id = _unusedvar(l);
+
+	struct lsi *elim = _augment_and_eliminate_rest(l, id, e);
+
+	/* if we have eliminated all other variables and all redundant formulae
+	 * then there should remain only two inequalities, bounding our variable
+	 * from above and beneath. */
+	struct le_arr *arr = elim->arr;
+	assert(le_arr_len(arr) == 2);
+
+	struct lsi_range *r =
+		lsi_range_create(_lowerbound(elim, id), _upperbound(elim, id));
+
+	lsi_destroy(elim);
+
+	free(id);
+
+	return r;
+}
+
+static char *
+_unusedvar_inmap(struct map *);
+
+static char *
+_unusedvar(struct lsi *l)
+{
+	struct map *m = _varstomap(l->arr);
+	char *s = _unusedvar_inmap(m);
+	map_destroy(m);
+	return s;
+}
+
+static char *
+_unusedvar_inmap(struct map *m)
+{
+	int i;
+
+	for (i = 0; i < INT_MAX; i++) {
+		struct strbuilder *b = strbuilder_create();
+		strbuilder_printf(b, "@%d", i);
+		char *s = strbuilder_build(b);
+		if (!map_get(m, s))
+			return s;
+		free(s);
+	}
+
+	assert(0);
+}
+
+static struct lsi *
+_augment(struct lsi *old, char *var, struct lsi_expr *e);
+
+static struct lsi *
+_augment_and_eliminate_rest(struct lsi *old, char *var, struct lsi_expr *e)
+{
+	struct lsi *new = _augment(old, var, e);
+	struct lsi *elim = _eliminate_exceptvar(new, var);
+	lsi_destroy(new);
+	return elim;
+}
+
+static void
+_assign(struct lsi *, char *var, struct lsi_expr *);
+
+static struct lsi *
+_augment(struct lsi *old, char *var, struct lsi_expr *e)
+{
+	struct lsi *new = lsi_copy(old);
+	_assign(new, var, e);
+	return new;
+}
+
+static void
+_assign(struct lsi *lsi, char *id, struct lsi_expr *e)
+{
+	struct lsi_expr *var = lsi_expr_var_create(dynamic_str(id));
+	le_arr_append(
+		lsi->arr,
+		lsi_le_create(lsi_expr_copy(var), lsi_expr_copy(e))
+	);
+	le_arr_append(
+		lsi->arr,
+		lsi_le_create(lsi_expr_copy(e), lsi_expr_copy(var))
+	);
+	lsi_expr_destroy(var);
+}
+
+
+static struct lsi *
+_eliminate_exceptvar(struct lsi *old, char *var)
+{
+	struct string_arr *arr = string_arr_create();
+	string_arr_append(arr, dynamic_str(var));
+	struct lsi *new = lsi_eliminate_except(old, arr);
+	string_arr_destroy(arr);
+	return new;
+}
+
+static int
+_lowerbound(struct lsi *lsi, char *var)
+{
+	int i;
+
+	struct le_arr *arr = lsi->arr;
+
+	for (i = 0; i < le_arr_len(arr); i++) {
+		struct lsi_le *le = le_arr_get(arr, i);
+		/* negate because in standard form the constant is on the rhs */
+		int c = -_lsi_le_getstdformconst(le);
+		if (_lsi_le_isconstlowerbound(le, var, c))
+			return c;
+	}
+
+	assert(0);
+}
+
+static int
+_upperbound(struct lsi *lsi, char *var)
+{
+	int i;
+
+	struct le_arr *arr = lsi->arr;
+
+	for (i = 0; i < le_arr_len(arr); i++) {
+		struct lsi_le *le = le_arr_get(arr, i);
+		int c = _lsi_le_getstdformconst(le);
+		if (_lsi_le_isconstupperbound(le, var, c))
+			return c;
+	}
+
+	assert(0);
 }

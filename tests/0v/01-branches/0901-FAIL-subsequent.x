@@ -24,7 +24,7 @@ test(int x) ~ [
 	int k;
 
 	m = x;
-	~ [ m == x; ]
+	~ [ m <= x; m >= x; ]
 	n = g(m);
 	~ [ n != g(x); ]
 	return alloc_if(f(n));

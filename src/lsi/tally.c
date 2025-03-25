@@ -34,16 +34,17 @@ _tally_forwardeq(struct tally *t, struct tally *u)
 }
 
 static int
-_tally_forwardorthogonal(struct tally *t, struct tally *u);
+_tally_forwardvarorthogonal(struct tally *t, struct tally *u);
 
 int
-_tally_orthogonal(struct tally *t, struct tally *u)
+_tally_varorthogonal(struct tally *t, struct tally *u)
 {
-	return _tally_forwardorthogonal(t, u) && _tally_forwardorthogonal(u, t);
+	return _tally_forwardvarorthogonal(t, u)
+		&& _tally_forwardvarorthogonal(u, t);
 }
 
 static int
-_tally_forwardorthogonal(struct tally *t, struct tally *u)
+_tally_forwardvarorthogonal(struct tally *t, struct tally *u)
 {
 	int i;
 	struct string_arr *arr;

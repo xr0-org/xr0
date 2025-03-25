@@ -283,6 +283,18 @@ _eliminate_rename(struct lsi *lsi, struct lsi_varmap *lv)
 }
 
 int
+rconst_satisfies(struct rconst *v, struct lsi_le *le)
+{
+	return lsi_satisfies(v->constraints, le);
+}
+
+struct lsi_range *
+rconst_range_eval(struct rconst *v, struct lsi_expr *e)
+{
+	return lsi_range_eval(v->constraints, e);
+}
+
+int
 rconst_isfeasible(struct rconst *r, struct lsi_le *le)
 {
 	struct lsi *constraints = lsi_copy(r->constraints);

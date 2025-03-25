@@ -268,7 +268,8 @@ skipws(char *s)
 char *
 skiplinespace(char *s)
 {
-	for (; *s == ' ' || *s == '\t'; s++) {}
+	/* changed from original to drop || */
+	for (; *s == ' '; s++) {}
 	return s;
 }
 
@@ -305,7 +306,8 @@ parse_id(char *input)
 	}
 	s = input + 1;
 	/* XXX: '0' is a placeholder to allow this to parse */
-	for (; isalpha(*s) || isdigit(*s) || *s == '_' ; 0) {
+	/* changed from orignal to drop || */
+	for (; isalpha(*s); 0) {
 		s++;
 	}
 	return substr(input, s - input);
@@ -604,7 +606,8 @@ count_tokens(char *pos)
 	struct tokenresult r;
 
 	n = 0;
-	for (; *pos != '\0' && strncmp(pos, "%%", 2) != 0 ; n++) {
+	/* changed from original to drop && */
+	for (; strncmp(pos, "%%", 2); n++) {
 		r = parse_token(pos);
 		pos = skipws(r.pos);
 		/* TODO: clean up r.tk */

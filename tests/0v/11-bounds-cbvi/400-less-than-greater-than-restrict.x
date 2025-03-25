@@ -23,6 +23,6 @@ main()
 		return 0;
 	}
 	res = a[i];
-	~ [ res == a[i]; ] 
+	~ [ res <= a[i]; res >= a[i]; ] 
 	return 0;
 }

@@ -23,7 +23,7 @@ expr_arr_copy(struct expr_arr *old)
 {
 	struct expr_arr *new = expr_arr_create();
 	for (int i = 0; i < old->n; i++) {
-		expr_arr_append(new, _lsi_expr_copy(old->le[i]));
+		expr_arr_append(new, lsi_expr_copy(old->le[i]));
 	}
 	return new;
 }
@@ -32,7 +32,7 @@ void
 expr_arr_destroy(struct expr_arr *arr)
 {
 	for (int i = 0; i < arr->n; i++) {
-		_lsi_expr_destroy(arr->le[i]);
+		lsi_expr_destroy(arr->le[i]);
 	}
 	free(arr);
 }

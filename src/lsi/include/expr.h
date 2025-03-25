@@ -24,16 +24,19 @@ struct lsi_expr *
 _lsi_expr_prefixvars(struct lsi_expr *, char *prefix);
 
 struct lsi_expr *
-_lsi_expr_copy(struct lsi_expr *);
+lsi_expr_copy(struct lsi_expr *);
 
 void
-_lsi_expr_destroy(struct lsi_expr *);
+lsi_expr_destroy(struct lsi_expr *);
 
 char *
 lsi_expr_str(struct lsi_expr *);
 
 int
 _lsi_expr_eq(struct lsi_expr *, struct lsi_expr *);
+
+int
+_lsi_expr_isconst(struct lsi_expr *e);
 
 struct lsi_expr *
 _lsi_expr_varterms(struct lsi_expr *);

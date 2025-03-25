@@ -51,6 +51,11 @@ _lsi_le_getvars(struct lsi_le *);
 int
 _lsi_le_getstdformcoef(struct lsi_le *, char *var);
 
+/* _lsi_le_getstdformconst: return k in the form described in
+ * _lsi_le_getstdformcoef. */
+int
+_lsi_le_getstdformconst(struct lsi_le *);
+
 /* _lsi_le_lowerbound: solve to place var alone on the rhs and return the lhs.
  * var must be in the inequality and have a positive sign on the rhs, or
  * assertion failure will result. */

@@ -110,38 +110,39 @@ struct object_res *
 block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		bool constructive)
 {
-	struct tagval_res *res = ast_expr_rangeeval(offset, s);
-	if (tagval_res_iserror(res)) {
-		return object_res_error_create(tagval_res_as_error(res));
-	}
-	struct tagval *tv = tagval_res_as_tagval(res);
+	struct lsi_expr *lsi_o = ast_expr_to_lsi_expr(offset);
 
-	struct value *range = tagval_value(tv);
-	int lw = value_int_lw(range, s),
-	    up = value_int_up(range, s);
-	if (lw < 0 || b->size < up) {
+	struct lsi_le *lw = lsi_le_create(
+		lsi_expr_const_create(0), lsi_expr_copy(lsi_o)
+	);
+	struct lsi_le *up = lsi_le_create(
+		/* non-inclusive upper bound */
+		lsi_expr_copy(lsi_o), lsi_expr_const_create(b->size-1)
+	);
+	if (!state_satisfies(s, lw) || !state_satisfies(s, up)) {
 		return object_res_error_create(error_printf("out of bounds"));
 	}
+	lsi_le_destroy(lw);
+	lsi_le_destroy(up);
 
-	if (!value_isconstant(range)) {
-		assert(0);
-		assert(tagval_hastag(tv));
-		/*
-		XXX
-		struct splitinstruct *splits = splitinstruct_create(s);
-		char *tag = tagval_tag(tv);
-		for (int i = lw; i < up; i++) {
-			struct map *m = map_create();
-			map_set(m, tag, number_const_create(i));
-			splitinstruct_append(splits, m);
-		}
+	struct lsi_range *r = state_range_eval(s, lsi_o);
+	if (!lsi_range_isconst(r)) {
+		/* split b/w case when equal to lower bound and not */
+		struct lsi_le *le = lsi_range_expr_le_lw(r, lsi_o);  
+		struct lsi_le *le_neg = lsi_le_negate(le);
 		return object_res_error_create(
-			error_verifierinstruct(verifierinstruct_split(splits))
+			error_verifierinstruct(
+				verifierinstruct_split(
+					splitinstruct_create(le, le_neg)
+				)
+			)
 		);
-		*/
 	}
 
-	offset = ast_expr_constant_create(value_as_constant(range));
+	offset = ast_expr_constant_create(lsi_range_as_const(r));
+	lsi_range_destroy(r);
+
+	lsi_expr_destroy(lsi_o);
 
 	int index = object_arr_index(b->arr, offset, s);
 	if (index == -1) {

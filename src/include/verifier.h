@@ -119,6 +119,15 @@ rconst_constraintverify(struct rconst *spec, struct rconst *impl,
 		struct lsi_varmap *spec_m, struct lsi_varmap *impl_m);
 
 int
+rconst_satisfies(struct rconst *, struct lsi_le *);
+
+struct lsi_range;
+struct lsi_expr;
+
+struct lsi_range *
+rconst_range_eval(struct rconst *, struct lsi_expr *);
+
+int
 rconst_isfeasible(struct rconst *, struct lsi_le *);
 
 #endif

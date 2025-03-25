@@ -24,10 +24,10 @@ test(int x) ~ [
 	int k;
 
 	m = x;
-	~ [ m == x; ]
+	~ [ m <= x; x >= m; ]
 	n = g(m);
 	k = g(x);
-	~ [ n == k; ]
+	~ [ n <= k; n >= k; ]
 	return alloc_if(f(n));
 }
 
