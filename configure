@@ -55,10 +55,12 @@ function replace_valgrind_params() {
 		_valgrind="valgrind --fullpath-after=\`pwd\`/src/"
 		_v_flags="--num-callers=30"
 		_leaks="--leak-check=full"
+	elif [[ `command -v lldb` ]]; then
+		_valgrind="lldb --batch -o \"run\" -o \"bt\" --"
 	fi
-	sed "s|@VALGRIND@|$_valgrind|;\
-		s|@VALGRINDVFLAGS@|$_v_flags|;\
-		s|@VALGRINDFULLLEAKS@|$_leaks|"
+	sed "s|@DEBUGGER@|$_valgrind|;\
+		s|@DEBUGGERVFLAGS@|$_v_flags|;\
+		s|@DEBUGGERFULLLEAKS@|$_leaks|"
 }
 
 INCLUDEDIRS=$(find $SRCDIR -type d -name "include")
