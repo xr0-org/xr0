@@ -504,7 +504,7 @@ help_exec(struct command *cmd)
 }
 
 static void
-help_base()
+help_base(void)
 {
 	d_printf("List of commands:\n");
 	d_printf("step -- Step to next logical statement.\n");
