@@ -2,6 +2,7 @@
 
 TMPL_MKFILE=scripts/tmpl.mk
 DEPS_MKFILE=scripts/deps.mk
+LLDB_SCRIPT=scripts/lldb
 
 # This script generates the Makefile from $TMPL_MKFILE and $DEPS_MKFILE,
 # the latter of which contains the rules to build the various object files.
@@ -56,7 +57,7 @@ function replace_valgrind_params() {
 		_v_flags="--num-callers=30"
 		_leaks="--leak-check=full"
 	elif [[ `command -v lldb` ]]; then
-		_valgrind="lldb --batch -o \"run\" -o \"bt\" --"
+		_valgrind="lldb --batch -s $LLDB_SCRIPT --"
 	fi
 	sed "s|@DEBUGGER@|$_valgrind|;\
 		s|@DEBUGGERVFLAGS@|$_v_flags|;\

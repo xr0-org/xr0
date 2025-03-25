@@ -7,9 +7,9 @@ CFLAGS = -g -I src/include \
 	 -Wreturn-type \
 	 -Wstrict-prototypes
 
-VALGRIND = @VALGRIND@
-VALGRINDVFLAGS = @VALGRINDVFLAGS@
-VALGRINDFULLLEAKS = @VALGRINDFULLLEAKS@
+DEBUGGER = @DEBUGGER@
+DEBUGGERVFLAGS = @DEBUGGERVFLAGS@
+DEBUGGERFULLLEAKS = @DEBUGGERFULLLEAKS@
 
 LEX = lex
 YACC = bison -yvd
@@ -60,21 +60,21 @@ test: $(XR0V) $(TEST_DIR)
 	@./tests/run
 
 check: $(RUNTEST) $(XR0V)
-	$(VALGRIND) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
+	$(DEBUGGER) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 check-verbose: $(RUNTEST) $(XR0V)
-	$(VALGRIND) $(VALGRINDVFLAGS) \
+	$(DEBUGGER) $(DEBUGGERVFLAGS) \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 check-leaks: $(RUNTEST) $(XR0V)
-	$(VALGRIND) $(VALGRINDFULLLEAKS) \
+	$(DEBUGGER) $(DEBUGGERFULLLEAKS) \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 debug: $(RUNTEST) $(XR0V)
-	$(VALGRIND) $(XR0V) -d -I libx $(filter-out $@,$(MAKECMDGOALS))
+	$(DEBUGGER) $(XR0V) -d -I libx $(filter-out $@,$(MAKECMDGOALS))
 
 lex: $(XR0V)
-	$(VALGRIND) $(XR0V) -I libx $(TEST_DIR)/99-program/100-lex/parse.x
+	$(DEBUGGER) $(XR0V) -I libx $(TEST_DIR)/99-program/100-lex/parse.x
 
 PARSER = $(BUILD_DIR)/lex-gen
 
@@ -86,22 +86,22 @@ lex-gen:
 	@diff $(BUILD_DIR)/gen_firstchar $(BUILD_DIR)/percent
 
 lex-leaks: $(XR0V)
-	$(VALGRIND) $(VALGRINDFULLLEAKS) \
+	$(DEBUGGER) $(DEBUGGERFULLLEAKS) \
 		$(XR0V) -I libx $(TEST_DIR)/99-program/100-lex/parse.x
 
 lex-verbose: $(XR0V) 
-	$(VALGRIND) $(VALGRINDVFLAGS) \
+	$(DEBUGGER) $(DEBUGGERVFLAGS) \
 		$(XR0V) -I libx -v $(TEST_DIR)/99-program/100-lex/parse.x
 
 matrix: $(XR0V)
-	$(VALGRIND) $(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
+	$(DEBUGGER) $(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
 
 matrix-leaks: $(XR0V)
-	$(VALGRIND) $(VALGRINDFULLLEAKS) \
+	$(DEBUGGER) $(DEBUGGERFULLLEAKS) \
 		$(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
 
 matrix-verbose: $(XR0V) 
-	$(VALGRIND) $(VALGRINDVFLAGS) \
+	$(DEBUGGER) $(DEBUGGERVFLAGS) \
 		$(XR0V) -I libx $(TEST_DIR)/99-program/000-matrix.x
 
 clean:
