@@ -11,7 +11,7 @@ malloc(int size) ~ [
 
 axiom void
 free(void *ptr) ~ [
-	setup: ptr = malloc(1);
+	setup: ptr = malloc([0?]);
 	.free(ptr);
 ];
 

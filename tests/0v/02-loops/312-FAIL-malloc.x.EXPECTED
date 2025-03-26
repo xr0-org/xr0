@@ -1,0 +1,1 @@
+02-loops/312-FAIL-malloc.x:13:13: *(arr) <= 0 not satisfied (unit | #1 <= 0)

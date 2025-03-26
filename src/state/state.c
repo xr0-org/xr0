@@ -171,6 +171,12 @@ state_atsetupend(struct state *s)
 }
 
 int
+state_ininvariant(struct state *s)
+{
+	return stack_ininvariant(s->stack);
+}
+
+int
 state_atinvariantend(struct state *s)
 {
 	return stack_atinvariantend(s->stack);
@@ -401,7 +407,7 @@ allocstatic(char *lit, struct state *state)
 		address,
 		offset_create(ast_expr_constant_create(0))
 	);
-	struct object_res *res = state_get(state, loc, true);
+	struct object_res *res = state_get(state, loc);
 	assert(object_res_hasobject(res));
 	object_assign(
 		object_res_as_object(res),
@@ -409,19 +415,6 @@ allocstatic(char *lit, struct state *state)
 	);
 	static_memory_stringpool(state->static_memory, lit, loc);
 	return loc;
-}
-
-struct value *
-state_clump(struct state *state, int size)
-{
-	/* XXX: should type be associated with blocks for type checking when we
-	 * assign? */
-	return value_ptr_create(
-		location_create_dereferencable(
-			clump_newblock(state->clump, size),
-			offset_create(ast_expr_constant_create(0))
-		)
-	);
 }
 
 bool
@@ -453,7 +446,7 @@ state_getrconst(struct state *state, char *id)
 }
 
 struct object_res *
-state_get(struct state *state, struct location *loc, bool constructive)
+state_get(struct state *state, struct location *loc)
 {
 	struct block_res *res = location_getblock(
 		loc,
@@ -483,7 +476,7 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	struct ast_expr *base_offset = offset_offset(of);
 	struct object_res *obj_res = block_observe(
 		block_res_as_block(res),
-		base_offset, state, constructive
+		base_offset, state
 	);
 	char *structmember = offset_member(of);
 	if (!structmember) {
@@ -492,7 +485,8 @@ state_get(struct state *state, struct location *loc, bool constructive)
 
 	struct ast_type *t = offset_membertype(of);
 	struct object *root_obj = object_res_as_object(obj_res);
-	struct object *member = object_getmember(root_obj, t, structmember, state
+	struct object *member = object_getmember(
+		root_obj, t, structmember, state
 	);
 	if (!member) {
 		char *type_str = ast_type_str(t);
@@ -505,21 +499,115 @@ state_get(struct state *state, struct location *loc, bool constructive)
 	return object_res_object_create(member);
 }
 
+static struct lsi_varmap *
+_stack_rconst_mapping(struct stack *stack, struct state *state);
+
+static struct error *
+_shapeverify_top(struct state *spec, struct state *impl);
+
 struct error *
-state_constraintverify_top(struct state *spec, struct state *impl)
+state_verify_callsetup(struct state *spec, struct state *impl)
 {
-	struct error *err = stack_shapeverify_top(spec->stack, spec, impl);
-	if (err) {
-		return err;
-	}
-	struct lsi_varmap *spec_lv = stack_rconst_mapping(spec->stack, spec);
-	struct lsi_varmap *impl_lv = stack_rconst_mapping(impl->stack, impl);
-	err = rconst_constraintverify(
-		spec->rconst, impl->rconst,
-		spec_lv, impl_lv
+	struct lsi_varmap *spec_lv = _stack_rconst_mapping(spec->stack, spec);
+	struct lsi_varmap *impl_lv = _stack_rconst_mapping(impl->stack, impl);
+	struct error *err = rconst_constraintverify(
+		spec->rconst, impl->rconst, spec_lv, impl_lv
 	);
 	lsi_varmap_destroy(impl_lv);
 	lsi_varmap_destroy(spec_lv);
+	return err ? err : _shapeverify_top(spec, impl);
+}
+
+static struct lsi_varmap *
+_var_rconst_mapping(struct state *, char *id);
+
+static struct lsi_varmap *
+_stack_rconst_mapping(struct stack *stack, struct state *state)
+{
+	int i;
+
+	struct lsi_varmap *lv = lsi_varmap_create();
+
+	struct map *m = stack_getlocalvars(stack);
+	for (i = 0; i < m->n; i++)
+		lsi_varmap_addrange(
+			lv, _var_rconst_mapping(state, m->entry[i].key)
+		);
+
+	return lv;
+}
+
+static struct object *
+location_mustgetobject(struct location *, struct state *);
+
+static struct lsi_varmap *
+_var_rconst_mapping(struct state *s, char *id)
+{
+	struct location *loc = loc_res_as_loc(state_getloc(s, id));
+	struct ast_type *t = state_getvariabletype(s, id);
+	if (ast_type_isarr(t)) {
+		struct ast_type *ptr = ast_type_create_ptr(
+			ast_type_arr_type(ast_type_copy(t))
+		);
+		struct lsi_varmap *lv = state_block_rconst_mapping(
+			s, loc, t, id
+		);
+		ast_type_destroy(ptr);
+		return lv;
+	}
+	struct object *obj = location_mustgetobject(loc, s);
+	if (!object_isdef(obj)) {
+		return lsi_varmap_create();
+	}
+	return value_rconst_mapping(
+		object_as_defvalue(obj), t, s, id
+	);
+}
+
+static struct object *
+location_mustgetobject(struct location *loc, struct state *s)
+{
+	return object_res_as_object(state_get(s, loc));
+}
+
+static struct error *
+_var_shapeverify(struct state *spec, struct state *impl, char *id);
+
+static struct error *
+_shapeverify_top(struct state *spec, struct state *impl)
+{
+	int i;
+
+	struct map *varmap = stack_getlocalvars(spec->stack);
+	for (i = 0; i < varmap->n; i++) {
+		char *id = varmap->entry[i].key;
+		struct error *err = _var_shapeverify(spec, impl, id);
+		if (err) {
+			return error_printf("invariant: %w", err);
+		}
+	}
+
+	return NULL;
+}
+
+static struct error *
+_var_shapeverify(struct state *spec, struct state *impl, char *id)
+{
+	struct constraint *c = constraint_create(
+		dynamic_str(id),
+		ast_type_copy(state_getvariabletype(spec, id)),
+		spec, impl
+	);
+	struct error *err = constraint_shapeverify(
+		c,
+		location_mustgetobject(
+			loc_res_as_loc(state_getloc(spec, id)), spec
+		),
+		location_mustgetobject(
+			loc_res_as_loc(state_getloc(impl, id)), impl
+		)
+	);
+	constraint_destroy(c);
 	return err;
 }
 
@@ -533,14 +621,15 @@ state_shapeverify_structmember(struct state *spec, struct state *impl,
 	if (!spec_obj) {
 		return NULL;
 	}
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%s.%s", "[PARENT]", member);
 	struct constraint *c = constraint_create(
+		strbuilder_build(b),
+		ast_type_copy(value_struct_membertype(spec_v, member)),
 		state_copy(spec),
-		state_copy(impl),
-		ast_type_copy(value_struct_membertype(spec_v, member))
+		state_copy(impl)
 	);
-	struct error *err = constraint_shapeverify(
-		c, object_as_value(spec_obj), object_as_value(impl_obj)
-	);
+	struct error *err = constraint_shapeverify(c, spec_obj, impl_obj);
 	constraint_destroy(c);
 	return err;
 }
@@ -559,7 +648,7 @@ state_rconst_mapping_structmember(struct state *s, struct value *v, char *parent
 	char *id = strbuilder_build(b);
 
 	struct lsi_varmap *lv = value_rconst_mapping(
-		object_as_value(obj),
+		object_as_defvalue(obj),
 		value_struct_membertype(v, member),
 		s,
 		id
@@ -594,29 +683,44 @@ state_constraintverify_all(struct state *spec, struct state *impl)
 }
 
 static struct error *
+_shapeverify_all(struct stack *spec_stack, struct state *spec,
+		struct state *impl);
+
+static struct error *
 _mutating_constraintverify_all(struct state *spec, struct state *impl)
 {
-	struct error *err = stack_shapeverify_all(
-		spec->stack, spec, impl
-	);
-	if (err) {
-		return err;
-	}
-	struct lsi_varmap *spec_lv = stack_rconst_mapping(spec->stack, spec);
-	struct lsi_varmap *impl_lv = stack_rconst_mapping(impl->stack, impl);
-	err = rconst_constraintverify(
+	struct lsi_varmap *spec_lv = _stack_rconst_mapping(spec->stack, spec);
+	struct lsi_varmap *impl_lv = _stack_rconst_mapping(impl->stack, impl);
+	struct error *err = rconst_constraintverify(
 		spec->rconst, impl->rconst,
 		spec_lv, impl_lv
 	);
 	lsi_varmap_destroy(impl_lv);
 	lsi_varmap_destroy(spec_lv);
-	return err;
+	if (err) {
+		return err;
+	}
+	return _shapeverify_all(spec->stack, spec, impl);
+}
+
+static struct error *
+_shapeverify_all(struct stack *spec_stack, struct state *spec,
+		struct state *impl)
+{
+	struct error *err = _shapeverify_top(spec, impl);
+	if (err) {
+		return err;
+	}
+	if (stack_prev(spec_stack)) {
+		return _shapeverify_all(stack_prev(spec_stack), spec, impl);
+	}
+	return NULL;
 }
 
 struct error *
-state_verifyinvariant(struct state *s)
+state_verify_invariant(struct state *s)
 {
-	return stack_verifyinvariant(s->stack, s);
+	return stack_verify_invariant(s->stack, s);
 }
 
 int
@@ -698,7 +802,7 @@ state_getobject(struct state *state, char *id)
 		);
 	}
 
-	return state_get(state, variable_location(v), true);
+	return state_get(state, variable_location(v));
 }
 
 struct object_res *
@@ -711,7 +815,7 @@ state_deref(struct state *state, struct value *ptr_val)
 	assert(deref);
 
 	/* `*(ptr+offset)` */
-	struct object_res *res = state_get(state, deref, true);
+	struct object_res *res = state_get(state, deref);
 	if (object_res_iserror(res)) {
 		struct error *err = object_res_as_error(res);
 		if (!error_to_state_get_no_block(err)) {
@@ -730,13 +834,28 @@ state_deref(struct state *state, struct value *ptr_val)
 
 
 struct location *
-state_alloc(struct state *state, int size)
+state_alloc(struct state *state, struct value *size)
 {
 	if (stack_insetup(state->stack)) {
 		return heap_newcallerblock(state->heap, size);
 	}
 	return heap_newblock(state->heap, size);
 }
+
+struct value *
+state_clump(struct state *state, struct value *size)
+{
+	/* XXX: should type be associated with blocks for type checking when we
+	 * assign? */
+	return value_ptr_create(
+		location_create_dereferencable(
+			clump_newblock(state->clump, size),
+			offset_create(ast_expr_constant_create(0))
+		)
+	);
+}
+
+
 
 struct error *
 state_dealloc(struct state *state, struct location *loc)
@@ -747,10 +866,10 @@ state_dealloc(struct state *state, struct location *loc)
 bool
 state_addresses_deallocand(struct state *state, struct object *obj)
 {
-	struct value *val = object_as_value(obj);
-	struct location *loc = value_as_location(val); 
-	
-	return state_isdeallocand(state, loc);
+	return state_isdeallocand(
+		state,
+		value_as_location(object_as_defvalue(obj))
+	);
 }
 
 bool
@@ -788,20 +907,11 @@ state_callerreferences(struct state *s, struct location *loc)
 	return clump_callerreferences(s->clump, loc, s);
 }
 
-bool
-state_eval(struct state *s, struct ast_expr *e)
-{
-	return rconst_eval(s->rconst, e);
-}
-
 static struct error *
 _shape_and_constraint_verify(struct state *spec, struct state *impl);
 
-static void
-state_normalise(struct state *s);
-
 struct error *
-state_specverify(struct state *impl, struct state *spec)
+state_verify_endstate(struct state *impl, struct state *spec)
 {
 	struct state *impl_c = state_copy(impl),
 		     *spec_c = state_copy(spec);
@@ -809,26 +919,11 @@ state_specverify(struct state *impl, struct state *spec)
 		if (!impl->reg) {
 			return error_printf("must have return value");
 		}
-		struct error *err = _shape_and_constraint_verify(spec, impl);
-		if (err) {
-			return err;
-		}
+		return _shape_and_constraint_verify(spec, impl);
 	}
-	state_normalise(impl_c);
-	state_normalise(spec_c);
-
-	char *str1 = state_str(impl_c),
-	     *str2 = state_str(spec_c);
-	int equal = strcmp(str1, str2) == 0;
-	if (!equal) {
-		return error_printf("actual and abstract states differ");
-	}
-	free(str2);
-	free(str1);
-
+	assert(!impl->reg);
 	state_destroy(spec_c);
 	state_destroy(impl_c);
-
 	return NULL;
 }
 
@@ -841,15 +936,22 @@ _shape_and_constraint_verify(struct state *spec, struct state *impl)
 	struct state *spec_copy = state_copy(spec),
 		     *impl_copy = state_copy(impl);
 	struct constraint *c = constraint_create(
+		dynamic_str("return"),
+		ast_type_copy(stack_returntype(spec->stack)),
 		spec_copy,
-		impl_copy,
-		ast_type_copy(stack_returntype(spec->stack))
+		impl_copy
 	);
 	struct error *err = constraint_shapeverify(
-		c, spec->reg, impl->reg
+		c,
+		object_create(
+			value_int_create(0), spec->reg, value_int_create(1)
+		),
+		object_create(
+			value_int_create(0), impl->reg, value_int_create(1)
+		)
 	);
 	if (err) {
-		return error_printf("return value %s", error_str(err));
+		return err;
 	}
 	struct lsi_varmap *spec_lv = _stack_and_return_mapping(
 		spec_copy, spec->reg
@@ -869,7 +971,7 @@ _shape_and_constraint_verify(struct state *spec, struct state *impl)
 static struct lsi_varmap *
 _stack_and_return_mapping(struct state *s, struct value *ret)
 {
-	struct lsi_varmap *lv = stack_rconst_mapping(s->stack, s);
+	struct lsi_varmap *lv = _stack_rconst_mapping(s->stack, s);
 	lsi_varmap_addrange(
 		lv,
 		value_rconst_mapping(
@@ -882,80 +984,56 @@ _stack_and_return_mapping(struct state *s, struct value *ret)
 	return lv;
 }
 
-static void
-state_undeclareliterals(struct state *s);
 
-static void
-state_undeclarevars(struct state *s);
+/* state_arr */
 
-void
-state_unnest(struct state *s);
+struct state_arr {
+	int n;
+	struct state **s;
+};
 
-static void
-state_permuteheap(struct state *, struct int_arr *);
-
-static struct int_arr *
-deriveorder(struct state *s);
-
-static void
-state_normalise(struct state *s)
+struct state_arr *
+state_arr_create(void)
 {
-	state_unnest(s);
-	state_undeclareliterals(s);
-	state_undeclarevars(s);
-	if (s->reg) {
-		state_permuteheap(s, deriveorder(s));
+	return calloc(1, sizeof(struct state_arr));
+}
+
+struct state_arr *
+state_arr_copy(struct state_arr *old)
+{
+	int i;
+
+	struct state_arr *new = state_arr_create();
+	for (i = 0; i < old->n; i++) {
+		state_arr_append(new, state_copy(old->s[i]));
 	}
-}
-
-static struct int_arr *
-deriveorder(struct state *s)
-{
-	struct circuitbreaker *cb = circuitbreaker_create();
-	struct int_arr *arr = value_deriveorder(s->reg, cb, s);
-	circuitbreaker_destroy(cb);
-	heap_fillorder(s->heap, arr);
-	return arr;
-}
-
-static void
-state_permuteheap(struct state *s, struct int_arr *arr)
-{
-	/* XXX: only permuting heap and return register; clump later */
-	assert(s->reg);
-
-	struct permutation *p = permutation_create(arr);
-	s->heap = heap_permute(s->heap, p);
-	s->reg = value_permuteheaplocs(s->reg, p);
-	permutation_destroy(p);
-}
-
-static void
-state_undeclareliterals(struct state *s)
-{
-	static_memory_destroy(s->static_memory);
-	/* XXX: map leaks */
-	s->static_memory = static_memory_create();
-}
-
-static void
-state_undeclarevars(struct state *s)
-{	
-	/*heap_undeclare(s->heap, s);*/
-	/*clump_undeclare(s->clump, s);*/
-	rconst_undeclare(s->rconst);
-	struct value *v = state_readregister(s);
-	if (v) {
-		/* XXX: avoid state_writeregister assert */
-		s->reg = value_abstractcopy(v, s);
-	}
-	stack_undeclare(s->stack, s);
+	return new;
 }
 
 void
-state_unnest(struct state *s)
+state_arr_destroy(struct state_arr *arr)
 {
-	while (stack_isnested(s->stack)) {
-		state_popframe(s);
+	for (int i = 0; i < arr->n; i++) {
+		state_destroy(arr->s[i]);
 	}
+	free(arr);
+}
+
+void
+state_arr_append(struct state_arr *arr, struct state *s)
+{
+	arr->s = realloc(arr->s, sizeof(struct state *) * ++arr->n);
+	arr->s[arr->n-1] = s;
+}
+
+int
+state_arr_len(struct state_arr *arr)
+{
+	return arr->n;
+}
+
+struct state **
+state_arr_s(struct state_arr *arr)
+{
+	return arr->s;
 }

@@ -80,17 +80,11 @@ struct stack {
 };
 
 static struct location *
-stack_newblock(struct stack *stack, int size)
+stack_newblock(struct stack *stack, struct value *size)
 {
-	struct block *b = block_create(size);
-	/* "Storage is guaranteed to be reserved for a new instance of such an
-	 * object on each normal entry into the block in which it is declared,
-	 * or on a jump from outside the block to a label in the block or in an
-	 * enclosed block." (3.1.2.4) */
-	block_install(b, object_value_create(ast_expr_constant_create(0), NULL));
 	return location_create_automatic(
 		stack->id,
-		block_arr_append(stack->memory, b),
+		block_arr_append(stack->memory, block_create(size)),
 		offset_create(ast_expr_constant_create(0))
 	);
 }
@@ -205,9 +199,9 @@ argmodulator(struct stack *stack, struct state *state)
 		string_arr_append(
 			arr,
 			value_str(
-				object_as_value(
+				object_as_defvalue(
 					object_res_as_object(
-						state_get(state, loc, false)
+						state_get(state, loc)
 					)
 				)
 			)
@@ -385,6 +379,12 @@ bool
 stack_islinear(struct stack *s)
 {
 	return frame_isinter(s->f);
+}
+
+bool
+stack_frameiscall(struct stack *s)
+{
+	return frame_iscall(s->f);
 }
 
 int
@@ -611,10 +611,29 @@ stack_propername(struct stack *s)
 	return frame_iscall(s->f) ? frame_name(s->f) : stack_propername(s->prev);
 }
 
+static void
+_addrange(struct map *, struct map *);
+
 struct map *
-stack_getvarmap(struct stack *s)
+stack_getlocalvars(struct stack *s)
 {
-	return s->varmap;
+	struct map *vars = map_create();
+	_addrange(vars, s->varmap);
+	if (s->prev && !frame_iscall(s->f)) {
+		_addrange(vars, stack_getlocalvars(s->prev));
+	}
+	return vars;
+}
+
+static void
+_addrange(struct map *m, struct map *m0)
+{
+	int i;
+
+	for (i = 0; i < m0->n; i++) {
+		struct entry e = m0->entry[i];
+		map_set(m, e.key, e.value);
+	}
 }
 
 struct variable *
@@ -631,127 +650,7 @@ stack_getvariable(struct stack *s, char *id)
 }
 
 struct error *
-stack_shapeverify_all(struct stack *spec_stack, struct state *spec,
-		struct state *impl)
-{
-	struct error *err = stack_shapeverify_top(
-		spec_stack, spec, impl
-	);
-	if (err) {
-		return err;
-	}
-	if (spec_stack->prev) {
-		return stack_shapeverify_all(
-			spec_stack->prev, spec, impl
-		);
-	}
-	return NULL;
-}
-
-static struct error *
-_var_shapeverify(struct state *spec, struct state *impl, char *id);
-
-struct error *
-stack_shapeverify_top(struct stack *spec_stack, struct state *spec,
-		struct state *impl)
-{
-	int i;
-
-	struct map *m = spec_stack->varmap;
-	for (i = 0; i < m->n; i++) {
-		char *id = m->entry[i].key;
-		struct error *err = _var_shapeverify(spec, impl, id);
-		if (err) {
-			return error_printf(
-				"precondition failure: `%s' %w",
-				id, err
-			);
-		}
-	}
-
-	return NULL;
-}
-
-static struct object *
-location_mustgetobject(struct location *, struct state *);
-
-static struct error *
-_var_shapeverify(struct state *spec, struct state *impl, char *id)
-{
-	struct object *spec_obj = location_mustgetobject(
-		loc_res_as_loc(state_getloc(spec, id)), spec
-	);
-	if (!object_hasvalue(spec_obj)) {
-		return NULL;
-	}
-	struct constraint *c = constraint_create(
-		spec, impl,
-		ast_type_copy(state_getvariabletype(spec, id))
-	);
-	struct error *err = constraint_shapeverify(
-		c,
-		object_as_value(spec_obj),
-		/* we can safely assume that impl has a value for id because
-		 * it's the result of an argument expression being evaluated */
-		object_as_value(
-			location_mustgetobject(
-				loc_res_as_loc(state_getloc(impl, id)),
-				impl
-			)
-		)
-	);
-	constraint_destroy(c);
-	return err;
-}
-
-static struct object *
-location_mustgetobject(struct location *loc, struct state *s)
-{
-	return object_res_as_object(state_get(s, loc, false));
-}
-
-static struct lsi_varmap *
-_var_rconst_mapping(struct state *, char *id);
-
-struct lsi_varmap *
-stack_rconst_mapping(struct stack *stack, struct state *state)
-{
-	int i;
-
-	struct lsi_varmap *lv = lsi_varmap_create();
-
-	struct map *m = stack->varmap;
-	for (i = 0; i < m->n; i++)
-		lsi_varmap_addrange(
-			lv, _var_rconst_mapping(state, m->entry[i].key)
-		);
-
-	if (!frame_iscall(stack->f)) {
-		assert(stack->prev);
-		lsi_varmap_addrange(
-			lv, stack_rconst_mapping(stack->prev, state)
-		);
-	}
-
-	return lv;
-}
-
-static struct lsi_varmap *
-_var_rconst_mapping(struct state *s, char *id)
-{
-	struct object *obj = location_mustgetobject(
-		loc_res_as_loc(state_getloc(s, id)), s
-	);
-	if (!object_hasvalue(obj)) {
-		return lsi_varmap_create();
-	}
-	return value_rconst_mapping(
-		object_as_value(obj), state_getvariabletype(s, id), s, id
-	);
-}
-
-struct error *
-stack_verifyinvariant(struct stack *s, struct state *impl)
+stack_verify_invariant(struct stack *s, struct state *impl)
 {
 	return frame_verifyinvariant(s->f, impl);
 }
@@ -788,7 +687,7 @@ struct frame {
 	struct ast_function *f;
 
 	int parentstackid; /* only defined in FRAME_INVARIANT and FRAME_LOOP */
-	struct state *inv_state; /* only defined in FRAME_LOOP */
+	struct state_arr *inv_states; /* only defined in FRAME_LOOP */
 };
 
 static struct frame *
@@ -860,7 +759,9 @@ frame_loop_create(struct ast_block *b, struct stack *s, struct state *inv_state)
 		"loop", program_abstract_create(b), FRAME_LOOP
 	);
 	f->parentstackid = stack_id(s);
-	f->inv_state = inv_state;
+	struct state_arr *sarr = state_arr_create();
+	state_arr_append(sarr, inv_state);
+	f->inv_states = sarr;
 	return f;
 }
 
@@ -904,7 +805,7 @@ frame_destroy(struct frame *f)
 		ast_function_destroy(f->f);
 	}
 	if (frame_isloop(f)) {
-		state_destroy(f->inv_state);
+		state_arr_destroy(f->inv_states);
 	}
 }
 
@@ -920,7 +821,7 @@ frame_copy(struct frame *old)
 		new->f = ast_function_copy(old->f);
 		break;
 	case FRAME_LOOP:
-		new->inv_state = state_copy(old->inv_state);
+		new->inv_states = state_arr_copy(old->inv_states);
 		/* fallthrough */
 	case FRAME_INVARIANT:
 		new->parentstackid = old->parentstackid;
@@ -1037,8 +938,19 @@ frame_call(struct frame *f)
 static struct error *
 frame_verifyinvariant(struct frame *f, struct state *impl)
 {
+	int i;
+
 	assert(frame_isloop(f));
-	return state_constraintverify_all(f->inv_state, impl);
+
+	for (i = 0; i < state_arr_len(f->inv_states); i++) {
+		struct error *err = state_constraintverify_all(
+			state_arr_s(f->inv_states)[i], impl
+		);
+		if (err) {
+			return err;
+		}
+	}
+	return NULL;
 }
 
 struct variable {
@@ -1090,11 +1002,11 @@ variable_abstractcopy(struct variable *old, struct state *s)
 	new->type = ast_type_copy(old->type);
 	new->isparam = old->isparam;
 	new->loc = location_copy(old->loc);
-	struct object_res *res = state_get(s, new->loc, false);
+	struct object_res *res = state_get(s, new->loc);
 	struct object *obj = object_res_as_object(res);
 	assert(obj);
-	if (object_hasvalue(obj)) {
-		struct value *v = object_as_value(obj);
+	if (object_isdef(obj)) {
+		struct value *v = object_as_defvalue(obj);
 		if (v) {
 			object_assign(obj, value_abstractcopy(v, s));
 		}

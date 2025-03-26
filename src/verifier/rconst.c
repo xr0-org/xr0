@@ -92,9 +92,9 @@ rconst_id(struct map *varmap, struct map *persistmap, bool persist);
 char *
 rconst_declarenokey(struct rconst *v, bool persist, struct state *state)
 {
-	struct map *m = v->varmap;
-	char *s = rconst_id(m, v->persist, persist);
-	map_set(m, dynamic_str(s), (void *) 1);
+	struct map *varmap = v->varmap;
+	char *s = rconst_id(varmap, v->persist, persist);
+	map_set(varmap, dynamic_str(s), (void *) 1);
 	map_set(v->persist, dynamic_str(s), (void *) persist);
 	return s;
 }
@@ -250,12 +250,6 @@ _constraints_prefix(char *indent)
 	return strbuilder_build(b);
 }
 
-bool
-rconst_eval(struct rconst *v, struct ast_expr *e)
-{
-	return ast_expr_matheval(e);
-}
-
 static struct lsi *
 _eliminate_rename(struct lsi *, struct lsi_varmap *);
 
@@ -274,10 +268,10 @@ rconst_constraintverify(struct rconst *spec, struct rconst *impl,
 static struct lsi *
 _eliminate_rename(struct lsi *lsi, struct lsi_varmap *lv)
 {
-	struct string_arr *arr = lsi_varmap_keys(lv);
+	struct string_arr *arr = lsi_varmap_values(lv);
 	struct lsi *eliminated = lsi_eliminate_except(lsi, arr);
 	string_arr_destroy(arr);
-	struct lsi *renamed = lsi_renamevars(eliminated, lv);
+	struct lsi *renamed = lsi_userspace_project(eliminated, lv);
 	lsi_destroy(eliminated);
 	return renamed;
 }

@@ -51,7 +51,7 @@ clump_copy(struct clump *c)
 }
 
 int
-clump_newblock(struct clump *c, int size)
+clump_newblock(struct clump *c, struct value *size)
 {
 	int address = block_arr_append(c->blocks, block_callercreate(size));
 

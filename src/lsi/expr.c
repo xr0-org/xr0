@@ -8,6 +8,7 @@
 #include "_limits.h"
 
 #include "expr.h"
+#include "expr_arr.h"
 #include "tally.h"
 
 /* lsi_expr: an expression involving constants, variables, and sums and products
@@ -90,9 +91,9 @@ _as_const(struct lsi_expr *e)
 }
 
 struct lsi_expr *
-_lsi_expr_renamevars(struct lsi_expr *e, struct lsi_varmap *m)
+_lsi_expr_renamevar(struct lsi_expr *e, char *old, char *new)
 {
-	return _create(_tally_renamekeys(e->_, m));
+	return _create(_tally_renamevar(e->_, old, new));
 }
 
 struct lsi_expr *

@@ -30,7 +30,6 @@ range_create(long lw, long up)
 		"have %li and %li\n",
 		lw, up
 	);
-	assert(lw < up);
 
 	struct range *r = malloc(sizeof(struct range));
 	assert(r);
@@ -93,32 +92,13 @@ range_copy(struct range *r) { return range_create(r->lower, r->upper); }
 void
 range_destroy(struct range *r) { free(r); }
 
-static char *
-_limit_str(long);
-
 char *
 range_str(struct range *r)
 {
-	struct strbuilder *b = strbuilder_create();
-	char *lw = _limit_str(r->lower),
-	     *up = _limit_str(r->upper);
-	strbuilder_printf(b, "%s?%s", lw, up);
-	free(up);
-	free(lw);
-	return strbuilder_build(b);
-}
+	assert(r->lower == r->upper-1);
 
-static char *
-_limit_str(long l)
-{
 	struct strbuilder *b = strbuilder_create();
-	switch (l) {
-	case C89_INT_MIN:
-	case C89_INT_MAX+1:
-		break;
-	default:
-		strbuilder_printf(b, "%d", l);
-	}
+	strbuilder_printf(b, "%d", r->lower);
 	return strbuilder_build(b);
 }
 

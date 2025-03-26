@@ -109,9 +109,6 @@ rconst_hasvar(struct rconst *, char *var);
 void
 rconst_undeclare(struct rconst *);
 
-bool
-rconst_eval(struct rconst *, struct ast_expr *);
-
 struct lsi_varmap;
 
 struct error *

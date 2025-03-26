@@ -1,0 +1,1 @@
+02-loops/303-FAIL-arr.x:10:13: *(arr) <= 0 not satisfied (unit | #0 <= 0)

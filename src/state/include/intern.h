@@ -4,9 +4,6 @@
 struct location;
 struct object;
 
-struct object_res *
-state_get(struct state *state, struct location *loc, bool constructive);
-
 struct block *
 state_getblock(struct state *state, struct location *loc);
 

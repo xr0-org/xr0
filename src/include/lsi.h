@@ -27,8 +27,11 @@ lsi_addrange(struct lsi *, struct lsi *);
 
 struct lsi_varmap;
 
+/* lsi_userspace_project: given an lsi and a mapping of names into variables
+ * within the lsi, create a system where every unique name is constrained the
+ * way its corresponding variable is in the original system. */
 struct lsi *
-lsi_renamevars(struct lsi *, struct lsi_varmap *);
+lsi_userspace_project(struct lsi *, struct lsi_varmap *name_var_m);
 
 struct lsi *
 lsi_prefixvars(struct lsi *, char *prefix);
@@ -169,6 +172,11 @@ lsi_varmap_addrange(struct lsi_varmap *m, struct lsi_varmap *m0);
 struct string_arr;
 
 struct string_arr *
-lsi_varmap_keys(struct lsi_varmap *);
+lsi_varmap_values(struct lsi_varmap *);
+
+/* lsi_var_names_map: given a (not-necessarily injective) mapping of names onto
+ * vars, return a unique mapping of vars onto string arrays of names. */
+struct map *
+lsi_varmap_var_names_map(struct lsi_varmap *name_var_m);
 
 #endif

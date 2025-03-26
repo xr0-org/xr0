@@ -359,7 +359,7 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 	struct eval *root_eval = e_res_as_eval(res);
 	struct location *root_loc = eval_as_lval(root_eval);
 	struct object *root_obj = object_res_as_object(
-		state_get(s, root_loc, true)
+		state_get(s, root_loc)
 	);
 	char *field = ast_expr_member_field(expr);
 	struct ast_type *member_type = object_getmembertype(
@@ -479,11 +479,7 @@ setupverify(struct ast_expr *call, struct state *impl)
 		rconst_create(),
 		state_getext(impl)
 	);
-	int nparams = ast_function_nparams(f);
-	struct ast_variable **param = ast_function_params(f);
-	for (int i = 0; i < nparams; i++) {
-		state_declare(spec, param[i], true);
-	}
+	ast_function_initparams(f, spec);
 
 	struct ast_block_res *decided_abs_res = setupdecided_abstract(
 		call, impl
@@ -510,7 +506,7 @@ setupverify(struct ast_expr *call, struct state *impl)
 	struct e_res *push_res = pushcallframe(call, impl);
 	assert(!e_res_iserror(push_res));
 
-	struct error *err = state_constraintverify_top(spec, impl);
+	struct error *err = state_verify_callsetup(spec, impl);
 	if (err) {
 		return err;
 	}
@@ -592,9 +588,13 @@ prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
 		}
 		struct value_res *v_res = eval_to_value(e_res_as_eval(res), s);
 		if (value_res_iserror(v_res)) {
+			char *expr = ast_expr_str(arg[i]);
 			return value_arr_res_error_create(
-				value_res_as_error(v_res)
+				error_printf(
+					"%s %w", expr, value_res_as_error(v_res)
+				)
 			);
+			free(expr);
 		}
 		if (!value_res_hasvalue(v_res)) {
 			char *expr = ast_expr_str(arg[i]);
@@ -630,7 +630,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 			return e_res_as_error(lval_res);
 		}
 		struct object_res *o_res = state_get(
-			state, eval_as_lval(e_res_as_eval(lval_res)), true
+			state, eval_as_lval(e_res_as_eval(lval_res))
 		);
 		assert(!object_res_iserror(o_res));
 		ast_expr_destroy(name);
@@ -646,12 +646,27 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
+	struct e_res *r_res = ast_expr_eval(rval, state);
+	if (e_res_iserror(r_res)) {
+		return r_res;
+	}
+	struct eval *eval = e_res_as_eval(r_res);
+	struct value_res *v_res = eval_to_value(eval, state);
+	if (value_res_iserror(v_res)) {
+		char *expr = ast_expr_str(rval);
+		struct e_res *e_res = e_res_error_create(
+			error_printf("%s %w", expr, value_res_as_error(v_res))
+		);
+		free(expr);
+		return e_res;
+	}
+
 	struct e_res *l_res = ast_expr_eval(lval, state);
 	if (e_res_iserror(l_res)) {
 		return e_res_error_create(e_res_as_error(l_res));
 	}
 	struct object_res *obj_res = eval_to_object(
-		e_res_as_eval(l_res), state, true
+		e_res_as_eval(l_res), state
 	);
 	if (object_res_iserror(obj_res)) {
 		return e_res_error_create(object_res_as_error(obj_res));
@@ -665,26 +680,7 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 		return e_res_error_create(e);
 	}
 	struct object *obj = object_res_as_object(obj_res);
-
-	struct e_res *r_res = ast_expr_eval(rval, state);
-	if (e_res_iserror(r_res)) {
-		return r_res;
-	}
-	struct eval *eval = e_res_as_eval(r_res);
-	struct value_res *v_res = eval_to_value(eval, state);
-	if (value_res_iserror(v_res)) {
-		return e_res_error_create(value_res_as_error(v_res));
-	}
-	if (!value_res_hasvalue(v_res)) {
-		char *s = ast_expr_str(rval);
-		struct error *e = error_printf(
-			"undefined memory access: %s has no value", s
-		);
-		free(s);
-		return e_res_error_create(e);
-	}
 	object_assign(obj, value_copy(value_res_as_value(v_res)));
-
 	return r_res;
 }
 
@@ -755,6 +751,10 @@ additive_eval(struct ast_expr *expr, struct state *state)
 	);
 }
 
+static struct value *
+_arithmetic_eval(struct value *, enum ast_binary_operator, struct value *,
+		struct state *);
+
 static struct e_res *
 value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 		struct eval *rv2, struct state *s)
@@ -799,15 +799,17 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 		}
 		struct location *loc1 = value_as_location(v1);
 		struct location *newloc = location_copy(loc1);
+		struct value *size = ast_type_size(ast_type_ptr_type(t1));
 		struct ast_expr *op1 = offset_as_expr(location_offset(loc1)),
 				*op2 = ast_expr_product_create(
 			/* v2 * sizeof(*v1) */
 			value_to_expr(v2),
 			ast_expr_constant_create(
 				/* scaled by size of object * pointed at */
-				ast_type_size(ast_type_ptr_type(t1))
+				value_as_constant(size)
 			)
 		);
+		value_destroy(size);
 		location_setoffset(
 			newloc,
 			offset_create(ast_expr_binary_create(op1, op, op2))
@@ -817,14 +819,56 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 	}
 	/* ⊢ !ast_type_isptr(t1) */
 
-	/* TODO: check t1, t2 are compatible arithmetic types */
-	struct value *v = value_rconst_create(
-		ast_expr_binary_create(
-			value_to_expr(v1), op, value_to_expr(v2)
-		)
+	/* TODO: generalise to check t1, t2 are compatible arithmetic types */
+	assert(ast_type_isint(t1) && ast_type_isint(t2));
+
+	return e_res_eval_create(
+		eval_rval_create(t1, _arithmetic_eval(v1, op, v2, s))
 	);
-	return e_res_eval_create(eval_rval_create(t1, v));
 }
+
+static struct lsi_expr *
+_to_lsi(struct value *, enum ast_binary_operator op, struct value *,
+		struct state *);
+
+static struct value *
+_arithmetic_eval(struct value *v0, enum ast_binary_operator op, struct value *v1,
+		struct state *s)
+{
+	if (value_isrconst(v0) || value_isrconst(v1))
+		return value_rconst_create(
+			ast_expr_binary_create(
+				value_to_expr(v0), op, value_to_expr(v1)
+			)
+		);
+
+	struct lsi_expr *e = _to_lsi(v0, op, v1, s);
+	struct lsi_range *r = state_range_eval(s, e);
+	lsi_expr_destroy(e);
+	return value_int_create(lsi_range_as_const(r));
+}
+
+static struct lsi_expr *
+_to_lsi(struct value *v0, enum ast_binary_operator op, struct value *v1,
+		struct state *s)
+{
+	struct lsi_expr *e0 = value_to_lsi_expr(v0, s),
+			*e1 = value_to_lsi_expr(v1, s);
+	switch (op) {
+	case BINARY_OP_ADDITION:
+		return lsi_expr_sum_create(e0, e1);
+	case BINARY_OP_SUBTRACTION:
+		return lsi_expr_sum_create(
+			e0,
+			lsi_expr_product_create(lsi_expr_const_create(-1), e1)
+		);
+	case BINARY_OP_MULTIPLICATION:
+		return lsi_expr_product_create(e0, e1);
+	default:
+		assert(0);
+	}
+}
+
 
 static struct e_res *
 value_relational_eval(struct eval *, enum ast_binary_operator, struct eval *,
@@ -848,9 +892,6 @@ relational_eval(struct ast_expr *e, struct state *s)
 		s
 	);
 }
-
-static struct lsi_expr * 
-_value_to_lsi_expr(struct value *, struct state *);
 
 static struct lsi_le *
 _rel_to_le(struct lsi_expr *, enum ast_binary_operator, struct lsi_expr *);
@@ -877,9 +918,9 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 	);
 
 	struct lsi_le *le = _rel_to_le(
-		_value_to_lsi_expr(value_res_as_value(v_res1), s),
+		value_to_lsi_expr(value_res_as_value(v_res1), s),
 		op,
-		_value_to_lsi_expr(value_res_as_value(v_res2), s)
+		value_to_lsi_expr(value_res_as_value(v_res2), s)
 	);
 	struct lsi_le *le_neg = lsi_le_negate(le);
 
@@ -900,18 +941,12 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 	}
 
 	return e_res_error_create(
-		error_verifierinstruct(
+		state_ininvariant(s)
+		? error_invariantsplit(splitinstruct_create(le, le_neg))
+		: error_verifierinstruct(
 			verifierinstruct_split(splitinstruct_create(le, le_neg))
 		)
 	);
-}
-
-static struct lsi_expr * 
-_value_to_lsi_expr(struct value *v, struct state *s)
-{
-	return value_isconstant(v)
-		? lsi_expr_const_create(value_as_constant(v))
-		: lsi_expr_var_create(value_to_rconstid(v, s));
 }
 
 static struct lsi_le *
@@ -1097,12 +1132,12 @@ hack_object_from_assertion(struct ast_expr *expr, struct state *state)
 		assert(false);
 	}
 	return object_res_as_object(
-		state_get(state, eval_as_lval(e_res_as_eval(res)), true)
+		state_get(state, eval_as_lval(e_res_as_eval(res)))
 	);
 }
 
-static int
-hack_constorone(struct ast_expr *, struct state *);
+static struct value *
+_size(struct ast_expr *, struct state *);
 
 static struct e_res *
 dealloc_process(struct ast_expr *, struct state *);
@@ -1129,7 +1164,7 @@ expr_alloc_eval(struct ast_expr *expr, struct state *state)
 				value_ptr_create(
 					state_alloc(
 						state,
-						hack_constorone(
+						_size(
 							ast_expr_alloc_arg(expr),
 							state
 						)
@@ -1147,7 +1182,7 @@ expr_alloc_eval(struct ast_expr *expr, struct state *state)
 				ast_type_create_void(),
 				state_clump(
 					state,
-					hack_constorone(
+					_size(
 						ast_expr_alloc_arg(expr),
 						state
 					)
@@ -1169,18 +1204,16 @@ expr_alloc_eval(struct ast_expr *expr, struct state *state)
 	return res;
 }
 
-static int
-hack_constorone(struct ast_expr *e, struct state *s)
+static struct value *
+_size(struct ast_expr *e, struct state *s)
 {
-	if (ast_expr_isconstant(e)) {
-		return ast_expr_isconstant(e) ? ast_expr_as_constant(e) : 1;
-	}
-	struct object_res *obj_res = state_getobject(s, ast_expr_as_identifier(e));
-	if (object_res_iserror(obj_res)) {
-		assert(false);
-	}
-	struct value *v = object_as_value(object_res_as_object(obj_res));
-	return value_isconstant(v) ? value_as_constant(v) : 1;
+	return ast_expr_isconstant(e)
+		? value_int_create(ast_expr_as_constant(e))
+		: object_as_defvalue(
+			object_res_as_object(
+				state_getobject(s, ast_expr_as_identifier(e))
+			)
+		);
 }
 
 static struct e_res *
@@ -1204,10 +1237,10 @@ dealloc_process(struct ast_expr *expr, struct state *state)
 		assert(false);
 	}
 	struct object *obj = object_res_as_object(obj_res);
-	if (!object_hasvalue(obj)) {
+	if (!object_isdef(obj)) {
 		assert(false);
 	}
-	struct value *v = object_as_value(obj);
+	struct value *v = object_as_defvalue(obj);
 	if (!value_islocation(v)) {
 		return e_res_error_create(
 			error_printf("undefined free of value not pointing at heap")
@@ -1281,6 +1314,7 @@ ast_expr_geninstr(struct ast_expr *expr, struct lexememarker *loc,
 	case EXPR_ALLOCATION:
 		return alloc_geninstr(expr, loc, b, s);	
 	case EXPR_ASSIGNMENT:
+
 		return assign_geninstr(expr, loc, b, s);
 	case EXPR_CALL:
 		return call_geninstr(expr, loc, b, s);

@@ -170,7 +170,7 @@ static struct error *
 exec(struct segment *s, progressor *prog)
 {	
 	if (state_atloopend(s->state)) {
-		struct error *err = state_verifyinvariant(s->state);
+		struct error *err = state_verify_invariant(s->state);
 		if (err) {
 			return state_stacktrace(s->state, err);
 		}
@@ -227,7 +227,7 @@ segment_audit(struct segment *abstract, struct segment *actual)
 		);
 	}
 	struct error *err;
-	if ((err = state_specverify(actual->state, abstract->state))) {
+	if ((err = state_verify_endstate(actual->state, abstract->state))) {
 		v_printf("spec:\n%s", state_str(abstract->state));
 		v_printf("impl:\n%s", state_str(actual->state));
 		return error_printf(

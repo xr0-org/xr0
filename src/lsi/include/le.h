@@ -11,7 +11,7 @@ lsi_le_create(struct lsi_expr *l, struct lsi_expr *r);
 struct lsi_varmap;
 
 struct lsi_le *
-_lsi_le_renamevars(struct lsi_le *, struct lsi_varmap *);
+_lsi_le_renamevar(struct lsi_le *, char *, char *);
 
 struct lsi_le *
 _lsi_le_prefixvars(struct lsi_le *, char *prefix);

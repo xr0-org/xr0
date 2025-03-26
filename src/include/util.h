@@ -30,6 +30,11 @@ map_create(void);
 void
 map_destroy(struct map *);
 
+typedef char *map_printer(void *);
+
+char *
+map_str(struct map *, map_printer);
+
 void *
 map_get(struct map *, const char *key);
 
@@ -217,6 +222,14 @@ error_lsi_notfeasible(void);
 
 struct error *
 error_to_lsi_notfeasible(struct error *);
+
+struct splitinstruct;
+
+struct error *
+error_invariantsplit(struct splitinstruct *);
+
+struct error *
+error_to_invariantsplit(struct error *);
 
 char *
 error_str(struct error *);

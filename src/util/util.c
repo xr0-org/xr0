@@ -58,6 +58,23 @@ map_destroy(struct map *map)
 	free(map);
 }
 
+char *
+map_str(struct map *m, map_printer print)
+{
+	int i;
+
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "{");
+	for (i = 0; i < m->n; i++) {
+		struct entry e = m->entry[i];
+		char *val = print((void *) e.value);
+		strbuilder_printf(b, "%s: %s%s", e.key, val, i+1<m->n? " " : "");
+		free(val);
+	}
+	strbuilder_printf(b, "}");
+	return strbuilder_build(b);
+}
+
 static int
 map_getindex(struct map *map, const char *key)
 {
@@ -396,10 +413,13 @@ struct error {
 		ERROR_EVAL_VOID,
 
 		ERROR_LSI_NOTFEASIBLE,
+
+		ERROR_INVARIANTSPLIT,
 	} type;
 	union error_contents {
 		char *printf;
-		struct verifierinstruct *inst;
+		struct verifierinstruct *inst;		/* verifier split */
+		struct splitinstruct *splitinst;	/* invariant split */
 	} contents;
 	struct error *inner;
 };
@@ -680,6 +700,21 @@ error_to_lsi_notfeasible(struct error *err)
 	return error_to(err, ERROR_LSI_NOTFEASIBLE);
 }
 
+struct error *
+error_invariantsplit(struct splitinstruct *s)
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	err->type = ERROR_INVARIANTSPLIT;
+	err->contents.splitinst = s;
+	return err;
+}
+
+struct error *
+error_to_invariantsplit(struct error *err)
+{
+	return error_to(err, ERROR_INVARIANTSPLIT);
+}
+
 char *
 error_str(struct error *err)
 {
@@ -703,6 +738,8 @@ error_str(struct error *err)
 		[ERROR_EVAL_VOID]		= "eval void",
 
 		[ERROR_LSI_NOTFEASIBLE]		= "not feasible",
+
+		[ERROR_INVARIANTSPLIT]		= "invariant split",
 	};
 
 	switch (err->type) {
@@ -720,6 +757,7 @@ error_str(struct error *err)
 	case ERROR_MODULATE_SKIP:
 	case ERROR_EVAL_VOID:
 	case ERROR_LSI_NOTFEASIBLE:
+	case ERROR_INVARIANTSPLIT:
 		return dynamic_str(error_type_str[err->type]);
 	case ERROR_VALUE_BOUNDS:
 		assert(err->inner);

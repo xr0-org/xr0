@@ -65,6 +65,9 @@ test-verbose: $(XR0V) $(TEST_DIR)
 check: $(RUNTEST) $(XR0V)
 	$(DEBUGGER) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
+check-fast: $(RUNTEST) $(XR0V)
+	$(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
+
 check-verbose: $(RUNTEST) $(XR0V)
 	$(DEBUGGER) $(DEBUGGERVFLAGS) \
 		$(XR0V) -v -I libx $(filter-out $@,$(MAKECMDGOALS))

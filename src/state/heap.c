@@ -150,7 +150,7 @@ heap_blocks(struct heap *h)
 }
 
 struct location *
-heap_newblock(struct heap *h, int size)
+heap_newblock(struct heap *h, struct value *size)
 {
 	int address = block_arr_append(h->blocks, block_create(size));
 
@@ -164,7 +164,7 @@ heap_newblock(struct heap *h, int size)
 }
 
 struct location *
-heap_newcallerblock(struct heap *h, int size)
+heap_newcallerblock(struct heap *h, struct value *size)
 {
 	int address = block_arr_append(h->blocks, block_callercreate(size));
 

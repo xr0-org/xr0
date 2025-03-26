@@ -12,13 +12,13 @@ void
 clump_destroy(struct clump *);
 
 char *
-clump_str(struct clump *, char * indent);
+clump_str(struct clump *, char *indent);
 
 struct clump *
 clump_copy(struct clump *);
 
 int
-clump_newblock(struct clump *, int size);
+clump_newblock(struct clump *, struct value *size);
 
 struct block;
 

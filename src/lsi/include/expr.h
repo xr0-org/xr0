@@ -18,7 +18,7 @@ lsi_expr_product_create(struct lsi_expr *, struct lsi_expr *);
 struct lsi_varmap;
 
 struct lsi_expr *
-_lsi_expr_renamevars(struct lsi_expr *, struct lsi_varmap *);
+_lsi_expr_renamevar(struct lsi_expr *, char *, char *);
 
 struct lsi_expr *
 _lsi_expr_prefixvars(struct lsi_expr *, char *prefix);

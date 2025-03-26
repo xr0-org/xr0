@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #include "util.h"
 
@@ -143,7 +144,7 @@ tally_create(void)
 }
 
 struct tally *
-_tally_renamekeys(struct tally *t, struct lsi_varmap *lv)
+_tally_renamevar(struct tally *t, char *oldvar, char *newvar)
 {
 	int i;
 
@@ -153,15 +154,8 @@ _tally_renamekeys(struct tally *t, struct lsi_varmap *lv)
 		struct entry e = m->entry[i];
 		map_set(
 			new,
-			dynamic_str(
-				/* XXX: for now we copy over values that aren't
-				 * in the map without renaming, but this will
-				 * need rethinking when/if an error due to
-				 * unreachable variables occurs */
-				_lsi_varmap_haskey(lv, e.key)
-				? _lsi_varmap_get(lv, e.key)
-				: e.key
-			),
+			/* oldvar -> newvar where applicable */
+			strcmp(oldvar, e.key) == 0 ? newvar : dynamic_str(e.key),
 			e.value
 		);
 	}

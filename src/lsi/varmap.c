@@ -137,7 +137,14 @@ lsi_varmap_addrange(struct lsi_varmap *lv, struct lsi_varmap *lv0)
 
 	for (i = 0; i < m0->n; i++) {
 		struct entry e = m0->entry[i];
-		if (!map_get(m, e.key)) {
+		char *prev = map_get(m, e.key);
+		if (prev) {
+			a_printf(
+				strcmp(prev, e.value) == 0,
+				"clashing values %s and %s for key %s\n",
+				prev, (char *) e.value, e.key
+			);
+		} else {
 			map_set(m, dynamic_str(e.key), dynamic_str(e.value));
 		}
 	}
@@ -174,7 +181,7 @@ lsi_varmap_valuealias_map(struct lsi_varmap *lv_old)
 }
 
 struct string_arr *
-lsi_varmap_keys(struct lsi_varmap *lv)
+lsi_varmap_values(struct lsi_varmap *lv)
 {
 	int i;
 
@@ -182,8 +189,34 @@ lsi_varmap_keys(struct lsi_varmap *lv)
 
 	struct map *m = lv->_;
 	for (i = 0; i < m->n; i++) {
-		string_arr_append(arr, dynamic_str(m->entry[i].key));
+		string_arr_append(arr, dynamic_str(m->entry[i].value));
 	}
 
 	return arr;
+}
+
+static void
+_ensurehasarr(struct map *, const char *);
+
+struct map *
+lsi_varmap_var_names_map(struct lsi_varmap *name_var_m)
+{
+	int i;
+
+	struct map *old = name_var_m->_,
+		   *new = map_create();
+	for (i = 0; i < old->n; i++) {
+		struct entry e = old->entry[i];
+		_ensurehasarr(new, e.value);
+		string_arr_append(map_get(new, e.value), dynamic_str(e.key));
+	}
+	return new;
+}
+
+static void
+_ensurehasarr(struct map *m, const char *k)
+{
+	if (!map_get(m, k)) {
+		map_set(m, dynamic_str(k), string_arr_create());
+	}
 }

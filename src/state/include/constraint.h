@@ -4,10 +4,8 @@
 struct constraint;
 
 struct constraint *
-constraint_create(struct state *spec, struct state *impl, struct ast_type *);
-
-struct constraint *
-constraint_deref(struct constraint *);
+constraint_create(char *id, struct ast_type *t, struct state *spec,
+		struct state *impl);
 
 void
 constraint_destroy(struct constraint *);
@@ -15,11 +13,7 @@ constraint_destroy(struct constraint *);
 struct error;
 
 struct error *
-constraint_shapeverify(struct constraint *, struct value *spec_v,
-		struct value *impl_v);
-
-struct error *
-constraint_shapeverify_object(struct constraint *, struct object *spec_obj,
-		struct location *impl_loc);
+constraint_shapeverify(struct constraint *, struct object *spec_obj,
+		struct object *impl_obj);
 
 #endif

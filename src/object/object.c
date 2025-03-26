@@ -2,25 +2,28 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
 #include "ext.h"
 #include "ast.h"
 #include "state.h"
 #include "object.h"
 #include "util.h"
 #include "value.h"
+#include "lsi.h"
 
 struct object {
-	struct ast_expr *offset;
-	struct value *value;
+	struct value *offset, *value, *size;
 };
 
 struct object *
-object_value_create(struct ast_expr *offset, struct value *v)
+object_create(struct value *offset, struct value *v, struct value *size)
 {
 	struct object *obj = malloc(sizeof(struct object));
 	assert(obj);
+	assert(offset && v && size);
 	obj->offset = offset;
 	obj->value = v;
+	obj->size = size;
 	return obj;
 }
 
@@ -35,310 +38,240 @@ object_deriveorder(struct object *obj, struct circuitbreaker *cb, struct state *
 struct object *
 object_permuteheaplocs(struct object *old, struct permutation *p)
 {
-	struct object *new = malloc(sizeof(struct object));
-	new->offset = ast_expr_copy(old->offset);
-	new->value = old->value
-		? value_permuteheaplocs(old->value, p)
-		: NULL;
-	return new;
+	return object_create(
+		value_copy(old->offset),
+		value_permuteheaplocs(old->value, p),
+		value_copy(old->size)
+	);
 }
 
 void
 object_destroy(struct object *obj)
 {
-	if (obj->value) {
-		value_destroy(obj->value);
-	}
-	ast_expr_destroy(obj->offset);
+	value_destroy(obj->offset);
+	/*value_destroy(obj->value);*/ /* TODO: */
+	value_destroy(obj->size);
 	free(obj);
 }
 
 struct object *
 object_copy(struct object *old)
 {
-	struct object *new = malloc(sizeof(struct object));
-	new->offset = ast_expr_copy(old->offset);
-	new->value = old->value ?  value_copy(old->value) : NULL;
-	return new;
+	return object_create(
+		value_copy(old->offset),
+		value_copy(old->value),
+		value_copy(old->size)
+	);
 }
 
 struct object *
 object_abstractcopy(struct object *old, struct state *s)
 {
-	return object_value_create(
-		ast_expr_copy(old->offset),
-		old->value ? value_abstractcopy(old->value, s) : NULL
+	return object_create(
+		value_copy(old->offset),
+		value_abstractcopy(old->value, s),
+		value_copy(old->size)
 	);
 }
-
-static char *
-inner_str(struct object *);
 
 char *
 object_str(struct object *obj)
 {
 	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "{");
-	char *offset = ast_expr_str(obj->offset);
-	strbuilder_printf(b, "%s:", offset);
+	char *offset = value_short_str(obj->offset);
+	char *value = value_str(obj->value);
+	char *size = value_short_str(obj->size);
+	strbuilder_printf(b, "%s:%s:|%s|", offset, value, size);
+	free(size);
+	free(value);
 	free(offset);
-	char *inner = inner_str(obj);
-	strbuilder_printf(b, "<%s>", inner);
-	free(inner);
-	strbuilder_printf(b, "}");
 	return strbuilder_build(b);
 }
 
-static char *
-inner_str(struct object *obj)
-{
-	return obj->value ? value_str(obj->value) : dynamic_str("");
-}
-
-bool
+int
 object_referencesheap(struct object *obj, struct state *s,
 		struct circuitbreaker *cb)
 {
 	if (!circuitbreaker_append(cb, obj)) {
 		/* already analysed */
-		return false;
+		return 0;
 	}
-	if (!object_hasvalue(obj)) {
+	if (!object_isdef(obj)) {
 		/* TODO: do we need to exclude the case of ranges on stack? */
-		return true;
+		return 1;
 	}
 	struct circuitbreaker *copy = circuitbreaker_copy(cb);
-	bool ans = obj->value && value_referencesheap(obj->value, s, copy);
+	int ans = obj->value && value_referencesheap(obj->value, s, copy);
 	circuitbreaker_destroy(copy);
 	return ans;
 }
 
-bool
-object_hasvalue(struct object *obj)
+int
+object_isdef(struct object *obj)
 {
-	return obj->value;
+	return !value_isundef(obj->value);
 }
 
 struct value *
-object_as_value(struct object *obj)
+object_as_defvalue(struct object *obj)
 {
-	assert(object_hasvalue(obj));
+	assert(object_isdef(obj));
 	return obj->value;
 }
 
-bool
-object_isdeallocand(struct object *obj, struct state *s)
-{
-	return obj->value && state_isdeallocand(s, value_as_location(obj->value));
-}
-
-bool
+int
 object_references(struct object *obj, struct location *loc, struct state *s,
 		struct circuitbreaker *cb)
 {
 	if (!circuitbreaker_append(cb, obj)) {
 		/* already handled */
-		return false;
+		return 0;
 	}
 
 	struct circuitbreaker *copy = circuitbreaker_copy(cb);
-	struct value *v = object_as_value(obj);
-	bool ans = v ? value_references(v, loc, s, copy) : false;
+	struct value *v = object_as_defvalue(obj);
+	int ans = v ? value_references(v, loc, s, copy) : 0;
 	circuitbreaker_destroy(copy);
 	return ans;
 }
 
-struct error *
+void
 object_assign(struct object *obj, struct value *val)
 {
-	/* XXX: check that if val has offset it's within range and return error
-	 * potentially */
-
 	obj->value = val;
-	return NULL;
 }
 
-static struct ast_expr *
-object_size(struct object *obj)
-{
-	return ast_expr_constant_create(1);
-}
-
-struct ast_expr *
-object_lower(struct object *obj)
+struct value *
+object_offset(struct object *obj)
 {
 	return obj->offset;
 }
 
-struct ast_expr *
-object_upper(struct object *obj)
+struct value *
+object_size(struct object *obj)
 {
-	return ast_expr_sum_create(
-		ast_expr_copy(obj->offset),
-		object_size(obj)
+	return obj->size;
+}
+
+
+int
+object_hasbefore(struct object *o, struct value *offset, struct state *s)
+{
+	/* o->offset < offset */
+	struct lsi_le *le = lsi_le_create(
+		value_to_lsi_expr(o->offset, s),
+		lsi_expr_sum_create(
+			value_to_lsi_expr(offset, s),
+			lsi_expr_const_create(-1)
+		)
+	);
+	int ans = state_satisfies(s, le);
+	lsi_le_destroy(le);
+	return ans;
+}
+
+struct object *
+object_upto(struct object *old, struct value *offset, struct state *s)
+{
+	assert(object_hasbefore(old, offset, s));
+	struct lsi_expr *size = lsi_expr_sum_create(
+		value_to_lsi_expr(offset, s),
+		lsi_expr_product_create(
+			lsi_expr_const_create(-1),
+			value_to_lsi_expr(old->offset, s)
+		)
+	);
+	struct lsi_range *r = state_range_eval(s, size);
+	lsi_expr_destroy(size);
+	struct object *new = object_create(
+		value_copy(old->offset),
+		value_copy(old->value),
+		value_int_create(lsi_range_as_const(r))
+	);
+	lsi_range_destroy(r);
+	return new;
+}
+
+int
+object_hasafter(struct object *o, struct value *offset, struct state *s)
+{
+	/* offset < o->offset+o->size */
+	struct lsi_le *le = lsi_le_create(
+		value_to_lsi_expr(offset, s),
+		lsi_expr_sum_create(
+			/* < */
+			lsi_expr_sum_create(
+				value_to_lsi_expr(o->offset, s),
+				value_to_lsi_expr(o->size, s)
+			),
+			lsi_expr_const_create(-1)
+		)
+	);
+	int ans = state_satisfies(s, le);
+	lsi_le_destroy(le);
+	return ans;
+}
+
+struct object *
+object_from(struct object *old, struct value *offset, struct state *s)
+{
+	assert(object_hasafter(old, offset, s));
+	struct lsi_expr *size = lsi_expr_sum_create(
+		lsi_expr_sum_create(
+			value_to_lsi_expr(old->offset, s),
+			value_to_lsi_expr(old->size, s)
+		),
+		lsi_expr_product_create(
+			lsi_expr_const_create(-1),
+			value_to_lsi_expr(offset, s)
+		)
+	);
+	struct lsi_range *r = state_range_eval(s, size);
+	lsi_expr_destroy(size);
+	struct object *new = object_create(
+		value_copy(offset),
+		value_copy(old->value),
+		value_int_create(lsi_range_as_const(r))
+	);
+	lsi_range_destroy(r);
+	return new;
+}
+
+struct object *
+object_at(struct object *o, struct value *offset)
+{
+	return object_create(
+		value_copy(offset), 
+		value_copy(o->value),
+		value_int_create(1)
 	);
 }
 
-bool
-object_contains(struct object *obj, struct ast_expr *offset, struct state *s)
+int
+object_contains(struct object *obj, struct value *offset, struct state *s)
 {
-	struct ast_expr *lw = obj->offset,
-			*up = object_upper(obj),
-			*of = offset;
+	struct lsi_expr *lw = value_to_lsi_expr(obj->offset, s);
+	struct lsi_expr *up = lsi_expr_sum_create(
+		lsi_expr_copy(lw), value_to_lsi_expr(obj->size, s)
+	);
+	struct lsi_expr *of = value_to_lsi_expr(offset, s);
 
-	struct ast_expr *e1 = ast_expr_le_create(
-		ast_expr_copy(lw), ast_expr_copy(of)
+	struct lsi_le *l0 = lsi_le_create(lw, of);
+	struct lsi_le *l1 = lsi_le_create(
+		of,
+		lsi_expr_sum_create(up, lsi_expr_const_create(-1)) /* < */
 	);
-	struct ast_expr *e2 = ast_expr_lt_create(
-		ast_expr_copy(of), ast_expr_copy(up)
-	);
-	ast_expr_destroy(up);
 	
-	bool contains =
-		/* lw ≤ of */
-		state_eval(s, e1)
-		&&
-		/* of < up */
-		state_eval(s, e2);
+	int contains = state_satisfies(s, l0) && state_satisfies(s, l1);
 
-	ast_expr_destroy(e2);
-	ast_expr_destroy(e1);
+	lsi_le_destroy(l1);
+	lsi_le_destroy(l0);
+
+	lsi_expr_destroy(of);
 
 	return contains;
 }
 
-bool
-object_contains_upperincl(struct object *obj, struct ast_expr *offset,
-		struct state *s)
-{
-	struct ast_expr *lw = obj->offset,
-			*up = object_upper(obj),
-			*of = offset;
-
-	return
-		/* lw ≤ of */
-		state_eval(s, ast_expr_le_create(lw, of))
-
-		&&
-
-		/* of ≤ up */
-		state_eval(s, ast_expr_le_create(of, up));
-}
-
-bool
-object_isempty(struct object *obj, struct state *s)
-{
-	struct ast_expr *lw = obj->offset,
-			*up = object_upper(obj);
-
-	return state_eval(s, ast_expr_eq_create(lw, up));
-}
-
-bool
-object_contig_precedes(struct object *before, struct object *after,
-		struct state *s)
-{
-	struct ast_expr *lw = object_upper(before),
-			*up = after->offset;
-	return state_eval(s, ast_expr_eq_create(lw, up));
-}
-
-bool
-object_issingular(struct object *obj, struct state *s)
-{
-	struct ast_expr *lw = obj->offset,
-			*up = object_upper(obj);
-
-	struct ast_expr *lw_succ = ast_expr_sum_create(
-		lw, ast_expr_constant_create(1)
-	);
-
-	/* lw + 1 == up */
-	return state_eval(s, ast_expr_eq_create(lw_succ, up));
-}
-
-struct object *
-object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
-{
-	struct ast_expr *lw = obj->offset,
-			*up = object_upper(obj);
-
-	struct ast_expr *prop0 = ast_expr_le_create(
-		ast_expr_copy(lw), ast_expr_copy(excl_up)
-	);
-	struct ast_expr *prop1 = ast_expr_eq_create(
-		ast_expr_copy(lw), ast_expr_copy(excl_up)
-	);
-	struct ast_expr *prop2 = ast_expr_eq_create(
-		ast_expr_copy(up), ast_expr_copy(excl_up)
-	);
-
-	bool e0 = state_eval(s, prop0),
-	     e1 = state_eval(s, prop1),
-	     e2 = state_eval(s, prop2);
-
-	ast_expr_destroy(prop2);
-	ast_expr_destroy(prop1);
-	ast_expr_destroy(prop0);
-	ast_expr_destroy(up);
-
-	assert(e0);
-
-	if (e1) {
-		return NULL;
-	}
-
-	if (e2) {
-		return object_value_create(
-			ast_expr_copy(obj->offset), value_copy(obj->value)
-		);
-	}
-	assert(false);
-	/* XXX: previously created range here */
-}
-
-struct object *
-object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
-{
-	struct ast_expr *lw = obj->offset,
-			*up = object_upper(obj);
-
-	struct ast_expr *prop0 = ast_expr_ge_create(
-		ast_expr_copy(incl_lw), ast_expr_copy(up)
-	);
-	struct ast_expr *prop1 = ast_expr_eq_create(
-		ast_expr_copy(incl_lw), ast_expr_copy(lw)
-	);
-
-	bool e0 = state_eval(s, prop0),
-	     e1 = state_eval(s, prop1);
-
-	ast_expr_destroy(prop1);
-	ast_expr_destroy(prop0);
-
-	if (e0) {
-		ast_expr_destroy(up);
-		return NULL;
-	}
-
-	if (e1) {
-		ast_expr_destroy(up);
-		return object_value_create(
-			ast_expr_copy(incl_lw),
-			value_copy(obj->value)
-		);
-	}
-	assert(false);
-	/* XXX: previously created range here */
-}
-
-
-struct error *
-object_dealloc(struct object *obj, struct state *s)
-{
-	assert(obj->value);
-	return state_dealloc(s, value_as_location(obj->value));
-}
 
 static struct value *
 getorcreatestruct(struct object *, struct ast_type *, struct state *);
@@ -353,8 +286,8 @@ object_getmember(struct object *obj, struct ast_type *t, char *member,
 static struct value *
 getorcreatestruct(struct object *obj, struct ast_type *t, struct state *s)
 {
-	if (object_hasvalue(obj)) {
-		return object_as_value(obj);
+	if (object_isdef(obj)) {
+		return object_as_defvalue(obj);
 	}
 	struct ast_type *complete = ast_type_struct_complete(t, state_getext(s));
 	a_printf(complete, "%s is incomplete\n", ast_type_str(t));
@@ -370,188 +303,6 @@ object_getmembertype(struct object *obj, struct ast_type *t, char *member,
 	return value_struct_membertype(
 		getorcreatestruct(obj, t, s), member
 	);
-}
-
-struct object_result {
-	struct object *val;
-	struct error *err;
-};
-
-struct object_result *
-object_result_error_create(struct error *err)
-{
-	assert(err);
-
-	struct object_result *r = malloc(sizeof(struct object_result));
-	r->val = NULL;
-	r->err = err;
-	return r;
-}
-
-struct object_result *
-object_result_value_create(struct object *val)
-{
-	struct object_result *r = malloc(sizeof(struct object_result));
-	r->val = val;
-	r->err = NULL;
-	return r;
-}
-
-void
-object_result_destroy(struct object_result *res)
-{
-	assert(!res->err);
-	if (res->val) {
-		object_destroy(res->val);
-	}
-	free(res);
-}
-
-bool
-object_result_iserror(struct object_result *res)
-{
-	return res->err;
-}
-
-struct error *
-object_result_as_error(struct object_result *res)
-{
-	assert(res->err);
-	return res->err;
-}
-
-struct object *
-object_result_as_value(struct object_result *res)
-{
-	assert(!res->err);
-	return res->val;
-}
-
-bool
-object_result_hasvalue(struct object_result *res)
-{
-	assert(!object_result_iserror(res));
-	return res->val; /* implicit cast */
-}
-
-
-struct object_arr {
-	int n;
-	struct object **object;
-};
-
-struct object_arr *
-object_arr_create(void)
-{
-	struct object_arr *arr = calloc(1, sizeof(struct object_arr));
-	assert(arr);
-	return arr;
-}
-
-void
-object_arr_destroy(struct object_arr *arr)
-{
-	for (int i = 0; i < arr->n; i++) {
-		object_destroy(arr->object[i]);
-	}
-	free(arr->object);
-	free(arr);
-}
-
-int
-object_arr_append(struct object_arr *arr, struct object *obj);
-
-struct object_arr *
-object_arr_copy(struct object_arr *arr)
-{
-	struct object_arr *copy = object_arr_create();
-	for (int i = 0; i < arr->n; i++) {
-		object_arr_append(copy, object_copy(arr->object[i]));
-	}
-	return copy;
-}
-
-struct object **
-object_arr_allocs(struct object_arr *arr)
-{
-	return arr->object;
-}
-
-int
-object_arr_nallocs(struct object_arr *arr)
-{
-	return arr->n;
-}
-
-int
-object_arr_index(struct object_arr *arr, struct ast_expr *offset,
-		struct state *state)
-{
-	for (int i = 0; i < arr->n; i++) {
-		if (object_contains(arr->object[i], offset, state)) {
-			return i;
-		}
-	}
-	return -1;
-}
-
-int
-object_arr_index_upperincl(struct object_arr *arr, struct ast_expr *offset,
-		struct state *state)
-{
-	for (int i = 0; i < arr->n; i++) {
-		if (object_contains_upperincl(arr->object[i], offset, state)) {
-			return i;
-		}
-	}
-	return -1;
-}
-
-int
-object_arr_insert(struct object_arr *arr, int index, struct object *obj)
-{
-	/*assert(!object_isempty(obj));*/
-
-	arr->object = realloc(arr->object, sizeof(struct object *) * ++arr->n);
-	assert(arr->object);
-	for (int i = arr->n-1; i > index; i--) {
-		arr->object[i] = arr->object[i-1];
-	}
-	arr->object[index] = obj;
-	return index;
-}
-
-int
-object_arr_append(struct object_arr *arr, struct object *obj)
-{
-	return object_arr_insert(arr, arr->n, obj);
-}
-
-void
-object_arr_remove(struct object_arr *arr, int index)
-{
-	for (int i = index; i < arr->n-1; i++) {
-		arr->object[i] = arr->object[i+1];
-	}
-	if (arr->n == 1) {
-		--arr->n;
-		free(arr->object[0]);
-	} else {
-		arr->object = realloc(arr->object, sizeof(struct object *) * --arr->n);
-		assert(arr->object || !arr->n);
-	}
-}
-
-int
-object_arr_nobjects(struct object_arr *arr)
-{
-	return arr->n;
-}
-
-struct object **
-object_arr_objects(struct object_arr *arr)
-{
-	return arr->object;
 }
 
 DEFINE_RESULT_TYPE(struct object *, object, object_destroy, object_res, false)

@@ -32,17 +32,49 @@ lsi_copy(struct lsi *old)
 	return new;
 }
 
+static struct le_arr *
+_var_name_perms(struct le_arr *, char *, struct string_arr *);
+
 struct lsi *
-lsi_renamevars(struct lsi *old, struct lsi_varmap *m)
+lsi_userspace_project(struct lsi *old_lsi, struct lsi_varmap *name_var_m)
 {
 	int i;
 
-	struct lsi *new = lsi_create();
-	for (i = 0; i < le_arr_len(old->arr); i++) {
-		le_arr_append(
-			new->arr, _lsi_le_renamevars(le_arr_get(old->arr, i), m)
-		);
+	struct map *m = lsi_varmap_var_names_map(name_var_m);
+
+	struct le_arr *new = le_arr_copy(old_lsi->arr);
+	for (i = 0; i < m->n; i++) {
+		struct entry e = m->entry[i];
+		struct le_arr *tmp = new;
+		new = _var_name_perms(tmp, e.key, (struct string_arr *) e.value);
+		le_arr_destroy(tmp);
 	}
+
+	struct lsi *new_lsi = lsi_create();
+	le_arr_destroy(new_lsi->arr);
+	new_lsi->arr = new;
+	
+	return new_lsi;
+}
+
+static struct le_arr *
+_var_name_perms(struct le_arr *old, char *v, struct string_arr *names)
+{
+	int i, j;
+
+	struct le_arr *new = le_arr_create();
+
+	for (i = 0; i < le_arr_len(old); i++)
+		for (j = 0; j < string_arr_n(names); j++)
+			le_arr_append(
+				new,
+				_lsi_le_renamevar(
+					le_arr_get(old, i),
+					v,
+					dynamic_str(string_arr_s(names)[j])
+				)
+			);
+
 	return new;
 }
 
@@ -193,7 +225,12 @@ _eliminate(struct le_arr *old, char *var)
 			continue;
 		}
 		int abs = coef >= 0 ? coef : -coef;
-		assert(abs == 1); /* TODO fractions */
+		a_printf(
+			abs == 1, /* TODO: fractions */
+			"can only handle zero and unit coefficients currently, "\
+			"have %s\n",
+			lsi_le_str(le)
+		);
 		/* coef is the standard-form coefficient, so if it's negative
 		 * the inequality appears on the rhs as a positive, and the
 		 * inequality provides a lower bound; or vice-versa. */

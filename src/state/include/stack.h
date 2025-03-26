@@ -46,6 +46,9 @@ stack_copy(struct stack *);
 struct stack *
 stack_copywithname(struct stack *, char *new_name);
 
+struct stack *
+stack_prev(struct stack *);
+
 char *
 stack_funcname(struct stack *);
 
@@ -54,6 +57,9 @@ stack_str(struct stack *, struct state *);
 
 bool
 stack_islinear(struct stack *);
+
+bool
+stack_frameiscall(struct stack *s);
 
 int
 stack_modecanverify(struct stack *);
@@ -122,18 +128,10 @@ struct error *
 stack_trace(struct stack *, struct error *);
 
 struct map *
-stack_getvarmap(struct stack *);
+stack_getlocalvars(struct stack *);
 
 struct variable *
 stack_getvariable(struct stack *s, char *id);
-
-struct error *
-stack_shapeverify_top(struct stack *, struct state *spec,
-		struct state *impl);
-
-struct error *
-stack_shapeverify_all(struct stack *spec_stack, struct state *spec,
-		struct state *impl);
 
 struct lsi_varmap;
 
@@ -141,7 +139,7 @@ struct lsi_varmap *
 stack_rconst_mapping(struct stack *, struct state *);
 
 struct error *
-stack_verifyinvariant(struct stack *s, struct state *impl);
+stack_verify_invariant(struct stack *s, struct state *impl);
 
 struct ast_expr;
 

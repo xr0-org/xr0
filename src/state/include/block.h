@@ -4,20 +4,16 @@
 struct block;
 
 struct block *
-block_create(int size);
+block_create(struct value *size);
 
 struct block *
-block_callercreate(int size);
+block_callercreate(struct value *size);
 
 void
 block_destroy(struct block *);
 
 char *
 block_str(struct block *);
-
-/* block_size_le: return whether b1's size ≤ b2's size */
-int
-block_size_le(struct block *b1, struct block *b2);
 
 struct error;
 struct value;
@@ -27,15 +23,11 @@ struct stack;
 struct heap;
 struct object;
 
-void
-block_install(struct block *, struct object *);
-
 struct state;
 struct object_res;
 
 struct object_res *
-block_observe(struct block *, struct ast_expr *offset, struct state *,
-		bool constructive);
+block_observe(struct block *, struct ast_expr *offset, struct state *);
 
 struct location;
 
@@ -58,11 +50,10 @@ struct permutation;
 struct block *
 block_permuteheaplocs(struct block *, struct permutation *);
 
-struct constraint;
-
 struct error *
-block_shapeverify(struct block *spec, struct location *impl,
-		struct constraint *);
+block_shapeverify(struct block *spec_b, struct block *impl_b, struct state *spec,
+		struct state *impl, char *block_name,
+		struct ast_type *elem_type);
 
 struct lsi_varmap;
 

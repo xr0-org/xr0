@@ -5,7 +5,6 @@
 
 #include "ast.h"
 #include "expr.h"
-#include "math.h"
 #include "state.h"
 #include "util.h"
 #include "value.h"
@@ -576,9 +575,6 @@ ast_expr_destroy_binary(struct ast_expr *expr)
 	ast_expr_destroy(expr->u.binary.e2);
 }
 
-static struct math_expr *
-math_expr(struct ast_expr *);
-
 static char *
 atomicstr(struct ast_expr *);
 
@@ -1146,91 +1142,6 @@ ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2)
 	case EXPR_ALLOCATION:
 		return ast_expr_alloc_kind(e1) == ast_expr_alloc_kind(e2) && 
 			ast_expr_equal(ast_expr_alloc_arg(e1), ast_expr_alloc_arg(e2));
-	default:
-		assert(false);
-	}
-}
-
-static bool
-eval_prop(struct math_expr *e1, enum ast_binary_operator, struct math_expr *e2);
-
-bool
-ast_expr_matheval(struct ast_expr *e)
-{
-	assert(e->kind == EXPR_BINARY);
-
-	struct math_expr *e1 = math_expr(e->u.binary.e1),
-			 *e2 = math_expr(e->u.binary.e2);
-
-	bool val = eval_prop(e1, e->u.binary.op, e2);
-
-	math_expr_destroy(e2);
-	math_expr_destroy(e1);
-
-	return val;
-}
-
-static bool
-eval_prop(struct math_expr *e1, enum ast_binary_operator op, struct math_expr *e2)
-{
-	switch (op) {
-	case BINARY_OP_EQ:
-		return math_eq(e1, e2);
-	case BINARY_OP_NE:
-		return !math_eq(e1, e2);
-	case BINARY_OP_LT:
-		return math_lt(e1, e2);
-	case BINARY_OP_GT:
-		return math_gt(e1, e2);
-	case BINARY_OP_LE:
-		return math_le(e1, e2);
-	case BINARY_OP_GE:
-		return math_ge(e1, e2);
-	default:
-		assert(false);
-	}
-}
-
-static struct math_expr *
-binary_e2(struct ast_expr *e2, enum ast_binary_operator op);
-
-static struct math_expr *
-math_expr(struct ast_expr *e)
-{
-	switch (e->kind) {
-	case EXPR_IDENTIFIER:
-		return math_expr_atom_create(
-			math_atom_variable_create(dynamic_str(e->u.string))
-		);
-	case EXPR_CONSTANT:
-		if (e->u.constant.constant < 0) {
-			return math_expr_neg_create(
-				math_expr_atom_create(
-					math_atom_nat_create(-e->u.constant.constant)
-				)
-			);
-		}
-		return math_expr_atom_create(
-			math_atom_nat_create(e->u.constant.constant)
-		);
-	case EXPR_BINARY:
-		return math_expr_sum_create(
-			math_expr(e->u.binary.e1),
-			binary_e2(e->u.binary.e2, e->u.binary.op)
-		);
-	default:
-		assert(false);
-	}
-}
-
-static struct math_expr *
-binary_e2(struct ast_expr *e2, enum ast_binary_operator op)
-{
-	switch (op) {
-	case BINARY_OP_ADDITION:
-		return math_expr(e2);
-	case BINARY_OP_SUBTRACTION:
-		return math_expr_neg_create(math_expr(e2));
 	default:
 		assert(false);
 	}

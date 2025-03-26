@@ -12,51 +12,64 @@
 #include "constraint.h"
 
 struct constraint {
-	struct state *spec, *impl;
+	char *varname;
 	struct ast_type *t;	
+	struct state *spec, *impl;
 };
 
 struct constraint *
-constraint_create(struct state *spec, struct state *impl, struct ast_type *t)
+constraint_create(char *varname, struct ast_type *t, struct state *spec,
+		struct state *impl)
 {
 	struct constraint *c = malloc(sizeof(struct constraint));
 	assert(c);
+	c->varname = varname;
+	c->t = t;
 	c->spec = spec;
 	c->impl = impl;
-	c->t = t;
 	return c;
-}
-
-struct constraint *
-constraint_deref(struct constraint *c)
-{
-	return constraint_create(c->spec, c->impl, ast_type_deref(c->t));
 }
 
 void
 constraint_destroy(struct constraint *c)
 {
+	free(c->varname);
 	ast_type_destroy(c->t);
 	free(c);
 }
 
 static int
-isrconst(struct ast_type *, struct value *);
-
-static int
-size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec,
-		struct state *impl);
-
-/* location_reloffset: return a location pointing at the same block as l1 but
- * with an offset that is the difference between l1's and l2's offset. */
-static struct location *
-location_reloffset(struct location *l1, struct location *l2);
+_isrconst(struct ast_type *, struct value *);
 
 struct error *
-constraint_shapeverify(struct constraint *c, struct value *spec_v,
-		struct value *impl_v)
+constraint_shapeverify(struct constraint *c, struct object *spec_obj,
+		struct object *impl_obj)
 {
-	if (isrconst(c->t, spec_v)) {
+	if (!object_isdef(spec_obj)) {
+		return NULL;
+	}
+
+	struct value *spec_v = object_as_defvalue(spec_obj),
+		     *impl_v = object_as_defvalue(impl_obj);
+
+	if (value_isundef(spec_v)) {
+		return NULL;
+	} else if (ast_type_isarr(c->t)) {
+		/* array-pointer conversion */
+		struct constraint *new_c = constraint_create(
+			dynamic_str(c->varname),
+			ast_type_create_ptr(
+				ast_type_arr_type(ast_type_copy(c->t))
+			),
+			c->spec,
+			c->impl
+		);
+		struct error *err = constraint_shapeverify(
+			new_c, spec_obj, impl_obj
+		);
+		constraint_destroy(new_c);
+		return err;
+	} else if (_isrconst(c->t, spec_v)) {
 		return NULL;
 	} else if (ast_type_isstruct(c->t)) {
 		return value_struct_shapeverify(
@@ -65,7 +78,9 @@ constraint_shapeverify(struct constraint *c, struct value *spec_v,
 	}
 	a_printf(
 		ast_type_isptr(c->t),
-		"can only verify int, struct and pointer params\n"
+		"can only verify int, pointer and struct params: "\
+		"have %s with values %s and %s\n",
+		ast_type_str(c->t), value_str(spec_v), value_str(impl_v)
 	);
 
 	/* spec requires value be valid pointer */
@@ -88,75 +103,46 @@ constraint_shapeverify(struct constraint *c, struct value *spec_v,
 		return error_printf("must be heap allocated");
 	}
 
-	if (!size_le(spec_loc, impl_loc, c->spec, c->impl)) {
-		return error_printf("must point at larger block");
-	}
+	/* now we validate that the block referred to by impl_loc satisfies that
+	 * referred to by spec_loc. the analysis is simplified by imposing the
+	 * assumption that any permissivity as to the size and contents of impl
+	 * block is encoded into the spec block. this means that, relative to
+	 * the offsets indicated by impl_loc and spec_loc, the impl block must
+	 * fit entirely into the spec block, and its contents within the region
+	 * indicated by the spec block's dimensions must satisfy the constraints
+	 * of the objects in spec block. it should be possible, therefore, to
+	 * construct a 1-1 mapping from the spec block onto the impl block,
+	 * mapping spec object onto satisfying impl object.
+	 *
+	 * in the constant case the requirement that whatever is permitted in
+	 * the impl block must be encoded in the spec block implies the blocks
+	 * must be of the same size and the offsets of the two locations be
+	 * identical.
+	 */
 
-	/* we shift the impl_loc's offset by spec_loc's so that
-	 * block_shapeverify can behave as though both were offset zero */
-	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
-	struct block *spec_b = state_getblock(c->spec, spec_loc);
-	assert(spec_b);
-	struct error *err = block_shapeverify(spec_b, rel_impl_loc, c);
-	location_destroy(rel_impl_loc);
-	return err;
+	struct ast_expr *spec_o = offset_as_expr(location_offset(spec_loc)),
+			*impl_o = offset_as_expr(location_offset(impl_loc));
+	a_printf(
+		ast_expr_isconstant(spec_o) && ast_expr_isconstant(impl_o),
+		"only constant offsets supported: have %s and %s\n", 
+		ast_expr_str(spec_o), ast_expr_str(impl_o)
+	);
+	a_printf(
+		ast_expr_as_constant(spec_o) == ast_expr_as_constant(impl_o),
+		"unequal offsets: have %s and %s\n", 
+		ast_expr_str(spec_o), ast_expr_str(impl_o)
+	);
+
+	struct block *spec_b = state_getblock(c->spec, spec_loc),
+		     *impl_b = state_getblock(c->impl, impl_loc);
+	assert(spec_b && impl_b);
+	return block_shapeverify(
+		spec_b, impl_b, c->spec, c->impl, c->varname, ast_type_deref(c->t)
+	);
 }
 
 static int
-isrconst(struct ast_type *t, struct value *v)
+_isrconst(struct ast_type *t, struct value *v)
 {
 	return ast_type_isint(t) || (ast_type_isptr(t) && !value_islocation(v));
-}
-
-static struct location *
-location_reloffset(struct location *l1, struct location *l2)
-{
-	struct ast_expr *offset = ast_expr_difference_create(
-		ast_expr_copy(offset_as_expr(location_offset(l1))),
-		ast_expr_copy(offset_as_expr(location_offset(l2)))
-	);
-	struct location *offset_loc = location_copy(l1);
-	location_setoffset(
-		offset_loc, offset_create(ast_expr_copy(offset))
-	);
-	return offset_loc;
-}
-
-static int
-size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec,
-		struct state *impl)
-{
-	struct block *spec_b = state_getblock(spec, spec_loc),
-		     *impl_b = state_getblock(impl, impl_loc);
-	assert(spec_b && impl_b);
-	return block_size_le(spec_b, impl_b);
-}
-
-struct error *
-constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
-		struct location *impl_loc)
-{
-	struct block *b_impl = state_getblock(c->impl, impl_loc);
-	assert(b_impl);
-	struct ast_expr *offset = ast_expr_sum_create(
-		offset_as_expr(location_offset(impl_loc)),
-		object_lower(spec_obj) /* XXX: assuming lower is offset */
-	);
-	struct object_res *res = block_observe(b_impl, offset, c->impl, false);
-	if (object_res_iserror(res)) {
-		struct error *err = object_res_as_error(res);
-		return error_to_block_observe_noobj(err)
-			? error_printf("must have object")
-			: err;
-	}
-	struct object *impl_obj = object_res_as_object(res);
-	if (!object_hasvalue(spec_obj)) {
-		return NULL;
-	}
-	if (!object_hasvalue(impl_obj)) {
-		return error_printf("must have value");
-	}
-	return constraint_shapeverify(
-		c, object_as_value(spec_obj), object_as_value(impl_obj)
-	);
 }

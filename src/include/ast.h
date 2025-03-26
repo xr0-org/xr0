@@ -219,11 +219,6 @@ ast_expr_copy(struct ast_expr *);
 bool
 ast_expr_equal(struct ast_expr *e1, struct ast_expr *e2);
 
-struct math_state;
-
-bool
-ast_expr_matheval(struct ast_expr *e);
-
 struct ast_expr *
 ast_expr_simplify(struct ast_expr *);
 
@@ -665,7 +660,9 @@ ast_type_copy(struct ast_type *t);
 struct ast_type *
 ast_type_ptr_type(struct ast_type *t);
 
-int
+struct value;
+
+struct value *
 ast_type_size(struct ast_type *);
 
 struct ast_type *

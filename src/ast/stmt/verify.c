@@ -399,7 +399,7 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 iter_setupverify(struct ast_stmt *, struct state *);
 
-static void
+static struct error *
 deriveinvstate(struct ast_stmt *, struct state *);
 
 static struct error *
@@ -410,7 +410,8 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
 		return err;
 	}
 
-	deriveinvstate(stmt, state);
+	err = deriveinvstate(stmt, state);
+	assert(!err);
 
 	iter_pushstatebody(ast_stmt_as_iter(stmt), state);
 
@@ -421,24 +422,38 @@ static struct error *
 iter_setupverify(struct ast_stmt *stmt, struct state *impl)
 {
 	struct state *spec = state_copy(impl);
-	deriveinvstate(stmt, spec);
-	struct error *err = state_constraintverify_all(spec, impl);
+	struct error *err = deriveinvstate(stmt, spec);
+	if (err) {
+		struct error *instr_err = error_to_verifierinstruct(err);
+		if (!instr_err) {
+			a_printf(!err, "%s\n", error_str(err));
+		}
+		/* |- verifier instruction */
+		return instr_err;
+	}
+	err = state_constraintverify_all(spec, impl);
 	state_destroy(spec);
 	return err;
 }
 
-static void
+static struct error *
 deriveinvstate(struct ast_stmt *stmt, struct state *state)
 {
 	state_pushinvariantframe(state, iter_inv(ast_stmt_as_iter(stmt)));
 	while (!state_atinvariantend(state)) {
 		struct error *err = state_step(state);
-		a_printf(!err, "%s\n", error_str(err));
+		if (err) {
+			struct error *instr_err = error_to_verifierinstruct(err);
+			if (!instr_err) {
+				a_printf(!err, "%s\n", error_str(err));
+			}
+			/* |- verifier instruction */
+			return instr_err;
+		}
 	}
 	state_popframe(state);
+	return NULL;
 }
-
-
 
 static int
 compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
@@ -567,7 +582,7 @@ asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *s)
 		return e_res_as_error(l_res);
 	}
 	struct object *l_obj = object_res_as_object(
-		state_get(s, eval_as_lval(e_res_as_eval(l_res)), true)
+		state_get(s, eval_as_lval(e_res_as_eval(l_res)))
 	);
 
 	object_assign(
@@ -596,7 +611,7 @@ asm_movret_exec(struct ast_variable *temp, struct state *state)
 		return e_res_as_error(l_res);
 	}
 	struct object *obj = object_res_as_object(
-		state_get(state, eval_as_lval(e_res_as_eval(l_res)), true)
+		state_get(state, eval_as_lval(e_res_as_eval(l_res)))
 	);
 
 	struct e_res *r_res = call_return(state);

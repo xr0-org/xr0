@@ -9,7 +9,7 @@ tally_create(void);
 struct lsi_varmap;
 
 struct tally *
-_tally_renamekeys(struct tally *, struct lsi_varmap *);
+_tally_renamevar(struct tally *, char *, char *);
 
 struct tally *
 _tally_prefixkeys(struct tally *, char *prefix);

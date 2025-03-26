@@ -367,7 +367,7 @@ inititalise_param(struct ast_variable *param, struct state *s)
 	);
 	struct object_res *res = state_getobject(s, name);
 	struct object *obj = object_res_as_object(res);
-	assert(!object_hasvalue(obj)); /* XXX: see git blame */
+	assert(!object_isdef(obj)); /* XXX: see git blame */
 	object_assign(
 		obj,
 		value_rconst_create(ast_expr_identifier_create(rconst))

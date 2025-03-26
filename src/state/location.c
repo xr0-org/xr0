@@ -105,7 +105,7 @@ location_deriveorder(struct location *loc, struct circuitbreaker *cb,
 		if (loc->type == LOCATION_DYNAMIC) {
 			int_arr_append(arr, loc->block);
 		}
-		struct object_res *res = state_get(s, loc, false);
+		struct object_res *res = state_get(s, loc);
 		if (object_res_iserror(res)) {
 			struct error *err = object_res_as_error(res);
 			if (error_to_block_observe_noobj(err)) {
@@ -314,7 +314,7 @@ location_referencesheap(struct location *l, struct state *s, struct circuitbreak
 		return true;
 	}
 	struct location *l_base = location_withoutoffset(l);
-	struct object_res *res = state_get(s, l_base, false);
+	struct object_res *res = state_get(s, l_base);
 	if (object_res_iserror(res)) {
 		assert(error_to_block_observe_noobj(object_res_as_error(res)));
 		object_res_errorignore(res);

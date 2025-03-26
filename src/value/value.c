@@ -18,6 +18,7 @@
 
 struct value {
 	enum value_type {
+		VALUE_UNDEF,
 		VALUE_RCONST,
 		VALUE_PTR,
 		VALUE_INT,
@@ -46,6 +47,21 @@ struct value {
 		} _struct;
 	};
 }; 
+
+struct value *
+value_undef_create(void)
+{
+	struct value *v = malloc(sizeof(struct value));
+	assert(v);
+	v->type = VALUE_UNDEF;
+	return v;
+}
+
+int
+value_isundef(struct value *v)
+{
+	return v->type == VALUE_UNDEF;
+}
 
 static struct int_arr *
 struct_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s);
@@ -144,7 +160,7 @@ value_ptr_sprint(struct value *v, struct strbuilder *b)
 {
 	char *s = v->ptr.isindefinite ?
 		number_str(v->ptr.n) : location_str(v->ptr.loc);
-	strbuilder_printf(b, "ptr:%s", s);
+	strbuilder_printf(b, "ptr{%s}", s);
 	free(s);
 }
 
@@ -346,8 +362,10 @@ frommembers(struct ast_variable_arr *members)
 	for (int i = 0; i < n; i++) {
 		map_set(
 			m, dynamic_str(ast_variable_name(v[i])),
-			object_value_create(
-				ast_expr_constant_create(0), NULL
+			object_create(
+				value_int_create(0),
+				NULL,
+				value_int_create(1) /* XXX */
 			)
 		);
 	}
@@ -520,19 +538,14 @@ struct lsi_varmap *
 value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
 		char *id)
 {
-	if (ast_type_isarr(t)) {
-		struct ast_type *ptr = ast_type_create_ptr(
-			ast_type_arr_type(ast_type_copy(t))
-		);
-		struct lsi_varmap *lv = value_rconst_mapping(v, ptr, s, id);
-		ast_type_destroy(ptr);
-		return lv;
+	if (value_isundef(v)) {
+		return lsi_varmap_create();
 	} else if (_isrconst(t, v)) {
 		struct lsi_varmap *lv = lsi_varmap_create();
 		lsi_varmap_set(
 			lv,
-			value_to_rconstid(v, s),
-			dynamic_str(id)
+			dynamic_str(id),
+			value_to_rconstid(v, s)
 		);
 		return lv;
 	} else if (ast_type_isstruct(t)) {
@@ -706,12 +719,22 @@ _int_to_rconstid(struct value *v, struct state *s)
 	return rconst;
 }
 
+struct lsi_expr *
+value_to_lsi_expr(struct value *v, struct state *s)
+{
+	return value_isconstant(v)
+		? lsi_expr_const_create(value_as_constant(v))
+		: lsi_expr_var_create(value_to_rconstid(v, s));
+}
+
 bool
 struct_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
 {
 	struct map *m = v->_struct.m;
 	for (int i = 0; i < m->n; i++) {
-		struct value *val = object_as_value((struct object *) m->entry[i].value);
+		struct value *val = object_as_defvalue(
+			(struct object *) m->entry[i].value
+		);
 		if (val && value_referencesheap(val, s, cb)) {
 			return true;
 		}
@@ -722,7 +745,7 @@ struct_referencesheap(struct value *v, struct state *s, struct circuitbreaker *c
 void
 value_struct_sprint(struct value *v, struct strbuilder *b)
 {
-	strbuilder_printf(b, "struct:{");
+	strbuilder_printf(b, "struct{");
 
 	struct ast_variable_arr *members = v->_struct.members;
 
@@ -731,8 +754,8 @@ value_struct_sprint(struct value *v, struct strbuilder *b)
 	for (int i = 0; i < n; i++) {
 		char *f = ast_variable_name(var[i]);
 		struct object *obj = map_get(v->_struct.m, f);
-		char *val_str = object_hasvalue(obj)
-			? value_str(object_as_value(obj))
+		char *val_str = object_isdef(obj)
+			? value_str(object_as_defvalue(obj))
 			: dynamic_str("");
 		strbuilder_printf(b, ".%s = <%s>%s", f, val_str,
 			i+1<n ? ", " : "");
@@ -745,13 +768,13 @@ value_struct_sprint(struct value *v, struct strbuilder *b)
 void
 value_int_sprint(struct value *v, struct strbuilder *b)
 {
-	strbuilder_printf(b, "int:%s", number_str(v->n));
+	strbuilder_printf(b, "int{%s}", number_short_str(v->n));
 }
 
 void
 value_rconst_sprint(struct value *v, struct strbuilder *b)
 {
-	strbuilder_printf(b, "rconst:%s", number_str(v->n));
+	strbuilder_printf(b, "rconst{%s}", number_str(v->n));
 }
 
 struct value *
@@ -759,6 +782,8 @@ value_copy(struct value *v)
 {
 	assert(v);
 	switch (v->type) {
+	case VALUE_UNDEF:
+		return value_undef_create();
 	case VALUE_RCONST:
 		return value_rconst_copy(v);
 	case VALUE_PTR:
@@ -841,6 +866,9 @@ value_str(struct value *v)
 {
 	struct strbuilder *b = strbuilder_create();
 	switch (v->type) {
+	case VALUE_UNDEF:
+		strbuilder_printf(b, "undef");
+		break;
 	case VALUE_RCONST:
 		value_rconst_sprint(v, b);
 		break;
@@ -863,10 +891,27 @@ value_str(struct value *v)
 }
 
 char *
+value_short_str(struct value *v)
+{
+	struct strbuilder *b = strbuilder_create();
+	switch (v->type) {
+	case VALUE_RCONST:
+	case VALUE_INT:
+		break;
+	default:
+		assert(false);
+	}
+	char *s = number_short_str(v->n);
+	strbuilder_printf(b, "%s", s);
+	free(s);
+	return strbuilder_build(b);
+}
+
+char *
 value_type_str(struct value *v)
 {
 	char *value_type_str[] = {
-		[VALUE_RCONST] = "rconst",
+		[VALUE_RCONST]	= "rconst",
 		[VALUE_PTR] 	= "ptr",
 		[VALUE_INT]	= "int",
 		[VALUE_LITERAL] = "literal",
@@ -1042,7 +1087,7 @@ struct_references(struct value *v, struct location *loc, struct state *s,
 {
 	struct map *m = v->_struct.m;
 	for (int i = 0; i < m->n; i++) {
-		struct value *val = object_as_value(
+		struct value *val = object_as_defvalue(
 			(struct object *) m->entry[i].value
 		);
 		if (val && value_references(val, loc, s, cb)) {

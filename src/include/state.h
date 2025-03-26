@@ -54,6 +54,9 @@ int
 state_atsetupend(struct state *);
 
 int
+state_ininvariant(struct state *);
+
+int
 state_atinvariantend(struct state *);
 
 int
@@ -118,7 +121,7 @@ state_deref(struct state *, struct value *ptr);
 struct location;
 
 struct location *
-state_alloc(struct state *, int size);
+state_alloc(struct state *, struct value *size);
 
 struct error *
 state_dealloc(struct state *, struct location *);
@@ -176,7 +179,7 @@ struct value *
 state_static_init(struct state *, struct ast_expr *);
 
 struct value *
-state_clump(struct state *, int size);
+state_clump(struct state *, struct value *size);
 
 bool
 state_loc_valid(struct state *, struct location *);
@@ -194,7 +197,7 @@ bool
 state_hasgarbage(struct state *);
 
 struct error *
-state_specverify(struct state *actual, struct state *spec);
+state_verify_endstate(struct state *impl, struct state *spec);
 
 struct value *
 state_popregister(struct state *);
@@ -311,10 +314,10 @@ struct location *
 location_permuteheap(struct location *loc, struct permutation *p);
 
 struct object_res *
-state_get(struct state *state, struct location *loc, bool constructive);
+state_get(struct state *state, struct location *loc);
 
 struct error *
-state_constraintverify_top(struct state *spec, struct state *impl);
+state_verify_callsetup(struct state *spec, struct state *impl);
 
 struct error *
 state_constraintverify_all(struct state *spec, struct state *impl);
@@ -339,7 +342,7 @@ state_block_rconst_mapping(struct state *, struct location *, struct ast_type *,
 		char *referent);
 
 struct error *
-state_verifyinvariant(struct state *);
+state_verify_invariant(struct state *);
 
 struct lsi_le;
 
@@ -351,12 +354,30 @@ state_isfeasible(struct state *, struct lsi_le *);
 bool
 state_isdeallocand(struct state *s, struct location *loc);
 
-bool
-state_eval(struct state *, struct ast_expr *);
-
 struct block;
 
 struct block *
 state_getblock(struct state *, struct location *);
+
+
+/* state_arr */
+
+struct state_arr *
+state_arr_create(void);
+
+struct state_arr *
+state_arr_copy(struct state_arr *);
+
+void
+state_arr_destroy(struct state_arr *);
+
+void
+state_arr_append(struct state_arr *, struct state *);
+
+int
+state_arr_len(struct state_arr *);
+
+struct state **
+state_arr_s(struct state_arr *);
 
 #endif

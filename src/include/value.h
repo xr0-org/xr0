@@ -11,6 +11,12 @@ struct permutation;
 
 struct int_arr;
 
+struct value *
+value_undef_create(void);
+
+int
+value_isundef(struct value *);
+
 struct ast_type;
 
 struct state;
@@ -89,6 +95,11 @@ value_rconst_mapping(struct value *, struct ast_type *, struct state *,
 char *
 value_to_rconstid(struct value *v, struct state *);
 
+struct lsi_expr;
+
+struct lsi_expr *
+value_to_lsi_expr(struct value *, struct state *);
+
 struct value *
 value_copy(struct value *);
 
@@ -100,6 +111,9 @@ value_destroy(struct value *);
 
 char *
 value_str(struct value *);
+
+char *
+value_short_str(struct value *);
 
 char *
 value_type_str(struct value *);

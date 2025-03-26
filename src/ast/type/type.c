@@ -618,8 +618,18 @@ ast_type_ptr_type(struct ast_type *t)
 	return t->ptr_type;
 }
 
-int
+
+static int
+_size(struct ast_type *);
+
+struct value *
 ast_type_size(struct ast_type *t)
+{
+	return value_int_create(_size(t));
+}
+
+static int
+_size(struct ast_type *t)
 {
 	/* XXX: simplistic sizing until we study the alignment rules more
 	 * closely */
@@ -632,7 +642,7 @@ ast_type_size(struct ast_type *t)
 		return 1;
 
 	case TYPE_ARRAY:
-		return t->arr.length * ast_type_size(t->arr.type);
+		return t->arr.length * _size(t->arr.type);
 
 	case TYPE_STRUCT:
 	case TYPE_USERDEF:

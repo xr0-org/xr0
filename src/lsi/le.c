@@ -7,7 +7,9 @@
 #include "lsi.h"
 
 #include "le.h"
+#include "le_arr.h"
 #include "expr.h"
+#include "expr_arr.h"
 #include "tally.h"
 
 struct lsi_le {
@@ -16,7 +18,7 @@ struct lsi_le {
 };
 
 static struct lsi_le *
-_lsi_le_create(struct lsi_expr *e)
+_create(struct lsi_expr *e)
 {
 	struct lsi_le *le = malloc(sizeof(struct lsi_le));
 	assert(le);
@@ -30,7 +32,7 @@ _negate(struct lsi_expr *);
 struct lsi_le *
 lsi_le_create(struct lsi_expr *l, struct lsi_expr *r)
 {
-	return _lsi_le_create(
+	return _create(
 		/* l - r */
 		lsi_expr_sum_create(l, _negate(r))
 	);
@@ -43,15 +45,15 @@ _negate(struct lsi_expr *e)
 }
 
 struct lsi_le *
-_lsi_le_renamevars(struct lsi_le *le, struct lsi_varmap *m)
+_lsi_le_renamevar(struct lsi_le *le, char *old, char *new)
 {
-	return _lsi_le_create(_lsi_expr_renamevars(le->_, m));
+	return _create(_lsi_expr_renamevar(le->_, old, new));
 }
 
 struct lsi_le *
 _lsi_le_prefixvars(struct lsi_le *le, char *prefix)
 {
-	return _lsi_le_create(_lsi_expr_prefixvars(le->_, prefix));
+	return _create(_lsi_expr_prefixvars(le->_, prefix));
 }
 
 struct lsi_le *
@@ -61,7 +63,7 @@ lsi_le_negate(struct lsi_le *le)
 	 * writing r < l, or r <= l - 1, which is represented as r - l + 1, or
 	 * 	1 - (l - r).
 	 * so we add 1 to the negation of the original representation. */
-	return _lsi_le_create(
+	return _create(
 		lsi_expr_sum_create(
 			lsi_expr_const_create(1),
 			_negate(le->_)
@@ -72,7 +74,7 @@ lsi_le_negate(struct lsi_le *le)
 struct lsi_le *
 lsi_le_copy(struct lsi_le *old)
 {
-	return _lsi_le_create(lsi_expr_copy(old->_));
+	return _create(lsi_expr_copy(old->_));
 }
 
 void
