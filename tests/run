@@ -17,7 +17,7 @@ main_func="main"
 
 fail="\e[31mFAIL\e[0m\n"
 pass="\e[32mPASS\e[0m\n"
-ignore="\e[33mIGNORE\e[0m\n"
+ignore="\e[33mSKIP\e[0m\n"
 
 run_cmd() {
 	f=$1
@@ -112,7 +112,7 @@ cd ..
 nfail=$((ntests-(npass+nignore)))
 finish=$(date +%s)
 time=$(echo "$finish-$start" | bc)
-printf "\n%d tests:\t%d passed\t%d failed\t%d ignored\tin %d seconds\n" \
+printf "\n%d tests:\t%d passed\t%d failed\t%d skipped\tin %d seconds\n" \
 	$ntests $npass $nfail $nignore $time
 if [ $nfail -ne 0 ]
 then
