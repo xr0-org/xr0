@@ -65,12 +65,15 @@ copy_stmt_arr(int len, struct ast_stmt **stmt)
 }
 
 static char *
+_indentation(int level);
+
+static char *
 ast_block_str_div(struct ast_block *b, int indent_level, char divst, char divend)
 {
 	assert(indent_level > 0);
 
-	char *indent = indentation(indent_level),
-	     *previndent = indentation(indent_level-1);
+	char *indent = _indentation(indent_level),
+	     *previndent = _indentation(indent_level-1);
 
 	struct strbuilder *sb = strbuilder_create();
 	strbuilder_printf(sb, "%c\n", divst);
@@ -86,6 +89,23 @@ ast_block_str_div(struct ast_block *b, int indent_level, char divst, char divend
 
 	return strbuilder_build(sb);
 }
+
+#define INDENT_CHAR '\t'
+
+static char *
+_indentation(int level)
+{
+	assert(level >= 0);
+	char *s = malloc(sizeof(char) * level + 1);
+	for (int i = 0; i < level; i++) {
+		s[i] = INDENT_CHAR;
+	}
+	s[level] = '\0';
+	return s;
+}
+
+
+
 
 char *
 ast_block_str(struct ast_block *b, int indent)

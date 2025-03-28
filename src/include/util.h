@@ -1,19 +1,12 @@
 #ifndef XR0_UTIL_H
 #define XR0_UTIL_H
+
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdbool.h>
 
-#define LEN(a) (sizeof(a) / sizeof((a)[0]))
-
 char *
 dynamic_str(const char *);
-
-#define INDENT_CHAR '\t'
-
-char *
-indentation(int level);
-
 
 /* XXX: We know. */
 struct map {
