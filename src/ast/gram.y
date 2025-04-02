@@ -563,8 +563,9 @@ struct_declaration_list
 	;
 
 struct_declaration
-	/*: specifier_qualifier_list struct_declarator_list ';'*/
-	: declaration /* XXX: added temporarily */ {
+	: specifier_qualifier_list struct_declarator_list ';'
+		{ TODO("specifier_qualifier_list struct_declarator_list ';'"); }
+	| declaration /* XXX: added temporarily */ {
 		assert(ast_variable_arr_n($1) == 1);
 		$$ = ast_variable_arr_v($1)[0];
 	}
@@ -577,16 +578,21 @@ specifier_qualifier_list
 	| type_qualifier
 	;
 
-/*struct_declarator_list*/
-	/*: struct_declarator*/
-	/*| struct_declarator_list ',' struct_declarator*/
-	/*;*/
+struct_declarator_list
+	: struct_declarator
+		{ TODO("struct_declarator"); }
+	| struct_declarator_list ',' struct_declarator
+		{ TODO("struct_declarator_list ',' struct_declarator"); }
+	;
 
-/*struct_declarator*/
-	/*: declarator*/
-	/*| ':' constant_expression*/
-	/*| declarator ':' constant_expression*/
-	/*;*/
+struct_declarator
+	: declarator
+		{ TODO("declarator"); }
+	| ':' constant_expression
+		{ TODO("':' constant_expression"); }
+	| declarator ':' constant_expression
+		{ TODO("declarator ':' constant_expression"); }
+	;
 
 enum_specifier
 	: ENUM '{' enumerator_list '}'
@@ -699,7 +705,8 @@ type_qualifier_list
 
 parameter_type_list
 	: parameter_list 
-	/*| parameter_list ',' ELLIPSIS*/
+	| parameter_list ',' ELLIPSIS
+		{ TODO("parameter_list ',' ELLIPSIS"); }
 	;
 
 parameter_list
