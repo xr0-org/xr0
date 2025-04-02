@@ -845,7 +845,8 @@ jump_statement
 	/*| CONTINUE ';'*/
 	: BREAK ';'
 		{ $$ = ast_stmt_create_break(lexloc()); }
-	/*| RETURN ';'*/
+	| RETURN ';'
+		{ a_printf(0, "RETURN without value not yet implemented\n"); }
 	| RETURN expression ';'
 		{ $$ = ast_stmt_create_return(lexloc(), $2); }
 	;
