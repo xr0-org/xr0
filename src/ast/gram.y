@@ -293,7 +293,8 @@ unary_expression
 		{ $$ = ast_expr_incdec_create($2, false, true); }
 	| unary_operator cast_expression
 		{ $$ = ast_expr_unary_create($2, $1); }
-	/*| SIZEOF unary_expression*/
+	| SIZEOF unary_expression
+		{ TODO("SIZEOF unary_expression"); }
 	| SIZEOF '(' type_name ')'
 		{ $$ = ast_expr_constant_create(1); /* XXX */ }
 	;
@@ -309,7 +310,8 @@ unary_operator
 
 cast_expression
 	: unary_expression
-	/*| '(' type_name ')' cast_expression*/
+	| '(' type_name ')' cast_expression
+		{ TODO("'(' type_name ')' cast_expression"); }
 	;
 
 multiplicative_expression
@@ -381,32 +383,38 @@ equality_expression
 
 and_expression
 	: equality_expression
-	/*| and_expression '&' equality_expression*/
+	| and_expression '&' equality_expression
+		{ TODO("and_expression '&' equality_expression"); }
 	;
 
 exclusive_or_expression
 	: and_expression
-	/*| exclusive_or_expression '^' and_expression*/
+	| exclusive_or_expression '^' and_expression
+		{ TODO("exclusive_or_expression '^' and_expression"); }
 	;
 
 inclusive_or_expression
 	: exclusive_or_expression
-	/*| inclusive_or_expression '|' exclusive_or_expression*/
+	| inclusive_or_expression '|' exclusive_or_expression
+		{ TODO("inclusive_or_expression '|' exclusive_or_expression"); }
 	;
 
 logical_and_expression
 	: inclusive_or_expression
-	/*| logical_and_expression AND_OP inclusive_or_expression*/
+	| logical_and_expression AND_OP inclusive_or_expression
+		{ TODO("logical_and_expression AND_OP inclusive_or_expression"); }
 	;
 
 logical_or_expression
 	: logical_and_expression
-	/*| logical_or_expression OR_OP logical_and_expression*/
+	| logical_or_expression OR_OP logical_and_expression
+		{ TODO("logical_or_expression OR_OP logical_and_expression"); }
 	;
 
 conditional_expression
 	: logical_or_expression
-	/*| logical_or_expression '?' expression ':' conditional_expression*/
+	| logical_or_expression '?' expression ':' conditional_expression
+		{ TODO("logical_or_expression '?' expression ':' conditional_expression"); }
 	;
 
 assignment_expression
@@ -431,7 +439,8 @@ assignment_operator
 
 expression
 	: assignment_expression
-	/*| expression ',' assignment_expression*/
+	| expression ',' assignment_expression
+		{ TODO("expression ',' assignment_expression"); }
 	;
 
 constant_expression
@@ -518,18 +527,18 @@ storage_class_specifier
 	;
 
 type_specifier
-	: VOID		{ $$ = ast_type_create(TYPE_VOID, 0); }
-	| CHAR		{ $$ = ast_type_create(TYPE_CHAR, 0); }
-	/*| SHORT*/
-	| INT		{ $$ = ast_type_create(TYPE_INT, 0); }
-	/*| LONG*/
-	/*| FLOAT*/
-	/*| DOUBLE*/
-	/*| SIGNED*/
-	/*| UNSIGNED*/
+	: VOID				{ $$ = ast_type_create(TYPE_VOID, 0); }
+	| CHAR				{ $$ = ast_type_create(TYPE_CHAR, 0); }
+	| SHORT				{ TODO("SHORT"); }
+	| INT				{ $$ = ast_type_create(TYPE_INT, 0); }
+	| LONG				{ TODO("LONG"); }
+	| FLOAT				{ TODO("FLOAT"); }
+	| DOUBLE			{ TODO("DOUBLE"); }
+	| SIGNED			{ TODO("SIGNED"); }
+	| UNSIGNED			{ TODO("UNSIGNED"); }
 	| struct_or_union_specifier
-	/*| enum_specifier*/
-	| TYPE_NAME	{ $$ = ast_type_create_userdef(dynamic_str(yytext)); }
+	| enum_specifier		{ TODO("enum_specifier"); }
+	| TYPE_NAME			{ $$ = ast_type_create_userdef(dynamic_str(yytext)); }
 	;
 
 struct_or_union_specifier
@@ -579,21 +588,28 @@ specifier_qualifier_list
 	/*| declarator ':' constant_expression*/
 	/*;*/
 
-/*enum_specifier*/
-	/*: ENUM '{' enumerator_list '}'*/
-	/*| ENUM IDENTIFIER '{' enumerator_list '}'*/
-	/*| ENUM IDENTIFIER*/
-	/*;*/
+enum_specifier
+	: ENUM '{' enumerator_list '}'
+		{ TODO("ENUM '{' enumerator_list '}'"); }
+	| ENUM IDENTIFIER '{' enumerator_list '}'
+		{ TODO("ENUM IDENTIFIER '{' enumerator_list '}'"); }
+	| ENUM IDENTIFIER
+		{ TODO("ENUM IDENTIFIER"); }
+	;
 
-/*enumerator_list*/
-	/*: enumerator*/
-	/*| enumerator_list ',' enumerator*/
-	/*;*/
+enumerator_list
+	: enumerator
+		{ TODO("enumerator"); }
+	| enumerator_list ',' enumerator
+		{ TODO("enumerator_list ',' enumerator"); }
+	;
 
-/*enumerator*/
-	/*: IDENTIFIER*/
-	/*| IDENTIFIER '=' constant_expression*/
-	/*;*/
+enumerator
+	: IDENTIFIER
+		{ TODO("IDENTIFIER"); }
+	| IDENTIFIER '=' constant_expression
+		{ TODO("IDENTIFIER '=' constant_expression"); }
+	;
 
 type_qualifier
 	: CONST		{ $$ = MOD_CONST; }
@@ -655,23 +671,31 @@ direct_declarator
 			UNARY_OP_DEREFERENCE
 		);
 	}
-	/*| direct_declarator '[' ']'*/
-	/*| direct_declarator '(' parameter_type_list ')'*/
-	/*| direct_declarator '(' identifier_list ')'*/
-	/*| direct_declarator '(' ')'*/
+	| direct_declarator '[' ']'
+		{ TODO("direct_declarator '[' ']'"); }
+	| direct_declarator '(' parameter_type_list ')'
+		{ TODO("direct_declarator '(' parameter_type_list ')'"); }
+	| direct_declarator '(' identifier_list ')'
+		{ TODO("direct_declarator '(' identifier_list ')'"); }
+	| direct_declarator '(' ')'
+		{ TODO("direct_declarator '(' ')'"); }
 	;
 
 pointer
 	: '*'		{ $$ = 1; }
-	/*| '*' type_qualifier_list*/
+	| '*' type_qualifier_list
+		{ TODO("'*' type_qualifier_list"); }
 	| '*' pointer	{ $$ = $2 + 1; }
-	/*| '*' type_qualifier_list pointer*/
+	| '*' type_qualifier_list pointer
+		{ TODO("'*' type_qualifier_list pointer"); }
 	;
 
-/*type_qualifier_list*/
-	/*: type_qualifier*/
-	/*| type_qualifier_list type_qualifier*/
-	/*;*/
+type_qualifier_list
+	: type_qualifier
+		{ TODO("type_qualifier"); }
+	| type_qualifier_list type_qualifier
+		{ TODO("type_qualifier_list type_qualifier"); }
+	;
 
 parameter_type_list
 	: parameter_list 
@@ -706,10 +730,12 @@ parameter_declaration
 	}
 	;
 
-/*identifier_list*/
-	/*: IDENTIFIER*/
-	/*| identifier_list ',' IDENTIFIER*/
-	/*;*/
+identifier_list
+	: IDENTIFIER
+		{ TODO("IDENTIFIER"); }
+	| identifier_list ',' IDENTIFIER
+		{ TODO("identifier_list ',' IDENTIFIER"); }
+	;
 
 type_name
 	: specifier_qualifier_list
@@ -718,33 +744,47 @@ type_name
 
 abstract_declarator
 	: pointer 
+	| direct_abstract_declarator
+		{ TODO("direct_abstract_declarator"); }
+	| pointer direct_abstract_declarator
+		{ TODO("pointer direct_abstract_declarator"); }
 	;
-	/*| direct_abstract_declarator*/
-	/*| pointer direct_abstract_declarator*/
-	/*;*/
 
-/*direct_abstract_declarator*/
-	/*: '(' abstract_declarator ')'*/
-	/*| '[' ']'*/
-	/*| '[' constant_expression ']'*/
-	/*| direct_abstract_declarator '[' ']'*/
-	/*| direct_abstract_declarator '[' constant_expression ']'*/
-	/*| '(' ')'*/
-	/*| '(' parameter_type_list ')'*/
-	/*| direct_abstract_declarator '(' ')'*/
-	/*| direct_abstract_declarator '(' parameter_type_list ')'*/
-	/*;*/
+direct_abstract_declarator
+	: '(' abstract_declarator ')'
+		{ TODO("'(' abstract_declarator ')'"); }
+	| '[' ']'
+		{ TODO("'[' ']'"); }
+	| '[' constant_expression ']'
+		{ TODO("'[' constant_expression ']'"); }
+	| direct_abstract_declarator '[' ']'
+		{ TODO("direct_abstract_declarator '[' ']'"); }
+	| direct_abstract_declarator '[' constant_expression ']'
+		{ TODO("direct_abstract_declarator '[' constant_expression ']'"); }
+	| '(' ')'
+		{ TODO("'(' ')'"); }
+	| '(' parameter_type_list ')'
+		{ TODO("'(' parameter_type_list ')'"); }
+	| direct_abstract_declarator '(' ')'
+		{ TODO("direct_abstract_declarator '(' ')'"); }
+	| direct_abstract_declarator '(' parameter_type_list ')'
+		{ TODO("direct_abstract_declarator '(' parameter_type_list ')'"); }
+	;
 
 initializer
 	: assignment_expression
-	/*| '{' initializer_list '}'*/
-	/*| '{' initializer_list ',' '}'*/
+	| '{' initializer_list '}'
+		{ TODO("initializer_list"); }
+	| '{' initializer_list ',' '}'
+		{ TODO("initialiser_list ','"); }
 	;
 
-/*initializer_list*/
-	/*: initializer*/
-	/*| initializer_list ',' initializer*/
-	/*;*/
+initializer_list
+	: initializer
+		{ TODO("initializer"); }
+	| initializer_list ',' initializer
+		{ TODO("initializer_list ',' initializer"); }
+	;
 
 statement
 	: labelled_statement
@@ -762,9 +802,9 @@ labelled_statement
 	: identifier ':' statement
 		{ $$ = ast_stmt_create_labelled(lexloc(), $1, $3); }
 	| CASE constant_expression ':' statement
-		{ $$ = ast_stmt_create_nop(lexloc()); }
+		{ TODO("CASE constant_expression ':' statement"); }
 	| DEFAULT ':' statement
-		{ $$ = ast_stmt_create_nop(lexloc()); }
+		{ TODO("DEFAULT ':' statement"); }
 	;
 
 compound_statement
@@ -817,10 +857,13 @@ selection_statement
 	: selection_statement_if '(' expression ')' statement
 		{ $$ = ast_stmt_create_sel($1, false, $3, ast_stmt_as_compound($5), NULL); }
 	| selection_statement_if '(' expression ')' statement ELSE statement
-		{ $$ = ast_stmt_create_sel($1, false, $3, ast_stmt_as_compound($5), ast_stmt_as_compound($7));
+		{ 
+			$$ = ast_stmt_create_sel(
+				$1, false, $3, ast_stmt_as_compound($5), ast_stmt_as_compound($7)
+			);
 		}
 	| SWITCH '(' expression ')' statement
-		{ assert(false); }
+		{ TODO("SWITCH '(' expression ')' statement"); }
 	;
 
 selection_statement_if
@@ -833,20 +876,23 @@ optional_compound_verification
 	;
 
 iteration_statement
-	/*: WHILE '(' expression ')' statement
+	: WHILE '(' expression ')' statement
+		{ TODO("WHILE '(' expression ')' statement"); }
 	| DO statement WHILE '(' expression ')' ';'
-	*/
-	: FOR '(' expression_statement expression_statement expression ')' optional_compound_verification statement
+		{ TODO("DO statement WHILE '(' expression ')' ';'"); }
+	| FOR '(' expression_statement expression_statement expression ')' optional_compound_verification statement
 		{ $$ = ast_stmt_create_for(lexloc(), $3, $4, $5, $7, $8); }
 	;
 
 jump_statement
-	/*: GOTO IDENTIFIER ';'*/
-	/*| CONTINUE ';'*/
-	: BREAK ';'
+	: GOTO IDENTIFIER ';'
+		{ TODO("GOTO IDENTIFIER ';'"); }
+	| CONTINUE ';'
+		{ TODO("CONTINUE ';'"); }
+	| BREAK ';'
 		{ $$ = ast_stmt_create_break(lexloc()); }
 	| RETURN ';'
-		{ a_printf(0, "RETURN without value not yet implemented\n"); }
+		{ TODO("RETURN ';'"); }
 	| RETURN expression ';'
 		{ $$ = ast_stmt_create_return(lexloc(), $2); }
 	;

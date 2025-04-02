@@ -127,6 +127,9 @@ v_printf(char *fmt, ...);
 /* a_printf: assert and print as appropriate if there is an error. */
 #define a_printf(expr, ...) if (!(expr)) { fprintf(stderr, __VA_ARGS__); assert(expr); }
 
+/* todo: assert 0 and print message */
+#define TODO(msg) { fprintf(stderr, "`%s' not implemented\n", msg); assert(0); }
+
 struct error;
 
 struct error *
