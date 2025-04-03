@@ -53,20 +53,12 @@ run_test() {
 	fi
 }
 
-nignore=$(cat $IGNORE_FILE | wc -l)
-ignore_files=$(cat $IGNORE_FILE)
-
-for f in $ignore_files; do
-	file=$TESTDIR/0v/$f
-	if [ ! -f "$file" ]; then
-		printf "error: ignored file %s not found\n" "$file" 1>&2
-		exit 1
-	fi
-done
+nignore=0
+ignore_patterns=$(cat $IGNORE_FILE)
 
 should_ignore() {
-    for name in $ignore_files; do
-        if [ "$name" = "$1" ]; then
+    for pattern in $ignore_patterns; do
+        if printf '%s\n' "$1" | grep -E -q "$pattern"; then
             return 0
         fi
     done
@@ -88,6 +80,7 @@ do
 	# skip ignores
 	if should_ignore $f; then
 		printf "$ignore"
+		nignore=$(($nignore+1))
 		continue
 	fi
 
