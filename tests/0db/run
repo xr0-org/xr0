@@ -22,16 +22,19 @@ should_0db_ignore() {
 for dir in "$TESTDIR"/*/; do
 	# remove trailing slash
 	dir=${dir%/}
-	printf "%-${length}s ..." "0db/${dir##*/}"
 	ntests=$(($ntests+1))
 
 	# skip ignores
 	if should_0db_ignore $(basename $dir); then
-		printf "$ignore"
+		if [ "$verbose" -eq 1 ]; then
+			printf "%-${length}s ...$ignore" "0db/${dir##*/}"
+		fi
 		nignore=$(($nignore+1))
 		continue
 	fi
 	
+	printf "%-${length}s ..." "0db/${dir##*/}"
+
 	# @ is the configurable debug separator
 	output=$($XR0 -I "$LIBX" -r@ "$dir/test.x" < "$dir/test.cfg" 2>&1)
 
@@ -48,6 +51,4 @@ for dir in "$TESTDIR"/*/; do
 	else
 		printf "$fail"
 	fi
-
-	ntests=$((ntests+1))
 done

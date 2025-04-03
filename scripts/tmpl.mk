@@ -59,6 +59,9 @@ $(BIN_DIR):
 test: $(XR0V) $(TEST_DIR)
 	@./tests/run
 
+test-verbose: $(XR0V) $(TEST_DIR)
+	@./tests/run -v
+
 check: $(RUNTEST) $(XR0V)
 	$(DEBUGGER) $(XR0V) -I libx $(filter-out $@,$(MAKECMDGOALS))
 
