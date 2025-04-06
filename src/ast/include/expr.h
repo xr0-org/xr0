@@ -109,14 +109,6 @@ ast_expr_alloc_kind_create(struct ast_expr *arg, enum ast_alloc_kind);
 struct value_arr;
 struct value_arr_res;
 
-struct value_arr_res *
-prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
-		struct ast_variable **param, struct state *state);
-
-struct error *
-prepare_parameters(int nparams, struct ast_variable **param, 
-		struct value_arr *args, char *fname, struct state *state);
-
 struct string_arr *
 ast_expr_getfuncs(struct ast_expr *);
 
@@ -144,6 +136,6 @@ calloralloc_type(struct ast_expr *e, struct state *s);
 struct e_res;
 
 struct e_res *
-ast_expr_setupverify(struct ast_expr *, struct state *);
+ast_expr_setupverify(struct ast_expr *, struct state *, struct rconst *);
 
 #endif

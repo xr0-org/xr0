@@ -490,15 +490,15 @@ stack_atloopend(struct stack *s)
 }
 
 struct error *
-stack_step(struct stack *s, struct state *state)
+stack_step(struct stack *s, struct state *state, struct rconst *rconst)
 {
-	return program_step(frame_program(s->f), state);
+	return program_step(frame_program(s->f), state, rconst);
 }
 
 struct error *
-stack_next(struct stack *s, struct state *state)
+stack_next(struct stack *s, struct state *state, struct rconst *rconst)
 {
-	return program_next(frame_program(s->f), state);
+	return program_next(frame_program(s->f), state, rconst);
 }
 
 void

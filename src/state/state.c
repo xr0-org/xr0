@@ -197,13 +197,13 @@ state_pushloopframe(struct state *s, struct ast_block *b)
 struct error *
 state_step(struct state *s)
 {
-	return stack_step(s->stack, s);
+	return stack_step(s->stack, s, s->rconst);
 }
 
 struct error *
 state_next(struct state *s)
 {
-	return stack_next(s->stack, s);
+	return stack_next(s->stack, s, s->rconst);
 }
 
 struct externals *

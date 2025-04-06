@@ -79,11 +79,13 @@ stack_atloopend(struct stack *);
 int
 stack_id(struct stack *);
 
-struct error *
-stack_step(struct stack *, struct state *);
+struct rconst;
 
 struct error *
-stack_next(struct stack *, struct state *);
+stack_step(struct stack *, struct state *, struct rconst *);
+
+struct error *
+stack_next(struct stack *, struct state *, struct rconst *);
 
 void
 stack_nextstmt(struct stack *s, struct state *state);

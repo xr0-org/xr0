@@ -17,9 +17,9 @@
 #include "_limits.h"
 
 struct bool_res *
-ast_expr_decide(struct ast_expr *expr, struct state *s)
+ast_expr_decide(struct ast_expr *expr, struct state *s, struct rconst *rconst)
 {
-	struct e_res *res = ast_expr_eval(expr, s);
+	struct e_res *res = ast_expr_eval(expr, s, rconst);
 	if (e_res_iserror(res)) {
 		return bool_res_error_create(e_res_as_error(res));
 	}
@@ -34,12 +34,12 @@ ast_expr_decide(struct ast_expr *expr, struct state *s)
 /* ast_expr_eval */
 
 static struct e_res *
-directeval(struct ast_expr *, struct state *);
+directeval(struct ast_expr *, struct state *, struct rconst *);
 
 struct e_res *
-ast_expr_eval(struct ast_expr *expr, struct state *state)
+ast_expr_eval(struct ast_expr *expr, struct state *state, struct rconst *rconst)
 {
-	struct e_res *res = directeval(expr, state);
+	struct e_res *res = directeval(expr, state, rconst);
 	if (e_res_iserror(res) || !e_res_haseval(res)) {
 		return res;
 	}
@@ -63,90 +63,92 @@ ast_expr_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-expr_constant_eval(struct ast_expr *expr, struct state *state);
+expr_constant_eval(struct ast_expr *);
 
 static struct e_res *
-expr_literal_eval(struct ast_expr *expr, struct state *state);
+expr_literal_eval(struct ast_expr *expr, struct state *);
 
 static struct e_res *
-expr_identifier_eval(struct ast_expr *expr, struct state *state);
+expr_identifier_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-expr_unary_eval(struct ast_expr *expr, struct state *state);
+expr_unary_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-expr_structmember_eval(struct ast_expr *expr, struct state *state);
+expr_structmember_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-expr_call_eval(struct ast_expr *expr, struct state *state);
+expr_call_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-expr_alloc_eval(struct ast_expr *expr, struct state *state);
+expr_alloc_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-expr_assign_eval(struct ast_expr *expr, struct state *state);
+expr_assign_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-expr_incdec_eval(struct ast_expr *expr, struct state *state);
+expr_incdec_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-expr_binary_eval(struct ast_expr *expr, struct state *state);
+expr_binary_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-range_eval(struct ast_expr *expr, struct state *state);
+range_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-isdeallocand_eval(struct ast_expr *expr, struct state *state);
+isdeallocand_eval(struct ast_expr *expr, struct state *, struct rconst *);
 
 static struct e_res *
-directeval(struct ast_expr *expr, struct state *state)
+directeval(struct ast_expr *expr, struct state *state, struct rconst *rconst)
 {
 	switch (ast_expr_kind(expr)) {
 	case EXPR_CONSTANT:
-		return expr_constant_eval(expr, state);
+		return expr_constant_eval(expr);
 	case EXPR_STRING_LITERAL:
 		return expr_literal_eval(expr, state);
 	case EXPR_IDENTIFIER:
-		return expr_identifier_eval(expr, state);
+		return expr_identifier_eval(expr, state, rconst);
 	case EXPR_UNARY:
-		return expr_unary_eval(expr, state);
+		return expr_unary_eval(expr, state, rconst);
 	case EXPR_STRUCTMEMBER:
-		return expr_structmember_eval(expr, state);
+		return expr_structmember_eval(expr, state, rconst);
 	case EXPR_CALL:
-		return expr_call_eval(expr, state);
+		return expr_call_eval(expr, state, rconst);
 	case EXPR_ALLOCATION:
-		return expr_alloc_eval(expr, state);
+		return expr_alloc_eval(expr, state, rconst);
 	case EXPR_ASSIGNMENT:
-		return expr_assign_eval(expr, state);
+		return expr_assign_eval(expr, state, rconst);
 	case EXPR_INCDEC:
-		return expr_incdec_eval(expr, state);
+		return expr_incdec_eval(expr, state, rconst);
 	case EXPR_BINARY:
-		return expr_binary_eval(expr, state);
+		return expr_binary_eval(expr, state, rconst);
 	case EXPR_RANGE:
-		return range_eval(expr, state);
+		return range_eval(expr, state, rconst);
 	case EXPR_BRACKETED:
-		return ast_expr_eval(ast_expr_bracketed_root(expr), state);
+		return ast_expr_eval(
+			ast_expr_bracketed_root(expr), state, rconst
+		);
 	case EXPR_ISDEALLOCAND:
 		assert(state_modecanverify(state));
-		return isdeallocand_eval(expr, state);
+		return isdeallocand_eval(expr, state, rconst);
 	default:
 		assert(false);
 	}
 }
 
 static struct e_res *
-expr_literal_eval(struct ast_expr *expr, struct state *state)
+expr_literal_eval(struct ast_expr *expr, struct state *s)
 {
 	return e_res_eval_create(
 		eval_rval_create(
 			ast_type_create_char(),
-			state_static_init(state, expr)
+			state_static_init(s, expr)
 		)
 	);
 }
 
 static struct e_res *
-expr_constant_eval(struct ast_expr *expr, struct state *state)
+expr_constant_eval(struct ast_expr *expr)
 {
 	return e_res_eval_create(
 		eval_rval_create(
@@ -157,13 +159,14 @@ expr_constant_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-hack_identifier_builtin_eval(char *id, struct state *state);
+hack_identifier_builtin_eval(char *id, struct rconst *);
 
 static struct e_res *
-expr_identifier_eval(struct ast_expr *expr, struct state *state)
+expr_identifier_eval(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	struct e_res *res = hack_identifier_builtin_eval(
-		ast_expr_as_identifier(expr), state
+		ast_expr_as_identifier(expr), rconst
 	);
 	if (!e_res_iserror(res) && e_res_haseval(res)) {
 		return res;
@@ -192,9 +195,9 @@ expr_identifier_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-hack_identifier_builtin_eval(char *id, struct state *state)
+hack_identifier_builtin_eval(char *id, struct rconst *rconst)
 {
-	if (state_hasrconst(state, id) || strncmp(id, "ptr:", 4) == 0) {
+	if (rconst_hasvar(rconst, id) || strncmp(id, "ptr:", 4) == 0) {
 		/* TODO set type from rconsts */
 		return e_res_eval_create(
 			eval_rval_create(
@@ -209,39 +212,41 @@ hack_identifier_builtin_eval(char *id, struct state *state)
 }
 
 static struct e_res *
-dereference_eval(struct ast_expr *, struct state *);
+dereference_eval(struct ast_expr *, struct state *, struct rconst *);
 
 static struct e_res *
-address_eval(struct ast_expr *, struct state *);
+address_eval(struct ast_expr *, struct state *, struct rconst *);
 
 static struct e_res *
-bang_eval(struct ast_expr *, struct state *);
+bang_eval(struct ast_expr *, struct state *, struct rconst *);
 
 static struct e_res *
-negative_eval(struct ast_expr *, struct state *);
+negative_eval(struct ast_expr *, struct state *, struct rconst *);
 
 static struct e_res *
-expr_unary_eval(struct ast_expr *expr, struct state *state)
+expr_unary_eval(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	switch (ast_expr_unary_op(expr)) {
 	case UNARY_OP_DEREFERENCE:
-		return dereference_eval(expr, state);
+		return dereference_eval(expr, state, rconst);
 	case UNARY_OP_ADDRESS:
-		return address_eval(expr, state);
+		return address_eval(expr, state, rconst);
 	case UNARY_OP_BANG:
-		return bang_eval(expr, state);
+		return bang_eval(expr, state, rconst);
 	case UNARY_OP_NEGATIVE:
-		return negative_eval(expr, state);
+		return negative_eval(expr, state, rconst);
 	default:
 		assert(false);
 	}
 }
 
 static struct e_res *
-dereference_eval(struct ast_expr *expr, struct state *state)
+dereference_eval(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	struct ast_expr *operand = ast_expr_unary_operand(expr);
-	struct e_res *res = ast_expr_eval(operand, state);
+	struct e_res *res = ast_expr_eval(operand, state, rconst);
 	if (e_res_iserror(res)) {
 		return e_res_error_create(e_res_as_error(res));
 	}
@@ -275,10 +280,10 @@ dereference_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-address_eval(struct ast_expr *expr, struct state *state)
+address_eval(struct ast_expr *expr, struct state *state, struct rconst *rconst)
 {
 	struct ast_expr *operand = ast_expr_unary_operand(expr);
-	struct e_res *res = ast_expr_eval(operand, state);
+	struct e_res *res = ast_expr_eval(operand, state, rconst);
 	if (e_res_iserror(res)) {
 		return res;
 	}
@@ -297,10 +302,10 @@ address_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-bang_eval(struct ast_expr *expr, struct state *state)
+bang_eval(struct ast_expr *expr, struct state *state, struct rconst *rconst)
 {
 	struct bool_res *istrue_res = ast_expr_decide(
-		ast_expr_unary_operand(expr), state
+		ast_expr_unary_operand(expr), state, rconst
 	);
 	if (bool_res_iserror(istrue_res)) {
 		return e_res_error_create(bool_res_as_error(istrue_res));
@@ -314,10 +319,11 @@ bang_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-negative_eval(struct ast_expr *expr, struct state *state)
+negative_eval(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	struct ast_expr *operand = ast_expr_unary_operand(expr);
-	struct e_res *res = ast_expr_eval(operand, state);
+	struct e_res *res = ast_expr_eval(operand, state, rconst);
 	if (e_res_iserror(res)) {
 		return res;
 	}
@@ -348,10 +354,11 @@ negative_eval(struct ast_expr *expr, struct state *state)
 
 
 static struct e_res *
-expr_structmember_eval(struct ast_expr *expr, struct state *s)
+expr_structmember_eval(struct ast_expr *expr, struct state *s,
+		struct rconst *rconst)
 {
 	struct ast_expr *root_expr = ast_expr_member_root(expr);
-	struct e_res *res = ast_expr_eval(root_expr, s);
+	struct e_res *res = ast_expr_eval(root_expr, s, rconst);
 	if (e_res_iserror(res)) {
 		return res;
 	}
@@ -385,16 +392,28 @@ expr_structmember_eval(struct ast_expr *expr, struct state *s)
 }
 
 static struct e_res *
-pushcallframe(struct ast_expr *expr, struct state *state);
+pushcallframe(struct ast_expr *, struct state *, struct rconst *);
 
 static struct e_res *
-expr_call_eval(struct ast_expr *expr, struct state *state)
+expr_call_eval(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
-	return pushcallframe(expr, state);
+	return pushcallframe(expr, state, rconst);
 }
 
+static struct value_arr_res *
+prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
+		struct ast_variable **param, struct state *,
+		struct rconst *);
+
+struct error *
+prepare_parameters(int nparams, struct ast_variable **param, 
+		struct value_arr *args_arr, char *fname, struct state *,
+		struct rconst *);
+
 static struct e_res *
-pushcallframe(struct ast_expr *expr, struct state *state)
+pushcallframe(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	struct error *err;
 
@@ -423,7 +442,8 @@ pushcallframe(struct ast_expr *expr, struct state *state)
 	struct value_arr_res *args_res = prepare_arguments(
 		nargs, ast_expr_call_args(expr),
 		nparams, params,
-		state
+		state,
+		rconst
 	);
 	if (value_arr_res_iserror(args_res)) {
 		return e_res_error_create(value_arr_res_as_error(args_res));
@@ -438,7 +458,9 @@ pushcallframe(struct ast_expr *expr, struct state *state)
 	);
 	state_pushframe(state, call_frame);
 
-	if ((err = prepare_parameters(nparams, params, args, name, state))) {
+	if ((err = prepare_parameters(
+		nparams, params, args, name, state, rconst
+	))) {
 		return e_res_error_create(err);
 	}
 
@@ -446,14 +468,16 @@ pushcallframe(struct ast_expr *expr, struct state *state)
 }
 
 static struct error *
-setupverify(struct ast_expr *expr, struct state *state);
+setupverify(struct ast_expr *expr, struct state *state,
+		struct rconst *);
 
 struct e_res *
-ast_expr_setupverify(struct ast_expr *expr, struct state *state)
+ast_expr_setupverify(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	/* XXX: no setup verification for alloc statement */
 	if (ast_expr_kind(expr) != EXPR_ALLOCATION) {
-		struct error *err = setupverify(expr, state);
+		struct error *err = setupverify(expr, state, rconst);
 		if (err) {
 			return e_res_error_create(err);
 		}
@@ -462,10 +486,10 @@ ast_expr_setupverify(struct ast_expr *expr, struct state *state)
 }
 
 static struct ast_block_res *
-setupdecided_abstract(struct ast_expr *, struct state *);
+setupdecided_abstract(struct ast_expr *, struct state *, struct rconst *);
 
 static struct error *
-setupverify(struct ast_expr *call, struct state *impl)
+setupverify(struct ast_expr *call, struct state *impl, struct rconst *rconst)
 {
 	char *fname = ast_expr_as_identifier(ast_expr_call_root(call));
 
@@ -486,7 +510,7 @@ setupverify(struct ast_expr *call, struct state *impl)
 	}
 
 	struct ast_block_res *decided_abs_res = setupdecided_abstract(
-		call, impl
+		call, impl, rconst
 	);
 	if (ast_block_res_iserror(decided_abs_res)) {
 		return ast_block_res_as_error(decided_abs_res);
@@ -507,7 +531,7 @@ setupverify(struct ast_expr *call, struct state *impl)
 
 	state_popframe(spec);
 
-	struct e_res *push_res = pushcallframe(call, impl);
+	struct e_res *push_res = pushcallframe(call, impl, rconst);
 	assert(!e_res_iserror(push_res));
 
 	struct error *err = state_constraintverify_top(spec, impl);
@@ -521,7 +545,8 @@ setupverify(struct ast_expr *call, struct state *impl)
 }
 
 static struct ast_block_res *
-setupdecided_abstract(struct ast_expr *call, struct state *s)
+setupdecided_abstract(struct ast_expr *call, struct state *s,
+		struct rconst *rconst)
 {
 	struct ast_function *f = externals_getfunc(
 		state_getext(s),
@@ -531,13 +556,13 @@ setupdecided_abstract(struct ast_expr *call, struct state *s)
 
 	/* modulation is by parameters in called function, so we prepare these
 	 * first */
-	struct e_res *push_res = pushcallframe(call, s);
+	struct e_res *push_res = pushcallframe(call, s, rconst);
 	if (e_res_iserror(push_res)) {
 		return ast_block_res_error_create(e_res_as_error(push_res));
 	}
 
 	struct ast_block_res *res = ast_block_setupdecide(
-		ast_function_abstract(f), s
+		ast_function_abstract(f), s, rconst
 	);
 	if (ast_block_res_iserror(res)) {
 		assert(error_to_verifierinstruct(ast_block_res_as_error(res)));
@@ -578,15 +603,16 @@ call_type(struct ast_expr *call, struct state *state)
 	return ast_type_copy(ast_function_type(f));
 }
 
-struct value_arr_res *
+static struct value_arr_res *
 prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
-		struct ast_variable **param, struct state *s)
+		struct ast_variable **param, struct state *s,
+		struct rconst *rconst)
 {
 	assert(nargs == nparams);
 
 	struct value_arr *args = value_arr_create();
 	for (int i = 0; i < nargs; i++) {
-		struct e_res *res = ast_expr_eval(arg[i], s);
+		struct e_res *res = ast_expr_eval(arg[i], s, rconst);
 		if (e_res_iserror(res)) {
 			return value_arr_res_error_create(e_res_as_error(res));
 		}
@@ -613,7 +639,8 @@ prepare_arguments(int nargs, struct ast_expr **arg, int nparams,
  * their respective parameters. */
 struct error *
 prepare_parameters(int nparams, struct ast_variable **param, 
-		struct value_arr *args_arr, char *fname, struct state *state)
+		struct value_arr *args_arr, char *fname, struct state *state,
+		struct rconst *rconst)
 {
 	int nargs = value_arr_len(args_arr);
 	struct value **arg = value_arr_v(args_arr);
@@ -625,7 +652,7 @@ prepare_parameters(int nparams, struct ast_variable **param,
 		struct ast_expr *name = ast_expr_identifier_create(
 			dynamic_str(ast_variable_name(param[i]))
 		);
-		struct e_res *lval_res = ast_expr_eval(name, state);
+		struct e_res *lval_res = ast_expr_eval(name, state, rconst);
 		if (e_res_iserror(lval_res)) {
 			return e_res_as_error(lval_res);
 		}
@@ -641,12 +668,13 @@ prepare_parameters(int nparams, struct ast_variable **param,
 }
 
 static struct e_res *
-expr_assign_eval(struct ast_expr *expr, struct state *state)
+expr_assign_eval(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	struct ast_expr *lval = ast_expr_assignment_lval(expr),
 			*rval = ast_expr_assignment_rval(expr);
 
-	struct e_res *l_res = ast_expr_eval(lval, state);
+	struct e_res *l_res = ast_expr_eval(lval, state, rconst);
 	if (e_res_iserror(l_res)) {
 		return e_res_error_create(e_res_as_error(l_res));
 	}
@@ -666,7 +694,7 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 	}
 	struct object *obj = object_res_as_object(obj_res);
 
-	struct e_res *r_res = ast_expr_eval(rval, state);
+	struct e_res *r_res = ast_expr_eval(rval, state, rconst);
 	if (e_res_iserror(r_res)) {
 		return r_res;
 	}
@@ -689,18 +717,19 @@ expr_assign_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-expr_incdec_eval(struct ast_expr *expr, struct state *state)
+expr_incdec_eval(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	struct ast_expr *assign = ast_expr_incdec_to_assignment(expr);
 
 	struct e_res *res;
 
 	if (ast_expr_incdec_pre(expr)) { /* ++i */
-		res = expr_assign_eval(assign, state);
+		res = expr_assign_eval(assign, state, rconst);
 	} else { /* i++ */
-		res = ast_expr_eval(ast_expr_incdec_root(expr), state);
+		res = ast_expr_eval(ast_expr_incdec_root(expr), state, rconst);
 		/* assign and ignore result */ 
-		e_res_destroy(expr_assign_eval(assign, state));
+		e_res_destroy(expr_assign_eval(assign, state, rconst));
 	}
 
 	ast_expr_destroy(assign);
@@ -709,24 +738,25 @@ expr_incdec_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct e_res *
-additive_eval(struct ast_expr *, struct state *);
+additive_eval(struct ast_expr *, struct state *, struct rconst *);
 
 static struct e_res *
-relational_eval(struct ast_expr *, struct state *);
+relational_eval(struct ast_expr *, struct state *, struct rconst *);
 
 static struct e_res *
-expr_binary_eval(struct ast_expr *expr, struct state *state)
+expr_binary_eval(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	switch (ast_expr_binary_op(expr)) {
 	case BINARY_OP_ADDITION:
 	case BINARY_OP_SUBTRACTION:
 	case BINARY_OP_MULTIPLICATION:
-		return additive_eval(expr, state);
+		return additive_eval(expr, state, rconst);
 	case BINARY_OP_LT:
 	case BINARY_OP_GT:
 	case BINARY_OP_GE:
 	case BINARY_OP_LE:
-		return relational_eval(expr, state);
+		return relational_eval(expr, state, rconst);
 	default:
 		assert(false);
 	}
@@ -737,10 +767,14 @@ value_additive_eval(struct eval *, enum ast_binary_operator, struct eval *,
 		struct state *);
 
 static struct e_res *
-additive_eval(struct ast_expr *expr, struct state *state)
+additive_eval(struct ast_expr *expr, struct state *state, struct rconst *rconst)
 {
-	struct e_res *res1 = ast_expr_eval(ast_expr_binary_e1(expr), state),
-		     *res2 = ast_expr_eval(ast_expr_binary_e2(expr), state);
+	struct e_res *res1 = ast_expr_eval(
+		ast_expr_binary_e1(expr), state, rconst
+	),
+		     *res2 = ast_expr_eval(
+		ast_expr_binary_e2(expr), state, rconst
+	);
 	if (e_res_iserror(res1)) {
 		return res1;
 	}
@@ -831,10 +865,10 @@ value_relational_eval(struct eval *, enum ast_binary_operator, struct eval *,
 		struct state *);
 
 static struct e_res *
-relational_eval(struct ast_expr *e, struct state *s)
+relational_eval(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
-	struct e_res *res1 = ast_expr_eval(ast_expr_binary_e1(e), s),
-		     *res2 = ast_expr_eval(ast_expr_binary_e2(e), s);
+	struct e_res *res1 = ast_expr_eval(ast_expr_binary_e1(e), s, rconst),
+		     *res2 = ast_expr_eval(ast_expr_binary_e2(e), s, rconst);
 	if (e_res_iserror(res1)) {
 		return res1;
 	}
@@ -938,12 +972,12 @@ _rel_to_le(struct lsi_expr *e1, enum ast_binary_operator op,
 
 
 static struct value_res *
-range_rconst(struct ast_expr *, struct state *);
+range_rconst(struct ast_expr *, struct state *, struct rconst *);
 
 static struct e_res *
-range_eval(struct ast_expr *expr, struct state *state)
+range_eval(struct ast_expr *expr, struct state *state, struct rconst *rconst)
 {
-	struct value_res *res = range_rconst(expr, state);
+	struct value_res *res = range_rconst(expr, state, rconst);
 	if (value_res_iserror(res)) {
 		return e_res_error_create(value_res_as_error(res));
 	}
@@ -957,23 +991,23 @@ range_eval(struct ast_expr *expr, struct state *state)
 }
 
 static char *
-declare_rconst(struct ast_expr *, struct state *);
+declare_rconst(struct ast_expr *, struct state *, struct rconst *);
 
 static struct lsi_expr *
-_range_lw(struct ast_expr *range, struct state *);
+_range_lw(struct ast_expr *range, struct state *, struct rconst *);
 
 static struct lsi_expr *
-_range_up(struct ast_expr *range, struct state *);
+_range_up(struct ast_expr *range, struct state *, struct rconst *);
 
 static struct value_res *
-range_rconst(struct ast_expr *e, struct state *s)
+range_rconst(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
-	char *rconst = declare_rconst(e, s);
-	struct error *err = state_addconstraint(
-		s,
+	char *rconst_str = declare_rconst(e, s, rconst);
+	struct error *err = rconst_addconstraint(
+		rconst,
 		lsi_le_create(
-			_range_lw(e, s),
-			lsi_expr_var_create(dynamic_str(rconst))
+			_range_lw(e, s, rconst),
+			lsi_expr_var_create(dynamic_str(rconst_str))
 		)
 	);
 	if (err) {
@@ -982,15 +1016,15 @@ range_rconst(struct ast_expr *e, struct state *s)
 	err = state_addconstraint(
 		s,
 		lsi_le_create(
-			lsi_expr_var_create(dynamic_str(rconst)),
-			_range_up(e, s)
+			lsi_expr_var_create(dynamic_str(rconst_str)),
+			_range_up(e, s, rconst)
 		)
 	);
 	if (err) {
 		return value_res_error_create(err);
 	}
 	return value_res_value_create(
-		value_rconst_create(ast_expr_identifier_create(rconst))
+		value_rconst_create(ast_expr_identifier_create(rconst_str))
 	);
 }
 
@@ -998,14 +1032,19 @@ static struct ast_expr *
 _value_to_expr(struct value *, struct state *);
 
 static struct lsi_expr *
-_range_lw(struct ast_expr *range, struct state *s)
+_range_lw(struct ast_expr *range, struct state *s, struct rconst *rconst)
 {
 	struct ast_expr *e = ast_expr_range_lw(range);
 	if (ast_expr_israngemin(e)) {
 		return lsi_expr_const_create(C89_INT_MIN);
 	} else {
 		struct value *v = value_res_as_value(
-			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
+			eval_to_value(
+				e_res_as_eval(
+					ast_expr_eval(e, s, rconst)
+				),
+				s
+			)
 		);
 		return ast_expr_to_lsi_expr(_value_to_expr(v, s));
 	}
@@ -1020,14 +1059,19 @@ _value_to_expr(struct value *v, struct state *s)
 }
 
 static struct lsi_expr *
-_range_up(struct ast_expr *range, struct state *s)
+_range_up(struct ast_expr *range, struct state *s, struct rconst *rconst)
 {
 	struct ast_expr *e = ast_expr_range_up(range);
 	if (ast_expr_israngemax(e)) {
 		return lsi_expr_const_create(C89_INT_MAX);
 	} else {
 		struct value *v = value_res_as_value(
-			eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
+			eval_to_value(
+				e_res_as_eval(
+					ast_expr_eval(e, s, rconst)
+				),
+				s
+			)
 		);
 		/* subtract 1 b/c range expression upper bounds are exclusive */
 		return ast_expr_to_lsi_expr(
@@ -1044,11 +1088,12 @@ static char *
 modulatedkey(struct ast_expr *, struct state *);
 
 static char *
-declare_rconst(struct ast_expr *expr, struct state *state)
+declare_rconst(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
 	if (ast_expr_range_haskey(expr)) {
-		return state_rconst(
-			state,
+		return rconst_declareorget(
+			rconst,
 			modulatedkey(expr, state),
 			false
 		);
@@ -1071,12 +1116,14 @@ modulatedkey(struct ast_expr *e, struct state *s)
 }
 
 static struct object *
-hack_object_from_assertion(struct ast_expr *, struct state *);
+hack_object_from_assertion(struct ast_expr *, struct state *,
+		struct rconst *);
 
 static struct e_res *
-isdeallocand_eval(struct ast_expr *expr, struct state *state)
+isdeallocand_eval(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
-	struct object *obj = hack_object_from_assertion(expr, state);
+	struct object *obj = hack_object_from_assertion(expr, state, rconst);
 	return e_res_eval_create(
 		eval_rval_create(
 			ast_type_create_int(),
@@ -1086,13 +1133,14 @@ isdeallocand_eval(struct ast_expr *expr, struct state *state)
 }
 
 static struct object *
-hack_object_from_assertion(struct ast_expr *expr, struct state *state)
+hack_object_from_assertion(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {	
 	/* get assertand */
 	struct ast_expr *assertand = ast_expr_isdeallocand_assertand(expr);
 
 	/* get `assertand' variable */
-	struct e_res *res = ast_expr_eval(assertand, state);
+	struct e_res *res = ast_expr_eval(assertand, state, rconst);
 	if (e_res_iserror(res)) {
 		assert(false);
 	}
@@ -1105,13 +1153,13 @@ static int
 hack_constorone(struct ast_expr *, struct state *);
 
 static struct e_res *
-dealloc_process(struct ast_expr *, struct state *);
+dealloc_process(struct ast_expr *, struct state *, struct rconst *);
 
 /* operates at location level. it either creates an object on the heap and
  * returns a location or gets the location pointed to by an lvalue and attempts
  * to free possibly returning an error */
 static struct e_res *
-expr_alloc_eval(struct ast_expr *expr, struct state *state)
+expr_alloc_eval(struct ast_expr *expr, struct state *state, struct rconst *rconst)
 {
 	if (!state_modecanrunxr0cmd(state)) {
 		return e_res_error_create(
@@ -1139,7 +1187,7 @@ expr_alloc_eval(struct ast_expr *expr, struct state *state)
 		);
 		break;
 	case DEALLOC:
-		res = dealloc_process(expr, state);
+		res = dealloc_process(expr, state, rconst);
 		break;
 	case CLUMP:
 		res = e_res_eval_create(
@@ -1184,12 +1232,12 @@ hack_constorone(struct ast_expr *e, struct state *s)
 }
 
 static struct e_res *
-dealloc_process(struct ast_expr *expr, struct state *state)
+dealloc_process(struct ast_expr *expr, struct state *state, struct rconst *rconst)
 {
 	struct ast_expr *arg = ast_expr_alloc_arg(expr);
 	/* arg is pointing at the heap location we want to free, so we want its
 	 * value rather than location */
-	struct e_res *res = ast_expr_eval(arg, state);
+	struct e_res *res = ast_expr_eval(arg, state, rconst);
 	if (e_res_iserror(res)) {
 		return res;
 	}

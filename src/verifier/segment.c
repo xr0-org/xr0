@@ -188,7 +188,12 @@ segment_verify(struct segment *s, struct ast_expr *e)
 {
 	switch (s->phase) {
 	case SEGMENT_PHASE_EXEC:
-		return ast_stmt_verify(ast_stmt_create_expr(NULL, e), s->state);
+		assert(0);
+		/*
+		return ast_stmt_verify(
+			ast_stmt_create_expr(NULL, e), s->state
+		);
+		*/
 	case SEGMENT_PHASE_INIT:
 	case SEGMENT_PHASE_ATEND:
 		return NULL;

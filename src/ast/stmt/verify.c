@@ -146,31 +146,32 @@ iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 
 /* stmt_verify */
 static struct error *
-directverify(struct ast_stmt *, struct state *);
+directverify(struct ast_stmt *, struct state *, struct rconst *);
 
 static bool
 islinearisable(struct ast_stmt *);
 
 struct error *
-ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
+ast_stmt_verify(struct ast_stmt *stmt, struct state *s,
+		struct rconst *rconst)
 {
 	struct state *copy = state_copy(s);
-	struct error *err = directverify(stmt, copy);
+	struct error *err = directverify(stmt, copy, rconst);
 	state_destroy(copy);
 	return err;
 }
 
 static struct error *
-stmt_expr_verify(struct ast_stmt *, struct state *);
+stmt_expr_verify(struct ast_stmt *, struct state *, struct rconst *);
 
 static struct error *
-directverify(struct ast_stmt *stmt, struct state *s)
+directverify(struct ast_stmt *stmt, struct state *s, struct rconst *rconst)
 {
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_NOP:
 		return NULL;
 	case STMT_EXPR:
-		return stmt_expr_verify(stmt, s);
+		return stmt_expr_verify(stmt, s, rconst);
 	default:
 		return error_printf(
 			"verification blocks only support statement expressions"
@@ -234,7 +235,8 @@ islinearisable_setuponly(struct ast_stmt *stmt)
 /* stmt_expr_verify */
 
 static struct error *
-stmt_expr_verify(struct ast_stmt *stmt, struct state *state)
+stmt_expr_verify(struct ast_stmt *stmt, struct state *state,
+		struct rconst *rconst)
 {
 	struct ast_expr *expr = ast_stmt_as_expr(stmt);
 	if (!ast_expr_isverifiable(expr)) {
@@ -243,7 +245,7 @@ stmt_expr_verify(struct ast_stmt *stmt, struct state *state)
 			ast_expr_str(expr)
 		);
 	}
-	struct bool_res *res = ast_expr_decide(expr, state);
+	struct bool_res *res = ast_expr_decide(expr, state, rconst);
 	if (bool_res_iserror(res)) {
 		return bool_res_as_error(res);
 	}
@@ -257,7 +259,7 @@ stmt_expr_verify(struct ast_stmt *stmt, struct state *state)
 /* stmt_exec */
 
 static struct error *
-stmt_decl_exec(struct ast_stmt *, struct state *);
+stmt_decl_exec(struct ast_stmt *, struct state *, struct rconst *);
 
 static struct error *
 stmt_compoundv_exec(struct ast_stmt *, struct state *);
@@ -266,78 +268,80 @@ static struct error *
 stmt_compound_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_expr_exec(struct ast_expr *, struct state *);
+stmt_expr_exec(struct ast_expr *, struct state *, struct rconst *);
 
 static struct error *
-stmt_sel_exec(struct ast_stmt *, struct state *);
+stmt_sel_exec(struct ast_stmt *, struct state *, struct rconst *);
 
 static struct error *
-stmt_iter_exec(struct ast_stmt *, struct state *);
+stmt_iter_exec(struct ast_stmt *, struct state *, struct rconst *);
 
 static struct error *
-stmt_jump_exec(struct ast_stmt *, struct state *);
+stmt_jump_exec(struct ast_stmt *, struct state *, struct rconst *);
 
 static struct error *
-stmt_asm_exec(struct ast_stmt *, struct state *);
+stmt_asm_exec(struct ast_stmt *, struct state *, struct rconst *);
 
 struct error *
-ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
+ast_stmt_exec(struct ast_stmt *stmt, struct state *s,
+		struct rconst *rconst)
 {
 	if (!state_islinear(s) && islinearisable(stmt)) {
 		return linearise(stmt, s);
 	}
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_DECLARATION:
-		return stmt_decl_exec(stmt, s);
+		return stmt_decl_exec(stmt, s, rconst);
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
 		a_printf(ast_stmt_issetup(stmt), "only setup labels supported\n");
 		return NULL;
 	case STMT_EXPR:
-		return stmt_expr_exec(ast_stmt_as_expr(stmt), s);
+		return stmt_expr_exec(ast_stmt_as_expr(stmt), s, rconst);
 	case STMT_COMPOUND:
 		return stmt_compound_exec(stmt, s);
 	case STMT_COMPOUND_V:
 		return stmt_compoundv_exec(stmt, s);
 	case STMT_SELECTION:
-		return stmt_sel_exec(stmt, s);
+		return stmt_sel_exec(stmt, s, rconst);
 	case STMT_ITERATION:
-		return stmt_iter_exec(stmt, s);
+		return stmt_iter_exec(stmt, s, rconst);
 	case STMT_JUMP:
-		return stmt_jump_exec(stmt, s);
+		return stmt_jump_exec(stmt, s, rconst);
 	case STMT_ASM:
-		return stmt_asm_exec(stmt, s);
+		return stmt_asm_exec(stmt, s, rconst);
 	default:
 		assert(false);
 	}
 }
 
 static struct error *
-decl_init(struct ast_variable *, struct state *);
+decl_init(struct ast_variable *, struct state *, struct rconst *);
 
 static struct error *
-stmt_decl_exec(struct ast_stmt *stmt, struct state *state)
+stmt_decl_exec(struct ast_stmt *stmt, struct state *state,
+		struct rconst *rconst)
 {
 	/* TODO: add initialisation */
 	struct ast_variable_arr *vars = ast_stmt_declaration_vars(stmt);
 	for (int i = 0; i < ast_variable_arr_n(vars); i++) {
 		struct ast_variable *v = ast_variable_arr_v(vars)[i];
 		state_declare(state, v, false);
-		decl_init(v, state);	
+		decl_init(v, state, rconst);	
 	}
 	return NULL;
 }
 
 static struct error *
-decl_init(struct ast_variable *v, struct state *s)
+decl_init(struct ast_variable *v, struct state *s, struct rconst *rconst)
 {
 	if (ast_variable_init(v)) {
 		struct ast_expr *assign = ast_expr_assignment_create(
 			ast_expr_identifier_create(ast_variable_name(v)),
 			ast_variable_init(v)
 		);
-		return stmt_expr_exec(assign, s);
+		return stmt_expr_exec(assign, s, rconst);
 	}
 	return NULL;
 }
@@ -365,9 +369,10 @@ stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 }
 
 static struct error *
-stmt_expr_exec(struct ast_expr *expr, struct state *state)
+stmt_expr_exec(struct ast_expr *expr, struct state *state,
+		struct rconst *rconst)
 {
-	struct e_res *res = ast_expr_eval(expr, state);
+	struct e_res *res = ast_expr_eval(expr, state, rconst);
 	if (e_res_iserror(res)) {
 		return e_res_as_error(res);
 	}
@@ -378,20 +383,21 @@ stmt_expr_exec(struct ast_expr *expr, struct state *state)
 /* stmt_sel_exec */
 
 static struct error *
-stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
+stmt_sel_exec(struct ast_stmt *stmt, struct state *state,
+		struct rconst *rconst)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
 
-	struct bool_res *res = ast_expr_decide(cond, state);
+	struct bool_res *res = ast_expr_decide(cond, state, rconst);
 	if (bool_res_iserror(res)) {
 		return bool_res_as_error(res);
 	}
 	if (bool_res_as_bool(res)) {
-		return ast_stmt_exec(body, state);
+		return ast_stmt_exec(body, state, rconst);
 	} else if (nest) {
-		return ast_stmt_exec(nest, state);
+		return ast_stmt_exec(nest, state, rconst);
 	}
 	return NULL;
 }
@@ -403,7 +409,8 @@ static void
 deriveinvstate(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_iter_exec(struct ast_stmt *stmt, struct state *state)
+stmt_iter_exec(struct ast_stmt *stmt, struct state *state,
+		struct rconst *rconst)
 {
 	struct error *err = iter_setupverify(stmt, state);
 	if (err) {
@@ -444,7 +451,8 @@ static int
 compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
 
 static struct error *
-stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
+stmt_jump_exec(struct ast_stmt *stmt, struct state *state,
+		struct rconst *rconst)
 {
 	struct jump *j = ast_stmt_as_jump(stmt);
 	if (jump_isbreak(j)) {
@@ -452,7 +460,7 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
 	}
 	if (jump_hasrv(j)) {
 		struct ast_expr *rv = jump_rv(j);
-		struct e_res *res = ast_expr_eval(rv, state);
+		struct e_res *res = ast_expr_eval(rv, state, rconst);
 		if (e_res_iserror(res)) {
 			struct error *err = e_res_as_error(res);
 			if (error_to_eval_void(err)) {
@@ -499,39 +507,42 @@ compatible(struct eval *e, struct ast_type *spec_t, struct state *s)
 }
 
 static struct error *
-asm_setupv_exec(struct ast_expr *call, struct state *);
+asm_setupv_exec(struct ast_expr *call, struct state *, struct rconst *);
 
 static struct error *
-asm_call_exec(struct ast_expr *call, struct state *);
+asm_call_exec(struct ast_expr *call, struct state *, struct rconst *);
 
 static struct error *
-asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *);
+asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *,
+		struct rconst *);
 
 static struct error *
-asm_movret_exec(struct ast_variable *temp, struct state *);
+asm_movret_exec(struct ast_variable *temp, struct state *, struct rconst *rconst);
 
 static struct error *
-stmt_asm_exec(struct ast_stmt *stmt, struct state *state)
+stmt_asm_exec(struct ast_stmt *stmt, struct state *state, struct rconst *rconst)
 {
 	if (ast_stmt_asm_issetupv(stmt)) {
-		return asm_setupv_exec(ast_stmt_asm_call(stmt), state);
+		return asm_setupv_exec(ast_stmt_asm_call(stmt), state, rconst);
 	} else if (ast_stmt_asm_iscall(stmt)) {
-		return asm_call_exec(ast_stmt_asm_call(stmt), state);
+		return asm_call_exec(ast_stmt_asm_call(stmt), state, rconst);
 	} else if (ast_stmt_asm_ismov(stmt)) {
 		return asm_mov_exec(
 			ast_stmt_asm_mov_var(stmt),
 			ast_stmt_asm_mov_val(stmt),
-			state
+			state,
+			rconst
 		);
 	} else {
-		return asm_movret_exec(ast_stmt_asm_mov_var(stmt), state);
+		return asm_movret_exec(ast_stmt_asm_mov_var(stmt), state, rconst);
 	}
 }
 
 static struct error *
-asm_setupv_exec(struct ast_expr *call, struct state *state)
+asm_setupv_exec(struct ast_expr *call, struct state *state,
+		struct rconst *rconst)
 {
-	struct e_res *res = ast_expr_setupverify(call, state);
+	struct e_res *res = ast_expr_setupverify(call, state, rconst);
 	if (e_res_iserror(res)) {
 		return e_res_as_error(res);
 	}
@@ -540,9 +551,9 @@ asm_setupv_exec(struct ast_expr *call, struct state *state)
 }
 
 static struct error *
-asm_call_exec(struct ast_expr *call, struct state *state)
+asm_call_exec(struct ast_expr *call, struct state *state, struct rconst *rconst)
 {
-	struct e_res *res = ast_expr_eval(call, state);
+	struct e_res *res = ast_expr_eval(call, state, rconst);
 	if (e_res_iserror(res)) {
 		return e_res_as_error(res);
 	}
@@ -551,9 +562,10 @@ asm_call_exec(struct ast_expr *call, struct state *state)
 }
 
 static struct error *
-asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *s)
+asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *s,
+		struct rconst *rconst)
 {
-	struct e_res *r_res = ast_expr_eval(val, s);
+	struct e_res *r_res = ast_expr_eval(val, s, rconst);
 	if (e_res_iserror(r_res)) {
 		return e_res_as_error(r_res);
 	}
@@ -562,7 +574,7 @@ asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *s)
 	struct ast_expr *name = ast_expr_identifier_create(
 		dynamic_str(ast_variable_name(temp))
 	);
-	struct e_res *l_res = ast_expr_eval(name, s);
+	struct e_res *l_res = ast_expr_eval(name, s, rconst);
 	if (e_res_iserror(l_res)) {
 		return e_res_as_error(l_res);
 	}
@@ -585,13 +597,14 @@ static struct e_res *
 call_return(struct state *);
 
 static struct error *
-asm_movret_exec(struct ast_variable *temp, struct state *state)
+asm_movret_exec(struct ast_variable *temp, struct state *state,
+		struct rconst *rconst)
 {
 	state_declare(state, temp, false);
 	struct ast_expr *name = ast_expr_identifier_create(
 		dynamic_str(ast_variable_name(temp))
 	);
-	struct e_res *l_res = ast_expr_eval(name, state);
+	struct e_res *l_res = ast_expr_eval(name, state, rconst);
 	if (e_res_iserror(l_res)) {
 		return e_res_as_error(l_res);
 	}
@@ -637,20 +650,21 @@ static struct error *
 labelled_pushsetup(struct ast_stmt *, struct state *);
 
 static struct error *
-sel_pushsetup(struct ast_stmt *stmt, struct state *);
+sel_pushsetup(struct ast_stmt *stmt, struct state *, struct rconst *);
 
 static struct error *
 comp_pushsetup(struct ast_stmt *stmt, struct state *);
 
 struct error *
-ast_stmt_pushsetup(struct ast_stmt *stmt, struct state *s)
+ast_stmt_pushsetup(struct ast_stmt *stmt, struct state *s,
+		struct rconst *rconst)
 {
 	if (!state_islinear(s) && islinearisable_setuponly(stmt)) {
 		return linearise(stmt, s);
 	}
 	switch (ast_stmt_kind(stmt)) {
 	case STMT_DECLARATION:
-		return stmt_decl_exec(stmt, s);
+		return stmt_decl_exec(stmt, s, rconst);
 	case STMT_NOP:
 	case STMT_EXPR:
 	case STMT_JUMP:
@@ -659,11 +673,11 @@ ast_stmt_pushsetup(struct ast_stmt *stmt, struct state *s)
 	case STMT_LABELLED:
 		return labelled_pushsetup(stmt, s);
 	case STMT_SELECTION:
-		return sel_pushsetup(stmt, s);
+		return sel_pushsetup(stmt, s, rconst);
 	case STMT_COMPOUND:
 		return comp_pushsetup(stmt, s);
 	case STMT_ASM:
-		return stmt_asm_exec(stmt, s);
+		return stmt_asm_exec(stmt, s, rconst);
 	default:
 		assert(false);
 	}
@@ -692,19 +706,20 @@ labelled_pushsetup(struct ast_stmt *stmt, struct state *state)
 
 
 static struct error *
-sel_pushsetup(struct ast_stmt *stmt, struct state *state)
+sel_pushsetup(struct ast_stmt *stmt, struct state *state,
+		struct rconst *rconst)
 {
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
-	struct bool_res *res = ast_expr_decide(cond, state);
+	struct bool_res *res = ast_expr_decide(cond, state, rconst);
 	if (bool_res_iserror(res)) {
 		return bool_res_as_error(res);
 	}
 	if (bool_res_as_bool(res)) {
-		return ast_stmt_pushsetup(body, state);
+		return ast_stmt_pushsetup(body, state, rconst);
 	} else if (nest) {
-		return ast_stmt_pushsetup(nest, state);
+		return ast_stmt_pushsetup(nest, state, rconst);
 	}
 	return NULL;
 }

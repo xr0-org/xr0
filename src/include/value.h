@@ -44,7 +44,7 @@ struct value *
 value_int_range_create(int lw, int up);
 
 struct value *
-value_int_range_fromexpr(struct ast_expr *, struct state *);
+value_int_range_fromexpr(struct ast_expr *, struct state *, struct rconst *);
 
 struct value *
 value_int_ne_create(int not_val);

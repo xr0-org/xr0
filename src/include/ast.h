@@ -284,8 +284,10 @@ ast_expr_rangeeval(struct ast_expr *, struct state *);
 
 struct bool_res;
 
+struct rconst;
+
 struct bool_res *
-ast_expr_decide(struct ast_expr *, struct state *);
+ast_expr_decide(struct ast_expr *, struct state *, struct rconst *);
 
 struct e_res;
 struct preresult;
@@ -338,7 +340,7 @@ eval_to_value(struct eval *, struct state *);
 DECLARE_RESULT_TYPE(struct eval *, eval, e_res)
 
 struct e_res *
-ast_expr_eval(struct ast_expr *, struct state *);
+ast_expr_eval(struct ast_expr *, struct state *, struct rconst *);
 
 struct value;
 
@@ -420,7 +422,7 @@ ast_block_setups(struct ast_block *b, struct state *);
 DECLARE_RESULT_TYPE(struct ast_block *, block, ast_block_res)
 
 struct ast_block_res *
-ast_block_setupdecide(struct ast_block *, struct state *);
+ast_block_setupdecide(struct ast_block *, struct state *, struct rconst *);
 
 struct externals;
 
@@ -547,18 +549,18 @@ struct ast_expr *
 ast_stmt_as_expr(struct ast_stmt *);
 
 struct error *
-ast_stmt_verify(struct ast_stmt *, struct state *);
+ast_stmt_verify(struct ast_stmt *, struct state *, struct rconst *);
 
 struct error *
-ast_stmt_exec(struct ast_stmt *, struct state *);
+ast_stmt_exec(struct ast_stmt *, struct state *, struct rconst *);
 
 struct error *
-ast_stmt_pushsetup(struct ast_stmt *, struct state *);
+ast_stmt_pushsetup(struct ast_stmt *, struct state *, struct rconst *);
 
 DECLARE_RESULT_TYPE(struct ast_stmt *, stmt, ast_stmt_res)
 
 struct ast_stmt_res *
-ast_stmt_setupdecide(struct ast_stmt *, struct state *);
+ast_stmt_setupdecide(struct ast_stmt *, struct state *, struct rconst *);
 
 struct ast_type;
 
@@ -644,11 +646,11 @@ struct externals;
 
 struct value *
 ast_type_rconst(struct ast_type *, struct state *s, struct ast_expr *range,
-	char *key, bool persist);
+	char *key, bool persist, struct rconst *);
 
 struct value *
 ast_type_rconstnokey(struct ast_type *, struct state *s, struct ast_expr *range,
-	bool persist);
+	bool persist, struct rconst *);
 
 void
 ast_type_destroy(struct ast_type *);

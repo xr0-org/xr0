@@ -49,40 +49,40 @@ struct range *
 range_entire_create(void) { return range_create(C89_INT_MIN, C89_INT_MAX+1); }
 
 static long
-_lw_bound_value(struct ast_expr *, struct state *);
+_lw_bound_value(struct ast_expr *, struct state *, struct rconst *);
 
 static long
-_up_bound_value(struct ast_expr *, struct state *);
+_up_bound_value(struct ast_expr *, struct state *, struct rconst *);
 
 struct range *
-range_fromexpr(struct ast_expr *e, struct state *s)
+range_fromexpr(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
 	return range_create(
-		_lw_bound_value(ast_expr_range_lw(e), s),
-		_up_bound_value(ast_expr_range_up(e), s)
+		_lw_bound_value(ast_expr_range_lw(e), s, rconst),
+		_up_bound_value(ast_expr_range_up(e), s, rconst)
 	);
 }
 
 static int
-_eval(struct ast_expr *, struct state *);
+_eval(struct ast_expr *, struct state *, struct rconst *);
 
 static long
-_lw_bound_value(struct ast_expr *e, struct state *s)
+_lw_bound_value(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
-	return ast_expr_israngemin(e) ? C89_INT_MIN : _eval(e, s);
+	return ast_expr_israngemin(e) ? C89_INT_MIN : _eval(e, s, rconst);
 }
 
 static long
-_up_bound_value(struct ast_expr *e, struct state *s)
+_up_bound_value(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
-	return ast_expr_israngemax(e) ? C89_INT_MAX+1 : _eval(e, s);
+	return ast_expr_israngemax(e) ? C89_INT_MAX+1 : _eval(e, s, rconst);
 }
 
 static int
-_eval(struct ast_expr *e, struct state *s)
+_eval(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
 	struct value *v = value_res_as_value(
-		eval_to_value(e_res_as_eval(ast_expr_eval(e, s)), s)
+		eval_to_value(e_res_as_eval(ast_expr_eval(e, s, rconst)), s)
 	);
 	return value_as_int(v, s);
 }

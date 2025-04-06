@@ -222,12 +222,13 @@ value_int_range_create(int lw, int up)
 }
 
 struct value *
-value_int_range_fromexpr(struct ast_expr *e, struct state *s)
+value_int_range_fromexpr(struct ast_expr *e, struct state *s,
+		struct rconst *rconst)
 {
 	struct value *v = malloc(sizeof(struct value));
 	assert(v);
 	v->type = VALUE_INT;
-	v->n = number_range_create(range_fromexpr(e, s));
+	v->n = number_range_create(range_fromexpr(e, s, rconst));
 	return v;
 }
 

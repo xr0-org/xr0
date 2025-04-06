@@ -9,8 +9,10 @@ range_create(long lw, long up);
 struct range *
 range_entire_create(void);
 
+struct rconst;
+
 struct range *
-range_fromexpr(struct ast_expr *, struct state *);
+range_fromexpr(struct ast_expr *, struct state *, struct rconst *);
 
 struct range *
 range_copy(struct range *);

@@ -54,11 +54,13 @@ program_atend(struct program *);
 struct ast_expr *
 program_prevcall(struct program *);
 
-struct error *
-program_step(struct program *, struct state *);
+struct rconst;
 
 struct error *
-program_next(struct program *, struct state *);
+program_step(struct program *, struct state *, struct rconst *);
+
+struct error *
+program_next(struct program *, struct state *, struct rconst *);
 
 char *
 program_loc(struct program *);

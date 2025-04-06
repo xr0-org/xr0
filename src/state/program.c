@@ -204,14 +204,16 @@ program_stmt_atend(struct program *p, struct state *s)
 }
 
 static struct error *
-program_stmt_step(struct program *, struct state *);
+program_stmt_step(struct program *, struct state *,
+		struct rconst *);
 
 struct error *
-program_step(struct program *p, struct state *s)
+program_step(struct program *p, struct state *s,
+		struct rconst *rconst)
 {
 	switch (p->s) {
 	case PROGRAM_COUNTER_STMTS:
-		return program_stmt_step(p, s);
+		return program_stmt_step(p, s, rconst);
 	case PROGRAM_COUNTER_ATEND:
 		if (state_frameid(s) != 0) {
 			state_popframe(s);
@@ -223,12 +225,14 @@ program_step(struct program *p, struct state *s)
 }
 
 static struct error *
-program_stmt_process(struct program *p, struct state *s);
+program_stmt_process(struct program *p, struct state *s,
+		struct rconst *);
 
 static struct error *
-program_stmt_step(struct program *p, struct state *s)
+program_stmt_step(struct program *p, struct state *s,
+		struct rconst *rconst)
 {
-	struct error *err = program_stmt_process(p, s);
+	struct error *err = program_stmt_process(p, s, rconst);
 	if (!err) {
 		program_nextstmt(p, s);
 		return NULL;
@@ -247,18 +251,19 @@ program_stmt_step(struct program *p, struct state *s)
 }
 
 static struct error *
-program_stmt_process(struct program *p, struct state *s)
+program_stmt_process(struct program *p, struct state *s,
+		struct rconst *rconst)
 {
 	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
 	switch (p->mode) {
 	case EXEC_FINDSETUP:
-		return ast_stmt_pushsetup(stmt, s);
+		return ast_stmt_pushsetup(stmt, s, rconst);
 	case EXEC_SETUP:
 	case EXEC_ABSTRACT:
 	case EXEC_ACTUAL:
-		return ast_stmt_exec(stmt, s);
+		return ast_stmt_exec(stmt, s, rconst);
 	case EXEC_VERIFY:
-		return ast_stmt_verify(stmt, s);
+		return ast_stmt_verify(stmt, s, rconst);
 	default:
 		assert(false);
 	}
@@ -268,11 +273,11 @@ static struct error *
 program_stmt_next(struct program *, struct state *);
 
 struct error *
-program_next(struct program *p, struct state *s)
+program_next(struct program *p, struct state *s, struct rconst *rconst)
 {
 	switch (p->s) {
 	case PROGRAM_COUNTER_ATEND:
-		return program_step(p, s);
+		return program_step(p, s, rconst);
 	case PROGRAM_COUNTER_STMTS:
 		return program_stmt_next(p, s);	
 	default:

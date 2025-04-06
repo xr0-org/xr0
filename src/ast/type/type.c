@@ -208,20 +208,20 @@ ast_type_create_userdef(char *name)
 
 struct value *
 ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
-		char *key, bool persist)
+		char *key, bool persist, struct rconst *rconst)
 {
 	switch (t->base) {
 	case TYPE_INT:
 		assert(range);
-		return value_int_range_fromexpr(range, s);
+		return value_int_range_fromexpr(range, s, rconst);
 	case TYPE_POINTER:
 		/* no key in the value except for structs */
 		assert(range);
-		return ast_type_rconstnokey(t, s, range, persist);
+		return ast_type_rconstnokey(t, s, range, persist, rconst);
 	case TYPE_USERDEF:
 		return ast_type_rconst(
 			externals_gettypedef(state_getext(s), t->userdef), s,
-			range, key, persist
+			range, key, persist, rconst
 		);
 	default:
 		assert(false);
@@ -230,18 +230,18 @@ ast_type_rconst(struct ast_type *t, struct state *s, struct ast_expr *range,
 
 struct value *
 ast_type_rconstnokey(struct ast_type *t, struct state *s, struct ast_expr *range,
-		bool persist)
+		bool persist, struct rconst *rconst)
 {
 	switch (t->base) {
 	case TYPE_INT:
 		assert(range);
-		return value_int_range_fromexpr(range, s);
+		return value_int_range_fromexpr(range, s, rconst);
 	case TYPE_POINTER:
 		return value_ptr_rconst_create();
 	case TYPE_USERDEF:
 		return ast_type_rconstnokey(
 			externals_gettypedef(state_getext(s), t->userdef),
-			s, range, persist
+			s, range, persist, rconst
 		);
 	default:
 		assert(false);
