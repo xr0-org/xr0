@@ -90,7 +90,7 @@ static char *
 rconst_id(struct map *varmap, struct map *persistmap, bool persist);
 
 char *
-rconst_declarenokey(struct rconst *v, bool persist, struct state *state)
+rconst_declarenokey(struct rconst *v, bool persist)
 {
 	struct map *m = v->varmap;
 	char *s = rconst_id(m, v->persist, persist);
@@ -132,14 +132,13 @@ static char *
 rconst_getidbykey(struct rconst *v, char *key);
 
 char *
-rconst_declareorget(struct rconst *v, char *key, bool persist,
-		struct state *state)
+rconst_declareorget(struct rconst *v, char *key, bool persist)
 {
 	char *prev = rconst_getidbykey(v, key);
 	if (prev) {
 		return dynamic_str(prev);
 	}
-	char *s = rconst_declarenokey(v, persist, state);
+	char *s = rconst_declarenokey(v, persist);
 	assert(key);
 	map_set(v->keymap, dynamic_str(s), dynamic_str(key));
 	return s;

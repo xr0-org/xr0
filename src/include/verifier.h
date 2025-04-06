@@ -85,10 +85,10 @@ char *
 rconst_str(struct rconst *, char *indent);
 
 char *
-rconst_declareorget(struct rconst *, char *key, bool persist, struct state *);
+rconst_declareorget(struct rconst *, char *key, bool persist);
 
 char *
-rconst_declarenokey(struct rconst *, bool persist, struct state *);
+rconst_declarenokey(struct rconst *, bool persist);
 
 struct error *
 rconst_addconstraint(struct rconst *v, struct lsi_le *le);

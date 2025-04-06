@@ -264,13 +264,13 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 char *
 state_rconst(struct state *s, char *key, bool persist)
 {
-	return rconst_declareorget(s->rconst, key, persist, s);
+	return rconst_declareorget(s->rconst, key, persist);
 }
 
 char *
 state_rconstnokey(struct state *s, bool persist)
 {
-	return rconst_declarenokey(s->rconst, persist, s);
+	return rconst_declarenokey(s->rconst, persist);
 }
 
 int
