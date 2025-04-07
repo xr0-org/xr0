@@ -68,7 +68,7 @@ struct lsi_varmap;
 
 struct lsi_varmap *
 block_rconst_mapping(struct block *, struct ast_type *t, struct state *,
-		char *referent);
+		struct rconst *, char *referent);
 
 struct block_arr;
 

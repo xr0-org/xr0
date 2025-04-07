@@ -83,24 +83,24 @@ path_atend(struct path *p)
 }
 
 struct error *
-path_progress(struct path *p, progressor *prog)
+path_progress(struct path *p, struct rconst *rconst, progressor *prog)
 {
 	switch (p->phase) {
 	case PATH_PHASE_ABSTRACT:
 		if (segment_atend(p->abstract)) {
 			p->phase = PATH_PHASE_ACTUAL;
-			return path_progress(p, prog);
+			return path_progress(p, rconst, prog);
 		}
-		return segment_progress(p->abstract, prog);
+		return segment_progress(p->abstract, rconst, prog);
 	case PATH_PHASE_ACTUAL:
 		if (segment_atend(p->actual)) {
 			p->phase = PATH_PHASE_AUDIT;
-			return path_progress(p, prog);
+			return path_progress(p, rconst, prog);
 		}
-		return segment_progress(p->actual, prog);
+		return segment_progress(p->actual, rconst, prog);
 	case PATH_PHASE_AUDIT:
 		p->phase = PATH_PHASE_ATEND;
-		return segment_audit(p->abstract, p->actual);
+		return segment_audit(p->abstract, p->actual, rconst);
 	case PATH_PHASE_ATEND:
 	default:
 		assert(false);

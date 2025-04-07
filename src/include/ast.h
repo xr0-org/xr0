@@ -279,12 +279,12 @@ tagval_destroy(struct tagval *);
 
 DECLARE_RESULT_TYPE(struct tagval *, tagval, tagval_res)
 
+struct rconst;
+
 struct tagval_res *
-ast_expr_rangeeval(struct ast_expr *, struct state *);
+ast_expr_rangeeval(struct ast_expr *, struct state *, struct rconst *);
 
 struct bool_res;
-
-struct rconst;
 
 struct bool_res *
 ast_expr_decide(struct ast_expr *, struct state *, struct rconst *);

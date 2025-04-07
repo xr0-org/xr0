@@ -24,7 +24,9 @@ verifier_str(struct verifier *);
 bool
 verifier_atend(struct verifier *);
 
-typedef struct error *(progressor)(struct state *);
+struct rconst;
+
+typedef struct error *(progressor)(struct state *, struct rconst *);
 
 progressor *
 progressor_step(void);
@@ -66,8 +68,6 @@ splitinstruct_0(struct splitinstruct *);
 
 struct lsi_le *
 splitinstruct_1(struct splitinstruct *);
-
-struct rconst;
 
 struct rconst *
 rconst_create(void);

@@ -122,44 +122,44 @@ segment_atend(struct segment *s)
 /* segment_progress */
 
 static struct error *
-setup(struct segment *, progressor *);
+setup(struct segment *, struct rconst *, progressor *);
 
 static struct error *
-exec(struct segment *, progressor *);
+exec(struct segment *, struct rconst *, progressor *);
 
 struct error *
-segment_progress(struct segment *s, progressor *prog)
+segment_progress(struct segment *s, struct rconst *rconst, progressor *prog)
 {
 	switch (s->phase) {
 	case SEGMENT_PHASE_INIT:
 		s->phase = SEGMENT_PHASE_SETUP;
 		return NULL;
 	case SEGMENT_PHASE_SETUP:
-		return setup(s, prog);
+		return setup(s, rconst, prog);
 	case SEGMENT_PHASE_EXEC:
-		return exec(s, prog);
+		return exec(s, rconst, prog);
 	default:
 		assert(false);
 	}
 }
 
 static struct error *
-progressortrace(struct state *, progressor *);
+progressortrace(struct state *, struct rconst *, progressor *);
 
 static struct error *
-setup(struct segment *s, progressor *prog)
+setup(struct segment *s, struct rconst *rconst, progressor *prog)
 {
 	if (state_atsetupend(s->state)) {
 		s->phase = SEGMENT_PHASE_EXEC;
 		return NULL;
 	}
-	return progressortrace(s->state, prog);
+	return progressortrace(s->state, rconst, prog);
 }
 
 static struct error *
-progressortrace(struct state *s, progressor *prog)
+progressortrace(struct state *s, struct rconst *rconst, progressor *prog)
 {
-	struct error *err = prog(s);
+	struct error *err = prog(s, rconst);
 	if (err) {
 		return state_stacktrace(s, err);
 	}
@@ -167,10 +167,10 @@ progressortrace(struct state *s, progressor *prog)
 }
 
 static struct error *
-exec(struct segment *s, progressor *prog)
+exec(struct segment *s, struct rconst *rconst, progressor *prog)
 {	
 	if (state_atloopend(s->state)) {
-		struct error *err = state_verifyinvariant(s->state);
+		struct error *err = state_verifyinvariant(s->state, rconst);
 		if (err) {
 			return state_stacktrace(s->state, err);
 		}
@@ -180,7 +180,7 @@ exec(struct segment *s, progressor *prog)
 		s->phase = SEGMENT_PHASE_ATEND;
 		return NULL;
 	}
-	return progressortrace(s->state, prog);
+	return progressortrace(s->state, rconst, prog);
 }
 
 struct error *
@@ -219,7 +219,8 @@ segment_lexememarker(struct segment *s)
 }
 
 struct error *
-segment_audit(struct segment *abstract, struct segment *actual)
+segment_audit(struct segment *abstract, struct segment *actual,
+		struct rconst *rconst)
 {
 	if (actual->phase == SEGMENT_PHASE_ATLOOPEND) {
 		return NULL;
@@ -232,7 +233,7 @@ segment_audit(struct segment *abstract, struct segment *actual)
 		);
 	}
 	struct error *err;
-	if ((err = state_specverify(actual->state, abstract->state))) {
+	if ((err = state_specverify(actual->state, abstract->state, rconst))) {
 		v_printf("spec:\n%s", state_str(abstract->state));
 		v_printf("impl:\n%s", state_str(actual->state));
 		return error_printf(

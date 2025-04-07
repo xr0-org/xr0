@@ -60,10 +60,10 @@ int
 state_atloopend(struct state *);
 
 struct error *
-state_step(struct state *);
+state_step(struct state *, struct rconst *);
 
 struct error *
-state_next(struct state *);
+state_next(struct state *, struct rconst *);
 
 struct externals *
 state_getext(struct state *);
@@ -184,17 +184,14 @@ state_loc_valid(struct state *, struct location *);
 bool
 state_loc_onheap(struct state *, struct location *);
 
-int
-state_hasrconst(struct state *state, char *id);
-
 struct value *
-state_getrconst(struct state *, char *id);
+state_getrconst(struct rconst *, char *id);
 
 bool
 state_hasgarbage(struct state *);
 
 struct error *
-state_specverify(struct state *actual, struct state *spec);
+state_specverify(struct state *actual, struct state *spec, struct rconst *);
 
 struct value *
 state_popregister(struct state *);
@@ -314,10 +311,12 @@ struct object_res *
 state_get(struct state *state, struct location *loc, bool constructive);
 
 struct error *
-state_constraintverify_top(struct state *spec, struct state *impl);
+state_constraintverify_top(struct state *spec, struct state *impl,
+		struct rconst *);
 
 struct error *
-state_constraintverify_all(struct state *spec, struct state *impl);
+state_constraintverify_all(struct state *spec, struct state *impl,
+		struct rconst *);
 
 struct error *
 state_shapeverify_structmember(struct state *spec, struct state *impl,
@@ -331,15 +330,15 @@ state_impl_spec_mapping_structmember(struct state *spec, struct state *impl,
 		char *member);
 
 struct lsi_varmap *
-state_rconst_mapping_structmember(struct state *, struct value *, char *parent,
-		char *member);
+state_rconst_mapping_structmember(struct state *, struct rconst *,
+		struct value *, char *parent, char *member);
 
 struct lsi_varmap *
-state_block_rconst_mapping(struct state *, struct location *, struct ast_type *,
-		char *referent);
+state_block_rconst_mapping(struct state *, struct rconst *, struct location *,
+		struct ast_type *, char *referent);
 
 struct error *
-state_verifyinvariant(struct state *);
+state_verifyinvariant(struct state *, struct rconst *);
 
 struct lsi_le;
 

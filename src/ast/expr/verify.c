@@ -345,7 +345,7 @@ negative_eval(struct ast_expr *expr, struct state *state,
 			eval_type(eval),
 			value_int_create(
 				-value_as_int(
-					value_res_as_value(v_res), state
+					value_res_as_value(v_res), state, rconst
 				)
 			)
 		)
@@ -524,7 +524,7 @@ setupverify(struct ast_expr *call, struct state *impl, struct rconst *rconst)
 	);
 
 	while (!state_atsetupend(spec)) {
-		struct error *err = state_step(spec);
+		struct error *err = state_step(spec, rconst);
 		assert(!err);
 	}
 	assert(!state_atend(spec));
@@ -534,7 +534,7 @@ setupverify(struct ast_expr *call, struct state *impl, struct rconst *rconst)
 	struct e_res *push_res = pushcallframe(call, impl, rconst);
 	assert(!e_res_iserror(push_res));
 
-	struct error *err = state_constraintverify_top(spec, impl);
+	struct error *err = state_constraintverify_top(spec, impl, rconst);
 	if (err) {
 		return err;
 	}
@@ -862,7 +862,7 @@ value_additive_eval(struct eval *rv1, enum ast_binary_operator op,
 
 static struct e_res *
 value_relational_eval(struct eval *, enum ast_binary_operator, struct eval *,
-		struct state *);
+		struct state *, struct rconst *);
 
 static struct e_res *
 relational_eval(struct ast_expr *e, struct state *s, struct rconst *rconst)
@@ -879,19 +879,20 @@ relational_eval(struct ast_expr *e, struct state *s, struct rconst *rconst)
 		e_res_as_eval(res1),
 		ast_expr_binary_op(e),
 		e_res_as_eval(res2),
-		s
+		s,
+		rconst
 	);
 }
 
 static struct lsi_expr * 
-_value_to_lsi_expr(struct value *, struct state *);
+_value_to_lsi_expr(struct value *, struct state *, struct rconst *);
 
 static struct lsi_le *
 _rel_to_le(struct lsi_expr *, enum ast_binary_operator, struct lsi_expr *);
 
 static struct e_res *
 value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
-		struct eval *rv2, struct state *s)
+		struct eval *rv2, struct state *s, struct rconst *rconst)
 {
 	struct ast_type *t1 = eval_type(rv1),
 			*t2 = eval_type(rv2);
@@ -911,9 +912,9 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 	);
 
 	struct lsi_le *le = _rel_to_le(
-		_value_to_lsi_expr(value_res_as_value(v_res1), s),
+		_value_to_lsi_expr(value_res_as_value(v_res1), s, rconst),
 		op,
-		_value_to_lsi_expr(value_res_as_value(v_res2), s)
+		_value_to_lsi_expr(value_res_as_value(v_res2), s, rconst)
 	);
 	struct lsi_le *le_neg = lsi_le_negate(le);
 
@@ -941,11 +942,11 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 }
 
 static struct lsi_expr * 
-_value_to_lsi_expr(struct value *v, struct state *s)
+_value_to_lsi_expr(struct value *v, struct state *s, struct rconst *rconst)
 {
 	return value_isconstant(v)
 		? lsi_expr_const_create(value_as_constant(v))
-		: lsi_expr_var_create(value_to_rconstid(v, s));
+		: lsi_expr_var_create(value_to_rconstid(v, s, rconst));
 }
 
 static struct lsi_le *
@@ -1029,7 +1030,7 @@ range_rconst(struct ast_expr *e, struct state *s, struct rconst *rconst)
 }
 
 static struct ast_expr *
-_value_to_expr(struct value *, struct state *);
+_value_to_expr(struct value *, struct state *, struct rconst *);
 
 static struct lsi_expr *
 _range_lw(struct ast_expr *range, struct state *s, struct rconst *rconst)
@@ -1046,15 +1047,15 @@ _range_lw(struct ast_expr *range, struct state *s, struct rconst *rconst)
 				s
 			)
 		);
-		return ast_expr_to_lsi_expr(_value_to_expr(v, s));
+		return ast_expr_to_lsi_expr(_value_to_expr(v, s, rconst));
 	}
 }
 
 static struct ast_expr *
-_value_to_expr(struct value *v, struct state *s)
+_value_to_expr(struct value *v, struct state *s, struct rconst *rconst)
 {
 	return value_isconstant(v)
-		? ast_expr_constant_create(value_as_int(v, s))
+		? ast_expr_constant_create(value_as_int(v, s, rconst))
 		: ast_expr_copy(value_as_rconst(v));
 }
 
@@ -1076,7 +1077,7 @@ _range_up(struct ast_expr *range, struct state *s, struct rconst *rconst)
 		/* subtract 1 b/c range expression upper bounds are exclusive */
 		return ast_expr_to_lsi_expr(
 			ast_expr_sum_create(
-				_value_to_expr(v, s),
+				_value_to_expr(v, s, rconst),
 				ast_expr_constant_create(-1)
 			)
 		);

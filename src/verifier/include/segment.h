@@ -26,7 +26,7 @@ int
 segment_atend(struct segment *);
 
 struct error *
-segment_progress(struct segment *, progressor *prog);
+segment_progress(struct segment *, struct rconst *, progressor *prog);
 
 struct error *
 segment_verify(struct segment *, struct ast_expr *);
@@ -35,6 +35,6 @@ struct lexememarker *
 segment_lexememarker(struct segment *);
 
 struct error *
-segment_audit(struct segment *abstract, struct segment *actual);
+segment_audit(struct segment *abstract, struct segment *actual, struct rconst *);
 
 #endif

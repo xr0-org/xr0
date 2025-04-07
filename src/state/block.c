@@ -251,7 +251,7 @@ _object_simplified_index(struct object *obj);
 
 struct lsi_varmap *
 block_rconst_mapping(struct block *b, struct ast_type *t, struct state *s,
-		char *referent)
+		struct rconst *rconst, char *referent)
 {
 	struct lsi_varmap *lv = lsi_varmap_create();
 	int n = object_arr_nobjects(b->arr);
@@ -276,7 +276,7 @@ block_rconst_mapping(struct block *b, struct ast_type *t, struct state *s,
 			value_rconst_mapping(
 				object_as_value(obj[i]),
 				ast_type_deref(t),
-				s, alias
+				s, rconst, alias
 			)
 		);
 

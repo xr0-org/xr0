@@ -233,27 +233,27 @@ value_int_range_fromexpr(struct ast_expr *e, struct state *s,
 }
 
 long
-value_int_lw(struct value *v, struct state *s)
+value_int_lw(struct value *v, struct state *s, struct rconst *rconst)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return number_as_const(number_lw(v->n, s));
+	return number_as_const(number_lw(v->n, s, rconst));
 }
 
 long
-value_int_up(struct value *v, struct state *s)
+value_int_up(struct value *v, struct state *s, struct rconst *rconst)
 {
 	assert(v->type == VALUE_RCONST || v->type == VALUE_INT);
-	return number_as_const(number_up(v->n, s));
+	return number_as_const(number_up(v->n, s, rconst));
 }
 
 static int
-value_issinglerange(struct value *, struct state *);
+value_issinglerange(struct value *, struct state *, struct rconst *);
 
 int
-value_as_int(struct value *v, struct state *s)
+value_as_int(struct value *v, struct state *s, struct rconst *rconst)
 {
-	assert(v->type == VALUE_INT && value_issinglerange(v, s));
-	return value_int_lw(v, s);
+	assert(v->type == VALUE_INT && value_issinglerange(v, s, rconst));
+	return value_int_lw(v, s, rconst);
 }
 
 struct number *
@@ -512,32 +512,35 @@ static int
 _isrconst(struct ast_type *, struct value *);
 
 static struct lsi_varmap *
-_struct_rconst_mapping(struct value *v, struct state *s, char *varname);
+_struct_rconst_mapping(struct value *v, struct state *s, struct rconst *,
+		char *varname);
 
 static char *
 _rconst_anyint(struct state *s);
 
 struct lsi_varmap *
 value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
-		char *id)
+		struct rconst *rconst, char *id)
 {
 	if (ast_type_isarr(t)) {
 		struct ast_type *ptr = ast_type_create_ptr(
 			ast_type_arr_type(ast_type_copy(t))
 		);
-		struct lsi_varmap *lv = value_rconst_mapping(v, ptr, s, id);
+		struct lsi_varmap *lv = value_rconst_mapping(
+			v, ptr, s, rconst, id
+		);
 		ast_type_destroy(ptr);
 		return lv;
 	} else if (_isrconst(t, v)) {
 		struct lsi_varmap *lv = lsi_varmap_create();
 		lsi_varmap_set(
 			lv,
-			value_to_rconstid(v, s),
+			value_to_rconstid(v, s, rconst),
 			dynamic_str(id)
 		);
 		return lv;
 	} else if (ast_type_isstruct(t)) {
-		return _struct_rconst_mapping(v, s, id);
+		return _struct_rconst_mapping(v, s, rconst, id);
 	}
 
 	/* TODO: reflect on this and align with spec */
@@ -561,7 +564,9 @@ value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
 		return lv;
 	}
 
-	lsi_varmap_addrange(lv, state_block_rconst_mapping(s, loc, t, id));
+	lsi_varmap_addrange(
+		lv, state_block_rconst_mapping(s, rconst, loc, t, id)
+	);
 	return lv;
 }
 
@@ -574,7 +579,8 @@ _isrconst(struct ast_type *t, struct value *v)
 }
 
 static struct lsi_varmap *
-_struct_rconst_mapping(struct value *v, struct state *s, char *varname)
+_struct_rconst_mapping(struct value *v, struct state *s, struct rconst *rconst,
+		char *vname)
 {
 	assert(value_isstruct(v));
 	struct ast_variable_arr *members = v->_struct.members;
@@ -587,7 +593,7 @@ _struct_rconst_mapping(struct value *v, struct state *s, char *varname)
 		lsi_varmap_addrange(
 			lv,
 			state_rconst_mapping_structmember(
-				s, v, varname, ast_variable_name(field[i])
+				s, rconst, v, vname, ast_variable_name(field[i])
 			)
 		);
 	}
@@ -619,17 +625,17 @@ _rconst_anyint(struct state *s)
 }
 
 static char *
-_expr_to_rconstid(struct ast_expr *, struct state *);
+_expr_to_rconstid(struct ast_expr *, struct state *, struct rconst *);
 
 static char *
 _int_to_rconstid(struct value *, struct state *);
 
 char *
-value_to_rconstid(struct value *v, struct state *s)
+value_to_rconstid(struct value *v, struct state *s, struct rconst *rconst)
 {
 	switch (v->type) {
 	case VALUE_RCONST:
-		return _expr_to_rconstid(value_as_rconst(v), s);
+		return _expr_to_rconstid(value_as_rconst(v), s, rconst);
 	case VALUE_INT:
 		return _int_to_rconstid(v, s);
 	default:
@@ -638,22 +644,22 @@ value_to_rconstid(struct value *v, struct state *s)
 }
 
 static char *
-_expr_to_rconstid(struct ast_expr *e, struct state *s)
+_expr_to_rconstid(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
 	if (ast_expr_isidentifier(e)) {
-		char *rconst = ast_expr_as_identifier(e);
-		assert(state_hasrconst(s, rconst));
-		return dynamic_str(rconst);
+		char *rconst_s = ast_expr_as_identifier(e);
+		assert(rconst_hasvar(rconst, rconst_s));
+		return dynamic_str(rconst_s);
 	}
 
-	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
+	char *rconst_s = state_rconstnokey(s, false); /* XXX: persist? */
 	struct lsi_expr *lsi_e = ast_expr_to_lsi_expr(e);
 	struct error *err = state_addconstraint(
 		s,
 		lsi_le_create(
 			/* e <= rconst */
 			lsi_expr_copy(lsi_e),
-			lsi_expr_var_create(dynamic_str(rconst))
+			lsi_expr_var_create(dynamic_str(rconst_s))
 		)
 	);
 	assert(!err);
@@ -661,13 +667,13 @@ _expr_to_rconstid(struct ast_expr *e, struct state *s)
 		s,
 		lsi_le_create(
 			/* rconst <= e */
-			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_expr_var_create(dynamic_str(rconst_s)),
 			lsi_expr_copy(lsi_e)
 		)
 	);
 	lsi_expr_destroy(lsi_e);
 	assert(!err);
-	return rconst;
+	return rconst_s;
 }
 
 static char *
@@ -1086,44 +1092,54 @@ _number_expr_equal(struct number *n, struct number *n0)
 }
 
 static struct number *
-value_lw(struct value *, struct state *);
+value_lw(struct value *, struct state *, struct rconst *);
 
 static struct number *
-value_up(struct value *, struct state *);
+value_up(struct value *, struct state *, struct rconst *);
 
 int
-value_lt(struct value *lhs, struct value *rhs, struct state *s)
+value_lt(struct value *lhs, struct value *rhs, struct state *s,
+		struct rconst *rconst)
 {
-	assert(value_issinglerange(lhs, s) && value_issinglerange(rhs, s));
+	assert(
+		value_issinglerange(lhs, s, rconst)
+		&&
+		value_issinglerange(rhs, s, rconst)
+	);
 
-	struct number *a = value_lw(lhs, s),
-		      *b = value_up(lhs, s),
-		      *c = value_lw(rhs, s),
-		      *d = value_up(rhs, s);
+	struct number *a = value_lw(lhs, s, rconst),
+		      *b = value_up(lhs, s, rconst),
+		      *c = value_lw(rhs, s, rconst),
+		      *d = value_up(rhs, s, rconst);
 
-	if (number_le(b, c, s)) { /* b ≤ c ==> lhs < rhs */
+	if (number_le(b, c, s, rconst)) { /* b ≤ c ==> lhs < rhs */
 		return 1;
 	} 
 	assert(
-		number_ge(a, d, s) /* rhs < lhs */
+		number_ge(a, d, s, rconst) /* rhs < lhs */
 		/* our assumption is that if there is overlap it is perfect */
 		|| samerconst(lhs, rhs)
-		|| (number_eq(a, c, s) && number_eq(b, d, s))
+		|| (number_eq(a, c, s, rconst) && number_eq(b, d, s, rconst))
 	);
 	return 0;
 }
 
 int
-value_eq(struct value *lhs, struct value *rhs, struct state *s)
+value_eq(struct value *lhs, struct value *rhs, struct state *s,
+		struct rconst *rconst)
 {
-	assert(value_issinglerange(lhs, s) && value_issinglerange(rhs, s));
+	assert(
+		value_issinglerange(lhs, s, rconst)
+		&&
+		value_issinglerange(rhs, s, rconst)
+	);
 
-	struct number *a = value_lw(lhs, s),
-		      *b = value_up(lhs, s),
-		      *c = value_lw(rhs, s),
-		      *d = value_up(rhs, s);
+	struct number *a = value_lw(lhs, s, rconst),
+		      *b = value_up(lhs, s, rconst),
+		      *c = value_lw(rhs, s, rconst),
+		      *d = value_up(rhs, s, rconst);
 
-	if (number_eq(a, c, s) && number_eq(b, d, s)) {
+	if (number_eq(a, c, s, rconst) && number_eq(b, d, s, rconst)) {
 		if (!samerconst(lhs, rhs)) {
 			long c_a = number_as_const(a),
 			     c_b = number_as_const(b);
@@ -1137,39 +1153,41 @@ value_eq(struct value *lhs, struct value *rhs, struct state *s)
 
 
 static struct number *
-_value_bound(struct value *v, struct state *s, int islw);
+_value_bound(struct value *v, struct state *s, int islw, struct rconst *);
 
 static struct number *
-value_lw(struct value *v, struct state *s)
+value_lw(struct value *v, struct state *s, struct rconst *rconst)
 {
-	return _value_bound(v, s, 1);
+	return _value_bound(v, s, 1, rconst);
 }
 
 static struct number *
-_value_bound(struct value *v, struct state *s, int islw)
+_value_bound(struct value *v, struct state *s, int islw, struct rconst *rconst)
 {
 	switch (v->type) {
 	case VALUE_INT:
 	case VALUE_RCONST:
-		return islw ? number_lw(v->n, s) : number_up(v->n, s);
+		return islw
+			? number_lw(v->n, s, rconst)
+			: number_up(v->n, s, rconst);
 	default:
 		assert(false);
 	}
 }
 
 static struct number *
-value_up(struct value *v, struct state *s)
+value_up(struct value *v, struct state *s, struct rconst *rconst)
 {
-	return _value_bound(v, s, 0);
+	return _value_bound(v, s, 0, rconst);
 }
 
 static int
-value_issinglerange(struct value *v, struct state *s)
+value_issinglerange(struct value *v, struct state *s, struct rconst *rconst)
 {
 	switch (v->type) {
 	case VALUE_INT:
 	case VALUE_RCONST:
-		return number_issinglerange(v->n, s);
+		return number_issinglerange(v->n, s, rconst);
 	default:
 		assert(false);
 	}

@@ -270,7 +270,7 @@ program_stmt_process(struct program *p, struct state *s,
 }
 
 static struct error *
-program_stmt_next(struct program *, struct state *);
+program_stmt_next(struct program *, struct state *, struct rconst *);
 
 struct error *
 program_next(struct program *p, struct state *s, struct rconst *rconst)
@@ -279,18 +279,18 @@ program_next(struct program *p, struct state *s, struct rconst *rconst)
 	case PROGRAM_COUNTER_ATEND:
 		return program_step(p, s, rconst);
 	case PROGRAM_COUNTER_STMTS:
-		return program_stmt_next(p, s);	
+		return program_stmt_next(p, s, rconst);	
 	default:
 		assert(false);
 	}
 }
 
 static struct error *
-program_stmt_next(struct program *p, struct state *s)
+program_stmt_next(struct program *p, struct state *s, struct rconst *rconst)
 {
 	int og_frame = state_frameid(s);
 	do {
-		struct error *err = state_step(s);
+		struct error *err = state_step(s, rconst);
 		if (err) {
 			return err;
 		}

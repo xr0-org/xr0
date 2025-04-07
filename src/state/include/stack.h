@@ -140,10 +140,10 @@ stack_shapeverify_all(struct stack *spec_stack, struct state *spec,
 struct lsi_varmap;
 
 struct lsi_varmap *
-stack_rconst_mapping(struct stack *, struct state *);
+stack_rconst_mapping(struct stack *, struct state *, struct rconst *);
 
 struct error *
-stack_verifyinvariant(struct stack *s, struct state *impl);
+stack_verifyinvariant(struct stack *s, struct state *impl, struct rconst *);
 
 struct ast_expr;
 

@@ -51,40 +51,46 @@ number_isconst(struct number *);
 struct range *
 number_as_range(struct number *);
 
-int
-number_lt(struct number *lhs, struct number *rhs, struct state *);
+struct rconst;
 
 int
-number_le(struct number *lhs, struct number *rhs, struct state *);
+number_lt(struct number *lhs, struct number *rhs, struct state *,
+		struct rconst *);
 
 int
-number_eq(struct number *, struct number *, struct state *);
+number_le(struct number *lhs, struct number *rhs, struct state *,
+		struct rconst *);
 
 int
-number_ge(struct number *lhs, struct number *rhs, struct state *);
+number_eq(struct number *, struct number *, struct state *,
+		struct rconst *);
 
 int
-number_issinglerange(struct number *, struct state *);
+number_ge(struct number *lhs, struct number *rhs, struct state *,
+		struct rconst *);
+
+int
+number_issinglerange(struct number *, struct state *, struct rconst *);
 
 int
 numbers_aresinglerange(struct number *lw, struct number *up);
 
 struct number *
-number_tosinglerange(struct number *, struct state *);
+number_tosinglerange(struct number *, struct state *, struct rconst *);
 
 struct state;
 
 struct number *
-number_lw(struct number *, struct state *);
+number_lw(struct number *, struct state *, struct rconst *);
 
 struct number *
-number_up(struct number *, struct state *);
+number_up(struct number *, struct state *, struct rconst *);
 
 struct map;
 
 void
 number_splitto(struct number *n, struct number *range, struct map *splits,
-		struct state *s);
+		struct state *s, struct rconst *);
 
 int
 number_assume(struct number *n, struct number *split, struct state *);

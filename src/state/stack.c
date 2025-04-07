@@ -68,7 +68,7 @@ static int
 frame_parentstackid(struct frame *);
 
 static struct error *
-frame_verifyinvariant(struct frame *, struct state *impl);
+frame_verifyinvariant(struct frame *, struct state *impl, struct rconst *);
 
 struct stack {
 	int id;
@@ -711,10 +711,11 @@ location_mustgetobject(struct location *loc, struct state *s)
 }
 
 static struct lsi_varmap *
-_var_rconst_mapping(struct state *, char *id);
+_var_rconst_mapping(struct state *, struct rconst *, char *id);
 
 struct lsi_varmap *
-stack_rconst_mapping(struct stack *stack, struct state *state)
+stack_rconst_mapping(struct stack *stack, struct state *state,
+		struct rconst *rconst)
 {
 	int i;
 
@@ -723,13 +724,13 @@ stack_rconst_mapping(struct stack *stack, struct state *state)
 	struct map *m = stack->varmap;
 	for (i = 0; i < m->n; i++)
 		lsi_varmap_addrange(
-			lv, _var_rconst_mapping(state, m->entry[i].key)
+			lv, _var_rconst_mapping(state, rconst, m->entry[i].key)
 		);
 
 	if (!frame_iscall(stack->f)) {
 		assert(stack->prev);
 		lsi_varmap_addrange(
-			lv, stack_rconst_mapping(stack->prev, state)
+			lv, stack_rconst_mapping(stack->prev, state, rconst)
 		);
 	}
 
@@ -737,7 +738,7 @@ stack_rconst_mapping(struct stack *stack, struct state *state)
 }
 
 static struct lsi_varmap *
-_var_rconst_mapping(struct state *s, char *id)
+_var_rconst_mapping(struct state *s, struct rconst *rconst, char *id)
 {
 	struct object *obj = location_mustgetobject(
 		loc_res_as_loc(state_getloc(s, id)), s
@@ -746,14 +747,14 @@ _var_rconst_mapping(struct state *s, char *id)
 		return lsi_varmap_create();
 	}
 	return value_rconst_mapping(
-		object_as_value(obj), state_getvariabletype(s, id), s, id
+		object_as_value(obj), state_getvariabletype(s, id), s, rconst, id
 	);
 }
 
 struct error *
-stack_verifyinvariant(struct stack *s, struct state *impl)
+stack_verifyinvariant(struct stack *s, struct state *impl, struct rconst *rconst)
 {
-	return frame_verifyinvariant(s->f, impl);
+	return frame_verifyinvariant(s->f, impl, rconst);
 }
 
 void
@@ -1035,10 +1036,10 @@ frame_call(struct frame *f)
 }
 
 static struct error *
-frame_verifyinvariant(struct frame *f, struct state *impl)
+frame_verifyinvariant(struct frame *f, struct state *impl, struct rconst *rconst)
 {
 	assert(frame_isloop(f));
-	return state_constraintverify_all(f->inv_state, impl);
+	return state_constraintverify_all(f->inv_state, impl, rconst);
 }
 
 struct variable {

@@ -403,21 +403,21 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state,
 }
 
 static struct error *
-iter_setupverify(struct ast_stmt *, struct state *);
+iter_setupverify(struct ast_stmt *, struct state *, struct rconst *);
 
 static void
-deriveinvstate(struct ast_stmt *, struct state *);
+deriveinvstate(struct ast_stmt *, struct state *, struct rconst *);
 
 static struct error *
 stmt_iter_exec(struct ast_stmt *stmt, struct state *state,
 		struct rconst *rconst)
 {
-	struct error *err = iter_setupverify(stmt, state);
+	struct error *err = iter_setupverify(stmt, state, rconst);
 	if (err) {
 		return err;
 	}
 
-	deriveinvstate(stmt, state);
+	deriveinvstate(stmt, state, rconst);
 
 	iter_pushstatebody(ast_stmt_as_iter(stmt), state);
 
@@ -425,21 +425,22 @@ stmt_iter_exec(struct ast_stmt *stmt, struct state *state,
 }
 
 static struct error *
-iter_setupverify(struct ast_stmt *stmt, struct state *impl)
+iter_setupverify(struct ast_stmt *stmt, struct state *impl,
+		struct rconst *rconst)
 {
 	struct state *spec = state_copy(impl);
-	deriveinvstate(stmt, spec);
-	struct error *err = state_constraintverify_all(spec, impl);
+	deriveinvstate(stmt, spec, rconst);
+	struct error *err = state_constraintverify_all(spec, impl, rconst);
 	state_destroy(spec);
 	return err;
 }
 
 static void
-deriveinvstate(struct ast_stmt *stmt, struct state *state)
+deriveinvstate(struct ast_stmt *stmt, struct state *state, struct rconst *rconst)
 {
 	state_pushinvariantframe(state, iter_inv(ast_stmt_as_iter(stmt)));
 	while (!state_atinvariantend(state)) {
-		struct error *err = state_step(state);
+		struct error *err = state_step(state, rconst);
 		a_printf(!err, "%s\n", error_str(err));
 	}
 	state_popframe(state);

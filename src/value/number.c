@@ -146,75 +146,87 @@ number_as_expr(struct number *n)
 }
 
 static struct number *
-_eval(struct ast_expr *, struct state *);
+_eval(struct ast_expr *, struct state *, struct rconst *);
 
 int
-number_le(struct number *lhs, struct number *rhs, struct state *s)
+number_le(struct number *lhs, struct number *rhs, struct state *s,
+		struct rconst *rconst)
 {
 	if (number_isexpr(lhs)) {
-		return number_le(_eval(number_as_expr(lhs), s), rhs, s);
+		return number_le(
+			_eval(number_as_expr(lhs), s, rconst), rhs, s, rconst
+		);
 	}
 	if (number_isexpr(rhs)) {
-		return number_le(lhs, _eval(number_as_expr(rhs), s), s);
+		return number_le(
+			lhs, _eval( number_as_expr(rhs), s, rconst), s, rconst
+		);
 	}
 	return number_as_const(lhs) <= number_as_const(rhs);
 }
 
 static struct number *
-_eval(struct ast_expr *e, struct state *s)
+_eval(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
 	return value_as_number(
-		tagval_value(tagval_res_as_tagval(ast_expr_rangeeval(e, s)))
+		tagval_value(
+			tagval_res_as_tagval(
+				ast_expr_rangeeval(e, s, rconst)
+			)
+		)
 	);
 }
 
 int
-number_ge(struct number *lhs, struct number *rhs, struct state *s)
+number_ge(struct number *lhs, struct number *rhs, struct state *s,
+		struct rconst *rconst)
 {
-	return number_le(rhs, lhs, s);
+	return number_le(rhs, lhs, s, rconst);
 }
 
 int
-number_eq(struct number *n, struct number *n0, struct state *s)
+number_eq(struct number *n, struct number *n0, struct state *s,
+		struct rconst *rconst)
 {
-	return number_le(n, n0, s) && number_ge(n, n0, s);
+	return number_le(n, n0, s, rconst) && number_ge(n, n0, s, rconst);
 }
 
 int
-number_lt(struct number *lhs, struct number *rhs, struct state *s)
+number_lt(struct number *lhs, struct number *rhs, struct state *s,
+		struct rconst *rconst)
 {
-	return number_le(lhs, rhs, s) && !number_eq(lhs, rhs, s);
+	return number_le(lhs, rhs, s, rconst) && !number_eq(lhs, rhs, s, rconst);
 }
 
 static struct number *
-_number_bound(struct number *n, int islw, struct state *s);
+_number_bound(struct number *n, int islw, struct state *s, struct rconst *);
 
 struct number *
-number_lw(struct number *n, struct state *s)
+number_lw(struct number *n, struct state *s, struct rconst *rconst)
 {
-	return _number_bound(n, 1, s);
+	return _number_bound(n, 1, s, rconst);
 }
 
 struct number *
-number_up(struct number *n, struct state *s)
+number_up(struct number *n, struct state *s, struct rconst *rconst)
 {
-	return _number_bound(n, 0, s);
+	return _number_bound(n, 0, s, rconst);
 }
 
 static struct number *
 _ranges_bound(struct number *, int islw);
 
 static struct number *
-_rconst_bound(struct ast_expr *, int islw, struct state *);
+_rconst_bound(struct ast_expr *, int islw, struct state *, struct rconst *);
 
 static struct number *
-_number_bound(struct number *n, int islw, struct state *s)
+_number_bound(struct number *n, int islw, struct state *s, struct rconst *rconst)
 {
 	switch (n->type) {
 	case NUMBER_RANGES:
 		return _ranges_bound(n, islw);
 	case NUMBER_EXPR:
-		return _rconst_bound(n->expr, islw, s);
+		return _rconst_bound(n->expr, islw, s, rconst);
 	default:
 		assert(false);
 	}
@@ -232,49 +244,62 @@ _ranges_bound(struct number *n, int islw)
 
 
 static struct number *
-_rconst_bound(struct ast_expr *e, int islw, struct state *s)
+_rconst_bound(struct ast_expr *e, int islw, struct state *s,
+		struct rconst *rconst)
 {
-	struct value *rconst = tagval_value(
-		tagval_res_as_tagval(ast_expr_rangeeval(e, s))
+	struct value *v = tagval_value(
+		tagval_res_as_tagval(ast_expr_rangeeval(e, s, rconst))
 	);
-	assert(rconst);
-	return _number_bound(value_as_number(rconst), islw, s);
+	assert(v);
+	return _number_bound(value_as_number(v), islw, s, rconst);
 }
 
 static int
-_rconst_issinglerange(struct ast_expr *, struct state *);
+_rconst_issinglerange(struct ast_expr *, struct state *, struct rconst *rconst);
 
 int
-number_issinglerange(struct number *n, struct state *s)
+number_issinglerange(struct number *n, struct state *s, struct rconst *rconst)
 {
 	switch (n->type) {
 	case NUMBER_RANGES:
 		return range_arr_n(n->ranges) == 1;
 	case NUMBER_EXPR:
-		return _rconst_issinglerange(n->expr, s);
+		return _rconst_issinglerange(n->expr, s, rconst);
 	default:
 		assert(false);
 	}
 }
 
 static int
-_rconst_issinglerange(struct ast_expr *e, struct state *s)
+_rconst_issinglerange(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
-	struct value *rconst = tagval_value(
-		tagval_res_as_tagval(ast_expr_rangeeval(e, s))
+	struct value *v = tagval_value(
+		tagval_res_as_tagval(ast_expr_rangeeval(e, s, rconst))
 	);
-	assert(rconst);
-	return number_issinglerange(value_as_number(rconst), s);
+	assert(v);
+	return number_issinglerange(value_as_number(v), s, rconst);
 }
 
 void
 number_splitto(struct number *n, struct number *range, struct map *splits,
-		struct state *s)
+		struct state *s, struct rconst *rconst)
 {
 	assert(number_isexpr(n));
-	assert(number_issinglerange(n, s));
-	assert(number_le(number_lw(n, s), number_lw(range, s), s));
-	assert(number_le(number_up(range, s), number_up(n, s), s));
+	assert(number_issinglerange(n, s, rconst));
+	assert(
+		number_le(
+			number_lw(n, s, rconst),
+			number_lw(range, s, rconst),
+			s, rconst
+		)
+	);
+	assert(
+		number_le(
+			number_up(range, s, rconst),
+			number_up(n, s, rconst),
+			s, rconst
+		)
+	);
 
 	map_set(
 		splits,
@@ -284,18 +309,18 @@ number_splitto(struct number *n, struct number *range, struct map *splits,
 }
 
 static struct number *
-_rconst_tosinglerange(char *, struct state *);
+_rconst_tosinglerange(char *, struct state *, struct rconst *);
 
 struct number *
-number_tosinglerange(struct number *n, struct state *s)
+number_tosinglerange(struct number *n, struct state *s, struct rconst *rconst)
 {
 	switch (n->type) {
 	case NUMBER_RANGES:
-		assert(number_issinglerange(n, s));
+		assert(number_issinglerange(n, s, rconst));
 		return n;
 	case NUMBER_EXPR:
 		return _rconst_tosinglerange(
-			ast_expr_as_identifier(n->expr), s
+			ast_expr_as_identifier(n->expr), s, rconst
 		);
 	default:
 		assert(false);
@@ -303,11 +328,11 @@ number_tosinglerange(struct number *n, struct state *s)
 }
 
 static struct number *
-_rconst_tosinglerange(char *id, struct state *s)
+_rconst_tosinglerange(char *id, struct state *s, struct rconst *rconst)
 {
-	struct value *rconst = state_getrconst(s, id);
-	assert(rconst);
-	return number_tosinglerange(value_as_number(rconst), s);
+	struct value *v = state_getrconst(rconst, id);
+	assert(v);
+	return number_tosinglerange(value_as_number(v), s, rconst);
 }
 
 struct number *

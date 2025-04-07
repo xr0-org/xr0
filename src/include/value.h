@@ -50,13 +50,13 @@ struct value *
 value_int_ne_create(int not_val);
 
 long
-value_int_lw(struct value *, struct state *);
+value_int_lw(struct value *, struct state *, struct rconst *);
 
 long
-value_int_up(struct value *, struct state *);
+value_int_up(struct value *, struct state *, struct rconst *);
 
 int
-value_as_int(struct value *, struct state *);
+value_as_int(struct value *, struct state *, struct rconst *);
 
 struct value *
 value_bang(struct value *);
@@ -84,10 +84,10 @@ struct lsi_varmap;
 
 struct lsi_varmap *
 value_rconst_mapping(struct value *, struct ast_type *, struct state *,
-		char *id);
+		struct rconst *, char *id);
 
 char *
-value_to_rconstid(struct value *v, struct state *);
+value_to_rconstid(struct value *v, struct state *, struct rconst *);
 
 struct value *
 value_copy(struct value *);
@@ -143,10 +143,10 @@ value_references(struct value *, struct location *, struct state *,
 DECLARE_RESULT_TYPE(bool, bool, bool_res)
 
 int
-value_eq(struct value *lhs, struct value *rhs, struct state *);
+value_eq(struct value *lhs, struct value *rhs, struct state *, struct rconst *);
 
 int
-value_lt(struct value *lhs, struct value *rhs, struct state *);
+value_lt(struct value *lhs, struct value *rhs, struct state *, struct rconst *);
 
 struct number;
 
