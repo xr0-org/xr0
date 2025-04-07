@@ -322,9 +322,6 @@ state_verifyinvariant(struct state *, struct rconst *);
 
 struct lsi_le;
 
-int
-state_isfeasible(struct rconst *, struct lsi_le *);
-
 /* USED BY OBJECT */
 
 bool

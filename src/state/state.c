@@ -566,10 +566,12 @@ _mutating_constraintverify_all(struct state *spec, struct state *impl,
 	if (err) {
 		return err;
 	}
-	struct lsi_varmap *spec_lv = stack_rconst_mapping(spec->stack, spec, rconst);
-	struct lsi_varmap *impl_lv = stack_rconst_mapping(impl->stack, impl, rconst);
+	struct rconst *rconst_spec = rconst_copy(rconst),
+		      *rconst_impl = rconst_copy(rconst);
+	struct lsi_varmap *spec_lv = stack_rconst_mapping(spec->stack, spec, rconst_spec);
+	struct lsi_varmap *impl_lv = stack_rconst_mapping(impl->stack, impl, rconst_impl);
 	err = rconst_constraintverify(
-		rconst, rconst,
+		rconst_spec, rconst_impl,
 		spec_lv, impl_lv
 	);
 	lsi_varmap_destroy(impl_lv);
@@ -582,13 +584,6 @@ state_verifyinvariant(struct state *s, struct rconst *rconst)
 {
 	return stack_verifyinvariant(s->stack, s, rconst);
 }
-
-int
-state_isfeasible(struct rconst *rconst, struct lsi_le *le)
-{
-	return rconst_isfeasible(rconst, le);
-}
-
 
 struct block *
 state_getblock(struct state *state, struct rconst *rconst,
@@ -757,12 +752,6 @@ state_callerreferences(struct state *s, struct rconst *rconst,
 	return clump_callerreferences(s->clump, loc, s, rconst);
 }
 
-bool
-state_eval(struct rconst *rconst, struct ast_expr *e)
-{
-	return rconst_eval(rconst, e);
-}
-
 static struct error *
 _shape_and_constraint_verify(struct state *spec, struct state *impl,
 		struct rconst *);
@@ -919,6 +908,7 @@ state_undeclarevars(struct state *s, struct rconst *rconst)
 {	
 	/*heap_undeclare(s->heap, s);*/
 	/*clump_undeclare(s->clump, s);*/
+	rconst_undeclare(rconst);
 	struct value *v = state_readregister(s);
 	if (v) {
 		/* XXX: avoid state_writeregister assert */

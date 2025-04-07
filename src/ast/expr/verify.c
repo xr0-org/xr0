@@ -918,15 +918,15 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 	);
 	struct lsi_le *le_neg = lsi_le_negate(le);
 
-	if (!state_isfeasible(rconst, le)) {
-		assert(state_isfeasible(rconst, le_neg));
+	if (!rconst_isfeasible(rconst, le)) {
+		assert(rconst_isfeasible(rconst, le_neg));
 		return e_res_eval_create(
 			eval_rval_create(
 				ast_type_create_int(), value_int_create(0)
 			)
 		);
 	}
-	if (!state_isfeasible(rconst, le_neg)) {
+	if (!rconst_isfeasible(rconst, le_neg)) {
 		return e_res_eval_create(
 			eval_rval_create(
 				ast_type_create_int(), value_int_create(1)

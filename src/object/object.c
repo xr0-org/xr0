@@ -8,6 +8,7 @@
 #include "object.h"
 #include "util.h"
 #include "value.h"
+#include "verifier.h"
 
 struct object {
 	struct ast_expr *offset;
@@ -201,10 +202,10 @@ object_contains(struct object *obj, struct ast_expr *offset, struct rconst *rcon
 	
 	bool contains =
 		/* lw ≤ of */
-		state_eval(rconst, e1)
+		rconst_eval(rconst, e1)
 		&&
 		/* of < up */
-		state_eval(rconst, e2);
+		rconst_eval(rconst, e2);
 
 	ast_expr_destroy(e2);
 	ast_expr_destroy(e1);
@@ -222,12 +223,12 @@ object_contains_upperincl(struct object *obj, struct ast_expr *offset,
 
 	return
 		/* lw ≤ of */
-		state_eval(rconst, ast_expr_le_create(lw, of))
+		rconst_eval(rconst, ast_expr_le_create(lw, of))
 
 		&&
 
 		/* of ≤ up */
-		state_eval(rconst, ast_expr_le_create(of, up));
+		rconst_eval(rconst, ast_expr_le_create(of, up));
 }
 
 bool
@@ -236,7 +237,7 @@ object_isempty(struct object *obj, struct rconst *rconst)
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
 
-	return state_eval(rconst, ast_expr_eq_create(lw, up));
+	return rconst_eval(rconst, ast_expr_eq_create(lw, up));
 }
 
 bool
@@ -245,7 +246,7 @@ object_contig_precedes(struct object *before, struct object *after,
 {
 	struct ast_expr *lw = object_upper(before),
 			*up = after->offset;
-	return state_eval(rconst, ast_expr_eq_create(lw, up));
+	return rconst_eval(rconst, ast_expr_eq_create(lw, up));
 }
 
 struct object *
@@ -264,9 +265,9 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct rconst *rconst)
 		ast_expr_copy(up), ast_expr_copy(excl_up)
 	);
 
-	bool e0 = state_eval(rconst, prop0),
-	     e1 = state_eval(rconst, prop1),
-	     e2 = state_eval(rconst, prop2);
+	bool e0 = rconst_eval(rconst, prop0),
+	     e1 = rconst_eval(rconst, prop1),
+	     e2 = rconst_eval(rconst, prop2);
 
 	ast_expr_destroy(prop2);
 	ast_expr_destroy(prop1);
@@ -301,8 +302,8 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct rconst *rconst)
 		ast_expr_copy(incl_lw), ast_expr_copy(lw)
 	);
 
-	bool e0 = state_eval(rconst, prop0),
-	     e1 = state_eval(rconst, prop1);
+	bool e0 = rconst_eval(rconst, prop0),
+	     e1 = rconst_eval(rconst, prop1);
 
 	ast_expr_destroy(prop1);
 	ast_expr_destroy(prop0);
