@@ -59,16 +59,15 @@ path_destroy(struct path *p)
 }
 
 char *
-path_str(struct path *p)
+path_str(struct path *p, struct rconst *rconst)
 {
 	switch (p->phase) {
 	case PATH_PHASE_ABSTRACT:
-		return segment_str(p->abstract, "ABSTRACT");
+		return segment_str(p->abstract, rconst, "ABSTRACT");
 	case PATH_PHASE_ACTUAL:
-		return segment_str(p->actual, "ACTUAL");
+		return segment_str(p->actual, rconst, "ACTUAL");
 	case PATH_PHASE_AUDIT:
 		return dynamic_str("phase:\tAUDIT\n");
-		break;
 	case PATH_PHASE_ATEND:
 		return dynamic_str("phase:\tEND\n");
 	default:

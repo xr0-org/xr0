@@ -20,7 +20,7 @@ void
 segment_destroy(struct segment *);
 
 char *
-segment_str(struct segment *, char *phase);
+segment_str(struct segment *, struct rconst *, char *phase);
 
 int
 segment_atend(struct segment *);

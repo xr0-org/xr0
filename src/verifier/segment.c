@@ -67,7 +67,7 @@ static char *
 phasename(struct segment *);
 
 char *
-segment_str(struct segment *s, char *pathphase)
+segment_str(struct segment *s, struct rconst *rconst, char *pathphase)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\t%s (%s)\n", pathphase, phasename(s));
@@ -79,7 +79,7 @@ segment_str(struct segment *s, char *pathphase)
 	case SEGMENT_PHASE_SETUP:
 	case SEGMENT_PHASE_EXEC:
 		strbuilder_printf(b, "\ntext:\n%s\n", state_programtext(s->state));
-		strbuilder_printf(b, "%s\n", state_str(s->state));
+		strbuilder_printf(b, "%s\n", state_str(s->state, rconst));
 		break;
 	default:
 		assert(false);
@@ -226,16 +226,16 @@ segment_audit(struct segment *abstract, struct segment *actual,
 		return NULL;
 	}
 
-	if (state_hasgarbage(actual->state)) {
-		v_printf("%s", state_str(actual->state));
+	if (state_hasgarbage(actual->state, rconst)) {
+		v_printf("%s", state_str(actual->state, rconst));
 		return error_printf(
 			"%s: garbage on heap", state_funcname(actual->state)
 		);
 	}
 	struct error *err;
 	if ((err = state_specverify(actual->state, abstract->state, rconst))) {
-		v_printf("spec:\n%s", state_str(abstract->state));
-		v_printf("impl:\n%s", state_str(actual->state));
+		v_printf("spec:\n%s", state_str(abstract->state, rconst));
+		v_printf("impl:\n%s", state_str(actual->state, rconst));
 		return error_printf(
 			"%s: %s",
 			state_funcname(actual->state),

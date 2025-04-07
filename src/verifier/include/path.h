@@ -14,7 +14,7 @@ void
 path_destroy(struct path *);
 
 char *
-path_str(struct path *);
+path_str(struct path *, struct rconst *);
 
 int
 path_atend(struct path *);

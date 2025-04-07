@@ -776,7 +776,7 @@ struct ast_variable **
 ast_function_params(struct ast_function *f);
 
 void
-ast_function_initparams(struct ast_function *, struct state *);
+ast_function_initparams(struct ast_function *, struct state *, struct rconst *);
 
 struct error *
 ast_function_initsetup(struct ast_function *, struct state *);

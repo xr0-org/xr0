@@ -330,10 +330,11 @@ history_replay(struct verifier *v, struct command_deque *h, char *sep)
 }
 
 static void
-inititalise_param(struct ast_variable *v, struct state *);
+inititalise_param(struct ast_variable *v, struct state *, struct rconst *);
 
 void
-ast_function_initparams(struct ast_function *f, struct state *s)
+ast_function_initparams(struct ast_function *f, struct state *s,
+		struct rconst *rconst)
 {
 	/* declare params and locals in stack frame */	
 	int nparams = ast_function_nparams(f);
@@ -342,35 +343,38 @@ ast_function_initparams(struct ast_function *f, struct state *s)
 		state_declare(s, params[i], true);
 	}
 	for (int i = 0; i < nparams; i++) {
-		inititalise_param(params[i], s);
+		inititalise_param(params[i], s, rconst);
 	}
 }
 
 static void
-inititalise_param(struct ast_variable *param, struct state *s)
+inititalise_param(struct ast_variable *param, struct state *s,
+		struct rconst *rconst)
 {
 	char *name = ast_variable_name(param);
-	char *rconst = state_rconst(s, dynamic_str(name), true);
-	state_addconstraint(
-		s,
+	char *rconst_s = rconst_declareorget(
+		rconst, dynamic_str(name), true
+	);
+	rconst_addconstraint(
+		rconst,
 		lsi_le_create(
 			lsi_expr_const_create(C89_INT_MIN),
-			lsi_expr_var_create(dynamic_str(rconst))
+			lsi_expr_var_create(dynamic_str(rconst_s))
 		)
 	);
-	state_addconstraint(
-		s,
+	rconst_addconstraint(
+		rconst,
 		lsi_le_create(
-			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_expr_var_create(dynamic_str(rconst_s)),
 			lsi_expr_const_create(C89_INT_MAX)
 		)
 	);
-	struct object_res *res = state_getobject(s, name);
+	struct object_res *res = state_getobject(s, rconst, name);
 	struct object *obj = object_res_as_object(res);
 	assert(!object_hasvalue(obj)); /* XXX: see git blame */
 	object_assign(
 		obj,
-		value_rconst_create(ast_expr_identifier_create(rconst))
+		value_rconst_create(ast_expr_identifier_create(rconst_s))
 	);
 }
 

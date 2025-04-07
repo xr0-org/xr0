@@ -41,7 +41,7 @@ verifier_str(struct verifier *v)
 {
 	return _verifier_issplit(v)
 		? verifier_str(mux_activeverifier(_verifier_mux(v)))
-		: path_str(_verifier_path(v));
+		: path_str(_verifier_path(v), _verifier_rconst(v));
 }
 
 bool
@@ -192,9 +192,9 @@ state_abstract(struct rconst *rconst, struct ast_function *f,
 			ast_expr_identifier_create(dynamic_str("base abs")),
 			f
 		),
-		rconst, ext
+		ext
 	);
-	ast_function_initparams(f, s);
+	ast_function_initparams(f, s, rconst);
 	state_pushframe(s, frame_setup(f));
 	return s;
 }
@@ -219,9 +219,10 @@ state_actual(struct rconst *rconst, struct ast_function *f,
 			ast_expr_identifier_create(dynamic_str("base act")),
 			f
 			
-		), rconst, ext
+		),
+		ext
 	);
-	ast_function_initparams(f, s);
+	ast_function_initparams(f, s, rconst);
 	state_pushframe(s, frame_setup(f));
 	return s;
 }

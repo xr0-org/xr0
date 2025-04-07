@@ -449,7 +449,8 @@ deriveinvstate(struct ast_stmt *stmt, struct state *state, struct rconst *rconst
 
 
 static int
-compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
+compatible(struct eval *ret, struct ast_type *spec_t, struct state *,
+		struct rconst *);
 
 static struct error *
 stmt_jump_exec(struct ast_stmt *stmt, struct state *state,
@@ -473,7 +474,7 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state,
 		if (e_res_haseval(res)) {
 			struct eval *eval = e_res_as_eval(res);
 			struct ast_type *spec_t = state_getreturntype(state);
-			if (!compatible(eval, spec_t, state)) {
+			if (!compatible(eval, spec_t, state, rconst)) {
 				char *spec_t_str = ast_type_str(spec_t),
 				     *rv_t_str = ast_type_str(eval_type(eval));
 				struct error *err = error_printf(
@@ -485,7 +486,9 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state,
 				free(spec_t_str);
 				return err;
 			}
-			struct value_res *v_res = eval_to_value(eval, state);
+			struct value_res *v_res = eval_to_value(
+				eval, state, rconst
+			);
 			if (!value_res_hasvalue(v_res)) {
 				return error_printf(
 					"returned expression has no value"
@@ -499,11 +502,16 @@ stmt_jump_exec(struct ast_stmt *stmt, struct state *state,
 }
 
 static int
-compatible(struct eval *e, struct ast_type *spec_t, struct state *s)
+compatible(struct eval *e, struct ast_type *spec_t, struct state *s,
+		struct rconst *rconst)
 {
 	return ast_type_compatible(eval_type(e), spec_t) || (
 		ast_type_compatiblewithrconst(spec_t)
-		&& value_isrconst(value_res_as_value(eval_to_value(e, s)))
+		&& value_isrconst(
+			value_res_as_value(
+				eval_to_value(e, s, rconst)
+			)
+		)
 	);
 }
 
@@ -580,14 +588,16 @@ asm_mov_exec(struct ast_variable *temp, struct ast_expr *val, struct state *s,
 		return e_res_as_error(l_res);
 	}
 	struct object *l_obj = object_res_as_object(
-		state_get(s, eval_as_lval(e_res_as_eval(l_res)), true)
+		state_get(s, rconst, eval_as_lval(e_res_as_eval(l_res)), true)
 	);
 
 	object_assign(
 		l_obj,
 		value_copy(
 			value_res_as_value(
-				eval_to_value(e_res_as_eval(r_res), s)
+				eval_to_value(
+					e_res_as_eval(r_res), s, rconst
+				)
 			)
 		)
 	);
@@ -610,7 +620,12 @@ asm_movret_exec(struct ast_variable *temp, struct state *state,
 		return e_res_as_error(l_res);
 	}
 	struct object *obj = object_res_as_object(
-		state_get(state, eval_as_lval(e_res_as_eval(l_res)), true)
+		state_get(
+			state,
+			rconst,
+			eval_as_lval(e_res_as_eval(l_res)),
+			true
+		)
 	);
 
 	struct e_res *r_res = call_return(state);
