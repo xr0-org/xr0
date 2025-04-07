@@ -143,12 +143,12 @@ static int
 object_res_hasvalue(struct object_res *);
 
 struct value_res *
-eval_to_value(struct eval *e, struct state *s)
+eval_to_value(struct eval *e, struct state *s, struct rconst *rconst)
 {
 	if (eval_isrval(e)) {
 		return value_res_value_create(eval_as_rval(e));
 	}
-	struct object_res *res = eval_to_object(e, s, false);
+	struct object_res *res = eval_to_object(e, s, rconst, false);
 	if (object_res_iserror(res)) {
 		return value_res_error_create(object_res_as_error(res));
 	}
@@ -176,10 +176,10 @@ object_res_hasvalue(struct object_res *res)
 
 
 struct object_res *
-eval_to_object(struct eval *e, struct state *s, bool constructive)
+eval_to_object(struct eval *e, struct state *s, struct rconst *rconst, bool constructive)
 {
 	assert(eval_islval(e));
-	struct object_res *obj_res = state_get(s, eval_as_lval(e), constructive);
+	struct object_res *obj_res = state_get(s, rconst, eval_as_lval(e), constructive);
 	if (object_res_iserror(obj_res)) {
 		struct error *err = object_res_as_error(obj_res);
 		if (error_to_state_get_no_block(err)

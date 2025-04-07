@@ -28,7 +28,7 @@ struct frame;
 struct rconst;
 
 struct state *
-state_create(struct frame *, struct rconst *, struct externals *);
+state_create(struct frame *, struct externals *);
 
 struct number;
 
@@ -45,7 +45,7 @@ void
 state_destroy(struct state *state);
 
 char *
-state_str(struct state *);
+state_str(struct state *, struct rconst *);
 
 int
 state_atend(struct state *);
@@ -99,7 +99,7 @@ bool
 state_isparam(struct state *, char *id);
 
 struct object_res *
-state_getobject(struct state *, char *id);
+state_getobject(struct state *, struct rconst *, char *id);
 
 struct ast_type *
 state_getvariabletype(struct state *, char *id);
@@ -113,7 +113,7 @@ struct loc_res *
 state_getloc(struct state *state, char *id);
 
 struct object_res *
-state_deref(struct state *, struct value *ptr);
+state_deref(struct state *, struct rconst *, struct value *ptr);
 
 struct location;
 
@@ -142,38 +142,15 @@ struct lexememarker *
 state_lexememarker(struct state *);
 
 bool
-state_addresses_deallocand(struct state *, struct object *);
-
-char *
-state_rconst(struct state *, char *key, bool persist);
-
-char *
-state_rconstnokey(struct state *, bool persist);
-
-int
-state_rconst_isanyint(struct state *, char *rconst);
-
-struct str_res;
-
-struct str_res *
-state_getrconstwithvalue(struct state *, int);
+state_addresses_deallocand(struct state *, struct rconst *, struct object *);
 
 struct lsi_le;
-
-struct error *
-state_addconstraint(struct state *, struct lsi_le *);
-
-int
-state_satisfies(struct state *, struct lsi_le *);
 
 struct lsi_range;
 struct lsi_expr;
 
-struct lsi_range *
-state_range_eval(struct state *, struct lsi_expr *);
-
 struct value *
-state_static_init(struct state *, struct ast_expr *);
+state_static_init(struct state *, struct rconst *, struct ast_expr *);
 
 struct value *
 state_clump(struct state *, int size);
@@ -188,7 +165,7 @@ struct value *
 state_getrconst(struct rconst *, char *id);
 
 bool
-state_hasgarbage(struct state *);
+state_hasgarbage(struct state *, struct rconst *);
 
 struct error *
 state_specverify(struct state *actual, struct state *spec, struct rconst *);
@@ -221,13 +198,13 @@ state_framecall(struct state *);
  * arguments for the call in the nearest call frame. return an empty string if
  * the nearest call frame is the base frame. */
 char *
-state_argmodulator(struct state *);
+state_argmodulator(struct state *, struct rconst *);
 
 bool
-state_returnreferences(struct state *, struct location *);
+state_returnreferences(struct state *, struct rconst *, struct location *);
 
 bool
-state_callerreferences(struct state *, struct location *);
+state_callerreferences(struct state *, struct rconst *, struct location *);
 
 /* FRAME DTO */
 
@@ -272,11 +249,11 @@ char *
 location_str(struct location *);
 
 bool
-location_references(struct location *l1, struct location *l2, struct state *,
-		struct circuitbreaker *cb);
+location_references(struct location *l1, struct location *l2,
+		struct state *, struct rconst *, struct circuitbreaker *cb);
 
 bool
-location_referencesheap(struct location *, struct state *,
+location_referencesheap(struct location *, struct state *, struct rconst *,
 		struct circuitbreaker *);
 
 struct location *
@@ -300,7 +277,8 @@ void
 location_setoffset(struct location *loc, struct offset *offset);
 
 struct int_arr *
-location_deriveorder(struct location *, struct circuitbreaker *, struct state *);
+location_deriveorder(struct location *, struct circuitbreaker *,
+		struct state *, struct rconst *);
 
 struct permutation;
 
@@ -308,7 +286,8 @@ struct location *
 location_permuteheap(struct location *loc, struct permutation *p);
 
 struct object_res *
-state_get(struct state *state, struct location *loc, bool constructive);
+state_get(struct state *, struct rconst *, struct location *,
+		bool constructive);
 
 struct error *
 state_constraintverify_top(struct state *spec, struct state *impl,
@@ -320,7 +299,8 @@ state_constraintverify_all(struct state *spec, struct state *impl,
 
 struct error *
 state_shapeverify_structmember(struct state *spec, struct state *impl,
-		struct value *spec_v, struct value *impl_v, char *member);
+		struct rconst *, struct value *spec_v, struct value *impl_v,
+		char *member);
 
 struct lsi_varmap;
 
@@ -343,19 +323,19 @@ state_verifyinvariant(struct state *, struct rconst *);
 struct lsi_le;
 
 int
-state_isfeasible(struct state *, struct lsi_le *);
+state_isfeasible(struct rconst *, struct lsi_le *);
 
 /* USED BY OBJECT */
 
 bool
-state_isdeallocand(struct state *s, struct location *loc);
+state_isdeallocand(struct state *s, struct rconst *, struct location *loc);
 
 bool
-state_eval(struct state *, struct ast_expr *);
+state_eval(struct rconst *, struct ast_expr *);
 
 struct block;
 
 struct block *
-state_getblock(struct state *, struct location *);
+state_getblock(struct state *, struct rconst *, struct location *);
 
 #endif

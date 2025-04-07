@@ -108,7 +108,7 @@ block_install(struct block *b, struct object *obj)
 
 struct object_res *
 block_observe(struct block *b, struct ast_expr *offset, struct state *s,
-		bool constructive)
+		struct rconst *rconst, bool constructive)
 {
 	struct lsi_expr *lsi_o = ast_expr_to_lsi_expr(offset);
 
@@ -119,13 +119,13 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 		/* non-inclusive upper bound */
 		lsi_expr_copy(lsi_o), lsi_expr_const_create(b->size-1)
 	);
-	if (!state_satisfies(s, lw) || !state_satisfies(s, up)) {
+	if (!rconst_satisfies(rconst, lw) || !rconst_satisfies(rconst, up)) {
 		return object_res_error_create(error_printf("out of bounds"));
 	}
 	lsi_le_destroy(lw);
 	lsi_le_destroy(up);
 
-	struct lsi_range *r = state_range_eval(s, lsi_o);
+	struct lsi_range *r = rconst_range_eval(rconst, lsi_o);
 	if (!lsi_range_isconst(r)) {
 		/* split b/w case when equal to lower bound and not */
 		struct lsi_le *le = lsi_range_expr_le_lw(r, lsi_o);  
@@ -144,7 +144,7 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 
 	lsi_expr_destroy(lsi_o);
 
-	int index = object_arr_index(b->arr, offset, s);
+	int index = object_arr_index(b->arr, offset, rconst);
 	if (index == -1) {
 		if (!constructive) {
 			return object_res_error_create(
@@ -163,12 +163,12 @@ block_observe(struct block *b, struct ast_expr *offset, struct state *s,
 
 bool
 block_references(struct block *b, struct location *loc, struct state *s,
-		struct circuitbreaker *cb)
+		struct rconst *rconst, struct circuitbreaker *cb)
 {
 	int n = object_arr_nobjects(b->arr);
 	struct object **obj = object_arr_objects(b->arr);
 	for (int i = 0; i < n; i++) {
-		if (object_references(obj[i], loc, s, cb)) {
+		if (object_references(obj[i], loc, s, rconst, cb)) {
 			return true;
 		}
 	}
@@ -182,7 +182,7 @@ block_iscaller(struct block *b)
 }
 
 void
-block_undeclare(struct block *b, struct state *s)
+block_undeclare(struct block *b, struct state *s, struct rconst *rconst)
 {
 	struct object_arr *new = object_arr_create();
 
@@ -191,8 +191,10 @@ block_undeclare(struct block *b, struct state *s)
 	for (int i = 0; i < n; i++) {
 		struct object *obj = object[i];
 		struct circuitbreaker *cb = circuitbreaker_create();
-		if (object_referencesheap(obj, s, cb)) {
-			object_arr_append(new, object_abstractcopy(obj, s));
+		if (object_referencesheap(obj, s, rconst, cb)) {
+			object_arr_append(
+				new, object_abstractcopy(obj, s, rconst)
+			);
 		}
 		circuitbreaker_destroy(cb);
 	}

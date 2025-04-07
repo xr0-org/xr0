@@ -12,13 +12,15 @@ struct state;
 
 struct value_res;
 
+struct rconst;
+
 struct value_res *
-eval_to_value(struct eval *, struct state *);
+eval_to_value(struct eval *, struct state *, struct rconst *);
 
 struct object_res;
 
 struct object_res *
-eval_to_object(struct eval *, struct state *, bool constructive);
+eval_to_object(struct eval *, struct state *, struct rconst *, bool constructive);
 
 struct preresult;
 

@@ -82,7 +82,12 @@ static int
 _eval(struct ast_expr *e, struct state *s, struct rconst *rconst)
 {
 	struct value *v = value_res_as_value(
-		eval_to_value(e_res_as_eval(ast_expr_eval(e, s, rconst)), s)
+		eval_to_value(
+			e_res_as_eval(
+				ast_expr_eval(e, s, rconst)
+			),
+			s, rconst
+		)
 	);
 	return value_as_int(v, s, rconst);
 }

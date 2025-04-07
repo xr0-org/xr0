@@ -25,10 +25,11 @@ object_value_create(struct ast_expr *offset, struct value *v)
 }
 
 struct int_arr *
-object_deriveorder(struct object *obj, struct circuitbreaker *cb, struct state *s)
+object_deriveorder(struct object *obj, struct circuitbreaker *cb,
+		struct state *s, struct rconst *rconst)
 {
 	return obj->value
-		? value_deriveorder(obj->value, cb, s)
+		? value_deriveorder(obj->value, cb, s, rconst)
 		: int_arr_create();
 }
 
@@ -63,11 +64,11 @@ object_copy(struct object *old)
 }
 
 struct object *
-object_abstractcopy(struct object *old, struct state *s)
+object_abstractcopy(struct object *old, struct state *s, struct rconst *rconst)
 {
 	return object_value_create(
 		ast_expr_copy(old->offset),
-		old->value ? value_abstractcopy(old->value, s) : NULL
+		old->value ? value_abstractcopy(old->value, s, rconst) : NULL
 	);
 }
 
@@ -96,7 +97,7 @@ inner_str(struct object *obj)
 }
 
 bool
-object_referencesheap(struct object *obj, struct state *s,
+object_referencesheap(struct object *obj, struct state *s, struct rconst *rconst,
 		struct circuitbreaker *cb)
 {
 	if (!circuitbreaker_append(cb, obj)) {
@@ -108,7 +109,9 @@ object_referencesheap(struct object *obj, struct state *s,
 		return true;
 	}
 	struct circuitbreaker *copy = circuitbreaker_copy(cb);
-	bool ans = obj->value && value_referencesheap(obj->value, s, copy);
+	bool ans = obj->value && value_referencesheap(
+		obj->value, s, rconst, copy
+	);
 	circuitbreaker_destroy(copy);
 	return ans;
 }
@@ -127,14 +130,16 @@ object_as_value(struct object *obj)
 }
 
 bool
-object_isdeallocand(struct object *obj, struct state *s)
+object_isdeallocand(struct object *obj, struct state *s, struct rconst *rconst)
 {
-	return obj->value && state_isdeallocand(s, value_as_location(obj->value));
+	return obj->value && state_isdeallocand(
+		s, rconst, value_as_location(obj->value)
+	);
 }
 
 bool
 object_references(struct object *obj, struct location *loc, struct state *s,
-		struct circuitbreaker *cb)
+		struct rconst *rconst, struct circuitbreaker *cb)
 {
 	if (!circuitbreaker_append(cb, obj)) {
 		/* already handled */
@@ -143,7 +148,7 @@ object_references(struct object *obj, struct location *loc, struct state *s,
 
 	struct circuitbreaker *copy = circuitbreaker_copy(cb);
 	struct value *v = object_as_value(obj);
-	bool ans = v ? value_references(v, loc, s, copy) : false;
+	bool ans = v ? value_references(v, loc, s, rconst, copy) : false;
 	circuitbreaker_destroy(copy);
 	return ans;
 }
@@ -180,7 +185,7 @@ object_upper(struct object *obj)
 }
 
 bool
-object_contains(struct object *obj, struct ast_expr *offset, struct state *s)
+object_contains(struct object *obj, struct ast_expr *offset, struct rconst *rconst)
 {
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj),
@@ -196,10 +201,10 @@ object_contains(struct object *obj, struct ast_expr *offset, struct state *s)
 	
 	bool contains =
 		/* lw ≤ of */
-		state_eval(s, e1)
+		state_eval(rconst, e1)
 		&&
 		/* of < up */
-		state_eval(s, e2);
+		state_eval(rconst, e2);
 
 	ast_expr_destroy(e2);
 	ast_expr_destroy(e1);
@@ -209,7 +214,7 @@ object_contains(struct object *obj, struct ast_expr *offset, struct state *s)
 
 bool
 object_contains_upperincl(struct object *obj, struct ast_expr *offset,
-		struct state *s)
+		struct rconst *rconst)
 {
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj),
@@ -217,48 +222,34 @@ object_contains_upperincl(struct object *obj, struct ast_expr *offset,
 
 	return
 		/* lw ≤ of */
-		state_eval(s, ast_expr_le_create(lw, of))
+		state_eval(rconst, ast_expr_le_create(lw, of))
 
 		&&
 
 		/* of ≤ up */
-		state_eval(s, ast_expr_le_create(of, up));
+		state_eval(rconst, ast_expr_le_create(of, up));
 }
 
 bool
-object_isempty(struct object *obj, struct state *s)
+object_isempty(struct object *obj, struct rconst *rconst)
 {
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
 
-	return state_eval(s, ast_expr_eq_create(lw, up));
+	return state_eval(rconst, ast_expr_eq_create(lw, up));
 }
 
 bool
 object_contig_precedes(struct object *before, struct object *after,
-		struct state *s)
+		struct rconst *rconst)
 {
 	struct ast_expr *lw = object_upper(before),
 			*up = after->offset;
-	return state_eval(s, ast_expr_eq_create(lw, up));
-}
-
-bool
-object_issingular(struct object *obj, struct state *s)
-{
-	struct ast_expr *lw = obj->offset,
-			*up = object_upper(obj);
-
-	struct ast_expr *lw_succ = ast_expr_sum_create(
-		lw, ast_expr_constant_create(1)
-	);
-
-	/* lw + 1 == up */
-	return state_eval(s, ast_expr_eq_create(lw_succ, up));
+	return state_eval(rconst, ast_expr_eq_create(lw, up));
 }
 
 struct object *
-object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
+object_upto(struct object *obj, struct ast_expr *excl_up, struct rconst *rconst)
 {
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
@@ -273,9 +264,9 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 		ast_expr_copy(up), ast_expr_copy(excl_up)
 	);
 
-	bool e0 = state_eval(s, prop0),
-	     e1 = state_eval(s, prop1),
-	     e2 = state_eval(s, prop2);
+	bool e0 = state_eval(rconst, prop0),
+	     e1 = state_eval(rconst, prop1),
+	     e2 = state_eval(rconst, prop2);
 
 	ast_expr_destroy(prop2);
 	ast_expr_destroy(prop1);
@@ -298,7 +289,7 @@ object_upto(struct object *obj, struct ast_expr *excl_up, struct state *s)
 }
 
 struct object *
-object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
+object_from(struct object *obj, struct ast_expr *incl_lw, struct rconst *rconst)
 {
 	struct ast_expr *lw = obj->offset,
 			*up = object_upper(obj);
@@ -310,8 +301,8 @@ object_from(struct object *obj, struct ast_expr *incl_lw, struct state *s)
 		ast_expr_copy(incl_lw), ast_expr_copy(lw)
 	);
 
-	bool e0 = state_eval(s, prop0),
-	     e1 = state_eval(s, prop1);
+	bool e0 = state_eval(rconst, prop0),
+	     e1 = state_eval(rconst, prop1);
 
 	ast_expr_destroy(prop1);
 	ast_expr_destroy(prop0);
@@ -485,10 +476,10 @@ object_arr_nallocs(struct object_arr *arr)
 
 int
 object_arr_index(struct object_arr *arr, struct ast_expr *offset,
-		struct state *state)
+		struct rconst *rconst)
 {
 	for (int i = 0; i < arr->n; i++) {
-		if (object_contains(arr->object[i], offset, state)) {
+		if (object_contains(arr->object[i], offset, rconst)) {
 			return i;
 		}
 	}
@@ -497,10 +488,10 @@ object_arr_index(struct object_arr *arr, struct ast_expr *offset,
 
 int
 object_arr_index_upperincl(struct object_arr *arr, struct ast_expr *offset,
-		struct state *state)
+		struct rconst *rconst)
 {
 	for (int i = 0; i < arr->n; i++) {
-		if (object_contains_upperincl(arr->object[i], offset, state)) {
+		if (object_contains_upperincl(arr->object[i], offset, rconst)) {
 			return i;
 		}
 	}

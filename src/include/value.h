@@ -16,7 +16,8 @@ struct ast_type;
 struct state;
 
 struct int_arr *
-value_deriveorder(struct value *, struct circuitbreaker *, struct state *);
+value_deriveorder(struct value *, struct circuitbreaker *, struct state *,
+		struct rconst *);
 
 struct value *
 value_permuteheaplocs(struct value *, struct permutation *);
@@ -78,7 +79,7 @@ value_struct_member(struct value *, char *member);
 
 struct error *
 value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
-		struct state *spec, struct state *impl);
+		struct state *spec, struct state *impl, struct rconst *);
 
 struct lsi_varmap;
 
@@ -93,7 +94,7 @@ struct value *
 value_copy(struct value *);
 
 struct value *
-value_abstractcopy(struct value *, struct state *s);
+value_abstractcopy(struct value *, struct state *, struct rconst *);
 
 void
 value_destroy(struct value *);
@@ -113,7 +114,8 @@ value_as_location(struct value *);
 struct circuitbreaker;
 
 bool
-value_referencesheap(struct value *, struct state *, struct circuitbreaker *);
+value_referencesheap(struct value *, struct state *, struct rconst *,
+		struct circuitbreaker *);
 
 int
 value_isconstant(struct value *v);
@@ -138,7 +140,7 @@ value_as_literal(struct value *v);
 
 bool
 value_references(struct value *, struct location *, struct state *,
-		struct circuitbreaker *);
+		struct rconst *, struct circuitbreaker *);
 
 DECLARE_RESULT_TYPE(bool, bool, bool_res)
 

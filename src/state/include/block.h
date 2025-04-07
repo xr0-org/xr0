@@ -35,7 +35,7 @@ struct object_res;
 
 struct object_res *
 block_observe(struct block *, struct ast_expr *offset, struct state *,
-		bool constructive);
+		struct rconst *, bool constructive);
 
 struct location;
 
@@ -43,7 +43,7 @@ struct circuitbreaker;
 
 bool
 block_references(struct block *, struct location *, struct state *,
-		struct circuitbreaker *);
+		struct rconst *, struct circuitbreaker *);
 
 bool
 block_iscaller(struct block *);
@@ -51,7 +51,7 @@ block_iscaller(struct block *);
 struct state;
 
 void
-block_undeclare(struct block *, struct state *);
+block_undeclare(struct block *, struct state *, struct rconst *);
 
 struct permutation;
 

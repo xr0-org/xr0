@@ -43,8 +43,10 @@ struct block;
 struct block *
 heap_getblock(struct heap *h, int block);
 
+struct rconst;
+
 bool
-heap_referenced(struct heap *h, struct state *);
+heap_referenced(struct heap *h, struct state *, struct rconst *);
 
 bool
 heap_blockisfreed(struct heap *h, int block);
@@ -53,7 +55,7 @@ struct error *
 heap_deallocblock(struct heap *h, int block);
 
 void
-heap_undeclare(struct heap *, struct state *);
+heap_undeclare(struct heap *, struct state *, struct rconst *);
 
 void
 heap_fillorder(struct heap *, struct int_arr *);

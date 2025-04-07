@@ -35,7 +35,7 @@ stack_framecall(struct stack *);
 struct externals;
 
 char *
-stack_argmodulator(struct stack *, struct state *);
+stack_argmodulator(struct stack *, struct state *, struct rconst *);
 
 void
 stack_destroy(struct stack *);
@@ -103,7 +103,7 @@ void
 stack_declare(struct stack *, struct ast_variable *var, bool isparam);
 
 void
-stack_undeclare(struct stack *stack, struct state *state);
+stack_undeclare(struct stack *, struct state *, struct rconst *);
 
 bool
 stack_isnested(struct stack *);
@@ -131,11 +131,11 @@ stack_getvariable(struct stack *s, char *id);
 
 struct error *
 stack_shapeverify_top(struct stack *, struct state *spec,
-		struct state *impl);
+		struct state *impl, struct rconst *);
 
 struct error *
 stack_shapeverify_all(struct stack *spec_stack, struct state *spec,
-		struct state *impl);
+		struct state *impl, struct rconst *);
 
 struct lsi_varmap;
 
@@ -180,7 +180,8 @@ struct ast_type *
 variable_type(struct variable *);
 
 bool
-variable_references(struct variable *v, struct location *loc, struct state *s);
+variable_references(struct variable *, struct location *, struct state *s,
+		struct rconst *);
 
 bool
 variable_isparam(struct variable *);

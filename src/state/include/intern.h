@@ -5,12 +5,12 @@ struct location;
 struct object;
 
 struct object_res *
-state_get(struct state *state, struct location *loc, bool constructive);
+state_get(struct state *, struct rconst *, struct location *, bool constructive);
 
 struct block *
-state_getblock(struct state *state, struct location *loc);
+state_getblock(struct state *, struct rconst *, struct location *);
 
 bool
-state_references(struct state *s, struct location *loc);
+state_references(struct state *, struct location *);
 
 #endif

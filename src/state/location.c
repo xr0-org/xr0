@@ -98,14 +98,14 @@ shouldderiveorder(struct location *, struct circuitbreaker *, struct state *);
 
 struct int_arr *
 location_deriveorder(struct location *loc, struct circuitbreaker *cb,
-		struct state *s)
+		struct state *s, struct rconst *rconst)
 {
 	struct int_arr *arr = int_arr_create();
 	if (shouldderiveorder(loc, cb, s)) {
 		if (loc->type == LOCATION_DYNAMIC) {
 			int_arr_append(arr, loc->block);
 		}
-		struct object_res *res = state_get(s, loc, false);
+		struct object_res *res = state_get(s, rconst, loc, false);
 		if (object_res_iserror(res)) {
 			struct error *err = object_res_as_error(res);
 			if (error_to_block_observe_noobj(err)) {
@@ -114,7 +114,9 @@ location_deriveorder(struct location *loc, struct circuitbreaker *cb,
 		}
 		if (object_res_hasobject(res)) {
 			struct object *obj = object_res_as_object(res);
-			int_arr_appendrange(arr, object_deriveorder(obj, cb, s));
+			int_arr_appendrange(
+				arr, object_deriveorder(obj, cb, s, rconst)
+			);
 		}
 	}
 	return arr;
@@ -275,27 +277,27 @@ location_equal(struct location *l1, struct location *l2)
 }
 
 bool
-location_referencescaller(struct location *l1, struct location *l2, struct state *s,
-		struct circuitbreaker *cb)
+location_referencescaller(struct location *l1, struct location *l2,
+		struct state *s, struct rconst *rconst, struct circuitbreaker *cb)
 {
 	if (location_equal(l1, l2)) {
 		return true;
 	}
 
-	struct block *b = state_getblock(s, l1);
-	return b && block_iscaller(b) && block_references(b, l2, s, cb);
+	struct block *b = state_getblock(s, rconst, l1);
+	return b && block_iscaller(b) && block_references(b, l2, s, rconst, cb);
 }
 
 bool
-location_references(struct location *l1, struct location *l2, struct state *s,
-		struct circuitbreaker *cb)
+location_references(struct location *l1, struct location *l2,
+		struct state *s, struct rconst *rconst, struct circuitbreaker *cb)
 {
 	if (location_equal(l1, l2)) {
 		return true;
 	}
 
-	struct block *b = state_getblock(s, l1);
-	return b && block_references(b, l2, s, cb);
+	struct block *b = state_getblock(s, rconst, l1);
+	return b && block_references(b, l2, s, rconst, cb);
 }
 
 bool
@@ -305,7 +307,8 @@ location_isauto(struct location *loc)
 }
 
 bool
-location_referencesheap(struct location *l, struct state *s, struct circuitbreaker *cb)
+location_referencesheap(struct location *l, struct state *s,
+		struct rconst *rconst, struct circuitbreaker *cb)
 {
 	if (l->type == LOCATION_DYNAMIC) {
 		if (heap_blockisfreed(state_getheap(s), l->block)) {
@@ -314,14 +317,16 @@ location_referencesheap(struct location *l, struct state *s, struct circuitbreak
 		return true;
 	}
 	struct location *l_base = location_withoutoffset(l);
-	struct object_res *res = state_get(s, l_base, false);
+	struct object_res *res = state_get(s, rconst, l_base, false);
 	if (object_res_iserror(res)) {
 		assert(error_to_block_observe_noobj(object_res_as_error(res)));
 		object_res_errorignore(res);
 	}
 	location_destroy(l_base);
 	return object_res_hasobject(res)
-		&& object_referencesheap(object_res_as_object(res), s, cb);
+		&& object_referencesheap(
+			object_res_as_object(res), s, rconst, cb
+		);
 }
 
 struct location *

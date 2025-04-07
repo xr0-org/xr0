@@ -335,7 +335,7 @@ eval_as_rval(struct eval *);
 struct value_res;
 
 struct value_res *
-eval_to_value(struct eval *, struct state *);
+eval_to_value(struct eval *, struct state *, struct rconst *);
 
 DECLARE_RESULT_TYPE(struct eval *, eval, e_res)
 

@@ -48,10 +48,12 @@ struct value {
 }; 
 
 static struct int_arr *
-struct_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s);
+struct_deriveorder(struct value *, struct circuitbreaker *,
+		struct state *, struct rconst *);
 
 struct int_arr *
-value_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
+value_deriveorder(struct value *v, struct circuitbreaker *cb,
+		struct state *s, struct rconst *rconst)
 {
 	switch (v->type) {
 	case VALUE_RCONST:
@@ -62,9 +64,9 @@ value_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
 		if (v->ptr.isindefinite) {
 			return int_arr_create();
 		}
-		return location_deriveorder(v->ptr.loc, cb, s);
+		return location_deriveorder(v->ptr.loc, cb, s, rconst);
 	case VALUE_STRUCT:
-		return struct_deriveorder(v, cb, s);
+		return struct_deriveorder(v, cb, s, rconst);
 	default:
 		assert(false);
 	}
@@ -116,9 +118,12 @@ value_ptr_rconst_create(void)
 }
 
 bool
-ptr_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
+ptr_referencesheap(struct value *v, struct state *s, struct rconst *rconst,
+		struct circuitbreaker *cb)
 {
-	return !v->ptr.isindefinite && location_referencesheap(v->ptr.loc, s, cb);
+	return !v->ptr.isindefinite && location_referencesheap(
+		v->ptr.loc, s, rconst, cb
+	);
 }
 
 struct number *
@@ -419,7 +424,8 @@ permutemembers(struct map *old, struct permutation *p)
 }
 
 static struct int_arr *
-struct_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
+struct_deriveorder(struct value *v, struct circuitbreaker *cb,
+		struct state *s, struct rconst *rconst)
 {
 	struct int_arr *arr = int_arr_create();
 	struct map *m = v->_struct.m;
@@ -427,7 +433,8 @@ struct_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
 		int_arr_appendrange(
 			arr,
 			object_deriveorder(
-				(struct object *) m->entry[i].value, cb, s
+				(struct object *) m->entry[i].value,
+				cb, s, rconst
 			)
 		);
 	}
@@ -435,28 +442,32 @@ struct_deriveorder(struct value *v, struct circuitbreaker *cb, struct state *s)
 }
 
 static struct map *
-abstractcopymembers(struct map *old, struct state *s);
+abstractcopymembers(struct map *old, struct state *, struct rconst *);
 
-struct value *
-value_struct_abstractcopy(struct value *old, struct state *s)
+static struct value *
+value_struct_abstractcopy(struct value *old, struct state *s,
+		struct rconst *rconst)
 {
 	struct value *new = malloc(sizeof(struct value));
 	assert(new);
 	new->type = VALUE_STRUCT;
 	new->_struct.members = ast_variable_arr_copy(old->_struct.members);
-	new->_struct.m = abstractcopymembers(old->_struct.m, s);
+	new->_struct.m = abstractcopymembers(old->_struct.m, s, rconst);
 	return new;
 }
 
 static struct map *
-abstractcopymembers(struct map *old, struct state *s)
+abstractcopymembers(struct map *old, struct state *s, struct rconst *rconst)
 {
 	struct map *new = map_create();
 	for (int i = 0; i < old->n; i++) {
 		struct entry e = old->entry[i];
 		map_set(
-			new, dynamic_str(e.key),
-			object_abstractcopy((struct object *) e.value, s)
+			new,
+			dynamic_str(e.key),
+			object_abstractcopy(
+				(struct object *) e.value, s, rconst
+			)
 		);
 	}
 	return new;
@@ -486,7 +497,7 @@ value_struct_member(struct value *v, char *member)
 
 struct error *
 value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
-		struct state *spec, struct state *impl)
+		struct state *spec, struct state *impl, struct rconst *rconst)
 {
 	assert(value_isstruct(spec_v) && value_isstruct(impl_v));
 	struct ast_variable_arr *spec_v_members = spec_v->_struct.members,
@@ -497,7 +508,7 @@ value_struct_shapeverify(struct value *spec_v, struct value *impl_v,
 	struct ast_variable **field = ast_variable_arr_v(spec_v_members);
 	for (int i = 0; i < n; i++) {
 		struct error *err = state_shapeverify_structmember(
-			spec, impl, spec_v, impl_v,
+			spec, impl, rconst, spec_v, impl_v,
 			ast_variable_name(field[i])
 		);
 		if (err) {
@@ -516,7 +527,7 @@ _struct_rconst_mapping(struct value *v, struct state *s, struct rconst *,
 		char *varname);
 
 static char *
-_rconst_anyint(struct state *s);
+_rconst_anyint(struct rconst *);
 
 struct lsi_varmap *
 value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
@@ -556,7 +567,7 @@ value_rconst_mapping(struct value *v, struct ast_type *t, struct state *s,
 	);
 
 	struct lsi_varmap *lv = lsi_varmap_create();
-	lsi_varmap_set(lv, _rconst_anyint(s), dynamic_str(id));
+	lsi_varmap_set(lv, _rconst_anyint(rconst), dynamic_str(id));
 
 	struct location *loc = value_as_location(v);
 	if (!state_loc_valid(s, loc)) {
@@ -602,33 +613,33 @@ _struct_rconst_mapping(struct value *v, struct state *s, struct rconst *rconst,
 }
 
 static char *
-_rconst_anyint(struct state *s)
+_rconst_anyint(struct rconst *rconst)
 {
-	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
-	struct error *err = state_addconstraint(
-		s,
+	char *rconst_s = rconst_declarenokey(rconst, false); /* XXX: persist? */
+	struct error *err = rconst_addconstraint(
+		rconst,
 		lsi_le_create(
 			lsi_expr_const_create(C89_INT_MIN),
-			lsi_expr_var_create(dynamic_str(rconst))
+			lsi_expr_var_create(dynamic_str(rconst_s))
 		)
 	);
 	assert(!err);
-	err = state_addconstraint(
-		s,
+	err = rconst_addconstraint(
+		rconst,
 		lsi_le_create(
-			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_expr_var_create(dynamic_str(rconst_s)),
 			lsi_expr_const_create(C89_INT_MAX)
 		)
 	);
 	assert(!err);
-	return rconst;
+	return rconst_s;
 }
 
 static char *
 _expr_to_rconstid(struct ast_expr *, struct state *, struct rconst *);
 
 static char *
-_int_to_rconstid(struct value *, struct state *);
+_int_to_rconstid(struct value *, struct rconst *);
 
 char *
 value_to_rconstid(struct value *v, struct state *s, struct rconst *rconst)
@@ -637,7 +648,7 @@ value_to_rconstid(struct value *v, struct state *s, struct rconst *rconst)
 	case VALUE_RCONST:
 		return _expr_to_rconstid(value_as_rconst(v), s, rconst);
 	case VALUE_INT:
-		return _int_to_rconstid(v, s);
+		return _int_to_rconstid(v, rconst);
 	default:
 		assert(0);
 	}
@@ -652,10 +663,10 @@ _expr_to_rconstid(struct ast_expr *e, struct state *s, struct rconst *rconst)
 		return dynamic_str(rconst_s);
 	}
 
-	char *rconst_s = state_rconstnokey(s, false); /* XXX: persist? */
+	char *rconst_s = rconst_declarenokey(rconst, false); /* XXX: persist? */
 	struct lsi_expr *lsi_e = ast_expr_to_lsi_expr(e);
-	struct error *err = state_addconstraint(
-		s,
+	struct error *err = rconst_addconstraint(
+		rconst,
 		lsi_le_create(
 			/* e <= rconst */
 			lsi_expr_copy(lsi_e),
@@ -663,8 +674,8 @@ _expr_to_rconstid(struct ast_expr *e, struct state *s, struct rconst *rconst)
 		)
 	);
 	assert(!err);
-	err = state_addconstraint(
-		s,
+	err = rconst_addconstraint(
+		rconst,
 		lsi_le_create(
 			/* rconst <= e */
 			lsi_expr_var_create(dynamic_str(rconst_s)),
@@ -677,49 +688,50 @@ _expr_to_rconstid(struct ast_expr *e, struct state *s, struct rconst *rconst)
 }
 
 static char *
-_int_to_rconstid(struct value *v, struct state *s)
+_int_to_rconstid(struct value *v, struct rconst *rconst)
 {
 	struct number *n = v->n;
 	assert(number_isconst(n));
 	int c = number_as_const(n);
 
-	struct str_res *res = state_getrconstwithvalue(s, c);
+	struct str_res *res = rconst_getwithconstvalue(rconst, c);
 	if (!str_res_iserror(res)) {
 		return dynamic_str(str_res_as_str(res));
 	}
 
 	/* morph v to equivalent rconst */
-	char *rconst = state_rconstnokey(s, false); /* XXX: persist? */
+	char *rconst_s = rconst_declarenokey(rconst, false); /* XXX: persist? */
 
-	struct error *err = state_addconstraint(
-		s,
+	struct error *err = rconst_addconstraint(
+		rconst,
 		lsi_le_create(
 			/* c <= rconst */
 			lsi_expr_const_create(c),
-			lsi_expr_var_create(dynamic_str(rconst))
+			lsi_expr_var_create(dynamic_str(rconst_s))
 		)
 	);
 	assert(!err);
-	err = state_addconstraint(
-		s,
+	err = rconst_addconstraint(
+		rconst,
 		lsi_le_create(
 			/* rconst <= c */
-			lsi_expr_var_create(dynamic_str(rconst)),
+			lsi_expr_var_create(dynamic_str(rconst_s)),
 			lsi_expr_const_create(c)
 		)
 	);
 	assert(!err);
 
-	return rconst;
+	return rconst_s;
 }
 
 bool
-struct_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
+struct_referencesheap(struct value *v, struct state *s, struct rconst *rconst,
+		struct circuitbreaker *cb)
 {
 	struct map *m = v->_struct.m;
 	for (int i = 0; i < m->n; i++) {
 		struct value *val = object_as_value((struct object *) m->entry[i].value);
-		if (val && value_referencesheap(val, s, cb)) {
+		if (val && value_referencesheap(val, s, rconst, cb)) {
 			return true;
 		}
 	}
@@ -782,30 +794,32 @@ value_copy(struct value *v)
 }
 
 static bool
-referencesheap_withcb(struct value *, struct state *);
+referencesheap_withcb(struct value *, struct state *, struct rconst *);
 
+static struct value *
+value_struct_abstractcopy(struct value *old, struct state *, struct rconst *);
 
 struct value *
-value_abstractcopy(struct value *v, struct state *s)
+value_abstractcopy(struct value *v, struct state *s, struct rconst *rconst)
 {
-	if (!referencesheap_withcb(v, s)) {
+	if (!referencesheap_withcb(v, s, rconst)) {
 		return NULL;
 	}
 	switch (v->type) {
 	case VALUE_PTR:
 		return value_copy(v);
 	case VALUE_STRUCT:
-		return value_struct_abstractcopy(v, s);
+		return value_struct_abstractcopy(v, s, rconst);
 	default:
 		assert(false);
 	}
 }
 
 static bool
-referencesheap_withcb(struct value *v, struct state *s)
+referencesheap_withcb(struct value *v, struct state *s, struct rconst *rconst)
 {
 	struct circuitbreaker *cb = circuitbreaker_create();
-	bool ans = value_referencesheap(v, s, cb);
+	bool ans = value_referencesheap(v, s, rconst, cb);
 	circuitbreaker_destroy(cb);
 	return ans;
 }
@@ -897,13 +911,14 @@ value_as_location(struct value *v)
 }
 
 bool
-value_referencesheap(struct value *v, struct state *s, struct circuitbreaker *cb)
+value_referencesheap(struct value *v, struct state *s, struct rconst *rconst,
+		struct circuitbreaker *cb)
 {
 	switch (v->type) {
 	case VALUE_PTR:
-		return ptr_referencesheap(v, s, cb);
+		return ptr_referencesheap(v, s, rconst, cb);
 	case VALUE_STRUCT:
-		return struct_referencesheap(v, s, cb);
+		return struct_referencesheap(v, s, rconst, cb);
 	default:
 		return false;
 	}
@@ -1026,17 +1041,19 @@ DEFINE_RESULT_TYPE(struct value_arr *, arr, value_arr_destroy, value_arr_res, fa
 
 static bool
 struct_references(struct value *v, struct location *loc, struct state *s,
-		struct circuitbreaker *);
+		struct rconst *, struct circuitbreaker *);
 
 bool
 value_references(struct value *v, struct location *loc, struct state *s,
-		struct circuitbreaker *cb)
+		struct rconst *rconst, struct circuitbreaker *cb)
 {
 	switch (v->type) {
 	case VALUE_PTR:
-		return !v->ptr.isindefinite && location_references(v->ptr.loc, loc, s, cb);
+		return !v->ptr.isindefinite && location_references(
+			v->ptr.loc, loc, s, rconst, cb
+		);
 	case VALUE_STRUCT:
-		return struct_references(v, loc, s, cb);
+		return struct_references(v, loc, s, rconst, cb);
 	default:
 		/* other kinds of values cannot reference */
 		return false;
@@ -1045,14 +1062,14 @@ value_references(struct value *v, struct location *loc, struct state *s,
 
 static bool
 struct_references(struct value *v, struct location *loc, struct state *s,
-		struct circuitbreaker *cb)
+		struct rconst *rconst, struct circuitbreaker *cb)
 {
 	struct map *m = v->_struct.m;
 	for (int i = 0; i < m->n; i++) {
 		struct value *val = object_as_value(
 			(struct object *) m->entry[i].value
 		);
-		if (val && value_references(val, loc, s, cb)) {
+		if (val && value_references(val, loc, s, rconst, cb)) {
 			return true;
 		}
 	}

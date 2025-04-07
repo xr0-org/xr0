@@ -71,15 +71,17 @@ clump_getblock(struct clump *c, int address)
 }
 
 static bool
-block_referenceswithcb(struct block *, struct location *, struct state *);
+block_referenceswithcb(struct block *, struct location *, struct state *,
+		struct rconst *);
 
 bool
-clump_callerreferences(struct clump *c, struct location *loc, struct state *s)
+clump_callerreferences(struct clump *c, struct location *loc, struct state *s,
+		struct rconst *rconst)
 {
 	int n = block_arr_nblocks(c->blocks);
 	struct block **arr = block_arr_blocks(c->blocks);	
 	for (int i = 0; i < n; i++) {
-		if (block_referenceswithcb(arr[i], loc, s)) {
+		if (block_referenceswithcb(arr[i], loc, s, rconst)) {
 			return true;
 		}
 	}
@@ -87,20 +89,21 @@ clump_callerreferences(struct clump *c, struct location *loc, struct state *s)
 }
 
 static bool
-block_referenceswithcb(struct block *b, struct location *loc, struct state *s)
+block_referenceswithcb(struct block *b, struct location *loc, struct state *s,
+		struct rconst *rconst)
 {
 	struct circuitbreaker *cb = circuitbreaker_create();
-	bool ref = block_references(b, loc, s, cb);	
+	bool ref = block_references(b, loc, s, rconst, cb);	
 	circuitbreaker_destroy(cb);
 	return ref;
 }
 
 void
-clump_undeclare(struct clump *c, struct state *s)
+clump_undeclare(struct clump *c, struct state *s, struct rconst *rconst)
 {
 	int n = block_arr_nblocks(c->blocks);
 	struct block **b = block_arr_blocks(c->blocks);
 	for (int i = 0; i < n; i++) {
-		block_undeclare(b[i], s);
+		block_undeclare(b[i], s, rconst);
 	}
 }

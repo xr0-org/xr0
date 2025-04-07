@@ -13,7 +13,7 @@ struct object *
 object_copy(struct object *old);
 
 struct object *
-object_abstractcopy(struct object *old, struct state *s);
+object_abstractcopy(struct object *old, struct state *, struct rconst *);
 
 struct int_arr;
 
@@ -22,7 +22,8 @@ struct circuitbreaker;
 struct state;
 
 struct int_arr *
-object_deriveorder(struct object *, struct circuitbreaker *, struct state *);
+object_deriveorder(struct object *, struct circuitbreaker *, struct state *,
+		struct rconst *);
 
 struct permutation;
 
@@ -44,17 +45,18 @@ object_upper(struct object *);
 struct state;
 
 bool
-object_isdeallocand(struct object *, struct state *);
+object_isdeallocand(struct object *, struct state *, struct rconst *);
 
 struct location;
 
 bool
 object_references(struct object *, struct location *, struct state *,
-		struct circuitbreaker *);
+		struct rconst *, struct circuitbreaker *);
 
 
 bool
-object_referencesheap(struct object *, struct state *, struct circuitbreaker *);
+object_referencesheap(struct object *, struct state *, struct rconst *,
+		struct circuitbreaker *);
 
 bool
 object_hasvalue(struct object *);
@@ -70,17 +72,17 @@ object_transfigure(struct object *obj, struct value *val, struct state *actual,
 		struct state *compare, bool islval);
 
 bool
-object_contains(struct object *, struct ast_expr *, struct state *);
+object_contains(struct object *, struct ast_expr *, struct rconst *);
 
 bool
 object_contig_precedes(struct object *before, struct object *after,
-		struct state *);
+		struct rconst *);
 
 struct object *
-object_upto(struct object *, struct ast_expr *excl_upper, struct state *);
+object_upto(struct object *, struct ast_expr *excl_upper, struct rconst *);
 
 struct object *
-object_from(struct object *, struct ast_expr *incl_lower, struct state *);
+object_from(struct object *, struct ast_expr *incl_lower, struct rconst *);
 
 struct object *
 object_getmember(struct object *obj, struct ast_type *t, char *member,
@@ -115,11 +117,11 @@ struct object **
 object_arr_objects(struct object_arr *);
 
 int
-object_arr_index(struct object_arr *arr, struct ast_expr *offset, struct state *);
+object_arr_index(struct object_arr *arr, struct ast_expr *offset, struct rconst *);
 
 int
 object_arr_index_upperincl(struct object_arr *arr, struct ast_expr *offset,
-		struct state *);
+		struct rconst *);
 
 int
 object_arr_insert(struct object_arr *arr, int index, struct object *);

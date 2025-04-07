@@ -25,10 +25,13 @@ struct block;
 struct block *
 clump_getblock(struct clump *c, int address);
 
+struct rconst;
+
 bool
-clump_callerreferences(struct clump *, struct location *, struct state *);
+clump_callerreferences(struct clump *, struct location *, struct state *,
+		struct rconst *);
 
 void
-clump_undeclare(struct clump *c, struct state *s);
+clump_undeclare(struct clump *, struct state *, struct rconst *);
 
 #endif

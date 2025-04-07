@@ -13,16 +13,19 @@
 
 struct constraint {
 	struct state *spec, *impl;
+	struct rconst *rconst;
 	struct ast_type *t;	
 };
 
 struct constraint *
-constraint_create(struct state *spec, struct state *impl, struct ast_type *t)
+constraint_create(struct state *spec, struct state *impl,
+		struct rconst *rconst, struct ast_type *t)
 {
 	struct constraint *c = malloc(sizeof(struct constraint));
 	assert(c);
 	c->spec = spec;
 	c->impl = impl;
+	c->rconst = rconst;
 	c->t = t;
 	return c;
 }
@@ -30,7 +33,7 @@ constraint_create(struct state *spec, struct state *impl, struct ast_type *t)
 struct constraint *
 constraint_deref(struct constraint *c)
 {
-	return constraint_create(c->spec, c->impl, ast_type_deref(c->t));
+	return constraint_create(c->spec, c->impl, c->rconst, ast_type_deref(c->t));
 }
 
 void
@@ -45,7 +48,7 @@ isrconst(struct ast_type *, struct value *);
 
 static int
 size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec,
-		struct state *impl);
+		struct state *impl, struct rconst *);
 
 /* location_reloffset: return a location pointing at the same block as l1 but
  * with an offset that is the difference between l1's and l2's offset. */
@@ -60,7 +63,7 @@ constraint_shapeverify(struct constraint *c, struct value *spec_v,
 		return NULL;
 	} else if (ast_type_isstruct(c->t)) {
 		return value_struct_shapeverify(
-			spec_v, impl_v, c->spec, c->impl
+			spec_v, impl_v, c->spec, c->impl, c->rconst
 		);
 	}
 	a_printf(
@@ -88,14 +91,14 @@ constraint_shapeverify(struct constraint *c, struct value *spec_v,
 		return error_printf("must be heap allocated");
 	}
 
-	if (!size_le(spec_loc, impl_loc, c->spec, c->impl)) {
+	if (!size_le(spec_loc, impl_loc, c->spec, c->impl, c->rconst)) {
 		return error_printf("must point at larger block");
 	}
 
 	/* we shift the impl_loc's offset by spec_loc's so that
 	 * block_shapeverify can behave as though both were offset zero */
 	struct location *rel_impl_loc = location_reloffset(impl_loc, spec_loc);
-	struct block *spec_b = state_getblock(c->spec, spec_loc);
+	struct block *spec_b = state_getblock(c->spec, c->rconst, spec_loc);
 	assert(spec_b);
 	struct error *err = block_shapeverify(spec_b, rel_impl_loc, c);
 	location_destroy(rel_impl_loc);
@@ -124,10 +127,10 @@ location_reloffset(struct location *l1, struct location *l2)
 
 static int
 size_le(struct location *spec_loc, struct location *impl_loc, struct state *spec,
-		struct state *impl)
+		struct state *impl, struct rconst *rconst)
 {
-	struct block *spec_b = state_getblock(spec, spec_loc),
-		     *impl_b = state_getblock(impl, impl_loc);
+	struct block *spec_b = state_getblock(spec, rconst, spec_loc),
+		     *impl_b = state_getblock(impl, rconst, impl_loc);
 	assert(spec_b && impl_b);
 	return block_size_le(spec_b, impl_b);
 }
@@ -136,13 +139,15 @@ struct error *
 constraint_shapeverify_object(struct constraint *c, struct object *spec_obj,
 		struct location *impl_loc)
 {
-	struct block *b_impl = state_getblock(c->impl, impl_loc);
+	struct block *b_impl = state_getblock(c->impl, c->rconst, impl_loc);
 	assert(b_impl);
 	struct ast_expr *offset = ast_expr_sum_create(
 		offset_as_expr(location_offset(impl_loc)),
 		object_lower(spec_obj) /* XXX: assuming lower is offset */
 	);
-	struct object_res *res = block_observe(b_impl, offset, c->impl, false);
+	struct object_res *res = block_observe(
+		b_impl, offset, c->impl, c->rconst, false
+	);
 	if (object_res_iserror(res)) {
 		struct error *err = object_res_as_error(res);
 		return error_to_block_observe_noobj(err)

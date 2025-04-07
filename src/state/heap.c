@@ -208,27 +208,27 @@ heap_blockisfreed(struct heap *h, int address)
 }
 
 void
-heap_undeclare(struct heap *h, struct state *s)
+heap_undeclare(struct heap *h, struct state *s, struct rconst *rconst)
 {
 	int n = block_arr_nblocks(h->blocks);
 	struct block **b = block_arr_blocks(h->blocks);
 	for (int i = 0; i < n; i++) {
 		if (!h->freed[i]) {
-			block_undeclare(b[i], s);
+			block_undeclare(b[i], s, rconst);
 		}
 	}
 }
 
 static bool
-block_referenced(struct state *s, int addr);
+block_referenced(struct state *, struct rconst *, int addr);
 
 bool
-heap_referenced(struct heap *h, struct state *s)
+heap_referenced(struct heap *h, struct state *s, struct rconst *rconst)
 {
 	int n = block_arr_nblocks(h->blocks);
 	for (int i = 0; i < n; i++) {
 		struct block *b = block_arr_blocks(h->blocks)[i];
-		if (!h->freed[i] && !block_iscaller(b) && !block_referenced(s, i)) {
+		if (!h->freed[i] && !block_iscaller(b) && !block_referenced(s, rconst, i)) {
 			return false;
 		}
 	}
@@ -236,14 +236,14 @@ heap_referenced(struct heap *h, struct state *s)
 }
 
 static bool
-block_referenced(struct state *s, int addr)
+block_referenced(struct state *s, struct rconst *rconst, int addr)
 {
 	struct location *loc = location_create_dynamic(
 		addr, offset_create(ast_expr_constant_create(0))
 	);
-	bool return_references = state_returnreferences(s, loc);
+	bool return_references = state_returnreferences(s, rconst, loc);
 	if (!return_references) {
-		return state_callerreferences(s, loc);
+		return state_callerreferences(s, rconst, loc);
 	}
 	
 	location_destroy(loc);

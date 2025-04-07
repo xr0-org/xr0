@@ -173,10 +173,11 @@ stack_framecall(struct stack *s)
 }
 
 static char *
-argmodulator(struct stack *, struct state *);
+argmodulator(struct stack *, struct state *, struct rconst *);
 
 char *
-stack_argmodulator(struct stack *stack, struct state *state)
+stack_argmodulator(struct stack *stack, struct state *state,
+		struct rconst *rconst)
 {
 	if (!stack->prev) {
 		/* base frame */
@@ -185,13 +186,13 @@ stack_argmodulator(struct stack *stack, struct state *state)
 	}
 	if (frame_iscall(stack->f)) {
 		assert(frame_call(stack->f));
-		return argmodulator(stack, state);
+		return argmodulator(stack, state, rconst);
 	}
-	return stack_argmodulator(stack->prev, state);
+	return stack_argmodulator(stack->prev, state, rconst);
 }
 
 static char *
-argmodulator(struct stack *stack, struct state *state)
+argmodulator(struct stack *stack, struct state *state, struct rconst *rconst)
 {
 	struct string_arr *arr = string_arr_create();
 	struct map *m = stack->varmap;
@@ -207,7 +208,7 @@ argmodulator(struct stack *stack, struct state *state)
 			value_str(
 				object_as_value(
 					object_res_as_object(
-						state_get(state, loc, false)
+						state_get(state, rconst, loc, false)
 					)
 				)
 			)
@@ -520,10 +521,11 @@ stack_declare(struct stack *stack, struct ast_variable *var, bool isparam)
 }
 
 static struct variable *
-variable_abstractcopy(struct variable *v, struct state *s);
+variable_abstractcopy(struct variable *, struct state *, struct rconst *);
 
 void
-stack_undeclare(struct stack *stack, struct state *state)
+stack_undeclare(struct stack *stack, struct state *state,
+		struct rconst *rconst)
 {
 	struct map *m = stack->varmap;
 	stack->varmap = map_create();
@@ -533,7 +535,7 @@ stack_undeclare(struct stack *stack, struct state *state)
 		if (variable_isparam(v)) {
 			map_set(
 				stack->varmap, dynamic_str(e.key),
-				variable_abstractcopy(v, state)
+				variable_abstractcopy(v, state, rconst)
 			);
 		}
 		variable_destroy(v);
@@ -632,35 +634,36 @@ stack_getvariable(struct stack *s, char *id)
 
 struct error *
 stack_shapeverify_all(struct stack *spec_stack, struct state *spec,
-		struct state *impl)
+		struct state *impl, struct rconst *rconst)
 {
 	struct error *err = stack_shapeverify_top(
-		spec_stack, spec, impl
+		spec_stack, spec, impl, rconst
 	);
 	if (err) {
 		return err;
 	}
 	if (spec_stack->prev) {
 		return stack_shapeverify_all(
-			spec_stack->prev, spec, impl
+			spec_stack->prev, spec, impl, rconst
 		);
 	}
 	return NULL;
 }
 
 static struct error *
-_var_shapeverify(struct state *spec, struct state *impl, char *id);
+_var_shapeverify(struct state *spec, struct state *impl, struct rconst *,
+		char *id);
 
 struct error *
 stack_shapeverify_top(struct stack *spec_stack, struct state *spec,
-		struct state *impl)
+		struct state *impl, struct rconst *rconst)
 {
 	int i;
 
 	struct map *m = spec_stack->varmap;
 	for (i = 0; i < m->n; i++) {
 		char *id = m->entry[i].key;
-		struct error *err = _var_shapeverify(spec, impl, id);
+		struct error *err = _var_shapeverify(spec, impl, rconst, id);
 		if (err) {
 			return error_printf(
 				"precondition failure: `%s' %w",
@@ -673,19 +676,21 @@ stack_shapeverify_top(struct stack *spec_stack, struct state *spec,
 }
 
 static struct object *
-location_mustgetobject(struct location *, struct state *);
+location_mustgetobject(struct location *, struct state *,
+		struct rconst *);
 
 static struct error *
-_var_shapeverify(struct state *spec, struct state *impl, char *id)
+_var_shapeverify(struct state *spec, struct state *impl,
+		struct rconst *rconst, char *id)
 {
 	struct object *spec_obj = location_mustgetobject(
-		loc_res_as_loc(state_getloc(spec, id)), spec
+		loc_res_as_loc(state_getloc(spec, id)), spec, rconst
 	);
 	if (!object_hasvalue(spec_obj)) {
 		return NULL;
 	}
 	struct constraint *c = constraint_create(
-		spec, impl,
+		spec, impl, rconst,
 		ast_type_copy(state_getvariabletype(spec, id))
 	);
 	struct error *err = constraint_shapeverify(
@@ -696,7 +701,8 @@ _var_shapeverify(struct state *spec, struct state *impl, char *id)
 		object_as_value(
 			location_mustgetobject(
 				loc_res_as_loc(state_getloc(impl, id)),
-				impl
+				impl,
+				rconst
 			)
 		)
 	);
@@ -705,9 +711,10 @@ _var_shapeverify(struct state *spec, struct state *impl, char *id)
 }
 
 static struct object *
-location_mustgetobject(struct location *loc, struct state *s)
+location_mustgetobject(struct location *loc, struct state *s,
+		struct rconst *rconst)
 {
-	return object_res_as_object(state_get(s, loc, false));
+	return object_res_as_object(state_get(s, rconst, loc, false));
 }
 
 static struct lsi_varmap *
@@ -741,7 +748,7 @@ static struct lsi_varmap *
 _var_rconst_mapping(struct state *s, struct rconst *rconst, char *id)
 {
 	struct object *obj = location_mustgetobject(
-		loc_res_as_loc(state_getloc(s, id)), s
+		loc_res_as_loc(state_getloc(s, id)), s, rconst
 	);
 	if (!object_hasvalue(obj)) {
 		return lsi_varmap_create();
@@ -1085,19 +1092,20 @@ variable_copy(struct variable *old)
 }
 
 static struct variable *
-variable_abstractcopy(struct variable *old, struct state *s)
+variable_abstractcopy(struct variable *old, struct state *s,
+		struct rconst *rconst)
 {
 	struct variable *new = malloc(sizeof(struct variable));
 	new->type = ast_type_copy(old->type);
 	new->isparam = old->isparam;
 	new->loc = location_copy(old->loc);
-	struct object_res *res = state_get(s, new->loc, false);
+	struct object_res *res = state_get(s, rconst, new->loc, false);
 	struct object *obj = object_res_as_object(res);
 	assert(obj);
 	if (object_hasvalue(obj)) {
 		struct value *v = object_as_value(obj);
 		if (v) {
-			object_assign(obj, value_abstractcopy(v, s));
+			object_assign(obj, value_abstractcopy(v, s, rconst));
 		}
 	}
 	return new;
@@ -1116,12 +1124,13 @@ variable_type(struct variable *v)
 }
 
 bool
-variable_references(struct variable *v, struct location *loc, struct state *s)
+variable_references(struct variable *v, struct location *loc,
+		struct state *s, struct rconst *rconst)
 {
 	assert(location_type(loc) != LOCATION_VCONST);
 
 	struct circuitbreaker *cb = circuitbreaker_create();
-	bool ans = location_referencescaller(v->loc, loc, s, cb);
+	bool ans = location_referencescaller(v->loc, loc, s, rconst, cb);
 	circuitbreaker_destroy(cb);
 	return ans;
 }

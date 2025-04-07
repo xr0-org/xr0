@@ -70,7 +70,8 @@ bool
 location_toclump(struct location *, struct clump *);
 
 bool
-location_referencesheap(struct location *, struct state *, struct circuitbreaker *);
+location_referencesheap(struct location *, struct state *,
+		struct rconst *, struct circuitbreaker *);
 
 enum location_type
 location_type(struct location *loc);
@@ -89,12 +90,12 @@ bool
 location_equal(struct location *loc1, struct location *loc2);
 
 bool
-location_referencescaller(struct location *l1, struct location *l2, struct state *s,
-		struct circuitbreaker *cb);
+location_referencescaller(struct location *l1, struct location *l2,
+		struct state *s, struct rconst *, struct circuitbreaker *cb);
 
 bool
-location_references(struct location *loc1, struct location *loc2, struct state *,
-		struct circuitbreaker *cb);
+location_references(struct location *loc1, struct location *loc2,
+		struct state *, struct rconst *, struct circuitbreaker *cb);
 
 struct permutation;
 
