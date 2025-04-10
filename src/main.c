@@ -438,6 +438,9 @@ main(int argc, char *argv[])
 	}
 }
 
+static void
+_stderr_print_lines(struct string_arr *);
+
 static int
 verify(struct config *c)
 {
@@ -467,12 +470,12 @@ verify(struct config *c)
 	case SORTMODE_SORT:
 		order = ast_topological_order(c->sortfunc, ext);
 		/* TODO: our tests run 2>&1 > /dev/null */
-		fprintf(stderr, "%s\n", string_arr_str(order));
+		_stderr_print_lines(order);
 		break;
 	case SORTMODE_VERIFY:
 		order = ast_topological_order(c->sortfunc, ext);
 		/* TODO: our tests run 2>&1 > /dev/null */
-		fprintf(stderr, "%s\n", string_arr_str(order));
+		_stderr_print_lines(order);
 		pass_inorder(order, ext);
 		break;
 	default:
@@ -483,6 +486,15 @@ verify(struct config *c)
 	ast_destroy(root);
 
 	return 0;
+}
+
+static void
+_stderr_print_lines(struct string_arr *arr)
+{
+	int i;
+
+	for (i = 0; i < string_arr_n(arr); i++)
+		fprintf(stderr, "%s\n", string_arr_s(arr)[i]);
 }
 
 bool
