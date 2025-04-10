@@ -7,7 +7,7 @@
 
 struct arr {
 	int n;
-	void **p;
+	struct any **p;
 };
 
 struct arr *
@@ -19,7 +19,7 @@ arr_create(void)
 }
 
 struct arr *
-arr_copy(struct arr *old, void *copy(void *))
+arr_copy(struct arr *old, struct any *copy(struct any *))
 {
 	int i;
 
@@ -39,7 +39,7 @@ arr_concat(struct arr *arr, struct arr *arr0)
 }
 
 void
-arr_destroy(struct arr *arr, void destroy(void *))
+arr_destroy(struct arr *arr, void destroy(struct any *))
 {
 	int i;
 
@@ -49,7 +49,7 @@ arr_destroy(struct arr *arr, void destroy(void *))
 }
 
 char *
-arr_str(struct arr *arr, char *str(void *))
+arr_str(struct arr *arr, char *str(struct any *))
 {
 	int i;
 
@@ -65,9 +65,9 @@ arr_str(struct arr *arr, char *str(void *))
 }
 
 void
-arr_append(struct arr *arr, void *p)
+arr_append(struct arr *arr, struct any *p)
 {
-	arr->p = realloc(arr->p, sizeof(void *)*++arr->n);
+	arr->p = realloc(arr->p, sizeof(struct any *)*++arr->n);
 	assert(arr->p);
 	arr->p[arr->n-1] = p;
 }
@@ -84,5 +84,5 @@ arr_appendall(struct arr *arr, struct arr *arr0)
 int
 arr_len(struct arr *arr) { return arr->n; }
 
-void *
+struct any *
 arr_get(struct arr *arr, int i) { return arr->p[i]; }
