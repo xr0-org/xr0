@@ -493,8 +493,8 @@ _stderr_print_lines(struct string_arr *arr)
 {
 	int i;
 
-	for (i = 0; i < string_arr_n(arr); i++)
-		fprintf(stderr, "%s\n", string_arr_s(arr)[i]);
+	for (i = 0; i < string_arr_len(arr); i++)
+		fprintf(stderr, "%s\n", string_arr_get(arr, i));
 }
 
 bool
