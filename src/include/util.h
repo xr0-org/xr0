@@ -36,37 +36,118 @@ map_get(struct map *, const char *key);
 void
 map_set(struct map *, const char *key, const void *value);
 
+/* DECLARE_ARRAY: declare an array of the given type, of the form
+ * 	`struct NAME##_arr`.  */
+#define DECLARE_ARRAY(TYPE, NAME) \
+struct NAME##_arr; \
+\
+struct NAME##_arr *\
+NAME##_arr_create(void); \
+\
+struct NAME##_arr * \
+NAME##_arr_copy(struct NAME##_arr *); \
+\
+void \
+NAME##_arr_destroy(struct NAME##_arr *); \
+\
+char * \
+NAME##_arr_str(struct NAME##_arr *); \
+\
+void \
+NAME##_arr_append(struct NAME##_arr *, TYPE); \
+\
+int \
+NAME##_arr_len(struct NAME##_arr *); \
+\
+TYPE \
+NAME##_arr_get(struct NAME##_arr *, int);
 
-/* XXX: string_arr: to be macro */
+/* DEFINE_ARRAY: define an array declared with DEFINE_ARRAY. COPY, DESTORY
+ * and STR are functions of the forms
+ * 	TYPE (TYPE),
+ * 	void (TYPE) and
+ * 	char *(TYPE).
+ */
+#define DEFINE_ARRAY(TYPE, NAME, COPY, DESTROY, STR) \
+struct NAME##_arr { struct arr *_; }; \
+\
+static struct NAME##_arr *\
+_##NAME##_arr_create(struct arr *_) \
+{ \
+	struct NAME##_arr *arr = malloc(sizeof(struct NAME##_arr)); \
+	assert(arr); \
+	arr->_ = _; \
+	return arr; \
+} \
+\
+struct NAME##_arr *\
+NAME##_arr_create(void) \
+{ \
+	return _##NAME##_arr_create(arr_create()); \
+} \
+\
+static void * \
+_NAME_copy(void *p); \
+\
+struct NAME##_arr * \
+NAME##_arr_copy(struct NAME##_arr *arr) \
+{ \
+	return _##NAME##_arr_create(arr_copy(arr->_, _NAME_copy)); \
+} \
+\
+static void * \
+_NAME_copy(void *p) \
+{ \
+	return (void *) COPY((TYPE) p); \
+} \
+\
+static void \
+_NAME_destroy(void *p); \
+\
+void \
+NAME##_arr_destroy(struct NAME##_arr *arr) \
+{ \
+	arr_destroy(arr->_, _NAME_destroy); \
+	free(arr); \
+} \
+\
+static void \
+_NAME_destroy(void *p) \
+{ \
+	DESTROY((TYPE) p); \
+} \
+\
+static char * \
+_NAME_str(void *p); \
+\
+char * \
+NAME##_arr_str(struct NAME##_arr *arr) \
+{ \
+	return arr_str(arr->_, _NAME_str); \
+} \
+\
+static char * \
+_NAME_str(void *p) \
+{ \
+	return STR((TYPE) p); \
+} \
+\
+void \
+NAME##_arr_append(struct NAME##_arr *arr, TYPE elem) \
+{ \
+	arr_append(arr->_, (void *) elem); \
+} \
+\
+int \
+NAME##_arr_len(struct NAME##_arr *arr) { return arr_len(arr->_); } \
+\
+TYPE \
+NAME##_arr_get(struct NAME##_arr *arr, int i) \
+{ \
+	return (TYPE) arr_get(arr->_, i); \
+}
 
-struct string_arr;
-
-struct string_arr *
-string_arr_create(void);
-
-void
-string_arr_destroy(struct string_arr *);
-
-char **
-string_arr_s(struct string_arr *);
-
-int
-string_arr_n(struct string_arr *);
-
-int
-string_arr_append(struct string_arr *, char *);
-
-char *
-string_arr_deque(struct string_arr *);
-
-struct string_arr *
-string_arr_concat(struct string_arr *s1, struct string_arr *s2);
-
-bool
-string_arr_contains(struct string_arr *, char *s);
-
-char *
-string_arr_str(struct string_arr *);
+DECLARE_ARRAY(char *, string)
 
 struct int_arr;
 

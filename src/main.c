@@ -158,10 +158,9 @@ char *
 genincludes(struct string_arr *includedirs)
 {
 	struct strbuilder *b = strbuilder_create();
-	char **s = string_arr_s(includedirs);
-	int n = string_arr_n(includedirs);
+	int n = string_arr_len(includedirs);
 	for (int i = 0; i < n; i++) {
-		strbuilder_printf(b, " -I %s", s[i]);
+		strbuilder_printf(b, " -I %s", string_arr_get(includedirs, i));
 	}
 	return strbuilder_build(b);
 }
@@ -336,10 +335,11 @@ void
 pass_inorder(struct string_arr *order, struct externals *ext)
 {
 	struct error *err;
-	int n = string_arr_n(order);
-	char **name = string_arr_s(order);
+	int n = string_arr_len(order);
 	for (int i = 0; i < n; i++) {
-		struct ast_function *f = externals_getfunc(ext, name[i]);
+		struct ast_function *f = externals_getfunc(
+			ext, string_arr_get(order, i)
+		);
 		if (ast_function_isaxiom(f) || ast_function_isproto(f)) {
 			continue;
 		}
