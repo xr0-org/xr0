@@ -77,7 +77,7 @@ static int
 _isconst(struct lsi_expr *e)
 {
 	struct string_arr *arr = tally_getvars(e->_);
-	int isconst = string_arr_n(arr) == 0;
+	int isconst = string_arr_len(arr) == 0;
 	string_arr_destroy(arr);
 	return isconst;
 }
@@ -121,9 +121,9 @@ lsi_expr_str(struct lsi_expr *e)
 	struct strbuilder *b = strbuilder_create();
 
 	struct string_arr *arr = tally_getvars(e->_); 
-	int len = string_arr_n(arr);
+	int len = string_arr_len(arr);
 	for (i = 0; i < len; i++) {
-		char *v = string_arr_s(arr)[i];
+		char *v = string_arr_get(arr, i);
 		int coef = tally_getval(e->_, v);
 		if (coef == 0) {
 			continue;
@@ -175,8 +175,8 @@ _lsi_expr_varterms(struct lsi_expr *e)
 	struct tally *t = tally_create();
 
 	struct string_arr *arr = tally_getvars(e->_);
-	for (int i = 0; i < string_arr_n(arr); i++) {
-		char *var = string_arr_s(arr)[i];
+	for (int i = 0; i < string_arr_len(arr); i++) {
+		char *var = string_arr_get(arr, i);
 		tally_setval(t, dynamic_str(var), tally_getval(e->_, var));
 	}
 	string_arr_destroy(arr);

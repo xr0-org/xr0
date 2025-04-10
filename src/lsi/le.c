@@ -214,8 +214,8 @@ _lsi_le_isfeasible(struct lsi_le *le)
 	int i;
 
 	struct string_arr *vars = _lsi_le_getvars(le);
-	for (i = 0; i < string_arr_n(vars); i++)
-		assert(!_lsi_expr_getcoef(le->_, string_arr_s(vars)[i]));
+	for (i = 0; i < string_arr_len(vars); i++)
+		assert(!_lsi_expr_getcoef(le->_, string_arr_get(vars, i)));
 	string_arr_destroy(vars);
 
 	/* l <= r stored as l - r, so the (constant) inequality is only feasible

@@ -9,6 +9,9 @@ arr_create(void);
 struct arr *
 arr_copy(struct arr *, void *copy(void *));
 
+struct arr *
+arr_concat(struct arr *, struct arr *);
+
 void
 arr_destroy(struct arr *, void destroy(void *));
 

@@ -314,9 +314,7 @@ stack_str(struct stack *stack, struct state *state)
 	struct map *m = stack->varmap;
 	struct string_arr *var_str_arr = var_strs(stack, state);
 	int var_str_max = maxlenorzero(var_str_arr);
-	assert(string_arr_n(var_str_arr) == m->n);
-	char **var_str = string_arr_s(var_str_arr);
-
+	assert(string_arr_len(var_str_arr) == m->n);
 	for (int i = 0; i < m->n; i++) {
 		struct entry e = m->entry[i];
 		struct variable *v = (struct variable *) e.value;
@@ -325,7 +323,7 @@ stack_str(struct stack *stack, struct state *state)
 			b, 
 			"\t%d: %-*s (%s",
 			i,
-			var_str_max, var_str[i],
+			var_str_max, string_arr_get(var_str_arr, i),
 			decl
 		);
 		if (variable_isparam(v)) {
@@ -369,11 +367,10 @@ var_strs(struct stack *stack, struct state *state)
 static int
 maxlenorzero(struct string_arr *arr)
 {
-	int n = string_arr_n(arr);
-	char **s = string_arr_s(arr);
+	int n = string_arr_len(arr);
 	int max = 0;
 	for (int i = 0; i < n; i++) {
-		int len = strlen(s[i]);
+		int len = strlen(string_arr_get(arr, i));
 		if (len > max) {
 			max = len;
 		}

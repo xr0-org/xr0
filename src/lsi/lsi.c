@@ -93,9 +93,9 @@ _eliminate_except(struct le_arr *old, struct string_arr *incl)
 	struct le_arr *new = le_arr_copy(old);
 
 	struct string_arr *elim = _getvars_except(new, incl);
-	for (i = 0; i < string_arr_n(elim); i++) {
+	for (i = 0; i < string_arr_len(elim); i++) {
 		struct le_arr *temp = new;
-		new = _eliminate(temp, string_arr_s(elim)[i]);
+		new = _eliminate(temp, string_arr_get(elim, i));
 		le_arr_destroy(temp);
 	}
 	string_arr_destroy(elim);
@@ -117,8 +117,8 @@ _getvars_except(struct le_arr *arr, struct string_arr *incl)
 	struct string_arr *exc = string_arr_create();
 
 	struct string_arr *vars = _getvars(arr);
-	for (i = 0; i < string_arr_n(vars); i++) {
-		char *var = string_arr_s(vars)[i];
+	for (i = 0; i < string_arr_len(vars); i++) {
+		char *var = string_arr_get(vars, i);
 		if (!_in(incl, var))
 			string_arr_append(exc, dynamic_str(var));
 	}
@@ -154,8 +154,8 @@ _varstomap(struct le_arr *arr)
 		int j;
 
 		struct string_arr *vararr = _lsi_le_getvars(le_arr_get(arr, i));
-		for (j = 0; j < string_arr_n(vararr); j++) {
-			char *var = string_arr_s(vararr)[j];
+		for (j = 0; j < string_arr_len(vararr); j++) {
+			char *var = string_arr_get(vararr, j);
 			map_set(m, dynamic_str(var), (void *) 1);
 		}
 		string_arr_destroy(vararr);
@@ -168,8 +168,8 @@ _in(struct string_arr *arr, char *s)
 {
 	int i;
 
-	for (i = 0; i < string_arr_n(arr); i++)
-		if (strcmp(s, string_arr_s(arr)[i]) == 0)
+	for (i = 0; i < string_arr_len(arr); i++)
+		if (strcmp(s, string_arr_get(arr, i)) == 0)
 			return 1;
 
 	return 0;
@@ -355,9 +355,9 @@ _verifyfeasible(struct lsi *lsi)
 	struct le_arr *arr = le_arr_copy(lsi->arr);
 
 	struct string_arr *vars = _getvars(lsi->arr); /* TODO: reverse list */
-	for (i = 0; i < string_arr_n(vars); i++) {
+	for (i = 0; i < string_arr_len(vars); i++) {
 		struct le_arr *temp = arr;
-		arr = _eliminate(temp, string_arr_s(vars)[i]);
+		arr = _eliminate(temp, string_arr_get(vars, i));
 		le_arr_destroy(temp);
 	}
 	string_arr_destroy(vars);

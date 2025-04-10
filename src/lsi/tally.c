@@ -23,8 +23,8 @@ _tally_forwardeq(struct tally *t, struct tally *u)
 	struct string_arr *arr;
 
 	arr = tally_getvars(t);
-	for (i = 0; i < string_arr_n(arr); i++) {
-		char *var = string_arr_s(arr)[i];
+	for (i = 0; i < string_arr_len(arr); i++) {
+		char *var = string_arr_get(arr, i);
 		if (tally_getval(t, var) != tally_getval(u, var)) {
 			return 0;
 		}
@@ -50,8 +50,8 @@ _tally_forwardvarorthogonal(struct tally *t, struct tally *u)
 	struct string_arr *arr;
 
 	arr = tally_getvars(t);
-	for (i = 0; i < string_arr_n(arr); i++) {
-		char *var = string_arr_s(arr)[i];
+	for (i = 0; i < string_arr_len(arr); i++) {
+		char *var = string_arr_get(arr, i);
 		if (tally_getval(t, var) && tally_getval(u, var)) {
 			return 0;
 		}
@@ -80,8 +80,8 @@ _tally_add(struct tally *t, struct tally *u)
 	struct string_arr *arr;
 
 	arr = tally_getvars(u);
-	for (i = 0; i < string_arr_n(arr); i++) {
-		char *var = string_arr_s(arr)[i];
+	for (i = 0; i < string_arr_len(arr); i++) {
+		char *var = string_arr_get(arr, i);
 		tally_setval(
 			t,
 			dynamic_str(var),
@@ -111,8 +111,8 @@ _tally_multiply(struct tally *t, long n)
 	struct string_arr *arr;
 
 	arr = tally_getvars(t);
-	for (i = 0; i < string_arr_n(arr); i++) {
-		char *var = string_arr_s(arr)[i];
+	for (i = 0; i < string_arr_len(arr); i++) {
+		char *var = string_arr_get(arr, i);
 		tally_setval(t, dynamic_str(var), n*tally_getval(t, var));
 	}
 	tally_setconst(t, n*tally_getconst(t));

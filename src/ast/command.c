@@ -54,10 +54,10 @@ struct command *
 command_copy(struct command *old)
 {
 	struct command *new = command_create(old->kind);
-	for (int i = 0; i < string_arr_n(old->args); i++) {
+	for (int i = 0; i < string_arr_len(old->args); i++) {
 		string_arr_append(
 			new->args,
-			dynamic_str(string_arr_s(old->args)[i])
+			dynamic_str(string_arr_get(old->args, i))
 		);
 	}
 	return new;
@@ -295,7 +295,7 @@ static struct command_res *
 command_help_create(struct string_arr *args, char *debugsep)
 {
 	assert(args);
-	if (string_arr_n(args) != 1) {
+	if (string_arr_len(args) != 1) {
 		return command_res_error_create(
 			error_printf(
 				"%w `help' expects single argument",
@@ -315,7 +315,7 @@ break_argislist(char *arg);
 static struct command_res *
 command_break_create(struct string_arr *args, char *debugsep)
 {
-	if (string_arr_n(args) != 1) {
+	if (string_arr_len(args) != 1) {
 		return command_res_error_create(
 			error_printf(
 				"%w `break' expects single argument",
@@ -323,7 +323,7 @@ command_break_create(struct string_arr *args, char *debugsep)
 			)
 		);
 	}
-	char *arg = string_arr_s(args)[0];
+	char *arg = string_arr_get(args, 0);
 	if (break_argisset(arg)) {
 		return command_res_cmd_create(
 			command_create_withargs(COMMAND_BREAKPOINT_SET, args)
@@ -480,13 +480,13 @@ help_quit(void);
 static struct error *
 help_exec(struct command *cmd)
 {
-	int nargs = string_arr_n(cmd->args);
+	int nargs = string_arr_len(cmd->args);
 	if (nargs == 0) {
 		help_base();
 		return NULL;
 	}
 	assert(nargs == 1);
-	char *arg = string_arr_s(cmd->args)[0];
+	char *arg = string_arr_get(cmd->args, 0);
 	if (command_isstep(arg)) {
 		help_step();
 	} else if (command_isnext(arg)) {
@@ -599,7 +599,7 @@ command_arg_toexpr(struct command *c)
 	extern FILE *yyin;
 	extern int LEX_START_TOKEN;
 
-	char *str = string_arr_s(c->args)[0];
+	char *str = string_arr_get(c->args, 0);
 	yyin = fmemopen(str, strlen(str), "r"); // Open the buffer for read/write
 	if (!yyin) {
 		fprintf(stderr, "error opening memory file\n");
@@ -619,8 +619,8 @@ command_arg_toexpr(struct command *c)
 static struct error *
 break_set_exec(struct command *c)
 {
-	assert(string_arr_n(c->args) == 1);
-	char *arg = string_arr_s(c->args)[0];
+	assert(string_arr_len(c->args) == 1);
+	char *arg = string_arr_get(c->args, 0);
 	assert(isint(arg));
 	int linenum = atoi(arg);
 	struct error *err = breakpoint_set("", linenum);

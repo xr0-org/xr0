@@ -424,21 +424,22 @@ recurse_buildgraph(struct map *g, struct map *dedup, char *fname, struct externa
 			continue;
 		}
 
-		char **func = string_arr_s(farr); 
-		for (int j = 0; j < string_arr_n(farr); j++) {
+		for (int j = 0; j < string_arr_len(farr); j++) {
+			char *func = string_arr_get(farr, j);
+
 			/* avoid duplicates */
-			if (map_get(local_dedup, func[j]) != NULL) {
+			if (map_get(local_dedup, func) != NULL) {
 				continue;
 			}
 			
-			struct ast_function *f = externals_getfunc(ext, func[j]);
+			struct ast_function *f = externals_getfunc(ext, func);
 			if (!f->isaxiom) {
-				string_arr_append(val, func[j]);	
+				string_arr_append(val, func);
 			}
-			map_set(local_dedup, func[j], (void *) true);
+			map_set(local_dedup, func, (void *) true);
 
 			/* recursively build for other funcs */
-			recurse_buildgraph(g, dedup, func[j], ext);
+			recurse_buildgraph(g, dedup, func, ext);
 		}
 	}
 

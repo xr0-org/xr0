@@ -24,9 +24,17 @@ arr_copy(struct arr *old, void *copy(void *))
 	int i;
 
 	struct arr *new = arr_create();
-	for (i = 0; i < old->n; i++) {
+	for (i = 0; i < old->n; i++)
 		arr_append(new, copy(old->p[i]));
-	}
+	return new;
+}
+
+struct arr *
+arr_concat(struct arr *arr, struct arr *arr0)
+{
+	struct arr *new = arr_create();
+	arr_appendall(new, arr);
+	arr_appendall(new, arr0);
 	return new;
 }
 
@@ -35,9 +43,8 @@ arr_destroy(struct arr *arr, void destroy(void *))
 {
 	int i;
 
-	for (i = 0; i < arr->n; i++) {
+	for (i = 0; i < arr->n; i++)
 		destroy(arr->p[i]);
-	}
 	free(arr);
 }
 
@@ -50,7 +57,7 @@ arr_str(struct arr *arr, char *str(void *))
 	strbuilder_printf(b, "{");
 	for (i = 0; i < arr->n; i++) {
 		char *s = str(arr->p[i]);
-		strbuilder_printf(b, "%s%s", s, i+1<=arr->n ? ", " : "");
+		strbuilder_printf(b, "%s%s", s, i+1<arr->n ? ", " : "");
 		free(s);
 	}
 	strbuilder_printf(b, "}");

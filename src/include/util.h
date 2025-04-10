@@ -47,6 +47,9 @@ NAME##_arr_create(void); \
 struct NAME##_arr * \
 NAME##_arr_copy(struct NAME##_arr *); \
 \
+struct NAME##_arr * \
+NAME##_arr_concat(struct NAME##_arr *, struct NAME##_arr *); \
+\
 void \
 NAME##_arr_destroy(struct NAME##_arr *); \
 \
@@ -55,6 +58,9 @@ NAME##_arr_str(struct NAME##_arr *); \
 \
 void \
 NAME##_arr_append(struct NAME##_arr *, TYPE); \
+\
+void \
+NAME##_arr_appendall(struct NAME##_arr *, struct NAME##_arr *); \
 \
 int \
 NAME##_arr_len(struct NAME##_arr *); \
@@ -66,8 +72,7 @@ NAME##_arr_get(struct NAME##_arr *, int);
  * and STR are functions of the forms
  * 	TYPE (TYPE),
  * 	void (TYPE) and
- * 	char *(TYPE).
- */
+ * 	char *(TYPE).  */
 #define DEFINE_ARRAY(TYPE, NAME, COPY, DESTROY, STR) \
 struct NAME##_arr { struct arr *_; }; \
 \
@@ -99,6 +104,12 @@ static void * \
 _NAME_copy(void *p) \
 { \
 	return (void *) COPY((TYPE) p); \
+} \
+\
+struct NAME##_arr * \
+NAME##_arr_concat(struct NAME##_arr *arr, struct NAME##_arr *arr0) \
+{ \
+	return _##NAME##_arr_create(arr_concat(arr->_, arr0->_)); \
 } \
 \
 static void \
@@ -136,6 +147,12 @@ void \
 NAME##_arr_append(struct NAME##_arr *arr, TYPE elem) \
 { \
 	arr_append(arr->_, (void *) elem); \
+} \
+\
+void \
+NAME##_arr_appendall(struct NAME##_arr *arr, struct NAME##_arr *arr0) \
+{ \
+	arr_appendall(arr->_, arr0->_); \
 } \
 \
 int \

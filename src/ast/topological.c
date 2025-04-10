@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
+
 #include "ast.h"
 #include "ext.h"
 #include "util.h"
@@ -16,6 +18,12 @@ calculate_indegrees(struct map *g);
 static struct string_arr *
 build_indegree_zero(struct map *indegrees);
 
+static char *
+_dequeue(struct string_arr **);
+
+static int
+_contains(struct string_arr *, char *);
+
 struct string_arr *
 topological_order(char *fname, struct externals *ext)
 {
@@ -25,15 +33,15 @@ topological_order(char *fname, struct externals *ext)
 	struct map *indegrees = calculate_indegrees(g);
 	struct string_arr *indegree_zero = build_indegree_zero(indegrees);
 	/* while there are nodes of indegree zero */
-	while (string_arr_n(indegree_zero) > 0) {
+	while (string_arr_len(indegree_zero) > 0) {
 		/* add one node with indegree zero to ordered */
-		char *curr = string_arr_deque(indegree_zero);
+		char *curr = _dequeue(&indegree_zero);
 		string_arr_append(order, curr);
 
 		for (int i = 0; i < g->n; i++) {
 			struct entry e = g->entry[i];
 			struct string_arr *v = (struct string_arr *) map_get(g, e.key);
-			if (string_arr_contains(v, curr)) {
+			if (_contains(v, curr)) {
 				/* decrement indegree */
 				int *count = (int *) map_get(indegrees, e.key);
 				*count = *count - 1;
@@ -45,7 +53,7 @@ topological_order(char *fname, struct externals *ext)
 	}
 
 	/* no more nodes with incoming edges */
-	if (string_arr_n(order) != indegrees->n) {
+	if (string_arr_len(order) != indegrees->n) {
 		/* TODO: pass up error */
 		fprintf(stderr, "cycle detected in graph\n");
 		exit(EXIT_FAILURE);
@@ -70,8 +78,8 @@ calculate_indegrees(struct map *g)
 			continue;
 		}
 		map_set(indegrees, dynamic_str(e.key), dynamic_int(0));
-		for (int j = 0; j < string_arr_n(deps); j++) {
-			char *dep_key = string_arr_s(deps)[j]; 
+		for (int j = 0; j < string_arr_len(deps); j++) {
+			char *dep_key = string_arr_get(deps, j); 
 			if (map_get(indegrees, dep_key) != NULL) {
 				continue;
 			}		
@@ -85,7 +93,7 @@ calculate_indegrees(struct map *g)
 		if (!n_arr) {
 			continue;
 		}
-		for (int j = 0; j < string_arr_n(n_arr); j++) {
+		for (int j = 0; j < string_arr_len(n_arr); j++) {
 			int *count = (int *) map_get(indegrees, e.key);
 			*count = *count + 1; /* XXX */
 		}
@@ -116,4 +124,35 @@ build_indegree_zero(struct map *indegrees)
 		}
 	}
 	return indegree_zero;
+}
+
+static char *
+_dequeue(struct string_arr **old)
+{
+	int i;
+
+	char *ret = dynamic_str(string_arr_get(*old, 0));
+
+	struct string_arr *new = string_arr_create();
+
+	for (i = 1; i < string_arr_len(*old); i++)
+		string_arr_append(new, dynamic_str(string_arr_get(*old, i)));
+
+	string_arr_destroy(*old);
+
+	*old = new;
+
+	return ret;
+}
+
+static int
+_contains(struct string_arr *arr, char *s)
+{
+	int i;
+
+	for (i = 0; i < string_arr_len(arr); i++)
+		if (strcmp(string_arr_get(arr, i), s) == 0)
+			return 1;
+
+	return 0;
 }
