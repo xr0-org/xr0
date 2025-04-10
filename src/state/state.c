@@ -23,6 +23,8 @@
 struct state {
 	struct externals *ext;
 	struct rconst *rconst;
+
+	/* ram */
 	struct static_memory *static_memory;
 	struct clump *clump;
 	struct stack *stack;

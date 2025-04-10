@@ -12,12 +12,7 @@
 #include "segment.h"
 
 struct path {
-	enum path_phase {
-		PATH_PHASE_ABSTRACT,
-		PATH_PHASE_ACTUAL,
-		PATH_PHASE_AUDIT,
-		PATH_PHASE_ATEND,
-	} phase;
+	enum phase { ABSTRACT, ACTUAL, AUDIT, ATEND } phase;
 	struct segment *abstract, *actual;
 };
 
@@ -26,7 +21,7 @@ path_create(struct state *abstract, struct state *actual)
 {
 	struct path *p = malloc(sizeof(struct path));
 	assert(p);
-	p->phase = PATH_PHASE_ABSTRACT;
+	p->phase = ABSTRACT;
 	p->abstract = segment_create_withstate(abstract);
 	p->actual = segment_create_withstate(actual);
 	return p;
@@ -39,8 +34,8 @@ path_split(struct path *old, struct rconst *rconst, char *fname)
 	assert(p);
 	p->phase = old->phase;
 	switch (old->phase) {
-	case PATH_PHASE_ABSTRACT:
-	case PATH_PHASE_ACTUAL:
+	case ABSTRACT:
+	case ACTUAL:
 		p->abstract = segment_split(old->abstract, rconst, fname);
 		p->actual = segment_split(old->actual, rconst, fname);
 		break;
@@ -62,14 +57,14 @@ char *
 path_str(struct path *p)
 {
 	switch (p->phase) {
-	case PATH_PHASE_ABSTRACT:
+	case ABSTRACT:
 		return segment_str(p->abstract, "ABSTRACT");
-	case PATH_PHASE_ACTUAL:
+	case ACTUAL:
 		return segment_str(p->actual, "ACTUAL");
-	case PATH_PHASE_AUDIT:
+	case AUDIT:
 		return dynamic_str("phase:\tAUDIT\n");
 		break;
-	case PATH_PHASE_ATEND:
+	case ATEND:
 		return dynamic_str("phase:\tEND\n");
 	default:
 		assert(false);
@@ -79,29 +74,29 @@ path_str(struct path *p)
 int
 path_atend(struct path *p)
 {
-	return p->phase == PATH_PHASE_ATEND;
+	return p->phase == ATEND;
 }
 
 struct error *
 path_progress(struct path *p, progressor *prog)
 {
 	switch (p->phase) {
-	case PATH_PHASE_ABSTRACT:
+	case ABSTRACT:
 		if (segment_atend(p->abstract)) {
-			p->phase = PATH_PHASE_ACTUAL;
+			p->phase = ACTUAL;
 			return path_progress(p, prog);
 		}
 		return segment_progress(p->abstract, prog);
-	case PATH_PHASE_ACTUAL:
+	case ACTUAL:
 		if (segment_atend(p->actual)) {
-			p->phase = PATH_PHASE_AUDIT;
+			p->phase = AUDIT;
 			return path_progress(p, prog);
 		}
 		return segment_progress(p->actual, prog);
-	case PATH_PHASE_AUDIT:
-		p->phase = PATH_PHASE_ATEND;
+	case AUDIT:
+		p->phase = ATEND;
 		return segment_audit(p->abstract, p->actual);
-	case PATH_PHASE_ATEND:
+	case ATEND:
 	default:
 		assert(false);
 	}
@@ -111,12 +106,12 @@ struct error *
 path_verify(struct path *p, struct ast_expr *expr)
 {
 	switch (p->phase) {
-	case PATH_PHASE_ABSTRACT:
+	case ABSTRACT:
 		return segment_verify(p->abstract, expr);
-	case PATH_PHASE_ACTUAL:
+	case ACTUAL:
 		return segment_verify(p->actual, expr);
-	case PATH_PHASE_AUDIT:
-	case PATH_PHASE_ATEND:
+	case AUDIT:
+	case ATEND:
 		return NULL;
 	default:
 		assert(false);
@@ -127,12 +122,12 @@ struct lexememarker *
 path_lexememarker(struct path *p)
 {
 	switch (p->phase) {
-	case PATH_PHASE_ABSTRACT:
+	case ABSTRACT:
 		return segment_lexememarker(p->abstract);
-	case PATH_PHASE_ACTUAL:
+	case ACTUAL:
 		return segment_lexememarker(p->actual);
-	case PATH_PHASE_AUDIT:
-	case PATH_PHASE_ATEND:
+	case AUDIT:
+	case ATEND:
 		return NULL;
 	default:
 		assert(false);

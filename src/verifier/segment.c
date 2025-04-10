@@ -10,18 +10,34 @@
 #include "segment.h"
 
 struct segment {
-	enum segment_phase {
-		SEGMENT_PHASE_INIT,
-		SEGMENT_PHASE_SETUP,
-		SEGMENT_PHASE_EXEC,
-		SEGMENT_PHASE_ATEND,
-		SEGMENT_PHASE_ATLOOPEND,
+	enum phase {
+		/* real phases */
+		INIT, SETUP, EXEC, ATEND,
+
+		/* XXX: to be taken out */
+		ATLOOPEND,
 	} phase;
+	struct state *setup_state;
+	struct point *p;
+};
+
+struct point {
+	enum point_phase {
+		POINT_EXEC,				/* ordinary point */
+
+		POINT_INV_DERIVE, POINT_INV_VERIFY,	/* invariant */
+
+		POINT_ATEND,
+	} phase;
+
+	/* only defined in invariant points */
+	struct state_arr *inv;
+
 	struct state *state;
 };
 
 static struct segment *
-_segment_create(enum segment_phase phase)
+_segment_create(enum phase phase)
 {
 	struct segment *s = malloc(sizeof(struct segment));
 	assert(s);
@@ -32,7 +48,7 @@ _segment_create(enum segment_phase phase)
 struct segment *
 segment_create_withstate(struct state *state)
 {
-	struct segment *s = _segment_create(SEGMENT_PHASE_INIT);
+	struct segment *s = _segment_create(INIT);
 	s->state = state;
 	return s;
 }
@@ -42,12 +58,12 @@ segment_split(struct segment *old, struct rconst *rconst, char *fname)
 {
 	struct segment *new = _segment_create(old->phase);
 	switch (old->phase) {
-	case SEGMENT_PHASE_INIT:
+	case INIT:
 		assert(old->state);
 		/* fallthrough */
-	case SEGMENT_PHASE_SETUP:
-	case SEGMENT_PHASE_EXEC:
-	case SEGMENT_PHASE_ATEND:
+	case SETUP:
+	case EXEC:
+	case ATEND:
 		new->state = state_split(old->state, rconst, fname);
 		break;
 	default:
@@ -72,12 +88,12 @@ segment_str(struct segment *s, char *pathphase)
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\t%s (%s)\n", pathphase, phasename(s));
 	switch (s->phase) {
-	case SEGMENT_PHASE_INIT:
-	case SEGMENT_PHASE_ATEND:
-	case SEGMENT_PHASE_ATLOOPEND:
+	case INIT:
+	case ATEND:
+	case ATLOOPEND:
 		break;
-	case SEGMENT_PHASE_SETUP:
-	case SEGMENT_PHASE_EXEC:
+	case SETUP:
+	case EXEC:
 		strbuilder_printf(b, "\ntext:\n%s\n", state_programtext(s->state));
 		strbuilder_printf(b, "%s\n", state_str(s->state));
 		break;
@@ -91,15 +107,15 @@ static char *
 phasename(struct segment *s)
 {
 	switch (s->phase) {
-	case SEGMENT_PHASE_INIT:
+	case INIT:
 		return "INIT";
-	case SEGMENT_PHASE_SETUP:
+	case SETUP:
 		return "SETUP";
-	case SEGMENT_PHASE_EXEC:
+	case EXEC:
 		return "EXEC";
-	case SEGMENT_PHASE_ATEND:
+	case ATEND:
 		return "END";
-	case SEGMENT_PHASE_ATLOOPEND:
+	case ATLOOPEND:
 		return "END LOOP";
 	default:
 		assert(false);
@@ -110,8 +126,8 @@ int
 segment_atend(struct segment *s)
 {
 	switch (s->phase) {
-	case SEGMENT_PHASE_ATEND:
-	case SEGMENT_PHASE_ATLOOPEND:
+	case ATEND:
+	case ATLOOPEND:
 		return 1;
 	default:
 		return 0;
@@ -131,12 +147,12 @@ struct error *
 segment_progress(struct segment *s, progressor *prog)
 {
 	switch (s->phase) {
-	case SEGMENT_PHASE_INIT:
-		s->phase = SEGMENT_PHASE_SETUP;
+	case INIT:
+		s->phase = SETUP;
 		return NULL;
-	case SEGMENT_PHASE_SETUP:
+	case SETUP:
 		return setup(s, prog);
-	case SEGMENT_PHASE_EXEC:
+	case EXEC:
 		return exec(s, prog);
 	default:
 		assert(false);
@@ -150,7 +166,7 @@ static struct error *
 setup(struct segment *s, progressor *prog)
 {
 	if (state_atsetupend(s->state)) {
-		s->phase = SEGMENT_PHASE_EXEC;
+		s->phase = EXEC;
 		return NULL;
 	}
 	return progressortrace(s->state, prog);
@@ -174,10 +190,10 @@ exec(struct segment *s, progressor *prog)
 		if (err) {
 			return state_stacktrace(s->state, err);
 		}
-		s->phase = SEGMENT_PHASE_ATLOOPEND;
+		s->phase = ATLOOPEND;
 	}
 	if (state_atend(s->state)) {
-		s->phase = SEGMENT_PHASE_ATEND;
+		s->phase = ATEND;
 		return NULL;
 	}
 	return progressortrace(s->state, prog);
@@ -187,10 +203,10 @@ struct error *
 segment_verify(struct segment *s, struct ast_expr *e)
 {
 	switch (s->phase) {
-	case SEGMENT_PHASE_EXEC:
+	case EXEC:
 		return ast_stmt_verify(ast_stmt_create_expr(NULL, e), s->state);
-	case SEGMENT_PHASE_INIT:
-	case SEGMENT_PHASE_ATEND:
+	case INIT:
+	case ATEND:
 		return NULL;
 	default:
 		assert(false);
@@ -201,12 +217,12 @@ struct lexememarker *
 segment_lexememarker(struct segment *s)
 {
 	switch (s->phase) {
-	case SEGMENT_PHASE_SETUP:
-	case SEGMENT_PHASE_EXEC:
+	case SETUP:
+	case EXEC:
 		return state_lexememarker(s->state);
-	case SEGMENT_PHASE_INIT:
-	case SEGMENT_PHASE_ATEND:
-	case SEGMENT_PHASE_ATLOOPEND:
+	case INIT:
+	case ATEND:
+	case ATLOOPEND:
 		return NULL;
 	default:
 		assert(false);
@@ -216,7 +232,7 @@ segment_lexememarker(struct segment *s)
 struct error *
 segment_audit(struct segment *abstract, struct segment *actual)
 {
-	if (actual->phase == SEGMENT_PHASE_ATLOOPEND) {
+	if (actual->phase == ATLOOPEND) {
 		return NULL;
 	}
 
