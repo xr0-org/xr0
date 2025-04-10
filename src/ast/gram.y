@@ -190,10 +190,10 @@ variable_array_create(struct ast_variable *v)
 %type <expr> multiplicative_expression cast_expression
 %type <expr> range_expression range_operand
 %type <expr> allocation_expression isdeallocand_expression constant_expression
-%type <expr> declarator init_declarator initializer
+%type <expr> declarator init_declarator initializer struct_declarator
 %type <expr> direct_declarator
 
-%type <expr_array> argument_expression_list init_declarator_list
+%type <expr_array> argument_expression_list init_declarator_list struct_declarator_list
 
 %type <externdecl> external_declaration
 %type <function> function_definition
@@ -205,12 +205,12 @@ variable_array_create(struct ast_variable *v)
 %type <stmt_array> statement_list declaration_list
 %type <string> identifier
 %type <type> declaration_specifiers type_specifier struct_or_union_specifier 
+%type <type> specifier_qualifier_list
 %type <type_modifier> declaration_modifier storage_class_specifier type_qualifier
 %type <unary_operator> unary_operator
-%type <variable> parameter_declaration struct_declaration
+%type <variable> parameter_declaration
 %type <variable_array> parameter_list parameter_type_list
-%type <variable_array> struct_declaration_list
-%type <variable_array> declaration
+%type <variable_array> declaration struct_declaration struct_declaration_list
 
 %start start
 
@@ -557,37 +557,55 @@ struct_or_union
 
 struct_declaration_list
 	: struct_declaration
-		{ $$ = variable_array_create($1); }
-	| struct_declaration_list struct_declaration
-		{ $$ = variable_array_append($1, $2); }
+	| struct_declaration_list struct_declaration {
+		$$ = $1;
+		for (int i = 0; i < ast_variable_arr_n($2); i++) {
+			$$ = variable_array_append(
+				$$, ast_variable_arr_v($2)[i]
+			);
+		}
+	}
 	;
 
 struct_declaration
-	: specifier_qualifier_list struct_declarator_list ';'
-		{ TODO("specifier_qualifier_list struct_declarator_list ';'"); }
-	| declaration /* XXX: added temporarily */ {
-		assert(ast_variable_arr_n($1) == 1);
-		$$ = ast_variable_arr_v($1)[0];
+	: specifier_qualifier_list struct_declarator_list ';' {
+		struct expr_array expr_arr = $2; 
+		struct ast_variable_arr *vars = ast_variable_arr_create();
+		for (int i = 0; i < expr_arr.n; i++) {
+			struct ast_declaration *decl = ast_expr_declare(
+				ast_expr_declarator(expr_arr.expr[i]), $1
+			);
+			struct ast_variable *v = ast_variable_create(
+				dynamic_str(ast_declaration_name(decl)),
+				ast_type_copy(ast_declaration_type(decl))
+			);
+			ast_variable_setinit(v, ast_expr_initialiser(expr_arr.expr[i]));
+			ast_variable_arr_append(vars, v);
+		}
+		assert(ast_variable_arr_n(vars) > 0);
+		$$ = vars;
 	}
 	;
 
 specifier_qualifier_list
 	: type_specifier specifier_qualifier_list
+		{ TODO("type_specifier specifier_qualifier_list"); }
 	| type_specifier
 	| type_qualifier specifier_qualifier_list
+		{ TODO("type_qualifier specifier_qualifier_list"); }
 	| type_qualifier
+		{ TODO("type_qualifier"); }
 	;
 
 struct_declarator_list
 	: struct_declarator
-		{ TODO("struct_declarator"); }
+		{ $$ = expr_array_create($1); }
 	| struct_declarator_list ',' struct_declarator
-		{ TODO("struct_declarator_list ',' struct_declarator"); }
+		{ $$ = expr_array_append(&$1, $3); }
 	;
 
 struct_declarator
 	: declarator
-		{ TODO("declarator"); }
 	| ':' constant_expression
 		{ TODO("':' constant_expression"); }
 	| declarator ':' constant_expression
