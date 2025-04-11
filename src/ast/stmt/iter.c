@@ -139,7 +139,6 @@ iter_gotoform(struct iter *iter, struct lexememarker *loc)
 static struct ast_block *
 for_gotoform(struct iter *old, struct lexememarker *loc)
 {
-	printf("oldinv:\n%s\n", ast_block_str(old->inv, 1));
 	struct ast_block *b = ast_block_create(NULL, 0);
 	ast_block_append_stmt(b, ast_stmt_copy(old->for_init));
 	ast_block_append_stmt(
@@ -147,7 +146,7 @@ for_gotoform(struct iter *old, struct lexememarker *loc)
 		ast_stmt_create_labelled(
 			lexememarker_copy(loc),
 			dynamic_str(".start"),
-			ast_stmt_create_compound_v(
+			ast_stmt_create_invariant(
 				lexememarker_copy(loc),
 				ast_block_copy(old->inv)
 			)

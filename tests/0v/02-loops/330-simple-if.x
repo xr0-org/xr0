@@ -8,7 +8,6 @@ f()
 
 	~ [ 2 <= i; i <= 2; ]
 }
-
 /*
 void
 f()
@@ -31,4 +30,26 @@ f()
 
 	~ [ 2 <= i; i <= 2; ]
 }
+
+i = 0;
+
+
+int
+f(int i, int *arr) ~ [ setup: i = 0; arr = .malloc(5); ]
+{
+
+b:
+	j = 2;
+c:
+	~ [ i = [0?3]; ]
+	j = 5;
+	~ [ j = 5; ]
+	arr[j];
+
+	j = 6;
+	i = 1;
+
+	goto c; // error, j <= 5 not satisfied
+}
+
 */

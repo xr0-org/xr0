@@ -138,11 +138,7 @@ _bounds_safe_offset(struct block *b, struct ast_expr *offset, struct state *s)
 		struct lsi_le *le = lsi_range_expr_le_lw(r, lsi_o);  
 		struct lsi_le *le_neg = lsi_le_negate(le);
 		return int_res_error_create(
-			error_verifierinstruct(
-				verifierinstruct_split(
-					splitinstruct_create(le, le_neg)
-				)
-			)
+			error_mustsplit(splitinstruct_create(le, le_neg))
 		);
 	}
 

@@ -481,7 +481,7 @@ struct ast_block *
 ast_stmt_as_block(struct ast_stmt *);
 
 struct ast_stmt *
-ast_stmt_create_compound_v(struct lexememarker *, struct ast_block *);
+ast_stmt_create_invariant(struct lexememarker *, struct ast_block *);
 
 struct ast_stmt *
 ast_stmt_create_break(struct lexememarker *);

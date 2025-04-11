@@ -394,8 +394,9 @@ v_printf(char *fmt, ...)
 struct error {
 	enum error_type {
 		ERROR_PRINTF,
-		ERROR_VERIFIERINSTRUCT,
-		ERROR_VERIFIERCONTRADICTION,
+
+		ERROR_ENTER_INVARIANT,
+
 		ERROR_RETURN,
 		ERROR_BREAK,
 		ERROR_PREV,
@@ -414,12 +415,12 @@ struct error {
 
 		ERROR_LSI_NOTFEASIBLE,
 
-		ERROR_INVARIANTSPLIT,
+		ERROR_MUSTSPLIT,
 	} type;
 	union error_contents {
 		char *printf;
-		struct verifierinstruct *inst;		/* verifier split */
-		struct splitinstruct *splitinst;	/* invariant split */
+		struct splitinstruct *splitinst;	/* must split */
+		char *label;				/* enter invariant */
 	} contents;
 	struct error *inner;
 };
@@ -509,40 +510,40 @@ findnextfmt(char **p)
 	return output;
 }
 
-struct error *
-error_verifierinstruct(struct verifierinstruct *inst)
+static struct error *
+_enterinvariant(char *label)
 {
 	struct error *err = calloc(1, sizeof(struct error));
-	err->type = ERROR_VERIFIERINSTRUCT;
-	err->contents.inst = inst;
+	assert(err);
+	err->type = ERROR_ENTER_INVARIANT;
+	err->contents.label = label;
 	return err;
 }
 
 struct error *
-error_to_verifierinstruct(struct error *err)
-{
-	return error_to(err, ERROR_VERIFIERINSTRUCT);
-}
-
-struct verifierinstruct *
-error_get_verifierinstruct(struct error *err)
-{
-	assert(err->type == ERROR_VERIFIERINSTRUCT);
-	return err->contents.inst;
-}
+error_enterinvariant(char *l) { assert(l); return _enterinvariant(l); }
 
 struct error *
-error_verifiercontradiction(void)
-{
-	struct error *err = calloc(1, sizeof(struct error));
-	err->type = ERROR_VERIFIERCONTRADICTION;
-	return err;
-}
+error_enterinvariant_nolabel(void) { return _enterinvariant(NULL); }
 
 struct error *
-error_to_verifiercontradiction(struct error *err)
+error_to_enterinvariant(struct error *err)
 {
-	return error_to(err, ERROR_VERIFIERCONTRADICTION);
+	return error_to(err, ERROR_ENTER_INVARIANT);
+}
+
+int
+error_enterinvariant_haslabel(struct error *err)
+{
+	assert(err->type == ERROR_ENTER_INVARIANT);
+	return err->contents.label != NULL;
+}
+
+char *
+error_enterinvariant_label(struct error *err)
+{
+	assert(error_enterinvariant_haslabel(err));
+	return err->contents.label;
 }
 
 struct error *
@@ -701,26 +702,33 @@ error_to_lsi_notfeasible(struct error *err)
 }
 
 struct error *
-error_invariantsplit(struct splitinstruct *s)
+error_mustsplit(struct splitinstruct *s)
 {
 	struct error *err = calloc(1, sizeof(struct error));
-	err->type = ERROR_INVARIANTSPLIT;
+	assert(err);
+	err->type = ERROR_MUSTSPLIT;
 	err->contents.splitinst = s;
 	return err;
 }
 
 struct error *
-error_to_invariantsplit(struct error *err)
+error_to_mustsplit(struct error *err)
 {
-	return error_to(err, ERROR_INVARIANTSPLIT);
+	return error_to(err, ERROR_MUSTSPLIT);
+}
+
+struct splitinstruct *
+error_get_splitinstruct(struct error *err)
+{
+	assert(error_to_mustsplit(err));
+	return err->contents.splitinst;
 }
 
 char *
 error_str(struct error *err)
 {
 	char *error_type_str[] = {
-		[ERROR_VERIFIERINSTRUCT]	= "verifier instruction",
-		[ERROR_VERIFIERCONTRADICTION]	= "verifier contradiction",
+		[ERROR_ENTER_INVARIANT]		= "enter invariant",
 		[ERROR_RETURN]			= "returned",
 		[ERROR_BREAK]			= "broken",
 		[ERROR_PREV]			= "prev",
@@ -739,14 +747,13 @@ error_str(struct error *err)
 
 		[ERROR_LSI_NOTFEASIBLE]		= "not feasible",
 
-		[ERROR_INVARIANTSPLIT]		= "invariant split",
+		[ERROR_MUSTSPLIT]		= "must split",
 	};
 
 	switch (err->type) {
 	case ERROR_PRINTF:
 		return dynamic_str(err->contents.printf);
-	case ERROR_VERIFIERINSTRUCT:
-	case ERROR_VERIFIERCONTRADICTION:
+	case ERROR_ENTER_INVARIANT:
 	case ERROR_RETURN:
 	case ERROR_BREAK:
 	case ERROR_PREV:
@@ -757,7 +764,7 @@ error_str(struct error *err)
 	case ERROR_MODULATE_SKIP:
 	case ERROR_EVAL_VOID:
 	case ERROR_LSI_NOTFEASIBLE:
-	case ERROR_INVARIANTSPLIT:
+	case ERROR_MUSTSPLIT:
 		return dynamic_str(error_type_str[err->type]);
 	case ERROR_VALUE_BOUNDS:
 		assert(err->inner);

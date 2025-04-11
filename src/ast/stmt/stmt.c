@@ -12,6 +12,7 @@
 #include "value.h"
 
 #include "asm.h"
+#include "inv.h"
 #include "iter.h"
 #include "jump.h"
 #include "stmt.h"
@@ -27,6 +28,7 @@ struct ast_stmt {
 			struct ast_stmt *stmt;
 		} labelled;
 		struct ast_block *compound;
+		struct inv *inv;
 		struct {
 			bool isswitch;
 			struct ast_expr *cond;
@@ -220,7 +222,7 @@ ast_stmt_create_compound(struct lexememarker *loc, struct ast_block *b)
 struct ast_block *
 ast_stmt_as_block(struct ast_stmt *stmt)
 {
-	assert(stmt->kind == STMT_COMPOUND || stmt->kind == STMT_COMPOUND_V);
+	assert(stmt->kind == STMT_COMPOUND || stmt->kind == STMT_INVARIANT);
 	return stmt->u.compound;
 }
 
@@ -235,22 +237,41 @@ ast_stmt_compound_sprint(struct ast_stmt *stmt, int indent_level,
 }
 
 static void
-ast_stmt_compound_v_sprint(struct ast_stmt *stmt, int indent_level,
+ast_stmt_invariant_sprint(struct ast_stmt *stmt, int indent_level,
 		struct strbuilder *sb)
 {
-	assert(stmt->kind == STMT_COMPOUND_V);
-	char *s = ast_block_absstr(stmt->u.compound, indent_level);
-	strbuilder_printf(sb, "~ %s", s);
+	assert(stmt->kind == STMT_INVARIANT);
+	char *s = inv_str(stmt->u.inv, indent_level);
+	strbuilder_printf(sb, "%s", s);
 	free(s);
 }
 
 struct ast_stmt *
-ast_stmt_create_compound_v(struct lexememarker *loc, struct ast_block *b)
+ast_stmt_create_inv(struct lexememarker *loc, struct inv *inv)
 {
 	struct ast_stmt *stmt = ast_stmt_create(loc);
-	stmt->kind = STMT_COMPOUND_V;
-	stmt->u.compound = b;
+	stmt->kind = STMT_INVARIANT;
+	stmt->u.inv = inv;
 	return stmt;
+}
+
+struct ast_stmt *
+ast_stmt_create_invariant(struct lexememarker *loc, struct ast_block *b)
+{
+	return ast_stmt_create_inv(loc, inv_create(b));
+}
+
+int
+ast_stmt_isinv(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_INVARIANT;
+}
+
+struct inv *
+ast_stmt_as_inv(struct ast_stmt *stmt)
+{
+	assert(ast_stmt_isinv(stmt));
+	return stmt->u.inv;
 }
 
 static struct ast_stmt *
@@ -520,7 +541,7 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 	case STMT_NOP:
 		break;
 	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
+	case STMT_INVARIANT:
 		ast_block_destroy(stmt->u.compound);
 		break;
 	case STMT_SELECTION:
@@ -575,9 +596,9 @@ ast_stmt_copy(struct ast_stmt *stmt)
 		return ast_stmt_create_compound(
 			loc, ast_block_copy(stmt->u.compound)
 		);
-	case STMT_COMPOUND_V:
-		return ast_stmt_create_compound_v(
-			loc, ast_block_copy(stmt->u.compound)
+	case STMT_INVARIANT:
+		return ast_stmt_create_inv(
+			loc, inv_copy(stmt->u.inv)
 		);
 	case STMT_SELECTION:
 		return ast_stmt_create_sel(
@@ -621,8 +642,8 @@ ast_stmt_str(struct ast_stmt *stmt, int indent_level)
 	case STMT_COMPOUND:
 		ast_stmt_compound_sprint(stmt, indent_level, b);
 		break;
-	case STMT_COMPOUND_V:
-		ast_stmt_compound_v_sprint(stmt, indent_level, b);
+	case STMT_INVARIANT:
+		ast_stmt_invariant_sprint(stmt, indent_level, b);
 		break;
 	case STMT_SELECTION:
 		ast_stmt_sel_sprint(stmt, indent_level, b);
@@ -668,7 +689,7 @@ ast_stmt_kind(struct ast_stmt *stmt)
 struct ast_block *
 ast_stmt_as_v_block(struct ast_stmt *stmt)
 {
-	assert(stmt->kind == STMT_COMPOUND_V);
+	assert(stmt->kind == STMT_INVARIANT);
 	return stmt->u.compound;
 }
 
@@ -698,7 +719,7 @@ ast_stmt_getfuncs(struct ast_stmt *stmt)
 	case STMT_LABELLED:
 		return ast_stmt_getfuncs(stmt->u.labelled.stmt);
 	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
+	case STMT_INVARIANT:
 		return ast_stmt_compound_getfuncs(stmt);
 	case STMT_EXPR:
 		return ast_stmt_expr_getfuncs(stmt);
@@ -760,7 +781,7 @@ static struct error *
 preconds_selection_verify(struct ast_stmt *stmt);
 
 static struct error *
-preconds_compound_verify(struct ast_stmt *);
+preconds_invarianterify(struct ast_stmt *);
 
 struct error *
 ast_stmt_preconds_validate(struct ast_stmt *stmt)
@@ -773,7 +794,7 @@ ast_stmt_preconds_validate(struct ast_stmt *stmt)
 	case STMT_SELECTION:
 		return preconds_selection_verify(stmt);	
 	case STMT_COMPOUND:
-		return preconds_compound_verify(stmt);
+		return preconds_invarianterify(stmt);
 	default:
 		assert(false);
 	}
@@ -789,7 +810,7 @@ preconds_selection_verify(struct ast_stmt *stmt)
 }
 
 static struct error *
-preconds_compound_verify(struct ast_stmt *stmt)
+preconds_invarianterify(struct ast_stmt *stmt)
 {
 	struct error *err;
 	struct ast_block *b = stmt->u.compound;

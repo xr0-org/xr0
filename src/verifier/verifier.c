@@ -9,7 +9,6 @@
 #include "value.h"
 
 #include "arr.h"
-#include "instruct.h"
 #include "lsi.h"
 #include "mux.h"
 #include "path.h"
@@ -63,6 +62,9 @@ progressor_next(void)
 	return state_next;
 }
 
+static void
+verifier_split(struct verifier *v, struct splitinstruct *inst);
+
 struct error *
 verifier_progress(struct verifier *v, progressor *prog)
 {
@@ -75,11 +77,10 @@ verifier_progress(struct verifier *v, progressor *prog)
 	}
 	struct error *err = path_progress(_verifier_path(v), prog);
 	if (err) {
-		struct error *inst_err = error_to_verifierinstruct(err);
-		if (!inst_err) {
+		if (!error_to_mustsplit(err)) {
 			return err;
 		}
-		verifierinstruct_do(error_get_verifierinstruct(inst_err), v);
+		verifier_split(v, error_get_splitinstruct(err));
 	}
 	return NULL;
 }
@@ -90,7 +91,7 @@ verifier_progress(struct verifier *v, progressor *prog)
 static struct verifier_arr *
 verifier_gensplits(struct verifier *, struct splitinstruct *);
 
-void
+static void
 verifier_split(struct verifier *v, struct splitinstruct *inst)
 {
 	_verifier_split(v, mux_create(verifier_gensplits(v, inst)));

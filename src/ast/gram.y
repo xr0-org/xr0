@@ -820,7 +820,7 @@ statement
 	| iteration_statement
 	| jump_statement
 	| compound_verification_statement
-		{ $$ = ast_stmt_create_compound_v(lexloc(), $1); }
+		{ $$ = ast_stmt_create_invariant(lexloc(), $1); }
 	;
 
 labelled_statement

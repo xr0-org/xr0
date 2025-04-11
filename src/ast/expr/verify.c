@@ -536,7 +536,7 @@ setupdecided_abstract(struct ast_expr *call, struct state *s)
 		ast_function_abstract(f), s
 	);
 	if (ast_block_res_iserror(res)) {
-		assert(error_to_verifierinstruct(ast_block_res_as_error(res)));
+		assert(error_to_mustsplit(ast_block_res_as_error(res)));
 	}
 
 	/* pop call frame */
@@ -941,11 +941,7 @@ value_relational_eval(struct eval *rv1, enum ast_binary_operator op,
 	}
 
 	return e_res_error_create(
-		state_ininvariant(s)
-		? error_invariantsplit(splitinstruct_create(le, le_neg))
-		: error_verifierinstruct(
-			verifierinstruct_split(splitinstruct_create(le, le_neg))
-		)
+		error_mustsplit(splitinstruct_create(le, le_neg))
 	);
 }
 

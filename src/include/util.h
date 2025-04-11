@@ -140,22 +140,31 @@ struct error;
 struct error *
 error_printf(char *fmt, ...);
 
-struct verifierinstruct;
+struct splitinstruct;
 
 struct error *
-error_verifierinstruct(struct verifierinstruct *);
+error_mustsplit(struct splitinstruct *);
 
 struct error *
-error_to_verifierinstruct(struct error *);
+error_to_mustsplit(struct error *);
 
-struct verifierinstruct *
-error_get_verifierinstruct(struct error *);
-
-struct error *
-error_verifiercontradiction(void);
+struct splitinstruct *
+error_get_splitinstruct(struct error *);
 
 struct error *
-error_to_verifiercontradiction(struct error *);
+error_enterinvariant(char *label);
+
+struct error *
+error_enterinvariant_nolabel(void);
+
+struct error *
+error_to_enterinvariant(struct error *);
+
+int
+error_enterinvariant_haslabel(struct error *);
+
+char *
+error_enterinvariant_label(struct error *);
 
 struct error *
 error_return(void);
@@ -222,14 +231,6 @@ error_lsi_notfeasible(void);
 
 struct error *
 error_to_lsi_notfeasible(struct error *);
-
-struct splitinstruct;
-
-struct error *
-error_invariantsplit(struct splitinstruct *);
-
-struct error *
-error_to_invariantsplit(struct error *);
 
 char *
 error_str(struct error *);

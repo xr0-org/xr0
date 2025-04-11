@@ -15,6 +15,7 @@
 
 #include "type.h"
 
+#include "inv.h"
 #include "iter.h"
 #include "jump.h"
 #include "stmt.h"
@@ -49,12 +50,16 @@ static struct error *
 jump_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
-struct error *
+static struct error *
 selection_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
 static struct error *
 iter_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
+
+static struct error *
+labelled_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
 static struct error *
@@ -70,6 +75,8 @@ linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		return selection_linearise(stmt, b, loc, state);
 	case STMT_ITERATION:
 		return iter_linearise(stmt, b, loc, state);
+	case STMT_LABELLED:
+		return labelled_linearise(stmt, b, loc, state);
 	default:
 		assert(false);
 	}
@@ -105,7 +112,7 @@ jump_linearise(struct ast_stmt *stmt, struct ast_block *b,
 	return NULL;
 }
 
-struct error *
+static struct error *
 selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
@@ -138,10 +145,46 @@ static struct error *
 iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
-	struct ast_block *w1 = iter_gotoform(ast_stmt_as_iter(stmt), loc);
-	ast_block_appendallcopy(b, w1);
-	ast_block_destroy(w1);
+	struct ast_block *gf_b = iter_gotoform(ast_stmt_as_iter(stmt), loc);
+	ast_block_appendallcopy(b, gf_b);
+	ast_block_destroy(gf_b);
 	return NULL;
+}
+
+static struct inv *
+_labelled_getinvcopy(struct ast_stmt *);
+
+static struct error *
+labelled_linearise(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
+{
+	struct inv *inv = _labelled_getinvcopy(stmt);
+	inv_addlabel(inv, ast_stmt_labelled_label(stmt));
+	ast_block_append_stmt(
+		b,
+		ast_stmt_create_inv(
+			lexememarker_copy(loc),
+			inv
+		)
+	);
+
+	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
+	if (!ast_stmt_isinv(inner))
+		ast_block_append_stmt(
+			b,
+			ast_stmt_copy(inner)
+		);
+
+	return NULL;
+}
+
+static struct inv *
+_labelled_getinvcopy(struct ast_stmt *stmt)
+{
+	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
+	return ast_stmt_isinv(inner)
+		? inv_copy(ast_stmt_as_inv(inner))
+		: inv_create(ast_block_create(NULL, 0));
 }
 
 /* stmt_verify */
@@ -188,10 +231,11 @@ islinearisable(struct ast_stmt *stmt)
 	case STMT_DECLARATION: /* XXX: will have to be linearised with
 				  initialisation */
 	case STMT_NOP:
-	case STMT_LABELLED:
 	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
+	case STMT_INVARIANT:
 		return false;
+	case STMT_LABELLED:
+		assert(0);
 	case STMT_ITERATION:
 	case STMT_SELECTION:
 	case STMT_EXPR:
@@ -218,7 +262,7 @@ islinearisable_setuponly(struct ast_stmt *stmt)
 	case STMT_NOP:
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
-	case STMT_COMPOUND_V:
+	case STMT_INVARIANT:
 	case STMT_ITERATION:
 	case STMT_JUMP:
 	case STMT_EXPR:
@@ -259,9 +303,6 @@ static struct error *
 stmt_decl_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_compoundv_exec(struct ast_stmt *, struct state *);
-
-static struct error *
 stmt_compound_exec(struct ast_stmt *, struct state *);
 
 static struct error *
@@ -291,14 +332,17 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
-		a_printf(ast_stmt_issetup(stmt), "only setup labels supported\n");
-		return NULL;
+		if (ast_stmt_issetup(stmt))
+			return NULL;
+		/* TODO: reconcile with state_islinear to allow recursive
+		 * linearisation, as this case requires */
+		return linearise(stmt, s);
 	case STMT_EXPR:
 		return stmt_expr_exec(ast_stmt_as_expr(stmt), s);
 	case STMT_COMPOUND:
 		return stmt_compound_exec(stmt, s);
-	case STMT_COMPOUND_V:
-		return stmt_compoundv_exec(stmt, s);
+	case STMT_INVARIANT:
+		return inv_exec(ast_stmt_as_inv(stmt), s);
 	case STMT_SELECTION:
 		return stmt_sel_exec(stmt, s);
 	case STMT_ITERATION:
@@ -338,16 +382,6 @@ decl_init(struct ast_variable *v, struct state *s)
 		);
 		return stmt_expr_exec(assign, s);
 	}
-	return NULL;
-}
-
-static struct error *
-stmt_compoundv_exec(struct ast_stmt *stmt, struct state *state)
-{
-	struct frame *block_frame = frame_blockverify_create(
-		dynamic_str("verification block"), ast_stmt_as_block(stmt)
-	);
-	state_pushframe(state, block_frame);
 	return NULL;
 }
 
@@ -422,14 +456,7 @@ iter_setupverify(struct ast_stmt *stmt, struct state *impl)
 {
 	struct state *spec = state_copy(impl);
 	struct error *err = deriveinvstate(stmt, spec);
-	if (err) {
-		struct error *instr_err = error_to_verifierinstruct(err);
-		if (!instr_err) {
-			a_printf(!err, "%s\n", error_str(err));
-		}
-		/* |- verifier instruction */
-		return instr_err;
-	}
+	assert(!err);
 	err = state_constraintverify_all(spec, impl);
 	state_destroy(spec);
 	return err;
@@ -441,14 +468,7 @@ deriveinvstate(struct ast_stmt *stmt, struct state *state)
 	state_pushinvariantframe(state, iter_inv(ast_stmt_as_iter(stmt)));
 	while (!state_atinvariantend(state)) {
 		struct error *err = state_step(state);
-		if (err) {
-			struct error *instr_err = error_to_verifierinstruct(err);
-			if (!instr_err) {
-				a_printf(!err, "%s\n", error_str(err));
-			}
-			/* |- verifier instruction */
-			return instr_err;
-		}
+		assert(!err);
 	}
 	state_popframe(state);
 	return NULL;

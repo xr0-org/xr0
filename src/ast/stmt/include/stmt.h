@@ -8,7 +8,7 @@ enum ast_stmt_kind {
 	STMT_DECLARATION,
 	STMT_LABELLED,
 	STMT_COMPOUND,
-	STMT_COMPOUND_V,
+	STMT_INVARIANT,
 	STMT_EXPR,
 	STMT_SELECTION,
 	STMT_ITERATION,
@@ -39,5 +39,16 @@ ast_stmt_as_jump(struct ast_stmt *);
 
 struct ast_stmt *
 ast_stmt_create_goto(struct lexememarker *, char *);
+
+struct inv;
+
+struct ast_stmt *
+ast_stmt_create_inv(struct lexememarker *loc, struct inv *inv);
+
+int
+ast_stmt_isinv(struct ast_stmt *);
+
+struct inv *
+ast_stmt_as_inv(struct ast_stmt *);
 
 #endif
