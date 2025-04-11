@@ -36,6 +36,44 @@ map_get(struct map *, const char *key);
 void
 map_set(struct map *, const char *key, const void *value);
 
+
+struct arr;
+
+struct arr *
+arr_create(void);
+
+struct arr *
+arr_copy(struct arr *, void *copy(void *));
+
+struct arr *
+arr_map(struct arr *, void *map(void *));
+
+struct arr *
+arr_concat(struct arr *, struct arr *);
+
+void
+arr_destroy(struct arr *, void destroy(void *));
+
+char *
+arr_str(struct arr *, char *str(void *));
+
+void
+arr_append(struct arr *, void *);
+
+void
+arr_appendall(struct arr *, struct arr *);
+
+int
+arr_len(struct arr *);
+
+void *
+arr_get(struct arr *, int);
+
+/* arr_do: apply f to the elements of the array, in sequence. */
+void
+arr_do(struct arr *, void f(void *));
+
+
 /* DECLARE_ARRAY: declare an array of the given type, of the form
  * 	`struct NAME##_arr`.  */
 #define DECLARE_ARRAY(TYPE, NAME) \
@@ -92,16 +130,16 @@ NAME##_arr_create(void) \
 } \
 \
 static void * \
-_NAME_copy(void *p); \
+_##NAME##_copy(void *p); \
 \
 struct NAME##_arr * \
 NAME##_arr_copy(struct NAME##_arr *arr) \
 { \
-	return _##NAME##_arr_create(arr_copy(arr->_, _NAME_copy)); \
+	return _##NAME##_arr_create(arr_copy(arr->_, _##NAME##_copy)); \
 } \
 \
 static void * \
-_NAME_copy(void *p) \
+_##NAME##_copy(void *p) \
 { \
 	return (void *) COPY((TYPE) p); \
 } \
@@ -113,32 +151,32 @@ NAME##_arr_concat(struct NAME##_arr *arr, struct NAME##_arr *arr0) \
 } \
 \
 static void \
-_NAME_destroy(void *p); \
+_##NAME##_destroy(void *p); \
 \
 void \
 NAME##_arr_destroy(struct NAME##_arr *arr) \
 { \
-	arr_destroy(arr->_, _NAME_destroy); \
+	arr_destroy(arr->_, _##NAME##_destroy); \
 	free(arr); \
 } \
 \
 static void \
-_NAME_destroy(void *p) \
+_##NAME##_destroy(void *p) \
 { \
 	DESTROY((TYPE) p); \
 } \
 \
 static char * \
-_NAME_str(void *p); \
+_##NAME##_str(void *p); \
 \
 char * \
 NAME##_arr_str(struct NAME##_arr *arr) \
 { \
-	return arr_str(arr->_, _NAME_str); \
+	return arr_str(arr->_, _##NAME##_str); \
 } \
 \
 static char * \
-_NAME_str(void *p) \
+_##NAME##_str(void *p) \
 { \
 	return STR((TYPE) p); \
 } \
@@ -166,6 +204,7 @@ NAME##_arr_get(struct NAME##_arr *arr, int i) \
 
 DECLARE_ARRAY(char *, string)
 
+
 struct int_arr;
 
 struct int_arr *
@@ -185,6 +224,7 @@ int_arr_append(struct int_arr *, int);
 
 void
 int_arr_appendrange(struct int_arr *arr, struct int_arr *arr2);
+
 
 struct strbuilder;
 

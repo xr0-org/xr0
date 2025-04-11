@@ -3,11 +3,9 @@
 
 #include "util.h"
 
-#include "arr.h"
-
 struct arr {
 	int n;
-	struct any **p;
+	void **p;
 };
 
 struct arr *
@@ -19,13 +17,24 @@ arr_create(void)
 }
 
 struct arr *
-arr_copy(struct arr *old, struct any *copy(struct any *))
+arr_copy(struct arr *old, void *copy(void *))
 {
 	int i;
 
 	struct arr *new = arr_create();
 	for (i = 0; i < old->n; i++)
 		arr_append(new, copy(old->p[i]));
+	return new;
+}
+
+struct arr *
+arr_map(struct arr *old, void *map(void *))
+{
+	int i;
+
+	struct arr *new = arr_create();
+	for (i = 0; i < old->n; i++)
+		arr_append(new, map(old->p[i]));
 	return new;
 }
 
@@ -39,17 +48,14 @@ arr_concat(struct arr *arr, struct arr *arr0)
 }
 
 void
-arr_destroy(struct arr *arr, void destroy(struct any *))
+arr_destroy(struct arr *arr, void destroy(void *))
 {
-	int i;
-
-	for (i = 0; i < arr->n; i++)
-		destroy(arr->p[i]);
+	arr_do(arr, destroy);
 	free(arr);
 }
 
 char *
-arr_str(struct arr *arr, char *str(struct any *))
+arr_str(struct arr *arr, char *str(void *))
 {
 	int i;
 
@@ -65,9 +71,9 @@ arr_str(struct arr *arr, char *str(struct any *))
 }
 
 void
-arr_append(struct arr *arr, struct any *p)
+arr_append(struct arr *arr, void *p)
 {
-	arr->p = realloc(arr->p, sizeof(struct any *)*++arr->n);
+	arr->p = realloc(arr->p, sizeof(void *)*++arr->n);
 	assert(arr->p);
 	arr->p[arr->n-1] = p;
 }
@@ -84,5 +90,14 @@ arr_appendall(struct arr *arr, struct arr *arr0)
 int
 arr_len(struct arr *arr) { return arr->n; }
 
-struct any *
+void *
 arr_get(struct arr *arr, int i) { return arr->p[i]; }
+
+void
+arr_do(struct arr *arr, void f(void *))
+{
+	int i;
+
+	for (i = 0; i < arr->n; i++)
+		f(arr->p[i]);
+}
