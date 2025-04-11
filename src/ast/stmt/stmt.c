@@ -238,18 +238,10 @@ static void
 ast_stmt_compound_v_sprint(struct ast_stmt *stmt, int indent_level,
 		struct strbuilder *sb)
 {
-	struct ast_block *b = ast_stmt_as_block(stmt);
-
-	/* special case for nice print */
-	if (ast_block_nstmts(b) == 1) {
-		char *s = ast_stmt_str(ast_block_stmts(b)[0], 0);
-		strbuilder_printf(sb, "~ [ %s ]", s);
-		free(s);
-	} else {
-		char *s = ast_block_absstr(stmt->u.compound, indent_level);
-		strbuilder_printf(sb, "~ %s", s);
-		free(s);
-	}
+	assert(stmt->kind == STMT_COMPOUND_V);
+	char *s = ast_block_absstr(stmt->u.compound, indent_level);
+	strbuilder_printf(sb, "~ %s", s);
+	free(s);
 }
 
 struct ast_stmt *
@@ -280,6 +272,12 @@ struct ast_stmt *
 ast_stmt_create_return(struct lexememarker *loc, struct ast_expr *rv)
 {
 	return ast_stmt_create_jump(loc, jump_return_create(rv));
+}
+
+struct ast_stmt *
+ast_stmt_create_goto(struct lexememarker *loc, char *label)
+{
+	return ast_stmt_create_jump(loc, jump_goto_create(label));
 }
 
 int

@@ -9,22 +9,26 @@ f()
 	~ [ 2 <= i; i <= 2; ]
 }
 
+/*
 void
 f()
 {
 	int i;
 
+{
 	i = 0;
 
-l0 ~ [ i = [0?3]; if (i) i = 2; ]:
+.start:	~ [ i = [0?3]; if (i) i = 2; ]
 
-	if (!(i < 1)) goto l1;
+	if (!(i < 1)) goto .end;
 
 	i = 1;
 	i++;
 
-	goto l0;
+	goto .start;
+.end: ;
+}
 
-l1:
 	~ [ 2 <= i; i <= 2; ]
 }
+*/

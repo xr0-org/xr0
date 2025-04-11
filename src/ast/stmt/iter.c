@@ -13,8 +13,6 @@
 
 struct iter {
 	enum type {
-		WHILE,
-		DO,
 		FOR,
 	} type;
 
@@ -38,13 +36,6 @@ iter_create(enum type type, struct ast_expr *cond, struct ast_block *inv,
 	iter->inv = inv;
 	iter->body = body;
 	return iter;
-}
-
-struct iter *
-iter_while_create(struct ast_expr *cond, struct ast_block *inv,
-		struct ast_stmt *body)
-{
-	return iter_create(WHILE, cond, inv, body);
 }
 
 struct iter *
@@ -90,42 +81,18 @@ iter_destroy(struct iter *iter)
 }
 
 static void
-while_sprint(struct iter *, int indent, struct strbuilder *);
-
-static void
 for_sprint(struct iter *, int indent, struct strbuilder *);
 
 void
 iter_sprint(struct iter *iter, int indent, struct strbuilder *b)
 {
 	switch (iter->type) {
-	case WHILE:
-		while_sprint(iter, indent, b);
-		break;
 	case FOR:
 		for_sprint(iter, indent, b);
 		break;
 	default:
 		assert(false);
 	}
-}
-
-static void
-while_sprint(struct iter *iter, int indent, struct strbuilder *b)
-{
-	char *cond = ast_expr_str(iter->cond),
-	     *body = ast_stmt_str(iter->body, indent);
-
-	char *inv = iter->inv ?
-		ast_block_absstr(iter->inv, indent) : dynamic_str("");
-
-	strbuilder_printf(
-		b,
-		"while (%s) ~ %s%s",
-		cond, inv, body
-	);
-
-	free(cond); free(body); free(inv);
 }
 
 static void
@@ -155,90 +122,86 @@ iter_inv(struct iter *iter)
 	return iter->inv;
 }
 
-static int
-isone(struct ast_expr *);
-
-int
-iter_inwhile1form(struct iter *iter)
-{
-	return iter->type == WHILE && isone(iter->cond);
-}
-
-static int
-isone(struct ast_expr *e)
-{
-	return ast_expr_isconstant(e) && ast_expr_as_constant(e) == 1;
-}
-
 static struct ast_block *
-for_while1form(struct iter *, struct lexememarker *);
+for_gotoform(struct iter *, struct lexememarker *);
 
 struct ast_block *
-iter_while1form(struct iter *iter, struct lexememarker *loc)
+iter_gotoform(struct iter *iter, struct lexememarker *loc)
 {
-	assert(!iter_inwhile1form(iter));
 	switch (iter->type) {
 	case FOR:
-		return for_while1form(iter, loc);
+		return for_gotoform(iter, loc);
 	default:
 		assert(false);
 	}
 }
 
-static struct iter *
-while1form(struct iter *, struct lexememarker *loc);
-
 static struct ast_block *
-for_while1form(struct iter *old, struct lexememarker *loc)
+for_gotoform(struct iter *old, struct lexememarker *loc)
 {
-	struct iter *new = while1form(old, loc);
+	printf("oldinv:\n%s\n", ast_block_str(old->inv, 1));
+	struct ast_block *b = ast_block_create(NULL, 0);
+	ast_block_append_stmt(b, ast_stmt_copy(old->for_init));
 	ast_block_append_stmt(
-		ast_stmt_as_block(new->body),
+		b,
+		ast_stmt_create_labelled(
+			lexememarker_copy(loc),
+			dynamic_str(".start"),
+			ast_stmt_create_compound_v(
+				lexememarker_copy(loc),
+				ast_block_copy(old->inv)
+			)
+		)
+	);
+	ast_block_append_stmt(
+		b,
+		ast_stmt_create_sel(
+			lexememarker_copy(loc),
+			false,
+			ast_expr_unary_create(
+				ast_expr_copy(old->cond), UNARY_OP_BANG
+			),
+			ast_stmt_create_goto(
+				lexememarker_copy(loc),
+				dynamic_str(".end")
+			),
+			NULL
+		)
+	);
+	ast_block_append_stmt(b, ast_stmt_copy(old->body));
+	ast_block_append_stmt(
+		b,
 		ast_stmt_create_expr(
 			lexememarker_copy(loc),
 			ast_expr_copy(old->for_update)
 		)
 	);
-	struct ast_block *b = ast_block_create(NULL, 0);
-	ast_block_append_stmt(b, ast_stmt_copy(old->for_init));
 	ast_block_append_stmt(
-		b, ast_stmt_create_iter(lexememarker_copy(loc), new)
+		b,
+		ast_stmt_create_goto(
+			lexememarker_copy(loc),
+			dynamic_str(".start")
+		)
+	);
+	ast_block_append_stmt(
+		b,
+		ast_stmt_create_labelled(
+			lexememarker_copy(loc),
+			dynamic_str(".end"),
+			ast_stmt_create_nop(lexememarker_copy(loc))
+		)
 	);
 	return b;
 }
 
 static struct ast_block *
-prepend(struct ast_stmt *old, struct ast_stmt *stmt);
-
-static struct iter *
-while1form(struct iter *old, struct lexememarker *loc)
-{
-	struct ast_stmt *term = ast_stmt_create_sel(
-		lexememarker_copy(loc),
-		false,
-		ast_expr_unary_create(ast_expr_copy(old->cond), UNARY_OP_BANG),
-		ast_stmt_create_break(lexememarker_copy(loc)),
-		NULL
-	);
-	return iter_while_create(
-		ast_expr_constant_create(1),
-		old->inv ? ast_block_copy(old->inv) : NULL,
-		ast_stmt_create_compound(
-			lexememarker_copy(ast_stmt_lexememarker(old->body)),
-			prepend(old->body, term)
-		)
-	);
-}
-
-static struct ast_block *
 toblock(struct ast_stmt *);
 
-static struct ast_block *
-prepend(struct ast_stmt *old, struct ast_stmt *stmt)
+void
+iter_pushstatebody(struct iter *iter, struct state *s)
 {
-	struct ast_block *new = toblock(old);
-	ast_block_prepend_stmt(new, stmt);
-	return new;
+	/* TODO: clean up block somehow */
+	state_pushloopframe(s, toblock(iter->body));
 }
 
 static struct ast_block *
@@ -257,13 +220,6 @@ toblock(struct ast_stmt *stmt)
 	struct ast_block *b = ast_block_create(NULL, 0);
 	ast_block_append_stmt(b, ast_stmt_copy(stmt));
 	return b;
-}
-
-void
-iter_pushstatebody(struct iter *iter, struct state *s)
-{
-	/* TODO: clean up block somehow */
-	state_pushloopframe(s, toblock(iter->body));
 }
 
 struct string_arr *

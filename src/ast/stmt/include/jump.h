@@ -5,6 +5,9 @@ struct jump *
 jump_break_create(void);
 
 struct jump *
+jump_goto_create(char *);
+
+struct jump *
 jump_return_create(struct ast_expr *rv);
 
 struct jump *

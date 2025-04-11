@@ -10,34 +10,18 @@
 #include "segment.h"
 
 struct segment {
-	enum phase {
-		/* real phases */
-		INIT, SETUP, EXEC, ATEND,
-
-		/* XXX: to be taken out */
+	enum segment_phase {
+		INIT,
+		SETUP,
+		EXEC,
+		ATEND,
 		ATLOOPEND,
 	} phase;
-	struct state *setup_state;
-	struct point *p;
-};
-
-struct point {
-	enum point_phase {
-		POINT_EXEC,				/* ordinary point */
-
-		POINT_INV_DERIVE, POINT_INV_VERIFY,	/* invariant */
-
-		POINT_ATEND,
-	} phase;
-
-	/* only defined in invariant points */
-	struct state_arr *inv;
-
 	struct state *state;
 };
 
 static struct segment *
-_segment_create(enum phase phase)
+_segment_create(enum segment_phase phase)
 {
 	struct segment *s = malloc(sizeof(struct segment));
 	assert(s);

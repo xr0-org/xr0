@@ -138,7 +138,7 @@ static struct error *
 iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
-	struct ast_block *w1 = iter_while1form(ast_stmt_as_iter(stmt), loc);
+	struct ast_block *w1 = iter_gotoform(ast_stmt_as_iter(stmt), loc);
 	ast_block_appendallcopy(b, w1);
 	ast_block_destroy(w1);
 	return NULL;
@@ -193,7 +193,6 @@ islinearisable(struct ast_stmt *stmt)
 	case STMT_COMPOUND_V:
 		return false;
 	case STMT_ITERATION:
-		return !iter_inwhile1form(ast_stmt_as_iter(stmt));
 	case STMT_SELECTION:
 	case STMT_EXPR:
 		return true;

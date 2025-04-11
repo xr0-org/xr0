@@ -26,13 +26,10 @@ iter_sprint(struct iter *iter, int indent, struct strbuilder *);
 struct ast_block *
 iter_inv(struct iter *);
 
-int
-iter_inwhile1form(struct iter *);
-
 struct lexememarker;
 
 struct ast_block *
-iter_while1form(struct iter *, struct lexememarker *);
+iter_gotoform(struct iter *, struct lexememarker *);
 
 struct state;
 
