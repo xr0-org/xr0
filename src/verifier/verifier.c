@@ -124,6 +124,11 @@ verifier_progress(struct verifier *v, progressor *prog)
 			if (err) {
 				return error_printf("invariant: %w", err);
 			}
+			/* TODO: if label present, store invariant states
+			 * accessible via _verifier_mux(v) against it in map
+			 * accessible to each of them, and then instruct all the
+			 * verifiers in _verifier_mux(v) to leave the invariants
+			 * and proceed normally. */
 			assert(0);
 		}
 
