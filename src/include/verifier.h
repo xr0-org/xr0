@@ -21,7 +21,7 @@ verifier_destroy(struct verifier *);
 char *
 verifier_str(struct verifier *);
 
-bool
+int
 verifier_atend(struct verifier *);
 
 typedef struct error *(progressor)(struct state *);
@@ -36,9 +36,6 @@ struct error *
 verifier_progress(struct verifier *, progressor *);
 
 struct error *
-verifier_verify(struct verifier *, struct ast_expr *);
-
-struct error *
 verifier_setbreakpoint(struct verifier *);
 
 struct lexememarker *
@@ -46,6 +43,9 @@ verifier_lexememarker(struct verifier *);
 
 int
 verifier_frameid(struct verifier *);
+
+struct error *
+verifier_verify(struct verifier *, struct state *);
 
 struct verifierinstruct;
 

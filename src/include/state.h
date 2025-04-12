@@ -28,18 +28,17 @@ struct frame;
 struct rconst;
 
 struct state *
-state_create(struct frame *, struct rconst *, struct externals *);
+state_create(struct frame *, struct externals *);
 
 struct number;
 
 struct state *
 state_copy(struct state *);
 
-struct state *
-state_split(struct state *, struct rconst *, char *funcname);
+struct lsi_le;
 
-char *
-state_funcname(struct state *s);
+struct state *
+state_split(struct state *, struct lsi_le *);
 
 void
 state_destroy(struct state *state);

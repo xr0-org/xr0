@@ -7,50 +7,73 @@
 #include "arr.h"
 #include "mux.h"
 
-struct mux {
-	int index;
-	struct verifier_arr *verifiers;
-};
+struct mux { struct verifier_arr *_; };
 
 struct mux *
 mux_create(struct verifier_arr *verifiers)
 {
 	struct mux *mux = calloc(1, sizeof(struct mux));
 	assert(mux);
-	mux->verifiers = verifiers;
+	mux->_ = verifiers;
 	return mux;
 }
 
 void
 mux_destroy(struct mux *mux)
 {
-	verifier_arr_destroy(mux->verifiers);
+	verifier_arr_destroy(mux->_);
 	free(mux);
 }
 
+static int
+_index_wherenot(struct mux *, verifier_rule);
+
 int
-mux_atend(struct mux *mux)
+mux_all(struct mux *mux, verifier_rule r)
 {
-	int n = verifier_arr_n(mux->verifiers);
-	assert(n);
+	return _index_wherenot(mux, r) == -1;
+}
 
-	struct verifier *v = verifier_arr_paths(mux->verifiers)[mux->index];
-	if (verifier_atend(v)) {
-		if (mux->index < n-1) {
-			mux->index++;
-			return mux_atend(mux);
-		} else {
-			return 1;
-		}
-	}
+static int
+_index_wherenot(struct mux *mux, verifier_rule r)
+{
+	int i;
 
-	return 0;
+	for (i = 0; i < verifier_arr_n(mux->_); i++)
+		if (!r(verifier_arr_paths(mux->_)[i]))
+			return i;
+
+	return -1;
 }
 
 struct verifier *
-mux_activeverifier(struct mux *mux)
+mux_firstnot(struct mux *mux, verifier_rule r)
 {
-	assert(!mux_atend(mux));
+	int i = _index_wherenot(mux, r);
+	assert(i != -1);
+	return verifier_arr_paths(mux->_)[i];
+}
 
-	return verifier_arr_paths(mux->verifiers)[mux->index];
+
+struct error *
+mux_one_verifies(struct mux *mux, struct state *s)
+{
+	int i;
+
+	struct strbuilder *b = strbuilder_create();
+
+	int n = verifier_arr_n(mux->_);
+	for (i = 0; i < n; i++) {
+		struct error *err = verifier_verify(
+			verifier_arr_paths(mux->_)[i], s
+		);
+		if (!err) {
+			return NULL;
+		}
+		strbuilder_printf(
+			b, "%s%s", error_str(err), i+1<n? " or " : ""
+		);
+	}
+
+	return error_printf(strbuilder_build(b));
 }

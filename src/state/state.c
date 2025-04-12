@@ -33,13 +33,13 @@ struct state {
 };
 
 struct state *
-state_create(struct frame *f, struct rconst *rconst, struct externals *ext)
+state_create(struct frame *f, struct externals *ext)
 {
 	struct state *state = malloc(sizeof(struct state));
 	assert(state);
 	state->ext = ext;
 	state->static_memory = static_memory_create();
-	state->rconst = rconst;
+	state->rconst = rconst_create();
 	state->clump = clump_create();
 	state->stack = stack_create(f, NULL);
 	state->heap = heap_create();
@@ -73,19 +73,28 @@ state_copy(struct state *state)
 	return copy;
 }
 
+static char *
+split_name(char *name, struct lsi_le *);
+
 struct state *
-state_split(struct state *state, struct rconst *rconst, char *func_name)
+state_split(struct state *old, struct lsi_le *cond)
 {
-	struct state *copy = state_copy(state);
-	copy->rconst = rconst;
-	copy->stack = stack_copywithname(state->stack, func_name);
-	return copy;
+	struct state *new = state_copy(old);
+	new->rconst = rconst_split(old->rconst, cond);
+	new->stack = stack_copywithname(
+		old->stack, split_name(stack_funcname(old->stack), cond)
+	);
+	return new;
 }
 
-char *
-state_funcname(struct state *s)
+static char *
+split_name(char *name, struct lsi_le *split)
 {
-	return stack_funcname(s->stack);
+	struct strbuilder *b = strbuilder_create();
+	char *s = lsi_le_str(split);
+	strbuilder_printf(b, "%s | %s", name, s);
+	free(s);
+	return strbuilder_build(b);
 }
 
 char *

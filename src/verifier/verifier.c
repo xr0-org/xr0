@@ -11,11 +11,8 @@
 
 #include "arr.h"
 #include "mux.h"
-#include "path.h"
 
 struct verifier;
-
-DECLARE_RESULT_TYPE(struct verifier *, verifier, v_res)
 
 static struct verifier *
 _verifier_copywithsplit(struct verifier *old, struct lsi_le *);
@@ -26,26 +23,76 @@ _verifier_split(struct verifier *, struct mux *);
 static int
 _verifier_issplit(struct verifier *);
 
+static int
+_verifier_ininv(struct verifier *);
+
+static int
+_verifier_inv_haslabel(struct verifier *);
+
+char *
+_verifier_inv_label(struct verifier *);
+
+static struct state *
+_verifier_inv_context(struct verifier *);
+
+static void
+_verifier_enterinvariant(struct verifier *);
+
+static void
+_verifier_setlabel(struct verifier *, char *);
+
 static struct mux *
 _verifier_mux(struct verifier *);
 
-static struct path *
-_verifier_path(struct verifier *);
+static struct state *
+_verifier_state(struct verifier *);
+
+static int
+verifier_atinvariantend(struct verifier *v);
 
 char *
 verifier_str(struct verifier *v)
 {
-	return _verifier_issplit(v)
-		? verifier_str(mux_activeverifier(_verifier_mux(v)))
-		: path_str(_verifier_path(v));
+	if (_verifier_issplit(v))
+		return verifier_str(
+			mux_firstnot(
+				_verifier_mux(v),
+				_verifier_ininv(v)
+					? verifier_atinvariantend
+					: verifier_atend
+			)
+		);
+
+	struct strbuilder *b = strbuilder_create();
+	struct state *s = _verifier_state(v);
+	strbuilder_printf(b, "mode:\t");
+	if (_verifier_ininv(v)) {
+		strbuilder_printf(b, "INV");
+		if (_verifier_inv_haslabel(v))
+			strbuilder_printf(b, " %s", _verifier_inv_label(v));
+		strbuilder_printf(b, "\n");
+	} else {
+		strbuilder_printf(b, "EXEC\n");
+	}
+	strbuilder_printf(b, "\ntext:\n%s\n", state_programtext(s));
+	strbuilder_printf(b, "%s\n", state_str(s));
+	return strbuilder_build(b);
 }
 
-bool
+int
 verifier_atend(struct verifier *v)
 {
 	return _verifier_issplit(v)
-		? mux_atend(_verifier_mux(v))
-		: path_atend(_verifier_path(v));
+		? mux_all(_verifier_mux(v), verifier_atend)
+		: state_atend(_verifier_state(v));
+}
+
+static int
+verifier_atinvariantend(struct verifier *v)
+{
+	return _verifier_issplit(v)
+		? mux_all(_verifier_mux(v), verifier_atinvariantend)
+		: state_atinvariantend(_verifier_state(v));
 }
 
 /* verifier_progress */
@@ -68,19 +115,60 @@ verifier_split(struct verifier *v, struct splitinstruct *inst);
 struct error *
 verifier_progress(struct verifier *v, progressor *prog)
 {
-	if (_verifier_issplit(v)) {
-		assert(!mux_atend(_verifier_mux(v)));
+	if (_verifier_ininv(v)) {
+		if (verifier_atinvariantend(v)) {
+			struct error *err = mux_one_verifies(
+				_verifier_mux(v),
+				_verifier_inv_context(v)
+			);
+			if (err) {
+				return error_printf("invariant: %w", err);
+			}
+			assert(0);
+		}
 
-		return verifier_progress(
-			mux_activeverifier(_verifier_mux(v)), prog
-		);
-	}
-	struct error *err = path_progress(_verifier_path(v), prog);
-	if (err) {
-		if (!error_to_mustsplit(err)) {
+		if (_verifier_issplit(v))
+			return verifier_progress(
+				mux_firstnot(
+					_verifier_mux(v),
+					verifier_atinvariantend
+				), prog
+			);
+
+		struct error *err = prog(_verifier_state(v));
+		if (err) {
+			if (error_to_mustsplit(err)) {
+				verifier_split(v, error_get_splitinstruct(err));
+				return NULL;
+			}
+			assert(!error_to_enterinvariant(err));
 			return err;
 		}
-		verifier_split(v, error_get_splitinstruct(err));
+		return NULL;
+	}
+
+	if (_verifier_issplit(v)) {
+		assert(!mux_all(_verifier_mux(v), verifier_atend));
+
+		return verifier_progress(
+			mux_firstnot(_verifier_mux(v), verifier_atend), prog
+		);
+	}
+	struct error *err = prog(_verifier_state(v));
+	if (err) {
+		if (error_to_mustsplit(err)) {
+			verifier_split(v, error_get_splitinstruct(err));
+			return NULL;
+		}
+		if (error_to_enterinvariant(err)) {
+			_verifier_enterinvariant(v);
+			if (error_enterinvariant_haslabel(err))
+				_verifier_setlabel(
+					v, error_enterinvariant_label(err)
+				);
+			return NULL;
+		}
+		return err;
 	}
 	return NULL;
 }
@@ -110,46 +198,51 @@ verifier_gensplits(struct verifier *v, struct splitinstruct *inst)
 	return arr;
 }
 
-struct error *
-verifier_verify(struct verifier *v, struct ast_expr *expr)
-{
-	return _verifier_issplit(v)
-		? verifier_verify(mux_activeverifier(_verifier_mux(v)), expr)
-		: path_verify(_verifier_path(v), expr);
-}
-
 struct lexememarker *
 verifier_lexememarker(struct verifier *v)
 {
+	if (_verifier_ininv(v) && verifier_atinvariantend(v))
+		return NULL;
+
 	return _verifier_issplit(v)
-		? verifier_lexememarker(mux_activeverifier(_verifier_mux(v)))
-		: path_lexememarker(_verifier_path(v));
+		? verifier_lexememarker(
+			mux_firstnot(
+				_verifier_mux(v),
+				_verifier_ininv(v)
+					? verifier_atinvariantend
+					: verifier_atend
+			)
+		)
+		: state_lexememarker(_verifier_state(v));
 }
 
 struct verifier {
 	int issplit;
 	union {
 		struct mux *mux;
-		struct path *p;
+		struct state *s;
 	} u;
-	struct rconst *rconst;
-	struct ast_function *f;
-	struct externals *ext;
+
+	int ininv;
+	struct state *context;	/* state before invariant */
+	char *label;		/* invariant label, may be NULL */
 };
 
 static struct verifier *
-_create(struct path *p, struct rconst *rconst, struct ast_function *f,
-		struct externals *ext)
+_create(struct state *s, int ininv, struct state *context, char *label)
 {
-	assert(p);
+	assert(s);
 
 	struct verifier *v = malloc(sizeof(struct verifier));
 	assert(v);
+
 	v->issplit = 0;
-	v->u.p = p;
-	v->rconst = rconst;
-	v->f = ast_function_copy(f);
-	v->ext = ext;
+	v->u.s = s;
+
+	v->ininv = ininv;
+	v->context = context;
+	v->label = label;
+
 	return v;
 }
 
@@ -158,7 +251,6 @@ verifier_create(struct ast_function *f, struct externals *ext)
 {
 	assert(ast_block_nstmts(ast_function_abstract(f)) == 0);
 
-	struct rconst *rconst = rconst_create();
 	struct state *s = state_create(
 		frame_callactual_create(
 			ast_function_name(f),
@@ -167,47 +259,21 @@ verifier_create(struct ast_function *f, struct externals *ext)
 			ast_expr_identifier_create(dynamic_str("base act")),
 			f
 			
-		), rconst, ext
+		), ext
 	);
 	ast_function_initparams(f, s);
-	return _create(path_create(s), rconst, f, ext);
+	return _create(s, 0, NULL, NULL);
 }
-
-static struct ast_function *
-copy_withsplitname(struct ast_function *, struct lsi_le *split); 
 
 static struct verifier *
 _verifier_copywithsplit(struct verifier *old, struct lsi_le *split)
 {
-	struct rconst *rconst = rconst_split(old->rconst, split);
-	struct ast_function *f = copy_withsplitname(old->f, split);
 	return _create(
-		path_split(old->u.p, rconst, ast_function_name(f)),
-		rconst,
-		f,
-		old->ext
+		state_split(old->u.s, split),
+		old->ininv,
+		old->context,
+		old->label
 	);
-}
-
-static char *
-split_name(char *name, struct lsi_le *split);
-
-static struct ast_function *
-copy_withsplitname(struct ast_function *old, struct lsi_le *split)
-{
-	struct ast_function *f = ast_function_copy(old);
-	ast_function_setname(f, split_name(ast_function_name(f), split));
-	return f;
-}
-
-static char *
-split_name(char *name, struct lsi_le *split)
-{
-	struct strbuilder *b = strbuilder_create();
-	char *s = lsi_le_str(split);
-	strbuilder_printf(b, "%s | %s", name, s);
-	free(s);
-	return strbuilder_build(b);
 }
 
 
@@ -229,11 +295,21 @@ verifier_destroy(struct verifier *v)
 		assert(v->u.mux);
 		mux_destroy(v->u.mux);
 	} else {
-		path_destroy(v->u.p);
+		/*state_destroy(v->u.s);*/
 	}
 	/*rconst_destroy(v->rconst);*/
 	free(v);
 }
+
+struct error *
+verifier_verify(struct verifier *v, struct state *s)
+{
+	assert(v->ininv);
+	return v->issplit
+		? mux_one_verifies(v->u.mux, s)
+		: state_constraintverify_all(v->u.s, s); 
+}
+
 
 static int
 _verifier_issplit(struct verifier *v)
@@ -248,11 +324,50 @@ _verifier_mux(struct verifier *v)
 	return v->u.mux;
 }
 
-static struct path *
-_verifier_path(struct verifier *v)
+static struct state *
+_verifier_state(struct verifier *v)
 {
 	assert(!v->issplit);
-	return v->u.p;
+	return v->u.s;
 }
 
-DEFINE_RESULT_TYPE(struct verifier *, verifier, verifier_destroy, v_res, false)
+static int
+_verifier_ininv(struct verifier *v)
+{
+	return v->ininv;
+}
+
+static int
+_verifier_inv_haslabel(struct verifier *v)
+{
+	assert(_verifier_ininv(v));
+	return v->label != NULL;
+}
+
+char *
+_verifier_inv_label(struct verifier *v)
+{
+	assert(_verifier_ininv(v));
+	return v->label;
+}
+
+static struct state *
+_verifier_inv_context(struct verifier *v)
+{
+	assert(_verifier_ininv(v));
+	return v->context;
+}
+
+static void
+_verifier_enterinvariant(struct verifier *v)
+{
+	assert(!v->ininv);
+	v->ininv = 1;
+	v->context = state_copy(v->u.s);
+}
+
+static void
+_verifier_setlabel(struct verifier *v, char *l)
+{
+	v->label = l;
+}

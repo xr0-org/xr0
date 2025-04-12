@@ -476,7 +476,6 @@ setupverify(struct ast_expr *call, struct state *impl)
 		frame_callabstract_create(
 			fname, ast_function_abstract(f), ast_expr_copy(call), f
 		),
-		rconst_create(),
 		state_getext(impl)
 	);
 	ast_function_initparams(f, spec);

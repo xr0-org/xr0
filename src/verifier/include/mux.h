@@ -13,10 +13,18 @@ mux_create(struct verifier_arr *);
 void
 mux_destroy(struct mux *);
 
+typedef int (*verifier_rule)(struct verifier *);
+
 int
-mux_atend(struct mux *);
+mux_all(struct mux *, verifier_rule);
 
 struct verifier *
-mux_activeverifier(struct mux *);
+mux_firstnot(struct mux *, verifier_rule);
+
+struct error;
+struct state;
+
+struct error *
+mux_one_verifies(struct mux *, struct state *);
 
 #endif

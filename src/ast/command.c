@@ -21,7 +21,6 @@ enum command_kind {
 	COMMAND_NEXT,
 	COMMAND_PREV,
 	COMMAND_CONTINUE,
-	COMMAND_VERIFY,
 	COMMAND_QUIT,
 	COMMAND_BREAKPOINT_SET,
 	COMMAND_BREAKPOINT_LIST,
@@ -147,9 +146,6 @@ static bool
 command_iscontinue(char *cmd);
 
 static bool
-command_isverify(char *cmd);
-
-static bool
 command_isquit(char *cmd);
 
 static bool
@@ -214,12 +210,6 @@ command_iscontinue(char *cmd)
 }
 
 static bool
-command_isverify(char *cmd)
-{
-	return strcmp(cmd, "v") == 0 || strcmp(cmd, "verify") == 0;
-}
-
-static bool
 command_isquit(char *cmd)
 {
 	return strcmp(cmd, "q") == 0 || strcmp(cmd, "quit") == 0;
@@ -244,9 +234,6 @@ static struct command_res *
 command_break_create(struct string_arr *args, char *debugsep);
 
 static struct command_res *
-command_verify_create(char *arg);
-
-static struct command_res *
 process_commandwithargs(char *cmd, char *args, char *debugsep)
 {
 	struct string_arr *args_tk = args_tokenise(dynamic_str(args));
@@ -264,8 +251,6 @@ process_commandwithargs(char *cmd, char *args, char *debugsep)
 		return command_help_create(args_tk, debugsep);
 	} else if (command_isbreak(cmd)) {
 		return command_break_create(args_tk, debugsep);
-	} else if (command_isverify(cmd)) {
-		return command_verify_create(args);
 	} else {
 		return command_res_error_create(
 			error_printf(
@@ -372,17 +357,6 @@ break_argislist(char *arg)
 	return strcmp(arg, "list") == 0;
 }
 
-static struct command_res *
-command_verify_create(char *arg)
-{
-	struct string_arr *sarr = string_arr_create();
-	string_arr_append(sarr, dynamic_str(arg));
-	return command_res_cmd_create(
-		command_create_withargs(COMMAND_VERIFY, sarr)
-	);
-}
-
-
 /* command_read */
 
 struct command *
@@ -416,9 +390,6 @@ static struct error *
 continue_exec(struct verifier *);
 
 static struct error *
-verify_exec(struct verifier *, struct command *);
-
-static struct error *
 break_set_exec(struct command *);
 
 struct error *
@@ -441,9 +412,6 @@ command_exec(struct verifier *v, struct command *c, char *debugsep)
 		break;
 	case COMMAND_CONTINUE:
 		err = continue_exec(v);
-		break;
-	case COMMAND_VERIFY:
-		err = verify_exec(v, c);
 		break;
 	case COMMAND_QUIT:
 		exit(0);
@@ -575,48 +543,10 @@ continue_exec(struct verifier *p)
 	return NULL;
 }
 
-static struct ast_expr *
-command_arg_toexpr(struct command *);
-
-static struct error *
-verify_exec(struct verifier *p, struct command *cmd)
-{
-	struct error *err = verifier_verify(p, command_arg_toexpr(cmd));
-	if (err) {
-		d_printf("false: %s\n", error_str(err));
-	} else {
-		d_printf("true\n");
-	}
-	return NULL;
-}
-
 struct ast_expr *YACC_PARSED_EXPR;
 
 int
 yyparse(void);
-
-static struct ast_expr *
-command_arg_toexpr(struct command *c)
-{
-	extern FILE *yyin;
-	extern int LEX_START_TOKEN;
-
-	char *str = string_arr_s(c->args)[0];
-	yyin = fmemopen(str, strlen(str), "r"); // Open the buffer for read/write
-	if (!yyin) {
-		fprintf(stderr, "error opening memory file\n");
-		exit(EXIT_FAILURE);
-	}
-
-	/* lex and parse */
-	LEX_START_TOKEN = START_EXPR;
-	lex_begin();
-	yyparse();
-	yylex_destroy();
-	/* lex_finish(); */
-
-	return ast_expr_copy(YACC_PARSED_EXPR);
-}
 
 static struct error *
 break_set_exec(struct command *c)
