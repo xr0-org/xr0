@@ -7,9 +7,9 @@
 #include "state.h"
 #include "verifier.h"
 #include "value.h"
+#include "lsi.h"
 
 #include "arr.h"
-#include "lsi.h"
 #include "mux.h"
 #include "path.h"
 
@@ -138,7 +138,7 @@ struct verifier {
 };
 
 static struct verifier *
-_verifier_create(struct path *p, struct rconst *rconst, struct ast_function *f,
+_create(struct path *p, struct rconst *rconst, struct ast_function *f,
 		struct externals *ext)
 {
 	assert(p);
@@ -153,59 +153,12 @@ _verifier_create(struct path *p, struct rconst *rconst, struct ast_function *f,
 	return v;
 }
 
-static struct state *
-state_abstract(struct rconst *, struct ast_function *, struct externals *);
-
-static struct state *
-state_actual(struct rconst *, struct ast_function *, struct externals *);
-
 struct verifier *
 verifier_create(struct ast_function *f, struct externals *ext)
 {
+	assert(ast_block_nstmts(ast_function_abstract(f)) == 0);
+
 	struct rconst *rconst = rconst_create();
-	return _verifier_create(
-		path_create(
-			state_abstract(rconst, f, ext),
-			state_actual(rconst, f, ext)
-		),
-		rconst, f, ext
-	);
-}
-
-static struct frame *
-frame_setup(struct ast_function *);
-
-static struct state *
-state_abstract(struct rconst *rconst, struct ast_function *f,
-		struct externals *ext)
-{
-	struct state *s = state_create(
-		frame_callabstract_create(
-			ast_function_name(f),
-			ast_function_abstract(f),
-			/* XXX */
-			ast_expr_identifier_create(dynamic_str("base abs")),
-			f
-		),
-		rconst, ext
-	);
-	ast_function_initparams(f, s);
-	state_pushframe(s, frame_setup(f));
-	return s;
-}
-
-static struct frame *
-frame_setup(struct ast_function *f)
-{
-	return frame_blockfindsetup_create(
-		dynamic_str("findsetup"), ast_function_abstract(f)
-	);
-}
-
-static struct state *
-state_actual(struct rconst *rconst, struct ast_function *f,
-		struct externals *ext)
-{
 	struct state *s = state_create(
 		frame_callactual_create(
 			ast_function_name(f),
@@ -217,8 +170,7 @@ state_actual(struct rconst *rconst, struct ast_function *f,
 		), rconst, ext
 	);
 	ast_function_initparams(f, s);
-	state_pushframe(s, frame_setup(f));
-	return s;
+	return _create(path_create(s), rconst, f, ext);
 }
 
 static struct ast_function *
@@ -229,7 +181,7 @@ _verifier_copywithsplit(struct verifier *old, struct lsi_le *split)
 {
 	struct rconst *rconst = rconst_split(old->rconst, split);
 	struct ast_function *f = copy_withsplitname(old->f, split);
-	return _verifier_create(
+	return _create(
 		path_split(old->u.p, rconst, ast_function_name(f)),
 		rconst,
 		f,
