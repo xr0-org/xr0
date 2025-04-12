@@ -6,6 +6,7 @@
 #include "state.h"
 #include "util.h"
 #include "verifier.h"
+#include "inv_verifier.h"
 
 #include "segment.h"
 
@@ -14,15 +15,7 @@ struct segment {
 
 	struct state *state;
 
-	struct inv_verifier {
-		int issplit;
-		union {
-			struct mux *mux;
-			struct state *state;
-		} u;
-	} *inv_verifier;
-
-	struct state *inv_state; /* TODO: mux */
+	struct inv_verifier *iv;
 	char *label; /* label of invariant under consideration */
 };
 
@@ -33,7 +26,7 @@ _segment_create(enum phase phase)
 	assert(s);
 	s->phase = phase;
 	s->label = NULL;
-	s->inv_state = NULL;
+	s->iv = NULL;
 	return s;
 }
 
@@ -74,28 +67,17 @@ segment_destroy(struct segment *s)
 static char *
 phasename(struct segment *);
 
+static char *
+phase_str(struct segment *);
+
 char *
 segment_str(struct segment *s, char *pathphase)
 {
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "phase:\t%s — %s\n", pathphase, phasename(s));
-	switch (s->phase) {
-	case INIT:
-	case ATEND:
-	case ATLOOPEND:
-		break;
-	case SETUP:
-	case EXEC:
-		strbuilder_printf(b, "\ntext:\n%s\n", state_programtext(s->state));
-		strbuilder_printf(b, "%s\n", state_str(s->state));
-		break;
-	case INV:
-		strbuilder_printf(b, "\ntext:\n%s\n", state_programtext(s->inv_state));
-		strbuilder_printf(b, "%s\n", state_str(s->inv_state));
-		break;
-	default:
-		assert(false);
-	}
+	char *phase = phase_str(s);
+	strbuilder_printf(b, "%s", phase);
+	free(phase);
 	return strbuilder_build(b);
 }
 
@@ -133,6 +115,50 @@ _inv_phasename(struct segment *s)
 	return strbuilder_build(b);
 }
 
+static char *
+_state_str(struct state *);
+
+static char *
+_inv_str(struct inv_verifier *);
+
+static char *
+phase_str(struct segment *s)
+{
+	switch (s->phase) {
+	case INIT:
+	case ATEND:
+	case ATLOOPEND:
+		return dynamic_str("");
+	case SETUP:
+	case EXEC:
+		return _state_str(s->state);
+	case INV:
+		return _inv_str(s->iv);
+	default:
+		assert(0);
+	}
+}
+
+static char *
+_state_str(struct state *s)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "\ntext:\n%s\n", state_programtext(s));
+	strbuilder_printf(b, "%s\n", state_str(s));
+	return strbuilder_build(b);
+}
+
+static char *
+_inv_str(struct inv_verifier *iv)
+{
+	struct strbuilder *b = strbuilder_create();
+	char *s = inv_verifier_str(iv);
+	strbuilder_printf(b, "%s", s);
+	free(s);
+	return strbuilder_build(b);
+}
+
+
 int
 segment_atend(struct segment *s)
 {
@@ -149,13 +175,13 @@ segment_atend(struct segment *s)
 /* segment_progress */
 
 static struct error *
-setup(struct segment *, progressor *);
+setup_progress(struct segment *, progressor *);
 
 static struct error *
-exec(struct segment *, progressor *);
+exec_progress(struct segment *, progressor *);
 
 static struct error *
-inv(struct segment *, progressor *);
+inv_progress(struct segment *, progressor *);
 
 struct error *
 segment_progress(struct segment *s, progressor *prog)
@@ -165,11 +191,11 @@ segment_progress(struct segment *s, progressor *prog)
 		s->phase = SETUP;
 		return NULL;
 	case SETUP:
-		return setup(s, prog);
+		return setup_progress(s, prog);
 	case EXEC:
-		return exec(s, prog);
+		return exec_progress(s, prog);
 	case INV:
-		return inv(s, prog);
+		return inv_progress(s, prog);
 	default:
 		assert(false);
 	}
@@ -179,7 +205,7 @@ static struct error *
 progressortrace(struct segment *, progressor *);
 
 static struct error *
-setup(struct segment *s, progressor *prog)
+setup_progress(struct segment *s, progressor *prog)
 {
 	if (state_atsetupend(s->state)) {
 		s->phase = EXEC;
@@ -196,7 +222,7 @@ progressortrace(struct segment *s, progressor *prog)
 		if (error_to_enterinvariant(err)) {
 			assert(s->phase == EXEC);
 			s->phase = INV;
-			s->inv_state = state_copy(s->state);
+			s->iv = inv_verifier_create(state_copy(s->state));
 			if (error_enterinvariant_haslabel(err))
 				s->label = error_enterinvariant_label(err);
 			return NULL;
@@ -207,7 +233,7 @@ progressortrace(struct segment *s, progressor *prog)
 }
 
 static struct error *
-exec(struct segment *s, progressor *prog)
+exec_progress(struct segment *s, progressor *prog)
 {	
 	if (state_atloopend(s->state)) {
 		struct error *err = state_verify_invariant(s->state);
@@ -224,19 +250,15 @@ exec(struct segment *s, progressor *prog)
 }
 
 static struct error *
-inv(struct segment *s, progressor *prog)
+inv_progress(struct segment *s, progressor *prog)
 {
-	if (state_atinvariantend(s->inv_state)) {
+	if (inv_verifier_atend(s->iv)) {
+		/* TODO: verify s->state satisfies one of the final states in
+		 * s->iv; store these states against s->label in some kind of
+		 * map for future reference */
 		assert(0);
 	}
-	struct error *err = prog(s->inv_state);
-	if (err) {
-		if (error_to_mustsplit(err)) {
-			assert(0);
-		}
-		return state_stacktrace(s->inv_state, err);
-	}
-	return NULL;
+	return inv_verifier_progress(s->iv, prog);
 }
 
 struct error *
@@ -260,6 +282,8 @@ segment_lexememarker(struct segment *s)
 	case SETUP:
 	case EXEC:
 		return state_lexememarker(s->state);
+	case INV:
+		return inv_verifier_lexememarker(s->iv);
 	case INIT:
 	case ATEND:
 	case ATLOOPEND:

@@ -59,10 +59,6 @@ iter_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
 static struct error *
-labelled_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
-		struct state *);
-
-static struct error *
 linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
@@ -75,8 +71,6 @@ linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		return selection_linearise(stmt, b, loc, state);
 	case STMT_ITERATION:
 		return iter_linearise(stmt, b, loc, state);
-	case STMT_LABELLED:
-		return labelled_linearise(stmt, b, loc, state);
 	default:
 		assert(false);
 	}
@@ -151,42 +145,6 @@ iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 	return NULL;
 }
 
-static struct inv *
-_labelled_getinvcopy(struct ast_stmt *);
-
-static struct error *
-labelled_linearise(struct ast_stmt *stmt, struct ast_block *b,
-		struct lexememarker *loc, struct state *state)
-{
-	struct inv *inv = _labelled_getinvcopy(stmt);
-	inv_addlabel(inv, ast_stmt_labelled_label(stmt));
-	ast_block_append_stmt(
-		b,
-		ast_stmt_create_inv(
-			lexememarker_copy(loc),
-			inv
-		)
-	);
-
-	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
-	if (!ast_stmt_isinv(inner))
-		ast_block_append_stmt(
-			b,
-			ast_stmt_copy(inner)
-		);
-
-	return NULL;
-}
-
-static struct inv *
-_labelled_getinvcopy(struct ast_stmt *stmt)
-{
-	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
-	return ast_stmt_isinv(inner)
-		? inv_copy(ast_stmt_as_inv(inner))
-		: inv_create(ast_block_create(NULL, 0));
-}
-
 /* stmt_verify */
 static struct error *
 directverify(struct ast_stmt *, struct state *);
@@ -233,9 +191,8 @@ islinearisable(struct ast_stmt *stmt)
 	case STMT_NOP:
 	case STMT_COMPOUND:
 	case STMT_INVARIANT:
-		return false;
 	case STMT_LABELLED:
-		assert(0);
+		return false;
 	case STMT_ITERATION:
 	case STMT_SELECTION:
 	case STMT_EXPR:
@@ -303,6 +260,9 @@ static struct error *
 stmt_decl_exec(struct ast_stmt *, struct state *);
 
 static struct error *
+labelled_exec(struct ast_stmt *, struct state *);
+
+static struct error *
 stmt_compound_exec(struct ast_stmt *, struct state *);
 
 static struct error *
@@ -332,11 +292,7 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 	case STMT_NOP:
 		return NULL;
 	case STMT_LABELLED:
-		if (ast_stmt_issetup(stmt))
-			return NULL;
-		/* TODO: reconcile with state_islinear to allow recursive
-		 * linearisation, as this case requires */
-		return linearise(stmt, s);
+		return labelled_exec(stmt, s);
 	case STMT_EXPR:
 		return stmt_expr_exec(ast_stmt_as_expr(stmt), s);
 	case STMT_COMPOUND:
@@ -384,6 +340,52 @@ decl_init(struct ast_variable *v, struct state *s)
 	}
 	return NULL;
 }
+
+static struct inv *
+_labelled_getinvcopy(struct ast_stmt *);
+
+static struct error *
+labelled_exec(struct ast_stmt *stmt, struct state *state)
+{
+	if (ast_stmt_issetup(stmt))
+		return NULL;
+
+	struct lexememarker *loc = ast_stmt_lexememarker(stmt);
+	struct ast_block *b = ast_block_create(NULL, 0);
+
+	struct inv *inv = _labelled_getinvcopy(stmt);
+	inv_addlabel(inv, ast_stmt_labelled_label(stmt));
+	ast_block_append_stmt(
+		b,
+		ast_stmt_create_inv(
+			lexememarker_copy(loc),
+			inv
+		)
+	);
+
+	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
+	if (!ast_stmt_isinv(inner))
+		ast_block_append_stmt(
+			b,
+			ast_stmt_copy(inner)
+		);
+
+	struct frame *inter_frame = frame_linear_create(
+		dynamic_str("inter"), b, state
+	);
+	state_pushframe(state, inter_frame);
+	return NULL;
+}
+
+static struct inv *
+_labelled_getinvcopy(struct ast_stmt *stmt)
+{
+	struct ast_stmt *inner = ast_stmt_labelled_stmt(stmt);
+	return ast_stmt_isinv(inner)
+		? inv_copy(ast_stmt_as_inv(inner))
+		: inv_create(ast_block_create(NULL, 0));
+}
+
 
 static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
