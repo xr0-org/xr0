@@ -67,12 +67,11 @@ struct error *
 verifier_progress(struct verifier *v, progressor *prog)
 {
 	if (_verifier_issplit(v)) {
-		struct verifier *branch = mux_activeverifier(_verifier_mux(v));
-		if (verifier_atend(branch)) {
-			mux_next(_verifier_mux(v));
-			return NULL;
-		}
-		return verifier_progress(branch, prog);
+		assert(!mux_atend(_verifier_mux(v)));
+
+		return verifier_progress(
+			mux_activeverifier(_verifier_mux(v)), prog
+		);
 	}
 	struct error *err = path_progress(_verifier_path(v), prog);
 	if (err) {

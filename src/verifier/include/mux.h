@@ -19,7 +19,4 @@ mux_atend(struct mux *);
 struct verifier *
 mux_activeverifier(struct mux *);
 
-void
-mux_next(struct mux *);
-
 #endif

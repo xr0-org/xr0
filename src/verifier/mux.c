@@ -34,21 +34,23 @@ mux_atend(struct mux *mux)
 	int n = verifier_arr_n(mux->verifiers);
 	assert(n);
 
-	return mux->index == n-1
-		&& verifier_atend(mux_activeverifier(mux));
+	struct verifier *v = verifier_arr_paths(mux->verifiers)[mux->index];
+	if (verifier_atend(v)) {
+		if (mux->index < n-1) {
+			mux->index++;
+			return mux_atend(mux);
+		} else {
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 struct verifier *
 mux_activeverifier(struct mux *mux)
 {
-	assert(mux->index < verifier_arr_n(mux->verifiers));
+	assert(!mux_atend(mux));
 
 	return verifier_arr_paths(mux->verifiers)[mux->index];
-}
-
-void
-mux_next(struct mux *mux)
-{
-	assert(!mux_atend(mux));
-	mux->index++;
 }

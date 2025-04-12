@@ -564,9 +564,11 @@ continue_exec(struct verifier *p)
 		if (err) {
 			return err;
 		}
-		struct lexememarker *loc = verifier_lexememarker(p);
-		if (loc && breakpoint_shouldbreak(loc)) {
-			return NULL;
+		if (!verifier_atend(p)) {
+			struct lexememarker *loc = verifier_lexememarker(p);
+			if (loc && breakpoint_shouldbreak(loc)) {
+				return NULL;
+			}
 		}
 	}
 	should_continue = true;
