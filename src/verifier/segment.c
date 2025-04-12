@@ -263,8 +263,10 @@ inv_progress(struct segment *s, progressor *prog)
 				error_printf("invariant: %w", err)
 			);
 		}
-		/* TODO: store these states against s->label in some kind of
-		 * map for future reference */
+		if (s->label) {
+			/* store s->iv in s->invariants */
+		}
+		s->phase = EXEC;
 		assert(0);
 	}
 	return inv_verifier_progress(s->iv, prog);
