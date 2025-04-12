@@ -148,6 +148,12 @@ bool
 state_addresses_deallocand(struct state *, struct object *);
 
 char *
+state_baseframename(struct state *);
+
+struct rconst *
+state_rconstxxx(struct state *);
+
+char *
 state_rconst(struct state *, char *key, bool persist);
 
 char *

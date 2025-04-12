@@ -17,6 +17,9 @@ stack_getframe(struct stack *, int frame);
 char *
 stack_programtext(struct stack *);
 
+char *
+stack_baseframename(struct stack *);
+
 int
 stack_programindex(struct stack *);
 

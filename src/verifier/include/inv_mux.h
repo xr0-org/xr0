@@ -19,4 +19,9 @@ inv_mux_atend(struct inv_mux *);
 struct inv_verifier *
 inv_mux_active_inv_verifier(struct inv_mux *);
 
+struct state;
+
+struct error *
+inv_mux_one_verifies(struct inv_mux *, struct state *);
+
 #endif

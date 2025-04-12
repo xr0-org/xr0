@@ -438,7 +438,7 @@ lsi_checksatisfiesrange(struct lsi *l, struct lsi *m)
 		struct lsi_le *le = le_arr_get(arr, i);
 		if (!lsi_satisfies(l, le)) {
 			char *s = lsi_le_str(le);
-			struct error *err = error_printf("%s not satisfied", s);
+			struct error *err = error_printf("must have %s", s);
 			free(s);
 			return err;
 		}

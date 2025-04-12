@@ -27,4 +27,7 @@ struct lexememarker;
 struct lexememarker *
 inv_verifier_lexememarker(struct inv_verifier *);
 
+struct error *
+inv_verifier_verify(struct inv_verifier *, struct state *);
+
 #endif

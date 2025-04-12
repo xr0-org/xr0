@@ -253,6 +253,15 @@ stack_copy(struct stack *old)
 	return new;
 }
 
+char *
+stack_baseframename(struct stack *s)
+{
+	if (s->prev) {
+		return stack_baseframename(s->prev);
+	}
+	return frame_name(s->f);
+}
+
 static void
 rename_lowestframe(struct stack *, char *new_name);
 

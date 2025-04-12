@@ -151,6 +151,9 @@ _state_str(struct state *s)
 static char *
 _inv_str(struct inv_verifier *iv)
 {
+	if (inv_verifier_atend(iv)) {
+		return dynamic_str("");
+	}
 	struct strbuilder *b = strbuilder_create();
 	char *s = inv_verifier_str(iv);
 	strbuilder_printf(b, "%s", s);
@@ -253,8 +256,14 @@ static struct error *
 inv_progress(struct segment *s, progressor *prog)
 {
 	if (inv_verifier_atend(s->iv)) {
-		/* TODO: verify s->state satisfies one of the final states in
-		 * s->iv; store these states against s->label in some kind of
+		struct error *err = inv_verifier_verify(s->iv, s->state);
+		if (err) {
+			return state_stacktrace(
+				s->state,
+				error_printf("invariant: %w", err)
+			);
+		}
+		/* TODO: store these states against s->label in some kind of
 		 * map for future reference */
 		assert(0);
 	}
@@ -283,6 +292,9 @@ segment_lexememarker(struct segment *s)
 	case EXEC:
 		return state_lexememarker(s->state);
 	case INV:
+		if (inv_verifier_atend(s->iv)) {
+			return NULL;
+		}
 		return inv_verifier_lexememarker(s->iv);
 	case INIT:
 	case ATEND:

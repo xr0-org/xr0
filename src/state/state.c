@@ -270,6 +270,18 @@ state_declare(struct state *state, struct ast_variable *var, bool isparam)
 }
 
 char *
+state_baseframename(struct state *s)
+{
+	return stack_baseframename(s->stack);
+}
+
+struct rconst *
+state_rconstxxx(struct state *s)
+{
+	return s->rconst;
+}
+
+char *
 state_rconst(struct state *s, char *key, bool persist)
 {
 	return rconst_declareorget(s->rconst, key, persist, s);

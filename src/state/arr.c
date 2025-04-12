@@ -21,7 +21,6 @@ struct state_arr *
 state_arr_copy(struct state_arr *old)
 {
 	int i;
-
 	struct state_arr *new = state_arr_create();
 	for (i = 0; i < old->n; i++) {
 		state_arr_append(new, state_copy(old->s[i]));

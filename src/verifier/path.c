@@ -63,7 +63,6 @@ path_str(struct path *p)
 		return segment_str(p->actual, "ACTUAL");
 	case AUDIT:
 		return dynamic_str("phase:\tAUDIT\n");
-		break;
 	case ATEND:
 		return dynamic_str("phase:\tEND\n");
 	default:
