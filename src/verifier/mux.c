@@ -16,15 +16,17 @@ struct mux {
 			struct mux *r;
 		} t;
 	} u;
+	atend_checker atend;
 };
 
 struct mux *
-mux_create(struct state *s)
+mux_create(struct state *s, atend_checker atend)
 {
 	struct mux *mux = malloc(sizeof(struct mux));
 	assert(mux);
 	mux->isleaf = 1;
 	mux->u.s = s;
+	mux->atend = atend;
 	return mux;
 }
 
@@ -41,6 +43,14 @@ mux_destroy(struct mux *mux)
 	free(mux);
 }
 
+int
+mux_isactive(struct mux *mux)
+{
+	return mux->isleaf
+		? !mux->atend(mux->u.s)
+		: mux_isactive(mux->u.t.l) || mux_isactive(mux->u.t.r);
+}
+
 static struct mux *
 _activeleaf(struct mux *);
 
@@ -50,24 +60,16 @@ mux_state(struct mux *mux)
 	return _activeleaf(mux)->u.s;
 }
 
-static int
-_isactive(struct mux *);
-
 static struct mux *
 _activeleaf(struct mux *mux)
 {
-	assert(_isactive(mux));
+	assert(mux_isactive(mux));
+
 	return mux->isleaf
 		? mux
-		: _activeleaf(_isactive(mux->u.t.l) ? mux->u.t.l : mux->u.t.r);
-}
-
-static int
-_isactive(struct mux *mux)
-{
-	return mux->isleaf
-		? !state_atend(mux->u.s)
-		: _isactive(mux->u.t.l) || _isactive(mux->u.t.r);
+		: _activeleaf(
+			mux_isactive(mux->u.t.l) ? mux->u.t.l : mux->u.t.r
+		);
 }
 
 void
@@ -76,6 +78,12 @@ mux_split(struct mux *mux, struct lsi_le *l, struct lsi_le *r)
 	struct mux *leaf = _activeleaf(mux);
 	struct state *s = leaf->u.s;
 	leaf->isleaf = 0;
-	leaf->u.t.l = mux_create(state_split(s, l));
-	leaf->u.t.r = mux_create(state_split(s, r));
+	leaf->u.t.l = mux_create(state_split(s, l), mux->atend);
+	leaf->u.t.r = mux_create(state_split(s, r), mux->atend);
+}
+
+void
+mux_set_atend(struct mux *mux, atend_checker atend)
+{
+	mux->atend = atend;
 }

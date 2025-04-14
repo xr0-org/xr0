@@ -28,7 +28,7 @@ _create(struct state *s, int ininv, struct state *context, char *label)
 	struct verifier *v = malloc(sizeof(struct verifier));
 	assert(v);
 
-	v->mux = mux_create(s);
+	v->mux = mux_create(s, state_atend);
 	v->ininv = ininv;
 	v->context = context;
 	v->label = label;
@@ -68,27 +68,29 @@ char *
 verifier_str(struct verifier *v)
 {
 	struct strbuilder *b = strbuilder_create();
-	struct state *s = mux_state(v->mux);
 	strbuilder_printf(b, "mode:\t");
-	if (v->ininv) {
-		strbuilder_printf(b, "INV");
-		if (v->label)
-			strbuilder_printf(b, " %s", v->label);
-		strbuilder_printf(b, "\n");
+	if (mux_isactive(v->mux)) {
+		if (v->ininv) {
+			strbuilder_printf(b, "INV");
+			if (v->label)
+				strbuilder_printf(b, " %s", v->label);
+			strbuilder_printf(b, "\n");
+		} else {
+			strbuilder_printf(b, "EXEC\n");
+		}
+		struct state *s = mux_state(v->mux);
+		strbuilder_printf(b, "\ntext:\n%s\n", state_programtext(s));
+		strbuilder_printf(b, "%s\n", state_str(s));
 	} else {
-		strbuilder_printf(b, "EXEC\n");
+		strbuilder_printf(b, "END\n");
 	}
-	strbuilder_printf(b, "\ntext:\n%s\n", state_programtext(s));
-	strbuilder_printf(b, "%s\n", state_str(s));
 	return strbuilder_build(b);
 }
 
 int
 verifier_atend(struct verifier *v)
 {
-	return (v->ininv ? state_atinvariantend : state_atend)(
-		mux_state(v->mux)
-	);
+	return !mux_isactive(v->mux);
 }
 
 /* verifier_progress */
@@ -126,6 +128,7 @@ verifier_progress(struct verifier *v, progressor *prog)
 		}
 		if (error_to_enterinvariant(err)) {
 			assert(!v->ininv);
+			mux_set_atend(v->mux, state_atinvariantend);
 			v->ininv = 1;
 			v->context = state_copy(s);
 			if (error_enterinvariant_haslabel(err))
