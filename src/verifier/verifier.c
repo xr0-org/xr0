@@ -13,11 +13,7 @@
 #include "mux.h"
 
 struct verifier {
-	int issplit;
-	union {
-		struct mux *mux;
-		struct state *s;
-	} u;
+	struct mux *mux;
 
 	int ininv;
 	struct state *context;	/* state before invariant */
@@ -32,9 +28,7 @@ _create(struct state *s, int ininv, struct state *context, char *label)
 	struct verifier *v = malloc(sizeof(struct verifier));
 	assert(v);
 
-	v->issplit = 0;
-	v->u.s = s;
-
+	v->mux = mux_create(s);
 	v->ininv = ininv;
 	v->context = context;
 	v->label = label;
@@ -66,34 +60,15 @@ verifier_destroy(struct verifier *v)
 {
 	assert(verifier_atend(v));
 
-	if (v->issplit) {
-		assert(v->u.mux);
-		mux_destroy(v->u.mux);
-	} else {
-		/*state_destroy(v->u.s);*/
-	}
-	/*rconst_destroy(v->rconst);*/
+	mux_destroy(v->mux);
 	free(v);
 }
-
-static int
-verifier_atinvariantend(struct verifier *);
 
 char *
 verifier_str(struct verifier *v)
 {
-	if (v->issplit)
-		return verifier_str(
-			mux_firstnot(
-				v->u.mux,
-				v->ininv
-					? verifier_atinvariantend
-					: verifier_atend
-			)
-		);
-
 	struct strbuilder *b = strbuilder_create();
-	struct state *s = v->u.s;
+	struct state *s = mux_state(v->mux);
 	strbuilder_printf(b, "mode:\t");
 	if (v->ininv) {
 		strbuilder_printf(b, "INV");
@@ -111,17 +86,9 @@ verifier_str(struct verifier *v)
 int
 verifier_atend(struct verifier *v)
 {
-	return v->issplit
-		? mux_all(v->u.mux, verifier_atend)
-		: state_atend(v->u.s);
-}
-
-static int
-verifier_atinvariantend(struct verifier *v)
-{
-	return v->issplit
-		? mux_all(v->u.mux, verifier_atinvariantend)
-		: state_atinvariantend(v->u.s);
+	return (v->ininv ? state_atinvariantend : state_atend)(
+		mux_state(v->mux)
+	);
 }
 
 /* verifier_progress */
@@ -138,68 +105,29 @@ progressor_next(void)
 	return state_next;
 }
 
-static void
-verifier_split(struct verifier *v, struct splitinstruct *inst);
-
 struct error *
 verifier_progress(struct verifier *v, progressor *prog)
 {
-	if (v->ininv) {
-		if (verifier_atinvariantend(v)) {
-			struct error *err = mux_one_verifies(
-				v->u.mux, v->context
-			);
-			if (err) {
-				return error_printf("invariant: %w", err);
-			}
-			/* TODO: if label present, store invariant states
-			 * accessible via v->u.mux against it in map
-			 * accessible to each of them, and then instruct all the
-			 * verifiers in v->u.mux to leave the invariants
-			 * and proceed normally. */
-			assert(0);
-		}
+	assert(!verifier_atend(v));
 
-		if (v->issplit)
-			return verifier_progress(
-				mux_firstnot(
-					v->u.mux,
-					verifier_atinvariantend
-				), prog
-			);
-
-		struct error *err = prog(v->u.s);
-		if (err) {
-			if (error_to_mustsplit(err)) {
-				verifier_split(v, error_get_splitinstruct(err));
-				return NULL;
-			}
-			assert(!error_to_enterinvariant(err));
-			return err;
-		}
-		return NULL;
-	}
-
-	if (v->issplit) {
-		assert(!mux_all(v->u.mux, verifier_atend));
-
-		return verifier_progress(
-			mux_firstnot(v->u.mux, verifier_atend), prog
-		);
-	}
-	struct error *err = prog(v->u.s);
+	struct state *s = mux_state(v->mux);
+	struct error *err = prog(s);
 	if (err) {
 		if (error_to_mustsplit(err)) {
-			verifier_split(v, error_get_splitinstruct(err));
+			struct splitinstruct *inst = error_get_splitinstruct(err);
+			mux_split(
+				v->mux,
+				splitinstruct_0(inst),
+				splitinstruct_1(inst)
+			);
 			return NULL;
 		}
 		if (error_to_enterinvariant(err)) {
 			assert(!v->ininv);
 			v->ininv = 1;
-			v->context = state_copy(v->u.s);
+			v->context = state_copy(s);
 			if (error_enterinvariant_haslabel(err))
 				v->label = error_enterinvariant_label(err);
-
 			return NULL;
 		}
 		return err;
@@ -207,66 +135,13 @@ verifier_progress(struct verifier *v, progressor *prog)
 	return NULL;
 }
 
-
-/* verifier_split */
-
-static struct verifier_arr *
-verifier_gensplits(struct verifier *, struct splitinstruct *);
-
-static void
-verifier_split(struct verifier *v, struct splitinstruct *inst)
-{
-	assert(!v->issplit);
-	/* TODO: destroy v->s */
-	v->issplit = 1;
-	v->u.mux = mux_create(verifier_gensplits(v, inst));
-}
-
-static struct verifier *
-_verifier_copywithsplit(struct verifier *old, struct lsi_le *split);
-
-static struct verifier_arr *
-verifier_gensplits(struct verifier *v, struct splitinstruct *inst)
-{
-	struct verifier_arr *arr = verifier_arr_create();
-	verifier_arr_append(
-		arr, _verifier_copywithsplit(v, splitinstruct_0(inst))
-	);
-	verifier_arr_append(
-		arr, _verifier_copywithsplit(v, splitinstruct_1(inst))
-	);
-	return arr;
-}
-
-static struct verifier *
-_verifier_copywithsplit(struct verifier *old, struct lsi_le *split)
-{
-	return _create(
-		state_split(old->u.s, split),
-		old->ininv,
-		old->context,
-		old->label
-	);
-}
-
 struct lexememarker *
 verifier_lexememarker(struct verifier *v)
 {
-	if (v->ininv && verifier_atinvariantend(v))
-		return NULL;
-
-	return v->issplit
-		? verifier_lexememarker(
-			mux_firstnot(
-				v->u.mux,
-				v->ininv
-					? verifier_atinvariantend
-					: verifier_atend
-			)
-		)
-		: state_lexememarker(v->u.s);
+	return verifier_atend(v) ? NULL : state_lexememarker(mux_state(v->mux));
 }
 
+/*
 struct error *
 verifier_verify(struct verifier *v, struct state *s)
 {
@@ -275,3 +150,4 @@ verifier_verify(struct verifier *v, struct state *s)
 		? mux_one_verifies(v->u.mux, s)
 		: state_constraintverify_all(v->u.s, s); 
 }
+*/

@@ -1,28 +1,25 @@
 #ifndef XR0_VERIFIER_MUX
 #define XR0_VERIFIER_MUX
 
-struct verifier;
-struct verifier_arr;
+struct state;
 
-/* mux: multiplexer for splittings of verifiers */
 struct mux;
 
 struct mux *
-mux_create(struct verifier_arr *);
+mux_create(struct state *);
 
 void
 mux_destroy(struct mux *);
 
-typedef int (*verifier_rule)(struct verifier *);
+struct state *
+mux_state(struct mux *);
 
-int
-mux_all(struct mux *, verifier_rule);
+struct lsi_le;
 
-struct verifier *
-mux_firstnot(struct mux *, verifier_rule);
+void
+mux_split(struct mux *, struct lsi_le *, struct lsi_le *);
 
 struct error;
-struct state;
 
 struct error *
 mux_one_verifies(struct mux *, struct state *);

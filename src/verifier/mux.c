@@ -2,78 +2,80 @@
 #include <assert.h>
 
 #include "util.h"
-#include "verifier.h"
+#include "state.h"
 
 #include "arr.h"
 #include "mux.h"
 
-struct mux { struct verifier_arr *_; };
+struct mux {
+	int isleaf;
+	union {
+		struct state *s;
+		struct tree {
+			struct mux *l;
+			struct mux *r;
+		} t;
+	} u;
+};
 
 struct mux *
-mux_create(struct verifier_arr *verifiers)
+mux_create(struct state *s)
 {
-	struct mux *mux = calloc(1, sizeof(struct mux));
+	struct mux *mux = malloc(sizeof(struct mux));
 	assert(mux);
-	mux->_ = verifiers;
+	mux->isleaf = 1;
+	mux->u.s = s;
 	return mux;
 }
 
 void
 mux_destroy(struct mux *mux)
 {
-	verifier_arr_destroy(mux->_);
+	if (mux->isleaf) {
+		/* TODO */
+		/*state_destroy(mux->u.s);*/
+	} else {
+		mux_destroy(mux->u.t.l);
+		mux_destroy(mux->u.t.r);
+	}
 	free(mux);
 }
 
-static int
-_index_wherenot(struct mux *, verifier_rule);
+static struct mux *
+_activeleaf(struct mux *);
 
-int
-mux_all(struct mux *mux, verifier_rule r)
+struct state *
+mux_state(struct mux *mux)
 {
-	return _index_wherenot(mux, r) == -1;
+	return _activeleaf(mux)->u.s;
 }
 
 static int
-_index_wherenot(struct mux *mux, verifier_rule r)
+_isactive(struct mux *);
+
+static struct mux *
+_activeleaf(struct mux *mux)
 {
-	int i;
-
-	for (i = 0; i < verifier_arr_n(mux->_); i++)
-		if (!r(verifier_arr_paths(mux->_)[i]))
-			return i;
-
-	return -1;
+	assert(_isactive(mux));
+	return mux->isleaf
+		? mux
+		: _activeleaf(_isactive(mux->u.t.l) ? mux->u.t.l : mux->u.t.r);
 }
 
-struct verifier *
-mux_firstnot(struct mux *mux, verifier_rule r)
+static int
+_isactive(struct mux *mux)
 {
-	int i = _index_wherenot(mux, r);
-	assert(i != -1);
-	return verifier_arr_paths(mux->_)[i];
+	return mux->isleaf
+		? !state_atend(mux->u.s)
+		: _isactive(mux->u.t.l) || _isactive(mux->u.t.r);
 }
 
-
-struct error *
-mux_one_verifies(struct mux *mux, struct state *s)
+void
+mux_split(struct mux *mux, struct lsi_le *l, struct lsi_le *r)
 {
-	int i;
-
-	struct strbuilder *b = strbuilder_create();
-
-	int n = verifier_arr_n(mux->_);
-	for (i = 0; i < n; i++) {
-		struct error *err = verifier_verify(
-			verifier_arr_paths(mux->_)[i], s
-		);
-		if (!err) {
-			return NULL;
-		}
-		strbuilder_printf(
-			b, "%s%s", error_str(err), i+1<n? " or " : ""
-		);
-	}
-
-	return error_printf(strbuilder_build(b));
+	struct mux *leaf = _activeleaf(mux);
+	struct state *s = leaf->u.s;
+	leaf->isleaf = 0;
+	leaf->u.t.l = mux_create(state_split(s, l));
+	leaf->u.t.r = mux_create(state_split(s, r));
 }
