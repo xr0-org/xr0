@@ -15,23 +15,24 @@
 struct verifier {
 	struct mux *mux;
 
-	int ininv;
+	struct mux *inv;
 	struct state *context;	/* state before invariant */
 	char *label;		/* invariant label, may be NULL */
 };
 
 static struct verifier *
-_create(struct state *s, int ininv, struct state *context, char *label)
+_create(struct state *s)
 {
 	assert(s);
 
 	struct verifier *v = malloc(sizeof(struct verifier));
 	assert(v);
 
-	v->mux = mux_create(s, state_atend);
-	v->ininv = ininv;
-	v->context = context;
-	v->label = label;
+	v->mux = mux_create(s);
+
+	v->inv = NULL;
+	v->context = NULL;
+	v->label = NULL;
 
 	return v;
 }
@@ -52,7 +53,7 @@ verifier_create(struct ast_function *f, struct externals *ext)
 		), ext
 	);
 	ast_function_initparams(f, s);
-	return _create(s, 0, NULL, NULL);
+	return _create(s);
 }
 
 void
@@ -70,7 +71,8 @@ verifier_str(struct verifier *v)
 	struct strbuilder *b = strbuilder_create();
 	strbuilder_printf(b, "mode:\t");
 	if (mux_isactive(v->mux)) {
-		if (v->ininv) {
+		struct state *s = mux_state(v->mux);
+		if (state_ininvariant(s)) {
 			strbuilder_printf(b, "INV");
 			if (v->label)
 				strbuilder_printf(b, " %s", v->label);
@@ -78,7 +80,6 @@ verifier_str(struct verifier *v)
 		} else {
 			strbuilder_printf(b, "EXEC\n");
 		}
-		struct state *s = mux_state(v->mux);
 		strbuilder_printf(b, "\ntext:\n%s\n", state_programtext(s));
 		strbuilder_printf(b, "%s\n", state_str(s));
 	} else {
@@ -107,8 +108,26 @@ progressor_next(void)
 	return state_next;
 }
 
+static struct error *
+_progress(struct verifier *v, progressor *prog);
+
 struct error *
 verifier_progress(struct verifier *v, progressor *prog)
+{
+	struct error *err = _progress(v, prog);
+	if (err) {
+		return err;
+	}
+	if (v->inv && !mux_isactive(v->inv)) {
+		/* TODO: verify context satisfies one of the invariant states;
+		 * then unset inv, context, label */
+		assert(0);
+	}
+	return NULL;
+}
+
+static struct error *
+_progress(struct verifier *v, progressor *prog)
 {
 	assert(!verifier_atend(v));
 
@@ -127,9 +146,7 @@ verifier_progress(struct verifier *v, progressor *prog)
 			return NULL;
 		}
 		if (error_to_enterinvariant(err)) {
-			assert(!v->ininv);
-			mux_set_atend(v->mux, state_atinvariantend);
-			v->ininv = 1;
+			v->inv = mux_activeleaf(v->mux);
 			v->context = state_copy(s);
 			if (error_enterinvariant_haslabel(err))
 				v->label = error_enterinvariant_label(err);

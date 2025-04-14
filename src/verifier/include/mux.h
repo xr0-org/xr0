@@ -5,13 +5,14 @@ struct state;
 
 struct mux;
 
-typedef int (*atend_checker)(struct state *);
-
 struct mux *
-mux_create(struct state *, atend_checker);
+mux_create(struct state *);
 
 void
 mux_destroy(struct mux *);
+
+struct mux *
+mux_activeleaf(struct mux *);
 
 int
 mux_isactive(struct mux *);
@@ -23,9 +24,6 @@ struct lsi_le;
 
 void
 mux_split(struct mux *, struct lsi_le *, struct lsi_le *);
-
-void
-mux_set_atend(struct mux *, atend_checker);
 
 struct error;
 
