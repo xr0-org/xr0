@@ -114,7 +114,9 @@ verifier_progress(struct verifier *v, progressor *prog)
 	struct error *err = prog(s);
 	if (err) {
 		if (error_to_mustsplit(err)) {
-			struct splitinstruct *inst = error_get_splitinstruct(err);
+			struct splitinstruct *inst = error_get_splitinstruct(
+				err
+			);
 			mux_split(
 				v->mux,
 				splitinstruct_0(inst),
