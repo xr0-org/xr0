@@ -41,3 +41,11 @@ text_pc_getstmt(struct text_pc *pc, struct text *t)
 		? text_pc_getstmt(pc->next, text_getnext(t, pc->i))
 		: text_getstmt(t, pc->i);
 }
+
+int
+text_pc_atblockend(struct text_pc *pc, struct text *t)
+{
+	return pc->next
+		? text_pc_atblockend(pc->next, text_getnext(t, pc->i))
+		: text_atend(t, pc->i);
+}

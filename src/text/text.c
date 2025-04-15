@@ -46,3 +46,11 @@ text_getstmt(struct text *t, int i)
 	assert(i < ast_block_nstmts(t->b));
 	return ast_block_stmts(t->b, i);
 }
+
+int
+text_atend(struct text *t, int i)
+{
+	int n = ast_block_nstmts(t->b);
+	assert(i <= n);
+	return i == n;
+}

@@ -8,14 +8,15 @@
 #include "program.h"
 #include "state.h"
 #include "util.h"
+#include "text.h"
 
 struct program {
+	struct text *t; /* not owned */
+	struct text_pc *pc;
 	enum program_state {
 		PROGRAM_COUNTER_STMTS,
 		PROGRAM_COUNTER_ATEND,
 	} s;
-	struct ast_block *b;
-	int index;
 	struct lexememarker *loc;
 	enum execution_mode {
 		EXEC_FINDSETUP,
@@ -27,14 +28,15 @@ struct program {
 };
 
 static enum program_state
-program_state_init(struct ast_block *);
+program_state_init(struct text *, struct text_pc *);
 
 static struct program *
-program_create(struct ast_block *b, enum execution_mode m)
+program_create(struct text *t, struct text_pc *pc, enum execution_mode m)
 {
 	struct program *p = malloc(sizeof(struct program));
 	assert(p);
-	p->b = b;
+	p->t = t;
+	p->pc = pc;
 	p->s = program_state_init(b);
 	p->index = 0;
 	p->loc = NULL;
@@ -113,9 +115,11 @@ program_storeloc(struct program *p)
 }
 
 static enum program_state
-program_state_init(struct ast_block *b)
+program_state_init(struct text *t, struct text_pc *pc)
 {
-	return ast_block_nstmts(b) ? PROGRAM_COUNTER_STMTS : PROGRAM_COUNTER_ATEND;
+	return text_pc_atblockend(pc, t)
+		? PROGRAM_COUNTER_ATEND
+		: PROGRAM_COUNTER_STMTS;
 }
 
 char *

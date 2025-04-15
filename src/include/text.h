@@ -26,4 +26,7 @@ text_pc_add(struct text_pc *, int);
 struct ast_stmt *
 text_pc_getstmt(struct text_pc *, struct text *);
 
+int
+text_pc_atblockend(struct text_pc *, struct text *);
+
 #endif

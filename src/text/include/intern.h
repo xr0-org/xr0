@@ -5,6 +5,9 @@ struct text *
 text_getnext(struct text *, int);
 
 struct ast_stmt *
-text_getstmt(struct text *, int)
+text_getstmt(struct text *, int);
+
+int
+text_atend(struct text *, int);
 
 #endif
