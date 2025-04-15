@@ -10,11 +10,11 @@
 #include "util.h"
 
 struct program {
-	struct ast_block *b;
 	enum program_state {
 		PROGRAM_COUNTER_STMTS,
 		PROGRAM_COUNTER_ATEND,
 	} s;
+	struct ast_block *b;
 	int index;
 	struct lexememarker *loc;
 	enum execution_mode {
