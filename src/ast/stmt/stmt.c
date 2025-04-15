@@ -46,6 +46,8 @@ struct ast_stmt {
 	} u;
 
 	struct lexememarker *loc;
+
+	int linearised;
 };
 
 struct lexememarker *
@@ -61,6 +63,52 @@ ast_stmt_create(struct lexememarker *loc)
 	stmt->loc = loc;
 	return stmt;
 }
+
+static int
+jump_islinearisable(struct jump *);
+
+int
+ast_stmt_islinearisable(struct ast_stmt *stmt)
+{
+	if (stmt->linearised)
+		return 0;
+
+	switch (ast_stmt_kind(stmt)) {
+	case STMT_DECLARATION: /* XXX: will have to be linearised with
+				  initialisation */
+	case STMT_NOP:
+	case STMT_COMPOUND:
+	case STMT_INVARIANT:
+	case STMT_LABELLED:
+	case STMT_ASM:
+		return 0;
+
+	case STMT_ITERATION:
+	case STMT_SELECTION:
+	case STMT_EXPR:
+		return 1;
+
+	case STMT_JUMP:
+		return jump_islinearisable(ast_stmt_as_jump(stmt));
+
+	default:
+		assert(0);
+	}
+}
+
+static int
+jump_islinearisable(struct jump *j)
+{
+	return jump_isreturn(j) && jump_hasrv(j);
+}
+
+void
+ast_stmt_marklinearised(struct ast_stmt *stmt)
+{
+	assert(!stmt->linearised);
+	stmt->linearised = 1;
+}
+
 
 struct ast_stmt *
 ast_stmt_create_declaration(struct lexememarker *loc, struct ast_variable_arr *vars)
@@ -570,8 +618,19 @@ ast_stmt_destroy(struct ast_stmt *stmt)
 	free(stmt);
 }
 
+static struct ast_stmt *
+_copy(struct ast_stmt *);
+
 struct ast_stmt *
-ast_stmt_copy(struct ast_stmt *stmt)
+ast_stmt_copy(struct ast_stmt *old)
+{
+	struct ast_stmt *new = _copy(old);
+	new->linearised = old->linearised;
+	return new;
+}
+
+struct ast_stmt *
+_copy(struct ast_stmt *stmt)
 {
 	struct lexememarker *loc = stmt->loc
 		? lexememarker_copy(stmt->loc)

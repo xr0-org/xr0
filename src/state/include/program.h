@@ -60,6 +60,9 @@ program_step(struct program *, struct state *);
 struct error *
 program_next(struct program *, struct state *);
 
+void
+program_endinvariant(struct program *, struct state *);
+
 char *
 program_loc(struct program *);
 

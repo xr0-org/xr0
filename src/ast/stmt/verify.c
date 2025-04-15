@@ -80,6 +80,8 @@ static struct error *
 expr_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
+	int i;
+
 	struct ast_expr *expr = ast_expr_geninstr(
 		ast_expr_copy(ast_stmt_as_expr(stmt)),
 		lexememarker_copy(loc),
@@ -89,6 +91,9 @@ expr_linearise(struct ast_stmt *stmt, struct ast_block *b,
 	if (expr) { /* XXX: ensure all cases return an expression */
 		ast_block_append_stmt(b, ast_stmt_create_expr(loc, expr));
 	}
+	for (i = 0; i < ast_block_nstmts(b); i++)
+		ast_stmt_marklinearised(ast_block_stmts(b)[i]);
+
 	return NULL;
 }
 
@@ -96,6 +101,8 @@ static struct error *
 jump_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
+	int i;
+
 	struct ast_expr *gen = ast_expr_geninstr(
 		jump_rv(ast_stmt_as_jump(stmt)), lexememarker_copy(loc), b, state
 	);
@@ -103,6 +110,10 @@ jump_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		lexememarker_copy(loc), gen
 	);
 	ast_block_append_stmt(b, newjump);
+
+	for (i = 0; i < ast_block_nstmts(b); i++)
+		ast_stmt_marklinearised(ast_block_stmts(b)[i]);
+
 	return NULL;
 }
 
@@ -110,6 +121,8 @@ static struct error *
 selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
+	int i;
+
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
@@ -124,6 +137,7 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		),
 		lexememarker_copy(loc), b, state
 	);
+
 	struct ast_stmt *newsel = ast_stmt_create_sel(
 		lexememarker_copy(loc),
 		false,
@@ -132,6 +146,11 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		nest ? ast_stmt_copy(nest) : NULL
 	);
 	ast_block_append_stmt(b, newsel);
+
+	/* all statements that produce the cond are linear */
+	for (i = 0; i < ast_block_nstmts(b); i++)
+		ast_stmt_marklinearised(ast_block_stmts(b)[i]);
+
 	return NULL;
 }
 
@@ -148,9 +167,6 @@ iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 /* stmt_verify */
 static struct error *
 directverify(struct ast_stmt *, struct state *);
-
-static bool
-islinearisable(struct ast_stmt *);
 
 struct error *
 ast_stmt_verify(struct ast_stmt *stmt, struct state *s)
@@ -178,38 +194,6 @@ directverify(struct ast_stmt *stmt, struct state *s)
 		);
 	}
 }
-
-static int
-jump_islinearisable(struct jump *);
-
-static bool
-islinearisable(struct ast_stmt *stmt)
-{
-	switch (ast_stmt_kind(stmt)) {
-	case STMT_DECLARATION: /* XXX: will have to be linearised with
-				  initialisation */
-	case STMT_NOP:
-	case STMT_COMPOUND:
-	case STMT_INVARIANT:
-	case STMT_LABELLED:
-		return false;
-	case STMT_ITERATION:
-	case STMT_SELECTION:
-	case STMT_EXPR:
-		return true;
-	case STMT_JUMP:
-		return jump_islinearisable(ast_stmt_as_jump(stmt));
-	default:
-		assert(false);
-	}
-}
-
-static int
-jump_islinearisable(struct jump *j)
-{
-	return jump_isreturn(j) && jump_hasrv(j);
-}
-
 
 static bool
 islinearisable_setuponly(struct ast_stmt *stmt)
@@ -283,7 +267,7 @@ stmt_asm_exec(struct ast_stmt *, struct state *);
 struct error *
 ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 {
-	if (!state_islinear(s) && islinearisable(stmt)) {
+	if (ast_stmt_islinearisable(stmt)) {
 		return linearise(stmt, s);
 	}
 	switch (ast_stmt_kind(stmt)) {

@@ -18,14 +18,33 @@ struct mux {
 	} u;
 };
 
-struct mux *
-mux_create(struct state *s)
+static struct mux *
+_create(int isleaf)
 {
 	struct mux *mux = malloc(sizeof(struct mux));
 	assert(mux);
-	mux->isleaf = 1;
+	mux->isleaf = isleaf;
+	return mux;
+}
+
+struct mux *
+mux_create(struct state *s)
+{
+	struct mux *mux = _create(1);
 	mux->u.s = s;
 	return mux;
+}
+
+struct mux *
+mux_copy(struct mux *old)
+{
+	if (old->isleaf)
+		return mux_create(state_copy(old->u.s));
+
+	struct mux *new = _create(0);
+	new->u.t.l = mux_copy(old->u.t.l);
+	new->u.t.r = mux_copy(old->u.t.r);
+	return new;
 }
 
 void
@@ -97,4 +116,15 @@ mux_one_verifies(struct mux *mux, struct state *s)
 	return l && r
 		? error_printf("%w || %w", l, r)
 		: NULL;
+}
+
+void
+mux_endinvariant(struct mux *mux)
+{
+	if (mux->isleaf)
+		state_endinvariant(mux->u.s);
+	else {
+		mux_endinvariant(mux->u.t.l);
+		mux_endinvariant(mux->u.t.r);
+	}
 }

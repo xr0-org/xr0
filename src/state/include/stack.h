@@ -95,6 +95,9 @@ struct error *
 stack_next(struct stack *, struct state *);
 
 void
+stack_endinvariant(struct stack *, struct state *);
+
+void
 stack_nextstmt(struct stack *s, struct state *state);
 
 struct stack *

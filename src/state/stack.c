@@ -511,6 +511,12 @@ stack_next(struct stack *s, struct state *state)
 }
 
 void
+stack_endinvariant(struct stack *s, struct state *state)
+{
+	program_endinvariant(frame_program(s->f), state);
+}
+
+void
 stack_storeloc(struct stack *s)
 {
 	program_storeloc(frame_program(s->f));

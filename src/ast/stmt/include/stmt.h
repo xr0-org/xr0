@@ -51,4 +51,10 @@ ast_stmt_isinv(struct ast_stmt *);
 struct inv *
 ast_stmt_as_inv(struct ast_stmt *);
 
+int
+ast_stmt_islinearisable(struct ast_stmt *);
+
+void
+ast_stmt_marklinearised(struct ast_stmt *);
+
 #endif

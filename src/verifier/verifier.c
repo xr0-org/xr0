@@ -18,6 +18,8 @@ struct verifier {
 	struct mux *inv;
 	struct state *context;	/* state before invariant */
 	char *label;		/* invariant label, may be NULL */
+
+	struct map *inv_m;
 };
 
 static struct verifier *
@@ -33,6 +35,8 @@ _create(struct state *s)
 	v->inv = NULL;
 	v->context = NULL;
 	v->label = NULL;
+
+	v->inv_m = map_create();
 
 	return v;
 }
@@ -69,6 +73,21 @@ char *
 verifier_str(struct verifier *v)
 {
 	struct strbuilder *b = strbuilder_create();
+
+	struct map *inv = v->inv_m;
+	if (inv->n) {
+		int i;
+
+		strbuilder_printf(b, "labels: ");
+		for (i = 0; i < inv->n; i++)
+			strbuilder_printf(
+				b,
+				"%s%s",
+				inv->entry[i].key,
+				i+1<inv->n ? ", " : ""
+			);
+		strbuilder_printf(b, "\n\n");
+	}
 	strbuilder_printf(b, "mode:\t");
 	if (mux_isactive(v->mux)) {
 		struct state *s = mux_state(v->mux);
@@ -126,7 +145,17 @@ verifier_progress(struct verifier *v, progressor *prog)
 				error_printf("invariant %w not satisfied", err)
 			);
 		}
-		assert(0);
+
+		if (v->label)
+			map_set(
+				v->inv_m, dynamic_str(v->label), mux_copy(v->inv)
+			);
+
+		mux_endinvariant(v->inv);
+
+		v->inv = NULL;
+		v->context = NULL; /* TODO: state_destroy(v->context); */
+		v->label = NULL;
 	}
 	return NULL;
 }

@@ -223,6 +223,12 @@ state_next(struct state *s)
 	return stack_next(s->stack, s);
 }
 
+void
+state_endinvariant(struct state *s)
+{
+	stack_endinvariant(s->stack, s);
+}
+
 struct externals *
 state_getext(struct state *s)
 {

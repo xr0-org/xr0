@@ -240,8 +240,12 @@ program_stmt_step(struct program *p, struct state *s)
 	}
 	struct error *break_err = error_to_break(err);
 	if (break_err) {
+		assert(0);
 		state_break(s);
 		return NULL;
+	}
+	if (error_to_enterinvariant(err)) {
+		program_nextstmt(p, s);
 	}
 	return err;
 }
@@ -292,6 +296,13 @@ program_stmt_next(struct program *p, struct state *s)
 	} while (state_frameid(s) != og_frame);
 
 	return NULL;
+}
+
+void
+program_endinvariant(struct program *p, struct state *s)
+{
+	assert(state_atinvariantend(s));
+	state_popframe(s);
 }
 
 char *
