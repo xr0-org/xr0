@@ -119,8 +119,13 @@ verifier_progress(struct verifier *v, progressor *prog)
 		return err;
 	}
 	if (v->inv && !mux_isactive(v->inv)) {
-		/* TODO: verify context satisfies one of the invariant states;
-		 * then unset inv, context, label */
+		struct error *err = mux_one_verifies(v->inv, v->context);
+		if (err) {
+			return state_stacktrace(
+				v->context,
+				error_printf("invariant %w not satisfied", err)
+			);
+		}
 		assert(0);
 	}
 	return NULL;

@@ -85,3 +85,16 @@ mux_split(struct mux *mux, struct lsi_le *l, struct lsi_le *r)
 	leaf->u.t.l = mux_create(state_split(s, l));
 	leaf->u.t.r = mux_create(state_split(s, r));
 }
+
+struct error *
+mux_one_verifies(struct mux *mux, struct state *s)
+{
+	if (mux->isleaf)
+		return state_constraintverify_all(mux->u.s, s);
+
+	struct error *l = mux_one_verifies(mux->u.t.l, s),
+		     *r = mux_one_verifies(mux->u.t.r, s);
+	return l && r
+		? error_printf("%w || %w", l, r)
+		: NULL;
+}
