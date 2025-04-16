@@ -128,9 +128,19 @@ selection_linearise(struct ast_stmt *stmt, struct ast_block *b,
 		false,
 		newcond,
 		ast_stmt_copy(body),
-		nest ? ast_stmt_copy(nest) : NULL
+		NULL
 	);
 	ast_block_append_stmt(b, newsel);
+	if (nest) {
+		struct ast_stmt *newnest = ast_stmt_create_sel(
+			lexememarker_copy(loc),
+			false,
+			ast_expr_inverted_copy(newcond, true),
+			ast_stmt_copy(nest),
+			NULL
+		);
+		ast_block_append_stmt(b, newnest);
+	}
 	return NULL;
 }
 
@@ -383,6 +393,7 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 	struct ast_expr *cond = ast_stmt_sel_cond(stmt);
 	struct ast_stmt *body = ast_stmt_sel_body(stmt),
 			*nest = ast_stmt_sel_nest(stmt);
+	assert(!nest);
 
 	struct bool_res *res = ast_expr_decide(cond, state);
 	if (bool_res_iserror(res)) {
@@ -390,8 +401,6 @@ stmt_sel_exec(struct ast_stmt *stmt, struct state *state)
 	}
 	if (bool_res_as_bool(res)) {
 		return ast_stmt_exec(body, state);
-	} else if (nest) {
-		return ast_stmt_exec(nest, state);
 	}
 	return NULL;
 }

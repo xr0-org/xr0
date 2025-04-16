@@ -337,6 +337,15 @@ ast_block_ternary_geninstr(struct ast_block *b, struct lexememarker *loc,
 				),
 				e2_r
 			),
+			NULL
+		)
+	);
+	ast_block_append_stmt(
+		b,
+		ast_stmt_create_sel(
+			loc,
+			false,
+			ast_expr_inverted_copy(e1_r, true),
 			ast_stmt_asm_mov_create(
 				loc,
 				ast_variable_create(
@@ -345,7 +354,8 @@ ast_block_ternary_geninstr(struct ast_block *b, struct lexememarker *loc,
 					ast_type_create_int()
 				),
 				e3_r
-			)
+			),
+			NULL
 		)
 	);
 	return ast_expr_identifier_create(tvar);
