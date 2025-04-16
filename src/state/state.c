@@ -225,12 +225,6 @@ state_programtext(struct state *s)
 }
 
 int
-state_programindex(struct state *s)
-{
-	return stack_programindex(s->stack);
-}
-
-int
 state_frameid(struct state *s)
 {
 	return stack_id(s->stack);

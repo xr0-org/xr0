@@ -102,14 +102,17 @@ ast_block_absstr(struct ast_block *b, int indent)
 char *
 ast_block_render(struct ast_block *b, int index)
 {
+	int i;
+
 	struct strbuilder *sb = strbuilder_create();
-	for (int i = 0; i < b->nstmt; i++) {
-		char *s = ast_stmt_str(b->stmt[i], 2);
-		if (i == index) {
-			strbuilder_printf(sb, "-->\t%s\n", s);
-		} else {
-			strbuilder_printf(sb, "\t%s\n", s);
-		}
+	for (i = 0; i < b->nstmt; i++) {
+		char *s;
+
+		if (i == index)
+			strbuilder_printf(sb, "-->");
+
+		s = ast_stmt_str(b->stmt[i], 2);
+		strbuilder_printf(sb, "\t%s\n", s);
 		free(s);
 	}
 	return strbuilder_build(sb);

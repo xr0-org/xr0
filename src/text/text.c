@@ -3,6 +3,9 @@
 #include <assert.h>
 
 #include "ast.h"
+#include "util.h"
+
+#include "intern.h"
 
 struct text {
 	struct ast_block *b;
@@ -35,22 +38,42 @@ text_destroy(struct text *t)
 struct text *
 text_getnext(struct text *t, int i)
 {
-	assert(i < ast_block_nstmts(t->b));
-	assert(t->t[i]);
+	assert(text_has(t, i));
+
+	a_printf(t->t[i], "need to create next if compound stmt\n");
 	return t->t[i];
+}
+
+void
+text_putgen(struct text *t, int i, struct ast_block *gen)
+{
+	assert(text_has(t, i));
+
+	assert(!t->t[i]);
+
+	t->t[i] = text_create(gen);
 }
 
 struct ast_stmt *
 text_getstmt(struct text *t, int i)
 {
-	assert(i < ast_block_nstmts(t->b));
-	return ast_block_stmts(t->b, i);
+	assert(text_has(t, i));
+
+	return ast_block_stmts(t->b)[i];
+}
+
+int
+text_has(struct text *t, int i)
+{
+	int n = ast_block_nstmts(t->b);
+	return 0 <= i && i < n;
 }
 
 int
 text_atend(struct text *t, int i)
 {
 	int n = ast_block_nstmts(t->b);
-	assert(i <= n);
+	assert(0 <= i && i <= n);
+
 	return i == n;
 }

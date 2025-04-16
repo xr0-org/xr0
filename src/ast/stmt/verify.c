@@ -355,7 +355,7 @@ stmt_compoundv_exec(struct ast_stmt *stmt, struct state *state)
 static struct error *
 stmt_compound_exec(struct ast_stmt *stmt, struct state *state)
 {
-	struct frame *block_frame = frame_blocksame_create(
+	struct frame *block_frame = frame_nestedblock_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
 		state
@@ -712,7 +712,7 @@ sel_pushsetup(struct ast_stmt *stmt, struct state *state)
 static struct error *
 comp_pushsetup(struct ast_stmt *stmt, struct state *state)
 {
-	struct frame *block_frame = frame_blocksame_create(
+	struct frame *block_frame = frame_nestedblock_create(
 		dynamic_str("block"),
 		ast_stmt_as_block(stmt),
 		state

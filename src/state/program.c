@@ -13,71 +13,76 @@
 struct program {
 	struct text *t; /* not owned */
 	struct text_pc *pc;
-	enum program_state {
-		PROGRAM_COUNTER_STMTS,
-		PROGRAM_COUNTER_ATEND,
-	} s;
+	enum program_state { STATE_STMTS, STATE_ATEND, } s;
 	struct lexememarker *loc;
 	enum execution_mode {
-		EXEC_FINDSETUP,
-		EXEC_SETUP,
-		EXEC_ABSTRACT,
-		EXEC_ACTUAL,
-		EXEC_VERIFY,
+		MODE_FINDSETUP,
+		MODE_SETUP,
+		MODE_ABSTRACT,
+		MODE_ACTUAL,
+		MODE_VERIFY,
 	} mode;
 };
 
-static enum program_state
-program_state_init(struct text *, struct text_pc *);
-
 static struct program *
-program_create(struct text *t, struct text_pc *pc, enum execution_mode m)
+_create(struct text *t, struct text_pc *pc, enum execution_mode m)
 {
 	struct program *p = malloc(sizeof(struct program));
 	assert(p);
 	p->t = t;
 	p->pc = pc;
-	p->s = program_state_init(b);
-	p->index = 0;
+	p->s = text_pc_atblockend(pc, t)
+		? STATE_ATEND
+		: STATE_STMTS;
 	p->loc = NULL;
 	p->mode = m;
 	return p;
 }
 
 struct program *
-program_same_create(struct ast_block *b, struct program *origin)
-{
-	return program_create(b, origin->mode);
-}
-
-struct program *
-program_findsetup_create(struct ast_block *b)
-{
-	return program_create(b, EXEC_FINDSETUP);
-}
-
-struct program *
-program_setup_create(struct ast_block *b)
-{
-	return program_create(b, EXEC_SETUP);
-}
-
-struct program *
 program_abstract_create(struct ast_block *b)
 {
-	return program_create(b, EXEC_ABSTRACT);
+	return _create(text_create(b), text_pc_create(), MODE_ABSTRACT);
 }
 
 struct program *
 program_actual_create(struct ast_block *b)
 {
-	return program_create(b, EXEC_ACTUAL);
+	return _create(text_create(b), text_pc_create(), MODE_ACTUAL);
+}
+
+struct program *
+program_setup_create(struct ast_block *b)
+{
+	return _create(text_create(b), text_pc_create(), MODE_SETUP);
+}
+
+struct program *
+program_findsetup_create(struct ast_block *b)
+{
+	return _create(text_create(b), text_pc_create(), MODE_FINDSETUP);
 }
 
 struct program *
 program_verify_create(struct ast_block *b)
 {
-	return program_create(b, EXEC_VERIFY);
+	return _create(text_create(b), text_pc_create(), MODE_VERIFY);
+}
+
+struct program *
+program_nestedblock_create(struct program *origin)
+{
+	struct text_pc *pc = text_pc_copy(origin->pc);
+	text_pc_enter(pc, origin->t);
+	return _create(origin->t, pc, origin->mode);
+}
+
+struct program *
+program_linear_create(struct program *origin, struct ast_block *gen)
+{
+	struct text_pc *pc = text_pc_copy(origin->pc);
+	text_pc_enterlinear(pc, origin->t, gen);
+	return _create(origin->t, pc, origin->mode);
 }
 
 struct program *
@@ -85,9 +90,9 @@ program_copy(struct program *old)
 {
 	struct program *new = malloc(sizeof(struct program));
 	assert(new);
-	new->b = ast_block_copy(old->b);
+	new->t = old->t;
+	new->pc = text_pc_copy(old->pc);
 	new->s = old->s;
-	new->index = old->index;
 	new->loc = old->loc ? lexememarker_copy(old->loc) : NULL;
 	new->mode = old->mode;
 	return new;
@@ -96,115 +101,78 @@ program_copy(struct program *old)
 void
 program_destroy(struct program *p)
 {
-	/* no ownership of block */
+	/* no ownership of text */
+	text_pc_destroy(p->pc);
 	free(p);
 }
 
 void
 program_setatend(struct program *p)
 {
-	p->s = PROGRAM_COUNTER_ATEND;
+	p->s = STATE_ATEND;
 }
 
 void
 program_storeloc(struct program *p)
 {
-	if (ast_block_nstmts(p->b) > 0) {
-		p->loc = ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index]);
-	}
-}
-
-static enum program_state
-program_state_init(struct text *t, struct text_pc *pc)
-{
-	return text_pc_atblockend(pc, t)
-		? PROGRAM_COUNTER_ATEND
-		: PROGRAM_COUNTER_STMTS;
-}
-
-char *
-program_str(struct program *p)
-{
-	struct strbuilder *b = strbuilder_create();
-	strbuilder_printf(b, "%s\n", ast_block_str(p->b, 1));
-	return strbuilder_build(b);
-}
-
-int
-program_index(struct program *p)
-{
-	return p->index;
+	if (!text_pc_atblockend(p->pc, p->t))
+		p->loc = ast_stmt_lexememarker(text_pc_getstmt(p->pc, p->t));
 }
 
 int
 program_modecanverify(struct program *p)
 {
-	return p->mode == EXEC_VERIFY;
+	return p->mode == MODE_VERIFY;
 }
 
 int
 program_modecanrunxr0cmd(struct program *p)
 {
 	switch (p->mode) {
-	case EXEC_SETUP:
-	case EXEC_ABSTRACT:
+	case MODE_SETUP:
+	case MODE_ABSTRACT:
 		return 1;
 	default:
 		return 0;
 	}
 }
 
-
 char *
 program_render(struct program *p)
 {
-	struct strbuilder *b = strbuilder_create();
 	switch (p->s) {
-	case PROGRAM_COUNTER_STMTS:
-		strbuilder_printf(b, "%s", ast_block_render(p->b, p->index));
-		break;
-	case PROGRAM_COUNTER_ATEND:
-		strbuilder_printf(b, "\t<end of frame>\n");
-		break;
+	case STATE_STMTS:
+		return text_pc_rendertop(p->pc, p->t);
+	case STATE_ATEND:
+		return dynamic_str("\t<end of frame>\n");
 	default:
 		assert(false);
 	}
-	return strbuilder_build(b);
 }
 
 bool
 program_atend(struct program *p)
 {
-	return p->s == PROGRAM_COUNTER_ATEND;
+	return p->s == STATE_ATEND;
 }
 
 struct ast_expr *
 program_prevcall(struct program *p)
 {
-	assert(p->s == PROGRAM_COUNTER_STMTS);
-	assert(p->index > 0);
-	struct ast_stmt *c = ast_block_stmts(p->b)[p->index-1];
-	return ast_expr_copy(ast_stmt_asm_call(c));
-}
+	assert(p->s == STATE_STMTS);
 
-static bool
-program_stmt_atend(struct program *, struct state *);
+	return ast_expr_copy(ast_stmt_asm_call(text_pc_prevstmt(p->pc, p->t)));
+}
 
 static void
 program_nextstmt(struct program *p, struct state *s)
 {
-	assert(p->s == PROGRAM_COUNTER_STMTS);
+	assert(p->s == STATE_STMTS);
 
-	++p->index;
-	if (program_stmt_atend(p, s)) {
-		p->s = PROGRAM_COUNTER_ATEND;
-	}
-}
+	text_pc_advance(p->pc, p->t);
 
-static bool
-program_stmt_atend(struct program *p, struct state *s)
-{
-	return p->index >= ast_block_nstmts(p->b);
+	if (text_pc_atblockend(p->pc, p->t))
+		p->s = STATE_ATEND;
 }
 
 static struct error *
@@ -214,9 +182,9 @@ struct error *
 program_step(struct program *p, struct state *s)
 {
 	switch (p->s) {
-	case PROGRAM_COUNTER_STMTS:
+	case STATE_STMTS:
 		return program_stmt_step(p, s);
-	case PROGRAM_COUNTER_ATEND:
+	case STATE_ATEND:
 		if (state_frameid(s) != 0) {
 			state_popframe(s);
 		}
@@ -253,15 +221,15 @@ program_stmt_step(struct program *p, struct state *s)
 static struct error *
 program_stmt_process(struct program *p, struct state *s)
 {
-	struct ast_stmt *stmt = ast_block_stmts(p->b)[p->index];
+	struct ast_stmt *stmt = text_pc_getstmt(p->pc, p->t);
 	switch (p->mode) {
-	case EXEC_FINDSETUP:
+	case MODE_FINDSETUP:
 		return ast_stmt_pushsetup(stmt, s);
-	case EXEC_SETUP:
-	case EXEC_ABSTRACT:
-	case EXEC_ACTUAL:
+	case MODE_SETUP:
+	case MODE_ABSTRACT:
+	case MODE_ACTUAL:
 		return ast_stmt_exec(stmt, s);
-	case EXEC_VERIFY:
+	case MODE_VERIFY:
 		return ast_stmt_verify(stmt, s);
 	default:
 		assert(false);
@@ -275,9 +243,9 @@ struct error *
 program_next(struct program *p, struct state *s)
 {
 	switch (p->s) {
-	case PROGRAM_COUNTER_ATEND:
+	case STATE_ATEND:
 		return program_step(p, s);
-	case PROGRAM_COUNTER_STMTS:
+	case STATE_STMTS:
 		return program_stmt_next(p, s);	
 	default:
 		assert(false);
@@ -305,14 +273,13 @@ program_loc(struct program *p)
 		return lexememarker_str(p->loc);
 	}
 	switch (p->s) {
-	case PROGRAM_COUNTER_STMTS:
+	case STATE_STMTS:
 		return lexememarker_str(
-			ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index])
+			ast_stmt_lexememarker(text_pc_getstmt(p->pc, p->t))
 		);
-	case PROGRAM_COUNTER_ATEND:
-		assert(p->index && ast_block_stmts(p->b)); /* i.e., it's nonzero */
+	case STATE_ATEND:
 		return lexememarker_str(
-			ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index-1])
+			ast_stmt_lexememarker(text_pc_prevstmt(p->pc, p->t))
 		);
 	default:
 		assert(false);
@@ -323,9 +290,9 @@ struct lexememarker *
 program_lexememarker(struct program *p)
 {
 	switch (p->s) {
-	case PROGRAM_COUNTER_STMTS:
-		return ast_stmt_lexememarker(ast_block_stmts(p->b)[p->index]);
-	case PROGRAM_COUNTER_ATEND:
+	case STATE_STMTS:
+		return ast_stmt_lexememarker(text_pc_getstmt(p->pc, p->t));
+	case STATE_ATEND:
 		return NULL;
 	default:
 		assert(false);

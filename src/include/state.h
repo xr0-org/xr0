@@ -72,9 +72,6 @@ char *
 state_programtext(struct state *);
 
 int
-state_programindex(struct state *);
-
-int
 state_frameid(struct state *);
 
 struct heap *
@@ -255,7 +252,7 @@ struct frame *
 frame_blockfindsetup_create(char *name, struct ast_block *);
 
 struct frame *
-frame_blocksame_create(char *name, struct ast_block *, struct state *);
+frame_nestedblock_create(char *name, struct ast_block *, struct state *);
 
 struct frame *
 frame_setup_create(char *name, struct ast_block *);

@@ -132,12 +132,6 @@ stack_programtext(struct stack *s)
 	return program_render(frame_program(s->f));
 }
 
-int
-stack_programindex(struct stack *s)
-{
-	return program_index(frame_program(s->f));
-}
-
 void
 stack_break(struct stack *s)
 {
@@ -871,10 +865,10 @@ frame_blockfindsetup_create(char *name, struct ast_block *b)
 }
 
 struct frame *
-frame_blocksame_create(char *name, struct ast_block *b, struct state *s)
+frame_nestedblock_create(char *name, struct ast_block *b, struct state *s)
 {
 	return frame_block_create_withprogram(
-		name, program_same_create(b, state_stack(s)->f->p)
+		name, program_nestedblock_create(state_stack(s)->f->p)
 	);
 }
 
@@ -889,7 +883,7 @@ frame_linear_create(char *n, struct ast_block *b, struct state *s)
 {
 	return frame_create(
 		n,
-		program_same_create(b, state_stack(s)->f->p),
+		program_linear_create(state_stack(s)->f->p, b),
 		FRAME_LINEAR
 	);
 }

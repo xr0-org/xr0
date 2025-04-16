@@ -3,14 +3,7 @@
 
 struct program;
 
-struct program *
-program_same_create(struct ast_block *, struct program *origin);
-
-struct program *
-program_findsetup_create(struct ast_block *);
-
-struct program *
-program_setup_create(struct ast_block *);
+struct ast_block;
 
 struct program *
 program_abstract_create(struct ast_block *);
@@ -19,19 +12,25 @@ struct program *
 program_actual_create(struct ast_block *);
 
 struct program *
+program_setup_create(struct ast_block *);
+
+struct program *
+program_findsetup_create(struct ast_block *);
+
+struct program *
 program_verify_create(struct ast_block *);
+
+struct program *
+program_nestedblock_create(struct program *origin);
+
+struct program *
+program_linear_create(struct program *origin, struct ast_block *gen);
 
 struct program *
 program_copy(struct program *);
 
 void
 program_destroy(struct program *);
-
-char *
-program_str(struct program *);
-
-int
-program_index(struct program *);
 
 int
 program_modecanverify(struct program *);

@@ -17,9 +17,6 @@ stack_getframe(struct stack *, int frame);
 char *
 stack_programtext(struct stack *);
 
-int
-stack_programindex(struct stack *);
-
 void
 stack_break(struct stack *);
 
