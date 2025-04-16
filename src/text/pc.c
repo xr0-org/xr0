@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include "util.h"
 #include "text.h"
 
 #include "intern.h"
@@ -39,9 +40,24 @@ text_pc_destroy(struct text_pc *pc)
 }
 
 char *
+text_pc_str(struct text_pc *pc)
+{
+	struct strbuilder *b = strbuilder_create();
+	strbuilder_printf(b, "%d", pc->i);
+	if (pc->next) {
+		char *next = text_pc_str(pc->next);
+		strbuilder_printf(b, "->%s", next);
+		free(next);
+	}
+	return strbuilder_build(b);
+}
+
+char *
 text_pc_rendertop(struct text_pc *pc, struct text *t)
 {
-	assert(0);
+	return pc->next
+		? text_pc_rendertop(pc->next, text_getnext(t, pc->i))
+		: text_render(t, pc->i);
 }
 
 void
@@ -51,32 +67,22 @@ text_pc_advance(struct text_pc *pc, struct text *t)
 		text_pc_advance(pc->next, text_getnext(t, pc->i));
 	else {
 		pc->i++;
-		assert(text_has(t, pc->i));
+		assert(text_has(t, pc->i) || text_atend(t, pc->i));
 	}
 }
 
 void
-text_pc_enter(struct text_pc *pc, struct text *t)
+text_pc_enter(struct text_pc *pc, struct text *t, struct ast_block *b)
 {
 	if (pc->next)
-		text_pc_enter(pc->next, text_getnext(t, pc->i));
+		text_pc_enter(pc->next, text_getnext(t, pc->i), b);
 	else {
+		text_enter(t, pc->i, b);
+
 		pc->next = text_pc_create();
 
 		/* will trigger assertions if we've invalidated something */
 		text_pc_getstmt(pc, t);
-	}
-}
-
-void
-text_pc_enterlinear(struct text_pc *pc, struct text *t, struct ast_block *gen)
-{
-	if (pc->next)
-		text_pc_enterlinear(pc->next, text_getnext(t, pc->i), gen);
-	else {
-		text_putgen(t, pc->i, gen);
-
-		text_pc_enter(pc, t);
 	}
 }
 
@@ -91,7 +97,7 @@ text_pc_getstmt(struct text_pc *pc, struct text *t)
 struct ast_stmt *
 text_pc_prevstmt(struct text_pc *pc, struct text *t)
 {
-	return (pc->next)
+	return pc->next
 		? text_pc_prevstmt(pc->next, text_getnext(t, pc->i))
 		: text_getstmt(t, pc->i-1);
 }

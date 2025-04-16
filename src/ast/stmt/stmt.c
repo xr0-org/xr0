@@ -224,6 +224,12 @@ ast_stmt_as_block(struct ast_stmt *stmt)
 	return stmt->u.compound;
 }
 
+int
+ast_stmt_isblock(struct ast_stmt *stmt)
+{
+	return stmt->kind == STMT_COMPOUND;
+}
+
 static void
 ast_stmt_compound_sprint(struct ast_stmt *stmt, int indent_level,
 		struct strbuilder *b)

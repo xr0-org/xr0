@@ -485,6 +485,9 @@ ast_stmt_as_compound(struct ast_stmt *);
 struct ast_block *
 ast_stmt_as_block(struct ast_stmt *);
 
+int
+ast_stmt_isblock(struct ast_stmt *);
+
 struct ast_stmt *
 ast_stmt_create_compound_v(struct lexememarker *, struct ast_block *);
 

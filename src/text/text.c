@@ -35,23 +35,36 @@ text_destroy(struct text *t)
 	free(t);
 }
 
-struct text *
-text_getnext(struct text *t, int i)
+
+char *
+text_render(struct text *t, int i)
 {
 	assert(text_has(t, i));
 
-	a_printf(t->t[i], "need to create next if compound stmt\n");
+	return ast_block_render(t->b, i);
+}
+
+struct text *
+text_getnext(struct text *t, int i)
+{
+	if (!t->t[i])
+		text_enter(t, i, ast_stmt_as_block(ast_block_stmts(t->b)[i]));
+
+	assert(t->t[i]);
+
 	return t->t[i];
 }
 
 void
-text_putgen(struct text *t, int i, struct ast_block *gen)
+text_enter(struct text *t, int i, struct ast_block *b)
 {
 	assert(text_has(t, i));
 
-	assert(!t->t[i]);
+	struct ast_stmt *stmt = ast_block_stmts(t->b)[i];
+	assert(!ast_stmt_isblock(stmt) || ast_stmt_as_block(stmt) == b);
 
-	t->t[i] = text_create(gen);
+	if (!t->t[i])
+		t->t[i] = text_create(ast_block_copy(b));
 }
 
 struct ast_stmt *

@@ -70,10 +70,10 @@ program_verify_create(struct ast_block *b)
 }
 
 struct program *
-program_nestedblock_create(struct program *origin)
+program_nestedblock_create(struct program *origin, struct ast_block *b)
 {
 	struct text_pc *pc = text_pc_copy(origin->pc);
-	text_pc_enter(pc, origin->t);
+	text_pc_enter(pc, origin->t, b);
 	return _create(origin->t, pc, origin->mode);
 }
 
@@ -81,7 +81,7 @@ struct program *
 program_linear_create(struct program *origin, struct ast_block *gen)
 {
 	struct text_pc *pc = text_pc_copy(origin->pc);
-	text_pc_enterlinear(pc, origin->t, gen);
+	text_pc_enter(pc, origin->t, gen);
 	return _create(origin->t, pc, origin->mode);
 }
 

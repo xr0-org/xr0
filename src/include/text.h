@@ -25,6 +25,9 @@ void
 text_pc_destroy(struct text_pc *);
 
 char *
+text_pc_str(struct text_pc *);
+
+char *
 text_pc_rendertop(struct text_pc *, struct text *);
 
 void
@@ -33,11 +36,7 @@ text_pc_advance(struct text_pc *, struct text *);
 /* text_pc_enter: enter the nested block in the text that the pc is currently
  * pointing at. */
 void
-text_pc_enter(struct text_pc *, struct text *);
-
-/* text_pc_enterlinear: enter the generated block. */
-void
-text_pc_enterlinear(struct text_pc *, struct text *, struct ast_block *gen);
+text_pc_enter(struct text_pc *, struct text *, struct ast_block *);
 
 struct ast_stmt;
 

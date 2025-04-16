@@ -21,7 +21,7 @@ struct program *
 program_verify_create(struct ast_block *);
 
 struct program *
-program_nestedblock_create(struct program *origin);
+program_nestedblock_create(struct program *origin, struct ast_block *b);
 
 struct program *
 program_linear_create(struct program *origin, struct ast_block *gen);

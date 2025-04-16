@@ -868,7 +868,7 @@ struct frame *
 frame_nestedblock_create(char *name, struct ast_block *b, struct state *s)
 {
 	return frame_block_create_withprogram(
-		name, program_nestedblock_create(state_stack(s)->f->p)
+		name, program_nestedblock_create(state_stack(s)->f->p, b)
 	);
 }
 

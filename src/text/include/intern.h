@@ -1,13 +1,18 @@
 #ifndef XR0_TEXT_TEXT_H
 #define XR0_TEXT_TEXT_H
 
+struct text;
+
+char *
+text_render(struct text *, int);
+
 struct text *
 text_getnext(struct text *, int);
 
 struct ast_block;
 
 void
-text_putgen(struct text *, int, struct ast_block *gen);
+text_enter(struct text *, int, struct ast_block *);
 
 struct ast_stmt *
 text_getstmt(struct text *, int);
