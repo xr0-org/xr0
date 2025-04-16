@@ -409,6 +409,9 @@ ast_block_append_stmt(struct ast_block *, struct ast_stmt *);
 void
 ast_block_appendallcopy(struct ast_block *b, struct ast_block *from);
 
+int
+ast_block_equal(struct ast_block *, struct ast_block *);
+
 struct preconds_result {
 	struct ast_block *b;
 	struct error *err;

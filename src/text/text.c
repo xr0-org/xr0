@@ -61,7 +61,8 @@ text_enter(struct text *t, int i, struct ast_block *b)
 	assert(text_has(t, i));
 
 	struct ast_stmt *stmt = ast_block_stmts(t->b)[i];
-	assert(!ast_stmt_isblock(stmt) || ast_stmt_as_block(stmt) == b);
+	assert(!ast_stmt_isblock(stmt)
+			|| ast_block_equal(ast_stmt_as_block(stmt), b));
 
 	if (!t->t[i])
 		t->t[i] = text_create(ast_block_copy(b));

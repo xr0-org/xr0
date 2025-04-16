@@ -373,3 +373,18 @@ ast_block_setupdecide(struct ast_block *old, struct state *s)
 	}
 	return ast_block_res_block_create(new);
 }
+
+int
+ast_block_equal(struct ast_block *b0, struct ast_block *b1)
+{
+	int i;
+
+	if (b0->nstmt != b1->nstmt)
+		return 0;
+
+	for (i = 0; i < b0->nstmt; i++)
+		if (!ast_stmt_equal(b0->stmt[i], b1->stmt[i]))
+			return 0;
+
+	return 1;
+}
