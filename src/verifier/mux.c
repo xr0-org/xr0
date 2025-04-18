@@ -3,6 +3,7 @@
 
 #include "util.h"
 #include "state.h"
+#include "verifier.h"
 
 #include "arr.h"
 #include "mux.h"
@@ -95,14 +96,38 @@ mux_state(struct mux *mux)
 	return mux_activeleaf(mux)->u.s;
 }
 
-void
-mux_split(struct mux *mux, struct lsi_le *l, struct lsi_le *r)
+struct error *
+mux_progress(struct mux *mux, progressor *prog)
 {
 	struct mux *leaf = mux_activeleaf(mux);
 	struct state *s = leaf->u.s;
-	leaf->isleaf = 0;
-	leaf->u.t.l = mux_create(state_split(s, l));
-	leaf->u.t.r = mux_create(state_split(s, r));
+	struct error *err = prog(s);
+	if (err) {
+		if (error_to_mustsplit(err)) {
+			struct splitinstruct *inst = error_get_splitinstruct(
+				err
+			);
+			leaf->isleaf = 0;
+			leaf->u.t.l = mux_create(
+				state_split(s, splitinstruct_0(inst))
+			);
+			leaf->u.t.r = mux_create(
+				state_split(s, splitinstruct_1(inst))
+			);
+			return NULL;
+		}
+		if (error_to_goto(err)) {
+			struct state *goto_s = state_copy(s);
+			char *label = error_goto_label(err);
+			if (!state_goto(goto_s, label))
+				return error_printf("`%s' not found", label);
+			/* TODO: state_destroy(leaf->u.s); */
+			leaf->u.s = goto_s;
+			return NULL;
+		}
+		return err;
+	}
+	return NULL;
 }
 
 struct error *

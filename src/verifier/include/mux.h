@@ -23,12 +23,10 @@ mux_isactive(struct mux *);
 struct state *
 mux_state(struct mux *);
 
-struct lsi_le;
-
-void
-mux_split(struct mux *, struct lsi_le *, struct lsi_le *);
-
 struct error;
+
+struct error *
+mux_progress(struct mux *, progressor *);
 
 struct error *
 mux_one_verifies(struct mux *, struct state *);

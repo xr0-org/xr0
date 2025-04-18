@@ -15,9 +15,9 @@
 struct verifier {
 	struct mux *mux;
 
-	struct mux *inv;
 	struct state *context;	/* state before invariant */
 	char *label;		/* invariant label, may be NULL */
+	struct mux *pre_inv_root;
 
 	struct map *inv_m;
 };
@@ -32,9 +32,9 @@ _create(struct state *s)
 
 	v->mux = mux_create(s);
 
-	v->inv = NULL;
 	v->context = NULL;
 	v->label = NULL;
+	v->pre_inv_root = NULL;
 
 	v->inv_m = map_create();
 
@@ -110,7 +110,7 @@ verifier_str(struct verifier *v)
 int
 verifier_atend(struct verifier *v)
 {
-	return !mux_isactive(v->mux);
+	return !v->pre_inv_root && !mux_isactive(v->mux);
 }
 
 /* verifier_progress */
@@ -127,18 +127,34 @@ progressor_next(void)
 	return state_next;
 }
 
-static struct error *
-_progress(struct verifier *v, progressor *prog);
-
 struct error *
 verifier_progress(struct verifier *v, progressor *prog)
 {
-	struct error *err = _progress(v, prog);
-	if (err) {
-		return err;
+	assert(!verifier_atend(v));
+
+	if (mux_isactive(v->mux)) {
+		struct mux *leaf = mux_activeleaf(v->mux);
+		struct state *s = mux_state(leaf);
+		struct error *err = mux_progress(leaf, prog);
+		if (err) {
+			if (error_to_enterinvariant(err)) {
+				assert(!v->pre_inv_root);
+
+				if (error_enterinvariant_haslabel(err)) {
+					char *label = error_enterinvariant_label(err);
+					assert(!map_get(v->inv_m, label));
+					v->label = label;
+				}
+				v->context = state_copy(s);
+				v->pre_inv_root = v->mux;
+				v->mux = leaf;
+				return NULL;
+			}
+			return state_stacktrace(s, err);
+		}
 	}
-	if (v->inv && !mux_isactive(v->inv)) {
-		struct error *err = mux_one_verifies(v->inv, v->context);
+	if (v->pre_inv_root && !mux_isactive(v->mux)) {
+		struct error *err = mux_one_verifies(v->mux, v->context);
 		if (err) {
 			return state_stacktrace(
 				v->context,
@@ -148,59 +164,15 @@ verifier_progress(struct verifier *v, progressor *prog)
 
 		if (v->label)
 			map_set(
-				v->inv_m, dynamic_str(v->label), mux_copy(v->inv)
+				v->inv_m, dynamic_str(v->label), mux_copy(v->mux)
 			);
 
-		mux_endinvariant(v->inv);
+		mux_endinvariant(v->mux);
+		v->mux = v->pre_inv_root;
+		v->pre_inv_root = NULL;
 
-		v->inv = NULL;
 		v->context = NULL; /* TODO: state_destroy(v->context); */
 		v->label = NULL;
-	}
-	return NULL;
-}
-
-static struct error *
-_progress(struct verifier *v, progressor *prog)
-{
-	assert(!verifier_atend(v));
-
-	struct state *s = mux_state(v->mux);
-	struct error *err = prog(s);
-	if (err) {
-		if (error_to_mustsplit(err)) {
-			struct splitinstruct *inst = error_get_splitinstruct(
-				err
-			);
-			mux_split(
-				v->mux,
-				splitinstruct_0(inst),
-				splitinstruct_1(inst)
-			);
-			return NULL;
-		}
-		if (error_to_enterinvariant(err)) {
-			if (error_enterinvariant_haslabel(err)) {
-				char *label = error_enterinvariant_label(err);
-				assert(!map_get(v->inv_m, label));
-				v->label = label;
-			}
-			v->inv = mux_activeleaf(v->mux);
-			v->context = state_copy(s);
-			return NULL;
-		}
-		if (error_to_goto(err)) {
-			struct state *context = state_copy(s);
-			char *label = error_goto_label(err);
-			if (!state_goto(s, label))
-				return state_stacktrace(
-					context,
-					error_printf("`%s' not found", label)
-				);
-			/* TODO: state_destroy(context); */
-			return NULL;
-		}
-		return state_stacktrace(s, err);
 	}
 	return NULL;
 }
@@ -210,14 +182,3 @@ verifier_lexememarker(struct verifier *v)
 {
 	return verifier_atend(v) ? NULL : state_lexememarker(mux_state(v->mux));
 }
-
-/*
-struct error *
-verifier_verify(struct verifier *v, struct state *s)
-{
-	assert(v->ininv);
-	return v->issplit
-		? mux_one_verifies(v->u.mux, s)
-		: state_constraintverify_all(v->u.s, s); 
-}
-*/
