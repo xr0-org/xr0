@@ -64,9 +64,6 @@ ast_stmt_create(struct lexememarker *loc)
 	return stmt;
 }
 
-static int
-jump_islinearisable(struct jump *);
-
 int
 ast_stmt_islinearisable(struct ast_stmt *stmt)
 {
@@ -94,12 +91,6 @@ ast_stmt_islinearisable(struct ast_stmt *stmt)
 	default:
 		assert(0);
 	}
-}
-
-static int
-jump_islinearisable(struct jump *j)
-{
-	return jump_isreturn(j) && jump_hasrv(j);
 }
 
 void

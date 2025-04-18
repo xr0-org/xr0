@@ -20,22 +20,27 @@ char *
 jump_str(struct jump *);
 
 int
+jump_isbreak(struct jump *);
+
+int
 jump_isreturn(struct jump *);
 
 int
-jump_hasrv(struct jump *);
+jump_islinearisable(struct jump *);
 
 struct ast_expr;
 
 struct ast_expr *
 jump_rv(struct jump *);
 
-int
-jump_isbreak(struct jump *);
-
 struct string_arr;
 
 struct string_arr *
 jump_getfuncs(struct jump *);
+
+struct error;
+
+struct error *
+jump_exec(struct jump *, struct state *);
 
 #endif

@@ -259,9 +259,6 @@ static struct error *
 stmt_iter_exec(struct ast_stmt *, struct state *);
 
 static struct error *
-stmt_jump_exec(struct ast_stmt *, struct state *);
-
-static struct error *
 stmt_asm_exec(struct ast_stmt *, struct state *);
 
 struct error *
@@ -288,7 +285,7 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 	case STMT_ITERATION:
 		return stmt_iter_exec(stmt, s);
 	case STMT_JUMP:
-		return stmt_jump_exec(stmt, s);
+		return jump_exec(ast_stmt_as_jump(stmt), s);
 	case STMT_ASM:
 		return stmt_asm_exec(stmt, s);
 	default:
@@ -458,64 +455,6 @@ deriveinvstate(struct ast_stmt *stmt, struct state *state)
 	}
 	state_popframe(state);
 	return NULL;
-}
-
-static int
-compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
-
-static struct error *
-stmt_jump_exec(struct ast_stmt *stmt, struct state *state)
-{
-	struct jump *j = ast_stmt_as_jump(stmt);
-	if (jump_isbreak(j)) {
-		return error_break();
-	}
-	if (jump_hasrv(j)) {
-		struct ast_expr *rv = jump_rv(j);
-		struct e_res *res = ast_expr_eval(rv, state);
-		if (e_res_iserror(res)) {
-			struct error *err = e_res_as_error(res);
-			if (error_to_eval_void(err)) {
-				e_res_errorignore(res);
-			} else {
-				return err;
-			}
-		}
-		if (e_res_haseval(res)) {
-			struct eval *eval = e_res_as_eval(res);
-			struct ast_type *spec_t = state_getreturntype(state);
-			if (!compatible(eval, spec_t, state)) {
-				char *spec_t_str = ast_type_str(spec_t),
-				     *rv_t_str = ast_type_str(eval_type(eval));
-				struct error *err = error_printf(
-					"cannot return %s as %s",
-					rv_t_str,
-					spec_t_str
-				);
-				free(rv_t_str);
-				free(spec_t_str);
-				return err;
-			}
-			struct value_res *v_res = eval_to_value(eval, state);
-			if (!value_res_hasvalue(v_res)) {
-				return error_printf(
-					"returned expression has no value"
-				);
-			}
-			struct value *v = value_copy(value_res_as_value(v_res));
-			state_writeregister(state, v);
-		}
-	}
-	return error_return();
-}
-
-static int
-compatible(struct eval *e, struct ast_type *spec_t, struct state *s)
-{
-	return ast_type_compatible(eval_type(e), spec_t) || (
-		ast_type_compatiblewithrconst(spec_t)
-		&& value_isrconst(value_res_as_value(eval_to_value(e, s)))
-	);
 }
 
 static struct error *

@@ -3,7 +3,10 @@
 
 #include "ast.h"
 #include "util.h"
+#include "state.h"
+#include "value.h"
 
+#include "type.h"
 #include "expr.h"
 
 #include "jump.h"
@@ -130,31 +133,29 @@ goto_str(struct jump *j)
 }
 
 int
-jump_isreturn(struct jump *j)
-{
-	return j->t == RETURN;
-}
-
-int
-jump_hasrv(struct jump *j)
-{
-	return jump_isreturn(j) && j->u.rv;
-}
-
-struct ast_expr *
-jump_rv(struct jump *j)
-{
-	assert(jump_isreturn(j));
-	assert(jump_hasrv(j));
-	return j->u.rv;
-}
-
-int
 jump_isbreak(struct jump *j)
 {
 	return j->t == BREAK;
 }
 
+int
+jump_isreturn(struct jump *j)
+{
+	return j->t == RETURN;
+}
+
+struct ast_expr *
+jump_rv(struct jump *j)
+{
+	assert(jump_isreturn(j) && j->u.rv);
+	return j->u.rv;
+}
+
+int
+jump_islinearisable(struct jump *j)
+{
+	return j->t == RETURN && j->u.rv;
+}
 
 struct string_arr *
 jump_getfuncs(struct jump *j)
@@ -169,4 +170,72 @@ jump_getfuncs(struct jump *j)
 		assert(0);
 	}
 	return string_arr_create();
+}
+
+static struct error *
+return_exec(struct jump *, struct state *);
+
+struct error *
+jump_exec(struct jump *j, struct state *s)
+{
+	switch (j->t) {
+	case RETURN:
+		return return_exec(j, s);
+	default:
+		assert(0);
+	}
+}
+
+static int
+compatible(struct eval *ret, struct ast_type *spec_t, struct state *);
+
+static struct error *
+return_exec(struct jump *j, struct state *s)
+{
+	if (j->u.rv) {
+		struct ast_expr *rv = jump_rv(j);
+		struct e_res *res = ast_expr_eval(rv, s);
+		if (e_res_iserror(res)) {
+			struct error *err = e_res_as_error(res);
+			if (error_to_eval_void(err)) {
+				e_res_errorignore(res);
+			} else {
+				return err;
+			}
+		}
+		if (e_res_haseval(res)) {
+			struct eval *eval = e_res_as_eval(res);
+			struct ast_type *spec_t = state_getreturntype(s);
+			if (!compatible(eval, spec_t, s)) {
+				char *spec_t_str = ast_type_str(spec_t),
+				     *rv_t_str = ast_type_str(eval_type(eval));
+				struct error *err = error_printf(
+					"cannot return %s as %s",
+					rv_t_str,
+					spec_t_str
+				);
+				free(rv_t_str);
+				free(spec_t_str);
+				return err;
+			}
+			struct value_res *v_res = eval_to_value(eval, s);
+			if (!value_res_hasvalue(v_res)) {
+				return error_printf(
+					"returned expression has no value"
+				);
+			}
+			struct value *v = value_copy(value_res_as_value(v_res));
+			state_writeregister(s, v);
+		}
+	}
+	return error_return();
+}
+
+static int
+compatible(struct eval *e, struct ast_type *spec_t, struct state *s)
+{
+	return ast_type_compatible(eval_type(e), spec_t) || (
+		ast_type_compatiblewithrconst(spec_t)
+		&& value_isrconst(value_res_as_value(eval_to_value(e, s)))
+	);
 }
