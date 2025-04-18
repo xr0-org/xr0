@@ -12,7 +12,7 @@ struct mux {
 	int isleaf;
 	union {
 		struct state *s;
-		struct tree {
+		struct {
 			struct mux *l;
 			struct mux *r;
 		} t;
@@ -62,44 +62,40 @@ mux_destroy(struct mux *mux)
 }
 
 struct mux *
-mux_activeleaf(struct mux *mux)
+mux_firstactive(struct mux *mux, atend_func atend)
 {
-	assert(mux_isactive(mux));
+	assert(mux_isactive(mux, atend));
 
 	return mux->isleaf
 		? mux
-		: mux_activeleaf(
-			mux_isactive(mux->u.t.l) ? mux->u.t.l : mux->u.t.r
+		: mux_firstactive(
+			mux_isactive(mux->u.t.l, atend)
+				? mux->u.t.l
+				: mux->u.t.r,
+			atend
 		);
 }
 
-static int
-_atend(struct state *);
-
 int
-mux_isactive(struct mux *mux)
+mux_isactive(struct mux *mux, atend_func atend)
 {
 	return mux->isleaf
-		? !_atend(mux->u.s)
-		: mux_isactive(mux->u.t.l) || mux_isactive(mux->u.t.r);
-}
-
-static int
-_atend(struct state *s)
-{
-	return state_ininvariant(s) ? state_atinvariantend(s) : state_atend(s);
+		? !atend(mux->u.s)
+		: mux_isactive(mux->u.t.l, atend)
+			|| mux_isactive(mux->u.t.r, atend);
 }
 
 struct state *
-mux_state(struct mux *mux)
+mux_state(struct mux *mux, atend_func atend)
 {
-	return mux_activeleaf(mux)->u.s;
+	return mux_firstactive(mux, atend)->u.s;
 }
 
 struct error *
-mux_progress(struct mux *mux, progressor *prog)
+mux_progress(struct mux *leaf, progressor *prog, atend_func atend)
 {
-	struct mux *leaf = mux_activeleaf(mux);
+	assert(leaf->isleaf);
+
 	struct state *s = leaf->u.s;
 	struct error *err = prog(s);
 	if (err) {

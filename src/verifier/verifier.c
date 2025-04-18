@@ -22,6 +22,12 @@ struct verifier {
 	struct map *inv_m;
 };
 
+static atend_func
+_atend(struct verifier *v)
+{
+	return v->pre_inv_root ? state_atinvariantend : state_atend;
+}
+
 static struct verifier *
 _create(struct state *s)
 {
@@ -89,8 +95,8 @@ verifier_str(struct verifier *v)
 		strbuilder_printf(b, "\n\n");
 	}
 	strbuilder_printf(b, "mode:\t");
-	if (mux_isactive(v->mux)) {
-		struct state *s = mux_state(v->mux);
+	if (mux_isactive(v->mux, _atend(v))) {
+		struct state *s = mux_state(v->mux, _atend(v));
 		if (state_ininvariant(s)) {
 			strbuilder_printf(b, "INV");
 			if (v->label)
@@ -110,7 +116,7 @@ verifier_str(struct verifier *v)
 int
 verifier_atend(struct verifier *v)
 {
-	return !v->pre_inv_root && !mux_isactive(v->mux);
+	return !v->pre_inv_root && !mux_isactive(v->mux, _atend(v));
 }
 
 /* verifier_progress */
@@ -132,10 +138,10 @@ verifier_progress(struct verifier *v, progressor *prog)
 {
 	assert(!verifier_atend(v));
 
-	if (mux_isactive(v->mux)) {
-		struct mux *leaf = mux_activeleaf(v->mux);
-		struct state *s = mux_state(leaf);
-		struct error *err = mux_progress(leaf, prog);
+	if (mux_isactive(v->mux, _atend(v))) {
+		struct mux *leaf = mux_firstactive(v->mux, _atend(v));
+		struct state *s = mux_state(leaf, _atend(v));
+		struct error *err = mux_progress(leaf, prog, _atend(v));
 		if (err) {
 			if (error_to_enterinvariant(err)) {
 				assert(!v->pre_inv_root);
@@ -153,7 +159,7 @@ verifier_progress(struct verifier *v, progressor *prog)
 			return state_stacktrace(s, err);
 		}
 	}
-	if (v->pre_inv_root && !mux_isactive(v->mux)) {
+	if (v->pre_inv_root && !mux_isactive(v->mux, _atend(v))) {
 		struct error *err = mux_one_verifies(v->mux, v->context);
 		if (err) {
 			return state_stacktrace(
@@ -180,5 +186,7 @@ verifier_progress(struct verifier *v, progressor *prog)
 struct lexememarker *
 verifier_lexememarker(struct verifier *v)
 {
-	return verifier_atend(v) ? NULL : state_lexememarker(mux_state(v->mux));
+	return verifier_atend(v)
+		? NULL
+		: state_lexememarker(mux_state(v->mux, _atend(v)));
 }
