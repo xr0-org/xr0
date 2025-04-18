@@ -397,6 +397,8 @@ struct error {
 
 		ERROR_ENTER_INVARIANT,
 
+		ERROR_GOTO,
+
 		ERROR_RETURN,
 		ERROR_BREAK,
 		ERROR_PREV,
@@ -543,6 +545,29 @@ char *
 error_enterinvariant_label(struct error *err)
 {
 	assert(error_enterinvariant_haslabel(err));
+	return err->contents.label;
+}
+
+struct error *
+error_goto(char *label)
+{
+	struct error *err = calloc(1, sizeof(struct error));
+	assert(err);
+	err->type = ERROR_GOTO;
+	err->contents.label = label;
+	return err;
+}
+
+struct error *
+error_to_goto(struct error *err)
+{
+	return error_to(err, ERROR_GOTO);
+}
+
+char *
+error_goto_label(struct error *err)
+{
+	assert(error_to_goto(err));
 	return err->contents.label;
 }
 
@@ -729,6 +754,7 @@ error_str(struct error *err)
 {
 	char *error_type_str[] = {
 		[ERROR_ENTER_INVARIANT]		= "enter invariant",
+		[ERROR_GOTO]			= "gone",
 		[ERROR_RETURN]			= "returned",
 		[ERROR_BREAK]			= "broken",
 		[ERROR_PREV]			= "prev",
@@ -754,6 +780,7 @@ error_str(struct error *err)
 	case ERROR_PRINTF:
 		return dynamic_str(err->contents.printf);
 	case ERROR_ENTER_INVARIANT:
+	case ERROR_GOTO:
 	case ERROR_RETURN:
 	case ERROR_BREAK:
 	case ERROR_PREV:

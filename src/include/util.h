@@ -167,6 +167,15 @@ char *
 error_enterinvariant_label(struct error *);
 
 struct error *
+error_goto(char *);
+
+struct error *
+error_to_goto(struct error *);
+
+char *
+error_goto_label(struct error *);
+
+struct error *
 error_return(void);
 
 struct error *

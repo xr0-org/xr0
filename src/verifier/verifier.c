@@ -180,13 +180,27 @@ _progress(struct verifier *v, progressor *prog)
 			return NULL;
 		}
 		if (error_to_enterinvariant(err)) {
+			if (error_enterinvariant_haslabel(err)) {
+				char *label = error_enterinvariant_label(err);
+				assert(!map_get(v->inv_m, label));
+				v->label = label;
+			}
 			v->inv = mux_activeleaf(v->mux);
 			v->context = state_copy(s);
-			if (error_enterinvariant_haslabel(err))
-				v->label = error_enterinvariant_label(err);
 			return NULL;
 		}
-		return err;
+		if (error_to_goto(err)) {
+			struct state *context = state_copy(s);
+			char *label = error_goto_label(err);
+			if (!state_goto(s, label))
+				return state_stacktrace(
+					context,
+					error_printf("`%s' not found", label)
+				);
+			/* TODO: state_destroy(context); */
+			return NULL;
+		}
+		return state_stacktrace(s, err);
 	}
 	return NULL;
 }

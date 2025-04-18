@@ -211,6 +211,12 @@ state_pushloopframe(struct state *s, struct ast_block *b)
 	state_pushframe(s, frame_loop_create(b, s->stack, state_copy(s)));
 }
 
+int
+state_goto(struct state *s, char *l)
+{
+	return stack_goto(s->stack, l, s);
+}
+
 struct error *
 state_step(struct state *s)
 {

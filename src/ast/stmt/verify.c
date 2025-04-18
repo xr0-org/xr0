@@ -679,3 +679,45 @@ comp_pushsetup(struct ast_stmt *stmt, struct state *state)
 	state_pushframe(state, block_frame);
 	return NULL;
 }
+
+static int
+sel_goto(struct ast_stmt *, char *, struct state *);
+
+int
+ast_stmt_goto(struct ast_stmt *s, char *l, struct state *state)
+{
+	switch (ast_stmt_kind(s)) {
+	case STMT_DECLARATION:
+	case STMT_NOP:
+	case STMT_EXPR:
+	case STMT_INVARIANT:
+	case STMT_JUMP:
+	case STMT_ASM:
+		return 0;
+
+	case STMT_LABELLED:
+		return strcmp(ast_stmt_labelled_label(s), l) == 0
+			? 1
+			: ast_stmt_goto(ast_stmt_labelled_stmt(s), l, state);
+
+	case STMT_SELECTION:
+		return sel_goto(s, l, state);
+
+	case STMT_COMPOUND:
+	case STMT_ITERATION:
+		TODO("goto over blocks and loops\n");
+
+	default:
+		assert(0);
+	}
+}
+
+static int
+sel_goto(struct ast_stmt *s, char *l, struct state *state)
+{
+	struct ast_stmt *nest = ast_stmt_sel_nest(s);
+
+	return ast_stmt_goto(ast_stmt_sel_body(s), l, state)	/* if */
+		|| (nest && ast_stmt_goto(nest, l, state));	/* else */
+}
+

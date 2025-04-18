@@ -238,12 +238,7 @@ program_stmt_step(struct program *p, struct state *s)
 		state_return(s);
 		return NULL;
 	}
-	struct error *break_err = error_to_break(err);
-	if (break_err) {
-		assert(0);
-		state_break(s);
-		return NULL;
-	}
+	assert(!error_to_break(err));
 	if (error_to_enterinvariant(err)) {
 		program_nextstmt(p, s);
 	}
@@ -296,6 +291,19 @@ program_stmt_next(struct program *p, struct state *s)
 	} while (state_frameid(s) != og_frame);
 
 	return NULL;
+}
+
+int
+program_goto(struct program *p, char *l, struct state *s)
+{
+	int n = ast_block_nstmts(p->b);
+
+	for (p->index = 0; p->index < n; p->index++) {
+		if (ast_stmt_goto(ast_block_stmts(p->b)[p->index], l, s))
+			return 1;
+	}
+
+	return 0; /* not found */
 }
 
 void

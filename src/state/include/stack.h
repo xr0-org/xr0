@@ -94,6 +94,10 @@ stack_step(struct stack *, struct state *);
 struct error *
 stack_next(struct stack *, struct state *);
 
+/* stack_goto: return 0 if unable, nonzero otherwise. */
+int
+stack_goto(struct stack *, char *, struct state *);
+
 void
 stack_endinvariant(struct stack *, struct state *);
 

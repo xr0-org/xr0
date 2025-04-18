@@ -510,6 +510,21 @@ stack_next(struct stack *s, struct state *state)
 	return program_next(frame_program(s->f), state);
 }
 
+int
+stack_goto(struct stack *s, char *l, struct state *state)
+{
+	assert(!frame_iscall(s->f));
+
+	if (program_goto(frame_program(s->f), l, state))
+		return 1;
+
+	if (!s->prev)
+		return 0;
+
+	state_popframe(state);
+	return state_goto(state, l);
+}
+
 void
 stack_endinvariant(struct stack *s, struct state *state)
 {

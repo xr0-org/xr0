@@ -181,6 +181,8 @@ jump_exec(struct jump *j, struct state *s)
 	switch (j->t) {
 	case RETURN:
 		return return_exec(j, s);
+	case GOTO:
+		return error_goto(j->u.label);
 	default:
 		assert(0);
 	}

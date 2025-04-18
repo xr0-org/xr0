@@ -544,6 +544,10 @@ ast_stmt_as_expr(struct ast_stmt *);
 struct error *
 ast_stmt_verify(struct ast_stmt *, struct state *);
 
+/* ast_stmt_goto: return 0 if unable, nonzero if successful. */
+int
+ast_stmt_goto(struct ast_stmt *, char *, struct state *);
+
 struct error *
 ast_stmt_exec(struct ast_stmt *, struct state *);
 

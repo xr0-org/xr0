@@ -60,6 +60,10 @@ program_step(struct program *, struct state *);
 struct error *
 program_next(struct program *, struct state *);
 
+/* program_goto: return 0 if unable, nonzero otherwise. */
+int
+program_goto(struct program *, char *, struct state *);
+
 void
 program_endinvariant(struct program *, struct state *);
 

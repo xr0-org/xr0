@@ -91,6 +91,10 @@ state_pushframe(struct state *, struct frame *);
 void
 state_popframe(struct state *);
 
+/* state_goto: return 0 if unable, nonzero otherwise. */
+int
+state_goto(struct state *, char *);
+
 void
 state_unnest(struct state *);
 
