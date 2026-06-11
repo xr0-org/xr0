@@ -73,6 +73,11 @@ ast_variable_str(struct ast_variable *v)
 	char *t = ast_type_str(v->type);
 	
 	strbuilder_printf(b, "%s %s", t, v->name);
+	if (v->init) {
+		char *e = ast_expr_str(v->init);
+		strbuilder_printf(b, " = %s", e);
+		free(e);
+	}
 	free(t);
 	return strbuilder_build(b);
 }

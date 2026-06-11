@@ -58,10 +58,16 @@ iter_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
 		struct state *);
 
 static struct error *
+decl_linearise(struct ast_stmt *, struct ast_block *, struct lexememarker *,
+		struct state *);
+
+static struct error *
 linearise_proper(struct ast_stmt *stmt, struct ast_block *b,
 		struct lexememarker *loc, struct state *state)
 {
 	switch (ast_stmt_kind(stmt)) {
+	case STMT_DECLARATION:
+		return decl_linearise(stmt, b, loc, state);
 	case STMT_EXPR:
 		return expr_linearise(stmt, b, loc, state);
 	case STMT_JUMP:
@@ -137,6 +143,37 @@ iter_linearise(struct ast_stmt *stmt, struct ast_block *b,
 	return NULL;
 }
 
+static struct error *
+decl_linearise(struct ast_stmt *stmt, struct ast_block *b,
+		struct lexememarker *loc, struct state *state)
+{
+	int i;
+
+	struct ast_variable_arr *vars = ast_stmt_declaration_vars(stmt);
+	for (i = 0; i < ast_variable_arr_n(vars); i++) {
+		struct ast_variable *v = ast_variable_arr_v(vars)[i];
+		state_declare(state, v, false);
+		if (ast_variable_init(v)) {
+			struct ast_stmt *assign = ast_stmt_create_expr(
+				lexememarker_copy(loc),
+				ast_expr_assignment_create(
+					ast_expr_identifier_create(
+						dynamic_str(ast_variable_name(v))
+					),
+					ast_expr_copy(ast_variable_init(v))
+				)
+			);
+			struct error *err = expr_linearise(
+				assign, b, lexememarker_copy(loc), state
+			);
+			ast_stmt_destroy(assign);
+			if (err)
+				return err;
+		}
+	}
+	return NULL;
+}
+
 /* stmt_verify */
 static struct error *
 directverify(struct ast_stmt *, struct state *);
@@ -174,12 +211,15 @@ directverify(struct ast_stmt *stmt, struct state *s)
 static int
 jump_islinearisable(struct jump *);
 
+static int
+decl_hasinit(struct ast_stmt *);
+
 static bool
 islinearisable(struct ast_stmt *stmt)
 {
 	switch (ast_stmt_kind(stmt)) {
-	case STMT_DECLARATION: /* XXX: will have to be linearised with
-				  initialisation */
+	case STMT_DECLARATION:
+		return decl_hasinit(stmt);
 	case STMT_NOP:
 	case STMT_LABELLED:
 	case STMT_COMPOUND:
@@ -307,32 +347,29 @@ ast_stmt_exec(struct ast_stmt *stmt, struct state *s)
 }
 
 static struct error *
-decl_init(struct ast_variable *, struct state *);
-
-static struct error *
 stmt_decl_exec(struct ast_stmt *stmt, struct state *state)
 {
-	/* TODO: add initialisation */
+	int i;
 	struct ast_variable_arr *vars = ast_stmt_declaration_vars(stmt);
-	for (int i = 0; i < ast_variable_arr_n(vars); i++) {
+	for (i = 0; i < ast_variable_arr_n(vars); i++) {
 		struct ast_variable *v = ast_variable_arr_v(vars)[i];
+		assert(!ast_variable_init(v));
 		state_declare(state, v, false);
-		decl_init(v, state);	
 	}
 	return NULL;
 }
 
-static struct error *
-decl_init(struct ast_variable *v, struct state *s)
+static int
+decl_hasinit(struct ast_stmt *stmt)
 {
-	if (ast_variable_init(v)) {
-		struct ast_expr *assign = ast_expr_assignment_create(
-			ast_expr_identifier_create(ast_variable_name(v)),
-			ast_variable_init(v)
-		);
-		return stmt_expr_exec(assign, s);
-	}
-	return NULL;
+	int i;
+
+	struct ast_variable_arr *vars = ast_stmt_declaration_vars(stmt);
+	for (i = 0; i < ast_variable_arr_n(vars); i++)
+		if (ast_variable_init(ast_variable_arr_v(vars)[i]))
+			return 1;
+
+	return 0;
 }
 
 static struct error *
